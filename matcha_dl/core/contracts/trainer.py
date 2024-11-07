@@ -24,6 +24,7 @@ Optimizer = TorchOptimizer
 
 TRAINER = "trainer"
 
+#TODO Improve seed function
 
 def set_seed(seed_val: Optional[int] = 888):
     """Set random seed for reproducible results"""

@@ -41,18 +41,36 @@ class BCEWeightedLoss(nn.BCELoss, ILoss):
         Returns:
             Tensor: The computed loss.
         """
+
+        print("Inputs: ", inputs)
+        print("Inputs Shape: ", inputs.shape)
+
+        print("Targets: ", targets)
+        print("Targets Shape: ", targets.shape)
         
         # Compute unweighted binary cross-entropy loss for each sample
         bce_loss = F.binary_cross_entropy(inputs, targets, reduction='none')
+
+        print("Unreduced BCE Loss: ", bce_loss)
+        print("Unreduced BCE Loss Shape: ", bce_loss.shape)
+        bce_loss_unreduced = bce_loss
 
         # Apply pos_weight to positive samples if specified
         if self.pos_weight is not None:
             weights = targets * self.pos_weight + (1 - targets)
             bce_loss = bce_loss * weights
 
+        print("Weighted BCE Loss: ", bce_loss)
+        print("Weighted BCE Loss Shape: ", bce_loss.shape)
+
+        print("Loss Comparison:", (bce_loss == bce_loss_unreduced).all())
+
         # Apply reduction
         if self.reduction == 'mean':
-            return bce_loss.mean()
+            print("Mean BCE Loss: ", bce_loss.mean())
+            print("Mean BCE Loss Shape: ", bce_loss.mean().shape)
+            raise Exception("Forced Stop after first loss calculation")
+            # return bce_loss.mean()
         elif self.reduction == 'sum':
             return bce_loss.sum()
         else:
@@ -87,7 +105,23 @@ class BCELoss(nn.BCELoss, ILoss):
         Returns:
             Tensor: The computed loss.
         """
-        return super().forward(inputs, targets)
+        print("Inputs: ", inputs)
+        print("Inputs Shape: ", inputs.shape)
+
+        print("Targets: ", targets)
+        print("Targets Shape: ", targets.shape)
+
+        loss_unreduced = F.binary_cross_entropy(inputs, targets, reduction='none')
+        print("Unreduced BCE Loss: ", loss_unreduced)
+        print("Unreduced BCE Loss Shape: ", loss_unreduced.shape)
+
+        loss = super().forward(inputs, targets)
+        print("Reduced BCE Loss: ", loss)
+        print("Reduced BCE Loss Shape: ", loss.shape)
+
+        raise Exception("Forced Stop after first loss calculation")
+
+        # return super().forward(inputs, targets)
 
 class BCEWithLogitsLoss(nn.BCEWithLogitsLoss, ILoss):
 

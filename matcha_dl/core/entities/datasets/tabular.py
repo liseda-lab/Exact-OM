@@ -142,6 +142,7 @@ class TabularDataset(Dataset):
             training_set["inference"] = False
 
             self.log("#Shuffling Training Set...", level="debug")
+            # TODO set random state for shuffling
 
             training_set = training_set.sample(frac=1).reset_index(drop=True)
 
