@@ -30,6 +30,8 @@ matcha_params:
   matchers: [LM, BKM, SM, WM, LLM]
   # Cardinality of negatives in the training set
   negcardinality: 10
+  # Filter to generate negatives in the training set
+  negthreshold: 0.1
 
 training_params:
   epochs: 10
