@@ -10,6 +10,7 @@ from matcha_dl.core.values import N_CLASSES
 from matcha_dl.impl.matcha import Matcha
 from matcha_dl.core.entities.datasets import TabularDataset
 from matcha_dl.impl.trainer import MLPTrainer
+from matcha_dl.impl.seed import SeedSetter
 
 
 class AlignmentAction(Protocol):
@@ -55,6 +56,12 @@ class AlignmentAction(Protocol):
             logger.info(f"Using configuration from {configs_file_path}")
         else:
             logger.info(f"Using default configuration")
+
+        # set seed
+
+        if configs.seed is not None:
+            logger.info(f"Setting seed to {configs.seed}")
+            SeedSetter(configs.seed)
 
         # Load JVM
 

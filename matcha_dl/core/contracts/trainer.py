@@ -24,17 +24,6 @@ Optimizer = TorchOptimizer
 
 TRAINER = "trainer"
 
-#TODO Improve seed function
-
-def set_seed(seed_val: Optional[int] = 888):
-    """Set random seed for reproducible results"""
-    random.seed(seed_val)
-    np.random.seed(seed_val)
-    th.manual_seed(seed_val)
-    th.cuda.manual_seed_all(seed_val)
-
-    return seed_val
-
 
 class ITrainer:
 
