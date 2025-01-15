@@ -37,6 +37,12 @@ training_params:
   epochs: 10
   batch_size: 1
   save_interval: 5
+  
+early_stopping:
+  stopper: EarlyStopping
+  params:
+    tolerance: 5
+    min_delta: 0.0
 
 model:
   model: MlpClassifier

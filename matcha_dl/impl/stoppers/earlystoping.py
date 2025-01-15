@@ -2,7 +2,7 @@ from matcha_dl.core.contracts.stopper import IStopper
 
 
 class EarlyStopping(IStopper):
-    def __init__(self, tolerance: int = 5, min_delta: int = 0):
+    def __init__(self, tolerance: int = 5, min_delta: float = 0.0):
         """
 
         Args:

@@ -36,10 +36,10 @@ class ITrainer:
         loss_params: Optional[Dict[str, Any]] = {},
         optimizer_params: Optional[Dict[str, Any]] = {},
         model_params: Optional[Dict[str, Any]] = {},
-        earlystoping: Optional[IStopper] = None,
+        stopping: Optional[Type[IStopper]] = None,
+        stopping_params: Optional[Dict[str, Any]] = {},
         device: Optional[int] = 0,
         output_dir: Optional[Path] = None,
-        seed: Optional[int] = 42,
         use_last_checkpoint: Optional[bool] = False,
         **kwargs,
     ):
@@ -51,10 +51,13 @@ class ITrainer:
         self._model = model(**model_params).to(self.device)
         self._optimizer = optimizer(self._model.parameters(), **optimizer_params)
         self._loss = loss(device=self.device, **loss_params)
-        self._earlystoping = earlystoping
+        
+        if stopping is not None:
+            self._stopping = stopping(**stopping_params)
+        else:
+            self._stopping = None
 
         self._output_dir = output_dir
-        self._seed = set_seed(seed)
 
         self._epoch = 1
 
@@ -106,8 +109,8 @@ class ITrainer:
         return self._seed
 
     @property
-    def earlystoping(self) -> Optional[IStopper]:
-        return self._earlystoping
+    def stopping(self) -> Optional[IStopper]:
+        return self._stopping
 
     @property
     def output_dir(self) -> Path:

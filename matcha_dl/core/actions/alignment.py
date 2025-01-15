@@ -138,10 +138,10 @@ class AlignmentAction(Protocol):
             loss_params=configs.loss.params,
             optimizer_params=configs.optimizer.params,
             model_params=model_params,
-            earlystoping=None,
+            earlystoping=configs.early_stopping_params.stopper,
+            earlystoping_params=configs.early_stopping_params.params,
             device=configs.device,
             output_dir= output_dir_path / "model",
-            seed=configs.seed,
             use_last_checkpoint=configs.use_last_checkpoint,
             logger=logger,
         )
