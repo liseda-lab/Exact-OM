@@ -41,36 +41,18 @@ class BCEWeightedLoss(nn.BCELoss, ILoss):
         Returns:
             Tensor: The computed loss.
         """
-
-        print("Inputs: ", inputs)
-        print("Inputs Shape: ", inputs.shape)
-
-        print("Targets: ", targets)
-        print("Targets Shape: ", targets.shape)
         
         # Compute unweighted binary cross-entropy loss for each sample
         bce_loss = F.binary_cross_entropy(inputs, targets, reduction='none')
-
-        print("Unreduced BCE Loss: ", bce_loss)
-        print("Unreduced BCE Loss Shape: ", bce_loss.shape)
-        bce_loss_unreduced = bce_loss
 
         # Apply pos_weight to positive samples if specified
         if self.pos_weight is not None:
             weights = targets * self.pos_weight + (1 - targets)
             bce_loss = bce_loss * weights
 
-        print("Weighted BCE Loss: ", bce_loss)
-        print("Weighted BCE Loss Shape: ", bce_loss.shape)
-
-        print("Loss Comparison:", (bce_loss == bce_loss_unreduced).all())
-
         # Apply reduction
         if self.reduction == 'mean':
-            print("Mean BCE Loss: ", bce_loss.mean())
-            print("Mean BCE Loss Shape: ", bce_loss.mean().shape)
-            raise Exception("Forced Stop after first loss calculation")
-            # return bce_loss.mean()
+            return bce_loss.mean()
         elif self.reduction == 'sum':
             return bce_loss.sum()
         else:
@@ -80,7 +62,7 @@ class BCELoss(nn.BCELoss, ILoss):
     
     def __init__(self, reduction='mean', device: Union[str, int]=None, **kwargs):
         """
-        Initialize the custom loss function.
+        Standart Binary Cross-Entropy Loss.
 
         Args:
             reduction (str, optional): Specifies the reduction to apply to the output: 'none' | 'mean' | 'sum'.
@@ -93,7 +75,6 @@ class BCELoss(nn.BCELoss, ILoss):
 
     def forward(self, inputs: Tensor, targets: Tensor) -> Tensor:
         """
-        Forward pass for the custom loss function.
 
         Args:
             inputs (Tensor): Model output (logits or probabilities). 
@@ -105,37 +86,30 @@ class BCELoss(nn.BCELoss, ILoss):
         Returns:
             Tensor: The computed loss.
         """
-        print("Inputs: ", inputs)
-        print("Inputs Shape: ", inputs.shape)
-
-        print("Targets: ", targets)
-        print("Targets Shape: ", targets.shape)
 
         loss_unreduced = F.binary_cross_entropy(inputs, targets, reduction='none')
-        print("Unreduced BCE Loss: ", loss_unreduced)
-        print("Unreduced BCE Loss Shape: ", loss_unreduced.shape)
 
         loss = super().forward(inputs, targets)
-        print("Reduced BCE Loss: ", loss)
-        print("Reduced BCE Loss Shape: ", loss.shape)
 
-        raise Exception("Forced Stop after first loss calculation")
-
-        # return super().forward(inputs, targets)
+        return super().forward(inputs, targets)
 
 class BCEWithLogitsLoss(nn.BCEWithLogitsLoss, ILoss):
 
     def __init__(self, pos_weight, reduction='mean', device: Union[str, int]=None, **kwargs):
         
         """
-        Initialize the custom loss function.
+        Binary Cross-Entropy Loss with logits (input is expected to be logits before applying sigmoid).
 
         Args:
+            pos_weight (float or Tensor, optional): Weight to apply to the positive samples. 
+                                                    If scalar, same weight applied across all samples.
+                                                    If tensor, different weights for different classes.
             reduction (str, optional): Specifies the reduction to apply to the output: 'none' | 'mean' | 'sum'.
                                        'none': No reduction will be applied.
                                        'mean': The output will be averaged.
                                        'sum': The output will be summed.
                                        Default: 'mean'
+            device (str or int, optional): Device to use. If None, defaults to the current device.
         """
 
         if pos_weight is not None:
@@ -146,12 +120,10 @@ class BCEWithLogitsLoss(nn.BCEWithLogitsLoss, ILoss):
 
     def forward(self, inputs: Tensor, targets: Tensor) -> Tensor:
         """
-        Forward pass for the custom loss function.
 
         Args:
-            inputs (Tensor): Model output (logits or probabilities). 
+            inputs (Tensor): Model logits. 
                              The user should ensure this matches the format needed.
-                             If logits, ensure you apply sigmoid before calling this function.
             targets (Tensor): Ground truth binary labels (0 or 1). 
                               Shape: same as inputs.
                               
