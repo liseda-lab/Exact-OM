@@ -39,23 +39,23 @@ training_params:
   save_interval: 5
   
 stopper:
-  stopper: EarlyStopping
+  name: EarlyStopping
   params:
     tolerance: 5
     min_delta: 0.0
 
 model:
-  model: MlpClassifier
+  name: MlpClassifier
   params:
     layers: [128, 256, 128]
 
 loss:
-  loss: BCEWeightedLoss
+  name: BCEWeightedLoss
   params:
     pos_weight: 1.0
     reduction: mean
 
 optimizer:
-  optimizer: Adam
+  name: Adam
   params:
     lr: 0.001
