@@ -1,1 +1,1 @@
-from .model import MlpClassifier
+from .mlp import MlpClassifier

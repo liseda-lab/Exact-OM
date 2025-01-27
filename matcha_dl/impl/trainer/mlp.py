@@ -9,6 +9,9 @@ from tqdm import tqdm
 
 from matcha_dl.core.contracts.trainer import EntityMapping, ITrainer
 
+# TODO add stopper support
+# TODO add validation split, keep track on tensorboard 
+
 
 class MLPTrainer(ITrainer):
 
