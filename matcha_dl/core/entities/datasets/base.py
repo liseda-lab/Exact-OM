@@ -5,7 +5,7 @@ from typing import Optional
 
 # from mowl.owlapi import OWLAPIAdapter
 
-from matcha_dl.impl.dp.utils import read_table
+from matcha_dl.impl.utils import read_table
 
 # from jpype import java
 

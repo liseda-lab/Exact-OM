@@ -11,7 +11,7 @@ import select
 import time
 import pandas as pd
 from ast import literal_eval
-from matcha_dl.impl.dp.utils import read_table
+from matcha_dl.impl.utils import read_table
 
 MATCHA = "matcha"
 
