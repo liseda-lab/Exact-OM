@@ -3,7 +3,7 @@ import time
 from pathlib import Path
 from typing import Optional, Protocol
 
-from deeponto import init_jvm
+from mowl import init_jvm
 
 from matcha_dl.core.entities.configs import ConfigModel
 from matcha_dl.core.values import N_CLASSES
@@ -63,7 +63,7 @@ class AlignmentAction(Protocol):
             logger.info(f"Setting seed to {configs.seed}")
             SeedSetter(configs.seed)
 
-        # Load JVM
+        # Init Jpype
 
         init_jvm(configs.matcha_params.max_heap)
 

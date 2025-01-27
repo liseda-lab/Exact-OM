@@ -1,7 +1,6 @@
 from pathlib import Path
 
 import yaml
-from deeponto import init_jvm
 
 import tarfile
 import os
@@ -34,10 +33,6 @@ def download_macha():
 if not (MATCHA_DL_DIR / "impl/matcha/matcha/").exists():
     print("Matcha-DL jar and dependencies not found. Downloading...")
     download_macha()
-
-# Init JVM to skip prompt
-
-init_jvm("8G")
 
 ## Load default configuration file
 
