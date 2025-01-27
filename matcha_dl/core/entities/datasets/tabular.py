@@ -8,12 +8,12 @@ from pathlib import Path
 
 DataFrame = pd.DataFrame
 
-from .base import Dataset
+from .base import IDataset
 
 from typing import Tuple, List
 
 
-class TabularDataset(Dataset):
+class TabularDataset(IDataset):
 
     def __init__(self, output_path: Path, matchers: List[str], **kwargs) -> None:
         super().__init__(output_path, matchers, **kwargs)

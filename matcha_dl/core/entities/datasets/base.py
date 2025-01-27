@@ -22,7 +22,7 @@ DataFrame = pd.DataFrame
 
 
 
-class Dataset(ABC):
+class IDataset(ABC):
 
     def __init__(self, output_path: Path, matchers: List[str], **kwargs) -> None:
 

@@ -8,9 +8,10 @@ from mowl import init_jvm
 from matcha_dl.core.entities.configs import ConfigModel
 from matcha_dl.core.values import N_CLASSES
 from matcha_dl.impl.matcha import Matcha
-from matcha_dl.core.entities.datasets import TabularDataset
-from matcha_dl.impl.trainer import MLPTrainer
 from matcha_dl.impl.seed import SeedSetter
+
+# TODO on debug check if init_jvm can run in action
+# TODO add eval to this action
 
 
 class AlignmentAction(Protocol):
@@ -57,6 +58,10 @@ class AlignmentAction(Protocol):
         else:
             logger.info(f"Using default configuration")
 
+        # Resolve dependencies
+
+        configs.resolve_dependencies()
+
         # set seed
 
         if configs.seed is not None:
@@ -95,7 +100,7 @@ class AlignmentAction(Protocol):
 
         logger.info(f'Building Dataset...')
 
-        dataset = TabularDataset(
+        dataset = configs.dataset(
             output_path=output_dir_path,
             matchers=matcha.matchers,
             logger=logger,
@@ -105,6 +110,8 @@ class AlignmentAction(Protocol):
         if matcha.reference is not None:
             dataset.load_reference(matcha.reference)
             dataset.load_negatives(matcha.negatives)
+
+        dataset.load_ontologies(source_file_path, target_file_path)
         
         dataset.load_candidates(matcha.candidates)
         dataset.load_data(matcha.matcha_features)
@@ -130,16 +137,16 @@ class AlignmentAction(Protocol):
 
         ## Train Model
 
-        trainer = MLPTrainer(
+        trainer = configs.trainer(
             dataset=dataset,
-            model=configs.model.model,
-            loss=configs.loss.loss,
-            optimizer=configs.optimizer.optimizer,
+            model=configs.model.name,
+            loss=configs.loss.name,
+            optimizer=configs.optimizer.name,
             loss_params=configs.loss.params,
             optimizer_params=configs.optimizer.params,
             model_params=model_params,
-            earlystoping=configs.early_stopping_params.stopper,
-            earlystoping_params=configs.early_stopping_params.params,
+            earlystoping=configs.stopper.name,
+            earlystoping_params=configs.stopper.params,
             device=configs.device,
             output_dir= output_dir_path / "model",
             use_last_checkpoint=configs.use_last_checkpoint,

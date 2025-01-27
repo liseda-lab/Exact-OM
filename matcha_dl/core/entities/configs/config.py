@@ -1,17 +1,55 @@
 import logging
-from typing import Optional, Type, Union
-
-import torch.optim as optim
-from pydantic import BaseModel, Field, field_validator
-
-from matcha_dl import config, read_yaml
-from matcha_dl.core.contracts.loss import ILoss
-from matcha_dl.core.contracts.model import IModel
-from matcha_dl.core.contracts.stopper import IStopper
-from matcha_dl.impl import losses, models, stoppers
+from typing import Optional, Type, Union, Any, Tuple
 
 from pathlib import Path
 
+from pydantic import BaseModel, Field, field_validator
+
+from matcha_dl import config, read_yaml
+from matcha_dl.core.entities.configs import ComponentRegistry
+from matcha_dl.core.contracts.loss import ILoss
+from matcha_dl.core.contracts.model import IModel
+from matcha_dl.core.contracts.stopper import IStopper
+from matcha_dl.core.contracts.optimizer import IOptimizer
+from matcha_dl.core.contracts.trainer import ITrainer
+from matcha_dl.core.entities.datasets import IDataset
+
+# TODO replace by new loading method through registry
+
+
+class RegistryParams(BaseModel):
+    """Base model for components managed via the ComponentRegistry."""
+    component_type: str
+    name: str 
+    params: dict
+
+    @field_validator("name", mode="before")
+    def validate_and_load(cls, name: str, values) -> Type[Any]:
+        """Validate and load the component from the registry."""
+        component_type = values.get("component_type")
+        if not component_type:
+            raise ValueError("Component type is required for registry-based parameters.")
+        return ComponentRegistry.get(component_type, name)
+    
+class StoppingParams(BaseModel):
+    component_type: str = 'stopper'
+    name: Type[IStopper] = Field(config["stopper"]["stopper"], validate_default=True)
+    params: dict = Field(config["stopper"]["params"])
+
+class ModelParams(BaseModel):
+    component_type: str = 'model'
+    name: Type[IModel] = Field(config["model"]["model"], validate_default=True)
+    params: dict = Field(config["model"]["params"])
+
+class LossParams(BaseModel):
+    component_type: str = 'loss'
+    name: Type[ILoss] = Field(config["loss"]["loss"], validate_default=True)
+    params: dict = Field(config["loss"]["params"])
+
+class OptimizerParams(BaseModel):
+    component_type: str = 'optimizer'
+    name: Type[IOptimizer] = Field(config["optimizer"]["optimizer"], validate_default=True)
+    params: dict = Field(config["optimizer"]["params"])
 
 class MatchaParams(BaseModel):
     max_heap: str = Field(config["matcha_params"]["max_heap"])
@@ -26,52 +64,6 @@ class TrainingParams(BaseModel):
     batch_size: Optional[int] = Field(config["training_params"]["batch_size"])
     save_interval: int = Field(config["training_params"]["save_interval"])
 
-class EarlyStoppingParams(BaseModel):
-    stopper: Type[IStopper] = Field(config["early_stopping"]["stopper"], validate_default=True)
-    params: dict = Field(config["early_stopping"]["params"])
-
-    @field_validator("stopper", mode="before")
-    def parse_stoper(stopper_name: str) -> IStopper:
-        if hasattr(stoppers, stopper_name):
-            return getattr(models, stopper_name)
-        else:
-            raise ValueError(f"Stopper {stopper_name} not recognized as matcha-dl stopper")
-
-class ModelParams(BaseModel):
-    model: Type[IModel] = Field(config["model"]["model"], validate_default=True)
-    params: dict = Field(config["model"]["params"])
-
-    @field_validator("model", mode="before")
-    def parse_model(model_name: str) -> IModel:
-        if hasattr(models, model_name):
-            return getattr(models, model_name)
-        else:
-            raise ValueError(f"Model {model_name} not recognized as matcha-dl model")
-
-class LossParams(BaseModel):
-    loss: Type[ILoss] = Field(config["loss"]["loss"], validate_default=True)
-    params: dict = Field(config["loss"]["params"])
-
-    @field_validator("loss", mode="before")
-    def parse_loss(loss_name: str) -> ILoss:
-        if hasattr(losses, loss_name):
-            return getattr(losses, loss_name)
-        else:
-            raise ValueError(f"Loss {loss_name} not recognized as matcha-dl loss")
-
-
-class OptimizerParams(BaseModel):
-    optimizer: Type[optim.Optimizer] = Field(config["optimizer"]["optimizer"], validate_default=True)
-    params: dict = Field(config["optimizer"]["params"])
-
-    @field_validator("optimizer", mode="before")
-    def parse_optimizer(optimizer_name: str) -> optim.Optimizer:
-        if hasattr(optim, optimizer_name):
-            return getattr(optim, optimizer_name)
-        else:
-            raise ValueError(f"Optimizer {optimizer_name} not recognized as torch optimizer")
-
-
 class ConfigModel(BaseModel):
     seed: int = Field(config["seed"])
     device: Union[int, str] = Field(config["device"], validate_default=True)
@@ -81,9 +73,12 @@ class ConfigModel(BaseModel):
     threshold: float = Field(config["threshold"])
     matcha_params: MatchaParams = MatchaParams()
     training_params: TrainingParams = TrainingParams()
+    stopper: StoppingParams = StoppingParams()
     model: ModelParams = ModelParams()
     loss: LossParams = LossParams()
     optimizer: OptimizerParams = OptimizerParams()
+    dataset: Optional[Type[IDataset]] = None
+    trainer: Optional[Type[ITrainer]] = None
 
     @field_validator("logging_level", mode="before")
     def parse_logging_level(logging_level: str) -> int:
@@ -95,6 +90,11 @@ class ConfigModel(BaseModel):
             return device
         else:
             return "cpu"
+        
+    def resolve_dependencies(self) -> None:
+        dependencies = ComponentRegistry.get_dependency(self.model.name)
+        self.dataset = ComponentRegistry.get("dataset", dependencies["dataset"])
+        self.trainer = ComponentRegistry.get("trainer", dependencies["trainer"])
 
     @classmethod
     def load_config(cls, file_path: Path) -> "ConfigModel":
@@ -102,7 +102,7 @@ class ConfigModel(BaseModel):
 
         matcha_params = MatchaParams(**yaml_config.get("matcha_params", {}))
         training_params = TrainingParams(**yaml_config.get("training_params", {}))
-        early_stopping_params = EarlyStoppingParams(**yaml_config.get("early_stopping", {}))
+        stopping_params = StoppingParams(**yaml_config.get("stopper", {}))
         model_params = ModelParams(**yaml_config.get("model", {}))
         loss_params = LossParams(**yaml_config.get("loss", {}))
         optimizer_params = OptimizerParams(**yaml_config.get("optimizer", {}))
@@ -113,13 +113,13 @@ class ConfigModel(BaseModel):
             for k, v in yaml_config.items()
             if v is not None
             and k in cls.model_fields
-            and k not in ["matcha_params", "training_params", "early_stopping", "model", "loss", "optimizer"]
+            and k not in ["matcha_params", "training_params", "stopper", "model", "loss", "optimizer"]
         }
 
         return cls(
             matcha_params=matcha_params,
             training_params=training_params,
-            early_stopping=early_stopping_params,
+            stopper=stopping_params,
             model=model_params,
             loss=loss_params,
             optimize=optimizer_params,

@@ -1,9 +1,13 @@
+
 from abc import abstractmethod
+
+from matcha_dl.core.contracts import SelfRegisteringComponent
 
 STOPPER = "stopper"
 
 
-class IStopper:
+class IStopper(SelfRegisteringComponent):
+    
     @abstractmethod
     def __init__(self, tolerance: int, min_delta: int):
         """

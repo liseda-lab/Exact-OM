@@ -1,16 +1,15 @@
 from abc import abstractmethod
 
 import torch as th
-from deeponto.align.mapping import EntityMapping as DeepOntoEntityMapping
-from torch.nn import Module as TorchModule
-from torch.optim import Optimizer as TorchOptimizer
 
+from matcha_dl.core.contracts import SelfRegisteringComponent
 from matcha_dl.core.contracts.loss import ILoss
 from matcha_dl.core.contracts.stopper import IStopper
-from matcha_dl.core.entities.datasets import TabularDataset
-from matcha_dl.impl.dp.utils import fill_anchored_scores, read_table
-
-EntityMapping = DeepOntoEntityMapping
+from matcha_dl.core.contracts.model import IModel
+from matcha_dl.core.contracts.optimizer import IOptimizer
+from matcha_dl.core.entities.datasets import IDataset
+from matcha_dl.core.entities.mappings import EntityMapping
+from matcha_dl.impl.utils import fill_anchored_scores, read_table
 
 import random
 from pathlib import Path
@@ -19,20 +18,17 @@ from typing import Any, Dict, List, Optional, Type
 import numpy as np
 import pandas as pd
 
-Module = TorchModule
-Optimizer = TorchOptimizer
-
 TRAINER = "trainer"
 
 
-class ITrainer:
+class ITrainer(SelfRegisteringComponent):
 
     def __init__(
         self,
-        dataset: TabularDataset,
-        model: Type[Module],
+        dataset: IDataset,
+        model: Type[IModel],
         loss: Type[ILoss],
-        optimizer: Type[Optimizer],
+        optimizer: Type[IOptimizer],
         loss_params: Optional[Dict[str, Any]] = {},
         optimizer_params: Optional[Dict[str, Any]] = {},
         model_params: Optional[Dict[str, Any]] = {},
@@ -89,15 +85,15 @@ class ITrainer:
         return th.device(self._device if th.cuda.is_available() else "cpu")
 
     @property
-    def dataset(self) -> TabularDataset:
+    def dataset(self) -> IDataset:
         return self._dataset
 
     @property
-    def model(self) -> Module:
+    def model(self) -> IModel:
         return self._model
 
     @property
-    def optimizer(self) -> Optimizer:
+    def optimizer(self) -> IOptimizer:
         return self._optimizer
 
     @property

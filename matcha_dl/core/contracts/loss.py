@@ -3,12 +3,14 @@ from abc import abstractmethod
 import torch
 import torch.nn as nn
 
+from matcha_dl.core.contracts import SelfRegisteringComponent
+
 LOSS = "loss"
 
 Tensor = torch.Tensor
 
 
-class ILoss(nn.Module):
+class ILoss(nn.Module, SelfRegisteringComponent):
     """
     Abstract base class for torch loss functions.
     """
