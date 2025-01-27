@@ -13,13 +13,16 @@ exclude = ["matcha_dl/impl/matcha/matcha/**/*"]
 
 [tool.poetry.dependencies]
 python = "^3.10"
-torch = "^2.3.0"
-deeponto = "^0.9.1"
+torch = "^2.4.0"
 tensorboard = "^2.16.2"
 dill = "^0.3.8"
 lxml = "^5.2.1"
 pandas = "^2.2.2"
 sentence-transformers = "^2.7.0"
+cython = "^3.0.11"
+typing-extensions = "^4.12.2"
+pydantic = "^2.10.6"
+mowl-borg = "^1.0.1"
 
 [tool.poetry.scripts]
 matchadl = "matcha_dl.delivery.cli:main"
@@ -31,7 +34,6 @@ isort = "^5.13.2"
 mypy = "^1.9.0"
 pytest = "^8.1.1"
 black = "^24.4.2"
-
 
 [build-system]
 requires = ["poetry-core"]
