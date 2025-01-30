@@ -72,9 +72,10 @@ class EntityMapping:
     def __repr__(self):
         return f"EntityMapping({self.head} {self.relation} {self.tail}, {round(self.score, 6)})"
     
-    @staticmethod
+    @classmethod
     def read_table_mappings(
-        table_of_mappings_file: str,
+        cls,
+        table_of_mappings_file: Union[Path, DataFrame],
         threshold: Optional[float] = None,
         relation: str = DEFAULT_REL,
         is_reference: bool = False,
@@ -96,15 +97,18 @@ class EntityMapping:
         Returns:
             (List[EntityMapping]): A list of entity mappings loaded from the table file.
         """
-        df = read_table(table_of_mappings_file)
+
+        if isinstance(table_of_mappings_file, Path):
+            table_of_mappings_file = read_table(table_of_mappings_file)
+
         entity_mappings = []
-        for dp in df.itertuples():
+        for dp in table_of_mappings_file.itertuples():
             if is_reference:
                 entity_mappings.append(ReferenceMapping(dp.SrcEntity, dp.TgtEntity, relation))
             else:
                 # allow `None` for threshold
                 if not threshold or dp["Score"] >= threshold:
-                    entity_mappings.append(EntityMapping(dp.SrcEntity, dp.TgtEntity, relation, dp.Score))
+                    entity_mappings.append(cls(dp.SrcEntity, dp.TgtEntity, relation, dp.Score))
         return entity_mappings
 
     def __repr__(self):

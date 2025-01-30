@@ -64,7 +64,7 @@ class ReferenceMapping(EntityMapping):
         self.candidates.append(candidate_mapping)
 
     @staticmethod
-    def read_table_mappings(table_of_mappings_file: str, relation: str = DEFAULT_REL):
+    def read_table_mappings(table_of_mappings_file: Union[Path, DataFrame], relation: str = DEFAULT_REL):
         r"""Read reference mappings from `.csv` or `.tsv` files.
         
         !!! note "Mapping Table Format"

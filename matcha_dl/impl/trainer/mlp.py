@@ -74,22 +74,14 @@ class MLPTrainer(ITrainer):
 
             df["Scores"] = logits.cpu()
 
-            return [
-                EntityMapping(dp["Src"], dp["Tgt"], "=", dp["Scores"])
-                for _, dp in df.iterrows()
-                if dp["Scores"] >= threshold
-            ]
+            return EntityMapping.read_table_mappings(df, threshold=threshold)
 
         # if unsupervised use max score from matcha
         else:
 
-            df["matcha"] = np.array(df["Features"].values.tolist()).max(axis=1)
+            df["Scores"] = np.array(df["Features"].values.tolist()).max(axis=1)
 
-            return [
-                EntityMapping(dp["Src"], dp["Tgt"], "=", dp["matcha"])
-                for _, dp in df.iterrows()
-                if dp["matcha"] >= threshold
-            ]
+            return EntityMapping.read_table_mappings(df, threshold=threshold)
 
     def _load_data(
         self, kind: Optional[str] = "train", batch_size: Optional[int] = 1
