@@ -1,6 +1,6 @@
 from typing import List, Union
 
-from matcha_dl.core.contracts.loss import ILoss, Tensor, torch, nn
+from matcha_dl.core.contracts.loss import ILoss, Tensor, nn, torch
 
 F = nn.functional
 

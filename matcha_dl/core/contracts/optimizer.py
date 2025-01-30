@@ -1,9 +1,14 @@
 
 from abc import ABC
+
 from matcha_dl.core.contracts.base import SelfRegisteringComponent
+from matcha_dl.core.entities.configs import ComponentType
 
 
 class IOptimizer(SelfRegisteringComponent, ABC):
+
+    component_type = ComponentType.OPTIMIZER
+    
     """
     Base class for all optimizers in the system.
     Automatically registers subclasses with the ComponentRegistry.

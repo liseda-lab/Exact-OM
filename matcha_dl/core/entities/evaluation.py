@@ -1,9 +1,10 @@
 
 from dataclasses import dataclass
-from typing import List, Optional, Tuple
 from enum import Enum
+from typing import List, Optional, Tuple
 
 from matcha_dl.core.entities.mappings import EntityMapping, ReferenceMapping
+
 
 @dataclass
 class EvaluationData:

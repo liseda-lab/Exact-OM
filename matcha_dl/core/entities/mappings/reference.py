@@ -1,11 +1,13 @@
 # Adapted from https://github.com/KRR-Oxford/DeepOnto
 
 import pprint
+from typing import List, Optional, Union
+from pathlib import Path
 
-from typing import List, Optional
-
+from matcha_dl.core.contracts.dataset import DataFrame
 from matcha_dl.core.entities.mappings import EntityMapping
 from matcha_dl.core.values import DEFAULT_REL
+
 
 class ReferenceMapping(EntityMapping):
     r"""A datastructure for entity mapping that acts as a reference mapping.

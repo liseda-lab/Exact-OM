@@ -1,8 +1,11 @@
 
 import random
+
 import numpy as np
 import torch
+
 from matcha_dl.core.contracts.seed import ISeedSetter
+
 
 class SeedSetter(ISeedSetter):
     def __init__(self, seed: int):

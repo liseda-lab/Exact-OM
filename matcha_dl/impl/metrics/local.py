@@ -1,10 +1,10 @@
 
 from typing import Dict, List
 
-
 from matcha_dl.core.contracts.metric import IMetric
-from matcha_dl.core.entities.mappings import EntityMapping
 from matcha_dl.core.entities.evaluation import EvaluationData, MetricNames
+from matcha_dl.core.entities.mappings import EntityMapping
+
 
 class HitsAtKMetric(IMetric):
     """Implementation of the Hits@K metric."""

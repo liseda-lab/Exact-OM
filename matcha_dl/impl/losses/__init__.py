@@ -1,1 +1,1 @@
-from .bceloss import BCEWeightedLoss, BCELoss, BCEWithLogitsLoss
+from .bceloss import BCELoss, BCEWeightedLoss, BCEWithLogitsLoss

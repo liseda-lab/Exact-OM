@@ -1,27 +1,23 @@
 from abc import abstractmethod
 
+import numpy as np
+import pandas as pd
 import torch as th
 
 from matcha_dl.core.contracts import SelfRegisteringComponent
+from matcha_dl.core.contracts.dataset import IDataset
 from matcha_dl.core.contracts.loss import ILoss
-from matcha_dl.core.contracts.stopper import IStopper
 from matcha_dl.core.contracts.model import IModel
 from matcha_dl.core.contracts.optimizer import IOptimizer
-from matcha_dl.core.entities.datasets import IDataset
+from matcha_dl.core.contracts.stopper import IStopper
+from matcha_dl.core.entities.configs import ComponentType
 from matcha_dl.core.entities.mappings import EntityMapping
 from matcha_dl.impl.utils import fill_anchored_scores, read_table
 
-import random
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Type
-
-import numpy as np
-import pandas as pd
-
-TRAINER = "trainer"
-
 
 class ITrainer(SelfRegisteringComponent):
+
+    component_type = ComponentType.TRAINER
 
     def __init__(
         self,

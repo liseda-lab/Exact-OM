@@ -2,10 +2,11 @@
 # coding: utf-8
 
 
-from sentence_transformers import SentenceTransformer
-import torch
 import decimal
 import sys
+
+import torch
+from sentence_transformers import SentenceTransformer
 
 # create a new context for this task
 ctx = decimal.Context()

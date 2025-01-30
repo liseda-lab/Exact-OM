@@ -5,6 +5,7 @@ from matcha_dl.core.contracts.metric import IMetric
 from matcha_dl.core.entities.evaluation import EvaluationData, MetricNames
 from matcha_dl.impl.utils import MetricUtils
 
+
 class PrecisionMetric(IMetric):
     def compute(self, data: EvaluationData) -> Dict[str, float]:
         preds_set, refs_set = MetricUtils.compute_intersection_and_union(

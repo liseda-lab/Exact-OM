@@ -4,13 +4,14 @@ import torch
 import torch.nn as nn
 
 from matcha_dl.core.contracts import SelfRegisteringComponent
-
-LOSS = "loss"
+from matcha_dl.core.entities.configs import ComponentType
 
 Tensor = torch.Tensor
 
 
 class ILoss(nn.Module, SelfRegisteringComponent):
+
+    component_type = ComponentType.LOSS
     """
     Abstract base class for torch loss functions.
     """

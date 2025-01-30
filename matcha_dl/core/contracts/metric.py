@@ -3,10 +3,13 @@ from abc import abstractmethod
 from typing import Dict, List
 
 from matcha_dl.core.contracts import SelfRegisteringComponent
+from matcha_dl.core.entities.configs import ComponentType
 from matcha_dl.core.entities.evaluation import EvaluationData
 
 
 class IMetric(SelfRegisteringComponent):
+
+    component_type = ComponentType.METRIC
 
     def prepare(self, data: EvaluationData) -> List[EvaluationData]:
         """

@@ -1,10 +1,8 @@
 
-from typing import Dict, List, Type
+from abc import ABC, abstractmethod
+from typing import Dict, List, Optional, Type, Union
 
 from matcha_dl.core.contracts.metric import IMetric
-
-from abc import ABC, abstractmethod
-from typing import Dict, Union, List, Optional
 from matcha_dl.core.entities.mappings import EntityMapping, ReferenceMapping
 
 

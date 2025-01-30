@@ -3,6 +3,7 @@ import torch.optim as optim
 
 from matcha_dl.core.contracts.optimizer import IOptimizer
 
+
 class Adam(IOptimizer, optim.Adam):
     """
     Implementation of the Adam optimizer that integrates with IOptimizer.

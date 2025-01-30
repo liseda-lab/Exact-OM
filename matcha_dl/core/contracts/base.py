@@ -1,5 +1,7 @@
 
 from abc import ABC
+from typing import Optional
+
 from matcha_dl.core.entities.configs import ComponentRegistry
 
 #TODO on debug check if all modules are being curretly registered, non imported implementations might not be registered.

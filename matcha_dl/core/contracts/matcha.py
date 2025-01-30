@@ -1,16 +1,18 @@
 import logging
 import os
+import queue
+import select
 import subprocess
 import sys
-from abc import abstractmethod
-from pathlib import Path
-from typing import Optional, List
-import queue
 import threading
-import select
 import time
-import pandas as pd
+from abc import abstractmethod
 from ast import literal_eval
+from pathlib import Path
+from typing import List, Optional
+
+import pandas as pd
+
 from matcha_dl.impl.utils import read_table
 
 MATCHA = "matcha"

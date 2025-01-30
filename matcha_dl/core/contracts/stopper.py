@@ -2,11 +2,12 @@
 from abc import abstractmethod
 
 from matcha_dl.core.contracts import SelfRegisteringComponent
-
-STOPPER = "stopper"
+from matcha_dl.core.entities.configs import ComponentType
 
 
 class IStopper(SelfRegisteringComponent):
+
+    component_type = ComponentType.STOPPER
     
     @abstractmethod
     def __init__(self, tolerance: int, min_delta: int):

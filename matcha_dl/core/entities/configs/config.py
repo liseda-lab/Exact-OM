@@ -1,18 +1,17 @@
 import logging
-from typing import Optional, Type, Union, Any, Tuple
-
 from pathlib import Path
+from typing import Any, Optional, Tuple, Type, Union
 
 from pydantic import BaseModel, Field, field_validator
 
 from matcha_dl import config, read_yaml
-from matcha_dl.core.entities.configs import ComponentRegistry
+from matcha_dl.core.contracts.dataset import IDataset
 from matcha_dl.core.contracts.loss import ILoss
 from matcha_dl.core.contracts.model import IModel
-from matcha_dl.core.contracts.stopper import IStopper
 from matcha_dl.core.contracts.optimizer import IOptimizer
+from matcha_dl.core.contracts.stopper import IStopper
 from matcha_dl.core.contracts.trainer import ITrainer
-from matcha_dl.core.entities.datasets import IDataset
+from matcha_dl.core.entities.configs import ComponentRegistry, ComponentType
 
 # TODO replace by new loading method through registry
 

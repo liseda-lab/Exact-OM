@@ -1,10 +1,13 @@
 # Adapted from https://github.com/KRR-Oxford/DeepOnto
 
-from typing import List, Optional
+from typing import List, Optional, Union
+from pathlib import Path
 
+from matcha_dl.core.contracts.dataset import DataFrame
+from matcha_dl.core.entities.mappings import ReferenceMapping
 from matcha_dl.core.values import DEFAULT_REL
 from matcha_dl.impl.utils import read_table
-from matcha_dl.core.entities.mappings import ReferenceMapping
+
 
 class EntityMapping:
     r"""A datastructure for entity mapping.
