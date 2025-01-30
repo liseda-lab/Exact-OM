@@ -44,6 +44,9 @@ COPY README.md README.md
 RUN set -e -x ; \
     poetry install
 
+# Set DGL backend to PyTorch
+ENV DGLBACKEND=pytorch
+
 # Expose the TensorBoard port
 EXPOSE 6006
 
