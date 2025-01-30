@@ -1,4 +1,7 @@
+import random
 from abc import abstractmethod
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Type
 
 import numpy as np
 import pandas as pd
@@ -139,7 +142,7 @@ class ITrainer(SelfRegisteringComponent):
     def save_alignment(self, preds: List[EntityMapping], candidates_one2many_path: Optional[Path] = None) -> None:
 
         if candidates_one2many_path is not None:
-            candidates_one2many = read_table(str(candidates_one2many_path))
+            candidates_one2many = read_table(candidates_one2many_path)
             candidates_one2many.columns = ["Src", "Tgt", "Candidates"]
             return self._save_local_alignment(preds, candidates_one2many)
 
