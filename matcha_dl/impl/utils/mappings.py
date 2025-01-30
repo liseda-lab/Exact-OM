@@ -12,7 +12,7 @@ def fill_anchored_scores(ref_anchored_maps, pred_maps):
 
     pred_maps_dict = {}
     for source, tgt, score in pred_maps_tuples:
-        if not source in pred_maps_dict:
+        if source not in pred_maps_dict:
             pred_maps_dict[source] = {}
         pred_maps_dict[source][tgt] = score
 
