@@ -18,7 +18,7 @@ from matcha_dl.core.entities.configs import ComponentRegistry, ComponentType
 
 class RegistryParams(BaseModel):
     """Base model for components managed via the ComponentRegistry."""
-    component_type: str
+    component_type: ComponentType
     name: str 
     params: dict
 
@@ -31,22 +31,22 @@ class RegistryParams(BaseModel):
         return ComponentRegistry.get(component_type, name)
     
 class StoppingParams(BaseModel):
-    component_type: str = 'stopper'
+    component_type: ComponentType = ComponentType.STOPPER
     name: Type[IStopper] = Field(config["stopper"]["stopper"], validate_default=True)
     params: dict = Field(config["stopper"]["params"])
 
 class ModelParams(BaseModel):
-    component_type: str = 'model'
+    component_type: ComponentType = ComponentType.MODEL
     name: Type[IModel] = Field(config["model"]["model"], validate_default=True)
     params: dict = Field(config["model"]["params"])
 
 class LossParams(BaseModel):
-    component_type: str = 'loss'
+    component_type: ComponentType = ComponentType.LOSS
     name: Type[ILoss] = Field(config["loss"]["loss"], validate_default=True)
     params: dict = Field(config["loss"]["params"])
 
 class OptimizerParams(BaseModel):
-    component_type: str = 'optimizer'
+    component_type: ComponentType = ComponentType.OPTIMIZER
     name: Type[IOptimizer] = Field(config["optimizer"]["optimizer"], validate_default=True)
     params: dict = Field(config["optimizer"]["params"])
 
@@ -92,8 +92,8 @@ class ConfigModel(BaseModel):
         
     def resolve_dependencies(self) -> None:
         dependencies = ComponentRegistry.get_dependency(self.model.name)
-        self.dataset = ComponentRegistry.get("dataset", dependencies["dataset"])
-        self.trainer = ComponentRegistry.get("trainer", dependencies["trainer"])
+        self.dataset = ComponentRegistry.get(ComponentType.DATASET, dependencies[ComponentType.DATASET])
+        self.trainer = ComponentRegistry.get(ComponentType.TRAINER, dependencies[ComponentType.TRAINER])
 
     @classmethod
     def load_config(cls, file_path: Path) -> "ConfigModel":
