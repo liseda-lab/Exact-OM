@@ -1,8 +1,14 @@
 
 from abc import ABC, abstractmethod
-from typing import Dict, List, Optional, Type, Union
+from typing import Dict, List, Optional, Tuple, Union
+from pathlib import Path
+import logging
 
-from matcha_dl.core.contracts.metric import IMetric
+from mowl.owlapi import OWLOntology
+
+from matcha_dl.core.contracts import LoggingClass
+from matcha_dl.core.entities.configs import ComponentRegistry
+from matcha_dl.core.entities.evaluation import EvaluationData, MetricNames
 from matcha_dl.core.entities.mappings import EntityMapping, ReferenceMapping
 
 
@@ -10,35 +16,80 @@ class IEvaluator(ABC):
     """Abstract base class for all evaluators."""
 
     @abstractmethod
-    def __init__(self, metrics: List[Type[IMetric]]):
-        """
-        Initialize the evaluator with a list of metrics.
+    def __init__(self, metrics: List[MetricNames],
+                 logger: Optional[logging.Logger] = None
+    ):
 
-        Parameters:
-            metrics (List[Type[IMetric]]): List of metric names to evaluate.
         """
-        pass
+        Initialize the evaluator with the specified metrics.
+        
+        Parameters:
+            metrics (List[MetricNames]): A list of metric names to be used for evaluation.
+        """
+
+        self.metrics = [
+            ComponentRegistry.get_metric("metric", metric.value)() for metric in metrics
+        ]
 
     @abstractmethod
     def evaluate(
         self,
-        data: Dict[str, Union[List[EntityMapping], List[ReferenceMapping], List[int]]],
-        source_ontology: Optional[OWLOntology] = None,
-        target_ontology: Optional[OWLOntology] = None
+        data: EvaluationData,
     ) -> Dict[str, float]:
+        
         """
         Evaluate the provided data using the configured metrics.
 
         Parameters:
-            data (Dict): A dictionary containing:
-                - prediction_mappings (List[EntityMapping]): Predicted entity mappings.
-                - reference_mappings (List[ReferenceMapping]): Reference entity mappings.
-                - null_reference_mappings (Optional[List[ReferenceMapping]]): Null reference mappings.
-                - reference_and_candidates (Optional[List[Tuple[ReferenceMapping, List[EntityMapping]]]]): Reference and candidate mappings.
-                - K (Optional[List[int]]): List of K values for Hits@K evaluation.
+            data (EvaluationData): The data to be evaluated.
 
-            source_ontology (Optional[OWLOntology]): Source ontology to filter ignored classes.
-            target_ontology (Optional[OWLOntology]): Target ontology to filter ignored classes.
+        Returns:
+            Dict[str, float]: A dictionary of metric results.
+        """
+        pass
+
+    @classmethod
+    @abstractmethod
+    def global_eval(
+        cls, 
+        predictions: Union[List[EntityMapping], Path],
+        test_reference: Union[List[ReferenceMapping], Path],
+        source_ontology: Optional[OWLOntology] = None,
+        target_ontology: Optional[OWLOntology] = None,
+        train_reference: Optional[List[ReferenceMapping]] = None,
+        threshold: Optional[float] = None,
+    ) -> Dict[str, float]:
+        
+        """
+        Evaluate the provided data using the configured metrics.
+
+        Parameters:
+            predictions (Union[List[EntityMapping], Path]): The data to be evaluated.
+            test_reference (Union[List[ReferenceMapping], Path]): The data to be evaluated.
+            source_ontology (Optional[OWLOntology]): The data to be evaluated.
+            target_ontology (Optional[OWLOntology]): The data to be evaluated.
+            train_reference (Optional[List[ReferenceMapping]]): The data to be evaluated.
+            threshold (Optional[float]): The data to be evaluated.
+
+        Returns:
+            Dict[str, float]: A dictionary of metric results.
+        """
+        pass
+
+    @classmethod
+    @abstractmethod
+    def local_eval(
+        cls,
+        reference_and_candidates: Union[List[Tuple[ReferenceMapping, List[EntityMapping]]], Path],
+        K: Optional[List[int]] = None,
+    ) -> Dict[str, float]:
+        
+        """
+        Evaluate the provided data using the configured metrics.
+
+        Parameters:
+            reference_and_candidates (Union[List[Tuple[ReferenceMapping, List[EntityMapping]]], Path]): The data to be evaluated.
+            K (Optional[List[int]]): The data to be evaluated.
 
         Returns:
             Dict[str, float]: A dictionary of metric results.

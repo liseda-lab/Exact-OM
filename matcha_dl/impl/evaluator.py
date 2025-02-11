@@ -9,14 +9,10 @@ from matcha_dl.core.contracts.dataset import IDataset
 from matcha_dl.core.entities.configs import ComponentRegistry
 from matcha_dl.core.entities.evaluation import EvaluationData, MetricNames
 from matcha_dl.core.entities.mappings import EntityMapping, ReferenceMapping
-from matcha_dl.impl.utils import MetricUtils
+from matcha_dl.impl.utils import MetricUtils, save_dict_to_csv
 
 
 class Evaluator(IEvaluator):
-    def __init__(self, metrics: List[MetricNames]):
-        self.metrics = [
-            ComponentRegistry.get_metric("metric", metric.value)() for metric in metrics
-        ]
 
     def evaluate(
         self,
@@ -35,9 +31,9 @@ class Evaluator(IEvaluator):
         cls, 
         predictions: Union[List[EntityMapping], Path],
         test_reference: Union[List[ReferenceMapping], Path],
+        train_reference: Optional[Union[List[ReferenceMapping], Path]] = None,
         source_ontology: Optional[OWLOntology] = None,
         target_ontology: Optional[OWLOntology] = None,
-        train_reference: Optional[List[ReferenceMapping]] = None,
         threshold: Optional[float] = None,
     ) -> Dict[str, float]:
         
@@ -73,16 +69,18 @@ class Evaluator(IEvaluator):
     ) -> Dict[str, float]:
         
         if isinstance(reference_and_candidates, Path):
-            reference_and_candidates = EntityMapping.read_table_mappings(reference_and_candidates)
 
-
-        try:
-            MetricUtils.ranking_result_file_check(reference_and_candidates)
-        except AssertionError:
-            raise ValueError("The file does not have the correct format for ranking results.")
-
-        reference_and_candidates = MetricUtils.read_candidate_mappings(reference_and_candidates)
+            try:
+                MetricUtils.ranking_result_file_check(reference_and_candidates)
+            except AssertionError:
+                raise ValueError("The file does not have the correct format for ranking results.")
+            
+            reference_and_candidates = MetricUtils.read_candidate_mappings(reference_and_candidates)
 
         return cls([MetricNames.HITS_AT_K, MetricNames.MRR]).evaluate(
             EvaluationData(reference_and_candidates=reference_and_candidates, K=K)
         )
+    
+    @staticmethod
+    def save_results(results: Dict[str, float], output_dir: Path) -> None:
+        save_dict_to_csv(results, output_dir / "evaluation_results.csv", ["Metric", "Value"])

@@ -76,6 +76,7 @@ class ConfigModel(BaseModel):
     model: ModelParams = ModelParams()
     loss: LossParams = LossParams()
     optimizer: OptimizerParams = OptimizerParams()
+    k: Optional[list[int]] = Field(config["k"])
     dataset: Optional[Type[IDataset]] = None
     trainer: Optional[Type[ITrainer]] = None
 
