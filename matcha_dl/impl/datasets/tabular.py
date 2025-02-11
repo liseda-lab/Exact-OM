@@ -32,12 +32,15 @@ class TabularDataset(IDataset):
     def __getitem__(self, idx: int, kind: str = "train") -> Tuple[np.ndarray, np.ndarray]:
 
         if idx >= len(self):
+            self.log(f"Index {idx} out of bounds.", level="error")
             raise IndexError("Index out of bounds.")
         
         elif idx < 0:
+            self.log(f"Index {idx} out of bounds.", level="error")
             raise IndexError("Index out of bounds.")
         
         elif len(self) == 0:
+            self.log("Empty dataset.", level="error")
             raise IndexError("Empty dataset.")
         
         return self.x(kind)[idx], self.y(kind)[idx]
@@ -54,6 +57,7 @@ class TabularDataset(IDataset):
     def x(self, kind: Optional[str] = "train") -> np.ndarray:
 
         if self.dataframe is None:
+            self.log("Dataset is empty.", level="error")
             raise ValueError("Dataset is empty.")
 
         return np.array(self.dataframe[self.dataframe[kind]]["Features"].values.tolist())
@@ -61,6 +65,7 @@ class TabularDataset(IDataset):
     def y(self, kind="train") -> np.ndarray:
 
         if self.dataframe is None:
+            self.log("Dataset is empty.", level="error")
             raise ValueError("Dataset is empty.")
 
         return self.dataframe[self.dataframe[kind]]["Label"].values
@@ -68,6 +73,7 @@ class TabularDataset(IDataset):
     def save(self) -> Path:
 
         if self.dataframe is None:
+            self.log("Dataset is empty.", level="error")
             raise ValueError("Dataset is empty.")
         
         if self.has_cache():
@@ -101,6 +107,7 @@ class TabularDataset(IDataset):
         self.log("Creating Inference set", level="debug")
 
         if self.candidates is None:
+            self.log("Candidates not loaded.", level="error")
             raise ValueError("Candidates not loaded.")
 
         inference_set = self.candidates
@@ -117,6 +124,7 @@ class TabularDataset(IDataset):
         if self.reference is not None:
 
             if self.negatives is None:
+                self.log("Negatives not loaded.", level="error")
                 raise ValueError("Negatives not loaded.")
 
             # get training set
@@ -170,6 +178,7 @@ class TabularDataset(IDataset):
             try:
                 vector = self.matcha_features.get(row["Src"]).get(row["Tgt"])
             except AttributeError:
+                self.log("Matcha features not loaded.", level="error", exc_info=True)
                 raise ValueError("Scores for source {} and target {} not found.".format(row["Src"], row["Tgt"]))
             
             feats.append(vector)

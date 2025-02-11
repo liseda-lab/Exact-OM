@@ -3,11 +3,13 @@ from abc import abstractmethod
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Type
 
+import logging
+
 import numpy as np
 import pandas as pd
 import torch as th
 
-from matcha_dl.core.contracts import SelfRegisteringComponent
+from matcha_dl.core.contracts import SelfRegisteringComponent, LoggingClass
 from matcha_dl.core.contracts.dataset import IDataset
 from matcha_dl.core.contracts.loss import ILoss
 from matcha_dl.core.contracts.model import IModel
@@ -17,8 +19,9 @@ from matcha_dl.core.entities.configs import ComponentType
 from matcha_dl.core.entities.mappings import EntityMapping
 from matcha_dl.impl.utils import fill_anchored_scores, read_table
 
+# TODO Refactor save to get easy access to in memory parsed alignments and to be able to run tests in the training loop
 
-class ITrainer(SelfRegisteringComponent):
+class ITrainer(SelfRegisteringComponent, LoggingClass):
 
     component_type = ComponentType.TRAINER
 
@@ -36,8 +39,11 @@ class ITrainer(SelfRegisteringComponent):
         device: Optional[int] = 0,
         output_dir: Optional[Path] = None,
         use_last_checkpoint: Optional[bool] = False,
+        logger: Optional[logging.Logger] = None,
         **kwargs,
     ):
+        
+        LoggingClass.__init__(logger=logger)
 
         # Load Args
 
@@ -55,10 +61,6 @@ class ITrainer(SelfRegisteringComponent):
         self._output_dir = output_dir
 
         self._epoch = 1
-
-        # Load Kwargs
-
-        self._logger = kwargs.get("logger")
 
         # Load checkpoint if exists
 
@@ -191,6 +193,7 @@ class ITrainer(SelfRegisteringComponent):
         
         else:
             if not (self.checkpoints_dir / checkpoint).exists():
+                self.log(f"Checkpoint {checkpoint} not found")
                 raise FileNotFoundError(f"Checkpoint {checkpoint} not found")
 
         checkpoint = th.load((self.checkpoints_dir / checkpoint).resolve(), weights_only=False)

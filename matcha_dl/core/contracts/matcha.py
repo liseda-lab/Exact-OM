@@ -13,12 +13,11 @@ from typing import List, Optional
 
 import pandas as pd
 
+from matcha_dl.core.contracts import LoggingClass
 from matcha_dl.impl.utils import read_table
 
-MATCHA = "matcha"
 
-
-class IMatcha:
+class IMatcha(LoggingClass):
     def __init__(
         self,
         threshold: float,
@@ -57,6 +56,8 @@ class IMatcha:
 
         self._logger = kwargs.get("logger")
         self._cache_ok = kwargs.get("cache_ok", True)
+
+        LoggingClass.__init__(logger=self._logger)
 
     @property
     @abstractmethod
@@ -218,8 +219,9 @@ class IMatcha:
             output_thread.join()
 
             if matcha_process.poll() == 0:
-                self.log(f"Matcha process finished without error code unespectedly", level="debug")
+                self.log(f"Matcha process finished without error code unespectedly", level="error")
             elif matcha_process.poll() is not None:
+                self.log(f"Matcha process finished with error code {matcha_process.returncode}", level="error")
                 raise RuntimeError(f"Matcha subprocess returned with error code {matcha_process.returncode} check error log at {self.log_file}")
 
         def comunicate_matcha_process(matcha_process, input, termination=None):
@@ -260,6 +262,7 @@ class IMatcha:
             return
 
         if self.source is None or self.target is None:
+            self.log("Ontologies not loaded", level="error")
             raise FileNotFoundError("Ontologies not loaded")
         
         # Main Matcha Execution
@@ -299,6 +302,7 @@ class IMatcha:
                     generate_candidates(matcha_process)
 
                     if not self.candidates.exists():
+                        self.log(f"Matcha failed to generate candidates at {self.candidates}", level="error")
                         raise FileNotFoundError(f"Matcha failed to generate candidates at {self.candidates}")
 
                 else:
@@ -309,6 +313,7 @@ class IMatcha:
                 if self.reference is not None and self.reference.exists():
                     generate_negatives(matcha_process)
                     if not self.negatives.exists():
+                        self.log(f"Matcha failed to generate negatives at {self.negatives}", level="error")
                         raise FileNotFoundError(f"Matcha failed to generate negatives at {self.negatives}")
 
                 # Compile all files to generate scores into a single file (reference/negatives/candidates)
@@ -331,9 +336,11 @@ class IMatcha:
                 generate_scores(matcha_process, pairs_file)
 
                 if not self.matcha_features.exists():
+                    self.log(f"Matcha failed to generate matcha features at {self.matcha_features}", level="error")
                     raise FileNotFoundError(f"Matcha failed to generate matcha features at {self.matcha_features}")
 
         except subprocess.CalledProcessError as e:
+            self.log(f"Matcha subprocess returned with error code {e.returncode}", level="error")
             raise RuntimeError(f"Matcha subprocess returned with error code {e.returncode}")
 
         finally:
@@ -347,11 +354,3 @@ class IMatcha:
         self.log(f"Matcha scores written to {self.matcha_features}", level="info")
 
         return
-        
-
-    def log(self, msg: str, level: Optional[str] = "info"):
-        if self._logger is not None:
-            getattr(self._logger, level)(msg)
-
-        else:
-            print(msg)

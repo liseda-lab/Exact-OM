@@ -2,6 +2,8 @@
 from abc import ABC
 from typing import Optional
 
+import logging
+
 from matcha_dl.core.entities.configs import ComponentRegistry
 
 #TODO on debug check if all modules are being curretly registered, non imported implementations might not be registered.
@@ -28,3 +30,22 @@ class SelfRegisteringComponent(ABC):
 
         # Register the class using the ComponentRegistry
         ComponentRegistry.register(cls.component_type, class_name, import_path)
+
+
+class LoggingClass:
+    """Base class for logging classes."""
+    def __init__(self, logger: Optional[logging.Logger] = None):
+        self.logger = logger
+
+    def log(self, msg: str, level: str = "info", traceback: bool = False):
+        if self.logger is not None:
+            log_method = getattr(self.logger, level, None)
+            if callable(log_method):
+                if traceback:
+                    log_method(msg, exc_info=True)
+                else:
+                    log_method(msg)
+            else:
+                self.logger.error(f"Invalid log level: {level}")
+        else:
+            print(msg)

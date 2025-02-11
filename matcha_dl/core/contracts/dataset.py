@@ -5,7 +5,7 @@ from typing import Dict, List, Optional, Tuple, Union
 import numpy as np
 import pandas as pd
 
-from matcha_dl.core.contracts.base import SelfRegisteringComponent
+from matcha_dl.core.contracts.base import SelfRegisteringComponent, LoggingClass
 from matcha_dl.core.entities.configs import ComponentType
 from matcha_dl.impl.utils import read_table
 
@@ -18,13 +18,18 @@ from mowl.datasets import PathDataset as OWLDataset
 DataFrame = pd.DataFrame
 
 # TODO look into x an y datatypes might not be compatible with graphdataset
+# TODO inherit from logging class
 
 
-class IDataset(SelfRegisteringComponent):
+class IDataset(SelfRegisteringComponent, LoggingClass):
 
     component_type = ComponentType.DATASET
 
-    def __init__(self, output_path: Path, matchers: List[str], **kwargs) -> None:
+    def __init__(self, 
+                 output_path: Path, 
+                 matchers: List[str], 
+                 **kwargs
+        ) -> None:
 
 
         self._output_path = output_path / "dataset"
@@ -40,6 +45,8 @@ class IDataset(SelfRegisteringComponent):
 
         self._logger = kwargs.get("logger")
         self._cache_ok = kwargs.get("cache_ok", True)
+
+        LoggingClass.__init__(logger=self._logger)
 
     @property
     def matchers(self) -> List[str]:
@@ -86,6 +93,7 @@ class IDataset(SelfRegisteringComponent):
     def load_candidates(self, file_path: Path) -> None:
 
         if not file_path.exists():
+            self.log(f"Candidates file not found at {file_path}", level="error")
             raise FileNotFoundError(f"Candidates file not found at {file_path}")
                                     
         self._candidates = read_table(file_path)
@@ -103,6 +111,7 @@ class IDataset(SelfRegisteringComponent):
     def load_negatives(self, file_path: str) -> None:
 
         if not file_path.exists():
+            self.log(f"Negatives file not found at {file_path}", level="error")
             raise FileNotFoundError(f"Negatives file not found at {file_path}")
         
         self._negatives = read_table(file_path)
@@ -114,6 +123,7 @@ class IDataset(SelfRegisteringComponent):
     def load_data(self, matcha_features_file: Path) -> None:
 
         if not matcha_features_file.exists():
+            self.log(f"Matcha Features file not found at {matcha_features_file}", level="error")
             raise FileNotFoundError(f"Matcha Features file not found at {matcha_features_file}")
 
         df = read_table(matcha_features_file)
@@ -128,13 +138,6 @@ class IDataset(SelfRegisteringComponent):
         }
 
         self.log("#Loaded Matcha Features...", level="debug")
-
-    def log(self, msg: str, level: Optional[str] = "info"):
-        if self._logger is not None:
-            getattr(self._logger, level)(msg)
-
-        else:
-            print(msg)
 
     @abstractmethod
     def __getitem__(self, idx: int, kind: str = "train") -> Tuple[np.ndarray, np.ndarray]:
