@@ -89,7 +89,7 @@ class MetricUtils:
         ]
     
     @staticmethod
-    def read_candidate_mappings(cand_maps_file: str):
+    def read_candidate_mappings(cand_maps_file: str) -> List[Tuple[ReferenceMapping, List[EntityMapping]]]:
         r"""Load scored or already ranked candidate mappings.
 
         The predicted candidate mappings are formatted the same as `test.cands.tsv`, with three columns:
@@ -125,7 +125,7 @@ class MetricUtils:
         return cands
     
     @classmethod
-    def ranking_result_file_check(cls, cand_maps_file: str, ref_cand_maps_file: str):
+    def ranking_result_file_check(cls, cand_maps_file: str, ref_cand_maps_file: str) -> None:
         r"""Check if the ranking result file is formatted correctly as the original
         `test.cands.tsv` file provided in the dataset.
         """
