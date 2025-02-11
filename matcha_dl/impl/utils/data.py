@@ -8,3 +8,9 @@ def read_table(file_path: Path) -> pd.DataFrame:
     """Read tsv file as pandas dataframe without treating "null" as empty string."""
     sep = "\t" if file_path.endswith(".tsv") else ","
     return pd.read_csv(str(file_path), sep=sep, na_values=na_vals, keep_default_na=False)
+
+
+# save dict to csv
+def save_dict_to_csv(data: dict, file_path: Path, sep: str = ",", columns: list = ["key", "value"]):
+    """Save a dictionary to a csv file."""
+    pd.DataFrame(data.items(), columns=columns).to_csv(str(file_path), index=False, sep=sep)
