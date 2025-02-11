@@ -87,10 +87,6 @@ class BCELoss(nn.BCELoss, ILoss):
             Tensor: The computed loss.
         """
 
-        loss_unreduced = F.binary_cross_entropy(inputs, targets, reduction='none')
-
-        loss = super().forward(inputs, targets)
-
         return super().forward(inputs, targets)
 
 class BCEWithLogitsLoss(nn.BCEWithLogitsLoss, ILoss):
