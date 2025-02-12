@@ -11,8 +11,10 @@ def run_alignment(args):
         output_dir_path=Path(args.output_dir).resolve(),
         configs_file_path=Path(args.config_file).resolve() if args.config_file else None,
         reference_file_path=Path(args.reference_file).resolve() if args.reference_file else None,
+        test_reference_file_path=Path(args.test_reference_file).resolve() if args.test_reference_file else None,
         candidates_file_path=Path(args.candidates_file).resolve() if args.candidates_file else None,
         log_file_path=Path(args.output_dir).resolve() / "matcha_dl.log" if args.save_logs else None,
+        run_eval=args.run_eval,
     )
 
 
@@ -44,7 +46,14 @@ def parse_arguments():
         "-r",
         type=str,
         required=False,
-        help="Please provide the path to the reference file",
+        help="Please provide the path to the training reference file",
+    )
+    parser.add_argument(
+        "--test_reference_file",
+        "-T",
+        type=str,
+        required=False,
+        help="Please provide the path to the test reference file",
     )
     parser.add_argument(
         "--candidates_file",
@@ -66,6 +75,12 @@ def parse_arguments():
         action="store_true",
         help="Whether to save logs",
     )
+    parser.add_argument(
+        "--run_eval",
+        "-e",
+        action="store_true",
+        help="Whether to run evaluation",
+    )
     return parser.parse_args()
 
 
@@ -78,6 +93,8 @@ def main():
         raise Exception(f"Target ontology file {args.target_ontology_file} does not exist")
     if args.reference_file and not Path(args.reference_file).exists():
         raise Exception(f"Reference file {args.reference_file} does not exist")
+    if args.test_reference_file and not Path(args.test_reference_file).exists():
+        raise Exception(f"Test reference file {args.test_reference_file} does not exist")
     if args.candidates_file and not Path(args.candidates_file).exists():
         raise Exception(f"Candidates file {args.candidates_file} does not exist")
     if not Path(args.output_dir).exists():

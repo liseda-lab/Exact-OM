@@ -5,13 +5,13 @@ from typing import Optional, Protocol
 
 from mowl import init_jvm
 
+from matcha_dl.core.actions.evaluation import EvaluationAction
 from matcha_dl.core.entities.configs import ConfigModel
 from matcha_dl.core.values import N_CLASSES
 from matcha_dl.impl.matcha import Matcha
 from matcha_dl.impl.seed import SeedSetter
 
 # TODO on debug check if init_jvm can run in action
-# TODO add eval to this action
 
 
 class AlignmentAction(Protocol):
@@ -22,8 +22,10 @@ class AlignmentAction(Protocol):
         output_dir_path: Path,
         configs_file_path: Optional[Path] = None,
         reference_file_path: Optional[Path] = None,
+        test_reference_file_path: Optional[Path] = None,
         candidates_file_path: Optional[Path] = None,
         log_file_path: Optional[Path] = None,
+        eval_run: Optional[bool] = False,
     ) -> None:
 
         start_time = time.time()
@@ -126,7 +128,7 @@ class AlignmentAction(Protocol):
 
         ## Parse model params
 
-        if reference_file_path is not None:
+        if dataset.reference is not None:
 
             model_params = configs.model.params
             model_params["n"] = dataset.x().shape[1]
@@ -163,9 +165,26 @@ class AlignmentAction(Protocol):
 
         logger.info(f"Writing alignment...")
 
-        trainer.save_alignment(alignment, candidates_file_path)
+        alignment_file_path = trainer.save_alignment(alignment, candidates_file_path)
 
-        logger.info(f"Alignment written to {trainer.alignment_dir}")
+        logger.info(f"Alignment written to {alignment_file_path}")
+
+        # Evaluate Alignment
+
+        if eval_run:
+            logger.info(f"Evaluating alignment...")
+
+            EvaluationAction.run(
+                alignment=alignment_file_path,
+                output_dir_path=output_dir_path,
+                error_on_fail=False,
+                K=configs.k,
+                source_file_path=dataset.source,
+                target_file_path=dataset.target,
+                train_reference_file_path=reference_file_path,
+                test_reference_file_path=test_reference_file_path,
+                logger=logger,
+            )
 
         end_time = time.time()
         elapsed_time = end_time - start_time

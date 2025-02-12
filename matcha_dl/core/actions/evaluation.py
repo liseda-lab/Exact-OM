@@ -65,13 +65,7 @@ class EvaluationAction(Protocol):
 
         logger.info(f"Starting evaluation")
 
-        if (train_reference_file_path and not test_reference_file_path) or (train_reference_file_path and not test_reference_file_path):
-            error_message = "Both train_reference and test_reference must be provided together to run global eval or not provided and local eval is run."
-            logger.error(error_message)
-            if error_on_fail:
-                raise ValueError(error_message)
-
-        if train_reference_file_path and test_reference_file_path is not None:
+        if test_reference_file_path is not None:
 
             logger.info(f"Using test reference file {test_reference_file_path} for global evaluation")
 

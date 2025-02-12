@@ -15,9 +15,11 @@ class AlignmentRunner:
         target_ontology_file: str,
         output_dir: str,
         reference_file: Optional[str] = None,
+        test_reference_file: Optional[str] = None,
         candidates_file: Optional[str] = None,
         config_file: Optional[str] = None,
         save_logs: Optional[bool] = False,
+        eval_run: Optional[bool] = False,
     ):
         """
 
@@ -26,17 +28,21 @@ class AlignmentRunner:
             target_ontology_file (str): Path to the target ontology file.
             output_dir (str): Path to the output directory.
             reference_file (str, optional): Path to the reference file. Defaults to None.
+            test_reference_file (str, optional): Path to the test reference file. Defaults to None.
             candidates_file (str, optional): Path to the candidates file. Defaults to None.
             config_file (str, optional): Path to the configuration file. Defaults to None.
             save_logs (bool, optional): Whether to save logs. Defaults to None.
+            eval_run (bool, optional): Whether to run evaluation. Defaults to None.
         """
         self.source_ontology_file = source_ontology_file
         self.target_ontology_file = target_ontology_file
         self.output_dir = output_dir
         self.reference_file = reference_file
+        self.test_reference_file = test_reference_file
         self.candidates_file = candidates_file
         self.config_file = config_file
         self.save_logs = save_logs
+        self.eval_run = eval_run
 
     def run_alignment(self) -> None:
 
@@ -46,8 +52,10 @@ class AlignmentRunner:
             output_dir_path=Path(self.output_dir).resolve(),
             configs_file_path=Path(self.config_file).resolve() if self.config_file else None,
             reference_file_path=Path(self.reference_file).resolve() if self.reference_file else None,
+            test_reference_file_path=Path(self.test_reference_file).resolve() if self.test_reference_file else None,
             candidates_file_path=Path(self.candidates_file).resolve() if self.candidates_file else None,
             log_file_path=Path(self.output_dir).resolve() / "matcha_dl.log" if self.save_logs else None,
+            run_eval=self.eval_run,
         )
 
     def validate_files(self) -> None:
@@ -58,6 +66,8 @@ class AlignmentRunner:
             raise Exception(f"Target ontology file {self.target_ontology_file} does not exist")
         if self.reference_file and not Path(self.reference_file).exists():
             raise Exception(f"Reference file {self.reference_file} does not exist")
+        if self.test_reference_file and not Path(self.test_reference_file).exists():
+            raise Exception(f"Test reference file {self.test_reference_file} does not exist")
         if self.candidates_file and not Path(self.candidates_file).exists():
             raise Exception(f"Candidates file {self.candidates_file} does not exist")
         if not Path(self.output_dir).exists():
