@@ -61,6 +61,7 @@ class MatchaParams(BaseModel):
 class TrainingParams(BaseModel):
     epochs: int = Field(config["training_params"]["epochs"])
     batch_size: Optional[int] = Field(config["training_params"]["batch_size"])
+    val_every: Optional[int] = Field(config["training_params"]["val_every"])
     save_interval: int = Field(config["training_params"]["save_interval"])
 
 class ConfigModel(BaseModel):

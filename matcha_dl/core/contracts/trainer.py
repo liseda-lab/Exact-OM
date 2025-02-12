@@ -1,7 +1,7 @@
 import random
 from abc import abstractmethod
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, Dict, List, Optional, Type, Tuple
 
 import logging
 
@@ -16,10 +16,9 @@ from matcha_dl.core.contracts.model import IModel
 from matcha_dl.core.contracts.optimizer import IOptimizer
 from matcha_dl.core.contracts.stopper import IStopper
 from matcha_dl.core.entities.configs import ComponentType
-from matcha_dl.core.entities.mappings import EntityMapping
+from matcha_dl.core.entities.mappings import EntityMapping, ReferenceMapping
 from matcha_dl.impl.utils import fill_anchored_scores, read_table
-
-# TODO Refactor save to get easy access to in memory parsed alignments and to be able to run tests in the training loop
+from matcha_dl.impl.evaluator import Evaluator
 
 class ITrainer(SelfRegisteringComponent, LoggingClass):
 
@@ -130,7 +129,14 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
         return [x.name for x in self.checkpoints_dir.glob("**/*") if x.is_file()]
 
     @abstractmethod
-    def train(self, epochs: Optional[int] = 100, batch_size: Optional[int] = None) -> None:
+    def train(self, 
+              epochs: Optional[int] = 100, 
+              batch_size: Optional[int] = None,
+              val_every: Optional[int] = 1, 
+              save_interval: Optional[int] = 5, 
+              **kwargs
+    ) -> None:
+        
         pass
 
     @abstractmethod
@@ -138,7 +144,11 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
         pass
 
     @abstractmethod
-    def predict(self, threshold: Optional[float] = 0.7, **kwargs) -> List[EntityMapping]:
+    def predict(self, kind: str = "inference", 
+                threshold: Optional[float] = 0.7,
+                **kwargs
+    ) -> Tuple[List[EntityMapping], float]:
+        
         pass
 
     def save_alignment(self, preds: List[EntityMapping], candidates_one2many_path: Optional[Path] = None) -> None:
@@ -151,7 +161,7 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
         else:
             return self._save_global_alignment(preds)
 
-    def _save_global_alignment(self, preds: List[EntityMapping]):
+    def _save_global_alignment(self, preds: List[EntityMapping], save_dir: Optional[Path] = None):
 
         # Get the best mapping for each unique source entity
 
@@ -171,6 +181,8 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
         pd.DataFrame(global_alignment, columns=["SrcEntity", "TgtEntity", "Score"]).to_csv(
             global_dir, sep="\t", index=False
         )
+
+        return global_dir
 
     def _save_local_alignment(self, preds: List[EntityMapping], candidates_one2many: pd.DataFrame):
 
@@ -203,9 +215,11 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
         self._epoch = checkpoint["epoch"]
         self._loss = checkpoint["loss"]
 
-    def save_checkpoint(self):
+    def save_checkpoint(self) -> None:
 
         checkpoint = str(self._get_last_checkpoint() + 1)
+
+        # Save torch model
 
         th.save(
             {
@@ -217,6 +231,45 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
             (self.checkpoints_dir / "{}.pt".format(checkpoint)).resolve(),
         )
 
+        self.log(f"Saved checkpoint {checkpoint}", level="debug")
+
+    def evaluate(self, kind: str = "inference",
+                threshold: Optional[float] = 0.7, 
+                candidates: Optional[Path] = None, 
+                test_reference: Optional[Path] = None,
+                k: Optional[List[int]] = None,
+                **kwargs,
+    ) -> Tuple[Dict[str, float], float]:
+
+        preds, loss = self.predict(kind=kind, threshold=threshold)
+        aligmnet_file = self.save_alignment(preds, candidates)
+
+        try:
+
+            if candidates is not None:
+                results = Evaluator.local_eval(
+                    reference_and_candidates=aligmnet_file,
+                    K=k,
+                )
+
+            results = Evaluator.global_eval(
+                predictions=aligmnet_file,
+                test_reference=test_reference,
+                train_reference=ReferenceMapping.read_table_mappings(self.dataset.reference),
+                source_ontology=self.dataset.source,
+                target_ontology=self.dataset.target,
+                threshold=threshold,
+            )
+
+            self.log(f"trainer evaluation finished", level="debug")
+
+            return results, loss
+        
+        except ValueError as e:
+            self.log(f"Error during trainer evaluation: {e}", level="error", exc_info=True)
+            raise e
+
+
     def _get_last_checkpoint(self) -> int:
         try:
             res = int(sorted(self.checkpoints)[-1].split(".")[0])
@@ -224,10 +277,3 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
             res = 0
 
         return res
-
-    def log(self, msg: str, level: Optional[str] = "info"):
-        if self._logger is not None:
-            getattr(self._logger, level)(msg)
-
-        else:
-            print(msg)

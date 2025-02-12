@@ -20,7 +20,7 @@ class IStopper(SelfRegisteringComponent):
         pass
 
     @abstractmethod
-    def __call__(self, train_loss: float, validation_loss: float) -> None:
+    def __call__(self, train_loss: float, validation_loss: float) -> bool:
         """
         Abstract method for calling a stopper.
 

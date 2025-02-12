@@ -1,5 +1,5 @@
 import warnings
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 import numpy as np
 import torch as th
@@ -19,7 +19,9 @@ class MLPTrainer(ITrainer):
         self,
         epochs: Optional[int] = 50,
         batch_size: Optional[int] = None,
+        val_every: Optional[int] = 1,
         save_interval: Optional[int] = 5,
+        **kwargs,
     ):
 
         warnings.filterwarnings("ignore", category=UserWarning)
@@ -47,8 +49,31 @@ class MLPTrainer(ITrainer):
 
                     _iter += 1
 
-            if self.epoch % save_interval == 0:
-                self.save_checkpoint()
+            if save_interval is not None and save_interval > 0:
+                if self.epoch % save_interval == 0:
+                    self.save_checkpoint()
+
+            if val_every is not None and val_every > 0:
+                if self.epoch % val_every == 0:
+
+                    results, validation_loss = self.evaluate(kind='inference', **kwargs)
+
+                    for label, value in results.items():
+                        writer.add_scalar(f"{label}/validation", value, self.epoch)
+
+                    writer.add_scalar("Loss/validation", validation_loss, self.epoch)
+
+                    tepoch.set_postfix(results)
+                    tepoch.set_postfix(validation_loss=validation_loss)
+
+                    self.log(f"Validation metrics at epoch {self.epoch} - {results}", level="info")
+                    self.log(f"Validation loss at epoch {self.epoch} - {validation_loss}", level="info")
+
+                    if self.stopping is not None:
+                        if self.stopping(train_loss=loss.item(), validation_loss=validation_loss):
+
+                            self.log(f"Early stopping at epoch {self.epoch}", level="info")
+                            break
 
             self._epoch += 1
 
@@ -57,9 +82,11 @@ class MLPTrainer(ITrainer):
 
         self.save_checkpoint()
 
-    def predict(self, threshold: Optional[float] = 0.7, **kwargs) -> List[EntityMapping]:
-
-        kind = "inference"
+    def predict(self, 
+                kind: str = "inference", 
+                threshold: Optional[float] = 0.7,
+                **kwargs
+    ) -> Tuple[List[EntityMapping], float]:
 
         df = self.dataset.dataframe.copy()
         df = df[df[kind] == True]
@@ -67,24 +94,25 @@ class MLPTrainer(ITrainer):
         # if supervised use model to calculate scores
         if self.dataset.reference is not None:
 
-            data, _ = self._load_data(kind=kind)
+            data, target = self._load_data(kind=kind)
             self._model.eval()
             with th.no_grad():
                 logits = self._model(data)
+                loss = self._loss(logits, target)
 
             df["Scores"] = logits.cpu()
 
-            return EntityMapping.read_table_mappings(df, threshold=threshold)
+            return EntityMapping.read_table_mappings(df, threshold=threshold), loss.item()
 
         # if unsupervised use max score from matcha
         else:
 
             df["Scores"] = np.array(df["Features"].values.tolist()).max(axis=1)
 
-            return EntityMapping.read_table_mappings(df, threshold=threshold)
+            return EntityMapping.read_table_mappings(df, threshold=threshold), 0.0
 
     def _load_data(
-        self, kind: Optional[str] = "train", batch_size: Optional[int] = 1
+        self, kind: str = "train", batch_size: Optional[int] = 1
     ) -> DataLoader:
 
         x = self.dataset.x(kind)

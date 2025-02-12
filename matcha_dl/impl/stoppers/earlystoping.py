@@ -14,7 +14,7 @@ class EarlyStopping(IStopper):
         self.counter = 0
         self.early_stop = False
 
-    def __call__(self, train_loss: float, validation_loss: float) -> None:
+    def __call__(self, train_loss: float, validation_loss: float) -> bool:
         """
         Call an early stopper.
 
@@ -26,3 +26,5 @@ class EarlyStopping(IStopper):
             self.counter += 1
             if self.counter >= self.tolerance:
                 self.early_stop = True
+                
+        return self.early_stop

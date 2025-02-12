@@ -157,12 +157,18 @@ class AlignmentAction(Protocol):
 
         if dataset.reference is not None:
             logger.info(f"Training model with {reference_file_path}")
-            trainer.train(**configs.training_params.model_dump())
+            trainer.train(**configs.training_params.model_dump(), 
+                          candidates=candidates_file_path, 
+                          threshold=configs.threshold,
+                          test_reference=test_reference_file_path,
+                          k=configs.k,)
 
         logger.info(f"Computing alignment...")
 
-        alignment = trainer.predict(threshold=configs.threshold)
+        alignment, _ = trainer.predict(threshold=configs.threshold)
 
+        # Save Alignment
+        
         logger.info(f"Writing alignment...")
 
         alignment_file_path = trainer.save_alignment(alignment, candidates_file_path)
