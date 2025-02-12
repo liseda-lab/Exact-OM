@@ -149,9 +149,10 @@ class TabularDataset(IDataset):
             training_set["inference"] = False
 
             self.log("#Shuffling Training Set...", level="debug")
-            # TODO set random state for shuffling
 
-            training_set = training_set.sample(frac=1).reset_index(drop=True)
+            # Ensure reproducibility by using seeded np random state
+
+            training_set = training_set.sample(frac=1, random_state=np.random.RandomState).reset_index(drop=True)
 
             self.log("#Combining Training and Inference Sets...", level="debug")
 
