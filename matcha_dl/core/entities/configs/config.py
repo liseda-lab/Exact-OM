@@ -56,6 +56,7 @@ class MatchaParams(BaseModel):
     matchers: list = Field(config["matcha_params"]["matchers"])
     negcardinality: int = Field(config["matcha_params"]["negcardinality"])
     negthreshold: float = Field(config["matcha_params"]["negthreshold"])
+    samplers: str = Field(config["matcha_params"]["samplers"])
 
 
 class TrainingParams(BaseModel):

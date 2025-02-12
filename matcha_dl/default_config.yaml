@@ -32,9 +32,11 @@ matcha_params:
   ## Matchers ro be used to calculate the similarity between the candidates.
   matchers: [LM, BKM, SM, WM, LLM]
   # Cardinality of negatives in the training set
-  negcardinality: 10
+  negcardinality: 10 # 9, 99
   # Filter to generate negatives in the training set
-  negthreshold: 0.1
+  negthreshold: 0.1 #0.4, 0.5, 0.6
+  # Samplers to be used to generate negatives in the training set
+  samplers: 'all' # all, rand, diff
 
 training_params:
   epochs: 10

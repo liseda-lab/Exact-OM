@@ -10,6 +10,7 @@ from abc import abstractmethod
 from ast import literal_eval
 from pathlib import Path
 from typing import List, Optional
+import random
 
 import pandas as pd
 
@@ -26,6 +27,7 @@ class IMatcha(LoggingClass):
         matchers: List[str],
         negcardinality: int,
         negthreshold: float,
+        samplers: str,
         **kwargs,
     ) -> None:
         """
@@ -45,6 +47,7 @@ class IMatcha(LoggingClass):
         self._matchers = matchers
         self._negcardinality = negcardinality
         self._negthreshold = negthreshold
+        self._samplers = samplers
 
         self._source = None
         self._target = None
@@ -139,6 +142,14 @@ class IMatcha(LoggingClass):
     @property
     def negthreshold(self) -> float:
         return self._negthreshold
+    
+    @property
+    def seed(self) -> int:
+        return random.randint(0, 2**32 - 1)
+    
+    @property
+    def samplers(self) -> int:
+        return self._samplers
     
     def load_ontologies(self, source_path: Path, target_path: Path) -> None:
 
@@ -241,7 +252,7 @@ class IMatcha(LoggingClass):
             comunicate_matcha_process(matcha_process, command, 'matchers set')
 
         def generate_negatives(matcha_process):
-            command = f"Negatives {self.reference} {self.negatives} {self.negcardinality} {self.negthreshold}"
+            command = f"Negatives {self.reference} {self.negatives} {self.negcardinality} {self.negthreshold} {self.samplers} {self.seed}"
             comunicate_matcha_process(matcha_process, command, 'finished generating negatives')
 
         def generate_candidates(matcha_process):
