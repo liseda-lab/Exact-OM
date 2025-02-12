@@ -21,6 +21,9 @@ use_last_checkpoint: False
 ## Threshold to be used to filter predictions.
 threshold: 0.7
 
+## Number of top-k predictions to be considered for evaluation.
+k: [1, 5, 10]
+
 matcha_params:
   ## JAVA Heap Size
   max_heap: 64G
@@ -36,6 +39,7 @@ matcha_params:
 training_params:
   epochs: 10
   batch_size: 1
+  val_every: 1
   save_interval: 5
   
 stopper:
