@@ -2,6 +2,7 @@ from ast import literal_eval
 from pathlib import Path
 from typing import Optional
 
+import random
 import numpy as np
 import pandas as pd
 
@@ -152,7 +153,7 @@ class TabularDataset(IDataset):
 
             # Ensure reproducibility by using seeded np random state
 
-            training_set = training_set.sample(frac=1, random_state=np.random.RandomState).reset_index(drop=True)
+            training_set = training_set.sample(frac=1, random_state=random.randint(0, 2**32 - 1)).reset_index(drop=True)
 
             self.log("#Combining Training and Inference Sets...", level="debug")
 
