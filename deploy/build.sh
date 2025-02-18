@@ -9,6 +9,6 @@ sudo docker build \
 
 sudo docker image tag matchadl:$TAG matchadl:latest
 
-sudo docker image tag matchadl:latest liscluster:5000/matchadl
+sudo docker image tag matchadl:latest liseda-cluster.lasige.di.fc.ul.pt:5000/matchadl
 
-sudo docker push liscluster:5000/matchadl
+sudo docker push liseda-cluster.lasige.di.fc.ul.pt:5000/matchadl

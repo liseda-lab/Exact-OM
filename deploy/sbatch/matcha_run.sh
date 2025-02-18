@@ -35,11 +35,12 @@ mkdir -p $EXP_DIR
 mv /exp/config.yaml $EXP_DIR/config.yaml
 
 # Run the Docker container
-docker run --rm \
-      -v $EXP_DIR:/code/exp \          # Mount the experiment directory
-      -v $DATA_DIR:/code/data \        # Mount the data directory
-      -w /code \                       # Set the working directory
-      localhost:5000/matchadl \        # Image
+srun docker run --rm \
+      -v $EXP_DIR:/code/exp \                               # Mount the experiment directory
+      -v $DATA_DIR:/code/data \                             # Mount the data directory
+      -w /code \                                            # Set the working directory
+      --gpus all \                                          # Assign GPUs
+      liseda-cluster.lasige.di.fc.ul.pt:5000/matchadl \     # Image
       /bin/bash -c "poetry run tensorboard --logdir=/code/exp/training_logs --host=0.0.0.0 & \
                         poetry run matchadl -s /code/data/$SOURCE -t /code/data/$TARGET -o /code/exp/ -r /code/data/$REFERENCE -c /code/data/$CANDIDATES -C /code/exp/config.yaml -l"
                         # Command to run in the container
