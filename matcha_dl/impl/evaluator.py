@@ -30,7 +30,7 @@ class Evaluator(IEvaluator):
     def global_eval(
         cls, 
         predictions: Union[List[EntityMapping], Path],
-        test_reference: Union[List[ReferenceMapping], Path],
+        full_reference: Union[List[ReferenceMapping], Path],
         train_reference: Optional[Union[List[ReferenceMapping], Path]] = None,
         source_ontology: Optional[OWLOntology] = None,
         target_ontology: Optional[OWLOntology] = None,
@@ -43,8 +43,8 @@ class Evaluator(IEvaluator):
         if isinstance(predictions, Path):
             predictions = EntityMapping.read_table_mappings(predictions, threshold=threshold)
 
-        if isinstance(test_reference, Path):
-            test_reference = ReferenceMapping.read_table_mappings(test_reference)
+        if isinstance(full_reference, Path):
+            full_reference = ReferenceMapping.read_table_mappings(full_reference)
 
         if train_reference:
             if isinstance(train_reference, Path):
@@ -58,7 +58,7 @@ class Evaluator(IEvaluator):
             predictions = MetricUtils.remove_ignored_mappings(predictions, ignored_class_index)
 
         return cls([MetricNames.F1]).evaluate(
-            EvaluationData(predictions, test_reference, null_reference_mappings=train_reference)
+            EvaluationData(predictions, full_reference, null_reference_mappings=train_reference)
         )
     
     @classmethod

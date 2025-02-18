@@ -15,7 +15,7 @@ class AlignmentRunner:
         target_ontology_file: str,
         output_dir: str,
         reference_file: Optional[str] = None,
-        test_reference_file: Optional[str] = None,
+        full_reference_file: Optional[str] = None,
         candidates_file: Optional[str] = None,
         config_file: Optional[str] = None,
         save_logs: Optional[bool] = False,
@@ -38,7 +38,7 @@ class AlignmentRunner:
         self.target_ontology_file = target_ontology_file
         self.output_dir = output_dir
         self.reference_file = reference_file
-        self.test_reference_file = test_reference_file
+        self.full_reference_file = full_reference_file
         self.candidates_file = candidates_file
         self.config_file = config_file
         self.save_logs = save_logs
@@ -52,7 +52,7 @@ class AlignmentRunner:
             output_dir_path=Path(self.output_dir).resolve(),
             configs_file_path=Path(self.config_file).resolve() if self.config_file else None,
             reference_file_path=Path(self.reference_file).resolve() if self.reference_file else None,
-            test_reference_file_path=Path(self.test_reference_file).resolve() if self.test_reference_file else None,
+            test_reference_file_path=Path(self.full_reference_file).resolve() if self.full_reference_file else None,
             candidates_file_path=Path(self.candidates_file).resolve() if self.candidates_file else None,
             log_file_path=Path(self.output_dir).resolve() / "matcha_dl.log" if self.save_logs else None,
             run_eval=self.eval_run,
@@ -66,8 +66,8 @@ class AlignmentRunner:
             raise Exception(f"Target ontology file {self.target_ontology_file} does not exist")
         if self.reference_file and not Path(self.reference_file).exists():
             raise Exception(f"Reference file {self.reference_file} does not exist")
-        if self.test_reference_file and not Path(self.test_reference_file).exists():
-            raise Exception(f"Test reference file {self.test_reference_file} does not exist")
+        if self.full_reference_file and not Path(self.full_reference_file).exists():
+            raise Exception(f"Test reference file {self.full_reference_file} does not exist")
         if self.candidates_file and not Path(self.candidates_file).exists():
             raise Exception(f"Candidates file {self.candidates_file} does not exist")
         if not Path(self.output_dir).exists():

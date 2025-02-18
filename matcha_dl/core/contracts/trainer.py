@@ -236,7 +236,7 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
     def evaluate(self, kind: str = "inference",
                 threshold: Optional[float] = 0.7, 
                 candidates: Optional[Path] = None, 
-                test_reference: Optional[Path] = None,
+                full_reference: Optional[Path] = None,
                 k: Optional[List[int]] = None,
                 **kwargs,
     ) -> Tuple[Dict[str, float], float]:
@@ -254,7 +254,7 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
 
             results = Evaluator.global_eval(
                 predictions=aligmnet_file,
-                test_reference=test_reference,
+                full_reference=full_reference,
                 train_reference=ReferenceMapping.read_table_mappings(self.dataset.reference),
                 source_ontology=self.dataset.source,
                 target_ontology=self.dataset.target,

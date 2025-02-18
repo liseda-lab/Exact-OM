@@ -27,7 +27,7 @@ class EvaluationAction(Protocol):
         source_file_path: Optional[Union[OWLDataset, Path]] = None,
         target_file_path: Optional[Union[OWLDataset, Path]] = None,
         train_reference_file_path: Optional[Path] = None,
-        test_reference_file_path: Optional[Path] = None,
+        full_reference_file_path: Optional[Path] = None,
         log_file_path: Optional[Path] = None,
         log_level: Optional[str] = None,
         logger: Optional[logging.Logger] = None,
@@ -65,9 +65,9 @@ class EvaluationAction(Protocol):
 
         logger.info(f"Starting evaluation")
 
-        if test_reference_file_path is not None:
+        if full_reference_file_path is not None:
 
-            logger.info(f"Using test reference file {test_reference_file_path} for global evaluation")
+            logger.info(f"Using test reference file {full_reference_file_path} for global evaluation")
 
             if isinstance(source_file_path, OWLDataset):
                 logger.info(f"Using source ontology from memory")
@@ -93,7 +93,7 @@ class EvaluationAction(Protocol):
 
                 results = Evaluator.global_eval(
                     predictions=alignment,
-                    test_reference=test_reference_file_path,
+                    full_reference=full_reference_file_path,
                     train_reference=train_reference_file_path,
                     source_ontology=source_ontology,
                     target_ontology=target_ontology,

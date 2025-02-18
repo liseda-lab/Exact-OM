@@ -22,7 +22,7 @@ class AlignmentAction(Protocol):
         output_dir_path: Path,
         configs_file_path: Optional[Path] = None,
         reference_file_path: Optional[Path] = None,
-        test_reference_file_path: Optional[Path] = None,
+        full_reference_file_path: Optional[Path] = None,
         candidates_file_path: Optional[Path] = None,
         log_file_path: Optional[Path] = None,
         eval_run: Optional[bool] = False,
@@ -160,7 +160,7 @@ class AlignmentAction(Protocol):
             trainer.train(**configs.training_params.model_dump(), 
                           candidates=candidates_file_path, 
                           threshold=configs.threshold,
-                          test_reference=test_reference_file_path,
+                          test_reference=full_reference_file_path,
                           k=configs.k,)
 
         logger.info(f"Computing alignment...")
@@ -188,7 +188,7 @@ class AlignmentAction(Protocol):
                 source_file_path=dataset.source,
                 target_file_path=dataset.target,
                 train_reference_file_path=reference_file_path,
-                test_reference_file_path=test_reference_file_path,
+                full_reference_file_path=full_reference_file_path,
                 logger=logger,
             )
 
