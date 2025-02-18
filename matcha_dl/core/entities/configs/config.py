@@ -58,6 +58,16 @@ class MatchaParams(BaseModel):
     negthreshold: float = Field(config["matcha_params"]["negthreshold"])
     samplers: str = Field(config["matcha_params"]["samplers"])
 
+class PlotNegativesParams(BaseModel):
+    enabled: bool = Field(config["plot_negatives"]["enabled"])
+    figsize: Tuple[int, int] = Field(config["plot_negatives"]["figsize"])
+    kde: bool = Field(config["plot_negatives"]["kde"])
+    bins: int = Field(config["plot_negatives"]["bins"])
+    color: str = Field(config["plot_negatives"]["color"])
+    alpha: float = Field(config["plot_negatives"]["alpha"])
+    dpi: int = Field(config["plot_negatives"]["dpi"])
+    grid: bool = Field(config["plot_negatives"]["grid"])
+
 
 class TrainingParams(BaseModel):
     epochs: int = Field(config["training_params"]["epochs"])
@@ -73,6 +83,7 @@ class ConfigModel(BaseModel):
     use_last_checkpoint: bool = Field(config["use_last_checkpoint"])
     threshold: float = Field(config["threshold"])
     matcha_params: MatchaParams = MatchaParams()
+    plot_negatives_params: PlotNegativesParams = PlotNegativesParams()
     training_params: TrainingParams = TrainingParams()
     stopper: StoppingParams = StoppingParams()
     model: ModelParams = ModelParams()
@@ -103,6 +114,7 @@ class ConfigModel(BaseModel):
         yaml_config = read_yaml(file_path)
 
         matcha_params = MatchaParams(**yaml_config.get("matcha_params", {}))
+        plot_negatives_params = PlotNegativesParams(**yaml_config.get("plot_negatives", {}))
         training_params = TrainingParams(**yaml_config.get("training_params", {}))
         stopping_params = StoppingParams(**yaml_config.get("stopper", {}))
         model_params = ModelParams(**yaml_config.get("model", {}))
@@ -115,11 +127,12 @@ class ConfigModel(BaseModel):
             for k, v in yaml_config.items()
             if v is not None
             and k in cls.model_fields
-            and k not in ["matcha_params", "training_params", "stopper", "model", "loss", "optimizer"]
+            and k not in ["matcha_params", "plot_negatives" "training_params", "stopper", "model", "loss", "optimizer"]
         }
 
         return cls(
             matcha_params=matcha_params,
+            plot_negatives_params=plot_negatives_params,
             training_params=training_params,
             stopper=stopping_params,
             model=model_params,

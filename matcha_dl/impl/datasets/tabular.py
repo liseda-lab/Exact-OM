@@ -170,27 +170,6 @@ class TabularDataset(IDataset):
         return self
 
             
-
-    def _get_matcha_features(self, dataset: pd.DataFrame) -> pd.DataFrame:
-
-        feats = []
-        
-        for _, row in dataset.iterrows():
-
-            try:
-                vector = self.matcha_features.get(row["Src"]).get(row["Tgt"])
-            except AttributeError:
-                self.log("Matcha features not loaded.", level="error", exc_info=True)
-                raise ValueError("Scores for source {} and target {} not found.".format(row["Src"], row["Tgt"]))
-            
-            feats.append(vector)
-            
-
-        dataset["Features"] = feats
-
-        return dataset
-
-            
             
 
 

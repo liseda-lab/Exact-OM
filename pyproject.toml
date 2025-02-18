@@ -24,6 +24,9 @@ typing-extensions = "^4.12.2"
 pydantic = "^2.10.6"
 mowl-borg = "^1.0.1"
 dgl = { url = "https://data.dgl.ai/wheels/torch-2.4/cu124/dgl-2.4.0%2Bcu124-cp310-cp310-manylinux1_x86_64.whl" }
+matplotlib = "^3.10.0"
+seaborn = "^0.13.2"
+
 
 [tool.poetry.scripts]
 matchadl = "matcha_dl.delivery.cli:main"

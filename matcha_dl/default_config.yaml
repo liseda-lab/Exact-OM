@@ -19,7 +19,7 @@ use_file_cache: False
 use_last_checkpoint: False
 
 ## Threshold to be used to filter predictions.
-threshold: 0.7
+threshold: 0.7 # 0.7
 
 ## Number of top-k predictions to be considered for evaluation.
 k: [1, 5, 10]
@@ -28,7 +28,7 @@ matcha_params:
   ## JAVA Heap Size
   max_heap: 64G
   ## Filter to generate candidates for global alignment.
-  threshold: 0.9
+  threshold: 0.9 # 0.7, 0.8, 0.9
   ## Matchers ro be used to calculate the similarity between the candidates.
   matchers: [LM, BKM, SM, WM, LLM]
   # Cardinality of negatives in the training set
@@ -38,9 +38,20 @@ matcha_params:
   # Samplers to be used to generate negatives in the training set
   samplers: 'all' # all, rand, diff
 
+## Whether to plot the distribution of the similarities in the negative set.
+plot_negatives:
+  enabled: True
+  figsize: [8, 5]
+  kde: True
+  bins: 20
+  color: blue
+  alpha: 0.6
+  dpi: 300
+  grid: True
+
 training_params:
-  epochs: 10
-  batch_size: 1
+  epochs: 10 # 50
+  batch_size: 1 # 1, 32
   val_every: 1
   save_interval: 5
   
@@ -58,7 +69,7 @@ model:
 loss:
   name: BCEWeightedLoss
   params:
-    pos_weight: 1.0
+    pos_weight: 1.0 # 1.0, cardinality_weight
     reduction: mean
 
 optimizer:

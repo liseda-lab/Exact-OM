@@ -122,6 +122,9 @@ class AlignmentAction(Protocol):
 
         logger.info(f"Dataset ready")
 
+        if configs.plot_negatives_params.enabled:
+            dataset.plot_negative_distributions(**configs.plot_negatives_params.model_dump())
+
         dataset.save()
 
         # Trainer module
