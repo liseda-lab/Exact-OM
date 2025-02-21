@@ -3,6 +3,7 @@
 # Static Variables
 TAG=$(date +%s)
 EXP_DIR=exp/${SLURM_JOB_NAME}
+CONFIG_FILE=/exp/config.yaml
 DATA_DIR=data/
 
 # Config
@@ -32,7 +33,7 @@ MEMORY=${MEMORY:-64G}
 mkdir -p $EXP_DIR
 
 # Copy the config file to the experiment directory
-mv /exp/config.yaml $EXP_DIR/config.yaml
+mv $CONFIG_FILE $EXP_DIR/config.yaml
 
 # Run the Docker container
 srun docker run --rm \
@@ -42,5 +43,4 @@ srun docker run --rm \
       --gpus all \                                          # Assign GPUs
       liseda-cluster.lasige.di.fc.ul.pt:5000/matchadl \     # Image
       /bin/bash -c "poetry run tensorboard --logdir=/code/exp/training_logs --host=0.0.0.0 & \
-                        poetry run matchadl -s /code/data/$SOURCE -t /code/data/$TARGET -o /code/exp/ -r /code/data/$REFERENCE -c /code/data/$CANDIDATES -C /code/exp/config.yaml -l"
-                        # Command to run in the container
+                        poetry run matchadl -s /code/data/$SOURCE -t /code/data/$TARGET -o /code/exp/ -r /code/data/$REFERENCE -c /code/data/$CANDIDATES -C /code/exp/config.yaml -l -m $MEMORY" # Run the command in the container
