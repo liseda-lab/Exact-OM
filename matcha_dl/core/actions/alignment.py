@@ -3,16 +3,11 @@ import time
 from pathlib import Path
 from typing import Optional, Protocol
 
-from mowl import init_jvm
-
 from matcha_dl.core.actions.evaluation import EvaluationAction
 from matcha_dl.core.entities.configs import ConfigModel
 from matcha_dl.core.values import N_CLASSES
 from matcha_dl.impl.matcha import Matcha
 from matcha_dl.impl.seed import SeedSetter
-
-# TODO on debug check if init_jvm can run in action
-
 
 class AlignmentAction(Protocol):
     @staticmethod
@@ -25,7 +20,6 @@ class AlignmentAction(Protocol):
         full_reference_file_path: Optional[Path] = None,
         candidates_file_path: Optional[Path] = None,
         log_file_path: Optional[Path] = None,
-        eval_run: Optional[bool] = False,
     ) -> None:
 
         start_time = time.time()
@@ -69,10 +63,6 @@ class AlignmentAction(Protocol):
         if configs.seed is not None:
             logger.info(f"Setting seed to {configs.seed}")
             SeedSetter(configs.seed)
-
-        # Init Jpype
-
-        init_jvm(configs.matcha_params.max_heap)
 
         # Matcha module
 
@@ -163,7 +153,7 @@ class AlignmentAction(Protocol):
             trainer.train(**configs.training_params.model_dump(), 
                           candidates=candidates_file_path, 
                           threshold=configs.threshold,
-                          test_reference=full_reference_file_path,
+                          full_reference=full_reference_file_path,
                           k=configs.k,)
 
         logger.info(f"Computing alignment...")
@@ -180,7 +170,7 @@ class AlignmentAction(Protocol):
 
         # Evaluate Alignment
 
-        if eval_run:
+        if full_reference_file_path is not None:
             logger.info(f"Evaluating alignment...")
 
             EvaluationAction.run(

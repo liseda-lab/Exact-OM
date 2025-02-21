@@ -7,8 +7,6 @@ import yaml
 
 MATCHA_DL_DIR = Path(__file__).parent
 
-print(MATCHA_DL_DIR)
-
 # If matchaJar and dependencies don't exist, download them.
 
 def download_macha():
@@ -51,6 +49,10 @@ def get_config_path():
 ## get current directory
 
 config = read_yaml(get_config_path())
+
+# Get Jpype init
+
+from mowl import init_jvm
 
 # Get AlignmentRunner
 
