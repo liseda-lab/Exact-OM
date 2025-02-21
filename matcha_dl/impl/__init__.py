@@ -1,7 +1,7 @@
 
-from matcha_dl.core.entities.configs import ComponentRegistry, ComponentType
+from matcha_dl.core.entities.registry import ComponentRegistry, ComponentType
 
-from . import datasets, losses, metrics, models, optimizers, stoppers, trainer
+from . import datasets, losses, models, optimizers, stoppers, trainer, metrics
 
 # Registering the dependencies
 

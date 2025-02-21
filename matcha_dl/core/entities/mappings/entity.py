@@ -1,13 +1,13 @@
 # Adapted from https://github.com/KRR-Oxford/DeepOnto
 
-from typing import List, Optional, Union
+from typing import List, Optional, Union, TYPE_CHECKING
 from pathlib import Path
 
-from matcha_dl.core.contracts.dataset import DataFrame
-from matcha_dl.core.entities.mappings import ReferenceMapping
 from matcha_dl.core.values import DEFAULT_REL
-from matcha_dl.impl.utils import read_table
+from matcha_dl.utils.data import read_table
 
+if TYPE_CHECKING:
+    from matcha_dl.core.contracts.dataset import DataFrame
 
 class EntityMapping:
     r"""A datastructure for entity mapping.
@@ -75,41 +75,14 @@ class EntityMapping:
     @classmethod
     def read_table_mappings(
         cls,
-        table_of_mappings_file: Union[Path, DataFrame],
+        table_of_mappings_file: Union[Path, 'DataFrame'],
         threshold: Optional[float] = None,
         relation: str = DEFAULT_REL,
-        is_reference: bool = False,
     ) -> List['EntityMapping']:
-        r"""Read entity mappings from `.csv` or `.tsv` files.
         
-        !!! note "Mapping Table Format"
-        
-            The columns of the mapping table must have the headings: `"SrcEntity"`, `"TgtEntity"`, and `"Score"`.
-
-        Args:
-            table_of_mappings_file (str): The path to the table (`.csv` or `.tsv`) of mappings.
-            threshold (Optional[float], optional): Mappings with scores less than `threshold` will not be loaded. Defaults to 0.0.
-            relation (str, optional): A symbol that represents what semantic relation this mapping stands for. Defaults to `<?rel>` which means unspecified.
-                Suggested inputs are `"<EquivalentTo>"` and `"<SubsumedBy>"`.
-            is_reference (bool): Whether the loaded mappings are reference mappigns; if so, `threshold` is disabled and mapping scores
-                are all set to $1.0$. Defaults to `False`.
-
-        Returns:
-            (List[EntityMapping]): A list of entity mappings loaded from the table file.
-        """
+        r"""Read entity mappings from `.csv` or `.tsv` files."""
 
         if isinstance(table_of_mappings_file, Path):
             table_of_mappings_file = read_table(table_of_mappings_file)
 
-        entity_mappings = []
-        for dp in table_of_mappings_file.itertuples():
-            if is_reference:
-                entity_mappings.append(ReferenceMapping(dp.SrcEntity, dp.TgtEntity, relation))
-            else:
-                # allow `None` for threshold
-                if not threshold or dp["Score"] >= threshold:
-                    entity_mappings.append(cls(dp.SrcEntity, dp.TgtEntity, relation, dp.Score))
-        return entity_mappings
-
-    def __repr__(self):
-        return f"EntityMapping({self.head} {self.relation} {self.tail}, {round(self.score, 6)})"
+        return [cls(dp.SrcEntity, dp.TgtEntity, relation, dp.Score) for dp in table_of_mappings_file.itertuples() if not threshold or dp["Score"] >= threshold]

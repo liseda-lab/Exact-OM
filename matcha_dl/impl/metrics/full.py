@@ -3,7 +3,7 @@ from typing import Dict
 
 from matcha_dl.core.contracts.metric import IMetric
 from matcha_dl.core.entities.evaluation import EvaluationData, MetricNames
-from matcha_dl.impl.utils import MetricUtils
+from matcha_dl.utils.eval import MetricUtils
 
 
 class PrecisionMetric(IMetric):

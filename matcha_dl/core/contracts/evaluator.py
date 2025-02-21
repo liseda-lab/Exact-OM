@@ -6,8 +6,7 @@ import logging
 
 from mowl.owlapi import OWLOntology
 
-from matcha_dl.core.contracts import LoggingClass
-from matcha_dl.core.entities.configs import ComponentRegistry
+from matcha_dl.core.entities.registry import ComponentRegistry
 from matcha_dl.core.entities.evaluation import EvaluationData, MetricNames
 from matcha_dl.core.entities.mappings import EntityMapping, ReferenceMapping
 

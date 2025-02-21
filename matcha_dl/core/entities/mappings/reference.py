@@ -1,13 +1,16 @@
 # Adapted from https://github.com/KRR-Oxford/DeepOnto
 
 import pprint
-from typing import List, Optional, Union
+from typing import List, Optional, Union, TYPE_CHECKING
 from pathlib import Path
 
-from matcha_dl.core.contracts.dataset import DataFrame
-from matcha_dl.core.entities.mappings import EntityMapping
 from matcha_dl.core.values import DEFAULT_REL
 
+from matcha_dl.utils.data import read_table
+from matcha_dl.core.entities.mappings import EntityMapping
+
+if TYPE_CHECKING:
+    from matcha_dl.core.contracts.dataset import DataFrame
 
 class ReferenceMapping(EntityMapping):
     r"""A datastructure for entity mapping that acts as a reference mapping.
@@ -63,20 +66,15 @@ class ReferenceMapping(EntityMapping):
             raise ValueError("Candidate mapping does not have the same head entity as the anchor mapping.")
         self.candidates.append(candidate_mapping)
 
-    @staticmethod
-    def read_table_mappings(table_of_mappings_file: Union[Path, DataFrame], relation: str = DEFAULT_REL):
-        r"""Read reference mappings from `.csv` or `.tsv` files.
-        
-        !!! note "Mapping Table Format"
-        
-            The columns of the mapping table must have the headings: `"SrcEntity"`, `"TgtEntity"`, and `"Score"`.
+    @classmethod
+    def read_table_mappings(
+        cls,
+        table_of_mappings_file: Union[Path, 'DataFrame'],
+        relation: str = DEFAULT_REL,
+    ) -> List['ReferenceMapping']:
+        r"""Read reference mappings from `.csv` or `.tsv` files."""
 
-        Args:
-            table_of_mappings_file (str): The path to the table (`.csv` or `.tsv`) of mappings.
-            relation (str, optional): A symbol that represents what semantic relation this mapping stands for. Defaults to `<?rel>` which means unspecified.
-                Suggested inputs are `"<EquivalentTo>"` and `"<SubsumedBy>"`.
+        if isinstance(table_of_mappings_file, Path):
+            table_of_mappings_file = read_table(table_of_mappings_file)
 
-        Returns:
-            (List[ReferenceMapping]): A list of reference mappings loaded from the table file.
-        """
-        return EntityMapping.read_table_mappings(table_of_mappings_file, relation=relation, is_reference=True)
+        return [cls(dp.SrcEntity, dp.TgtEntity, relation, 1.0) for dp in table_of_mappings_file.itertuples()]

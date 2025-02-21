@@ -9,8 +9,7 @@ from tqdm import tqdm
 
 from matcha_dl.core.contracts.trainer import EntityMapping, ITrainer
 
-# TODO add stopper support
-# TODO add validation split, keep track on tensorboard 
+# TODO add validation split
 
 
 class MLPTrainer(ITrainer):
@@ -53,7 +52,7 @@ class MLPTrainer(ITrainer):
                 if self.epoch % save_interval == 0:
                     self.save_checkpoint()
 
-            if val_every is not None and val_every > 0:
+            if val_every is not None and val_every > 0 and kwargs.get("full_reference") is not None:
                 if self.epoch % val_every == 0:
 
                     results, validation_loss = self.evaluate(kind='inference', **kwargs)

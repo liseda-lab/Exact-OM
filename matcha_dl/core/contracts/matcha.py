@@ -15,7 +15,7 @@ import random
 import pandas as pd
 
 from matcha_dl.core.contracts import LoggingClass
-from matcha_dl.impl.utils import read_table
+from matcha_dl.utils.data import read_table
 
 
 class IMatcha(LoggingClass):

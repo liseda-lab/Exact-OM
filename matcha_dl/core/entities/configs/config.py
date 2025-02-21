@@ -5,15 +5,14 @@ from typing import Any, Optional, Tuple, Type, Union
 from pydantic import BaseModel, Field, field_validator
 
 from matcha_dl import config, read_yaml
-from matcha_dl.core.contracts.dataset import IDataset
-from matcha_dl.core.contracts.loss import ILoss
-from matcha_dl.core.contracts.model import IModel
-from matcha_dl.core.contracts.optimizer import IOptimizer
-from matcha_dl.core.contracts.stopper import IStopper
-from matcha_dl.core.contracts.trainer import ITrainer
-from matcha_dl.core.entities.configs import ComponentRegistry, ComponentType
+from matcha_dl.core.entities.registry import ComponentType, ComponentRegistry
 
-# TODO replace by new loading method through registry
+from matcha_dl.core.contracts.stopper import IStopper
+from matcha_dl.core.contracts.model import IModel
+from matcha_dl.core.contracts.loss import ILoss
+from matcha_dl.core.contracts.optimizer import IOptimizer
+from matcha_dl.core.contracts.trainer import ITrainer
+from matcha_dl.core.contracts.dataset import IDataset
 
 
 class RegistryParams(BaseModel):
@@ -25,29 +24,29 @@ class RegistryParams(BaseModel):
     @field_validator("name", mode="before")
     def validate_and_load(cls, name: str, values) -> Type[Any]:
         """Validate and load the component from the registry."""
-        component_type = values.get("component_type")
+        component_type = values.data.get("component_type")
         if not component_type:
             raise ValueError("Component type is required for registry-based parameters.")
         return ComponentRegistry.get(component_type, name)
     
-class StoppingParams(BaseModel):
+class StoppingParams(RegistryParams):
     component_type: ComponentType = ComponentType.STOPPER
-    name: Type[IStopper] = Field(config["stopper"]["stopper"], validate_default=True)
+    name: Type[IStopper] = Field(config["stopper"]["name"], validate_default=True)
     params: dict = Field(config["stopper"]["params"])
 
-class ModelParams(BaseModel):
+class ModelParams(RegistryParams):
     component_type: ComponentType = ComponentType.MODEL
-    name: Type[IModel] = Field(config["model"]["model"], validate_default=True)
+    name: Type[IModel] = Field(config["model"]["name"], validate_default=True)
     params: dict = Field(config["model"]["params"])
 
-class LossParams(BaseModel):
+class LossParams(RegistryParams):
     component_type: ComponentType = ComponentType.LOSS
-    name: Type[ILoss] = Field(config["loss"]["loss"], validate_default=True)
+    name: Type[ILoss] = Field(config["loss"]["name"], validate_default=True)
     params: dict = Field(config["loss"]["params"])
 
-class OptimizerParams(BaseModel):
+class OptimizerParams(RegistryParams):
     component_type: ComponentType = ComponentType.OPTIMIZER
-    name: Type[IOptimizer] = Field(config["optimizer"]["optimizer"], validate_default=True)
+    name: Type[IOptimizer] = Field(config["optimizer"]["name"], validate_default=True)
     params: dict = Field(config["optimizer"]["params"])
 
 class MatchaParams(BaseModel):
@@ -68,7 +67,6 @@ class PlotNegativesParams(BaseModel):
     dpi: int = Field(config["plot_negatives"]["dpi"])
     grid: bool = Field(config["plot_negatives"]["grid"])
 
-
 class TrainingParams(BaseModel):
     epochs: int = Field(config["training_params"]["epochs"])
     batch_size: Optional[int] = Field(config["training_params"]["batch_size"])
@@ -76,6 +74,7 @@ class TrainingParams(BaseModel):
     save_interval: int = Field(config["training_params"]["save_interval"])
 
 class ConfigModel(BaseModel):
+
     seed: int = Field(config["seed"])
     device: Union[int, str] = Field(config["device"], validate_default=True)
     logging_level: int = Field(config["logging_level"], validate_default=True)

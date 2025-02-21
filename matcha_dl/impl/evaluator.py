@@ -1,15 +1,16 @@
 
-from typing import Dict, List, Optional, Union, Tuple
+from typing import Dict, List, Optional, Union, Tuple, TYPE_CHECKING
 from pathlib import Path
 
-from mowl.owlapi import OWLOntology
-
 from matcha_dl.core.contracts.evaluator import IEvaluator
-from matcha_dl.core.contracts.dataset import IDataset
-from matcha_dl.core.entities.configs import ComponentRegistry
+from matcha_dl.core.entities.registry import ComponentRegistry
 from matcha_dl.core.entities.evaluation import EvaluationData, MetricNames
 from matcha_dl.core.entities.mappings import EntityMapping, ReferenceMapping
-from matcha_dl.impl.utils import MetricUtils, save_dict_to_csv
+from matcha_dl.utils.eval import MetricUtils
+from matcha_dl.utils.data import save_dict_to_csv
+
+if TYPE_CHECKING:
+    from mowl.owlapi import OWLOntology
 
 
 class Evaluator(IEvaluator):
@@ -32,8 +33,8 @@ class Evaluator(IEvaluator):
         predictions: Union[List[EntityMapping], Path],
         full_reference: Union[List[ReferenceMapping], Path],
         train_reference: Optional[Union[List[ReferenceMapping], Path]] = None,
-        source_ontology: Optional[OWLOntology] = None,
-        target_ontology: Optional[OWLOntology] = None,
+        source_ontology: Optional['OWLOntology'] = None,
+        target_ontology: Optional['OWLOntology'] = None,
         threshold: Optional[float] = None,
     ) -> Dict[str, float]:
         

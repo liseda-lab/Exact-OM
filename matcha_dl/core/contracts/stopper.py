@@ -2,7 +2,7 @@
 from abc import abstractmethod
 
 from matcha_dl.core.contracts import SelfRegisteringComponent
-from matcha_dl.core.entities.configs import ComponentType
+from matcha_dl.core.entities.registry import ComponentType
 
 
 class IStopper(SelfRegisteringComponent):

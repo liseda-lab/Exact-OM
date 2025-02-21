@@ -1,17 +1,19 @@
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, TYPE_CHECKING
 
-from matcha_dl.core.entities.mappings import EntityMapping, ReferenceMapping
+
+if TYPE_CHECKING:
+    from matcha_dl.core.entities.mappings import EntityMapping, ReferenceMapping
 
 
 @dataclass
 class EvaluationData:
-    prediction_mappings: List[EntityMapping]
-    reference_mappings: List[ReferenceMapping]
-    reference_and_candidates: Optional[List[Tuple[ReferenceMapping, List[EntityMapping]]]] = None
-    null_reference_mappings: Optional[List[ReferenceMapping]] = None
+    prediction_mappings: List['EntityMapping']
+    reference_mappings: List['ReferenceMapping']
+    reference_and_candidates: Optional[List[Tuple['ReferenceMapping', List['EntityMapping']]]] = None
+    null_reference_mappings: Optional[List['ReferenceMapping']] = None
     K: Optional[List[int]] = None
 
 class MetricNames(Enum):

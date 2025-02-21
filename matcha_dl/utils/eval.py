@@ -13,7 +13,7 @@ from org.semanticweb.owlapi.model import (
 
 from matcha_dl.core.entities.mappings import EntityMapping, ReferenceMapping
 from matcha_dl.core.values import ANNOTATION_IRI
-from matcha_dl.impl.utils.data import read_table
+from matcha_dl.utils.data import read_table
 
 
 class MetricUtils:

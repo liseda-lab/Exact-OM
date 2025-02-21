@@ -1,7 +1,7 @@
 import torch
 
 from matcha_dl.core.contracts import SelfRegisteringComponent
-from matcha_dl.core.entities.configs import ComponentType
+from matcha_dl.core.entities.registry import ComponentType
 
 nn = torch.nn
 Tensor = torch.Tensor

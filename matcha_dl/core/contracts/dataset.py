@@ -8,8 +8,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 from matcha_dl.core.contracts.base import SelfRegisteringComponent, LoggingClass
-from matcha_dl.core.entities.configs import ComponentType
-from matcha_dl.impl.utils import read_table
+from matcha_dl.core.entities.registry import ComponentType
+from matcha_dl.utils.data import read_table
 
 from mowl.datasets import PathDataset as OWLDataset
 
