@@ -95,6 +95,7 @@ class AlignmentAction(Protocol):
         dataset = configs.dataset(
             output_path=output_dir_path,
             matchers=matcha.matchers,
+            validation_set=configs.validation_set,
             logger=logger,
             cache_ok=configs.use_file_cache,
         )

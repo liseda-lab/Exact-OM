@@ -120,6 +120,7 @@ class TabularDataset(IDataset):
 
         # assign training label
         inference_set["train"] = False
+        inference_set["validation"] = False
         inference_set["inference"] = True
         
         if self.reference is not None:
@@ -145,19 +146,36 @@ class TabularDataset(IDataset):
             self.log("#Getting Matcha Features...", level="debug")
             training_set = self._get_matcha_features(training_set)
 
-            # assign training label
-            training_set["train"] = True
-            training_set["inference"] = False
-
             self.log("#Shuffling Training Set...", level="debug")
 
             # Ensure reproducibility by using seeded np random state
 
             training_set = training_set.sample(frac=1, random_state=random.randint(0, 2**32 - 1)).reset_index(drop=True)
 
-            self.log("#Combining Training and Inference Sets...", level="debug")
+            if self.validation_set is not None and self.validation_set > 0:
 
-            dataset = pd.concat([training_set, inference_set], ignore_index=True)
+                self.log(f'#Splitting Training Set into Train and Validation Sets({self.validation_set*100}%)...', level="debug")
+
+                # split training set into train and validation sets
+            
+                validation_set = training_set.sample(frac=0.1, random_state=random.randint(0, 2**32 - 1)).reset_index(drop=True)
+
+                training_set = training_set.drop(validation_set.index).reset_index(drop=True)
+
+                # assign validation label
+                validation_set["train"] = False
+                validation_set["validation"] = True
+                validation_set["inference"] = False
+
+            # assign training label
+            training_set["train"] = True
+            training_set["validation"] = False
+            training_set["inference"] = False
+
+
+            self.log("#Combining Training, Validation and Inference Sets...", level="debug")
+
+            dataset = pd.concat([training_set, validation_set, inference_set], ignore_index=True)
 
         else:
 

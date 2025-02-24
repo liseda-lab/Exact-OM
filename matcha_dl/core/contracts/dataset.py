@@ -29,7 +29,8 @@ class IDataset(SelfRegisteringComponent, LoggingClass):
 
     def __init__(self, 
                  output_path: Path, 
-                 matchers: List[str], 
+                 matchers: List[str],
+                 validation_set: Optional[float] = 0.1, 
                  **kwargs
         ) -> None:
 
@@ -37,6 +38,7 @@ class IDataset(SelfRegisteringComponent, LoggingClass):
         self._output_path = output_path / "dataset"
         self._output_path.mkdir(parents=True, exist_ok=True)
         self._matchers = matchers
+        self._validation_set = validation_set
 
         self._source = None
         self._target = None
@@ -53,6 +55,10 @@ class IDataset(SelfRegisteringComponent, LoggingClass):
     @property
     def matchers(self) -> List[str]:
         return self._matchers
+    
+    @property
+    def validation_set(self) -> float:
+        return self._validation_set
 
     @property
     def source(self) -> OWLDataset:

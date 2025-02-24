@@ -21,6 +21,10 @@ use_last_checkpoint: False
 ## Threshold to be used to filter predictions.
 threshold: 0.7 # 0.7
 
+## Validation set to be used to stop training, and in training guidance.
+
+validation_set: 0.1
+
 ## Number of top-k predictions to be considered for evaluation.
 k: [1, 5, 10]
 

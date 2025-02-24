@@ -55,7 +55,7 @@ class MLPTrainer(ITrainer):
             if val_every is not None and val_every > 0:
                 if self.epoch % val_every == 0:
 
-                    _ , validation_loss = self.predict(kind='inference', **kwargs)
+                    _ , validation_loss = self.predict(kind='validation', **kwargs)
 
                     writer.add_scalar("Loss/validation", validation_loss, self.epoch)
 

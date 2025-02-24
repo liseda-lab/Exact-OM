@@ -81,6 +81,7 @@ class ConfigModel(BaseModel):
     use_file_cache: bool = Field(config["use_file_cache"])
     use_last_checkpoint: bool = Field(config["use_last_checkpoint"])
     threshold: float = Field(config["threshold"])
+    validation_set: float = Field(config["validation_set"])
     matcha_params: MatchaParams = MatchaParams()
     plot_negatives_params: PlotNegativesParams = PlotNegativesParams()
     training_params: TrainingParams = TrainingParams()
