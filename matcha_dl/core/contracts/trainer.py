@@ -11,10 +11,9 @@ import torch as th
 
 from matcha_dl.core.contracts import SelfRegisteringComponent, LoggingClass
 from matcha_dl.core.entities.registry import ComponentType
-from matcha_dl.core.entities.mappings import EntityMapping, ReferenceMapping
+from matcha_dl.core.entities.mappings import EntityMapping
 from matcha_dl.utils.mappings import fill_anchored_scores
 from matcha_dl.utils.data import read_table
-from matcha_dl.impl.evaluator import Evaluator
 
 if TYPE_CHECKING:
     from matcha_dl.core.contracts.dataset import IDataset
@@ -236,42 +235,6 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
         )
 
         self.log(f"Saved checkpoint {checkpoint}", level="debug")
-
-    def evaluate(self, kind: str = "inference",
-                threshold: Optional[float] = 0.7, 
-                candidates: Optional[Path] = None, 
-                full_reference: Optional[Path] = None,
-                k: Optional[List[int]] = None,
-                **kwargs,
-    ) -> Tuple[Dict[str, float], float]:
-
-        preds, loss = self.predict(kind=kind, threshold=threshold)
-        aligmnet_file = self.save_alignment(preds, candidates)
-
-        try:
-
-            if candidates is not None:
-                results = Evaluator.local_eval(
-                    reference_and_candidates=aligmnet_file,
-                    K=k,
-                )
-
-            results = Evaluator.global_eval(
-                predictions=aligmnet_file,
-                full_reference=full_reference,
-                train_reference=ReferenceMapping.read_table_mappings(self.dataset.reference),
-                source_ontology=self.dataset.source,
-                target_ontology=self.dataset.target,
-                threshold=threshold,
-            )
-
-            self.log(f"trainer evaluation finished", level="debug")
-
-            return results, loss
-        
-        except ValueError as e:
-            self.log(f"Error during trainer evaluation: {e}", level="error", exc_info=True)
-            raise e
 
 
     def _get_last_checkpoint(self) -> int:

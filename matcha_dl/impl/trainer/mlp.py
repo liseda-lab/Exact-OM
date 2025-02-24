@@ -52,20 +52,15 @@ class MLPTrainer(ITrainer):
                 if self.epoch % save_interval == 0:
                     self.save_checkpoint()
 
-            if val_every is not None and val_every > 0 and kwargs.get("full_reference") is not None:
+            if val_every is not None and val_every > 0:
                 if self.epoch % val_every == 0:
 
-                    results, validation_loss = self.evaluate(kind='inference', **kwargs)
-
-                    for label, value in results.items():
-                        writer.add_scalar(f"{label}/validation", value, self.epoch)
+                    _ , validation_loss = self.predict(kind='inference', **kwargs)
 
                     writer.add_scalar("Loss/validation", validation_loss, self.epoch)
 
-                    tepoch.set_postfix(results)
                     tepoch.set_postfix(validation_loss=validation_loss)
 
-                    self.log(f"Validation metrics at epoch {self.epoch} - {results}", level="info")
                     self.log(f"Validation loss at epoch {self.epoch} - {validation_loss}", level="info")
 
                     if self.stopping is not None:
