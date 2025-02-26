@@ -45,7 +45,7 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
         **kwargs,
     ):
         
-        LoggingClass.__init__(logger=logger)
+        LoggingClass.__init__(self, logger=logger)
 
         # Load Args
 

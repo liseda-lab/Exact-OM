@@ -57,10 +57,9 @@ class IMatcha(LoggingClass):
         self._matcha_features = self.output_path / "matcha_features.tsv"
         self._log_file = self.output_path / "matcha_error.log"
 
-        self._logger = kwargs.get("logger")
         self._cache_ok = kwargs.get("cache_ok", True)
 
-        LoggingClass.__init__(logger=self._logger)
+        LoggingClass.__init__(self, logger=kwargs.get("logger"))
 
     @property
     @abstractmethod

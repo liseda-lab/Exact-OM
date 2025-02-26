@@ -47,10 +47,9 @@ class IDataset(SelfRegisteringComponent, LoggingClass):
         self._negatives = None
         self._matcha_features = None
 
-        self._logger = kwargs.get("logger")
         self._cache_ok = kwargs.get("cache_ok", True)
 
-        LoggingClass.__init__(logger=self._logger)
+        LoggingClass.__init__(self, logger=kwargs.get("logger"))
 
     @property
     def matchers(self) -> List[str]:
