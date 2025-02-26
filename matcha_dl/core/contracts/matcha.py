@@ -167,7 +167,7 @@ class IMatcha(LoggingClass):
         def get_cands(df: pd.DataFrame) -> pd.DataFrame:
 
             return pd.DataFrame([
-                    [source, cand, None]
+                    [source, cand, 0]
                     for source, _, target_cands in df.values
                     for cand in literal_eval(target_cands)
                 ], columns=["Src", "Tgt", "Score"])
