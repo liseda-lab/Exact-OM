@@ -105,7 +105,7 @@ class ConfigModel(BaseModel):
             return "cpu"
         
     def resolve_dependencies(self) -> None:
-        dependencies = ComponentRegistry.get_dependency(self.model.name)
+        dependencies = ComponentRegistry.get_dependency(self.model.name.__name__)
         self.dataset = ComponentRegistry.get(ComponentType.DATASET, dependencies[ComponentType.DATASET])
         self.trainer = ComponentRegistry.get(ComponentType.TRAINER, dependencies[ComponentType.TRAINER])
 
@@ -127,7 +127,7 @@ class ConfigModel(BaseModel):
             for k, v in yaml_config.items()
             if v is not None
             and k in cls.model_fields
-            and k not in ["matcha_params", "plot_negatives" "training_params", "stopper", "model", "loss", "optimizer"]
+            and k not in ["matcha_params", "plot_negatives", "training_params", "stopper", "model", "loss", "optimizer"]
         }
 
         return cls(
