@@ -29,7 +29,6 @@ class EvaluationAction(Protocol):
         log_file_path: Optional[Path] = None,
         log_level: Optional[str] = None,
         logger: Optional[logging.Logger] = None,
-        max_heap_size: Optional[str] = None,
     ) -> None:
         
         start_time = time.time()
