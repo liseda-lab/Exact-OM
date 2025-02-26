@@ -20,6 +20,7 @@ class AlignmentAction(Protocol):
         full_reference_file_path: Optional[Path] = None,
         candidates_file_path: Optional[Path] = None,
         log_file_path: Optional[Path] = None,
+        run_eval: bool = False,
     ) -> None:
 
         start_time = time.time()
@@ -168,7 +169,7 @@ class AlignmentAction(Protocol):
 
         # Evaluate Alignment
 
-        if full_reference_file_path is not None:
+        if run_eval:
             logger.info(f"Evaluating alignment...")
 
             EvaluationAction.run(
@@ -179,7 +180,7 @@ class AlignmentAction(Protocol):
                 source_file_path=dataset.source,
                 target_file_path=dataset.target,
                 train_reference_file_path=reference_file_path,
-                full_reference_file_path=full_reference_file_path,
+                full_reference_file_path=full_reference_file_path if candidates_file_path is None else None,
                 logger=logger,
             )
 

@@ -19,6 +19,7 @@ class AlignmentRunner:
         config_file: Optional[str] = None,
         save_logs: Optional[bool] = False,
         jvm_heap_size: Optional[str] = "32g",
+        run_eval: bool = False,
     ):
         """
 
@@ -32,7 +33,7 @@ class AlignmentRunner:
             candidates_file (str, optional): Path to the candidates file. Defaults to None.
             config_file (str, optional): Path to the configuration file. Defaults to None.
             save_logs (bool, optional): Whether to save logs. Defaults to None.
-            eval_run (bool, optional): Whether to run evaluation. Defaults to None.
+            run_eval (bool, optional): Whether to run evaluation. Defaults to False.
         """
         self.source_ontology_file = source_ontology_file
         self.target_ontology_file = target_ontology_file
@@ -43,6 +44,7 @@ class AlignmentRunner:
         self.config_file = config_file
         self.save_logs = save_logs
         self.jvm_heap_size = jvm_heap_size
+        self.run_eval = run_eval
 
     def run_alignment(self) -> None:
 
@@ -54,9 +56,10 @@ class AlignmentRunner:
             output_dir_path=Path(self.output_dir).resolve(),
             configs_file_path=Path(self.config_file).resolve() if self.config_file else None,
             reference_file_path=Path(self.reference_file).resolve() if self.reference_file else None,
-            test_reference_file_path=Path(self.full_reference_file).resolve() if self.full_reference_file else None,
+            full_reference_file_path=Path(self.full_reference_file).resolve() if self.full_reference_file else None,
             candidates_file_path=Path(self.candidates_file).resolve() if self.candidates_file else None,
             log_file_path=Path(self.output_dir).resolve() / "matcha_dl.log" if self.save_logs else None,
+            run_eval=self.run_eval,
         )
 
     def validate_files(self) -> None:

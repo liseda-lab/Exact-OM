@@ -16,6 +16,7 @@ def run_alignment(args):
         full_reference_file_path=Path(args.full_reference_file).resolve() if args.full_reference_file else None,
         candidates_file_path=Path(args.candidates_file).resolve() if args.candidates_file else None,
         log_file_path=Path(args.output_dir).resolve() / "matcha_dl.log" if args.save_logs else None,
+        run_eval=args.run_eval
     )
 
 
@@ -51,7 +52,7 @@ def parse_arguments():
     )
     parser.add_argument(
         "--full_reference_file",
-        "-T",
+        "-f",
         type=str,
         required=False,
         help="Please provide the path to the full reference file",
@@ -65,7 +66,7 @@ def parse_arguments():
     )
     parser.add_argument(
         "--config_file",
-        "-C",
+        "-y",
         type=str,
         required=False,
         help="Please provide the path to the yaml configuration file",
@@ -75,6 +76,12 @@ def parse_arguments():
         "-l",
         action="store_true",
         help="Whether to save logs",
+    )
+    parser.add_argument(
+        '--run_eval',
+        '-e',
+        action='store_true',
+        help='Whether to run evaluation',
     )
     parser.add_argument(
         "--jvm_heap_size",
