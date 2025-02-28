@@ -89,11 +89,11 @@ class IDataset(SelfRegisteringComponent, LoggingClass):
     
     def load_ontologies(self, source_path: Path, target_path: Path) -> None:
         
-        self._source = OWLDataset(source_path)
+        self._source = OWLDataset(str(source_path))
         
         self.log("#Loaded Source...", level="debug")
         
-        self._target = OWLDataset(target_path)
+        self._target = OWLDataset(str(target_path))
         
         self.log("#Loaded Target...", level="debug")
 

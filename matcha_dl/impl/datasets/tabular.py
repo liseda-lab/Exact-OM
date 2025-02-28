@@ -158,7 +158,7 @@ class TabularDataset(IDataset):
 
                 # split training set into train and validation sets
             
-                validation_set = training_set.sample(frac=0.1, random_state=random.randint(0, 2**32 - 1)).reset_index(drop=True)
+                validation_set = training_set.sample(frac=self.validation_set, random_state=random.randint(0, 2**32 - 1)).reset_index(drop=True)
 
                 training_set = training_set.drop(validation_set.index).reset_index(drop=True)
 
