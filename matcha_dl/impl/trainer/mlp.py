@@ -52,7 +52,7 @@ class MLPTrainer(ITrainer):
                 if self.epoch % save_interval == 0:
                     self.save_checkpoint()
 
-            if val_every is not None and val_every > 0:
+            if val_every is not None and val_every > 0 and self.dataset.validation_set is not None:
                 if self.epoch % val_every == 0:
 
                     _ , validation_loss = self.predict(kind='validation')

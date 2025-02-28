@@ -1,7 +1,7 @@
 import random
 from abc import abstractmethod
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Type, Tuple, TYPE_CHECKING
+from typing import Any, Dict, List, Optional, Type, Tuple, TYPE_CHECKING, Union
 
 import logging
 
@@ -38,7 +38,7 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
         model_params: Optional[Dict[str, Any]] = {},
         stopping: Optional[Type['IStopper']] = None,
         stopping_params: Optional[Dict[str, Any]] = {},
-        device: Optional[int] = 0,
+        device: Union[int, str] = 0,
         output_dir: Optional[Path] = None,
         use_last_checkpoint: Optional[bool] = False,
         logger: Optional[logging.Logger] = None,
@@ -140,10 +140,6 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
               **kwargs
     ) -> None:
         
-        pass
-
-    @abstractmethod
-    def repair(self, **kwargs) -> None:
         pass
 
     @abstractmethod
