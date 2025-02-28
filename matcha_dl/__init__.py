@@ -3,9 +3,8 @@ import tarfile
 import urllib.request
 from pathlib import Path
 
-import yaml
-
 MATCHA_DL_DIR = Path(__file__).parent
+DEFAULT_CONFIG_PATH = MATCHA_DL_DIR / "default_config.yaml"
 
 # If matchaJar and dependencies don't exist, download them.
 
@@ -22,22 +21,9 @@ if not (MATCHA_DL_DIR / "impl/matcha/matcha/").exists():
 
 ## Load default configuration file
 
+from .utils.data import read_yaml
 
-def read_yaml(file_path: Path):
-    with open(str(file_path), "r") as file:
-        return yaml.safe_load(file)
-
-
-def get_config_path():
-    current_file = Path(__file__)
-    parent_directory = current_file.parent
-    config_path = parent_directory / "default_config.yaml"
-    return config_path
-
-
-## get current directory
-
-config = read_yaml(get_config_path())
+config = read_yaml(DEFAULT_CONFIG_PATH)
 
 # Get Jpype init
 

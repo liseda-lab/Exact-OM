@@ -7,6 +7,7 @@ import zipfile
 import shutil
 import tarfile
 from tqdm import tqdm
+import yaml
 
 ## read data tables
 
@@ -26,6 +27,12 @@ def read_table(file_path: Path) -> pd.DataFrame:
 def save_dict_to_csv(data: dict, file_path: Path, sep: str = ",", columns: list = ["key", "value"]):
     """Save a dictionary to a csv file."""
     pd.DataFrame(data.items(), columns=columns).to_csv(str(file_path), index=False, sep=sep)
+
+## read yaml
+
+def read_yaml(file_path: Path):
+    with open(str(file_path), "r") as file:
+        return yaml.safe_load(file)
 
 ## get data from urls
 
