@@ -166,16 +166,9 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
 
     def _save_global_alignment(self, preds: List[EntityMapping], save_dir: Optional[Path] = None):
 
-        # Get the best mapping for each unique source entity
-
-        all_sources = {}
-        for ent_map in preds:
-            if ent_map.head not in all_sources or ent_map.score > all_sources[ent_map.head].score:
-                all_sources[ent_map.head] = ent_map
-
         # Extract the mappings as tuples
 
-        global_alignment = EntityMapping.as_tuples(list(all_sources.values()), with_score=True)
+        global_alignment = EntityMapping.as_tuples(preds, with_score=True)
 
         # Save the global alignment
 

@@ -20,7 +20,7 @@ class MLPTrainer(ITrainer):
         batch_size: Optional[int] = None,
         val_every: Optional[int] = 1,
         save_interval: Optional[int] = 5,
-        **kwargs,
+        **kwargs
     ):
 
         warnings.filterwarnings("ignore", category=UserWarning)
@@ -55,7 +55,7 @@ class MLPTrainer(ITrainer):
             if val_every is not None and val_every > 0:
                 if self.epoch % val_every == 0:
 
-                    _ , validation_loss = self.predict(kind='validation', **kwargs)
+                    _ , validation_loss = self.predict(kind='validation')
 
                     writer.add_scalar("Loss/validation", validation_loss, self.epoch)
 
@@ -78,7 +78,8 @@ class MLPTrainer(ITrainer):
 
     def predict(self, 
                 kind: str = "inference", 
-                threshold: Optional[float] = 0.7,
+                threshold: Optional[float] = None,
+                cardinality: Optional[int] = None,
                 **kwargs
     ) -> Tuple[List[EntityMapping], float]:
 
@@ -96,14 +97,14 @@ class MLPTrainer(ITrainer):
 
             df["Scores"] = logits.cpu()
 
-            return EntityMapping.read_table_mappings(df, threshold=threshold), loss.item()
+            return EntityMapping.read_table_mappings(df, threshold=threshold, cardinality=cardinality), loss.item()
 
         # if unsupervised use max score from matcha
         else:
 
             df["Scores"] = np.array(df["Features"].values.tolist()).max(axis=1)
 
-            return EntityMapping.read_table_mappings(df, threshold=threshold), 0.0
+            return EntityMapping.read_table_mappings(df, threshold=threshold, cardinality=cardinality), 0.0
 
     def _load_data(
         self, kind: str = "train", batch_size: Optional[int] = 1
