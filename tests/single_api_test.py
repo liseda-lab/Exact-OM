@@ -11,7 +11,7 @@ EXP_DIR = Path.cwd() / "exp"
 def main():
     source_ontology_file = str(NCIT_DIR / "ncit.owl")
     target_ontology_file = str(NCIT_DIR / "doid.owl")
-    output_dir = str(EXP_DIR / "test")
+    output_dir = str(EXP_DIR / "test2")
     config_file = str(EXP_DIR / "test" / "config.yaml")
     reference_file = str(NCIT_DIR / "train.tsv")
     candidates_file = str(NCIT_DIR / "test.cands.tsv")
