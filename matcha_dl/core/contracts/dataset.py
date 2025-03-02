@@ -136,12 +136,21 @@ class IDataset(SelfRegisteringComponent, LoggingClass):
         df = read_table(matcha_features_file)
         df.columns = ["Src", "Tgt"] + self.matchers
 
+        # self._matcha_features = {
+        #     src_ent: {
+        #         row["Tgt"]: row[self.matchers].values.tolist()
+        #         for _, row in df[df["Src"] == src_ent].iterrows()
+        #     }
+        #     for src_ent in df["Src"].unique()
+        # }
+
+        df_grouped = df.groupby("Src")
         self._matcha_features = {
             src_ent: {
                 row["Tgt"]: row[self.matchers].values.tolist()
-                for _, row in df[df["Src"] == src_ent].iterrows()
+                for _, row in group.iterrows()
             }
-            for src_ent in df["Src"].unique()
+            for src_ent, group in df_grouped
         }
 
         self.log("#Loaded Matcha Features...", level="debug")
