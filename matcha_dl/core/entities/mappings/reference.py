@@ -79,4 +79,4 @@ class ReferenceMapping(EntityMapping):
 
         table_of_mappings_file.columns = ["SrcEntity", "TgtEntity", "Score"]
 
-        return [cls(dp.SrcEntity, dp.TgtEntity, relation, 1.0) for dp in table_of_mappings_file.itertuples()]
+        return [cls(dp.SrcEntity, dp.TgtEntity, relation) for dp in table_of_mappings_file.itertuples()]
