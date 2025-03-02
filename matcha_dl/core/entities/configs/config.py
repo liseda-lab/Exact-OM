@@ -24,6 +24,9 @@ class RegistryParams(BaseModel):
     @field_validator("name", mode="before")
     def validate_and_load(cls, name: str, values) -> Type[Any]:
         """Validate and load the component from the registry."""
+        if name is None:
+            return None
+        
         component_type = values.data.get("component_type")
         if not component_type:
             raise ValueError("Component type is required for registry-based parameters.")
