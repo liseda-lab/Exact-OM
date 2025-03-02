@@ -26,8 +26,9 @@ class MLPTrainer(ITrainer):
         warnings.filterwarnings("ignore", category=UserWarning)
 
         writer = SummaryWriter(self.logs_dir)
+        early_stopping = False
 
-        while self.epoch <= epochs:
+        while self.epoch <= epochs and not early_stopping:
             self._model.train()
             _iter = 1
 
@@ -48,26 +49,26 @@ class MLPTrainer(ITrainer):
 
                     _iter += 1
 
+                if val_every is not None and val_every > 0 and self.dataset.validation_set is not None:
+                    if self.epoch % val_every == 0:
+
+                        _ , validation_loss = self.predict(kind='validation')
+
+                        writer.add_scalar("Loss/validation", validation_loss, self.epoch)
+
+                        tepoch.set_postfix(validation_loss=validation_loss)
+
+                        self.log(f"Validation loss at epoch {self.epoch} - {validation_loss}", level="info")
+
+                        if self.stopping is not None:
+                            if self.stopping(validation_loss=validation_loss):
+                                self.log(f"Early stopping at epoch {self.epoch}", level="info")
+                                early_stopping = True
+                                break
+
             if save_interval is not None and save_interval > 0:
                 if self.epoch % save_interval == 0:
                     self.save_checkpoint()
-
-            if val_every is not None and val_every > 0 and self.dataset.validation_set is not None:
-                if self.epoch % val_every == 0:
-
-                    _ , validation_loss = self.predict(kind='validation')
-
-                    writer.add_scalar("Loss/validation", validation_loss, self.epoch)
-
-                    tepoch.set_postfix(validation_loss=validation_loss)
-
-                    self.log(f"Validation loss at epoch {self.epoch} - {validation_loss}", level="info")
-
-                    if self.stopping is not None:
-                        if self.stopping(train_loss=loss.item(), validation_loss=validation_loss):
-
-                            self.log(f"Early stopping at epoch {self.epoch}", level="info")
-                            break
 
             self._epoch += 1
 
