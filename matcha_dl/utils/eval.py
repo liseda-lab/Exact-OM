@@ -63,7 +63,7 @@ class MetricUtils:
             for axiom in ontology.getAnnotationAssertionAxioms(owl_class.getIRI()):
                 if axiom.getProperty() == annotation_property:
                     value = axiom.getValue()
-                    if isinstance(value, OWLLiteral) and value.getLiteral().lower() == "false":
+                    if isinstance(value, OWLLiteral) and str(value.getLiteral()).lower() == "false":
                         ignored_class_index[owl_class.getIRI().toString()] = True
 
         return ignored_class_index
