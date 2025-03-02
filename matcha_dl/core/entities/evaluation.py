@@ -10,8 +10,8 @@ if TYPE_CHECKING:
 
 @dataclass
 class EvaluationData:
-    prediction_mappings: List['EntityMapping']
-    reference_mappings: List['ReferenceMapping']
+    prediction_mappings: Optional[List['EntityMapping']] = None
+    reference_mappings: Optional[List['ReferenceMapping']] = None
     reference_and_candidates: Optional[List[Tuple['ReferenceMapping', List['EntityMapping']]]] = None
     null_reference_mappings: Optional[List['ReferenceMapping']] = None
     K: Optional[List[int]] = None

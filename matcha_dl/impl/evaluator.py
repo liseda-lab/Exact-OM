@@ -3,7 +3,6 @@ from typing import Dict, List, Optional, Union, Tuple, TYPE_CHECKING
 from pathlib import Path
 
 from matcha_dl.core.contracts.evaluator import IEvaluator
-from matcha_dl.core.entities.registry import ComponentRegistry
 from matcha_dl.core.entities.evaluation import EvaluationData, MetricNames
 from matcha_dl.core.entities.mappings import EntityMapping, ReferenceMapping
 from matcha_dl.utils.eval import MetricUtils
@@ -66,17 +65,20 @@ class Evaluator(IEvaluator):
     def local_eval(
         cls,
         reference_and_candidates: Union[List[Tuple[ReferenceMapping, List[EntityMapping]]], Path],
+        reference_candidates: Optional[Path] = None,
         K: Optional[List[int]] = None,
     ) -> Dict[str, float]:
         
         if isinstance(reference_and_candidates, Path):
 
-            try:
-                MetricUtils.ranking_result_file_check(reference_and_candidates)
-            except AssertionError:
-                raise ValueError("The file does not have the correct format for ranking results.")
+            if reference_candidates is not None:
+
+                try:
+                    MetricUtils.ranking_result_file_check(cand_maps_file=reference_and_candidates, ref_cand_maps_file=reference_candidates)
+                except AssertionError:
+                    raise ValueError("The file does not have the correct format for ranking results.")
             
-            reference_and_candidates = MetricUtils.read_candidate_mappings(reference_and_candidates)
+            reference_and_candidates = MetricUtils.read_candidate_mappings(str(reference_and_candidates))
 
         return cls([MetricNames.HITS_AT_K, MetricNames.MRR]).evaluate(
             EvaluationData(reference_and_candidates=reference_and_candidates, K=K)
@@ -84,4 +86,4 @@ class Evaluator(IEvaluator):
     
     @staticmethod
     def save_results(results: Dict[str, float], output_dir: Path) -> None:
-        save_dict_to_csv(results, output_dir / "evaluation_results.csv", ["Metric", "Value"])
+        save_dict_to_csv(data=results, file_path=output_dir / "evaluation_results.csv", columns=["Metric", "Value"])

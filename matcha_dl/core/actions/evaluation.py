@@ -26,6 +26,7 @@ class EvaluationAction(Protocol):
         target_file_path: Optional[Union[OWLDataset, Path]] = None,
         train_reference_file_path: Optional[Path] = None,
         full_reference_file_path: Optional[Path] = None,
+        reference_candidates: Optional[Path] = None,
         log_file_path: Optional[Path] = None,
         log_level: Optional[str] = None,
         logger: Optional[logging.Logger] = None,
@@ -104,6 +105,7 @@ class EvaluationAction(Protocol):
 
                 results = Evaluator.local_eval(
                     reference_and_candidates=alignment,
+                    reference_candidates=reference_candidates,
                     K=K,
                 )
             
