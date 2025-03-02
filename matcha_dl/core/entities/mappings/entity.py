@@ -123,6 +123,8 @@ class EntityMapping:
         if isinstance(table_of_mappings_file, Path):
             table_of_mappings_file = read_table(table_of_mappings_file)
 
+        table_of_mappings_file.columns = ["SrcEntity", "TgtEntity", "Score"]
+
         mappings = [cls(dp.SrcEntity, dp.TgtEntity, relation, dp.Score) for dp in table_of_mappings_file.itertuples()]
 
         if threshold is not None:

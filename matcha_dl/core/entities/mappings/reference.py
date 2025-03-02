@@ -77,4 +77,6 @@ class ReferenceMapping(EntityMapping):
         if isinstance(table_of_mappings_file, Path):
             table_of_mappings_file = read_table(table_of_mappings_file)
 
+        table_of_mappings_file.columns = ["SrcEntity", "TgtEntity", "Score"]
+
         return [cls(dp.SrcEntity, dp.TgtEntity, relation, 1.0) for dp in table_of_mappings_file.itertuples()]

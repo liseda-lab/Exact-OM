@@ -97,14 +97,14 @@ class MLPTrainer(ITrainer):
 
             df["Scores"] = logits.cpu()
 
-            return EntityMapping.read_table_mappings(df, threshold=threshold, cardinality=cardinality), loss.item()
+            return EntityMapping.read_table_mappings(df[["Src", "Tgt", "Scores"]], threshold=threshold, cardinality=cardinality), loss.item()
 
         # if unsupervised use max score from matcha
         else:
 
             df["Scores"] = np.array(df["Features"].values.tolist()).max(axis=1)
 
-            return EntityMapping.read_table_mappings(df, threshold=threshold, cardinality=cardinality), 0.0
+            return EntityMapping.read_table_mappings(df[["Src", "Tgt", "Scores"]], threshold=threshold, cardinality=cardinality), 0.0
 
     def _load_data(
         self, kind: str = "train", batch_size: Optional[int] = 1
