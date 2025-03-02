@@ -228,7 +228,7 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
 
     def _get_last_checkpoint(self) -> int:
         try:
-            res = int(sorted(self.checkpoints)[-1].split(".")[0])
+            res = sorted([int(checkpoint.split(".")[0]) for checkpoint in self.checkpoints])[-1]
         except IndexError:
             res = 0
 
