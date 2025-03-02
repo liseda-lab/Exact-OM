@@ -20,5 +20,4 @@ class Adam(IOptimizer, optim.Adam):
             amsgrad: Whether to use the AMSGrad variant of this algorithm from the paper 
                      "On the Convergence of Adam and Beyond".
         """
-        IOptimizer.__init__(self, params, **kwargs)
         optim.Adam.__init__(self, params, lr, betas, eps, weight_decay, amsgrad, **kwargs)
