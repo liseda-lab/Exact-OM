@@ -1,1 +1,1 @@
-from .earlystoping import EarlyStopping
+from .stable_loss import StableLossStopping

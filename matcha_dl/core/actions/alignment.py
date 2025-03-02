@@ -142,8 +142,8 @@ class AlignmentAction(Protocol):
             loss_params=configs.loss.params,
             optimizer_params=configs.optimizer.params,
             model_params=model_params,
-            earlystoping=configs.stopper.name,
-            earlystoping_params=configs.stopper.params,
+            stopping=configs.stopper.name,
+            stopping_params=configs.stopper.params,
             device=configs.device,
             output_dir= output_dir_path / "model",
             use_last_checkpoint=configs.use_last_checkpoint,
@@ -175,7 +175,7 @@ class AlignmentAction(Protocol):
             logger.info(f"Evaluating alignment...")
 
             EvaluationAction.run(
-                alignment=alignment_file_path,
+                alignment=Path(alignment_file_path),
                 output_dir_path=output_dir_path,
                 error_on_fail=False,
                 K=configs.k,
@@ -183,6 +183,7 @@ class AlignmentAction(Protocol):
                 target_file_path=dataset.target,
                 train_reference_file_path=reference_file_path,
                 full_reference_file_path=full_reference_file_path if candidates_file_path is None else None,
+                reference_candidates=candidates_file_path,
                 logger=logger,
             )
 

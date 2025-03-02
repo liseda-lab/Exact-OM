@@ -69,10 +69,10 @@ training_params:
   save_interval: 5
   
 stopper:
-  name: EarlyStopping
+  name: StableLossStopping
   params:
-    tolerance: 5
-    min_delta: 0.0
+    patience: 5 # 5, 10
+    min_delta: 1e-4
 
 model:
   name: MlpClassifier
