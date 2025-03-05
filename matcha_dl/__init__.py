@@ -31,4 +31,4 @@ from mowl import init_jvm
 
 # Get AlignmentRunner
 
-from .delivery.api import AlignmentRunner
+from .delivery.api import AlignmentRunner, EvalutionRunner

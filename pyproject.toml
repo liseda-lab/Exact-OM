@@ -30,7 +30,8 @@ pyaml = "^25.1.0"
 
 
 [tool.poetry.scripts]
-matchadl = "matcha_dl.delivery.cli:main"
+matchadl = "matcha_dl.delivery.cli.single_align:main"
+matchadl-eval = "matcha_dl.delivery.cli.eval:main"
 
 
 [tool.poetry.group.prebuild.dependencies]

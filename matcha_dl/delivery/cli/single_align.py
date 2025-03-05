@@ -16,7 +16,8 @@ def run_alignment(args):
         full_reference_file_path=Path(args.full_reference_file).resolve() if args.full_reference_file else None,
         candidates_file_path=Path(args.candidates_file).resolve() if args.candidates_file else None,
         log_file_path=Path(args.output_dir).resolve() / "matcha_dl.log" if args.save_logs else None,
-        run_eval=args.run_eval
+        run_eval=args.run_eval,
+        device=args.device
     )
 
 
@@ -89,6 +90,13 @@ def parse_arguments():
         type=str,
         required=False,
         help="JVM heap size",
+    )
+    parser.add_argument(
+        "--device",
+        "-d",
+        type=int,
+        required=False,
+        help="Device number",
     )
     return parser.parse_args()
 
