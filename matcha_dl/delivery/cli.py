@@ -1,10 +1,12 @@
 import argparse
 from pathlib import Path
 
-from matcha_dl.core.actions.alignment import AlignmentAction
+from matcha_dl import init_jvm
 
 
 def run_alignment(args):
+    from matcha_dl.core.actions.alignment import AlignmentAction
+
     AlignmentAction.run(
         source_file_path=Path(args.source_ontology_file).resolve(),
         target_file_path=Path(args.target_ontology_file).resolve(),
@@ -14,7 +16,7 @@ def run_alignment(args):
         full_reference_file_path=Path(args.full_reference_file).resolve() if args.full_reference_file else None,
         candidates_file_path=Path(args.candidates_file).resolve() if args.candidates_file else None,
         log_file_path=Path(args.output_dir).resolve() / "matcha_dl.log" if args.save_logs else None,
-        run_eval=args.run_eval,
+        run_eval=args.run_eval
     )
 
 
@@ -50,10 +52,10 @@ def parse_arguments():
     )
     parser.add_argument(
         "--full_reference_file",
-        "-T",
+        "-f",
         type=str,
         required=False,
-        help="Please provide the path to the test reference file",
+        help="Please provide the path to the full reference file",
     )
     parser.add_argument(
         "--candidates_file",
@@ -64,7 +66,7 @@ def parse_arguments():
     )
     parser.add_argument(
         "--config_file",
-        "-C",
+        "-y",
         type=str,
         required=False,
         help="Please provide the path to the yaml configuration file",
@@ -76,10 +78,17 @@ def parse_arguments():
         help="Whether to save logs",
     )
     parser.add_argument(
-        "--run_eval",
-        "-e",
-        action="store_true",
-        help="Whether to run evaluation",
+        '--run_eval',
+        '-e',
+        action='store_true',
+        help='Whether to run evaluation',
+    )
+    parser.add_argument(
+        "--jvm_heap_size",
+        "-m",
+        type=str,
+        required=False,
+        help="JVM heap size",
     )
     return parser.parse_args()
 
@@ -104,6 +113,16 @@ def main():
         config_file = Path(args.config_file)
         if not config_file.exists():
             raise Exception(f"Configuration file {args.config_file} does not exist")
+        
+    if args.jvm_heap_size:
+        if args.jvm_heap_size.isdigit():
+            args.jvm_heap_size += 'G'
+        elif not (args.jvm_heap_size[:-1].isdigit() and args.jvm_heap_size[-1].lower() == 'g'):
+            raise Exception(f"JVM heap size {args.jvm_heap_size} is not valid, please provide a valid format")
+    else:
+        args.jvm_heap_size = '32G'
+
+    init_jvm(args.jvm_heap_size)
 
     run_alignment(args)
 

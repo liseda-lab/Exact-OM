@@ -15,7 +15,7 @@ import random
 import pandas as pd
 
 from matcha_dl.core.contracts import LoggingClass
-from matcha_dl.impl.utils import read_table
+from matcha_dl.utils.data import read_table
 
 
 class IMatcha(LoggingClass):
@@ -57,10 +57,9 @@ class IMatcha(LoggingClass):
         self._matcha_features = self.output_path / "matcha_features.tsv"
         self._log_file = self.output_path / "matcha_error.log"
 
-        self._logger = kwargs.get("logger")
         self._cache_ok = kwargs.get("cache_ok", True)
 
-        LoggingClass.__init__(logger=self._logger)
+        LoggingClass.__init__(self, logger=kwargs.get("logger"))
 
     @property
     @abstractmethod
@@ -168,7 +167,7 @@ class IMatcha(LoggingClass):
         def get_cands(df: pd.DataFrame) -> pd.DataFrame:
 
             return pd.DataFrame([
-                    [source, cand, None]
+                    [source, cand, 0]
                     for source, _, target_cands in df.values
                     for cand in literal_eval(target_cands)
                 ], columns=["Src", "Tgt", "Score"])

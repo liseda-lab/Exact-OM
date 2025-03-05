@@ -7,6 +7,15 @@
 /matcha_dl/impl/matcha/matcha/*
 !/matcha_dl/impl/matcha/matcha/*.py
 
+# Data folder
+
+/data/*
+!/data/*.py
+
+# Experiments folder
+
+/exp/*
+
 # Test Data
 
 /tests/test_data/*

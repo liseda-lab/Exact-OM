@@ -3,16 +3,11 @@ import time
 from pathlib import Path
 from typing import Optional, Protocol
 
-from mowl import init_jvm
-
 from matcha_dl.core.actions.evaluation import EvaluationAction
 from matcha_dl.core.entities.configs import ConfigModel
 from matcha_dl.core.values import N_CLASSES
 from matcha_dl.impl.matcha import Matcha
 from matcha_dl.impl.seed import SeedSetter
-
-# TODO on debug check if init_jvm can run in action
-
 
 class AlignmentAction(Protocol):
     @staticmethod
@@ -25,7 +20,7 @@ class AlignmentAction(Protocol):
         full_reference_file_path: Optional[Path] = None,
         candidates_file_path: Optional[Path] = None,
         log_file_path: Optional[Path] = None,
-        eval_run: Optional[bool] = False,
+        run_eval: bool = False,
     ) -> None:
 
         start_time = time.time()
@@ -70,10 +65,6 @@ class AlignmentAction(Protocol):
             logger.info(f"Setting seed to {configs.seed}")
             SeedSetter(configs.seed)
 
-        # Init Jpype
-
-        init_jvm(configs.matcha_params.max_heap)
-
         # Matcha module
 
         logger.info(f"Matching {source_file_path} and {target_file_path}")
@@ -105,6 +96,7 @@ class AlignmentAction(Protocol):
         dataset = configs.dataset(
             output_path=output_dir_path,
             matchers=matcha.matchers,
+            validation_set=configs.validation_set,
             logger=logger,
             cache_ok=configs.use_file_cache,
         )
@@ -122,10 +114,10 @@ class AlignmentAction(Protocol):
 
         logger.info(f"Dataset ready")
 
+        dataset.save()
+
         if configs.plot_negatives_params.enabled:
             dataset.plot_negative_distributions(**configs.plot_negatives_params.model_dump())
-
-        dataset.save()
 
         # Trainer module
 
@@ -150,8 +142,8 @@ class AlignmentAction(Protocol):
             loss_params=configs.loss.params,
             optimizer_params=configs.optimizer.params,
             model_params=model_params,
-            earlystoping=configs.stopper.name,
-            earlystoping_params=configs.stopper.params,
+            stopping=configs.stopper.name,
+            stopping_params=configs.stopper.params,
             device=configs.device,
             output_dir= output_dir_path / "model",
             use_last_checkpoint=configs.use_last_checkpoint,
@@ -160,15 +152,14 @@ class AlignmentAction(Protocol):
 
         if dataset.reference is not None:
             logger.info(f"Training model with {reference_file_path}")
-            trainer.train(**configs.training_params.model_dump(), 
-                          candidates=candidates_file_path, 
-                          threshold=configs.threshold,
-                          test_reference=full_reference_file_path,
-                          k=configs.k,)
+            trainer.train(**configs.training_params.model_dump())
 
         logger.info(f"Computing alignment...")
 
-        alignment, _ = trainer.predict(threshold=configs.threshold)
+        if candidates_file_path is not None:
+            alignment, _ = trainer.predict(threshold=configs.threshold, cardinality=configs.cardinality)
+        else:
+            alignment, _ = trainer.predict(threshold=configs.threshold)
 
         # Save Alignment
         
@@ -180,18 +171,19 @@ class AlignmentAction(Protocol):
 
         # Evaluate Alignment
 
-        if eval_run:
+        if run_eval:
             logger.info(f"Evaluating alignment...")
 
             EvaluationAction.run(
-                alignment=alignment_file_path,
+                alignment=Path(alignment_file_path),
                 output_dir_path=output_dir_path,
                 error_on_fail=False,
                 K=configs.k,
                 source_file_path=dataset.source,
                 target_file_path=dataset.target,
                 train_reference_file_path=reference_file_path,
-                full_reference_file_path=full_reference_file_path,
+                full_reference_file_path=full_reference_file_path if candidates_file_path is None else None,
+                reference_candidates=candidates_file_path,
                 logger=logger,
             )
 

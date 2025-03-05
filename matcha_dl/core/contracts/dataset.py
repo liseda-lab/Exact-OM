@@ -8,8 +8,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 from matcha_dl.core.contracts.base import SelfRegisteringComponent, LoggingClass
-from matcha_dl.core.entities.configs import ComponentType
-from matcha_dl.impl.utils import read_table
+from matcha_dl.core.entities.registry import ComponentType
+from matcha_dl.utils.data import read_table
 
 from mowl.datasets import PathDataset as OWLDataset
 
@@ -29,7 +29,8 @@ class IDataset(SelfRegisteringComponent, LoggingClass):
 
     def __init__(self, 
                  output_path: Path, 
-                 matchers: List[str], 
+                 matchers: List[str],
+                 validation_set: Optional[float] = 0.1, 
                  **kwargs
         ) -> None:
 
@@ -37,6 +38,7 @@ class IDataset(SelfRegisteringComponent, LoggingClass):
         self._output_path = output_path / "dataset"
         self._output_path.mkdir(parents=True, exist_ok=True)
         self._matchers = matchers
+        self._validation_set = validation_set
 
         self._source = None
         self._target = None
@@ -45,14 +47,17 @@ class IDataset(SelfRegisteringComponent, LoggingClass):
         self._negatives = None
         self._matcha_features = None
 
-        self._logger = kwargs.get("logger")
         self._cache_ok = kwargs.get("cache_ok", True)
 
-        LoggingClass.__init__(logger=self._logger)
+        LoggingClass.__init__(self, logger=kwargs.get("logger"))
 
     @property
     def matchers(self) -> List[str]:
         return self._matchers
+    
+    @property
+    def validation_set(self) -> float:
+        return self._validation_set
 
     @property
     def source(self) -> OWLDataset:
@@ -84,11 +89,11 @@ class IDataset(SelfRegisteringComponent, LoggingClass):
     
     def load_ontologies(self, source_path: Path, target_path: Path) -> None:
         
-        self._source = OWLDataset(source_path)
+        self._source = OWLDataset(str(source_path))
         
         self.log("#Loaded Source...", level="debug")
         
-        self._target = OWLDataset(target_path)
+        self._target = OWLDataset(str(target_path))
         
         self.log("#Loaded Target...", level="debug")
 
@@ -131,12 +136,21 @@ class IDataset(SelfRegisteringComponent, LoggingClass):
         df = read_table(matcha_features_file)
         df.columns = ["Src", "Tgt"] + self.matchers
 
+        # self._matcha_features = {
+        #     src_ent: {
+        #         row["Tgt"]: row[self.matchers].values.tolist()
+        #         for _, row in df[df["Src"] == src_ent].iterrows()
+        #     }
+        #     for src_ent in df["Src"].unique()
+        # }
+
+        df_grouped = df.groupby("Src")
         self._matcha_features = {
             src_ent: {
                 row["Tgt"]: row[self.matchers].values.tolist()
-                for _, row in df[df["Src"] == src_ent].iterrows()
+                for _, row in group.iterrows()
             }
-            for src_ent in df["Src"].unique()
+            for src_ent, group in df_grouped
         }
 
         self.log("#Loaded Matcha Features...", level="debug")

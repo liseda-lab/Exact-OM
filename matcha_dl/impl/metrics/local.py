@@ -9,6 +9,8 @@ from matcha_dl.core.entities.mappings import EntityMapping
 class HitsAtKMetric(IMetric):
     """Implementation of the Hits@K metric."""
 
+    metric_name = MetricNames.HITS_AT_K
+
     def prepare(self, data: EvaluationData) -> List[EvaluationData]:
         return [
             EvaluationData(
@@ -28,10 +30,12 @@ class HitsAtKMetric(IMetric):
             if ref.to_tuple() in ordered_candidates[:k]:
                 n_hits += 1
         hits_at_k = n_hits / len(data.reference_and_candidates) if data.reference_and_candidates else 0.0
-        return {MetricNames.HITS_AT_K.value.format(k=k): round(hits_at_k, 3)}
+        return {self.metric_name.value.format(k=k): round(hits_at_k, 3)}
     
 class MeanReciprocalRankMetric(IMetric):
     """Implementation of the Mean Reciprocal Rank (MRR) metric."""
+
+    metric_name = MetricNames.MRR
 
     def compute(self, data: EvaluationData) -> Dict[str, float]:
         reciprocal_ranks = 0
@@ -41,4 +45,4 @@ class MeanReciprocalRankMetric(IMetric):
                 rank = ordered_candidates.index(ref.to_tuple()) + 1
                 reciprocal_ranks += 1 / rank
         mrr = reciprocal_ranks / len(data.reference_and_candidates) if data.reference_and_candidates else 0.0
-        return {MetricNames.MRR.value: round(mrr, 3)}
+        return {self.metric_name.value: round(mrr, 3)}

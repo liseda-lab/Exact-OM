@@ -1,7 +1,7 @@
 import random
 from abc import abstractmethod
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Type, Tuple
+from typing import Any, Dict, List, Optional, Type, Tuple, TYPE_CHECKING, Union
 
 import logging
 
@@ -10,15 +10,18 @@ import pandas as pd
 import torch as th
 
 from matcha_dl.core.contracts import SelfRegisteringComponent, LoggingClass
-from matcha_dl.core.contracts.dataset import IDataset
-from matcha_dl.core.contracts.loss import ILoss
-from matcha_dl.core.contracts.model import IModel
-from matcha_dl.core.contracts.optimizer import IOptimizer
-from matcha_dl.core.contracts.stopper import IStopper
-from matcha_dl.core.entities.configs import ComponentType
-from matcha_dl.core.entities.mappings import EntityMapping, ReferenceMapping
-from matcha_dl.impl.utils import fill_anchored_scores, read_table
-from matcha_dl.impl.evaluator import Evaluator
+from matcha_dl.core.entities.registry import ComponentType
+from matcha_dl.core.entities.mappings import EntityMapping
+from matcha_dl.utils.mappings import fill_anchored_scores
+from matcha_dl.utils.data import read_table
+
+if TYPE_CHECKING:
+    from matcha_dl.core.contracts.dataset import IDataset
+    from matcha_dl.core.contracts.loss import ILoss
+    from matcha_dl.core.contracts.model import IModel
+    from matcha_dl.core.contracts.optimizer import IOptimizer
+    from matcha_dl.core.contracts.stopper import IStopper
+
 
 class ITrainer(SelfRegisteringComponent, LoggingClass):
 
@@ -26,23 +29,23 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
 
     def __init__(
         self,
-        dataset: IDataset,
-        model: Type[IModel],
-        loss: Type[ILoss],
-        optimizer: Type[IOptimizer],
+        dataset: 'IDataset',
+        model: Type['IModel'],
+        loss: Type['ILoss'],
+        optimizer: Type['IOptimizer'],
         loss_params: Optional[Dict[str, Any]] = {},
         optimizer_params: Optional[Dict[str, Any]] = {},
         model_params: Optional[Dict[str, Any]] = {},
-        stopping: Optional[Type[IStopper]] = None,
+        stopping: Optional[Type['IStopper']] = None,
         stopping_params: Optional[Dict[str, Any]] = {},
-        device: Optional[int] = 0,
+        device: Union[int, str] = 0,
         output_dir: Optional[Path] = None,
         use_last_checkpoint: Optional[bool] = False,
         logger: Optional[logging.Logger] = None,
         **kwargs,
     ):
         
-        LoggingClass.__init__(logger=logger)
+        LoggingClass.__init__(self, logger=logger)
 
         # Load Args
 
@@ -85,19 +88,19 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
         return th.device(self._device if th.cuda.is_available() else "cpu")
 
     @property
-    def dataset(self) -> IDataset:
+    def dataset(self) -> 'IDataset':
         return self._dataset
 
     @property
-    def model(self) -> IModel:
+    def model(self) -> 'IModel':
         return self._model
 
     @property
-    def optimizer(self) -> IOptimizer:
+    def optimizer(self) -> 'IOptimizer':
         return self._optimizer
 
     @property
-    def loss(self) -> ILoss:
+    def loss(self) -> 'ILoss':
         return self._loss
 
     @property
@@ -105,7 +108,7 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
         return self._seed
 
     @property
-    def stopping(self) -> Optional[IStopper]:
+    def stopping(self) -> Optional['IStopper']:
         return self._stopping
 
     @property
@@ -140,10 +143,6 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
         pass
 
     @abstractmethod
-    def repair(self, **kwargs) -> None:
-        pass
-
-    @abstractmethod
     def predict(self, kind: str = "inference", 
                 threshold: Optional[float] = 0.7,
                 **kwargs
@@ -163,16 +162,9 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
 
     def _save_global_alignment(self, preds: List[EntityMapping], save_dir: Optional[Path] = None):
 
-        # Get the best mapping for each unique source entity
-
-        all_sources = {}
-        for ent_map in preds:
-            if ent_map.head not in all_sources or ent_map.score > all_sources[ent_map.head].score:
-                all_sources[ent_map.head] = ent_map
-
         # Extract the mappings as tuples
 
-        global_alignment = EntityMapping.as_tuples(list(all_sources.values()), with_score=True)
+        global_alignment = EntityMapping.as_tuples(preds, with_score=True)
 
         # Save the global alignment
 
@@ -233,46 +225,10 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
 
         self.log(f"Saved checkpoint {checkpoint}", level="debug")
 
-    def evaluate(self, kind: str = "inference",
-                threshold: Optional[float] = 0.7, 
-                candidates: Optional[Path] = None, 
-                full_reference: Optional[Path] = None,
-                k: Optional[List[int]] = None,
-                **kwargs,
-    ) -> Tuple[Dict[str, float], float]:
-
-        preds, loss = self.predict(kind=kind, threshold=threshold)
-        aligmnet_file = self.save_alignment(preds, candidates)
-
-        try:
-
-            if candidates is not None:
-                results = Evaluator.local_eval(
-                    reference_and_candidates=aligmnet_file,
-                    K=k,
-                )
-
-            results = Evaluator.global_eval(
-                predictions=aligmnet_file,
-                full_reference=full_reference,
-                train_reference=ReferenceMapping.read_table_mappings(self.dataset.reference),
-                source_ontology=self.dataset.source,
-                target_ontology=self.dataset.target,
-                threshold=threshold,
-            )
-
-            self.log(f"trainer evaluation finished", level="debug")
-
-            return results, loss
-        
-        except ValueError as e:
-            self.log(f"Error during trainer evaluation: {e}", level="error", exc_info=True)
-            raise e
-
 
     def _get_last_checkpoint(self) -> int:
         try:
-            res = int(sorted(self.checkpoints)[-1].split(".")[0])
+            res = sorted([int(checkpoint.split(".")[0]) for checkpoint in self.checkpoints])[-1]
         except IndexError:
             res = 0
 

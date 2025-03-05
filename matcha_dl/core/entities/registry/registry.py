@@ -1,28 +1,18 @@
-from enum import Enum
-from typing import Any, Dict, Type
+from typing import Any, Dict, Type, TYPE_CHECKING
 
-from matcha_dl.core.contracts import SelfRegisteringComponent
+from matcha_dl.core.entities.registry import ComponentType
 
-
-class ComponentType(Enum):
-    """Enum for valid component types."""
-    MODEL = "model"
-    DATASET = "dataset"
-    TRAINER = "trainer"
-    LOSS = "loss"
-    OPTIMIZER = "optimizer"
-    STOPPER = "stopper"
-    METRIC = "metric"
+if TYPE_CHECKING:
+    from matcha_dl.core.contracts.base import SelfRegisteringComponent
 
 
 class ComponentRegistry:
     """A registry for managing components and dependencies with lazy loading and type validation."""
     _registries: Dict[ComponentType, Dict[str, str]] = {}  # Store components by type
-    _type_validators: Dict[ComponentType, Type[SelfRegisteringComponent]] = {}  # Validators
     _dependencies: Dict[str, Dict[ComponentType, str]] = {}  # Dependency mappings
 
     @classmethod
-    def register_validator(cls, component_type: ComponentType, base_class: Type[SelfRegisteringComponent]):
+    def register_validator(cls, component_type: ComponentType, base_class: Type['SelfRegisteringComponent']):
         """Register a base class validator for a specific component type."""
         if not isinstance(component_type, ComponentType):
             raise ValueError(f"Invalid component type '{component_type}'. Must be a ComponentType Enum value.")
@@ -41,7 +31,7 @@ class ComponentRegistry:
 
     @classmethod
     def register(cls, component_type: ComponentType, name: str, component_path: str):
-        """Register a component under a specific type with validation."""
+        """Register a component under a specific type."""
         if not isinstance(component_type, ComponentType):
             raise ValueError(f"Invalid component type '{component_type}'. Must be a ComponentType Enum value.")
 
@@ -53,18 +43,6 @@ class ComponentRegistry:
                 raise ValueError(
                     f"Component '{name}' is already registered under type '{component_type.value}' "
                     f"with a different path: {cls._registries[component_type][name]}."
-                )
-
-        # Validate component class if a validator exists
-        if component_type in cls._type_validators:
-            base_class = cls._type_validators[component_type]
-            module_name, class_name = component_path.rsplit(".", 1)
-            component_class = cls._load_class(module_name, class_name)
-
-            if not issubclass(component_class, base_class):
-                raise TypeError(
-                    f"Cannot register component '{name}' under type '{component_type.value}': "
-                    f"it must inherit from '{base_class.__name__}'."
                 )
 
         # Register the component

@@ -1,17 +1,19 @@
 
 from abc import ABC
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
 import logging
 
-from matcha_dl.core.entities.configs import ComponentRegistry
+if TYPE_CHECKING:
+    from matcha_dl.core.entities.registry import ComponentType
 
 #TODO on debug check if all modules are being curretly registered, non imported implementations might not be registered.
 
 
 class SelfRegisteringComponent(ABC):
+    
     """Base class for self-registering components."""
-    component_type: str  # To be defined in subclasses
+    component_type: 'ComponentType'  # To be defined in subclasses
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
@@ -29,6 +31,8 @@ class SelfRegisteringComponent(ABC):
         import_path = f"{module_name}.{class_name}"
 
         # Register the class using the ComponentRegistry
+        
+        from matcha_dl.core.entities.registry import ComponentRegistry
         ComponentRegistry.register(cls.component_type, class_name, import_path)
 
 

@@ -6,8 +6,7 @@ import logging
 
 from mowl.owlapi import OWLOntology
 
-from matcha_dl.core.contracts import LoggingClass
-from matcha_dl.core.entities.configs import ComponentRegistry
+from matcha_dl.core.entities.registry import ComponentRegistry, ComponentType
 from matcha_dl.core.entities.evaluation import EvaluationData, MetricNames
 from matcha_dl.core.entities.mappings import EntityMapping, ReferenceMapping
 
@@ -15,10 +14,7 @@ from matcha_dl.core.entities.mappings import EntityMapping, ReferenceMapping
 class IEvaluator(ABC):
     """Abstract base class for all evaluators."""
 
-    @abstractmethod
-    def __init__(self, metrics: List[MetricNames],
-                 logger: Optional[logging.Logger] = None
-    ):
+    def __init__(self, metrics: List[MetricNames]):
 
         """
         Initialize the evaluator with the specified metrics.
@@ -27,9 +23,14 @@ class IEvaluator(ABC):
             metrics (List[MetricNames]): A list of metric names to be used for evaluation.
         """
 
-        self.metrics = [
-            ComponentRegistry.get_metric("metric", metric.value)() for metric in metrics
-        ]
+        self.metrics = []
+
+        for register in ComponentRegistry.list(ComponentType.METRIC)[1:]:
+
+                reg_class = ComponentRegistry.get(ComponentType.METRIC, register)
+
+                if reg_class.metric_name in metrics:
+                    self.metrics.append(reg_class())
 
     @abstractmethod
     def evaluate(

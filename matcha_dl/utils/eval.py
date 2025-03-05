@@ -13,7 +13,7 @@ from org.semanticweb.owlapi.model import (
 
 from matcha_dl.core.entities.mappings import EntityMapping, ReferenceMapping
 from matcha_dl.core.values import ANNOTATION_IRI
-from matcha_dl.impl.utils.data import read_table
+from matcha_dl.utils.data import read_table
 
 
 class MetricUtils:
@@ -63,7 +63,7 @@ class MetricUtils:
             for axiom in ontology.getAnnotationAssertionAxioms(owl_class.getIRI()):
                 if axiom.getProperty() == annotation_property:
                     value = axiom.getValue()
-                    if isinstance(value, OWLLiteral) and value.getLiteral().lower() == "false":
+                    if isinstance(value, OWLLiteral) and str(value.getLiteral()).lower() == "false":
                         ignored_class_index[owl_class.getIRI().toString()] = True
 
         return ignored_class_index

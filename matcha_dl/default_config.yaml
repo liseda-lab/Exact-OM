@@ -10,19 +10,32 @@ seed: 42
 ## Cuda device to be used. If None, CPU will be used.
 device: 0
 
-# Alignment Parameters
-
 ## Used cached files to skip computations if available.
 use_file_cache: False
 
 ## Use the last checkpoint to continue training
 use_last_checkpoint: False
 
-## Threshold to be used to filter predictions.
-threshold: 0.7 # 0.7
+# Evaluation Parameters
+
+## Validation set to be used to stop training, and in training guidance.
+## If Null, no validation set will be used.
+
+validation_set: 0.1
 
 ## Number of top-k predictions to be considered for evaluation.
 k: [1, 5, 10]
+
+# Alignment Parameters
+
+## Threshold to be used to filter predictions.
+## If Null, final alignment will not be filtered by score.
+threshold: 0.7 # 0.7
+
+## Cardinality to be used to filter predictions.
+## If Null, final alignment will not be filtered by cardinality.
+## Only used in full alignment tasks.
+cardinality: null # 1
 
 matcha_params:
   ## JAVA Heap Size
@@ -56,10 +69,10 @@ training_params:
   save_interval: 5
   
 stopper:
-  name: EarlyStopping
+  name: StableLossStopping
   params:
-    tolerance: 5
-    min_delta: 0.0
+    patience: 5 # 5, 10
+    min_delta: 1e-4
 
 model:
   name: MlpClassifier

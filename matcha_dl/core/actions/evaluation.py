@@ -10,8 +10,6 @@ import time
 from pathlib import Path
 from typing import Optional, Protocol, Union, List, Tuple
 
-from mowl import init_jvm
-
 from matcha_dl.core.contracts.dataset import OWLDataset
 from matcha_dl.impl.evaluator import Evaluator
 from matcha_dl.core.entities.mappings import EntityMapping, ReferenceMapping
@@ -28,10 +26,10 @@ class EvaluationAction(Protocol):
         target_file_path: Optional[Union[OWLDataset, Path]] = None,
         train_reference_file_path: Optional[Path] = None,
         full_reference_file_path: Optional[Path] = None,
+        reference_candidates: Optional[Path] = None,
         log_file_path: Optional[Path] = None,
         log_level: Optional[str] = None,
         logger: Optional[logging.Logger] = None,
-        max_heap_size: Optional[str] = None,
     ) -> None:
         
         start_time = time.time()
@@ -53,13 +51,6 @@ class EvaluationAction(Protocol):
                 logger.info(f"Logging to file {log_file_path}")
 
             logger.debug(f"Logging level set to {log_level}")
-
-        # Init JVM
-
-        if max_heap_size is not None:
-            init_jvm(max_heap_size)
-
-            logger.info(f"JVM initialized with max heap size {max_heap_size}")
 
         # Start evaluation
 
@@ -114,6 +105,7 @@ class EvaluationAction(Protocol):
 
                 results = Evaluator.local_eval(
                     reference_and_candidates=alignment,
+                    reference_candidates=reference_candidates,
                     K=K,
                 )
             

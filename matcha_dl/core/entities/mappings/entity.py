@@ -1,13 +1,16 @@
 # Adapted from https://github.com/KRR-Oxford/DeepOnto
 
-from typing import List, Optional, Union
+from typing import List, Optional, Union, TYPE_CHECKING
 from pathlib import Path
 
-from matcha_dl.core.contracts.dataset import DataFrame
-from matcha_dl.core.entities.mappings import ReferenceMapping
-from matcha_dl.core.values import DEFAULT_REL
-from matcha_dl.impl.utils import read_table
+from collections import defaultdict
+from heapq import nlargest
 
+from matcha_dl.core.values import DEFAULT_REL
+from matcha_dl.utils.data import read_table
+
+if TYPE_CHECKING:
+    from matcha_dl.core.contracts.dataset import DataFrame
 
 class EntityMapping:
     r"""A datastructure for entity mapping.
@@ -68,6 +71,40 @@ class EntityMapping:
             (List[EntityMapping]): A list of sorted entity mappings.
         """
         return list(sorted(entity_mappings, key=lambda x: x.score, reverse=True))[:k]
+    
+    @staticmethod
+    def filter_entity_mappings_by_score(entity_mappings: List['EntityMapping'], threshold: float) -> List['EntityMapping']:
+        r"""Filter the entity mappings in a list by their scores.
+
+        Args:
+            entity_mappings (List[EntityMapping]): A list entity mappings to filter.
+            threshold (float): The threshold value to filter the entity mappings.
+
+        Returns:
+            (List[EntityMapping]): A list of filtered entity mappings.
+        """
+        return [m for m in entity_mappings if m.score >= threshold]
+    
+    @staticmethod
+    def filter_top_n_entity_mappings(preds: List['EntityMapping'], n: int) -> List['EntityMapping']:
+        r"""Filter the entity mappings in a list by their scores.
+        Args:
+            preds (List[EntityMapping]): A list entity mappings to filter.
+            n (int): The number of top $n$ scored entities preserved.
+        Returns:
+            (List[EntityMapping]): A list of filtered entity mappings.
+        """
+        all_sources = defaultdict(list)
+        
+        for ent_map in preds:
+            all_sources[ent_map.head].append(ent_map)
+        
+        filtered_mappings = []
+        for head, mappings in all_sources.items():
+            top_n_mappings = nlargest(n, mappings, key=lambda x: x.score)
+            filtered_mappings.extend(top_n_mappings)
+        
+        return filtered_mappings
 
     def __repr__(self):
         return f"EntityMapping({self.head} {self.relation} {self.tail}, {round(self.score, 6)})"
@@ -75,41 +112,24 @@ class EntityMapping:
     @classmethod
     def read_table_mappings(
         cls,
-        table_of_mappings_file: Union[Path, DataFrame],
+        table_of_mappings_file: Union[Path, 'DataFrame'],
         threshold: Optional[float] = None,
+        cardinality: Optional[int] = None,
         relation: str = DEFAULT_REL,
-        is_reference: bool = False,
     ) -> List['EntityMapping']:
-        r"""Read entity mappings from `.csv` or `.tsv` files.
         
-        !!! note "Mapping Table Format"
-        
-            The columns of the mapping table must have the headings: `"SrcEntity"`, `"TgtEntity"`, and `"Score"`.
-
-        Args:
-            table_of_mappings_file (str): The path to the table (`.csv` or `.tsv`) of mappings.
-            threshold (Optional[float], optional): Mappings with scores less than `threshold` will not be loaded. Defaults to 0.0.
-            relation (str, optional): A symbol that represents what semantic relation this mapping stands for. Defaults to `<?rel>` which means unspecified.
-                Suggested inputs are `"<EquivalentTo>"` and `"<SubsumedBy>"`.
-            is_reference (bool): Whether the loaded mappings are reference mappigns; if so, `threshold` is disabled and mapping scores
-                are all set to $1.0$. Defaults to `False`.
-
-        Returns:
-            (List[EntityMapping]): A list of entity mappings loaded from the table file.
-        """
+        r"""Read entity mappings from `.csv` or `.tsv` files."""
 
         if isinstance(table_of_mappings_file, Path):
             table_of_mappings_file = read_table(table_of_mappings_file)
 
-        entity_mappings = []
-        for dp in table_of_mappings_file.itertuples():
-            if is_reference:
-                entity_mappings.append(ReferenceMapping(dp.SrcEntity, dp.TgtEntity, relation))
-            else:
-                # allow `None` for threshold
-                if not threshold or dp["Score"] >= threshold:
-                    entity_mappings.append(cls(dp.SrcEntity, dp.TgtEntity, relation, dp.Score))
-        return entity_mappings
+        table_of_mappings_file.columns = ["SrcEntity", "TgtEntity", "Score"]
 
-    def __repr__(self):
-        return f"EntityMapping({self.head} {self.relation} {self.tail}, {round(self.score, 6)})"
+        mappings = [cls(dp.SrcEntity, dp.TgtEntity, relation, dp.Score) for dp in table_of_mappings_file.itertuples()]
+
+        if threshold is not None:
+            mappings = cls.filter_entity_mappings_by_score(mappings, threshold)
+
+        if cardinality is not None:
+            mappings = cls.filter_top_n_entity_mappings(mappings, cardinality)
+        return mappings

@@ -9,8 +9,7 @@ from tqdm import tqdm
 
 from matcha_dl.core.contracts.trainer import EntityMapping, ITrainer
 
-# TODO add stopper support
-# TODO add validation split, keep track on tensorboard 
+# TODO add validation split
 
 
 class MLPTrainer(ITrainer):
@@ -21,14 +20,15 @@ class MLPTrainer(ITrainer):
         batch_size: Optional[int] = None,
         val_every: Optional[int] = 1,
         save_interval: Optional[int] = 5,
-        **kwargs,
+        **kwargs
     ):
 
         warnings.filterwarnings("ignore", category=UserWarning)
 
         writer = SummaryWriter(self.logs_dir)
+        early_stopping = False
 
-        while self.epoch <= epochs:
+        while self.epoch <= epochs and not early_stopping:
             self._model.train()
             _iter = 1
 
@@ -49,31 +49,26 @@ class MLPTrainer(ITrainer):
 
                     _iter += 1
 
+                if val_every is not None and val_every > 0 and self.dataset.validation_set is not None:
+                    if self.epoch % val_every == 0:
+
+                        _ , validation_loss = self.predict(kind='validation')
+
+                        writer.add_scalar("Loss/validation", validation_loss, self.epoch)
+
+                        tepoch.set_postfix(validation_loss=validation_loss)
+
+                        self.log(f"Validation loss at epoch {self.epoch} - {validation_loss}", level="info")
+
+                        if self.stopping is not None:
+                            if self.stopping(validation_loss=validation_loss):
+                                self.log(f"Early stopping at epoch {self.epoch}", level="info")
+                                early_stopping = True
+                                break
+
             if save_interval is not None and save_interval > 0:
                 if self.epoch % save_interval == 0:
                     self.save_checkpoint()
-
-            if val_every is not None and val_every > 0:
-                if self.epoch % val_every == 0:
-
-                    results, validation_loss = self.evaluate(kind='inference', **kwargs)
-
-                    for label, value in results.items():
-                        writer.add_scalar(f"{label}/validation", value, self.epoch)
-
-                    writer.add_scalar("Loss/validation", validation_loss, self.epoch)
-
-                    tepoch.set_postfix(results)
-                    tepoch.set_postfix(validation_loss=validation_loss)
-
-                    self.log(f"Validation metrics at epoch {self.epoch} - {results}", level="info")
-                    self.log(f"Validation loss at epoch {self.epoch} - {validation_loss}", level="info")
-
-                    if self.stopping is not None:
-                        if self.stopping(train_loss=loss.item(), validation_loss=validation_loss):
-
-                            self.log(f"Early stopping at epoch {self.epoch}", level="info")
-                            break
 
             self._epoch += 1
 
@@ -84,7 +79,8 @@ class MLPTrainer(ITrainer):
 
     def predict(self, 
                 kind: str = "inference", 
-                threshold: Optional[float] = 0.7,
+                threshold: Optional[float] = None,
+                cardinality: Optional[int] = None,
                 **kwargs
     ) -> Tuple[List[EntityMapping], float]:
 
@@ -102,14 +98,14 @@ class MLPTrainer(ITrainer):
 
             df["Scores"] = logits.cpu()
 
-            return EntityMapping.read_table_mappings(df, threshold=threshold), loss.item()
+            return EntityMapping.read_table_mappings(df[["Src", "Tgt", "Scores"]], threshold=threshold, cardinality=cardinality), loss.item()
 
         # if unsupervised use max score from matcha
         else:
 
             df["Scores"] = np.array(df["Features"].values.tolist()).max(axis=1)
 
-            return EntityMapping.read_table_mappings(df, threshold=threshold), 0.0
+            return EntityMapping.read_table_mappings(df[["Src", "Tgt", "Scores"]], threshold=threshold, cardinality=cardinality), 0.0
 
     def _load_data(
         self, kind: str = "train", batch_size: Optional[int] = 1
