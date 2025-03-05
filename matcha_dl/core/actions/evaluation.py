@@ -1,10 +1,4 @@
 
-# TODO create eval action from files
-    # Single Eval
-    # Directory Eval
-# TODO refactor delivery to allow for multiple cli and apis
-# TODO add eval to list of poetry toml commands
-
 import logging
 import time
 from pathlib import Path
@@ -13,7 +7,6 @@ from typing import Optional, Protocol, Union, List, Tuple
 from matcha_dl.core.contracts.dataset import OWLDataset
 from matcha_dl.impl.evaluator import Evaluator
 from matcha_dl.core.entities.mappings import EntityMapping, ReferenceMapping
-
 
 class EvaluationAction(Protocol):
     @staticmethod
@@ -40,6 +33,7 @@ class EvaluationAction(Protocol):
             logger = logging.getLogger("matcha-dl-evaluation")
 
             if log_level is not None:
+                log_level = getattr(logging, log_level)
                 logger.setLevel(log_level)
 
             if log_file_path is not None:
@@ -133,15 +127,14 @@ class DirectoryEvaluationAction(Protocol):
     @staticmethod
     def run(
         directory: Path,
-        max_heap_size: str = "4g",
+        output_dir_path: Path,
         log_level: str = "INFO",
         K: Optional[List[int]] = None,
         error_on_fail: bool = False,
-        log_file_path: Optional[Path] = None,
-    ):
-        """
-        Given a directory it will look for a directory containg the following subdirectories:
-
-        """
-
+        save_logs: bool = False,
+    ) -> None:
+        
         pass
+
+
+        
