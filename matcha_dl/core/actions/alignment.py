@@ -1,13 +1,18 @@
 import logging
 import time
 from pathlib import Path
-from typing import Optional, Protocol
+from typing import Optional, Protocol, List
+import concurrent.futures
+from multiprocessing import Manager
+import pandas as pd
 
 from matcha_dl.core.actions.evaluation import EvaluationAction
-from matcha_dl.core.entities.configs import ConfigModel
+from matcha_dl.core.entities.configs import ConfigModel, ConfigTuner
+from matcha_dl.core.entities.directories import OEAIDir
 from matcha_dl.core.values import N_CLASSES
 from matcha_dl.impl.matcha import Matcha
 from matcha_dl.impl.seed import SeedSetter
+from matcha_dl.utils.directories import OEAIDirSearcher
 
 class AlignmentAction(Protocol):
     @staticmethod
@@ -198,3 +203,277 @@ class AlignmentAction(Protocol):
         end_time = time.time()
         elapsed_time = end_time - start_time
         logger.info(f"Alignment completed in {elapsed_time:.3f} seconds")
+
+        return results
+
+class DirectoryAlignmentAction(Protocol):
+    @staticmethod
+    def run(
+        data_dir: Path,
+        output_dir: Path,
+        configs_file_path: Optional[Path] = None,
+        run_eval: bool = False,
+        save_logs: bool = False,
+        devices: Optional[List[int]] = None,
+    ) -> None:
+        
+        start_time = time.time()
+
+        # Load Configs
+
+        if configs_file_path is not None:
+            configs = ConfigModel.load_config(configs_file_path)
+
+        else:
+            configs = ConfigModel()
+
+        # Loading logging configuration from configs
+
+        logger = logging.getLogger("matcha-dl-dir")
+        logger.setLevel(configs.logging_level)
+
+        if save_logs:
+            file_handler = logging.FileHandler(output_dir / "matcha_dl-dir.log")
+            file_handler.setLevel(configs.logging_level)
+            formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+            file_handler.setFormatter(formatter)
+            logger.addHandler(file_handler)
+            logger.info(f"Logging to file {output_dir / "matcha_dl-dir.log"}")
+
+        logger.debug(f"Logging level set to {configs.logging_level}")
+
+        searcher = OEAIDirSearcher(data_dir)
+
+        try:
+
+            logger.info(f"Searching OEAI directories in {data_dir}")
+            oeai_dirs = searcher.find_oeai_dirs()
+
+        except Exception as e:
+            logging.error(f"Error searching OEAI directories: {e}")
+            return
+
+        def process_oeai_dir(oeai_dir: OEAIDir, available_devices: List[int]) -> dict:
+                    temp_output_dir = output_dir / oeai_dir.data_name
+                    temp_output_dir.mkdir(parents=True, exist_ok=True)
+
+                    tasks = [
+                        ("global_supervised", None, oeai_dir.reference_file_path),
+                        ("local_supervised", oeai_dir.candidates_file_path, oeai_dir.reference_file_path),
+                        ("global_unsupervised", None, None),
+                        ("local_unsupervised", oeai_dir.candidates_file_path, None),
+                    ]
+
+                    with available_devices.get_lock():
+                        if available_devices:
+                            device = available_devices.pop(0)
+                        else:
+                            device = None
+
+                    task_results = {}
+
+                    try:
+                        for task_name, candidates_file_path, reference_file_path in tasks:
+                            results = AlignmentAction.run(
+                                source_file_path=oeai_dir.source_file_path,
+                                target_file_path=oeai_dir.target_file_path,
+                                output_dir_path=temp_output_dir,
+                                configs_file_path=configs_file_path,
+                                reference_file_path=reference_file_path,
+                                full_reference_file_path=oeai_dir.full_reference_file_path,
+                                candidates_file_path=candidates_file_path,
+                                log_file_path=temp_output_dir / f"{task_name}.log" if save_logs else None,
+                                run_eval=run_eval,
+                                task_name=task_name,
+                                device=device,
+                            )
+                            task_results[task_name] = results
+                    finally:
+                        with available_devices.get_lock():
+                            if device is not None:
+                                available_devices.append(device)
+
+                    return {oeai_dir.data_name: task_results}
+
+                    
+
+        logger.info(f"Running Alignments on found OEAI directories...")
+
+        all_results = {}
+
+        with Manager() as manager:
+            available_devices = manager.list(devices) if devices else manager.list()
+            with concurrent.futures.ProcessPoolExecutor() as executor:
+                futures = [
+                    executor.submit(process_oeai_dir, oeai_dir, available_devices)
+                    for oeai_dir in oeai_dirs
+                ]
+                for future in concurrent.futures.as_completed(futures):
+                    try:
+                        task_results = future.result()
+                        all_results.update(task_results)
+                    except Exception as e:
+                        logging.error(f"Error processing OEAI directory: {e}")
+
+        logger.info(f"All OEAI directories processed successfully")
+        logger.info(f"Writing results...")
+
+        results_list = []
+        for oeai_dir_name, tasks in all_results.items():
+            for task_name, result in tasks.items():
+                flattened_result = {"OEAI Directory": oeai_dir_name, "Task Name": task_name}
+                if isinstance(result, dict):
+                    flattened_result.update(result)
+                else:
+                    flattened_result["Result"] = result
+                results_list.append(flattened_result)
+
+        df = pd.DataFrame(results_list)
+        df.to_csv(output_dir / "alignment_full_results.csv", index=False)
+
+        logger.info(f"Results written to {output_dir / 'alignment_full_results.csv'}")
+
+        end_time = time.time()
+        elapsed_time = end_time - start_time
+        logger.info(f"Directory alignment completed in {elapsed_time:.3f} seconds")
+
+class TuningAlignmentAction(Protocol):
+    @staticmethod
+    def run(
+        source_file_path: Path,
+        target_file_path: Path,
+        reference_file_path: Path,
+        candidates_file_path: Path,
+        output_dir_path: Path,
+        configs_file_path: Path,
+        full_reference_file_path: Optional[Path] = None,
+        run_eval: bool = False,
+        save_logs: bool = False,
+        devices: Optional[List[int]] = None,
+        max_combinations: Optional[int] = None,
+    ) -> None:
+        
+
+        start_time = time.time()
+
+        logger = logging.getLogger("matcha-dl-tuner")
+        logger.setLevel(logging.DEBUG)
+
+        if save_logs:
+            file_handler = logging.FileHandler(output_dir_path / "matcha_dl-tuner.log")
+            file_handler.setLevel(logging.DEBUG)
+            formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+            file_handler.setFormatter(formatter)
+            logger.addHandler(file_handler)
+            logger.info(f"Logging to file {output_dir_path / 'matcha_dl-tuner.log'}")
+
+        logger.debug(f"Logging level set to {logging.DEBUG}")
+
+        logger.info(f"Loading Possible Configs...")
+
+        config_tuner = ConfigTuner(configs_file_path, ignore_params=["k", "matcha_params.matchers", "plot_negatives", "model.params.layers"])
+
+        tune_configs = config_tuner.load_tuned_config(max_combinations)
+
+        logger.info(f"Loaded {len(tune_configs)} possible configurations")
+
+        def flatten_config(config: ConfigModel) -> dict:
+            """Flatten the ConfigModel into a dictionary."""
+            config_dict = config.model_dump()
+            flattened_config = {}
+            for key, value in config_dict.items():
+                if isinstance(value, dict):
+                    for sub_key, sub_value in value.items():
+                        flattened_config[f"{key}.{sub_key}"] = sub_value
+                else:
+                    flattened_config[key] = value
+            return flattened_config
+
+        def process_config(tag: str, config: ConfigModel, available_devices: List[int] = None) -> dict:
+            
+            temp_output_dir = output_dir_path / tag
+            temp_output_dir.mkdir(parents=True, exist_ok=True)
+
+            tasks = [
+                ("global_supervised", None, reference_file_path),
+                ("local_supervised", candidates_file_path, reference_file_path),
+                ("global_unsupervised", None, None),
+                ("local_unsupervised", candidates_file_path, None),
+            ]
+
+            task_results = {}
+
+            with available_devices.get_lock():
+                if available_devices:
+                    device = available_devices.pop(0)
+                else:
+                    device = None
+
+            try:
+                for task_name, candidates_file_path, reference_file_path in tasks:
+                    results = AlignmentAction.run(
+                        source_file_path=source_file_path,
+                        target_file_path=target_file_path,
+                        output_dir_path=temp_output_dir,
+                        configs_file_path=config,
+                        reference_file_path=reference_file_path,
+                        full_reference_file_path=full_reference_file_path,
+                        candidates_file_path=candidates_file_path,
+                        log_file_path=temp_output_dir / f"{task_name}.log" if save_logs else None,
+                        run_eval=run_eval,
+                        task_name=task_name,
+                        device=device,
+                    )
+                    task_results[task_name] = results
+            finally:
+                with available_devices.get_lock():
+                    if device is not None:
+                        available_devices.append(device)
+
+            return {"config_tag": tag, "config": flatten_config(config), "results": task_results}
+
+        logger.info(f"Running Alignments on possible combinations...")
+
+        all_tuning_results = []
+
+        with Manager() as manager:
+            available_devices = manager.list(devices) if devices else manager.list()
+            with concurrent.futures.ProcessPoolExecutor() as executor:
+                futures = [
+                    executor.submit(process_config, str(i), config, available_devices)
+                    for i, config in enumerate(tune_configs)
+                ]
+                for future in concurrent.futures.as_completed(futures):
+                    try:
+                        tuning_result = future.result()
+                        all_tuning_results.append(tuning_result)
+                    except Exception as e:
+                        logging.error(f"Error processing combination: {e}")
+
+        logger.info(f"All combinations run successfully")
+        logger.info(f"Writing results...")
+
+        tuning_results_list = []
+        for tuning_result in all_tuning_results:
+            config_tag = tuning_result["config_tag"]
+            config = tuning_result["config"]
+            results = tuning_result["results"]
+            for task_name, result in results.items():
+                flattened_result = {"Config Tag": config_tag, "Task Name": task_name}
+                if isinstance(result, dict):
+                    flattened_result.update(result)
+                else:
+                    flattened_result["Result"] = result
+                flattened_result.update(config)
+                tuning_results_list.append(flattened_result)
+
+        tuning_df = pd.DataFrame(tuning_results_list)
+
+        tuning_df.to_csv(output_dir_path / "tuning_alignment_full_results.csv", index=False)
+
+        logger.info(f"Results written to {output_dir_path / 'tuning_alignment_full_results.csv'}")
+
+        end_time = time.time()
+        elapsed_time = end_time - start_time
+        logger.info(f"Tuning alignment completed in {elapsed_time:.3f} seconds")
+        

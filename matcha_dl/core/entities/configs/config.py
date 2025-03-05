@@ -1,6 +1,8 @@
 import logging
 from pathlib import Path
-from typing import Any, Optional, Tuple, Type, Union
+from typing import Any, Optional, Tuple, Type, Union, List, Dict
+import itertools
+import random
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -106,14 +108,7 @@ class ConfigModel(BaseModel):
     @field_validator("logging_level", mode="before")
     def parse_logging_level(logging_level: str) -> int:
         return getattr(logging, logging_level.upper())
-
-    @field_validator("device", mode="before")
-    def parse_device(cls, device: Optional[int]) -> Union[int, str]:
-        if device is not None:
-            return device
-        else:
-            return "cpu"
-        
+    
     def resolve_dependencies(self) -> None:
         dependencies = ComponentRegistry.get_dependency(self.model.name.__name__)
         self.dataset = ComponentRegistry.get(ComponentType.DATASET, dependencies[ComponentType.DATASET])
@@ -137,7 +132,7 @@ class ConfigModel(BaseModel):
             for k, v in yaml_config.items()
             if v is not None
             and k in cls.model_fields
-            and k not in ["matcha_params", "plot_negatives", "training_params", "stopper", "model", "loss", "optimizer"]
+            and k not in ["matcha_params", "plot_negatives", "training_params", "dataset_params", "alignment_params" "stopper", "model", "loss", "optimizer"]
         }
 
         return cls(
@@ -150,3 +145,78 @@ class ConfigModel(BaseModel):
             optimize=optimizer_params,
             **filtered_config,
         )
+    
+
+class ConfigTuner:
+    def __init__(self, config_file: Path, ignore_params: List[str]):
+        self.config_file = config_file
+        self.ignore_params = ignore_params
+        self.yaml_config = read_yaml(config_file)
+
+    def _is_tunable_param(self, key: str, value: Any) -> bool:
+        return isinstance(value, list) and key not in self.ignore_params
+
+    def _extract_tunable_params(self, config: Dict[str, Any], parent_key: str = '') -> Dict[str, List[Any]]:
+        tunable_params = {}
+        for k, v in config.items():
+            full_key = f"{parent_key}.{k}" if parent_key else k
+            if self._is_tunable_param(full_key, v):
+                tunable_params[full_key] = v
+            elif isinstance(v, dict):
+                tunable_params.update(self._extract_tunable_params(v, full_key))
+        return tunable_params
+
+    def _set_nested_value(self, config: Dict[str, Any], keys: List[str], value: Any) -> None:
+        for key in keys[:-1]:
+            config = config.setdefault(key, {})
+        config[keys[-1]] = value
+
+    def _generate_tuning_combinations(self, tunable_params: Dict[str, List[Any]]) -> List[Dict[str, Any]]:
+        keys, values = zip(*tunable_params.items())
+        combinations = [dict(zip(keys, combination)) for combination in itertools.product(*values)]
+        return combinations
+
+    def _generate_random_combinations(self, tunable_params: Dict[str, List[Any]], n: int) -> List[Dict[str, Any]]:
+        keys = list(tunable_params.keys())
+        combinations = []
+        for _ in range(n):
+            combination = {key: random.choice(tunable_params[key]) for key in keys}
+            combinations.append(combination)
+        return combinations
+
+    def _apply_combinations(self, base_config: Dict[str, Any], combinations: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        config_models = []
+        for combination in combinations:
+            config_copy = base_config.copy()
+            for key, value in combination.items():
+                keys = key.split('.')
+                self._set_nested_value(config_copy, keys, value)
+            config_models.append(config_copy)
+        return config_models
+
+    def load_tuned_all_configs(self) -> List[ConfigModel]:
+        tunable_params = self._extract_tunable_params(self.yaml_config)
+        static_params = {k: v for k, v in self.yaml_config.items() if k not in tunable_params}
+
+        tuning_combinations = self._generate_tuning_combinations(tunable_params)
+        combined_configs = self._apply_combinations(static_params, tuning_combinations)
+
+        config_models = [ConfigModel(**config) for config in combined_configs]
+        return config_models
+
+    def load_random_tuned_configs(self, n: int) -> List[ConfigModel]:
+        tunable_params = self._extract_tunable_params(self.yaml_config)
+        static_params = {k: v for k, v in self.yaml_config.items() if k not in tunable_params}
+
+        random_combinations = self._generate_random_combinations(tunable_params, n)
+        combined_configs = self._apply_combinations(static_params, random_combinations)
+
+        config_models = [ConfigModel(**config) for config in combined_configs]
+        return config_models
+    
+    def load_tuned_config(self, max_combinations: Optional[int] = None) -> List[ConfigModel]:
+        if max_combinations:
+            return self.load_random_tuned_configs(max_combinations)
+        return self.load_tuned_all_configs()
+    
+

@@ -49,15 +49,11 @@ class OEAIDirSearcher:
                     full_file = dir_path / "full.tsv"
                     candidates_file = dir_path / "test.cands.tsv"
                     
-                    # Optional config file
-                    config_file = next(dir_path.glob("*.yaml"), None)
-                    
                     if all(f.exists() for f in [source_file, target_file, train_file, full_file, candidates_file]):
                         oeai_dirs.append(OEAIDir(
+                            data_name=dir_path.name,
                             source_file_path=source_file,
                             target_file_path=target_file,
-                            output_dir_path=dir_path,
-                            configs_file_path=config_file,
                             reference_file_path=train_file,
                             full_reference_file_path=full_file,
                             candidates_file_path=candidates_file
