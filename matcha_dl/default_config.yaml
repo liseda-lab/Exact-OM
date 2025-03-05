@@ -7,35 +7,32 @@ logging_level: INFO
 ## Seed for reproducibility.
 seed: 42
 
-## Cuda device to be used. If None, CPU will be used.
-device: 0
-
 ## Used cached files to skip computations if available.
 use_file_cache: False
 
 ## Use the last checkpoint to continue training
 use_last_checkpoint: False
 
+## If True, the training will be skipped if a checkpoint is found.
+
+skip_training_if_checkpoint: False
+
 # Evaluation Parameters
-
-## Validation set to be used to stop training, and in training guidance.
-## If Null, no validation set will be used.
-
-validation_set: 0.1
 
 ## Number of top-k predictions to be considered for evaluation.
 k: [1, 5, 10]
 
 # Alignment Parameters
 
-## Threshold to be used to filter predictions.
-## If Null, final alignment will not be filtered by score.
-threshold: 0.7 # 0.7
+alignment_params:
+  ## Threshold to be used to filter predictions.
+  ## If Null, final alignment will not be filtered by score.
+  threshold: 0.7 # 0.7
 
-## Cardinality to be used to filter predictions.
-## If Null, final alignment will not be filtered by cardinality.
-## Only used in full alignment tasks.
-cardinality: null # 1
+  ## Cardinality to be used to filter predictions.
+  ## If Null, final alignment will not be filtered by cardinality.
+  ## Only used in full alignment tasks.
+  cardinality: null # 1
 
 matcha_params:
   ## JAVA Heap Size
@@ -61,6 +58,11 @@ plot_negatives:
   alpha: 0.6
   dpi: 300
   grid: True
+
+dataset_params:
+  ## Validation set to be used to stop training, and in training guidance.
+  ## If Null or not declared, no validation set will be used.
+  validation_set: 0.1
 
 training_params:
   epochs: 10 # 50

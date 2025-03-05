@@ -70,24 +70,30 @@ class PlotNegativesParams(BaseModel):
     dpi: int = Field(config["plot_negatives"]["dpi"])
     grid: bool = Field(config["plot_negatives"]["grid"])
 
+class DatasetParams(BaseModel):
+    validation_set: Optional[float] = Field(config["validation_set"])
+
 class TrainingParams(BaseModel):
     epochs: int = Field(config["training_params"]["epochs"])
     batch_size: Optional[int] = Field(config["training_params"]["batch_size"])
     val_every: Optional[int] = Field(config["training_params"]["val_every"])
-    save_interval: int = Field(config["training_params"]["save_interval"])
+    save_interval: Optional[int] = Field(config["training_params"]["save_interval"])
+
+class AlignmentParams(BaseModel):
+    threshold: Optional[float] = Field(config["threshold"])
+    cardinality: Optional[int] = Field(config["cardinality"])
 
 class ConfigModel(BaseModel):
 
     seed: int = Field(config["seed"])
-    device: Union[int, str] = Field(config["device"], validate_default=True)
     logging_level: int = Field(config["logging_level"], validate_default=True)
     use_file_cache: bool = Field(config["use_file_cache"])
     use_last_checkpoint: bool = Field(config["use_last_checkpoint"])
-    threshold: Optional[float] = Field(config["threshold"])
-    cardinality: Optional[int] = Field(config["cardinality"])
-    validation_set: Optional[float] = Field(config["validation_set"])
+    skip_training_if_checkpoint: bool = Field(config["skip_training_if_checkpoint"])
     matcha_params: MatchaParams = MatchaParams()
     plot_negatives_params: PlotNegativesParams = PlotNegativesParams()
+    dataset_params: DatasetParams = DatasetParams()
+    alignment_params: AlignmentParams = AlignmentParams()
     training_params: TrainingParams = TrainingParams()
     stopper: StoppingParams = StoppingParams()
     model: ModelParams = ModelParams()

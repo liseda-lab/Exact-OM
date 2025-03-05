@@ -21,7 +21,9 @@ class AlignmentAction(Protocol):
         candidates_file_path: Optional[Path] = None,
         log_file_path: Optional[Path] = None,
         run_eval: bool = False,
-    ) -> None:
+        task_name: Optional[str] = None,
+        device: Optional[int] = None,
+    ) -> Optional[dict]:
 
         start_time = time.time()
 
@@ -96,9 +98,9 @@ class AlignmentAction(Protocol):
         dataset = configs.dataset(
             output_path=output_dir_path,
             matchers=matcha.matchers,
-            validation_set=configs.validation_set,
             logger=logger,
             cache_ok=configs.use_file_cache,
+            **configs.dataset_params.model_dump(),
         )
 
         if matcha.reference is not None:
@@ -144,9 +146,10 @@ class AlignmentAction(Protocol):
             model_params=model_params,
             stopping=configs.stopper.name,
             stopping_params=configs.stopper.params,
-            device=configs.device,
+            device=device if device is not None else 'cpu',
             output_dir= output_dir_path / "model",
             use_last_checkpoint=configs.use_last_checkpoint,
+            skip_training_if_checkpoint=configs.skip_training_if_checkpoint,
             logger=logger,
         )
 
@@ -157,26 +160,31 @@ class AlignmentAction(Protocol):
         logger.info(f"Computing alignment...")
 
         if candidates_file_path is not None:
-            alignment, _ = trainer.predict(threshold=configs.threshold, cardinality=configs.cardinality)
+            alignment, _ = trainer.predict(configs.alignment_params.model_dump())
         else:
-            alignment, _ = trainer.predict(threshold=configs.threshold)
+            alignment, _ = trainer.predict(
+                threshold=configs.alignment_params.threshold)
 
         # Save Alignment
         
         logger.info(f"Writing alignment...")
 
-        alignment_file_path = trainer.save_alignment(alignment, candidates_file_path)
+        alignment_file_path = trainer.save_alignment(alignment=alignment, 
+                                                     candidates_one2many_path=candidates_file_path, 
+                                                     sub_dir=task_name)
 
         logger.info(f"Alignment written to {alignment_file_path}")
 
         # Evaluate Alignment
 
+        results = None
+
         if run_eval:
             logger.info(f"Evaluating alignment...")
 
-            EvaluationAction.run(
+            results = EvaluationAction.run(
                 alignment=Path(alignment_file_path),
-                output_dir_path=output_dir_path,
+                output_dir_path=output_dir_path / task_name,
                 error_on_fail=False,
                 K=configs.k,
                 source_file_path=dataset.source,

@@ -16,12 +16,16 @@ class MLPTrainer(ITrainer):
 
     def train(
         self,
-        epochs: Optional[int] = 50,
+        epochs: int = 50,
         batch_size: Optional[int] = None,
         val_every: Optional[int] = 1,
         save_interval: Optional[int] = 5,
         **kwargs
     ):
+        
+        if self.skip_training:
+            self.log("Skipping training, because checkpoint already exists", level="info")
+            return
 
         warnings.filterwarnings("ignore", category=UserWarning)
 

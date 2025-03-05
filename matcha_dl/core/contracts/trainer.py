@@ -41,6 +41,7 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
         device: Union[int, str] = 0,
         output_dir: Optional[Path] = None,
         use_last_checkpoint: Optional[bool] = False,
+        skip_training_if_checkpoint: Optional[bool] = False,
         logger: Optional[logging.Logger] = None,
         **kwargs,
     ):
@@ -64,10 +65,12 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
 
         self._epoch = 1
 
+        self._skip_training_if_checkpoint = skip_training_if_checkpoint
+
         # Load checkpoint if exists
 
         if use_last_checkpoint:
-            if self.checkpoints_dir.is_dir() and any(self.checkpoints_dir.iterdir()):
+            if self.has_checkpoints:
                 self.load_checkpoint()
                 self.log(f"Loaded checkpoint {self._get_last_checkpoint()}")
             else:
@@ -118,6 +121,14 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
     @property
     def checkpoints_dir(self) -> Path:
         return (self._output_dir / "training_checkpoints").resolve()
+    
+    @property
+    def has_checkpoints(self) -> bool:
+        return self.checkpoints_dir.is_dir() and any(self.checkpoints_dir.iterdir())
+    
+    @property
+    def skip_training(self) -> bool:
+        return self._skip_training_if_checkpoint and self.has_checkpoints
 
     @property
     def logs_dir(self) -> Path:
@@ -150,15 +161,26 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
         
         pass
 
-    def save_alignment(self, preds: List[EntityMapping], candidates_one2many_path: Optional[Path] = None) -> None:
+    def save_alignment(self, 
+                       preds: List[EntityMapping], 
+                       candidates_one2many_path: Optional[Path] = None,
+                       sub_dir: Optional[str] = None
+                       ) -> None:
+        
+        if sub_dir is not None:
+            alignment_dir = self.alignment_dir / sub_dir
+            alignment_dir.mkdir(parents=True, exist_ok=True)
+
+        else:
+            alignment_dir = self.alignment_dir
 
         if candidates_one2many_path is not None:
             candidates_one2many = read_table(candidates_one2many_path)
             candidates_one2many.columns = ["Src", "Tgt", "Candidates"]
-            return self._save_local_alignment(preds, candidates_one2many)
+            return self._save_local_alignment(preds, candidates_one2many, alignment_dir)
 
         else:
-            return self._save_global_alignment(preds)
+            return self._save_global_alignment(preds, alignment_dir)
 
     def _save_global_alignment(self, preds: List[EntityMapping], save_dir: Optional[Path] = None):
 
@@ -168,7 +190,7 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
 
         # Save the global alignment
 
-        global_dir = str(self.alignment_dir) + f"/{'src2tgt.maps'}_global.tsv"
+        global_dir = str(save_dir) + f"/{'src2tgt.maps'}_global.tsv"
 
         pd.DataFrame(global_alignment, columns=["SrcEntity", "TgtEntity", "Score"]).to_csv(
             global_dir, sep="\t", index=False
@@ -176,13 +198,13 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
 
         return global_dir
 
-    def _save_local_alignment(self, preds: List[EntityMapping], candidates_one2many: pd.DataFrame):
+    def _save_local_alignment(self, preds: List[EntityMapping], candidates_one2many: pd.DataFrame, save_dir: Optional[Path] = None):
 
         # candidates is now a 1-1 format for this the original candidates are required
 
         ranking_results = fill_anchored_scores(candidates_one2many.values, preds)
 
-        local_dir = str(self.alignment_dir) + f"/{'src2tgt.maps'}_local.tsv"
+        local_dir = str(save_dir) + f"/{'src2tgt.maps'}_local.tsv"
 
         pd.DataFrame(ranking_results, columns=["SrcEntity", "TgtEntity", "TgtCandidates"]).to_csv(
             local_dir, sep="\t", index=False

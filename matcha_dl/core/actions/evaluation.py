@@ -30,7 +30,7 @@ class EvaluationAction(Protocol):
         log_file_path: Optional[Path] = None,
         log_level: Optional[str] = None,
         logger: Optional[logging.Logger] = None,
-    ) -> None:
+    ) -> Optional[dict]:
         
         start_time = time.time()
 
@@ -125,6 +125,8 @@ class EvaluationAction(Protocol):
             logger.error(f"Error during evaluation, skipping evaluation..")
 
         logger.info(f"Finished evaluation in {time.time() - start_time} seconds")
+
+        return results
 
 
 class DirectoryEvaluationAction(Protocol):
