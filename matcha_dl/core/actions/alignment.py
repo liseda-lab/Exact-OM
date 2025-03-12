@@ -346,7 +346,7 @@ class TuningAlignmentAction(Protocol):
         candidates_file_path: Path,
         output_dir_path: Path,
         configs_file_path: Path,
-        full_reference_file_path: Optional[Path] = None,
+        full_reference_file_path: Path,
         run_eval: bool = False,
         save_logs: bool = False,
         devices: Optional[List[int]] = None,

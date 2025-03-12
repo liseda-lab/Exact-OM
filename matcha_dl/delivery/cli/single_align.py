@@ -96,7 +96,7 @@ def parse_arguments():
         "-d",
         type=int,
         required=False,
-        help="Device number",
+        help="GPU device ID to use (leave empty for CPU)"
     )
     return parser.parse_args()
 

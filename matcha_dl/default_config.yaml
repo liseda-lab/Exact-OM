@@ -7,32 +7,35 @@ logging_level: INFO
 ## Seed for reproducibility.
 seed: 42
 
+## Cuda device to be used. If None, CPU will be used.
+device: 0
+
 ## Used cached files to skip computations if available.
 use_file_cache: False
 
 ## Use the last checkpoint to continue training
 use_last_checkpoint: False
 
-## If True, the training will be skipped if a checkpoint is found.
-
-skip_training_if_checkpoint: False
-
 # Evaluation Parameters
+
+## Validation set to be used to stop training, and in training guidance.
+## If Null, no validation set will be used.
+
+validation_set: 0.1
 
 ## Number of top-k predictions to be considered for evaluation.
 k: [1, 5, 10]
 
 # Alignment Parameters
 
-alignment_params:
-  ## Threshold to be used to filter predictions.
-  ## If Null, final alignment will not be filtered by score.
-  threshold: 0.7 # 0.7
+## Threshold to be used to filter predictions.
+## If Null, final alignment will not be filtered by score.
+threshold: 0.7 # 0.7, 0.8, 0.9
 
-  ## Cardinality to be used to filter predictions.
-  ## If Null, final alignment will not be filtered by cardinality.
-  ## Only used in full alignment tasks.
-  cardinality: null # 1
+## Cardinality to be used to filter predictions.
+## If Null, final alignment will not be filtered by cardinality.
+## Only used in full alignment tasks.
+cardinality: null # null, 1, 4
 
 matcha_params:
   ## JAVA Heap Size
@@ -42,7 +45,7 @@ matcha_params:
   ## Matchers ro be used to calculate the similarity between the candidates.
   matchers: [LM, BKM, SM, WM, LLM]
   # Cardinality of negatives in the training set
-  negcardinality: 10 # 9, 99
+  negcardinality: 9 # 9, 99
   # Filter to generate negatives in the training set
   negthreshold: 0.1 #0.4, 0.5, 0.6
   # Samplers to be used to generate negatives in the training set
@@ -59,21 +62,16 @@ plot_negatives:
   dpi: 300
   grid: True
 
-dataset_params:
-  ## Validation set to be used to stop training, and in training guidance.
-  ## If Null or not declared, no validation set will be used.
-  validation_set: 0.1
-
 training_params:
-  epochs: 10 # 50
+  epochs: 10 # 10, 50
   batch_size: 1 # 1, 32
   val_every: 1
-  save_interval: 5
+  save_interval: 1
   
 stopper:
   name: StableLossStopping
   params:
-    patience: 5 # 5, 10
+    patience: 5 # 5, null
     min_delta: 1e-4
 
 model:
@@ -84,10 +82,10 @@ model:
 loss:
   name: BCEWeightedLoss
   params:
-    pos_weight: 1.0 # 1.0, cardinality_weight
+    pos_weight: 1.0 # 1.0, ==cardinality_weight
     reduction: mean
 
 optimizer:
   name: Adam
   params:
-    lr: 0.001
+    lr: 0.001 # 0.001, 0.0001

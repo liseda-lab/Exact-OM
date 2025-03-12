@@ -17,8 +17,8 @@ class AlignmentRunner:
         full_reference_file: Optional[str] = None,
         candidates_file: Optional[str] = None,
         config_file: Optional[str] = None,
-        save_logs: Optional[bool] = False,
-        jvm_heap_size: Optional[str] = "32g",
+        save_logs: bool = False,
+        jvm_heap_size: str = "32g",
         run_eval: bool = False,
     ):
         """
@@ -82,13 +82,10 @@ class AlignmentRunner:
             if not config_file.exists():
                 raise Exception(f"Configuration file {self.config_file} does not exist")
             
-        if self.jvm_heap_size:
-            if self.jvm_heap_size.isdigit():
-                self.jvm_heap_size += 'G'
-            elif not (self.jvm_heap_size[:-1].isdigit() and self.jvm_heap_size[-1].lower() == 'g'):
-                raise Exception(f"JVM heap size {self.jvm_heap_size} is not valid, please provide a valid format")
-        else:
-            self.jvm_heap_size = '32G'
+        if self.jvm_heap_size.isdigit():
+            self.jvm_heap_size += 'G'
+        elif not (self.jvm_heap_size[:-1].isdigit() and self.jvm_heap_size[-1].lower() == 'g'):
+            raise Exception(f"JVM heap size {self.jvm_heap_size} is not valid, please provide a valid format")
 
     def run(self) -> None:
 

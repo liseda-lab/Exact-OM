@@ -20,8 +20,8 @@ class EvalutionRunner:
         full_reference_file: Optional[str] = None,
         reference_candidates: Optional[str] = None,
         log_level: Optional[str] = None,
-        save_logs: Optional[bool] = False,
-        jvm_heap_size: Optional[str] = "32g",
+        save_logs: bool = False,
+        jvm_heap_size: str = "32g",
     ):
         """
 
@@ -87,13 +87,10 @@ class EvalutionRunner:
         if self.reference_candidates and not Path(self.reference_candidates).exists():
             raise FileNotFoundError(f"Reference candidates file {self.reference_candidates} does not exist")
         
-        if self.jvm_heap_size:
-            if self.jvm_heap_size.isdigit():
-                self.jvm_heap_size += 'G'
-            elif not (self.jvm_heap_size[:-1].isdigit() and self.jvm_heap_size[-1].lower() == 'g'):
-                raise Exception(f"JVM heap size {self.jvm_heap_size} is not valid, please provide a valid format")
-        else:
-            self.jvm_heap_size = '32G'
+        if self.jvm_heap_size.isdigit():
+            self.jvm_heap_size += 'G'
+        elif not (self.jvm_heap_size[:-1].isdigit() and self.jvm_heap_size[-1].lower() == 'g'):
+            raise Exception(f"JVM heap size {self.jvm_heap_size} is not valid, please provide a valid format")
         
     def run(self) -> None:
         """
