@@ -1,7 +1,7 @@
 import logging
 import time
 from pathlib import Path
-from typing import Optional, Protocol, List
+from typing import Optional, Protocol, List, Union
 import concurrent.futures
 from multiprocessing import Manager
 import pandas as pd
@@ -20,7 +20,7 @@ class AlignmentAction(Protocol):
         source_file_path: Path,
         target_file_path: Path,
         output_dir_path: Path,
-        configs_file_path: Optional[Path] = None,
+        configs_file_path: Optional[Union[Path, ConfigModel]] = None,
         reference_file_path: Optional[Path] = None,
         full_reference_file_path: Optional[Path] = None,
         candidates_file_path: Optional[Path] = None,
@@ -35,7 +35,10 @@ class AlignmentAction(Protocol):
         # Load Configs
 
         if configs_file_path is not None:
-            configs = ConfigModel.load_config(configs_file_path)
+            if isinstance(configs_file_path, ConfigModel):
+                configs = configs_file_path
+            else:
+                configs = ConfigModel.load_config(configs_file_path)
 
         else:
             configs = ConfigModel()
@@ -233,12 +236,13 @@ class DirectoryAlignmentAction(Protocol):
         logger.setLevel(configs.logging_level)
 
         if save_logs:
-            file_handler = logging.FileHandler(output_dir / "matcha_dl-dir.log")
+            temp_log = output_dir / "matcha_dl-dir.log"
+            file_handler = logging.FileHandler(temp_log)
             file_handler.setLevel(configs.logging_level)
             formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
             file_handler.setFormatter(formatter)
             logger.addHandler(file_handler)
-            logger.info(f"Logging to file {output_dir / "matcha_dl-dir.log"}")
+            logger.info(f"Logging to file {temp_log}")
 
         logger.debug(f"Logging level set to {configs.logging_level}")
 
@@ -347,9 +351,9 @@ class TuningAlignmentAction(Protocol):
         output_dir_path: Path,
         configs_file_path: Path,
         full_reference_file_path: Path,
-        run_eval: bool = False,
         save_logs: bool = False,
         devices: Optional[List[int]] = None,
+        max_workers: Optional[int] = None,
         max_combinations: Optional[int] = None,
     ) -> None:
         
@@ -360,87 +364,53 @@ class TuningAlignmentAction(Protocol):
         logger.setLevel(logging.DEBUG)
 
         if save_logs:
-            file_handler = logging.FileHandler(output_dir_path / "matcha_dl-tuner.log")
+            temp_log = output_dir_path / "matcha_dl-tuner.log"
+            file_handler = logging.FileHandler(temp_log)
             file_handler.setLevel(logging.DEBUG)
             formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
             file_handler.setFormatter(formatter)
             logger.addHandler(file_handler)
-            logger.info(f"Logging to file {output_dir_path / 'matcha_dl-tuner.log'}")
+            logger.info(f"Logging to file {temp_log}")
 
         logger.debug(f"Logging level set to {logging.DEBUG}")
 
         logger.info(f"Loading Possible Configs...")
 
-        config_tuner = ConfigTuner(configs_file_path, ignore_params=["k", "matcha_params.matchers", "plot_negatives", "model.params.layers"])
+        config_tuner = ConfigTuner(configs_file_path)
 
         tune_configs = config_tuner.load_tuned_config(max_combinations)
 
-        logger.info(f"Loaded {len(tune_configs)} possible configurations")
-
-        def flatten_config(config: ConfigModel) -> dict:
-            """Flatten the ConfigModel into a dictionary."""
-            config_dict = config.model_dump()
-            flattened_config = {}
-            for key, value in config_dict.items():
-                if isinstance(value, dict):
-                    for sub_key, sub_value in value.items():
-                        flattened_config[f"{key}.{sub_key}"] = sub_value
-                else:
-                    flattened_config[key] = value
-            return flattened_config
-
-        def process_config(tag: str, config: ConfigModel, available_devices: List[int] = None) -> dict:
-            
-            temp_output_dir = output_dir_path / tag
-            temp_output_dir.mkdir(parents=True, exist_ok=True)
-
-            tasks = [
-                ("global_supervised", None, reference_file_path),
-                ("local_supervised", candidates_file_path, reference_file_path),
-                ("global_unsupervised", None, None),
-                ("local_unsupervised", candidates_file_path, None),
-            ]
-
-            task_results = {}
-
-            with available_devices.get_lock():
-                if available_devices:
-                    device = available_devices.pop(0)
-                else:
-                    device = None
-
-            try:
-                for task_name, candidates_file_path, reference_file_path in tasks:
-                    results = AlignmentAction.run(
-                        source_file_path=source_file_path,
-                        target_file_path=target_file_path,
-                        output_dir_path=temp_output_dir,
-                        configs_file_path=config,
-                        reference_file_path=reference_file_path,
-                        full_reference_file_path=full_reference_file_path,
-                        candidates_file_path=candidates_file_path,
-                        log_file_path=temp_output_dir / f"{task_name}.log" if save_logs else None,
-                        run_eval=run_eval,
-                        task_name=task_name,
-                        device=device,
-                    )
-                    task_results[task_name] = results
-            finally:
-                with available_devices.get_lock():
-                    if device is not None:
-                        available_devices.append(device)
-
-            return {"config_tag": tag, "config": flatten_config(config), "results": task_results}
+        logger.info(f"Loaded {len(tune_configs)} {'possible' if max_combinations is not None else 'random'} configurations")
 
         logger.info(f"Running Alignments on possible combinations...")
 
+        from matcha_dl.utils.action import process_config
+
         all_tuning_results = []
+        error_counts = 0
+
+        if max_workers is not None and devices is not None:
+                max_workers = min(max_workers, len(devices))
 
         with Manager() as manager:
-            available_devices = manager.list(devices) if devices else manager.list()
-            with concurrent.futures.ProcessPoolExecutor() as executor:
+            available_devices = manager.list(devices) if devices else None
+            condition = manager.Condition()
+             
+            with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
                 futures = [
-                    executor.submit(process_config, str(i), config, available_devices)
+                    executor.submit(process_config, 
+                                    tag=str(i),
+                                    config=config, 
+                                    available_devices=available_devices,
+                                    condition=condition,
+                                    source_file_path=source_file_path, 
+                                    target_file_path=target_file_path, 
+                                    reference_file_path=reference_file_path, 
+                                    candidates_file_path=candidates_file_path, 
+                                    output_dir_path=output_dir_path, 
+                                    full_reference_file_path=full_reference_file_path, 
+                                    save_logs=save_logs)
+
                     for i, config in enumerate(tune_configs)
                 ]
                 for future in concurrent.futures.as_completed(futures):
@@ -448,9 +418,18 @@ class TuningAlignmentAction(Protocol):
                         tuning_result = future.result()
                         all_tuning_results.append(tuning_result)
                     except Exception as e:
-                        logging.error(f"Error processing combination: {e}")
+                        logger.error(f"Error processing combination: {e}", exc_info=True)
+                        error_counts += 1
+                        continue
 
-        logger.info(f"All combinations run successfully")
+        if error_counts == len(tune_configs):
+            logger.error(f"All combinations failed")
+            return
+        elif error_counts > 0:
+            logger.warning(f"{error_counts} combinations failed")
+        else:
+            logger.info(f"All combinations run successfully")
+            
         logger.info(f"Writing results...")
 
         tuning_results_list = []
