@@ -36,7 +36,7 @@ class RegistryParams(BaseModel):
     
 class StoppingParams(RegistryParams):
     component_type: ComponentType = ComponentType.STOPPER
-    name: Type[IStopper] = Field(config["stopper"]["name"], validate_default=True)
+    name: Optional[Type[IStopper]] = Field(config["stopper"]["name"], validate_default=True)
     params: dict = Field(config["stopper"]["params"])
 
 class ModelParams(RegistryParams):
@@ -73,7 +73,7 @@ class PlotNegativesParams(BaseModel):
     grid: bool = Field(config["plot_negatives"]["grid"])
 
 class DatasetParams(BaseModel):
-    validation_set: Optional[float] = Field(config["validation_set"])
+    validation_set: Optional[float] = Field(config["dataset_params"]["validation_set"])
 
 class TrainingParams(BaseModel):
     epochs: int = Field(config["training_params"]["epochs"])
@@ -82,8 +82,8 @@ class TrainingParams(BaseModel):
     save_interval: Optional[int] = Field(config["training_params"]["save_interval"])
 
 class AlignmentParams(BaseModel):
-    threshold: Optional[float] = Field(config["threshold"])
-    cardinality: Optional[int] = Field(config["cardinality"])
+    threshold: Optional[float] = Field(config["alignment_params"]["threshold"])
+    cardinality: Optional[int] = Field(config["alignment_params"]["cardinality"])
 
 class ConfigModel(BaseModel):
 
@@ -148,9 +148,9 @@ class ConfigModel(BaseModel):
     
 
 class ConfigTuner:
-    def __init__(self, config_file: Path, ignore_params: List[str]):
+    def __init__(self, config_file: Path, ignore_params: Optional[List[str]] = None):
         self.config_file = config_file
-        self.ignore_params = ignore_params
+        self.ignore_params = ignore_params if ignore_params else []
         self.yaml_config = read_yaml(config_file)
 
     def _is_tunable_param(self, key: str, value: Any) -> bool:
