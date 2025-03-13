@@ -16,8 +16,8 @@ def run_tuning(args):
         full_reference_file_path=Path(args.full_reference_file).resolve(),
         candidates_file_path=Path(args.candidates_file).resolve(),
         save_logs=args.save_logs,
-        run_eval=args.run_eval,
         devices=args.devices,
+        max_workers=args.max_workers,
         max_combinations=args.max_combinations
     )
 
@@ -74,12 +74,6 @@ def parse_arguments():
         help="Please provide the path to the configuration file",
     )
     parser.add_argument(
-        "--run_eval",
-        "-e",
-        action="store_true",
-        help="Run evaluation after alignment",
-    )
-    parser.add_argument(
         "--save_logs",
         "-l",
         action="store_true",
@@ -93,6 +87,13 @@ def parse_arguments():
         type=list,
         required=False,
         help="List of GPU device IDs to use (leave empty for CPU)",
+    )
+    parser.add_argument(
+        "--max_workers",
+        "-w",
+        type=int,
+        required=False,
+        help="Number of workers to use for parallel processing",
     )
     parser.add_argument(
         "--max_combinations",

@@ -18,8 +18,8 @@ class TuningAlignmentRunner:
         candidates_file: str,
         config_file: str,
         save_logs: bool = False,
-        run_eval: bool = False,
         devices: Optional[list[int]] = None,
+        max_workers: Optional[int] = None,
         max_combinations: Optional[int] = None,
         jvm_heap_size: str = "32G",
     ):
@@ -35,6 +35,7 @@ class TuningAlignmentRunner:
             save_logs (bool, optional): Whether to save logs. Defaults to False.
             run_eval (bool, optional): Whether to run evaluation. Defaults to False.
             devices (list, optional): List of GPU device IDs to use (if None CPU is user)".
+            max_workers (int, optional): Maximum number of workers to use (if None all available are used).
             max_combinations (int, optional): Maximum number of combinations to evaluate (if None all combinations are used).
             jvm_heap_size (str, optional): JVM heap size. Defaults to "32G".
         """
@@ -46,8 +47,8 @@ class TuningAlignmentRunner:
         self.candidates_file = candidates_file
         self.config_file = config_file
         self.save_logs = save_logs
-        self.run_eval = run_eval
         self.devices = devices
+        self.max_workers = max_workers
         self.max_combinations = max_combinations
         self.jvm_heap_size = jvm_heap_size
 
@@ -63,8 +64,8 @@ class TuningAlignmentRunner:
             full_reference_file_path=Path(self.full_reference_file).resolve(),
             candidates_file_path=Path(self.candidates_file).resolve(),
             save_logs=self.save_logs,
-            run_eval=self.run_eval,
             devices=self.devices,
+            max_workers=self.max_workers,
             max_combinations=self.max_combinations,
         )
 
