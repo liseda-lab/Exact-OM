@@ -380,7 +380,7 @@ class TuningAlignmentAction(Protocol):
 
         tune_configs = config_tuner.load_tuned_config(max_combinations)
 
-        logger.info(f"Loaded {len(tune_configs)} {'possible' if max_combinations is not None else 'random'} configurations")
+        logger.info(f"Loaded {len(tune_configs)} {'random' if max_combinations is None else 'possible'} configurations")
 
         logger.info(f"Running Alignments on possible combinations...")
 

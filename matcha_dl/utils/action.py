@@ -70,7 +70,7 @@ def process_config(
             )
             task_results[task_name] = results
     finally:
-        with lock:
+        with condition:
             if device is not None:
                 available_devices.append(device)
                 condition.notify_all()
