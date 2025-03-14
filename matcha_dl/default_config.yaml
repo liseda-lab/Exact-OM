@@ -63,12 +63,24 @@ dataset_params:
   ## Validation set to be used to stop training, and in training guidance.
   ## If Null or not declared, no validation set will be used.
   validation_set: 0.1
+  # Can also  be list if multiple prompts and then agregation is used majority if no likelihood and aggr param
+  example: [True] # bool
+  task_context: [True] # bool
+  separator: ['comma'] # comma, paranthesis
+  label_type: ['Simple'] # Simple, Compound
+  label_cardinality: [1] # 3, 5, 100
+  context_type : ['Parent'] # Parent, Child, Top
+  context_cardinality: [1] # 3, 5, 100
+  context_semantics: [part_of] # part_of, kind_of, type_of, subclass_of, with_subclass, with_part, with_type, with_kind
+  likelihood: [float] # float, int, cat
+  critic: [True] # bool
 
 training_params:
   epochs: 10 # 50
   batch_size: 1 # 1, 32
   val_every: 1
   save_interval: 5
+  agrgg: 'mean' # mean, sum
   
 stopper:
   name: StableLossStopping
@@ -77,9 +89,11 @@ stopper:
     min_delta: 1e-4
 
 model:
-  name: MlpClassifier
+  name: FlanT5 # FlanT5, Llama, Deepseek
   params:
-    layers: [128, 256, 128]
+    model_version: google/flan-t5-base # google/flan-t5-base/, meta-llama/Llama-3.3-70B-Instruct/, deepseek-ai/deepseek-llm-7b
+
+# TODO loss and optimizer
 
 loss:
   name: BCEWeightedLoss
