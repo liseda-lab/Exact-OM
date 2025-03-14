@@ -1,3 +1,21 @@
+#dataset_params:
+#  ## Validation set to be used to stop training, and in training guidance.
+#  ## If Null or not declared, no validation set will be used.
+#  validation_set: 0.1
+#  # Can also  be list if multiple prompts and then agregation is used majority if no likelihood and aggr param
+#  example: [True] # bool                            -» InstructionInformation
+#  task_context: [True] # bool                       -» TaskContext
+#  separator: ['comma'] # comma, paranthesis         -» LabelInformation
+#  label_type: ['Simple'] # Simple, Compound         -» LabelInformation (REDUNDANTE?)
+#  label_cardinality: [1] # 3, 5, 100                -» LabelInformation
+#  context_type : ['Parent'] # Parent, Child, Top    -» ClassInformation
+#  context_cardinality: [1] # 3, 5, 100              -» ClassInformation (not accounted for yet)
+#  context_semantics: [part_of] # part_of, kind_of, type_of, subclass_of, with_subclass, with_part, with_type, with_kind -» ClassInformation
+#  likelihood: [float] # float, int, cat             -» Confidence
+#  critic: [True] # bool                             -» Critic
+
+
+
 from pathlib import Path
 from typing import Optional
 
@@ -11,6 +29,7 @@ from typing import List, Tuple
 
 from matcha_dl.impl.datasets.tabular import TabularDataset
 #from matcha_dl.core.entities.configs.prompt 
+
 
 class PromptDataset(TabularDataset):
 
@@ -95,29 +114,42 @@ class PromptDataset(TabularDataset):
         """
         Generates prompts for the dataset.
         """
+        from matcha_dl.impl.datasets.temporary_prompt_aux import split_instances, generate_static_skeletons, generate_queries, ConfigMock
 
-        # If critic on
-        # Features = [[1src2tgt1:Prompt1:str, Critic:str], [1src2tgt1:Prompt2:str, Critic: str]]
-        # If critic off
-        # Features = [[[1src2tgt1:Prompt1:str], [1src2tgt1:Prompt2:str]], ...]
+        config_mock = ConfigMock()
 
+        # Read static and dynamic info from the configuration and format it
+        # Both are a list of lists, in which the inner ones are lists of BaseInformation 
+        # (the class on which we will do .process). There should be one inner list per "run" 
+        # (corresponding to a column in the config), and each run should yield one query at the end.
+        static_info = split_instances(config_mock.static_info)
+        dynamic_info = split_instances(config_mock.dynamic_info)
 
-        feats = []
-        
+        # Generate static skeletons from static info
+        # This is a list of lists of strings (skeletons). There should be one skeleton per run.
+        static_skeletons = generate_static_skeletons(static_info)
+
+        all_queries = []
+
         for _, row in dataset.iterrows():
 
             try:
-                vector = self.matcha_features.get(row["Src"]).get(row["Tgt"])
+                source = row["Src"]
+                target = row["Tgt"]
+
+                # Use dynamic info to obtain queries from static skeletons
+                # This is a list of lists of strings (queries or queries + critic queries). 
+                # There should be one query per run.
+                generated_queries = generate_queries(source, target, dynamic_info, static_skeletons)
+
             except AttributeError:
-                self.log("Matcha features not loaded.", level="error", exc_info=True)
+                self.log("Attribute error in query generation", level="error", exc_info=True)
                 raise ValueError("Scores for source {} and target {} not found.".format(row["Src"], row["Tgt"]))
             
-            feats.append(vector)
+            all_queries.append(generated_queries)
             
+        dataset["Features"] = all_queries
 
-        dataset["Features"] = feats
-
-        return dataset
-
+        print(queries)
 
 
