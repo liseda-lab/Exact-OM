@@ -7,7 +7,7 @@ from multiprocessing import Manager
 import pandas as pd
 
 from matcha_dl.core.actions.evaluation import EvaluationAction
-from matcha_dl.core.entities.configs import ConfigModel, ConfigTuner
+from matcha_dl.core.entities.configs.config import ConfigModel, ConfigTuner
 from matcha_dl.core.entities.directories import OEAIDir
 from matcha_dl.core.values import N_CLASSES
 from matcha_dl.impl.matcha import Matcha
@@ -168,7 +168,7 @@ class AlignmentAction(Protocol):
         logger.info(f"Computing alignment...")
 
         if candidates_file_path is not None:
-            alignment, _ = trainer.predict(configs.alignment_params.model_dump())
+            alignment, _ = trainer.predict(**configs.alignment_params.model_dump())
         else:
             alignment, _ = trainer.predict(
                 threshold=configs.alignment_params.threshold)
@@ -209,6 +209,7 @@ class AlignmentAction(Protocol):
 
         return results
 
+# TODO global and local candidates are different
 class DirectoryAlignmentAction(Protocol):
     @staticmethod
     def run(
