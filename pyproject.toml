@@ -27,6 +27,7 @@ dgl = { url = "https://data.dgl.ai/wheels/torch-2.4/cu124/dgl-2.4.0%2Bcu124-cp31
 matplotlib = "^3.10.0"
 seaborn = "^0.13.2"
 pyaml = "^25.1.0"
+peft = "^0.15.0"
 
 
 [tool.poetry.scripts]
