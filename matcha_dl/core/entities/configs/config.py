@@ -8,6 +8,8 @@ from pydantic import BaseModel, Field, field_validator
 
 from matcha_dl import config, read_yaml
 from matcha_dl.core.entities.registry import ComponentType, ComponentRegistry
+from matcha_dl.core.entities.configs.dataset import Separator, ComparisonType, ContextType, ContextSemantics, Likelihood
+from matcha_dl.core.entities.configs.matcha import Sampler, Matchers
 
 from matcha_dl.core.contracts.stopper import IStopper
 from matcha_dl.core.contracts.model import IModel
@@ -57,10 +59,21 @@ class OptimizerParams(RegistryParams):
 class MatchaParams(BaseModel):
     max_heap: str = Field(config["matcha_params"]["max_heap"])
     threshold: float = Field(config["matcha_params"]["threshold"])
-    matchers: list = Field(config["matcha_params"]["matchers"])
+    matchers: List[Matchers] = Field(config["matcha_params"]["matchers"])
     negcardinality: int = Field(config["matcha_params"]["negcardinality"])
     negthreshold: float = Field(config["matcha_params"]["negthreshold"])
-    samplers: str = Field(config["matcha_params"]["samplers"])
+    samplers: Sampler = Field(config["matcha_params"]["samplers"])
+    calculate_scores: bool = Field(config["matcha_params"]["calculate_scores"])
+
+    @field_validator('matchers', 'samplers', pre=True, each_item=True)
+    def parse_enum(cls, value, field):
+        if isinstance(value, str):
+            return field.type_(value)
+        return value
+    
+    @field_validator('matchers', pre=True)
+    def ensure_unique_matchers(cls, matchers):
+        return list(set(matchers))
 
 class PlotNegativesParams(BaseModel):
     enabled: bool = Field(config["plot_negatives"]["enabled"])
@@ -74,12 +87,57 @@ class PlotNegativesParams(BaseModel):
 
 class DatasetParams(BaseModel):
     validation_set: Optional[float] = Field(config["dataset_params"]["validation_set"])
+    example: Optional[List[bool]] = Field(config["dataset_params"]["example"])
+    positive_examples: Optional[List[int]] = Field(config["dataset_params"]["positive_examples"])
+    negative_examples: Optional[List[int]] = Field(config["dataset_params"]["negative_examples"])
+    task_context: Optional[List[bool]] = Field(config["dataset_params"]["task_context"])
+    separator: Optional[List[Separator]] = Field(config["dataset_params"]["separator"])
+    comparison_type: Optional[List[ComparisonType]] = Field(config["dataset_params"]["comparison_type"])
+    label_cardinality: Optional[List[int]] = Field(config["dataset_params"]["label_cardinality"])
+    context_type: Optional[List[ContextType]] = Field(config["dataset_params"]["context_type"])
+    context_cardinality: Optional[List[int]] = Field(config["dataset_params"]["context_cardinality"])
+    context_semantics: Optional[List[ContextSemantics]] = Field(config["dataset_params"]["context_semantics"])
+    likelihood: Optional[List[Likelihood]] = Field(config["dataset_params"])
+
+    @field_validator(
+            'separator', 
+            'comparison_type', 
+            'context_type', 
+            'context_semantics', 
+            'likelihood', 
+            pre=True, each_item=True)
+    def parse_enum(cls, value, field):
+        if isinstance(value, str):
+            return field.type_(value)
+        return value
+
+    @field_validator(
+            'example', 
+            'task_context', 
+            'separator', 
+            'comparison_type', 
+            'label_cardinality', 
+            'context_type', 
+            'context_cardinality', 
+            'context_semantics', 
+            'likelihood', 
+            'critic', 
+            pre=True)
+    def validate_list_lengths(cls, values):
+        list_lengths = [len(value) for value in values if value is not None]
+        if len(set(list_lengths)) > 1:
+            raise ValueError("All lists in DatasetParams must have the same length")
+        return values
 
 class TrainingParams(BaseModel):
     epochs: int = Field(config["training_params"]["epochs"])
-    batch_size: Optional[int] = Field(config["training_params"]["batch_size"])
+    batch_size: int = Field(config["training_params"]["batch_size"])
+    num_workers: int = Field(config["training_params"]["num_workers"])
+    shuffle: bool = Field(config["training_params"]["shuffle"])
     val_every: Optional[int] = Field(config["training_params"]["val_every"])
     save_interval: Optional[int] = Field(config["training_params"]["save_interval"])
+    gradient_accumulation_steps: int = Field(config["training_params"]["gradient_accumulation_steps"])
+    mixed_precision: bool = Field(config["training_params"]["mixed_precision"])
 
 class AlignmentParams(BaseModel):
     threshold: Optional[float] = Field(config["alignment_params"]["threshold"])
@@ -101,13 +159,17 @@ class ConfigModel(BaseModel):
     model: ModelParams = ModelParams()
     loss: LossParams = LossParams()
     optimizer: OptimizerParams = OptimizerParams()
-    k: Optional[list[int]] = Field(config["k"])
+    k: Optional[List[int]] = Field(config["k"])
     dataset: Optional[Type[IDataset]] = None
     trainer: Optional[Type[ITrainer]] = None
 
     @field_validator("logging_level", mode="before")
     def parse_logging_level(logging_level: str) -> int:
         return getattr(logging, logging_level.upper())
+    
+    @field_validator('k', pre=True)
+    def ensure_unique_k(cls, k):
+        return list(set(k))
     
     def resolve_dependencies(self) -> None:
         dependencies = ComponentRegistry.get_dependency(self.model.name.__name__)
@@ -218,5 +280,5 @@ class ConfigTuner:
         if max_combinations:
             return self.load_random_tuned_configs(max_combinations)
         return self.load_tuned_all_configs()
-    
+
 
