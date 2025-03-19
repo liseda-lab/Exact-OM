@@ -6,9 +6,12 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+from torch.utils.data import Dataset
+from torch import Tensor
 
 from matcha_dl.core.contracts.base import SelfRegisteringComponent, LoggingClass
 from matcha_dl.core.entities.registry import ComponentType
+from matcha_dl.core.entities.dataset import DatasetMask
 from matcha_dl.utils.data import read_table
 
 from mowl.datasets import PathDataset as OWLDataset
@@ -19,11 +22,8 @@ from mowl.datasets import PathDataset as OWLDataset
 
 DataFrame = pd.DataFrame
 
-# TODO look into x an y datatypes might not be compatible with graphdataset
-# TODO inherit from logging class
 
-
-class IDataset(SelfRegisteringComponent, LoggingClass):
+class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
 
     component_type = ComponentType.DATASET
 
@@ -47,9 +47,19 @@ class IDataset(SelfRegisteringComponent, LoggingClass):
         self._negatives = None
         self._matcha_features = None
 
+        self._default_kind = DatasetMask.train
+
         self._cache_ok = kwargs.get("cache_ok", True)
 
         LoggingClass.__init__(self, logger=kwargs.get("logger"))
+
+    @property
+    def default_kind(self) -> DatasetMask:
+        return self._default_kind
+
+    @default_kind.setter
+    def default_kind(self, kind: DatasetMask):
+        self._default_kind = kind
 
     @property
     def matchers(self) -> List[str]:
@@ -229,7 +239,7 @@ class IDataset(SelfRegisteringComponent, LoggingClass):
         return dataset
 
     @abstractmethod
-    def __getitem__(self, idx: int, kind: str = "train") -> Tuple[np.ndarray, np.ndarray]:
+    def __getitem__(self, idx: int) -> Tuple[Tensor, Tensor]:
         pass
 
     @abstractmethod
@@ -253,10 +263,10 @@ class IDataset(SelfRegisteringComponent, LoggingClass):
         pass
 
     @abstractmethod
-    def x(self, kind: Optional[str] = "train") -> np.ndarray:
+    def x(self, kind: Optional[str] = None) -> np.ndarray:
         pass
 
     @abstractmethod
-    def y(self, kind="train") -> np.ndarray:
+    def y(self, kind: Optional[str] = None) -> np.ndarray:
         pass
 

@@ -6,11 +6,15 @@ import random
 import numpy as np
 import pandas as pd
 
+import torch as th
+from torch import Tensor
+
 DataFrame = pd.DataFrame
 
 from typing import List, Tuple
 
 from matcha_dl.core.contracts.dataset import IDataset
+from matcha_dl.core.entities.dataset import DatasetMask
 
 
 class TabularDataset(IDataset):
@@ -30,7 +34,7 @@ class TabularDataset(IDataset):
             return 0
         return len(self.dataframe)
     
-    def __getitem__(self, idx: int, kind: str = "train") -> Tuple[np.ndarray, np.ndarray]:
+    def __getitem__(self, idx: int) -> Tuple[Tensor, Tensor]:
 
         if idx >= len(self):
             self.log(f"Index {idx} out of bounds.", level="error")
@@ -40,11 +44,7 @@ class TabularDataset(IDataset):
             self.log(f"Index {idx} out of bounds.", level="error")
             raise IndexError("Index out of bounds.")
         
-        elif len(self) == 0:
-            self.log("Empty dataset.", level="error")
-            raise IndexError("Empty dataset.")
-        
-        return self.x(kind)[idx], self.y(kind)[idx]
+        return self.pre_process_x(self.x()[idx]), self.pre_process_y(self.y()[idx])
     
     def __iter__(self):
         for i in range(len(self)):
@@ -53,23 +53,36 @@ class TabularDataset(IDataset):
     def __str__(self) -> str:
         return self.dataframe.__str__()
 
-    # In Future X and Y shoulf return DGL.backend.F tensor
+    def x(self, kind: Optional[str] = None) -> np.ndarray:
 
-    def x(self, kind: Optional[str] = "train") -> np.ndarray:
+        if kind is None:
+            kind = self.default_kind
 
         if self.dataframe is None:
             self.log("Dataset is empty.", level="error")
             raise ValueError("Dataset is empty.")
+        
+        if kind is None:
+            kind = self.default_kind
 
         return np.array(self.dataframe[self.dataframe[kind]]["Features"].values.tolist())
 
-    def y(self, kind="train") -> np.ndarray:
+    def y(self, kind: Optional[str] = None) -> np.ndarray:
+
+        if kind is None:
+            kind = self.default_kind
 
         if self.dataframe is None:
             self.log("Dataset is empty.", level="error")
             raise ValueError("Dataset is empty.")
 
         return self.dataframe[self.dataframe[kind]]["Label"].values
+    
+    def pre_process_x(self, data: np.ndarray) -> Tensor:
+        return th.tensor(data, dtype=th.float32)
+    
+    def pre_process_y(self, data: np.ndarray) -> Tensor:
+        return th.tensor(data, dtype=th.float32)
 
     def save(self) -> Path:
 
@@ -96,6 +109,9 @@ class TabularDataset(IDataset):
         if self._cache_ok:
             return self._df_save_path.exists()
         return False
+    
+    def get_features(self, dataset: DataFrame) -> DataFrame:
+        return self._get_matcha_features(dataset)
 
     def process(self) -> "TabularDataset":
 
@@ -115,13 +131,13 @@ class TabularDataset(IDataset):
 
         # get features from matcha
 
-        self.log("#Getting Matcha Features...", level="debug")
-        inference_set = self._get_matcha_features(inference_set)
+        self.log("#Getting Features...", level="debug")
+        inference_set = self.get_features(inference_set)
 
         # assign training label
-        inference_set["train"] = False
-        inference_set["validation"] = False
-        inference_set["inference"] = True
+        inference_set[DatasetMask.train] = False
+        inference_set[DatasetMask.validation] = False
+        inference_set[DatasetMask.inference] = True
         
         if self.reference is not None:
 
@@ -143,8 +159,8 @@ class TabularDataset(IDataset):
             training_set = pd.concat([positive_set, negative_set], ignore_index=True)
 
             # get features from matcha
-            self.log("#Getting Matcha Features...", level="debug")
-            training_set = self._get_matcha_features(training_set)
+            self.log("#Getting Features...", level="debug")
+            training_set = self.get_features(training_set)
 
             self.log("#Shuffling Training Set...", level="debug")
 
@@ -163,14 +179,14 @@ class TabularDataset(IDataset):
                 training_set = training_set.drop(validation_set.index).reset_index(drop=True)
 
                 # assign validation label
-                validation_set["train"] = False
-                validation_set["validation"] = True
-                validation_set["inference"] = False
+                validation_set[DatasetMask.train] = False
+                validation_set[DatasetMask.validation] = True
+                validation_set[DatasetMask.inference] = False
 
             # assign training label
-            training_set["train"] = True
-            training_set["validation"] = False
-            training_set["inference"] = False
+            training_set[DatasetMask.train] = True
+            training_set[DatasetMask.validation] = False
+            training_set[DatasetMask.inference] = False
 
 
             self.log("#Combining Training, Validation and Inference Sets...", level="debug")
