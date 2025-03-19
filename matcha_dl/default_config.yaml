@@ -47,6 +47,8 @@ matcha_params:
   negthreshold: 0.1 #0.4, 0.5, 0.6
   # Samplers to be used to generate negatives in the training set
   samplers: 'all' # all, rand, diff
+  # If matcha scores should be calculated. Serves to speed up the process if not needed. Warning: If False, the scores will not be available and can break the pipeline.
+  calculate_scores: True
 
 ## Whether to plot the distribution of the similarities in the negative set.
 plot_negatives:
@@ -63,24 +65,33 @@ dataset_params:
   ## Validation set to be used to stop training, and in training guidance.
   ## If Null or not declared, no validation set will be used.
   validation_set: 0.1
-  # Can also  be list if multiple prompts and then agregation is used majority if no likelihood and aggr param
-  example: [True] # bool
-  task_context: [True] # bool
+  
+  ## Prompt Dataset Configs [Optional] Only used if model is prompt based
+  ## Should should be list of params of size n (equal for all lists so that it can behabe like an array)
+  ## If only one value is given, a single prompt will be used per source-target pair
+  ## If n values are given, n prompts will be used per source-target pair and will be agregated following the agrgg param
+  example: [True] # True, False
+  positive_examples: [1] #1, 3, 5
+  negative_examples: [1] #1, 3, 5
+  task_context: [True] #
   separator: ['comma'] # comma, paranthesis
-  label_type: ['Simple'] # Simple, Compound
-  label_cardinality: [1] # 3, 5, 100
+  comparison_type: ['Synonym'] # Synonym, Equivalent, Match
+  label_cardinality: [1] #  3, 5, 100
   context_type : ['Parent'] # Parent, Child, Top
   context_cardinality: [1] # 3, 5, 100
   context_semantics: [part_of] # part_of, kind_of, type_of, subclass_of, with_subclass, with_part, with_type, with_kind
   likelihood: [float] # float, int, cat
-  critic: [True] # bool
 
 training_params:
   epochs: 10 # 50
   batch_size: 1 # 1, 32
+  num_workers: 0
+  shuffle: True
   val_every: 1
   save_interval: 5
-  agrgg: 'mean' # mean, sum
+  ## Not used in for MLP models
+  gradient_accumulation_steps: 1
+  mixed_precision: True
   
 stopper:
   name: StableLossStopping
@@ -88,12 +99,22 @@ stopper:
     patience: 5 # 5, 10
     min_delta: 1e-4
 
+# model:
+#   name: MlpClassifier
+#   params:
+#     layers: [128, 256, 128]
+
 model:
-  name: FlanT5 # FlanT5, Llama, Deepseek
+  name: PromptModel
   params:
     model_version: google/flan-t5-base # google/flan-t5-base/, meta-llama/Llama-3.3-70B-Instruct/, deepseek-ai/deepseek-llm-7b
-
-# TODO loss and optimizer
+    use_critic: True
+    max_length: 50
+    aggregation_strategy: 'mean' # mean, max, min
+    use_lora: True
+    lora_r: 16
+    lora_alpha: 32
+    lora_dropout: 0.05
 
 loss:
   name: BCEWeightedLoss
