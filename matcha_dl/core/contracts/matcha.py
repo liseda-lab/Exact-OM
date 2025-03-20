@@ -16,6 +16,7 @@ import pandas as pd
 
 from matcha_dl.core.contracts import LoggingClass
 from matcha_dl.utils.data import read_table
+from matcha_dl.core.entities.configs.matcha import Matchers, Sampler
 
 
 class IMatcha(LoggingClass):
@@ -24,10 +25,11 @@ class IMatcha(LoggingClass):
         threshold: float,
         max_heap: str,
         output_path: Path,
-        matchers: List[str],
+        matchers: List[Matchers],
         negcardinality: int,
         negthreshold: float,
-        samplers: str,
+        samplers: Sampler,
+        calculate_scores: bool = True,
         **kwargs,
     ) -> None:
         """
@@ -48,6 +50,7 @@ class IMatcha(LoggingClass):
         self._negcardinality = negcardinality
         self._negthreshold = negthreshold
         self._samplers = samplers
+        self._calculate_scores = calculate_scores
 
         self._source = None
         self._target = None
@@ -149,6 +152,10 @@ class IMatcha(LoggingClass):
     @property
     def samplers(self) -> int:
         return self._samplers
+    
+    @property
+    def calculate_scores(self) -> bool:
+        return self._calculate_scores
     
     def load_ontologies(self, source_path: Path, target_path: Path) -> None:
 
@@ -328,26 +335,28 @@ class IMatcha(LoggingClass):
 
                 # Compile all files to generate scores into a single file (reference/negatives/candidates)
 
-                pairs_file = self.output_path / "pairs.tsv"
+                if self.calculate_scores:
 
-                with open(pairs_file, "w") as pairs:
-                    with open(self.candidates, "r") as candidates:
-                        pairs.write(candidates.read())
-                    if self.reference is not None and self.reference.exists():
-                        with open(self.reference, "r") as reference:
-                            next(reference)  # Skip header
-                            pairs.write(reference.read())
-                        with open(self.negatives, "r") as negatives:
-                            next(negatives)  # Skip header
-                            pairs.write(negatives.read())
+                    pairs_file = self.output_path / "pairs.tsv"
 
-                # Use Scores command to get scores from matcha
+                    with open(pairs_file, "w") as pairs:
+                        with open(self.candidates, "r") as candidates:
+                            pairs.write(candidates.read())
+                        if self.reference is not None and self.reference.exists():
+                            with open(self.reference, "r") as reference:
+                                next(reference)  # Skip header
+                                pairs.write(reference.read())
+                            with open(self.negatives, "r") as negatives:
+                                next(negatives)  # Skip header
+                                pairs.write(negatives.read())
 
-                generate_scores(matcha_process, pairs_file)
+                    # Use Scores command to get scores from matcha
 
-                if not self.matcha_features.exists():
-                    self.log(f"Matcha failed to generate matcha features at {self.matcha_features}", level="error")
-                    raise FileNotFoundError(f"Matcha failed to generate matcha features at {self.matcha_features}")
+                    generate_scores(matcha_process, pairs_file)
+
+                    if not self.matcha_features.exists():
+                        self.log(f"Matcha failed to generate matcha features at {self.matcha_features}", level="error")
+                        raise FileNotFoundError(f"Matcha failed to generate matcha features at {self.matcha_features}")
 
         except subprocess.CalledProcessError as e:
             self.log(f"Matcha subprocess returned with error code {e.returncode}", level="error")
