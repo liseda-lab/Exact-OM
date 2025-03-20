@@ -8,6 +8,7 @@ from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
 from matcha_dl.core.contracts.trainer import EntityMapping, ITrainer
+from matcha_dl.core.entities.dataset import DatasetMask
 
 # TODO add validation split
 
@@ -20,6 +21,8 @@ class MLPTrainer(ITrainer):
         batch_size: Optional[int] = None,
         val_every: Optional[int] = 1,
         save_interval: Optional[int] = 5,
+        num_workers: int = 0,
+        shuffle: bool = True,
         **kwargs
     ):
         
@@ -32,17 +35,21 @@ class MLPTrainer(ITrainer):
         writer = SummaryWriter(self.logs_dir)
         early_stopping = False
 
+        self.dataset.default_kind = DatasetMask.train
+
         while self.epoch <= epochs and not early_stopping:
-            self._model.train()
+            self.model.train()
             _iter = 1
 
-            with tqdm(self._load_data(kind="train", batch_size=batch_size), unit="batch") as tepoch:
+            with tqdm(DataLoader(self.dataset, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers), unit="batch") as tepoch:
 
                 for data, target in tepoch:
                     tepoch.set_description(f"Epoch {self.epoch}")
 
+                    data, target = data.to(self.device), target.unsqueeze(1).to(self.device)
+
                     self._optimizer.zero_grad()
-                    logits = self._model(data)
+                    logits = self.model(data)
                     loss = self._loss(logits, target)
                     writer.add_scalar("Loss/train", loss, _iter)
 
@@ -82,11 +89,14 @@ class MLPTrainer(ITrainer):
         self.save_checkpoint()
 
     def predict(self, 
-                kind: str = "inference", 
+                kind: DatasetMask = DatasetMask.inference,
+                batch_size: int = 32,
                 threshold: Optional[float] = None,
                 cardinality: Optional[int] = None,
                 **kwargs
     ) -> Tuple[List[EntityMapping], float]:
+        
+        self.dataset.default_kind = kind
 
         df = self.dataset.dataframe.copy()
         df = df[df[kind] == True]
@@ -94,15 +104,26 @@ class MLPTrainer(ITrainer):
         # if supervised use model to calculate scores
         if self.dataset.reference is not None:
 
-            data, target = self._load_data(kind=kind)
-            self._model.eval()
+            dataloader = DataLoader(self.dataset, batch_size=batch_size, shuffle=False)
+
+            self.model.eval()
+            all_logits = []
+            total_loss = 0.0
+
             with th.no_grad():
-                logits = self._model(data)
+
+                for data, target in dataloader:
+                    data, target = data.to(self.device), target.unsqueeze(1).to(self.device)
+
+                logits = self.model(data)
                 loss = self._loss(logits, target)
+                total_loss += loss.item() * data.size(0)
+                all_logits.append(logits.cpu())
 
-            df["Scores"] = logits.cpu()
+            df["Scores"] = th.cat(all_logits).numpy()
+            avg_loss = total_loss / len(self.dataset)
 
-            return EntityMapping.read_table_mappings(df[["Src", "Tgt", "Scores"]], threshold=threshold, cardinality=cardinality), loss.item()
+            return EntityMapping.read_table_mappings(df[["Src", "Tgt", "Scores"]], threshold=threshold, cardinality=cardinality), avg_loss
 
         # if unsupervised use max score from matcha
         else:
@@ -110,24 +131,3 @@ class MLPTrainer(ITrainer):
             df["Scores"] = np.array(df["Features"].values.tolist()).max(axis=1)
 
             return EntityMapping.read_table_mappings(df[["Src", "Tgt", "Scores"]], threshold=threshold, cardinality=cardinality), 0.0
-
-    def _load_data(
-        self, kind: str = "train", batch_size: Optional[int] = 1
-    ) -> DataLoader:
-
-        x = self.dataset.x(kind)
-        y = self.dataset.y(kind)
-
-        x = th.tensor(x, dtype=th.float32)
-        x = x.to(self.device)
-
-        y = th.tensor(y, dtype=th.float32)
-        y = y.unsqueeze(1)
-        y = y.to(self.device)
-
-        if kind == "train":
-            ds = TensorDataset(x, y)
-
-            return DataLoader(ds, batch_size=batch_size, shuffle=True)
-
-        return x, y
