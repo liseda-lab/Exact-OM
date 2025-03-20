@@ -13,7 +13,7 @@ class AggregationStrategy(str, Enum):
     min = "min"
     mean = "mean"
 
-class PromptModel(IModel, torch.nn.Module):
+class PromptClassifier(IModel, torch.nn.Module):
     def __init__(self, 
                  model_name: str, 
                  use_critic: bool = False, 

@@ -6,3 +6,4 @@ from . import datasets, losses, models, optimizers, stoppers, trainer, metrics
 # Registering the dependencies
 
 ComponentRegistry.register_dependency("MlpClassifier", {ComponentType.DATASET: "TabularDataset", ComponentType.TRAINER: "MLPTrainer"})
+ComponentRegistry.register_dependency("PromptClassifier", {ComponentType.DATASET: "PromptDataset", ComponentType.TRAINER: "PromptTrainer"})
