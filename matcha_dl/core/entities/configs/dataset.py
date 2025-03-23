@@ -11,7 +11,7 @@ class ComparisonType(str, Enum):
     a_match = 'a_match'
 
 class ContextType(str, Enum):
-    parent = 'superclasses'
+    superclasses = 'superclasses'
     subclasses = 'subclasses'
     top_superclass = 'top_superclass'
 
@@ -27,5 +27,4 @@ class ContextSemantics(str, Enum):
 
 class Likelihood(str, Enum):
     float = 'float'
-    int = 'int'
     cat = 'cat'
