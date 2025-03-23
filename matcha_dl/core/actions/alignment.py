@@ -170,10 +170,9 @@ class AlignmentAction(Protocol):
         logger.info(f"Computing alignment...")
 
         if candidates_file_path is not None:
-            alignment, _ = trainer.predict(**configs.alignment_params.model_dump())
+            alignment, _ = trainer.predict(**configs.training_params.model_dump(), **configs.alignment_params.model_dump())
         else:
-            alignment, _ = trainer.predict(
-                threshold=configs.alignment_params.threshold)
+            alignment, _ = trainer.predict(**configs.training_params.model_dump())
 
         # Save Alignment
         
