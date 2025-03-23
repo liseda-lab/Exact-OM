@@ -179,6 +179,10 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
         Generates and saves distribution plots for each negative similarity and an average distribution plot.
         """
 
+        if self.negatives is None:
+            self.log("No negatives loaded. Please load negatives before plotting.", level="warning")
+            return None
+
         # copy negatives
         negatives_df = self.negatives.copy()
 
