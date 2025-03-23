@@ -111,14 +111,18 @@ class AlignmentAction(Protocol):
             **configs.dataset_params.model_dump(),
         )
 
+        dataset.load_ontologies(source_file_path, target_file_path)
+        dataset.load_candidates(matcha.candidates)
+
+        if configs.matcha_params.calculate_scores:
+            dataset.load_data(matcha.matcha_features)
+
         if matcha.reference is not None:
             dataset.load_reference(matcha.reference)
             dataset.load_negatives(matcha.negatives)
 
-        dataset.load_ontologies(source_file_path, target_file_path)
-        
-        dataset.load_candidates(matcha.candidates)
-        dataset.load_data(matcha.matcha_features)
+            if configs.plot_negatives_params.enabled:
+                dataset.plot_negative_distributions(**configs.plot_negatives_params.model_dump())
 
         dataset.process()
 
@@ -126,8 +130,6 @@ class AlignmentAction(Protocol):
 
         dataset.save()
 
-        if configs.plot_negatives_params.enabled:
-            dataset.plot_negative_distributions(**configs.plot_negatives_params.model_dump())
 
         # Trainer module
 
