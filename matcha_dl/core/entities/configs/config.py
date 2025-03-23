@@ -4,7 +4,7 @@ from typing import Any, Optional, Tuple, Type, Union, List, Dict
 import itertools
 import random
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from matcha_dl import config, read_yaml
 from matcha_dl.core.entities.registry import ComponentType, ComponentRegistry
@@ -65,15 +65,13 @@ class MatchaParams(BaseModel):
     samplers: Sampler = Field(config["matcha_params"]["samplers"])
     calculate_scores: bool = Field(config["matcha_params"]["calculate_scores"])
 
-    @field_validator('matchers', 'samplers', pre=True, each_item=True)
-    def parse_enum(cls, value, field):
-        if isinstance(value, str):
-            return field.type_(value)
-        return value
+    @field_validator('matchers', mode="before")
+    def parse_matchers(cls, value):
+        return [Matchers(val) for val in set(value)]
     
-    @field_validator('matchers', pre=True)
-    def ensure_unique_matchers(cls, matchers):
-        return list(set(matchers))
+    @field_validator('samplers', mode="before")
+    def parse_samplers(cls, value):
+        return Sampler(value)
 
 class PlotNegativesParams(BaseModel):
     enabled: bool = Field(config["plot_negatives"]["enabled"])
@@ -97,37 +95,38 @@ class DatasetParams(BaseModel):
     context_type: Optional[List[ContextType]] = Field(config["dataset_params"]["context_type"])
     context_cardinality: Optional[List[int]] = Field(config["dataset_params"]["context_cardinality"])
     context_semantics: Optional[List[ContextSemantics]] = Field(config["dataset_params"]["context_semantics"])
-    likelihood: Optional[List[Likelihood]] = Field(config["dataset_params"])
+    likelihood: Optional[List[Likelihood]] = Field(config["dataset_params"]["likelihood"])
+    
+    @field_validator('separator', mode="before")
+    def parse_separator(cls, value):
+        return [Separator(val) for val in value]
+    @field_validator('comparison_type', mode="before")
+    def parse_comparison_type(cls, value):
+        return [ComparisonType(val) for val in value]
+    @field_validator('context_type', mode="before")
+    def parse_context_type(cls, value):
+        return [ContextType(val) for val in value]
+    @field_validator('context_semantics', mode="before")
+    def parse_context_semantics(cls, value):
+        return [ContextSemantics(val) for val in value]
+    @field_validator('likelihood', mode="before")
+    def parse_likelihood(cls, value):
+        return [Likelihood(val) for val in value]
 
-    @field_validator(
-            'separator', 
-            'comparison_type', 
-            'context_type', 
-            'context_semantics', 
-            'likelihood', 
-            pre=True, each_item=True)
-    def parse_enum(cls, value, field):
-        if isinstance(value, str):
-            return field.type_(value)
-        return value
+    @model_validator(mode="after")
+    def validate_list_lengths(self):
+        """Ensure all list fields have the same length."""
+        fields_to_check = [
+            'example', 'positive_examples', 'negative_examples', 
+            'task_context', 'separator', 'comparison_type', 
+            'label_cardinality', 'context_type', 
+            'context_cardinality', 'context_semantics', 'likelihood'
+        ]
 
-    @field_validator(
-            'example', 
-            'task_context', 
-            'separator', 
-            'comparison_type', 
-            'label_cardinality', 
-            'context_type', 
-            'context_cardinality', 
-            'context_semantics', 
-            'likelihood', 
-            'critic', 
-            pre=True)
-    def validate_list_lengths(cls, values):
-        list_lengths = [len(value) for value in values if value is not None]
-        if len(set(list_lengths)) > 1:
-            raise ValueError("All lists in DatasetParams must have the same length")
-        return values
+        lengths = [len(getattr(self, field)) for field in fields_to_check if getattr(self, field) is not None]
+        if len(set(lengths)) > 1:
+            raise ValueError("All lists in DatasetParams must have the same length.")
+        return self
 
 class TrainingParams(BaseModel):
     epochs: int = Field(config["training_params"]["epochs"])
@@ -167,9 +166,17 @@ class ConfigModel(BaseModel):
     def parse_logging_level(logging_level: str) -> int:
         return getattr(logging, logging_level.upper())
     
-    @field_validator('k', pre=True)
+    @field_validator('k', mode="before")
     def ensure_unique_k(cls, k):
         return list(set(k))
+    
+    # TODO on register have the model register if it requires scores or not, this way this check can be more generic
+    # @model_validator(mode="after")
+    # def validate_calculate_scores(cls) -> "ConfigModel":
+    #     """Ensure calculate_scores is set to True if model is MlpClassifier."""
+    #     if cls.model.name.__name__ == "MlpClassifier" and not cls.matcha_params.calculate_scores:
+    #         raise ValueError("calculate_scores must be True for MlpClassifier.")
+    #     return cls
     
     def resolve_dependencies(self) -> None:
         dependencies = ComponentRegistry.get_dependency(self.model.name.__name__)
@@ -182,6 +189,8 @@ class ConfigModel(BaseModel):
 
         matcha_params = MatchaParams(**yaml_config.get("matcha_params", {}))
         plot_negatives_params = PlotNegativesParams(**yaml_config.get("plot_negatives", {}))
+        dataset_params = DatasetParams(**yaml_config.get("dataset_params", {}))
+        alignment_params = AlignmentParams(**yaml_config.get("alignment_params", {}))
         training_params = TrainingParams(**yaml_config.get("training_params", {}))
         stopping_params = StoppingParams(**yaml_config.get("stopper", {}))
         model_params = ModelParams(**yaml_config.get("model", {}))
@@ -194,12 +203,14 @@ class ConfigModel(BaseModel):
             for k, v in yaml_config.items()
             if v is not None
             and k in cls.model_fields
-            and k not in ["matcha_params", "plot_negatives", "training_params", "dataset_params", "alignment_params" "stopper", "model", "loss", "optimizer"]
+            and k not in ["matcha_params", "plot_negatives", "dataset_params", "alignment_params", "training_params", "dataset_params", "alignment_params", "stopper", "model", "loss", "optimizer"]
         }
 
         return cls(
             matcha_params=matcha_params,
             plot_negatives_params=plot_negatives_params,
+            dataset_params=dataset_params,
+            alignment_params=alignment_params,
             training_params=training_params,
             stopper=stopping_params,
             model=model_params,
