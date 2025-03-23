@@ -127,12 +127,25 @@ class IMatcha(LoggingClass):
         return self._output_path
 
     @property
+    def has_scores(self) -> bool:
+        if self.calculate_scores:
+            if self._cache_ok:
+                return self.matcha_features.exists()
+            return False
+        return True
+    
+    @property
+    def has_negatives(self) -> bool:
+        if self.reference is not None and self.reference.exists():
+            if self._cache_ok:
+                return self.negatives.exists()
+            return False
+        return True
+    
+    @property
     def has_cache(self) -> bool:
+        return self.candidates.exists() and self.has_scores and self.has_negatives
         
-        if self._cache_ok:
-            return self.matcha_features.exists()
-        return False
-
     @property
     def max_heap(self) -> str:
         return self._max_heap
@@ -272,7 +285,7 @@ class IMatcha(LoggingClass):
         if self.has_cache:
 
             self.log(
-                f"Matcha scores already exist at {self.matcha_features}. Skipping computation.",
+                f"All required files cached. Skipping computation.",
                 level="info",
             )
 
@@ -309,10 +322,6 @@ class IMatcha(LoggingClass):
 
                 wait_for_reply(matcha_process, 'Matcha CLI activated')
 
-                # Load matchers to use
-
-                add_matchers(matcha_process)
-
                 # If candidates exist, skip, otherwise get candidates with matcha Match command
 
                 if not self.candidates.exists():
@@ -327,15 +336,19 @@ class IMatcha(LoggingClass):
 
                 # If reference exists, get negatives from reference, otherwirse skip
 
-                if self.reference is not None and self.reference.exists():
+                if not self.has_negatives:
                     generate_negatives(matcha_process)
                     if not self.negatives.exists():
                         self.log(f"Matcha failed to generate negatives at {self.negatives}", level="error")
                         raise FileNotFoundError(f"Matcha failed to generate negatives at {self.negatives}")
+                    else:
+                        self.log(f"Matcha negatives generated at {self.negatives}", level="info")
+                else:
+                    self.log(f"Skipping generating negatives", level="info")
 
                 # Compile all files to generate scores into a single file (reference/negatives/candidates)
 
-                if self.calculate_scores:
+                if not self.has_scores:
 
                     pairs_file = self.output_path / "pairs.tsv"
 
@@ -350,6 +363,10 @@ class IMatcha(LoggingClass):
                                 next(negatives)  # Skip header
                                 pairs.write(negatives.read())
 
+                    # Load matchers to use
+
+                    add_matchers(matcha_process)
+
                     # Use Scores command to get scores from matcha
 
                     generate_scores(matcha_process, pairs_file)
@@ -357,6 +374,11 @@ class IMatcha(LoggingClass):
                     if not self.matcha_features.exists():
                         self.log(f"Matcha failed to generate matcha features at {self.matcha_features}", level="error")
                         raise FileNotFoundError(f"Matcha failed to generate matcha features at {self.matcha_features}")
+                    else:
+                        self.log(f"Matcha features generated at {self.matcha_features}", level="info")
+                    
+                else:
+                    self.log(f"Skipping generating matcha features", level="info")
 
         except subprocess.CalledProcessError as e:
             self.log(f"Matcha subprocess returned with error code {e.returncode}", level="error")
@@ -369,7 +391,5 @@ class IMatcha(LoggingClass):
 
             # change back to original directory
             os.chdir(current_cwd)
-
-        self.log(f"Matcha scores written to {self.matcha_features}", level="info")
 
         return
