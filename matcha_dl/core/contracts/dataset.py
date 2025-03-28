@@ -15,6 +15,8 @@ from matcha_dl.core.entities.dataset import DatasetMask
 from matcha_dl.utils.data import read_table
 
 from mowl.datasets import PathDataset as OWLDataset
+from mowl.owlapi import OWLOntology
+from org.semanticweb.HermiT import Reasoner
 
 
 # from jpype import java
@@ -30,7 +32,8 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
     def __init__(self, 
                  output_path: Path, 
                  matchers: List[str],
-                 validation_set: Optional[float] = 0.1, 
+                 validation_set: Optional[float] = 0.1,
+                 example: Optional[List[bool]] = None,
                  **kwargs
         ) -> None:
 
@@ -42,12 +45,18 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
 
         self._source = None
         self._target = None
+        self._source_reasoner = None
+        self._target_reasoner = None
         self._candidates = None
         self._reference = None
         self._negatives = None
         self._matcha_features = None
 
         self._default_kind = DatasetMask.train
+
+        self._example = example
+        if self.in_context_training:
+            self._default_kind = DatasetMask.inference
 
         self._cache_ok = kwargs.get("cache_ok", True)
 
@@ -60,6 +69,14 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
     @default_kind.setter
     def default_kind(self, kind: DatasetMask):
         self._default_kind = kind
+
+    @property
+    def example(self) -> List[bool]:
+        return self._example
+
+    @property
+    def in_context_training(self) -> bool:
+        return self._example is not None and any(self._example)
 
     @property
     def matchers(self) -> List[str]:
@@ -76,6 +93,24 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
     @property
     def target(self) -> OWLDataset:
         return self._target
+    
+    @property
+    def source_reasoner(self) -> Reasoner:
+        if self.source is None:
+            self.log("Source ontology not loaded.", level="error")
+            raise ValueError("Source ontology not loaded.")
+        if self._source_reasoner is None:
+            self._source_reasoner = Reasoner.ReasonerFactory().createReasoner(self.source.ontology)
+        return self._source_reasoner
+    
+    @property
+    def target_reasoner(self) -> Reasoner:
+        if self.target is None:
+            self.log("Target ontology not loaded.", level="error")
+            raise ValueError("Target ontology not loaded.")
+        if self._target_reasoner is None:
+            self._target_reasoner = Reasoner.ReasonerFactory().createReasoner(self.target.ontology)
+        return self._target_reasoner
     
     @property
     def candidates(self) -> DataFrame:

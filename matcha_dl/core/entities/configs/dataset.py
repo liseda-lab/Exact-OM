@@ -16,10 +16,10 @@ class ContextType(str, Enum):
     top_superclass = 'top_superclass'
 
 class ContextSemantics(str, Enum):
-    part_of = 'part_of'
-    kind_of = 'kind_of'
-    type_of = 'type_of'
-    subclass_of = 'subclass_of'
+    a_part_of = 'a_part_of'
+    a_kind_of = 'a_kind_of'
+    a_type_of = 'a_type_of'
+    a_subclass_of = 'a_subclass_of'
     with_subclass = 'with_subclass'
     with_part = 'with_part'
     with_type = 'with_type'

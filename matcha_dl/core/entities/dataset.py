@@ -9,12 +9,12 @@ class StaticPrompts:
     POSITIVE_CONFIDENCE = "confident"
     NEGATIVE_CONFIDENCE = "not confident"
     VERY_POSITIVE_CONFIDENCE = "very confident"
-    TASK_CONTEXT = "You are doing an ontology alignment task, "
-    INSTRUCTION = f"I am going to ask you a question and you should answer '{POSITIVE_SOLUTION}' or '{NEGATIVE_SOLUTION}'."
+    TASK_CONTEXT = "You are doing an ontology alignment task. "
+    INSTRUCTION = f"I am going to ask you a question and you should answer '{POSITIVE_SOLUTION}' or '{NEGATIVE_SOLUTION}'. "
     FIRST_EXAMPLE = "For example"
     FOLLOWING_EXAMPLE = "Another example"
     EXAMPLE_BASE = "$START given the question '$EXAMPLE' you should respond '$SOLUTION'. "
-    SKELETON = "$TC$I$E$CONF: 'Are '$S' $CTX_S and '$T' $CTX_T $TYPE?'"
+    SKELETON = "$TC$I$E$CONF. Question: Are '$S' $CTX_S and '$T' $CTX_T $TYPE?"
     EXAMPLE = "Are '$S' and '$T' equivalent?"
     CONFIDENCE = {
         Likelihood.float: f"Followed by your confidence in your answer as a score from 0 to 1, like this: '{POSITIVE_SOLUTION}:0.8'",

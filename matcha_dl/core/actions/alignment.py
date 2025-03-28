@@ -79,6 +79,9 @@ class AlignmentAction(Protocol):
 
         logger.info(f"Matching {source_file_path} and {target_file_path}")
 
+        logger.info(f"Running Matcha...")
+        matcha_start = time.time()
+
         matcha = Matcha(
             output_path=output_dir_path,
             logger=logger,
@@ -86,22 +89,28 @@ class AlignmentAction(Protocol):
             cache_ok=configs.use_file_cache,
         )
 
-        logger.info(f"Computing matcha scores...")
         logger.debug(f"Matcha error logs are being written to {matcha.log_file}")
 
-        matcha.load_ontologies(source_file_path, target_file_path)
+        if not matcha.has_cache:
 
-        if reference_file_path is not None:
-            matcha.load_reference(reference_file_path)
+            matcha.load_ontologies(source_file_path, target_file_path)
 
-        if candidates_file_path is not None:
-            matcha.load_candidates(candidates_file_path)
+            if reference_file_path is not None:
+                matcha.load_reference(reference_file_path)
+
+            if candidates_file_path is not None:
+                matcha.load_candidates(candidates_file_path)
 
         matcha.match()
+
+        matcha_end = time.time()
+        matcha_elapsed = (matcha_end - matcha_start) / 60
+        logger.info(f"Matcha completed in {matcha_elapsed:.1f} minutes")
 
         # Create Dataset
 
         logger.info(f'Building Dataset...')
+        dataset_start = time.time()
 
         dataset = configs.dataset(
             output_path=output_dir_path,
@@ -111,24 +120,28 @@ class AlignmentAction(Protocol):
             **configs.dataset_params.model_dump(),
         )
 
-        dataset.load_ontologies(source_file_path, target_file_path)
-        dataset.load_candidates(matcha.candidates)
+        if not dataset.has_cache():
+            dataset.load_ontologies(source_file_path, target_file_path)
+            dataset.load_candidates(matcha.candidates)
 
-        if configs.matcha_params.calculate_scores:
-            dataset.load_data(matcha.matcha_features)
+            if configs.matcha_params.calculate_scores:
+                dataset.load_data(matcha.matcha_features)
 
-        if matcha.reference is not None:
-            dataset.load_reference(matcha.reference)
-            dataset.load_negatives(matcha.negatives)
+            if matcha.reference is not None:
+                dataset.load_reference(matcha.reference)
+                dataset.load_negatives(matcha.negatives)
 
-            if configs.plot_negatives_params.enabled:
-                dataset.plot_negative_distributions(**configs.plot_negatives_params.model_dump())
+                if configs.plot_negatives_params.enabled:
+                    dataset.plot_negative_distributions(**configs.plot_negatives_params.model_dump())
 
         dataset.process()
 
-        logger.info(f"Dataset ready")
+        if not dataset.has_cache():
+            dataset.save()
 
-        dataset.save()
+        dataset_end = time.time()
+        dataset_elapsed = (dataset_end - dataset_start) / 60
+        logger.info(f"Dataset built in {dataset_elapsed:.1f} minutes")
 
 
         # Trainer module
@@ -165,20 +178,32 @@ class AlignmentAction(Protocol):
 
         if dataset.reference is not None:
             logger.info(f"Training model with {reference_file_path}")
+            train_start = time.time()
+
             trainer.train(**configs.training_params.model_dump())
+
+            train_end = time.time()
+            train_elapsed = (train_end - train_start) / 60
+            logger.info(f"Model trained in {train_elapsed:.1f} minutes")
 
         logger.info(f"Computing alignment...")
 
-        if candidates_file_path is not None:
+        alignment_start = time.time()
+
+        if candidates_file_path is None:
             alignment, _ = trainer.predict(**configs.training_params.model_dump(), **configs.alignment_params.model_dump())
         else:
             alignment, _ = trainer.predict(**configs.training_params.model_dump())
+
+        alignment_end = time.time()
+        alignment_elapsed = (alignment_end - alignment_start) / 60
+        logger.info(f"Alignment computed in {alignment_elapsed:.1f} minutes")
 
         # Save Alignment
         
         logger.info(f"Writing alignment...")
 
-        alignment_file_path = trainer.save_alignment(alignment=alignment, 
+        alignment_file_path = trainer.save_alignment(alignment, 
                                                      candidates_one2many_path=candidates_file_path, 
                                                      sub_dir=task_name)
 
@@ -193,7 +218,7 @@ class AlignmentAction(Protocol):
 
             results = EvaluationAction.run(
                 alignment=Path(alignment_file_path),
-                output_dir_path=output_dir_path / task_name,
+                output_dir_path=output_dir_path / task_name if task_name is not None else output_dir_path,
                 error_on_fail=False,
                 K=configs.k,
                 source_file_path=dataset.source,
@@ -205,8 +230,8 @@ class AlignmentAction(Protocol):
             )
 
         end_time = time.time()
-        elapsed_time = end_time - start_time
-        logger.info(f"Alignment completed in {elapsed_time:.3f} seconds")
+        elapsed_time = (end_time - start_time)/ 60
+        logger.info(f"Alignment completed in {elapsed_time:.1f} minutes")
 
         return results
 

@@ -65,14 +65,6 @@ class MatchaParams(BaseModel):
     samplers: Sampler = Field(config["matcha_params"]["samplers"])
     calculate_scores: bool = Field(config["matcha_params"]["calculate_scores"])
 
-    @field_validator('matchers', mode="before")
-    def parse_matchers(cls, value):
-        return [Matchers(val) for val in set(value)]
-    
-    @field_validator('samplers', mode="before")
-    def parse_samplers(cls, value):
-        return Sampler(value)
-
 class PlotNegativesParams(BaseModel):
     enabled: bool = Field(config["plot_negatives"]["enabled"])
     figsize: Tuple[int, int] = Field(config["plot_negatives"]["figsize"])
@@ -92,30 +84,30 @@ class DatasetParams(BaseModel):
     separator: Optional[List[Separator]] = Field(config["dataset_params"]["separator"])
     comparison_type: Optional[List[ComparisonType]] = Field(config["dataset_params"]["comparison_type"])
     label_cardinality: Optional[List[int]] = Field(config["dataset_params"]["label_cardinality"])
-    context_type: Optional[List[ContextType]] = Field(config["dataset_params"]["context_type"])
+    context_type: Optional[List[Optional[ContextType]]] = Field(config["dataset_params"]["context_type"])
     context_cardinality: Optional[List[int]] = Field(config["dataset_params"]["context_cardinality"])
-    context_semantics: Optional[List[ContextSemantics]] = Field(config["dataset_params"]["context_semantics"])
+    context_semantics: Optional[List[Optional[ContextSemantics]]] = Field(config["dataset_params"]["context_semantics"])
     likelihood: Optional[List[Likelihood]] = Field(config["dataset_params"]["likelihood"])
+
+    # TODO Add more checks to dataset params
+    @field_validator('validation_set', mode="after")
+    def validate_validation_set(cls, v: Optional[float]) -> Optional[float]:
+        "Ensure validation_set is between 0 and 1."
+        if v is not None and (v < 0 or v > 1):
+            raise ValueError("validation_set must be between 0 and 1.")
+        return v
     
-    @field_validator('separator', mode="before")
-    def parse_separator(cls, value):
-        return [Separator(val) for val in value]
-    @field_validator('comparison_type', mode="before")
-    def parse_comparison_type(cls, value):
-        return [ComparisonType(val) for val in value]
-    @field_validator('context_type', mode="before")
-    def parse_context_type(cls, value):
-        return [ContextType(val) for val in value]
-    @field_validator('context_semantics', mode="before")
-    def parse_context_semantics(cls, value):
-        return [ContextSemantics(val) for val in value]
-    @field_validator('likelihood', mode="before")
-    def parse_likelihood(cls, value):
-        return [Likelihood(val) for val in value]
+    @field_validator('label_cardinality', 'context_cardinality', 'positive_examples', 'negative_examples',  mode="after")
+    def validate_ints(cls, v: Optional[List[int]]) -> Optional[List[int]]:
+        """Ensure cardinality lists are either None or contain non-negative integers."""
+        if v is not None and any(x < 0 for x in v):
+            raise ValueError("Integer params must contain only non-negative integers.")
+        return v
 
     @model_validator(mode="after")
-    def validate_list_lengths(self):
-        """Ensure all list fields have the same length."""
+    def validate_prompt_params(self):
+        
+        ##Ensure all list fields have the same length.
         fields_to_check = [
             'example', 'positive_examples', 'negative_examples', 
             'task_context', 'separator', 'comparison_type', 
@@ -126,7 +118,22 @@ class DatasetParams(BaseModel):
         lengths = [len(getattr(self, field)) for field in fields_to_check if getattr(self, field) is not None]
         if len(set(lengths)) > 1:
             raise ValueError("All lists in DatasetParams must have the same length.")
+        
+        # Ensure that context_type and context_semantics are not both provided if one is provided
+        if self.context_type is not None and self.context_semantics is not None:
+            for ct, cs in zip(self.context_type, self.context_semantics):
+                if ct is None and cs is not None:
+                    raise ValueError("If context_semantics is provided, context_type must also be provided.")
+                if ct is not None and cs is None:
+                    raise ValueError("If context_type is provided, context_semantics must also be provided.")
+        if self.context_type is None and self.context_semantics is not None:
+            raise ValueError("If context_semantics is provided, context_type must also be provided.")
+        if self.context_type is not None and self.context_semantics is None:
+            raise ValueError("If context_type is provided, context_semantics must also be provided.")
+            
+        
         return self
+        
 
 class TrainingParams(BaseModel):
     epochs: int = Field(config["training_params"]["epochs"])

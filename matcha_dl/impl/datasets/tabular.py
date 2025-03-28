@@ -19,8 +19,8 @@ from matcha_dl.core.entities.dataset import DatasetMask
 
 class TabularDataset(IDataset):
 
-    def __init__(self, output_path: Path, matchers: List[str], **kwargs) -> None:
-        super().__init__(output_path, matchers, **kwargs)
+    def __init__(self, output_path: Path, **kwargs) -> None:
+        super().__init__(output_path, **kwargs)
 
         self._df = None
         self._df_save_path = self.output_path / "dataset.csv"
@@ -61,9 +61,6 @@ class TabularDataset(IDataset):
         if self.dataframe is None:
             self.log("Dataset is empty.", level="error")
             raise ValueError("Dataset is empty.")
-        
-        if kind is None:
-            kind = self.default_kind
 
         return np.array(self.dataframe[self.dataframe[kind]]["Features"].values.tolist())
 
@@ -141,60 +138,71 @@ class TabularDataset(IDataset):
         
         if self.reference is not None:
 
-            if self.negatives is None:
-                self.log("Negatives not loaded.", level="error")
-                raise ValueError("Negatives not loaded.")
+            if not self.in_context_training:
 
-            # get training set
-            self.log("Creating Training Set...", level="debug")
+                if self.negatives is None:
+                    self.log("Negatives not loaded.", level="error")
+                    raise ValueError("Negatives not loaded.")
 
-            # get positive samples from refs
-            positive_set = self.reference
+                # get training set
+                self.log("Creating Training Set...", level="debug")
 
-            # add negatives
-            self.log("#Adding Negative Samples...", level="debug")
-            negative_set = self.negatives
+                # get positive samples from refs
+                positive_set = self.reference
 
-            # combine positive and negative samples
-            training_set = pd.concat([positive_set, negative_set], ignore_index=True)
+                # add negatives
+                self.log("#Adding Negative Samples...", level="debug")
+                negative_set = self.negatives
 
-            # get features from matcha
-            self.log("#Getting Features...", level="debug")
-            training_set = self.get_features(training_set)
+                # combine positive and negative samples
+                training_set = pd.concat([positive_set, negative_set], ignore_index=True)
 
-            self.log("#Shuffling Training Set...", level="debug")
+                # get features from matcha
+                self.log("#Getting Features...", level="debug")
+                training_set = self.get_features(training_set)
 
-            # Ensure reproducibility by using seeded np random state
+                self.log("#Shuffling Training Set...", level="debug")
 
-            training_set = training_set.sample(frac=1, random_state=random.randint(0, 2**32 - 1)).reset_index(drop=True)
+                # Ensure reproducibility by using seeded np random state
 
-            if self.validation_set is not None and self.validation_set > 0:
+                training_set = training_set.sample(frac=1, random_state=random.randint(0, 2**32 - 1)).reset_index(drop=True)
 
-                self.log(f'#Splitting Training Set into Train and Validation Sets({self.validation_set*100}%)...', level="debug")
+                if self.validation_set is not None and self.validation_set > 0:
 
-                # split training set into train and validation sets
-            
-                validation_set = training_set.sample(frac=self.validation_set, random_state=random.randint(0, 2**32 - 1)).reset_index(drop=True)
+                    self.log(f'#Splitting Training Set into Train and Validation Sets({self.validation_set*100}%)...', level="debug")
 
-                training_set = training_set.drop(validation_set.index).reset_index(drop=True)
+                    # split training set into train and validation sets
+                
+                    validation_set = training_set.sample(frac=self.validation_set, random_state=random.randint(0, 2**32 - 1)).reset_index(drop=True)
 
-                # assign validation label
-                validation_set[DatasetMask.train] = False
-                validation_set[DatasetMask.validation] = True
-                validation_set[DatasetMask.inference] = False
+                    training_set = training_set.drop(validation_set.index).reset_index(drop=True)
 
-            # assign training label
-            training_set[DatasetMask.train] = True
-            training_set[DatasetMask.validation] = False
-            training_set[DatasetMask.inference] = False
+                    # assign validation label
+                    validation_set[DatasetMask.train] = False
+                    validation_set[DatasetMask.validation] = True
+                    validation_set[DatasetMask.inference] = False
+
+                # assign training label
+                training_set[DatasetMask.train] = True
+                training_set[DatasetMask.validation] = False
+                training_set[DatasetMask.inference] = False
 
 
-            self.log("#Combining Training, Validation and Inference Sets...", level="debug")
+                self.log("#Combining Training, Validation and Inference Sets...", level="debug")
 
-            dataset = pd.concat([training_set, validation_set, inference_set], ignore_index=True)
+                dataset = pd.concat([training_set, validation_set, inference_set], ignore_index=True)
+
+            else:
+                self.log("#In-Context Training Enabled: Skipping Training Set, using Inference Set...", level="debug")
+
+                # if example is set to True, skip training set and use inference set
+                dataset = inference_set
 
         else:
 
+            self.log("#No Reference: Skipping Training Set, using Inference Set...", level="debug")
+
+            # if reference is None, skip training set and use inference set
             dataset = inference_set
 
         self.log("#Processing Done", level="debug")

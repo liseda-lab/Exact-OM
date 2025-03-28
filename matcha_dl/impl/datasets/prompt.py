@@ -9,9 +9,13 @@ DataFrame = pd.DataFrame
 from torch import Tensor
 import torch as th
 
+from tqdm import tqdm
+
 from typing import List, Tuple, Optional
 
 from transformers import AutoTokenizer
+
+import re
 
 
 from matcha_dl.impl.datasets.tabular import TabularDataset
@@ -23,7 +27,6 @@ class PromptDataset(TabularDataset):
 
     def __init__(
                 self,
-                example: List[bool],
                 positive_examples: List[int],
                 negative_examples: List[int],
                 task_context: List[bool],
@@ -38,7 +41,6 @@ class PromptDataset(TabularDataset):
         ) -> None:
 
         super().__init__(**kwargs)
-        self._example = example
         self._positive_examples = positive_examples
         self._negative_examples = negative_examples
         self._task_context = task_context
@@ -50,12 +52,7 @@ class PromptDataset(TabularDataset):
         self._context_semantics = context_semantics
         self._likelihood = likelihood
         self._static_skeletons = None
-
         self._tokenizer = None
-    
-    @property
-    def example(self) -> List[bool]:
-        return self._example
     
     @property
     def positive_examples(self) -> List[int]:
@@ -128,14 +125,14 @@ class PromptDataset(TabularDataset):
             skeleton = self.apply_confidence(skeleton, likelihood)
             skeletons.append(skeleton)
 
-        self.log("Static skeletons generated.", level="debug")
+        self.log(f"{len(skeletons)} Static skeletons generated.", level="debug")
         self.log(f"Skeletons: {skeletons}", level="debug")
 
         return skeletons
 
     def pre_process_x(self, data: np.ndarray) -> Tensor:
         if self.tokenizer:
-            return self.tokenizer(data, padding=True, truncation=True, return_tensors="pt")
+            return self.tokenizer(data.tolist(), padding=True, truncation=True, return_tensors="pt")
         
         return super().pre_process_x(data)
         
@@ -154,11 +151,16 @@ class PromptDataset(TabularDataset):
         source_entities = Entity.load_from_list(dataset["Src"], self.source.ontology)
         target_entities = Entity.load_from_list(dataset["Tgt"], self.target.ontology)
             
-        dataset["Features"] = [self.add_dynamic_information(source, target, self.static_skeletons) 
-                               for source, target in zip(source_entities, target_entities)]
+        dynamic_features = []
+        for idx, (source, target) in enumerate(zip(source_entities, target_entities)):
+            dynamic_features.append(self.add_dynamic_information(source, target, self.static_skeletons))
+
+            if idx % 10000 == 0:
+                self.log(f"Processed {idx} source-target pairs of {len(source_entities)}...", level="debug")
         
-        self.log("Dynamic prompts generated.", level="debug")
-        self.log(f"Generated {len(dataset['Features'])*self.static_skeletons} Prompts", level="debug")
+        self.log(f"Generated {len(source_entities)*len(self.static_skeletons)} Dynamic Prompts", level="debug")
+
+        dataset["Features"] = dynamic_features
         
         return dataset
     
@@ -166,13 +168,13 @@ class PromptDataset(TabularDataset):
 
         dynamic_queries = []
 
-        for static_skeleton, example, positive_examples, negative_examples, label_cardinality, separator, context_type, context_cardinality in zip(
-            skeletons, self.example, self.positive_examples, self.negative_examples, self.label_cardinality, self.separator, self.context_type, self.context_cardinality
+        for static_skeleton, example, positive_examples, negative_examples, label_cardinality, separator, context_type, context_cardinality, context_semantics in zip(
+            skeletons, self.example, self.positive_examples, self.negative_examples, self.label_cardinality, self.separator, self.context_type, self.context_cardinality, self.context_semantics
         ):
 
             query = self.apply_examples(static_skeleton, example, positive_examples, negative_examples, self.reference, self.negatives)
             query = self.apply_label_information(source, target, query, label_cardinality, separator)
-            query = self.apply_context_information(source, target, query, context_type, context_cardinality, separator)
+            query = self.apply_context_information(source, target, query, context_type, context_cardinality, separator, context_semantics)
 
             dynamic_queries.append(query)
 
@@ -184,11 +186,7 @@ class PromptDataset(TabularDataset):
     
     @staticmethod
     def apply_comparison_type(skeleton: str, comparison_type: ComparisonType):
-
-        if comparison_type is not None:
-            return skeleton.replace('$TYPE', comparison_type.replace("_", " "))
-
-        return skeleton.replace('$TYPE', '')
+        return skeleton.replace('$TYPE', comparison_type.replace("_", " "))
     
     @staticmethod
     def apply_context_semantics(skeleton: str, context_semantics: ContextSemantics):
@@ -196,7 +194,7 @@ class PromptDataset(TabularDataset):
             context_semantics = context_semantics.replace("_", " ")
             skeleton = skeleton.replace('$CTX_S', f"{context_semantics} $CTX_S")
             return skeleton.replace('$CTX_T', f"{context_semantics} $CTX_T")
-        return skeleton
+        return skeleton.replace('$CTX_S', '').replace('$CTX_T', '')
     
     @staticmethod
     def apply_instruction_information(skeleton: str):
@@ -206,15 +204,14 @@ class PromptDataset(TabularDataset):
     def apply_confidence(skeleton: str, likelihood: Likelihood):
         return skeleton.replace('$CONF', StaticPrompts.get_confidence(likelihood))
     
-    @classmethod
-    def apply_examples(cls, skeleton: str, example: bool, positive_examples: int, negative_examples: int, reference: DataFrame, negatives: DataFrame) -> str:
+    def apply_examples(self, skeleton: str, example: bool, positive_examples: int, negative_examples: int, reference: DataFrame, negatives: DataFrame) -> str:
         if example:
             examples = ""
             if reference is not None:
-                examples = cls._get_examples(reference, positive_examples, random.randint(0, 2**32 - 1), True, examples)
+                examples = self._get_examples(reference, positive_examples, random.randint(0, 2**32 - 1), True, examples)
 
                 if negatives is not None:
-                    examples = cls._get_examples(negatives, negative_examples, random.randint(0, 2**32 - 1), False, examples)
+                    examples = self._get_examples(negatives, negative_examples, random.randint(0, 2**32 - 1), False, examples)
 
             return skeleton.replace('$E', examples)
 
@@ -229,13 +226,20 @@ class PromptDataset(TabularDataset):
         return skeleton.replace('$S', source_labels).replace('$T', target_labels)
     
     @classmethod
-    def apply_context_information(cls, source: Entity, target: Entity, skeleton: str, context_type: ContextType, context_cardinality: int, separator: Separator) -> str:
+    def apply_context_information(cls, source: Entity, target: Entity, skeleton: str, context_type: ContextType, context_cardinality: int, separator: Separator, context_semantics: ContextSemantics) -> str:
 
-        if context_type is None or context_cardinality <= 0:
+        if context_type is None:
             return skeleton.replace('$CTX_S', '').replace('$CTX_T', '')
 
         source_context = cls._format_labels(getattr(source, context_type), context_cardinality, separator)
         target_context = cls._format_labels(getattr(target, context_type), context_cardinality, separator)
+
+        context_semantics = context_semantics.replace("_", " ")
+
+        if source_context == "":
+            skeleton = cls._remove_if_followed(skeleton, context_semantics,'$CTX_S')
+        if target_context == "":
+            skeleton = cls._remove_if_followed(skeleton, context_semantics,'$CTX_T')
 
         return skeleton.replace('$CTX_S', source_context).replace('$CTX_T', target_context)
 
@@ -243,37 +247,51 @@ class PromptDataset(TabularDataset):
     def _format_labels(labels: List[str], cardinality: int, separator: Separator) -> str:
 
         # Ensure cardinality is a positive integer and labels is not empty
-        if cardinality <= 0 or not labels:
+        if len(labels) == 0 or cardinality <= 0:
             return ""
+        
+        # If there's only one label or cardinality is 1 or less, return the label directly
+        if len(labels) == 1 or cardinality == 1:
+            return labels[0]
         
         # Limit the number of labels to the specified cardinality
         if len(labels) > cardinality:
             labels = labels[:cardinality]
         
-        # If there's only one label or cardinality is 1, return the label directly
-        if len(labels) == 1 or cardinality == 1:
-            return labels[0]
-        
         # Else format the labels based on the specified separator
         if separator == Separator.comma:
             labels_string = ", ".join(labels[1:])
         elif separator == Separator.paranthesis:
-            labels_string = "("+") (".join(labels[1:])+")"
+            labels_string = "(" + ", ".join(labels[1:]) + ")"
         else:
             labels_string = ""
         
         return f"{labels[0]} {labels_string}"
     
-    @staticmethod
-    def _get_examples(dataset: DataFrame, num_examples: int, random_state: int, solution: bool, examples: str = "") -> str:
+    def _get_examples(self, dataset: DataFrame, num_examples: int, random_state: int, solution: bool, examples: str = "") -> str:
+
+        if num_examples <= 0 or dataset.empty:
+            return examples
         
         dataset = dataset.sample(num_examples, random_state=random_state).reset_index(drop=True)
+
+        source_labels = [ent.labels[0] for ent in Entity.load_from_list(dataset["Src"], self.source.ontology, self.source_reasoner)]
+        target_labels = [ent.labels[0] for ent in Entity.load_from_list(dataset["Tgt"], self.target.ontology, self.target_reasoner)]
         
         return examples + "".join([
             StaticPrompts.get_example(source, target, solution, True)
-            if examples == ""
+            if idx==0 and examples == ""
             else StaticPrompts.get_example(source, target, solution, False)
-            for source, target in zip(dataset["Src"].tolist(), dataset["Tgt"].tolist()) 
+            for idx, (source, target) in enumerate(zip(source_labels, target_labels))
         ])
+    
+    @staticmethod
+    def _remove_if_followed(sentence: str, target: str, follow: str) -> str:
+        """
+        Remove the target phrase if it is immediately followed by the follow word.
+        """
+        pattern = rf'\b{re.escape(target)}\s+(?={re.escape(follow)}\b)'
+        
+        return re.sub(pattern, '', sentence)
 
 

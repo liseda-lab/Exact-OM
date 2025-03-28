@@ -342,7 +342,7 @@ class IMatcha(LoggingClass):
                         self.log(f"Matcha failed to generate negatives at {self.negatives}", level="error")
                         raise FileNotFoundError(f"Matcha failed to generate negatives at {self.negatives}")
                     else:
-                        self.log(f"Matcha negatives generated at {self.negatives}", level="info")
+                        self.log(f"Matcha negatives generated at {self.negatives}", level="debug")
                 else:
                     self.log(f"Skipping generating negatives", level="info")
 
@@ -375,10 +375,10 @@ class IMatcha(LoggingClass):
                         self.log(f"Matcha failed to generate matcha features at {self.matcha_features}", level="error")
                         raise FileNotFoundError(f"Matcha failed to generate matcha features at {self.matcha_features}")
                     else:
-                        self.log(f"Matcha features generated at {self.matcha_features}", level="info")
+                        self.log(f"Matcha features generated at {self.matcha_features}", level="debug")
                     
                 else:
-                    self.log(f"Skipping generating matcha features", level="info")
+                    self.log(f"Skipping generating matcha features...", level="info")
 
         except subprocess.CalledProcessError as e:
             self.log(f"Matcha subprocess returned with error code {e.returncode}", level="error")

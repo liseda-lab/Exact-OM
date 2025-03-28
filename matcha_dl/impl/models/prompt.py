@@ -112,6 +112,8 @@ class PromptClassifier(IModel):
 
     def aggregate_responses(self, confidences: torch.Tensor) -> torch.Tensor:
         # confidences is of shape [batch_size, num_prompts]
+        # return aggregated confidence based on the specified aggregation strategy
+        # shape of returned tensor is [batch_size]
         if confidences.shape[-1] == 1:
             return confidences.squeeze(-1)
         elif self.aggregation_strategy == AggregationStrategy.mean:

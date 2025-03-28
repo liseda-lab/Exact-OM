@@ -81,7 +81,7 @@ dataset_params:
   label_cardinality: [1] #  3, 5, 100
   context_type : [superclasses] # superclasses, subclasses, top_superclass
   context_cardinality: [1] # 3, 5, 100
-  context_semantics: [part_of] # part_of, kind_of, type_of, subclass_of, with_subclass, with_part, with_type, with_kind
+  context_semantics: [a_part_of] # a_part_of, a_kind_of, a_type_of, a_subclass_of, with_subclass, with_part, with_type, with_kind
   likelihood: [float] # float, cat
 
 training_params:
@@ -109,7 +109,7 @@ stopper:
 model:
   name: PromptClassifier
   params:
-    model_version: google/flan-t5-base # google/flan-t5-base/ (250M), google/flan-t5-xl (3B), google/flan-t5-xxl (11B)
+    model_name: google/flan-t5-base # google/flan-t5-base/ (250M), google/flan-t5-xl (3B), google/flan-t5-xxl (11B)
     # Future suport meta-llama/Llama-3.1-8B-Instruct, meta-llama/Llama-3.3-70B-Instruct/ 
     # deepseek-ai/DeepSeek-R1-Distill-Llama-8B, deepseek-ai/DeepSeek-R1-Distill-Llama-70B
     use_critic: True

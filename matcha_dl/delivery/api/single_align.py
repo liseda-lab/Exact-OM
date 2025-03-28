@@ -20,6 +20,7 @@ class AlignmentRunner:
         save_logs: bool = False,
         jvm_heap_size: str = "32g",
         run_eval: bool = False,
+        device: Optional[int] = None  # Device for running the alignment, e.g., 0 for GPU 0, None for CPU
     ):
         """
 
@@ -45,6 +46,7 @@ class AlignmentRunner:
         self.save_logs = save_logs
         self.jvm_heap_size = jvm_heap_size
         self.run_eval = run_eval
+        self.device = device
 
     def run_alignment(self) -> None:
 
@@ -60,6 +62,7 @@ class AlignmentRunner:
             candidates_file_path=Path(self.candidates_file).resolve() if self.candidates_file else None,
             log_file_path=Path(self.output_dir).resolve() / "matcha_dl.log" if self.save_logs else None,
             run_eval=self.run_eval,
+            device=self.device
         )
 
     def validate_files(self) -> None:

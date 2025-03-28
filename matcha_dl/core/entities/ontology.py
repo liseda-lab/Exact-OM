@@ -87,9 +87,11 @@ class Entity:
         if isinstance(owl_class, str):
             owl_class = cls._get_owl_class(owl_class, ontology)
         label_property = ontology.getOWLOntologyManager().getOWLDataFactory().getRDFSLabel()
-        return [annotation.getValue().asLiteral().get().getLiteral() for annotation in EntitySearcher.getAnnotations(owl_class, ontology, label_property) if annotation.getValue().isLiteral()]
+        return [str(annotation.getValue().asLiteral().get().getLiteral()) for annotation in EntitySearcher.getAnnotations(owl_class, ontology, label_property) if annotation.getValue().isLiteral()]
 
     @classmethod
-    def load_from_list(cls, class_iris: List[str], ontology: OWLOntology) -> List['Entity']:
-        reasoner = Reasoner.ReasonerFactory().createReasoner(ontology)
+    def load_from_list(cls, class_iris: List[str], ontology: OWLOntology, reasoner: Optional[Reasoner] = None) -> List['Entity']:
+
+        if reasoner is None:
+            reasoner = Reasoner.ReasonerFactory().createReasoner(ontology)
         return [cls(class_iri=class_iri, ontology=ontology, reasoner=reasoner) for class_iri in class_iris]
