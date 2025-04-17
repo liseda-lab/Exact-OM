@@ -21,6 +21,19 @@ class StaticPrompts:
         Likelihood.cat: f"Followed by your confidence in your answer '{NEGATIVE_CONFIDENCE}', '{POSITIVE_CONFIDENCE}', '{VERY_POSITIVE_CONFIDENCE}', like this: '{POSITIVE_SOLUTION}:confident'"
     }
     CRITIC_SKELETON = f"You are verifying an ontology aligmnent task, given the question $P the response was $R is this correct? You should answer '{POSITIVE_SOLUTION}' or '{NEGATIVE_SOLUTION}'$U."
+    VERBALIZATION_SKELETON = (
+            "You are a natural language generator that converts structured data into a coherent sentence. "
+            "Given the triple below, generate one complete, grammatically correct sentence that clearly expresses "
+            "the relationship between the head and the tail as indicated by the relation. Do not include any additional "
+            "commentary or information. The triple is: head: $HEAD, relation: $REL, tail: $TAIL. The sentence should be: <think>"
+    )
+    SUMMARIZATION_SKELETON = (
+        "You are an expert summariser. Given the following context subgraph, presented as a list of triples "
+        "in the format 'head, relation, tail', that describe various aspects and relationships of the entity "
+        "'$ENTITY', please provide a concise and informative summary that captures the key characteristics of "
+        "$ENTITY. The context subgraph is as follows:\n$CONTEXT\nSummary: <think>"
+    )
+    
 
     @classmethod
     def get_task_context(cls, task_context:bool) -> str:
@@ -44,6 +57,13 @@ class StaticPrompts:
         if uncertainty:
             return critic.replace("$U", f" or {cls.UNCERTAIN_SOLUTION}")
         return cls.CRITIC_SKELETON.replace("$U", "")
+    
+    @classmethod
+    def get_verbalization(cls, head: str, relation: str, tail: str) -> str:
+        return cls.VERBALIZATION_SKELETON.replace("$HEAD", head).replace("$REL", relation).replace("$TAIL", tail)
+    @classmethod
+    def get_summarization(cls, entity: str, context: str) -> str:
+        return cls.SUMMARIZATION_SKELETON.replace("$ENTITY", entity).replace("$CONTEXT", context)
     
 
 class DatasetMask(str, Enum):
