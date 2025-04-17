@@ -17,6 +17,7 @@ from matcha_dl.utils.data import read_table
 from mowl.datasets import PathDataset as OWLDataset
 from mowl.owlapi import OWLOntology
 from org.semanticweb.HermiT import Reasoner
+from org.semanticweb.owlapi.reasoner import InferenceType
 
 
 # from jpype import java
@@ -34,6 +35,7 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
                  matchers: List[str],
                  validation_set: Optional[float] = 0.1,
                  example: Optional[List[bool]] = None,
+                 num_workers: Optional[int] = None,
                  **kwargs
         ) -> None:
 
@@ -42,6 +44,7 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
         self._output_path.mkdir(parents=True, exist_ok=True)
         self._matchers = matchers
         self._validation_set = validation_set
+        self._num_workers = num_workers
 
         self._source = None
         self._target = None
@@ -101,6 +104,7 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
             raise ValueError("Source ontology not loaded.")
         if self._source_reasoner is None:
             self._source_reasoner = Reasoner.ReasonerFactory().createReasoner(self.source.ontology)
+            self._source_reasoner.precomputeInferences(InferenceType.CLASS_HIERARCHY, InferenceType.OBJECT_PROPERTY_HIERARCHY)
         return self._source_reasoner
     
     @property
@@ -110,6 +114,7 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
             raise ValueError("Target ontology not loaded.")
         if self._target_reasoner is None:
             self._target_reasoner = Reasoner.ReasonerFactory().createReasoner(self.target.ontology)
+            self._target_reasoner.precomputeInferences(InferenceType.CLASS_HIERARCHY, InferenceType.OBJECT_PROPERTY_HIERARCHY)
         return self._target_reasoner
     
     @property
@@ -131,6 +136,10 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
     @property
     def output_path(self) -> Path:
         return self._output_path
+    
+    @property
+    def num_workers(self) -> Optional[int]:
+        return self._num_workers
     
     def load_ontologies(self, source_path: Path, target_path: Path) -> None:
         
@@ -262,10 +271,10 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
 
         feats = []
         
-        for _, row in dataset.iterrows():
+        for row in dataset.itertuples(index=False):
 
             try:
-                vector = self.matcha_features.get(row["Src"]).get(row["Tgt"])
+                vector = self.matcha_features[row.Src][row.Tgt]
             except AttributeError:
                 self.log("Matcha features not loaded.", level="error", exc_info=True)
                 raise ValueError("Scores for source {} and target {} not found.".format(row["Src"], row["Tgt"]))
