@@ -16,12 +16,25 @@ from typing import List, Tuple, Optional
 from transformers import AutoTokenizer
 
 import re
+import concurrent.futures
 
 
 from matcha_dl.impl.datasets.tabular import TabularDataset
 from matcha_dl.core.entities.configs.dataset import Separator, ComparisonType, ContextType, ContextSemantics, Likelihood
 from matcha_dl.core.entities.dataset import StaticPrompts
 from matcha_dl.core.entities.ontology import Entity
+
+def _process_dynamic_info(args: Tuple[int, 'Entity', 'Entity', list, 'PromptDataset']) -> Tuple[int, List[str]]:
+    """
+    Helper function to process a single source-target pair.
+    Args:
+        args: A tuple (idx, source, target, static_skeletons, dataset_instance)
+    Returns:
+        (idx, dynamic_queries) produced by calling dataset_instance.add_dynamic_information.
+    """
+    idx, source, target, static_skeletons, dataset_instance = args
+    result = dataset_instance.add_dynamic_information(source, target, static_skeletons)
+    return idx, result
 
 class PromptDataset(TabularDataset):
 
@@ -140,28 +153,37 @@ class PromptDataset(TabularDataset):
     def get_features(self, dataset: DataFrame) -> DataFrame:
         return self.generate_prompts(dataset)
 
-
+    # TODO test this parallelization
     def generate_prompts(self, dataset: pd.DataFrame) -> pd.DataFrame:
         """
         Generates prompts for the dataset.
         """
-
         self.log("Generating dynamic prompts...", level="debug")
 
-        source_entities = Entity.load_from_list(dataset["Src"], self.source.ontology)
-        target_entities = Entity.load_from_list(dataset["Tgt"], self.target.ontology)
-            
-        dynamic_features = []
-        for idx, (source, target) in enumerate(zip(source_entities, target_entities)):
-            dynamic_features.append(self.add_dynamic_information(source, target, self.static_skeletons))
+        # Load the source and target entities
+        source_entities = Entity.load_from_list(dataset["Src"], self.source.ontology, self.source_reasoner)
+        target_entities = Entity.load_from_list(dataset["Tgt"], self.target.ontology, self.target_reasoner)
 
-            if idx % 10000 == 0:
-                self.log(f"Processed {idx} source-target pairs of {len(source_entities)}...", level="debug")
-        
-        self.log(f"Generated {len(source_entities)*len(self.static_skeletons)} Dynamic Prompts", level="debug")
+        # Prepare arguments for parallel processing
+        args_list = [
+            (idx, source, target, self.static_skeletons, self)
+            for idx, (source, target) in enumerate(zip(source_entities, target_entities))
+        ]
 
+        dynamic_features = [None] * len(source_entities)
+        total = len(source_entities)
+
+        # Use a ProcessPoolExecutor since these operations are CPU-bound
+        with concurrent.futures.ProcessPoolExecutor(max_workers=self.num_workers) as executor:
+            futures = {executor.submit(_process_dynamic_info, args): args[0] for args in args_list}
+            for future in concurrent.futures.as_completed(futures):
+                idx, result = future.result()
+                dynamic_features[idx] = result
+                if idx % 10000 == 0:
+                    self.log(f"Processed {idx} source-target pairs of {total}...", level="debug")
+
+        self.log(f"Generated {total * len(self.static_skeletons)} Dynamic Prompts", level="debug")
         dataset["Features"] = dynamic_features
-        
         return dataset
     
     def add_dynamic_information(self, source: Entity, target: Entity, skeletons: List[str]) -> List[str]:
