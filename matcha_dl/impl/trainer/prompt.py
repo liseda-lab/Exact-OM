@@ -9,10 +9,9 @@ from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 import numpy as np
 
-from transformers import DataCollatorWithPadding
-
 from matcha_dl.core.contracts.trainer import EntityMapping, ITrainer
 from matcha_dl.core.entities.dataset import DatasetMask
+from matcha_dl.utils.collate import DataCollator
 
 # 
 
@@ -52,19 +51,19 @@ class PromptTrainer(ITrainer):
 
         self.model.unexpected_response_count.reset()
 
+        collator = DataCollator(self.model.tokenizer)
+
         while self._epoch <= epochs and not early_stopping:
             self.model.train()
             _iter = 1
             self._optimizer.zero_grad()
 
-            with tqdm(DataLoader(self.dataset, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers), unit="batch") as tepoch:
+            with tqdm(DataLoader(self.dataset, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers, collate_fn=collator), unit="batch") as tepoch:
                 for step, (batch_prompts, target) in enumerate(tepoch):
                     tepoch.set_description(f"Epoch {self._epoch}")
 
-                    batch_prompts, target = (
-                        batch_prompts.to(self.device),
-                        target.unsqueeze(1).to(self.device),
-                    )
+                    batch_prompts = {k: v.to(self.device) for k, v in batch_prompts.items()}
+                    target = target.to(self.device)
 
                     with torch.amp.autocast('cuda', enabled=mixed_precision):
                         logits = self.model(batch_prompts["input_ids"], batch_prompts["attention_mask"])
@@ -119,60 +118,14 @@ class PromptTrainer(ITrainer):
 
         self.dataset.default_kind = kind
         
-        data_collator = DataCollatorWithPadding(tokenizer=self.model.tokenizer)
-
-        # def custom_collate_fn(batch):
-        #     # Each item in the batch is a tuple (batch_prompts, target)
-        #     batch_prompts, targets = zip(*batch)
-        #     # Use the data collator to pad the tokenized prompts
-        #     padded_prompts = data_collator(list(batch_prompts))
-        #     # If targets are tensors, stack them; otherwise, process as needed.
-        #     targets = torch.stack(targets) if isinstance(targets[0], torch.Tensor) else targets
-
-        #     return padded_prompts, targets
-
-        def custom_collate_fn(batch):
-            # Each sample in 'batch' is a tuple: (tokenized_prompts, target)
-            # tokenized_prompts is a BatchEncoding (or dict) with shape [num_prompts, seq_len]
-            batch_prompts, targets = zip(*batch)
-            
-            # Flatten the prompts across the batch dimension:
-            # For example, if each tokenized_prompts is a dict with "input_ids" of shape [num_prompts, seq_len],
-            # we want to create a list of dicts, one for each prompt.
-            flat_prompts = []
-            for prompts in batch_prompts:
-                # Assume prompts is already a BatchEncoding or dict with keys like "input_ids" etc.
-                # And assume there are N prompts.
-                # We need to iterate over the prompts and extract each one.
-                for i in range(len(prompts["input_ids"])):
-                    # Construct a dict for the i-th prompt of this sample.
-                    flat_prompts.append({k: prompts[k][i] for k in prompts})
-            
-            # Now use DataCollatorWithPadding on the flattened list.
-            padded_flat = data_collator(flat_prompts)  # This will pad to a uniform sequence length.
-            
-            # Determine the number of prompts per sample:
-            num_prompts = len(batch_prompts[0]["input_ids"])
-            batch_size = len(batch_prompts)
-            # Now, reconstruct the padded batch to shape [batch_size, num_prompts, padded_seq_len] for each key.
-            # We need to split the padded outputs back into samples.
-            reconstructed = {}
-            for key, tensor in padded_flat.items():
-                # tensor shape is [batch_size * num_prompts, padded_seq_len]
-                # Reshape it to [batch_size, num_prompts, padded_seq_len]
-                reconstructed[key] = tensor.view(batch_size, num_prompts, -1)
-            
-            # Process targets as needed; for example, if they are tensors:
-            targets = torch.stack(targets) if isinstance(targets[0], torch.Tensor) else targets
-            
-            return reconstructed, targets
+        collator = DataCollator(self.model.tokenizer)
         
         dataloader = DataLoader(self.dataset, 
                                 batch_size=batch_size, 
                                 shuffle=False, 
                                 num_workers=num_workers, 
                                 pin_memory=True,
-                                collate_fn=custom_collate_fn)
+                                collate_fn=collator)
         
         self.model.eval()
         self.model.unexpected_response_count.reset()
@@ -182,15 +135,11 @@ class PromptTrainer(ITrainer):
         logits_all = None
         start_idx = 0
 
-        # TODO add tqdm progress bar for inference
-
         with torch.no_grad():
             with tqdm(dataloader, unit="batch") as tepoch:
                 for batch_prompts, target in tepoch:
                     tepoch.set_description(f"Running {self.dataset.default_kind}")
-                    # Ensure each tensor in the batch is moved to the correct device.
                     batch_prompts = {k: v.to(self.device) for k, v in batch_prompts.items()}
-                    # The batch size is provided by the tensor shape.
                     current_batch_size = batch_prompts["input_ids"].size(0)
                     target = target.to(self.device)
                     
@@ -198,9 +147,7 @@ class PromptTrainer(ITrainer):
                     loss = self._loss(logits, target)
                     total_loss += loss.item() * current_batch_size
                     
-                    # Pre-allocate logits_all on the first iteration.
                     if logits_all is None:
-                        # Determine full shape: (num_examples, ...) where ... matches logits' extra dimensions.
                         logits_shape = (num_examples,) + logits.shape[1:]
                         logits_all = torch.empty(logits_shape, dtype=logits.dtype)
                     
