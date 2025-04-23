@@ -38,6 +38,22 @@ class OntologyGraph:
         self._build_projection()
         self.precompute_all_labels()
 
+    def __repr__(self) -> str:
+        return (f"OntologyGraph(ontology={self.ontology.getOntologyID().getOntologyIRI()}, "
+                f"NumberOfEdges={len(self.edges) if self.edges else 0}, "
+                f"NumberOfNodes={len(self.graph) if self.graph else 0})")
+    def __len__(self) -> int:
+        return len(self.edges) if self.edges is not None else 0
+    
+    def __getitem__(self, item: str) -> Set[str]:
+        """
+        Allows access to the graph structure using the IRI as a key.
+        Returns a set of connected nodes (IRIs) for the given IRI.
+        """
+        if self.graph is None:
+            raise ValueError("Graph has not been built yet.")
+        return self.graph.get(item, set())
+
     def _build_projection(self) -> None:
         projector = OWL2VecStarProjector()
         self.edges = projector.project(self.ontology)
@@ -155,7 +171,7 @@ class OntologyGraph:
                     if edge.rel != rel:
                         continue
                     else:
-                        src, dst, rel_lbl = edge.src, edge.dst, edge.rel
+                        src, dst, rel_lbl = str(edge.src), str(edge.dst), str(edge.rel)
 
                     exs.append((src, rel_lbl, dst))
                     if len(exs) >= n:
@@ -173,12 +189,11 @@ class OntologyGraph:
                     (self.get_labels(src)[0], self.get_labels(rel_lbl)[0], self.get_labels(dst)[0])
                     for src, rel_lbl, dst in exs
                 ]
+            return examples
         
         else:
             # return IRIs
-            examples = self._example_triples_cache
-
-        return examples
+            return self._example_triples_cache
 
     def get_labels(self, iri: str) -> List[str]:
         """
@@ -194,7 +209,7 @@ class OntologyGraph:
                 for annotation in EntitySearcher.getAnnotations(owl_class, self.ontology, label_property)
                 if annotation.getValue().isLiteral()
             ]
-            self.label_cache[iri] = labels if labels else [owl_class.getIRI().getShortForm()]
+            self.label_cache[iri] = labels if labels else [str(owl_class.getIRI().getShortForm())]
         return self.label_cache[iri]
 
     def precompute_all_labels(self) -> None:
@@ -250,12 +265,14 @@ class OntologyGraph:
                     dst = self.get_labels(edge.dst)[0]
                     rel = self.get_labels(edge.rel)[0]
                 else:
-                    src, dst, rel = edge.src, edge.dst, edge.rel
+                    src, dst, rel = str(edge.src), str(edge.dst), str(edge.rel)
 
                 # original (outgoing) triple
                 subgraph_edges.append((src, rel, dst))
 
         return subgraph_edges
+    
+
 
 
 class Entity:
