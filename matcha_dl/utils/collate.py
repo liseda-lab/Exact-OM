@@ -5,7 +5,7 @@ import torch
 class DataCollator:
     def __init__(self, tokenizer):
         self.tokenizer = tokenizer
-        data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
+        self.data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
 
     def __call__(self, batch):
         batch_prompts, targets = zip(*batch)
