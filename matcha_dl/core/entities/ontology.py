@@ -29,6 +29,7 @@ class OntologyGraph:
         self._missing_dom_cache: Optional[List[str]] = None
         self._missing_rng_cache: Optional[List[str]] = None
         self._example_triples_cache: Optional[Dict[str, List[Tuple[str]]]] = None
+        self._context_subgraph_cache: Dict[Tuple[str,int,bool], List[Tuple[str]]] = {}
 
 
         if reasoner is None:
@@ -244,6 +245,10 @@ class OntologyGraph:
         :return: List of triples (src, rel, dst) where each element is either an IRI or a list of labels.
         """
 
+        key = (start, n, human_readable)
+        if key in self._context_subgraph_cache:
+            return self._context_subgraph_cache[key]
+
         visited = {start: 0}
         queue = deque([start])
         while queue:
@@ -256,7 +261,8 @@ class OntologyGraph:
                         queue.append(nbr)
         reachable = set(visited.keys())
 
-        subgraph_edges = []
+        subgraph_edges: List[Tuple[str,str,str]] = []
+
         for edge in self.edges:
             if edge.src in reachable and edge.dst in reachable:
                 # get either IRIs or labels
@@ -270,6 +276,7 @@ class OntologyGraph:
                 # original (outgoing) triple
                 subgraph_edges.append((src, rel, dst))
 
+        self._context_subgraph_cache[key] = subgraph_edges
         return subgraph_edges
     
 

@@ -106,6 +106,9 @@ class ContextTabularDataset(TabularDataset):
         self._verbalization_templates: Optional[Dict[str, str]] = None
         self._tokenizer: Optional[AutoTokenizer] = None
 
+        self._join_cache: Dict[Tuple[Tuple[str, str, str], ...], str] = {}
+        self._summary_cache: Dict[str, str] = {}
+
     @property
     def source_graph(self) -> OntologyGraph:
         if self._source_graph is None:
@@ -167,40 +170,50 @@ class ContextTabularDataset(TabularDataset):
         return self.generate_defenitions(dataset)
 
     def generate_defenitions(self, dataset: DataFrame) -> DataFrame:
-        
-        self.log("##Generating Entity defenitions...", level="debug")
+        # Log start
+        self.log("##Generating Entity definitions...", level="debug")
+        self.log("###Loading source and target entities uniquely...", level="debug")
 
-        self.log("###Loading source and target entities...", level="debug")
+        # Extract IRIs and cache Entity instances
+        src_iris = dataset["Src"].tolist()
+        tgt_iris = dataset["Tgt"].tolist()
+        unique_src = set(src_iris)
+        unique_tgt = set(tgt_iris)
+        src_map = {iri: Entity(class_iri=iri,
+                              ontology=self.source.ontology,
+                              reasoner=self.source_reasoner,
+                              ontology_graph=self.source_graph)
+                   for iri in unique_src}
+        tgt_map = {iri: Entity(class_iri=iri,
+                              ontology=self.target.ontology,
+                              reasoner=self.target_reasoner,
+                              ontology_graph=self.target_graph)
+                   for iri in unique_tgt}
+        source_entities = [src_map[iri] for iri in src_iris]
+        target_entities = [tgt_map[iri] for iri in tgt_iris]
 
-        # Load the source and target entities
-        source_entities = Entity.load_from_list(dataset["Src"], 
-                                                ontology=self.source.ontology, 
-                                                reasoner=self.source_reasoner, 
-                                                ontology_graph=self.source_graph)
-        target_entities = Entity.load_from_list(dataset["Tgt"], 
-                                                ontology=self.target.ontology, reasoner=self.target_reasoner,
-                                                ontology_graph=self.target_graph)
-        
-        #ordered_entities: List of tuples for each sample: (source_entities, target_entities) lists.
-        ordered_entities: List[List[Entity]] = [source_entities, target_entities]
-
-        # context_graph_list: List of context graphs, each with shape [2, num_entities, num_triples, 3].
-        #                        The first dimension corresponds to source (index 0) and target (index 1) subgraphs.
-
+        # Generate context subgraphs
         self.log("###Generating context subgraphs for each entity...", level="debug")
+        src_subs = [ent.get_context_subgraph(self.n_hops) for ent in source_entities]
+        tgt_subs = [ent.get_context_subgraph(self.n_hops) for ent in target_entities]
+        self.log(f"###Generated context subgraphs for {len(src_subs)} source and {len(tgt_subs)} target entities.", level="debug")
 
-        source_context: List[Tuple[str]] = [source.get_context_subgraph(self.n_hops) for source in ordered_entities[0]]
-        target_context: List[Tuple[str]] = [target.get_context_subgraph(self.n_hops) for target in ordered_entities[1]]
-        context_graph_list: List[List[List[Tuple[str]]]] = [source_context, target_context]
+        # Aggregate via join or summarisation
+        if self.aggregation_strategy is AggregationStrategy.JOIN:
+            self.log("###Verbalising and joining subgraphs...", level="debug")
+            features = self._subgraphs_join([src_subs, tgt_subs])
+        else:
+            self.log("###Verbalising and summarising subgraphs...", level="debug")
+            features = self._subgraphs_summarise(
+                [src_subs, tgt_subs],
+                [source_entities, target_entities]
+            )
 
-        self.log(f"###Generated context subgraphs for {len(source_context)} source and {len(target_context)} target entities.", level="debug")
-        self.log("###Verbalising context subgraphs...", level="debug")
-
-        dataset["Features"] = np.array(self._process_subgraphs(context_graph_list, ordered_entities)).T.tolist()
-        self.log("##Entity defenitions generated.", level="debug")
-
+        # Attach features back to DataFrame
+        dataset["Features"] = np.array(features).T.tolist()
+        self.log("##Entity definitions generated.", level="debug")
         return dataset
-
+    
     def _process_subgraphs(self, context_graph_list: List[List[List[Tuple[str]]]], ordered_entities:List[List[Entity]]) -> List[List[str]]:
 
         """
@@ -212,133 +225,144 @@ class ContextTabularDataset(TabularDataset):
             return self._subgraphs_join(context_graph_list)
         else:
             return self._subgraphs_summarise(context_graph_list, ordered_entities)
+
+    def _verbalize_triples(self, triples: List[Tuple[str, str, str]]) -> str:
+        """
+        Verbalise a list of (head, relation, tail) triples and join them using the delimiter.
+        Results are cached to avoid redundant replace/join operations.
+        """
+        key = tuple(triples)
+        if key not in self._join_cache:
+            texts = [
+                self.verbalization_templates[rel]
+                    .replace('$SRC', head)
+                    .replace('$TGT', tail)
+                for head, rel, tail in triples
+            ]
+            self._join_cache[key] = self.delimiter.join(texts)
+        return self._join_cache[key]
     
     def _subgraphs_join(self, context_graph_list: List[List[List[Tuple[str]]]]) -> List[List[str]]:
-        """Aggregates each subgraph by verbalising and joining triple strings using a delimiter.
-           Returns a nested list of shape [2, num_entities].
-        """
+        """Aggregate each subgraph by verbalising via _verbalize_triples and joining."""
         self.log("####Joining subgraphs with delimiter...", level="debug")
-
-        sides = len(context_graph_list)                     # Should be 2 (source and target)
-        num_entities = len(context_graph_list[0])
-        aggregated = []
+        sides, num = 2, len(context_graph_list[0])
+        aggregated = [[], []]
         for side in range(sides):
-            side_agg = []
-            for entity in range(num_entities):
-                subgraph = context_graph_list[side][entity]  # list of triples
-                triple_verb = [self.verbalization_templates[rel].replace('$SRC', head).replace('$TGT', tail) for head, rel, tail in subgraph]
-                joined = self.delimiter.join(triple_verb)
-                side_agg.append(joined)
-            aggregated.append(side_agg)
+            for idx in range(num):
+                triples = context_graph_list[side][idx]
+                text = self._verbalize_triples(triples)
+                aggregated[side].append(text)
+        self.log("####Subgraph join complete.", level="debug")
         return aggregated
 
-    def _subgraphs_summarise(self, context_graph_list: List[List[List[Tuple[str]]]], ordered_entity_tuple: List[List[Entity]]) -> List[List[str]]:
-        """Aggregates each subgraph using a summarisation model.
-           ordered_entity_tuple is (source_entities, target_entities) for this sample.
-           Returns a nested list of shape [2, num_entities].
-        """
-
+    def _subgraphs_summarise(
+        self,
+        context_graph_list: List[List[List[Tuple[str]]]],
+        ordered_entity_tuple: List[List[Entity]]
+    ) -> List[List[str]]:
+        # Log summarisation start
         self.log("####Summarising subgraphs with language model...", level="debug")
-
         sides = len(context_graph_list)
         num_entities = len(context_graph_list[0])
-        prompts = []
-        # For each side and each entity, build a summarisation prompt.
+
+        # Build prompts using cached verbalisation
+        prompts: List[str] = []
+        positions: List[Tuple[int, int]] = []
         for side in range(sides):
-            for entity in range(num_entities):
-                # Collapse the subgraph into a string using a simple join.
-                subgraph = context_graph_list[side][entity]
-                triple_strs = [self.verbalization_templates[rel].replace('$SRC', head).replace('$TGT', tail) for head, rel, tail in subgraph]
-                context_str = self.delimiter.join(triple_strs)
-                # Get the entity name from the ordered_entities tuple.
-                entity_name = ordered_entity_tuple[side][entity].labels[0]
-                # Build the summarisation prompt.
-                prompt = StaticPrompts.get_summarization(entity_name, context_str)
+            for idx in range(num_entities):
+                ent = ordered_entity_tuple[side][idx]
+                triples = context_graph_list[side][idx]
+                context_str = self._verbalize_triples(triples)
+                prompt = StaticPrompts.get_summarization(ent.labels[0], context_str)
                 prompts.append(prompt)
-        # Batch generate summarisation.
+                positions.append((side, idx))
+
         self.log(f"####Generated {len(prompts)} summarisation prompts.", level="debug")
         self.log("####Generating summaries in batches...", level="debug")
 
-        self.summariser_model.eval()
-        total = len(prompts)
-        num_batches = (total + self.batch_size - 1) // self.batch_size
-        summarised_sentences: List[str] = []
-        for i in range(num_batches):
-            start = i * self.batch_size
-            end = min(start + self.batch_size, total)
-            batch_prompts = prompts[start:end]
-            self.log(f"Summariser: Processing batch {i+1}/{num_batches} (items {start}-{end-1})", level="debug")
-            with torch.no_grad():
-                inputs = self.summariser_tokenizer(
-                    batch_prompts,
-                    return_tensors="pt",
-                    padding=True,
-                    truncation=True,
-                    max_length=self.max_length
-                ).to(self.device)
-                outputs = self.summariser_model.generate(
-                    **inputs,
-                    max_new_tokens=self.gen_max_new_tokens,
-                    do_sample=self.do_sample,
-                    num_beams=self.num_beams,
-                    early_stopping=self.early_stopping,
-                    temperature=self.temperature,
-                    top_k=self.top_k,
-                    top_p=self.top_p,
-                    # Use the EOS token as padding to avoid issues with variable-length outputs
-                    pad_token_id=self.summariser_tokenizer.eos_token_id,
-                )
-            decoded = self.summariser_tokenizer.batch_decode(outputs, skip_special_tokens=True)
-            batch_summaries = [extract_answer(resp) for resp in decoded]
-            summarised_sentences.extend(batch_summaries)
+        # Deduplicate prompts and call LLM only on new ones
+        unique_prompts = list(dict.fromkeys(prompts))
+        to_generate = [p for p in unique_prompts if p not in self._summary_cache]
+        if to_generate:
+            new_summaries = self._batch_summarise(to_generate)
+            for p, s in zip(to_generate, new_summaries):
+                self._summary_cache[p] = s
+            self.log(f"####Cached {len(to_generate)} new summaries; cache size: {len(self._summary_cache)}.", level="debug")
 
-        self.log(f"####Generated {len(summarised_sentences)} summarised sentences.", level="debug")
+        # Reassemble into nested result
+        aggregated = [[None] * num_entities for _ in range(sides)]
+        for prompt, (side, idx) in zip(prompts, positions):
+            aggregated[side][idx] = self._summary_cache[prompt]
 
-        # Reassemble into nested list of shape [2, num_entities]
-        aggregated: List[List[str]] = []
-        index = 0
-        for side in range(sides):
-            side_list = []
-            for _ in range(num_entities):
-                side_list.append(summarised_sentences[index])
-                index += 1
-            aggregated.append(side_list)
+        self.log("####Subgraph summarisation complete.", level="debug")
         return aggregated
 
-    def _generate_verbalisation(self, prompts: List[str]) -> List[str]:
+
+    def _batch_generate(
+        self,
+        prompts: List[str],
+        model: AutoModelForCausalLM,
+        tokenizer: AutoTokenizer,
+        name: str
+    ) -> List[str]:
         """
-        Generates verbalised sentences in batches to optimize memory and log progress.
+        Core batch‐generation loop for any (model, tokenizer) pair.
+        Logs progress and returns the list of extracted answers.
         """
-        self.verbaliser_model.eval()
-        verbalised_sentences: List[str] = []
+        model.eval()
+        results: List[str] = []
         total = len(prompts)
         num_batches = (total + self.batch_size - 1) // self.batch_size
-        for i in range(num_batches):
-            start = i * self.batch_size
-            end = min(start + self.batch_size, total)
-            batch_prompts = prompts[start:end]
-            self.log(f"Verbaliser: Processing batch {i+1}/{num_batches} (items {start}-{end-1})", level="debug")
+
+        for batch_idx in range(num_batches):
+            start = batch_idx * self.batch_size
+            end   = min(start + self.batch_size, total)
+            batch = prompts[start:end]
+
+            self.log(f"{name}: Processing batch {batch_idx+1}/{num_batches} (items {start}-{end-1})", level="debug")
             with torch.no_grad():
-                inputs = self.verbaliser_tokenizer(
-                    batch_prompts,
+                # tokenization & to(device)
+                inputs = tokenizer(
+                    batch,
                     return_tensors="pt",
                     padding=True,
                     truncation=True,
                     max_length=self.max_length
                 ).to(self.device)
-                outputs = self.verbaliser_model.generate(
+
+                # actual generation
+                outputs = model.generate(
                     **inputs,
                     max_new_tokens=self.gen_max_new_tokens,
-                    # Use the EOS token as padding to avoid issues with variable-length outputs
-                    pad_token_id=self.verbaliser_tokenizer.eos_token_id,
                     do_sample=self.do_sample,
                     num_beams=self.num_beams,
                     early_stopping=self.early_stopping,
                     temperature=self.temperature,
                     top_k=self.top_k,
                     top_p=self.top_p,
+                    pad_token_id=tokenizer.eos_token_id,
                 )
-            decoded = self.verbaliser_tokenizer.batch_decode(outputs, skip_special_tokens=True)
-            batch_answers = [extract_answer(resp) for resp in decoded]
-            verbalised_sentences.extend(batch_answers)
-        return verbalised_sentences
+
+            # decode & extract
+            decoded = tokenizer.batch_decode(outputs, skip_special_tokens=True)
+            batch_results = [extract_answer(text) for text in decoded]
+            self.log(f"{name}: Finished batch {batch_idx+1}/{num_batches}", level="debug")
+
+            results.extend(batch_results)
+
+        self.log(f"{name}: Generated {len(results)}/{total} outputs.", level="debug")
+        return results
+
+
+    def _generate_verbalisation(self, prompts: List[str]) -> List[str]:
+        return self._batch_generate(prompts,
+                                    self.verbaliser_model,
+                                    self.verbaliser_tokenizer,
+                                    name="Verbaliser")
+
+
+    def _batch_summarise(self, prompts: List[str]) -> List[str]:
+        return self._batch_generate(prompts,
+                                    self.summariser_model,
+                                    self.summariser_tokenizer,
+                                    name="Summariser")
