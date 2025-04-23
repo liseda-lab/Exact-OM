@@ -12,8 +12,7 @@ import numpy as np
 from matcha_dl.core.contracts.trainer import EntityMapping, ITrainer
 from matcha_dl.core.entities.dataset import DatasetMask
 from matcha_dl.utils.collate import DataCollator
-
-# 
+from matcha_dl.utils.logs import TqdmLogger
 
 class EncoderTrainer(ITrainer):
 
@@ -22,6 +21,9 @@ class EncoderTrainer(ITrainer):
 
         # Set dataset tokenizer
         self.dataset.tokenizer = self.model.tokenizer
+        # Init common instances
+        self.collator = DataCollator(self.model.tokenizer)
+        self.tqdm_stream = TqdmLogger(self.log, level="debug")
 
     def train(
         self,
@@ -43,16 +45,15 @@ class EncoderTrainer(ITrainer):
         writer = SummaryWriter(self.logs_dir)
         early_stopping = False
         self.dataset.default_kind = DatasetMask.train
-        scaler = torch.amp.GradScaler('cuda') if mixed_precision else None
 
-        collator = DataCollator(self.model.tokenizer)
+        scaler = torch.amp.GradScaler('cuda') if mixed_precision else None
 
         while self._epoch <= epochs and not early_stopping:
             self.model.train()
             _iter = 1
             self._optimizer.zero_grad()
 
-            with tqdm(DataLoader(self.dataset, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers, collate_fn=collator), unit="batch") as tepoch:
+            with tqdm(DataLoader(self.dataset, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers, collate_fn=self.collator), unit="batch", file=self.tqdm_stream, leave=False) as tepoch:
                 for step, (batch_prompts, target) in enumerate(tepoch):
                     tepoch.set_description(f"Epoch {self._epoch}")
 
@@ -82,7 +83,7 @@ class EncoderTrainer(ITrainer):
                         _, validation_loss = self.predict(kind=DatasetMask.validation, batch_size=batch_size, num_workers=num_workers)
                         writer.add_scalar("Loss/validation", validation_loss, self._epoch)
                         tepoch.set_postfix(validation_loss=validation_loss)
-                        self.log(f"Validation loss at epoch {self._epoch} - {validation_loss}", level="info")
+                        self.log(f"Validation loss at epoch {self._epoch} - {validation_loss}", level="debug")
                         if self.stopping and self.stopping(validation_loss=validation_loss):
                             self.log(f"Early stopping at epoch {self._epoch}", level="info")
                             early_stopping = True
@@ -100,7 +101,6 @@ class EncoderTrainer(ITrainer):
         self.log(f"Training finished at epoch {self._epoch}", level="info")
         self.log(f"Final validation loss - {validation_loss}", level="info")
         self.log(f"Final training loss - {loss.item()}", level="info")
-        self.log(f"Number of unexpected responses from model during training: \n {self.model.unexpected_response_count}", level="debug")
 
     def predict(self, 
             kind: DatasetMask = DatasetMask.inference, 
@@ -111,15 +111,14 @@ class EncoderTrainer(ITrainer):
             **kwargs) -> Tuple[List[EntityMapping], float]:
 
         self.dataset.default_kind = kind
-        
-        collator = DataCollator(self.model.tokenizer)
+
         
         dataloader = DataLoader(self.dataset, 
                                 batch_size=batch_size, 
                                 shuffle=False, 
                                 num_workers=num_workers, 
                                 pin_memory=True,
-                                collate_fn=collator)
+                                collate_fn=self.collator)
         
         self.model.eval()
         total_loss = 0.0
@@ -129,7 +128,7 @@ class EncoderTrainer(ITrainer):
         start_idx = 0
 
         with torch.no_grad():
-            with tqdm(dataloader, unit="batch") as tepoch:
+            with tqdm(dataloader, unit="batch", file=self.tqdm_stream, leave=False) as tepoch:
                 for batch_prompts, target in tepoch:
                     tepoch.set_description(f"Running {self.dataset.default_kind}")
                     batch_prompts = {k: v.to(self.device) for k, v in batch_prompts.items()}

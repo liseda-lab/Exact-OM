@@ -17,6 +17,7 @@ from matcha_dl.core.entities.dataset import StaticPrompts
 from matcha_dl.core.entities.ontology import OntologyGraph
 from matcha_dl.core.entities.ontology import Entity
 from matcha_dl.utils.models import extract_answer
+from matcha_dl.utils.logs import capture_stdout
 from matcha_dl.core.entities.configs.dataset import AggregationStrategy
 
 class ContextTabularDataset(TabularDataset):
@@ -25,12 +26,18 @@ class ContextTabularDataset(TabularDataset):
                  verbaliser_name: str,
                  gen_max_new_tokens: int = 5000,
                  batch_size: int = 32,
+                 do_sample: bool = False,
+                 num_beams: int = 1,
+                 early_stopping: bool = False,
                  aggregation_strategy: AggregationStrategy = AggregationStrategy.JOIN, 
                  delimiter: str = "\n",
                  exclude_missing_dr: bool = False,
                  device: tdevice = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
                  max_length: Optional[int] = None,
                  summariser_name: Optional[str] = None,
+                 temperature: Optional[float] = None,
+                 top_p: Optional[float] = None,
+                 top_k: Optional[int] = None,
                 **kwargs):
 
         """
@@ -55,13 +62,19 @@ class ContextTabularDataset(TabularDataset):
 
         super().__init__(**kwargs)
         self.n_hops: int = n_hops
-        self.max_length: int = max_length
+        self.max_length: Optional[int] = max_length
         self.gen_max_new_tokens: int = gen_max_new_tokens
         self.batch_size = batch_size
+        self.do_sample: bool = do_sample
+        self.num_beams: int = num_beams
+        self.early_stopping: bool = early_stopping
         self.aggregation_strategy: AggregationStrategy = aggregation_strategy
         self.delimiter: str = delimiter
         self.exclude_missing_dr: bool = exclude_missing_dr
         self.device: tdevice = device
+        self.temperature: Optional[float] = temperature
+        self.top_p: Optional[float] = top_p
+        self.top_k: Optional[int] = top_k
 
         self.verbaliser_tokenizer: AutoTokenizer = AutoTokenizer.from_pretrained(verbaliser_name)
         self.verbaliser_model: AutoModelForCausalLM = AutoModelForCausalLM.from_pretrained(verbaliser_name)
@@ -97,7 +110,8 @@ class ContextTabularDataset(TabularDataset):
     def source_graph(self) -> OntologyGraph:
         if self._source_graph is None:
             self.log("Loading source graph from ontology..", level="debug")
-            self._source_graph = OntologyGraph(self.source.ontology, self.source_reasoner)
+            with capture_stdout(self.log, level="debug"):
+                self._source_graph = OntologyGraph(self.source.ontology, self.source_reasoner)
             self.log("Source graph loaded.", level="debug")
             self.log(f"Source graph has {len(self._source_graph)} triples.", level="debug")
         return self._source_graph
@@ -106,7 +120,8 @@ class ContextTabularDataset(TabularDataset):
     def target_graph(self) -> OntologyGraph:
         if self._target_graph is None:
             self.log("Loading target graph from ontology..", level="debug")
-            self._target_graph = OntologyGraph(self.target.ontology, self.target_reasoner)
+            with capture_stdout(self.log, level="debug"):
+                self._target_graph = OntologyGraph(self.target.ontology, self.target_reasoner)
             self.log("Target graph loaded.", level="debug")
             self.log(f"Target graph has {len(self._target_graph)} triples.", level="debug")
         return self._target_graph
@@ -263,7 +278,15 @@ class ContextTabularDataset(TabularDataset):
                 ).to(self.device)
                 outputs = self.summariser_model.generate(
                     **inputs,
-                    max_new_tokens=self.gen_max_new_tokens
+                    max_new_tokens=self.gen_max_new_tokens,
+                    do_sample=self.do_sample,
+                    num_beams=self.num_beams,
+                    early_stopping=self.early_stopping,
+                    temperature=self.temperature,
+                    top_k=self.top_k,
+                    top_p=self.top_p,
+                    # Use the EOS token as padding to avoid issues with variable-length outputs
+                    pad_token_id=self.summariser_tokenizer.eos_token_id,
                 )
             decoded = self.summariser_tokenizer.batch_decode(outputs, skip_special_tokens=True)
             batch_summaries = [extract_answer(resp) for resp in decoded]
@@ -305,7 +328,15 @@ class ContextTabularDataset(TabularDataset):
                 ).to(self.device)
                 outputs = self.verbaliser_model.generate(
                     **inputs,
-                    max_new_tokens=self.gen_max_new_tokens
+                    max_new_tokens=self.gen_max_new_tokens,
+                    # Use the EOS token as padding to avoid issues with variable-length outputs
+                    pad_token_id=self.verbaliser_tokenizer.eos_token_id,
+                    do_sample=self.do_sample,
+                    num_beams=self.num_beams,
+                    early_stopping=self.early_stopping,
+                    temperature=self.temperature,
+                    top_k=self.top_k,
+                    top_p=self.top_p,
                 )
             decoded = self.verbaliser_tokenizer.batch_decode(outputs, skip_special_tokens=True)
             batch_answers = [extract_answer(resp) for resp in decoded]

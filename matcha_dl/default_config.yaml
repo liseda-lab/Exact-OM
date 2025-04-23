@@ -92,6 +92,12 @@ dataset_params:
   verbaliser_name: deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B
   gen_max_new_tokens: 5000
   batch_size: 32
+  do_sample: False # If True sampling will be used to generate the context.
+  temperature: null # Temperature to be used in sampling. If >1, the model will be more creative.
+  top_k: null # Top-k to be used in sampling. If >0, the model will only sample from the top-k most probable tokens.
+  top_p: null # Top-p to be used in sampling. If >0, the model will only sample from the top-p most probable tokens.
+  num_beams: 1 # If >1 beam search will be used to generate the context.
+  early_stopping: False # If True, the generation will stop when all beams reach the end token.
   aggregation_strategy: join # join, summarise
   delimiter: \n
   exclude_missing_dr: False
