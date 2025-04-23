@@ -67,6 +67,9 @@ dataset_params:
   ## Validation set to be used to stop training, and in training guidance.
   ## If Null or not declared, no validation set will be used.
   validation_set: 0.1
+
+  ## Number of workers to be used to load the data. If null, the all available cores will be used.
+  num_workers: null
   
   ## Prompt Dataset Configs [Optional] Only used if model is prompt based
   ## Should should be list of params of size n (equal for all lists so that it can behabe like an array)
@@ -83,6 +86,17 @@ dataset_params:
   context_cardinality: [1] # 3, 5, 100
   context_semantics: [a_part_of] # a_part_of, a_kind_of, a_type_of, a_subclass_of, with_subclass, with_part, with_type, with_kind
   likelihood: [float] # float, cat
+
+  # Context Tabular Dataset Configs [Optional] Only used if model is EncoderClassifier
+  n_hops: 1
+  verbaliser_name: deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B
+  gen_max_new_tokens: 5000
+  batch_size: 32
+  aggregation_strategy: join # join, summarise
+  delimiter: \n
+  exclude_missing_dr: False
+  max_length: null
+  summariser_name: deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B
 
 training_params:
   epochs: 10 # 50
@@ -106,17 +120,25 @@ stopper:
 #   params:
 #     layers: [128, 256, 128]
 
+# model:
+#   name: PromptClassifier
+#   params:
+#     model_name: deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B
+#     use_critic: True
+#     critic_weight: 0.5
+#     critic_uncertainty: True
+#     max_length: 50
+#     aggregation_strategy: 'mean' # mean, max, min
+#     use_lora: True
+#     lora_r: 16
+#     lora_alpha: 32
+#     lora_dropout: 0.05
+
 model:
-  name: PromptClassifier
+  name: EncoderClassifier
   params:
-    model_name: google/flan-t5-base # google/flan-t5-base/ (250M), google/flan-t5-xl (3B), google/flan-t5-xxl (11B)
-    # Future suport meta-llama/Llama-3.1-8B-Instruct, meta-llama/Llama-3.3-70B-Instruct/ 
-    # deepseek-ai/DeepSeek-R1-Distill-Llama-8B, deepseek-ai/DeepSeek-R1-Distill-Llama-70B
-    use_critic: True
-    critic_weight: 0.5 # 0.5
-    critic_uncertainty: True
-    max_length: 50
-    aggregation_strategy: 'mean' # mean, max, min
+    encoder_name: sentence-transformers/all-MiniLM-L6-v2
+    pooling: mean # mean, cls, max
     use_lora: True
     lora_r: 16
     lora_alpha: 32
