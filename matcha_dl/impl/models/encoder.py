@@ -10,15 +10,14 @@ from matcha_dl.utils.models import extract_answer
 from matcha_dl.core.contracts.model import IModel
 
 class PoolingStrategy(str, Enum):
-    max = "mean"
-    min = "max"
-    mean = "cls"
+    mean = "mean"
+    max = "max"
+    cls = "cls"
 
-class SemanticRanker(nn.Module):
+class EncoderClassifier(IModel):
     def __init__(self,
-                 encoder_name: str = "sentence-transformers/all-MiniLM-L6-v2",
-                 max_length: int = 128,
-                 pooling_method: PoolingStrategy = PoolingStrategy.mean,
+                 encoder_name: str,
+                 pooling: PoolingStrategy = PoolingStrategy.mean,
                  use_lora: bool = False,
                  lora_r: int = 16,
                  lora_alpha: int = 32,
@@ -26,17 +25,15 @@ class SemanticRanker(nn.Module):
         """
         Parameters:
             encoder_name: The name of the pretrained encoder.
-            max_length: Maximum sequence length for tokenized encoder inputs.
-            pooling_method: One of "mean", "max", or "cls".
+            pooling: One of "mean", "max", or "cls".
             use_lora: Whether to apply LoRA to the encoder (using peft package).
             lora_r: LoRA low-rank dimension.
             lora_alpha: LoRA scaling factor.
             lora_dropout: Dropout probability for LoRA.
         """
-        super(SemanticRanker, self).__init__()
+        super(EncoderClassifier, self).__init__()
         self.encoder_name = encoder_name
-        self.max_length = max_length
-        self.pooling_method = PoolingStrategy(pooling_method)
+        self.pooling = PoolingStrategy(pooling)
         self.use_lora = use_lora
         self.lora_r = lora_r
         self.lora_alpha = lora_alpha
@@ -54,9 +51,9 @@ class SemanticRanker(nn.Module):
                 r=self.lora_r,
                 lora_alpha=self.lora_alpha,
                 lora_dropout=self.lora_dropout,
-                target_modules=["q_proj", "v_proj"],
+                target_modules=["query", "value"],
                 bias="none",
-                task_type="SEQ_CLS"
+                task_type="FEATURE_EXTRACTION"
             )
             self.encoder = get_peft_model(self.encoder, lora_config)
 
@@ -91,7 +88,7 @@ class SemanticRanker(nn.Module):
         super().eval()
         self.encoder.eval()
 
-    def forward(self, input_ids: torch.Tensor) -> torch.Tensor:
+    def forward(self, input_ids: torch.Tensor, attention_mask: torch.Tensor) -> torch.Tensor:
         """
         Expects:
             input_ids: Tensor of shape [batch_size, 2, seq_len] where the two slices correspond
@@ -102,18 +99,17 @@ class SemanticRanker(nn.Module):
         batch_size, pair_size, seq_len = input_ids.size()  # pair_size should be 2
         # Flatten the input to shape [batch_size*2, seq_len]
         flat_input_ids = input_ids.view(batch_size * pair_size, seq_len).to(self.device)
-        # Create attention mask (assuming pad token id is 0)
-        attention_mask = (flat_input_ids != 0).long().to(self.device)
+        attention_mask = attention_mask.view(batch_size * pair_size, seq_len).to(self.device)
 
         outputs = self.encoder(input_ids=flat_input_ids, attention_mask=attention_mask)
         token_embeddings = outputs.last_hidden_state  # [batch_size*2, seq_len, hidden_dim]
 
         # Pool the token embeddings using the selected method
-        if self.pooling_method == "mean":
+        if self.pooling is PoolingStrategy.mean:
             pooled_embeddings = self.mean_pooling(token_embeddings, attention_mask)
-        elif self.pooling_method == "max":
+        elif self.pooling is PoolingStrategy.max:
             pooled_embeddings = self.max_pooling(token_embeddings, attention_mask)
-        elif self.pooling_method == "cls":
+        elif self.pooling is PoolingStrategy.cls:
             pooled_embeddings = self.cls_pooling(token_embeddings, attention_mask)
         else:
             raise ValueError("Invalid pooling method selected.")
