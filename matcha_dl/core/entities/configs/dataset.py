@@ -28,3 +28,7 @@ class ContextSemantics(str, Enum):
 class Likelihood(str, Enum):
     float = 'float'
     cat = 'cat'
+
+class AggregationStrategy(str, Enum):
+    JOIN = "join"
+    SUMMARISE = "summarise"
