@@ -109,7 +109,7 @@ class BCEWithLogitsLoss(nn.BCEWithLogitsLoss, ILoss):
         """
 
         if pos_weight is not None:
-            self.pos_weight = torch.tensor(pos_weight).to(device)
+            pos_weight = torch.tensor(pos_weight).to(device)
 
         super(BCEWithLogitsLoss, self).__init__(pos_weight=pos_weight, reduction=reduction, **kwargs)
 
