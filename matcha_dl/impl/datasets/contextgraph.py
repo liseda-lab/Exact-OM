@@ -1,4 +1,3 @@
-
 import torch
 from itertools import chain
 from torch import Tensor
@@ -10,7 +9,7 @@ import pandas as pd
 DataFrame = pd.DataFrame
 import numpy as np
 
-from typing import List, Tuple, Optional, Dict
+from typing import List, Tuple, Optional, Dict, Any
 
 from matcha_dl.impl.datasets.tabular import TabularDataset
 from matcha_dl.core.entities.dataset import StaticPrompts
@@ -19,6 +18,9 @@ from matcha_dl.core.entities.ontology import Entity
 from matcha_dl.utils.models import extract_answer
 from matcha_dl.utils.logs import capture_stdout
 from matcha_dl.core.entities.configs.dataset import AggregationStrategy
+from matcha_dl.core.entities.dataset import DatasetMask
+
+# TODO Harmonize get_item with TabularDataset
 
 class ContextTabularDataset(TabularDataset):
     def __init__(self,
@@ -109,6 +111,11 @@ class ContextTabularDataset(TabularDataset):
         self._join_cache: Dict[Tuple[Tuple[str, str, str], ...], str] = {}
         self._summary_cache: Dict[str, str] = {}
 
+        # Raw token-id lists and labels cache
+        self._raw_src_ids: Dict[Any, List[List[int]]] = {}
+        self._raw_tgt_ids: Dict[Any, List[List[int]]] = {}
+        self._label_cache: Dict[Any, Tensor] = {}
+
     @property
     def source_graph(self) -> OntologyGraph:
         if self._source_graph is None:
@@ -157,14 +164,70 @@ class ContextTabularDataset(TabularDataset):
     
     @tokenizer.setter
     def tokenizer(self, tokenizer: AutoTokenizer) -> None:
+
+        self.log("###Setting tokenizer for ContextTabularDataset...", level="debug")
         self._tokenizer = tokenizer
 
+        self.log("###Pre-tokenizing and caching features and labels...", level="debug")
 
-    def pre_process_x(self, data: np.ndarray) -> Tensor:
-        if self.tokenizer:
-            return self.tokenizer(data.tolist(), padding=True, truncation=True, return_tensors="pt")
+        for kind in DatasetMask:
+            
+            dfk = self.dataframe[self.dataframe[kind]]
 
-        return super().pre_process_x(data)
+            # Check if DataFrame is empty
+            if dfk.empty:
+                self.log(f"####Skipping empty DataFrame for kind '{kind.name}'", level="debug")
+                continue
+
+            pairs: List[List[str]] = dfk["Features"].tolist()
+            # Split into separate lists
+            src_texts = [p[0] for p in pairs]
+            tgt_texts = [p[1] for p in pairs]
+
+            self.log(f"####Tokenizing {len(src_texts)} source and {len(tgt_texts)} target texts for kind '{kind.name}'", level="debug")
+
+            # Tokenize without padding here
+            enc_src = self.tokenizer(
+                src_texts,
+                padding=False,
+                truncation=True
+            )
+            enc_tgt = self.tokenizer(
+                tgt_texts,
+                padding=False,
+                truncation=True
+            )
+
+            # Store raw input_ids lists
+            self._raw_src_ids[kind] = enc_src['input_ids']
+            self._raw_tgt_ids[kind] = enc_tgt['input_ids']
+
+            self.log(f"####Cached {len(self._raw_src_ids[kind])} source and {len(self._raw_tgt_ids[kind])} target raw IDs for kind '{kind.name}'", level="debug")
+
+            # Cache labels as tensor
+            labels = torch.tensor(
+                dfk["Label"].values,
+                dtype=torch.float32
+            )
+            self._label_cache[kind] = labels
+
+            self.log(f"####Cached labels for kind '{kind.name}' with shape {labels.shape}", level="debug")
+
+    def __len__(self) -> int:
+        # dataset length depends on current default_kind
+        return len(self._label_cache[self.default_kind])
+
+
+    def __getitem__(self, idx: int) -> Any:
+        if idx < 0 or idx >= len(self):
+            raise IndexError(f"Index {idx} out of bounds for dataset of size {len(self)}.")
+
+        kind = self.default_kind
+        src_ids = self._raw_src_ids[kind][idx]
+        tgt_ids = self._raw_tgt_ids[kind][idx]
+        label   = self._label_cache[kind][idx]
+
+        return { 'input_ids': (src_ids, tgt_ids)}, label
 
     def get_features(self, dataset: DataFrame) -> DataFrame:
         return self.generate_defenitions(dataset)
@@ -210,7 +273,8 @@ class ContextTabularDataset(TabularDataset):
             )
 
         # Attach features back to DataFrame
-        dataset["Features"] = np.array(features).T.tolist()
+        src_feats, tgt_feats = features
+        dataset["Features"] = [[s, t] for s, t in zip(src_feats, tgt_feats)]
         self.log("##Entity definitions generated.", level="debug")
         return dataset
     
