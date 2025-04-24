@@ -160,6 +160,7 @@ class TrainingParams(BaseModel):
     shuffle: bool = Field(config["training_params"]["shuffle"])
     val_every: Optional[int] = Field(config["training_params"]["val_every"])
     save_interval: Optional[int] = Field(config["training_params"]["save_interval"])
+    log_every: int = Field(config["training_params"]["log_every"])
     gradient_accumulation_steps: int = Field(config["training_params"]["gradient_accumulation_steps"])
     mixed_precision: bool = Field(config["training_params"]["mixed_precision"])
 

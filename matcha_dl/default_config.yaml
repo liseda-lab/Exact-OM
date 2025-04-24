@@ -111,6 +111,7 @@ training_params:
   shuffle: True
   val_every: 1
   save_interval: 5
+  log_every: 1
   ## Not used in for MLP models
   gradient_accumulation_steps: 1
   mixed_precision: True
