@@ -8,6 +8,7 @@ import logging
 import numpy as np
 import pandas as pd
 import torch as th
+from torch import device as tdevice
 
 from matcha_dl.core.contracts import SelfRegisteringComponent, LoggingClass
 from matcha_dl.core.entities.registry import ComponentType
@@ -21,6 +22,8 @@ if TYPE_CHECKING:
     from matcha_dl.core.contracts.model import IModel
     from matcha_dl.core.contracts.optimizer import IOptimizer
     from matcha_dl.core.contracts.stopper import IStopper
+
+# TODO implement LR scheduler
 
 
 class ITrainer(SelfRegisteringComponent, LoggingClass):
@@ -38,7 +41,7 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
         model_params: Optional[Dict[str, Any]] = {},
         stopping: Optional[Type['IStopper']] = None,
         stopping_params: Optional[Dict[str, Any]] = {},
-        device: Union[int, str] = 0,
+        device: tdevice = tdevice("cuda" if th.cuda.is_available() else "cpu"),
         output_dir: Optional[Path] = None,
         use_last_checkpoint: Optional[bool] = False,
         skip_training_if_checkpoint: Optional[bool] = False,
