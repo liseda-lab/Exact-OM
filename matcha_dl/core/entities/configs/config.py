@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 from matcha_dl import config, read_yaml
 from matcha_dl.core.entities.registry import ComponentType, ComponentRegistry
-from matcha_dl.core.entities.configs.dataset import Separator, ComparisonType, ContextType, ContextSemantics, Likelihood, AggregationStrategy
+from matcha_dl.core.entities.configs.dataset import Separator, ComparisonType, ContextType, ContextSemantics, Likelihood, AggregationStrategy, BatchLengthSortMode
 from matcha_dl.core.entities.configs.matcha import Sampler, Matchers
 
 from matcha_dl.core.contracts.stopper import IStopper
@@ -103,10 +103,16 @@ class DatasetParams(BaseModel):
     early_stopping: Optional[bool] = Field(config["dataset_params"]["early_stopping"])
     batch_size: Optional[int] = Field(config["dataset_params"]["batch_size"])
     aggregation_strategy: Optional[AggregationStrategy] = Field(config["dataset_params"]["aggregation_strategy"], validate_default=True)
+    cache_chunk_size: Optional[int] = Field(config["dataset_params"]["cache_chunk_size"])
     delimiter: Optional[str] = Field(config["dataset_params"]["delimiter"])
     exclude_missing_dr: Optional[bool] = Field(config["dataset_params"]["exclude_missing_dr"])
-    max_length: Optional[int] = Field(config["dataset_params"]["max_length"])
+    encoding_max_length: Optional[int] = Field(config["dataset_params"]["encoding_max_length"])
+    gen_max_length: Optional[int] = Field(config["dataset_params"]["gen_max_length"])
     summariser_name: Optional[str] = Field(config["dataset_params"]["summariser_name"])
+    max_verb_gen_retries: Optional[int] = Field(config["dataset_params"]["max_verb_gen_retries"])
+    batch_length_sort_mode: Optional[BatchLengthSortMode] = Field(config["dataset_params"]["batch_length_sort_mode"], validate_default=True)
+    smallest_batch_first: Optional[bool] = Field(config["dataset_params"]["smallest_batch_first"])
+
 
     @field_validator('validation_set', mode="after")
     def validate_validation_set(cls, v: Optional[float]) -> Optional[float]:

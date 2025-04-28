@@ -4,10 +4,13 @@ from torch import Tensor
 from torch import device as tdevice
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from enum import Enum
+import json
 
 import pandas as pd
 DataFrame = pd.DataFrame
 import numpy as np
+
+from pathlib import Path
 
 from typing import List, Tuple, Optional, Dict, Any
 
@@ -17,7 +20,7 @@ from matcha_dl.core.entities.ontology import OntologyGraph
 from matcha_dl.core.entities.ontology import Entity
 from matcha_dl.utils.models import extract_answer
 from matcha_dl.utils.logs import capture_stdout
-from matcha_dl.core.entities.configs.dataset import AggregationStrategy
+from matcha_dl.core.entities.configs.dataset import AggregationStrategy, BatchLengthSortMode
 from matcha_dl.core.entities.dataset import DatasetMask
 
 # TODO Harmonize get_item with TabularDataset
@@ -31,11 +34,16 @@ class ContextTabularDataset(TabularDataset):
                  do_sample: bool = False,
                  num_beams: int = 1,
                  early_stopping: bool = False,
+                 max_verb_gen_retries: int = 0,
                  aggregation_strategy: AggregationStrategy = AggregationStrategy.JOIN, 
                  delimiter: str = "\n",
                  exclude_missing_dr: bool = False,
                  device: tdevice = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
-                 max_length: Optional[int] = None,
+                 cache_chunk_size: int = 10000,
+                 encoding_max_length: Optional[int] = 256,
+                 smallest_batch_first: bool = False,
+                 batch_length_sort_mode: BatchLengthSortMode = BatchLengthSortMode.max,
+                 gen_max_length: Optional[int] = None,
                  summariser_name: Optional[str] = None,
                  temperature: Optional[float] = None,
                  top_p: Optional[float] = None,
@@ -64,16 +72,21 @@ class ContextTabularDataset(TabularDataset):
 
         super().__init__(**kwargs)
         self.n_hops: int = n_hops
-        self.max_length: Optional[int] = max_length
+        self.encoding_max_length: int = encoding_max_length
+        self.gen_max_length: int = gen_max_length
         self.gen_max_new_tokens: int = gen_max_new_tokens
+        self.smallest_batch_first: bool = smallest_batch_first
+        self.batch_length_sort_mode: BatchLengthSortMode = batch_length_sort_mode
         self.batch_size = batch_size
         self.do_sample: bool = do_sample
         self.num_beams: int = num_beams
         self.early_stopping: bool = early_stopping
+        self.max_verb_gen_retries: int = max_verb_gen_retries
         self.aggregation_strategy: AggregationStrategy = aggregation_strategy
         self.delimiter: str = delimiter
         self.exclude_missing_dr: bool = exclude_missing_dr
         self.device: tdevice = device
+        self.cache_chunk_size: int = cache_chunk_size
         self.temperature: Optional[float] = temperature
         self.top_p: Optional[float] = top_p
         self.top_k: Optional[int] = top_k
@@ -105,16 +118,26 @@ class ContextTabularDataset(TabularDataset):
 
         self._source_graph: Optional[OntologyGraph] = None
         self._target_graph: Optional[OntologyGraph] = None
-        self._verbalization_templates: Optional[Dict[str, str]] = None
         self._tokenizer: Optional[AutoTokenizer] = None
+
+        self._verbalization_templates: Optional[Dict[str, str]] = None
 
         self._join_cache: Dict[Tuple[Tuple[str, str, str], ...], str] = {}
         self._summary_cache: Dict[str, str] = {}
 
-        # Raw token-id lists and labels cache
-        self._raw_src_ids: Dict[Any, List[List[int]]] = {}
-        self._raw_tgt_ids: Dict[Any, List[List[int]]] = {}
+        # Internal storage
+        self._memmap_src: Dict[Any, np.memmap] = {}
+        self._off_src: Dict[Any, np.ndarray] = {}
+        self._memmap_tgt: Dict[Any, np.memmap] = {}
+        self._off_tgt: Dict[Any, np.ndarray] = {}
         self._label_cache: Dict[Any, Tensor] = {}
+
+        self._mem_map_cache_dir = self.output_path / "memmap_cache"
+        self._mem_map_cache_dir.mkdir(parents=True, exist_ok=True)
+
+        self._meta_mem_map_path = self._mem_map_cache_dir / "meta.json"
+        
+        self._verb_temp_path = self.output_path / "verbalization_templates.json"
 
     @property
     def source_graph(self) -> OntologyGraph:
@@ -139,24 +162,101 @@ class ContextTabularDataset(TabularDataset):
     @property
     def verbalization_templates(self) -> Dict[str, str]:
         if self._verbalization_templates is None:
-            self.log("###Generating verbalisation templates from ontology...", level="debug")
 
-            self.log("####Getting example triples from source and target graphs.", level="debug")
-            
-            examples: Dict[str, List[Tuple[str]]] = self.source_graph.get_example_triples(1, exclude_missing_dr=self.exclude_missing_dr)
+            if hasattr(self, "_verb_temp_path") and self._verb_temp_path.exists():
+                self.log("### Loading verbalisation templates from file...", level="debug")
+                with open(self._verb_temp_path, "r") as f:
+                    self._verbalization_templates = json.load(f)
+                self.log("### Verbalisation templates loaded.", level="debug")
+                return self._verbalization_templates
+
+
+            self.log("### Generating verbalisation templates from ontology...", level="debug")
+            examples = self.source_graph.get_example_triples(1, exclude_missing_dr=self.exclude_missing_dr)
             examples.update(self.target_graph.get_example_triples(1, exclude_missing_dr=self.exclude_missing_dr))
+            self.log(f"#### Found {len(examples)} unique relations", level="debug")
 
-            self.log(f"####Found {len(examples)} unique relations", level="debug")
-            self.log("####Generating verbalisation prompts for each relation...", level="debug")
-            verbalization_prompts: List[str] = [StaticPrompts.get_verbalization(*example[0]) for example in examples.values()]
-            self.log("####Generating verbalised templates for each relation...", level="debug")
-            verbalized_sentences: List[str] = self._generate_verbalisation(verbalization_prompts)
-            verbalized_templates = [sentence.replace(triple[0][0], "$SRC").replace(triple[0][2], "$TGT") for triple, sentence in zip(examples.values(), verbalized_sentences)]
-            self._verbalization_templates = {k: v for k, v in zip(examples.keys(), verbalized_templates)}
+            keys = list(examples.keys())
+            # initial batch of prompts
+            base_prompts = [
+                StaticPrompts.get_verbalization(head, rel.replace("_", " ").lower(), tail)
+                for key in keys
+                for (head, rel, tail) in [examples[key][0]]
+            ]
 
-            self.log("####Verbalisation templates generated.", level="debug")
+            self.log("#### Batch generating initial verbalisations", level="debug")
+            sentences = self._batch_generate(
+                base_prompts,
+                self.verbaliser_model,
+                self.verbaliser_tokenizer,
+                name="Verbaliser"
+            )
+
+            templates: Dict[str, str] = {}
+            to_retry: List[str] = []
+
+            # first pass: lower+replace and validate
+            for key, sent in zip(keys, sentences):
+                head, _, tail = examples[key][0]
+                tmpl = sent.lower().replace(head.lower(), "$SRC").replace(tail.lower(), "$TGT")
+                if "$SRC" in tmpl and "$TGT" in tmpl:
+                    templates[key] = tmpl
+                else:
+                    to_retry.append((key, sent))
+
+            # recursive retries: use the previous (faulty) sentence + corrective note
+            retry_round = 0
+            if self.max_verb_gen_retries > 0:
+                while to_retry and retry_round < self.max_verb_gen_retries:
+                    retry_round += 1
+                    self.log(f"#### Retry #{retry_round} for {len(to_retry)} templates", level="warning")
+
+                    retry_prompts = []
+                    retry_keys = []
+                    for key, prev_tmpl in to_retry:
+                        head, _, tail = examples[key][0]
+
+                        retry_prompts.append(
+                            StaticPrompts.get_corrective_verbalization(prev_tmpl, head, tail)
+                        )
+                        retry_keys.append(key)
+
+                    self.log("#### Batch generating retry verbalisations", level="debug")
+                    new_sentences = self._batch_generate(
+                        retry_prompts,
+                        self.verbaliser_model,
+                        self.verbaliser_tokenizer,
+                        name="Verbaliser-Retry"
+                    )
+
+                    new_to_retry = []
+                    for key, sent in zip(retry_keys, new_sentences):
+                        head, _, tail = examples[key][0]
+                        tmpl = sent.lower().replace(head.lower(), "$SRC").replace(tail.lower(), "$TGT")
+                        if "$SRC" in tmpl and "$TGT" in tmpl:
+                            templates[key] = tmpl
+                        else:
+                            new_to_retry.append((key, sent))
+                            self.log(f"Still missing placeholders for '{key}'", level="warning")
+
+                    to_retry = new_to_retry
+
+            # final fallback for any that still failed
+            for key, _ in to_retry:
+                self.log(f"Falling back stub for '{key}'", level="warning")
+                templates[key] = "$SRC " + key.replace("_", " ").lower() + " $TGT"
+
+            # save out
+            if hasattr(self, "_verb_temp_path"):
+                self.log("#### Saving verbalisation templates to file...", level="debug")
+                with open(self._verb_temp_path, "w") as f:
+                    json.dump(templates, f, indent=2)
+                self.log("#### Templates saved.", level="debug")
+
+            self._verbalization_templates = templates
 
         return self._verbalization_templates
+
     
     @property
     def tokenizer(self) -> Optional[AutoTokenizer]:
@@ -167,8 +267,24 @@ class ContextTabularDataset(TabularDataset):
 
         self.log("###Setting tokenizer for ContextTabularDataset...", level="debug")
         self._tokenizer = tokenizer
+        tokenizer_id = getattr(self.tokenizer, 'name_or_path', self.tokenizer.__class__.__name__)
 
         self.log("###Pre-tokenizing and caching features and labels...", level="debug")
+
+        meta = {}
+        if self._meta_mem_map_path.exists():
+            self.log("####Meta memmap file exists, loading meta info", level="debug")
+
+            try:
+                meta = json.load(open(self._meta_mem_map_path, "r"))
+            except Exception:
+                self.log("####Failed to load meta info, will rebuild cache", level="debug")
+                meta = {}
+
+        rebuild = (
+            meta.get('tokenizer_id') != tokenizer_id or
+            meta.get('cache_chunk_size') != self.cache_chunk_size
+        )
 
         for kind in DatasetMask:
             
@@ -176,45 +292,33 @@ class ContextTabularDataset(TabularDataset):
 
             # Check if DataFrame is empty
             if dfk.empty:
-                self.log(f"####Skipping empty DataFrame for kind '{kind.name}'", level="debug")
+                self.log(f"####Skipping empty DataFrame for kind '{kind}'", level="debug")
                 continue
+            
+            # Loading Labels
+            self.log(f'####Loading labels for kind "{kind}"', level="debug")
+            self._label_cache[kind] = torch.tensor(dfk['Label'].values, dtype=torch.float32)
 
-            pairs: List[List[str]] = dfk["Features"].tolist()
-            # Split into separate lists
-            src_texts = [p[0] for p in pairs]
-            tgt_texts = [p[1] for p in pairs]
+            paths = self._get_paths(kind)
+            if not rebuild and all(p.exists() for p in paths.values()):
+                self.log(f"####Using existing cache files for kind '{kind}'", level="debug")
+                off_s = np.load(paths['src_off'], mmap_mode='r')
+                off_t = np.load(paths['tgt_off'], mmap_mode='r')
+                self._off_src[kind], self._off_tgt[kind] = off_s, off_t
+                self._memmap_src[kind] = np.memmap(paths['src_flat'], mode='r', dtype=np.int32, shape=(int(off_s[-1]),))
+                self._memmap_tgt[kind] = np.memmap(paths['tgt_flat'], mode='r', dtype=np.int32, shape=(int(off_t[-1]),))
+            else:
+                self._build_cache_for_kind(kind, paths)
 
-            self.log(f"####Tokenizing {len(src_texts)} source and {len(tgt_texts)} target texts for kind '{kind.name}'", level="debug")
-
-            # Tokenize without padding here
-            enc_src = self.tokenizer(
-                src_texts,
-                padding=False,
-                truncation=True
+                self.log("###Saving meta information for token cache...", level="debug")
+                json.dump(
+                {'tokenizer_id': tokenizer_id, 'cache_chunk_size': self.cache_chunk_size},
+                open(self._meta_mem_map_path, 'w')
             )
-            enc_tgt = self.tokenizer(
-                tgt_texts,
-                padding=False,
-                truncation=True
-            )
-
-            # Store raw input_ids lists
-            self._raw_src_ids[kind] = enc_src['input_ids']
-            self._raw_tgt_ids[kind] = enc_tgt['input_ids']
-
-            self.log(f"####Cached {len(self._raw_src_ids[kind])} source and {len(self._raw_tgt_ids[kind])} target raw IDs for kind '{kind.name}'", level="debug")
-
-            # Cache labels as tensor
-            labels = torch.tensor(
-                dfk["Label"].values,
-                dtype=torch.float32
-            )
-            self._label_cache[kind] = labels
-
-            self.log(f"####Cached labels for kind '{kind.name}' with shape {labels.shape}", level="debug")
+        
+        self.log("###Pre-tokenization and caching complete.", level="debug")
 
     def __len__(self) -> int:
-        # dataset length depends on current default_kind
         return len(self._label_cache[self.default_kind])
 
 
@@ -223,16 +327,16 @@ class ContextTabularDataset(TabularDataset):
             raise IndexError(f"Index {idx} out of bounds for dataset of size {len(self)}.")
 
         kind = self.default_kind
-        src_ids = self._raw_src_ids[kind][idx]
-        tgt_ids = self._raw_tgt_ids[kind][idx]
-        label   = self._label_cache[kind][idx]
-
-        return { 'input_ids': (src_ids, tgt_ids)}, label
+        off_s, off_t = self._off_src[kind], self._off_tgt[kind]
+        mem_s, mem_t = self._memmap_src[kind], self._memmap_tgt[kind]
+        s_ids = mem_s[off_s[idx]:off_s[idx+1]].tolist()
+        t_ids = mem_t[off_t[idx]:off_t[idx+1]].tolist()
+        return {'input_ids': (s_ids, t_ids)}, self._label_cache[kind][idx]
 
     def get_features(self, dataset: DataFrame) -> DataFrame:
-        return self.generate_defenitions(dataset)
+        return self.generate_definitions(dataset)
 
-    def generate_defenitions(self, dataset: DataFrame) -> DataFrame:
+    def generate_definitions(self, dataset: DataFrame) -> DataFrame:
         # Log start
         self.log("##Generating Entity definitions...", level="debug")
         self.log("###Loading source and target entities uniquely...", level="debug")
@@ -275,6 +379,25 @@ class ContextTabularDataset(TabularDataset):
         # Attach features back to DataFrame
         src_feats, tgt_feats = features
         dataset["Features"] = [[s, t] for s, t in zip(src_feats, tgt_feats)]
+
+        self.log("###Features verbalised and attached to DataFrame.", level="debug")
+
+        # --- sort by word-count length, using either sum or max of src/tgt ---
+        # compute a length key for each example:
+        self.log("###Sorting dataset by feature lengths... (for batch efficiency)", level="debug")
+        lengths = []
+        for s, t in zip(src_feats, tgt_feats):
+            src_wc = len(s.split())
+            tgt_wc = len(t.split())
+            if self.batch_length_sort_mode == "sum":
+                lengths.append(src_wc + tgt_wc)
+            else:  # "max"
+                lengths.append(max(src_wc, tgt_wc))
+        # attach, sort descending (biggest first), then drop helper
+        dataset["__feat_len"] = lengths
+        dataset = dataset.sort_values("__feat_len", ascending=self.smallest_batch_first).reset_index(drop=True)
+        dataset.drop(columns="__feat_len", inplace=True)
+
         self.log("##Entity definitions generated.", level="debug")
         return dataset
     
@@ -370,31 +493,43 @@ class ContextTabularDataset(TabularDataset):
         name: str
     ) -> List[str]:
         """
-        Core batch‐generation loop for any (model, tokenizer) pair.
-        Logs progress and returns the list of extracted answers.
+        Core batch‐generation loop with global length‐sorting:
+        1) sort all prompts by descending word‐count
+        2) batch‐tokenize & generate in that order
+        3) unsort outputs back to original prompt order
         """
         model.eval()
-        results: List[str] = []
         total = len(prompts)
-        num_batches = (total + self.batch_size - 1) // self.batch_size
 
+        # 1) GLOBAL SORT
+        lengths = [len(p.split()) for p in prompts]
+        sorted_idxs = sorted(range(total), key=lambda i: lengths[i], reverse=True)
+        inv_idxs = [0] * total
+        for new_pos, orig_pos in enumerate(sorted_idxs):
+            inv_idxs[orig_pos] = new_pos
+        sorted_prompts = [prompts[i] for i in sorted_idxs]
+
+        # 2) BATCH PROCESSING
+        results_sorted = []
+        num_batches = (total + self.batch_size - 1) // self.batch_size
         for batch_idx in range(num_batches):
             start = batch_idx * self.batch_size
             end   = min(start + self.batch_size, total)
-            batch = prompts[start:end]
+            batch = sorted_prompts[start:end]
 
-            self.log(f"{name}: Processing batch {batch_idx+1}/{num_batches} (items {start}-{end-1})", level="debug")
+            self.log(f"{name}: Processing sorted batch {batch_idx+1}/{num_batches} "
+                    f"(items {start}-{end-1}, max_len={len(batch[0].split())})",
+                    level="debug")
+
             with torch.no_grad():
-                # tokenization & to(device)
                 inputs = tokenizer(
                     batch,
                     return_tensors="pt",
                     padding=True,
                     truncation=True,
-                    max_length=self.max_length
+                    max_length=self.gen_max_length
                 ).to(self.device)
 
-                # actual generation
                 outputs = model.generate(
                     **inputs,
                     max_new_tokens=self.gen_max_new_tokens,
@@ -407,12 +542,12 @@ class ContextTabularDataset(TabularDataset):
                     pad_token_id=tokenizer.eos_token_id,
                 )
 
-            # decode & extract
             decoded = tokenizer.batch_decode(outputs, skip_special_tokens=True)
-            batch_results = [extract_answer(text) for text in decoded]
-            self.log(f"{name}: Finished batch {batch_idx+1}/{num_batches}", level="debug")
+            batch_results = [extract_answer(txt) for txt in decoded]
+            results_sorted.extend(batch_results)
 
-            results.extend(batch_results)
+        # 3) UNSORT back to original order
+        results = [results_sorted[inv] for inv in inv_idxs]
 
         self.log(f"{name}: Generated {len(results)}/{total} outputs.", level="debug")
         return results
@@ -430,3 +565,70 @@ class ContextTabularDataset(TabularDataset):
                                     self.summariser_model,
                                     self.summariser_tokenizer,
                                     name="Summariser")
+    
+    def _get_paths(self, kind: DatasetMask) -> Dict[str, Path]:
+        """
+        Return a dict of file paths for offsets and flat memmap arrays for a given split.
+        Keys: 'src_off', 'tgt_off', 'src_flat', 'tgt_flat'.
+        """
+        base = self._mem_map_cache_dir
+        name = kind
+        return {
+            'src_off': base / f"src_off_{name}.npy",
+            'tgt_off':  base / f"tgt_off_{name}.npy",
+            'src_flat': base / f"src_flat_{name}.npy",
+            'tgt_flat': base / f"tgt_flat_{name}.npy"
+        }
+    
+    def _build_cache_for_kind(self, kind: DatasetMask, paths: Dict[str, str]) -> None:
+        dfk = self.dataframe[self.dataframe[kind]]
+        pairs = dfk['Features'].tolist()
+        N = len(pairs)
+        src_texts = [p[0] for p in pairs]
+        tgt_texts = [p[1] for p in pairs]
+
+        # Log start of cache building
+        self.log(f"#### Building cache for split '{kind}' ({N} examples)", level="debug")
+
+        # Pass 1: compute lengths
+        self.log("## Pass 1: computing token lengths in chunks", level="debug")
+        src_l = np.zeros(N, dtype=np.int64)
+        tgt_l = np.zeros(N, dtype=np.int64)
+        for start in range(0, N, self.cache_chunk_size):
+            end = min(start + self.cache_chunk_size, N)
+            self.log(f"### Tokenizing lengths [{start}:{end}]", level="debug")
+            enc_s = self.tokenizer(src_texts[start:end], padding=False, truncation=True, max_length=self.encoding_max_length)['input_ids']
+            enc_t = self.tokenizer(tgt_texts[start:end], padding=False, truncation=True, max_length=self.encoding_max_length)['input_ids']
+            for i, ids in enumerate(enc_s, start): src_l[i] = len(ids)
+            for i, ids in enumerate(enc_t, start): tgt_l[i] = len(ids)
+
+        off_s = np.concatenate([[0], np.cumsum(src_l, dtype=np.int64)])
+        off_t = np.concatenate([[0], np.cumsum(tgt_l, dtype=np.int64)])
+        np.save(paths['src_off'], off_s)
+        np.save(paths['tgt_off'], off_t)
+        self.log(f"## Length pass complete: total src tokens={off_s[-1]}, total tgt tokens={off_t[-1]}", level="debug")
+
+        # Allocate memmaps
+        flat_s = np.memmap(paths['src_flat'], mode='w+', dtype=np.int32, shape=(int(off_s[-1]),))
+        flat_t = np.memmap(paths['tgt_flat'], mode='w+', dtype=np.int32, shape=(int(off_t[-1]),))
+
+        # Pass 2: write IDs
+        self.log("## Pass 2: writing token IDs into memmap", level="debug")
+        for start in range(0, N, self.cache_chunk_size):
+            end = min(start + self.cache_chunk_size, N)
+            self.log(f"### Filling memmap [{start}:{end}]", level="debug")
+            enc_s = self.tokenizer(src_texts[start:end], padding=False, truncation=True, max_length=self.encoding_max_length)['input_ids']
+            enc_t = self.tokenizer(tgt_texts[start:end], padding=False, truncation=True, max_length=self.encoding_max_length)['input_ids']
+            for i, ids in enumerate(enc_s, start):
+                s, e = off_s[i], off_s[i+1]
+                flat_s[s:e] = np.array(ids, dtype=np.int32)
+            for i, ids in enumerate(enc_t, start):
+                s, e = off_t[i], off_t[i+1]
+                flat_t[s:e] = np.array(ids, dtype=np.int32)
+
+        flat_s.flush()
+        flat_t.flush()
+        self._off_src[kind], self._off_tgt[kind] = off_s, off_t
+        self._memmap_src[kind] = np.memmap(paths['src_flat'], mode='r', dtype=np.int32, shape=(int(off_s[-1]),))
+        self._memmap_tgt[kind] = np.memmap(paths['tgt_flat'], mode='r', dtype=np.int32, shape=(int(off_t[-1]),))
+        self.log(f"## Cache build for '{kind}' complete", level="debug")
