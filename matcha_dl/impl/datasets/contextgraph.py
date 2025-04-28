@@ -28,7 +28,7 @@ from matcha_dl.core.entities.dataset import DatasetMask
 class ContextTabularDataset(TabularDataset):
     def __init__(self,
                  n_hops: int,
-                 verbaliser_name: str,
+                 verbaliser_name: Optional[str],
                  gen_max_new_tokens: int = 5000,
                  batch_size: int = 32,
                  do_sample: bool = False,
@@ -83,7 +83,7 @@ class ContextTabularDataset(TabularDataset):
         self.early_stopping: bool = early_stopping
         self.max_verb_gen_retries: int = max_verb_gen_retries
         self.aggregation_strategy: AggregationStrategy = aggregation_strategy
-        self.delimiter: str = delimiter
+        self.delimiter: str = delimiter + " "
         self.exclude_missing_dr: bool = exclude_missing_dr
         self.device: tdevice = device
         self.cache_chunk_size: int = cache_chunk_size
@@ -91,9 +91,15 @@ class ContextTabularDataset(TabularDataset):
         self.top_p: Optional[float] = top_p
         self.top_k: Optional[int] = top_k
 
-        self.verbaliser_tokenizer: AutoTokenizer = AutoTokenizer.from_pretrained(verbaliser_name)
-        self.verbaliser_model: AutoModelForCausalLM = AutoModelForCausalLM.from_pretrained(verbaliser_name)
-        self.verbaliser_model.to(self.device)
+        if verbaliser_name is not None:
+
+            self.verbaliser_tokenizer: AutoTokenizer = AutoTokenizer.from_pretrained(verbaliser_name)
+            self.verbaliser_model: AutoModelForCausalLM = AutoModelForCausalLM.from_pretrained(verbaliser_name)
+            self.verbaliser_model.to(self.device)
+        
+        else:
+            self.verbaliser_tokenizer: Optional[AutoTokenizer] = None
+            self.verbaliser_model: Optional[AutoModelForCausalLM] = None
 
         if self.aggregation_strategy is AggregationStrategy.SUMMARISE:
             if summariser_name is None:
@@ -169,89 +175,97 @@ class ContextTabularDataset(TabularDataset):
                     self._verbalization_templates = json.load(f)
                 self.log("### Verbalisation templates loaded.", level="debug")
                 return self._verbalization_templates
+            
+            if self.verbaliser_model is None or self.verbaliser_tokenizer is None:
+                self.log(f"#### No verbaliser model/tokenizer set, using stub for all triples", level="warning")
+                templates = {}
+                for rel in self.source_graph.get_relations().union(self.target_graph.get_relations()):
+                    templates[rel] = "$SRC " + rel.replace("_", " ").lower() + " $TGT"
+
+            else:
 
 
-            self.log("### Generating verbalisation templates from ontology...", level="debug")
-            examples = self.source_graph.get_example_triples(1, exclude_missing_dr=self.exclude_missing_dr)
-            examples.update(self.target_graph.get_example_triples(1, exclude_missing_dr=self.exclude_missing_dr))
-            self.log(f"#### Found {len(examples)} unique relations", level="debug")
+                self.log("### Generating verbalisation templates from ontology...", level="debug")
+                examples = self.source_graph.get_example_triples(1, exclude_missing_dr=self.exclude_missing_dr)
+                examples.update(self.target_graph.get_example_triples(1, exclude_missing_dr=self.exclude_missing_dr))
+                self.log(f"#### Found {len(examples)} unique relations", level="debug")
 
-            keys = list(examples.keys())
-            # initial batch of prompts
-            base_prompts = [
-                StaticPrompts.get_verbalization(head, rel.replace("_", " ").lower(), tail)
-                for key in keys
-                for (head, rel, tail) in [examples[key][0]]
-            ]
+                keys = list(examples.keys())
+                # initial batch of prompts
+                base_prompts = [
+                    StaticPrompts.get_verbalization(head, rel.replace("_", " ").lower(), tail)
+                    for key in keys
+                    for (head, rel, tail) in [examples[key][0]]
+                ]
 
-            self.log("#### Batch generating initial verbalisations", level="debug")
-            sentences = self._batch_generate(
-                base_prompts,
-                self.verbaliser_model,
-                self.verbaliser_tokenizer,
-                name="Verbaliser"
-            )
+                self.log("#### Batch generating initial verbalisations", level="debug")
+                sentences = self._batch_generate(
+                    base_prompts,
+                    self.verbaliser_model,
+                    self.verbaliser_tokenizer,
+                    name="Verbaliser"
+                )
 
-            templates: Dict[str, str] = {}
-            to_retry: List[str] = []
+                templates: Dict[str, str] = {}
+                to_retry: List[str] = []
 
-            # first pass: lower+replace and validate
-            for key, sent in zip(keys, sentences):
-                head, _, tail = examples[key][0]
-                tmpl = sent.lower().replace(head.lower(), "$SRC").replace(tail.lower(), "$TGT")
-                if "$SRC" in tmpl and "$TGT" in tmpl:
-                    templates[key] = tmpl
-                else:
-                    to_retry.append((key, sent))
+                # first pass: lower+replace and validate
+                for key, sent in zip(keys, sentences):
+                    head, _, tail = examples[key][0]
+                    tmpl = sent.lower().replace(head.lower(), "$SRC").replace(tail.lower(), "$TGT")
+                    if "$SRC" in tmpl and "$TGT" in tmpl:
+                        templates[key] = tmpl
+                    else:
+                        to_retry.append((key, sent))
 
-            # recursive retries: use the previous (faulty) sentence + corrective note
-            retry_round = 0
-            if self.max_verb_gen_retries > 0:
-                while to_retry and retry_round < self.max_verb_gen_retries:
-                    retry_round += 1
-                    self.log(f"#### Retry #{retry_round} for {len(to_retry)} templates", level="warning")
+                # recursive retries: use the previous (faulty) sentence + corrective note
+                retry_round = 0
+                if self.max_verb_gen_retries > 0:
+                    while to_retry and retry_round < self.max_verb_gen_retries:
+                        retry_round += 1
+                        self.log(f"#### Retry #{retry_round} for {len(to_retry)} templates", level="warning")
 
-                    retry_prompts = []
-                    retry_keys = []
-                    for key, prev_tmpl in to_retry:
-                        head, _, tail = examples[key][0]
+                        retry_prompts = []
+                        retry_keys = []
+                        for key, prev_tmpl in to_retry:
+                            head, _, tail = examples[key][0]
 
-                        retry_prompts.append(
-                            StaticPrompts.get_corrective_verbalization(prev_tmpl, head, tail)
+                            retry_prompts.append(
+                                StaticPrompts.get_corrective_verbalization(prev_tmpl, head, tail)
+                            )
+                            retry_keys.append(key)
+
+                        self.log("#### Batch generating retry verbalisations", level="debug")
+                        new_sentences = self._batch_generate(
+                            retry_prompts,
+                            self.verbaliser_model,
+                            self.verbaliser_tokenizer,
+                            name="Verbaliser-Retry"
                         )
-                        retry_keys.append(key)
 
-                    self.log("#### Batch generating retry verbalisations", level="debug")
-                    new_sentences = self._batch_generate(
-                        retry_prompts,
-                        self.verbaliser_model,
-                        self.verbaliser_tokenizer,
-                        name="Verbaliser-Retry"
-                    )
+                        new_to_retry = []
+                        for key, sent in zip(retry_keys, new_sentences):
+                            head, _, tail = examples[key][0]
+                            tmpl = sent.lower().replace(head.lower(), "$SRC").replace(tail.lower(), "$TGT")
+                            if "$SRC" in tmpl and "$TGT" in tmpl:
+                                templates[key] = tmpl
+                            else:
+                                new_to_retry.append((key, sent))
+                                self.log(f"Still missing placeholders for '{key}'", level="warning")
 
-                    new_to_retry = []
-                    for key, sent in zip(retry_keys, new_sentences):
-                        head, _, tail = examples[key][0]
-                        tmpl = sent.lower().replace(head.lower(), "$SRC").replace(tail.lower(), "$TGT")
-                        if "$SRC" in tmpl and "$TGT" in tmpl:
-                            templates[key] = tmpl
-                        else:
-                            new_to_retry.append((key, sent))
-                            self.log(f"Still missing placeholders for '{key}'", level="warning")
+                        to_retry = new_to_retry
 
-                    to_retry = new_to_retry
+                # final fallback for any that still failed
+                for key, _ in to_retry:
+                    self.log(f"Falling back stub for '{key}'", level="warning")
+                    templates[key] = "$SRC " + key.replace("_", " ").lower() + " $TGT"
 
-            # final fallback for any that still failed
-            for key, _ in to_retry:
-                self.log(f"Falling back stub for '{key}'", level="warning")
-                templates[key] = "$SRC " + key.replace("_", " ").lower() + " $TGT"
-
-            # save out
-            if hasattr(self, "_verb_temp_path"):
-                self.log("#### Saving verbalisation templates to file...", level="debug")
-                with open(self._verb_temp_path, "w") as f:
-                    json.dump(templates, f, indent=2)
-                self.log("#### Templates saved.", level="debug")
+                # save out
+                if hasattr(self, "_verb_temp_path"):
+                    self.log("#### Saving verbalisation templates to file...", level="debug")
+                    with open(self._verb_temp_path, "w") as f:
+                        json.dump(templates, f, indent=2)
+                    self.log("#### Templates saved.", level="debug")
 
             self._verbalization_templates = templates
 
