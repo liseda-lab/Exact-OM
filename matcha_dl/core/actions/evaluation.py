@@ -118,7 +118,7 @@ class EvaluationAction(Protocol):
         else:
             logger.error(f"Error during evaluation, skipping evaluation..")
 
-        logger.info(f"Finished evaluation in {time.time() - start_time} seconds")
+        logger.info(f"Finished evaluation in {(time.time() - start_time):.3f} seconds")
 
         return results
 
