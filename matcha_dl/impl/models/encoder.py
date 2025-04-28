@@ -8,7 +8,7 @@ from enum import Enum
 from matcha_dl.core.contracts.model import IModel
 
 class PoolingStrategy(str, Enum):
-    mean = "mean"
+    sum = "sum"
     max = "max"
     cls = "cls"
 
@@ -16,7 +16,7 @@ class EncoderClassifier(IModel):
     def __init__(
         self,
         encoder_name: str,
-        pooling: PoolingStrategy = PoolingStrategy.mean,
+        pooling: PoolingStrategy = PoolingStrategy.sum,
         use_lora: bool = False,
         lora_r: int = 16,
         lora_alpha: int = 32,
@@ -36,7 +36,7 @@ class EncoderClassifier(IModel):
 
         super(EncoderClassifier, self).__init__()
         self.encoder_name = encoder_name
-        self.pooling = pooling
+        self.pooling = PoolingStrategy(pooling)
         self.use_lora = use_lora
         self.fp16_inference = fp16_inference
 
@@ -104,12 +104,10 @@ class EncoderClassifier(IModel):
         mask = flat_mask.unsqueeze(-1)
 
         # Pooling
-        if self.pooling == PoolingStrategy.mean:
-            # sum then divide by lengths
-            sum_emb = (outputs * mask).sum(dim=1)
-            lengths = mask.sum(dim=1).clamp(min=1e-9)
-            pooled = sum_emb / lengths
-        elif self.pooling == PoolingStrategy.max:
+        if self.pooling is PoolingStrategy.sum:
+            # sum
+            pooled = (outputs * mask).sum(dim=1)
+        elif self.pooling is PoolingStrategy.max:
             # mask then max
             neg_inf = torch.finfo(outputs.dtype).min
             pooled = outputs.masked_fill(mask == 0, neg_inf).max(dim=1)[0]
