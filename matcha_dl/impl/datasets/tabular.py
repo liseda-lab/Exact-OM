@@ -125,16 +125,56 @@ class TabularDataset(IDataset):
             raise ValueError("Candidates not loaded.")
 
         inference_set = self.candidates
+        pre_filtered_set = pd.DataFrame()
+
+        # pre-filter easy mappings
+        if self.pre_filtering:
+            self.log("#Pre-filtering Inference Set...", level="debug")
+
+            self.log(f'#Getting Features...', level="debug")
+            inference_set = self._get_matcha_features(inference_set)
+
+            self.log(f'#Pre-filtering with threshold {self.pre_filtering_threshold}...', level="debug")
+
+            # Filter easy mappings based on pre_filtering_threshold
+
+            filter_mask = inference_set["Features"].apply(max) >= self.pre_filtering_threshold
+            pre_filtered_mappings = inference_set[filter_mask]
+            inference_set = inference_set[~filter_mask]
+
+            # # Filter candidates for mappings that are already in pre_filtered_mappings
+
+            pre_filter_candidates_mask = inference_set["Src"].isin(pre_filtered_mappings["Src"])
+            filtered_candidates = inference_set[pre_filter_candidates_mask]
+            inference_set = inference_set[~pre_filter_candidates_mask]
+
+            # combine pre_filtered_mappings and filtered_candidates
+            
+            pre_filtered_set = pd.concat([pre_filtered_mappings, filtered_candidates], ignore_index=True)
+
+            # assign pre-filtered label
+            pre_filtered_set[DatasetMask.train] = False
+            pre_filtered_set[DatasetMask.validation] = False
+            pre_filtered_set[DatasetMask.inference] = False
+            pre_filtered_set[DatasetMask.prefiltered] = True
+
+            self.log(f"#Pre-filtered Inference Set: {len(pre_filtered_set)} samples", level="debug")
 
         # get features from matcha
 
         self.log("#Getting Features...", level="debug")
         inference_set = self.get_features(inference_set)
 
-        # assign training label
+        # assign label
         inference_set[DatasetMask.train] = False
         inference_set[DatasetMask.validation] = False
         inference_set[DatasetMask.inference] = True
+        inference_set[DatasetMask.prefiltered] = False
+
+        self.log(f"#Inference Set: {len(inference_set)} samples", level="debug")
+
+        inference_set = pd.concat([inference_set, pre_filtered_set], ignore_index=True)
+        self.log("#Inference Set Created", level="debug")
         
         if self.reference is not None:
 
@@ -181,11 +221,13 @@ class TabularDataset(IDataset):
                     validation_set[DatasetMask.train] = False
                     validation_set[DatasetMask.validation] = True
                     validation_set[DatasetMask.inference] = False
+                    inference_set[DatasetMask.prefiltered] = False
 
                 # assign training label
                 training_set[DatasetMask.train] = True
                 training_set[DatasetMask.validation] = False
                 training_set[DatasetMask.inference] = False
+                inference_set[DatasetMask.prefiltered] = False
 
 
                 self.log("#Combining Training, Validation and Inference Sets...", level="debug")

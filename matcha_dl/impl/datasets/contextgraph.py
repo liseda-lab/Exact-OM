@@ -301,6 +301,10 @@ class ContextTabularDataset(TabularDataset):
         )
 
         for kind in DatasetMask:
+
+            if kind is DatasetMask.prefiltered:
+                self.log(f"####Skipping 'prefiltered' candidates", level="debug")
+                continue
             
             dfk = self.dataframe[self.dataframe[kind]]
 
@@ -310,7 +314,7 @@ class ContextTabularDataset(TabularDataset):
                 continue
             
             # Loading Labels
-            self.log(f'####Loading labels for kind "{kind}"', level="debug")
+            self.log(f"####Loading labels for kind '{kind}'", level="debug")
             self._label_cache[kind] = torch.tensor(dfk['Label'].values, dtype=torch.float32)
 
             paths = self._get_paths(kind)

@@ -195,6 +195,17 @@ class AlignmentAction(Protocol):
         else:
             alignment, _ = trainer.predict(**configs.training_params.model_dump())
 
+        if dataset.pre_filtering:
+            logger.info(f"Applying pre-filtering to alignment...")
+
+            if candidates_file_path is None:
+                pre_filtered_mappings = trainer.apply_prefilter(**configs.alignment_params.model_dump())
+            
+            else:
+                pre_filtered_mappings = trainer.apply_prefilter()
+
+            alignment += pre_filtered_mappings
+
         alignment_end = time.time()
         alignment_elapsed = (alignment_end - alignment_start) / 60
         logger.info(f"Alignment computed in {alignment_elapsed:.1f} minutes")

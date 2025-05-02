@@ -84,3 +84,4 @@ class DatasetMask(str, Enum):
     train = "train"
     validation = "validation"
     inference = "inference"
+    prefiltered = "prefiltered"

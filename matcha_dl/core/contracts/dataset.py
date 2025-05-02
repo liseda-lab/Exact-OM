@@ -34,6 +34,8 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
                  output_path: Path, 
                  matchers: List[str],
                  validation_set: Optional[float] = 0.1,
+                 pre_filtering: Optional[bool] = True,
+                 pre_filtering_threshold: Optional[float] = 0.85,
                  example: Optional[List[bool]] = None,
                  num_workers: Optional[int] = None,
                  **kwargs
@@ -54,6 +56,9 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
         self._reference = None
         self._negatives = None
         self._matcha_features = None
+
+        self._pre_filtering = pre_filtering
+        self._pre_filtering_threshold = pre_filtering_threshold
 
         self._default_kind = DatasetMask.train
 
@@ -88,6 +93,14 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
     @property
     def validation_set(self) -> float:
         return self._validation_set
+    
+    @property
+    def pre_filtering(self) -> bool:
+        return self._pre_filtering
+    
+    @property
+    def pre_filtering_threshold(self) -> float:
+        return self._pre_filtering_threshold
 
     @property
     def source(self) -> OWLDataset:
@@ -268,6 +281,11 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
         return self.output_path
 
     def _get_matcha_features(self, dataset: pd.DataFrame) -> pd.DataFrame:
+
+        # check if dataset features are already set
+        if "Features" in dataset.columns:
+            self.log("Dataset already has features. Skipping feature extraction.", level="debug")
+            return dataset
 
         feats = []
         

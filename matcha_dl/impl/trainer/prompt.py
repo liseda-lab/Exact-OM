@@ -9,13 +9,14 @@ from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 import numpy as np
 
-from matcha_dl.core.contracts.trainer import EntityMapping, ITrainer
+from matcha_dl.core.contracts.trainer import EntityMapping
+from matcha_dl.impl.trainer.mlp import MLPTrainer
 from matcha_dl.core.entities.dataset import DatasetMask
 from matcha_dl.utils.collate import DataCollator
 
 # 
 
-class PromptTrainer(ITrainer):
+class PromptTrainer(MLPTrainer):
 
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
@@ -25,88 +26,9 @@ class PromptTrainer(ITrainer):
 
     def train(
         self,
-        epochs: int = 50,
-        batch_size: int = 1,
-        num_workers: int = 0,
-        shuffle: bool = True,
-        gradient_accumulation_steps: int = 1,
-        mixed_precision: bool = False,
-        val_every: Optional[int] = 1,
-        save_interval: Optional[int] = 5,
         **kwargs
     ):
-        if self.skip_training:
-            self.log("Checkpoint Exists: Skipping training ...", level="info")
-            return
-        
-        if self.dataset.in_context_training:
-            self.log("In-Context Training Enabled: Skipping training loop..", level="info")
-            return
-
-        warnings.filterwarnings("ignore", category=UserWarning)
-        writer = SummaryWriter(self.logs_dir)
-        early_stopping = False
-        self.dataset.default_kind = DatasetMask.train
-        scaler = torch.amp.GradScaler('cuda') if mixed_precision else None
-
-        self.model.unexpected_response_count.reset()
-
-        collator = DataCollator(self.model.tokenizer)
-
-        while self._epoch <= epochs and not early_stopping:
-            self.model.train()
-            _iter = 1
-            self._optimizer.zero_grad()
-
-            with tqdm(DataLoader(self.dataset, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers, collate_fn=collator), unit="batch") as tepoch:
-                for step, (batch_prompts, target) in enumerate(tepoch):
-                    tepoch.set_description(f"Epoch {self._epoch}")
-
-                    batch_prompts = {k: v.to(self.device) for k, v in batch_prompts.items()}
-                    target = target.to(self.device)
-
-                    with torch.amp.autocast('cuda', enabled=mixed_precision):
-                        logits = self.model(batch_prompts["input_ids"], batch_prompts["attention_mask"])
-                        loss = self._loss(logits, target) / gradient_accumulation_steps
-
-                    writer.add_scalar("Loss/train", loss.item(), _iter)
-                    loss.backward()
-
-                    if (step + 1) % gradient_accumulation_steps == 0:
-                        if mixed_precision:
-                            scaler.step(self._optimizer)
-                            scaler.update()
-                        else:
-                            self._optimizer.step()
-                        self._optimizer.zero_grad()
-
-                    tepoch.set_postfix(loss=loss.item())
-                    _iter += 1
-
-                if val_every and val_every > 0 and self.dataset.validation_set is not None:
-                    if self._epoch % val_every == 0:
-                        _, validation_loss = self.predict(kind=DatasetMask.validation, batch_size=batch_size, num_workers=num_workers)
-                        writer.add_scalar("Loss/validation", validation_loss, self._epoch)
-                        tepoch.set_postfix(validation_loss=validation_loss)
-                        self.log(f"Validation loss at epoch {self._epoch} - {validation_loss}", level="info")
-                        if self.stopping and self.stopping(validation_loss=validation_loss):
-                            self.log(f"Early stopping at epoch {self._epoch}", level="info")
-                            early_stopping = True
-                            break
-
-            if save_interval and save_interval > 0 and self._epoch % save_interval == 0:
-                self.save_checkpoint()
-
-            self._epoch += 1
-
-        writer.flush()
-        writer.close()
-        self.save_checkpoint()
-
-        self.log(f"Training finished at epoch {self._epoch}", level="info")
-        self.log(f"Final validation loss - {validation_loss}", level="info")
-        self.log(f"Final training loss - {loss.item()}", level="info")
-        self.log(f"Number of unexpected responses from model during training: \n {self.model.unexpected_response_count}", level="debug")
+        self.log(f"PromptTrainer only supports inference and does not support training.. skypping ...", level="debug")
 
     def predict(self, 
             kind: DatasetMask = DatasetMask.inference, 

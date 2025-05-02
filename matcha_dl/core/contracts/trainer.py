@@ -164,6 +164,12 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
         
         pass
 
+    def apply_prefilter(self, threshold: Optional[float] = None, cardinality: Optional[int] = None, **kwargs) -> List[EntityMapping]:
+        """
+        Apply prefiltering to the dataset. This method should be implemented in the derived class.
+        """
+        pass
+
     def save_alignment(self, 
                        preds: List[EntityMapping], 
                        candidates_one2many_path: Optional[Path] = None,

@@ -131,3 +131,26 @@ class MLPTrainer(ITrainer):
             df["Scores"] = np.array(df["Features"].values.tolist()).max(axis=1)
 
             return EntityMapping.read_table_mappings(df[["Src", "Tgt", "Scores"]], threshold=threshold, cardinality=cardinality), 0.0
+        
+    def apply_prefilter(self,
+                        threshold: Optional[float] = None,
+                        cardinality: Optional[int] = None,
+                        **kwargs
+    ) -> List[EntityMapping]:
+        """
+        Apply prefiltering to the dataset based on the features.
+        """
+        
+        df = self.dataset.dataframe.copy()
+        df = df[df[DatasetMask.prefiltered] == True]
+
+        if df.empty:
+            self.log("No data to prefilter", level="warning")
+            return []
+        
+        df["Scores"] = np.array(df["Features"].values.tolist()).max(axis=1)
+        return EntityMapping.read_table_mappings(df[["Src", "Tgt", "Scores"]], threshold=threshold, cardinality=cardinality)
+
+
+
+

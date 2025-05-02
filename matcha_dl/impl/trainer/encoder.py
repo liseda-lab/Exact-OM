@@ -8,11 +8,12 @@ from torch.utils.tensorboard import SummaryWriter
 
 from typing import List, Optional, Tuple
 
-from matcha_dl.core.contracts.trainer import EntityMapping, ITrainer
+from matcha_dl.core.contracts.trainer import EntityMapping
+from matcha_dl.impl.trainer.mlp import MLPTrainer
 from matcha_dl.core.entities.dataset import DatasetMask
 from matcha_dl.utils.collate import DataCollator
 
-class EncoderTrainer(ITrainer):
+class EncoderTrainer(MLPTrainer):
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
         # Set dataset tokenizer

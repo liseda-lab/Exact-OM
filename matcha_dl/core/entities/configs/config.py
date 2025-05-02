@@ -79,6 +79,9 @@ class DatasetParams(BaseModel):
     # General Params
     validation_set: Optional[float] = Field(config["dataset_params"]["validation_set"])
     num_workers: Optional[int] = Field(config["dataset_params"]["num_workers"])
+    pre_filtering: Optional[bool] = Field(config["dataset_params"]["pre_filtering"])
+    pre_filtering_threshold: Optional[float] = Field(config["dataset_params"]["pre_filtering_threshold"])
+
     # Prompt Params
     example: Optional[List[bool]] = Field(config["dataset_params"]["example"])
     positive_examples: Optional[List[int]] = Field(config["dataset_params"]["positive_examples"])
