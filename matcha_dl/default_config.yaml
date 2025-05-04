@@ -158,11 +158,12 @@ model:
   name: EncoderClassifier
   params:
     encoder_name: sentence-transformers/all-MiniLM-L6-v2
-    pooling: sum # sum, cls, max
+    pooling: sum # sum, cls, max, sum_max, cls_mean, attentive (only for supervised settings)
     use_lora: True
     lora_r: 16
     lora_alpha: 32
     lora_dropout: 0.05
+    use_classifier: False # If True, a classifier will be added on top of the encode, only use in supervised settings
 
 loss:
   # If model is EncoderClassifier, use BCEWithLogitsLoss
