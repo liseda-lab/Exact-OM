@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 from matcha_dl import config, read_yaml
 from matcha_dl.core.entities.registry import ComponentType, ComponentRegistry
-from matcha_dl.core.entities.configs.dataset import Separator, ComparisonType, ContextType, ContextSemantics, Likelihood, AggregationStrategy, BatchLengthSortMode
+from matcha_dl.core.entities.configs.dataset import Separator, ComparisonType, ContextType, ContextSemantics, Likelihood, AggregationStrategy, BatchLengthSortMode, ContextMethod, BestPathMethod
 from matcha_dl.core.entities.configs.matcha import Sampler, Matchers
 
 from matcha_dl.core.contracts.stopper import IStopper
@@ -96,6 +96,11 @@ class DatasetParams(BaseModel):
     likelihood: Optional[List[Likelihood]] = Field(config["dataset_params"]["likelihood"], validate_default=True)
     # Context Tabular Params
     n_hops: Optional[int] = Field(config["dataset_params"]["n_hops"])
+    context_method: Optional[ContextMethod] = Field(config["dataset_params"]["context_method"], validate_default=True)
+    context_hop_penalty: Optional[float] = Field(config["dataset_params"]["context_hop_penalty"])
+    context_token_ratio: Optional[float] = Field(config["dataset_params"]["context_token_ratio"])
+    context_safety: Optional[float] = Field(config["dataset_params"]["context_safety"])
+    best_path_src_method: Optional[BestPathMethod] = Field(config["dataset_params"]["best_path_src_method"], validate_default=True)
     verbaliser_name: Optional[str] = Field(config["dataset_params"]["verbaliser_name"])
     gen_max_new_tokens: Optional[int] = Field(config["dataset_params"]["gen_max_new_tokens"])
     do_sample: Optional[bool] = Field(config["dataset_params"]["do_sample"])

@@ -14,21 +14,29 @@ from pathlib import Path
 
 from typing import List, Tuple, Optional, Dict, Any
 
+from concurrent.futures import ProcessPoolExecutor
+
 from matcha_dl.impl.datasets.tabular import TabularDataset
 from matcha_dl.core.entities.dataset import StaticPrompts
 from matcha_dl.core.entities.ontology import OntologyGraph
 from matcha_dl.core.entities.ontology import Entity
 from matcha_dl.utils.models import extract_answer
 from matcha_dl.utils.logs import capture_stdout
-from matcha_dl.core.entities.configs.dataset import AggregationStrategy, BatchLengthSortMode
+from matcha_dl.utils.paths import extract_entity_context
+from matcha_dl.core.entities.configs.dataset import AggregationStrategy, BatchLengthSortMode, ContextMethod, BestPathMethod
 from matcha_dl.core.entities.dataset import DatasetMask
 
-# TODO Harmonize get_item with TabularDataset
+# TODO Harmonize TabularDataset
 
 class ContextTabularDataset(TabularDataset):
     def __init__(self,
                  n_hops: int,
                  verbaliser_name: Optional[str],
+                 context_method: ContextMethod = ContextMethod.bfs,
+                 best_path_src_method: Optional[BestPathMethod] = None,
+                 context_hop_penalty: Optional[float] = 0.1,
+                 context_token_ratio: Optional[float] = 1.3,
+                 context_safety: Optional[float] = 0.8,
                  gen_max_new_tokens: int = 5000,
                  batch_size: int = 32,
                  do_sample: bool = False,
@@ -91,6 +99,16 @@ class ContextTabularDataset(TabularDataset):
         self.top_p: Optional[float] = top_p
         self.top_k: Optional[int] = top_k
 
+        # Greedy search parameters
+        self.context_method: ContextMethod = context_method
+        self.best_path_src_method: Optional[BestPathMethod] = best_path_src_method
+        self.context_hop_penalty: Optional[float] = context_hop_penalty
+        self.context_token_ratio: Optional[float] = context_token_ratio
+        self.context_safety: Optional[float] = context_safety
+        self.context_budget: int = int(
+            self.encoding_max_length * self.context_safety
+        ) if self.encoding_max_length is not None and self.context_safety is not None else None
+
         if verbaliser_name is not None:
 
             self.verbaliser_tokenizer: AutoTokenizer = AutoTokenizer.from_pretrained(verbaliser_name)
@@ -144,6 +162,13 @@ class ContextTabularDataset(TabularDataset):
         self._meta_mem_map_path = self._mem_map_cache_dir / "meta.json"
         
         self._verb_temp_path = self.output_path / "verbalization_templates.json"
+
+        # build approximate cost function
+        def _triple_token_cost(triple):
+            text = self._verbalize_triples([triple])
+            return int(len(text.split()) * self.context_token_ratio)
+        
+        self.context_cost_fn = _triple_token_cost
 
     @property
     def source_graph(self) -> OntologyGraph:
@@ -379,8 +404,33 @@ class ContextTabularDataset(TabularDataset):
 
         # Generate context subgraphs
         self.log("###Generating context subgraphs for each entity...", level="debug")
-        src_subs = [ent.get_context_subgraph(self.n_hops) for ent in source_entities]
-        tgt_subs = [ent.get_context_subgraph(self.n_hops) for ent in target_entities]
+
+        if self.context_method is ContextMethod.greedy:
+            self.log("####Using 'greedy' context extraction method.", level="debug")
+            if self.best_path_src_method is None:
+                self.log("####No best path source method set, using default 'dp'.", level="debug")
+                self.best_path_src_method = BestPathMethod.dp
+            else:
+                self.log(f"####Using best path source method: '{self.best_path_src_method}'.", level="debug")
+
+                # Set cost function for greedy extraction
+                self.log("####Setting cost function for context extraction. Computing cost for every triple..", level="debug")
+                self.source_graph.cost_fn = self.context_cost_fn
+                self.target_graph.cost_fn = self.context_cost_fn
+
+        else:
+            self.log("####Using 'BFS' context extraction method.", level="debug")
+
+        src_subs = [ent.get_context_subgraph(
+            self.n_hops, human_readable=True, method=self.context_method, 
+            best_path_method=self.best_path_src_method, budget=self.context_budget, 
+            hop_penalty=self.context_hop_penalty) for ent in source_entities]
+
+        tgt_subs = [ent.get_context_subgraph(
+            self.n_hops, human_readable=True, method=self.context_method, 
+            best_path_method=self.best_path_src_method, budget=self.context_budget, 
+            hop_penalty=self.context_hop_penalty) for ent in target_entities]
+
         self.log(f"###Generated context subgraphs for {len(src_subs)} source and {len(tgt_subs)} target entities.", level="debug")
 
         # Aggregate via join or summarisation
@@ -418,18 +468,6 @@ class ContextTabularDataset(TabularDataset):
 
         self.log("##Entity definitions generated.", level="debug")
         return dataset
-    
-    def _process_subgraphs(self, context_graph_list: List[List[List[Tuple[str]]]], ordered_entities:List[List[Entity]]) -> List[List[str]]:
-
-        """
-        Processes the context graph list and ordered entities to generate verbalised sentences.
-        Returns: A nested list of shape [2, num_entities] (one aggregated sentence per subgraph).
-        """
-
-        if self.aggregation_strategy is AggregationStrategy.JOIN:
-            return self._subgraphs_join(context_graph_list)
-        else:
-            return self._subgraphs_summarise(context_graph_list, ordered_entities)
 
     def _verbalize_triples(self, triples: List[Tuple[str, str, str]]) -> str:
         """
@@ -439,7 +477,7 @@ class ContextTabularDataset(TabularDataset):
         key = tuple(triples)
         if key not in self._join_cache:
             texts = [
-                self.verbalization_templates[rel]
+                self.verbalization_templates.get(rel, "$SRC " + rel.replace("_", " ").lower() + " $TGT")
                     .replace('$SRC', head)
                     .replace('$TGT', tail)
                 for head, rel, tail in triples

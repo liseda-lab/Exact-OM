@@ -36,3 +36,12 @@ class AggregationStrategy(str, Enum):
 class BatchLengthSortMode(str, Enum):
     max = "max"
     sum = "sum"
+
+class ContextMethod(str, Enum):
+    bfs = "bfs"
+    greedy = "greedy"
+
+class BestPathMethod(str, Enum):
+    dp = "dp"
+    lagrangian = "lagrangian"
+    greedy = "greedy"

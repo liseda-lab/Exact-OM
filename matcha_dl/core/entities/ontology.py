@@ -2,6 +2,10 @@ from collections import defaultdict, deque
 from typing import List, Optional, Union, Dict, Set, Tuple
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+import math
+from collections import Counter, namedtuple
+from typing import Union, Tuple, Callable
+
 from mowl.owlapi import OWLOntology
 from org.semanticweb.owlapi.search import EntitySearcher
 from org.semanticweb.HermiT import Reasoner
@@ -9,6 +13,9 @@ from org.semanticweb.owlapi.reasoner import InferenceType
 from org.semanticweb.owlapi.model import IRI, OWLClass
 
 from mowl.projection import OWL2VecStarProjector, Edge
+
+from matcha_dl.utils.paths import best_path_dp, best_path_lagrangian_relaxation, best_path_local
+from matcha_dl.core.entities.configs.dataset import ContextMethod, BestPathMethod
 
 
 class OntologyGraph:
@@ -20,6 +27,7 @@ class OntologyGraph:
         self.ontology = ontology
         self.reasoner = reasoner
         self.edges: Optional[List[Edge]] = None
+        self.out_edges: Dict[str, List[Edge]] = None
         self.graph: Optional[Dict[str, Set[str]]] = None
         self.label_cache: Dict[str, List[str]] = {}  # Cache: IRI string -> list of labels (str)
 
@@ -31,6 +39,13 @@ class OntologyGraph:
         self._example_triples_cache: Optional[Dict[str, List[Tuple[str]]]] = None
         self._context_subgraph_cache: Dict[Tuple[str,int,bool], List[Tuple[str]]] = {}
 
+        # IC caches
+
+        self._node_ic_cache: Optional[Dict[Tuple[str,str], float]]    = None
+        self._edge_ic_cache: Optional[Dict[Tuple[str,str,str], float]] = None
+
+        # edge cost cache
+        self._edge_cost_cache: Dict[Tuple[str,str,str], int] = None
 
         if reasoner is None:
             reasoner = Reasoner.ReasonerFactory().createReasoner(ontology)
@@ -54,11 +69,87 @@ class OntologyGraph:
         if self.graph is None:
             raise ValueError("Graph has not been built yet.")
         return self.graph.get(item, set())
+    
+    @property
+    def node_ic(self) -> Dict[Tuple[str,str], float]:
+        """Relation-local node surprisal: ICr(x) = −log(deg_r(x)/|E_r|)."""
+        if self._node_ic_cache is None:
+             rel2counts = defaultdict(Counter)
+             rel2size   = defaultdict(int)
+             for e in self.edges:
+                 rel2counts[e.rel][e.src] += 1
+                 rel2counts[e.rel][e.dst] += 1
+                 rel2size[e.rel]    += 1
+             self._node_ic_cache = {}
+             for r, counts in rel2counts.items():
+                 m = rel2size[r]
+                 for x, deg in counts.items():
+                     self._node_ic_cache[(r,x)] = -math.log(deg / m)
+        return self._node_ic_cache
+ 
+    @property
+    def edge_ic(self) -> Dict[Tuple[str,str,str], float]:
+        """Per-edge IC = avg of endpoints’ relation-local surprisal."""
+        if self._edge_ic_cache is None:
+             # ensure node_ic is populated
+             _ = self.node_ic
+             self._edge_ic_cache = {}
+             for e in self.edges:
+                 u,r,v = e.astuple()
+                 ic_u = self._node_ic_cache[(r,u)]
+                 ic_v = self._node_ic_cache[(r,v)]
+                 self._edge_ic_cache[(u,r,v)] = 0.5 * (ic_u + ic_v)
+        return self._edge_ic_cache
+
+    @property
+    def avg_edge_ic(self) -> float:
+        """Average edge IC across all edges in the graph."""
+        return sum(self.edge_ic.values()) / len(self.edge_ic)
+
+
+    @property
+    def cost_fn(self) -> Callable[[Tuple[str,str,str]], int]:
+         """
+         Returns a fast lookup into the precomputed edge‐cost cache.
+         """
+         if self._edge_cost_cache is None:
+            raise ValueError("Cost function has not been set or edges have not been built yet.")
+        
+         return lambda triple: self._edge_cost_cache[triple]
+ 
+    @cost_fn.setter
+    def cost_fn(self, fn: Callable[[Tuple[str,str,str]], int]):
+        """
+        When the user assigns a new cost function, precompute its value
+        for every edge in the graph and cache it for O(1) lookup.
+        """
+        self._cost_fn = fn
+        # Build the cache once
+        self._edge_cost_cache = {}
+        for e in self.edges:
+            t = e.astuple()
+            human_readable = (self.get_labels(i)[0] for i in t)
+            self._edge_cost_cache[t] = fn(human_readable)
 
     def _build_projection(self) -> None:
         projector = OWL2VecStarProjector()
         self.edges = projector.project(self.ontology)
+        self.out_edges = self._build_out_edges()
         self.graph = self._build_graph(self.edges)
+
+    def _build_out_edges(self) -> Dict[str, List[Edge]]:
+        """
+        Builds a mapping of source IRIs to their outgoing edges.
+        This is useful for quickly accessing all edges originating from a specific node.
+        """
+        if self.edges is None:
+            raise ValueError("Edges have not been built yet.")
+        
+        out_edges = defaultdict(list)
+        for edge in self.edges:
+            out_edges[edge.src].append(edge)
+
+        return out_edges
 
     def _build_graph(self, edges: List[Edge]) -> Dict[str, Set[str]]:
         graph = defaultdict(set)
@@ -231,55 +322,121 @@ class OntologyGraph:
             futures = {executor.submit(self.get_labels, iri): iri for iri in iris}
             # Wait for all tasks to complete.
             for future in as_completed(futures):
-                _ = future.result() 
+                _ = future.result()
 
-    def get_context_subgraph(self, start: str, n: int, human_readable: bool = True) -> List[Tuple[str]]:
+    def get_context_subgraph(
+        self,
+        start: str,
+        n: int,
+        human_readable: bool = True,
+        method: ContextMethod = ContextMethod.bfs,  # "bfs" or "greedy"
+        best_path_method: Optional[BestPathMethod] = None,  # "dp", "lagrangian", "greedy"
+        budget: Optional[int] = None,               # token budget
+        hop_penalty: Optional[float] = 0.0,                   # α
+    ) -> List[Tuple[str,str,str]]:
         """
-        Performs a BFS on the cached graph (nodes are IRIs) starting at node `start`
-        and collects all edges within n hops.
-        
-        :param start: The starting node IRI.
-        :param n: Maximum hop distance.
-        :param human_readable: If True, converts IRIs (for nodes and relations) to their
-                               full list of human readable labels.
-        :return: List of triples (src, rel, dst) where each element is either an IRI or a list of labels.
+        If method="bfs": original n-hop BFS (cached).
+        If method="greedy": runs budget-aware greedy extraction.
         """
 
-        key = (start, n, human_readable)
+        key = (start, n, method, human_readable)
         if key in self._context_subgraph_cache:
             return self._context_subgraph_cache[key]
+        
+        if method is ContextMethod.bfs: 
 
-        visited = {start: 0}
-        queue = deque([start])
-        while queue:
-            node = queue.popleft()
-            dist = visited[node]
-            if dist < n:
-                for nbr in self.graph.get(node, []):
-                    if nbr not in visited:
-                        visited[nbr] = dist + 1
-                        queue.append(nbr)
-        reachable = set(visited.keys())
+            visited = {start: 0}
+            queue = deque([start])
+            while queue:
+                node = queue.popleft()
+                dist = visited[node]
+                if dist < n:
+                    for nbr in self.graph.get(node, []):
+                        if nbr not in visited:
+                            visited[nbr] = dist + 1
+                            queue.append(nbr)
+            reachable = set(visited.keys())
 
-        subgraph_edges: List[Tuple[str,str,str]] = []
+            subgraph_edges: List[Tuple[str,str,str]] = []
 
-        for edge in self.edges:
-            if edge.src in reachable and edge.dst in reachable:
-                # get either IRIs or labels
-                if human_readable:
-                    src = self.get_labels(edge.src)[0]
-                    dst = self.get_labels(edge.dst)[0]
-                    rel = self.get_labels(edge.rel)[0]
-                else:
-                    src, dst, rel = str(edge.src), str(edge.dst), str(edge.rel)
+            for edge in self.edges:
+                if edge.src in reachable and edge.dst in reachable:
+                    # get either IRIs or labels
+                    if human_readable:
+                        src = self.get_labels(edge.src)[0]
+                        dst = self.get_labels(edge.dst)[0]
+                        rel = self.get_labels(edge.rel)[0]
+                    else:
+                        src, dst, rel = str(edge.src), str(edge.dst), str(edge.rel)
 
-                # original (outgoing) triple
-                subgraph_edges.append((src, rel, dst))
+                    # original (outgoing) triple
+                    subgraph_edges.append((src, rel, dst))
 
-        self._context_subgraph_cache[key] = subgraph_edges
-        return subgraph_edges
+            self._context_subgraph_cache[key] = subgraph_edges
+
+            return subgraph_edges
+
+        else:
+            
+            # Adjusting hop penalty based on average edge IC
+            hop_penalty = hop_penalty*self.avg_edge_ic
+
+            triples = self._greedy_context_subgraph(
+                start, n, best_path_method, human_readable, budget, hop_penalty, self.cost_fn
+            )
+
+            self._context_subgraph_cache[key] = triples
+
+            return triples
+
+    def _greedy_context_subgraph(
+        self,
+        start: str,
+        n: int,
+        method: BestPathMethod,
+        human_readable: bool,
+        budget: Optional[int],
+        hop_penalty: float,
+        token_cost_fn: Optional[callable]
+    ) -> List[Tuple[str,str,str]]:
+        
+
+        E_used = set()
+        C_rem  = budget if budget is not None else float("inf")
+
+        if method is BestPathMethod.dp:
+            best_path_fn = best_path_dp
+        elif method is BestPathMethod.lagrangian:
+            best_path_fn = best_path_lagrangian_relaxation
+        else:
+            best_path_fn = best_path_local
+
+        selected = []
+        while C_rem > 0:
+            path, delta_c = best_path_fn(
+                self.out_edges,
+                self.edge_ic,
+                start, n,
+                E_used, C_rem,
+                hop_penalty, token_cost_fn
+            )
+            if path is None or delta_c == 0 or delta_c > C_rem:
+                break
+            selected.extend(path)
+            E_used.update(path)
+            C_rem -= delta_c
+        return self._format_subgraph(E_used, human_readable)
     
-
+    def _format_subgraph(self, selected: List[Tuple[str,str,str]], human_readable: bool) -> List[Tuple[str,str,str]]:
+        """
+        Formats the selected subgraph edges based on whether human-readable labels are requested.
+        """
+        if human_readable:
+            return [
+                (self.get_labels(src)[0], self.get_labels(rel)[0], self.get_labels(dst)[0])
+                for src, rel, dst in selected
+            ]
+        return selected
 
 
 class Entity:
@@ -395,7 +552,7 @@ class Entity:
         return [cls(class_iri=ci, ontology=ontology, reasoner=reasoner, ontology_graph=ontology_graph)
                 for ci in class_iris]
 
-    def get_context_subgraph(self, n: int, human_readable: bool = True) -> List[Tuple[Union[str, List[str]], Union[str, List[str]], Union[str, List[str]]]]:
+    def get_context_subgraph(self, n: int, human_readable: bool = True, **kwargs) -> List[Tuple[Union[str, List[str]], Union[str, List[str]], Union[str, List[str]]]]:
         """
         Returns the subgraph (as a list of triples) for the current entity up to n hops.
         If an OntologyGraph is provided, uses the cached projection (converting IRIs to labels
@@ -407,7 +564,7 @@ class Entity:
         :return: List of triples (src, rel, dst). When human_readable is True, each element is a list of labels.
         """
         if self.ontology_graph is not None:
-            return self.ontology_graph.get_context_subgraph(self.class_iri, n, human_readable)
+            return self.ontology_graph.get_context_subgraph(self.class_iri, n, human_readable, **kwargs)
         else:
             local_graph = defaultdict(set)
             current_label = self.labels[0] if self.labels else self.name
