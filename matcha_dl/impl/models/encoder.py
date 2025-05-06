@@ -36,7 +36,8 @@ class EncoderClassifier(IModel):
         lora_alpha: int       = 32,
         lora_dropout: float   = 0.05,
         fp16_inference: bool  = False,
-        use_classifier: bool  = False
+        use_classifier: bool  = False,
+        **kwargs
     ):
         super().__init__()
         self.pooling         = PoolingStrategy(pooling)
@@ -151,5 +152,5 @@ class EncoderClassifier(IModel):
             logits = self.classifier(pair).squeeze(-1)
             return logits
 
-        # else unsupervised cosine
+        # else unsupervised cosine (Normalization + Dot Product)
         return F.cosine_similarity(src, tgt, dim=-1)

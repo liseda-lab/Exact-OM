@@ -103,6 +103,13 @@ class AlignmentAction(Protocol):
 
         matcha.match()
 
+        if matcha.generated_reference.exists() and reference_file_path is None:
+            logger.info(f"Running on self-supervised setting, using generated reference file")
+            logger.info(f"Generated reference file: {matcha.generated_reference}")
+
+            reference_file_path = matcha.generated_reference
+
+
         matcha_end = time.time()
         matcha_elapsed = (matcha_end - matcha_start) / 60
         logger.info(f"Matcha completed in {matcha_elapsed:.1f} minutes")
@@ -146,16 +153,18 @@ class AlignmentAction(Protocol):
 
         # Trainer module
 
+        # TODO Find another way to pass this model params
+
         ## Parse model params
 
-        if dataset.reference is not None:
+        # if dataset.reference is not None:
 
-            model_params = configs.model.params
-            model_params["n"] = dataset.x().shape[1]
-            model_params["n_classes"] = N_CLASSES
+        #     model_params = configs.model.params
+        #     model_params["n"] = dataset.x().shape[1]
+        #     model_params["n_classes"] = N_CLASSES
 
-        else:
-            model_params = configs.model.params
+        # else:
+        #     model_params = configs.model.params
 
         ## Train Model
 
@@ -166,7 +175,7 @@ class AlignmentAction(Protocol):
             optimizer=configs.optimizer.name,
             loss_params=configs.loss.params,
             optimizer_params=configs.optimizer.params,
-            model_params=model_params,
+            model_params=configs.model.params,
             stopping=configs.stopper.name,
             stopping_params=configs.stopper.params,
             device=device if device is not None else 'cpu',
@@ -176,7 +185,7 @@ class AlignmentAction(Protocol):
             logger=logger,
         )
 
-        if dataset.reference is not None:
+        if reference_file_path is not None:
             logger.info(f"Training model with {reference_file_path}")
             train_start = time.time()
 

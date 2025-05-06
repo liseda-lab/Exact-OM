@@ -60,10 +60,15 @@ class MatchaParams(BaseModel):
     max_heap: str = Field(config["matcha_params"]["max_heap"])
     threshold: float = Field(config["matcha_params"]["threshold"])
     matchers: List[Matchers] = Field(config["matcha_params"]["matchers"], validate_default=True)
-    negcardinality: int = Field(config["matcha_params"]["negcardinality"])
+    negcardinality: Optional[int] = Field(config["matcha_params"]["negcardinality"])
     negthreshold: float = Field(config["matcha_params"]["negthreshold"])
     samplers: Sampler = Field(config["matcha_params"]["samplers"])
     calculate_scores: bool = Field(config["matcha_params"]["calculate_scores"])
+    generate_reference: bool = Field(config["matcha_params"]["generate_reference"])
+    min_threshold_hard_positives: float = Field(config["matcha_params"]["min_threshold_hard_positives"])
+    min_threshold_soft_positives: float = Field(config["matcha_params"]["min_threshold_soft_positives"])
+    hard_positives: float = Field(config["matcha_params"]["hard_positives"])
+    soft_positives: float = Field(config["matcha_params"]["soft_positives"])
 
 class PlotNegativesParams(BaseModel):
     enabled: bool = Field(config["plot_negatives"]["enabled"])
@@ -177,6 +182,8 @@ class TrainingParams(BaseModel):
     log_every: int = Field(config["training_params"]["log_every"])
     gradient_accumulation_steps: int = Field(config["training_params"]["gradient_accumulation_steps"])
     mixed_precision: bool = Field(config["training_params"]["mixed_precision"])
+    warmup_percent: Optional[float] = Field(config["training_params"]["warmup_percent"])
+
 
 class AlignmentParams(BaseModel):
     threshold: Optional[float] = Field(config["alignment_params"]["threshold"])

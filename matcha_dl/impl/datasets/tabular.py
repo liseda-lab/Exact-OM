@@ -221,13 +221,13 @@ class TabularDataset(IDataset):
                     validation_set[DatasetMask.train] = False
                     validation_set[DatasetMask.validation] = True
                     validation_set[DatasetMask.inference] = False
-                    inference_set[DatasetMask.prefiltered] = False
+                    validation_set[DatasetMask.prefiltered] = False
 
                 # assign training label
                 training_set[DatasetMask.train] = True
                 training_set[DatasetMask.validation] = False
                 training_set[DatasetMask.inference] = False
-                inference_set[DatasetMask.prefiltered] = False
+                training_set[DatasetMask.prefiltered] = False
 
 
                 self.log("#Combining Training, Validation and Inference Sets...", level="debug")

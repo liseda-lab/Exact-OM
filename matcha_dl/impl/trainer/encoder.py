@@ -12,17 +12,16 @@ from matcha_dl.core.contracts.trainer import EntityMapping
 from matcha_dl.impl.trainer.mlp import MLPTrainer
 from matcha_dl.core.entities.dataset import DatasetMask
 from matcha_dl.utils.collate import DataCollator
+from transformers import get_linear_schedule_with_warmup
 
 class EncoderTrainer(MLPTrainer):
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
-        # Set dataset tokenizer
         self.dataset.tokenizer = self.model.tokenizer
-        # Collation for batches
         self.collator = DataCollator(self.model.tokenizer)
-        # Sliding windows for smoothing batch times
         self._train_time_window = deque(maxlen=20)
         self._infer_time_window = deque(maxlen=20)
+        self._best_val_loss = float('inf')
 
     def train(
         self,
@@ -32,19 +31,21 @@ class EncoderTrainer(MLPTrainer):
         shuffle: bool = True,
         gradient_accumulation_steps: int = 1,
         mixed_precision: bool = False,
-        val_every: Optional[int] = 1,
-        save_interval: Optional[int] = 5,
+        val_every: int = 1,
+        save_interval: Optional[int] = None,
         log_every: int = 1,
+        warmup_percent: float = 0.1,
         **kwargs
     ):
         if self.skip_training:
-            self.log("Checkpoint Exists: Skipping training ...", level="info")
+            self.log("Checkpoint exists: skipping training …", level="info")
             return
 
         # Enable cuDNN autotune for fixed-size inputs
         torch.backends.cudnn.benchmark = True
-
         warnings.filterwarnings("ignore", category=UserWarning)
+
+        
         writer = SummaryWriter(self.logs_dir)
         scaler = torch.amp.GradScaler('cuda') if mixed_precision else None
         self.dataset.default_kind = DatasetMask.train
@@ -58,9 +59,17 @@ class EncoderTrainer(MLPTrainer):
             pin_memory=True,
             persistent_workers=True if num_workers > 0 else None,
             prefetch_factor=2 if num_workers > 0 else None,
-            # collate_fn=self.collator
+            collate_fn=self.collator
         )
         total_batches = len(dataloader)
+
+        num_train_steps   = (epochs * total_batches) // gradient_accumulation_steps
+        num_warmup_steps  = int(warmup_percent * num_train_steps)  # 10% warmup
+        scheduler = get_linear_schedule_with_warmup(
+            self._optimizer,
+            num_warmup_steps=num_warmup_steps,
+            num_training_steps=num_train_steps
+        )
 
         early_stopping = False
         while self._epoch <= epochs and not early_stopping:
@@ -79,6 +88,7 @@ class EncoderTrainer(MLPTrainer):
                     for k, v in batch_prompts.items()
                 }
                 target = target.to(self.device, non_blocking=True)
+
                 with torch.amp.autocast('cuda', enabled=mixed_precision):
                     logits = self.model(
                         batch_prompts["input_ids"],
@@ -86,36 +96,50 @@ class EncoderTrainer(MLPTrainer):
                     )
                     loss = self._loss(logits, target) / gradient_accumulation_steps
 
-                writer.add_scalar(
-                    "Loss/train",
-                    loss.item(),
-                    step + (self._epoch - 1) * total_batches
-                )
-                loss.backward()
+                if mixed_precision:
+                    scaler.scale(loss).backward()
+                else:
+                    loss.backward()
 
-                if (step % gradient_accumulation_steps) == 0:
+                global_step = step + self._epoch * total_batches
+                writer.add_scalar("Loss/train", loss.item(), global_step)
+
+                if (step % gradient_accumulation_steps == 0) or (step == total_batches):
+                    grad_norm = torch.nn.utils.clip_grad_norm_(
+                        self.model.parameters(), max_norm=1.0
+                    )
+                    writer.add_scalar("GradNorm", grad_norm, global_step)
+
                     if mixed_precision:
                         scaler.step(self._optimizer)
                         scaler.update()
                     else:
                         self._optimizer.step()
+
+                    scheduler.step()
                     self._optimizer.zero_grad()
 
-                # GPU-accurate timing end + update window
+                    current_lr = self._optimizer.param_groups[0]['lr']
+                    writer.add_scalar("LR", current_lr, global_step)
+                    if mixed_precision:
+                        writer.add_scalar("AMP_Scale", scaler.get_scale(), global_step)
+
                 if self.device.type == 'cuda':
                     torch.cuda.synchronize(self.device)
                 batch_time = time.perf_counter() - t0
                 self._train_time_window.append(batch_time)
                 avg_time = sum(self._train_time_window) / len(self._train_time_window)
+                throughput = batch_size / batch_time
+                writer.add_scalar("Throughput", throughput, global_step)
                 remaining = total_batches - step
-                eta_str = str(timedelta(seconds=int(avg_time * remaining)))
+                eta = timedelta(seconds=int(avg_time * remaining))
 
-                # log batch info at interval
                 if step % log_every == 0 or step == total_batches:
                     self.log(
-                        f"Epoch {self._epoch} | batch {step}/{total_batches} | "
-                        f"loss={loss.item():.4f} | "
-                        f"batch_time={batch_time:.2f}s | ETA={eta_str}",
+                        f"Epoch {self._epoch}/{epochs} "
+                        f"batch {step}/{total_batches} "
+                        f"loss={loss.item():.4f} "
+                        f"batch_time={batch_time:.2f}s ETA={eta}",
                         level="debug"
                     )
 
@@ -129,6 +153,13 @@ class EncoderTrainer(MLPTrainer):
                 )
                 writer.add_scalar("Loss/validation", val_loss, self._epoch)
                 self.log(f"Validation loss at epoch {self._epoch}: {val_loss:.4f}", level="debug")
+
+                #checkpoint best
+                if val_loss < self._best_val_loss:
+                    self._best_val_loss = val_loss
+                    self.save_checkpoint()
+                    self.log("New best model saved.", level="info")
+
                 if self.stopping and self.stopping(validation_loss=val_loss):
                     self.log(f"Early stopping at epoch {self._epoch}", level="info")
                     early_stopping = True
