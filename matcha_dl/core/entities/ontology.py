@@ -23,9 +23,10 @@ class OntologyGraph:
     Builds a cached graph structure for an ontology by projecting it using OWL2VecStarProjector.
     The edges are stored with IRIs. Label extractions are cached for efficiency.
     """
-    def __init__(self, ontology: OWLOntology, reasoner: Reasoner) -> None:
+    def __init__(self, ontology: OWLOntology, reasoner: Reasoner, only_taxonomy: bool = False) -> None:
         self.ontology = ontology
         self.reasoner = reasoner
+        self.only_taxonomy = only_taxonomy
         self.edges: Optional[List[Edge]] = None
         self.out_edges: Dict[str, List[Edge]] = None
         self.graph: Optional[Dict[str, Set[str]]] = None
@@ -132,7 +133,7 @@ class OntologyGraph:
             self._edge_cost_cache[t] = fn(human_readable)
 
     def _build_projection(self) -> None:
-        projector = OWL2VecStarProjector()
+        projector = OWL2VecStarProjector(only_taxonomy=self.only_taxonomy)
         self.edges = projector.project(self.ontology)
         self.out_edges = self._build_out_edges()
         self.graph = self._build_graph(self.edges)

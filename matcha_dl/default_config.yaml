@@ -126,6 +126,7 @@ dataset_params:
   max_verb_gen_retries: 1
   smallest_batch_first: False # If True, the smallest batch will be processed first.
   batch_length_sort_mode: max # max, sum
+  only_taxonomy: False # If True, only the taxonomy will be used to generate the context.
 
 training_params:
   epochs: 10 # 50

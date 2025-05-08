@@ -125,6 +125,7 @@ class DatasetParams(BaseModel):
     max_verb_gen_retries: Optional[int] = Field(config["dataset_params"]["max_verb_gen_retries"])
     batch_length_sort_mode: Optional[BatchLengthSortMode] = Field(config["dataset_params"]["batch_length_sort_mode"], validate_default=True)
     smallest_batch_first: Optional[bool] = Field(config["dataset_params"]["smallest_batch_first"])
+    only_taxonomy: Optional[bool] = Field(config["dataset_params"]["only_taxonomy"])
 
 
     @field_validator('validation_set', mode="after")

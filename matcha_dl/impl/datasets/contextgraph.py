@@ -51,6 +51,7 @@ class ContextTabularDataset(TabularDataset):
                  encoding_max_length: Optional[int] = 256,
                  smallest_batch_first: bool = False,
                  batch_length_sort_mode: BatchLengthSortMode = BatchLengthSortMode.max,
+                 only_taxonomy: bool = False,
                  gen_max_length: Optional[int] = None,
                  summariser_name: Optional[str] = None,
                  temperature: Optional[float] = None,
@@ -98,6 +99,7 @@ class ContextTabularDataset(TabularDataset):
         self.temperature: Optional[float] = temperature
         self.top_p: Optional[float] = top_p
         self.top_k: Optional[int] = top_k
+        self.only_taxonomy: bool = only_taxonomy
 
         # Greedy search parameters
         self.context_method: ContextMethod = context_method
@@ -175,7 +177,7 @@ class ContextTabularDataset(TabularDataset):
         if self._source_graph is None:
             self.log("Loading source graph from ontology..", level="debug")
             with capture_stdout(self.log, level="debug"):
-                self._source_graph = OntologyGraph(self.source.ontology, self.source_reasoner)
+                self._source_graph = OntologyGraph(self.source.ontology, self.source_reasoner, self.only_taxonomy)
             self.log("Source graph loaded.", level="debug")
             self.log(f"Source graph has {len(self._source_graph)} triples.", level="debug")
         return self._source_graph
@@ -185,14 +187,23 @@ class ContextTabularDataset(TabularDataset):
         if self._target_graph is None:
             self.log("Loading target graph from ontology..", level="debug")
             with capture_stdout(self.log, level="debug"):
-                self._target_graph = OntologyGraph(self.target.ontology, self.target_reasoner)
+                self._target_graph = OntologyGraph(self.target.ontology, self.target_reasoner, self.only_taxonomy)
             self.log("Target graph loaded.", level="debug")
             self.log(f"Target graph has {len(self._target_graph)} triples.", level="debug")
         return self._target_graph
     
     @property
     def verbalization_templates(self) -> Dict[str, str]:
+
         if self._verbalization_templates is None:
+
+            if self.only_taxonomy is True:
+                self.log("### Using taxonomy only verbalisation templates", level="debug")
+                self._verbalization_templates = {
+                    "subclassof": "$SRC is a subclass of $TGT",
+                    "subclass_of": "$SRC is a subclass of $TGT"
+                }
+                return self._verbalization_templates
 
             if hasattr(self, "_verb_temp_path") and self._verb_temp_path.exists():
                 self.log("### Loading verbalisation templates from file...", level="debug")
@@ -328,7 +339,7 @@ class ContextTabularDataset(TabularDataset):
         for kind in DatasetMask:
 
             if kind is DatasetMask.prefiltered:
-                self.log(f"####Skipping 'prefiltered' candidates", level="debug")
+                self.log(f"####Skipping {kind} candidates", level="debug")
                 continue
             
             dfk = self.dataframe[self.dataframe[kind]]
