@@ -44,11 +44,21 @@ matcha_params:
   ## Matchers ro be used to calculate the similarity between the candidates.
   matchers: [LM, BKM, SM, WM, LLM]
   # Cardinality of negatives in the training set
-  negcardinality: 10 # 9, 99
+  negcardinality: null # If null or not delclared, the cardinality will be calculated based on the positive set cardinality.
   # Filter to generate negatives in the training set
   negthreshold: 0.1 #0.4, 0.5, 0.6
   # Samplers to be used to generate negatives in the training set
-  samplers: 'all' # all, rand, diff
+  samplers: rand # all, rand, diff
+  # If True, a reference set will be generated for the training set if no reference set is provided.
+  generate_reference: True
+  # Minimim threshold to be used to filter the hard positives
+  min_threshold_hard_positives: 0.85
+  # Minimim threshold to be used to filter the soft positives
+  min_threshold_soft_positives: 0.65
+  # Number of hard positives to be used in generated the training set
+  hard_positives: 1
+  # Number of soft positives to be used in generated the training set
+  soft_positives: 0.5
   # If matcha scores should be calculated. Serves to speed up the process if not needed. Warning: If False, the scores will not be available and can break the pipeline.
   calculate_scores: True
 
@@ -78,7 +88,7 @@ dataset_params:
   ## Should should be list of params of size n (equal for all lists so that it can behabe like an array)
   ## If only one value is given, a single prompt will be used per source-target pair
   ## If n values are given, n prompts will be used per source-target pair and will be agregated following the agrgg param
-  example: [True] # True, False
+  example: [False] # True, False
   positive_examples: [1] #1, 3, 5
   negative_examples: [1] #1, 3, 5
   task_context: [True] #
@@ -128,6 +138,7 @@ training_params:
   ## Not used in for MLP models
   gradient_accumulation_steps: 1
   mixed_precision: True
+  warmup_percent: 0.1
   
 stopper:
   name: StableLossStopping

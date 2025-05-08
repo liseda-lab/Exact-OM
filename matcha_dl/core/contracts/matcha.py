@@ -174,6 +174,7 @@ class IMatcha(LoggingClass):
             # Calculate reference cardinality if not provided
             if self.reference is not None and self.reference.exists():
                 df = read_table(self.reference)
+                df.columns = ["Src", "Tgt", "Label"]
                 
                 # Get average number of target entities per unique source
                 self._negcardinality = int(df.groupby("Src")["Tgt"].nunique().mean())

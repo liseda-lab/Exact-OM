@@ -29,6 +29,16 @@ class AlignmentAction(Protocol):
         task_name: Optional[str] = None,
         device: Optional[int] = None,
     ) -> Optional[dict]:
+        
+        # TODO ensure support in all contracts for torch device format
+        # Process device into torch device format
+        # if device is not None:
+        #     if isinstance(device, int):
+        #         device = f"cuda:{device}" if device >= 0 else "cpu"
+        #     elif isinstance(device, str):
+        #         device = device.lower()
+        #     else:
+        #         raise ValueError(f"Invalid device type: {type(device)}. Expected int or str.")
 
         start_time = time.time()
 
@@ -127,8 +137,9 @@ class AlignmentAction(Protocol):
             **configs.dataset_params.model_dump(),
         )
 
+        dataset.load_ontologies(source_file_path, target_file_path)
+
         if not dataset.has_cache():
-            dataset.load_ontologies(source_file_path, target_file_path)
             dataset.load_candidates(matcha.candidates)
 
             if configs.matcha_params.calculate_scores:
@@ -255,7 +266,7 @@ class AlignmentAction(Protocol):
 
         return results
 
-# TODO global and local candidates are different
+# TODO rework complex actions
 class DirectoryAlignmentAction(Protocol):
     @staticmethod
     def run(

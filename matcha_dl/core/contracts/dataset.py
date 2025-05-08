@@ -276,6 +276,20 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
         avg_plot_path = self.output_path / "average_feature_distribution.png"
         plt.savefig(str(avg_plot_path.resolve()), dpi=dpi)
         plt.close()
+
+         # Compute and plot average distribution
+        max_feature_scores = feature_df.max(axis=1)
+        plt.figure(figsize=figsize)
+        sns.histplot(max_feature_scores, kde=kde, bins=bins, color=color, alpha=alpha)
+        plt.xlabel("Max Feature Score")
+        plt.ylabel("Density")
+        plt.title("Max Distribution of All Features")
+        plt.grid(grid)
+        
+        # Save average distribution plot
+        max_plot_path = self.output_path / "max_feature_distribution.png"
+        plt.savefig(str(max_plot_path.resolve()), dpi=dpi)
+        plt.close()
         
         self.log(f"Plots saved in: {self.output_path}", level="info")
         return self.output_path
