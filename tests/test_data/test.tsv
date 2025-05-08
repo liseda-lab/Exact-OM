@@ -1,0 +1,7 @@
+SrcEntity	TgtEntity	Score
+http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C27420	http://purl.obolibrary.org/obo/DOID_3747	1.0
+http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C35610	http://purl.obolibrary.org/obo/DOID_11713	1.0
+http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C7190	http://purl.obolibrary.org/obo/DOID_8533	1.0
+http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C125596	http://purl.obolibrary.org/obo/DOID_3343	1.0
+http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C34880	http://purl.obolibrary.org/obo/DOID_0080008	1.0
+http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C7581	http://purl.obolibrary.org/obo/DOID_5569	1.0tests/test_data/full.tsv

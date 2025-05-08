@@ -1,14 +1,13 @@
-import subprocess
+import pytest
 from pathlib import Path
-import os
-
-
+from matcha_dl.delivery.api.eval import EvalutionRunner
 
 DATA_DIR = Path.cwd() / "data"
 NCIT_DIR = DATA_DIR / "ncit-doid"
 EXP_DIR = Path.cwd() / "exp"
 
-def main():
+@pytest.fixture
+def eval_runner():
     source_ontology_file = NCIT_DIR / "ncit.owl"
     target_ontology_file = NCIT_DIR / "doid.owl"
     output_dir = EXP_DIR / "test"
@@ -20,9 +19,7 @@ def main():
     k = [1, 5, 10]
     error_on_fail = False
 
-    from matcha_dl.delivery.api.eval import EvalutionRunner
-
-    eval_runner = EvalutionRunner(
+    return EvalutionRunner(
         source_ontology_file=str(source_ontology_file),
         target_ontology_file=str(target_ontology_file),
         output_dir=str(output_dir),
@@ -34,7 +31,12 @@ def main():
         k=k,
         error_on_fail=error_on_fail
     )
-    eval_runner.run()
+
+def test_eval_runner_run(eval_runner):
+    try:
+        eval_runner.run()
+    except Exception as e:
+        pytest.fail(f"EvalutionRunner.run() raised an exception: {e}")
 
 if __name__ == "__main__":
-    main()
+    pytest.main(["-v", __file__])

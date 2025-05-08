@@ -1,0 +1,7 @@
+SrcEntity	TgtEntity	TgtCandidates
+http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C27420	http://purl.obolibrary.org/obo/DOID_3747	['http://purl.obolibrary.org/obo/DOID_3747', 'http://purl.obolibrary.org/obo/DOID_112']
+http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C35610	http://purl.obolibrary.org/obo/DOID_11713	['http://purl.obolibrary.org/obo/DOID_11713', 'http://purl.obolibrary.org/obo/DOID_0050850']
+http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C7190	http://purl.obolibrary.org/obo/DOID_8533	['http://purl.obolibrary.org/obo/DOID_8533', 'http://purl.obolibrary.org/obo/DOID_7639']
+http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C125596	http://purl.obolibrary.org/obo/DOID_3343	['http://purl.obolibrary.org/obo/DOID_3343', 'http://purl.obolibrary.org/obo/DOID_856']
+http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C34880	http://purl.obolibrary.org/obo/DOID_0080008	['http://purl.obolibrary.org/obo/DOID_0080008', 'http://purl.obolibrary.org/obo/DOID_0080018']
+http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C7581	http://purl.obolibrary.org/obo/DOID_5569	['http://purl.obolibrary.org/obo/DOID_5569', 'http://purl.obolibrary.org/obo/DOID_9261']
