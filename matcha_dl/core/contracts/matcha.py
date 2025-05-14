@@ -193,7 +193,7 @@ class IMatcha(LoggingClass):
     
     @property
     def samplers(self) -> int:
-        return self._samplers
+        return self._samplers.value
     
     @property
     def generate_reference(self) -> bool:
