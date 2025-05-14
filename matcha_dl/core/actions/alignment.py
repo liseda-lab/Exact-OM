@@ -9,7 +9,6 @@ import pandas as pd
 from matcha_dl.core.actions.evaluation import EvaluationAction
 from matcha_dl.core.entities.configs.config import ConfigModel, ConfigTuner
 from matcha_dl.core.entities.directories import OEAIDir
-from matcha_dl.core.values import N_CLASSES
 from matcha_dl.impl.matcha import Matcha
 from matcha_dl.impl.seed import SeedSetter
 from matcha_dl.utils.directories import OEAIDirSearcher
@@ -163,19 +162,6 @@ class AlignmentAction(Protocol):
 
 
         # Trainer module
-
-        # TODO Find another way to pass this model params
-
-        ## Parse model params
-
-        # if dataset.reference is not None:
-
-        #     model_params = configs.model.params
-        #     model_params["n"] = dataset.x().shape[1]
-        #     model_params["n_classes"] = N_CLASSES
-
-        # else:
-        #     model_params = configs.model.params
 
         ## Train Model
 

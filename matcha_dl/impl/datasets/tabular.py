@@ -32,7 +32,7 @@ class TabularDataset(IDataset):
     def __len__(self) -> int:
         if self.dataframe is None:
             return 0
-        return len(self.dataframe)
+        return len(self.dataframe[self.dataframe[self.default_kind]])
     
     def __getitem__(self, idx: int) -> Tuple[Tensor, Tensor]:
 
@@ -62,7 +62,7 @@ class TabularDataset(IDataset):
             self.log("Dataset is empty.", level="error")
             raise ValueError("Dataset is empty.")
 
-        return np.array(self.dataframe[self.dataframe[kind]]["Features"].values.tolist())
+        return self.dataframe[self.dataframe[kind]]["Features"].values
 
     def y(self, kind: Optional[str] = None) -> np.ndarray:
 
