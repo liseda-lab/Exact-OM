@@ -45,3 +45,14 @@ class BestPathMethod(str, Enum):
     dp = "dp"
     lagrangian = "lagrangian"
     greedy = "greedy"
+
+class PLotAgregationMethod(str, Enum):
+    mean = "mean"
+    max = "max"
+    min = "min"
+    sum = "sum"
+    median = "median"
+    mode = "mode"
+    std = "std"
+    var = "var"
+    count = "count"

@@ -63,8 +63,14 @@ matcha_params:
   calculate_scores: True
 
 ## Whether to plot the distribution of the similarities in the negative set.
-plot_negatives:
+plot_params:
   enabled: True
+  plot_negatives: True
+  plot_candidates: True
+  plot_reference: True
+  plot_prefiltered: True
+  plot_by_matcher: True
+  aggregate_funcs: [max, mean]
   figsize: [8, 5]
   kde: True
   bins: 20

@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 from matcha_dl import config, read_yaml
 from matcha_dl.core.entities.registry import ComponentType, ComponentRegistry
-from matcha_dl.core.entities.configs.dataset import Separator, ComparisonType, ContextType, ContextSemantics, Likelihood, AggregationStrategy, BatchLengthSortMode, ContextMethod, BestPathMethod
+from matcha_dl.core.entities.configs.dataset import Separator, ComparisonType, ContextType, ContextSemantics, Likelihood, AggregationStrategy, BatchLengthSortMode, ContextMethod, BestPathMethod, PLotAgregationMethod
 from matcha_dl.core.entities.configs.matcha import Sampler, Matchers
 
 from matcha_dl.core.contracts.stopper import IStopper
@@ -70,15 +70,21 @@ class MatchaParams(BaseModel):
     hard_positives: float = Field(config["matcha_params"]["hard_positives"])
     soft_positives: float = Field(config["matcha_params"]["soft_positives"])
 
-class PlotNegativesParams(BaseModel):
-    enabled: bool = Field(config["plot_negatives"]["enabled"])
-    figsize: Tuple[int, int] = Field(config["plot_negatives"]["figsize"])
-    kde: bool = Field(config["plot_negatives"]["kde"])
-    bins: int = Field(config["plot_negatives"]["bins"])
-    color: str = Field(config["plot_negatives"]["color"])
-    alpha: float = Field(config["plot_negatives"]["alpha"])
-    dpi: int = Field(config["plot_negatives"]["dpi"])
-    grid: bool = Field(config["plot_negatives"]["grid"])
+class PlotParams(BaseModel):
+    enabled: bool = Field(config["plot_params"]["enabled"])
+    plot_reference: bool = Field(config["plot_params"]["plot_reference"])
+    plot_negatives: bool = Field(config["plot_params"]["plot_negatives"])
+    plot_candidates: bool = Field(config["plot_params"]["plot_candidates"])
+    plot_prefiltered: bool = Field(config["plot_params"]["plot_prefiltered"])
+    figsize: Tuple[int, int] = Field(config["plot_params"]["figsize"], validate_default=True)
+    plot_by_matcher: bool = Field(config["plot_params"]["plot_by_matcher"])
+    aggregate_funcs: Optional[List[PLotAgregationMethod]] = Field(config["plot_params"]["aggregate_funcs"], validate_default=True)
+    kde: bool = Field(config["plot_params"]["kde"])
+    bins: int = Field(config["plot_params"]["bins"])
+    color: str = Field(config["plot_params"]["color"])
+    alpha: float = Field(config["plot_params"]["alpha"])
+    dpi: int = Field(config["plot_params"]["dpi"])
+    grid: bool = Field(config["plot_params"]["grid"])
 
 class DatasetParams(BaseModel):
     # General Params
@@ -198,7 +204,7 @@ class ConfigModel(BaseModel):
     use_last_checkpoint: bool = Field(config["use_last_checkpoint"])
     skip_training_if_checkpoint: bool = Field(config["skip_training_if_checkpoint"])
     matcha_params: MatchaParams = MatchaParams()
-    plot_negatives_params: PlotNegativesParams = PlotNegativesParams()
+    plot_params: PlotParams = PlotParams()
     dataset_params: DatasetParams = DatasetParams()
     alignment_params: AlignmentParams = AlignmentParams()
     training_params: TrainingParams = TrainingParams()
@@ -236,7 +242,7 @@ class ConfigModel(BaseModel):
         yaml_config = read_yaml(file_path)
 
         matcha_params = MatchaParams(**yaml_config.get("matcha_params", {}))
-        plot_negatives_params = PlotNegativesParams(**yaml_config.get("plot_negatives", {}))
+        plot_negatives_params = PlotParams(**yaml_config.get("plot_negatives", {}))
         dataset_params = DatasetParams(**yaml_config.get("dataset_params", {}))
         alignment_params = AlignmentParams(**yaml_config.get("alignment_params", {}))
         training_params = TrainingParams(**yaml_config.get("training_params", {}))
@@ -251,7 +257,7 @@ class ConfigModel(BaseModel):
             for k, v in yaml_config.items()
             if v is not None
             and k in cls.model_fields
-            and k not in ["matcha_params", "plot_negatives", "dataset_params", "alignment_params", "training_params", "dataset_params", "alignment_params", "stopper", "model", "loss", "optimizer"]
+            and k not in ["matcha_params", "plot_params", "dataset_params", "alignment_params", "training_params", "dataset_params", "alignment_params", "stopper", "model", "loss", "optimizer"]
         }
 
         return cls(

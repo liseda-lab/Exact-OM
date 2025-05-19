@@ -16,6 +16,8 @@ from typing import List, Tuple
 from matcha_dl.core.contracts.dataset import IDataset
 from matcha_dl.core.entities.dataset import DatasetMask
 
+from matcha_dl.core.entities.configs.dataset import PLotAgregationMethod
+
 
 class TabularDataset(IDataset):
 
@@ -253,7 +255,42 @@ class TabularDataset(IDataset):
 
         return self
 
-            
+    def plot_matcha_features(
+        self,
+        plot_prefiltered: bool = True,
+        aggregate_funcs: Optional[List[PLotAgregationMethod]] = None,
+        **kwargs
+    ) -> Path:
+        
+        plot_dir=self.output_path / "matcha_features_plots"
+        plot_dir.mkdir(parents=True, exist_ok=True)
+
+        base_path = super().plot_matcha_features(aggregate_funcs=aggregate_funcs, **kwargs)
+
+        if plot_prefiltered and self.pre_filtering:
+            self.log("Plotting Prefiltered Features...", level="debug")
+            df_pref = self.dataframe[self.dataframe[DatasetMask.prefiltered]]
+
+            if df_pref.empty:
+                self.log("#No Prefiltered Features to plot", level="debug")
+                return base_path
+
+            # build a small map of {name:function} just like the base wrapper does
+            methods = aggregate_funcs or [PLotAgregationMethod.mean, PLotAgregationMethod.max]
+            agg_map = {
+                m.value: (lambda df, m=m: getattr(df, m.value)(axis=1))
+                for m in methods
+            }
+
+            # delegate to the same distribution-plotter
+            return self.plot_matcha_distributions(
+                data_dict={"prefiltered": df_pref},
+                aggregate_funcs=agg_map,
+                plot_dir=plot_dir,
+                **kwargs
+            )
+
+        return base_path
             
 
 

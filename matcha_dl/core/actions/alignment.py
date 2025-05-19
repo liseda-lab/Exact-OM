@@ -148,10 +148,10 @@ class AlignmentAction(Protocol):
                 dataset.load_reference(matcha.reference)
                 dataset.load_negatives(matcha.negatives)
 
-                if configs.plot_negatives_params.enabled:
-                    dataset.plot_negative_distributions(**configs.plot_negatives_params.model_dump())
-
         dataset.process()
+
+        if configs.plot_params.enabled:
+                dataset.plot_matcha_features(**configs.plot_params.model_dump())
 
         if not dataset.has_cache():
             dataset.save()
