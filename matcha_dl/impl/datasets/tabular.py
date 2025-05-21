@@ -127,8 +127,25 @@ class TabularDataset(IDataset):
             raise ValueError("Candidates not loaded.")
 
         inference_set = self.candidates
-        pre_filtered_set = pd.DataFrame()
 
+        if self.full_reference is not None:
+            # Update Labels based on full_reference
+            self.log("#Updating Labels based on Full Reference...", level="debug")
+            inference_set = inference_set.merge(self.full_reference, on=["Src", "Tgt"], how="left", suffixes=("", "_y"))
+            inference_set["Label"] = inference_set["Label_y"].combine_first(inference_set["Label"])
+            inference_set.drop(columns=["Label_y"], inplace=True)
+
+            # Log how many unique Source entities don't at least one correct mapping in the Dataset
+            unique_src_entities = len(inference_set["Src"].unique())
+            unique_src_entities_with_mappings = len(inference_set[inference_set["Label"] == 1]["Src"].unique())
+            unique_src_without_mappings = unique_src_entities - unique_src_entities_with_mappings
+            percentage = (unique_src_without_mappings / unique_src_entities) * 100
+
+            if unique_src_without_mappings > 0:
+                self.log(f"#Found {unique_src_without_mappings}({percentage:.0%}) unique source entities without any possible mappings in candidates.", level="warning")
+
+
+        pre_filtered_set = pd.DataFrame()
         # pre-filter easy mappings
         if self.pre_filtering:
             self.log("#Pre-filtering Inference Set...", level="debug")
@@ -255,17 +272,16 @@ class TabularDataset(IDataset):
 
         return self
 
-    def plot_matcha_features(
-        self,
-        plot_prefiltered: bool = True,
-        aggregate_funcs: Optional[List[PLotAgregationMethod]] = None,
-        **kwargs
-    ) -> Path:
+    def plot_matcha_features(self) -> Path:
         
-        plot_dir=self.output_path / "matcha_features_plots"
-        plot_dir.mkdir(parents=True, exist_ok=True)
+        aggregate_funcs = self.plot_params.get("aggregate_funcs", None)
+        plot_prefiltered = self.plot_params.get("plot_prefiltered", False)
 
-        base_path = super().plot_matcha_features(aggregate_funcs=aggregate_funcs, **kwargs)
+        other_params = dict(self.plot_params)    # shallow copy
+        for k in ("aggregate_funcs","plot_prefiltered"):
+            other_params.pop(k, None)
+
+        base_path = super().plot_matcha_features()
 
         if plot_prefiltered and self.pre_filtering:
             self.log("Plotting Prefiltered Features...", level="debug")
@@ -286,8 +302,7 @@ class TabularDataset(IDataset):
             return self.plot_matcha_distributions(
                 data_dict={"prefiltered": df_pref},
                 aggregate_funcs=agg_map,
-                plot_dir=plot_dir,
-                **kwargs
+                **other_params
             )
 
         return base_path

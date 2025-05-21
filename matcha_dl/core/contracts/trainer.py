@@ -10,11 +10,15 @@ import pandas as pd
 import torch as th
 from torch import device as tdevice
 
+import seaborn as sns
+import matplotlib.pyplot as plt
+
 from matcha_dl.core.contracts import SelfRegisteringComponent, LoggingClass
 from matcha_dl.core.entities.registry import ComponentType
 from matcha_dl.core.entities.mappings import EntityMapping
 from matcha_dl.utils.mappings import fill_anchored_scores
 from matcha_dl.utils.data import read_table
+from matcha_dl.core.entities.dataset import DatasetMask
 
 if TYPE_CHECKING:
     from matcha_dl.core.contracts.dataset import IDataset
@@ -46,6 +50,7 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
         use_last_checkpoint: Optional[bool] = False,
         skip_training_if_checkpoint: Optional[bool] = False,
         logger: Optional[logging.Logger] = None,
+        plot_params: Optional[Dict[str, Any]] = {},
         **kwargs,
     ):
         
@@ -58,6 +63,7 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
         self._model = model(**model_params).to(self.device)
         self._optimizer = optimizer(self._model.parameters(), **optimizer_params)
         self._loss = loss(device=self.device, **loss_params)
+        self._plot_params = plot_params
         
         if stopping is not None:
             self._stopping = stopping(**stopping_params)
@@ -84,6 +90,7 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
         self.checkpoints_dir.mkdir(parents=True, exist_ok=True)
         self.logs_dir.mkdir(parents=True, exist_ok=True)
         self.alignment_dir.mkdir(parents=True, exist_ok=True)
+        self.plot_dir.mkdir(parents=True, exist_ok=True)
 
     @property
     def epoch(self) -> int:
@@ -120,10 +127,18 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
     @property
     def output_dir(self) -> Path:
         return self._output_dir
-
+    
     @property
     def checkpoints_dir(self) -> Path:
         return (self._output_dir / "training_checkpoints").resolve()
+    
+    @property
+    def plot_dir(self) -> Path:
+        return (self._output_dir / "plots").resolve()
+    
+    @property
+    def plot_params(self) -> Dict[str, Any]:
+        return self._plot_params
     
     @property
     def has_checkpoints(self) -> bool:
@@ -157,7 +172,7 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
         pass
 
     @abstractmethod
-    def predict(self, kind: str = "inference", 
+    def predict(self, kind: DatasetMask = DatasetMask.inference, 
                 threshold: Optional[float] = 0.7,
                 **kwargs
     ) -> Tuple[List[EntityMapping], float]:
@@ -264,3 +279,85 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
             res = 0
 
         return res
+    
+    def plot_score_distribution(
+        self,
+        df: pd.DataFrame,
+        kind: DatasetMask,
+        figsize: Tuple[int, int] = (8, 6),
+        kde: bool = False,
+        bins: int = 30,
+        all_alpha: float = 0.4,
+        dpi: int = 300,
+        grid: bool = True,
+        log_scale: bool = False,
+        x_clip: Optional[float] = None,
+        **kwargs
+    ) -> None:
+        """
+        Overlaid histogram/KDE of scores. If both labels {0,1} present, plots
+        green=Positive, red=Negative. If only one label, plots a single
+        blue “Distribution”.
+        """
+        labels = sorted(df["Label"].unique(), reverse=True)
+        if len(labels) > 2:
+            self.log(f"Expected ≤2 labels, found {labels}. Skipping plot.", level="warning")
+            return
+
+        fig, ax = plt.subplots(figsize=figsize)
+        # decide how to name & color each series
+        for lbl in labels:
+            if len(labels) == 1:
+                label_name = "Distribution"
+                label_color = "blue"
+                subset = df["Scores"]
+            else:
+                # exactly two labels case
+                if lbl == 1:
+                    label_name = "Positive"
+                    label_color = "green"
+                else:
+                    label_name = "Negative"
+                    label_color = "red"
+                subset = df[df["Label"] == lbl]["Scores"]
+
+            if subset.empty:
+                self.log(f"Empty subset for label {lbl}: skipping.", level="warning")
+                continue
+
+            sns.histplot(
+                subset,
+                bins=bins,
+                kde=kde,
+                stat="probability",
+                alpha=all_alpha,
+                color=label_color,
+                label=label_name,
+                ax=ax,
+                common_norm=False
+            )
+
+        # axis transforms
+        if log_scale:
+            ax.set_xscale("log")
+        if x_clip is not None:
+            cutoff = float(df["Scores"].quantile(x_clip))
+            ax.set_xlim(0, cutoff)
+
+        # labels & title
+        ax.set_xlabel("Model score")
+        ax.set_ylabel("Probability")
+        ax.set_title(f"{kind.name.capitalize()} Score Distribution")
+
+        if grid:
+            ax.grid(True)
+        ax.legend()
+        plt.tight_layout()
+
+        # save
+        suffix = "_single" if len(labels) == 1 else ""
+        out_file = self.plot_dir / f"{kind.name.lower()}_score_dist{suffix}.png"
+        fig.savefig(out_file, dpi=dpi)
+        plt.close(fig)
+
+        self.log(f"Saved score distribution plot to {out_file}", level="debug")

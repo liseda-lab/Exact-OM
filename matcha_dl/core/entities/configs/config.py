@@ -76,15 +76,20 @@ class PlotParams(BaseModel):
     plot_negatives: bool = Field(config["plot_params"]["plot_negatives"])
     plot_candidates: bool = Field(config["plot_params"]["plot_candidates"])
     plot_prefiltered: bool = Field(config["plot_params"]["plot_prefiltered"])
+    plot_predictions: bool = Field(config["plot_params"]["plot_predictions"])
     figsize: Tuple[int, int] = Field(config["plot_params"]["figsize"], validate_default=True)
     plot_by_matcher: bool = Field(config["plot_params"]["plot_by_matcher"])
+    plot_all_matchers: bool = Field(config["plot_params"]["plot_all_matchers"])
     aggregate_funcs: Optional[List[PLotAgregationMethod]] = Field(config["plot_params"]["aggregate_funcs"], validate_default=True)
     kde: bool = Field(config["plot_params"]["kde"])
     bins: int = Field(config["plot_params"]["bins"])
     color: str = Field(config["plot_params"]["color"])
     alpha: float = Field(config["plot_params"]["alpha"])
+    log_scale: bool = Field(config["plot_params"]["log_scale"])
+    x_clip: Optional[float] = Field(config["plot_params"]["x_clip"])
     dpi: int = Field(config["plot_params"]["dpi"])
     grid: bool = Field(config["plot_params"]["grid"])
+    all_alpha: Optional[float] = Field(config["plot_params"]["all_alpha"])
 
 class DatasetParams(BaseModel):
     # General Params
@@ -92,6 +97,7 @@ class DatasetParams(BaseModel):
     num_workers: Optional[int] = Field(config["dataset_params"]["num_workers"])
     pre_filtering: Optional[bool] = Field(config["dataset_params"]["pre_filtering"])
     pre_filtering_threshold: Optional[float] = Field(config["dataset_params"]["pre_filtering_threshold"])
+    sanity_check: Optional[bool] = Field(config["dataset_params"]["sanity_check"])
 
     # Prompt Params
     example: Optional[List[bool]] = Field(config["dataset_params"]["example"])
@@ -132,6 +138,7 @@ class DatasetParams(BaseModel):
     batch_length_sort_mode: Optional[BatchLengthSortMode] = Field(config["dataset_params"]["batch_length_sort_mode"], validate_default=True)
     smallest_batch_first: Optional[bool] = Field(config["dataset_params"]["smallest_batch_first"])
     only_taxonomy: Optional[bool] = Field(config["dataset_params"]["only_taxonomy"])
+    sanity_check_n_samples: Optional[int] = Field(config["dataset_params"]["sanity_check_n_samples"])
 
 
     @field_validator('validation_set', mode="after")
@@ -242,7 +249,7 @@ class ConfigModel(BaseModel):
         yaml_config = read_yaml(file_path)
 
         matcha_params = MatchaParams(**yaml_config.get("matcha_params", {}))
-        plot_negatives_params = PlotParams(**yaml_config.get("plot_negatives", {}))
+        plot_params = PlotParams(**yaml_config.get("plot_params", {}))
         dataset_params = DatasetParams(**yaml_config.get("dataset_params", {}))
         alignment_params = AlignmentParams(**yaml_config.get("alignment_params", {}))
         training_params = TrainingParams(**yaml_config.get("training_params", {}))
@@ -262,7 +269,7 @@ class ConfigModel(BaseModel):
 
         return cls(
             matcha_params=matcha_params,
-            plot_negatives_params=plot_negatives_params,
+            plot_params=plot_params,
             dataset_params=dataset_params,
             alignment_params=alignment_params,
             training_params=training_params,

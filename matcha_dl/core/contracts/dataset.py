@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Callable
+from typing import Dict, List, Optional, Tuple, Callable, Any
 
 import numpy as np
 import pandas as pd
@@ -39,15 +39,21 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
                  pre_filtering_threshold: Optional[float] = 0.85,
                  example: Optional[List[bool]] = None,
                  num_workers: Optional[int] = None,
+                 sanity_check: Optional[bool] = True,
+                 plot_params: Dict[str, Any] = {},
                  **kwargs
         ) -> None:
 
 
         self._output_path = output_path / "dataset"
         self._output_path.mkdir(parents=True, exist_ok=True)
+        self.plot_dir= self.output_path / "plots"
+        self.plot_dir.mkdir(parents=True, exist_ok=True)
+
         self._matchers = matchers
         self._validation_set = validation_set
         self._num_workers = num_workers
+        self._plot_params = plot_params
 
         self._source = None
         self._target = None
@@ -55,11 +61,14 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
         self._target_reasoner = None
         self._candidates = None
         self._reference = None
+        self._full_reference = None
         self._negatives = None
         self._matcha_features = None
 
         self._pre_filtering = pre_filtering
         self._pre_filtering_threshold = pre_filtering_threshold
+
+        self._sanity_check = sanity_check
 
         self._default_kind = DatasetMask.train
 
@@ -140,6 +149,10 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
         return self._reference
     
     @property
+    def full_reference(self) -> DataFrame:
+        return self._full_reference
+    
+    @property
     def negatives(self) -> DataFrame:
         return self._negatives
     
@@ -155,6 +168,14 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
     def num_workers(self) -> Optional[int]:
         return self._num_workers
     
+    @property
+    def sanity_check(self) -> bool:
+        return self._sanity_check
+    
+    @property
+    def plot_params(self) -> Dict[str, Any]:
+        return self._plot_params
+
     def load_ontologies(self, source_path: Path, target_path: Path) -> None:
         
         self._source = OWLDataset(str(source_path))
@@ -175,6 +196,12 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
         self._candidates.columns = ["Src", "Tgt", "Label"]
 
         self.log("#Loaded Candidates...", level="debug")
+
+    def load_full_reference(self, file_path: Path) -> None:
+
+        self._full_reference = read_table(file_path)
+        self._full_reference.columns = ["Src", "Tgt", "Label"]
+        self.log("#Loaded Full Reference...", level="debug")
               
     def load_reference(self, file_path: Path) -> None:
         
@@ -223,29 +250,30 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
 
         self.log("#Loaded Matcha Features...", level="debug")
 
-    def plot_matcha_features(
-        self,
-        plot_reference: bool = True,
-        plot_negatives: bool = True,
-        plot_candidates: bool = True,
-        aggregate_funcs: Optional[List[PLotAgregationMethod]] = None,
-        **kwargs
-    ) -> Path:
+    def plot_matcha_features(self) -> Path:
         """
         Wrapper to select which datasets to plot (reference, negatives, candidates)
         and which aggregation methods to apply.
         """
+        plot_reference = self.plot_params.get("plot_reference", True)
+        plot_negatives = self.plot_params.get("plot_negatives", True)
+        plot_candidates = self.plot_params.get("plot_candidates", True)
+        aggregate_funcs = self.plot_params.get("aggregate_funcs", None)
 
-        plot_dir=self.output_path / "matcha_features_plots"
-        plot_dir.mkdir(parents=True, exist_ok=True)
+        other_params = dict(self.plot_params)    # shallow copy
+        for k in ("plot_reference","plot_negatives","plot_candidates","aggregate_funcs"):
+            other_params.pop(k, None)
 
         data_dict: Dict[str, pd.DataFrame] = {}
         if plot_reference and getattr(self, 'reference', None) is not None:
             data_dict['reference'] = self.reference
+
         if plot_negatives and getattr(self, 'negatives', None) is not None:
             data_dict['negatives'] = self.negatives
+
         if plot_candidates and getattr(self, 'candidates', None) is not None:
             data_dict['candidates'] = self.candidates
+
         # build aggregate function map
         if aggregate_funcs is None:
             agg_list = [PLotAgregationMethod.mean, PLotAgregationMethod.max]
@@ -268,8 +296,7 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
         return self.plot_matcha_distributions(
             data_dict=data_dict,
             aggregate_funcs=agg_map,
-            plot_dir=plot_dir,
-            **kwargs
+            **other_params
         )
     
     def plot_matcha_distributions(
@@ -278,13 +305,13 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
         figsize: Tuple[int, int] = (8, 5),
         kde: bool = True,
         bins: int = 20,
-        color: str = "blue",
         alpha: float = 0.6,
         dpi: int = 300,
         grid: bool = True,
         aggregate_funcs: Dict[str, Callable[[pd.DataFrame], pd.Series]] = None,
         plot_by_matcher: bool = False,
-        plot_dir: Optional[Path] = None,
+        plot_all_matchers: bool = False,
+        all_alpha: Optional[float] = None,
         **kwargs
     ) -> Path:
         """
@@ -312,6 +339,12 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
         aggregate_funcs: dict of {label: function}
             Optional mapping from aggregate label (e.g. 'mean', 'max') to a function
             that takes feature_df and returns a pd.Series of aggregate scores.
+        plot_by_matcher: bool
+            Whether to plot each matcher separately.
+        plot_all_matchers: bool
+            Whether to plot all matchers in a single plot.
+        all_alpha: float
+            Transparency level for the combined plot of all matchers.
         **kwargs:
             Additional keyword arguments passed to seaborn.histplot.
 
@@ -319,79 +352,180 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
         --------
         Path to the directory where plots are saved.
         """
-        # Default to negatives if no data_dict provided
-        if data_dict is None:
-            data_dict = {'negatives': self.negatives,
-                         'candidates': self.candidates,
-                         'reference': self.reference}
 
-        # Default aggregates: mean and max
+        plot_dir = self.plot_dir / "matcha_features_plots"
+        plot_dir.mkdir(parents=True, exist_ok=True)
+
+        # Defaults
+        if data_dict is None:
+            data_dict = {
+                'negatives': self.negatives,
+                'candidates': self.candidates,
+                'reference': self.reference
+            }
         if aggregate_funcs is None:
             aggregate_funcs = {
-                'average': lambda df: df.mean(axis=1),
-                'max': lambda df: df.max(axis=1),
+                'mean':   lambda df: df.mean(axis=1),
+                'max':    lambda df: df.max(axis=1),
             }
 
         for label, df in data_dict.items():
             if df is None:
-                self.log(f"No data provided for '{label}'. Skipping.", level="warning")
+                self.log(f"No data for '{label}', skipping.", level="warning")
                 continue
 
-            self.log(f"Plotting {label}...", level="debug")
+            self.log(f"Plotting {label}…", level="debug")
 
-            # Only compute features if not already present
-            if 'Features' not in df.columns:
-                df = self._get_matcha_features(df.copy())
-            else:
-                df = df.copy()
+            # Copy df to avoid modifying original
+            df = df.copy()
+
+            df = df.drop(columns=["Features", "__feat_len"], errors="ignore")
+
+            df = self._get_matcha_features(df)
 
             feature_df = pd.DataFrame(df['Features'].tolist(), columns=self.matchers)
 
+            # -- Combined view of all matchers?
+            if plot_all_matchers:
+                alpha_all = all_alpha if all_alpha is not None else alpha * 0.4
+                data_map = {m: feature_df[m] for m in self.matchers}
+                self._plot_distributions_core(
+                    data_map=data_map,
+                    plot_dir=plot_dir,
+                    prefix=f"{label}_all_matchers",
+                    xlabel="Similarity Score",
+                    title=f"{label.capitalize()} – All Matchers",
+                    single_plot=True,
+                    figsize=figsize,
+                    kde=kde,
+                    bins=bins,
+                    alpha=alpha_all,
+                    grid=grid,
+                    dpi=dpi
+                )
+                # skip individual/aggregate if only combined desired
+                continue
+
+            # -- Individual matcher plots --
             if plot_by_matcher:
-
-                # Plot each feature
-                for feature in self.matchers:
-                    plt.figure(figsize=figsize)
-                    sns.histplot(
-                        feature_df[feature],
+                for matcher in self.matchers:
+                    self._plot_distributions_core(
+                        data_map={matcher: feature_df[matcher]},
+                        plot_dir=plot_dir,
+                        prefix=f"{label}",
+                        xlabel="Similarity Score",
+                        title=f"{label.capitalize()}",
+                        single_plot=False,
+                        figsize=figsize,
                         kde=kde,
                         bins=bins,
-                        color=color,
                         alpha=alpha,
+                        grid=grid,
+                        dpi=dpi
                     )
-                    plt.xlabel("Similarity Score")
-                    plt.ylabel("Density")
-                    plt.title(f"{label.capitalize()} - Distribution for {feature}")
-                    plt.grid(grid)
 
-                    out_path = plot_dir / f"{label}_{feature}_distribution.png"
-                    plt.savefig(out_path.resolve(), dpi=dpi)
-                    plt.close()
+            # -- Aggregate function plots --
+            for agg_label, func in aggregate_funcs.items():
+                series = func(feature_df)
+                self._plot_distributions_core(
+                    data_map={agg_label: series},
+                    plot_dir=plot_dir,
+                    prefix=f"{label}_{agg_label}",
+                    xlabel=f"{agg_label.capitalize()} Feature Score",
+                    title=f"{label.capitalize()} – {agg_label.capitalize()}",
+                    single_plot=False,
+                    figsize=figsize,
+                    kde=kde,
+                    bins=bins,
+                    alpha=alpha,
+                    grid=grid,
+                    dpi=dpi
+                )
 
-            if aggregate_funcs:
+        # Print original candidates to see 
 
-                # Plot aggregates
-                for agg_label, func in aggregate_funcs.items():
-                    series = func(feature_df)
-                    plt.figure(figsize=figsize)
-                    sns.histplot(
-                        series,
-                        kde=kde,
-                        bins=bins,
-                        color=color,
-                        alpha=alpha,
-                    )
-                    plt.xlabel(f"{agg_label.capitalize()} Feature Score")
-                    plt.ylabel("Density")
-                    plt.title(f"{label.capitalize()} - {agg_label.capitalize()} Feature Distribution")
-                    plt.grid(grid)
-
-                    out_path = plot_dir / f"{label}_{agg_label}_feature_distribution.png"
-                    plt.savefig(out_path.resolve(), dpi=dpi)
-                    plt.close()
-
-        self.log(f"Plots saved in: {plot_dir}", level="info")
+        self.log(f"All plots saved in: {plot_dir}", level="debug")
         return plot_dir
+    
+    def _plot_distributions_core(
+        self,
+        data_map: Dict[str, pd.Series],
+        plot_dir: Path,
+        prefix: str,
+        xlabel: str,
+        title: str,
+        single_plot: bool = False,
+        figsize: Tuple[int, int] = (8, 5),
+        kde: bool = True,
+        bins: int = 20,
+        alpha: float = 0.6,
+        grid: bool = True,
+        log_scale: bool = False,
+        x_clip: Optional[float] = None, 
+        dpi: int = 300,
+        **kwargs
+    ) -> None:
+        """
+        Core Seaborn-based plotting helper.
+        - single_plot=True: overlays all series in one figure.
+        - single_plot=False: one figure per series.
+        """
+
+        if single_plot:
+            plt.figure(figsize=figsize)
+            for label, series in data_map.items():
+                sns.histplot(
+                    series,
+                    kde=kde,
+                    bins=bins,
+                    alpha=alpha,
+                    label=label,
+                    stat="probability",
+                    common_norm=False,
+                )
+            if log_scale:
+                plt.xscale('log')
+            if x_clip is not None:
+                high = pd.concat(list(data_map.values())).quantile(x_clip)
+                plt.xlim(0, high)
+            plt.xlabel(xlabel)
+            plt.ylabel("Probability")
+            plt.title(title)
+            plt.legend()
+            if grid:
+                plt.grid(True)
+            plt.tight_layout()
+            out = plot_dir / f"{prefix}_combined_distribution.png"
+            plt.savefig(out, dpi=dpi)
+            plt.close()
+            self.log(f"Saved combined plot: {out}", level="debug")
+        else:
+            for label, series in data_map.items():
+                plt.figure(figsize=figsize)
+                sns.histplot(
+                    series,
+                    kde=kde,
+                    bins=bins,
+                    alpha=alpha,
+                    label=label,
+                    stat="probability",
+                    common_norm=False,
+                )
+                if log_scale:
+                    plt.xscale('log')
+                if x_clip is not None:
+                    high = pd.concat(list(data_map.values())).quantile(x_clip)
+                    plt.xlim(0, high)
+                plt.xlabel(xlabel)
+                plt.ylabel("Probability")
+                plt.title(f"{title} – {label}")
+                if grid:
+                    plt.grid(True)
+                plt.tight_layout()
+                out = plot_dir / f"{prefix}_{label}_distribution.png"
+                plt.savefig(out, dpi=dpi)
+                plt.close()
+                self.log(f"Saved plot for {label}: {out}", level="info")
 
     def _get_matcha_features(self, dataset: pd.DataFrame) -> pd.DataFrame:
 

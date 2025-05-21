@@ -4,10 +4,12 @@ from torch import Tensor
 from torch import device as tdevice
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from enum import Enum
+import random
 import json
 
 import pandas as pd
 DataFrame = pd.DataFrame
+Series = pd.Series
 import numpy as np
 
 from pathlib import Path
@@ -57,6 +59,7 @@ class ContextTabularDataset(TabularDataset):
                  temperature: Optional[float] = None,
                  top_p: Optional[float] = None,
                  top_k: Optional[int] = None,
+                 sanity_check_n_samples: int = 5,
                 **kwargs):
 
         """
@@ -100,6 +103,7 @@ class ContextTabularDataset(TabularDataset):
         self.top_p: Optional[float] = top_p
         self.top_k: Optional[int] = top_k
         self.only_taxonomy: bool = only_taxonomy
+        self.sanity_check_n_samples: int = sanity_check_n_samples
 
         # Greedy search parameters
         self.context_method: ContextMethod = context_method
@@ -395,26 +399,37 @@ class ContextTabularDataset(TabularDataset):
         self.log("##Generating Entity definitions...", level="debug")
         self.log("###Loading source and target entities uniquely...", level="debug")
 
-        # Extract IRIs and cache Entity instances
+        # Extract IRIs and cache Entity instances / build entity maps (unique)
         src_iris = dataset["Src"].tolist()
         tgt_iris = dataset["Tgt"].tolist()
-        unique_src = set(src_iris)
-        unique_tgt = set(tgt_iris)
-        src_map = {iri: Entity(class_iri=iri,
-                              ontology=self.source.ontology,
-                              reasoner=self.source_reasoner,
-                              ontology_graph=self.source_graph)
-                   for iri in unique_src}
-        tgt_map = {iri: Entity(class_iri=iri,
-                              ontology=self.target.ontology,
-                              reasoner=self.target_reasoner,
-                              ontology_graph=self.target_graph)
-                   for iri in unique_tgt}
-        source_entities = [src_map[iri] for iri in src_iris]
-        target_entities = [tgt_map[iri] for iri in tgt_iris]
+
+        unique_src_iris = list(dict.fromkeys(src_iris))
+        unique_tgt_iris = list(dict.fromkeys(tgt_iris))
+
+        src_map = {
+            iri: Entity(
+                class_iri=iri,
+                ontology=self.source.ontology,
+                reasoner=self.source_reasoner,
+                ontology_graph=self.source_graph
+            )
+            for iri in unique_src_iris
+        }
+        tgt_map = {
+            iri: Entity(
+                class_iri=iri,
+                ontology=self.target.ontology,
+                reasoner=self.target_reasoner,
+                ontology_graph=self.target_graph
+            )
+            for iri in unique_tgt_iris
+        }
+
+        unique_src_entities = list(src_map.values())
+        unique_tgt_entities = list(tgt_map.values())
 
         # Generate context subgraphs
-        self.log("###Generating context subgraphs for each entity...", level="debug")
+        self.log("###Generating context subgraphs for each unique entity...", level="debug")
 
         if self.context_method is ContextMethod.greedy:
             self.log("####Using 'greedy' context extraction method.", level="debug")
@@ -432,34 +447,160 @@ class ContextTabularDataset(TabularDataset):
         else:
             self.log("####Using 'BFS' context extraction method.", level="debug")
 
-        src_subs = [ent.get_context_subgraph(
-            self.n_hops, human_readable=True, method=self.context_method, 
-            best_path_method=self.best_path_src_method, budget=self.context_budget, 
-            hop_penalty=self.context_hop_penalty) for ent in source_entities]
+        src_subs_unique = [
+            ent.get_context_subgraph(
+                self.n_hops,
+                human_readable=True,
+                method=self.context_method,
+                best_path_method=self.best_path_src_method,
+                budget=self.context_budget,
+                hop_penalty=self.context_hop_penalty
+            )
+            for ent in unique_src_entities
+        ]
+        tgt_subs_unique = [
+            ent.get_context_subgraph(
+                self.n_hops,
+                human_readable=True,
+                method=self.context_method,
+                best_path_method=self.best_path_src_method,
+                budget=self.context_budget,
+                hop_penalty=self.context_hop_penalty
+            )
+            for ent in unique_tgt_entities
+        ]
 
-        tgt_subs = [ent.get_context_subgraph(
-            self.n_hops, human_readable=True, method=self.context_method, 
-            best_path_method=self.best_path_src_method, budget=self.context_budget, 
-            hop_penalty=self.context_hop_penalty) for ent in target_entities]
+        # Verify that the subgraphs are not empty
+        empty_src_iris = [iri for iri, sub in zip(unique_src_iris, src_subs_unique) if not sub]
+        if empty_src_iris:
+            self.log(f"####Empty source subgraphs for {len(empty_src_iris)} entities ({len(tgt_subs_unique)/len(empty_tgt_iris)*100:.0%})", level="warning")
+            if len(empty_src_iris) > self.sanity_check_n_samples:
+                empty_src_iris = empty_src_iris[:self.sanity_check_n_samples] + ["..."]
+            self.log(f"####Empty source subgraphs for IRIs: {empty_src_iris}", level="debug")
 
-        self.log(f"###Generated context subgraphs for {len(src_subs)} source and {len(tgt_subs)} target entities.", level="debug")
+        empty_tgt_iris = [iri for iri, sub in zip(unique_tgt_iris, tgt_subs_unique) if not sub]
+        if empty_tgt_iris:
+            self.log(f"####Empty target subgraphs for {len(empty_tgt_iris)} entities ({len(tgt_subs_unique)/len(empty_tgt_iris)*100:.0%}%)", level="warning")
+            if len(empty_tgt_iris) > self.sanity_check_n_samples:
+                empty_tgt_iris = empty_tgt_iris[:self.sanity_check_n_samples] + ["..."]
+            self.log(f"####Empty target subgraphs for IRIs: {empty_tgt_iris}", level="debug")
+
+        self.log(f"###Generated context subgraphs for {len(src_subs_unique)} unique source and {len(tgt_subs_unique)} target entities.", level="debug")
 
         # Aggregate via join or summarisation
+
+        combined_subs  = src_subs_unique + tgt_subs_unique
+        combined_entities = unique_src_entities + unique_tgt_entities
+
         if self.aggregation_strategy is AggregationStrategy.JOIN:
-            self.log("###Verbalising and joining subgraphs...", level="debug")
-            features = self._subgraphs_join([src_subs, tgt_subs])
+            self.log("### Verbalising & joining unique subgraphs…", level="debug")
+            all_feats = self._verbalise_subgraphs(combined_subs)
         else:
-            self.log("###Verbalising and summarising subgraphs...", level="debug")
-            features = self._subgraphs_summarise(
-                [src_subs, tgt_subs],
-                [source_entities, target_entities]
-            )
+            self.log("### Verbalising & summarising unique subgraphs…", level="debug")
+            all_feats = self._summarise_subgraphs(combined_subs, combined_entities)
+
+        # Split back into source and target
+        src_feats_unique = all_feats[:len(src_subs_unique)]
+        tgt_feats_unique = all_feats[len(src_subs_unique):]
+
+        # Verify that the verbalisation exists for all unique entities
+        src_feats_map = dict(zip(unique_src_iris, src_feats_unique))
+        missing = set(unique_src_iris) - set(src_feats_map)
+        if missing:
+            self.log(f"####Missing source verbalisations for {len(missing)} entities", level="warning")
+            if len(missing) > self.sanity_check_n_samples:
+                missing = list(missing)[:self.sanity_check_n_samples] + ["..."]
+            self.log(f"####Missing source verbalisations for IRIs: {missing}", level="debug")
+            for iri in missing:
+                src_feats_map[iri] = ""
+
+        tgt_feats_map = dict(zip(unique_tgt_iris, tgt_feats_unique))
+        missing = set(unique_tgt_iris) - set(tgt_feats_map)
+        if missing:
+            self.log(f"####Missing target verbalisations for {len(missing)} entities", level="warning")
+            if len(missing) > self.sanity_check_n_samples:
+                missing = list(missing)[:self.sanity_check_n_samples] + ["..."]
+            self.log(f"####Missing target verbalisations for IRIs: {missing}", level="debug")
+            for iri in missing:
+                tgt_feats_map[iri] = ""
+
+        # map back to full-length lists aligned with DataFrame rows
+        # build direct IRI→feature maps for source and target
+        src_feats_map = dict(zip(unique_src_iris, src_feats_unique))
+        tgt_feats_map = dict(zip(unique_tgt_iris, tgt_feats_unique))
+
+        # then just lookup each row’s iris—this can’t go out of bounds
+        src_feats = [src_feats_map[iri] for iri in src_iris]
+        tgt_feats = [tgt_feats_map[iri] for iri in tgt_iris]
 
         # Attach features back to DataFrame
-        src_feats, tgt_feats = features
+        dataset["Features"] = list(zip(src_feats, tgt_feats))
         dataset["Features"] = [[s, t] for s, t in zip(src_feats, tgt_feats)]
 
         self.log("###Features verbalised and attached to DataFrame.", level="debug")
+
+        # ─── SANITY CHECKS ───
+        if self.sanity_check:
+            k = min(self.sanity_check_n_samples, len(src_subs_unique))
+            self.log("### Sanity check (SOURCE): raw vs verbalised", level="debug")
+
+            # sample k unique triples
+            src_samples = random.sample(
+                list(zip(unique_src_entities, src_subs_unique, src_feats_unique)), k
+            )
+            for ent, raw, verb in src_samples:
+                self.log(f"[SRC] {ent.class_iri}", level="debug")
+                # log *all* triples
+                self.log(f"  raw triples: {raw!r}", level="debug")
+                self.log(f"  verbalisation: {verb!r}", level="debug")
+
+            k = min(5, len(tgt_subs_unique))
+            self.log("### Sanity check (TARGET): raw vs verbalised", level="debug")
+            tgt_samples = random.sample(
+                list(zip(unique_tgt_entities, tgt_subs_unique, tgt_feats_unique)), k
+            )
+            for ent, raw, verb in tgt_samples:
+                self.log(f"[TGT] {ent.class_iri}", level="debug")
+                self.log(f"  raw triples: {raw!r}", level="debug")
+                self.log(f"  verbalisation: {verb!r}", level="debug")
+
+            # build pandas.Series maps
+            counts_map = {
+                "source": Series(len(s) for s in src_subs_unique),
+                "target": Series(len(s) for s in tgt_subs_unique),
+            }
+            verblen_map = {
+                "source": Series(len(v) for v in src_feats_unique),
+                "target": Series(len(v) for v in tgt_feats_unique),
+            }
+
+            plot_dir = self.plot_dir / "sanity_check"
+            plot_dir.mkdir(parents=True, exist_ok=True)
+
+            alpha = self.plot_params.get("all_alpha", self.plot_params.get("alpha", 0.6)*0.4)
+            other_params = self.plot_params.copy()
+            other_params.pop("alpha", None)
+
+            self._plot_distributions_core(
+                data_map=counts_map,
+                plot_dir=plot_dir,
+                prefix="sanity_triples_dist",
+                xlabel="Triples per context subgraph",
+                title="Distribution of Triple Counts",
+                single_plot=True,
+                alpha=alpha,
+                **other_params
+            )
+            self._plot_distributions_core(
+                data_map=verblen_map,
+                plot_dir=plot_dir,
+                prefix="sanity_verblen_dist",
+                xlabel="Verbalisation length (chars)",
+                title="Distribution of Verbalisation Lengths",
+                single_plot=True,
+                alpha=alpha,
+                **other_params
+            )
 
         # --- sort by word-count length, using either sum or max of src/tgt ---
         # compute a length key for each example:
@@ -496,61 +637,44 @@ class ContextTabularDataset(TabularDataset):
             self._join_cache[key] = self.delimiter.join(texts)
         return self._join_cache[key]
     
-    def _subgraphs_join(self, context_graph_list: List[List[List[Tuple[str]]]]) -> List[List[str]]:
+    def _verbalise_subgraphs(self, subgraphs: List[List[Tuple[str, str, str]]]) -> List[str]:
         """Aggregate each subgraph by verbalising via _verbalize_triples and joining."""
-        self.log("####Joining subgraphs with delimiter...", level="debug")
-        sides, num = 2, len(context_graph_list[0])
-        aggregated = [[], []]
-        for side in range(sides):
-            for idx in range(num):
-                triples = context_graph_list[side][idx]
-                text = self._verbalize_triples(triples)
-                aggregated[side].append(text)
+        self.log(f"####Joining subgraphs with delimiter '{self.delimiter}'.", level="debug")
+        agregated = [self._verbalize_triples(triples) for triples in subgraphs]
         self.log("####Subgraph join complete.", level="debug")
-        return aggregated
+        return agregated
 
-    def _subgraphs_summarise(
+    def _summarise_subgraphs(
         self,
-        context_graph_list: List[List[List[Tuple[str]]]],
-        ordered_entity_tuple: List[List[Entity]]
+        subgraphs: List[List[Tuple[str, str, str]]],
+        entities:  List[Entity]
     ) -> List[List[str]]:
         # Log summarisation start
         self.log("####Summarising subgraphs with language model...", level="debug")
-        sides = len(context_graph_list)
-        num_entities = len(context_graph_list[0])
-
-        # Build prompts using cached verbalisation
-        prompts: List[str] = []
-        positions: List[Tuple[int, int]] = []
-        for side in range(sides):
-            for idx in range(num_entities):
-                ent = ordered_entity_tuple[side][idx]
-                triples = context_graph_list[side][idx]
-                context_str = self._verbalize_triples(triples)
-                prompt = StaticPrompts.get_summarization(ent.labels[0], context_str)
-                prompts.append(prompt)
-                positions.append((side, idx))
+        prompts = []
+        for ent, triples in zip(entities, subgraphs):
+            context_str = self._verbalize_triples(triples)
+            prompts.append( StaticPrompts.get_summarization(ent.labels[0], context_str) )
 
         self.log(f"####Generated {len(prompts)} summarisation prompts.", level="debug")
         self.log("####Generating summaries in batches...", level="debug")
 
         # Deduplicate prompts and call LLM only on new ones
         unique_prompts = list(dict.fromkeys(prompts))
-        to_generate = [p for p in unique_prompts if p not in self._summary_cache]
-        if to_generate:
-            new_summaries = self._batch_summarise(to_generate)
-            for p, s in zip(to_generate, new_summaries):
+        to_gen = [p for p in unique_prompts if p not in self._summary_cache]
+        if to_gen:
+            new = self._batch_summarise(to_gen)
+            for p,s in zip(to_gen, new):
                 self._summary_cache[p] = s
-            self.log(f"####Cached {len(to_generate)} new summaries; cache size: {len(self._summary_cache)}.", level="debug")
+            self.log(f"####Cached {len(to_gen)} new summaries.", level="debug")
 
-        # Reassemble into nested result
-        aggregated = [[None] * num_entities for _ in range(sides)]
-        for prompt, (side, idx) in zip(prompts, positions):
-            aggregated[side][idx] = self._summary_cache[prompt]
+        # Reassemble into result
+        aggregated = []
+        for p in prompts:
+            aggregated.append(self._summary_cache[p])
 
         self.log("####Subgraph summarisation complete.", level="debug")
         return aggregated
-
 
     def _batch_generate(
         self,

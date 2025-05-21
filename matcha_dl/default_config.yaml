@@ -69,15 +69,20 @@ plot_params:
   plot_candidates: True
   plot_reference: True
   plot_prefiltered: True
-  plot_by_matcher: True
+  plot_predictions: True
+  plot_by_matcher: False
+  plot_all_matchers : True
   aggregate_funcs: [max, mean]
   figsize: [8, 5]
-  kde: True
+  kde: False
   bins: 20
   color: blue
   alpha: 0.6
   dpi: 300
   grid: True
+  log_scale: False
+  x_clip: 0.99
+  all_alpha: 0.4
 
 dataset_params:
   ## Validation set to be used to stop training, and in training guidance.
@@ -89,6 +94,7 @@ dataset_params:
 
   pre_filtering: True # If True, matcha scores will be used to filter easy mappings in the inference set.
   pre_filtering_threshold: 0.85 # Threshold to be used to filter easy mappings in the inference set.
+  sanity_check: True # If True, the data will be checked for sanity before training.
   
   ## Prompt Dataset Configs [Optional] Only used if model is prompt based
   ## Should should be list of params of size n (equal for all lists so that it can behabe like an array)
@@ -133,6 +139,7 @@ dataset_params:
   smallest_batch_first: False # If True, the smallest batch will be processed first.
   batch_length_sort_mode: max # max, sum
   only_taxonomy: False # If True, only the taxonomy will be used to generate the context.
+  sanity_check_n_samples: 5 # Number of samples to be used in the sanity check.
 
 training_params:
   epochs: 10 # 50

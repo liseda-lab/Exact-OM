@@ -133,6 +133,7 @@ class AlignmentAction(Protocol):
             matchers=matcha.matchers,
             logger=logger,
             cache_ok=configs.use_file_cache,
+            plot_params=configs.plot_params.model_dump(),
             **configs.dataset_params.model_dump(),
         )
 
@@ -140,6 +141,9 @@ class AlignmentAction(Protocol):
 
         if not dataset.has_cache():
             dataset.load_candidates(matcha.candidates)
+
+            if full_reference_file_path is not None:
+                dataset.load_full_reference(full_reference_file_path)
 
             if configs.matcha_params.calculate_scores:
                 dataset.load_data(matcha.matcha_features)
@@ -150,10 +154,9 @@ class AlignmentAction(Protocol):
 
         dataset.process()
 
-        if configs.plot_params.enabled:
-                dataset.plot_matcha_features(**configs.plot_params.model_dump())
-
         if not dataset.has_cache():
+            if configs.plot_params.enabled:
+                dataset.plot_matcha_features() 
             dataset.save()
 
         dataset_end = time.time()
@@ -180,8 +183,10 @@ class AlignmentAction(Protocol):
             use_last_checkpoint=configs.use_last_checkpoint,
             skip_training_if_checkpoint=configs.skip_training_if_checkpoint,
             logger=logger,
+            plot_params=configs.plot_params.model_dump()
         )
 
+        train_elapsed = None
         if reference_file_path is not None:
             logger.info(f"Training model with {reference_file_path}")
             train_start = time.time()
@@ -250,7 +255,26 @@ class AlignmentAction(Protocol):
         elapsed_time = (end_time - start_time)/ 60
         logger.info(f"Alignment completed in {elapsed_time:.1f} minutes")
 
-        return results
+        # Save Times
+        times_file_path = output_dir_path / "times.txt"
+        with open(times_file_path, "a") as f:
+            f.write(f"Total: {elapsed_time:.1f} minutes\n")
+            f.write(f"Matcha: {matcha_elapsed:.1f} minutes\n")
+            f.write(f"Dataset: {dataset_elapsed:.1f} minutes\n")
+            if train_elapsed is not None:
+                f.write(f"Training: {train_elapsed:.1f} minutes\n")
+            f.write(f"Alignment: {alignment_elapsed:.1f} minutes\n")
+        logger.info(f"Times written to {times_file_path}")
+
+        timmings = {
+            "Matcha": matcha_elapsed,
+            "Dataset": dataset_elapsed,
+            "Training": train_elapsed if train_elapsed is not None else 0,
+            "Alignment": alignment_elapsed,
+            "Total": elapsed_time,
+        }
+
+        return results, timmings
 
 # TODO rework complex actions
 class DirectoryAlignmentAction(Protocol):

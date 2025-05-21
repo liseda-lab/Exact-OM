@@ -184,6 +184,7 @@ class EncoderTrainer(MLPTrainer):
         num_workers: int = 0,
         log_every: int = 1,
         mixed_precision: bool = False,
+        plot_params: Optional[dict] = None,
         **kwargs
     ) -> Tuple[List[EntityMapping], float]:
         self.dataset.default_kind = kind
@@ -263,6 +264,14 @@ class EncoderTrainer(MLPTrainer):
         df = df[df[kind] == True]
         df["Scores"] = logits_all.numpy()
         avg_loss = total_loss / num_examples
+
+        if self.plot_params is not None and self.plot_params.get("enabled", False) and self.plot_params.get("plot_predictions", False):
+            self.plot_score_distribution(
+                df,
+                kind=kind,
+                **self.plot_params
+            )
+        
         return EntityMapping.read_table_mappings(
             df[["Src", "Tgt", "Scores"]],
             threshold=threshold,
