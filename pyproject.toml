@@ -13,7 +13,7 @@ exclude = ["matcha_dl/impl/matcha/matcha/**/*"]
 
 [tool.poetry.dependencies]
 python = "^3.10"
-torch = "^2.4.0"
+torch = {version = "2.7.0+cu128", source = "pytorch-gpu"}
 tensorboard = "^2.16.2"
 dill = "^0.3.8"
 lxml = "^5.2.1"
@@ -23,12 +23,15 @@ cython = "^3.0.11"
 typing-extensions = "^4.12.2"
 pydantic = "^2.10.6"
 mowl-borg = "^1.0.1"
-dgl = { url = "https://data.dgl.ai/wheels/torch-2.4/cu124/dgl-2.4.0%2Bcu124-cp310-cp310-manylinux1_x86_64.whl" }
 matplotlib = "^3.10.0"
 seaborn = "^0.13.2"
 pyaml = "^25.1.0"
 peft = "^0.15.0"
 sentencepiece = "^0.2.0"
+gensim = "^4.3.3"
+
+
+# dgl = { url = "https://data.dgl.ai/wheels/torch-2.4/cu124/dgl-2.4.0%2Bcu124-cp310-cp310-manylinux1_x86_64.whl" }
 
 
 [tool.poetry.scripts]
@@ -44,6 +47,12 @@ isort = "^5.13.2"
 mypy = "^1.9.0"
 pytest = "^8.1.1"
 black = "^24.4.2"
+
+
+[[tool.poetry.source]]
+name = "pytorch-gpu"
+url = "https://download.pytorch.org/whl/cu128"
+priority = "explicit"
 
 [build-system]
 requires = ["poetry-core"]
