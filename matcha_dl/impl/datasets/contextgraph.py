@@ -60,6 +60,7 @@ class ContextTabularDataset(TabularDataset):
                  top_p: Optional[float] = None,
                  top_k: Optional[int] = None,
                  sanity_check_n_samples: int = 5,
+                 max_log_lenght: int = 100,
                 **kwargs):
 
         """
@@ -104,6 +105,7 @@ class ContextTabularDataset(TabularDataset):
         self.top_k: Optional[int] = top_k
         self.only_taxonomy: bool = only_taxonomy
         self.sanity_check_n_samples: int = sanity_check_n_samples
+        self.max_log_length: int = max_log_lenght
 
         # Greedy search parameters
         self.context_method: ContextMethod = context_method
@@ -156,10 +158,8 @@ class ContextTabularDataset(TabularDataset):
         self._summary_cache: Dict[str, str] = {}
 
         # Internal storage
-        self._memmap_src: Dict[Any, np.memmap] = {}
-        self._off_src: Dict[Any, np.ndarray] = {}
-        self._memmap_tgt: Dict[Any, np.memmap] = {}
-        self._off_tgt: Dict[Any, np.ndarray] = {}
+        self._memmap_fields: Dict[Any, List[np.memmap]] = {}
+        self._off_fields:    Dict[Any, List[np.ndarray]] = {}
         self._label_cache: Dict[Any, Tensor] = {}
 
         self._mem_map_cache_dir = self.output_path / "memmap_cache"
@@ -357,14 +357,17 @@ class ContextTabularDataset(TabularDataset):
             self.log(f"####Loading labels for kind '{kind}'", level="debug")
             self._label_cache[kind] = torch.tensor(dfk['Label'].values, dtype=torch.float32)
 
+            # Build or load four‐field memmaps
             paths = self._get_paths(kind)
-            if not rebuild and all(p.exists() for p in paths.values()):
-                self.log(f"####Using existing cache files for kind '{kind}'", level="debug")
-                off_s = np.load(paths['src_off'], mmap_mode='r')
-                off_t = np.load(paths['tgt_off'], mmap_mode='r')
-                self._off_src[kind], self._off_tgt[kind] = off_s, off_t
-                self._memmap_src[kind] = np.memmap(paths['src_flat'], mode='r', dtype=np.int32, shape=(int(off_s[-1]),))
-                self._memmap_tgt[kind] = np.memmap(paths['tgt_flat'], mode='r', dtype=np.int32, shape=(int(off_t[-1]),))
+            if not rebuild and all((paths[k].exists() for k in paths)):
+                # load four offsets & four memmaps
+                offs = [ np.load(paths[f"off_{i}"], mmap_mode='r') for i in range(4) ]
+                flats = [
+                    np.memmap(paths[f"flat_{i}"], mode='r', dtype=np.int32, shape=(int(offs[i][-1]),))
+                    for i in range(4)
+                ]
+                self._off_fields[kind]    = offs
+                self._memmap_fields[kind] = flats
             else:
                 self._build_cache_for_kind(kind, paths)
 
@@ -385,11 +388,13 @@ class ContextTabularDataset(TabularDataset):
             raise IndexError(f"Index {idx} out of bounds for dataset of size {len(self)}.")
 
         kind = self.default_kind
-        off_s, off_t = self._off_src[kind], self._off_tgt[kind]
-        mem_s, mem_t = self._memmap_src[kind], self._memmap_tgt[kind]
-        s_ids = mem_s[off_s[idx]:off_s[idx+1]].tolist()
-        t_ids = mem_t[off_t[idx]:off_t[idx+1]].tolist()
-        return {'input_ids': (s_ids, t_ids)}, self._label_cache[kind][idx]
+        offs = self._off_fields[kind]
+        mems = self._memmap_fields[kind]
+        seqs = [
+            mems[f][ offs[f][idx] : offs[f][idx+1] ].tolist()
+            for f in range(4)
+        ]
+        return {'input_ids': seqs}, self._label_cache[kind][idx]
 
     def get_features(self, dataset: DataFrame) -> DataFrame:
         return self.generate_definitions(dataset)
@@ -473,14 +478,14 @@ class ContextTabularDataset(TabularDataset):
         # Verify that the subgraphs are not empty
         empty_src_iris = [iri for iri, sub in zip(unique_src_iris, src_subs_unique) if not sub]
         if empty_src_iris:
-            self.log(f"####Empty source subgraphs for {len(empty_src_iris)} entities ({len(tgt_subs_unique)/len(empty_tgt_iris)*100:.0%})", level="warning")
+            self.log(f"####Empty source subgraphs for {len(empty_src_iris)} entities ({len(empty_src_iris)/len(src_subs_unique)*100:.0%})", level="warning")
             if len(empty_src_iris) > self.sanity_check_n_samples:
                 empty_src_iris = empty_src_iris[:self.sanity_check_n_samples] + ["..."]
             self.log(f"####Empty source subgraphs for IRIs: {empty_src_iris}", level="debug")
 
         empty_tgt_iris = [iri for iri, sub in zip(unique_tgt_iris, tgt_subs_unique) if not sub]
         if empty_tgt_iris:
-            self.log(f"####Empty target subgraphs for {len(empty_tgt_iris)} entities ({len(tgt_subs_unique)/len(empty_tgt_iris)*100:.0%}%)", level="warning")
+            self.log(f"####Empty target subgraphs for {len(empty_tgt_iris)} entities ({len(empty_tgt_iris)/len(tgt_subs_unique)*100:.0%}%)", level="warning")
             if len(empty_tgt_iris) > self.sanity_check_n_samples:
                 empty_tgt_iris = empty_tgt_iris[:self.sanity_check_n_samples] + ["..."]
             self.log(f"####Empty target subgraphs for IRIs: {empty_tgt_iris}", level="debug")
@@ -533,9 +538,15 @@ class ContextTabularDataset(TabularDataset):
         src_feats = [src_feats_map[iri] for iri in src_iris]
         tgt_feats = [tgt_feats_map[iri] for iri in tgt_iris]
 
-        # Attach features back to DataFrame
-        dataset["Features"] = list(zip(src_feats, tgt_feats))
-        dataset["Features"] = [[s, t] for s, t in zip(src_feats, tgt_feats)]
+        # Attach four‐tuple features: [src_label, src_ctx, tgt_label, tgt_ctx]
+        src_labels = [src_map[iri].labels[0] for iri in src_iris]
+        tgt_labels = [tgt_map[iri].labels[0] for iri in tgt_iris]
+
+        dataset["Features"] = [
+             [s_lbl, s_ctx, t_lbl, t_ctx]
+             for s_lbl, s_ctx, t_lbl, t_ctx
+             in zip(src_labels, src_feats, tgt_labels, tgt_feats)
+        ]
 
         self.log("###Features verbalised and attached to DataFrame.", level="debug")
 
@@ -549,8 +560,12 @@ class ContextTabularDataset(TabularDataset):
                 list(zip(unique_src_entities, src_subs_unique, src_feats_unique)), k
             )
             for ent, raw, verb in src_samples:
-                self.log(f"[SRC] {ent.class_iri}", level="debug")
-                # log *all* triples
+                self.log(f"[SRC] {ent.class_iri} ({ent.labels[0]})", level="debug")
+
+                if len(str(raw)) > self.max_log_length:
+                    raw = raw[:self.sanity_check_n_samples] + [("...")]
+                if len(str(verb)) > self.max_log_length:
+                    verb = verb[:self.max_log_length] + "..."
                 self.log(f"  raw triples: {raw!r}", level="debug")
                 self.log(f"  verbalisation: {verb!r}", level="debug")
 
@@ -560,7 +575,13 @@ class ContextTabularDataset(TabularDataset):
                 list(zip(unique_tgt_entities, tgt_subs_unique, tgt_feats_unique)), k
             )
             for ent, raw, verb in tgt_samples:
-                self.log(f"[TGT] {ent.class_iri}", level="debug")
+                self.log(f"[TGT] {ent.class_iri} ({ent.labels[0]})", level="debug")
+
+                if len(str(raw)) > self.max_log_length:
+                    raw = raw[:self.sanity_check_n_samples] + [("...")]
+                if len(str(verb)) > self.max_log_length:
+                    verb = verb[:self.max_log_length] + "..."
+
                 self.log(f"  raw triples: {raw!r}", level="debug")
                 self.log(f"  verbalisation: {verb!r}", level="debug")
 
@@ -760,66 +781,92 @@ class ContextTabularDataset(TabularDataset):
     def _get_paths(self, kind: DatasetMask) -> Dict[str, Path]:
         """
         Return a dict of file paths for offsets and flat memmap arrays for a given split.
-        Keys: 'src_off', 'tgt_off', 'src_flat', 'tgt_flat'.
         """
         base = self._mem_map_cache_dir
         name = kind
-        return {
-            'src_off': base / f"src_off_{name}.npy",
-            'tgt_off':  base / f"tgt_off_{name}.npy",
-            'src_flat': base / f"src_flat_{name}.npy",
-            'tgt_flat': base / f"tgt_flat_{name}.npy"
-        }
+        paths: Dict[str, Path] = {}
+        
+        for idx in range(4):
+            paths[f"off_{idx}"]  = base / f"off_{idx}_{name}.npy"
+            paths[f"flat_{idx}"] = base / f"flat_{idx}_{name}.npy"
+        return paths
     
     def _build_cache_for_kind(self, kind: DatasetMask, paths: Dict[str, str]) -> None:
+
         dfk = self.dataframe[self.dataframe[kind]]
-        pairs = dfk['Features'].tolist()
-        N = len(pairs)
-        src_texts = [p[0] for p in pairs]
-        tgt_texts = [p[1] for p in pairs]
+        quads = dfk['Features'].tolist()  # [src_lbl, src_ctx, tgt_lbl, tgt_ctx]
+        N     = len(quads)
+        # split into four parallel lists
+        texts_per_field = list(zip(*quads))
+
 
         # Log start of cache building
         self.log(f"#### Building cache for split '{kind}' ({N} examples)", level="debug")
 
-        # Pass 1: compute lengths
-        self.log("## Pass 1: computing token lengths in chunks", level="debug")
-        src_l = np.zeros(N, dtype=np.int64)
-        tgt_l = np.zeros(N, dtype=np.int64)
-        for start in range(0, N, self.cache_chunk_size):
-            end = min(start + self.cache_chunk_size, N)
-            self.log(f"### Tokenizing lengths [{start}:{end}]", level="debug")
-            enc_s = self.tokenizer(src_texts[start:end], padding=False, truncation=True, max_length=self.encoding_max_length)['input_ids']
-            enc_t = self.tokenizer(tgt_texts[start:end], padding=False, truncation=True, max_length=self.encoding_max_length)['input_ids']
-            for i, ids in enumerate(enc_s, start): src_l[i] = len(ids)
-            for i, ids in enumerate(enc_t, start): tgt_l[i] = len(ids)
+        # Pass 1: compute token lengths for each of the 4 fields in chunks
+        self.log("## Pass 1: computing token lengths", level="debug")
+        lengths = [np.zeros(N, dtype=np.int64) for _ in range(4)]
+        for field_idx, texts in enumerate(texts_per_field):
+            self.log(f"### Field {field_idx}: computing lengths", level="debug")
+            for start in range(0, N, self.cache_chunk_size):
+                end = min(start + self.cache_chunk_size, N)
+                self.log(f"#### Field {field_idx}: tokenizing [{start}:{end}]", level="debug")
+                encs = self.tokenizer(
+                    texts[start:end],
+                    padding=False,
+                    truncation=True,
+                    max_length=self.encoding_max_length
+                )['input_ids']
+                for i, ids in enumerate(encs, start):
+                    lengths[field_idx][i] = len(ids)
 
-        off_s = np.concatenate([[0], np.cumsum(src_l, dtype=np.int64)])
-        off_t = np.concatenate([[0], np.cumsum(tgt_l, dtype=np.int64)])
-        np.save(paths['src_off'], off_s)
-        np.save(paths['tgt_off'], off_t)
-        self.log(f"## Length pass complete: total src tokens={off_s[-1]}, total tgt tokens={off_t[-1]}", level="debug")
+        offs = [ np.concatenate([[0], np.cumsum(l, dtype=np.int64)]) for l in lengths ]
+        for idx, off in enumerate(offs):
+            np.save(paths[f"off_{idx}"], off)
+        self.log("## Length pass complete: total tokens per field = " +
+                 ", ".join(str(off[-1]) for off in offs), level="debug")
+        
+        # Allocate memmaps for each field
+        flats: List[np.memmap] = []
+        for idx, off in enumerate(offs):
+            m = np.memmap(
+                paths[f"flat_{idx}"],
+                mode='w+',
+                dtype=np.int32,
+                shape=(int(off[-1]),)
+            )
+            flats.append(m)
+        
+        # Pass 2: write token IDs into memmaps for all 4 fields
+        self.log("## Pass 2: writing token IDs into memmaps", level="debug")
+        for field_idx, texts in enumerate(texts_per_field):
+            self.log(f"### Field {field_idx}: filling memmap", level="debug")
+            off = offs[field_idx]
+            flat = flats[field_idx]
+            for start in range(0, N, self.cache_chunk_size):
+                end = min(start + self.cache_chunk_size, N)
+                self.log(f"#### Field {field_idx}: range [{start}:{end}]", level="debug")
+                encs = self.tokenizer(
+                    texts[start:end],
+                    padding=False,
+                    truncation=True,
+                    max_length=self.encoding_max_length
+                )['input_ids']
+                for i, ids in enumerate(encs, start):
+                    s, e = off[i], off[i+1]
+                    flat[s:e] = np.array(ids, dtype=np.int32)
 
-        # Allocate memmaps
-        flat_s = np.memmap(paths['src_flat'], mode='w+', dtype=np.int32, shape=(int(off_s[-1]),))
-        flat_t = np.memmap(paths['tgt_flat'], mode='w+', dtype=np.int32, shape=(int(off_t[-1]),))
-
-        # Pass 2: write IDs
-        self.log("## Pass 2: writing token IDs into memmap", level="debug")
-        for start in range(0, N, self.cache_chunk_size):
-            end = min(start + self.cache_chunk_size, N)
-            self.log(f"### Filling memmap [{start}:{end}]", level="debug")
-            enc_s = self.tokenizer(src_texts[start:end], padding=False, truncation=True, max_length=self.encoding_max_length)['input_ids']
-            enc_t = self.tokenizer(tgt_texts[start:end], padding=False, truncation=True, max_length=self.encoding_max_length)['input_ids']
-            for i, ids in enumerate(enc_s, start):
-                s, e = off_s[i], off_s[i+1]
-                flat_s[s:e] = np.array(ids, dtype=np.int32)
-            for i, ids in enumerate(enc_t, start):
-                s, e = off_t[i], off_t[i+1]
-                flat_t[s:e] = np.array(ids, dtype=np.int32)
-
-        flat_s.flush()
-        flat_t.flush()
-        self._off_src[kind], self._off_tgt[kind] = off_s, off_t
-        self._memmap_src[kind] = np.memmap(paths['src_flat'], mode='r', dtype=np.int32, shape=(int(off_s[-1]),))
-        self._memmap_tgt[kind] = np.memmap(paths['tgt_flat'], mode='r', dtype=np.int32, shape=(int(off_t[-1]),))
+        # Flush and register memmaps
+        for m in flats:
+            m.flush()
+        self._off_fields[kind]    = offs
+        self._memmap_fields[kind] = [
+            np.memmap(
+                paths[f"flat_{idx}"],
+                mode='r',
+                dtype=np.int32,
+                shape=(int(offs[idx][-1]),)
+            )
+            for idx in range(4)
+        ]
         self.log(f"## Cache build for '{kind}' complete", level="debug")
