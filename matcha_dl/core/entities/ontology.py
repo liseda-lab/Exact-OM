@@ -334,6 +334,7 @@ class OntologyGraph:
         best_path_method: Optional[BestPathMethod] = None,  # "dp", "lagrangian", "greedy"
         budget: Optional[int] = None,               # token budget
         hop_penalty: Optional[float] = 0.0,                   # α
+        all_labels: bool = False  # If True, return all labels for each node and relation
     ) -> List[Tuple[str,str,str]]:
         """
         If method="bfs": original n-hop BFS (cached).
@@ -364,14 +365,21 @@ class OntologyGraph:
                 if edge.src in reachable and edge.dst in reachable:
                     # get either IRIs or labels
                     if human_readable:
-                        src = self.get_labels(edge.src)[0]
-                        dst = self.get_labels(edge.dst)[0]
-                        rel = self.get_labels(edge.rel)[0]
+                            src = self.get_labels(edge.src)
+                            dst = self.get_labels(edge.dst)
+                            rel = self.get_labels(edge.rel)
                     else:
-                        src, dst, rel = str(edge.src), str(edge.dst), str(edge.rel)
+                        src, dst, rel = [str(edge.src)], [str(edge.dst)], [str(edge.rel)]
 
-                    # original (outgoing) triple
-                    subgraph_edges.append((src, rel, dst))
+                    if all_labels:
+                        # return all combinations of labels
+                        for s in src:
+                            for d in dst:
+                                for r in rel:
+                                    subgraph_edges.append((s, r, d))
+                    else:
+                        # return single labels
+                        subgraph_edges.append((src[0], rel[0], dst[0]))
 
             self._context_subgraph_cache[key] = subgraph_edges
 

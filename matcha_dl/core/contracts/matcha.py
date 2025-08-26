@@ -262,6 +262,8 @@ class IMatcha(LoggingClass):
             output_thread = threading.Thread(target=read_output, args=(matcha_process, output_queue, stop_event))
             output_thread.start()
 
+            # count = 0
+
             # Wait for a response from the process
             while matcha_process.poll() is None:
                 try:
@@ -273,6 +275,11 @@ class IMatcha(LoggingClass):
                         break
                 except queue.Empty:
                     # No output received within the timeout period
+                    # count += 1
+                    # if count > 100:
+                    #     self.log("Matcha process is taking too long to respond. Terminating...", level="error")
+                    #     matcha_process.terminate()
+                    #     raise TimeoutError("Matcha process timed out while waiting for response.")
                     continue
 
             # Signal the output thread to stop

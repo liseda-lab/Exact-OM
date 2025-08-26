@@ -128,8 +128,8 @@ dataset_params:
   top_p: null # Top-p to be used in sampling. If >0, the model will only sample from the top-p most probable tokens.
   num_beams: 1 # If >1 beam search will be used to generate the context.
   early_stopping: False # If True, the generation will stop when all beams reach the end token.
-  aggregation_strategy: join # join, summarise
-  delimiter: \n
+  aggregation_strategy: join # join, summarise, separate
+  delimiter: ""
   exclude_missing_dr: False
   cache_chunk_size: 100000 # Number of rows to be cached in memory before writing to disk.
   gen_max_length: null
@@ -140,6 +140,8 @@ dataset_params:
   batch_length_sort_mode: max # max, sum
   only_taxonomy: False # If True, only the taxonomy will be used to generate the context.
   sanity_check_n_samples: 5 # Number of samples to be used in the sanity check.
+  all_labels: False
+  all_context_labels: False
 
 training_params:
   epochs: 10 # 50
@@ -184,7 +186,9 @@ model:
   params:
     encoder_name: sentence-transformers/all-MiniLM-L6-v2
     pooling: sum # sum, cls, max, sum_max, cls_mean, attentive (only for supervised settings)
-    use_lora: True
+    fusion: weighted_cosine
+    label_pooling: max_pair # max_pair, concat
+    ctx_pooling: max_pair # max_pair, concat
     lora_r: 16
     lora_alpha: 32
     lora_dropout: 0.05

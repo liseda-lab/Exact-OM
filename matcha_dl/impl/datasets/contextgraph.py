@@ -61,6 +61,8 @@ class ContextTabularDataset(TabularDataset):
                  top_k: Optional[int] = None,
                  sanity_check_n_samples: int = 5,
                  max_log_lenght: int = 100,
+                 all_labels: bool = False,
+                 all_context_labels: bool = False,
                 **kwargs):
 
         """
@@ -106,6 +108,8 @@ class ContextTabularDataset(TabularDataset):
         self.only_taxonomy: bool = only_taxonomy
         self.sanity_check_n_samples: int = sanity_check_n_samples
         self.max_log_length: int = max_log_lenght
+        self.all_labels: bool = all_labels
+        self.all_context_labels: bool = all_context_labels
 
         # Greedy search parameters
         self.context_method: ContextMethod = context_method
@@ -168,6 +172,8 @@ class ContextTabularDataset(TabularDataset):
         self._meta_mem_map_path = self._mem_map_cache_dir / "meta.json"
         
         self._verb_temp_path = self.output_path / "verbalization_templates.json"
+
+        self.K: int = 0  # Maximum length of any label or context
 
         # build approximate cost function
         def _triple_token_cost(triple):
@@ -390,12 +396,22 @@ class ContextTabularDataset(TabularDataset):
         kind = self.default_kind
         offs = self._off_fields[kind]
         mems = self._memmap_fields[kind]
-        seqs = [
-            mems[f][ offs[f][idx] : offs[f][idx+1] ].tolist()
-            for f in range(4)
-        ]
-        return {'input_ids': seqs}, self._label_cache[kind][idx]
 
+        # We have N*K sequences flattened per field,
+        # so sample idx starts at idx*self.K and spans K sequences.
+        base = idx * self.K
+        seqs = []
+        for f in range(4):
+            field_seqs = []
+            for k in range(self.K):
+                flat_idx = base + k
+                start = offs[f][flat_idx]
+                end   = offs[f][flat_idx + 1]
+                field_seqs.append( mems[f][start:end].tolist() )
+            seqs.append(field_seqs)
+
+        return {'input_ids': seqs}, self._label_cache[kind][idx]
+    
     def get_features(self, dataset: DataFrame) -> DataFrame:
         return self.generate_definitions(dataset)
 
@@ -459,7 +475,8 @@ class ContextTabularDataset(TabularDataset):
                 method=self.context_method,
                 best_path_method=self.best_path_src_method,
                 budget=self.context_budget,
-                hop_penalty=self.context_hop_penalty
+                hop_penalty=self.context_hop_penalty,
+                all_labels=self.all_context_labels,
             )
             for ent in unique_src_entities
         ]
@@ -470,7 +487,8 @@ class ContextTabularDataset(TabularDataset):
                 method=self.context_method,
                 best_path_method=self.best_path_src_method,
                 budget=self.context_budget,
-                hop_penalty=self.context_hop_penalty
+                hop_penalty=self.context_hop_penalty,
+                all_labels=self.all_context_labels,
             )
             for ent in unique_tgt_entities
         ]
@@ -478,14 +496,14 @@ class ContextTabularDataset(TabularDataset):
         # Verify that the subgraphs are not empty
         empty_src_iris = [iri for iri, sub in zip(unique_src_iris, src_subs_unique) if not sub]
         if empty_src_iris:
-            self.log(f"####Empty source subgraphs for {len(empty_src_iris)} entities ({len(empty_src_iris)/len(src_subs_unique)*100:.0%})", level="warning")
+            self.log(f"####Empty source subgraphs for {len(empty_src_iris)} entities ({len(empty_src_iris)/len(src_subs_unique):.0%})", level="warning")
             if len(empty_src_iris) > self.sanity_check_n_samples:
                 empty_src_iris = empty_src_iris[:self.sanity_check_n_samples] + ["..."]
             self.log(f"####Empty source subgraphs for IRIs: {empty_src_iris}", level="debug")
 
         empty_tgt_iris = [iri for iri, sub in zip(unique_tgt_iris, tgt_subs_unique) if not sub]
         if empty_tgt_iris:
-            self.log(f"####Empty target subgraphs for {len(empty_tgt_iris)} entities ({len(empty_tgt_iris)/len(tgt_subs_unique)*100:.0%}%)", level="warning")
+            self.log(f"####Empty target subgraphs for {len(empty_tgt_iris)} entities ({len(empty_tgt_iris)/len(tgt_subs_unique):.0%})", level="warning")
             if len(empty_tgt_iris) > self.sanity_check_n_samples:
                 empty_tgt_iris = empty_tgt_iris[:self.sanity_check_n_samples] + ["..."]
             self.log(f"####Empty target subgraphs for IRIs: {empty_tgt_iris}", level="debug")
@@ -500,9 +518,11 @@ class ContextTabularDataset(TabularDataset):
         if self.aggregation_strategy is AggregationStrategy.JOIN:
             self.log("### Verbalising & joining unique subgraphs…", level="debug")
             all_feats = self._verbalise_subgraphs(combined_subs)
-        else:
+        elif self.aggregation_strategy is AggregationStrategy.SUMMARISE:
             self.log("### Verbalising & summarising unique subgraphs…", level="debug")
             all_feats = self._summarise_subgraphs(combined_subs, combined_entities)
+        else:
+            all_feats = self._separate_subgraphs(combined_subs, combined_entities)
 
         # Split back into source and target
         src_feats_unique = all_feats[:len(src_subs_unique)]
@@ -539,8 +559,26 @@ class ContextTabularDataset(TabularDataset):
         tgt_feats = [tgt_feats_map[iri] for iri in tgt_iris]
 
         # Attach four‐tuple features: [src_label, src_ctx, tgt_label, tgt_ctx]
-        src_labels = [src_map[iri].labels[0] for iri in src_iris]
-        tgt_labels = [tgt_map[iri].labels[0] for iri in tgt_iris]
+        if self.all_labels:
+            src_labels = [src_map[iri].labels[:] for iri in src_iris]
+            tgt_labels = [tgt_map[iri].labels[:] for iri in tgt_iris]
+        else:
+            src_labels = [[src_map[iri].labels[0]] for iri in src_iris]
+            tgt_labels = [[tgt_map[iri].labels[0]] for iri in tgt_iris]
+
+        # compute K = maximum length of any label-list or ctx-list
+        K_labels = max(len(x) for x in src_labels + tgt_labels)
+        K_ctx = max(len(x) for x in src_feats + tgt_feats)
+        self.K = max(K_labels, K_ctx)
+
+        # pad every list to length K with "" so tokeniser will turn it into padding
+        def pad_to_K(lst):
+            return lst + [""]*(self.K - len(lst))
+        
+        src_labels = [pad_to_K(x) for x in src_labels]
+        tgt_labels = [pad_to_K(x) for x in tgt_labels]
+        src_feats = [pad_to_K(x) for x in src_feats]
+        tgt_feats = [pad_to_K(x) for x in tgt_feats]
 
         dataset["Features"] = [
              [s_lbl, s_ctx, t_lbl, t_ctx]
@@ -559,31 +597,38 @@ class ContextTabularDataset(TabularDataset):
             src_samples = random.sample(
                 list(zip(unique_src_entities, src_subs_unique, src_feats_unique)), k
             )
-            for ent, raw, verb in src_samples:
+            for ent, raw_triples, verb_list in src_samples:
                 self.log(f"[SRC] {ent.class_iri} ({ent.labels[0]})", level="debug")
+                # raw_triples is still a list of triples
+                truncated_raw = raw_triples
+                if len(raw_triples) > self.max_log_length:
+                    truncated_raw = raw_triples[: self.max_log_length] + [("...")]
+                self.log(f"  raw triples: {truncated_raw!r}", level="debug")
 
-                if len(str(raw)) > self.max_log_length:
-                    raw = raw[:self.sanity_check_n_samples] + [("...")]
-                if len(str(verb)) > self.max_log_length:
-                    verb = verb[:self.max_log_length] + "..."
-                self.log(f"  raw triples: {raw!r}", level="debug")
-                self.log(f"  verbalisation: {verb!r}", level="debug")
+                # verb_list is now a list of up to K strings
+                for i, ctx in enumerate(verb_list):
+                    txt = ctx
+                    if len(txt) > self.max_log_length:
+                        txt = txt[: self.max_log_length] + "..."
+                    self.log(f"  verbalisation[{i}]: {txt!r}", level="debug")
 
             k = min(5, len(tgt_subs_unique))
             self.log("### Sanity check (TARGET): raw vs verbalised", level="debug")
             tgt_samples = random.sample(
                 list(zip(unique_tgt_entities, tgt_subs_unique, tgt_feats_unique)), k
             )
-            for ent, raw, verb in tgt_samples:
+            for ent, raw_triples, verb_list in tgt_samples:
                 self.log(f"[TGT] {ent.class_iri} ({ent.labels[0]})", level="debug")
+                truncated_raw = raw_triples
+                if len(raw_triples) > self.max_log_length:
+                    truncated_raw = raw_triples[: self.max_log_length] + [("...")]
+                self.log(f"  raw triples: {truncated_raw!r}", level="debug")
+                for i, ctx in enumerate(verb_list):
+                    txt = ctx
+                    if len(txt) > self.max_log_length:
+                        txt = txt[: self.max_log_length] + "..."
+                    self.log(f"  verbalisation[{i}]: {txt!r}", level="debug")
 
-                if len(str(raw)) > self.max_log_length:
-                    raw = raw[:self.sanity_check_n_samples] + [("...")]
-                if len(str(verb)) > self.max_log_length:
-                    verb = verb[:self.max_log_length] + "..."
-
-                self.log(f"  raw triples: {raw!r}", level="debug")
-                self.log(f"  verbalisation: {verb!r}", level="debug")
 
             # build pandas.Series maps
             counts_map = {
@@ -627,9 +672,16 @@ class ContextTabularDataset(TabularDataset):
         # compute a length key for each example:
         self.log("###Sorting dataset by feature lengths... (for batch efficiency)", level="debug")
         lengths = []
-        for s, t in zip(src_feats, tgt_feats):
-            src_wc = len(s.split())
-            tgt_wc = len(t.split())
+        for src_list, tgt_list in zip(src_feats, tgt_feats):
+            # get word‐counts per sample
+            src_wc_list = [len(ctx.split()) for ctx in src_list]
+            tgt_wc_list = [len(ctx.split()) for ctx in tgt_list]
+            if self.batch_length_sort_mode == "sum":
+                src_wc = sum(src_wc_list)
+                tgt_wc = sum(tgt_wc_list)
+            else:  # "max"
+                src_wc = max(src_wc_list)
+                tgt_wc = max(tgt_wc_list)
             if self.batch_length_sort_mode == "sum":
                 lengths.append(src_wc + tgt_wc)
             else:  # "max"
@@ -657,12 +709,26 @@ class ContextTabularDataset(TabularDataset):
             ]
             self._join_cache[key] = self.delimiter.join(texts)
         return self._join_cache[key]
-    
-    def _verbalise_subgraphs(self, subgraphs: List[List[Tuple[str, str, str]]]) -> List[str]:
+
+    def _verbalise_subgraphs(self, subgraphs: List[List[Tuple[str, str, str]]]) -> List[List[str]]:
         """Aggregate each subgraph by verbalising via _verbalize_triples and joining."""
         self.log(f"####Joining subgraphs with delimiter '{self.delimiter}'.", level="debug")
-        agregated = [self._verbalize_triples(triples) for triples in subgraphs]
+        agregated = [[self._verbalize_triples(triples)] for triples in subgraphs]
         self.log("####Subgraph join complete.", level="debug")
+        return agregated
+    
+    def _separate_subgraphs(
+        self,
+        subgraphs: List[List[Tuple[str, str, str]]],
+        entities:  List[Entity]
+    ) -> List[List[str]]:
+        """
+        Separate subgraphs into individual verbalised triples.
+        Each subgraph is verbalised and returned as a list of strings.
+        """
+        self.log("####Separating subgraphs into individual triples...", level="debug")
+        agregated = [[self._verbalize_triples([triple]) for triple in triples] for triples in subgraphs]
+        self.log("####Subgraph separation complete.", level="debug")
         return agregated
 
     def _summarise_subgraphs(
@@ -692,7 +758,7 @@ class ContextTabularDataset(TabularDataset):
         # Reassemble into result
         aggregated = []
         for p in prompts:
-            aggregated.append(self._summary_cache[p])
+            aggregated.append([self._summary_cache[p]])
 
         self.log("####Subgraph summarisation complete.", level="debug")
         return aggregated
@@ -796,23 +862,27 @@ class ContextTabularDataset(TabularDataset):
         dfk = self.dataframe[self.dataframe[kind]]
         quads = dfk['Features'].tolist()  # [src_lbl, src_ctx, tgt_lbl, tgt_ctx]
         N     = len(quads)
-        # split into four parallel lists
-        texts_per_field = list(zip(*quads))
-
+        # split into four parallel lists, each of length N, each entry is a list of K strings
+        texts_per_field = [ [ quad[f] for quad in quads ] for f in range(4) ]
 
         # Log start of cache building
         self.log(f"#### Building cache for split '{kind}' ({N} examples)", level="debug")
 
         # Pass 1: compute token lengths for each of the 4 fields in chunks
         self.log("## Pass 1: computing token lengths", level="debug")
-        lengths = [np.zeros(N, dtype=np.int64) for _ in range(4)]
-        for field_idx, texts in enumerate(texts_per_field):
+        lengths = [np.zeros(N*self.K, dtype=np.int64) for _ in range(4)]
+        for field_idx, lists_of_K in enumerate(texts_per_field):
             self.log(f"### Field {field_idx}: computing lengths", level="debug")
-            for start in range(0, N, self.cache_chunk_size):
-                end = min(start + self.cache_chunk_size, N)
-                self.log(f"#### Field {field_idx}: tokenizing [{start}:{end}]", level="debug")
+            # flatten sample×K into a single list
+            flat_texts = [
+               txt
+               for sample_texts in lists_of_K
+               for txt in sample_texts
+            ]
+            for start in range(0, N*self.K, self.cache_chunk_size):
+                end = min(start + self.cache_chunk_size, N*self.K)
                 encs = self.tokenizer(
-                    texts[start:end],
+                    flat_texts[start:end],
                     padding=False,
                     truncation=True,
                     max_length=self.encoding_max_length
@@ -839,15 +909,18 @@ class ContextTabularDataset(TabularDataset):
         
         # Pass 2: write token IDs into memmaps for all 4 fields
         self.log("## Pass 2: writing token IDs into memmaps", level="debug")
-        for field_idx, texts in enumerate(texts_per_field):
-            self.log(f"### Field {field_idx}: filling memmap", level="debug")
+        for field_idx, lists_of_K in enumerate(texts_per_field):
             off = offs[field_idx]
             flat = flats[field_idx]
-            for start in range(0, N, self.cache_chunk_size):
-                end = min(start + self.cache_chunk_size, N)
-                self.log(f"#### Field {field_idx}: range [{start}:{end}]", level="debug")
+            flat_texts = [
+               txt
+               for sample_texts in lists_of_K
+               for txt in sample_texts
+            ]
+            for start in range(0, N*self.K, self.cache_chunk_size):
+                end = min(start + self.cache_chunk_size, N*self.K)
                 encs = self.tokenizer(
-                    texts[start:end],
+                    flat_texts[start:end],
                     padding=False,
                     truncation=True,
                     max_length=self.encoding_max_length

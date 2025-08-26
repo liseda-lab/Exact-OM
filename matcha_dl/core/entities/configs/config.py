@@ -139,6 +139,8 @@ class DatasetParams(BaseModel):
     smallest_batch_first: Optional[bool] = Field(config["dataset_params"]["smallest_batch_first"])
     only_taxonomy: Optional[bool] = Field(config["dataset_params"]["only_taxonomy"])
     sanity_check_n_samples: Optional[int] = Field(config["dataset_params"]["sanity_check_n_samples"])
+    all_labels: Optional[bool] = Field(config["dataset_params"]["all_labels"])
+    all_context_labels: Optional[bool] = Field(config["dataset_params"]["all_context_labels"])
 
 
     @field_validator('validation_set', mode="after")

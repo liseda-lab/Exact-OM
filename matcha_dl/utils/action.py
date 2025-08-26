@@ -4,7 +4,7 @@ from typing import List
 
 from multiprocessing.synchronize import Lock, Condition
 
-from matcha_dl.core.entities.configs import ConfigModel
+from matcha_dl.core.entities.configs.config import ConfigModel
 
 def flatten_config(config: ConfigModel) -> dict:
     """Flatten the ConfigModel into a dictionary."""

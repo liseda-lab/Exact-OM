@@ -63,7 +63,7 @@ class MLPTrainer(ITrainer):
                 if val_every is not None and val_every > 0 and self.dataset.validation_set is not None:
                     if self.epoch % val_every == 0:
 
-                        _ , validation_loss = self.predict(kind='validation')
+                        _ , validation_loss = self.predict(kind=DatasetMask.validation)
 
                         writer.add_scalar("Loss/validation", validation_loss, self.epoch)
 
@@ -104,7 +104,7 @@ class MLPTrainer(ITrainer):
         # if supervised use model to calculate scores
         if self.dataset.reference is not None:
 
-            dataloader = DataLoader(self.dataset, batch_size=batch_size, shuffle=False)
+            dataloader = DataLoader(self.dataset, batch_size=1024, shuffle=False)
 
             self.model.eval()
             all_logits = []

@@ -32,6 +32,7 @@ class Likelihood(str, Enum):
 class AggregationStrategy(str, Enum):
     JOIN = "join"
     SUMMARISE = "summarise"
+    SEPARATE = "separate"
 
 class BatchLengthSortMode(str, Enum):
     max = "max"

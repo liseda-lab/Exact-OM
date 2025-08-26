@@ -135,14 +135,32 @@ class TabularDataset(IDataset):
             inference_set["Label"] = inference_set["Label_y"].combine_first(inference_set["Label"])
             inference_set.drop(columns=["Label_y"], inplace=True)
 
-            # Log how many unique Source entities don't at least one correct mapping in the Dataset
-            unique_src_entities = len(inference_set["Src"].unique())
-            unique_src_entities_with_mappings = len(inference_set[inference_set["Label"] == 1]["Src"].unique())
-            unique_src_without_mappings = unique_src_entities - unique_src_entities_with_mappings
-            percentage = (unique_src_without_mappings / unique_src_entities) * 100
+            # Warn how many unique source-target pairs full reference has that are not in the candidates with percentage
+            unique_pairs_inference = set(zip(inference_set["Src"], inference_set["Tgt"]))
+            unique_pairs_full_ref = set(zip(self.full_reference["Src"], self.full_reference["Tgt"]))
+            missing_pairs = unique_pairs_full_ref - unique_pairs_inference  
 
-            if unique_src_without_mappings > 0:
-                self.log(f"#Found {unique_src_without_mappings}({percentage:.0%}) unique source entities without any possible mappings in candidates.", level="warning")
+            if missing_pairs:
+                missing_percentage = len(missing_pairs) / len(unique_pairs_full_ref) * 100
+                self.log(f"#Warning: {len(missing_pairs)} unique source-target pairs from full reference are not in the candidates ({missing_percentage:.2f}%)", level="warning")
+
+                # Warn how many unique source entities full reference has that are not in the candidates with percentage
+                unique_src_inference = set(inference_set["Src"].unique())
+                unique_src_full_ref = set(self.full_reference["Src"].unique())
+                missing_src = unique_src_full_ref - unique_src_inference
+
+                if missing_src:
+                    missing_percentage = len(missing_src) / len(unique_src_full_ref) * 100
+                    self.log(f"#Warning: {len(missing_src)} unique source entities from full reference are not in the candidates ({missing_percentage:.2f}%)", level="warning")
+
+                # Warn how many unique target entities full reference has that are not in the candidates with percentage
+                unique_tgt_inference = set(inference_set["Tgt"].unique())
+                unique_tgt_full_ref = set(self.full_reference["Tgt"].unique())
+                missing_tgt = unique_tgt_full_ref - unique_tgt_inference
+
+                if missing_tgt:
+                    missing_percentage = len(missing_tgt) / len(unique_tgt_full_ref) * 100
+                    self.log(f"#Warning: {len(missing_tgt)} unique target entities from full reference are not in the candidates ({missing_percentage:.2f}%)", level="warning")
 
 
         pre_filtered_set = pd.DataFrame()

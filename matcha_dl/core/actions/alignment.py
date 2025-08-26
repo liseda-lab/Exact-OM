@@ -13,6 +13,9 @@ from matcha_dl.impl.matcha import Matcha
 from matcha_dl.impl.seed import SeedSetter
 from matcha_dl.utils.directories import OEAIDirSearcher
 
+import shutil, yaml, os
+from datetime import datetime
+
 class AlignmentAction(Protocol):
     @staticmethod
     def run(
@@ -409,118 +412,74 @@ class DirectoryAlignmentAction(Protocol):
         elapsed_time = end_time - start_time
         logger.info(f"Directory alignment completed in {elapsed_time:.3f} seconds")
 
-class TuningAlignmentAction(Protocol):
+
+class TuningAlignmentAction:
     @staticmethod
     def run(
         source_file_path: Path,
         target_file_path: Path,
-        reference_file_path: Path,
-        candidates_file_path: Path,
-        output_dir_path: Path,
-        configs_file_path: Path,
+        reference_file_path: Path|None,
+        candidates_file_path: Path|None,
         full_reference_file_path: Path,
+        configs_file_path: Path,
+        output_dir_path: Path,
         save_logs: bool = False,
-        devices: Optional[List[int]] = None,
-        max_workers: Optional[int] = None,
-        max_combinations: Optional[int] = None,
+        extra_dirs: list[Path] = [],
+        tag: str|None = None,
     ) -> None:
-        
-
-        start_time = time.time()
-
         logger = logging.getLogger("matcha-dl-tuner")
-        logger.setLevel(logging.DEBUG)
+        logger.setLevel(logging.INFO)
 
+        # 1) load this one-combo YAML → model
+        cfg_dict  = yaml.safe_load(configs_file_path.read_text())
+        cfg_model = ConfigModel(**cfg_dict)
+
+        # 2) make run-dir
+        run_tag = tag or cfg_dict.get("tag") or datetime.now().strftime("%Y%m%d_%H%M%S")
+        run_dir = output_dir_path / run_tag
+        run_dir.mkdir(parents=True, exist_ok=True)
+
+        # 3) dump exact config
+        (run_dir/"config.yaml").write_text(yaml.safe_dump(cfg_dict))
+
+        # 4) copy extras in
+        for d in extra_dirs:
+            tgt = run_dir / d.name
+            if d.is_dir(): shutil.copytree(d, tgt)
+            else:           shutil.copy2(d, tgt)
+
+        # 5) optional file logging
         if save_logs:
-            temp_log = output_dir_path / "matcha_dl-tuner.log"
-            file_handler = logging.FileHandler(temp_log)
-            file_handler.setLevel(logging.DEBUG)
-            formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-            file_handler.setFormatter(formatter)
-            logger.addHandler(file_handler)
-            logger.info(f"Logging to file {temp_log}")
+            fh = logging.FileHandler(run_dir/f"tuner_{run_tag}.log")
+            fh.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
+            logger.addHandler(fh)
 
-        logger.debug(f"Logging level set to {logging.DEBUG}")
+        # 6) run alignment & catch errors
+        try:
+            start  = time.time()
+            out    = AlignmentAction.run(
+                        source_file_path        = source_file_path,
+                        target_file_path        = target_file_path,
+                        reference_file_path     = reference_file_path,
+                        candidates_file_path    = candidates_file_path,
+                        full_reference_file_path= full_reference_file_path,
+                        output_dir_path         = run_dir,
+                        configs_file_path       = configs_file_path,
+                        save_logs               = save_logs
+                     )
+            duration = time.time() - start
+            results  = out.get("results", {})
+            timings  = out.get("timings", {})
+            status   = "success"
+        except Exception as e:
+            logger.error(f"Run {run_tag} failed: {e}", exc_info=True)
+            results, timings, status = {}, {}, "error"
 
-        logger.info(f"Loading Possible Configs...")
-
-        config_tuner = ConfigTuner(configs_file_path)
-
-        tune_configs = config_tuner.load_tuned_config(max_combinations)
-
-        logger.info(f"Loaded {len(tune_configs)} {'random' if max_combinations is None else 'possible'} configurations")
-
-        logger.info(f"Running Alignments on possible combinations...")
-
-        from matcha_dl.utils.action import process_config
-
-        all_tuning_results = []
-        error_counts = 0
-
-        if max_workers is not None and devices is not None:
-                max_workers = min(max_workers, len(devices))
-
-        with Manager() as manager:
-            available_devices = manager.list(devices) if devices else None
-            condition = manager.Condition()
-             
-            with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
-                futures = [
-                    executor.submit(process_config, 
-                                    tag=str(i),
-                                    config=config, 
-                                    available_devices=available_devices,
-                                    condition=condition,
-                                    source_file_path=source_file_path, 
-                                    target_file_path=target_file_path, 
-                                    reference_file_path=reference_file_path, 
-                                    candidates_file_path=candidates_file_path, 
-                                    output_dir_path=output_dir_path, 
-                                    full_reference_file_path=full_reference_file_path, 
-                                    save_logs=save_logs)
-
-                    for i, config in enumerate(tune_configs)
-                ]
-                for future in concurrent.futures.as_completed(futures):
-                    try:
-                        tuning_result = future.result()
-                        all_tuning_results.append(tuning_result)
-                    except Exception as e:
-                        logger.error(f"Error processing combination: {e}", exc_info=True)
-                        error_counts += 1
-                        continue
-
-        if error_counts == len(tune_configs):
-            logger.error(f"All combinations failed")
-            return
-        elif error_counts > 0:
-            logger.warning(f"{error_counts} combinations failed")
-        else:
-            logger.info(f"All combinations run successfully")
-            
-        logger.info(f"Writing results...")
-
-        tuning_results_list = []
-        for tuning_result in all_tuning_results:
-            config_tag = tuning_result["config_tag"]
-            config = tuning_result["config"]
-            results = tuning_result["results"]
-            for task_name, result in results.items():
-                flattened_result = {"Config Tag": config_tag, "Task Name": task_name}
-                if isinstance(result, dict):
-                    flattened_result.update(result)
-                else:
-                    flattened_result["Result"] = result
-                flattened_result.update(config)
-                tuning_results_list.append(flattened_result)
-
-        tuning_df = pd.DataFrame(tuning_results_list)
-
-        tuning_df.to_csv(output_dir_path / "tuning_alignment_full_results.csv", index=False)
-
-        logger.info(f"Results written to {output_dir_path / 'tuning_alignment_full_results.csv'}")
-
-        end_time = time.time()
-        elapsed_time = end_time - start_time
-        logger.info(f"Tuning alignment completed in {elapsed_time:.3f} seconds")
-        
+        # 7) flatten & append to CSV safely
+        row        = {"tag": run_tag, "status": status, **flatten_config(cfg_model), **results, **timings}
+        df         = pd.DataFrame([row])
+        csv_path   = output_dir_path/"tuning_alignment_results.csv"
+        write_hdr  = not csv_path.exists() or os.path.getsize(csv_path)==0
+        with open(csv_path, "a", newline="") as f:
+            df.to_csv(f, index=False, header=write_hdr)
+        logger.info(f"Appended results for {run_tag}")
