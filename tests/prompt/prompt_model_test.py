@@ -2,13 +2,13 @@ import torch
 import pytest
 import pandas as pd
 
-from matcha_dl import init_jvm
+from exact import init_jvm
 init_jvm('32G')
 
 # Import the PromptClassifier and AggregationStrategy from your module.
 # Adjust the import path as needed.
-from matcha_dl.impl.models.prompt import PromptClassifier, AggregationStrategy
-from matcha_dl.core.entities.dataset import StaticPrompts
+from exact.impl.models.prompt import PromptClassifier, AggregationStrategy
+from exact.core.entities.dataset import StaticPrompts
 
 # --- Define dummy classes to replace the real tokenizer and model ---
 

@@ -1,6 +1,6 @@
 import pytest
 from pathlib import Path
-from matcha_dl import AlignmentRunner
+from exact import AlignmentRunner
 
 NCIT_DIR = Path.cwd() / "data" / "ncit-doid"
 TEST_DIR = Path.cwd() / "tests" / "test_data"

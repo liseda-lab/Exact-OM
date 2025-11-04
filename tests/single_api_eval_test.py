@@ -1,6 +1,6 @@
 import pytest
 from pathlib import Path
-from matcha_dl.delivery.api.eval import EvalutionRunner
+from exact.delivery.api.eval import EvalutionRunner
 
 DATA_DIR = Path.cwd() / "data"
 NCIT_DIR = DATA_DIR / "ncit-doid"

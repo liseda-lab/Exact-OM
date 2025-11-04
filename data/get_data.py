@@ -1,8 +1,8 @@
 
 from pathlib import Path
 
-from matcha_dl.utils.data import DataDownloader
-from matcha_dl.core.values import DATASET_URL
+from exact.utils.data import DataDownloader
+from exact.core.values import DATASET_URL
 
 DATA_DIR = Path(__file__).parent
 

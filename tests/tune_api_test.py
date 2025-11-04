@@ -21,7 +21,7 @@ def main():
     devices = [0]
     max_combinations = 2
 
-    from matcha_dl import TuningAlignmentRunner
+    from exact import TuningAlignmentRunner
 
     runner = TuningAlignmentRunner(
         source_ontology_file=source_ontology_file,

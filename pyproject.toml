@@ -1,12 +1,12 @@
 [tool.poetry]
-name = "matcha-dl"
-version = "2.0.0"
-description = "Matcha-DL is a tool for supervised ontology alignment. It takes as input two ontologies and a set of mappings between them, and learns a model that can predict mappings between the two ontologies."
+name = "Exact-OM"
+version = "1.0.0"
+description = "Exact is a deep learning framework for explainable ontology matching."
 authors = ["Pedro Cotovio <pgcotovio@gmail.com>"]
 readme = "README.md"
 repository = "https://github.com/liseda-lab/Matcha-DL"
 packages = [
-    { include = "matcha_dl" },
+    { include = "exact" },
 ]
 
 exclude = ["matcha_dl/impl/matcha/matcha/**/*"]
@@ -31,14 +31,9 @@ sentencepiece = "^0.2.0"
 gensim = "^4.3.3"
 
 
-# dgl = { url = "https://data.dgl.ai/wheels/torch-2.4/cu124/dgl-2.4.0%2Bcu124-cp310-cp310-manylinux1_x86_64.whl" }
-
-
 [tool.poetry.scripts]
-matchadl = "matcha_dl.delivery.cli.single_align:main"
-matchadl-eval = "matcha_dl.delivery.cli.eval:main"
-matchadl-dir = "matcha_dl.delivery.cli.dir_align:main"
-matchadl-tune = "matcha_dl.delivery.cli.tune_align:main"
+exact = "exact.delivery.cli.align:main"
+bioml-eval = "exact.delivery.cli.eval:main"
 
 
 [tool.poetry.group.prebuild.dependencies]

@@ -1,10 +1,10 @@
 import pandas as pd
 import pytest
-from matcha_dl.impl.datasets.tabular import TabularDataset 
-from matcha_dl.core.entities.dataset import StaticPrompts
-from matcha_dl.core.entities.configs.dataset import Separator, ComparisonType, ContextType, ContextSemantics, Likelihood
-from matcha_dl.core.entities.ontology import Entity
-from matcha_dl.impl.datasets.prompt import PromptDataset 
+from exact.impl.datasets.tabular import TabularDataset 
+from exact.core.entities.dataset import StaticPrompts
+from exact.core.entities.configs.dataset import Separator, ComparisonType, ContextType, ContextSemantics, Likelihood
+from exact.core.entities.ontology import Entity
+from exact.impl.datasets.prompt import PromptDataset 
 
 # Create dummy implementations for StaticPrompts functions/attributes.
 StaticPrompts.SKELETON = "SKELETON $TC $TYPE $CTX_S $CTX_T $I $CONF $E $S $T"
