@@ -1,23 +1,7 @@
-import os
-import tarfile
-import urllib.request
 from pathlib import Path
 
-MATCHA_DL_DIR = Path(__file__).parent
-DEFAULT_CONFIG_PATH = MATCHA_DL_DIR / "default_config.yaml"
-
-# If matchaJar and dependencies don't exist, download them.
-
-if not (MATCHA_DL_DIR / "impl/matcha/matcha/").exists():
-
-    print("Matcha-DL jar and dependencies not found. Downloading...")
-
-    from .core.values import MATCHA_URL
-    from .utils.data import DataDownloader
-
-    # Create an instance of DataDownloader
-    downloader = DataDownloader(str(MATCHA_DL_DIR / "impl/matcha/"))
-    downloader.download_matcha(MATCHA_URL)
+EXACT_DIR = Path(__file__).parent
+DEFAULT_CONFIG_PATH = EXACT_DIR / "default_config.yaml"
 
 ## Load default configuration file
 
@@ -31,4 +15,4 @@ from mowl import init_jvm
 
 # Get AlignmentRunner
 
-from .delivery.api import AlignmentRunner, EvalutionRunner, TuningAlignmentRunner, DirectoryAlignmentRunner
+from .delivery.api import AlignmentRunner, EvalutionRunner

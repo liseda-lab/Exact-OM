@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 import torch as th
 from torch import device as tdevice
+import json
 
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -18,16 +19,11 @@ from exact.core.entities.registry import ComponentType
 from exact.core.entities.mappings import EntityMapping
 from exact.utils.mappings import fill_anchored_scores
 from exact.utils.data import read_table
-from exact.core.entities.dataset import DatasetMask
+from exact.core.entities.configs.dataset import DatasetMask
 
 if TYPE_CHECKING:
     from exact.core.contracts.dataset import IDataset
-    from exact.core.contracts.loss import ILoss
     from exact.core.contracts.model import IModel
-    from exact.core.contracts.optimizer import IOptimizer
-    from exact.core.contracts.stopper import IStopper
-
-# TODO implement LR scheduler
 
 
 class ITrainer(SelfRegisteringComponent, LoggingClass):
@@ -42,7 +38,6 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
         device: tdevice = tdevice("cuda" if th.cuda.is_available() else "cpu"),
         output_dir: Optional[Path] = None,
         logger: Optional[logging.Logger] = None,
-        plot_params: Optional[Dict[str, Any]] = {},
         **kwargs,
     ):
         
@@ -52,14 +47,15 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
 
         self._dataset = dataset
         self._device = device
-        self._model = model(**model_params).to(self.device)
-        self._plot_params = plot_params
+        self._model = model(device=device, **model_params).to(self.device)
+
+        self._results_json: List[Dict[str, Any]] = []
+        self._results_df: Optional[pd.DataFrame] = None
         
         self._output_dir = output_dir
 
         # Create output directories
 
-        self.checkpoints_dir.mkdir(parents=True, exist_ok=True)
         self.logs_dir.mkdir(parents=True, exist_ok=True)
         self.alignment_dir.mkdir(parents=True, exist_ok=True)
         self.plot_dir.mkdir(parents=True, exist_ok=True)
@@ -77,20 +73,12 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
         return self._model
 
     @property
-    def seed(self) -> int:
-        return self._seed
-
-    @property
     def output_dir(self) -> Path:
         return self._output_dir
     
     @property
     def plot_dir(self) -> Path:
         return (self._output_dir / "plots").resolve()
-    
-    @property
-    def plot_params(self) -> Dict[str, Any]:
-        return self._plot_params
 
     @property
     def logs_dir(self) -> Path:
@@ -100,6 +88,13 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
     def alignment_dir(self) -> Path:
         return (self._output_dir / "alignment").resolve()
 
+    @property
+    def results_json(self) -> List[Dict[str, Any]]:
+        return self._results_json
+
+    @property
+    def results_df(self) -> Optional[pd.DataFrame]:
+        return self._results_df
 
     @abstractmethod
     def predict(self, kind: DatasetMask = DatasetMask.inference, 
@@ -109,11 +104,114 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
         
         pass
 
-    def apply_prefilter(self, threshold: Optional[float] = None, cardinality: Optional[int] = None, **kwargs) -> List[EntityMapping]:
+    def apply_prefilter(self,
+                        alignment: List[EntityMapping],
+                        threshold: Optional[float] = None,
+                        cardinality: Optional[int] = None,
+                        **kwargs
+    ) -> List[EntityMapping]:
         """
-        Apply prefiltering to the dataset. This method should be implemented in the derived class.
+        Apply prefiltering to the dataset based on the features.
         """
-        pass
+        
+        df = self.dataset.dataframe.copy()
+        df = df[df[DatasetMask.prefiltered] == True]
+
+        if df.empty:
+            self.log("No data to prefilter", level="warning")
+            return alignment
+
+        prefiltered_mappings = EntityMapping.read_table_mappings(df[["Src", "Tgt", "Scores"]], threshold=threshold, cardinality=cardinality)
+        final_alignment = alignment + prefiltered_mappings
+        
+        if cardinality is not None:
+            return EntityMapping.filter_top_n_entity_mappings(final_alignment, cardinality)
+        
+        return final_alignment
+
+    def save_results(
+        self,
+        preds: List[EntityMapping],
+        sub_dir: Optional[str] = None,
+        candidates_one2many_path: Optional[Path] = None,
+        save_json: bool = True,
+        save_csv: bool = True,
+        save_stats_csv: bool = True,
+        append_stats_to_summary_csv: bool = False,
+        review_low: Optional[float] = None,
+        review_high: Optional[float] = None,
+        **kwargs
+    ) -> Dict[str, Path]:
+        """
+        Saves TSVs (alignment), JSON (explanations), CSV (summary), and run-level stats.
+        Returns dict of output file paths.
+        """
+        output_paths = {}
+
+        # ---- Alignments (existing behavior)
+        align_path = self.save_alignment(
+            preds=preds,
+            candidates_one2many_path=candidates_one2many_path,
+            sub_dir=sub_dir,
+        )
+        output_paths["alignment_tsv"] = Path(align_path)
+
+        out_dir = (self.alignment_dir / (sub_dir or "default")).resolve()
+        out_dir.mkdir(parents=True, exist_ok=True)
+
+        # ---- Explanations JSON
+        if save_json and self.results_json:
+            json_path = out_dir / "full_explanations.json"
+            with open(json_path, "w", encoding="utf-8") as f:
+                json.dump(self.results_json, f, indent=2, ensure_ascii=False)
+            self.log(f"Saved full explanations JSON → {json_path}", level="info")
+            output_paths["explanations_json"] = json_path
+
+        # ---- Summary CSV
+        if save_csv and self.results_json:
+            csv_path = out_dir / "summary_metrics.csv"
+            self.results_df.to_csv(csv_path, sep="\t", index=False)
+            self.log(f"Saved numeric summary CSV → {csv_path}", level="info")
+            output_paths["summary_csv"] = csv_path
+
+            # ---- Run-level stats
+            stats = self._compute_run_stats(self.results_df, review_low=review_low, review_high=review_high)
+            stats_json_path = out_dir / "run_stats.json"
+            with open(stats_json_path, "w", encoding="utf-8") as f:
+                json.dump(stats, f, indent=2, ensure_ascii=False)
+            self.log(f"Saved run-level stats JSON → {stats_json_path}", level="info")
+            output_paths["run_stats_json"] = stats_json_path
+
+            if save_stats_csv:
+                # One-row CSV for spreadsheet usage
+                flat = {
+                    "n_mappings": stats.get("n_mappings"),
+                    "n_llm": stats.get("n_llm"),
+                    "frac_llm": stats.get("frac_llm"),
+                    "frac_review_band": stats.get("frac_review_band"),
+                }
+                # flatten metric aggregates: e.g., S_final_mean, S_final_std, ...
+                for col, agg in (stats.get("metrics") or {}).items():
+                    for k, v in agg.items():
+                        flat[f"{col}_{k}"] = v
+                # add triple_importance aggregates if available
+                if stats.get("triple_importance"):
+                    for k, v in stats["triple_importance"].items():
+                        flat[f"triple_importance_{k}"] = v
+
+                stats_csv_path = out_dir / "run_stats.csv"
+                pd.DataFrame([flat]).to_csv(stats_csv_path, index=False)
+                self.log(f"Saved run-level stats CSV → {stats_csv_path}", level="info")
+                output_paths["run_stats_csv"] = stats_csv_path
+
+            if append_stats_to_summary_csv:
+                # Append a footer block to the summary CSV (human-readable)
+                with open(csv_path, "a", encoding="utf-8") as f:
+                    f.write("\n# ---- RUN STATS (human-readable footer) ----\n")
+                    f.write(json.dumps(stats, indent=2))
+                self.log("Appended run stats as footer to summary CSV.", level="info")
+
+        return output_paths
 
     def save_alignment(self, 
                        preds: List[EntityMapping], 
@@ -166,84 +264,150 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
 
         return local_dir
     
-    def plot_score_distribution(
+    def _make_summary_dataframe(self, records: List[Dict[str, Any]]) -> pd.DataFrame:
+        """
+        Extracts numeric metrics and weights into a flat DataFrame for plotting.
+        """
+        rows = []
+        for rec in records:
+            base = {
+                "src_iri": rec.get("src_iri"),
+                "tgt_iri": rec.get("tgt_iri"),
+            }
+            conf = rec.get("confidences", {})
+            wts = rec.get("weights", {})
+            imps = rec.get("importances", {})
+            base.update({**conf, **wts, **imps})
+            rows.append(base)
+        return pd.DataFrame(rows)
+
+    
+    def plot_distributions(
         self,
-        df: pd.DataFrame,
-        kind: DatasetMask,
-        figsize: Tuple[int, int] = (8, 6),
-        kde: bool = False,
+        which: List[str] = ["S_final", "I_label", "I_ctx", "I_llm", "w_c", "w_i"],
+        kind: DatasetMask = DatasetMask.inference,
         bins: int = 30,
-        all_alpha: float = 0.4,
+        kde: bool = True,
+        figsize: Tuple[int, int] = (7, 5),
+        alpha: float = 0.6,
         dpi: int = 300,
-        grid: bool = True,
-        log_scale: bool = False,
-        x_clip: Optional[float] = None,
-        **kwargs
-    ) -> None:
+        **kwargs,
+    ):
         """
-        Overlaid histogram/KDE of scores. If both labels {0,1} present, plots
-        green=Positive, red=Negative. If only one label, plots a single
-        blue “Distribution”.
+        Plots histogram/KDE for any numeric metrics in the summary CSV or DataFrame.
+        Example columns: ["S_final", "I_label", "I_ctx", "I_llm", "w_c", "w_i"].
         """
-        labels = sorted(df["Label"].unique(), reverse=True)
-        if len(labels) > 2:
-            self.log(f"Expected ≤2 labels, found {labels}. Skipping plot.", level="warning")
+        if self.results_df is None or self.results_df.empty:
+            self.log("No numeric results to plot.", level="warning")
             return
 
-        fig, ax = plt.subplots(figsize=figsize)
-        # decide how to name & color each series
-        for lbl in labels:
-            if len(labels) == 1:
-                label_name = "Distribution"
-                label_color = "blue"
-                subset = df["Scores"]
-            else:
-                # exactly two labels case
-                if lbl == 1:
-                    label_name = "Positive"
-                    label_color = "green"
-                else:
-                    label_name = "Negative"
-                    label_color = "red"
-                subset = df[df["Label"] == lbl]["Scores"]
-
-            if subset.empty:
-                self.log(f"Empty subset for label {lbl}: skipping.", level="warning")
+        for col in which:
+            if col not in self.results_df.columns:
+                self.log(f"Column {col} missing in summary DF; skipping.", level="warning")
                 continue
 
+            plt.figure(figsize=figsize)
             sns.histplot(
-                subset,
-                bins=bins,
+                self.results_df[col].dropna(),
                 kde=kde,
+                bins=bins,
+                color="royalblue",
+                alpha=alpha,
                 stat="probability",
-                alpha=all_alpha,
-                color=label_color,
-                label=label_name,
-                ax=ax,
-                common_norm=False
             )
+            plt.title(f"{kind.name}: {col} distribution")
+            plt.xlabel(col)
+            plt.ylabel("Probability")
+            plt.grid(True)
+            plt.tight_layout()
 
-        # axis transforms
-        if log_scale:
-            ax.set_xscale("log")
-        if x_clip is not None:
-            cutoff = float(df["Scores"].quantile(x_clip))
-            ax.set_xlim(0, cutoff)
+            out_path = self.plot_dir / f"{kind.name.lower()}_{col}_dist.png"
+            plt.savefig(out_path, dpi=dpi)
+            plt.close()
+            self.log(f"Saved {col} distribution plot to {out_path}", level="debug")
 
-        # labels & title
-        ax.set_xlabel("Model score")
-        ax.set_ylabel("Probability")
-        ax.set_title(f"{kind.name.capitalize()} Score Distribution")
+    def _compute_run_stats(
+        self,
+        df: pd.DataFrame,
+        review_low: Optional[float] = None,
+        review_high: Optional[float] = None,
+    ) -> Dict[str, Any]:
+        """
+        Produces a dict with:
+          - dataset-level counters (n_mappings, n_llm, frac_llm, frac_review_band)
+          - numeric column aggregates (mean, std, min, max, p25, p50, p75)
+          - triple-importance aggregates (if 'triple_importances' present in JSON)
+        """
+        stats: Dict[str, Any] = {}
 
-        if grid:
-            ax.grid(True)
-        ax.legend()
-        plt.tight_layout()
+        # --- basics
+        n = len(df)
+        stats["n_mappings"] = int(n)
 
-        # save
-        suffix = "_single" if len(labels) == 1 else ""
-        out_file = self.plot_dir / f"{kind.name.lower()}_score_dist{suffix}.png"
-        fig.savefig(out_file, dpi=dpi)
-        plt.close(fig)
+        # LLM usage if available
+        if "w_i" in df.columns:
+            n_llm = int((df["w_i"] > 0).sum())
+        elif "need_llm" in df.columns:
+            n_llm = int(df["need_llm"].astype(bool).sum())
+        else:
+            n_llm = None
+        stats["n_llm"] = n_llm
+        stats["frac_llm"] = (n_llm / n) if (n_llm is not None and n > 0) else None
 
-        self.log(f"Saved score distribution plot to {out_file}", level="debug")
+        # review band if thresholds are recorded in rows (optional)
+        frac_review = None
+        if review_low is not None and review_high is not None and "S_final" in df.columns and n > 0:
+            in_band = ((df["S_final"] >= review_low) & (df["S_final"] <= review_high)).sum()
+            frac_review = in_band / n
+        stats["frac_review_band"] = frac_review
+
+        # --- numeric aggregates
+        numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+        per_col = {}
+        for col in numeric_cols:
+            series = df[col].dropna().astype(float)
+            if series.empty:
+                continue
+            per_col[col] = {
+                "mean": float(series.mean()),
+                "std": float(series.std(ddof=0)),
+                "min": float(series.min()),
+                "p25": float(series.quantile(0.25)),
+                "p50": float(series.quantile(0.50)),
+                "p75": float(series.quantile(0.75)),
+                "max": float(series.max()),
+            }
+        stats["metrics"] = per_col
+
+        # --- triple-level importance aggregates (if present in self.results_json)
+        # Flatten all I_i across mappings, if present
+        all_I = []
+        for rec in getattr(self, "results_json", []) or []:
+            ctx = rec.get("context", {})
+            # support either list of importances or list of triples-with-importance
+            if "triple_importances" in ctx and isinstance(ctx["triple_importances"], list):
+                # format: [{"triple": "...", "importance": float, ...}, ...] OR [float, ...]
+                vals = []
+                for entry in ctx["triple_importances"]:
+                    if isinstance(entry, dict) and "importance" in entry:
+                        vals.append(entry["importance"])
+                    elif isinstance(entry, (int, float)):
+                        vals.append(float(entry))
+                all_I.extend(vals)
+
+        if all_I:
+            series = pd.Series(all_I, dtype=float)
+            stats["triple_importance"] = {
+                "n_edges": int(series.size),
+                "mean": float(series.mean()),
+                "std": float(series.std(ddof=0)),
+                "min": float(series.min()),
+                "p25": float(series.quantile(0.25)),
+                "p50": float(series.quantile(0.50)),
+                "p75": float(series.quantile(0.75)),
+                "max": float(series.max()),
+            }
+        else:
+            stats["triple_importance"] = None
+
+        return stats

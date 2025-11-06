@@ -6,7 +6,4 @@ class ComponentType(Enum):
     MODEL = "model"
     DATASET = "dataset"
     TRAINER = "trainer"
-    LOSS = "loss"
-    OPTIMIZER = "optimizer"
-    STOPPER = "stopper"
     METRIC = "metric"

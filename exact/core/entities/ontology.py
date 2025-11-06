@@ -446,6 +446,37 @@ class OntologyGraph:
                 for src, rel, dst in selected
             ]
         return selected
+    
+    @staticmethod
+    def normalize_label(text: str) -> str:
+        """Lowercase and remove spaces/punctuation for exact-matching."""
+        import re
+        if text is None:
+            return ""
+        t = text.lower()
+        t = re.sub(r"[\W_]+", "", t)  # drop non-alnum incl. underscores
+        return t
+
+    def get_all_classes(self) -> List[str]:
+        """
+        Return all named class IRIs present in the ontology.
+        Uses the OWLAPI signature for robustness.
+        """
+        out = []
+        for cls in self.ontology.getClassesInSignature():
+            out.append(cls.getIRI().toString())
+        return out
+
+    def get_labels_map(self) -> Dict[str, List[str]]:
+        """
+        Map: class IRI -> list of labels (cached).
+        Ensures at least one fallback short form if none found.
+        """
+        return {iri: self.get_labels(iri) for iri in self.get_all_classes()}
+
+    def get_primary_label(self, iri: str) -> str:
+        """Return the first (primary) label for a class IRI (always exists)."""
+        return self.get_labels(iri)[0]
 
 
 class Entity:

@@ -1,3 +1,1 @@
-from .mlp import MlpClassifier
-from .prompt import PromptClassifier
-from .encoder import EncoderClassifier
+from .semantic_scorer import SemanticScorer

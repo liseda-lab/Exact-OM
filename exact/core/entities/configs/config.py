@@ -40,48 +40,72 @@ class ModelParams(RegistryParams):
 class DatasetParams(BaseModel):
     # General Params
     num_workers: Optional[int] = Field(config["dataset_params"]["num_workers"])
-    pre_filtering: Optional[bool] = Field(config["dataset_params"]["pre_filtering"])
-    sanity_check: Optional[bool] = Field(config["dataset_params"]["sanity_check"])
+    filter_exact_matches: bool = Field(config["dataset_params"]["filter_exact_matches"])
 
-    # Context Tabular Params
-    n_hops: Optional[int] = Field(config["dataset_params"]["n_hops"])
-    context_method: Optional[ContextMethod] = Field(config["dataset_params"]["context_method"], validate_default=True)
-    context_hop_penalty: Optional[float] = Field(config["dataset_params"]["context_hop_penalty"])
-    context_token_ratio: Optional[float] = Field(config["dataset_params"]["context_token_ratio"])
-    context_safety: Optional[float] = Field(config["dataset_params"]["context_safety"])
-    best_path_src_method: Optional[BestPathMethod] = Field(config["dataset_params"]["best_path_src_method"], validate_default=True)
+    # Context Main Params
+    n_hops: int = Field(config["dataset_params"]["n_hops"])
+    context_method: ContextMethod = Field(config["dataset_params"]["context_method"], validate_default=True)
+    best_path_method: BestPathMethod = Field(config["dataset_params"]["best_path_method"], validate_default=True)
+    context_hop_penalty: float = Field(config["dataset_params"]["context_hop_penalty"])
+    context_token_ratio: float = Field(config["dataset_params"]["context_token_ratio"])
+    context_safety: float = Field(config["dataset_params"]["context_safety"])
+    max_input_tokens_context: int = Field(config["dataset_params"]["max_input_tokens_context"])
+    only_taxonomy: bool = Field(config["dataset_params"]["only_taxonomy"])
+    all_labels: bool = Field(config["dataset_params"]["all_labels"])
+    # Verbaliser Params
     verbaliser_name: Optional[str] = Field(config["dataset_params"]["verbaliser_name"])
-    gen_max_new_tokens: Optional[int] = Field(config["dataset_params"]["gen_max_new_tokens"])
-    do_sample: Optional[bool] = Field(config["dataset_params"]["do_sample"])
-    temperature: Optional[float] = Field(config["dataset_params"]["temperature"])
+    gen_max_new_tokens: int = Field(config["dataset_params"]["gen_max_new_tokens"])
+    do_sample: bool = Field(config["dataset_params"]["do_sample"])
+    temperature: float = Field(config["dataset_params"]["temperature"])
     top_k: Optional[int] = Field(config["dataset_params"]["top_k"])
-    top_p: Optional[float] = Field(config["dataset_params"]["top_p"])
-    num_beams: Optional[int] = Field(config["dataset_params"]["num_beams"])
-    batch_size: Optional[int] = Field(config["dataset_params"]["batch_size"])
-    cache_chunk_size: Optional[int] = Field(config["dataset_params"]["cache_chunk_size"])
-    delimiter: Optional[str] = Field(config["dataset_params"]["delimiter"])
-    exclude_missing_dr: Optional[bool] = Field(config["dataset_params"]["exclude_missing_dr"])
-    encoding_max_length: Optional[int] = Field(config["dataset_params"]["encoding_max_length"])
-    gen_max_length: Optional[int] = Field(config["dataset_params"]["gen_max_length"])
-    summariser_name: Optional[str] = Field(config["dataset_params"]["summariser_name"])
-    max_verb_gen_retries: Optional[int] = Field(config["dataset_params"]["max_verb_gen_retries"])
-    smallest_batch_first: Optional[bool] = Field(config["dataset_params"]["smallest_batch_first"])
-    only_taxonomy: Optional[bool] = Field(config["dataset_params"]["only_taxonomy"])
-    sanity_check_n_samples: Optional[int] = Field(config["dataset_params"]["sanity_check_n_samples"])
-    all_labels: Optional[bool] = Field(config["dataset_params"]["all_labels"])
-        
+    top_p: float = Field(config["dataset_params"]["top_p"])
+    max_verb_gen_retries: int = Field(config["dataset_params"]["max_verb_gen_retries"])
+    # Efficiency Params
+    batch_size_verbaliser: int = Field(config["dataset_params"]["batch_size_verbaliser"])
+    exclude_missing_dr: bool = Field(config["dataset_params"]["exclude_missing_dr"])
+    # Context Agregation Params
+    delimiter: str = Field(config["dataset_params"]["delimiter"])
+    # Plotting Params
+    which: Optional[List[str]] = Field(config["dataset_params"]["which"])
+
+class CandidatesParams(BaseModel):
+    lexical_encoder_name: Optional[str] = Field(config["candidates_params"]["lexical_encoder_name"])
+    encode_batch_size: int = Field(config["candidates_params"]["encode_batch_size"])
+    search_batch_size: int = Field(config["candidates_params"]["search_batch_size"])
+    top_k: int = Field(config["candidates_params"]["top_k"])
+    use_amp: bool = Field(config["candidates_params"]["use_amp"])
+
+class SanityCheckParams(BaseModel):
+    sanity_check: bool = Field(config["sanity_check_params"]["sanity_check"])
+    n: int = Field(config["sanity_check_params"]["n"])
+    max_ctx_show: int = Field(config["sanity_check_params"]["max_ctx_show"])
+    max_label_show: int = Field(config["sanity_check_params"]["max_label_show"])
+
+class PlotParams(BaseModel):
+    bins: int = Field(config["plot_params"]["bins"])
+    figsize: Tuple[int, int] = Field(tuple(config["plot_params"]["figsize"]))
+    dpi: int = Field(config["plot_params"]["dpi"])
+    kde: bool = Field(config["plot_params"]["kde"])
+    alpha: float = Field(config["plot_params"]["alpha"])
+
 
 class InferenceParams(BaseModel):
-    epochs: int = Field(config["inference_params"]["epochs"])
     batch_size: int = Field(config["inference_params"]["batch_size"])
     num_workers: int = Field(config["inference_params"]["num_workers"])
     log_every: int = Field(config["inference_params"]["log_every"])
     mixed_precision: bool = Field(config["inference_params"]["mixed_precision"])
+    which: Optional[List[str]] = Field(config["inference_params"]["which"])
 
 
 class AlignmentParams(BaseModel):
     threshold: Optional[float] = Field(config["alignment_params"]["threshold"])
     cardinality: Optional[int] = Field(config["alignment_params"]["cardinality"])
+    save_json: bool = Field(config["alignment_params"]["save_json"])
+    save_csv: bool = Field(config["alignment_params"]["save_csv"])
+    save_stats_csv: bool = Field(config["alignment_params"]["save_stats_csv"])
+    append_stats_to_summary_csv: bool = Field(config["alignment_params"]["append_stats_to_summary_csv"])
+    review_low: Optional[float] = Field(config["alignment_params"]["review_low"])
+    review_high: Optional[float] = Field(config["alignment_params"]["review_high"])
 
 class ConfigModel(BaseModel):
 
@@ -89,6 +113,9 @@ class ConfigModel(BaseModel):
     logging_level: int = Field(config["logging_level"], validate_default=True)
     use_file_cache: bool = Field(config["use_file_cache"])
     dataset_params: DatasetParams = DatasetParams()
+    candidates_params: CandidatesParams = CandidatesParams()
+    plot_params: PlotParams = PlotParams()
+    sanity_check_params: SanityCheckParams = SanityCheckParams()
     alignment_params: AlignmentParams = AlignmentParams()
     inference_params: InferenceParams = InferenceParams()
     model: ModelParams = ModelParams()
@@ -114,6 +141,9 @@ class ConfigModel(BaseModel):
         yaml_config = read_yaml(file_path)
 
         dataset_params = DatasetParams(**yaml_config.get("dataset_params", {}))
+        candidates_params = CandidatesParams(**yaml_config.get("candidates_params", {}))
+        plot_params = PlotParams(**yaml_config.get("plot_params", {}))
+        sanity_check_params = SanityCheckParams(**yaml_config.get("sanity_check_params", {}))
         alignment_params = AlignmentParams(**yaml_config.get("alignment_params", {}))
         inference_params = InferenceParams(**yaml_config.get("inference_params", {}))
         model_params = ModelParams(**yaml_config.get("model", {}))
@@ -124,11 +154,14 @@ class ConfigModel(BaseModel):
             for k, v in yaml_config.items()
             if v is not None
             and k in cls.model_fields
-            and k not in ["dataset_params", "alignment_params", "inference_params", "model"]
+            and k not in ["dataset_params", "candidates_params", "alignment_params", "inference_params", "model", "plot_params", "sanity_check_params"]
         }
 
         return cls(
             dataset_params=dataset_params,
+            candidates_params=candidates_params,
+            plot_params=plot_params,
+            sanity_check_params=sanity_check_params,
             alignment_params=alignment_params,
             inference_params=inference_params,
             model=model_params,

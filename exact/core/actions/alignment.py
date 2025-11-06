@@ -7,14 +7,12 @@ from multiprocessing import Manager
 import pandas as pd
 
 from exact.core.actions.evaluation import EvaluationAction
-from exact.core.entities.configs.config import ConfigModel, ConfigTuner
-from exact.core.entities.directories import OEAIDir
-from exact.impl.matcha import Matcha
+from exact.core.entities.configs.config import ConfigModel
 from exact.impl.seed import SeedSetter
-from exact.utils.directories import OEAIDirSearcher
 
 import shutil, yaml, os
 from datetime import datetime
+import torch
 
 class AlignmentAction(Protocol):
     @staticmethod
@@ -77,9 +75,10 @@ class AlignmentAction(Protocol):
             logger.info(f"Setting seed to {configs.seed}")
             SeedSetter(configs.seed)
 
-        # Matcha module
+        if device is not None and not torch.cuda.is_available():
+            logger.warning(f"CUDA device specified but not available. Using CPU instead.")
 
-        logger.info(f"Matching {source_file_path} and {target_file_path}")
+        device = torch.device(device) if device is not None and torch.cuda.is_available() else torch.device('cpu')
 
         # Create Dataset
 
@@ -90,19 +89,27 @@ class AlignmentAction(Protocol):
             output_path=output_dir_path,
             logger=logger,
             cache_ok=configs.use_file_cache,
-            plot_params=configs.plot_params.model_dump(),
+            device=device
             **configs.dataset_params.model_dump(),
         )
 
         dataset.load_ontologies(source_file_path, target_file_path)
 
         if not dataset.has_cache():
-            dataset.load_candidates(candidates_file_path)
 
             if full_reference_file_path is not None:
                 dataset.load_reference(full_reference_file_path)
+            
+            dataset.load_candidates(candidates_file_path, device=device, **configs.candidates_params.model_dump())
 
         dataset.process()
+
+        dataset.log_sanity_examples(**configs.sanity_check_params.model_dump())
+
+        dataset.plot_feature_distributions(
+            which=configs.dataset_params.which,
+            **configs.plot_params.model_dump()
+        )
 
         dataset_end = time.time()
         dataset_elapsed = (dataset_end - dataset_start) / 60
@@ -116,11 +123,10 @@ class AlignmentAction(Protocol):
         trainer = configs.trainer(
             dataset=dataset,
             model=configs.model.name,
-            model_params=configs.model.params,
-            device=device if device is not None else 'cpu',
+            model_params=configs.model.params.update(**configs.alignment_params.model_dump()),
+            device=device,
             output_dir= output_dir_path / "model",
             logger=logger,
-            plot_params=configs.plot_params.model_dump()
         )
 
         logger.info(f"Computing alignment...")
@@ -128,20 +134,20 @@ class AlignmentAction(Protocol):
         alignment_start = time.time()
 
         if candidates_file_path is None:
-            alignment, _ = trainer.predict(**configs.training_params.model_dump(), **configs.alignment_params.model_dump())
+            alignment, avg_t = trainer.predict(**configs.inference_params.model_dump(), **configs.alignment_params.model_dump())
         else:
-            alignment, _ = trainer.predict(**configs.training_params.model_dump())
+            alignment, avg_t = trainer.predict(**configs.inference_params.model_dump())
 
-        if dataset.pre_filtering:
-            logger.info(f"Applying pre-filtering to alignment...")
+        logger.info(f"Average inference time per example: {avg_t:.4f} seconds")
+
+        if dataset.filter_exact_matches:
+            logger.info(f"Applying Exact Matches to alignment...")
 
             if candidates_file_path is None:
-                pre_filtered_mappings = trainer.apply_prefilter(**configs.alignment_params.model_dump())
-            
-            else:
-                pre_filtered_mappings = trainer.apply_prefilter()
+                alignment = trainer.apply_prefilter(alignment, **configs.alignment_params.model_dump())
 
-            alignment += pre_filtered_mappings
+            else:
+                alignment = trainer.apply_prefilter(alignment)
 
         alignment_end = time.time()
         alignment_elapsed = (alignment_end - alignment_start) / 60
@@ -151,11 +157,19 @@ class AlignmentAction(Protocol):
         
         logger.info(f"Writing alignment...")
 
-        alignment_file_path = trainer.save_alignment(alignment, 
+        alignment_file_path = trainer.save_results(alignment, 
                                                      candidates_one2many_path=candidates_file_path, 
-                                                     sub_dir=task_name)
+                                                     sub_dir=task_name,
+                                                     **configs.alignment_params.model_dump()
+                                                     )["alignment_tsv"]
 
         logger.info(f"Alignment written to {alignment_file_path}")
+
+        # Plot Distributions
+        trainer.plot_distributions(
+            which=configs.inference_params.which,
+            **configs.plot_params.model_dump()
+        )
 
         # Evaluate Alignment
 
