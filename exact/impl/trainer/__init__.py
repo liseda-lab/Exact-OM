@@ -1,1 +1,1 @@
-from .semantic_runner import SemanticRunner
+from .semantic_runner import SemanticAlignmentRunner

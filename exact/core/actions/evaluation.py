@@ -30,7 +30,7 @@ class EvaluationAction(Protocol):
         # Load logging configuration
 
         if logger is None:
-            logger = logging.getLogger("matcha-dl-evaluation")
+            logger = logging.getLogger("OAEI-BIO-ML:eval")
 
             if log_level is not None:
                 log_level = getattr(logging, log_level)

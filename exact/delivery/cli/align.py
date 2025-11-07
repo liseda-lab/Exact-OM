@@ -15,7 +15,7 @@ def run_alignment(args):
         training_reference_file_path=Path(args.training_reference_file).resolve() if args.training_reference_file else None,
         full_reference_file_path=Path(args.full_reference_file).resolve() if args.full_reference_file else None,
         candidates_file_path=Path(args.candidates_file).resolve() if args.candidates_file else None,
-        log_file_path=Path(args.output_dir).resolve() / "matcha_dl.log" if args.save_logs else None,
+        log_file_path=Path(args.output_dir).resolve() / "exact.log" if args.save_logs else None,
         run_eval=args.run_eval,
         device=args.device
     )

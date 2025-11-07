@@ -16,7 +16,7 @@ def run_evaluation(args):
         train_reference_file_path=Path(args.train_reference_file).resolve() if args.train_reference_file else None,
         full_reference_file_path=Path(args.full_reference_file).resolve() if args.full_reference_file else None,
         reference_candidates=Path(args.reference_candidates).resolve() if args.reference_candidates else None,
-        log_file_path=Path(args.output_dir).resolve() / "matcha_dl_eval.log" if args.save_logs else None,
+        log_file_path=Path(args.output_dir).resolve() / "OAEI_bio_ml_eval.log" if args.save_logs else None,
         log_level=args.log_level,
     )
 

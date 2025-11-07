@@ -1,10 +1,11 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, List, Optional, Tuple, Any, Union
 
 import random
 import json
+import re
 import torch
 
 from torch.utils.data import Dataset
@@ -21,22 +22,27 @@ from exact.core.entities.configs.dataset import DatasetMask, ContextMethod, Best
 from exact.core.contracts.dataset import IDataset, DataFrame
 from exact.core.entities.ontology import OntologyGraph, Entity
 
-def _prompt_verbalize(head: str, rel: str, tail: str) -> str:
-    return (
-        "You are an ontology expert natural language generator that converts structured data into a coherent sentence.\n"
-        "Given the triple below, generate one complete, grammatically correct sentence that clearly expresses the relationship "
-        "between the head and the tail as indicated by the relation. You must use the exact wording of HEAD and TAIL.\n"
-        f"HEAD: {head}\nRELATION: {rel}\nTAIL: {tail}\nSentence:"
-    )
+def _prompt_verbalize(head: str, rel: str, tail: str) -> Dict[str, str]:
+    return {
+        "system": "You are an ontology expert natural language generator that converts structured data into coherent sentences.",
+        "user": (
+            "Given the triple below, generate one complete, grammatically correct sentence that clearly expresses the relationship "
+            "between the head and the tail as indicated by the relation. You must use the exact wording of HEAD and TAIL.\n"
+            f"HEAD: {head}\nRELATION: {rel}\nTAIL: {tail}\nSentence:"
+        ),
+    }
 
-def _prompt_corrective(prev_sentence: str, head: str, tail: str) -> str:
-    return (
-        "You previously generated the following incorrect sentence that failed to use the exact entity names.\n"
-        f"Incorrect: {prev_sentence}\n"
-        f"Please regenerate a single sentence that uses EXACTLY these surface forms for the entities:\n"
-        f"HEAD must appear as: {head}\nTAIL must appear as: {tail}\n"
-        "Provide only the corrected sentence:"
-    )
+def _prompt_corrective(prev_sentence: str, head: str, tail: str) -> Dict[str, str]:
+    return {
+        "system": "You are an ontology expert natural language generator that strictly follows the requested surface forms.",
+        "user": (
+            "You previously generated the following incorrect sentence that failed to use the exact entity names.\n"
+            f"Incorrect: {prev_sentence}\n"
+            f"Please regenerate a single sentence that uses EXACTLY these surface forms for the entities:\n"
+            f"HEAD must appear as: {head}\nTAIL must appear as: {tail}\n"
+            "Provide only the corrected sentence:"
+        ),
+    }
 
 
 class ContextDataset(IDataset):
@@ -114,6 +120,7 @@ class ContextDataset(IDataset):
         self.max_verb_gen_retries = int(max_verb_gen_retries)
 
         self.delimiter = delimiter
+        self._default_verbaliser_system_prompt = "You are a helpful ontology expert."
 
         # Prepared on demand
         self._source_graph: Optional[OntologyGraph] = None
@@ -130,6 +137,15 @@ class ContextDataset(IDataset):
         # Output dataframe:
         # columns: ["Src", "Tgt", "Label", "SrcLabels", "TgtLabels", "SrcCtx", "TgtCtx"]
         self._df = None  # managed by process()
+
+        def _triple_token_cost(triple):
+            sentences = self._verbalize_triples([triple])
+            if isinstance(sentences, str):
+                sentences = [sentences]
+            word_count = sum(len(sentence.split()) for sentence in sentences if sentence)
+            return int(word_count * self.context_token_ratio)
+        
+        self.context_cost_fn = _triple_token_cost
 
     # ------------------------------------------------------------------
     # Ontology graphs (cached)
@@ -259,19 +275,20 @@ class ContextDataset(IDataset):
     # LLM batch generation
     # ------------------------------------------------------------------
     @torch.inference_mode()
-    def _batch_generate(self, prompts: List[str]) -> List[str]:
+    def _batch_generate(self, prompts: List[Union[str, Dict[str, str]]]) -> List[str]:
         self._ensure_verbaliser()
         tok = self._verbaliser_tok
         model = self._verbaliser
         model.eval()
 
         # Sort by length for efficiency
-        lengths = [len(p.split()) for p in prompts]
+        rendered_prompts = [self._render_prompt(p) for p in prompts]
+        lengths = [len(p.split()) for p in rendered_prompts]
         order = sorted(range(len(prompts)), key=lambda i: lengths[i], reverse=True)
         inv = [0] * len(prompts)
         for new_pos, old_pos in enumerate(order):
             inv[old_pos] = new_pos
-        sorted_prompts = [prompts[i] for i in order]
+        sorted_prompts = [rendered_prompts[i] for i in order]
 
         outs_sorted: List[str] = []
         B = self.batch_size_verbaliser
@@ -290,13 +307,9 @@ class ContextDataset(IDataset):
                 top_k=self.top_k if self.top_k is not None else 0,
                 pad_token_id=tok.eos_token_id,
             )
-            dec = tok.batch_decode(gen, skip_special_tokens=True)
-            # Heuristic: take last line or the part after "Sentence:"
-            cleaned = []
-            for txt in dec:
-                if "Sentence:" in txt:
-                    txt = txt.split("Sentence:", 1)[-1].strip()
-                cleaned.append(txt.strip())
+            new_tokens = self._strip_prompt_tokens(enc, gen)
+            dec = tok.batch_decode(new_tokens, skip_special_tokens=True)
+            cleaned = [self._clean_template_text(txt) for txt in dec]
             outs_sorted.extend(cleaned)
 
         # Unsort
@@ -304,6 +317,58 @@ class ContextDataset(IDataset):
         for orig_idx, new_idx in enumerate(inv):
             outs[orig_idx] = outs_sorted[new_idx]
         return outs
+
+    def _render_prompt(self, prompt: Union[str, Dict[str, str]]) -> str:
+        if isinstance(prompt, dict):
+            system = prompt.get("system", "").strip()
+            user = prompt.get("user", "").strip()
+        else:
+            system = ""
+            user = str(prompt).strip()
+        if not system:
+            system = self._default_verbaliser_system_prompt
+
+        tok = self._verbaliser_tok
+        if hasattr(tok, "apply_chat_template") and getattr(tok, "chat_template", None):
+            messages = []
+            if system:
+                messages.append({"role": "system", "content": system})
+            messages.append({"role": "user", "content": user})
+            return tok.apply_chat_template(
+                messages,
+                tokenize=False,
+                add_generation_prompt=True,
+            )
+
+        segments = [seg for seg in [system, user] if seg]
+        return "\n\n".join(segments)
+
+    def _strip_prompt_tokens(self, enc: Dict[str, torch.Tensor], gen: torch.Tensor) -> List[torch.Tensor]:
+        attn = enc["attention_mask"].sum(dim=1)
+        outputs: List[torch.Tensor] = []
+        for row, plen in zip(gen, attn):
+            plen = int(plen.item())
+            if plen < row.shape[0]:
+                outputs.append(row[plen:])
+            else:
+                outputs.append(row[-1:].clone())
+        return outputs
+
+    @staticmethod
+    def _clean_template_text(text: str) -> str:
+        txt = text.strip()
+        if not txt:
+            return ""
+        if "Sentence:" in txt:
+            txt = txt.split("Sentence:", 1)[-1].strip()
+        first_line = txt.splitlines()[0].strip()
+        prefix_pattern = re.compile(r"^(assistant|assistant:|assistant,|ai[- ]generated sentence:)", re.IGNORECASE)
+        first_line = prefix_pattern.sub("", first_line).strip(" :,-\t")
+        if not first_line:
+            first_line = txt
+        sentence_parts = re.split(r"(?<=[.!?])\s+", first_line)
+        cleaned = sentence_parts[0].strip()
+        return cleaned or first_line
 
     # ------------------------------------------------------------------
     # Verbalise triples with templates
@@ -347,13 +412,22 @@ class ContextDataset(IDataset):
         dfk = self._df[self._df[self.default_kind]].reset_index(drop=True)
         row = dfk.iloc[idx]
 
+        feats = row.get("Features")
+        if isinstance(feats, (list, tuple)) and len(feats) == 4:
+            src_labels, src_ctx_list, tgt_labels, tgt_ctx_list = feats
+        else:
+            src_labels = row["SrcLabels"]
+            src_ctx_list = row["SrcCtx"]
+            tgt_labels = row["TgtLabels"]
+            tgt_ctx_list = row["TgtCtx"]
+
         item = {
             "src_iri": row["Src"],
             "tgt_iri": row["Tgt"],
-            "src_labels": row["SrcLabels"],          # List[str]
-            "tgt_labels": row["TgtLabels"],          # List[str]
-            "src_ctx_triples": row["SrcCtx"],        # List[str] sentences
-            "tgt_ctx_triples": row["TgtCtx"],        # List[str] sentences
+            "src_labels": src_labels,          # List[str]
+            "tgt_labels": tgt_labels,          # List[str]
+            "src_ctx_triples": src_ctx_list,        # List[str] sentences
+            "tgt_ctx_triples": tgt_ctx_list,        # List[str] sentences
             "label": row.get("Label", None),
         }
         return item
@@ -395,21 +469,34 @@ class ContextDataset(IDataset):
         # Context subgraphs (triples) and verbalisation
         def _ctx(iri: str, graph: OntologyGraph) -> List[str]:
 
-            budget = int(
-                (self.max_input_tokens_context * self.context_safety) / self.context_token_ratio
-            )
             triples = graph.get_context_subgraph(
                 iri,
                 n=self.n_hops,
                 human_readable=True,
                 method=self.context_method,
                 best_path_method=self.best_path_method,
-                budget=budget,
+                budget=self.max_input_tokens_context,
                 hop_penalty=self.context_hop_penalty,
             )
             if not triples:
                 return []
             return self._verbalize_triples(triples)
+
+        if self.context_method is ContextMethod.greedy:
+            self.log("####Using 'greedy' context extraction method.", level="debug")
+            if self.best_path_method is None:
+                self.log("####No best path source method set, using default 'dp'.", level="debug")
+                self.best_path_method = BestPathMethod.dp
+            else:
+                self.log(f"####Using best path source method: '{self.best_path_method}'.", level="debug")
+
+            # Set cost function for greedy extraction
+            self.log("####Setting cost function for context extraction. Computing cost for every triple..", level="debug")
+            self.source_graph.cost_fn = self.context_cost_fn
+            self.target_graph.cost_fn = self.context_cost_fn
+
+        else:
+            self.log("####Using 'BFS' context extraction method.", level="debug")
 
         self.log("Extracting and verbalising source contexts…", level="debug")
         src_ctx_map: Dict[str, List[str]] = {iri: _ctx(iri, self.source_graph) for iri in usrc}
@@ -418,12 +505,18 @@ class ContextDataset(IDataset):
         tgt_ctx_map: Dict[str, List[str]] = {iri: _ctx(iri, self.target_graph) for iri in utgt}
 
         # ---- Context metrics per row ----
-        src_ctx_metrics = [self._compute_metrics_for_context_list(xs) for xs in src_ctx_map]
-        tgt_ctx_metrics = [self._compute_metrics_for_context_list(xs) for xs in tgt_ctx_map]
+        src_ctx_metrics_map = {
+            iri: self._compute_metrics_for_context_list(src_ctx_map[iri])
+            for iri in usrc
+        }
+        tgt_ctx_metrics_map = {
+            iri: self._compute_metrics_for_context_list(tgt_ctx_map[iri])
+            for iri in utgt
+        }
 
         for key in ["n_triples","char_len","word_len","tok_len","is_empty"]:
-            df[f"src_ctx_{key}"] = [m[key] for m in src_ctx_metrics]
-            df[f"tgt_ctx_{key}"] = [m[key] for m in tgt_ctx_metrics]
+            df[f"src_ctx_{key}"] = [src_ctx_metrics_map[iri][key] for iri in src_iris]
+            df[f"tgt_ctx_{key}"] = [tgt_ctx_metrics_map[iri][key] for iri in tgt_iris]
 
         # Quick context emptiness alerts
         empty_src_ctx = int(df["src_ctx_is_empty"].sum())
@@ -434,12 +527,18 @@ class ContextDataset(IDataset):
             self.log(f"#### Empty target contexts: {empty_tgt_ctx} ({empty_tgt_ctx/len(df):.1%})", level="warning")
 
         # ---- Label metrics per row ----
-        src_label_metrics = [self._compute_metrics_for_label_list(ls) for ls in src_lab_map]
-        tgt_label_metrics = [self._compute_metrics_for_label_list(ls) for ls in tgt_lab_map]
+        src_label_metrics_map = {
+            iri: self._compute_metrics_for_label_list(src_lab_map[iri])
+            for iri in usrc
+        }
+        tgt_label_metrics_map = {
+            iri: self._compute_metrics_for_label_list(tgt_lab_map[iri])
+            for iri in utgt
+        }
 
         for key in ["n_labels","char_len","word_len","max_label_words","avg_label_words","is_empty"]:
-            df[f"src_lab_{key}"] = [m[key] for m in src_label_metrics]
-            df[f"tgt_lab_{key}"] = [m[key] for m in tgt_label_metrics]
+            df[f"src_lab_{key}"] = [src_label_metrics_map[iri][key] for iri in src_iris]
+            df[f"tgt_lab_{key}"] = [tgt_label_metrics_map[iri][key] for iri in tgt_iris]
 
         # Quick label emptiness alerts
         empty_src_lab = int(df["src_lab_is_empty"].sum())
@@ -453,10 +552,24 @@ class ContextDataset(IDataset):
 
         # Assemble per row
         df = df.copy()
-        df["SrcLabels"] = [src_lab_map[iri] for iri in src_iris]
-        df["TgtLabels"] = [tgt_lab_map[iri] for iri in tgt_iris]
-        df["SrcCtx"]    = [src_ctx_map[iri]   for iri in src_iris]
-        df["TgtCtx"]    = [tgt_ctx_map[iri]   for iri in tgt_iris]
+        src_labels_per_row = [src_lab_map[iri] for iri in src_iris]
+        tgt_labels_per_row = [tgt_lab_map[iri] for iri in tgt_iris]
+        src_ctx_per_row = [src_ctx_map[iri] for iri in src_iris]
+        tgt_ctx_per_row = [tgt_ctx_map[iri] for iri in tgt_iris]
+
+        df["SrcLabels"] = src_labels_per_row
+        df["TgtLabels"] = tgt_labels_per_row
+        df["SrcCtx"] = src_ctx_per_row
+        df["TgtCtx"] = tgt_ctx_per_row
+        df["Features"] = [
+            [src_labels, src_ctx, tgt_labels, tgt_ctx]
+            for src_labels, src_ctx, tgt_labels, tgt_ctx in zip(
+                src_labels_per_row,
+                src_ctx_per_row,
+                tgt_labels_per_row,
+                tgt_ctx_per_row
+            )
+        ]
 
         return df
     
@@ -617,11 +730,62 @@ class ContextDataset(IDataset):
         if self._df is not None:
             return self._df
         
-        self._df = pd.read_csv(self._df_save_path, converters={
-            "SrcLabels": literal_eval,
-            "TgtLabels": literal_eval,
-            "SrcCtx": literal_eval,
-            "TgtCtx": literal_eval,
-        })
+        df = pd.read_csv(self._df_save_path)
 
+        def _parse_column(column: str, fallback_factory):
+            missing = 0
+            invalid = 0
+            parsed = []
+            for value in df[column].tolist():
+                if pd.isna(value):
+                    missing += 1
+                    parsed.append(fallback_factory())
+                    continue
+                text = value if isinstance(value, str) else str(value)
+                if not text.strip():
+                    missing += 1
+                    parsed.append(fallback_factory())
+                    continue
+                try:
+                    parsed_value = literal_eval(text)
+                except (SyntaxError, ValueError):
+                    invalid += 1
+                    parsed.append(fallback_factory())
+                    continue
+                parsed.append(parsed_value)
+            if missing or invalid:
+                self.log(
+                    f"Filled {missing} empty and {invalid} invalid entries while parsing column '{column}'.",
+                    level="warning",
+                )
+            df[column] = parsed
 
+        for column in ["SrcLabels", "TgtLabels", "SrcCtx", "TgtCtx"]:
+            _parse_column(column, lambda: [])
+
+        def _features_fallback():
+            return [[], [], [], []]
+
+        _parse_column("Features", _features_fallback)
+
+        def _features_valid(feats):
+            return isinstance(feats, (list, tuple)) and len(feats) == 4
+
+        missing_features_mask = ~df["Features"].apply(_features_valid)
+        if missing_features_mask.any():
+            self.log(
+                f"Rebuilding {int(missing_features_mask.sum())} feature rows from individual columns.",
+                level="warning",
+            )
+            rebuilt = [
+                [src_labels, src_ctx, tgt_labels, tgt_ctx]
+                for src_labels, src_ctx, tgt_labels, tgt_ctx in zip(
+                    df.loc[missing_features_mask, "SrcLabels"],
+                    df.loc[missing_features_mask, "SrcCtx"],
+                    df.loc[missing_features_mask, "TgtLabels"],
+                    df.loc[missing_features_mask, "TgtCtx"],
+                )
+            ]
+            df.loc[missing_features_mask, "Features"] = rebuilt
+
+        self._df = df

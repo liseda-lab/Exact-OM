@@ -60,7 +60,7 @@ class AlignmentRunner:
             training_reference_file_path=Path(self.training_reference_file).resolve() if self.training_reference_file else None,
             full_reference_file_path=Path(self.full_reference_file).resolve() if self.full_reference_file else None,
             candidates_file_path=Path(self.candidates_file).resolve() if self.candidates_file else None,
-            log_file_path=Path(self.output_dir).resolve() / "matcha_dl.log" if self.save_logs else None,
+            log_file_path=Path(self.output_dir).resolve() / "exact.log" if self.save_logs else None,
             run_eval=self.run_eval,
             device=self.device
         )

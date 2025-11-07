@@ -45,7 +45,7 @@ class AlignmentAction(Protocol):
 
         # Loading logging configuration from configs
 
-        logger = logging.getLogger("matcha-dl")
+        logger = logging.getLogger("exact")
         logger.setLevel(configs.logging_level)
 
         if log_file_path is not None:
@@ -89,7 +89,7 @@ class AlignmentAction(Protocol):
             output_path=output_dir_path,
             logger=logger,
             cache_ok=configs.use_file_cache,
-            device=device
+            device=device,
             **configs.dataset_params.model_dump(),
         )
 
@@ -104,12 +104,16 @@ class AlignmentAction(Protocol):
 
         dataset.process()
 
-        dataset.log_sanity_examples(**configs.sanity_check_params.model_dump())
+        if not dataset.has_cache():
 
-        dataset.plot_feature_distributions(
-            which=configs.dataset_params.which,
-            **configs.plot_params.model_dump()
-        )
+            dataset.save()
+
+            dataset.log_sanity_examples(**configs.sanity_check_params.model_dump())
+
+            dataset.plot_feature_distributions(
+                which=configs.dataset_params.which,
+                **configs.plot_params.model_dump()
+            )
 
         dataset_end = time.time()
         dataset_elapsed = (dataset_end - dataset_start) / 60
@@ -119,11 +123,18 @@ class AlignmentAction(Protocol):
         # Trainer module
 
         ## Train Model
+        logger.info(f"Building Trainer and Model...")
+
+        # Merge model params with alignment-related params needed by the model (without mutating originals)
+        merged_model_params = {
+            **configs.model.params,
+            **configs.alignment_params.model_dump(exclude_none=True),
+        }
 
         trainer = configs.trainer(
             dataset=dataset,
             model=configs.model.name,
-            model_params=configs.model.params.update(**configs.alignment_params.model_dump()),
+            model_params=merged_model_params,
             device=device,
             output_dir= output_dir_path / "model",
             logger=logger,

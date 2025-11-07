@@ -55,8 +55,6 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
         self._output_dir = output_dir
 
         # Create output directories
-
-        self.logs_dir.mkdir(parents=True, exist_ok=True)
         self.alignment_dir.mkdir(parents=True, exist_ok=True)
         self.plot_dir.mkdir(parents=True, exist_ok=True)
 
@@ -81,10 +79,6 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
         return (self._output_dir / "plots").resolve()
 
     @property
-    def logs_dir(self) -> Path:
-        return (self._output_dir / "training_logs").resolve()
-
-    @property
     def alignment_dir(self) -> Path:
         return (self._output_dir / "alignment").resolve()
 
@@ -95,6 +89,10 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
     @property
     def results_df(self) -> Optional[pd.DataFrame]:
         return self._results_df
+
+    @results_df.setter
+    def results_df(self, value: Optional[pd.DataFrame]) -> None:
+        self._results_df = value
 
     @abstractmethod
     def predict(self, kind: DatasetMask = DatasetMask.inference, 

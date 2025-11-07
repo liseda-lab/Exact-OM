@@ -66,7 +66,7 @@ class EvalutionRunner:
             train_reference_file_path=Path(self.train_reference_file).resolve() if self.train_reference_file else None,
             full_reference_file_path=Path(self.full_reference_file).resolve() if self.full_reference_file else None,
             reference_candidates=Path(self.reference_candidates).resolve() if self.reference_candidates else None,
-            log_file_path=Path(self.output_dir).resolve() / "matcha_dl_eval.log" if self.save_logs else None,
+            log_file_path=Path(self.output_dir).resolve() / "oaei_bio_ml_eval.log" if self.save_logs else None,
             log_level=self.log_level,
         )
 

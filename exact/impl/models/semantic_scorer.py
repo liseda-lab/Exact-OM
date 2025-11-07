@@ -1,6 +1,8 @@
 import math
 from enum import Enum
 from typing import List, Optional, Tuple, Dict, Any
+import re
+import time
 
 import torch
 from torch import nn
@@ -79,6 +81,8 @@ class SemanticScorer(IModel):
         llm_temperature: float = 0.1,
         llm_top_p: float = 0.9,
         llm_do_sample: bool = False,
+        llm_summary_batch_size: Optional[int] = 8,
+        llm_decision_batch_size: Optional[int] = 8,
 
         # ---- Explanations / review band ----
         return_explanations: bool = False,
@@ -90,6 +94,9 @@ class SemanticScorer(IModel):
     ):
         super().__init__()
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+        self.device_type = (
+            self.device.type if isinstance(self.device, torch.device) else torch.device(self.device).type
+        )
         self.fp16 = fp16_inference
         self.pooling_method = PoolingMethod(pooling_method)
 
@@ -103,6 +110,8 @@ class SemanticScorer(IModel):
         self.max_total_tokens_llm_summary = max_total_tokens_llm_summary
         self.max_total_tokens_llm_decision = max_total_tokens_llm_decision
         self.max_new_tokens_llm = max_new_tokens_llm
+        self.llm_summary_batch_size = llm_summary_batch_size
+        self.llm_decision_batch_size = llm_decision_batch_size
 
         self.use_lexical = use_lexical
         self.use_context = use_context
@@ -197,7 +206,7 @@ class SemanticScorer(IModel):
         enc = tokenizer(
             texts, padding=True, truncation=True, max_length=max_len, return_tensors="pt"
         ).to(self.device)
-        with torch.amp.autocast(enabled=self.fp16):
+        with torch.amp.autocast(device_type=self.device_type, enabled=self.fp16):
             out = model(**enc).last_hidden_state
         return self._pool(out, enc["attention_mask"])
 
@@ -232,47 +241,104 @@ class SemanticScorer(IModel):
     # -------------------------------------------------------------------------
     # Generative Models
     # -------------------------------------------------------------------------
-    def _summary_prompt(self, label: str, ctx: str) -> str:
-        return (
-            "You are an ontology expert entity summariser.\n"
-            f"Given the following context subgraph describing the entity '{label}', "
-            "provide a concise and informative summary capturing its key characteristics.\n\n"
-            f"Context: {ctx}\nSummary:"
-        )
+    def _summary_prompt(self, label: str, ctx: str) -> Dict[str, str]:
+        return {
+            "system": "You are an ontology expert entity summariser.",
+            "user": (
+                f"Given the following context subgraph describing the entity '{label}', "
+                "provide a concise and informative summary capturing its key characteristics.\n\n"
+                f"Context: {ctx}\nSummary:"
+            ),
+        }
 
-    def _decision_prompt(self, src_label: str, tgt_label: str, src_summary: str, tgt_summary: str) -> str:
-        return (
-            "You are an ontology alignment expert.\n"
-            "Determine whether the following two ontology entities refer to the same concept.\n"
-            "Answer with a single token: Yes or No.\n\n"
-            f"Source entity: {src_label}\nSummary: {src_summary}\n\n"
-            f"Target entity: {tgt_label}\nSummary: {tgt_summary}\n\n"
-            "Answer:"
-        )
+    def _decision_prompt(self, src_label: str, tgt_label: str, src_summary: str, tgt_summary: str) -> Dict[str, str]:
+        return {
+            "system": "You are an ontology alignment expert.",
+            "user": (
+                "Determine whether the following two ontology entities refer to the same concept.\n"
+                "Answer with a single token: Yes or No.\n\n"
+                f"Source entity: {src_label}\nSummary: {src_summary}\n\n"
+                f"Target entity: {tgt_label}\nSummary: {tgt_summary}\n\n"
+                "Answer:"
+            ),
+        }
+
+    def _render_llm_prompt(self, prompt: Dict[str, str], add_generation_prompt: bool = True) -> str:
+        system = prompt.get("system", "").strip()
+        user = prompt.get("user", "").strip()
+        tok = self.llm_tok
+        if hasattr(tok, "apply_chat_template") and getattr(tok, "chat_template", None):
+            messages = []
+            if system:
+                messages.append({"role": "system", "content": system})
+            if user:
+                messages.append({"role": "user", "content": user})
+            return tok.apply_chat_template(
+                messages,
+                tokenize=False,
+                add_generation_prompt=add_generation_prompt,
+            )
+        segments = [seg for seg in [system, user] if seg]
+        return "\n\n".join(segments)
+
+    def _strip_llm_prompt_tokens(self, enc: Dict[str, torch.Tensor], gen: torch.Tensor) -> List[torch.Tensor]:
+        prompt_lens = enc["attention_mask"].sum(dim=1)
+        outputs: List[torch.Tensor] = []
+        for row, plen in zip(gen, prompt_lens):
+            plen = int(plen.item())
+            if plen < row.shape[0]:
+                outputs.append(row[plen:])
+            else:
+                outputs.append(row[-1:].clone())
+        return outputs
+
+    @staticmethod
+    def _clean_summary_text(text: str) -> str:
+        txt = text.strip()
+        if not txt:
+            return ""
+        if "Summary:" in txt:
+            txt = txt.split("Summary:", 1)[-1].strip()
+        line = txt.splitlines()[0].strip()
+        prefix_pattern = re.compile(r"^(assistant|assistant:|assistant,|summary:)", re.IGNORECASE)
+        line = prefix_pattern.sub("", line).strip(" :,-\t")
+        sentence_parts = re.split(r"(?<=[.!?])\s+", line)
+        cleaned = sentence_parts[0].strip()
+        return cleaned or line
 
     @torch.inference_mode()
     def generate_summaries_batched(self, labels: List[str], contexts: List[str]) -> List[str]:
         if not self.use_llm:
             return ["" for _ in labels]
-        prompts = [self._summary_prompt(l, c) for l, c in zip(labels, contexts)]
-        summaries: List[str] = []
-        for p in prompts:
+        if not labels:
+            return []
+        prompts = [self._render_llm_prompt(self._summary_prompt(l, c)) for l, c in zip(labels, contexts)]
+        outputs = [""] * len(prompts)
+        chunk = self.llm_summary_batch_size or len(prompts)
+        chunk = chunk if chunk > 0 else len(prompts)
+        for start in range(0, len(prompts), chunk):
+            end = min(start + chunk, len(prompts))
             enc = self.llm_tok(
-                p, return_tensors="pt", truncation=True,
-                max_length=self.max_total_tokens_llm_summary
+                prompts[start:end],
+                padding=True,
+                return_tensors="pt",
+                truncation=True,
+                max_length=self.max_total_tokens_llm_summary,
             ).to(self.device)
-            with torch.amp.autocast(enabled=self.fp16):
+            with torch.amp.autocast(device_type=self.device_type, enabled=self.fp16):
                 out = self.llm.generate(
                     **enc,
                     max_new_tokens=self.max_new_tokens_llm,
                     temperature=self.llm_temperature,
                     top_p=self.llm_top_p,
                     do_sample=self.llm_do_sample,
+                    pad_token_id=self.llm_tok.eos_token_id,
                 )
-            text = self.llm_tok.decode(out[0], skip_special_tokens=True)
-            summ = text.split("Summary:")[-1].strip()
-            summaries.append(summ)
-        return summaries
+            new_tokens = self._strip_llm_prompt_tokens(enc, out)
+            decoded = self.llm_tok.batch_decode(new_tokens, skip_special_tokens=True)
+            for offset, text in enumerate(decoded):
+                outputs[start + offset] = self._clean_summary_text(text)
+        return outputs
 
     @torch.inference_mode()
     def llm_yesno_probs_batched(
@@ -284,23 +350,36 @@ class SemanticScorer(IModel):
     ) -> torch.Tensor:
         if not self.use_llm:
             return torch.zeros(len(src_labels), device=self.device)
-        probs: List[float] = []
-        for s_lab, t_lab, s_sum, t_sum in zip(src_labels, tgt_labels, src_summaries, tgt_summaries):
-            prompt = self._decision_prompt(s_lab, t_lab, s_sum, t_sum)
+        if not src_labels:
+            return torch.zeros(0, device=self.device)
+        prompts = [
+            self._render_llm_prompt(
+                self._decision_prompt(s_lab, t_lab, s_sum, t_sum),
+                add_generation_prompt=True,
+            )
+            for s_lab, t_lab, s_sum, t_sum in zip(src_labels, tgt_labels, src_summaries, tgt_summaries)
+        ]
+        probs = torch.zeros(len(prompts), device=self.device)
+        chunk = self.llm_decision_batch_size or len(prompts)
+        chunk = chunk if chunk > 0 else len(prompts)
+        for start in range(0, len(prompts), chunk):
+            end = min(start + chunk, len(prompts))
             enc = self.llm_tok(
-                prompt, return_tensors="pt", truncation=True,
-                max_length=self.max_total_tokens_llm_decision
+                prompts[start:end],
+                padding=True,
+                return_tensors="pt",
+                truncation=True,
+                max_length=self.max_total_tokens_llm_decision,
             ).to(self.device)
-            with torch.amp.autocast(enabled=self.fp16):
+            with torch.amp.autocast(device_type=self.device_type, enabled=self.fp16):
                 out = self.llm(**enc)
                 last_logits = out.logits[:, -1, :]
                 logprobs = torch.log_softmax(last_logits, dim=-1)
                 yes_lp = torch.logsumexp(logprobs[:, self.yes_token_ids], dim=-1)
                 no_lp = torch.logsumexp(logprobs[:, self.no_token_ids], dim=-1)
                 stacked = torch.stack([yes_lp, no_lp], dim=-1)
-                p_yes = torch.softmax(stacked, dim=-1)[:, 0]
-                probs.append(p_yes.item())
-        return torch.tensor(probs, device=self.device)
+                probs[start:end] = torch.softmax(stacked, dim=-1)[:, 0]
+        return probs
 
     # -------------------------------------------------------------------------
     # Context attribution helper

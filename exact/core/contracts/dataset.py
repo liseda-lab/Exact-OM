@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Callable, Any
+from contextlib import nullcontext
 
 import math
 import numpy as np
@@ -335,7 +336,7 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
         tgt_texts = [self.target_graph.get_primary_label(iri) for iri in tgt_iris]
 
         # 2) Encode with MiniLM (fast)
-        self.log("  Encoding labels with sentence-transformers MiniLM…", level="debug")
+        self.log("  Encoding labels…", level="debug")
         st = SentenceTransformer(lexical_encoder_name, device=str(dev))
         # Already does batching internally; normalize embeddings for cosine
         src_emb = st.encode(src_texts, batch_size=encode_batch_size, convert_to_numpy=True, normalize_embeddings=True)
@@ -369,11 +370,13 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
 
     @torch.inference_mode()
     def topk_cosine_search_torch(
+        self,
         E_src: np.ndarray,           # [Ns, d], float32
         E_tgt: np.ndarray,           # [Nt, d], float32
         top_k: int = 10,
         batch_size_src: int = 2048,  # tune per VRAM; 2–8K typical for d=384
-        device: Optional[torch.device] = None
+        device: Optional[torch.device] = None,
+        amp: bool = True
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Return (indices, scores) where:
@@ -381,6 +384,9 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
         scores:  [Ns, top_k] cosine similarities
         """
         dev = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        use_autocast = amp and dev.type == "cuda"
+        autocast_ctx = torch.amp.autocast if use_autocast else nullcontext
+        autocast_kwargs = {"device_type": dev.type} if use_autocast else {}
 
         # Move target once, normalize
         T = torch.from_numpy(E_tgt).to(dev, non_blocking=True)
@@ -400,11 +406,12 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
 
             # cosine = inner product of normalized vectors
             # [Bs, d] @ [d, Nt] -> [Bs, Nt]
-            sims = S @ T.T
+            with autocast_ctx(**autocast_kwargs):
+                sims = S @ T.T
 
             vals, idx = torch.topk(sims, k=K, dim=-1, largest=True, sorted=True)
             all_idx[s0:s1] = idx.cpu().numpy()
-            all_scr[s0:s1] = vals.cpu().numpy()
+            all_scr[s0:s1] = vals.to(dtype=torch.float32).cpu().numpy()
 
         return all_idx, all_scr
 
@@ -491,34 +498,39 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
                     missing_percentage = len(missing_tgt) / len(unique_tgt_full_ref) * 100
                     self.log(f"#Warning: {len(missing_tgt)} unique target entities from full reference are not in the candidates ({missing_percentage:.2f}%)", level="warning")
 
+        pre_filtered_set = pd.DataFrame(columns=inference_set.columns)
         pre_filtered_mappings = self.exact_matches
 
-        if self.candidates_generated and self.cardinality_1_to_many and pre_filtered_mappings is not None:
-            # If candidates were generated and cardinality is 1-to-many, filter exact matches from candidates.
-            self.log("#Filtering Exact Matches from Inference Set...", level="debug")
-            pre_filter_candidates_mask = inference_set.apply(
-                lambda row: (row["Src"] in set(pre_filtered_mappings["Src"])) and
-                            (row["Tgt"] in set(pre_filtered_mappings["Tgt"])),
-                axis=1
-            )
-            inference_set = inference_set[~pre_filter_candidates_mask]
-            pre_filtered_set["Score"] = 1.0
+        if pre_filtered_mappings is not None and not pre_filtered_mappings.empty:
+            pre_filtered_mappings = pre_filtered_mappings.drop_duplicates(subset=["Src", "Tgt"])
 
-        # If Ranking Task, filter all candidates from source entities that are in pre_filtered_mappings.
-        # If both the source and target entities are in pre_filtered_mappings, keep them in the pre_filtered_set with score of 1
-        # If only the source entity is in pre_filtered_mappings, keep them in the pre_filtered_set with score 0
-        elif not self.candidates_generated and pre_filtered_mappings is not None:
-            self.log("#Filtering Exact Matches from Inference Set...", level="debug")
-            pre_filter_candidates_mask = inference_set["Src"].isin(pre_filtered_mappings["Src"])
-            pre_filtered_set = inference_set[pre_filter_candidates_mask].copy()
-            pre_filtered_set = pre_filtered_set.merge(pre_filtered_mappings, on="Src", how="left", suffixes=("", "_y"))
-            pre_filtered_set["Tgt"] = pre_filtered_set["Tgt_y"].combine_first
-            pre_filtered_set["Score"] = pre_filtered_set.apply(
-                lambda row: 1.0 if row["Tgt"] == row["Tgt_y"] else 0.0,
-                axis=1
-            )
-            pre_filtered_set = pre_filtered_set[["Src", "Tgt", "Score"]]
-            inference_set = inference_set[~pre_filter_candidates_mask]
+            if self.candidates_generated and self.cardinality_1_to_many:
+                # Global task: remove only the exact (Src, Tgt) matches from the inference pool.
+                self.log("#Filtering Exact (Src, Tgt) matches from Inference Set...", level="debug")
+                exact_pairs_idx = pd.MultiIndex.from_frame(pre_filtered_mappings[["Src", "Tgt"]])
+                inference_pairs_idx = pd.MultiIndex.from_frame(inference_set[["Src", "Tgt"]])
+                match_mask = pd.Series(inference_pairs_idx.isin(exact_pairs_idx), index=inference_set.index)
+
+                if match_mask.any():
+                    pre_filtered_set = inference_set[match_mask].copy()
+                    pre_filtered_set["Score"] = 1.0
+                    inference_set = inference_set[~match_mask]
+
+            else:
+                # Ranking task or cardinality=1-to-1: drop every candidate for sources with an exact match.
+                self.log("#Filtering Exact-match sources from Inference Set...", level="debug")
+                exact_src_map = (
+                    pre_filtered_mappings.drop_duplicates(subset=["Src"])
+                    .set_index("Src")["Tgt"]
+                )
+
+                src_mask = inference_set["Src"].isin(exact_src_map.index)
+
+                if src_mask.any():
+                    pre_filtered_set = inference_set[src_mask].copy()
+                    expected_tgt = pre_filtered_set["Src"].map(exact_src_map)
+                    pre_filtered_set["Score"] = (pre_filtered_set["Tgt"] == expected_tgt).astype(float)
+                    inference_set = inference_set[~src_mask]
 
         pre_filtered_set[DatasetMask.inference] = False
         pre_filtered_set[DatasetMask.prefiltered] = True
