@@ -44,6 +44,7 @@ dataset_params:
   # General Dataset Configs
   num_workers: null # Number of workers to be used to load the data. If null, the all available cores will be used.
   filter_exact_matches: True # If True, exact matches between source and target will be filtered out before training/inference.
+  drop_exact_match_sources: True # If True, drop all candidates for sources with an exact match (1-to-1 tasks). If False, only the exact pairs are removed.
   
   # Context Main Params
   n_hops: 1
@@ -101,6 +102,9 @@ inference_params:
   log_every: 10
   mixed_precision: True
   which: ["S_final", "I_label", "I_ctx", "I_llm", "w_c", "w_i"]
+  checkpoint_every: 10
+  resume_from_checkpoint: True
+  enable_checkpoints: True
   
 model:
   name: SemanticScorer
@@ -144,3 +148,11 @@ model:
     profile_llm: False
     # Explanations
     return_explanations: True
+    # Caching
+    cache_dir: null
+    cache_namespace: null
+    dataset_signature: null
+    persist_cache_to_disk: True
+    max_cached_labels: null
+    max_cached_contexts: null
+    max_cached_summaries: null

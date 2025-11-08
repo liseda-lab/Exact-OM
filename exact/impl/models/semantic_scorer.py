@@ -3,6 +3,10 @@ from enum import Enum
 from typing import List, Optional, Tuple, Dict, Any
 import re
 import time
+import json
+import hashlib
+from pathlib import Path
+from collections import OrderedDict
 
 import torch
 from torch import nn
@@ -90,6 +94,15 @@ class SemanticScorer(IModel):
         review_high: float = 0.75,
         threshold: float = 0.7,
 
+        # ---- Caching ----
+        cache_dir: Optional[str] = None,
+        cache_namespace: Optional[str] = None,
+        dataset_signature: Optional[str] = None,
+        persist_cache_to_disk: bool = True,
+        max_cached_labels: Optional[int] = None,
+        max_cached_contexts: Optional[int] = None,
+        max_cached_summaries: Optional[int] = None,
+
         **kwargs,
     ):
         super().__init__()
@@ -130,12 +143,30 @@ class SemanticScorer(IModel):
         self.review_high = review_high
         self.threshold = threshold
         self.ctx_sentence_delimiter = ctx_sentence_delimiter
+        self.dataset_signature = dataset_signature
+        self.cache_namespace = (cache_namespace or "default").strip() or "default"
+        self.persist_cache_to_disk = bool(persist_cache_to_disk)
+        default_cache_dir = Path(cache_dir).expanduser() if cache_dir else (Path.home() / ".cache" / "exact" / "semantic_scorer")
+        self.cache_dir = default_cache_dir
+        self._cache_tensor_dtype = torch.float16 if self.fp16 else torch.float32
+        self.max_cached_labels = max_cached_labels
+        self.max_cached_contexts = max_cached_contexts
+        self.max_cached_summaries = max_cached_summaries
+        self._lex_cache: "OrderedDict[str, torch.Tensor]" = OrderedDict()
+        self._ctx_cache: "OrderedDict[str, torch.Tensor]" = OrderedDict()
+        self._summary_cache: "OrderedDict[str, str]" = OrderedDict()
+        self._cache_dirty = False
+        self._cache_file_path = (
+            (self.cache_dir / f"{self.cache_namespace}_cache.pt").resolve()
+            if self.persist_cache_to_disk else None
+        )
 
         # store model names (for explanations)
         self.lexical_model_name = lexical_model_name
         self.context_model_name = context_model_name
         self.cross_encoder_name = cross_encoder_name
         self.llm_model_name = llm_model_name
+        self._cache_fingerprint = self._build_cache_fingerprint()
 
         # ---- Load models ----
         if self.use_lexical:
@@ -168,6 +199,9 @@ class SemanticScorer(IModel):
             self.yes_token_ids = self._candidate_token_ids([" Yes", "Yes", "yes"])
             self.no_token_ids = self._candidate_token_ids([" No", "No", "no"])
 
+        if self.persist_cache_to_disk:
+            self._load_cache_from_disk()
+
     # -------------------------------------------------------------------------
     # Helpers
     # -------------------------------------------------------------------------
@@ -199,6 +233,177 @@ class SemanticScorer(IModel):
         return self.ctx_sentence_delimiter.join(triples) if self.ctx_sentence_delimiter else " ".join(triples)
 
     # -------------------------------------------------------------------------
+    # Cache helpers
+    # -------------------------------------------------------------------------
+    def _build_cache_fingerprint(self) -> str:
+        payload = {
+            "lexical_model": self.lexical_model_name if self.use_lexical else None,
+            "context_model": self.context_model_name if self.use_context else None,
+            "llm_model": self.llm_model_name if self.use_llm else None,
+            "max_input_tokens_lexical": self.max_input_tokens_lexical,
+            "max_input_tokens_context": self.max_input_tokens_context,
+            "max_total_tokens_llm_summary": self.max_total_tokens_llm_summary,
+            "max_total_tokens_llm_decision": self.max_total_tokens_llm_decision,
+            "pooling_method": self.pooling_method.value,
+            "ctx_sentence_delimiter": self.ctx_sentence_delimiter,
+            "dataset_signature": self.dataset_signature,
+        }
+        blob = json.dumps(payload, sort_keys=True, default=str)
+        return hashlib.sha1(blob.encode("utf-8")).hexdigest()
+
+    def _model_hidden_size(self, model: nn.Module) -> int:
+        cfg = getattr(model, "config", None)
+        if cfg is None:
+            raise ValueError("Encoder lacks a config; cannot infer hidden size for caching.")
+        for attr in ("hidden_size", "projection_dim", "text_embed_dim", "word_embed_proj_dim"):
+            if hasattr(cfg, attr):
+                val = getattr(cfg, attr)
+                if isinstance(val, (list, tuple)):
+                    if val:
+                        return int(val[-1])
+                else:
+                    return int(val)
+        if hasattr(cfg, "hidden_sizes") and getattr(cfg, "hidden_sizes"):
+            return int(cfg.hidden_sizes[-1])
+        raise ValueError("Unable to infer encoder hidden size for caching.")
+
+    def _cache_store(
+        self,
+        cache: "OrderedDict[str, Any]",
+        key: str,
+        value: Any,
+        limit: Optional[int],
+    ) -> None:
+        cache[key] = value
+        cache.move_to_end(key)
+        if limit and limit > 0 and len(cache) > limit:
+            cache.popitem(last=False)
+        self._cache_dirty = True
+
+    def _encode_with_cache(
+        self,
+        texts: List[str],
+        tokenizer,
+        model,
+        max_len: int,
+        cache: "OrderedDict[str, torch.Tensor]",
+        limit: Optional[int],
+    ) -> torch.Tensor:
+        if not texts:
+            hidden = self._model_hidden_size(model)
+            return torch.zeros((0, hidden), device=self.device)
+
+        outputs: List[Optional[torch.Tensor]] = [None] * len(texts)
+        missing_keys: List[str] = []
+        key_to_indices: Dict[str, List[int]] = {}
+
+        for idx, text in enumerate(texts):
+            key = text or ""
+            cached = cache.get(key)
+            if cached is None:
+                key_to_indices.setdefault(key, []).append(idx)
+                if key not in missing_keys:
+                    missing_keys.append(key)
+            else:
+                outputs[idx] = cached
+
+        if missing_keys:
+            encodings = self._encode_texts(tokenizer, model, missing_keys, max_len)
+            encodings = encodings.detach().to("cpu").to(self._cache_tensor_dtype)
+            for key, tensor in zip(missing_keys, encodings):
+                self._cache_store(cache, key, tensor, limit)
+                for idx in key_to_indices[key]:
+                    outputs[idx] = tensor
+
+        stacked = torch.stack(outputs, dim=0).to(self.device)
+        return stacked
+
+    @staticmethod
+    def _summary_key(label: str, context: str) -> str:
+        payload = (label or "") + "\u241F" + (context or "")
+        return hashlib.sha1(payload.encode("utf-8")).hexdigest()
+
+    def _serialize_cache_payload(self) -> Dict[str, Any]:
+        return {
+            "metadata": {
+                "version": 1,
+                "fingerprint": self._cache_fingerprint,
+                "dataset_signature": self.dataset_signature,
+                "namespace": self.cache_namespace,
+                "timestamp": time.time(),
+            },
+            "lexical": [(k, v.cpu().to(self._cache_tensor_dtype)) for k, v in self._lex_cache.items()],
+            "context": [(k, v.cpu().to(self._cache_tensor_dtype)) for k, v in self._ctx_cache.items()],
+            "summaries": list(self._summary_cache.items()),
+        }
+
+    def _load_cache_from_disk(self) -> None:
+        if not self.persist_cache_to_disk or not self._cache_file_path:
+            return
+        if not self._cache_file_path.exists():
+            return
+        try:
+            payload = torch.load(self._cache_file_path, map_location="cpu")
+        except Exception as exc:  # noqa: BLE001
+            self.log(f"Failed to load SemanticScorer cache at {self._cache_file_path}: {exc}", "warning")
+            return
+
+        meta = (payload or {}).get("metadata") or {}
+        if meta.get("fingerprint") != self._cache_fingerprint:
+            self.log(
+                (
+                    "Cached embeddings/summaries are invalid for the current configuration. "
+                    "Discarding on-disk cache."
+                ),
+                "warning",
+            )
+            return
+
+        self._lex_cache.clear()
+        for key, tensor in payload.get("lexical", []):
+            self._lex_cache[key] = tensor.to(dtype=self._cache_tensor_dtype)
+        self._ctx_cache.clear()
+        for key, tensor in payload.get("context", []):
+            self._ctx_cache[key] = tensor.to(dtype=self._cache_tensor_dtype)
+        self._summary_cache.clear()
+        for key, text in payload.get("summaries", []):
+            self._summary_cache[key] = text
+
+        counts = (
+            len(self._lex_cache),
+            len(self._ctx_cache),
+            len(self._summary_cache),
+        )
+        self._cache_dirty = False
+        self.log(
+            (
+                f"Loaded SemanticScorer cache from {self._cache_file_path} "
+                f"(lexical={counts[0]}, context={counts[1]}, summaries={counts[2]})."
+            ),
+            "info",
+        )
+
+    def persist_caches(self, force: bool = False, reason: str = "manual") -> None:
+        if not self.persist_cache_to_disk or not self._cache_file_path:
+            return
+        if not (force or self._cache_dirty):
+            return
+        payload = self._serialize_cache_payload()
+        try:
+            self.cache_dir.mkdir(parents=True, exist_ok=True)
+            torch.save(payload, self._cache_file_path)
+            self.log(
+                (
+                    f"Persisted SemanticScorer cache to {self._cache_file_path} "
+                    f"(reason={reason})."
+                ),
+                "debug",
+            )
+            self._cache_dirty = False
+        except OSError as exc:
+            self.log(f"Failed to persist SemanticScorer cache to {self._cache_file_path}: {exc}", "warning")
+
+    # -------------------------------------------------------------------------
     # Encoders
     # -------------------------------------------------------------------------
     @torch.inference_mode()
@@ -212,11 +417,29 @@ class SemanticScorer(IModel):
 
     @torch.inference_mode()
     def encode_labels_batch(self, label_texts: List[str]) -> torch.Tensor:
-        return self._encode_texts(self.lex_tok, self.lex_model, label_texts, self.max_input_tokens_lexical)
+        if not self.use_lexical:
+            raise RuntimeError("Lexical encoder is disabled.")
+        return self._encode_with_cache(
+            label_texts,
+            self.lex_tok,
+            self.lex_model,
+            self.max_input_tokens_lexical,
+            self._lex_cache,
+            self.max_cached_labels,
+        )
 
     @torch.inference_mode()
     def encode_contexts_batch(self, ctx_texts: List[str]) -> torch.Tensor:
-        return self._encode_texts(self.ctx_tok, self.ctx_model, ctx_texts, self.max_input_tokens_context)
+        if not self.use_context:
+            raise RuntimeError("Context encoder is disabled.")
+        return self._encode_with_cache(
+            ctx_texts,
+            self.ctx_tok,
+            self.ctx_model,
+            self.max_input_tokens_context,
+            self._ctx_cache,
+            self.max_cached_contexts,
+        )
     
     @torch.inference_mode()
     def cross_encode_pairs(self, pairs: List[Tuple[str, str]]) -> torch.Tensor:
@@ -312,6 +535,33 @@ class SemanticScorer(IModel):
             return ["" for _ in labels]
         if not labels:
             return []
+        outputs = [""] * len(labels)
+        pending: Dict[str, Dict[str, Any]] = {}
+        for idx, (label, ctx) in enumerate(zip(labels, contexts)):
+            key = self._summary_key(label, ctx)
+            cached = self._summary_cache.get(key)
+            if cached is not None:
+                outputs[idx] = cached
+                continue
+            entry = pending.setdefault(key, {"label": label, "context": ctx, "indices": []})
+            entry["indices"].append(idx)
+
+        if pending:
+            pending_keys = list(pending.keys())
+            labs = [pending[k]["label"] for k in pending_keys]
+            ctxs = [pending[k]["context"] for k in pending_keys]
+            generated = self._generate_summaries_uncached(labs, ctxs)
+            for key, summary in zip(pending_keys, generated):
+                clean = self._clean_summary_text(summary)
+                self._cache_store(self._summary_cache, key, clean, self.max_cached_summaries)
+                for idx in pending[key]["indices"]:
+                    outputs[idx] = clean
+
+        return outputs
+
+    def _generate_summaries_uncached(self, labels: List[str], contexts: List[str]) -> List[str]:
+        if not labels:
+            return []
         prompts = [self._render_llm_prompt(self._summary_prompt(l, c)) for l, c in zip(labels, contexts)]
         outputs = [""] * len(prompts)
         chunk = self.llm_summary_batch_size or len(prompts)
@@ -337,7 +587,7 @@ class SemanticScorer(IModel):
             new_tokens = self._strip_llm_prompt_tokens(enc, out)
             decoded = self.llm_tok.batch_decode(new_tokens, skip_special_tokens=True)
             for offset, text in enumerate(decoded):
-                outputs[start + offset] = self._clean_summary_text(text)
+                outputs[start + offset] = text
         return outputs
 
     @torch.inference_mode()

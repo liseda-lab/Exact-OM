@@ -394,7 +394,8 @@ class ContextDataset(IDataset):
     def __len__(self) -> int:
         if self._df is None:
             raise RuntimeError("Dataset not processed. Call process() first.")
-        return len(self._df[self.default_kind])
+        # Align length with the boolean mask used by __getitem__.
+        return len(self._df[self._df[self.default_kind]])
 
     def __getitem__(self, idx: int) -> Any:
         """
@@ -690,10 +691,43 @@ class ContextDataset(IDataset):
                 problematic = pd.concat([problematic, rest.sample(min(n-len(problematic), len(rest)))])
         show = problematic.head(n)
 
+        def _coerce_seq(value):
+            if isinstance(value, list):
+                return value
+            if isinstance(value, tuple):
+                return list(value)
+            if isinstance(value, str):
+                try:
+                    parsed = literal_eval(value)
+                    if isinstance(parsed, (list, tuple)):
+                        return list(parsed)
+                except (SyntaxError, ValueError):
+                    return []
+            if value is None or (isinstance(value, float) and pd.isna(value)):
+                return []
+            return [value]
+
+        def _valid_feats(feats):
+            return isinstance(feats, (list, tuple)) and len(feats) == 4
+
         self.log(f"### Sanity examples (n={len(show)})", level="info")
         for i, row in show.iterrows():
             src, tgt = row["Src"], row["Tgt"]
             feats = row["Features"]  # [src_labels, src_ctx, tgt_labels, tgt_ctx]
+            if not _valid_feats(feats):
+                feats = [
+                    _coerce_seq(row.get("SrcLabels")),
+                    _coerce_seq(row.get("SrcCtx")),
+                    _coerce_seq(row.get("TgtLabels")),
+                    _coerce_seq(row.get("TgtCtx")),
+                ]
+            if not _valid_feats(feats):
+                self.log(
+                    f"- Pair {i}: Src={src} | Tgt={tgt} — skipping (missing feature details).",
+                    level="warning",
+                )
+                continue
+
             src_labels, src_ctx_list, tgt_labels, tgt_ctx_list = feats
 
             self.log(f"- Pair {i}: Src={src} | Tgt={tgt}", level="info")

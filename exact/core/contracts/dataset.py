@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Callable, Any
 from contextlib import nullcontext
+import hashlib
 
 import math
 import numpy as np
@@ -41,6 +42,7 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
                  filter_exact_matches: bool = False,
                  cardinality: int = 1,
                  num_workers: Optional[int] = None,
+                 drop_exact_match_sources: bool = True,
                  **kwargs
         ) -> None:
 
@@ -68,12 +70,16 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
         self._exact_matches: DataFrame = None
 
         self._filter_exact_matches: bool = filter_exact_matches
+        self._drop_exact_match_sources: bool = drop_exact_match_sources
 
         self._cardinality: int = cardinality
 
         self._cache_ok = kwargs.get("cache_ok", True)
 
         self._candidates_generated = False
+        self._source_path: Optional[Path] = None
+        self._target_path: Optional[Path] = None
+        self._dataset_signature: Optional[str] = None
 
         LoggingClass.__init__(self, logger=kwargs.get("logger"))
 
@@ -110,6 +116,10 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
     @property
     def filter_exact_matches(self) -> bool:
         return self._filter_exact_matches
+
+    @property
+    def drop_exact_match_sources(self) -> bool:
+        return self._drop_exact_match_sources
 
     @property
     def source(self) -> OWLDataset:
@@ -235,13 +245,34 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
 
     def load_ontologies(self, source_path: Path, target_path: Path) -> None:
         
-        self._source = OWLDataset(str(source_path))
+        self._source_path = Path(source_path).resolve()
+        self._target_path = Path(target_path).resolve()
+        self._dataset_signature = None
+
+        self._source = OWLDataset(str(self._source_path))
         
         self.log("#Loaded Source...", level="debug")
         
-        self._target = OWLDataset(str(target_path))
+        self._target = OWLDataset(str(self._target_path))
         
         self.log("#Loaded Target...", level="debug")
+
+    def _path_fingerprint(self, path: Path) -> str:
+        try:
+            stat = path.stat()
+            return f"{path.as_posix()}::{int(stat.st_mtime)}::{stat.st_size}"
+        except OSError:
+            return path.as_posix()
+
+    @property
+    def dataset_signature(self) -> Optional[str]:
+        if self._dataset_signature is not None:
+            return self._dataset_signature
+        if self._source_path is None or self._target_path is None:
+            return None
+        blob = f"{self._path_fingerprint(self._source_path)}||{self._path_fingerprint(self._target_path)}"
+        self._dataset_signature = hashlib.sha1(blob.encode("utf-8")).hexdigest()
+        return self._dataset_signature
 
     def load_candidates(self, 
                         file_path: Optional[Path] = None,
@@ -324,7 +355,9 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
         tgt_iris = self.target_graph.get_all_classes()
         self.log(f"## Source classes: {len(src_iris)} | Target classes: {len(tgt_iris)}", level="debug")
 
-        if not self.cardinality_1_to_many and self._exact_matches is not None:
+        if (not self.cardinality_1_to_many 
+                and self.drop_exact_match_sources 
+                and self._exact_matches is not None):
             self.log("#Filtering Exact Matches from Candidate Generation...", level="debug")
             src_iris = [iri for iri in src_iris if iri not in set(self._exact_matches["Src"])]
             self.log(f"## Filtered Source classes for Candidate Generation: {len(src_iris)}", level="debug")
@@ -504,8 +537,10 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
         if pre_filtered_mappings is not None and not pre_filtered_mappings.empty:
             pre_filtered_mappings = pre_filtered_mappings.drop_duplicates(subset=["Src", "Tgt"])
 
-            if self.candidates_generated and self.cardinality_1_to_many:
-                # Global task: remove only the exact (Src, Tgt) matches from the inference pool.
+            pair_filtering = self.cardinality_1_to_many or not self.drop_exact_match_sources
+
+            if pair_filtering:
+                # Remove only the exact (Src, Tgt) matches from the inference pool.
                 self.log("#Filtering Exact (Src, Tgt) matches from Inference Set...", level="debug")
                 exact_pairs_idx = pd.MultiIndex.from_frame(pre_filtered_mappings[["Src", "Tgt"]])
                 inference_pairs_idx = pd.MultiIndex.from_frame(inference_set[["Src", "Tgt"]])
@@ -513,23 +548,27 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
 
                 if match_mask.any():
                     pre_filtered_set = inference_set[match_mask].copy()
-                    pre_filtered_set["Score"] = 1.0
+                    pre_filtered_set["Scores"] = 1.0
                     inference_set = inference_set[~match_mask]
 
             else:
                 # Ranking task or cardinality=1-to-1: drop every candidate for sources with an exact match.
                 self.log("#Filtering Exact-match sources from Inference Set...", level="debug")
-                exact_src_map = (
-                    pre_filtered_mappings.drop_duplicates(subset=["Src"])
-                    .set_index("Src")["Tgt"]
-                )
+                inference_pairs_idx = pd.MultiIndex.from_frame(inference_set[["Src", "Tgt"]])
+                exact_pairs_idx = pd.MultiIndex.from_frame(pre_filtered_mappings[["Src", "Tgt"]])
+                exact_pair_mask = pd.Series(inference_pairs_idx.isin(exact_pairs_idx), index=inference_set.index)
 
-                src_mask = inference_set["Src"].isin(exact_src_map.index)
+                if exact_pair_mask.any():
+                    matched_pairs = (
+                        inference_set.loc[exact_pair_mask, ["Src", "Tgt"]]
+                        .drop_duplicates(subset=["Src"])
+                        .set_index("Src")["Tgt"]
+                    )
 
-                if src_mask.any():
+                    src_mask = inference_set["Src"].isin(matched_pairs.index)
                     pre_filtered_set = inference_set[src_mask].copy()
-                    expected_tgt = pre_filtered_set["Src"].map(exact_src_map)
-                    pre_filtered_set["Score"] = (pre_filtered_set["Tgt"] == expected_tgt).astype(float)
+                    expected_tgt = pre_filtered_set["Src"].map(matched_pairs)
+                    pre_filtered_set["Scores"] = (pre_filtered_set["Tgt"] == expected_tgt).astype(float)
                     inference_set = inference_set[~src_mask]
 
         pre_filtered_set[DatasetMask.inference] = False

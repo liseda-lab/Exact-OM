@@ -83,6 +83,12 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
         return (self._output_dir / "alignment").resolve()
 
     @property
+    def checkpoint_dir(self) -> Path:
+        path = (self._output_dir / "checkpoints").resolve()
+        path.mkdir(parents=True, exist_ok=True)
+        return path
+
+    @property
     def results_json(self) -> List[Dict[str, Any]]:
         return self._results_json
 
@@ -119,7 +125,20 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
             self.log("No data to prefilter", level="warning")
             return alignment
 
-        prefiltered_mappings = EntityMapping.read_table_mappings(df[["Src", "Tgt", "Scores"]], threshold=threshold, cardinality=cardinality)
+        score_column = None
+        for candidate in ("Scores", "Score"):
+            if candidate in df.columns:
+                score_column = candidate
+                break
+
+        if score_column is None:
+            self.log("Prefiltered dataframe missing score column; skipping prefilter step.", level="warning")
+            return alignment
+
+        prefilter_df = df[["Src", "Tgt", score_column]].copy()
+        prefilter_df.columns = ["Src", "Tgt", "Score"]
+
+        prefiltered_mappings = EntityMapping.read_table_mappings(prefilter_df, threshold=threshold, cardinality=cardinality)
         final_alignment = alignment + prefiltered_mappings
         
         if cardinality is not None:

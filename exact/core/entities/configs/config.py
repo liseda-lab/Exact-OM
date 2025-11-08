@@ -41,6 +41,7 @@ class DatasetParams(BaseModel):
     # General Params
     num_workers: Optional[int] = Field(config["dataset_params"]["num_workers"])
     filter_exact_matches: bool = Field(config["dataset_params"]["filter_exact_matches"])
+    drop_exact_match_sources: bool = Field(config["dataset_params"]["drop_exact_match_sources"])
 
     # Context Main Params
     n_hops: int = Field(config["dataset_params"]["n_hops"])
@@ -95,6 +96,9 @@ class InferenceParams(BaseModel):
     log_every: int = Field(config["inference_params"]["log_every"])
     mixed_precision: bool = Field(config["inference_params"]["mixed_precision"])
     which: Optional[List[str]] = Field(config["inference_params"]["which"])
+    checkpoint_every: int = Field(config["inference_params"]["checkpoint_every"])
+    resume_from_checkpoint: bool = Field(config["inference_params"]["resume_from_checkpoint"])
+    enable_checkpoints: bool = Field(config["inference_params"]["enable_checkpoints"])
 
 
 class AlignmentParams(BaseModel):
@@ -167,5 +171,4 @@ class ConfigModel(BaseModel):
             model=model_params,
             **filtered_config,
         )
-
 
