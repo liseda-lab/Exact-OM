@@ -359,9 +359,13 @@ class ContextDataset(IDataset):
         txt = text.strip()
         if not txt:
             return ""
+        lines = txt.splitlines()
+        if not lines:
+            return ""
         if "Sentence:" in txt:
             txt = txt.split("Sentence:", 1)[-1].strip()
-        first_line = txt.splitlines()[0].strip()
+            lines = txt.splitlines() or lines
+        first_line = lines[0].strip()
         prefix_pattern = re.compile(r"^(assistant|assistant:|assistant,|ai[- ]generated sentence:)", re.IGNORECASE)
         first_line = prefix_pattern.sub("", first_line).strip(" :,-\t")
         if not first_line:
