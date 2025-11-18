@@ -124,6 +124,14 @@ def main() -> None:
         job_cfg = cfg["job"]
         exp_dir = Path(job_cfg["output_dir"]).resolve()
         exp_dir.mkdir(parents=True, exist_ok=True)
+
+        def env_value(value):
+            if value is None:
+                return ""
+            if isinstance(value, Path):
+                return str(value)
+            return str(value)
+
         env = {
             "JOB_NAME": job_cfg.get("name", Path(job_cfg["output_dir"]).name),
             "EXP_DIR": str(exp_dir),
@@ -131,12 +139,13 @@ def main() -> None:
             "DATA_DIR": str(Path(dataset_cfg["data_dir"]).resolve()),
             "SOURCE": dataset_cfg["source"],
             "TARGET": dataset_cfg["target"],
-            "FULL_REFERENCE": dataset_cfg.get("full_reference", ""),
-            "CANDIDATES": dataset_cfg.get("candidates", ""),
+            "TRAIN_REFERENCE": env_value(dataset_cfg.get("train_reference")),
+            "FULL_REFERENCE": env_value(dataset_cfg.get("full_reference")),
+            "CANDIDATES": env_value(dataset_cfg.get("candidates")),
             "MEMORY": str(job_cfg.get("memory", "60G")),
             "RUN_EVAL": "1" if job_cfg.get("run_eval") else "0",
             "SAVE_LOGS": "1" if job_cfg.get("save_logs") else "0",
-            "DEVICE": str(job_cfg.get("device", "")),
+            "DEVICE": env_value(job_cfg.get("device")),
         }
         stdout = exp_dir / "slurm_%j.out"
         stderr = exp_dir / "slurm_%j.err"
