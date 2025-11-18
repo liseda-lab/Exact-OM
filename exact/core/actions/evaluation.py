@@ -59,7 +59,7 @@ class EvaluationAction(Protocol):
                 source_ontology = source_file_path.ontology
             elif isinstance(source_file_path, Path):
                 logger.info(f"Using source ontology from file {source_file_path}")
-                source_ontology = OWLDataset(source_file_path).ontology
+                source_ontology = OWLDataset(str(source_file_path)).ontology
             else:
                 target_ontology = None
                 logger.warning(f"not using source ontology for global evaluation")
@@ -69,7 +69,7 @@ class EvaluationAction(Protocol):
                 target_ontology = target_file_path.ontology
             elif isinstance(target_file_path, Path):
                 logger.info(f"Using target ontology from file {target_file_path}")
-                target_ontology = OWLDataset(target_file_path).ontology
+                target_ontology = OWLDataset(str(target_file_path)).ontology
             else:
                 target_ontology = None
                 logger.warning(f"not using target ontology for global evaluation")
