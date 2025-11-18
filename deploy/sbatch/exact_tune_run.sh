@@ -1,7 +1,5 @@
 #!/bin/bash
 #SBATCH --job-name=exact_tune
-#SBATCH --output=slurm_tune_%j.out
-#SBATCH --error=slurm_tune_%j.err
 #SBATCH --partition=tier3
 #SBATCH --nodes=1
 #SBATCH --ntasks=1

@@ -12,9 +12,10 @@ import itertools
 import json
 import math
 import random
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Iterable, List, Sequence
+from typing import Dict, Iterable, List, Sequence, Tuple
 
 import yaml
 
@@ -77,9 +78,9 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--strategy",
-        choices=("grid", "smart"),
+        choices=("grid", "smart", "per_param"),
         default="grid",
-        help="Grid search or low-discrepancy smart sampler.",
+        help="Grid search, low-discrepancy smart sampler, or per-parameter sweeps.",
     )
     parser.add_argument(
         "--num-samples",
@@ -139,6 +140,17 @@ def grid_trials(params: Sequence[ParamSpec]) -> List[Dict[str, object]]:
         trial = {name: value for name, value in combo}
         combinations.append(trial)
     return combinations
+
+
+def per_param_trials(params: Sequence[ParamSpec]) -> List[Dict[str, object]]:
+    """Generate trials that change one parameter at a time from the baseline."""
+    trials: List[Dict[str, object]] = []
+    for spec in params:
+        if not spec.values:
+            raise ValueError(f"Param '{spec.name}' requires explicit values for per-parameter sweeps.")
+        for value in spec.values:
+            trials.append({spec.name: spec.convert(value)})
+    return trials
 
 
 def halton(dim: int, count: int, skip: int = 0) -> List[List[float]]:
@@ -261,6 +273,57 @@ def ensure_dir(path: Path) -> None:
     path.mkdir(parents=True, exist_ok=True)
 
 
+def resolve_extra_files(entries: Iterable, config_dir: Path) -> List[Tuple[Path, Path]]:
+    if not entries:
+        return []
+    if isinstance(entries, (str, bytes)) or isinstance(entries, dict):
+        entries = [entries]
+    normalized: List[Tuple[Path, Path]] = []
+    for idx, entry in enumerate(entries):
+        if isinstance(entry, str):
+            src_str = entry
+            dst_str = Path(entry).name
+        elif isinstance(entry, dict):
+            src_str = entry.get("source") or entry.get("src")
+            if not src_str:
+                raise ValueError(f"extra_files[{idx}] is missing 'source'.")
+            dst_str = entry.get("destination") or entry.get("dest") or entry.get("target") or Path(src_str).name
+        else:
+            raise ValueError("extra_files entries must be strings or mappings with 'source'.")
+        src_path = Path(src_str).expanduser()
+        candidates: List[Path] = []
+        if src_path.is_absolute():
+            candidates.append(src_path)
+        else:
+            candidates.append((Path.cwd() / src_path))
+            candidates.append((config_dir / src_path))
+        resolved_src = None
+        for candidate in candidates:
+            candidate_resolved = candidate.resolve()
+            if candidate_resolved.exists():
+                resolved_src = candidate_resolved
+                break
+        if resolved_src is None:
+            raise FileNotFoundError(f"Extra file '{src_str}' was not found relative to the current working directory or {config_dir}.")
+        dst_path = Path(dst_str)
+        if dst_path.is_absolute():
+            raise ValueError(f"Destination path '{dst_str}' for extra_files[{idx}] must be relative.")
+        if any(part == ".." for part in dst_path.parts):
+            raise ValueError(f"Destination path '{dst_str}' for extra_files[{idx}] cannot contain '..'.")
+        normalized.append((resolved_src, dst_path))
+    return normalized
+
+
+def copy_extra_files(trial_dir: Path, extra_files: Sequence[Tuple[Path, Path]]) -> None:
+    for src, rel_dst in extra_files:
+        dest = trial_dir / rel_dst
+        if src.is_dir():
+            shutil.copytree(src, dest, dirs_exist_ok=True)
+        else:
+            ensure_dir(dest.parent)
+            shutil.copy2(src, dest)
+
+
 def create_trial_files(
     trial_dir: Path,
     config_template: dict,
@@ -326,7 +389,10 @@ def maybe_submit(commands: List[str]) -> None:
 
 def main() -> None:
     args = parse_args()
-    tuner_cfg = load_yaml(args.tuner_config)
+    tuner_config_path = args.tuner_config.resolve()
+    tuner_cfg = load_yaml(tuner_config_path)
+    config_dir = tuner_config_path.parent
+    extra_files = resolve_extra_files(tuner_cfg.get("extra_files"), config_dir)
     base_config_path = Path(tuner_cfg["base_config"]).resolve()
     base_config = load_yaml(base_config_path)
     params = [ParamSpec.from_mapping(name, spec) for name, spec in tuner_cfg["search_space"].items()]
@@ -341,6 +407,8 @@ def main() -> None:
 
     if args.strategy == "grid":
         trial_params = grid_trials(params)
+    elif args.strategy == "per_param":
+        trial_params = per_param_trials(params)
     else:
         trial_params = smart_trials(params, tuner_cfg.get("smart", {}), base_config, args.num_samples)
 
@@ -354,6 +422,8 @@ def main() -> None:
         job_name = build_trial_name(job_prefix, index, param_values)
         trial_dir = experiment_root / job_name
         config_path = create_trial_files(trial_dir, base_config, param_values)
+        if extra_files:
+            copy_extra_files(trial_dir, extra_files)
         export_vars = build_export_vars(dataset_cfg, config_path, trial_dir, job_name)
         slurm_dir = trial_dir / "slurm"
         ensure_dir(slurm_dir)
