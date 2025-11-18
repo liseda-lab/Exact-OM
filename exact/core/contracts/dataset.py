@@ -393,7 +393,7 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
             tgt_idx_row = idxs[i]
             sim_row = sims[i]
             for j, score in zip(tgt_idx_row, sim_row):
-                rows.append([s_iri, tgt_iris[int(j)], 0, float(score)])
+                rows.append([str(s_iri), str(tgt_iris[int(j)]), 0, float(score)])
 
         cand_df = pd.DataFrame(rows, columns=["Src", "Tgt", "Label", "cand_sim"])
 

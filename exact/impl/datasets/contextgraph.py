@@ -65,6 +65,7 @@ class ContextDataset(IDataset):
     """
 
     component_type = ComponentType.DATASET
+    _taxonomy_warning_emitted_global = False
 
     def __init__(
         self,
@@ -121,6 +122,8 @@ class ContextDataset(IDataset):
 
         self.delimiter = delimiter
         self._default_verbaliser_system_prompt = "You are a helpful ontology expert."
+        self._taxonomy_warning_emitted = False
+        self._taxonomy_template_log_emitted = False
 
         # Prepared on demand
         self._source_graph: Optional[OntologyGraph] = None
@@ -187,7 +190,9 @@ class ContextDataset(IDataset):
     def verbalization_templates(self) -> Dict[str, str]:
 
         if self.only_taxonomy:
-            self.log("Using taxonomy-only templates.", level="debug")
+            if not self._taxonomy_template_log_emitted:
+                self.log("Using taxonomy-only templates.", level="debug")
+                self._taxonomy_template_log_emitted = True
             self._verbalization_templates = {
                 "subclassof": "$SRC is a subclass of $TGT",
                 "subclass_of": "$SRC is a subclass of $TGT",
@@ -388,6 +393,17 @@ class ContextDataset(IDataset):
             key = rel  # human-readable key as produced by OntologyGraph.human_readable=True
             tmpl = tmpls.get(key)
             if tmpl is None:
+                if (
+                    self.only_taxonomy
+                    and not self._taxonomy_warning_emitted
+                    and not ContextDataset._taxonomy_warning_emitted_global
+                ):
+                    self.log(
+                        "only_taxonomy=True: using generic '$SRC rel $TGT' templates for non-taxonomy relations (suppressing further warnings).",
+                        level="warning",
+                    )
+                    self._taxonomy_warning_emitted = True
+                    ContextDataset._taxonomy_warning_emitted_global = True
                 tmpl = "$SRC " + key.replace("_", " ").lower() + " $TGT"
             out.append(tmpl.replace("$SRC", head).replace("$TGT", tail))
         return out

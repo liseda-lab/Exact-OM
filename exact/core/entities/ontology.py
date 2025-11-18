@@ -464,7 +464,8 @@ class OntologyGraph:
         """
         out = []
         for cls in self.ontology.getClassesInSignature():
-            out.append(cls.getIRI().toString())
+            # Ensure JPype java.lang.String objects are converted to native Python str.
+            out.append(str(cls.getIRI().toString()))
         return out
 
     def get_labels_map(self) -> Dict[str, List[str]]:
@@ -639,4 +640,3 @@ class Entity:
                     if neighbor in reachable and (neighbor, node, "subClassOf") not in subgraph_edges:
                         subgraph_edges.append((node, "subClassOf", neighbor))
             return subgraph_edges
-
