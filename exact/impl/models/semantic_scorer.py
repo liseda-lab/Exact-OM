@@ -1,6 +1,6 @@
 import math
 from enum import Enum
-from typing import List, Optional, Tuple, Dict, Any
+from typing import List, Optional, Tuple, Dict, Any, Iterable
 import re
 import time
 import json
@@ -26,10 +26,15 @@ class PoolingMethod(str, Enum):
     MAX = "max"
 
 
+class LabelPairPooling(str, Enum):
+    MAX = "max"
+    MEAN = "mean"
+
+
 class SemanticScorer(IModel):
     """
     Explainable ontology matching scorer integrating:
-      • Lexical embeddings with max-pooling over label variants
+      • Lexical embeddings with configurable pooling over label variants
       • Ambiguity-triggered cross-encoder refinement (BGE reranker)
       • Context embeddings over verbalised subgraphs (lists of sentences)
       • Uncertainty-driven, gated LLM (summarise + Yes/No logits probability)
@@ -51,6 +56,7 @@ class SemanticScorer(IModel):
 
         # ---- Pooling for encoders ----
         pooling_method: PoolingMethod = PoolingMethod.MEAN,
+        label_pair_pooling: LabelPairPooling = LabelPairPooling.MAX,
 
         # ---- Context sentence delimiter ----
         ctx_sentence_delimiter: Optional[str] = " || ",
@@ -61,6 +67,7 @@ class SemanticScorer(IModel):
         max_input_tokens_ce: int = 64,
         max_total_tokens_llm_summary: int = 512,
         max_total_tokens_llm_decision: int = 384,
+        max_total_tokens_llm_rationale: int = 512,
         max_new_tokens_llm: int = 64,
 
         # ---- Ablations / toggles ----
@@ -87,9 +94,15 @@ class SemanticScorer(IModel):
         llm_do_sample: bool = False,
         llm_summary_batch_size: Optional[int] = 8,
         llm_decision_batch_size: Optional[int] = 8,
+        llm_rationale_batch_size: Optional[int] = 8,
 
         # ---- Explanations / review band ----
         return_explanations: bool = False,
+        generate_llm_rationales: bool = False,
+        use_llm_calibration: bool = False,
+        llm_calibration_a: Optional[float] = None,
+        llm_calibration_b: Optional[float] = None,
+        llm_calibration_info: Optional[str] = None,
         review_low: float = 0.35,
         review_high: float = 0.75,
         threshold: float = 0.7,
@@ -102,6 +115,7 @@ class SemanticScorer(IModel):
         max_cached_labels: Optional[int] = None,
         max_cached_contexts: Optional[int] = None,
         max_cached_summaries: Optional[int] = None,
+        max_cached_rationales: Optional[int] = None,
 
         **kwargs,
     ):
@@ -112,6 +126,7 @@ class SemanticScorer(IModel):
         )
         self.fp16 = fp16_inference
         self.pooling_method = PoolingMethod(pooling_method)
+        self.label_pair_pooling = LabelPairPooling(label_pair_pooling)
 
         # attach logger hook
         self.log = getattr(self, "log", lambda *a, **kw: None)
@@ -122,14 +137,26 @@ class SemanticScorer(IModel):
         self.max_input_tokens_ce = max_input_tokens_ce
         self.max_total_tokens_llm_summary = max_total_tokens_llm_summary
         self.max_total_tokens_llm_decision = max_total_tokens_llm_decision
+        self.max_total_tokens_llm_rationale = max_total_tokens_llm_rationale
         self.max_new_tokens_llm = max_new_tokens_llm
         self.llm_summary_batch_size = llm_summary_batch_size
         self.llm_decision_batch_size = llm_decision_batch_size
+        self.llm_rationale_batch_size = llm_rationale_batch_size
 
         self.use_lexical = use_lexical
         self.use_context = use_context
         self.use_cross_encoder = use_cross_encoder and (cross_encoder_name is not None)
         self.use_llm = use_llm and (llm_model_name is not None)
+        self.generate_llm_rationales = generate_llm_rationales and self.use_llm
+        self.llm_calibration_a = llm_calibration_a
+        self.llm_calibration_b = llm_calibration_b
+        self.llm_calibration_info = (llm_calibration_info or "").strip() or None
+        self.use_llm_calibration = bool(use_llm_calibration) and self.use_llm
+        self._llm_calibration_can_apply = (
+            self.use_llm_calibration
+            and (self.llm_calibration_a is not None)
+            and (self.llm_calibration_b is not None)
+        )
 
         self.tau = tau
         self.tau_ce = tau_ce
@@ -152,14 +179,22 @@ class SemanticScorer(IModel):
         self.max_cached_labels = max_cached_labels
         self.max_cached_contexts = max_cached_contexts
         self.max_cached_summaries = max_cached_summaries
+        self.max_cached_rationales = max_cached_rationales
         self._lex_cache: "OrderedDict[str, torch.Tensor]" = OrderedDict()
         self._ctx_cache: "OrderedDict[str, torch.Tensor]" = OrderedDict()
         self._summary_cache: "OrderedDict[str, str]" = OrderedDict()
+        self._rationale_cache: "OrderedDict[str, str]" = OrderedDict()
         self._cache_dirty = False
         self._cache_file_path = (
             (self.cache_dir / f"{self.cache_namespace}_cache.pt").resolve()
             if self.persist_cache_to_disk else None
         )
+        self._computed_llm_calibration: Optional[Dict[str, Any]] = None
+        self._calibration_messages: List[str] = []
+        self._calibration_pending_probs: List[float] = []
+        self._calibration_pending_labels: List[float] = []
+        self._llm_calibration_fitted_once = False
+        self.reset_summary_stats()
 
         # store model names (for explanations)
         self.lexical_model_name = lexical_model_name
@@ -201,6 +236,7 @@ class SemanticScorer(IModel):
 
         if self.persist_cache_to_disk:
             self._load_cache_from_disk()
+        self.reset_llm_calibration_tracking()
 
     # -------------------------------------------------------------------------
     # Helpers
@@ -218,6 +254,30 @@ class SemanticScorer(IModel):
 
     def _cos_sim(self, a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
         return torch.nn.functional.cosine_similarity(a, b)
+
+    def _select_label_pair(
+        self,
+        mat: torch.Tensor,
+        labs_s: List[str],
+        labs_t: List[str],
+    ) -> Tuple[torch.Tensor, Tuple[str, str]]:
+        if mat.numel() == 0:
+            return torch.tensor(0.0, device=mat.device), ("", "")
+        if self.label_pair_pooling == LabelPairPooling.MAX:
+            score = mat.max()
+            idx_flat = torch.argmax(mat)
+        elif self.label_pair_pooling == LabelPairPooling.MEAN:
+            score = mat.mean()
+            idx_flat = torch.argmin((mat - score).abs())
+        else:
+            raise ValueError(f"Unknown label pair pooling: {self.label_pair_pooling}")
+        r = int(idx_flat // mat.shape[1])
+        c = int(idx_flat % mat.shape[1])
+        pair = (
+            labs_s[r] if 0 <= r < len(labs_s) else "",
+            labs_t[c] if 0 <= c < len(labs_t) else "",
+        )
+        return score, pair
 
     def _candidate_token_ids(self, variants: List[str]) -> List[int]:
         ids = []
@@ -244,9 +304,16 @@ class SemanticScorer(IModel):
             "max_input_tokens_context": self.max_input_tokens_context,
             "max_total_tokens_llm_summary": self.max_total_tokens_llm_summary,
             "max_total_tokens_llm_decision": self.max_total_tokens_llm_decision,
+            "max_total_tokens_llm_rationale": self.max_total_tokens_llm_rationale,
             "pooling_method": self.pooling_method.value,
+            "label_pair_pooling": self.label_pair_pooling.value,
             "ctx_sentence_delimiter": self.ctx_sentence_delimiter,
             "dataset_signature": self.dataset_signature,
+            "generate_llm_rationales": self.generate_llm_rationales,
+            "use_llm_calibration": self.use_llm_calibration,
+            "llm_calibration_a": self.llm_calibration_a,
+            "llm_calibration_b": self.llm_calibration_b,
+            "llm_calibration_info": self.llm_calibration_info,
         }
         blob = json.dumps(payload, sort_keys=True, default=str)
         return hashlib.sha1(blob.encode("utf-8")).hexdigest()
@@ -323,6 +390,24 @@ class SemanticScorer(IModel):
         payload = (label or "") + "\u241F" + (context or "")
         return hashlib.sha1(payload.encode("utf-8")).hexdigest()
 
+    @staticmethod
+    def _rationale_key(
+        src_label: str,
+        tgt_label: str,
+        src_summary: str,
+        tgt_summary: str,
+        decision: str,
+    ) -> str:
+        sep = "\u241F"
+        payload = sep.join([
+            src_label or "",
+            tgt_label or "",
+            src_summary or "",
+            tgt_summary or "",
+            decision or "",
+        ])
+        return hashlib.sha1(payload.encode("utf-8")).hexdigest()
+
     def _serialize_cache_payload(self) -> Dict[str, Any]:
         return {
             "metadata": {
@@ -335,6 +420,7 @@ class SemanticScorer(IModel):
             "lexical": [(k, v.cpu().to(self._cache_tensor_dtype)) for k, v in self._lex_cache.items()],
             "context": [(k, v.cpu().to(self._cache_tensor_dtype)) for k, v in self._ctx_cache.items()],
             "summaries": list(self._summary_cache.items()),
+            "rationales": list(self._rationale_cache.items()),
         }
 
     def _load_cache_from_disk(self) -> None:
@@ -368,17 +454,21 @@ class SemanticScorer(IModel):
         self._summary_cache.clear()
         for key, text in payload.get("summaries", []):
             self._summary_cache[key] = text
+        self._rationale_cache.clear()
+        for key, text in payload.get("rationales", []):
+            self._rationale_cache[key] = text
 
         counts = (
             len(self._lex_cache),
             len(self._ctx_cache),
             len(self._summary_cache),
+            len(self._rationale_cache),
         )
         self._cache_dirty = False
         self.log(
             (
                 f"Loaded SemanticScorer cache from {self._cache_file_path} "
-                f"(lexical={counts[0]}, context={counts[1]}, summaries={counts[2]})."
+                f"(lexical={counts[0]}, context={counts[1]}, summaries={counts[2]}, rationales={counts[3]})."
             ),
             "info",
         )
@@ -486,6 +576,28 @@ class SemanticScorer(IModel):
             ),
         }
 
+    def _rationale_prompt(
+        self,
+        src_label: str,
+        tgt_label: str,
+        src_summary: str,
+        tgt_summary: str,
+        decision: str,
+    ) -> Dict[str, str]:
+        return {
+            "system": "You are an ontology alignment expert.",
+            "user": (
+                "Based only on the information below, write one or two sentences explaining "
+                "why the two entities should or should not be considered equivalent.\n"
+                "Reference specific evidence from the label pair and the summaries. "
+                "Do not introduce external knowledge.\n\n"
+                f"Source\nLabel: {src_label}\nSummary: {src_summary}\n\n"
+                f"Target\nLabel: {tgt_label}\nSummary: {tgt_summary}\n\n"
+                f"Model decision: {decision}\n\n"
+                "Rationale:"
+            ),
+        }
+
     def _render_llm_prompt(self, prompt: Dict[str, str], add_generation_prompt: bool = True) -> str:
         system = prompt.get("system", "").strip()
         user = prompt.get("user", "").strip()
@@ -515,19 +627,190 @@ class SemanticScorer(IModel):
                 outputs.append(row[-1:].clone())
         return outputs
 
+    def reset_summary_stats(self) -> None:
+        self._summary_stats = {"requested": 0, "usable": 0, "empty": 0}
+
+    def _record_summary_stats(self, summaries: Iterable[Optional[str]]) -> None:
+        if not self.use_llm:
+            return
+        stats = getattr(self, "_summary_stats", None)
+        if stats is None:
+            self.reset_summary_stats()
+            stats = self._summary_stats
+        for text in summaries:
+            stats["requested"] += 1
+            normalized = ""
+            if isinstance(text, str):
+                normalized = text.strip()
+            elif text is None:
+                normalized = ""
+            else:
+                normalized = str(text).strip()
+            if normalized:
+                stats["usable"] += 1
+            else:
+                stats["empty"] += 1
+
+    def llm_summary_stats(self) -> Dict[str, Any]:
+        stats = dict(getattr(self, "_summary_stats", {}))
+        total = int(stats.get("requested", 0) or 0)
+        empty = int(stats.get("empty", 0) or 0)
+        usable = int(stats.get("usable", 0) or 0)
+        if usable + empty != total:
+            usable = max(0, total - empty)
+        stats["requested"] = total
+        stats["usable"] = usable
+        stats["empty"] = empty
+        stats["empty_fraction"] = (float(empty) / total) if total else 0.0
+        stats["usable_fraction"] = (float(usable) / total) if total else 0.0
+        return stats
+
     @staticmethod
-    def _clean_summary_text(text: str) -> str:
+    def _clean_summary_text(text: Optional[str]) -> str:
+        if not isinstance(text, str):
+            text = "" if text is None else str(text)
         txt = text.strip()
         if not txt:
             return ""
         if "Summary:" in txt:
             txt = txt.split("Summary:", 1)[-1].strip()
-        line = txt.splitlines()[0].strip()
+        lines = [ln.strip() for ln in txt.splitlines() if ln.strip()]
+        if not lines:
+            return ""
+        line = lines[0]
         prefix_pattern = re.compile(r"^(assistant|assistant:|assistant,|summary:)", re.IGNORECASE)
         line = prefix_pattern.sub("", line).strip(" :,-\t")
         sentence_parts = re.split(r"(?<=[.!?])\s+", line)
         cleaned = sentence_parts[0].strip()
         return cleaned or line
+
+    @staticmethod
+    def _clean_rationale_text(text: str) -> str:
+        txt = text.strip()
+        if not txt:
+            return ""
+        prefix_pattern = re.compile(r"^(assistant|rationale:|assistant:)", re.IGNORECASE)
+        txt = prefix_pattern.sub("", txt).strip()
+        lines = [ln.strip() for ln in txt.splitlines() if ln.strip()]
+        if lines:
+            txt = " ".join(lines)
+        sentences = re.split(r"(?<=[.!?])\s+", txt)
+        trimmed = " ".join(sentences[:2]).strip()
+        return trimmed or txt
+
+    def reset_llm_calibration_tracking(self) -> None:
+        self._computed_llm_calibration = None
+        self._calibration_messages = []
+        self._calibration_pending_probs = []
+        self._calibration_pending_labels = []
+        self._llm_calibration_fitted_once = False
+
+    def _apply_llm_calibration(self, probs: torch.Tensor) -> torch.Tensor:
+        if not self._llm_calibration_can_apply:
+            return probs
+        a = torch.tensor(self.llm_calibration_a, device=probs.device, dtype=probs.dtype)
+        b = torch.tensor(self.llm_calibration_b, device=probs.device, dtype=probs.dtype)
+        calibrated = torch.sigmoid(a * probs + b)
+        return calibrated.clamp(0.0, 1.0)
+
+    def _collect_calibration_samples(
+        self,
+        idxs: List[int],
+        probs: torch.Tensor,
+        labels: Optional[List[float]],
+    ) -> Optional[Tuple[torch.Tensor, torch.Tensor]]:
+        if labels is None:
+            self._calibration_messages.append("LLM calibration skipped: ground-truth labels not provided.")
+            return None
+        xs: List[float] = []
+        ys: List[float] = []
+        for offset, idx in enumerate(idxs):
+            if idx >= len(labels):
+                continue
+            gt = labels[idx]
+            if gt is None:
+                continue
+            xs.append(float(probs[offset].item()))
+            ys.append(float(gt))
+        if len(xs) < 2:
+            self._calibration_messages.append(
+                f"LLM calibration skipped: insufficient labelled pairs ({len(xs)})."
+            )
+            return None
+        x_t = torch.tensor(xs, dtype=torch.float64)
+        y_t = torch.tensor(ys, dtype=torch.float64).clamp(0.0, 1.0)
+        return x_t, y_t
+
+    def _fit_llm_calibration_from_samples(
+        self,
+        probs: torch.Tensor,
+        labels: torch.Tensor,
+        max_iters: int = 400,
+        lr: float = 1.0,
+    ) -> Dict[str, Any]:
+        x = probs.clamp(1e-6, 1.0 - 1e-6)
+        y = labels
+        a = torch.tensor(0.0, dtype=torch.float64)
+        b = torch.tensor(0.0, dtype=torch.float64)
+        step = lr
+        for _ in range(max_iters):
+            logits = a * x + b
+            sig = torch.sigmoid(logits)
+            error = sig - y
+            grad_a = (error * x).mean()
+            grad_b = error.mean()
+            a -= step * grad_a
+            b -= step * grad_b
+            if max(abs(grad_a.item()), abs(grad_b.item())) < 1e-6:
+                break
+            step = max(step * 0.99, 0.01)
+        logits = a * x + b
+        loss = torch.nn.functional.binary_cross_entropy_with_logits(logits, y).item()
+        info = {
+            "a": float(a.item()),
+            "b": float(b.item()),
+            "loss": loss,
+            "samples": int(x.numel()),
+        }
+        return info
+
+    def _llm_calibration_payload(self, batch_samples: int = 0) -> Dict[str, Any]:
+        return {
+            "enabled": self.use_llm_calibration,
+            "configured": self._llm_calibration_can_apply,
+            "a": self.llm_calibration_a,
+            "b": self.llm_calibration_b,
+            "info": self.llm_calibration_info,
+            "learned": self._computed_llm_calibration,
+            "messages": list(self._calibration_messages),
+            "pending_batch_samples": batch_samples,
+            "pending_total_samples": len(self._calibration_pending_probs),
+        }
+
+    def llm_calibration_state(self) -> Dict[str, Any]:
+        return self._llm_calibration_payload(batch_samples=0)
+
+    def finalize_llm_calibration(self) -> Optional[Dict[str, Any]]:
+        if (
+            not self.use_llm_calibration
+            or self._llm_calibration_can_apply
+            or self._llm_calibration_fitted_once
+        ):
+            return None
+        if not self._calibration_pending_probs or not self._calibration_pending_labels:
+            return None
+        probs = torch.tensor(self._calibration_pending_probs, dtype=torch.float64)
+        labels = torch.tensor(self._calibration_pending_labels, dtype=torch.float64)
+        info = self._fit_llm_calibration_from_samples(probs, labels)
+        self._computed_llm_calibration = info
+        self._llm_calibration_fitted_once = True
+        self._calibration_messages.append(
+            (
+                "Fitted final LLM calibration coefficients "
+                f"(samples={info['samples']}, a={info['a']:.4f}, b={info['b']:.4f}, loss={info['loss']:.4f})."
+            )
+        )
+        return self._llm_calibration_payload(batch_samples=0)
 
     @torch.inference_mode()
     def generate_summaries_batched(self, labels: List[str], contexts: List[str]) -> List[str]:
@@ -557,6 +840,7 @@ class SemanticScorer(IModel):
                 for idx in pending[key]["indices"]:
                     outputs[idx] = clean
 
+        self._record_summary_stats(outputs)
         return outputs
 
     def _generate_summaries_uncached(self, labels: List[str], contexts: List[str]) -> List[str]:
@@ -574,6 +858,95 @@ class SemanticScorer(IModel):
                 return_tensors="pt",
                 truncation=True,
                 max_length=self.max_total_tokens_llm_summary,
+            ).to(self.device)
+            with torch.amp.autocast(device_type=self.device_type, enabled=self.fp16):
+                out = self.llm.generate(
+                    **enc,
+                    max_new_tokens=self.max_new_tokens_llm,
+                    temperature=self.llm_temperature,
+                    top_p=self.llm_top_p,
+                    do_sample=self.llm_do_sample,
+                    pad_token_id=self.llm_tok.eos_token_id,
+                )
+            new_tokens = self._strip_llm_prompt_tokens(enc, out)
+            decoded = self.llm_tok.batch_decode(new_tokens, skip_special_tokens=True)
+            for offset, text in enumerate(decoded):
+                outputs[start + offset] = text
+        return outputs
+
+    @torch.inference_mode()
+    def generate_rationales_batched(
+        self,
+        src_labels: List[str],
+        tgt_labels: List[str],
+        src_summaries: List[str],
+        tgt_summaries: List[str],
+        decisions: List[str],
+    ) -> List[str]:
+        if not (self.use_llm and self.generate_llm_rationales):
+            return ["" for _ in src_labels]
+        if not src_labels:
+            return []
+        outputs = [""] * len(src_labels)
+        pending: Dict[str, Dict[str, Any]] = {}
+        for idx, (s_lab, t_lab, s_sum, t_sum, decision) in enumerate(
+            zip(src_labels, tgt_labels, src_summaries, tgt_summaries, decisions)
+        ):
+            key = self._rationale_key(s_lab, t_lab, s_sum, t_sum, decision)
+            cached = self._rationale_cache.get(key)
+            if cached is not None:
+                outputs[idx] = cached
+                continue
+            entry = pending.setdefault(
+                key,
+                {
+                    "src_label": s_lab,
+                    "tgt_label": t_lab,
+                    "src_summary": s_sum,
+                    "tgt_summary": t_sum,
+                    "decision": decision,
+                    "indices": [],
+                },
+            )
+            entry["indices"].append(idx)
+
+        if pending:
+            pending_keys = list(pending.keys())
+            prompts = [
+                self._render_llm_prompt(
+                    self._rationale_prompt(
+                        pending[key]["src_label"],
+                        pending[key]["tgt_label"],
+                        pending[key]["src_summary"],
+                        pending[key]["tgt_summary"],
+                        pending[key]["decision"],
+                    )
+                )
+                for key in pending_keys
+            ]
+            generated = self._generate_rationales_uncached(prompts)
+            for key, rationale in zip(pending_keys, generated):
+                clean = self._clean_rationale_text(rationale)
+                self._cache_store(self._rationale_cache, key, clean, self.max_cached_rationales)
+                for idx in pending[key]["indices"]:
+                    outputs[idx] = clean
+
+        return outputs
+
+    def _generate_rationales_uncached(self, prompts: List[str]) -> List[str]:
+        if not prompts:
+            return []
+        outputs = [""] * len(prompts)
+        chunk = self.llm_rationale_batch_size or len(prompts)
+        chunk = chunk if chunk > 0 else len(prompts)
+        for start in range(0, len(prompts), chunk):
+            end = min(start + chunk, len(prompts))
+            enc = self.llm_tok(
+                prompts[start:end],
+                padding=True,
+                return_tensors="pt",
+                truncation=True,
+                max_length=self.max_total_tokens_llm_rationale,
             ).to(self.device)
             with torch.amp.autocast(device_type=self.device_type, enabled=self.fp16):
                 out = self.llm.generate(
@@ -687,8 +1060,24 @@ class SemanticScorer(IModel):
         tgt_contexts = tgt_contexts or [[] for _ in range(N)]
         src_ctx_joined = [self._join_context(c) for c in src_contexts]
         tgt_ctx_joined = [self._join_context(c) for c in tgt_contexts]
+        if self.use_context:
+            src_ctx_present = torch.tensor(
+                [bool(ctx.strip()) for ctx in src_ctx_joined],
+                device=self.device,
+                dtype=torch.bool,
+            )
+            tgt_ctx_present = torch.tensor(
+                [bool(ctx.strip()) for ctx in tgt_ctx_joined],
+                device=self.device,
+                dtype=torch.bool,
+            )
+            ctx_pair_mask = src_ctx_present & tgt_ctx_present
+        else:
+            ctx_pair_mask = torch.zeros(N, dtype=torch.bool, device=self.device)
+        self._computed_llm_calibration = None
+        self._calibration_messages = []
 
-        # ---------- LEXICAL + MAX POOL ----------
+        # ---------- LEXICAL + LABEL PAIR POOL ----------
         if self.use_lexical:
             self.log("Encoding lexical label variants...", "info")
             flat_src = [lab for labs in src_label_lists for lab in labs]
@@ -715,12 +1104,9 @@ class SemanticScorer(IModel):
                     Esn = torch.nn.functional.normalize(Es, dim=-1)
                     Etn = torch.nn.functional.normalize(Et, dim=-1)
                     mat = Esn @ Etn.T
-                    v, idx = mat.max(dim=0)[0].max(dim=0)
-                    idx_flat = torch.argmax(mat)
-                    r = idx_flat // mat.shape[1]
-                    c = idx_flat % mat.shape[1]
-                    sims.append(mat[r, c])
-                    best_pairs.append((labs_s[int(r)], labs_t[int(c)]))
+                    score, pair = self._select_label_pair(mat, labs_s, labs_t)
+                    sims.append(score)
+                    best_pairs.append(pair)
                 s_label = torch.stack(sims)
         else:
             s_label = torch.zeros(N, device=self.device)
@@ -742,12 +1128,10 @@ class SemanticScorer(IModel):
                 Esn = torch.nn.functional.normalize(Es, dim=-1)
                 Etn = torch.nn.functional.normalize(Et, dim=-1)
                 mat = Esn @ Etn.T
-                idx_max = torch.argmax(mat)
-                r = idx_max // mat.shape[1]
-                c = idx_max % mat.shape[1]
-                pairs.append((labs_s[int(r)], labs_t[int(c)]))
+                _, pair = self._select_label_pair(mat, labs_s, labs_t)
+                pairs.append(pair)
                 pair_idx.append(i)
-                best_pairs[i] = (labs_s[int(r)], labs_t[int(c)])  # ensure consistency for LLM
+                best_pairs[i] = pair  # ensure consistency for LLM
 
             if pairs:
                 ce_scores = self.cross_encode_pairs(pairs)
@@ -781,10 +1165,17 @@ class SemanticScorer(IModel):
         else:
             w_c = w_c_adaptive
 
+        if self.use_context:
+            w_c = w_c * ctx_pair_mask.to(w_c.dtype)
+
         S_lctx = (1.0 - w_c) * s_label_star + w_c * s_ctx
 
         # ---------- LLM GATING ----------
-        m = 0.5 * (s_label_star + s_ctx)
+        if self.use_context:
+            ctx_pair_mask_float = ctx_pair_mask.to(s_label_star.dtype)
+            m = ctx_pair_mask_float * (0.5 * (s_label_star + s_ctx)) + (1.0 - ctx_pair_mask_float) * s_label_star
+        else:
+            m = s_label_star
         U = (2.0 * (self.tau - (m - self.tau).abs())).clamp(0.0, 1.0)
 
         if self.use_llm:
@@ -795,6 +1186,10 @@ class SemanticScorer(IModel):
             need_llm = torch.zeros_like(U, dtype=torch.bool)
 
         # ---------- LLM (SUMMARIES + YES/NO) ----------
+        llm_decisions = [""] * N
+        llm_rationales = [""] * N
+        batch_calibration_samples = 0
+
         if self.use_llm and need_llm.any():
             self.log("LLM fired for ambiguous/uncertain pairs: generating summaries...", "info")
 
@@ -806,8 +1201,45 @@ class SemanticScorer(IModel):
             tgt_sum = self.generate_summaries_batched(tgt_best, [tgt_ctx_joined[i] for i in idxs])
 
             p_yes_needed = self.llm_yesno_probs_batched(src_best, tgt_best, src_sum, tgt_sum)
+            calibration_info: Optional[Dict[str, Any]] = None
+            if self.use_llm_calibration:
+                if self._llm_calibration_can_apply:
+                    p_yes_needed = self._apply_llm_calibration(p_yes_needed)
+                    self._calibration_messages.append("Applied configured LLM calibration coefficients.")
+                else:
+                    samples = self._collect_calibration_samples(idxs, p_yes_needed, label)
+                    if samples is not None:
+                        probs_fit, labels_fit = samples
+                        count = int(probs_fit.shape[0])
+                        self._calibration_pending_probs.extend(
+                            probs_fit.detach().cpu().tolist()
+                        )
+                        self._calibration_pending_labels.extend(
+                            labels_fit.detach().cpu().tolist()
+                        )
+                        batch_calibration_samples += count
+                        self._calibration_messages.append(
+                            (
+                                f"Collected {count} calibration samples this batch "
+                                f"(total={len(self._calibration_pending_probs)})."
+                            )
+                        )
             p_llm = torch.zeros(N, device=self.device)
             p_llm[idxs] = p_yes_needed
+            decisions_needed = ["Yes" if float(prob) >= 0.5 else "No" for prob in p_yes_needed]
+            for offset, idx in enumerate(idxs):
+                llm_decisions[idx] = decisions_needed[offset]
+
+            if self.generate_llm_rationales:
+                rationales_needed = self.generate_rationales_batched(
+                    src_best,
+                    tgt_best,
+                    src_sum,
+                    tgt_sum,
+                    decisions_needed,
+                )
+                for offset, idx in enumerate(idxs):
+                    llm_rationales[idx] = rationales_needed[offset]
 
             S_final = S_lctx.clone()
             S_final[need_llm] = (1.0 - w_i[need_llm]) * S_lctx[need_llm] + w_i[need_llm] * p_llm[need_llm]
@@ -835,6 +1267,10 @@ class SemanticScorer(IModel):
             "I_label": I_label,
             "I_ctx": I_ctx,
             "I_llm": I_llm,
+            "llm_decisions": llm_decisions,
+            "llm_rationales": llm_rationales,
+            "llm_calibration": self._llm_calibration_payload(batch_samples=batch_calibration_samples),
+            "llm_summary_stats": self.llm_summary_stats(),
         }
 
         if self.return_explanations:
@@ -856,6 +1292,7 @@ class SemanticScorer(IModel):
                         "cross_encoder_model": self.cross_encoder_name if self.use_cross_encoder else None,
                         "llm_model": self.llm_model_name if self.use_llm else None,
                     },
+                    "llm_calibration": self._llm_calibration_payload(batch_samples=0),
                     "confidences": {
                         "s_label": float(s_label[i]),
                         "s_label_star": float(s_label_star[i]),
@@ -881,7 +1318,9 @@ class SemanticScorer(IModel):
                     },
                     "prediction": {
                         "global_match": bool(S_final[i] >= self.threshold),
-                        "ground_truth": label,
+                        "ground_truth": label[i],
+                        "llm_decision": llm_decisions[i],
+                        "llm_rationale": llm_rationales[i],
 
                     },
                     "context_sentences": {

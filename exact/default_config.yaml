@@ -117,13 +117,15 @@ model:
     # Precision
     fp16: True
     # Pooling Method
-    pooling_method: mean
+    pooling_method: mean # Options: 'mean', 'max', 'sum'
+    label_pair_pooling: mean # Options: 'mean', 'max'
     # Max Tokens
     max_input_tokens_lexical: 32
     max_input_tokens_context: 256
     max_input_tokens_ce: 64
     max_total_tokens_llm_summary: 512
     max_total_tokens_llm_decision: 384
+    max_total_tokens_llm_rationale: 512
     max_new_tokens_llm: 64
     # Ablations / toggles
     use_lexical: True
@@ -145,9 +147,15 @@ model:
     llm_do_sample: False
     llm_summary_batch_size: 8
     llm_decision_batch_size: 8
+    llm_rationale_batch_size: 8
     profile_llm: False
     # Explanations
     return_explanations: True
+    generate_llm_rationales: False
+    use_llm_calibration: False
+    llm_calibration_a: null
+    llm_calibration_b: null
+    llm_calibration_info: null
     # Caching
     cache_dir: null
     cache_namespace: null
@@ -156,3 +164,4 @@ model:
     max_cached_labels: null
     max_cached_contexts: null
     max_cached_summaries: null
+    max_cached_rationales: null

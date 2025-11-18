@@ -1,7 +1,7 @@
 import json
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Set
 
 import pandas as pd
 import torch
@@ -21,10 +21,13 @@ def _semantic_collate_fn(batch):
         return {}
 
     ragged_keys = {"src_labels", "tgt_labels", "src_ctx_triples", "tgt_ctx_triples"}
+    list_only_keys = {"label"}
     collated = {}
     for key in batch[0].keys():
         values = [sample[key] for sample in batch]
         if key in ragged_keys or values[0] is None:
+            collated[key] = values
+        elif key in list_only_keys:
             collated[key] = values
         else:
             collated[key] = default_collate(values)
@@ -225,6 +228,32 @@ class SemanticAlignmentRunner(ITrainer):
         except Exception as exc:  # noqa: BLE001
             self.log(f"Failed to persist model cache during {reason}: {exc}", "warning")
 
+    def _record_llm_calibration(self, calib: Optional[Dict[str, Any]]) -> None:
+        if not calib or self._llm_calibration_report is None:
+            return
+        messages = calib.get("messages") or []
+        for msg in messages:
+            if not msg:
+                continue
+            if msg not in self._llm_calibration_messages_logged:
+                self._llm_calibration_messages_logged.add(msg)
+                self._llm_calibration_report["messages"].append(msg)
+                self.log(msg, level="debug")
+        learned = calib.get("learned")
+        if learned:
+            self._llm_calibration_report["learned"] = learned
+        pending = calib.get("pending_total_samples")
+        if pending is not None:
+            self._llm_calibration_report["pending_total_samples"] = pending
+
+    def _finalize_llm_calibration(self) -> None:
+        model = getattr(self, "model", None)
+        if model is None or not hasattr(model, "finalize_llm_calibration"):
+            return
+        payload = model.finalize_llm_calibration()
+        if payload:
+            self._record_llm_calibration(payload)
+
     @torch.no_grad()
     def predict(
         self,
@@ -245,6 +274,25 @@ class SemanticAlignmentRunner(ITrainer):
         self.model.eval()
         self.results_json.clear()
         self.results_df = None
+        self._llm_summary_stats: Optional[Dict[str, Any]] = None
+        self._llm_calibration_messages_logged: Set[str] = set()
+        self._llm_calibration_report: Optional[Dict[str, Any]] = None
+        if hasattr(self.model, "reset_llm_calibration_tracking"):
+            self.model.reset_llm_calibration_tracking()
+        if hasattr(self.model, "reset_summary_stats"):
+            self.model.reset_summary_stats()
+        if hasattr(self.model, "use_llm_calibration"):
+            self._llm_calibration_report = {
+                "configured": {
+                    "enabled": bool(getattr(self.model, "use_llm_calibration", False)),
+                    "a": getattr(self.model, "llm_calibration_a", None),
+                    "b": getattr(self.model, "llm_calibration_b", None),
+                    "info": getattr(self.model, "llm_calibration_info", None),
+                },
+                "learned": None,
+                "messages": [],
+                "pending_total_samples": 0,
+            }
 
         checkpoint_enabled = enable_checkpoints
         checkpoint_every = max(1, int(checkpoint_every))
@@ -329,6 +377,9 @@ class SemanticAlignmentRunner(ITrainer):
             tgt_labels = batch["tgt_labels"]
             src_ctxs = batch.get("src_contexts", None)
             tgt_ctxs = batch.get("tgt_contexts", None)
+            labels = batch.get("label")
+            if isinstance(labels, torch.Tensor):
+                labels = labels.tolist()
 
             with torch.amp.autocast("cuda", enabled=mixed_precision):
                 out = self.model.forward(
@@ -338,7 +389,9 @@ class SemanticAlignmentRunner(ITrainer):
                     tgt_label_lists=tgt_labels,
                     src_contexts=src_ctxs,
                     tgt_contexts=tgt_ctxs,
+                    label=labels,
                 )
+            self._record_llm_calibration(out.get("llm_calibration"))
 
             # Accumulate mappings
             s_final = out["S_final"].detach().cpu().numpy().tolist()
@@ -381,17 +434,37 @@ class SemanticAlignmentRunner(ITrainer):
                     "debug",
                 )
 
+        self._finalize_llm_calibration()
+
         total_time = time.perf_counter() - start_time
+        duration_str = _format_duration(total_time)
         new_examples = max(0, processed_examples - restored_examples)
         avg_t = total_time / max(1, new_examples)
         avg_bt = total_time / max(1, batches_run)
         self.log(
             (
-                f"Completed {kind.name} in {total_time:.2f}s "
+                f"Completed {kind.name} in {duration_str} "
                 f"(processed {new_examples} new pairs, ~{avg_t:.3f}s/example, ~{avg_bt:.2f}s/batch)"
             ),
             "info",
         )
+        if hasattr(self.model, "llm_summary_stats"):
+            self._llm_summary_stats = self.model.llm_summary_stats()
+            stats = self._llm_summary_stats or {}
+            requested = stats.get("requested", 0)
+            usable = stats.get("usable", 0)
+            empty = stats.get("empty", 0)
+            if requested:
+                empty_pct = (empty / requested) * 100.0
+                self.log(
+                    (
+                        "LLM summary quality: "
+                        f"{requested} requested, {usable} usable, {empty} empty (~{empty_pct:.2f}% empty)"
+                    ),
+                    "info",
+                )
+            else:
+                self.log("LLM summaries were not requested for this run.", "info")
         self._maybe_persist_model_cache(reason="finalize", force=True)
 
         df = pd.DataFrame(all_mappings, columns=["Src", "Tgt", "Scores"])

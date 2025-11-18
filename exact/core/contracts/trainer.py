@@ -193,6 +193,9 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
 
             # ---- Run-level stats
             stats = self._compute_run_stats(self.results_df, review_low=review_low, review_high=review_high)
+            summary_stats = getattr(self, "_llm_summary_stats", None)
+            if summary_stats is not None:
+                stats["llm_summary_stats"] = summary_stats
             stats_json_path = out_dir / "run_stats.json"
             with open(stats_json_path, "w", encoding="utf-8") as f:
                 json.dump(stats, f, indent=2, ensure_ascii=False)
@@ -215,6 +218,11 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
                 if stats.get("triple_importance"):
                     for k, v in stats["triple_importance"].items():
                         flat[f"triple_importance_{k}"] = v
+                if summary_stats is not None:
+                    flat["llm_summary_requested"] = summary_stats.get("requested")
+                    flat["llm_summary_usable"] = summary_stats.get("usable")
+                    flat["llm_summary_empty"] = summary_stats.get("empty")
+                    flat["llm_summary_empty_fraction"] = summary_stats.get("empty_fraction")
 
                 stats_csv_path = out_dir / "run_stats.csv"
                 pd.DataFrame([flat]).to_csv(stats_csv_path, index=False)
@@ -227,6 +235,14 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
                     f.write("\n# ---- RUN STATS (human-readable footer) ----\n")
                     f.write(json.dumps(stats, indent=2))
                 self.log("Appended run stats as footer to summary CSV.", level="info")
+
+        calib_report = getattr(self, "_llm_calibration_report", None)
+        if calib_report and (calib_report.get("messages") or calib_report.get("learned")):
+            calib_path = out_dir / "llm_calibration.json"
+            with open(calib_path, "w", encoding="utf-8") as f:
+                json.dump(calib_report, f, indent=2, ensure_ascii=False)
+            self.log(f"Saved LLM calibration metadata → {calib_path}", level="info")
+            output_paths["llm_calibration_json"] = calib_path
 
         return output_paths
 
