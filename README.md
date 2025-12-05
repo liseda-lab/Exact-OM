@@ -1,6 +1,6 @@
-# **EXACT: An Explainable Context-Aware Matching Framework for Ontology Alignment**
+# **EXACT-OM: An Explainable Context-Aware Matching Model for Ontology Alignment**
 
-**EXACT** is a hybrid ontology matching framework that integrates lexical, contextual, and reasoning-based signals within a unified, interpretable architecture.
+**EXACT-OM** is a hybrid ontology matching model that integrates lexical, contextual, and language model-based signals within a unified, interpretable architecture.
 It combines the strengths of **language models** and **ontology semantics** to align entities across heterogeneous knowledge bases while preserving explainability.
 
 ### **Core Principles**
@@ -14,24 +14,24 @@ It combines the strengths of **language models** and **ontology semantics** to a
 3. **Adaptive Fusion**
    Lexical and contextual similarities are combined through a **confidence-weighted function**, granting higher influence to the most reliable modality for each pair.
 
-4. **Uncertainty-Driven Reasoning**
+4. **Uncertainty-Driven Language Model Inference**
    When ambiguity remains high, an **instruction-tuned LLM (Qwen-Instruct)** summarises both entities’ contexts and issues a **Yes/No decision** with a short textual rationale, which is incorporated into the final score.
 
 ### **Explainability**
 
-For every evaluated mapping, EXACT provides:
+For every evaluated mapping, EXACT-OM provides:
 
 * Label and context contributions with their confidence and weight.
-* Relative importance of lexical, contextual, and reasoning components.
+* Relative importance of lexical, contextual, and generative LM components.
 * Natural-language rationales generated for ambiguous cases.
   All results are exported as structured JSON explanations, ensuring transparent and traceable alignment decisions.
 
 ### **Outcome**
 
-By integrating structured semantics, adaptive weighting, and interpretable reasoning, EXACT delivers high-quality ontology alignments with explicit, human-readable evidence of how and why each mapping was made.
+By integrating structured semantics, adaptive weighting, and interpretable reasoning, EXACT-OM delivers high-quality ontology alignments with explicit, human-readable evidence of how and why each mapping was made.
 
 
-## Running Exact
+## Running Exact-OM
 
 ### CLI (`exact`)
 
