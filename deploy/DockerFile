@@ -1,0 +1,61 @@
+# Use the CUDA 12.4 with cudnn runtime support on Ubuntu 22.04
+FROM nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04
+
+# Set the working directory in the container
+WORKDIR /code
+
+# Set environment variable to make apt-get install non-interactive
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install dependencies and ensure Python 3.10 is installed
+RUN set -e -x ; \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+        python3.10 \
+        python3.10-venv \
+        python3.10-dev \
+        python3-pip \
+        python3-distutils && \
+    update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.10 1 && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install JDK 11
+RUN set -e -x ; \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+        openjdk-11-jdk && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install Poetry
+RUN set -e -x ; \
+    pip3 install --no-cache-dir pipx && \
+    pipx install poetry && \
+    pipx upgrade poetry
+
+# Add pipx binary path to PATH
+ENV PATH="/root/.local/bin:$PATH"
+
+RUN set -e -x ; \
+    poetry config virtualenvs.in-project true
+
+# Copy the poetry files
+COPY pyproject.toml pyproject.toml
+COPY poetry.lock poetry.lock
+
+# Copy the rest of the code
+COPY matcha_dl matcha_dl
+COPY README.md README.md
+
+# Install dependencies
+RUN set -e -x ; \
+    poetry install
+
+# Set DGL backend to PyTorch
+ENV DGLBACKEND=pytorch
+
+# Expose the TensorBoard port
+EXPOSE 6006
+
+CMD [ "bash" ]

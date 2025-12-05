@@ -5,10 +5,16 @@
 # Matcha folder
 
 /matcha_dl/impl/matcha/matcha/*
+!/matcha_dl/impl/matcha/matcha/*.py
 
-# Test Data
+# Data folder
 
-/tests/test_data/*
+/data/*
+!/data/*.py
+
+# Experiments folder
+
+/exp/*
 
 # Ignore dist folder
 

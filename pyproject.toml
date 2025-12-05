@@ -1,29 +1,39 @@
 [tool.poetry]
-name = "matcha-dl"
-version = "0.1.1"
-description = "Matcha-DL is a tool for supervised ontology alignment. It takes as input two ontologies and a set of mappings between them, and learns a model that can predict mappings between the two ontologies."
+name = "Exact-OM"
+version = "1.0.0"
+description = "Exact is a deep learning framework for explainable ontology matching."
 authors = ["Pedro Cotovio <pgcotovio@gmail.com>"]
 readme = "README.md"
 repository = "https://github.com/liseda-lab/Matcha-DL"
 packages = [
-    { include = "matcha_dl" },
+    { include = "exact" },
 ]
 
 exclude = ["matcha_dl/impl/matcha/matcha/**/*"]
 
 [tool.poetry.dependencies]
 python = "^3.10"
-torch = "^2.3.0"
-deeponto = "^0.9.1"
+torch = {version = "2.7.0+cu128", source = "pytorch-gpu"}
 tensorboard = "^2.16.2"
 dill = "^0.3.8"
 lxml = "^5.2.1"
 pandas = "^2.2.2"
-pyyaml = "^6.0.1"
 sentence-transformers = "^2.7.0"
+cython = "^3.0.11"
+typing-extensions = "^4.12.2"
+pydantic = "^2.10.6"
+mowl-borg = "^1.0.1"
+matplotlib = "^3.10.0"
+seaborn = "^0.13.2"
+pyaml = "^25.1.0"
+peft = "^0.15.0"
+sentencepiece = "^0.2.0"
+gensim = "^4.3.3"
+
 
 [tool.poetry.scripts]
-matchadl = "matcha_dl.delivery.cli:main"
+exact = "exact.delivery.cli.align:main"
+bioml-eval = "exact.delivery.cli.eval:main"
 
 
 [tool.poetry.group.prebuild.dependencies]
@@ -33,6 +43,11 @@ mypy = "^1.9.0"
 pytest = "^8.1.1"
 black = "^24.4.2"
 
+
+[[tool.poetry.source]]
+name = "pytorch-gpu"
+url = "https://download.pytorch.org/whl/cu128"
+priority = "explicit"
 
 [build-system]
 requires = ["poetry-core"]

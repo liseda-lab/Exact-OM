@@ -1,90 +1,159 @@
-# Matcha DL
+# **EXACT: An Explainable Context-Aware Matching Framework for Ontology Alignment**
 
-## Description
-Matcha-DL is an extension of the matching system Matcha to tackle semi-supervised tasks using machine-learning algorithms. Matcha builds upon the algorithms of the established system AgreementMakerLight with a novel broader core architecture designed to tackle long-standing challenges such as complex and holistic ontology matching. Matcha-DL uses a linear neural network that learns to rank candidate mappings proposed by Matcha by using a partial reference alignment as a training set, and using the confidence scores produced by Matcha's matching algorithms as features.
+**EXACT** is a hybrid ontology matching framework that integrates lexical, contextual, and reasoning-based signals within a unified, interpretable architecture.
+It combines the strengths of **language models** and **ontology semantics** to align entities across heterogeneous knowledge bases while preserving explainability.
 
-## Installation
+### **Core Principles**
 
-To install Matcha DL, you can use pip:
+1. **Lexical Understanding**
+   Entities are represented through all label variants and embedded using **SapBERT**, capturing synonymy and abbreviation patterns. The highest pairwise similarity defines the lexical correspondence.
+
+2. **Contextual Semantics**
+   Each entity’s local neighbourhood is extracted and **verbalised into natural language**, allowing a contextual encoder (e.g., **BGE-Large**) to model the relational meaning of concepts beyond surface labels.
+
+3. **Adaptive Fusion**
+   Lexical and contextual similarities are combined through a **confidence-weighted function**, granting higher influence to the most reliable modality for each pair.
+
+4. **Uncertainty-Driven Reasoning**
+   When ambiguity remains high, an **instruction-tuned LLM (Qwen-Instruct)** summarises both entities’ contexts and issues a **Yes/No decision** with a short textual rationale, which is incorporated into the final score.
+
+### **Explainability**
+
+For every evaluated mapping, EXACT provides:
+
+* Label and context contributions with their confidence and weight.
+* Relative importance of lexical, contextual, and reasoning components.
+* Natural-language rationales generated for ambiguous cases.
+  All results are exported as structured JSON explanations, ensuring transparent and traceable alignment decisions.
+
+### **Outcome**
+
+By integrating structured semantics, adaptive weighting, and interpretable reasoning, EXACT delivers high-quality ontology alignments with explicit, human-readable evidence of how and why each mapping was made.
+
+
+## Running Exact
+
+### CLI (`exact`)
+
+`exact` (defined in `exact/delivery/cli/align.py`) exposes the following key flags:
+
+- `-s/--source_ontology_file`, `-t/--target_ontology_file`: required OWL inputs.
+- `-o/--output_dir`: target directory (created automatically) for checkpoints, plots, and logs.
+- `-y/--config_file`: path to a YAML configuration (defaults to built-in settings if omitted).
+- `-r/--training_reference_file`, `-f/--full_reference_file`: TSV ground-truth mappings. `-r` is used for supervised tasks; `-f` unlocks evaluation and certain context caches.
+- `-c/--candidates_file`: optional `test.cands*.tsv` restricting the search space.
+- `-l/--save_logs`: write `exact.log` inside the output dir; stdout only otherwise.
+- `-e/--run_eval`: run the evaluation stage after inference (requires `-f` when no candidates file is used).
+- `-m/--jvm_heap_size`: heap passed to the JVM-based preprocessing (accepts sizes like `32G`).
+- `-d/--device`: CUDA device id; omit to run entirely on CPU.
+
+Typical workflow:
+
+1. Prepare ontologies (`*.owl`), references (`train.tsv`, `test.tsv`), and candidates (`test.cands.val.tsv`).
+2. Adjust a config (copy `exp/debug_new_approach/full_ncit2doid_local_small/config.yaml` and edit thresholds, model names, etc.).
+3. Invoke `exact` with the paths above; include `-c` when running on validation slices, drop it for full-test inference.
+
+Example:
+
 ```bash
-pip install matcha-dl
+exact \
+  -s data/ncit-doid/ncit.owl \
+  -t data/ncit-doid/doid.owl \
+  -o exp/runs/ncit_doid/manual \
+  -y exp/debug_new_approach/full_ncit2doid_local_small/config.yaml \
+  -f data/ncit-doid/test.tsv \
+  -c data/ncit-doid/test.cands.val.tsv \
+  -l -e -m 60G -d 0
 ```
 
-## USAGE
+### Python API (`exact.delivery.api`)
 
-### CLI
+For programmatic control:
 
-Matcha DL provides a command line interface for computing the alignment between two ontologies. Here's how you can use it:
+- `AlignmentRunner` mirrors the CLI parameters. Constructor arguments map 1:1 to the flags listed above (e.g., `source_ontology_file`, `target_ontology_file`, `output_dir`, `config_file`, `training_reference_file`, `full_reference_file`, `candidates_file`, `save_logs`, `run_eval`, `device`, `jvm_heap_size`). Call `runner.run()` to validate, boot the JVM, and execute the alignment.
+- `EvalutionRunner` (note spelling) encapsulates the standalone evaluation tool. Key args are `alignment_file`, `output_dir`, `full_reference_file`, optional ontologies/references for contextual metrics, `K` (list of cutoffs), `log_level`, `save_logs`, and `jvm_heap_size`. Call `run()` to produce precision/recall scores and CSV summaries.
+
+### Evaluation CLI (`bioml-eval`)
+
+`bioml-eval` (defined in `exact/delivery/cli/eval.py`) accepts the same fields as `EvalutionRunner`:
+
+- `--alignment_file/-a`: TSV with predictions.
+- `--output_dir/-o`: destination for metrics and logs.
+- Optional: `--source_ontology_file`, `--target_ontology_file`, `--train_reference_file`, `--full_reference_file`, `--reference_candidates`, `--K`, `--log_level`, `--save_logs`, `--jvm_heap_size`.
+- `--error_on_fail/-e`: make evaluation raise on missing references instead of logging warnings.
+
+Example:
 
 ```bash
-matchadl --source_ontology_file <source_file_path> --target_ontology_file <target_file_path> --output_dir <output_dir_path> [--reference_file <reference_file_path>] [--candidates_file <candidates_file_path>] [--config_file <config_file_path>]
+bioml-eval \
+  --alignment_file exp/runs/ncit_doid/manual/model/alignment.tsv \
+  --output_dir exp/runs/ncit_doid/manual \
+  --full_reference_file data/ncit-doid/test.tsv \
+  --source_ontology_file data/ncit-doid/ncit.owl \
+  --target_ontology_file data/ncit-doid/doid.owl \
+  --save_logs -m 32G
 ```
 
-### API
+### YAML-driven runner
 
-#### AlignmentRunner Class
+`tools/run_exact_job.py` lets you express runs declaratively. A config consists of:
 
-The `AlignmentRunner` is a quick and easy class that can be programaticly imported to run an alignemnt using Matcha-DL.
+- `dataset`: `data_dir`, `source`, `target`, `train_reference`, `full_reference`, `candidates`, plus optional runtime knobs forwarded to the runner (`memory`, `device`, `run_eval`, `save_logs`).
+- `job`: `name`, `output_dir`, `config_file`, `memory`, `device`, `save_logs`, `run_eval`.
 
-Here's an example on how to use it:
+Usage:
 
-```python
+- `python3 tools/run_exact_job.py --run-config exp/run_configs/ncit_doid_val.yaml --dry-run` shows the resolved `exact` command.
+- Drop `--dry-run` to execute locally.
+- Pass `--sbatch-script deploy/sbatch/exact_tune_run.sh` to submit the same run through Slurm.
 
-from matcha_dl import AlignmentRunner
+### Slurm helper scripts
 
-runner = AlignmentRunner(
-    source_ontology_file="path/to/source_ontology_file",
-    target_ontology_file="path/to/target_ontology_file",
-    output_dir="path/to/output_dir",
-    reference_file="path/to/reference_file",
-    candidates_file="path/to/candidates_file",
-    config_file="path/to/config_file"
-)
+- `deploy/sbatch/exact_single_run.sh`: minimal template with hard-coded paths for quick manual edits (e.g., update the variables at the top and call `sbatch …`).
+- `deploy/sbatch/exact_tune_run.sh`: argument-driven script used by the tuner and YAML runner. Supports overrides via `--data-dir`, `--source`, `--target`, `--candidates`, `--config-file`, `--run-eval`, `--save-logs`, etc., or the equivalent environment variables when invoking `sbatch`.
 
-runner.run()
+## Hyperparameter tuning helper
 
+The `tools/hparam_tuner.py` utility creates per-trial experiment folders, configs, and
+corresponding `sbatch` commands. Describe your dataset, base config, and search space
+in a tuner file (see `exp/tuning/ncit_doid_val/tuner.yaml` for an example), then pick a
+strategy:
+
+Tuner YAML layout:
+
+- `base_config`: path to the reference config that every trial will clone and mutate.
+- `experiment_root`: directory where per-trial folders, manifests, and submit scripts are written.
+- `job_name_prefix`: label applied to each generated job (suffixed with trial index + params).
+- `dataset`: values forwarded to the Slurm runner (`data_dir`, ontology filenames, references, candidates, memory, device, run_eval, save_logs).
+- `slurm`: `script` (defaults to `deploy/sbatch/exact_tune_run.sh`) plus optional `sbatch_args` (partition, nodes, etc.).
+- `search_space`: keys reference dotted config paths (e.g., `model.params.gamma`). For each parameter:
+  - `type`: `float`, `int`, or `categorical`.
+  - `values`: explicit list used during grid search (and as anchor points for smart sampling).
+  - `bounds`: `[min, max]` interval for the smart sampler; combine with `scale: log` for log-space sampling and `quantize`
+    to snap results (e.g., batch sizes) to sensible increments.
+- `smart`: knobs for the low-discrepancy sampler: `num_samples`, `exploit_fraction` (portion of configs perturbed around
+  anchor configs), `exploit_noise` (relative perturbation magnitude), `random_seed`, and explicit `anchor_configs`
+  (each providing `values` per parameter). When omitted, the sampler centers exploitation around the base config.
+
+Common command-line options:
+
+```bash
+# Dense, exhaustive combinations over the provided discrete values.
+python3 tools/hparam_tuner.py \
+  --tuner-config exp/tuning/ncit_doid_val/tuner.yaml \
+  --strategy grid --dry-run
+
+# Lightweight low-discrepancy sampling with local exploitation.
+python3 tools/hparam_tuner.py \
+  --tuner-config exp/tuning/ncit_doid_val/tuner.yaml \
+  --strategy smart --num-samples 24
 ```
 
-### Arguments
+Running without `--dry-run` writes trial configs under `experiment_root`, generates a
+`submit_all.sh` helper with ready-to-run `sbatch` lines, and produces a manifest of the
+sampled hyperparameters. Use `--submit` if you want the script to enqueue every job
+immediately after generation.
 
-* --source_ontology_file or -s: Path to the source ontology file (required)
-* --target_ontology_file or -t: Path to the target ontology file (required)
-* --output_dir or -o: Path to the output directory (required)
-* --reference_file or -r: Path to the reference file (optional)
-* --candidates_file or -c: Path to the candidates file (optional)
-* --config_file or -C: Path to the config file (optional)
-
-#### Details
- 
-* The reference file should be a reference alignment, that follows the standards from the [OAEI's Bio-ML track](https://krr-oxford.github.io/DeepOnto/bio-ml/#oaei-bio-ml-2023).
-* The candidates file should be a list of all the candidates for each of the entities to rank, that follows the standards from the [OAEI's Bio-ML track](https://krr-oxford.github.io/DeepOnto/bio-ml/#oaei-bio-ml-2023).
-* The configuration file is a user-defined configuration file. An example can be found at [https://github.com/liseda-lab/Matcha-DL/blob/main/matcha_dl/default_config.yaml](https://github.com/liseda-lab/Matcha-DL/blob/main/matcha_dl/default_config.yaml).
-
-### Tasks
-
-#### Supervised/Unsupervised settings
-
-If reference files are provided Matcha-DL will train a model to predict an alignment, otherwise it will use the scores from matcha to compute the alignment directly.
-
-#### Global Alignment/ Local Alignment
-
-If a candidates file is provided Matcha-DL will generate a ranking for those candidates (local alignment), otherwise it will perform global pairwise alignemnt for all the entities in the source and target ontologies.
-
-## Acknowledgements
-
-This work was supported by FCT through the fellowships 2022.10557.BD (Pedro Cotovio) and 2022.11895.BD (Marta Silva), and through the LASIGE Research Unit, ref. UIDB/00408/2020 (https://doi.org/10.54499/UIDB/00408/2020) and ref. UIDP/00408/2020 (https://doi.org/10.54499/UIDP/00408/2020). It was also partially supported by the KATY project which has received funding from the European Union’s Horizon 2020 research and innovation program under grant agreement No 101017453. This work was also supported partially by project 41, HfPT: Health from Portugal, funded by the Portuguese Plano de Recuperação e Resiliência.
-
-## Contributions
-
-**Authors:**
-
-Pedro Giesteira Cotovio, [1], Lucas Ferraz, [1], Daniel Faria, [2], Laura Balbi, [1], Marta Contreiras Silva, [1], Catia Pesquita, [1]
-
-**Institutions:**
-
-1. LASIGE, Faculdade de Ciências, Universidade de Lisboa, Portugal
-2. INESC-ID, Instituto Superior Técnico, Universidade de Lisboa, Portugal
-
-
-
-
+The tuning Slurm wrapper (`deploy/sbatch/exact_tune_run.sh`) honors environment overrides
+for the dataset, config path, candidates file, and memory budget, so every generated job
+can stay self-contained without duplicating shell scripts.
