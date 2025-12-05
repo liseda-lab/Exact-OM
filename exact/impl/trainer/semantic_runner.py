@@ -1,3 +1,4 @@
+import inspect
 import json
 import time
 from pathlib import Path
@@ -20,7 +21,16 @@ def _semantic_collate_fn(batch):
     if not batch:
         return {}
 
-    ragged_keys = {"src_labels", "tgt_labels", "src_ctx_triples", "tgt_ctx_triples"}
+    ragged_keys = {
+        "src_labels",
+        "tgt_labels",
+        "src_ctx_triples",
+        "tgt_ctx_triples",
+        "src_ctx_raw_triples",
+        "tgt_ctx_raw_triples",
+        "src_ctx_bridge_triples",
+        "tgt_ctx_bridge_triples",
+    }
     list_only_keys = {"label"}
     collated = {}
     for key in batch[0].keys():
@@ -59,8 +69,9 @@ class SemanticAlignmentRunner(ITrainer):
     def __init__(
         self,
         dataset,
-        model,
+        model=None,
         model_params: Optional[Dict[str, Any]] = None,
+        models: Optional[List[Tuple[Any, Dict[str, Any]]]] = None,
         device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
         output_dir: Optional[Path] = None,
         logger: Optional[Any] = None,
@@ -74,10 +85,26 @@ class SemanticAlignmentRunner(ITrainer):
         if ds_signature:
             params.setdefault("dataset_signature", ds_signature)
             params.setdefault("cache_namespace", ds_signature)
+
+        model_specs = None
+        if models is not None:
+            model_specs = []
+            for idx, (m_cls, m_params) in enumerate(models):
+                spec_params = dict(m_params or {})
+                if idx == 0:
+                    cache_dir = spec_params.get("cache_dir")
+                    if cache_dir is None and output_dir is not None:
+                        spec_params["cache_dir"] = (output_dir / "cache").resolve()
+                    if ds_signature:
+                        spec_params.setdefault("dataset_signature", ds_signature)
+                        spec_params.setdefault("cache_namespace", ds_signature)
+                model_specs.append((m_cls, spec_params))
+
         super().__init__(
             dataset=dataset,
             model=model,
-            model_params=params,
+            model_params=params if model_specs is None else None,
+            models=model_specs,
             device=device,
             output_dir=output_dir,
             logger=logger,
@@ -220,13 +247,14 @@ class SemanticAlignmentRunner(ITrainer):
             self.log(f"Failed to write checkpoint {checkpoint_path}: {exc}", "warning")
 
     def _maybe_persist_model_cache(self, reason: str, force: bool = False) -> None:
-        model = getattr(self, "model", None)
-        if model is None or not hasattr(model, "persist_caches"):
-            return
-        try:
-            model.persist_caches(force=force, reason=reason)
-        except Exception as exc:  # noqa: BLE001
-            self.log(f"Failed to persist model cache during {reason}: {exc}", "warning")
+        models = getattr(self, "models", None) or [getattr(self, "model", None)]
+        for model in models:
+            if model is None or not hasattr(model, "persist_caches"):
+                continue
+            try:
+                model.persist_caches(force=force, reason=reason)
+            except Exception as exc:  # noqa: BLE001
+                self.log(f"Failed to persist model cache during {reason}: {exc}", "warning")
 
     def _record_llm_calibration(self, calib: Optional[Dict[str, Any]]) -> None:
         if not calib or self._llm_calibration_report is None:
@@ -254,6 +282,19 @@ class SemanticAlignmentRunner(ITrainer):
         if payload:
             self._record_llm_calibration(payload)
 
+    @staticmethod
+    def _summarize_label(labels: Optional[List[str]]) -> str:
+        if not labels:
+            return ""
+        return " | ".join(labels[:2])
+
+    @staticmethod
+    def _summarize_context(ctx: Optional[List[str]]) -> str:
+        if not ctx:
+            return ""
+        snippet = " ".join(ctx[:2])
+        return snippet[:512]
+
     @torch.no_grad()
     def predict(
         self,
@@ -272,11 +313,17 @@ class SemanticAlignmentRunner(ITrainer):
     ) -> Tuple[List[EntityMapping], float]:
         self.dataset.default_kind = kind
         self.model.eval()
+        for extra_model in getattr(self, "models", [])[1:]:
+            try:
+                extra_model.eval()
+            except Exception:
+                pass
         self.results_json.clear()
         self.results_df = None
         self._llm_summary_stats: Optional[Dict[str, Any]] = None
         self._llm_calibration_messages_logged: Set[str] = set()
         self._llm_calibration_report: Optional[Dict[str, Any]] = None
+        self._candidate_rows: List[Dict[str, Any]] = []
         if hasattr(self.model, "reset_llm_calibration_tracking"):
             self.model.reset_llm_calibration_tracking()
         if hasattr(self.model, "reset_summary_stats"):
@@ -377,6 +424,10 @@ class SemanticAlignmentRunner(ITrainer):
             tgt_labels = batch["tgt_labels"]
             src_ctxs = batch.get("src_contexts", None)
             tgt_ctxs = batch.get("tgt_contexts", None)
+            src_ctx_raw = batch.get("src_ctx_raw_triples")
+            tgt_ctx_raw = batch.get("tgt_ctx_raw_triples")
+            src_ctx_bridges = batch.get("src_ctx_bridge_triples")
+            tgt_ctx_bridges = batch.get("tgt_ctx_bridge_triples")
             labels = batch.get("label")
             if isinstance(labels, torch.Tensor):
                 labels = labels.tolist()
@@ -389,14 +440,44 @@ class SemanticAlignmentRunner(ITrainer):
                     tgt_label_lists=tgt_labels,
                     src_contexts=src_ctxs,
                     tgt_contexts=tgt_ctxs,
+                    src_ctx_raw=src_ctx_raw,
+                    tgt_ctx_raw=tgt_ctx_raw,
+                    src_ctx_bridges=src_ctx_bridges,
+                    tgt_ctx_bridges=tgt_ctx_bridges,
                     label=labels,
                 )
             self._record_llm_calibration(out.get("llm_calibration"))
 
             # Accumulate mappings
-            s_final = out["S_final"].detach().cpu().numpy().tolist()
-            for s, t, score in zip(src_iri, tgt_iri, s_final):
+            s_label_vals = out["s_label"].detach().cpu().tolist()
+            s_label_star_vals = out["s_label_star"].detach().cpu().tolist()
+            s_ctx_vals = out["s_ctx"].detach().cpu().tolist()
+            s_lctx_vals = out["S_lctx"].detach().cpu().tolist()
+            s_final = out["S_final"].detach().cpu().tolist()
+            w_c_vals = out["w_c"].detach().cpu().tolist()
+            w_i_vals = out["w_i"].detach().cpu().tolist()
+            p_llm_vals = out["p_llm"].detach().cpu().tolist()
+            ground_truth = labels or [None] * len(src_iri)
+
+            for idx, (s, t, score) in enumerate(zip(src_iri, tgt_iri, s_final)):
                 all_mappings.append((s, t, float(score)))
+                self._candidate_rows.append({
+                    "Src": s,
+                    "Tgt": t,
+                    "ground_truth": ground_truth[idx],
+                    "s_label": float(s_label_vals[idx]),
+                    "s_label_star": float(s_label_star_vals[idx]),
+                    "s_ctx": float(s_ctx_vals[idx]),
+                    "S_lctx": float(s_lctx_vals[idx]),
+                    "S_final": float(score),
+                    "w_c": float(w_c_vals[idx]),
+                    "w_i": float(w_i_vals[idx]),
+                    "p_llm": float(p_llm_vals[idx]),
+                    "src_label_text": self._summarize_label(src_labels[idx]),
+                    "tgt_label_text": self._summarize_label(tgt_labels[idx]),
+                    "src_context_text": self._summarize_context(src_ctxs[idx] if src_ctxs else []),
+                    "tgt_context_text": self._summarize_context(tgt_ctxs[idx] if tgt_ctxs else []),
+                })
 
             processed_examples += len(src_iri)
             batches_run += 1
@@ -465,9 +546,73 @@ class SemanticAlignmentRunner(ITrainer):
                 )
             else:
                 self.log("LLM summaries were not requested for this run.", "info")
+
+        # Normalize LLM importance: if the LLM did not run (p_llm == 0 or no decision),
+        # clamp I_llm to 0 so downstream summaries/plots are consistent with behavior.
+        for rec in self.results_json or []:
+            imps = rec.get("importances") or {}
+            if "I_llm" not in imps:
+                continue
+            conf = rec.get("confidences") or {}
+            pred = rec.get("prediction") or {}
+            p_llm = conf.get("p_llm")
+            llm_decision = pred.get("llm_decision")
+            if p_llm is None or float(p_llm) == 0.0 or llm_decision in ("", None):
+                imps["I_llm"] = 0.0
+
         self._maybe_persist_model_cache(reason="finalize", force=True)
 
-        df = pd.DataFrame(all_mappings, columns=["Src", "Tgt", "Scores"])
-        preds = EntityMapping.read_table_mappings(df, threshold=threshold, cardinality=cardinality)
-        self.results_df = self._make_summary_dataframe(self.results_json)
+        candidate_df = self._build_candidate_dataframe()
+        if self.results_json:
+            # Prefer the richer JSON (includes importances and LLM info) for plotting/summary
+            self.results_df = self._make_summary_dataframe(self.results_json)
+        elif not candidate_df.empty:
+            candidate_df = self._apply_additional_models(candidate_df)
+            all_mappings = list(zip(candidate_df["Src"], candidate_df["Tgt"], candidate_df["S_final"]))
+            self.results_df = candidate_df
+        else:
+            self.results_df = self._make_summary_dataframe(self.results_json)
+
+        df_scores = pd.DataFrame(all_mappings, columns=["Src", "Tgt", "Scores"])
+        preds = EntityMapping.read_table_mappings(df_scores, threshold=threshold, cardinality=cardinality)
         return preds, avg_t
+
+    def _build_candidate_dataframe(self) -> pd.DataFrame:
+        if not self._candidate_rows:
+            return pd.DataFrame()
+        return pd.DataFrame(self._candidate_rows)
+
+    def _apply_additional_models(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Run any additional models (beyond the first) sequentially.
+        Each model is expected to accept the candidate dataframe and return
+        either an updated dataframe or a dict containing 'candidate_df'.
+        """
+        current = df
+        if len(getattr(self, "models", [])) <= 1:
+            return current
+        for idx, extra_model in enumerate(self.models[1:], start=2):
+            extra_model.eval()
+            sig = inspect.signature(extra_model.forward)
+            accepts_var_kw = any(p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values())
+            call_kwargs = {"candidate_df": current}
+            if accepts_var_kw or "dataset" in sig.parameters:
+                call_kwargs["dataset"] = self.dataset
+            if accepts_var_kw or "logger" in sig.parameters:
+                call_kwargs["logger"] = getattr(self, "logger", None)
+            if accepts_var_kw or "primary_model" in sig.parameters:
+                call_kwargs["primary_model"] = self.model
+            out = extra_model.forward(**call_kwargs)
+            if isinstance(out, pd.DataFrame):
+                current = out
+            elif isinstance(out, dict) and "candidate_df" in out:
+                current = out["candidate_df"]
+                extra_json = out.get("results_json")
+                if extra_json:
+                    self.results_json.extend(extra_json)
+            else:
+                self.log(
+                    f"Additional model #{idx} returned unsupported type {type(out)}; ignoring its output.",
+                    level="warning",
+                )
+        return current

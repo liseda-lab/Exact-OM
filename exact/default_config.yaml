@@ -1,5 +1,6 @@
 
 # System Parameters
+# For detailed parameter descriptions see docs/semantic_scorer_defaults.md
 
 ## Verbosity level of the logs.
 logging_level: INFO # DEBUG, INFO, WARNING, ERROR
@@ -44,7 +45,7 @@ dataset_params:
   # General Dataset Configs
   num_workers: null # Number of workers to be used to load the data. If null, the all available cores will be used.
   filter_exact_matches: True # If True, exact matches between source and target will be filtered out before training/inference.
-  drop_exact_match_sources: True # If True, drop all candidates for sources with an exact match (1-to-1 tasks). If False, only the exact pairs are removed.
+  drop_exact_match_sources: False # If True, drop all candidates for sources with an exact match (1-to-1 tasks). If False, only the exact pairs are removed.
   
   # Context Main Params
   n_hops: 1
@@ -56,6 +57,8 @@ dataset_params:
   max_input_tokens_context: 256 # Maximum number of input tokens for the context (Budget).
   only_taxonomy: False # If True, only the taxonomy will be used to generate the context
   all_labels: True # If True, all labels will be provided as candidates for consideration in the alignment task.
+  add_connectivity_bridges: True # If True, add explanation-only connectors so context subgraphs are connected to the entity.
+  bridge_max_hops: null # Optional cap on bridge path length (null = unbounded, else integer hop limit).
 
   # Verbaliser Params
   verbaliser_name: Qwen/Qwen2.5-3B-Instruct
@@ -74,22 +77,32 @@ dataset_params:
   which: ["src_ctx_n_triples","tgt_ctx_n_triples","src_ctx_tok_len","tgt_ctx_tok_len","src_ctx_word_len","tgt_ctx_word_len","src_ctx_char_len","tgt_ctx_char_len",
           "src_lab_n_labels","tgt_lab_n_labels","src_lab_word_len","tgt_lab_word_len","src_lab_char_len","tgt_lab_char_len","src_lab_max_label_words","tgt_lab_max_label_words",
           "src_lab_avg_label_words","tgt_lab_avg_label_words",
-          "cand_sim"] # Features to be plotted for analysis.
+          "cand_sim","cand_sim_src_mean"] # Features to be plotted for analysis.
+  candidate_share_k: 2
 
 candidates_params:
+  # lexical_encoder_name — encoder used to score source/target labels.
   lexical_encoder_name: sentence-transformers/all-MiniLM-L6-v2
+  # encode_batch_size — batch size for embedding generation.
   encode_batch_size: 512 
+  # search_batch_size — batch size for cosine search.
   search_batch_size: 4096
+  # top_k — number of candidates retained per source.
   top_k: 50
+  # use_amp — use automatic mixed precision during search.
   use_amp: True
 
 sanity_check_params:
+  # sanity_check — emit dataset sanity logs when True.
   sanity_check: True
+  # n — number of examples printed in sanity log.
   n: 3
+  # max_ctx_show/max_label_show — truncate contexts/labels in sanity output.
   max_ctx_show: 3
   max_label_show: 3
 
 plot_params:
+  # Histogram defaults for dataset/model plots.
   bins: 30
   figsize: [7, 5]
   dpi: 300
@@ -97,32 +110,36 @@ plot_params:
   alpha: 0.6
 
 inference_params:
+  # batch_size — semantic scorer batch size.
   batch_size: 64 # 
+  # num_workers — dataloader workers for inference.
   num_workers: 5
+  # log_every — log cadence during inference.
   log_every: 10
+  # mixed_precision — use torch autocast on GPU.
   mixed_precision: True
-  which: ["S_final", "I_label", "I_ctx", "I_llm", "w_c", "w_i"]
+  # which — metrics plotted/saved after inference.
+  which: ["S_final", "s_label", "s_ctx", "S_lctx", "I_label", "I_ctx", "I_llm", "w_c", "w_i", "p_llm"]
+  # checkpoint_every/resume/enable — checkpointing policy.
   checkpoint_every: 10
   resume_from_checkpoint: True
   enable_checkpoints: True
-  
+
 model:
   name: SemanticScorer
   params:
     # Models
     lexical_model_name: cambridgeltl/SapBERT-from-PubMedBERT-fulltext
     context_model_name: BAAI/bge-large-en-v1.5
-    cross_encoder_name: BAAI/bge-reranker-large
     llm_model_name: Qwen/Qwen2.5-7B-Instruct
     # Precision
-    fp16: True
+    fp16_inference: True
     # Pooling Method
     pooling_method: mean # Options: 'mean', 'max', 'sum'
-    label_pair_pooling: mean # Options: 'mean', 'max'
+    label_pair_pooling: max # Options: 'mean', 'max'
     # Max Tokens
     max_input_tokens_lexical: 32
     max_input_tokens_context: 256
-    max_input_tokens_ce: 64
     max_total_tokens_llm_summary: 512
     max_total_tokens_llm_decision: 384
     max_total_tokens_llm_rationale: 512
@@ -130,17 +147,14 @@ model:
     # Ablations / toggles
     use_lexical: True
     use_context: True
-    use_cross_encoder: True
     use_llm: True
-    # Cross-Encoder Params
     tau: 0.5 # Mid point to determine signal strength
-    tau_ce: 0.9 # threshold for cross-encoder activation
-    eta: 1.0 # Scaling factor for cross-encoder score
     # Adaptive context weighting
     gamma: 1.0 # Scaling factor for context/label adaptive weighting
     # LLM gating
     beta: 0.8 # Limit for LLM gating
     tau_LLM: 0.8 # Threshold for LLM activation
+    force_llm_summaries: False # Generate LLM summaries for every pair even when LLM gating is off
     # LLM generation knobs
     llm_temperature: 0.1
     llm_top_p: 0.9
@@ -165,3 +179,20 @@ model:
     max_cached_contexts: null
     max_cached_summaries: null
     max_cached_rationales: null
+
+# Optional chained model (disabled by default)
+second_model:
+  name: SecondPassReranker
+  params:
+    enabled: False
+    top_k: 5
+    epsilon: 0.03
+    min_ties: 3
+    ce_model_name: null
+    ce_weight: 0.5
+    use_symbolic: True
+    symbolic_weight: 0.05
+    use_llm: False
+    llm_trigger_epsilon: 0.01
+    max_llm_prompts: 0
+    max_prompt_candidates: 5

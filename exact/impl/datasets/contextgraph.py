@@ -79,6 +79,8 @@ class ContextDataset(IDataset):
         max_input_tokens_context: int = 256,                          # budget safety
         only_taxonomy: bool = False,                                  # if True, fixed templates for subclass
         all_labels: bool = True,                                     # if True, pass all labels; else use best label only
+        add_connectivity_bridges: bool = True,                        # if True, add explanation-only connectors to keep contexts connected
+        bridge_max_hops: Optional[int] = None,                        # cap for bridge path search (None = unbounded)
         # Verbalisation LLM
         device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
         verbaliser_name: Optional[str] = "Qwen/Qwen2.5-3B-Instruct",
@@ -107,6 +109,8 @@ class ContextDataset(IDataset):
         self.only_taxonomy = bool(only_taxonomy)
         self.all_labels = bool(all_labels)
         self.exclude_missing_dr = bool(exclude_missing_dr)
+        self.add_connectivity_bridges = bool(add_connectivity_bridges)
+        self.bridge_max_hops = bridge_max_hops
     
 
         # Verbaliser LLM
@@ -156,7 +160,10 @@ class ContextDataset(IDataset):
     @property
     def source_graph(self) -> OntologyGraph:
         if self._source_graph is None:
-            self.log("Loading source graph (OWL2Vec*)…", level="info")
+            if self.only_taxonomy:
+                self.log("Loading source graph (taxonomy only)…", level="info")
+            else:
+                self.log("Loading source graph (OWL2Vec*)…", level="info")
             self._source_graph = OntologyGraph(self.source.ontology, self.source_reasoner, self.only_taxonomy)
             self.log(f"Source graph edges: {len(self._source_graph)}", level="debug")
         return self._source_graph
@@ -164,7 +171,10 @@ class ContextDataset(IDataset):
     @property
     def target_graph(self) -> OntologyGraph:
         if self._target_graph is None:
-            self.log("Loading target graph (OWL2Vec*)…", level="info")
+            if self.only_taxonomy:
+                self.log("Loading target graph (taxonomy only)…", level="info")
+            else:
+                self.log("Loading target graph (OWL2Vec*)…", level="info")
             self._target_graph = OntologyGraph(self.target.ontology, self.target_reasoner, self.only_taxonomy)
             self.log(f"Target graph edges: {len(self._target_graph)}", level="debug")
         return self._target_graph
@@ -441,6 +451,10 @@ class ContextDataset(IDataset):
             src_ctx_list = row["SrcCtx"]
             tgt_labels = row["TgtLabels"]
             tgt_ctx_list = row["TgtCtx"]
+        src_ctx_raw = row.get("SrcCtxRaw", [])
+        tgt_ctx_raw = row.get("TgtCtxRaw", [])
+        src_ctx_bridge = row.get("SrcCtxBridge", [])
+        tgt_ctx_bridge = row.get("TgtCtxBridge", [])
 
         item = {
             "src_iri": row["Src"],
@@ -449,6 +463,10 @@ class ContextDataset(IDataset):
             "tgt_labels": tgt_labels,          # List[str]
             "src_ctx_triples": src_ctx_list,        # List[str] sentences
             "tgt_ctx_triples": tgt_ctx_list,        # List[str] sentences
+            "src_ctx_raw_triples": src_ctx_raw,     # List[Tuple[str,str,str]]
+            "tgt_ctx_raw_triples": tgt_ctx_raw,
+            "src_ctx_bridge_triples": src_ctx_bridge, # Explanation-only connectors
+            "tgt_ctx_bridge_triples": tgt_ctx_bridge,
             "label": row.get("Label", None),
         }
         return item
@@ -488,20 +506,32 @@ class ContextDataset(IDataset):
             tgt_lab_map[iri] = lbls[:] if self.all_labels else [lbls[0]] if lbls else [Entity._get_owl_class(iri, self.target.ontology).getIRI().getShortForm()]
 
         # Context subgraphs (triples) and verbalisation
-        def _ctx(iri: str, graph: OntologyGraph) -> List[str]:
-
-            triples = graph.get_context_subgraph(
-                iri,
-                n=self.n_hops,
-                human_readable=True,
-                method=self.context_method,
-                best_path_method=self.best_path_method,
-                budget=self.max_input_tokens_context,
-                hop_penalty=self.context_hop_penalty,
-            )
+        def _ctx(iri: str, graph: OntologyGraph) -> Tuple[List[str], List[Tuple[str, str, str]], List[Tuple[str, str, str]]]:
+            if self.add_connectivity_bridges:
+                triples, bridge_triples = graph.get_context_subgraph_with_bridges(
+                    iri,
+                    n=self.n_hops,
+                    human_readable=True,
+                    method=self.context_method,
+                    best_path_method=self.best_path_method,
+                    budget=self.max_input_tokens_context,
+                    hop_penalty=self.context_hop_penalty,
+                    max_bridge_hops=self.bridge_max_hops,
+                )
+            else:
+                triples = graph.get_context_subgraph(
+                    iri,
+                    n=self.n_hops,
+                    human_readable=True,
+                    method=self.context_method,
+                    best_path_method=self.best_path_method,
+                    budget=self.max_input_tokens_context,
+                    hop_penalty=self.context_hop_penalty,
+                )
+                bridge_triples = []
             if not triples:
-                return []
-            return self._verbalize_triples(triples)
+                return [], [], []
+            return self._verbalize_triples(triples), triples, bridge_triples
 
         if self.context_method is ContextMethod.greedy:
             self.log("####Using 'greedy' context extraction method.", level="debug")
@@ -520,10 +550,24 @@ class ContextDataset(IDataset):
             self.log("####Using 'BFS' context extraction method.", level="debug")
 
         self.log("Extracting and verbalising source contexts…", level="debug")
-        src_ctx_map: Dict[str, List[str]] = {iri: _ctx(iri, self.source_graph) for iri in usrc}
+        src_ctx_map: Dict[str, List[str]] = {}
+        src_ctx_raw_map: Dict[str, List[Tuple[str, str, str]]] = {}
+        src_ctx_bridge_map: Dict[str, List[Tuple[str, str, str]]] = {}
+        for iri in usrc:
+            ctx_sentences, raw_triples, bridge_triples = _ctx(iri, self.source_graph)
+            src_ctx_map[iri] = ctx_sentences
+            src_ctx_raw_map[iri] = raw_triples
+            src_ctx_bridge_map[iri] = bridge_triples
 
         self.log("Extracting and verbalising target contexts…", level="debug")
-        tgt_ctx_map: Dict[str, List[str]] = {iri: _ctx(iri, self.target_graph) for iri in utgt}
+        tgt_ctx_map: Dict[str, List[str]] = {}
+        tgt_ctx_raw_map: Dict[str, List[Tuple[str, str, str]]] = {}
+        tgt_ctx_bridge_map: Dict[str, List[Tuple[str, str, str]]] = {}
+        for iri in utgt:
+            ctx_sentences, raw_triples, bridge_triples = _ctx(iri, self.target_graph)
+            tgt_ctx_map[iri] = ctx_sentences
+            tgt_ctx_raw_map[iri] = raw_triples
+            tgt_ctx_bridge_map[iri] = bridge_triples
 
         # ---- Context metrics per row ----
         src_ctx_metrics_map = {
@@ -577,11 +621,19 @@ class ContextDataset(IDataset):
         tgt_labels_per_row = [tgt_lab_map[iri] for iri in tgt_iris]
         src_ctx_per_row = [src_ctx_map[iri] for iri in src_iris]
         tgt_ctx_per_row = [tgt_ctx_map[iri] for iri in tgt_iris]
+        src_ctx_raw_per_row = [src_ctx_raw_map[iri] for iri in src_iris]
+        tgt_ctx_raw_per_row = [tgt_ctx_raw_map[iri] for iri in tgt_iris]
+        src_ctx_bridge_per_row = [src_ctx_bridge_map[iri] for iri in src_iris]
+        tgt_ctx_bridge_per_row = [tgt_ctx_bridge_map[iri] for iri in tgt_iris]
 
         df["SrcLabels"] = src_labels_per_row
         df["TgtLabels"] = tgt_labels_per_row
         df["SrcCtx"] = src_ctx_per_row
         df["TgtCtx"] = tgt_ctx_per_row
+        df["SrcCtxRaw"] = src_ctx_raw_per_row
+        df["TgtCtxRaw"] = tgt_ctx_raw_per_row
+        df["SrcCtxBridge"] = src_ctx_bridge_per_row
+        df["TgtCtxBridge"] = tgt_ctx_bridge_per_row
         df["Features"] = [
             [src_labels, src_ctx, tgt_labels, tgt_ctx]
             for src_labels, src_ctx, tgt_labels, tgt_ctx in zip(

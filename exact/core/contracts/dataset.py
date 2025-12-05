@@ -75,6 +75,7 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
         self._cardinality: int = cardinality
 
         self._cache_ok = kwargs.get("cache_ok", True)
+        self._candidate_share_k: int = int(kwargs.get("candidate_share_k", 1))
 
         self._candidates_generated = False
         self._source_path: Optional[Path] = None
@@ -306,6 +307,7 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
 
             # Get One2One candidates df
             self._candidates = get_cands(candidates)
+            self._annotate_candidate_similarity_stats()
             self.log("#Loaded Candidates...", level="info")
 
             if self.filter_exact_matches:
@@ -398,6 +400,7 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
         cand_df = pd.DataFrame(rows, columns=["Src", "Tgt", "Label", "cand_sim"])
 
         self._candidates = cand_df
+        self._annotate_candidate_similarity_stats()
         self._candidates_generated = True
         self.log(f"#Candidate generation complete: {len(self._candidates)} rows (Top-{top_k} per source).", level="debug")
 
@@ -448,6 +451,32 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
 
         return all_idx, all_scr
 
+    def _annotate_candidate_similarity_stats(self) -> None:
+        if self._candidates is None:
+            return
+        if "cand_sim" not in self._candidates.columns:
+            return
+        groups = self._candidates.groupby("Src", sort=False)
+        self._candidates["cand_sim_src_mean"] = groups["cand_sim"].transform("mean")
+
+        src_sum = groups["cand_sim"].transform("sum")
+        eps = np.finfo(np.float32).eps
+        src_sum = src_sum.replace(0.0, eps)
+        self._candidates["cand_sim_prob"] = self._candidates["cand_sim"] / src_sum
+
+        k_share = max(1, int(getattr(self, "_candidate_share_k", 1)))
+        ranks = groups.cumcount()
+        top_mask = ranks < k_share
+        share_top_series = (
+            self._candidates.loc[top_mask]
+            .groupby("Src", sort=False)["cand_sim_prob"]
+            .sum()
+        )
+        share_top = self._candidates["Src"].map(share_top_series).fillna(0.0)
+        share_rest = (1.0 - share_top).clip(lower=0.0)
+        self._candidates["cand_share_top"] = share_top
+        self._candidates["cand_share_rest"] = share_rest
+        self._candidates["cand_share_log_ratio"] = np.log((share_top + eps) / (share_rest + eps))
 
     def load_reference(self, file_path: Path) -> None:
 
@@ -475,6 +504,8 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
         self._df = pd.read_csv(self._df_save_path, converters={"Features": literal_eval})
 
         self.log("#Loaded Cached Dataset...", level="info")
+        if "cand_sim" in self._df.columns:
+            self._candidates_generated = True
 
     def has_cache(self) -> bool:
         if self._cache_ok:
@@ -482,6 +513,8 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
         return False
 
     def process(self) -> "IDataset":
+
+        self._annotate_candidate_similarity_stats()
 
         if self.has_cache():
             self.load()

@@ -13,7 +13,6 @@ from torch import nn
 from transformers import (
     AutoTokenizer,
     AutoModel,
-    AutoModelForSequenceClassification,
     AutoModelForCausalLM,
 )
 
@@ -35,7 +34,6 @@ class SemanticScorer(IModel):
     """
     Explainable ontology matching scorer integrating:
       • Lexical embeddings with configurable pooling over label variants
-      • Ambiguity-triggered cross-encoder refinement (BGE reranker)
       • Context embeddings over verbalised subgraphs (lists of sentences)
       • Uncertainty-driven, gated LLM (summarise + Yes/No logits probability)
       • Adaptive fusion (w_c) and bounded ambiguity U for LLM weight w_i
@@ -47,7 +45,6 @@ class SemanticScorer(IModel):
         # ---- Models ----
         lexical_model_name: str = "cambridgeltl/SapBERT-from-PubMedBERT-fulltext",
         context_model_name: str = "BAAI/bge-large-en-v1.5",
-        cross_encoder_name: Optional[str] = "BAAI/bge-reranker-large",
         llm_model_name: Optional[str] = "Qwen/Qwen2.5-7B-Instruct",
 
         # ---- Precision / device ----
@@ -64,7 +61,6 @@ class SemanticScorer(IModel):
         # ---- Token limits ----
         max_input_tokens_lexical: int = 32,
         max_input_tokens_context: int = 256,
-        max_input_tokens_ce: int = 64,
         max_total_tokens_llm_summary: int = 512,
         max_total_tokens_llm_decision: int = 384,
         max_total_tokens_llm_rationale: int = 512,
@@ -73,13 +69,10 @@ class SemanticScorer(IModel):
         # ---- Ablations / toggles ----
         use_lexical: bool = True,
         use_context: bool = True,
-        use_cross_encoder: bool = True,
         use_llm: bool = True,
 
-        # ---- Cross-encoder ambiguity gating ----
+        # ---- Adaptive weighting thresholds ----
         tau: float = 0.5,
-        tau_ce: float = 0.3,
-        eta: float = 2.0,
 
         # ---- Adaptive context weighting ----
         gamma: float = 2.0,
@@ -95,6 +88,7 @@ class SemanticScorer(IModel):
         llm_summary_batch_size: Optional[int] = 8,
         llm_decision_batch_size: Optional[int] = 8,
         llm_rationale_batch_size: Optional[int] = 8,
+        force_llm_summaries: bool = False,
 
         # ---- Explanations / review band ----
         return_explanations: bool = False,
@@ -134,7 +128,6 @@ class SemanticScorer(IModel):
         # store params
         self.max_input_tokens_lexical = max_input_tokens_lexical
         self.max_input_tokens_context = max_input_tokens_context
-        self.max_input_tokens_ce = max_input_tokens_ce
         self.max_total_tokens_llm_summary = max_total_tokens_llm_summary
         self.max_total_tokens_llm_decision = max_total_tokens_llm_decision
         self.max_total_tokens_llm_rationale = max_total_tokens_llm_rationale
@@ -145,8 +138,8 @@ class SemanticScorer(IModel):
 
         self.use_lexical = use_lexical
         self.use_context = use_context
-        self.use_cross_encoder = use_cross_encoder and (cross_encoder_name is not None)
         self.use_llm = use_llm and (llm_model_name is not None)
+        self.force_llm_summaries = bool(force_llm_summaries) and self.use_llm
         self.generate_llm_rationales = generate_llm_rationales and self.use_llm
         self.llm_calibration_a = llm_calibration_a
         self.llm_calibration_b = llm_calibration_b
@@ -159,8 +152,6 @@ class SemanticScorer(IModel):
         )
 
         self.tau = tau
-        self.tau_ce = tau_ce
-        self.eta = eta
         self.gamma = gamma
         self.beta = beta
         self.tau_LLM = tau_LLM
@@ -189,6 +180,7 @@ class SemanticScorer(IModel):
             (self.cache_dir / f"{self.cache_namespace}_cache.pt").resolve()
             if self.persist_cache_to_disk else None
         )
+        self._log_once_keys = set()
         self._computed_llm_calibration: Optional[Dict[str, Any]] = None
         self._calibration_messages: List[str] = []
         self._calibration_pending_probs: List[float] = []
@@ -199,7 +191,6 @@ class SemanticScorer(IModel):
         # store model names (for explanations)
         self.lexical_model_name = lexical_model_name
         self.context_model_name = context_model_name
-        self.cross_encoder_name = cross_encoder_name
         self.llm_model_name = llm_model_name
         self._cache_fingerprint = self._build_cache_fingerprint()
 
@@ -213,13 +204,6 @@ class SemanticScorer(IModel):
             self.log("Loading context encoder...", "info")
             self.ctx_tok = AutoTokenizer.from_pretrained(context_model_name)
             self.ctx_model = AutoModel.from_pretrained(context_model_name).to(self.device)
-
-        if self.use_cross_encoder:
-            self.log("Loading cross-encoder...", "info")
-            self.ce_tok = AutoTokenizer.from_pretrained(cross_encoder_name)
-            self.ce_model = AutoModelForSequenceClassification.from_pretrained(
-                cross_encoder_name
-            ).to(self.device)
 
         if self.use_llm:
             self.log("Loading LLM...", "info")
@@ -237,6 +221,16 @@ class SemanticScorer(IModel):
         if self.persist_cache_to_disk:
             self._load_cache_from_disk()
         self.reset_llm_calibration_tracking()
+
+    def _log_once(self, key: str, message: str, level: str = "info") -> None:
+        """
+        Emit the log message only the first time it is requested.
+        Useful for forward() logs that would otherwise repeat every batch.
+        """
+        if key in self._log_once_keys:
+            return
+        self._log_once_keys.add(key)
+        self.log(message, level)
 
     # -------------------------------------------------------------------------
     # Helpers
@@ -314,6 +308,7 @@ class SemanticScorer(IModel):
             "llm_calibration_a": self.llm_calibration_a,
             "llm_calibration_b": self.llm_calibration_b,
             "llm_calibration_info": self.llm_calibration_info,
+            "force_llm_summaries": self.force_llm_summaries,
         }
         blob = json.dumps(payload, sort_keys=True, default=str)
         return hashlib.sha1(blob.encode("utf-8")).hexdigest()
@@ -531,26 +526,6 @@ class SemanticScorer(IModel):
             self.max_cached_contexts,
         )
     
-    @torch.inference_mode()
-    def cross_encode_pairs(self, pairs: List[Tuple[str, str]]) -> torch.Tensor:
-        """
-        Runs the cross-encoder (BGE reranker) on a list of (src_label, tgt_label) pairs
-        and returns sigmoid-normalised relevance scores in [0, 1].
-        """
-        if not self.use_cross_encoder or not pairs:
-            return torch.zeros(len(pairs) if pairs else 0, device=self.device)
-
-        batch = self.ce_tok(
-            [a for a, _ in pairs], [b for _, b in pairs],
-            padding=True, truncation=True, max_length=self.max_input_tokens_ce,
-            return_tensors="pt"
-        ).to(self.device)
-
-        with torch.cuda.amp.autocast(enabled=self.fp16):
-            logits = self.ce_model(**batch).logits.squeeze(-1)  # [B]
-        return torch.sigmoid(logits)
-
-
     # -------------------------------------------------------------------------
     # Generative Models
     # -------------------------------------------------------------------------
@@ -1049,6 +1024,10 @@ class SemanticScorer(IModel):
         tgt_label_lists: List[List[str]],
         src_contexts: Optional[List[List[str]]] = None,
         tgt_contexts: Optional[List[List[str]]] = None,
+        src_ctx_raw: Optional[List[List[str]]] = None,
+        tgt_ctx_raw: Optional[List[List[str]]] = None,
+        src_ctx_bridges: Optional[List[List[str]]] = None,
+        tgt_ctx_bridges: Optional[List[List[str]]] = None,
         label: Optional[List[float]] = None,
     ) -> Dict[str, Any]:
         N = len(src_label_lists)
@@ -1058,6 +1037,10 @@ class SemanticScorer(IModel):
         # Join context triples
         src_contexts = src_contexts or [[] for _ in range(N)]
         tgt_contexts = tgt_contexts or [[] for _ in range(N)]
+        src_ctx_raw = src_ctx_raw or [[] for _ in range(N)]
+        tgt_ctx_raw = tgt_ctx_raw or [[] for _ in range(N)]
+        src_ctx_bridges = src_ctx_bridges or [[] for _ in range(N)]
+        tgt_ctx_bridges = tgt_ctx_bridges or [[] for _ in range(N)]
         src_ctx_joined = [self._join_context(c) for c in src_contexts]
         tgt_ctx_joined = [self._join_context(c) for c in tgt_contexts]
         if self.use_context:
@@ -1079,7 +1062,7 @@ class SemanticScorer(IModel):
 
         # ---------- LEXICAL + LABEL PAIR POOL ----------
         if self.use_lexical:
-            self.log("Encoding lexical label variants...", "info")
+            self._log_once("lexical_encoding", "Encoding lexical label variants...", "info")
             flat_src = [lab for labs in src_label_lists for lab in labs]
             flat_tgt = [lab for labs in tgt_label_lists for lab in labs]
             if len(flat_src) == 0 or len(flat_tgt) == 0:
@@ -1112,38 +1095,12 @@ class SemanticScorer(IModel):
             s_label = torch.zeros(N, device=self.device)
             best_pairs = [("", "") for _ in range(N)]
 
-        # ---------- CE REFINEMENT ----------
-        if self.use_cross_encoder and self.use_lexical:
-            self.log("Cross-encoder refinement on ambiguous label pairs...", "info")
-            A_label = 1.0 - (s_label - self.tau).abs()
-            need_ce = (A_label >= self.tau_ce)
-            s_label_star = s_label.clone()
-
-            pairs, pair_idx = [], []
-            for i, (labs_s, labs_t) in enumerate(zip(src_label_lists, tgt_label_lists)):
-                if not need_ce[i] or not labs_s or not labs_t:
-                    continue
-                Es = self.encode_labels_batch(labs_s)
-                Et = self.encode_labels_batch(labs_t)
-                Esn = torch.nn.functional.normalize(Es, dim=-1)
-                Etn = torch.nn.functional.normalize(Et, dim=-1)
-                mat = Esn @ Etn.T
-                _, pair = self._select_label_pair(mat, labs_s, labs_t)
-                pairs.append(pair)
-                pair_idx.append(i)
-                best_pairs[i] = pair  # ensure consistency for LLM
-
-            if pairs:
-                ce_scores = self.cross_encode_pairs(pairs)
-                for j, i in enumerate(pair_idx):
-                    alpha = (A_label[i] ** self.eta).clamp(0, 1)
-                    s_label_star[i] = (1 - alpha) * s_label[i] + alpha * ce_scores[j]
-        else:
-            s_label_star = s_label
+        # ---------- CE REFINEMENT (disabled) ----------
+        s_label_star = s_label
 
         # ---------- CONTEXT ----------
         if self.use_context:
-            self.log("Encoding contextual subgraphs...", "info")
+            self._log_once("context_encoding", "Encoding contextual subgraphs...", "info")
             e_cs = self.encode_contexts_batch(src_ctx_joined)
             e_ct = self.encode_contexts_batch(tgt_ctx_joined)
             s_ctx = self._cos_sim(e_cs, e_ct)
@@ -1186,28 +1143,53 @@ class SemanticScorer(IModel):
             need_llm = torch.zeros_like(U, dtype=torch.bool)
 
         # ---------- LLM (SUMMARIES + YES/NO) ----------
+        src_llm_summaries = [""] * N
+        tgt_llm_summaries = [""] * N
         llm_decisions = [""] * N
         llm_rationales = [""] * N
         batch_calibration_samples = 0
 
-        if self.use_llm and need_llm.any():
-            self.log("LLM fired for ambiguous/uncertain pairs: generating summaries...", "info")
+        decision_idxs: List[int] = []
+        summary_idxs: List[int] = []
+        if self.use_llm:
+            decision_idxs = torch.nonzero(need_llm).flatten().tolist()
+            summary_idxs = list(range(N)) if self.force_llm_summaries else list(decision_idxs)
 
-            idxs = torch.nonzero(need_llm).flatten().tolist()
-            src_best = [best_pairs[i][0] for i in idxs]
-            tgt_best = [best_pairs[i][1] for i in idxs]
+        if self.use_llm and summary_idxs:
+            log_key = "llm_summaries_forced" if self.force_llm_summaries else "llm_triggered"
+            log_msg = (
+                "LLM summaries forced for all pairs (force_llm_summaries=True)."
+                if self.force_llm_summaries
+                else "LLM fired for ambiguous/uncertain pairs: generating summaries..."
+            )
+            self._log_once(log_key, log_msg, "info")
 
-            src_sum = self.generate_summaries_batched(src_best, [src_ctx_joined[i] for i in idxs])
-            tgt_sum = self.generate_summaries_batched(tgt_best, [tgt_ctx_joined[i] for i in idxs])
+            src_best_summary = [best_pairs[i][0] for i in summary_idxs]
+            tgt_best_summary = [best_pairs[i][1] for i in summary_idxs]
+
+            src_sum = self.generate_summaries_batched(src_best_summary, [src_ctx_joined[i] for i in summary_idxs])
+            tgt_sum = self.generate_summaries_batched(tgt_best_summary, [tgt_ctx_joined[i] for i in summary_idxs])
+            for offset, idx in enumerate(summary_idxs):
+                src_llm_summaries[idx] = src_sum[offset]
+                tgt_llm_summaries[idx] = tgt_sum[offset]
+
+        p_llm = torch.zeros(N, device=self.device)
+        S_final = S_lctx
+
+        if self.use_llm and decision_idxs:
+            src_best = [best_pairs[i][0] for i in decision_idxs]
+            tgt_best = [best_pairs[i][1] for i in decision_idxs]
+
+            src_sum = [src_llm_summaries[i] for i in decision_idxs]
+            tgt_sum = [tgt_llm_summaries[i] for i in decision_idxs]
 
             p_yes_needed = self.llm_yesno_probs_batched(src_best, tgt_best, src_sum, tgt_sum)
-            calibration_info: Optional[Dict[str, Any]] = None
             if self.use_llm_calibration:
                 if self._llm_calibration_can_apply:
                     p_yes_needed = self._apply_llm_calibration(p_yes_needed)
                     self._calibration_messages.append("Applied configured LLM calibration coefficients.")
                 else:
-                    samples = self._collect_calibration_samples(idxs, p_yes_needed, label)
+                    samples = self._collect_calibration_samples(decision_idxs, p_yes_needed, label)
                     if samples is not None:
                         probs_fit, labels_fit = samples
                         count = int(probs_fit.shape[0])
@@ -1224,10 +1206,9 @@ class SemanticScorer(IModel):
                                 f"(total={len(self._calibration_pending_probs)})."
                             )
                         )
-            p_llm = torch.zeros(N, device=self.device)
-            p_llm[idxs] = p_yes_needed
+            p_llm[decision_idxs] = p_yes_needed
             decisions_needed = ["Yes" if float(prob) >= 0.5 else "No" for prob in p_yes_needed]
-            for offset, idx in enumerate(idxs):
+            for offset, idx in enumerate(decision_idxs):
                 llm_decisions[idx] = decisions_needed[offset]
 
             if self.generate_llm_rationales:
@@ -1238,19 +1219,21 @@ class SemanticScorer(IModel):
                     tgt_sum,
                     decisions_needed,
                 )
-                for offset, idx in enumerate(idxs):
+                for offset, idx in enumerate(decision_idxs):
                     llm_rationales[idx] = rationales_needed[offset]
 
             S_final = S_lctx.clone()
             S_final[need_llm] = (1.0 - w_i[need_llm]) * S_lctx[need_llm] + w_i[need_llm] * p_llm[need_llm]
-        else:
-            p_llm = torch.zeros(N, device=self.device)
-            S_final = S_lctx
+
+        llm_used_mask = torch.zeros(N, dtype=torch.bool, device=self.device)
+        if decision_idxs:
+            llm_used_mask[decision_idxs] = True
+        w_i_effective = w_i * llm_used_mask.to(w_i.dtype)
 
         # ---------- IMPORTANCES ----------
-        I_label = (1.0 - w_c) * (1.0 - w_i)
-        I_ctx = w_c * (1.0 - w_i)
-        I_llm = w_i
+        I_label = (1.0 - w_c) * (1.0 - w_i_effective)
+        I_ctx = w_c * (1.0 - w_i_effective)
+        I_llm = w_i_effective
 
         # ---------- OUTPUT ----------
         result = {
@@ -1271,6 +1254,10 @@ class SemanticScorer(IModel):
             "llm_rationales": llm_rationales,
             "llm_calibration": self._llm_calibration_payload(batch_samples=batch_calibration_samples),
             "llm_summary_stats": self.llm_summary_stats(),
+            "llm_summaries": {
+                "source": src_llm_summaries,
+                "target": tgt_llm_summaries,
+            },
         }
 
         if self.return_explanations:
@@ -1289,7 +1276,6 @@ class SemanticScorer(IModel):
                     "models": {
                         "lexical_model": self.lexical_model_name if self.use_lexical else None,
                         "context_model": self.context_model_name if self.use_context else None,
-                        "cross_encoder_model": self.cross_encoder_name if self.use_cross_encoder else None,
                         "llm_model": self.llm_model_name if self.use_llm else None,
                     },
                     "llm_calibration": self._llm_calibration_payload(batch_samples=0),
@@ -1327,6 +1313,37 @@ class SemanticScorer(IModel):
                         "source": list(src_contexts[i]),
                         "target": list(tgt_contexts[i]),
                         "delimiter": self.ctx_sentence_delimiter,
+                    },
+                    "context_triples": {
+                        "source": [list(t) for t in (src_ctx_raw[i] or [])],
+                        "target": [list(t) for t in (tgt_ctx_raw[i] or [])],
+                        "note": "Context triples used by the model; connectors omitted.",
+                    },
+                    "connectivity_bridges": {
+                        "source": [
+                            {
+                                "triple": list(t),
+                                "used_by_model": False,
+                                "info_score": 0.0,
+                                "verbalized": False,
+                                "reason": "connectivity_bridge",
+                            }
+                            for t in (src_ctx_bridges[i] or [])
+                        ],
+                        "target": [
+                            {
+                                "triple": list(t),
+                                "used_by_model": False,
+                                "info_score": 0.0,
+                                "verbalized": False,
+                                "reason": "connectivity_bridge",
+                            }
+                            for t in (tgt_ctx_bridges[i] or [])
+                        ],
+                    },
+                    "llm_summaries": {
+                        "source": src_llm_summaries[i],
+                        "target": tgt_llm_summaries[i],
                     },
                     "triple_attributions": triple_attrib,
                 })

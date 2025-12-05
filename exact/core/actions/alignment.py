@@ -125,16 +125,26 @@ class AlignmentAction(Protocol):
         ## Train Model
         logger.info(f"Building Trainer and Model...")
 
-        # Merge model params with alignment-related params needed by the model (without mutating originals)
-        merged_model_params = {
-            **configs.model.params,
+        model_sequence = configs.get_model_sequence()
+        if not model_sequence:
+            raise ValueError("No models configured for alignment.")
+        model_specs = []
+        primary = model_sequence[0]
+        primary_params = {
+            **primary.params,
             **configs.alignment_params.model_dump(exclude_none=True),
         }
+        model_specs.append((primary.name, primary_params))
+        for extra in model_sequence[1:]:
+            if extra.name is None:
+                continue
+            if isinstance(extra.params, dict) and extra.params.get("enabled") is False:
+                continue
+            model_specs.append((extra.name, extra.params))
 
         trainer = configs.trainer(
             dataset=dataset,
-            model=configs.model.name,
-            model_params=merged_model_params,
+            models=model_specs,
             device=device,
             output_dir= output_dir_path / "model",
             logger=logger,
@@ -144,10 +154,13 @@ class AlignmentAction(Protocol):
 
         alignment_start = time.time()
 
+        inference_kwargs = configs.inference_params.model_dump()
+
         if candidates_file_path is None:
-            alignment, avg_t = trainer.predict(**configs.inference_params.model_dump(), **configs.alignment_params.model_dump())
+            inference_kwargs.update(configs.alignment_params.model_dump())
+            alignment, avg_t = trainer.predict(**inference_kwargs)
         else:
-            alignment, avg_t = trainer.predict(**configs.inference_params.model_dump())
+            alignment, avg_t = trainer.predict(**inference_kwargs)
 
         logger.info(f"Average inference time per example: {avg_t:.4f} seconds")
 
@@ -180,6 +193,12 @@ class AlignmentAction(Protocol):
         trainer.plot_distributions(
             which=configs.inference_params.which,
             **configs.plot_params.model_dump()
+        )
+        trainer.plot_scores_vs_labels(
+            which=configs.inference_params.which,
+            figsize=configs.plot_params.figsize,
+            alpha=configs.plot_params.alpha,
+            dpi=configs.plot_params.dpi,
         )
 
         # Evaluate Alignment

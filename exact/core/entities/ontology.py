@@ -12,7 +12,7 @@ from org.semanticweb.HermiT import Reasoner
 from org.semanticweb.owlapi.reasoner import InferenceType
 from org.semanticweb.owlapi.model import IRI, OWLClass
 
-from mowl.projection import OWL2VecStarProjector, Edge
+from mowl.projection import OWL2VecStarProjector, TaxonomyProjector, Edge
 
 from exact.utils.paths import best_path_dp, best_path_lagrangian_relaxation, best_path_local
 from exact.core.entities.configs.dataset import ContextMethod, BestPathMethod
@@ -47,6 +47,9 @@ class OntologyGraph:
 
         # edge cost cache
         self._edge_cost_cache: Dict[Tuple[str,str,str], int] = None
+
+        # adjacency cache including relation labels (for shortest paths)
+        self._rel_adj_cache: Optional[Dict[str, List[Tuple[str, str]]]] = None
 
         if reasoner is None:
             reasoner = Reasoner.ReasonerFactory().createReasoner(ontology)
@@ -127,13 +130,18 @@ class OntologyGraph:
         self._cost_fn = fn
         # Build the cache once
         self._edge_cost_cache = {}
-        for e in self.edges:
+        for e in self.edges: 
             t = e.astuple()
             human_readable = (self.get_labels(i)[0] for i in t)
             self._edge_cost_cache[t] = fn(human_readable)
 
     def _build_projection(self) -> None:
-        projector = OWL2VecStarProjector(only_taxonomy=self.only_taxonomy)
+
+        if self.only_taxonomy:
+            projector = TaxonomyProjector()
+        else:
+            projector = OWL2VecStarProjector()
+
         self.edges = projector.project(self.ontology)
         self.out_edges = self._build_out_edges()
         self.graph = self._build_graph(self.edges)
@@ -446,6 +454,160 @@ class OntologyGraph:
                 for src, rel, dst in selected
             ]
         return selected
+
+    def _is_subclass_rel(self, rel_iri: str) -> bool:
+        """
+        Lightweight check to treat variations of the subclass relation as taxonomy edges.
+        """
+        if rel_iri is None:
+            return False
+        r = rel_iri.lower()
+        return "subclassof" in r or "subclass_of" in r
+
+    @property
+    def rel_adj(self) -> Dict[str, List[Tuple[str, str]]]:
+        """
+        Cached adjacency list that keeps relation labels for each neighbor traversal.
+        Used for shortest-path bridging in explanations.
+        """
+        if self._rel_adj_cache is None:
+            adj = defaultdict(list)
+            for e in self.edges:
+                adj[e.src].append((e.dst, e.rel))
+                adj[e.dst].append((e.src, e.rel))
+            self._rel_adj_cache = dict(adj)
+        return self._rel_adj_cache
+
+    def _shortest_path_to_set(
+        self,
+        start: str,
+        targets: Set[str],
+        max_depth: Optional[int] = None,
+    ) -> List[Tuple[str, str, str]]:
+        """
+        BFS to the nearest node in `targets`, returning the edge sequence as triples.
+        If no path is found (or depth exceeded), returns [].
+        """
+        if not targets:
+            return []
+        q = deque([(start, [])])
+        seen = {start}
+        adj = self.rel_adj
+        while q:
+            node, path = q.popleft()
+            if node in targets and path:
+                return path
+            if max_depth is not None and len(path) >= max_depth:
+                continue
+            for nbr, rel in adj.get(node, []):
+                if nbr in seen:
+                    continue
+                seen.add(nbr)
+                q.append((nbr, path + [(node, rel, nbr)]))
+        return []
+
+    def _connectivity_bridges(
+        self,
+        start: str,
+        selected: List[Tuple[str, str, str]],
+        max_depth: Optional[int] = None,
+    ) -> List[Tuple[str, str, str]]:
+        """
+        Ensure every selected triple can reach `start` by adding bridging triples.
+        Taxonomy-only components get a direct subclass bridge; other components
+        receive the shortest available path in the projected graph (bounded by `max_depth`).
+        """
+        if not selected:
+            return []
+
+        # Build adjacency for the selected subgraph (undirected for connectivity)
+        adj = defaultdict(set)
+        for u, _, v in selected:
+            adj[u].add(v)
+            adj[v].add(u)
+
+        # Reachable nodes within the selected triples from the start
+        reachable = set()
+        dq = deque([start])
+        while dq:
+            node = dq.popleft()
+            if node in reachable:
+                continue
+            reachable.add(node)
+            for nbr in adj.get(node, []):
+                if nbr not in reachable:
+                    dq.append(nbr)
+
+        bridges: List[Tuple[str, str, str]] = []
+        visited = set()
+
+        # Identify disconnected components and bridge them
+        for node in adj.keys():
+            if node in reachable or node in visited:
+                continue
+            comp_nodes: Set[str] = set()
+            dq = deque([node])
+            while dq:
+                cur = dq.popleft()
+                if cur in comp_nodes:
+                    continue
+                comp_nodes.add(cur)
+                for nbr in adj.get(cur, []):
+                    if nbr not in comp_nodes:
+                        dq.append(nbr)
+            visited.update(comp_nodes)
+
+            comp_edges = [
+                (u, r, v) for (u, r, v) in selected if u in comp_nodes or v in comp_nodes
+            ]
+            # Taxonomy components: add a direct subclass bridge to the start
+            if comp_edges and all(self._is_subclass_rel(r) for _, r, _ in comp_edges):
+                bridge_rel = comp_edges[0][1]
+                bridges.append((node, bridge_rel, start))
+                reachable.update(comp_nodes)
+                reachable.add(start)
+                continue
+
+            # General case: shortest path from component to any reachable node
+            path = self._shortest_path_to_set(node, reachable, max_depth=max_depth)
+            if path:
+                bridges.extend(path)
+                for u, _, v in path:
+                    reachable.add(u)
+                    reachable.add(v)
+
+        return bridges
+
+    def get_context_subgraph_with_bridges(
+        self,
+        start: str,
+        n: int,
+        human_readable: bool = True,
+        method: ContextMethod = ContextMethod.bfs,
+        best_path_method: Optional[BestPathMethod] = None,
+        budget: Optional[int] = None,
+        hop_penalty: Optional[float] = 0.0,
+        max_bridge_hops: Optional[int] = None,
+        all_labels: bool = False,
+    ) -> Tuple[List[Tuple[str, str, str]], List[Tuple[str, str, str]]]:
+        """
+        Returns (selected_context_triples, bridge_triples) where bridge_triples are
+        added only for explainability to ensure connectivity to `start`.
+        """
+        raw_selected = self.get_context_subgraph(
+            start,
+            n,
+            human_readable=False,
+            method=method,
+            best_path_method=best_path_method,
+            budget=budget,
+            hop_penalty=hop_penalty,
+            all_labels=all_labels,
+        )
+        bridges_raw = self._connectivity_bridges(start, raw_selected, max_depth=max_bridge_hops)
+        selected_fmt = self._format_subgraph(raw_selected, human_readable)
+        bridges_fmt = self._format_subgraph(bridges_raw, human_readable)
+        return selected_fmt, bridges_fmt
     
     @staticmethod
     def normalize_label(text: str) -> str:

@@ -37,11 +37,24 @@ class ModelParams(RegistryParams):
     name: Type[IModel] = Field(config["model"]["name"], validate_default=True)
     params: dict = Field(config["model"]["params"])
 
+
+class SecondModelParams(RegistryParams):
+    component_type: ComponentType = ComponentType.MODEL
+    name: Optional[Type[IModel]] = Field(config.get("second_model", {}).get("name", None), validate_default=True)
+    params: dict = Field(config.get("second_model", {}).get("params", {}))
+
+
+class ModelChainEntry(RegistryParams):
+    component_type: ComponentType = ComponentType.MODEL
+    name: Type[IModel]
+    params: dict = Field(default_factory=dict)
+
 class DatasetParams(BaseModel):
     # General Params
     num_workers: Optional[int] = Field(config["dataset_params"]["num_workers"])
     filter_exact_matches: bool = Field(config["dataset_params"]["filter_exact_matches"])
     drop_exact_match_sources: bool = Field(config["dataset_params"]["drop_exact_match_sources"])
+    candidate_share_k: int = Field(config["dataset_params"].get("candidate_share_k", 1))
 
     # Context Main Params
     n_hops: int = Field(config["dataset_params"]["n_hops"])
@@ -53,6 +66,8 @@ class DatasetParams(BaseModel):
     max_input_tokens_context: int = Field(config["dataset_params"]["max_input_tokens_context"])
     only_taxonomy: bool = Field(config["dataset_params"]["only_taxonomy"])
     all_labels: bool = Field(config["dataset_params"]["all_labels"])
+    add_connectivity_bridges: bool = Field(config["dataset_params"].get("add_connectivity_bridges", True))
+    bridge_max_hops: Optional[int] = Field(config["dataset_params"].get("bridge_max_hops", None))
     # Verbaliser Params
     verbaliser_name: Optional[str] = Field(config["dataset_params"]["verbaliser_name"])
     gen_max_new_tokens: int = Field(config["dataset_params"]["gen_max_new_tokens"])
@@ -123,6 +138,8 @@ class ConfigModel(BaseModel):
     alignment_params: AlignmentParams = AlignmentParams()
     inference_params: InferenceParams = InferenceParams()
     model: ModelParams = ModelParams()
+    second_model: Optional[SecondModelParams] = SecondModelParams()
+    model_chain: Optional[List[ModelChainEntry]] = None
     k: Optional[List[int]] = Field(config["k"])
     dataset: Optional[Type[IDataset]] = None
     trainer: Optional[Type[ITrainer]] = None
@@ -136,7 +153,12 @@ class ConfigModel(BaseModel):
         return list(set(k))
     
     def resolve_dependencies(self) -> None:
-        dependencies = ComponentRegistry.get_dependency(self.model.name.__name__)
+        primary_model = None
+        if self.model_chain and len(self.model_chain) > 0:
+            primary_model = self.model_chain[0]
+        else:
+            primary_model = self.model
+        dependencies = ComponentRegistry.get_dependency(primary_model.name.__name__)
         self.dataset = ComponentRegistry.get(ComponentType.DATASET, dependencies[ComponentType.DATASET])
         self.trainer = ComponentRegistry.get(ComponentType.TRAINER, dependencies[ComponentType.TRAINER])
 
@@ -151,6 +173,15 @@ class ConfigModel(BaseModel):
         alignment_params = AlignmentParams(**yaml_config.get("alignment_params", {}))
         inference_params = InferenceParams(**yaml_config.get("inference_params", {}))
         model_params = ModelParams(**yaml_config.get("model", {}))
+        second_model_raw = yaml_config.get("second_model", {}) or {}
+        legacy_second_pass = yaml_config.get("second_pass_params")
+        if not second_model_raw and legacy_second_pass is not None:
+            second_model_raw = {"name": "SecondPassReranker", "params": legacy_second_pass}
+        second_model_params = SecondModelParams(**second_model_raw)
+        model_chain = None
+        if "model_chain" in yaml_config:
+            entries = yaml_config.get("model_chain") or []
+            model_chain = [ModelChainEntry(**entry) for entry in entries]
 
         # filter config for set keys
         filtered_config = {
@@ -158,7 +189,17 @@ class ConfigModel(BaseModel):
             for k, v in yaml_config.items()
             if v is not None
             and k in cls.model_fields
-            and k not in ["dataset_params", "candidates_params", "alignment_params", "inference_params", "model", "plot_params", "sanity_check_params"]
+            and k not in [
+                "dataset_params",
+                "candidates_params",
+                "alignment_params",
+                "inference_params",
+                "model",
+                "plot_params",
+                "sanity_check_params",
+                "second_model",
+                "model_chain",
+            ]
         }
 
         return cls(
@@ -169,6 +210,20 @@ class ConfigModel(BaseModel):
             alignment_params=alignment_params,
             inference_params=inference_params,
             model=model_params,
+            second_model=second_model_params,
+            model_chain=model_chain,
             **filtered_config,
         )
 
+    def get_model_sequence(self) -> List[RegistryParams]:
+        """
+        Returns the ordered list of model specs to be instantiated.
+        If model_chain is provided in the YAML it takes precedence,
+        otherwise falls back to the primary model plus optional second_model.
+        """
+        if self.model_chain:
+            return list(self.model_chain)
+        chain: List[RegistryParams] = [self.model]
+        if self.second_model and self.second_model.name is not None:
+            chain.append(self.second_model)
+        return chain

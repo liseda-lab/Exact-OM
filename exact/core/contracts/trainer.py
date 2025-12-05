@@ -33,8 +33,9 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
     def __init__(
         self,
         dataset: 'IDataset',
-        model: Type['IModel'],
-        model_params: Optional[Dict[str, Any]] = {},
+        model: Optional[Type['IModel']] = None,
+        model_params: Optional[Dict[str, Any]] = None,
+        models: Optional[List[Tuple[Type['IModel'], Dict[str, Any]]]] = None,
         device: tdevice = tdevice("cuda" if th.cuda.is_available() else "cpu"),
         output_dir: Optional[Path] = None,
         logger: Optional[logging.Logger] = None,
@@ -47,7 +48,31 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
 
         self._dataset = dataset
         self._device = device
-        self._model = model(device=device, **model_params).to(self.device)
+        model_specs: List[Tuple[Type['IModel'], Dict[str, Any]]] = []
+        if models:
+            model_specs = [(m, params or {}) for m, params in models]
+        elif model is not None:
+            model_specs = [(model, model_params or {})]
+        else:
+            raise ValueError("At least one model definition must be provided to the trainer.")
+
+        def _bind_logger(obj: Any) -> None:
+            if logger is None:
+                return
+            obj.logger = logger
+
+            def _log(msg: str, level: str = "info", traceback: bool = False):
+                log_method = getattr(logger, level, None) or logger.info
+                log_method(msg, exc_info=traceback)
+
+            obj.log = _log
+
+        self._models: List['IModel'] = []
+        for model_cls, params in model_specs:
+            instance = model_cls(device=device, **params)
+            _bind_logger(instance)
+            self._models.append(instance.to(self.device))
+        self._model = self._models[0]
 
         self._results_json: List[Dict[str, Any]] = []
         self._results_df: Optional[pd.DataFrame] = None
@@ -69,6 +94,10 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
     @property
     def model(self) -> 'IModel':
         return self._model
+
+    @property
+    def models(self) -> List['IModel']:
+        return self._models
 
     @property
     def output_dir(self) -> Path:
@@ -307,9 +336,19 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
                 "src_iri": rec.get("src_iri"),
                 "tgt_iri": rec.get("tgt_iri"),
             }
+            pred = rec.get("prediction") or {}
+            if "ground_truth" in pred:
+                base["ground_truth"] = pred.get("ground_truth")
             conf = rec.get("confidences", {})
             wts = rec.get("weights", {})
             imps = rec.get("importances", {})
+            # If the LLM did not fire, force its importance to 0 to avoid misleading plots
+            if imps and "I_llm" in imps:
+                p_llm = conf.get("p_llm")
+                llm_decision = pred.get("llm_decision")
+                if (p_llm is None or float(p_llm) == 0.0) or (llm_decision in ("", None)):
+                    imps = dict(imps)
+                    imps["I_llm"] = 0.0
             base.update({**conf, **wts, **imps})
             rows.append(base)
         return pd.DataFrame(rows)
@@ -334,7 +373,12 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
             self.log("No numeric results to plot.", level="warning")
             return
 
-        for col in which:
+        metrics = which or []
+        if not metrics:
+            self.log("No metrics specified for distribution plots.", level="warning")
+            return
+
+        for col in metrics:
             if col not in self.results_df.columns:
                 self.log(f"Column {col} missing in summary DF; skipping.", level="warning")
                 continue
@@ -358,6 +402,60 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
             plt.savefig(out_path, dpi=dpi)
             plt.close()
             self.log(f"Saved {col} distribution plot to {out_path}", level="debug")
+
+    def plot_scores_vs_labels(
+        self,
+        which: Optional[List[str]],
+        kind: DatasetMask = DatasetMask.inference,
+        figsize: Tuple[int, int] = (7, 5),
+        alpha: float = 0.6,
+        dpi: int = 300,
+        jitter: float = 0.2,
+    ) -> None:
+        if self.results_df is None or self.results_df.empty:
+            self.log("No numeric results to plot.", level="warning")
+            return
+        if "ground_truth" not in self.results_df.columns:
+            self.log("Summary DF lacks ground_truth column; skipping score-vs-label plots.", level="warning")
+            return
+        metrics = which or []
+        if not metrics:
+            self.log("No metrics specified for score-vs-label plots.", level="warning")
+            return
+
+        for col in metrics:
+            if col not in self.results_df.columns:
+                self.log(f"Column {col} missing in summary DF; skipping label plot.", level="warning")
+                continue
+
+            plot_df = self.results_df[["ground_truth", col]].dropna()
+            if plot_df.empty:
+                self.log(f"No data to plot for column {col} vs ground_truth.", level="warning")
+                continue
+
+            try:
+                plot_df = plot_df.assign(ground_truth=plot_df["ground_truth"].astype(int))
+            except (ValueError, TypeError):
+                plot_df = plot_df.assign(ground_truth=plot_df["ground_truth"])
+
+            plt.figure(figsize=figsize)
+            sns.stripplot(
+                data=plot_df,
+                x="ground_truth",
+                y=col,
+                jitter=jitter,
+                alpha=alpha,
+                dodge=False,
+            )
+            plt.title(f"{kind.name}: {col} vs ground_truth")
+            plt.xlabel("ground_truth")
+            plt.ylabel(col)
+            plt.grid(True, axis="y", linestyle="--", linewidth=0.5)
+            plt.tight_layout()
+            out_path = self.plot_dir / f"{kind.name.lower()}_{col}_vs_label.png"
+            plt.savefig(out_path, dpi=dpi)
+            plt.close()
+            self.log(f"Saved {col} vs ground_truth plot to {out_path}", level="debug")
 
     def _compute_run_stats(
         self,
