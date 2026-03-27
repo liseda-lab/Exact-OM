@@ -9,3 +9,7 @@ ANNOTATION_IRI = "http://oaei.ontologymatching.org/bio-ml/ann/use_in_alignment"
 # DATASET
 
 DATASET_URL = "https://zenodo.org/api/records/13119437/files-archive"
+CONFERENCE_URL = "https://oaei.ontologymatching.org/2025/conference/data/conference.zip"
+REFERENCE_ALIGNMENT_URL = (
+    "https://oaei.ontologymatching.org/2025/conference/data/reference-alignment.zip"
+)

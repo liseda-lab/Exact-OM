@@ -1,11 +1,11 @@
 
-import pandas as pd
-from pathlib import Path
-import os
-import requests
-import zipfile
 import shutil
 import tarfile
+import zipfile
+from pathlib import Path
+
+import pandas as pd
+import requests
 from tqdm import tqdm
 import yaml
 
@@ -38,73 +38,91 @@ def read_yaml(file_path: Path):
 
 class DataDownloader:
     def __init__(self, dest_folder):
-        self.dest_folder = dest_folder
+        self.dest_folder = Path(dest_folder)
+        self.dest_folder.mkdir(parents=True, exist_ok=True)
 
-    def download_file(self, url):
-        local_filename = os.path.join(self.dest_folder, url.split('/')[-1])
+    def download_file(self, url, filename=None, skip_existing=True):
+        local_filename = self.dest_folder / (filename or url.split("/")[-1])
+        if skip_existing and local_filename.exists():
+            print(f"{local_filename.name} already present; skipping download.")
+            return local_filename
+
         response = requests.get(url, stream=True)
         response.raise_for_status()
-        total_size = int(response.headers.get('content-length', 0))
+        total_size = int(response.headers.get("content-length", 0))
         block_size = 1024
-        t = tqdm(total=total_size, unit='iB', unit_scale=True)
-        with open(local_filename, 'wb') as f:
+        t = tqdm(total=total_size, unit="iB", unit_scale=True)
+        with local_filename.open("wb") as f:
             for chunk in response.iter_content(chunk_size=block_size):
                 t.update(len(chunk))
                 f.write(chunk)
         t.close()
         return local_filename
 
-    def unzip_file(self, zip_path):
-        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-            zip_ref.extractall(self.dest_folder)
+    def unzip_file(self, zip_path, dest_folder=None):
+        destination = Path(dest_folder) if dest_folder is not None else self.dest_folder
+        destination.mkdir(parents=True, exist_ok=True)
+        with zipfile.ZipFile(zip_path, "r") as zip_ref:
+            zip_ref.extractall(destination)
 
-    def untar_file(self, tar_path):
-        with tarfile.open(tar_path, 'r:gz') as tar_ref:
-            tar_ref.extractall(self.dest_folder)
+    def untar_file(self, tar_path, dest_folder=None):
+        destination = Path(dest_folder) if dest_folder is not None else self.dest_folder
+        destination.mkdir(parents=True, exist_ok=True)
+        with tarfile.open(tar_path, "r:gz") as tar_ref:
+            tar_ref.extractall(destination)
+
+    def extract_archive(self, archive_path, dest_folder=None, delete_archive=False):
+        archive_path = Path(archive_path)
+        destination = Path(dest_folder) if dest_folder is not None else self.dest_folder
+
+        if zipfile.is_zipfile(archive_path):
+            self.unzip_file(archive_path, destination)
+        elif tarfile.is_tarfile(archive_path):
+            self.untar_file(archive_path, destination)
+        else:
+            raise ValueError(f"Unsupported archive format: {archive_path}")
+
+        if delete_archive:
+            self.delete_file(archive_path)
+
+        return destination
 
     def move_files_and_cleanup(self, folder):
-        refs_equiv_path = os.path.join(folder, 'refs_equiv')
-        refs_sub_path = os.path.join(folder, 'refs_subs')
+        folder = Path(folder)
+        refs_equiv_path = folder / "refs_equiv"
+        refs_sub_path = folder / "refs_subs"
 
-        if os.path.exists(refs_sub_path):
+        if refs_sub_path.exists():
             shutil.rmtree(refs_sub_path)
 
-        if os.path.exists(refs_equiv_path):
-            for item in os.listdir(refs_equiv_path):
-                item_path = os.path.join(refs_equiv_path, item)
-                shutil.move(item_path, folder)
-            os.rmdir(refs_equiv_path)
+        if refs_equiv_path.exists():
+            for item_path in refs_equiv_path.iterdir():
+                shutil.move(str(item_path), str(folder))
+            refs_equiv_path.rmdir()
 
     def process_unzipped_folders(self):
-        for item in os.listdir(self.dest_folder):
-            item_path = os.path.join(self.dest_folder, item)
-            if os.path.isdir(item_path):
+        for item_path in self.dest_folder.iterdir():
+            if item_path.is_dir():
                 self.move_files_and_cleanup(item_path)
 
     def unzip_all_in_folder(self):
-        for item in os.listdir(self.dest_folder):
-            item_path = os.path.join(self.dest_folder, item)
+        for item_path in self.dest_folder.iterdir():
             if zipfile.is_zipfile(item_path):
-                self.unzip_file(item_path)
-                self.delete_file(item_path)
+                self.extract_archive(item_path, delete_archive=True)
                 self.process_unzipped_folders()
 
     def download_dataset(self, url):
         print("Downloading dataset...")
         zip_path = self.download_file(url)
         print("Uncompressing dataset...")
-        self.unzip_file(zip_path)
+        self.extract_archive(zip_path, delete_archive=True)
         print("Processing unzipped folders...")
-        self.delete_file(zip_path)
         self.unzip_all_in_folder()
 
     @staticmethod
     def has_subdirs(directory):
-        for item in os.listdir(directory):
-            if os.path.isdir(os.path.join(directory, item)):
-                return True
-        return False
+        return any(item.is_dir() for item in Path(directory).iterdir())
     
     @staticmethod
     def delete_file(file_path):
-        os.remove(file_path)
+        Path(file_path).unlink()
