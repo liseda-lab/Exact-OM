@@ -2,16 +2,13 @@ import logging
 import time
 from pathlib import Path
 from typing import Optional, Protocol, List, Union
-import concurrent.futures
-from multiprocessing import Manager
 import pandas as pd
 
 from exact.core.actions.evaluation import EvaluationAction
 from exact.core.entities.configs.config import ConfigModel
 from exact.impl.seed import SeedSetter
+from exact.utils.timing import load_recorded_timings, write_recorded_timings
 
-import shutil, yaml, os
-from datetime import datetime
 import torch
 
 class AlignmentAction(Protocol):
@@ -101,8 +98,9 @@ class AlignmentAction(Protocol):
         )
 
         dataset.load_ontologies(source_file_path, target_file_path)
+        dataset_loaded_from_cache = dataset.has_cache()
 
-        if not dataset.has_cache():
+        if not dataset_loaded_from_cache:
 
             if full_reference_file_path is not None:
                 dataset.load_reference(full_reference_file_path)
@@ -111,7 +109,7 @@ class AlignmentAction(Protocol):
 
         dataset.process()
 
-        if not dataset.has_cache():
+        if not dataset_loaded_from_cache:
 
             dataset.save()
 
@@ -234,16 +232,22 @@ class AlignmentAction(Protocol):
 
         # Save Times
         times_file_path = output_dir_path / "times.txt"
-        with open(times_file_path, "a") as f:
-            f.write(f"Total: {elapsed_time:.1f} minutes\n")
-            f.write(f"Dataset: {dataset_elapsed:.1f} minutes\n")
-            f.write(f"Alignment: {alignment_elapsed:.1f} minutes\n")
-        logger.info(f"Times written to {times_file_path}")
+        timings = load_recorded_timings(times_file_path)
+        timings["Total"] = elapsed_time
+        timings["Alignment"] = alignment_elapsed
+        if not dataset_loaded_from_cache:
+            timings["Dataset"] = dataset_elapsed
+
+        write_recorded_timings(times_file_path, timings)
+        logger.info(f"Times updated at {times_file_path}")
 
         timmings = {
-            "Dataset": dataset_elapsed,
             "Alignment": alignment_elapsed,
             "Total": elapsed_time,
         }
+        if not dataset_loaded_from_cache:
+            timmings["Dataset"] = dataset_elapsed
+        elif "Dataset" in timings:
+            timmings["Dataset"] = timings["Dataset"]
 
         return results, timmings
