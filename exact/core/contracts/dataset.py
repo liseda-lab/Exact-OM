@@ -2,9 +2,11 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Callable, Any
 from contextlib import nullcontext
+from concurrent.futures import ThreadPoolExecutor
 import hashlib
 
 import math
+import time
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -24,6 +26,8 @@ from exact.utils.data import read_table
 from mowl.datasets import PathDataset as OWLDataset
 from mowl.owlapi import OWLOntology
 from org.semanticweb.HermiT import Reasoner
+from org.semanticweb.elk.owlapi import ElkReasonerFactory
+from org.semanticweb.owlapi.reasoner.structural import StructuralReasonerFactory
 from org.semanticweb.owlapi.reasoner import InferenceType
 
 
@@ -82,7 +86,106 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
         self._target_path: Optional[Path] = None
         self._dataset_signature: Optional[str] = None
 
+        # Hint for skipping heavy reasoning when only taxonomy is requested.
+        self._only_taxonomy_hint: bool = bool(kwargs.get("only_taxonomy", False))
+        self._reasoner_timeout_secs: float = float(kwargs.get("reasoner_timeout_secs", 120.0))
+        self._reasoner_force_hermit: bool = bool(kwargs.get("reasoner_force_hermit", False))
+        self._source_reasoner_attempted: bool = False
+        self._target_reasoner_attempted: bool = False
+
         LoggingClass.__init__(self, logger=kwargs.get("logger"))
+
+    # ------------------------------------------------------------------
+    # Reasoner helpers (lazy, timeout, ELK-first when only_taxonomy=True).
+    # ------------------------------------------------------------------
+    def _get_reasoner(self, label: str, ontology: OWLOntology) -> Optional[Reasoner]:
+        cache = self._source_reasoner if label == "source" else self._target_reasoner
+        attempted = self._source_reasoner_attempted if label == "source" else self._target_reasoner_attempted
+
+        if cache is not None or attempted:
+            return cache
+
+        # Mark attempted to avoid repeated long builds
+        if label == "source":
+            self._source_reasoner_attempted = True
+        else:
+            self._target_reasoner_attempted = True
+
+        def _build():
+            return self._make_reasoner(ontology, label=label)
+
+        try:
+            with ThreadPoolExecutor(max_workers=1) as ex:
+                fut = ex.submit(_build)
+                cache = fut.result(timeout=self._reasoner_timeout_secs)
+        except Exception as exc:
+            self.log(
+                f"Reasoner creation for {label} failed or timed out after {self._reasoner_timeout_secs:.0f}s: {exc}",
+                level="warning",
+            )
+            cache = None
+
+        if label == "source":
+            self._source_reasoner = cache
+        else:
+            self._target_reasoner = cache
+
+        return cache
+
+    def _make_reasoner(self, ontology: OWLOntology, label: str) -> Reasoner:
+        only_tax = self._only_taxonomy_hint
+        start = time.time()
+        self.log(
+            f"Creating reasoner for {label} (only_taxonomy={only_tax}, force_hermit={self._reasoner_force_hermit})…",
+            level="info",
+        )
+        # Order: lightweight first; HermiT only when explicitly forced.
+        attempts = ["elk", "structural"]
+        if self._reasoner_force_hermit:
+            attempts.append("hermit")
+
+        last_exc: Optional[Exception] = None
+        for kind in attempts:
+            try:
+                if kind == "elk":
+                    elk = ElkReasonerFactory().createReasoner(ontology)
+                    elk.precomputeInferences(InferenceType.CLASS_HIERARCHY)
+                    self.log(
+                        f"ELK reasoner for {label} ready in {time.time() - start:.2f}s",
+                        level="info",
+                    )
+                    return elk
+                if kind == "structural":
+                    struct = StructuralReasonerFactory().createReasoner(ontology)
+                    struct.precomputeInferences(InferenceType.CLASS_HIERARCHY)
+                    self.log(
+                        f"Structural reasoner for {label} ready in {time.time() - start:.2f}s",
+                        level="info",
+                    )
+                    return struct
+                # hermit
+                hermit = Reasoner.ReasonerFactory().createReasoner(ontology)
+                if only_tax:
+                    hermit.precomputeInferences(InferenceType.CLASS_HIERARCHY)
+                else:
+                    hermit.precomputeInferences(
+                        InferenceType.CLASS_HIERARCHY, InferenceType.OBJECT_PROPERTY_HIERARCHY
+                    )
+                self.log(
+                    f"HermiT reasoner for {label} ready in {time.time() - start:.2f}s",
+                    level="info",
+                )
+                return hermit
+            except Exception as exc:
+                last_exc = exc
+                self.log(f"{kind.capitalize()} reasoner failed for {label}: {exc}", level="warning")
+                continue
+
+        self.log(
+            f"All reasoner attempts failed for {label}; returning None. Last error: {last_exc}",
+            level="warning",
+        )
+        return None
 
     def __iter__(self):
         for i in range(len(self)):
@@ -135,20 +238,14 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
         if self.source is None:
             self.log("Source ontology not loaded.", level="error")
             raise ValueError("Source ontology not loaded.")
-        if self._source_reasoner is None:
-            self._source_reasoner = Reasoner.ReasonerFactory().createReasoner(self.source.ontology)
-            self._source_reasoner.precomputeInferences(InferenceType.CLASS_HIERARCHY, InferenceType.OBJECT_PROPERTY_HIERARCHY)
-        return self._source_reasoner
-    
+        return self._get_reasoner(label="source", ontology=self.source.ontology)
+
     @property
     def target_reasoner(self) -> Reasoner:
         if self.target is None:
             self.log("Target ontology not loaded.", level="error")
             raise ValueError("Target ontology not loaded.")
-        if self._target_reasoner is None:
-            self._target_reasoner = Reasoner.ReasonerFactory().createReasoner(self.target.ontology)
-            self._target_reasoner.precomputeInferences(InferenceType.CLASS_HIERARCHY, InferenceType.OBJECT_PROPERTY_HIERARCHY)
-        return self._target_reasoner
+        return self._get_reasoner(label="target", ontology=self.target.ontology)
     
     @property
     def exact_matches(self) -> DataFrame:
@@ -249,6 +346,11 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
         self._source_path = Path(source_path).resolve()
         self._target_path = Path(target_path).resolve()
         self._dataset_signature = None
+
+        self.log(
+            f"Loading ontologies: src={self._source_path} tgt={self._target_path}",
+            level="info",
+        )
 
         self._source = OWLDataset(str(self._source_path))
         

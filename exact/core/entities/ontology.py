@@ -3,6 +3,10 @@ from typing import List, Optional, Union, Dict, Set, Tuple
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import math
+import sys
+import time
+import logging
+import threading
 from collections import Counter, namedtuple
 from typing import Union, Tuple, Callable
 
@@ -27,6 +31,7 @@ class OntologyGraph:
         self.ontology = ontology
         self.reasoner = reasoner
         self.only_taxonomy = only_taxonomy
+        self._logger = logging.getLogger("exact")
         self.edges: Optional[List[Edge]] = None
         self.out_edges: Dict[str, List[Edge]] = None
         self.graph: Optional[Dict[str, Set[str]]] = None
@@ -51,10 +56,6 @@ class OntologyGraph:
         # adjacency cache including relation labels (for shortest paths)
         self._rel_adj_cache: Optional[Dict[str, List[Tuple[str, str]]]] = None
 
-        if reasoner is None:
-            reasoner = Reasoner.ReasonerFactory().createReasoner(ontology)
-            reasoner.precomputeInferences(InferenceType.OBJECT_PROPERTY_HIERARCHY)
-       
         self._build_projection()
         self.precompute_all_labels()
 
@@ -137,14 +138,47 @@ class OntologyGraph:
 
     def _build_projection(self) -> None:
 
-        if self.only_taxonomy:
-            projector = TaxonomyProjector()
-        else:
-            projector = OWL2VecStarProjector()
+        proj_name = "TaxonomyProjector" if self.only_taxonomy else "OWL2VecStarProjector"
+        start = time.time()
+        self._log(
+            f"OntologyGraph: projecting ontology ({proj_name}), only_taxonomy={self.only_taxonomy}",
+            level="info",
+        )
+
+        projector = TaxonomyProjector() if self.only_taxonomy else OWL2VecStarProjector()
+
+        stop_evt = threading.Event()
+
+        def _heartbeat():
+            while not stop_evt.wait(60):
+                elapsed = time.time() - start
+                self._log(
+                    f"OntologyGraph: projection still running ({proj_name}) after {elapsed:.1f}s",
+                    level="info",
+                )
+
+        hb_thread = threading.Thread(target=_heartbeat, daemon=True)
+        hb_thread.start()
 
         self.edges = projector.project(self.ontology)
+        stop_evt.set()
+        hb_thread.join(timeout=1)
         self.out_edges = self._build_out_edges()
         self.graph = self._build_graph(self.edges)
+        self._log(
+            f"OntologyGraph: projection finished ({proj_name}) in {time.time() - start:.2f}s with {len(self.edges)} edges",
+            level="info",
+        )
+
+    # ------------------------------------------------------------------
+    # Logging helper that falls back to stderr if logger is misconfigured.
+    # ------------------------------------------------------------------
+    def _log(self, msg: str, level: str = "info") -> None:
+        try:
+            log_fn = getattr(self._logger, level, self._logger.info)
+            log_fn(msg)
+        except Exception:
+            print(msg, file=sys.stderr, flush=True)
 
     def _build_out_edges(self) -> Dict[str, List[Edge]]:
         """
@@ -659,6 +693,7 @@ class Entity:
         self._subclasses: Optional[List[str]] = None
         self._superclasses: Optional[List[str]] = None
         self._top_superclass: Optional[str] = None
+        self._reasoner_warned = False
 
     def __repr__(self) -> str:
         return (f"Entity(name={self.name}, labels={self.labels}, subclasses={self.subclasses}, "
@@ -689,21 +724,33 @@ class Entity:
     @property
     def subclasses(self) -> List[str]:
         if self._subclasses is None:
-            self._subclasses = [
-                self._extract_labels(subcls.getIRI(), self.ontology)[0]
-                for subcls in self.reasoner.getSubClasses(self.owl_class, True).getFlattened()
-                if not subcls.isOWLNothing()
-            ]
+            if self.reasoner is None:
+                if not self._reasoner_warned:
+                    print("Entity subclasses requested without reasoner; returning empty list.", file=sys.stderr)
+                    self._reasoner_warned = True
+                self._subclasses = []
+            else:
+                self._subclasses = [
+                    self._extract_labels(subcls.getIRI(), self.ontology)[0]
+                    for subcls in self.reasoner.getSubClasses(self.owl_class, True).getFlattened()
+                    if not subcls.isOWLNothing()
+                ]
         return self._subclasses
 
     @property
     def superclasses(self) -> List[str]:
         if self._superclasses is None:
-            self._superclasses = [
-                self._extract_labels(supercls.getIRI(), self.ontology)[0]
-                for supercls in self.reasoner.getSuperClasses(self.owl_class, True).getFlattened()
-                if not supercls.isOWLThing()
-            ]
+            if self.reasoner is None:
+                if not self._reasoner_warned:
+                    print("Entity superclasses requested without reasoner; returning empty list.", file=sys.stderr)
+                    self._reasoner_warned = True
+                self._superclasses = []
+            else:
+                self._superclasses = [
+                    self._extract_labels(supercls.getIRI(), self.ontology)[0]
+                    for supercls in self.reasoner.getSuperClasses(self.owl_class, True).getFlattened()
+                    if not supercls.isOWLThing()
+                ]
         return self._superclasses
 
     @property
@@ -713,6 +760,11 @@ class Entity:
         return [self._top_superclass]
 
     def _find_top_superclass(self) -> str:
+        if self.reasoner is None:
+            if not self._reasoner_warned:
+                print("Entity top_superclass requested without reasoner; returning self.", file=sys.stderr)
+                self._reasoner_warned = True
+            return self.owl_class.getIRI()
         owl_class = self.owl_class
         while True:
             superclasses = self.reasoner.getSuperClasses(owl_class, True).getFlattened()
@@ -744,12 +796,8 @@ class Entity:
     def load_from_list(cls, class_iris: List[str], ontology: OWLOntology,
                        reasoner: Optional[Reasoner] = None,
                        ontology_graph: Optional[OntologyGraph] = None, load_onto_graph: bool = False) -> List['Entity']:
-        if reasoner is None:
-            if ontology_graph is None:
-                reasoner = Reasoner.ReasonerFactory().createReasoner(ontology)
-                reasoner.precomputeInferences(InferenceType.CLASS_HIERARCHY, InferenceType.OBJECT_PROPERTY_HIERARCHY)
-            else:
-                reasoner = ontology_graph.reasoner
+        if reasoner is None and ontology_graph is not None:
+            reasoner = ontology_graph.reasoner
         if load_onto_graph and ontology_graph is None:
             ontology_graph = OntologyGraph(ontology, reasoner)
         return [cls(class_iri=ci, ontology=ontology, reasoner=reasoner, ontology_graph=ontology_graph)

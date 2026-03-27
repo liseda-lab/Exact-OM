@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import Optional
+import os
 
 from exact import init_jvm
 
@@ -93,7 +94,8 @@ class AlignmentRunner:
     def run(self) -> None:
 
         self.validate_files()
-
+        
+        print(f"[exact-api] init_jvm heap={self.jvm_heap_size}", flush=True)
         init_jvm(self.jvm_heap_size)
 
         self.run_alignment()

@@ -68,6 +68,8 @@ class DatasetParams(BaseModel):
     all_labels: bool = Field(config["dataset_params"]["all_labels"])
     add_connectivity_bridges: bool = Field(config["dataset_params"].get("add_connectivity_bridges", True))
     bridge_max_hops: Optional[int] = Field(config["dataset_params"].get("bridge_max_hops", None))
+    reasoner_timeout_secs: float = Field(config["dataset_params"].get("reasoner_timeout_secs", 120))
+    reasoner_force_hermit: bool = Field(config["dataset_params"].get("reasoner_force_hermit", False))
     # Verbaliser Params
     verbaliser_name: Optional[str] = Field(config["dataset_params"]["verbaliser_name"])
     gen_max_new_tokens: int = Field(config["dataset_params"]["gen_max_new_tokens"])

@@ -1,4 +1,5 @@
 import argparse
+import os
 from pathlib import Path
 
 from exact import init_jvm
@@ -129,6 +130,8 @@ def main():
             raise Exception(f"JVM heap size {args.jvm_heap_size} is not valid, please provide a valid format")
     else:
         args.jvm_heap_size = '32G'
+
+    print(f"[exact-cli] init_jvm heap={args.jvm_heap_size}", flush=True)
 
     init_jvm(args.jvm_heap_size)
 

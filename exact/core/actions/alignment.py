@@ -68,6 +68,13 @@ class AlignmentAction(Protocol):
         # Resolve dependencies
 
         configs.resolve_dependencies()
+        logger.info(
+            "Dataset params: only_taxonomy=%s all_labels=%s filter_exact_matches=%s use_file_cache=%s",
+            configs.dataset_params.only_taxonomy,
+            configs.dataset_params.all_labels,
+            configs.dataset_params.filter_exact_matches,
+            configs.use_file_cache,
+        )
 
         # set seed
 

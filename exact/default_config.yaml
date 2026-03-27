@@ -46,6 +46,8 @@ dataset_params:
   num_workers: null # Number of workers to be used to load the data. If null, the all available cores will be used.
   filter_exact_matches: True # If True, exact matches between source and target will be filtered out before training/inference.
   drop_exact_match_sources: False # If True, drop all candidates for sources with an exact match (1-to-1 tasks). If False, only the exact pairs are removed.
+  reasoner_timeout_secs: 120 # Timeout for reasoner creation (seconds).
+  reasoner_force_hermit: False # If True, try HermiT after lightweight reasoners.
   
   # Context Main Params
   n_hops: 1

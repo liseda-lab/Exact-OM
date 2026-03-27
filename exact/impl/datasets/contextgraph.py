@@ -140,6 +140,10 @@ class ContextDataset(IDataset):
         # Templates & caches
         self._verbalization_templates: Optional[Dict[str, str]] = None
         self._verb_temp_path = self.output_path / "verbalization_templates.json"
+        self.log(
+            f"ContextDataset initialised with only_taxonomy={self.only_taxonomy}, all_labels={self.all_labels}",
+            level="info",
+        )
 
         # Output dataframe:
         # columns: ["Src", "Tgt", "Label", "SrcLabels", "TgtLabels", "SrcCtx", "TgtCtx"]

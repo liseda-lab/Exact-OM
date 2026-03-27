@@ -29,6 +29,7 @@ pyaml = "^25.1.0"
 peft = "^0.15.0"
 sentencepiece = "^0.2.0"
 gensim = "^4.3.3"
+rdflib = "^7.5.0"
 
 
 [tool.poetry.scripts]
