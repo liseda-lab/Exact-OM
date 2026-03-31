@@ -1,4 +1,5 @@
 import math
+from concurrent.futures import ThreadPoolExecutor
 from enum import Enum
 from typing import List, Optional, Tuple, Dict, Any, Iterable
 import re
@@ -7,6 +8,7 @@ import json
 import hashlib
 from pathlib import Path
 from collections import OrderedDict
+from urllib import error as urlerror
 
 import torch
 from torch import nn
@@ -17,6 +19,12 @@ from transformers import (
 )
 
 from exact.core.contracts.model import IModel
+from exact.utils.llm_routing import (
+    LLMRouter,
+    extract_chat_text,
+    extract_first_token_top_logprobs,
+    parse_structured_json,
+)
 
 
 class PoolingMethod(str, Enum):
@@ -35,7 +43,7 @@ class SemanticScorer(IModel):
     Explainable ontology matching scorer integrating:
       • Lexical embeddings with configurable pooling over label variants
       • Context embeddings over verbalised subgraphs (lists of sentences)
-      • Uncertainty-driven, gated LLM (summarise + Yes/No logits probability)
+      • Uncertainty-driven, gated LLM (summarise + binary decision probability)
       • Adaptive fusion (w_c) and bounded ambiguity U for LLM weight w_i
       • Optional explanation generation incl. model provenance and triple attributions
     """
@@ -65,6 +73,7 @@ class SemanticScorer(IModel):
         max_total_tokens_llm_decision: int = 384,
         max_total_tokens_llm_rationale: int = 512,
         max_new_tokens_llm: int = 64,
+        max_new_tokens_llm_rationale: Optional[int] = None,
 
         # ---- Ablations / toggles ----
         use_lexical: bool = True,
@@ -88,6 +97,8 @@ class SemanticScorer(IModel):
         llm_summary_batch_size: Optional[int] = 8,
         llm_decision_batch_size: Optional[int] = 8,
         llm_rationale_batch_size: Optional[int] = 8,
+        hosted_decision_labels: Optional[List[str]] = None,
+        hosted_decision_logit_bias: float = 20.0,
         force_llm_summaries: bool = False,
 
         # ---- Explanations / review band ----
@@ -110,6 +121,9 @@ class SemanticScorer(IModel):
         max_cached_contexts: Optional[int] = None,
         max_cached_summaries: Optional[int] = None,
         max_cached_rationales: Optional[int] = None,
+        llm_profiles: Optional[Dict[str, Any]] = None,
+        llm_routing: Optional[Dict[str, Any]] = None,
+        request_seed: Optional[int] = None,
 
         **kwargs,
     ):
@@ -132,9 +146,21 @@ class SemanticScorer(IModel):
         self.max_total_tokens_llm_decision = max_total_tokens_llm_decision
         self.max_total_tokens_llm_rationale = max_total_tokens_llm_rationale
         self.max_new_tokens_llm = max_new_tokens_llm
+        self.max_new_tokens_llm_rationale = (
+            int(max_new_tokens_llm_rationale)
+            if max_new_tokens_llm_rationale is not None
+            else int(max_new_tokens_llm)
+        )
         self.llm_summary_batch_size = llm_summary_batch_size
         self.llm_decision_batch_size = llm_decision_batch_size
         self.llm_rationale_batch_size = llm_rationale_batch_size
+        raw_hosted_labels = list(hosted_decision_labels or ["A", "B"])
+        if len(raw_hosted_labels) != 2 or any(not str(label).strip() for label in raw_hosted_labels):
+            raise ValueError("hosted_decision_labels must contain exactly two non-empty labels.")
+        self.hosted_decision_labels = (str(raw_hosted_labels[0]).strip(), str(raw_hosted_labels[1]).strip())
+        if self.hosted_decision_labels[0] == self.hosted_decision_labels[1]:
+            raise ValueError("hosted_decision_labels must contain two distinct labels.")
+        self.hosted_decision_logit_bias = float(hosted_decision_logit_bias)
 
         self.use_lexical = use_lexical
         self.use_context = use_context
@@ -171,6 +197,7 @@ class SemanticScorer(IModel):
         self.max_cached_contexts = max_cached_contexts
         self.max_cached_summaries = max_cached_summaries
         self.max_cached_rationales = max_cached_rationales
+        self.request_seed = int(request_seed) if request_seed is not None else None
         self._lex_cache: "OrderedDict[str, torch.Tensor]" = OrderedDict()
         self._ctx_cache: "OrderedDict[str, torch.Tensor]" = OrderedDict()
         self._summary_cache: "OrderedDict[str, str]" = OrderedDict()
@@ -187,11 +214,32 @@ class SemanticScorer(IModel):
         self._calibration_pending_labels: List[float] = []
         self._llm_calibration_fitted_once = False
         self.reset_summary_stats()
+        self.reset_decision_stats()
 
         # store model names (for explanations)
         self.lexical_model_name = lexical_model_name
         self.context_model_name = context_model_name
         self.llm_model_name = llm_model_name
+        self._llm_router = LLMRouter(llm_profiles=llm_profiles, llm_routing=llm_routing, log=self.log)
+        self._local_llm_profile_name = "__semantic_local_llm__"
+        self._llm_router.ensure_profile(
+            self._local_llm_profile_name,
+            {"backend": "local_hf", "model": self.llm_model_name},
+        )
+        if self._llm_router.routing.default_profile is None:
+            self._llm_router.routing.default_profile = self._local_llm_profile_name
+        if self._llm_router.routing.fallback_profile is None:
+            self._llm_router.routing.fallback_profile = self._local_llm_profile_name
+        if self._llm_router.routing.decision_fallback_profile is None:
+            self._llm_router.routing.decision_fallback_profile = self._local_llm_profile_name
+        self.llm_tok = None
+        self.llm = None
+        self.yes_token_ids: List[int] = []
+        self.no_token_ids: List[int] = []
+        self._last_summary_backend_meta: Dict[str, Any] = {}
+        self._last_decision_backend_meta: Dict[str, Any] = {}
+        self._last_rationale_backend_meta: Dict[str, Any] = {}
+        self._hosted_decision_tokenizers: Dict[str, Any] = {}
         self._cache_fingerprint = self._build_cache_fingerprint()
 
         # ---- Load models ----
@@ -206,21 +254,29 @@ class SemanticScorer(IModel):
             self.ctx_model = AutoModel.from_pretrained(context_model_name).to(self.device)
 
         if self.use_llm:
-            self.log("Loading LLM...", "info")
-            self.llm_tok = AutoTokenizer.from_pretrained(llm_model_name)
-            self.llm = AutoModelForCausalLM.from_pretrained(
-                llm_model_name,
-                torch_dtype=torch.float16 if self.fp16 else torch.float32
-            ).to(self.device)
             self.llm_temperature = llm_temperature
             self.llm_top_p = llm_top_p
             self.llm_do_sample = llm_do_sample
-            self.yes_token_ids = self._candidate_token_ids([" Yes", "Yes", "yes"])
-            self.no_token_ids = self._candidate_token_ids([" No", "No", "no"])
 
         if self.persist_cache_to_disk:
             self._load_cache_from_disk()
         self.reset_llm_calibration_tracking()
+
+    def _ensure_local_llm(self) -> None:
+        if not self.use_llm:
+            return
+        if self.llm is not None and self.llm_tok is not None:
+            return
+        if not self.llm_model_name:
+            raise ValueError("Local LLM fallback requested but llm_model_name is not configured.")
+        self.log("Loading local LLM fallback...", "info")
+        self.llm_tok = AutoTokenizer.from_pretrained(self.llm_model_name)
+        self.llm = AutoModelForCausalLM.from_pretrained(
+            self.llm_model_name,
+            torch_dtype=torch.float16 if self.fp16 else torch.float32
+        ).to(self.device)
+        self.yes_token_ids = self._candidate_token_ids([" Yes", "Yes", "yes"])
+        self.no_token_ids = self._candidate_token_ids([" No", "No", "no"])
 
     def _log_once(self, key: str, message: str, level: str = "info") -> None:
         """
@@ -274,6 +330,7 @@ class SemanticScorer(IModel):
         return score, pair
 
     def _candidate_token_ids(self, variants: List[str]) -> List[int]:
+        self._ensure_local_llm()
         ids = []
         for v in variants:
             tok = self.llm_tok(v, add_special_tokens=False).input_ids
@@ -294,11 +351,17 @@ class SemanticScorer(IModel):
             "lexical_model": self.lexical_model_name if self.use_lexical else None,
             "context_model": self.context_model_name if self.use_context else None,
             "llm_model": self.llm_model_name if self.use_llm else None,
+            "llm_router": self._llm_router.fingerprint_payload() if self.use_llm else None,
             "max_input_tokens_lexical": self.max_input_tokens_lexical,
             "max_input_tokens_context": self.max_input_tokens_context,
             "max_total_tokens_llm_summary": self.max_total_tokens_llm_summary,
             "max_total_tokens_llm_decision": self.max_total_tokens_llm_decision,
             "max_total_tokens_llm_rationale": self.max_total_tokens_llm_rationale,
+            "max_new_tokens_llm": self.max_new_tokens_llm,
+            "max_new_tokens_llm_rationale": self.max_new_tokens_llm_rationale,
+            "hosted_decision_labels": list(self.hosted_decision_labels),
+            "hosted_decision_logit_bias": self.hosted_decision_logit_bias,
+            "request_seed": self.request_seed,
             "pooling_method": self.pooling_method.value,
             "label_pair_pooling": self.label_pair_pooling.value,
             "ctx_sentence_delimiter": self.ctx_sentence_delimiter,
@@ -312,6 +375,9 @@ class SemanticScorer(IModel):
         }
         blob = json.dumps(payload, sort_keys=True, default=str)
         return hashlib.sha1(blob.encode("utf-8")).hexdigest()
+
+    def runtime_fingerprint(self) -> str:
+        return self._cache_fingerprint
 
     def _model_hidden_size(self, model: nn.Module) -> int:
         cfg = getattr(model, "config", None)
@@ -531,11 +597,12 @@ class SemanticScorer(IModel):
     # -------------------------------------------------------------------------
     def _summary_prompt(self, label: str, ctx: str) -> Dict[str, str]:
         return {
-            "system": "You are an ontology expert entity summariser.",
+            "system": "You are an ontology expert entity summariser that returns strict JSON.",
             "user": (
                 f"Given the following context subgraph describing the entity '{label}', "
-                "provide a concise and informative summary capturing its key characteristics.\n\n"
-                f"Context: {ctx}\nSummary:"
+                "provide one concise and informative summary capturing its key characteristics.\n\n"
+                f"Context: {ctx}\n\n"
+                "Return exactly one JSON object with one key: \"summary\"."
             ),
         }
 
@@ -562,18 +629,20 @@ class SemanticScorer(IModel):
         return {
             "system": "You are an ontology alignment expert.",
             "user": (
-                "Based only on the information below, write one or two sentences explaining "
+                "Based only on the information below, write two to four sentences explaining "
                 "why the two entities should or should not be considered equivalent.\n"
                 "Reference specific evidence from the label pair and the summaries. "
-                "Do not introduce external knowledge.\n\n"
+                "Do not introduce external knowledge. Return exactly one JSON object with one key: "
+                "\"rationale\".\n\n"
                 f"Source\nLabel: {src_label}\nSummary: {src_summary}\n\n"
                 f"Target\nLabel: {tgt_label}\nSummary: {tgt_summary}\n\n"
-                f"Model decision: {decision}\n\n"
-                "Rationale:"
+                f"Final decision: {decision}\n\n"
+                "Return only JSON."
             ),
         }
 
     def _render_llm_prompt(self, prompt: Dict[str, str], add_generation_prompt: bool = True) -> str:
+        self._ensure_local_llm()
         system = prompt.get("system", "").strip()
         user = prompt.get("user", "").strip()
         tok = self.llm_tok
@@ -604,6 +673,17 @@ class SemanticScorer(IModel):
 
     def reset_summary_stats(self) -> None:
         self._summary_stats = {"requested": 0, "usable": 0, "empty": 0}
+
+    def reset_decision_stats(self) -> None:
+        self._decision_stats = {
+            "requested": 0,
+            "hosted_attempted": 0,
+            "hosted_scored": 0,
+            "probe_failures": 0,
+            "scoring_failures": 0,
+            "local_fallbacks": 0,
+        }
+        self._decision_probe_cache: Dict[str, Dict[str, Any]] = {}
 
     def _record_summary_stats(self, summaries: Iterable[Optional[str]]) -> None:
         if not self.use_llm:
@@ -640,11 +720,42 @@ class SemanticScorer(IModel):
         stats["usable_fraction"] = (float(usable) / total) if total else 0.0
         return stats
 
+    def _record_decision_stat(self, key: str, amount: int = 1) -> None:
+        stats = getattr(self, "_decision_stats", None)
+        if stats is None:
+            self.reset_decision_stats()
+            stats = self._decision_stats
+        stats[key] = int(stats.get(key, 0) or 0) + int(amount)
+
+    def llm_decision_stats(self) -> Dict[str, Any]:
+        stats = dict(getattr(self, "_decision_stats", {}))
+        for key in [
+            "requested",
+            "hosted_attempted",
+            "hosted_scored",
+            "probe_failures",
+            "scoring_failures",
+            "local_fallbacks",
+        ]:
+            stats[key] = int(stats.get(key, 0) or 0)
+        requested = stats["requested"]
+        hosted_attempted = stats["hosted_attempted"]
+        hosted_scored = stats["hosted_scored"]
+        stats["hosted_success_fraction"] = (
+            float(hosted_scored) / hosted_attempted if hosted_attempted else 0.0
+        )
+        stats["fallback_fraction"] = (
+            float(stats["local_fallbacks"]) / requested if requested else 0.0
+        )
+        return stats
+
     @staticmethod
     def _clean_summary_text(text: Optional[str]) -> str:
         if not isinstance(text, str):
             text = "" if text is None else str(text)
         txt = text.strip()
+        txt = re.sub(r"^\s*```(?:json)?\s*", "", txt, flags=re.IGNORECASE)
+        txt = re.sub(r"\s*```\s*$", "", txt).strip()
         if not txt:
             return ""
         if "Summary:" in txt:
@@ -652,26 +763,321 @@ class SemanticScorer(IModel):
         lines = [ln.strip() for ln in txt.splitlines() if ln.strip()]
         if not lines:
             return ""
-        line = lines[0]
+        if lines[0].lower() in {"json", "```json", "```"}:
+            lines = lines[1:]
+        if not lines:
+            return ""
+        line = " ".join(lines)
         prefix_pattern = re.compile(r"^(assistant|assistant:|assistant,|summary:)", re.IGNORECASE)
         line = prefix_pattern.sub("", line).strip(" :,-\t")
-        sentence_parts = re.split(r"(?<=[.!?])\s+", line)
-        cleaned = sentence_parts[0].strip()
-        return cleaned or line
+        if not line:
+            return ""
+        sentence_match = re.search(r"^(.+?[.!?](?:['\")\]]|$))", line)
+        if sentence_match:
+            return sentence_match.group(1).strip()
+        return line
 
     @staticmethod
     def _clean_rationale_text(text: str) -> str:
         txt = text.strip()
+        txt = re.sub(r"^\s*```(?:json)?\s*", "", txt, flags=re.IGNORECASE)
+        txt = re.sub(r"\s*```\s*$", "", txt).strip()
         if not txt:
             return ""
         prefix_pattern = re.compile(r"^(assistant|rationale:|assistant:)", re.IGNORECASE)
         txt = prefix_pattern.sub("", txt).strip()
         lines = [ln.strip() for ln in txt.splitlines() if ln.strip()]
+        if lines and lines[0].lower() in {"json", "```json", "```"}:
+            lines = lines[1:]
         if lines:
             txt = " ".join(lines)
-        sentences = re.split(r"(?<=[.!?])\s+", txt)
-        trimmed = " ".join(sentences[:2]).strip()
-        return trimmed or txt
+        if not txt:
+            return ""
+        sentence_pattern = re.compile(r".+?[.!?](?=(?:['\")\]]|\s|$))")
+        complete_sentences = [match.group(0).strip() for match in sentence_pattern.finditer(txt)]
+        if complete_sentences:
+            return " ".join(complete_sentences[:4]).strip()
+        return txt
+
+    @staticmethod
+    def _parse_structured_text(text: str, key: str, cleaner) -> str:
+        try:
+            return cleaner(parse_structured_json(text, key))
+        except Exception:
+            return cleaner(text)
+
+    @staticmethod
+    def _safe_logsumexp(log_values: List[float]) -> Optional[float]:
+        if not log_values:
+            return None
+        vals = torch.tensor(log_values, dtype=torch.float64)
+        return float(torch.logsumexp(vals, dim=0).item())
+
+    def _resolved_backend_metadata(self, resolved) -> Dict[str, Any]:
+        return {
+            "backend": resolved.backend,
+            "profile": resolved.profile_name,
+            "model": resolved.model,
+            "decision_capable": bool(resolved.decision_capable),
+            "fallback_triggered": bool(resolved.fallback_triggered),
+            "fallback_reason": resolved.fallback_reason,
+            "endpoint": None,
+            "provider": None,
+            "decision_probe_passed": None,
+            "decision_probe_error": None,
+            "decision_scoring_mode": None,
+        }
+
+    @staticmethod
+    def _truncate_debug_text(text: Any, limit: int = 800) -> str:
+        value = str(text or "")
+        if len(value) <= limit:
+            return value
+        return value[:limit] + "...<truncated>"
+
+    @staticmethod
+    def _format_first_token_logprobs(pairs: List[Tuple[str, float]], limit: int = 10) -> str:
+        if not pairs:
+            return "<empty>"
+        formatted = [f"{token!r}:{float(lp):.4f}" for token, lp in pairs[:limit]]
+        suffix = "" if len(pairs) <= limit else ", ..."
+        return ", ".join(formatted) + suffix
+
+    @staticmethod
+    def _logsumexp(values: List[float]) -> float:
+        return float(torch.logsumexp(torch.tensor(values, dtype=torch.float64), dim=0).item())
+
+    @staticmethod
+    def _candidate_token_ids_for_tokenizer(tokenizer, variants: List[str]) -> List[int]:
+        ids: List[int] = []
+        for variant in variants:
+            token_ids = tokenizer(variant, add_special_tokens=False).input_ids
+            if len(token_ids) == 1:
+                ids.append(int(token_ids[0]))
+        return sorted(set(ids))
+
+    def _run_hosted_chat_prompts(
+        self,
+        prompts: List[Dict[str, str]],
+        profile,
+        max_tokens: int,
+        temperature: Optional[float],
+        top_p: Optional[float],
+        concurrency: Optional[int],
+    ) -> List[str]:
+        if not prompts:
+            return []
+        workers = concurrency or len(prompts)
+        workers = max(1, min(int(workers), len(prompts)))
+
+        def _call(prompt: Dict[str, str]) -> str:
+            payload = self._llm_router.hosted.chat_completion(
+                profile=profile,
+                messages=[
+                    {"role": "system", "content": prompt["system"]},
+                    {"role": "user", "content": prompt["user"]},
+                ],
+                max_tokens=max_tokens,
+                temperature=temperature,
+                top_p=top_p,
+                seed=self.request_seed,
+            )
+            return extract_chat_text(payload)
+
+        if workers == 1:
+            return [_call(prompt) for prompt in prompts]
+        with ThreadPoolExecutor(max_workers=workers) as executor:
+            return list(executor.map(_call, prompts))
+
+    def _get_hosted_decision_tokenizer(self, profile):
+        tokenizer_name = getattr(profile, "tokenizer", None)
+        if not tokenizer_name:
+            raise ValueError(
+                f"OpenRouter decision profile '{profile.name}' must define a tokenizer for hosted decision biasing."
+            )
+        cached = self._hosted_decision_tokenizers.get(tokenizer_name)
+        if cached is not None:
+            return cached
+        self._log_once(
+            f"hosted_decision_tokenizer_load:{tokenizer_name}",
+            f"Loading hosted decision tokenizer '{tokenizer_name}' for profile '{profile.name}'.",
+            "debug",
+        )
+        tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
+        self._hosted_decision_tokenizers[tokenizer_name] = tokenizer
+        return tokenizer
+
+    def _hosted_decision_label_ids(self, profile) -> Dict[str, List[int]]:
+        tokenizer = self._get_hosted_decision_tokenizer(profile)
+        label_ids: Dict[str, List[int]] = {}
+        for label in self.hosted_decision_labels:
+            ids = self._candidate_token_ids_for_tokenizer(tokenizer, [label, f" {label}"])
+            if not ids:
+                raise ValueError(
+                    f"Hosted decision label '{label}' is not a single-token option for tokenizer '{profile.tokenizer}'."
+                )
+            label_ids[label] = ids
+        return label_ids
+
+    def _hosted_decision_logit_bias(self, profile) -> Tuple[Dict[str, float], Dict[str, List[int]]]:
+        label_ids = self._hosted_decision_label_ids(profile)
+        logit_bias: Dict[str, float] = {}
+        for ids in label_ids.values():
+            for token_id in ids:
+                logit_bias[str(token_id)] = self.hosted_decision_logit_bias
+        return logit_bias, label_ids
+
+    def _hosted_decision_prompt(
+        self,
+        src_label: str,
+        tgt_label: str,
+        src_summary: str,
+        tgt_summary: str,
+    ) -> Dict[str, str]:
+        positive_label, negative_label = self.hosted_decision_labels
+        return {
+            "system": "You are a binary classifier for ontology alignment.",
+            "user": (
+                f"Return exactly one token: {positive_label} or {negative_label}.\n"
+                f"{positive_label} = the source and target entities are equivalent.\n"
+                f"{negative_label} = the source and target entities are not equivalent.\n\n"
+                f"Source entity: {src_label}\nSummary: {src_summary}\n\n"
+                f"Target entity: {tgt_label}\nSummary: {tgt_summary}"
+            ),
+        }
+
+    def _extract_hosted_decision_label_scores(self, payload: Dict[str, Any]) -> Dict[str, float]:
+        top_pairs = extract_first_token_top_logprobs(payload)
+        grouped: Dict[str, List[float]] = {label: [] for label in self.hosted_decision_labels}
+        for token, logprob in top_pairs:
+            normalized = token.strip()
+            for label in self.hosted_decision_labels:
+                if normalized == label:
+                    grouped[label].append(float(logprob))
+        missing = [label for label, values in grouped.items() if not values]
+        if missing:
+            missing_text = ", ".join(missing)
+            raise ValueError(
+                f"OpenRouter chat response lacked usable decision-label logprobs for: {missing_text}."
+            )
+        return {label: self._logsumexp(values) for label, values in grouped.items()}
+
+    def _record_hosted_decision_chat_debug(
+        self,
+        profile_name: str,
+        payload: Dict[str, Any],
+        error_message: str,
+    ) -> None:
+        top_pairs = extract_first_token_top_logprobs(payload)
+        self._last_decision_backend_meta["debug"] = {
+            "error": error_message,
+            "scoring_mode": "chat_logprobs_binary_head",
+            "provider": payload.get("provider"),
+            "top_logprobs": top_pairs,
+            "raw_payload_excerpt": self._truncate_debug_text(
+                json.dumps(payload, ensure_ascii=True, sort_keys=True),
+                limit=1500,
+            ),
+        }
+        self._log_once(
+            "hosted_decision_chat_debug_warning",
+            (
+                f"Hosted decision debug for profile '{profile_name}': {error_message} "
+                f"provider={payload.get('provider')!r} "
+                f"first_token_top_logprobs=[{self._format_first_token_logprobs(top_pairs)}]"
+            ),
+            "warning",
+        )
+        self._log_once(
+            "hosted_decision_chat_debug_payload",
+            (
+                "Hosted decision raw payload excerpt: "
+                f"{self._truncate_debug_text(json.dumps(payload, ensure_ascii=True, sort_keys=True), limit=1500)}"
+            ),
+            "debug",
+        )
+
+    def _probe_hosted_decision_profile(self, profile) -> Dict[str, Any]:
+        cached = self._decision_probe_cache.get(profile.name)
+        if cached is not None:
+            return cached
+        positive_label, negative_label = self.hosted_decision_labels
+        result = {
+            "passed": False,
+            "provider": None,
+            "error": None,
+            "debug": None,
+        }
+        payload = None
+        try:
+            logit_bias, label_ids = self._hosted_decision_logit_bias(profile)
+            prompt = {
+                "system": "You are a binary classifier.",
+                "user": (
+                    f"Return exactly one token: {positive_label} or {negative_label}.\n"
+                    f"{positive_label} = positive\n"
+                    f"{negative_label} = negative"
+                ),
+            }
+            payload = self._llm_router.hosted.chat_completion(
+                profile=profile,
+                messages=[
+                    {"role": "system", "content": prompt["system"]},
+                    {"role": "user", "content": prompt["user"]},
+                ],
+                max_tokens=1,
+                temperature=0.0,
+                top_p=1.0,
+                logprobs=True,
+                top_logprobs=20,
+                logit_bias=logit_bias,
+                provider={"require_parameters": True},
+                seed=self.request_seed,
+            )
+            self._extract_hosted_decision_label_scores(payload)
+            result["passed"] = True
+            result["provider"] = payload.get("provider")
+            result["label_ids"] = label_ids
+        except (RuntimeError, ValueError, KeyError, OSError, urlerror.URLError) as exc:
+            result["error"] = str(exc)
+            if payload is not None:
+                result["debug"] = {
+                    "provider": payload.get("provider"),
+                    "top_logprobs": extract_first_token_top_logprobs(payload),
+                    "raw_payload_excerpt": self._truncate_debug_text(
+                        json.dumps(payload, ensure_ascii=True, sort_keys=True),
+                        limit=1500,
+                    ),
+                }
+            self._record_decision_stat("probe_failures")
+            self._log_once(
+                f"hosted_decision_probe_failed:{profile.name}",
+                (
+                f"OpenRouter decision chat-logprob probe failed for profile '{profile.name}'. "
+                    f"Falling back to local decision scoring. Error: {exc}"
+                ),
+                "warning",
+            )
+            if result["debug"] is not None:
+                self._log_once(
+                    f"hosted_decision_probe_failed_debug:{profile.name}",
+                    (
+                        f"Hosted decision probe debug for profile '{profile.name}': "
+                        f"provider={result['debug'].get('provider')!r}, "
+                        f"top_logprobs=[{self._format_first_token_logprobs(result['debug'].get('top_logprobs') or [])}]"
+                    ),
+                    "warning",
+                )
+                self._log_once(
+                    f"hosted_decision_probe_failed_payload:{profile.name}",
+                    (
+                        "Hosted decision probe raw payload excerpt: "
+                        f"{result['debug'].get('raw_payload_excerpt')}"
+                    ),
+                    "debug",
+                )
+        self._decision_probe_cache[profile.name] = result
+        return result
 
     def reset_llm_calibration_tracking(self) -> None:
         self._computed_llm_calibration = None
@@ -793,6 +1199,8 @@ class SemanticScorer(IModel):
             return ["" for _ in labels]
         if not labels:
             return []
+        summary_backend = self._llm_router.resolve_task("summary")
+        self._last_summary_backend_meta = self._resolved_backend_metadata(summary_backend)
         outputs = [""] * len(labels)
         pending: Dict[str, Dict[str, Any]] = {}
         for idx, (label, ctx) in enumerate(zip(labels, contexts)):
@@ -808,9 +1216,25 @@ class SemanticScorer(IModel):
             pending_keys = list(pending.keys())
             labs = [pending[k]["label"] for k in pending_keys]
             ctxs = [pending[k]["context"] for k in pending_keys]
-            generated = self._generate_summaries_uncached(labs, ctxs)
+            if summary_backend.backend == "openrouter":
+                self._log_once(
+                    "hosted_summary_stage_start",
+                    (
+                        "Hosted summary stage: "
+                        f"{len(labels)} requested, {len(pending_keys)} uncached unique prompts, "
+                        f"concurrency={self.llm_summary_batch_size or len(pending_keys)}."
+                    ),
+                    "debug",
+                )
+            generated = self._generate_summaries_uncached(labs, ctxs, summary_backend)
+            if summary_backend.backend == "openrouter":
+                self._log_once(
+                    "hosted_summary_stage_done",
+                    f"Hosted summary stage completed for {len(pending_keys)} uncached prompts.",
+                    "debug",
+                )
             for key, summary in zip(pending_keys, generated):
-                clean = self._clean_summary_text(summary)
+                clean = self._parse_structured_text(summary, "summary", self._clean_summary_text)
                 self._cache_store(self._summary_cache, key, clean, self.max_cached_summaries)
                 for idx in pending[key]["indices"]:
                     outputs[idx] = clean
@@ -818,9 +1242,23 @@ class SemanticScorer(IModel):
         self._record_summary_stats(outputs)
         return outputs
 
-    def _generate_summaries_uncached(self, labels: List[str], contexts: List[str]) -> List[str]:
+    def _generate_summaries_uncached(self, labels: List[str], contexts: List[str], resolved_backend) -> List[str]:
         if not labels:
             return []
+        if resolved_backend.backend == "openrouter":
+            profile = self._llm_router.profiles.get(resolved_backend.profile_name or "")
+            if profile is None:
+                raise RuntimeError("OpenRouter summary profile was resolved but not found.")
+            prompts = [self._summary_prompt(label, ctx) for label, ctx in zip(labels, contexts)]
+            return self._run_hosted_chat_prompts(
+                prompts=prompts,
+                profile=profile,
+                max_tokens=self.max_new_tokens_llm,
+                temperature=self.llm_temperature,
+                top_p=self.llm_top_p,
+                concurrency=self.llm_summary_batch_size,
+            )
+        self._ensure_local_llm()
         prompts = [self._render_llm_prompt(self._summary_prompt(l, c)) for l, c in zip(labels, contexts)]
         outputs = [""] * len(prompts)
         chunk = self.llm_summary_batch_size or len(prompts)
@@ -862,6 +1300,8 @@ class SemanticScorer(IModel):
             return ["" for _ in src_labels]
         if not src_labels:
             return []
+        rationale_backend = self._llm_router.resolve_task("rationale")
+        self._last_rationale_backend_meta = self._resolved_backend_metadata(rationale_backend)
         outputs = [""] * len(src_labels)
         pending: Dict[str, Dict[str, Any]] = {}
         for idx, (s_lab, t_lab, s_sum, t_sum, decision) in enumerate(
@@ -888,36 +1328,64 @@ class SemanticScorer(IModel):
         if pending:
             pending_keys = list(pending.keys())
             prompts = [
-                self._render_llm_prompt(
-                    self._rationale_prompt(
-                        pending[key]["src_label"],
-                        pending[key]["tgt_label"],
-                        pending[key]["src_summary"],
-                        pending[key]["tgt_summary"],
-                        pending[key]["decision"],
-                    )
+                self._rationale_prompt(
+                    pending[key]["src_label"],
+                    pending[key]["tgt_label"],
+                    pending[key]["src_summary"],
+                    pending[key]["tgt_summary"],
+                    pending[key]["decision"],
                 )
                 for key in pending_keys
             ]
-            generated = self._generate_rationales_uncached(prompts)
+            if rationale_backend.backend == "openrouter":
+                self._log_once(
+                    "hosted_rationale_stage_start",
+                    (
+                        "Hosted rationale stage: "
+                        f"{len(src_labels)} requested, {len(pending_keys)} uncached unique prompts, "
+                        f"concurrency={self.llm_rationale_batch_size or len(pending_keys)}."
+                    ),
+                    "debug",
+                )
+            generated = self._generate_rationales_uncached(prompts, rationale_backend)
+            if rationale_backend.backend == "openrouter":
+                self._log_once(
+                    "hosted_rationale_stage_done",
+                    f"Hosted rationale stage completed for {len(pending_keys)} uncached prompts.",
+                    "debug",
+                )
             for key, rationale in zip(pending_keys, generated):
-                clean = self._clean_rationale_text(rationale)
+                clean = self._parse_structured_text(rationale, "rationale", self._clean_rationale_text)
                 self._cache_store(self._rationale_cache, key, clean, self.max_cached_rationales)
                 for idx in pending[key]["indices"]:
                     outputs[idx] = clean
 
         return outputs
 
-    def _generate_rationales_uncached(self, prompts: List[str]) -> List[str]:
+    def _generate_rationales_uncached(self, prompts: List[Dict[str, str]], resolved_backend) -> List[str]:
         if not prompts:
             return []
-        outputs = [""] * len(prompts)
-        chunk = self.llm_rationale_batch_size or len(prompts)
-        chunk = chunk if chunk > 0 else len(prompts)
-        for start in range(0, len(prompts), chunk):
-            end = min(start + chunk, len(prompts))
+        if resolved_backend.backend == "openrouter":
+            profile = self._llm_router.profiles.get(resolved_backend.profile_name or "")
+            if profile is None:
+                raise RuntimeError("OpenRouter rationale profile was resolved but not found.")
+            return self._run_hosted_chat_prompts(
+                prompts=prompts,
+                profile=profile,
+                max_tokens=self.max_new_tokens_llm_rationale,
+                temperature=self.llm_temperature,
+                top_p=self.llm_top_p,
+                concurrency=self.llm_rationale_batch_size,
+            )
+        self._ensure_local_llm()
+        rendered = [self._render_llm_prompt(prompt) for prompt in prompts]
+        outputs = [""] * len(rendered)
+        chunk = self.llm_rationale_batch_size or len(rendered)
+        chunk = chunk if chunk > 0 else len(rendered)
+        for start in range(0, len(rendered), chunk):
+            end = min(start + chunk, len(rendered))
             enc = self.llm_tok(
-                prompts[start:end],
+                rendered[start:end],
                 padding=True,
                 return_tensors="pt",
                 truncation=True,
@@ -926,7 +1394,7 @@ class SemanticScorer(IModel):
             with torch.amp.autocast(device_type=self.device_type, enabled=self.fp16):
                 out = self.llm.generate(
                     **enc,
-                    max_new_tokens=self.max_new_tokens_llm,
+                    max_new_tokens=self.max_new_tokens_llm_rationale,
                     temperature=self.llm_temperature,
                     top_p=self.llm_top_p,
                     do_sample=self.llm_do_sample,
@@ -950,6 +1418,139 @@ class SemanticScorer(IModel):
             return torch.zeros(len(src_labels), device=self.device)
         if not src_labels:
             return torch.zeros(0, device=self.device)
+        self._record_decision_stat("requested", len(src_labels))
+        decision_backend = self._llm_router.resolve_task("decision", require_logprobs=True)
+        self._last_decision_backend_meta = self._resolved_backend_metadata(decision_backend)
+        self._last_decision_backend_meta["decision_scoring_mode"] = "chat_logprobs_binary_head"
+        if decision_backend.backend == "openrouter":
+            profile = self._llm_router.profiles.get(decision_backend.profile_name or "")
+            if profile is not None:
+                self._last_decision_backend_meta["endpoint"] = "chat/completions"
+                self._log_once(
+                    "hosted_decision_probe_start",
+                    (
+                        "Hosted decision probe: checking chat-logprob binary-head support "
+                        f"for profile '{profile.name}'."
+                    ),
+                    "debug",
+                )
+                probe = self._probe_hosted_decision_profile(profile)
+                self._last_decision_backend_meta["decision_probe_passed"] = bool(probe.get("passed"))
+                self._last_decision_backend_meta["decision_probe_error"] = probe.get("error")
+                if probe.get("provider"):
+                    self._last_decision_backend_meta["provider"] = probe.get("provider")
+                if probe.get("passed"):
+                    self._log_once(
+                        "hosted_decision_probe_passed",
+                        (
+                            f"Hosted decision probe passed for profile '{profile.name}'"
+                            + (
+                                f" via provider '{probe.get('provider')}'."
+                                if probe.get("provider") else "."
+                            )
+                        ),
+                        "debug",
+                    )
+                if not probe.get("passed"):
+                    self._last_decision_backend_meta["fallback_triggered"] = True
+                    self._last_decision_backend_meta["fallback_reason"] = "decision_probe_failed"
+                    self._last_decision_backend_meta["fallback_error"] = probe.get("error")
+                    self._last_decision_backend_meta["backend"] = "local_hf"
+                    self._last_decision_backend_meta["model"] = self.llm_model_name
+                    self._record_decision_stat("local_fallbacks", len(src_labels))
+                else:
+                    self._record_decision_stat("hosted_attempted", len(src_labels))
+                    try:
+                        logit_bias, label_ids = self._hosted_decision_logit_bias(profile)
+                        self._last_decision_backend_meta["label_ids"] = label_ids
+                        outputs: List[float] = []
+                        last_provider = self._last_decision_backend_meta.get("provider")
+                        workers = self.llm_decision_batch_size or len(src_labels)
+                        workers = max(1, min(int(workers), len(src_labels)))
+                        self._log_once(
+                            "hosted_decision_stage_start",
+                            (
+                                "Hosted decision stage: "
+                                f"{len(src_labels)} pairs, concurrency={workers}, "
+                                f"labels={self.hosted_decision_labels[0]}/{self.hosted_decision_labels[1]}, "
+                                f"logit_bias={self.hosted_decision_logit_bias:.2f}."
+                            ),
+                            "debug",
+                        )
+                        prompts = [
+                            self._hosted_decision_prompt(s_lab, t_lab, s_sum, t_sum)
+                            for s_lab, t_lab, s_sum, t_sum in zip(
+                                src_labels, tgt_labels, src_summaries, tgt_summaries
+                            )
+                        ]
+                        if prompts:
+                            self._log_once(
+                                "hosted_decision_first_chunk_start",
+                                (
+                                    "Hosted decision first concurrent wave started: "
+                                    f"{min(workers, len(prompts))} in-flight requests."
+                                ),
+                                "debug",
+                            )
+
+                        def _score_prompt(prompt: Dict[str, str]) -> Dict[str, Any]:
+                            return self._llm_router.hosted.chat_completion(
+                                profile=profile,
+                                messages=[
+                                    {"role": "system", "content": prompt["system"]},
+                                    {"role": "user", "content": prompt["user"]},
+                                ],
+                                max_tokens=1,
+                                temperature=0.0,
+                                top_p=1.0,
+                                logprobs=True,
+                                top_logprobs=20,
+                                logit_bias=logit_bias,
+                                provider={"require_parameters": True},
+                                seed=self.request_seed,
+                            )
+
+                        if workers == 1:
+                            payloads = [_score_prompt(prompt) for prompt in prompts]
+                        else:
+                            with ThreadPoolExecutor(max_workers=workers) as executor:
+                                payloads = list(executor.map(_score_prompt, prompts))
+                        if prompts:
+                            self._log_once(
+                                "hosted_decision_first_chunk_done",
+                                "Hosted decision first concurrent wave completed successfully.",
+                                "debug",
+                            )
+                        positive_label, negative_label = self.hosted_decision_labels
+                        for payload in payloads:
+                            label_scores = self._extract_hosted_decision_label_scores(payload)
+                            if payload.get("provider"):
+                                if last_provider is None:
+                                    last_provider = payload.get("provider")
+                                elif last_provider != payload.get("provider"):
+                                    last_provider = "mixed"
+                            stacked = torch.tensor(
+                                [label_scores[positive_label], label_scores[negative_label]],
+                                dtype=torch.float64,
+                            )
+                            outputs.append(float(torch.softmax(stacked, dim=-1)[0].item()))
+                        self._record_decision_stat("hosted_scored", len(outputs))
+                        self._last_decision_backend_meta["provider"] = last_provider
+                        return torch.tensor(outputs, dtype=torch.float32, device=self.device)
+                    except (RuntimeError, ValueError, KeyError, OSError, urlerror.URLError) as exc:
+                        self.log(f"Hosted decision backend failed; falling back to local LLM. Error: {exc}", "warning")
+                        if 'payloads' in locals() and payloads:
+                            self._record_hosted_decision_chat_debug(profile.name, payloads[0], str(exc))
+                        self._last_decision_backend_meta["fallback_triggered"] = True
+                        self._last_decision_backend_meta["fallback_reason"] = "decision_scoring_failed"
+                        self._last_decision_backend_meta["fallback_error"] = str(exc)
+                        self._last_decision_backend_meta["backend"] = "local_hf"
+                        self._last_decision_backend_meta["model"] = self.llm_model_name
+                        self._record_decision_stat("scoring_failures", len(src_labels))
+                        self._record_decision_stat("local_fallbacks", len(src_labels))
+        elif decision_backend.fallback_triggered:
+            self._record_decision_stat("local_fallbacks", len(src_labels))
+        self._ensure_local_llm()
         prompts = [
             self._render_llm_prompt(
                 self._decision_prompt(s_lab, t_lab, s_sum, t_sum),
@@ -978,6 +1579,31 @@ class SemanticScorer(IModel):
                 stacked = torch.stack([yes_lp, no_lp], dim=-1)
                 probs[start:end] = torch.softmax(stacked, dim=-1)[:, 0]
         return probs
+
+    def generate_final_rationales_for_records(self, records: List[Dict[str, Any]]) -> List[str]:
+        if not (self.use_llm and self.generate_llm_rationales):
+            return ["" for _ in records]
+        src_labels: List[str] = []
+        tgt_labels: List[str] = []
+        src_summaries: List[str] = []
+        tgt_summaries: List[str] = []
+        decisions: List[str] = []
+        for rec in records:
+            labels = rec.get("selected_labels") or {}
+            summaries = rec.get("llm_summaries") or {}
+            prediction = rec.get("prediction") or {}
+            src_labels.append(str(labels.get("source", "")))
+            tgt_labels.append(str(labels.get("target", "")))
+            src_summaries.append(str(summaries.get("source", "")))
+            tgt_summaries.append(str(summaries.get("target", "")))
+            decisions.append(str(prediction.get("rationale_decision_label", "")))
+        return self.generate_rationales_batched(
+            src_labels=src_labels,
+            tgt_labels=tgt_labels,
+            src_summaries=src_summaries,
+            tgt_summaries=tgt_summaries,
+            decisions=decisions,
+        )
 
     # -------------------------------------------------------------------------
     # Context attribution helper
@@ -1154,6 +1780,16 @@ class SemanticScorer(IModel):
         if self.use_llm:
             decision_idxs = torch.nonzero(need_llm).flatten().tolist()
             summary_idxs = list(range(N)) if self.force_llm_summaries else list(decision_idxs)
+            self._log_once(
+                "first_batch_llm_counts",
+                (
+                    "First batch LLM gating: "
+                    f"batch_size={N}, need_llm={len(decision_idxs)}, "
+                    f"summary_requests={len(summary_idxs)}, "
+                    f"lexical_only={N - len(decision_idxs)}."
+                ),
+                "debug",
+            )
 
         if self.use_llm and summary_idxs:
             log_key = "llm_summaries_forced" if self.force_llm_summaries else "llm_triggered"
@@ -1211,17 +1847,6 @@ class SemanticScorer(IModel):
             for offset, idx in enumerate(decision_idxs):
                 llm_decisions[idx] = decisions_needed[offset]
 
-            if self.generate_llm_rationales:
-                rationales_needed = self.generate_rationales_batched(
-                    src_best,
-                    tgt_best,
-                    src_sum,
-                    tgt_sum,
-                    decisions_needed,
-                )
-                for offset, idx in enumerate(decision_idxs):
-                    llm_rationales[idx] = rationales_needed[offset]
-
             S_final = S_lctx.clone()
             S_final[need_llm] = (1.0 - w_i[need_llm]) * S_lctx[need_llm] + w_i[need_llm] * p_llm[need_llm]
 
@@ -1254,9 +1879,15 @@ class SemanticScorer(IModel):
             "llm_rationales": llm_rationales,
             "llm_calibration": self._llm_calibration_payload(batch_samples=batch_calibration_samples),
             "llm_summary_stats": self.llm_summary_stats(),
+            "llm_decision_stats": self.llm_decision_stats(),
             "llm_summaries": {
                 "source": src_llm_summaries,
                 "target": tgt_llm_summaries,
+            },
+            "backend_usage": {
+                "summary": dict(self._last_summary_backend_meta),
+                "decision": dict(self._last_decision_backend_meta),
+                "rationale": dict(self._last_rationale_backend_meta),
             },
         }
 
@@ -1276,7 +1907,11 @@ class SemanticScorer(IModel):
                     "models": {
                         "lexical_model": self.lexical_model_name if self.use_lexical else None,
                         "context_model": self.context_model_name if self.use_context else None,
-                        "llm_model": self.llm_model_name if self.use_llm else None,
+                        "llm_model": None,
+                        "llm_summary_model": self._last_summary_backend_meta.get("model") if self.use_llm else None,
+                        "llm_decision_model": self._last_decision_backend_meta.get("model") if self.use_llm else None,
+                        "llm_rationale_model": self._last_rationale_backend_meta.get("model") if self.use_llm else None,
+                        "llm_local_fallback_model": self.llm_model_name if self.use_llm else None,
                     },
                     "llm_calibration": self._llm_calibration_payload(batch_samples=0),
                     "confidences": {
@@ -1304,10 +1939,21 @@ class SemanticScorer(IModel):
                     },
                     "prediction": {
                         "global_match": bool(S_final[i] >= self.threshold),
-                        "ground_truth": label[i],
+                        "ground_truth": label[i] if label is not None and i < len(label) else None,
                         "llm_decision": llm_decisions[i],
                         "llm_rationale": llm_rationales[i],
-
+                        "threshold_positive": bool(S_final[i] >= self.threshold),
+                        "saved_alignment_member": False,
+                        "rationale_decision_label": "",
+                    },
+                    "selected_labels": {
+                        "source": best_pairs[i][0],
+                        "target": best_pairs[i][1],
+                    },
+                    "backend_usage": {
+                        "summary": dict(self._last_summary_backend_meta),
+                        "decision": dict(self._last_decision_backend_meta),
+                        "rationale": dict(self._last_rationale_backend_meta),
                     },
                     "context_sentences": {
                         "source": list(src_contexts[i]),

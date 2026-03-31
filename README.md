@@ -15,7 +15,7 @@ It combines the strengths of **language models** and **ontology semantics** to a
    Lexical and contextual similarities are combined through a **confidence-weighted function**, granting higher influence to the most reliable modality for each pair.
 
 4. **Uncertainty-Driven Language Model Inference**
-   When ambiguity remains high, an **instruction-tuned LLM (Qwen-Instruct)** summarises both entities’ contexts and issues a **Yes/No decision** with a short textual rationale, which is incorporated into the final score.
+   When ambiguity remains high, configurable LLM backends summarise both entities’ contexts and issue a **binary decision** whose probability is incorporated into the final score. The verbaliser, summary model, decision model, and rationale model can now be routed independently to either **local Hugging Face models** or **hosted OpenRouter models**.
 
 ### **Explainability**
 
@@ -23,7 +23,7 @@ For every evaluated mapping, EXACT-OM provides:
 
 * Label and context contributions with their confidence and weight.
 * Relative importance of lexical, contextual, and generative LM components.
-* Natural-language rationales generated for ambiguous cases.
+* Natural-language rationales aligned with the final model outcome.
   All results are exported as structured JSON explanations, ensuring transparent and traceable alignment decisions.
 
 ### **Outcome**
@@ -53,6 +53,41 @@ Typical workflow:
 2. Adjust a config (copy `exp/debug_new_approach/full_ncit2doid_local_small/config.yaml` and edit thresholds, model names, etc.).
 3. Invoke `exact` with the paths above; include `-c` when running on validation slices, drop it for full-test inference.
 
+### Hosted LLM configuration
+
+The default config now supports both local and hosted LLM backends.
+
+- `llm_profiles` defines named backend profiles.
+- `llm_routing` decides which profile is used for each task:
+  - verbaliser
+  - summary
+  - decision
+  - rationale
+
+Hosted profiles use OpenRouter and resolve the API key in this order:
+
+1. `OPENROUTER_API_KEY`
+2. the profile-specific `api_key_path`
+3. `~/.config/openrouter/api_key`
+4. an interactive prompt for a key-file path
+5. local fallback with a warning
+
+The decision path is stricter than the other LLM tasks: if the selected hosted
+model cannot support the configured binary-head chat-logprob scoring path,
+EXACT-OM falls back to the configured local decision model.
+
+Hosted decision scoring now uses OpenRouter `/chat/completions` with a
+constrained binary head. The runtime asks the model to emit exactly one label
+(default: `A` or `B`), applies equal positive `logit_bias` to both label
+tokens, reads first-token `top_logprobs`, and normalizes the two label scores
+into the positive-class probability used by the scorer. A runtime probe checks
+whether the selected model/provider route exposes usable chat logprobs for both
+labels before the hosted decision path is used.
+
+Hosted summary, rationale, and verbaliser calls still send one prompt per API
+request, but the runtime now executes them with bounded concurrency using the
+corresponding batch-size settings as the concurrency cap.
+
 Example:
 
 ```bash
@@ -65,6 +100,15 @@ exact \
   -c data/ncit-doid/test.cands.val.tsv \
   -l -e -m 60G -d 0
 ```
+
+### Threshold and rationale semantics
+
+`alignment_params.threshold` is the shared final decision threshold.
+
+- In **global mode**, it filters saved alignments and also defines positive vs
+  negative rationale polarity together with `cardinality`.
+- In **local mode**, all candidates remain in the ranking output, but the same
+  threshold is still used to label rationales as positive or negative.
 
 ### Python API (`exact.delivery.api`)
 

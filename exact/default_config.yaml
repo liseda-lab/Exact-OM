@@ -1,200 +1,308 @@
 
-# System Parameters
-# For detailed parameter descriptions see docs/semantic_scorer_defaults.md
+# Default runtime configuration for EXACT.
+# For fuller parameter descriptions, see `docs/semantic_scorer_defaults.md`.
 
-## Verbosity level of the logs.
-logging_level: INFO # DEBUG, INFO, WARNING, ERROR
+# Logging verbosity for the full pipeline.
+logging_level: INFO # One of: DEBUG, INFO, WARNING, ERROR
 
-# Seed for reproducibility.
+# Global random seed used where the pipeline exposes deterministic behavior.
 seed: 42
 
-## Used cached files to skip computations if available.
+# Reuse dataset/model caches when available.
 use_file_cache: True
 
-# Evaluation Parameters
-
-## Number of top-k predictions to be considered for evaluation.
+# Cutoffs reported by the evaluation step.
 k: [1, 5, 10]
 
-# Alignment Parameters
-
 alignment_params:
-  ### ONLY USED FOR GLOBAL ALIGNMENT TASKS ###
+  # Parameters that determine which scored pairs become part of the final
+  # global alignment. For local/ranking runs, all candidates stay in the
+  # output file, but this same threshold is still used to define positive vs
+  # negative rationale polarity.
 
-  ## Threshold to be used to filter predictions.
-  ## If Null, final alignment will not be filtered by score.
-  threshold: 0.7 # 0.7
+  # Minimum final score required for a pair to count as a positive alignment.
+  # If null, no score-based filtering is applied to the global alignment.
+  threshold: 0.7
 
-  ## Cardinality to be used to filter predictions.
-  ## If Null, final alignment will not be filtered by cardinality.
-  ## Only used in full alignment tasks.
-  cardinality: 1 # null, 3
+  # Maximum number of targets retained per source in the final global alignment.
+  # If null, no cardinality filter is applied.
+  cardinality: 1
 
-  # Saves
-  save_json: True # If True, explanations JSON file should be saved.
-  save_csv: True # If True, explanations CSV file should be saved.
-  save_stats_csv: True # If True, detailed stats per example will be saved to a CSV file.
-  append_stats_to_summary_csv: True # If True, human readable stats will be appended to the summary CSV file.
+  # Output artifacts.
+  save_json: True # Save full candidate-level explanations as JSON.
+  save_csv: True # Save the flattened summary table as TSV/CSV-style output.
+  save_stats_csv: True # Save one-row run statistics for spreadsheet use.
+  append_stats_to_summary_csv: True # Append human-readable run stats to the summary file.
 
-  # Explanations
-  review_low: 0.5 # Lower bound score to flag a mapping for review.
-  review_high: 0.8 # Upper bound score to flag a mapping for review.
+  # Review band used in reports and plots.
+  review_low: 0.5 # Lower score bound for "needs review".
+  review_high: 0.8 # Upper score bound for "needs review".
 
 dataset_params:
-
-  # General Dataset Configs
-  num_workers: null # Number of workers to be used to load the data. If null, the all available cores will be used.
-  filter_exact_matches: True # If True, exact matches between source and target will be filtered out before training/inference.
-  drop_exact_match_sources: False # If True, drop all candidates for sources with an exact match (1-to-1 tasks). If False, only the exact pairs are removed.
-  reasoner_timeout_secs: 120 # Timeout for reasoner creation (seconds).
-  reasoner_force_hermit: False # If True, try HermiT after lightweight reasoners.
+  # Dataset construction and ontology loading.
+  num_workers: null # Dataset loading worker count. Null means "let the system decide".
+  filter_exact_matches: True # Remove exact lexical matches before scoring.
+  drop_exact_match_sources: False # If True, remove all candidates for sources with an exact exact-match hit.
+  reasoner_timeout_secs: 120 # Timeout for ontology reasoner construction, in seconds.
+  reasoner_force_hermit: False # If True, force a HermiT retry after lighter reasoners.
   
-  # Context Main Params
+  # Context extraction.
   n_hops: 1
-  context_method: greedy # Method to generate context graph. Options: 'bfs' (breadth-first search), 'greedy'
-  best_path_method: dp # Search method to find best path from source to target. Options: 'dp' (dynamic programming), 'greedy', 'lagrangian'
-  context_hop_penalty: 0.1 # Penalty to be applied to each hop in the context graph.
-  context_token_ratio: 1.3 # Ratio of context tokens to the model's max input length.
-  context_safety: 0.8 # Safety margin to avoid exceeding the model's max input length when generating context.
-  max_input_tokens_context: 256 # Maximum number of input tokens for the context (Budget).
-  only_taxonomy: False # If True, only the taxonomy will be used to generate the context
-  all_labels: True # If True, all labels will be provided as candidates for consideration in the alignment task.
-  add_connectivity_bridges: True # If True, add explanation-only connectors so context subgraphs are connected to the entity.
-  bridge_max_hops: null # Optional cap on bridge path length (null = unbounded, else integer hop limit).
+  context_method: greedy # Context extraction strategy: `bfs` or `greedy`.
+  best_path_method: dp # Path search strategy inside context extraction: `dp`, `greedy`, or `lagrangian`.
+  context_hop_penalty: 0.1 # Penalty applied per graph hop when ranking candidate context paths.
+  context_token_ratio: 1.3 # Approximate token-per-word multiplier used for context budgeting.
+  context_safety: 0.8 # Safety factor applied before hitting the configured context token budget.
+  max_input_tokens_context: 256 # Shared: max context encoder input length.
+  only_taxonomy: False # If True, use taxonomy-only context extraction and fixed subclass templates.
+  all_labels: True # If True, score all source/target label variants instead of a single best label.
+  add_connectivity_bridges: True # Add explanation-only bridge triples to keep extracted contexts connected.
+  bridge_max_hops: null # Optional hard cap on bridge path length. Null means unbounded.
 
-  # Verbaliser Params
+  # Verbaliser generation controls.
+  # `verbaliser_name` is local-only fallback model selection.
+  # `gen_max_new_tokens`, `temperature`, and `top_p` are shared by local and hosted
+  # verbaliser generation. `do_sample` and `top_k` are local-only.
+  # `batch_size_verbaliser` is used as the local batch size and as the hosted
+  # concurrency cap for OpenRouter verbaliser requests.
   verbaliser_name: Qwen/Qwen2.5-3B-Instruct
-  gen_max_new_tokens: 64 # Max number of new tokens to be generated by the model for the context.
-  do_sample: False # If True sampling will be used to generate the context.
-  temperature: 0.1 # Temperature to be used in sampling. If >1, the model will be more creative.
-  top_k: null # Top-k to be used in sampling. If >0, the model will only sample from the top-k most probable tokens.
-  top_p: 0.9 # Top-p to be used in sampling. If >0, the model will only sample from the top-p most probable tokens.
-  max_verb_gen_retries: 1 # Maximum number of retries for template generation in case of failure.
-  # Efficiency Params
-  exclude_missing_dr: False
-  batch_size_verbaliser: 4 # Batch size to be used for verbaliser model inference.
-  # Formatting Params
-  delimiter: "\n" # Delimiter to be used when concatenating multiple context triples.
-  # PLotting
+  gen_max_new_tokens: 64 # Shared: max generated tokens for relation-template creation.
+  do_sample: False # Local-only: use sampling instead of greedy decoding for local verbaliser runs.
+  temperature: 0.1 # Shared: generation temperature for verbaliser calls.
+  top_k: null # Local-only: top-k sampling cutoff for local verbaliser runs.
+  top_p: 0.9 # Shared: nucleus sampling cutoff for verbaliser calls.
+  max_verb_gen_retries: 1 # Retry count when a generated template is invalid.
+  exclude_missing_dr: False # Skip relations with missing domain/range examples when building templates.
+  batch_size_verbaliser: 4 # Shared: local batch size and hosted concurrency cap for verbaliser generation.
+  delimiter: "\n" # Delimiter used when joining verbalised context triples into one text block.
+
+  # Dataset-side analysis plots.
   which: ["src_ctx_n_triples","tgt_ctx_n_triples","src_ctx_tok_len","tgt_ctx_tok_len","src_ctx_word_len","tgt_ctx_word_len","src_ctx_char_len","tgt_ctx_char_len",
           "src_lab_n_labels","tgt_lab_n_labels","src_lab_word_len","tgt_lab_word_len","src_lab_char_len","tgt_lab_char_len","src_lab_max_label_words","tgt_lab_max_label_words",
           "src_lab_avg_label_words","tgt_lab_avg_label_words",
-          "cand_sim","cand_sim_src_mean"] # Features to be plotted for analysis.
-  candidate_share_k: 2
+          "cand_sim","cand_sim_src_mean"] # Dataset features to visualize after preprocessing.
+  candidate_share_k: 2 # Number of top lexical candidates to share across candidate generation utilities.
 
 candidates_params:
-  # lexical_encoder_name — encoder used to score source/target labels.
-  lexical_encoder_name: sentence-transformers/all-MiniLM-L6-v2
-  # encode_batch_size — batch size for embedding generation.
-  encode_batch_size: 512 
-  # search_batch_size — batch size for cosine search.
-  search_batch_size: 4096
-  # top_k — number of candidates retained per source.
-  top_k: 50
-  # use_amp — use automatic mixed precision during search.
-  use_amp: True
+  # Candidate generation settings for the lexical prefilter stage.
+  lexical_encoder_name: sentence-transformers/all-MiniLM-L6-v2 # Encoder used to embed source/target labels.
+  encode_batch_size: 512 # Batch size for lexical embedding generation.
+  search_batch_size: 4096 # Batch size for cosine similarity search.
+  top_k: 50 # Number of candidates retained per source after lexical retrieval.
+  use_amp: True # Use automatic mixed precision during lexical retrieval when supported.
 
 sanity_check_params:
-  # sanity_check — emit dataset sanity logs when True.
-  sanity_check: True
-  # n — number of examples printed in sanity log.
-  n: 3
-  # max_ctx_show/max_label_show — truncate contexts/labels in sanity output.
-  max_ctx_show: 3
-  max_label_show: 3
+  # Human-readable dataset debug output.
+  sanity_check: True # Emit sample rows after dataset construction.
+  n: 3 # Number of sample examples to print.
+  max_ctx_show: 3 # Max number of context sentences shown per side in sanity logs.
+  max_label_show: 3 # Max number of label variants shown per side in sanity logs.
 
 plot_params:
-  # Histogram defaults for dataset/model plots.
-  bins: 30
-  figsize: [7, 5]
-  dpi: 300
-  kde: False
-  alpha: 0.6
+  # Shared plotting defaults for dataset and model reports.
+  bins: 30 # Histogram bin count.
+  figsize: [7, 5] # Figure size in inches.
+  dpi: 300 # Export resolution.
+  kde: False # Overlay KDE on histogram plots.
+  alpha: 0.6 # Default plot transparency.
 
 inference_params:
-  # batch_size — semantic scorer batch size.
-  batch_size: 64 # 
-  # num_workers — dataloader workers for inference.
-  num_workers: 5
-  # log_every — log cadence during inference.
-  log_every: 10
-  # mixed_precision — use torch autocast on GPU.
-  mixed_precision: True
-  # which — metrics plotted/saved after inference.
+  # Inference runner settings.
+  batch_size: 64 # Candidate-pair batch size passed to the semantic scorer.
+  num_workers: 5 # DataLoader worker count for inference.
+  log_every: 10 # Emit inference progress logs every N batches.
+  mixed_precision: True # Use torch autocast on GPU where supported.
   which: ["S_final", "s_label", "s_ctx", "S_lctx", "I_label", "I_ctx", "I_llm", "w_c", "w_i", "p_llm"]
-  # checkpoint_every/resume/enable — checkpointing policy.
-  checkpoint_every: 10
-  resume_from_checkpoint: True
-  enable_checkpoints: True
+  checkpoint_every: 10 # Write an inference checkpoint every N batches.
+  resume_from_checkpoint: True # Resume from the latest checkpoint when available.
+  enable_checkpoints: True # Enable checkpoint creation during inference.
+
+llm_profiles:
+  # Named LLM backend profiles.
+  # `backend: openrouter` profiles call hosted models through OpenRouter.
+  # `backend: local_hf` profiles use local Hugging Face models.
+  # The routing block below decides which profile each task uses.
+  # OpenRouter profiles may also include an optional `provider:` object with
+  # keys such as `require_parameters`, `order`, `only`, `ignore`, or `sort`.
+  # These options are passed through to OpenRouter requests.
+
+  # Default hosted profile used unless a task-specific profile overrides it.
+  openrouter_gpt4o_mini:
+    backend: openrouter
+    model: openai/gpt-4o-mini
+    tokenizer: Xenova/gpt-4o
+    api_base: https://openrouter.ai/api/v1
+    api_key_env: OPENROUTER_API_KEY # First lookup location for the hosted API key.
+    api_key_path: ~/.config/openrouter/api_key # Second lookup location before the interactive prompt.
+    timeout_secs: 60.0 # Per-request timeout in seconds.
+
+  # Hosted generation ablation profiles.
+  # These are good candidates for verbaliser, summary, and rationale generation only.
+  # tokenizer mapping.
+  openrouter_claude_sonnet_46:
+    backend: openrouter
+    model: anthropic/claude-sonnet-4.6
+    api_base: https://openrouter.ai/api/v1
+    api_key_env: OPENROUTER_API_KEY
+    api_key_path: ~/.config/openrouter/api_key
+    timeout_secs: 60.0
+  openrouter_gpt5:
+    backend: openrouter
+    model: openai/gpt-5
+    api_base: https://openrouter.ai/api/v1
+    api_key_env: OPENROUTER_API_KEY
+    api_key_path: ~/.config/openrouter/api_key
+    timeout_secs: 60.0
+  openrouter_gpt_oss_120b:
+    backend: openrouter
+    model: openai/gpt-oss-120b
+    api_base: https://openrouter.ai/api/v1
+    api_key_env: OPENROUTER_API_KEY
+    api_key_path: ~/.config/openrouter/api_key
+    timeout_secs: 60.0
+
+  # Hosted decision ablation profiles for the chat-logprob binary-head path.
+  openrouter_qwen35_122b:
+    backend: openrouter
+    model: qwen/qwen3.5-122b-a10b
+    tokenizer: Qwen/Qwen3.5-122B-A10B
+    api_base: https://openrouter.ai/api/v1
+    api_key_env: OPENROUTER_API_KEY
+    api_key_path: ~/.config/openrouter/api_key
+    timeout_secs: 60.0
+  openrouter_qwen3_235b:
+    backend: openrouter
+    model: qwen/qwen3-235b-a22b-2507
+    tokenizer: Qwen/Qwen3-235B-A22B-2507
+    api_base: https://openrouter.ai/api/v1
+    api_key_env: OPENROUTER_API_KEY
+    api_key_path: ~/.config/openrouter/api_key
+    timeout_secs: 60.0
+  openrouter_llama33_70b:
+    backend: openrouter
+    model: meta-llama/llama-3.3-70b-instruct
+    tokenizer: meta-llama/Llama-3.3-70B-Instruct
+    api_base: https://openrouter.ai/api/v1
+    api_key_env: OPENROUTER_API_KEY
+    api_key_path: ~/.config/openrouter/api_key
+    timeout_secs: 60.0
+  openrouter_deepseek_chat_v31:
+    backend: openrouter
+    model: deepseek/deepseek-chat-v3.1
+    tokenizer: deepseek-ai/DeepSeek-V3.1
+    api_base: https://openrouter.ai/api/v1
+    api_key_env: OPENROUTER_API_KEY
+    api_key_path: ~/.config/openrouter/api_key
+    timeout_secs: 60.0
+
+  # Local fallback profiles.
+  local_verbaliser_default:
+    backend: local_hf
+    model: Qwen/Qwen2.5-3B-Instruct # Default local fallback for template verbalisation.
+  local_llm_default:
+    backend: local_hf
+    model: Qwen/Qwen2.5-7B-Instruct # Default local fallback for summary/decision/rationale.
+
+llm_routing:
+  # Task-to-profile routing.
+  # Each task can use a different hosted or local model.
+  # `fallback_*` entries are used when the selected hosted profile is unavailable,
+  # misconfigured, missing credentials, or unsupported for the requested task.
+  default_profile: openrouter_gpt4o_mini
+  verbaliser_profile: openrouter_gpt4o_mini
+  summary_profile: openrouter_gpt4o_mini
+  decision_profile: openrouter_gpt4o_mini # Decision defaults to the shared hosted profile.
+  rationale_profile: openrouter_gpt4o_mini
+  verbaliser_fallback_profile: local_verbaliser_default # Fallback used only for verbaliser calls.
+  fallback_profile: local_llm_default # Shared fallback for summary and rationale.
+  decision_fallback_profile: local_llm_default # Fallback used when hosted decision scoring cannot provide logprobs.
 
 model:
   name: SemanticScorer
   params:
-    # Models
-    lexical_model_name: cambridgeltl/SapBERT-from-PubMedBERT-fulltext
-    context_model_name: BAAI/bge-large-en-v1.5
-    llm_model_name: Qwen/Qwen2.5-7B-Instruct
-    # Precision
-    fp16_inference: True
-    # Pooling Method
-    pooling_method: mean # Options: 'mean', 'max', 'sum'
-    label_pair_pooling: max # Options: 'mean', 'max'
-    # Max Tokens
-    max_input_tokens_lexical: 32
-    max_input_tokens_context: 256
-    max_total_tokens_llm_summary: 512
-    max_total_tokens_llm_decision: 384
-    max_total_tokens_llm_rationale: 512
-    max_new_tokens_llm: 64
-    # Ablations / toggles
-    use_lexical: True
-    use_context: True
-    use_llm: True
-    tau: 0.5 # Mid point to determine signal strength
-    # Adaptive context weighting
-    gamma: 1.0 # Scaling factor for context/label adaptive weighting
-    # LLM gating
-    beta: 0.8 # Limit for LLM gating
-    tau_LLM: 0.8 # Threshold for LLM activation
-    force_llm_summaries: False # Generate LLM summaries for every pair even when LLM gating is off
-    # LLM generation knobs
+    # Core model selection.
+    lexical_model_name: cambridgeltl/SapBERT-from-PubMedBERT-fulltext # Encoder for label similarity.
+    context_model_name: BAAI/bge-large-en-v1.5 # Encoder for verbalised context similarity.
+    llm_model_name: Qwen/Qwen2.5-7B-Instruct # Local-only fallback model for summary/decision/rationale.
+
+    # Precision and pooling.
+    fp16_inference: True # Use fp16 where supported during model inference.
+    pooling_method: mean # Token pooling for encoder outputs: `mean`, `max`, or `sum`.
+    label_pair_pooling: max # Pooling over label-pair similarity matrix: `mean` or `max`.
+
+    # Input/output length limits.
+    max_input_tokens_lexical: 32 # Max tokens per label passed to the lexical encoder.
+    max_input_tokens_context: 256 # Max tokens per joined context passed to the context encoder.
+    max_total_tokens_llm_summary: 512 # Local-only prompt length cap for summary generation.
+    max_total_tokens_llm_decision: 384 # Local-only prompt length cap for decision scoring.
+    max_total_tokens_llm_rationale: 512 # Local-only prompt length cap for rationale generation.
+    max_new_tokens_llm: 64 # Shared: max generated tokens for summaries and rationales.
+    max_new_tokens_llm_rationale: 256 # Rationale-only generation cap; lets explanations be longer than summaries.
+
+    # Main feature toggles.
+    use_lexical: True # Enable lexical similarity.
+    use_context: True # Enable context similarity.
+    use_llm: True # Enable LLM summaries/decision/rationale components.
+    tau: 0.5 # Neutral midpoint used when estimating confidence and ambiguity.
+
+    # Adaptive weighting and LLM gating.
+    gamma: 1.0 # Controls how sharply lexical/context confidence changes the fusion weight.
+    beta: 0.8 # Maximum contribution allowed from the LLM branch.
+    tau_LLM: 0.8 # Ambiguity threshold above which the LLM branch is activated.
+    force_llm_summaries: False # If True, generate summaries for all pairs even when the decision LLM is gated off.
+
+    # LLM generation controls.
+    # `llm_temperature`, `llm_top_p`, and `max_new_tokens_llm` are shared by local
+    # and hosted summary/rationale generation.
+    # `llm_do_sample` is local-only.
+    # `llm_summary_batch_size` and `llm_rationale_batch_size` are used as local
+    # batch sizes and as hosted concurrency caps for OpenRouter chat requests.
+    # `llm_decision_batch_size` is used as the local decision batch size and as
+    # the hosted concurrency cap for OpenRouter decision scoring.
+    # Hosted decision scoring ignores stochastic generation knobs and uses fixed
+    # deterministic settings (`temperature=0`, `top_p=1`) while reading first-token
+    # chat logprobs over a constrained binary label head.
     llm_temperature: 0.1
     llm_top_p: 0.9
     llm_do_sample: False
     llm_summary_batch_size: 8
     llm_decision_batch_size: 8
     llm_rationale_batch_size: 8
-    profile_llm: False
-    # Explanations
-    return_explanations: True
-    generate_llm_rationales: False
-    use_llm_calibration: False
-    llm_calibration_a: null
-    llm_calibration_b: null
-    llm_calibration_info: null
-    # Caching
-    cache_dir: null
-    cache_namespace: null
-    dataset_signature: null
-    persist_cache_to_disk: True
-    max_cached_labels: null
-    max_cached_contexts: null
-    max_cached_summaries: null
-    max_cached_rationales: null
+    hosted_decision_labels: ["A", "B"] # Hosted-only: first label is positive, second label is negative.
+    hosted_decision_logit_bias: 20.0 # Hosted-only: equal positive bias added to both decision labels.
+    profile_llm: False # Reserved profiling/debug flag; not currently used by the hosted path.
 
-# Optional chained model (disabled by default)
+    # Explanation and calibration outputs.
+    return_explanations: True # Include candidate-level explanations in model output.
+    generate_llm_rationales: False # Generate final positive/negative rationales.
+    use_llm_calibration: False # Enable post-hoc calibration on the decision probability.
+    llm_calibration_a: null # Optional preconfigured calibration coefficient.
+    llm_calibration_b: null # Optional preconfigured calibration coefficient.
+    llm_calibration_info: null # Optional human-readable description of the calibration source.
+
+    # On-disk and in-memory caches.
+    cache_dir: null # Cache root. Null uses the default cache directory.
+    cache_namespace: null # Optional namespace to isolate cache files between runs.
+    dataset_signature: null # Optional cache fingerprint override.
+    persist_cache_to_disk: True # Persist summary/rationale/embedding caches between runs.
+    max_cached_labels: null # Optional in-memory cap for lexical embedding cache entries.
+    max_cached_contexts: null # Optional in-memory cap for context embedding cache entries.
+    max_cached_summaries: null # Optional in-memory cap for summary cache entries.
+    max_cached_rationales: null # Optional in-memory cap for rationale cache entries.
+
+# Optional second-stage reranker (disabled by default).
 second_model:
   name: SecondPassReranker
   params:
-    enabled: False
-    top_k: 5
-    epsilon: 0.03
-    min_ties: 3
-    ce_model_name: null
-    ce_weight: 0.5
-    use_symbolic: True
-    symbolic_weight: 0.05
-    use_llm: False
-    llm_trigger_epsilon: 0.01
-    max_llm_prompts: 0
-    max_prompt_candidates: 5
+    enabled: False # Enable the reranker after the primary semantic scorer.
+    top_k: 5 # Number of top candidates per source passed into the reranker.
+    epsilon: 0.03 # Score closeness threshold used to decide whether reranking is needed.
+    min_ties: 3 # Minimum number of near-tied candidates required before reranking fires.
+    ce_model_name: null # Optional cross-encoder model name for reranking.
+    ce_weight: 0.5 # Weight assigned to the cross-encoder contribution.
+    use_symbolic: True # Include symbolic reranking features.
+    symbolic_weight: 0.05 # Weight assigned to symbolic reranking features.
+    use_llm: False # Enable LLM-assisted reranking inside the second pass.
+    llm_trigger_epsilon: 0.01 # Ambiguity threshold used to trigger LLM reranking.
+    max_llm_prompts: 0 # Hard cap on LLM reranking prompts.
+    max_prompt_candidates: 5 # Max candidates packed into one reranking prompt.

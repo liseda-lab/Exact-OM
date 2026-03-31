@@ -4,6 +4,7 @@ from typing import Dict, List, Optional, Tuple, Callable, Any
 from contextlib import nullcontext
 from concurrent.futures import ThreadPoolExecutor
 import hashlib
+import json
 
 import math
 import time
@@ -58,6 +59,7 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
 
         self._df: DataFrame = None
         self._df_save_path: Path = self.output_path / "dataset.csv"
+        self._cache_meta_path: Path = self.output_path / "dataset.meta.json"
 
         self._num_workers: int = num_workers
 
@@ -85,6 +87,7 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
         self._source_path: Optional[Path] = None
         self._target_path: Optional[Path] = None
         self._dataset_signature: Optional[str] = None
+        self._cache_warning_emitted: bool = False
 
         # Hint for skipping heavy reasoning when only taxonomy is requested.
         self._only_taxonomy_hint: bool = bool(kwargs.get("only_taxonomy", False))
@@ -377,6 +380,39 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
         self._dataset_signature = hashlib.sha1(blob.encode("utf-8")).hexdigest()
         return self._dataset_signature
 
+    def _cache_fingerprint_payload(self) -> Dict[str, Any]:
+        return {
+            "component": self.__class__.__name__,
+            "dataset_signature": self.dataset_signature,
+            "filter_exact_matches": self.filter_exact_matches,
+            "drop_exact_match_sources": self.drop_exact_match_sources,
+            "cardinality": self._cardinality,
+            "candidate_share_k": self._candidate_share_k,
+            "only_taxonomy_hint": self._only_taxonomy_hint,
+        }
+
+    @property
+    def cache_fingerprint(self) -> Optional[str]:
+        payload = self._cache_fingerprint_payload()
+        blob = json.dumps(payload, sort_keys=True, default=str)
+        return hashlib.sha1(blob.encode("utf-8")).hexdigest()
+
+    def _load_cache_metadata(self) -> Dict[str, Any]:
+        if not self._cache_meta_path.exists():
+            return {}
+        try:
+            return json.loads(self._cache_meta_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return {}
+
+    def _write_cache_metadata(self) -> None:
+        payload = {
+            "fingerprint": self.cache_fingerprint,
+            "dataset_signature": self.dataset_signature,
+            "component": self.__class__.__name__,
+        }
+        self._cache_meta_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
     def load_candidates(self, 
                         file_path: Optional[Path] = None,
                         top_k: Optional[int] = 100,
@@ -597,6 +633,7 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
             return self._df_save_path
 
         self.dataframe.to_csv(str(self._df_save_path), index=False)
+        self._write_cache_metadata()
 
         self.log(f"#Dataset saved to {self._df_save_path}", level="debug")
 
@@ -610,8 +647,18 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
             self._candidates_generated = True
 
     def has_cache(self) -> bool:
-        if self._cache_ok:
-            return self._df_save_path.exists()
+        if self._cache_ok and self._df_save_path.exists():
+            meta = self._load_cache_metadata()
+            if meta.get("fingerprint") == self.cache_fingerprint:
+                return True
+            if not self._cache_warning_emitted:
+                reason = "missing metadata" if not meta else "fingerprint mismatch"
+                self.log(
+                    f"Existing dataset cache at {self._df_save_path} is invalid for the current configuration ({reason}); rebuilding.",
+                    level="warning",
+                )
+                self._cache_warning_emitted = True
+            return False
         return False
 
     def process(self) -> "IDataset":

@@ -2,8 +2,7 @@
 #SBATCH --job-name=full_ncit2doid_local_small  # Job name
 #SBATCH --output=exp/debug_new_approach/full_ncit2doid_local_small/slurm_job_%j.out       # Output file
 #SBATCH --error=exp/debug_new_approach/full_ncit2doid_local_small/slurm_job_%j.err        # Error file
-#SBATCH --partition=tier3                        # Partition
-#SBATCH --nodelist=liseda-01,liseda-05                    # Node
+#SBATCH --partition=gpu_hi                        # Partition
 #SBATCH --nodes=1                                # Number of nodes
 #SBATCH --ntasks=1                               # Number of tasks
 #SBATCH --cpus-per-task=16                      # Number of CPUs
@@ -13,7 +12,7 @@
 
 # Static Variables
 # TAG=$(date +%s)
-JOB_NAME=full_ncit2doid_local_small 
+JOB_NAME=xact_single
 EXP_DIR=exp/debug_new_approach/$JOB_NAME
 CONFIG_FILE=$EXP_DIR/config.yaml
 DATA_DIR=data/

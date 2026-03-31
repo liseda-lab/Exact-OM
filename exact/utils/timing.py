@@ -23,6 +23,7 @@ def load_recorded_timings(times_file_path: Path) -> dict[str, float]:
 
 
 def write_recorded_timings(times_file_path: Path, timings: dict[str, float]) -> None:
+    times_file_path.parent.mkdir(parents=True, exist_ok=True)
     ordered_steps = [step for step in TIMING_STEP_ORDER if step in timings]
     remaining_steps = sorted(step for step in timings if step not in TIMING_STEP_ORDER)
     lines = [
@@ -30,3 +31,13 @@ def write_recorded_timings(times_file_path: Path, timings: dict[str, float]) -> 
         for step in [*ordered_steps, *remaining_steps]
     ]
     times_file_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def update_recorded_timings(
+    times_file_path: Path,
+    updates: dict[str, float],
+) -> dict[str, float]:
+    timings = load_recorded_timings(times_file_path)
+    timings.update({step: value for step, value in updates.items() if value is not None})
+    write_recorded_timings(times_file_path, timings)
+    return timings

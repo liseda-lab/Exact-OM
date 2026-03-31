@@ -339,6 +339,9 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
             pred = rec.get("prediction") or {}
             if "ground_truth" in pred:
                 base["ground_truth"] = pred.get("ground_truth")
+            for key in ("threshold_positive", "saved_alignment_member", "rationale_positive"):
+                if key in pred:
+                    base[key] = pred.get(key)
             conf = rec.get("confidences", {})
             wts = rec.get("weights", {})
             imps = rec.get("importances", {})

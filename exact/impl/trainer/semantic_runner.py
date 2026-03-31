@@ -1,5 +1,6 @@
 import inspect
 import json
+import hashlib
 import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Set
@@ -110,6 +111,34 @@ class SemanticAlignmentRunner(ITrainer):
             logger=logger,
             **kwargs,
         )
+        self._last_stage_timings: Dict[str, float] = {}
+        self._checkpoint_fingerprint: str = self._build_checkpoint_fingerprint()
+
+    def _build_checkpoint_fingerprint(self) -> str:
+        dataset_signature = getattr(self.dataset, "dataset_signature", None)
+        models = getattr(self, "models", None) or [getattr(self, "model", None)]
+        model_payloads: List[Dict[str, Any]] = []
+        for model in models:
+            if model is None:
+                continue
+            if hasattr(model, "runtime_fingerprint"):
+                fingerprint = model.runtime_fingerprint()
+            elif hasattr(model, "_cache_fingerprint"):
+                fingerprint = getattr(model, "_cache_fingerprint")
+            else:
+                fingerprint = None
+            model_payloads.append(
+                {
+                    "class": model.__class__.__name__,
+                    "fingerprint": fingerprint,
+                }
+            )
+        payload = {
+            "dataset_signature": dataset_signature,
+            "models": model_payloads,
+        }
+        blob = json.dumps(payload, sort_keys=True, default=str)
+        return hashlib.sha1(blob.encode("utf-8")).hexdigest()
 
     def _auto_checkpoint_filename(self, kind: DatasetMask) -> str:
         return f"{kind.name.lower()}_{int(time.time())}.json"
@@ -195,6 +224,36 @@ class SemanticAlignmentRunner(ITrainer):
                 level="warning",
             )
             return [], [], 0
+        payload_dataset_signature = payload.get("dataset_signature")
+        current_dataset_signature = getattr(self.dataset, "dataset_signature", None)
+        if payload_dataset_signature != current_dataset_signature:
+            self.log(
+                (
+                    f"Ignoring checkpoint '{checkpoint_path.name}' because its dataset signature "
+                    f"does not match the current dataset."
+                ),
+                level="warning",
+            )
+            return [], [], 0
+        payload_fingerprint = payload.get("checkpoint_fingerprint")
+        if not payload_fingerprint:
+            self.log(
+                (
+                    f"Ignoring checkpoint '{checkpoint_path.name}' because it lacks a model/config "
+                    f"fingerprint and may have been created by an older or different run."
+                ),
+                level="warning",
+            )
+            return [], [], 0
+        if payload_fingerprint != self._checkpoint_fingerprint:
+            self.log(
+                (
+                    f"Ignoring checkpoint '{checkpoint_path.name}' because its model/config "
+                    f"fingerprint does not match the current run."
+                ),
+                level="warning",
+            )
+            return [], [], 0
 
         mappings: List[Tuple[str, str, float]] = []
         for rec in payload.get("mappings", []):
@@ -223,6 +282,8 @@ class SemanticAlignmentRunner(ITrainer):
     ) -> None:
         payload = {
             "kind": kind.name,
+            "dataset_signature": getattr(self.dataset, "dataset_signature", None),
+            "checkpoint_fingerprint": self._checkpoint_fingerprint,
             "total_examples": total_examples,
             "processed_examples": processed_examples,
             "mappings": [
@@ -274,6 +335,77 @@ class SemanticAlignmentRunner(ITrainer):
         if pending is not None:
             self._llm_calibration_report["pending_total_samples"] = pending
 
+    def _annotate_final_prediction_records(
+        self,
+        preds: List[EntityMapping],
+        threshold: Optional[float],
+        local_alignment: bool,
+    ) -> None:
+        if not self.results_json:
+            return
+        kept_pairs = {(m.head, m.tail) for m in preds}
+        threshold_value = float(threshold) if threshold is not None else None
+        for rec in self.results_json:
+            pred = rec.get("prediction") or {}
+            conf = rec.get("confidences") or {}
+            src = rec.get("src_iri")
+            tgt = rec.get("tgt_iri")
+            s_final = conf.get("S_final")
+            threshold_positive = False
+            if s_final is not None and threshold_value is not None:
+                threshold_positive = float(s_final) >= threshold_value
+            elif s_final is not None and threshold_value is None:
+                threshold_positive = True
+            saved_alignment_member = (src, tgt) in kept_pairs
+            pred["threshold_positive"] = bool(threshold_positive)
+            pred["saved_alignment_member"] = bool(saved_alignment_member)
+            if local_alignment:
+                rationale_positive = bool(threshold_positive)
+            else:
+                rationale_positive = bool(saved_alignment_member)
+            pred["rationale_positive"] = rationale_positive
+            pred["rationale_decision_label"] = "Match" if rationale_positive else "No match"
+            rec["prediction"] = pred
+
+    def _generate_final_rationales(self) -> None:
+        if not self.results_json:
+            return
+        model = getattr(self, "model", None)
+        if model is None or not hasattr(model, "generate_final_rationales_for_records"):
+            return
+        rationales = model.generate_final_rationales_for_records(self.results_json)
+        rationale_meta = getattr(model, "_last_rationale_backend_meta", {}) or {}
+        for rec, rationale in zip(self.results_json, rationales):
+            pred = rec.get("prediction") or {}
+            pred["llm_rationale"] = rationale
+            rec["prediction"] = pred
+            backend_usage = rec.get("backend_usage") or {}
+            backend_usage["rationale"] = dict(rationale_meta)
+            rec["backend_usage"] = backend_usage
+            self._sync_record_model_usage(rec)
+
+    @staticmethod
+    def _sync_record_model_usage(rec: Dict[str, Any]) -> None:
+        models = dict(rec.get("models") or {})
+        backend_usage = rec.get("backend_usage") or {}
+        summary_model = (backend_usage.get("summary") or {}).get("model")
+        decision_model = (backend_usage.get("decision") or {}).get("model")
+        rationale_model = (backend_usage.get("rationale") or {}).get("model")
+        models["llm_summary_model"] = summary_model
+        models["llm_decision_model"] = decision_model
+        models["llm_rationale_model"] = rationale_model
+        unique_models: List[str] = []
+        for name in (summary_model, decision_model, rationale_model):
+            if name and name not in unique_models:
+                unique_models.append(name)
+        if not unique_models:
+            pass
+        elif len(unique_models) == 1:
+            models["llm_model"] = unique_models[0]
+        else:
+            models["llm_model"] = "multiple"
+        rec["models"] = models
+
     def _finalize_llm_calibration(self) -> None:
         model = getattr(self, "model", None)
         if model is None or not hasattr(model, "finalize_llm_calibration"):
@@ -301,6 +433,7 @@ class SemanticAlignmentRunner(ITrainer):
         kind: DatasetMask = DatasetMask.inference,
         threshold: Optional[float] = 0.7,
         cardinality: Optional[int] = None,
+        local_alignment: bool = False,
         batch_size: int = 8,
         num_workers: int = 0,
         log_every: int = 1,
@@ -324,6 +457,7 @@ class SemanticAlignmentRunner(ITrainer):
         self._llm_calibration_messages_logged: Set[str] = set()
         self._llm_calibration_report: Optional[Dict[str, Any]] = None
         self._candidate_rows: List[Dict[str, Any]] = []
+        self._last_stage_timings = {}
         if hasattr(self.model, "reset_llm_calibration_tracking"):
             self.model.reset_llm_calibration_tracking()
         if hasattr(self.model, "reset_summary_stats"):
@@ -377,7 +511,16 @@ class SemanticAlignmentRunner(ITrainer):
             )
             df = pd.DataFrame(all_mappings, columns=["Src", "Tgt", "Scores"])
             preds = EntityMapping.read_table_mappings(df, threshold=threshold, cardinality=cardinality)
+            self._annotate_final_prediction_records(preds, threshold=threshold, local_alignment=local_alignment)
+            rationale_start = time.perf_counter()
+            self._generate_final_rationales()
+            rationale_elapsed = time.perf_counter() - rationale_start
             self.results_df = self._make_summary_dataframe(self.results_json)
+            self._last_stage_timings = {
+                "Alignment.Inference": 0.0,
+                "Alignment.PostInference": 0.0,
+                "Postprocess.Rationales": rationale_elapsed / 60.0,
+            }
             return preds, 0.0
 
         if checkpoint_enabled:
@@ -517,7 +660,8 @@ class SemanticAlignmentRunner(ITrainer):
 
         self._finalize_llm_calibration()
 
-        total_time = time.perf_counter() - start_time
+        inference_elapsed_seconds = time.perf_counter() - start_time
+        total_time = inference_elapsed_seconds
         duration_str = _format_duration(total_time)
         new_examples = max(0, processed_examples - restored_examples)
         avg_t = total_time / max(1, new_examples)
@@ -562,6 +706,7 @@ class SemanticAlignmentRunner(ITrainer):
 
         self._maybe_persist_model_cache(reason="finalize", force=True)
 
+        post_inference_start = time.perf_counter()
         candidate_df = self._build_candidate_dataframe()
         if self.results_json:
             # Prefer the richer JSON (includes importances and LLM info) for plotting/summary
@@ -575,7 +720,25 @@ class SemanticAlignmentRunner(ITrainer):
 
         df_scores = pd.DataFrame(all_mappings, columns=["Src", "Tgt", "Scores"])
         preds = EntityMapping.read_table_mappings(df_scores, threshold=threshold, cardinality=cardinality)
+        self._annotate_final_prediction_records(preds, threshold=threshold, local_alignment=local_alignment)
+        rationale_start = time.perf_counter()
+        self._generate_final_rationales()
+        rationale_elapsed_seconds = time.perf_counter() - rationale_start
+        post_inference_elapsed_seconds = time.perf_counter() - post_inference_start - rationale_elapsed_seconds
+        if self.results_json:
+            self.results_df = self._make_summary_dataframe(self.results_json)
+            for rec in self.results_json:
+                self._sync_record_model_usage(rec)
+        self._last_stage_timings = {
+            "Alignment.Inference": inference_elapsed_seconds / 60.0,
+            "Alignment.PostInference": max(0.0, post_inference_elapsed_seconds) / 60.0,
+            "Postprocess.Rationales": rationale_elapsed_seconds / 60.0,
+        }
         return preds, avg_t
+
+    @property
+    def last_stage_timings(self) -> Dict[str, float]:
+        return dict(self._last_stage_timings)
 
     def _build_candidate_dataframe(self) -> pd.DataFrame:
         if not self._candidate_rows:

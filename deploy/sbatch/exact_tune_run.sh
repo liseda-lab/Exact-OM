@@ -1,6 +1,6 @@
 #!/bin/bash
-#SBATCH --job-name=exact_tune
-#SBATCH --partition=tier3
+#SBATCH --job-name=exact
+#SBATCH --partition=gpu_hi
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16

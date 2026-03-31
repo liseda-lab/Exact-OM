@@ -30,11 +30,13 @@ peft = "^0.15.0"
 sentencepiece = "^0.2.0"
 gensim = "^4.3.3"
 rdflib = "^7.5.0"
+httpx = "^0.28.1"
 
 
 [tool.poetry.scripts]
 exact = "exact.delivery.cli.align:main"
 bioml-eval = "exact.delivery.cli.eval:main"
+exact-llm-debug = "exact.delivery.cli.llm_debug:main"
 
 
 [tool.poetry.group.prebuild.dependencies]

@@ -128,6 +128,31 @@ class AlignmentParams(BaseModel):
     review_low: Optional[float] = Field(config["alignment_params"]["review_low"])
     review_high: Optional[float] = Field(config["alignment_params"]["review_high"])
 
+
+class LLMProfileConfig(BaseModel):
+    backend: str = "local_hf"
+    model: Optional[str] = None
+    tokenizer: Optional[str] = None
+    api_base: str = "https://openrouter.ai/api/v1"
+    api_key_env: str = "OPENROUTER_API_KEY"
+    api_key_path: Optional[str] = None
+    timeout_secs: float = 60.0
+    extra_headers: Dict[str, str] = Field(default_factory=dict)
+    provider: Dict[str, Any] = Field(default_factory=dict)
+
+
+class LLMRoutingConfig(BaseModel):
+    default_profile: Optional[str] = None
+    verbaliser_profile: Optional[str] = None
+    summary_profile: Optional[str] = None
+    decision_profile: Optional[str] = None
+    rationale_profile: Optional[str] = None
+    verbaliser_fallback_profile: Optional[str] = None
+    summary_fallback_profile: Optional[str] = None
+    rationale_fallback_profile: Optional[str] = None
+    fallback_profile: Optional[str] = None
+    decision_fallback_profile: Optional[str] = None
+
 class ConfigModel(BaseModel):
 
     seed: int = Field(config["seed"])
@@ -139,6 +164,15 @@ class ConfigModel(BaseModel):
     sanity_check_params: SanityCheckParams = SanityCheckParams()
     alignment_params: AlignmentParams = AlignmentParams()
     inference_params: InferenceParams = InferenceParams()
+    llm_profiles: Dict[str, LLMProfileConfig] = Field(
+        default_factory=lambda: {
+            name: LLMProfileConfig(**payload)
+            for name, payload in (config.get("llm_profiles", {}) or {}).items()
+        }
+    )
+    llm_routing: LLMRoutingConfig = Field(
+        default_factory=lambda: LLMRoutingConfig(**(config.get("llm_routing", {}) or {}))
+    )
     model: ModelParams = ModelParams()
     second_model: Optional[SecondModelParams] = SecondModelParams()
     model_chain: Optional[List[ModelChainEntry]] = None
@@ -174,6 +208,21 @@ class ConfigModel(BaseModel):
         sanity_check_params = SanityCheckParams(**yaml_config.get("sanity_check_params", {}))
         alignment_params = AlignmentParams(**yaml_config.get("alignment_params", {}))
         inference_params = InferenceParams(**yaml_config.get("inference_params", {}))
+        default_llm_profiles = config.get("llm_profiles", {}) or {}
+        merged_llm_profiles = {
+            **default_llm_profiles,
+            **(yaml_config.get("llm_profiles", {}) or {}),
+        }
+        llm_profiles = {
+            name: LLMProfileConfig(**payload)
+            for name, payload in merged_llm_profiles.items()
+        }
+        llm_routing = LLMRoutingConfig(
+            **{
+                **(config.get("llm_routing", {}) or {}),
+                **(yaml_config.get("llm_routing", {}) or {}),
+            }
+        )
         model_params = ModelParams(**yaml_config.get("model", {}))
         second_model_raw = yaml_config.get("second_model", {}) or {}
         legacy_second_pass = yaml_config.get("second_pass_params")
@@ -196,6 +245,8 @@ class ConfigModel(BaseModel):
                 "candidates_params",
                 "alignment_params",
                 "inference_params",
+                "llm_profiles",
+                "llm_routing",
                 "model",
                 "plot_params",
                 "sanity_check_params",
@@ -211,6 +262,8 @@ class ConfigModel(BaseModel):
             sanity_check_params=sanity_check_params,
             alignment_params=alignment_params,
             inference_params=inference_params,
+            llm_profiles=llm_profiles,
+            llm_routing=llm_routing,
             model=model_params,
             second_model=second_model_params,
             model_chain=model_chain,

@@ -1,10 +1,12 @@
 from __future__ import annotations
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Any, Union
 
 import random
 import json
+import hashlib
 import re
 import torch
 
@@ -21,26 +23,31 @@ from exact.core.entities.registry import ComponentType
 from exact.core.entities.configs.dataset import DatasetMask, ContextMethod, BestPathMethod
 from exact.core.contracts.dataset import IDataset, DataFrame
 from exact.core.entities.ontology import OntologyGraph, Entity
+from exact.utils.llm_routing import LLMRouter, extract_chat_text, parse_structured_json
 
 def _prompt_verbalize(head: str, rel: str, tail: str) -> Dict[str, str]:
     return {
-        "system": "You are an ontology expert natural language generator that converts structured data into coherent sentences.",
+        "system": "You are an ontology expert natural language generator that returns strict JSON.",
         "user": (
-            "Given the triple below, generate one complete, grammatically correct sentence that clearly expresses the relationship "
-            "between the head and the tail as indicated by the relation. You must use the exact wording of HEAD and TAIL.\n"
-            f"HEAD: {head}\nRELATION: {rel}\nTAIL: {tail}\nSentence:"
+            "Given the relation and example triple below, return one JSON object with exactly one key: "
+            "\"template\".\n"
+            "The template must be one complete sentence and must contain the literal placeholders $SRC and $TGT "
+            "exactly once each. Do not use the concrete entity names in the template.\n\n"
+            f"HEAD example: {head}\nRELATION: {rel}\nTAIL example: {tail}\n\n"
+            "Return only JSON."
         ),
     }
 
-def _prompt_corrective(prev_sentence: str, head: str, tail: str) -> Dict[str, str]:
+def _prompt_corrective(prev_sentence: str, head: str, rel: str, tail: str) -> Dict[str, str]:
     return {
-        "system": "You are an ontology expert natural language generator that strictly follows the requested surface forms.",
+        "system": "You are an ontology expert natural language generator that returns strict JSON.",
         "user": (
-            "You previously generated the following incorrect sentence that failed to use the exact entity names.\n"
-            f"Incorrect: {prev_sentence}\n"
-            f"Please regenerate a single sentence that uses EXACTLY these surface forms for the entities:\n"
-            f"HEAD must appear as: {head}\nTAIL must appear as: {tail}\n"
-            "Provide only the corrected sentence:"
+            "Your previous output did not follow the requested template format.\n"
+            f"Previous output: {prev_sentence}\n\n"
+            "Regenerate and return one JSON object with exactly one key: \"template\".\n"
+            "The template must contain literal $SRC and $TGT exactly once each and must not contain the example entity names.\n\n"
+            f"HEAD example: {head}\nRELATION: {rel}\nTAIL example: {tail}\n\n"
+            "Return only JSON."
         ),
     }
 
@@ -93,6 +100,9 @@ class ContextDataset(IDataset):
         # Efficiency
         batch_size_verbaliser: int = 32,
         exclude_missing_dr: bool = False,
+        llm_profiles: Optional[Dict[str, Any]] = None,
+        llm_routing: Optional[Dict[str, Any]] = None,
+        request_seed: Optional[int] = None,
         # Formatting
         delimiter: str = "\n",
         # Base class args
@@ -125,9 +135,24 @@ class ContextDataset(IDataset):
         self.max_verb_gen_retries = int(max_verb_gen_retries)
 
         self.delimiter = delimiter
+        self.request_seed = int(request_seed) if request_seed is not None else None
         self._default_verbaliser_system_prompt = "You are a helpful ontology expert."
         self._taxonomy_warning_emitted = False
         self._taxonomy_template_log_emitted = False
+        self._llm_router = LLMRouter(llm_profiles=llm_profiles, llm_routing=llm_routing, log=self.log)
+        self._local_verbaliser_profile_name = "__context_local_verbaliser__"
+        self._llm_router.ensure_profile(
+            self._local_verbaliser_profile_name,
+            {"backend": "local_hf", "model": self.verbaliser_name},
+        )
+        if (
+            self._llm_router.routing.verbaliser_profile is None
+            and self._llm_router.routing.default_profile is None
+        ):
+            self._llm_router.routing.verbaliser_profile = self._local_verbaliser_profile_name
+        if self._llm_router.routing.fallback_profile is None:
+            self._llm_router.routing.fallback_profile = self._local_verbaliser_profile_name
+        self._verbaliser_backend = self._llm_router.resolve_task("verbaliser")
 
         # Prepared on demand
         self._source_graph: Optional[OntologyGraph] = None
@@ -140,6 +165,7 @@ class ContextDataset(IDataset):
         # Templates & caches
         self._verbalization_templates: Optional[Dict[str, str]] = None
         self._verb_temp_path = self.output_path / "verbalization_templates.json"
+        self._verb_temp_meta_path = self.output_path / "verbalization_templates.meta.json"
         self.log(
             f"ContextDataset initialised with only_taxonomy={self.only_taxonomy}, all_labels={self.all_labels}",
             level="info",
@@ -157,6 +183,96 @@ class ContextDataset(IDataset):
             return int(word_count * self.context_token_ratio)
         
         self.context_cost_fn = _triple_token_cost
+
+    def _cache_fingerprint_payload(self) -> Dict[str, Any]:
+        payload = super()._cache_fingerprint_payload()
+        payload.update(
+            {
+                "n_hops": self.n_hops,
+                "context_method": str(self.context_method),
+                "best_path_method": str(self.best_path_method),
+                "context_hop_penalty": self.context_hop_penalty,
+                "context_token_ratio": self.context_token_ratio,
+                "context_safety": self.context_safety,
+                "max_input_tokens_context": self.max_input_tokens_context,
+                "only_taxonomy": self.only_taxonomy,
+                "all_labels": self.all_labels,
+                "add_connectivity_bridges": self.add_connectivity_bridges,
+                "bridge_max_hops": self.bridge_max_hops,
+                "verbaliser_name": self.verbaliser_name,
+                "verbaliser_backend": self._verbaliser_backend.backend,
+                "verbaliser_profile": self._verbaliser_backend.profile_name,
+                "verbaliser_model": self._verbaliser_backend.model,
+                "gen_max_new_tokens": self.gen_max_new_tokens,
+                "do_sample": self.do_sample,
+                "temperature": self.temperature,
+                "top_p": self.top_p,
+                "top_k": self.top_k,
+                "batch_size_verbaliser": self.batch_size_verbaliser,
+                "max_verb_gen_retries": self.max_verb_gen_retries,
+                "delimiter": self.delimiter,
+                "llm_router": self._llm_router.fingerprint_payload(),
+                "request_seed": self.request_seed,
+            }
+        )
+        return payload
+
+    @property
+    def verbalizer_template_fingerprint(self) -> str:
+        payload = {
+            "dataset_signature": self.dataset_signature,
+            "only_taxonomy": self.only_taxonomy,
+            "verbaliser_name": self.verbaliser_name,
+            "verbaliser_backend": self._verbaliser_backend.backend,
+            "verbaliser_profile": self._verbaliser_backend.profile_name,
+            "verbaliser_model": self._verbaliser_backend.model,
+            "gen_max_new_tokens": self.gen_max_new_tokens,
+            "do_sample": self.do_sample,
+            "temperature": self.temperature,
+            "top_p": self.top_p,
+            "top_k": self.top_k,
+            "batch_size_verbaliser": self.batch_size_verbaliser,
+            "max_verb_gen_retries": self.max_verb_gen_retries,
+            "llm_router": self._llm_router.fingerprint_payload(),
+            "request_seed": self.request_seed,
+        }
+        blob = json.dumps(payload, sort_keys=True, default=str)
+        return hashlib.sha1(blob.encode("utf-8")).hexdigest()
+
+    def _template_cache_matches(self) -> bool:
+        if not self._verb_temp_path.exists():
+            return False
+        if not self._verb_temp_meta_path.exists():
+            self.log(
+                "Existing verbalisation template cache lacks metadata; regenerating templates.",
+                level="warning",
+            )
+            return False
+        try:
+            meta = json.loads(self._verb_temp_meta_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            self.log(
+                "Verbalisation template cache metadata is unreadable; regenerating templates.",
+                level="warning",
+            )
+            return False
+        if meta.get("fingerprint") != self.verbalizer_template_fingerprint:
+            self.log(
+                "Existing verbalisation template cache is invalid for the current model/configuration; regenerating templates.",
+                level="warning",
+            )
+            return False
+        return True
+
+    def _write_template_cache_metadata(self) -> None:
+        payload = {
+            "fingerprint": self.verbalizer_template_fingerprint,
+            "dataset_signature": self.dataset_signature,
+            "backend": self._verbaliser_backend.backend,
+            "profile": self._verbaliser_backend.profile_name,
+            "model": self._verbaliser_backend.model,
+        }
+        self._verb_temp_meta_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
     # ------------------------------------------------------------------
     # Ontology graphs (cached)
@@ -189,6 +305,8 @@ class ContextDataset(IDataset):
     def _ensure_verbaliser(self):
         if self.only_taxonomy:
             return # no LLM needed
+        if self._verbaliser_backend.backend == "openrouter":
+            return
         if self._verbaliser is None or self._verbaliser_tok is None:
             if self.verbaliser_name is None:
                 self.log("verbaliser_name is None but only_taxonomy=False; cannot generate templates.", level="error")
@@ -218,10 +336,15 @@ class ContextDataset(IDataset):
             return self._verbalization_templates
 
         # Try load cache
-        if self._verb_temp_path.exists():
+        if self._template_cache_matches():
             self.log("Loading verbalisation templates from cache…", level="debug")
             with open(self._verb_temp_path, "r") as f:
-                self._verbalization_templates = json.load(f)
+                payload = json.load(f)
+            self._verbalization_templates = (
+                payload.get("templates")
+                if isinstance(payload, dict) and "templates" in payload
+                else payload
+            )
             return self._verbalization_templates
 
         # Else Generate fresh
@@ -250,10 +373,8 @@ class ContextDataset(IDataset):
         templates: Dict[str, str] = {}
         to_retry: List[Tuple[str, str]] = []
         for key, sent in zip(keys, sents):
-            head = key2heads[key]
-            tail = key2tails[key]
-            tmpl = sent.replace(head, "$SRC").replace(tail, "$TGT")
-            if "$SRC" in tmpl and "$TGT" in tmpl:
+            tmpl = self._parse_template_output(sent)
+            if self._template_is_valid(tmpl):
                 templates[key] = tmpl
             else:
                 to_retry.append((key, sent))
@@ -264,15 +385,13 @@ class ContextDataset(IDataset):
                 break
             retry_prompts, retry_keys = [], []
             for key, prev in to_retry:
-                retry_prompts.append(_prompt_corrective(prev, key2heads[key], key2tails[key]))
+                retry_prompts.append(_prompt_corrective(prev, key2heads[key], key, key2tails[key]))
                 retry_keys.append(key)
             retry_out = self._batch_generate(retry_prompts)
             new_retry: List[Tuple[str, str]] = []
             for key, sent in zip(retry_keys, retry_out):
-                head = key2heads[key]
-                tail = key2tails[key]
-                tmpl = sent.replace(head, "$SRC").replace(tail, "$TGT")
-                if "$SRC" in tmpl and "$TGT" in tmpl:
+                tmpl = self._parse_template_output(sent)
+                if self._template_is_valid(tmpl):
                     templates[key] = tmpl
                 else:
                     new_retry.append((key, sent))
@@ -285,7 +404,8 @@ class ContextDataset(IDataset):
 
         # Save
         with open(self._verb_temp_path, "w") as f:
-            json.dump(templates, f, indent=2)
+            json.dump({"templates": templates}, f, indent=2)
+        self._write_template_cache_metadata()
 
         self._verbalization_templates = templates
         return self._verbalization_templates
@@ -295,6 +415,8 @@ class ContextDataset(IDataset):
     # ------------------------------------------------------------------
     @torch.inference_mode()
     def _batch_generate(self, prompts: List[Union[str, Dict[str, str]]]) -> List[str]:
+        if self._verbaliser_backend.backend == "openrouter":
+            return self._batch_generate_openrouter(prompts)
         self._ensure_verbaliser()
         tok = self._verbaliser_tok
         model = self._verbaliser
@@ -336,6 +458,49 @@ class ContextDataset(IDataset):
         for orig_idx, new_idx in enumerate(inv):
             outs[orig_idx] = outs_sorted[new_idx]
         return outs
+
+    def _batch_generate_openrouter(self, prompts: List[Union[str, Dict[str, str]]]) -> List[str]:
+        profile = self._llm_router.profiles.get(self._verbaliser_backend.profile_name or "")
+        if profile is None:
+            raise RuntimeError("OpenRouter verbaliser profile was resolved but not found.")
+        workers = self.batch_size_verbaliser or len(prompts)
+        workers = max(1, min(int(workers), len(prompts))) if prompts else 1
+        self.log(
+            (
+                "Hosted verbaliser stage: "
+                f"{len(prompts)} prompts, concurrency={workers}, profile='{profile.name}'."
+            ),
+            level="debug",
+        )
+
+        def _call(prompt: Union[str, Dict[str, str]]) -> str:
+            if isinstance(prompt, dict):
+                system = prompt.get("system", "").strip()
+                user = prompt.get("user", "").strip()
+            else:
+                system = self._default_verbaliser_system_prompt
+                user = str(prompt).strip()
+            payload = self._llm_router.hosted.chat_completion(
+                profile=profile,
+                messages=[
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user},
+                ],
+                max_tokens=self.gen_max_new_tokens,
+                temperature=self.temperature,
+                top_p=self.top_p,
+                seed=self.request_seed,
+            )
+            return extract_chat_text(payload)
+
+        if workers == 1:
+            outputs = [_call(prompt) for prompt in prompts]
+            self.log("Hosted verbaliser stage completed.", level="debug")
+            return outputs
+        with ThreadPoolExecutor(max_workers=workers) as executor:
+            outputs = list(executor.map(_call, prompts))
+        self.log("Hosted verbaliser stage completed.", level="debug")
+        return outputs
 
     def _render_prompt(self, prompt: Union[str, Dict[str, str]]) -> str:
         if isinstance(prompt, dict):
@@ -392,6 +557,20 @@ class ContextDataset(IDataset):
         sentence_parts = re.split(r"(?<=[.!?])\s+", first_line)
         cleaned = sentence_parts[0].strip()
         return cleaned or first_line
+
+    @staticmethod
+    def _parse_template_output(text: str) -> str:
+        try:
+            candidate = parse_structured_json(text, "template")
+        except Exception:
+            candidate = ContextDataset._clean_template_text(text)
+        return candidate.strip()
+
+    @staticmethod
+    def _template_is_valid(text: str) -> bool:
+        if not text:
+            return False
+        return text.count("$SRC") == 1 and text.count("$TGT") == 1
 
     # ------------------------------------------------------------------
     # Verbalise triples with templates
