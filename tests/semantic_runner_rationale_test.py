@@ -19,9 +19,28 @@ class _Pred:
 class _DummyModel:
     def __init__(self):
         self._last_rationale_backend_meta = {"backend": "openrouter", "model": "openai/gpt-4o-mini"}
+        self.generate_llm_rationales = True
 
-    def generate_final_rationales_for_records(self, records):
+    def generate_final_rationales_for_records(self, records, progress_callback=None):
         return [f"rationale:{rec['prediction']['rationale_decision_label']}" for rec in records]
+
+
+class _FingerprintModel:
+    def __init__(self, generate_llm_rationales):
+        self.generate_llm_rationales = generate_llm_rationales
+
+    def runtime_fingerprint_payload(self, generate_llm_rationales_override=None):
+        value = self.generate_llm_rationales
+        if generate_llm_rationales_override is not None:
+            value = bool(generate_llm_rationales_override)
+        return {
+            "name": "dummy",
+            "generate_llm_rationales": value,
+            "other_setting": 123,
+        }
+
+    def runtime_fingerprint(self):
+        raise AssertionError("runner should use runtime_fingerprint_payload for compatibility checks")
 
 
 def test_global_annotation_uses_saved_alignment_membership():
@@ -93,6 +112,10 @@ def test_generate_final_rationales_updates_records():
 def test_checkpoint_with_mismatched_fingerprint_is_ignored(tmp_path):
     runner = object.__new__(SemanticAlignmentRunner)
     runner._dataset = type("DatasetStub", (), {"dataset_signature": "dataset-a"})()
+    runner._checkpoint_fingerprint_payload = {
+        "dataset_signature": "dataset-a",
+        "models": [{"class": "CurrentModel", "fingerprint": "current-fingerprint"}],
+    }
     runner._checkpoint_fingerprint = "current-fingerprint"
     runner.log = lambda *args, **kwargs: None
     checkpoint = tmp_path / "inference.json"
@@ -116,3 +139,125 @@ def test_checkpoint_with_mismatched_fingerprint_is_ignored(tmp_path):
     assert mappings == []
     assert results_json == []
     assert processed_examples == 0
+
+
+def test_checkpoint_mismatch_logs_payload_details_when_available(tmp_path):
+    runner = object.__new__(SemanticAlignmentRunner)
+    runner._dataset = type("DatasetStub", (), {"dataset_signature": "dataset-a"})()
+    runner._checkpoint_fingerprint_payload = {
+        "dataset_signature": "dataset-a",
+        "models": [
+            {
+                "class": "PairAdaptiveSemanticScorer",
+                "fingerprint": "current-fingerprint",
+                "payload": {
+                    "generate_llm_rationales": False,
+                    "llm_router": {"routing": {"decision_profile": "openrouter_gpt4o_mini"}},
+                },
+            }
+        ],
+    }
+    runner._checkpoint_fingerprint = "current-fingerprint"
+    messages = []
+    runner.log = lambda message, level="info": messages.append((level, message))
+    checkpoint = tmp_path / "inference.json"
+    checkpoint.write_text(
+        json.dumps(
+            {
+                "kind": "inference",
+                "dataset_signature": "dataset-a",
+                "checkpoint_fingerprint": "old-fingerprint",
+                "checkpoint_fingerprint_payload": {
+                    "dataset_signature": "dataset-a",
+                    "models": [
+                        {
+                            "class": "SemanticScorer",
+                            "fingerprint": "old-fingerprint",
+                            "payload": {
+                                "generate_llm_rationales": True,
+                                "llm_router": {"routing": {"decision_profile": "local_llm_default"}},
+                            },
+                        }
+                    ],
+                },
+                "processed_examples": 10,
+                "mappings": [{"src": "s", "tgt": "t", "score": 0.9}],
+                "results_json": [{"src_iri": "s", "tgt_iri": "t"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    mappings, results_json, processed_examples = runner._load_checkpoint_state(
+        checkpoint,
+        type("Kind", (), {"name": "inference"})(),
+    )
+
+    assert mappings == []
+    assert results_json == []
+    assert processed_examples == 0
+    assert len(messages) == 1
+    logged = messages[0][1]
+    assert "Mismatch details:" in logged
+    assert "models[0].class" in logged
+    assert "SemanticScorer" in logged
+    assert "PairAdaptiveSemanticScorer" in logged
+    assert "models[0].payload.generate_llm_rationales" in logged
+
+
+def test_checkpoint_with_only_rationale_toggle_change_can_resume_when_enabled(tmp_path):
+    runner = object.__new__(SemanticAlignmentRunner)
+    runner._dataset = type("DatasetStub", (), {"dataset_signature": "dataset-a"})()
+    runner._models = [_FingerprintModel(generate_llm_rationales=False)]
+    runner._model = runner._models[0]
+    runner._checkpoint_fingerprint = runner._build_checkpoint_fingerprint()
+    runner.log = lambda *args, **kwargs: None
+
+    checkpoint = tmp_path / "inference.json"
+    checkpoint.write_text(
+        json.dumps(
+            {
+                "kind": "inference",
+                "dataset_signature": "dataset-a",
+                "checkpoint_fingerprint": runner._build_checkpoint_fingerprint(
+                    generate_llm_rationales_override=True
+                ),
+                "processed_examples": 10,
+                "mappings": [{"src": "s", "tgt": "t", "score": 0.9}],
+                "results_json": [{"src_iri": "s", "tgt_iri": "t"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    mappings, results_json, processed_examples = runner._load_checkpoint_state(
+        checkpoint,
+        type("Kind", (), {"name": "inference"})(),
+        allow_rationale_toggle_checkpoint_resume=True,
+    )
+    assert mappings == [("s", "t", 0.9)]
+    assert results_json == [{"src_iri": "s", "tgt_iri": "t"}]
+    assert processed_examples == 10
+
+
+def test_generate_final_rationales_preserves_existing_values_when_disabled():
+    runner = object.__new__(SemanticAlignmentRunner)
+    runner._results_json = [
+        {
+            "prediction": {"rationale_decision_label": "Match", "llm_rationale": "keep me"},
+            "backend_usage": {},
+            "models": {},
+        },
+        {
+            "prediction": {"rationale_decision_label": "No match", "llm_rationale": ""},
+            "backend_usage": {},
+            "models": {},
+        },
+    ]
+    runner._model = _DummyModel()
+    runner._model.generate_llm_rationales = False
+
+    runner._generate_final_rationales()
+
+    assert runner.results_json[0]["prediction"]["llm_rationale"] == "keep me"
+    assert runner.results_json[1]["prediction"]["llm_rationale"] == ""

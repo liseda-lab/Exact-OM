@@ -70,6 +70,16 @@ class DatasetParams(BaseModel):
     bridge_max_hops: Optional[int] = Field(config["dataset_params"].get("bridge_max_hops", None))
     reasoner_timeout_secs: float = Field(config["dataset_params"].get("reasoner_timeout_secs", 120))
     reasoner_force_hermit: bool = Field(config["dataset_params"].get("reasoner_force_hermit", False))
+    projection_include_literals: bool = Field(config["dataset_params"].get("projection_include_literals", False))
+    hierarchical_relation_families: Dict[str, Dict[str, Any]] = Field(
+        default_factory=lambda: dict(config["dataset_params"].get("hierarchical_relation_families", {}))
+    )
+    hierarchy_max_depth: int = Field(config["dataset_params"].get("hierarchy_max_depth", 2))
+    max_hierarchy_triples_per_family: int = Field(config["dataset_params"].get("max_hierarchy_triples_per_family", 6))
+    max_object_triples: int = Field(config["dataset_params"].get("max_object_triples", 48))
+    max_diff_triples: int = Field(config["dataset_params"].get("max_diff_triples", 24))
+    max_attr_items: int = Field(config["dataset_params"].get("max_attr_items", 12))
+    pair_adaptive_feature_log_every: int = Field(config["dataset_params"].get("pair_adaptive_feature_log_every", 1000))
     # Verbaliser Params
     verbaliser_name: Optional[str] = Field(config["dataset_params"]["verbaliser_name"])
     gen_max_new_tokens: int = Field(config["dataset_params"]["gen_max_new_tokens"])
@@ -116,6 +126,9 @@ class InferenceParams(BaseModel):
     checkpoint_every: int = Field(config["inference_params"]["checkpoint_every"])
     resume_from_checkpoint: bool = Field(config["inference_params"]["resume_from_checkpoint"])
     enable_checkpoints: bool = Field(config["inference_params"]["enable_checkpoints"])
+    allow_rationale_toggle_checkpoint_resume: bool = Field(
+        config["inference_params"].get("allow_rationale_toggle_checkpoint_resume", False)
+    )
 
 
 class AlignmentParams(BaseModel):
@@ -198,6 +211,24 @@ class ConfigModel(BaseModel):
         self.dataset = ComponentRegistry.get(ComponentType.DATASET, dependencies[ComponentType.DATASET])
         self.trainer = ComponentRegistry.get(ComponentType.TRAINER, dependencies[ComponentType.TRAINER])
 
+    @staticmethod
+    def _merge_registry_entry(raw_entry: Optional[Dict[str, Any]], default_entry: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        Merge registry-backed config entries while preserving default params.
+
+        YAML overrides for `model.params` commonly specify only a handful of
+        keys. Without this merge, those partial overrides replace the full
+        default params dict and silently disable unrelated defaults.
+        """
+        base = dict(default_entry or {})
+        override = dict(raw_entry or {})
+        merged = {**base, **{k: v for k, v in override.items() if k != "params"}}
+        merged["params"] = {
+            **dict(base.get("params") or {}),
+            **dict(override.get("params") or {}),
+        }
+        return merged
+
     @classmethod
     def load_config(cls, file_path: Path) -> "ConfigModel":
         yaml_config = read_yaml(file_path)
@@ -223,16 +254,20 @@ class ConfigModel(BaseModel):
                 **(yaml_config.get("llm_routing", {}) or {}),
             }
         )
-        model_params = ModelParams(**yaml_config.get("model", {}))
+        model_params = ModelParams(
+            **cls._merge_registry_entry(yaml_config.get("model", {}) or {}, config.get("model", {}) or {})
+        )
         second_model_raw = yaml_config.get("second_model", {}) or {}
         legacy_second_pass = yaml_config.get("second_pass_params")
         if not second_model_raw and legacy_second_pass is not None:
             second_model_raw = {"name": "SecondPassReranker", "params": legacy_second_pass}
-        second_model_params = SecondModelParams(**second_model_raw)
+        second_model_params = SecondModelParams(
+            **cls._merge_registry_entry(second_model_raw, config.get("second_model", {}) or {})
+        )
         model_chain = None
         if "model_chain" in yaml_config:
             entries = yaml_config.get("model_chain") or []
-            model_chain = [ModelChainEntry(**entry) for entry in entries]
+            model_chain = [ModelChainEntry(**cls._merge_registry_entry(entry, None)) for entry in entries]
 
         # filter config for set keys
         filtered_config = {

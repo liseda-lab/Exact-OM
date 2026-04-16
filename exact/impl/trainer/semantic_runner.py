@@ -112,33 +112,177 @@ class SemanticAlignmentRunner(ITrainer):
             **kwargs,
         )
         self._last_stage_timings: Dict[str, float] = {}
-        self._checkpoint_fingerprint: str = self._build_checkpoint_fingerprint()
+        self._checkpoint_fingerprint_payload: Dict[str, Any] = self._build_checkpoint_fingerprint_payload()
+        self._checkpoint_fingerprint: str = self._hash_checkpoint_fingerprint_payload(
+            self._checkpoint_fingerprint_payload
+        )
 
-    def _build_checkpoint_fingerprint(self) -> str:
+    @staticmethod
+    def _hash_checkpoint_fingerprint_payload(payload: Dict[str, Any]) -> str:
+        blob = json.dumps(payload, sort_keys=True, default=str)
+        return hashlib.sha1(blob.encode("utf-8")).hexdigest()
+
+    @staticmethod
+    def _format_checkpoint_mismatch_value(value: Any, max_chars: int = 120) -> str:
+        try:
+            rendered = json.dumps(value, sort_keys=True, default=str)
+        except TypeError:
+            rendered = repr(value)
+        if len(rendered) > max_chars:
+            return f"{rendered[: max_chars - 3]}..."
+        return rendered
+
+    def _build_checkpoint_fingerprint_payload(
+        self,
+        generate_llm_rationales_override: Optional[bool] = None,
+    ) -> Dict[str, Any]:
         dataset_signature = getattr(self.dataset, "dataset_signature", None)
         models = getattr(self, "models", None) or [getattr(self, "model", None)]
         model_payloads: List[Dict[str, Any]] = []
         for model in models:
             if model is None:
                 continue
+            fingerprint_payload: Optional[Dict[str, Any]] = None
             if hasattr(model, "runtime_fingerprint"):
-                fingerprint = model.runtime_fingerprint()
+                if hasattr(model, "runtime_fingerprint_payload"):
+                    fingerprint_payload = model.runtime_fingerprint_payload(
+                        generate_llm_rationales_override=generate_llm_rationales_override
+                    )
+                    fingerprint = self._hash_checkpoint_fingerprint_payload(fingerprint_payload)
+                else:
+                    fingerprint = model.runtime_fingerprint()
             elif hasattr(model, "_cache_fingerprint"):
                 fingerprint = getattr(model, "_cache_fingerprint")
             else:
                 fingerprint = None
-            model_payloads.append(
-                {
-                    "class": model.__class__.__name__,
-                    "fingerprint": fingerprint,
-                }
-            )
-        payload = {
+            model_entry: Dict[str, Any] = {
+                "class": model.__class__.__name__,
+                "fingerprint": fingerprint,
+            }
+            if fingerprint_payload is not None:
+                model_entry["payload"] = fingerprint_payload
+            model_payloads.append(model_entry)
+        return {
             "dataset_signature": dataset_signature,
             "models": model_payloads,
         }
-        blob = json.dumps(payload, sort_keys=True, default=str)
-        return hashlib.sha1(blob.encode("utf-8")).hexdigest()
+
+    def _build_checkpoint_fingerprint(
+        self,
+        generate_llm_rationales_override: Optional[bool] = None,
+    ) -> str:
+        payload = self._build_checkpoint_fingerprint_payload(
+            generate_llm_rationales_override=generate_llm_rationales_override
+        )
+        return self._hash_checkpoint_fingerprint_payload(payload)
+
+    def _collect_checkpoint_fingerprint_diffs(
+        self,
+        checkpoint_value: Any,
+        current_value: Any,
+        path: str,
+        diffs: List[str],
+        max_diffs: int,
+    ) -> None:
+        if len(diffs) >= max_diffs:
+            return
+        if type(checkpoint_value) is not type(current_value):
+            diffs.append(
+                f"{path}: checkpoint={self._format_checkpoint_mismatch_value(checkpoint_value)}, "
+                f"current={self._format_checkpoint_mismatch_value(current_value)}"
+            )
+            return
+        if isinstance(checkpoint_value, dict):
+            for key in sorted(set(checkpoint_value) | set(current_value)):
+                if len(diffs) >= max_diffs:
+                    return
+                next_path = f"{path}.{key}" if path else str(key)
+                if key not in checkpoint_value:
+                    diffs.append(
+                        f"{next_path}: checkpoint=<missing>, "
+                        f"current={self._format_checkpoint_mismatch_value(current_value[key])}"
+                    )
+                    continue
+                if key not in current_value:
+                    diffs.append(
+                        f"{next_path}: checkpoint={self._format_checkpoint_mismatch_value(checkpoint_value[key])}, "
+                        "current=<missing>"
+                    )
+                    continue
+                self._collect_checkpoint_fingerprint_diffs(
+                    checkpoint_value[key],
+                    current_value[key],
+                    next_path,
+                    diffs,
+                    max_diffs,
+                )
+            return
+        if isinstance(checkpoint_value, list):
+            shared = min(len(checkpoint_value), len(current_value))
+            for idx in range(shared):
+                if len(diffs) >= max_diffs:
+                    return
+                self._collect_checkpoint_fingerprint_diffs(
+                    checkpoint_value[idx],
+                    current_value[idx],
+                    f"{path}[{idx}]",
+                    diffs,
+                    max_diffs,
+                )
+            if len(diffs) >= max_diffs:
+                return
+            if len(checkpoint_value) != len(current_value):
+                diffs.append(
+                    f"{path}.length: checkpoint={len(checkpoint_value)}, current={len(current_value)}"
+                )
+            return
+        if checkpoint_value != current_value:
+            diffs.append(
+                f"{path}: checkpoint={self._format_checkpoint_mismatch_value(checkpoint_value)}, "
+                f"current={self._format_checkpoint_mismatch_value(current_value)}"
+            )
+
+    def _describe_checkpoint_fingerprint_mismatch(
+        self,
+        checkpoint_payload: Optional[Dict[str, Any]],
+        current_payload: Optional[Dict[str, Any]],
+        max_diffs: int = 8,
+    ) -> Optional[str]:
+        if not isinstance(checkpoint_payload, dict) or not isinstance(current_payload, dict):
+            return None
+        diffs: List[str] = []
+        self._collect_checkpoint_fingerprint_diffs(
+            checkpoint_payload,
+            current_payload,
+            "",
+            diffs,
+            max_diffs + 1,
+        )
+        if not diffs:
+            return None
+        extra = len(diffs) - max_diffs
+        shown = diffs[:max_diffs]
+        summary = "; ".join(shown)
+        if extra > 0:
+            summary = f"{summary}; ... (+{extra} more)"
+        return summary
+
+    def _checkpoint_matches_rationale_toggle_override(
+        self,
+        payload_fingerprint: Optional[str],
+    ) -> bool:
+        if not payload_fingerprint:
+            return False
+        model = getattr(self, "model", None)
+        if model is None or not hasattr(model, "generate_llm_rationales"):
+            return False
+        current_value = getattr(model, "generate_llm_rationales", None)
+        if not isinstance(current_value, bool):
+            return False
+        alternate = self._build_checkpoint_fingerprint(
+            generate_llm_rationales_override=(not current_value)
+        )
+        return payload_fingerprint == alternate
 
     def _auto_checkpoint_filename(self, kind: DatasetMask) -> str:
         return f"{kind.name.lower()}_{int(time.time())}.json"
@@ -172,6 +316,7 @@ class SemanticAlignmentRunner(ITrainer):
         self,
         kind: DatasetMask,
         preferred_file: Optional[str],
+        allow_rationale_toggle_checkpoint_resume: bool = False,
     ) -> Tuple[Optional[Path], List[Tuple[str, str, float]], List[Dict[str, Any]], int]:
         candidates: List[Path] = []
         if preferred_file:
@@ -196,7 +341,11 @@ class SemanticAlignmentRunner(ITrainer):
             ordered.append(path)
 
         for path in ordered:
-            mappings, results_json, processed_examples = self._load_checkpoint_state(path, kind)
+            mappings, results_json, processed_examples = self._load_checkpoint_state(
+                path,
+                kind,
+                allow_rationale_toggle_checkpoint_resume=allow_rationale_toggle_checkpoint_resume,
+            )
             if processed_examples > 0:
                 return path, mappings, results_json, processed_examples
         return None, [], [], 0
@@ -205,6 +354,7 @@ class SemanticAlignmentRunner(ITrainer):
         self,
         checkpoint_path: Path,
         kind: DatasetMask,
+        allow_rationale_toggle_checkpoint_resume: bool = False,
     ) -> Tuple[List[Tuple[str, str, float]], List[Dict[str, Any]], int]:
         try:
             with open(checkpoint_path, "r", encoding="utf-8") as f:
@@ -236,6 +386,7 @@ class SemanticAlignmentRunner(ITrainer):
             )
             return [], [], 0
         payload_fingerprint = payload.get("checkpoint_fingerprint")
+        payload_fingerprint_payload = payload.get("checkpoint_fingerprint_payload")
         if not payload_fingerprint:
             self.log(
                 (
@@ -246,14 +397,31 @@ class SemanticAlignmentRunner(ITrainer):
             )
             return [], [], 0
         if payload_fingerprint != self._checkpoint_fingerprint:
-            self.log(
-                (
-                    f"Ignoring checkpoint '{checkpoint_path.name}' because its model/config "
-                    f"fingerprint does not match the current run."
-                ),
-                level="warning",
-            )
-            return [], [], 0
+            if (
+                allow_rationale_toggle_checkpoint_resume
+                and self._checkpoint_matches_rationale_toggle_override(payload_fingerprint)
+            ):
+                self.log(
+                    (
+                        f"Accepting checkpoint '{checkpoint_path.name}' despite a fingerprint mismatch "
+                        "because the only allowed change is `generate_llm_rationales`."
+                    ),
+                    level="warning",
+                )
+            else:
+                mismatch_details = self._describe_checkpoint_fingerprint_mismatch(
+                    payload_fingerprint_payload,
+                    getattr(self, "_checkpoint_fingerprint_payload", None),
+                )
+                detail_suffix = f" Mismatch details: {mismatch_details}" if mismatch_details else ""
+                self.log(
+                    (
+                        f"Ignoring checkpoint '{checkpoint_path.name}' because its model/config "
+                        f"fingerprint does not match the current run.{detail_suffix}"
+                    ),
+                    level="warning",
+                )
+                return [], [], 0
 
         mappings: List[Tuple[str, str, float]] = []
         for rec in payload.get("mappings", []):
@@ -284,6 +452,11 @@ class SemanticAlignmentRunner(ITrainer):
             "kind": kind.name,
             "dataset_signature": getattr(self.dataset, "dataset_signature", None),
             "checkpoint_fingerprint": self._checkpoint_fingerprint,
+            "checkpoint_fingerprint_payload": getattr(
+                self,
+                "_checkpoint_fingerprint_payload",
+                self._build_checkpoint_fingerprint_payload(),
+            ),
             "total_examples": total_examples,
             "processed_examples": processed_examples,
             "mappings": [
@@ -367,13 +540,91 @@ class SemanticAlignmentRunner(ITrainer):
             pred["rationale_decision_label"] = "Match" if rationale_positive else "No match"
             rec["prediction"] = pred
 
-    def _generate_final_rationales(self) -> None:
+    def _generate_final_rationales(self, log_every: int = 10) -> None:
         if not self.results_json:
             return
         model = getattr(self, "model", None)
         if model is None or not hasattr(model, "generate_final_rationales_for_records"):
             return
-        rationales = model.generate_final_rationales_for_records(self.results_json)
+        if not bool(getattr(model, "generate_llm_rationales", True)):
+            return
+        progress_state: Dict[str, Any] = {
+            "started": False,
+            "start_time": None,
+            "last_logged_uncached": 0,
+            "interval_uncached_records": 0,
+            "cached_records": 0,
+            "uncached_records": 0,
+            "uncached_unique_prompts": 0,
+            "backend": None,
+            "model": None,
+            "concurrency": None,
+        }
+
+        def _progress_callback(event: Dict[str, Any]) -> None:
+            if not event or event.get("stage") != "rationale":
+                return
+            event_type = str(event.get("event", ""))
+            if event_type == "start":
+                start_time = time.perf_counter()
+                progress_state["started"] = True
+                progress_state["start_time"] = start_time
+                progress_state["cached_records"] = int(event.get("cached_records", 0) or 0)
+                progress_state["uncached_records"] = int(event.get("uncached_records", 0) or 0)
+                progress_state["uncached_unique_prompts"] = int(event.get("uncached_unique_prompts", 0) or 0)
+                progress_state["backend"] = event.get("backend")
+                progress_state["model"] = event.get("model")
+                progress_state["concurrency"] = int(event.get("concurrency", 0) or 0)
+                concurrency = max(1, progress_state["concurrency"] or 1)
+                progress_state["interval_uncached_records"] = max(1, int(log_every)) * concurrency
+                self.log(
+                    (
+                        "Rationale stage started: "
+                        f"records={int(event.get('total_records', 0) or 0)}, "
+                        f"uncached_records={progress_state['uncached_records']}, "
+                        f"uncached_unique_prompts={progress_state['uncached_unique_prompts']}, "
+                        f"cached_records={progress_state['cached_records']}, "
+                        f"backend={progress_state['backend']}, "
+                        f"model={progress_state['model']}, "
+                        f"concurrency={progress_state['concurrency'] or 1}."
+                    ),
+                    level="info",
+                )
+                return
+            if event_type != "progress" or not progress_state["started"]:
+                return
+
+            total_uncached = int(event.get("total_uncached_records", 0) or 0)
+            completed_uncached = int(event.get("completed_uncached_records", 0) or 0)
+            if total_uncached <= 0:
+                return
+            last_logged = int(progress_state["last_logged_uncached"] or 0)
+            interval = int(progress_state["interval_uncached_records"] or 1)
+            if completed_uncached < total_uncached and (completed_uncached - last_logged) < interval:
+                return
+
+            progress_state["last_logged_uncached"] = completed_uncached
+            elapsed = max(1e-8, time.perf_counter() - float(progress_state["start_time"]))
+            rate = completed_uncached / elapsed
+            remaining = max(0, total_uncached - completed_uncached)
+            eta = _format_duration(remaining / rate) if rate > 0 else _format_duration(0.0)
+            avg_seconds = elapsed / max(1, completed_uncached)
+            self.log(
+                (
+                    "Rationale progress: "
+                    f"uncached_records={completed_uncached}/{total_uncached}, "
+                    f"unique_prompts={int(event.get('completed_unique_prompts', 0) or 0)}/"
+                    f"{int(event.get('total_unique_prompts', 0) or 0)}, "
+                    f"cached_records={int(event.get('cached_records', 0) or 0)}, "
+                    f"avg={avg_seconds:.2f}s/record, ETA {eta}"
+                ),
+                level="info",
+            )
+
+        rationales = model.generate_final_rationales_for_records(
+            self.results_json,
+            progress_callback=_progress_callback,
+        )
         rationale_meta = getattr(model, "_last_rationale_backend_meta", {}) or {}
         for rec, rationale in zip(self.results_json, rationales):
             pred = rec.get("prediction") or {}
@@ -383,6 +634,24 @@ class SemanticAlignmentRunner(ITrainer):
             backend_usage["rationale"] = dict(rationale_meta)
             rec["backend_usage"] = backend_usage
             self._sync_record_model_usage(rec)
+        if progress_state["started"]:
+            elapsed = max(0.0, time.perf_counter() - float(progress_state["start_time"]))
+            duration = _format_duration(elapsed)
+            uncached_records = int(progress_state["uncached_records"] or 0)
+            throughput = (uncached_records / elapsed) if elapsed > 1e-8 and uncached_records > 0 else 0.0
+            avg_seconds = (elapsed / uncached_records) if uncached_records > 0 else 0.0
+            self.log(
+                (
+                    "Rationale stage completed: "
+                    f"records={len(self.results_json)}, "
+                    f"uncached_records={uncached_records}, "
+                    f"cached_records={int(progress_state['cached_records'] or 0)}, "
+                    f"duration={duration}, "
+                    f"throughput={throughput:.2f} uncached records/s, "
+                    f"avg={avg_seconds:.2f}s/uncached record"
+                ),
+                level="info",
+            )
 
     @staticmethod
     def _sync_record_model_usage(rec: Dict[str, Any]) -> None:
@@ -442,6 +711,7 @@ class SemanticAlignmentRunner(ITrainer):
         checkpoint_every: int = 10,
         resume_from_checkpoint: bool = True,
         enable_checkpoints: bool = True,
+        allow_rationale_toggle_checkpoint_resume: bool = False,
         **kwargs,
     ) -> Tuple[List[EntityMapping], float]:
         self.dataset.default_kind = kind
@@ -485,7 +755,9 @@ class SemanticAlignmentRunner(ITrainer):
 
         if checkpoint_enabled and resume_from_checkpoint:
             cp_path, restored_mappings, restored_json, restored_examples = self._restore_from_available_checkpoints(
-                kind, checkpoint_file
+                kind,
+                checkpoint_file,
+                allow_rationale_toggle_checkpoint_resume=allow_rationale_toggle_checkpoint_resume,
             )
             if restored_examples and cp_path:
                 self.log(
@@ -513,7 +785,7 @@ class SemanticAlignmentRunner(ITrainer):
             preds = EntityMapping.read_table_mappings(df, threshold=threshold, cardinality=cardinality)
             self._annotate_final_prediction_records(preds, threshold=threshold, local_alignment=local_alignment)
             rationale_start = time.perf_counter()
-            self._generate_final_rationales()
+            self._generate_final_rationales(log_every=log_every)
             rationale_elapsed = time.perf_counter() - rationale_start
             self.results_df = self._make_summary_dataframe(self.results_json)
             self._last_stage_timings = {
@@ -590,16 +862,72 @@ class SemanticAlignmentRunner(ITrainer):
                     label=labels,
                 )
             self._record_llm_calibration(out.get("llm_calibration"))
+            pair_batch_stats = out.get("batch_pair_adaptive_stats") or {}
+            if step == 1 and pair_batch_stats:
+                src_pool = pair_batch_stats.get("src_pool") or {}
+                tgt_pool = pair_batch_stats.get("tgt_pool") or {}
+                evidence = pair_batch_stats.get("pair_evidence") or {}
+                self.log(
+                    (
+                        "Pair-adaptive pair context is assembled during inference batches. "
+                        f"First batch: pairs={pair_batch_stats.get('pairs', len(src_iri))}, "
+                        f"unique src/tgt={pair_batch_stats.get('unique_src', 0)}/{pair_batch_stats.get('unique_tgt', 0)}, "
+                        f"entity-cache hits src={pair_batch_stats.get('src_cache_hits', 0)}/{pair_batch_stats.get('unique_src', 0)}, "
+                        f"tgt={pair_batch_stats.get('tgt_cache_hits', 0)}/{pair_batch_stats.get('unique_tgt', 0)}; "
+                        f"src pools h/o/a={src_pool.get('hier_nonempty', 0)}/{src_pool.get('entities', 0)},"
+                        f"{src_pool.get('obj_nonempty', 0)}/{src_pool.get('entities', 0)},"
+                        f"{src_pool.get('attr_nonempty', 0)}/{src_pool.get('entities', 0)}; "
+                        f"tgt pools h/o/a={tgt_pool.get('hier_nonempty', 0)}/{tgt_pool.get('entities', 0)},"
+                        f"{tgt_pool.get('obj_nonempty', 0)}/{tgt_pool.get('entities', 0)},"
+                        f"{tgt_pool.get('attr_nonempty', 0)}/{tgt_pool.get('entities', 0)}; "
+                        f"selected pair evidence hier/sim/diff/attr={evidence.get('hier_selected', 0)}/{pair_batch_stats.get('pairs', len(src_iri))},"
+                        f"{evidence.get('sim_selected', 0)}/{pair_batch_stats.get('pairs', len(src_iri))},"
+                        f"{evidence.get('diff_selected', 0)}/{pair_batch_stats.get('pairs', len(src_iri))},"
+                        f"{evidence.get('attr_selected', 0)}/{pair_batch_stats.get('pairs', len(src_iri))}."
+                    ),
+                    "info",
+                )
 
             # Accumulate mappings
-            s_label_vals = out["s_label"].detach().cpu().tolist()
-            s_label_star_vals = out["s_label_star"].detach().cpu().tolist()
-            s_ctx_vals = out["s_ctx"].detach().cpu().tolist()
-            s_lctx_vals = out["S_lctx"].detach().cpu().tolist()
-            s_final = out["S_final"].detach().cpu().tolist()
-            w_c_vals = out["w_c"].detach().cpu().tolist()
-            w_i_vals = out["w_i"].detach().cpu().tolist()
-            p_llm_vals = out["p_llm"].detach().cpu().tolist()
+            def _tensor_list(name: str, default: float = 0.0):
+                value = out.get(name)
+                if isinstance(value, torch.Tensor):
+                    return value.detach().cpu().tolist()
+                return [default] * len(src_iri)
+
+            s_label_vals = _tensor_list("s_label")
+            s_label_star_vals = _tensor_list("s_label_star")
+            s_ctx_vals = _tensor_list("s_ctx")
+            s_lctx_vals = _tensor_list("S_lctx")
+            s_base_vals = _tensor_list("S_base")
+            s_struct_vals = _tensor_list("S_struct")
+            s_hier_vals = _tensor_list("s_hier")
+            s_sim_vals = _tensor_list("s_sim")
+            s_diff_vals = _tensor_list("s_diff")
+            s_attr_vals = _tensor_list("s_attr")
+            q_label_vals = _tensor_list("q_label")
+            q_struct_vals = _tensor_list("Q_struct")
+            q_hier_vals = _tensor_list("q_hier")
+            q_sim_vals = _tensor_list("q_sim")
+            q_diff_vals = _tensor_list("q_diff")
+            q_attr_vals = _tensor_list("q_attr")
+            s_final = _tensor_list("S_final")
+            w_c_vals = _tensor_list("w_c")
+            w_struct_vals = _tensor_list("w_struct")
+            w_i_vals = _tensor_list("w_i")
+            u_vals = _tensor_list("U")
+            u_ind_vals = _tensor_list("U_ind")
+            u_dis_vals = _tensor_list("U_dis")
+            p_llm_vals = _tensor_list("p_llm")
+            i_label_vals = _tensor_list("I_label")
+            i_struct_vals = _tensor_list("I_struct")
+            i_ctx_vals = _tensor_list("I_ctx")
+            i_hier_vals = _tensor_list("I_hier")
+            i_sim_vals = _tensor_list("I_sim")
+            i_diff_vals = _tensor_list("I_diff")
+            i_attr_vals = _tensor_list("I_attr")
+            i_llm_vals = _tensor_list("I_llm")
+            llm_pair_briefs = list(out.get("llm_pair_briefs") or [""] * len(src_iri))
             ground_truth = labels or [None] * len(src_iri)
 
             for idx, (s, t, score) in enumerate(zip(src_iri, tgt_iri, s_final)):
@@ -612,10 +940,35 @@ class SemanticAlignmentRunner(ITrainer):
                     "s_label_star": float(s_label_star_vals[idx]),
                     "s_ctx": float(s_ctx_vals[idx]),
                     "S_lctx": float(s_lctx_vals[idx]),
+                    "S_base": float(s_base_vals[idx]),
+                    "S_struct": float(s_struct_vals[idx]),
+                    "s_hier": float(s_hier_vals[idx]),
+                    "s_sim": float(s_sim_vals[idx]),
+                    "s_diff": float(s_diff_vals[idx]),
+                    "s_attr": float(s_attr_vals[idx]),
+                    "q_label": float(q_label_vals[idx]),
+                    "Q_struct": float(q_struct_vals[idx]),
+                    "q_hier": float(q_hier_vals[idx]),
+                    "q_sim": float(q_sim_vals[idx]),
+                    "q_diff": float(q_diff_vals[idx]),
+                    "q_attr": float(q_attr_vals[idx]),
                     "S_final": float(score),
                     "w_c": float(w_c_vals[idx]),
+                    "w_struct": float(w_struct_vals[idx]),
                     "w_i": float(w_i_vals[idx]),
+                    "U": float(u_vals[idx]),
+                    "U_ind": float(u_ind_vals[idx]),
+                    "U_dis": float(u_dis_vals[idx]),
                     "p_llm": float(p_llm_vals[idx]),
+                    "I_label": float(i_label_vals[idx]),
+                    "I_struct": float(i_struct_vals[idx]),
+                    "I_ctx": float(i_ctx_vals[idx]),
+                    "I_hier": float(i_hier_vals[idx]),
+                    "I_sim": float(i_sim_vals[idx]),
+                    "I_diff": float(i_diff_vals[idx]),
+                    "I_attr": float(i_attr_vals[idx]),
+                    "I_llm": float(i_llm_vals[idx]),
+                    "llm_pair_brief": llm_pair_briefs[idx],
                     "src_label_text": self._summarize_label(src_labels[idx]),
                     "tgt_label_text": self._summarize_label(tgt_labels[idx]),
                     "src_context_text": self._summarize_context(src_ctxs[idx] if src_ctxs else []),
@@ -650,10 +1003,26 @@ class SemanticAlignmentRunner(ITrainer):
                 remaining_batches = max(0, total_batches - step)
                 remaining_time = remaining_batches * avg_batch_time
                 eta_str = _format_duration(remaining_time)
+                pair_diag = ""
+                if pair_batch_stats:
+                    evidence = pair_batch_stats.get("pair_evidence") or {}
+                    pair_total = max(1, int(pair_batch_stats.get("pairs", len(src_iri))))
+                    pair_diag = (
+                        " | pair-adaptive ctx: "
+                        f"cache src={pair_batch_stats.get('src_cache_hits', 0)}/{pair_batch_stats.get('unique_src', 0)}, "
+                        f"tgt={pair_batch_stats.get('tgt_cache_hits', 0)}/{pair_batch_stats.get('unique_tgt', 0)}; "
+                        f"selected hier/sim/diff/attr={evidence.get('hier_selected', 0)}/{pair_total},"
+                        f"{evidence.get('sim_selected', 0)}/{pair_total},"
+                        f"{evidence.get('diff_selected', 0)}/{pair_total},"
+                        f"{evidence.get('attr_selected', 0)}/{pair_total}; "
+                        f"struct-active={pair_batch_stats.get('struct_active_pairs', 0)}/{pair_total}; "
+                        f"llm-gated={pair_batch_stats.get('llm_gated_pairs', 0)}/{pair_total}"
+                    )
                 self.log(
                     (
                         f"Batch {step}/{total_batches} done "
                         f"(avg {avg_batch_time:.2f}s/batch, ETA {eta_str})"
+                        f"{pair_diag}"
                     ),
                     "debug",
                 )
@@ -683,13 +1052,13 @@ class SemanticAlignmentRunner(ITrainer):
                 empty_pct = (empty / requested) * 100.0
                 self.log(
                     (
-                        "LLM summary quality: "
+                        "LLM summary/brief quality: "
                         f"{requested} requested, {usable} usable, {empty} empty (~{empty_pct:.2f}% empty)"
                     ),
                     "info",
                 )
             else:
-                self.log("LLM summaries were not requested for this run.", "info")
+                self.log("LLM summaries/briefs were not requested for this run.", "info")
 
         # Normalize LLM importance: if the LLM did not run (p_llm == 0 or no decision),
         # clamp I_llm to 0 so downstream summaries/plots are consistent with behavior.
@@ -722,7 +1091,7 @@ class SemanticAlignmentRunner(ITrainer):
         preds = EntityMapping.read_table_mappings(df_scores, threshold=threshold, cardinality=cardinality)
         self._annotate_final_prediction_records(preds, threshold=threshold, local_alignment=local_alignment)
         rationale_start = time.perf_counter()
-        self._generate_final_rationales()
+        self._generate_final_rationales(log_every=log_every)
         rationale_elapsed_seconds = time.perf_counter() - rationale_start
         post_inference_elapsed_seconds = time.perf_counter() - post_inference_start - rationale_elapsed_seconds
         if self.results_json:

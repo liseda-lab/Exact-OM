@@ -1,8 +1,9 @@
 from collections import defaultdict, deque
-from typing import List, Optional, Union, Dict, Set, Tuple
+from typing import List, Optional, Union, Dict, Set, Tuple, Any
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import math
+import re
 import sys
 import time
 import logging
@@ -27,10 +28,17 @@ class OntologyGraph:
     Builds a cached graph structure for an ontology by projecting it using OWL2VecStarProjector.
     The edges are stored with IRIs. Label extractions are cached for efficiency.
     """
-    def __init__(self, ontology: OWLOntology, reasoner: Reasoner, only_taxonomy: bool = False) -> None:
+    def __init__(
+        self,
+        ontology: OWLOntology,
+        reasoner: Reasoner,
+        only_taxonomy: bool = False,
+        include_literals: bool = False,
+    ) -> None:
         self.ontology = ontology
         self.reasoner = reasoner
         self.only_taxonomy = only_taxonomy
+        self.include_literals = include_literals
         self._logger = logging.getLogger("exact")
         self.edges: Optional[List[Edge]] = None
         self.out_edges: Dict[str, List[Edge]] = None
@@ -49,12 +57,15 @@ class OntologyGraph:
 
         self._node_ic_cache: Optional[Dict[Tuple[str,str], float]]    = None
         self._edge_ic_cache: Optional[Dict[Tuple[str,str,str], float]] = None
+        self._edge_ic_max_cache: Optional[float] = None
 
         # edge cost cache
         self._edge_cost_cache: Dict[Tuple[str,str,str], int] = None
 
         # adjacency cache including relation labels (for shortest paths)
         self._rel_adj_cache: Optional[Dict[str, List[Tuple[str, str]]]] = None
+        self._incident_edge_cache: Optional[Dict[str, List[Tuple[str, str, str]]]] = None
+        self._raw_neighborhood_cache: Dict[Tuple[str, int, bool], List[Tuple[str, str, str]]] = {}
 
         self._build_projection()
         self.precompute_all_labels()
@@ -104,6 +115,7 @@ class OntologyGraph:
                  ic_u = self._node_ic_cache[(r,u)]
                  ic_v = self._node_ic_cache[(r,v)]
                  self._edge_ic_cache[(u,r,v)] = 0.5 * (ic_u + ic_v)
+             self._edge_ic_max_cache = max(self._edge_ic_cache.values(), default=1.0) or 1.0
         return self._edge_ic_cache
 
     @property
@@ -145,7 +157,13 @@ class OntologyGraph:
             level="info",
         )
 
-        projector = TaxonomyProjector() if self.only_taxonomy else OWL2VecStarProjector()
+        if self.only_taxonomy:
+            projector = TaxonomyProjector()
+        else:
+            try:
+                projector = OWL2VecStarProjector(include_literals=self.include_literals)
+            except TypeError:
+                projector = OWL2VecStarProjector()
 
         stop_evt = threading.Event()
 
@@ -336,8 +354,15 @@ class OntologyGraph:
         If no label is found, returns a list containing the short form of the IRI.
         """
         if iri not in self.label_cache:
+            if iri is None:
+                self.label_cache[iri] = [""]
+                return self.label_cache[iri]
+            iri_text = str(iri)
+            if self._looks_like_literal_or_blank(iri_text):
+                self.label_cache[iri] = [self._normalize_literal_text(iri_text)]
+                return self.label_cache[iri]
             factory = self.ontology.getOWLOntologyManager().getOWLDataFactory()
-            owl_class = factory.getOWLClass(IRI.create(iri))
+            owl_class = factory.getOWLClass(IRI.create(iri_text))
             label_property = self.ontology.getOWLOntologyManager().getOWLDataFactory().getRDFSLabel()
             labels = [
                 str(annotation.getValue().asLiteral().get().getLiteral())
@@ -346,6 +371,85 @@ class OntologyGraph:
             ]
             self.label_cache[iri] = labels if labels else [str(owl_class.getIRI().getShortForm())]
         return self.label_cache[iri]
+
+    @staticmethod
+    def _looks_like_literal_or_blank(text: str) -> bool:
+        if text is None:
+            return True
+        txt = str(text).strip()
+        if not txt:
+            return True
+        if txt.startswith("_:"):
+            return True
+        if txt.startswith('"') and txt.endswith('"'):
+            return True
+        if txt.startswith("'") and txt.endswith("'"):
+            return True
+        if "^^" in txt or txt.startswith("literal:"):
+            return True
+        return not bool(re.match(r"^[a-zA-Z][a-zA-Z0-9+.-]*:", txt))
+
+    @staticmethod
+    def _normalize_literal_text(text: str) -> str:
+        txt = str(text).strip()
+        txt = re.sub(r"^literal:", "", txt, flags=re.IGNORECASE).strip()
+        txt = re.sub(r"\^\^.*$", "", txt).strip()
+        txt = txt.strip("'\"")
+        return txt or str(text)
+
+    def edge_ic_norm(self, triple: Tuple[str, str, str]) -> float:
+        edge_ic = self.edge_ic
+        val = float(edge_ic.get(triple, 0.0))
+        if not edge_ic:
+            return 0.0
+        mx = self._edge_ic_max_cache or 1.0
+        return max(0.0, min(1.0, val / mx))
+
+    def _incident_edges(self) -> Dict[str, List[Tuple[str, str, str]]]:
+        if self._incident_edge_cache is None:
+            incident = defaultdict(list)
+            for edge in self.edges:
+                triple = (str(edge.src), str(edge.rel), str(edge.dst))
+                incident[triple[0]].append(triple)
+                incident[triple[2]].append(triple)
+            self._incident_edge_cache = dict(incident)
+        return self._incident_edge_cache
+
+    def get_raw_neighborhood(
+        self,
+        start: str,
+        n: int,
+        include_reverse: bool = True,
+    ) -> List[Tuple[str, str, str]]:
+        key = (start, int(n), bool(include_reverse))
+        if key in self._raw_neighborhood_cache:
+            return list(self._raw_neighborhood_cache[key])
+
+        visited = {start: 0}
+        queue = deque([start])
+        while queue:
+            node = queue.popleft()
+            dist = visited[node]
+            if dist < n:
+                for nbr in self.graph.get(node, []):
+                    if nbr not in visited:
+                        visited[nbr] = dist + 1
+                        queue.append(nbr)
+        reachable = set(visited.keys())
+        triples: List[Tuple[str, str, str]] = []
+        seen = set()
+        incident = self._incident_edges()
+        candidate_nodes = reachable if include_reverse else {start}
+        for node in candidate_nodes:
+            for src, rel, dst in incident.get(node, []):
+                if src in reachable and dst in reachable:
+                    triple = (src, rel, dst)
+                    if triple in seen:
+                        continue
+                    seen.add(triple)
+                    triples.append(triple)
+        self._raw_neighborhood_cache[key] = list(triples)
+        return triples
 
     def precompute_all_labels(self) -> None:
         """

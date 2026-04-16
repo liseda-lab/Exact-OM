@@ -1,2 +1,3 @@
 from .semantic_scorer import SemanticScorer
+from .pair_adaptive_scorer import PairAdaptiveSemanticScorer
 from .second_pass_reranker import SecondPassReranker

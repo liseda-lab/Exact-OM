@@ -125,9 +125,16 @@ class AlignmentAction(Protocol):
 
             dataset_step_start = time.time()
             dataset.save()
-
-            dataset.log_sanity_examples(**configs.sanity_check_params.model_dump())
             dataset_stage_timings["Dataset.Save"] = (time.time() - dataset_step_start) / 60
+
+            if getattr(dataset, "emit_feature_metrics_on_build", lambda: False)():
+                dataset_step_start = time.time()
+                dataset.save_feature_metrics()
+                dataset_stage_timings["Dataset.FeatureMetrics"] = (time.time() - dataset_step_start) / 60
+
+            dataset_step_start = time.time()
+            dataset.log_sanity_examples(**configs.sanity_check_params.model_dump())
+            dataset_stage_timings["Dataset.Sanity"] = (time.time() - dataset_step_start) / 60
 
             dataset_step_start = time.time()
             dataset.plot_feature_distributions(

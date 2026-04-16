@@ -886,6 +886,57 @@ class ContextDataset(IDataset):
         df[cols].to_csv(out_path, index=False)
         self.log(f"Saved feature metrics CSV to {out_path}", level="info")
         return out_path
+
+    def emit_feature_metrics_on_build(self) -> bool:
+        return False
+
+    def supported_plot_metrics(self) -> List[str]:
+        return [
+            "src_ctx_n_triples", "tgt_ctx_n_triples",
+            "src_ctx_tok_len", "tgt_ctx_tok_len",
+            "src_ctx_word_len", "tgt_ctx_word_len",
+            "src_ctx_char_len", "tgt_ctx_char_len",
+            "src_lab_n_labels", "tgt_lab_n_labels",
+            "src_lab_word_len", "tgt_lab_word_len",
+            "src_lab_char_len", "tgt_lab_char_len",
+            "src_lab_max_label_words", "tgt_lab_max_label_words",
+            "src_lab_avg_label_words", "tgt_lab_avg_label_words",
+            "cand_sim", "cand_sim_src_mean",
+            "cand_sim_prob", "cand_share_top", "cand_share_rest", "cand_share_log_ratio",
+        ]
+
+    def default_plot_metrics(self) -> List[str]:
+        return [
+            "src_ctx_n_triples", "tgt_ctx_n_triples",
+            "src_ctx_tok_len", "tgt_ctx_tok_len",
+            "src_lab_n_labels", "tgt_lab_n_labels",
+            "src_lab_word_len", "tgt_lab_word_len",
+            "src_lab_max_label_words", "tgt_lab_max_label_words",
+            "cand_sim", "cand_sim_src_mean",
+        ]
+
+    def _resolve_plot_metrics(self, which: Optional[List[str]], df: DataFrame) -> List[str]:
+        supported = list(self.supported_plot_metrics())
+        default_metrics = [col for col in self.default_plot_metrics() if col in supported]
+        requested = default_metrics if which is None else list(which)
+        unsupported = [col for col in requested if col not in supported]
+        if unsupported:
+            preview = ", ".join(unsupported[:8])
+            suffix = "" if len(unsupported) <= 8 else ", ..."
+            self.log(
+                f"Skipping unsupported dataset plot metrics for {self.__class__.__name__}: {preview}{suffix}",
+                level="info",
+            )
+        selected = [col for col in requested if col in supported and col in df.columns]
+        if selected:
+            return selected
+        fallback = [col for col in default_metrics if col in df.columns]
+        if which is not None:
+            self.log(
+                f"No supported dataset plot metrics requested for {self.__class__.__name__}; using dataset defaults instead.",
+                level="warning",
+            )
+        return fallback
     
     def plot_feature_distributions(
             self,
@@ -902,23 +953,18 @@ class ContextDataset(IDataset):
             Labels:  "src_lab_n_labels","tgt_lab_n_labels","src_lab_word_len","tgt_lab_word_len","src_lab_char_len","tgt_lab_char_len","src_lab_max_label_words","tgt_lab_max_label_words","src_lab_avg_label_words","tgt_lab_avg_label_words"
             Candidates: "cand_sim"
             """
-            if which is None:
-                which = [
-                    "src_ctx_n_triples","tgt_ctx_n_triples",
-                    "src_ctx_tok_len","tgt_ctx_tok_len",
-                    "src_lab_n_labels","tgt_lab_n_labels",
-                    "src_lab_word_len","tgt_lab_word_len",
-                    "src_lab_max_label_words","tgt_lab_max_label_words",
-                ]
-
             df = self.dataframe
+            which = self._resolve_plot_metrics(which, df)
+            if not which:
+                self.log(
+                    f"No dataset plot metrics available for {self.__class__.__name__}; skipping feature plots.",
+                    level="warning",
+                )
+                return
             plot_dir = (self.plot_dir / "features").resolve()
             plot_dir.mkdir(parents=True, exist_ok=True)
 
             for col in which:
-                if col not in df.columns:
-                    self.log(f"Skipping missing metric '{col}'", level="warning")
-                    continue
                 plt.figure(figsize=(7,5))
                 sns.histplot(df[col], bins=bins, kde=kde, stat="probability", alpha=alpha)
                 plt.title(col.replace("_", " ").title())

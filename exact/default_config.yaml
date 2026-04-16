@@ -40,24 +40,69 @@ alignment_params:
 
 dataset_params:
   # Dataset construction and ontology loading.
+  #
+  # Important mode split:
+  # - The default model (`PairAdaptiveSemanticScorer`) uses
+  #   `PairAdaptiveContextDataset`. It builds ontology-native hierarchy bundles,
+  #   projection-backed non-hierarchical structure, and auxiliary attributes per
+  #   entity, then forms pair-specific evidence inside the scorer.
+  # - The legacy model (`SemanticScorer`) uses `ContextDataset`. It builds one
+  #   cached context subgraph per entity and compares those joined contexts
+  #   directly.
+  #
+  # The block immediately below contains the default pair-adaptive dataset
+  # controls. The later "Legacy single-context extraction" block is kept so you
+  # can still switch back to `SemanticScorer` without rebuilding configs.
   num_workers: null # Dataset loading worker count. Null means "let the system decide".
   filter_exact_matches: True # Remove exact lexical matches before scoring.
   drop_exact_match_sources: False # If True, remove all candidates for sources with an exact exact-match hit.
   reasoner_timeout_secs: 120 # Timeout for ontology reasoner construction, in seconds.
   reasoner_force_hermit: False # If True, force a HermiT retry after lighter reasoners.
+  projection_include_literals: True # Pair-adaptive: if True, projected literal/annotation edges can feed attribute/support evidence in addition to ontology-native annotations.
+  hierarchy_max_depth: 2 # Pair-adaptive: max ontology-native hierarchy depth collected per configured relation family.
+  max_hierarchy_triples_per_family: 6 # Pair-adaptive: max hierarchy triples kept per family and entity before pair-specific selection.
+  max_object_triples: 48 # Pair-adaptive: max non-hierarchical object-property triples kept per entity for the similarity channel.
+  max_diff_triples: 24 # Pair-adaptive: max distinctive non-hierarchical triples kept per entity before pair-specific reranking for the difference channel.
+  max_attr_items: 12 # Pair-adaptive: max literal/annotation snippets kept per entity for auxiliary attribute evidence.
+  pair_adaptive_feature_log_every: 1000 # Pair-adaptive: emit dataset feature-build progress every N unique entities per side; progress lines are debug-only.
+  hierarchical_relation_families:
+    # Pair-adaptive hierarchy families.
+    # These define what counts as ontology-native hierarchical evidence. `is_a`
+    # is usually enough for standard taxonomies; add domain-specific relations
+    # such as `part_of` when they should contribute to the hierarchy channel.
+    is_a:
+      iri_aliases:
+        - "http://www.w3.org/2000/01/rdf-schema#subClassOf"
+      label_seeds: ["subclass of", "is a", "type of", "kind of"]
+    part_of:
+      iri_aliases:
+        - "http://purl.obolibrary.org/obo/BFO_0000050"
+      label_seeds: ["part of", "component of"]
+    has_part:
+      iri_aliases:
+        - "http://purl.obolibrary.org/obo/BFO_0000051"
+      label_seeds: ["has part"]
   
-  # Context extraction.
-  n_hops: 1
-  context_method: greedy # Context extraction strategy: `bfs` or `greedy`.
-  best_path_method: dp # Path search strategy inside context extraction: `dp`, `greedy`, or `lagrangian`.
-  context_hop_penalty: 0.1 # Penalty applied per graph hop when ranking candidate context paths.
-  context_token_ratio: 1.3 # Approximate token-per-word multiplier used for context budgeting.
-  context_safety: 0.8 # Safety factor applied before hitting the configured context token budget.
-  max_input_tokens_context: 256 # Shared: max context encoder input length.
-  only_taxonomy: False # If True, use taxonomy-only context extraction and fixed subclass templates.
-  all_labels: True # If True, score all source/target label variants instead of a single best label.
-  add_connectivity_bridges: True # Add explanation-only bridge triples to keep extracted contexts connected.
-  bridge_max_hops: null # Optional hard cap on bridge path length. Null means unbounded.
+  # Shared graph-exploration and legacy single-context controls.
+  # `n_hops` still matters in the default pair-adaptive mode: it sets the raw
+  # projected neighborhood radius used to collect non-hierarchical object
+  # triples and projected literal edges for the `sim`, `diff`, and literal-side
+  # attribute support channels. The remaining controls below are primarily for
+  # the legacy `SemanticScorer`, which builds one cached context subgraph per
+  # entity. The pair-adaptive scorer does not build one cached joined context
+  # per entity, but the shared lexical and verbalisation code still uses
+  # `all_labels`, `delimiter`, and `max_input_tokens_context` as general utilities.
+  n_hops: 1 # Shared: raw projection neighborhood radius. Pair-adaptive uses it for `sim`/`diff`/projected literals; legacy uses it for single-context extraction.
+  context_method: greedy # Legacy: context extraction strategy for `SemanticScorer` (`bfs` or `greedy`).
+  best_path_method: dp # Legacy: path search strategy inside single-context extraction (`dp`, `greedy`, or `lagrangian`).
+  context_hop_penalty: 0.1 # Legacy: hop penalty used when ranking candidate context paths.
+  context_token_ratio: 1.3 # Legacy: approximate token-per-word multiplier for context budgeting.
+  context_safety: 0.8 # Legacy: safety factor applied before hitting the configured context token budget.
+  max_input_tokens_context: 256 # Shared upper bound for joined context text; legacy uses it directly, pair-adaptive uses it as a global encoder ceiling.
+  only_taxonomy: False # Legacy: if True, use taxonomy-only extraction and fixed subclass templates.
+  all_labels: True # Shared: if True, score all source/target label variants instead of a single best label.
+  add_connectivity_bridges: True # Legacy: add explanation-only bridge triples to keep extracted contexts connected.
+  bridge_max_hops: null # Legacy: optional hard cap on bridge path length. Null means unbounded.
 
   # Verbaliser generation controls.
   # `verbaliser_name` is local-only fallback model selection.
@@ -77,8 +122,15 @@ dataset_params:
   delimiter: "\n" # Delimiter used when joining verbalised context triples into one text block.
 
   # Dataset-side analysis plots.
-  which: ["src_ctx_n_triples","tgt_ctx_n_triples","src_ctx_tok_len","tgt_ctx_tok_len","src_ctx_word_len","tgt_ctx_word_len","src_ctx_char_len","tgt_ctx_char_len",
-          "src_lab_n_labels","tgt_lab_n_labels","src_lab_word_len","tgt_lab_word_len","src_lab_char_len","tgt_lab_char_len","src_lab_max_label_words","tgt_lab_max_label_words",
+  # The default list below targets the pair-adaptive dataset. If you switch back
+  # to the legacy `ContextDataset`, unsupported metrics are filtered out at
+  # runtime and the dataset falls back to its legacy defaults.
+  which: ["src_hier_total_count","tgt_hier_total_count","src_hier_is_a_count","tgt_hier_is_a_count",
+          "src_hier_part_of_count","tgt_hier_part_of_count","src_hier_has_part_count","tgt_hier_has_part_count",
+          "src_obj_count","tgt_obj_count","src_obj_relation_count","tgt_obj_relation_count",
+          "src_obj_ic_mean","tgt_obj_ic_mean","src_attr_count","tgt_attr_count",
+          "src_attr_weight_mean","tgt_attr_weight_mean",
+          "src_lab_n_labels","tgt_lab_n_labels","src_lab_word_len","tgt_lab_word_len",
           "src_lab_avg_label_words","tgt_lab_avg_label_words",
           "cand_sim","cand_sim_src_mean"] # Dataset features to visualize after preprocessing.
   candidate_share_k: 2 # Number of top lexical candidates to share across candidate generation utilities.
@@ -108,14 +160,15 @@ plot_params:
 
 inference_params:
   # Inference runner settings.
-  batch_size: 64 # Candidate-pair batch size passed to the semantic scorer.
+  batch_size: 512 # Candidate-pair batch size passed to the semantic scorer.
   num_workers: 5 # DataLoader worker count for inference.
   log_every: 10 # Emit inference progress logs every N batches.
   mixed_precision: True # Use torch autocast on GPU where supported.
-  which: ["S_final", "s_label", "s_ctx", "S_lctx", "I_label", "I_ctx", "I_llm", "w_c", "w_i", "p_llm"]
+  which: ["S_final", "S_base", "S_struct", "s_label", "s_hier", "s_sim", "s_diff", "s_attr", "I_label", "I_struct", "I_hier", "I_sim", "I_diff", "I_attr", "I_llm", "w_c", "w_i", "U", "U_ind", "U_dis", "p_llm"]
   checkpoint_every: 10 # Write an inference checkpoint every N batches.
   resume_from_checkpoint: True # Resume from the latest checkpoint when available.
   enable_checkpoints: True # Enable checkpoint creation during inference.
+  allow_rationale_toggle_checkpoint_resume: True # If True, resume a checkpoint when the only model/config difference is `generate_llm_rationales`.
 
 llm_profiles:
   # Named LLM backend profiles.
@@ -206,6 +259,9 @@ llm_profiles:
 llm_routing:
   # Task-to-profile routing.
   # Each task can use a different hosted or local model.
+  # The task names are stable across scorers, but `summary_profile` means:
+  # - pair brief generation for `PairAdaptiveSemanticScorer`
+  # - per-entity summary generation for legacy `SemanticScorer`
   # `fallback_*` entries are used when the selected hosted profile is unavailable,
   # misconfigured, missing credentials, or unsupported for the requested task.
   default_profile: openrouter_gpt4o_mini
@@ -214,16 +270,23 @@ llm_routing:
   decision_profile: openrouter_gpt4o_mini # Decision defaults to the shared hosted profile.
   rationale_profile: openrouter_gpt4o_mini
   verbaliser_fallback_profile: local_verbaliser_default # Fallback used only for verbaliser calls.
-  fallback_profile: local_llm_default # Shared fallback for summary and rationale.
+  fallback_profile: local_llm_default # Shared fallback for the summary task and rationale.
   decision_fallback_profile: local_llm_default # Fallback used when hosted decision scoring cannot provide logprobs.
 
 model:
-  name: SemanticScorer
+  # Default scorer: pair-adaptive lexical + structural fusion with optional LLM.
+  # Set `name: SemanticScorer` to recover the legacy lexical + single-context
+  # fusion path.
+  name: PairAdaptiveSemanticScorer
   params:
     # Core model selection.
     lexical_model_name: cambridgeltl/SapBERT-from-PubMedBERT-fulltext # Encoder for label similarity.
-    context_model_name: BAAI/bge-large-en-v1.5 # Encoder for verbalised context similarity.
-    llm_model_name: Qwen/Qwen2.5-7B-Instruct # Local-only fallback model for summary/decision/rationale.
+    context_model_name: BAAI/bge-large-en-v1.5 # Encoder for structural text blocks: hierarchy, non-hier similarity, difference, and attribute snippets.
+    llm_model_name: Qwen/Qwen2.5-7B-Instruct # Local-only fallback model for pair briefs, decisions, and rationales.
+    max_input_tokens_hier: 128 # Pair-adaptive: max tokens per joined hierarchy-family block.
+    max_input_tokens_sim: 256 # Pair-adaptive: max tokens per joined non-hierarchical similarity block.
+    max_input_tokens_diff: 256 # Pair-adaptive: max tokens per joined distinctive-evidence block.
+    max_input_tokens_attr_item: 96 # Pair-adaptive: max tokens per embedded attribute snippet.
 
     # Precision and pooling.
     fp16_inference: True # Use fp16 where supported during model inference.
@@ -232,24 +295,24 @@ model:
 
     # Input/output length limits.
     max_input_tokens_lexical: 32 # Max tokens per label passed to the lexical encoder.
-    max_input_tokens_context: 256 # Max tokens per joined context passed to the context encoder.
-    max_total_tokens_llm_summary: 512 # Local-only prompt length cap for summary generation.
-    max_total_tokens_llm_decision: 384 # Local-only prompt length cap for decision scoring.
-    max_total_tokens_llm_rationale: 512 # Local-only prompt length cap for rationale generation.
-    max_new_tokens_llm: 64 # Shared: max generated tokens for summaries and rationales.
-    max_new_tokens_llm_rationale: 256 # Rationale-only generation cap; lets explanations be longer than summaries.
+    max_input_tokens_context: 256 # Shared joined-context ceiling. Legacy uses it directly; pair-adaptive uses per-channel caps above plus this global ceiling.
+    max_total_tokens_llm_summary: 768 # Local-only prompt length cap for the "summary" task: pair-brief compression by default, per-entity summaries in legacy mode.
+    max_total_tokens_llm_decision: 640 # Local-only prompt length cap for decision scoring with pair briefs.
+    max_total_tokens_llm_rationale: 896 # Local-only prompt length cap for rationale generation with pair briefs.
+    max_new_tokens_llm: 64 # Shared: max generated tokens for pair briefs and short rationale helpers.
+    max_new_tokens_llm_rationale: 256 # Rationale-only generation cap; lets final explanations be longer than pair briefs.
 
     # Main feature toggles.
     use_lexical: True # Enable lexical similarity.
     use_context: True # Enable context similarity.
-    use_llm: True # Enable LLM summaries/decision/rationale components.
+    use_llm: True # Enable LLM pair-brief/decision/rationale components.
     tau: 0.5 # Neutral midpoint used when estimating confidence and ambiguity.
 
     # Adaptive weighting and LLM gating.
-    gamma: 1.0 # Controls how sharply lexical/context confidence changes the fusion weight.
+    gamma: 2.0 # Controls how sharply lexical/structural confidence changes the fusion weight.
     beta: 0.8 # Maximum contribution allowed from the LLM branch.
-    tau_LLM: 0.8 # Ambiguity threshold above which the LLM branch is activated.
-    force_llm_summaries: False # If True, generate summaries for all pairs even when the decision LLM is gated off.
+    tau_LLM: 0.5 # Ambiguity threshold above which the LLM branch is activated.
+    force_llm_summaries: False # If True, always run the "summary" task even when the decision LLM is gated off. In the default scorer this means pair briefs.
 
     # LLM generation controls.
     # `llm_temperature`, `llm_top_p`, and `max_new_tokens_llm` are shared by local
@@ -274,7 +337,7 @@ model:
 
     # Explanation and calibration outputs.
     return_explanations: True # Include candidate-level explanations in model output.
-    generate_llm_rationales: False # Generate final positive/negative rationales.
+    generate_llm_rationales: True # Generate final positive/negative rationales.
     use_llm_calibration: False # Enable post-hoc calibration on the decision probability.
     llm_calibration_a: null # Optional preconfigured calibration coefficient.
     llm_calibration_b: null # Optional preconfigured calibration coefficient.
@@ -287,7 +350,7 @@ model:
     persist_cache_to_disk: True # Persist summary/rationale/embedding caches between runs.
     max_cached_labels: null # Optional in-memory cap for lexical embedding cache entries.
     max_cached_contexts: null # Optional in-memory cap for context embedding cache entries.
-    max_cached_summaries: null # Optional in-memory cap for summary cache entries.
+    max_cached_summaries: null # Optional in-memory cap for summary-task cache entries. In the default scorer these entries are pair briefs.
     max_cached_rationales: null # Optional in-memory cap for rationale cache entries.
 
 # Optional second-stage reranker (disabled by default).

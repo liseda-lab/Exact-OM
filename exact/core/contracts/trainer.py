@@ -71,6 +71,11 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
         for model_cls, params in model_specs:
             instance = model_cls(device=device, **params)
             _bind_logger(instance)
+            if hasattr(instance, "attach_dataset"):
+                try:
+                    instance.attach_dataset(dataset)
+                except Exception as exc:
+                    self.log(f"Failed to attach dataset to model {model_cls.__name__}: {exc}", level="warning")
             self._models.append(instance.to(self.device))
         self._model = self._models[0]
 

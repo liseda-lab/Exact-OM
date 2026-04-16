@@ -1,28 +1,36 @@
 # **EXACT-OM: An Explainable Context-Aware Matching Model for Ontology Alignment**
 
-**EXACT-OM** is a hybrid ontology matching model that integrates lexical, contextual, and language model-based signals within a unified, interpretable architecture.
+**EXACT-OM** is a hybrid ontology matching model that integrates lexical, structural, and language model-based signals within a unified, interpretable architecture.
 It combines the strengths of **language models** and **ontology semantics** to align entities across heterogeneous knowledge bases while preserving explainability.
+
+The current default runtime uses a **pair-adaptive scorer**:
+
+- lexical similarity is still the primary signal
+- structural evidence is split into separate channels instead of one pooled context
+- the LLM sees one **pair brief** built from the pair-specific evidence
+
+The original **single-context scorer** is still available as an opt-in legacy mode.
 
 ### **Core Principles**
 
 1. **Lexical Understanding**
    Entities are represented through all label variants and embedded using **SapBERT**, capturing synonymy and abbreviation patterns. The highest pairwise similarity defines the lexical correspondence.
 
-2. **Contextual Semantics**
-   Each entity’s local neighbourhood is extracted and **verbalised into natural language**, allowing a contextual encoder (e.g., **BGE-Large**) to model the relational meaning of concepts beyond surface labels.
+2. **Pair-Adaptive Structural Semantics**
+   Instead of relying only on one cached context subgraph per entity, the default scorer builds pair-specific evidence from multiple channels: ontology-native hierarchy families, non-hierarchical similarity triples, distinctive difference triples, and auxiliary literal/annotation attributes.
 
-3. **Adaptive Fusion**
-   Lexical and contextual similarities are combined through a **confidence-weighted function**, granting higher influence to the most reliable modality for each pair.
+3. **Hierarchical Adaptive Fusion**
+   Structural channels are first aggregated into one structural score, then fused with lexical similarity through a **confidence-weighted function**, granting higher influence to the most reliable signal for each pair.
 
 4. **Uncertainty-Driven Language Model Inference**
-   When ambiguity remains high, configurable LLM backends summarise both entities’ contexts and issue a **binary decision** whose probability is incorporated into the final score. The verbaliser, summary model, decision model, and rationale model can now be routed independently to either **local Hugging Face models** or **hosted OpenRouter models**.
+   When ambiguity remains high, configurable LLM backends compress the pair evidence into a **pair brief** and issue a **binary decision** whose probability is incorporated into the final score. The verbaliser, brief-generation model, decision model, and rationale model can now be routed independently to either **local Hugging Face models** or **hosted OpenRouter models**.
 
 ### **Explainability**
 
 For every evaluated mapping, EXACT-OM provides:
 
-* Label and context contributions with their confidence and weight.
-* Relative importance of lexical, contextual, and generative LM components.
+* Top-level lexical, structural, and LLM contributions with their confidence and weight.
+* Structural breakdowns over hierarchy, similarity, difference, and attribute channels.
 * Natural-language rationales aligned with the final model outcome.
   All results are exported as structured JSON explanations, ensuring transparent and traceable alignment decisions.
 
@@ -60,7 +68,7 @@ The default config now supports both local and hosted LLM backends.
 - `llm_profiles` defines named backend profiles.
 - `llm_routing` decides which profile is used for each task:
   - verbaliser
-  - summary
+  - summary task, which generates pair briefs in the default scorer
   - decision
   - rationale
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 import random
 import re
@@ -94,6 +95,53 @@ def _truncate_http_body(text: str, limit: int = 1200) -> str:
     if len(body) <= limit:
         return body
     return body[:limit] + "...<truncated>"
+
+
+def _sanitize_json_string(text: Any) -> str:
+    value = str(text or "")
+    if "\x00" in value:
+        value = value.replace("\x00", " ")
+    try:
+        value.encode("utf-8")
+        return value
+    except UnicodeEncodeError:
+        return value.encode("utf-8", errors="replace").decode("utf-8")
+
+
+def _sanitize_json_payload(value: Any, path: str = "$") -> Any:
+    if value is None or isinstance(value, bool):
+        return value
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            raise ValueError(f"Non-finite float in OpenRouter payload at {path}: {value!r}")
+        return value
+    if isinstance(value, str):
+        return _sanitize_json_string(value)
+    if isinstance(value, dict):
+        out: Dict[str, Any] = {}
+        for key, item in value.items():
+            clean_key = _sanitize_json_string(key)
+            out[clean_key] = _sanitize_json_payload(item, path=f"{path}.{clean_key}")
+        return out
+    if isinstance(value, (list, tuple)):
+        return [
+            _sanitize_json_payload(item, path=f"{path}[{idx}]")
+            for idx, item in enumerate(value)
+        ]
+    return _sanitize_json_string(value)
+
+
+def _dump_json_payload(payload: Dict[str, Any]) -> bytes:
+    sanitized = _sanitize_json_payload(payload)
+    encoded = json.dumps(
+        sanitized,
+        ensure_ascii=True,
+        allow_nan=False,
+        separators=(",", ":"),
+    )
+    return encoded.encode("utf-8")
 
 
 @dataclass
@@ -227,6 +275,18 @@ class OpenRouterClient:
         if isinstance(payload, dict):
             model = payload.get("model")
             provider = payload.get("provider")
+        request_content = None
+        if payload is not None:
+            try:
+                request_content = _dump_json_payload(payload)
+            except Exception as exc:
+                details = (
+                    f"Failed to serialize OpenRouter request payload for {method} {url}"
+                    + (f" model={model!r}" if model is not None else "")
+                    + (f" provider={provider!r}" if provider is not None else "")
+                    + f": {exc}"
+                )
+                raise RuntimeError(details) from exc
 
         for attempt in range(self.max_retries + 1):
             try:
@@ -234,7 +294,7 @@ class OpenRouterClient:
                     method=method,
                     url=url,
                     headers=headers or {},
-                    json=payload,
+                    content=request_content,
                     timeout=timeout_secs,
                 )
                 response.raise_for_status()

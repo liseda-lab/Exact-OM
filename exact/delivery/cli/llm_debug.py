@@ -70,10 +70,16 @@ def run_llm_debug(args) -> None:
         task = str(example.get("task", "")).strip().lower()
         result: Dict[str, Any] = {"index": idx, "task": task, "input": example}
         if task == "summary":
-            label = str(example.get("label", ""))
+            src_label = str(example.get("src_label", example.get("source_label", example.get("label", ""))))
+            tgt_label = str(example.get("tgt_label", example.get("target_label", "")))
             context = str(example.get("context", ""))
-            summary = model.generate_summaries_batched([label], [context])[0]
-            result["output"] = {"summary": summary}
+            pair_packet = str(example.get("pair_packet", example.get("brief_input", context)))
+            if hasattr(model, "generate_pair_briefs_batched") and tgt_label:
+                brief = model.generate_pair_briefs_batched([src_label], [tgt_label], [pair_packet])[0]
+                result["output"] = {"pair_brief": brief}
+            else:
+                summary = model.generate_summaries_batched([src_label], [context])[0]
+                result["output"] = {"summary": summary}
             result["backend_usage"] = {"summary": dict(getattr(model, "_last_summary_backend_meta", {}))}
         elif task == "rationale":
             src_label = str(example.get("src_label", example.get("source_label", "")))
@@ -81,25 +87,46 @@ def run_llm_debug(args) -> None:
             decision = _normalize_decision(example.get("decision", example.get("rationale_decision_label", "")))
             src_summary = str(example.get("src_summary", example.get("source_summary", "")))
             tgt_summary = str(example.get("tgt_summary", example.get("target_summary", "")))
-            if not src_summary:
-                src_context = str(example.get("src_context", example.get("source_context", "")))
-                src_summary = model.generate_summaries_batched([src_label], [src_context])[0]
-            if not tgt_summary:
-                tgt_context = str(example.get("tgt_context", example.get("target_context", "")))
-                tgt_summary = model.generate_summaries_batched([tgt_label], [tgt_context])[0]
-            rationale = model.generate_rationales_batched(
-                [src_label],
-                [tgt_label],
-                [src_summary],
-                [tgt_summary],
-                [decision],
-            )[0]
-            result["output"] = {
-                "src_summary": src_summary,
-                "tgt_summary": tgt_summary,
-                "rationale": rationale,
-                "decision": decision,
-            }
+            pair_brief = str(example.get("pair_brief", example.get("brief", "")))
+            if hasattr(model, "generate_pair_briefs_batched") and tgt_label:
+                if not pair_brief:
+                    pair_packet = str(example.get("pair_packet", example.get("brief_input", "")))
+                    if pair_packet:
+                        pair_brief = model.generate_pair_briefs_batched([src_label], [tgt_label], [pair_packet])[0]
+                    elif src_summary:
+                        pair_brief = src_summary
+                rationale = model.generate_rationales_batched(
+                    [src_label],
+                    [tgt_label],
+                    [pair_brief],
+                    [""],
+                    [decision],
+                )[0]
+                result["output"] = {
+                    "pair_brief": pair_brief,
+                    "rationale": rationale,
+                    "decision": decision,
+                }
+            else:
+                if not src_summary:
+                    src_context = str(example.get("src_context", example.get("source_context", "")))
+                    src_summary = model.generate_summaries_batched([src_label], [src_context])[0]
+                if not tgt_summary:
+                    tgt_context = str(example.get("tgt_context", example.get("target_context", "")))
+                    tgt_summary = model.generate_summaries_batched([tgt_label], [tgt_context])[0]
+                rationale = model.generate_rationales_batched(
+                    [src_label],
+                    [tgt_label],
+                    [src_summary],
+                    [tgt_summary],
+                    [decision],
+                )[0]
+                result["output"] = {
+                    "src_summary": src_summary,
+                    "tgt_summary": tgt_summary,
+                    "rationale": rationale,
+                    "decision": decision,
+                }
             result["backend_usage"] = {
                 "summary": dict(getattr(model, "_last_summary_backend_meta", {})),
                 "rationale": dict(getattr(model, "_last_rationale_backend_meta", {})),

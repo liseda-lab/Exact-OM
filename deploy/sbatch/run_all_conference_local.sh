@@ -49,14 +49,22 @@ dry_run = sys.argv[4] == "1"
 job_cfg = yaml.safe_load(job_file.read_text())
 dataset = job_cfg["dataset"]
 job = job_cfg["job"]
+exp_dir = Path(job.get("output_dir", str(job_file.parent)))
+exp_dir.mkdir(parents=True, exist_ok=True)
+slurm_out = exp_dir / "slurm-%j.out"
+slurm_err = exp_dir / "slurm-%j.err"
 
 cmd = [
     "sbatch",
+    "--output",
+    str(slurm_out),
+    "--error",
+    str(slurm_err),
     sbatch_script,
     "--job-name",
     job.get("name", job_file.stem),
     "--exp-dir",
-    job.get("output_dir", str(job_file.parent)),
+    str(exp_dir),
     "--config-file",
     str(config_file),
     "--data-dir",

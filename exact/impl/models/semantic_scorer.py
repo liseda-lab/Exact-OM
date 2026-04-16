@@ -1,7 +1,7 @@
 import math
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from enum import Enum
-from typing import List, Optional, Tuple, Dict, Any, Iterable
+from typing import List, Optional, Tuple, Dict, Any, Iterable, Callable
 import re
 import time
 import json
@@ -346,8 +346,16 @@ class SemanticScorer(IModel):
     # -------------------------------------------------------------------------
     # Cache helpers
     # -------------------------------------------------------------------------
-    def _build_cache_fingerprint(self) -> str:
-        payload = {
+    def _runtime_fingerprint_payload(
+        self,
+        generate_llm_rationales_override: Optional[bool] = None,
+    ) -> Dict[str, Any]:
+        generate_llm_rationales = (
+            self.generate_llm_rationales
+            if generate_llm_rationales_override is None
+            else bool(generate_llm_rationales_override)
+        )
+        return {
             "lexical_model": self.lexical_model_name if self.use_lexical else None,
             "context_model": self.context_model_name if self.use_context else None,
             "llm_model": self.llm_model_name if self.use_llm else None,
@@ -366,18 +374,34 @@ class SemanticScorer(IModel):
             "label_pair_pooling": self.label_pair_pooling.value,
             "ctx_sentence_delimiter": self.ctx_sentence_delimiter,
             "dataset_signature": self.dataset_signature,
-            "generate_llm_rationales": self.generate_llm_rationales,
+            "generate_llm_rationales": generate_llm_rationales,
             "use_llm_calibration": self.use_llm_calibration,
             "llm_calibration_a": self.llm_calibration_a,
             "llm_calibration_b": self.llm_calibration_b,
             "llm_calibration_info": self.llm_calibration_info,
             "force_llm_summaries": self.force_llm_summaries,
         }
+
+    def _build_cache_fingerprint(
+        self,
+        generate_llm_rationales_override: Optional[bool] = None,
+    ) -> str:
+        payload = self._runtime_fingerprint_payload(
+            generate_llm_rationales_override=generate_llm_rationales_override
+        )
         blob = json.dumps(payload, sort_keys=True, default=str)
         return hashlib.sha1(blob.encode("utf-8")).hexdigest()
 
     def runtime_fingerprint(self) -> str:
         return self._cache_fingerprint
+
+    def runtime_fingerprint_payload(
+        self,
+        generate_llm_rationales_override: Optional[bool] = None,
+    ) -> Dict[str, Any]:
+        return self._runtime_fingerprint_payload(
+            generate_llm_rationales_override=generate_llm_rationales_override
+        )
 
     def _model_hidden_size(self, model: nn.Module) -> int:
         cfg = getattr(model, "config", None)
@@ -526,9 +550,10 @@ class SemanticScorer(IModel):
             len(self._rationale_cache),
         )
         self._cache_dirty = False
+        model_name = self.__class__.__name__
         self.log(
             (
-                f"Loaded SemanticScorer cache from {self._cache_file_path} "
+                f"Loaded {model_name} cache from {self._cache_file_path} "
                 f"(lexical={counts[0]}, context={counts[1]}, summaries={counts[2]}, rationales={counts[3]})."
             ),
             "info",
@@ -543,16 +568,18 @@ class SemanticScorer(IModel):
         try:
             self.cache_dir.mkdir(parents=True, exist_ok=True)
             torch.save(payload, self._cache_file_path)
+            model_name = self.__class__.__name__
             self.log(
                 (
-                    f"Persisted SemanticScorer cache to {self._cache_file_path} "
+                    f"Persisted {model_name} cache to {self._cache_file_path} "
                     f"(reason={reason})."
                 ),
                 "debug",
             )
             self._cache_dirty = False
         except OSError as exc:
-            self.log(f"Failed to persist SemanticScorer cache to {self._cache_file_path}: {exc}", "warning")
+            model_name = self.__class__.__name__
+            self.log(f"Failed to persist {model_name} cache to {self._cache_file_path}: {exc}", "warning")
 
     # -------------------------------------------------------------------------
     # Encoders
@@ -836,6 +863,17 @@ class SemanticScorer(IModel):
         return value[:limit] + "...<truncated>"
 
     @staticmethod
+    def _text_debug_stats(text: Any) -> Dict[str, int]:
+        value = str(text or "")
+        return {
+            "length": len(value),
+            "non_ascii": sum(1 for ch in value if ord(ch) > 127),
+            "control": sum(1 for ch in value if ((ord(ch) < 32 and ch not in "\n\r\t") or ord(ch) == 127)),
+            "nul": value.count("\x00"),
+            "surrogates": sum(1 for ch in value if 0xD800 <= ord(ch) <= 0xDFFF),
+        }
+
+    @staticmethod
     def _format_first_token_logprobs(pairs: List[Tuple[str, float]], limit: int = 10) -> str:
         if not pairs:
             return "<empty>"
@@ -996,6 +1034,82 @@ class SemanticScorer(IModel):
             ),
             "debug",
         )
+
+    def _record_hosted_decision_request_debug(
+        self,
+        profile_name: str,
+        prompt: Dict[str, str],
+        error_message: str,
+        *,
+        prompt_idx: Optional[int] = None,
+        src_label: Optional[str] = None,
+        tgt_label: Optional[str] = None,
+        request_payload: Optional[Dict[str, Any]] = None,
+    ) -> str:
+        system_text = str(prompt.get("system", ""))
+        user_text = str(prompt.get("user", ""))
+        prompt_blob = json.dumps(
+            {"system": system_text, "user": user_text},
+            ensure_ascii=True,
+            sort_keys=True,
+        )
+        prompt_sha1 = hashlib.sha1(prompt_blob.encode("utf-8")).hexdigest()[:12]
+        system_stats = self._text_debug_stats(system_text)
+        user_stats = self._text_debug_stats(user_text)
+        request_excerpt = None
+        if request_payload is not None:
+            try:
+                request_excerpt = self._truncate_debug_text(
+                    json.dumps(request_payload, ensure_ascii=True, sort_keys=True),
+                    limit=1800,
+                )
+            except Exception:
+                request_excerpt = self._truncate_debug_text(str(request_payload), limit=1800)
+        self._last_decision_backend_meta["request_debug"] = {
+            "error": error_message,
+            "prompt_sha1": prompt_sha1,
+            "prompt_idx": prompt_idx,
+            "src_label": src_label,
+            "tgt_label": tgt_label,
+            "system_stats": system_stats,
+            "user_stats": user_stats,
+            "system_excerpt": self._truncate_debug_text(system_text, limit=400),
+            "user_excerpt": self._truncate_debug_text(user_text, limit=1200),
+            "request_payload_excerpt": request_excerpt,
+        }
+        label_note = ""
+        if src_label is not None or tgt_label is not None:
+            label_note = (
+                f" src={self._truncate_debug_text(src_label, limit=120)!r}"
+                f" tgt={self._truncate_debug_text(tgt_label, limit=120)!r}"
+            )
+        idx_note = "" if prompt_idx is None else f" batch_prompt_idx={prompt_idx}"
+        self._log_once(
+            f"hosted_decision_request_debug_warning:{prompt_sha1}",
+            (
+                f"Hosted decision request debug for profile '{profile_name}'{idx_note}: "
+                f"prompt_sha1={prompt_sha1}{label_note} "
+                f"system_stats={system_stats} user_stats={user_stats} "
+                f"error={error_message}"
+            ),
+            "warning",
+        )
+        self._log_once(
+            f"hosted_decision_request_debug_prompt:{prompt_sha1}",
+            (
+                f"Hosted decision request prompt excerpt [{prompt_sha1}]: "
+                f"system={self._truncate_debug_text(system_text, limit=400)!r} "
+                f"user={self._truncate_debug_text(user_text, limit=1500)!r}"
+            ),
+            "debug",
+        )
+        if request_excerpt:
+            self._log_once(
+                f"hosted_decision_request_debug_payload:{prompt_sha1}",
+                f"Hosted decision request payload excerpt [{prompt_sha1}]: {request_excerpt}",
+                "debug",
+            )
+        return prompt_sha1
 
     def _probe_hosted_decision_profile(self, profile) -> Dict[str, Any]:
         cached = self._decision_probe_cache.get(profile.name)
@@ -1295,6 +1409,7 @@ class SemanticScorer(IModel):
         src_summaries: List[str],
         tgt_summaries: List[str],
         decisions: List[str],
+        progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
     ) -> List[str]:
         if not (self.use_llm and self.generate_llm_rationales):
             return ["" for _ in src_labels]
@@ -1325,6 +1440,26 @@ class SemanticScorer(IModel):
             )
             entry["indices"].append(idx)
 
+        total_records = len(src_labels)
+        uncached_unique_prompts = len(pending)
+        uncached_record_count = sum(len(entry["indices"]) for entry in pending.values())
+        cached_record_count = total_records - uncached_record_count
+        configured_concurrency = self.llm_rationale_batch_size or max(1, uncached_unique_prompts)
+        if progress_callback is not None:
+            progress_callback(
+                {
+                    "stage": "rationale",
+                    "event": "start",
+                    "total_records": total_records,
+                    "cached_records": cached_record_count,
+                    "uncached_records": uncached_record_count,
+                    "uncached_unique_prompts": uncached_unique_prompts,
+                    "backend": rationale_backend.backend,
+                    "model": self._last_rationale_backend_meta.get("model"),
+                    "concurrency": configured_concurrency,
+                }
+            )
+
         if pending:
             pending_keys = list(pending.keys())
             prompts = [
@@ -1347,7 +1482,14 @@ class SemanticScorer(IModel):
                     ),
                     "debug",
                 )
-            generated = self._generate_rationales_uncached(prompts, rationale_backend)
+            generated = self._generate_rationales_uncached(
+                prompts,
+                rationale_backend,
+                progress_callback=progress_callback,
+                prompt_record_counts=[len(pending[key]["indices"]) for key in pending_keys],
+                total_records=total_records,
+                cached_records=cached_record_count,
+            )
             if rationale_backend.backend == "openrouter":
                 self._log_once(
                     "hosted_rationale_stage_done",
@@ -1360,23 +1502,95 @@ class SemanticScorer(IModel):
                 for idx in pending[key]["indices"]:
                     outputs[idx] = clean
 
+        if progress_callback is not None:
+            progress_callback(
+                {
+                    "stage": "rationale",
+                    "event": "done",
+                    "total_records": total_records,
+                    "cached_records": cached_record_count,
+                    "uncached_records": uncached_record_count,
+                    "uncached_unique_prompts": uncached_unique_prompts,
+                    "backend": rationale_backend.backend,
+                    "model": self._last_rationale_backend_meta.get("model"),
+                    "concurrency": configured_concurrency,
+                }
+            )
+
         return outputs
 
-    def _generate_rationales_uncached(self, prompts: List[Dict[str, str]], resolved_backend) -> List[str]:
+    def _generate_rationales_uncached(
+        self,
+        prompts: List[Dict[str, str]],
+        resolved_backend,
+        progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+        prompt_record_counts: Optional[List[int]] = None,
+        total_records: int = 0,
+        cached_records: int = 0,
+    ) -> List[str]:
         if not prompts:
             return []
+        prompt_record_counts = list(prompt_record_counts or [1 for _ in prompts])
+        total_uncached_records = int(sum(prompt_record_counts))
+        completed_records = 0
+        completed_unique_prompts = 0
+
+        def _emit_progress(record_delta: int, unique_delta: int) -> None:
+            nonlocal completed_records, completed_unique_prompts
+            completed_records += int(record_delta)
+            completed_unique_prompts += int(unique_delta)
+            if progress_callback is None:
+                return
+            progress_callback(
+                {
+                    "stage": "rationale",
+                    "event": "progress",
+                    "total_records": total_records,
+                    "cached_records": cached_records,
+                    "total_uncached_records": total_uncached_records,
+                    "completed_uncached_records": completed_records,
+                    "total_unique_prompts": len(prompts),
+                    "completed_unique_prompts": completed_unique_prompts,
+                }
+            )
+
         if resolved_backend.backend == "openrouter":
             profile = self._llm_router.profiles.get(resolved_backend.profile_name or "")
             if profile is None:
                 raise RuntimeError("OpenRouter rationale profile was resolved but not found.")
-            return self._run_hosted_chat_prompts(
-                prompts=prompts,
-                profile=profile,
-                max_tokens=self.max_new_tokens_llm_rationale,
-                temperature=self.llm_temperature,
-                top_p=self.llm_top_p,
-                concurrency=self.llm_rationale_batch_size,
-            )
+            workers = self.llm_rationale_batch_size or len(prompts)
+            workers = max(1, min(int(workers), len(prompts)))
+
+            def _call(prompt: Dict[str, str]) -> str:
+                payload = self._llm_router.hosted.chat_completion(
+                    profile=profile,
+                    messages=[
+                        {"role": "system", "content": prompt["system"]},
+                        {"role": "user", "content": prompt["user"]},
+                    ],
+                    max_tokens=self.max_new_tokens_llm_rationale,
+                    temperature=self.llm_temperature,
+                    top_p=self.llm_top_p,
+                    seed=self.request_seed,
+                )
+                return extract_chat_text(payload)
+
+            outputs = [""] * len(prompts)
+            if workers == 1:
+                for idx, prompt in enumerate(prompts):
+                    outputs[idx] = _call(prompt)
+                    _emit_progress(prompt_record_counts[idx], 1)
+                return outputs
+            with ThreadPoolExecutor(max_workers=workers) as executor:
+                future_to_idx = {
+                    executor.submit(_call, prompt): idx
+                    for idx, prompt in enumerate(prompts)
+                }
+                for future in as_completed(future_to_idx):
+                    idx = future_to_idx[future]
+                    outputs[idx] = future.result()
+                    _emit_progress(prompt_record_counts[idx], 1)
+            return outputs
         self._ensure_local_llm()
         rendered = [self._render_llm_prompt(prompt) for prompt in prompts]
         outputs = [""] * len(rendered)
@@ -1404,6 +1618,7 @@ class SemanticScorer(IModel):
             decoded = self.llm_tok.batch_decode(new_tokens, skip_special_tokens=True)
             for offset, text in enumerate(decoded):
                 outputs[start + offset] = text
+            _emit_progress(sum(prompt_record_counts[start:end]), end - start)
         return outputs
 
     @torch.inference_mode()
@@ -1493,28 +1708,55 @@ class SemanticScorer(IModel):
                                 "debug",
                             )
 
-                        def _score_prompt(prompt: Dict[str, str]) -> Dict[str, Any]:
-                            return self._llm_router.hosted.chat_completion(
-                                profile=profile,
-                                messages=[
+                        def _score_prompt(index_prompt: Tuple[int, Dict[str, str]]) -> Dict[str, Any]:
+                            idx, prompt = index_prompt
+                            request_payload = {
+                                "messages": [
                                     {"role": "system", "content": prompt["system"]},
                                     {"role": "user", "content": prompt["user"]},
                                 ],
-                                max_tokens=1,
-                                temperature=0.0,
-                                top_p=1.0,
-                                logprobs=True,
-                                top_logprobs=20,
-                                logit_bias=logit_bias,
-                                provider={"require_parameters": True},
-                                seed=self.request_seed,
-                            )
+                                "max_tokens": 1,
+                                "temperature": 0.0,
+                                "top_p": 1.0,
+                                "logprobs": True,
+                                "top_logprobs": 20,
+                                "logit_bias": logit_bias,
+                                "provider": {"require_parameters": True},
+                                "seed": self.request_seed,
+                                "model": getattr(profile, "model", None),
+                            }
+                            try:
+                                return self._llm_router.hosted.chat_completion(
+                                    profile=profile,
+                                    messages=request_payload["messages"],
+                                    max_tokens=1,
+                                    temperature=0.0,
+                                    top_p=1.0,
+                                    logprobs=True,
+                                    top_logprobs=20,
+                                    logit_bias=logit_bias,
+                                    provider={"require_parameters": True},
+                                    seed=self.request_seed,
+                                )
+                            except Exception as exc:
+                                prompt_sha1 = self._record_hosted_decision_request_debug(
+                                    profile.name,
+                                    prompt,
+                                    str(exc),
+                                    prompt_idx=idx,
+                                    src_label=src_labels[idx] if idx < len(src_labels) else None,
+                                    tgt_label=tgt_labels[idx] if idx < len(tgt_labels) else None,
+                                    request_payload=request_payload,
+                                )
+                                raise RuntimeError(
+                                    f"{exc} [prompt_sha1={prompt_sha1}, batch_prompt_idx={idx}]"
+                                ) from exc
 
                         if workers == 1:
-                            payloads = [_score_prompt(prompt) for prompt in prompts]
+                            payloads = [_score_prompt((idx, prompt)) for idx, prompt in enumerate(prompts)]
                         else:
                             with ThreadPoolExecutor(max_workers=workers) as executor:
-                                payloads = list(executor.map(_score_prompt, prompts))
+                                payloads = list(executor.map(_score_prompt, enumerate(prompts)))
                         if prompts:
                             self._log_once(
                                 "hosted_decision_first_chunk_done",
@@ -1580,7 +1822,11 @@ class SemanticScorer(IModel):
                 probs[start:end] = torch.softmax(stacked, dim=-1)[:, 0]
         return probs
 
-    def generate_final_rationales_for_records(self, records: List[Dict[str, Any]]) -> List[str]:
+    def generate_final_rationales_for_records(
+        self,
+        records: List[Dict[str, Any]],
+        progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+    ) -> List[str]:
         if not (self.use_llm and self.generate_llm_rationales):
             return ["" for _ in records]
         src_labels: List[str] = []
@@ -1603,6 +1849,7 @@ class SemanticScorer(IModel):
             src_summaries=src_summaries,
             tgt_summaries=tgt_summaries,
             decisions=decisions,
+            progress_callback=progress_callback,
         )
 
     # -------------------------------------------------------------------------
