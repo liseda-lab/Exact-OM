@@ -46,6 +46,16 @@ def resolve(path: str | None, base: Path) -> str | None:
     return str(p)
 
 
+def _normalize_sbatch_args(value) -> List[str]:
+    if not value:
+        return []
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, list):
+        return [str(item) for item in value if str(item).strip()]
+    raise TypeError(f"Unsupported sbatch_args value: {type(value)!r}")
+
+
 def build_exact_command(cfg: Dict) -> List[str]:
     dataset_cfg = cfg["dataset"]
     job_cfg = cfg["job"]
@@ -92,7 +102,12 @@ def build_exact_command(cfg: Dict) -> List[str]:
 
 
 def submit_via_sbatch(
-    script: Path, env: Dict[str, str], stdout: Path | None = None, stderr: Path | None = None
+    script: Path,
+    env: Dict[str, str],
+    job_name: str | None = None,
+    sbatch_args: List[str] | None = None,
+    stdout: Path | None = None,
+    stderr: Path | None = None,
 ) -> None:
     if stdout:
         stdout.parent.mkdir(parents=True, exist_ok=True)
@@ -100,10 +115,14 @@ def submit_via_sbatch(
         stderr.parent.mkdir(parents=True, exist_ok=True)
     export = ",".join(f"{k}={v}" for k, v in env.items())
     cmd = ["sbatch"]
+    if job_name:
+        cmd.extend(["--job-name", job_name])
     if stdout:
         cmd.extend(["--output", str(stdout)])
     if stderr:
         cmd.extend(["--error", str(stderr)])
+    if sbatch_args:
+        cmd.extend(sbatch_args)
     cmd.extend([f"--export=ALL,{export}", str(script)])
     subprocess.run(cmd, check=True)
 
@@ -122,6 +141,7 @@ def main() -> None:
     if args.sbatch_script:
         dataset_cfg = cfg["dataset"]
         job_cfg = cfg["job"]
+        slurm_cfg = job_cfg.get("slurm", {})
         exp_dir = Path(job_cfg["output_dir"]).resolve()
         exp_dir.mkdir(parents=True, exist_ok=True)
 
@@ -149,7 +169,16 @@ def main() -> None:
         }
         stdout = exp_dir / "slurm_%j.out"
         stderr = exp_dir / "slurm_%j.err"
-        submit_via_sbatch(args.sbatch_script, env, stdout=stdout, stderr=stderr)
+        job_name = str(job_cfg.get("name", Path(job_cfg["output_dir"]).name))
+        sbatch_args = _normalize_sbatch_args(slurm_cfg.get("sbatch_args"))
+        submit_via_sbatch(
+            args.sbatch_script,
+            env,
+            job_name=job_name,
+            sbatch_args=sbatch_args,
+            stdout=stdout,
+            stderr=stderr,
+        )
     else:
         subprocess.run(cmd, check=True)
 

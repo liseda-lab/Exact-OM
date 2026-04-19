@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 import torch
@@ -160,6 +161,309 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
     def _brief_key(self, src_label: str, tgt_label: str, packet: str) -> str:
         payload = "\u241F".join([src_label or "", tgt_label or "", packet or ""])
         return hashlib.sha1(payload.encode("utf-8")).hexdigest()
+
+    def _stable_item_id(
+        self,
+        channel: str,
+        side: str,
+        item: Dict[str, Any],
+        family: Optional[str] = None,
+    ) -> str:
+        triple = [self._normalize_text(value) for value in list(item.get("triple") or [])[:3]]
+        payload = {
+            "channel": self._normalize_text(channel),
+            "side": self._normalize_text(side),
+            "family": self._normalize_text(family),
+            "triple": triple,
+            "property": self._normalize_text(item.get("property", item.get("prop"))),
+            "value": self._normalize_text(item.get("value")),
+            "text": self._normalize_text(item.get("text")),
+        }
+        digest = hashlib.sha1(
+            json.dumps(payload, ensure_ascii=False, sort_keys=True).encode("utf-8")
+        ).hexdigest()[:16]
+        return f"{payload['channel']}-{payload['side']}-{digest}"
+
+    def _with_item_id(
+        self,
+        channel: str,
+        side: str,
+        item: Dict[str, Any],
+        family: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        row = dict(item or {})
+        row["item_id"] = self._stable_item_id(channel, side, row, family=family)
+        if family and "family" not in row:
+            row["family"] = family
+        return row
+
+    def _matrix_provenance_links(
+        self,
+        src_items: Sequence[Dict[str, Any]],
+        tgt_items: Sequence[Dict[str, Any]],
+        support_matrix: Optional[torch.Tensor],
+    ) -> List[Dict[str, Any]]:
+        if not src_items or not tgt_items or support_matrix is None:
+            return []
+        if support_matrix.ndim != 2:
+            return []
+        if support_matrix.shape[0] != len(src_items) or support_matrix.shape[1] != len(tgt_items):
+            return []
+
+        links: Dict[Tuple[str, str], Dict[str, Any]] = {}
+
+        def _upsert(src_idx: int, tgt_idx: int) -> None:
+            score = float(support_matrix[src_idx, tgt_idx].item())
+            if score <= 0.0:
+                return
+            source_item_id = self._normalize_text(src_items[src_idx].get("item_id"))
+            target_item_id = self._normalize_text(tgt_items[tgt_idx].get("item_id"))
+            if not source_item_id or not target_item_id:
+                return
+            key = (source_item_id, target_item_id)
+            payload = {
+                "source_item_id": source_item_id,
+                "target_item_id": target_item_id,
+                "score": score,
+            }
+            prev = links.get(key)
+            if prev is None or score > float(prev.get("score", 0.0)):
+                links[key] = payload
+
+        for src_idx in range(support_matrix.shape[0]):
+            tgt_idx = int(torch.argmax(support_matrix[src_idx]).item())
+            _upsert(src_idx, tgt_idx)
+        for tgt_idx in range(support_matrix.shape[1]):
+            src_idx = int(torch.argmax(support_matrix[:, tgt_idx]).item())
+            _upsert(src_idx, tgt_idx)
+
+        return sorted(
+            links.values(),
+            key=lambda row: (
+                -float(row.get("score", 0.0)),
+                self._normalize_text(row.get("source_item_id")),
+                self._normalize_text(row.get("target_item_id")),
+            ),
+        )
+
+    def _build_cross_side_provenance(
+        self,
+        s_label_value: float,
+        hierarchy_payloads: Dict[str, Dict[str, Any]],
+        sim_payload: Dict[str, Any],
+        diff_payload: Dict[str, Any],
+        attr_payload: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        return {
+            "lexical": [
+                {
+                    "source_ref": "__source__",
+                    "target_ref": "__target__",
+                    "score": float(s_label_value),
+                }
+            ],
+            "hierarchy": {
+                family: list(payload.get("links", []))
+                for family, payload in hierarchy_payloads.items()
+                if payload.get("links")
+            },
+            "similarity": list(sim_payload.get("links", [])),
+            "attributes": {
+                "source": list(attr_payload.get("source_links", [])),
+                "target": list(attr_payload.get("target_links", [])),
+            },
+            "difference": {
+                "source": list(diff_payload.get("source_links", [])),
+                "target": list(diff_payload.get("target_links", [])),
+            },
+        }
+
+    def _hydrate_record_item_ids(self, record: Dict[str, Any]) -> Dict[str, Any]:
+        hydrated = dict(record or {})
+        triple_attributions = dict(hydrated.get("triple_attributions") or {})
+        hierarchy = dict(triple_attributions.get("hierarchy") or {})
+        for family, family_payload in hierarchy.items():
+            family_payload = dict(family_payload or {})
+            family_payload["source"] = [
+                self._with_item_id("hierarchy", "source", item, family=family)
+                for item in list(family_payload.get("source") or [])
+            ]
+            family_payload["target"] = [
+                self._with_item_id("hierarchy", "target", item, family=family)
+                for item in list(family_payload.get("target") or [])
+            ]
+            hierarchy[family] = family_payload
+        triple_attributions["hierarchy"] = hierarchy
+        for channel in ["similarity", "difference"]:
+            payload = dict(triple_attributions.get(channel) or {})
+            payload["source"] = [
+                self._with_item_id(channel, "source", item)
+                for item in list(payload.get("source") or [])
+            ]
+            payload["target"] = [
+                self._with_item_id(channel, "target", item)
+                for item in list(payload.get("target") or [])
+            ]
+            triple_attributions[channel] = payload
+        hydrated["triple_attributions"] = triple_attributions
+        attributes = dict(hydrated.get("attributes") or {})
+        attributes["source"] = [
+            self._with_item_id("attribute", "source", item)
+            for item in list(attributes.get("source") or [])
+        ]
+        attributes["target"] = [
+            self._with_item_id("attribute", "target", item)
+            for item in list(attributes.get("target") or [])
+        ]
+        hydrated["attributes"] = attributes
+        hydrated["explanation_schema_version"] = max(
+            2,
+            int(hydrated.get("explanation_schema_version", 0) or 0),
+        )
+        return hydrated
+
+    def _explanation_family_names_from_record(self, record: Dict[str, Any]) -> List[str]:
+        family_names = list(self.hierarchical_relation_families.keys() or [])
+        if "is_a" not in family_names:
+            family_names = ["is_a"] + family_names
+        hierarchy_payload = (record.get("triple_attributions") or {}).get("hierarchy") or {}
+        for family in hierarchy_payload.keys():
+            if family not in family_names:
+                family_names.append(family)
+        return family_names
+
+    def _saved_record_hierarchy_items(
+        self,
+        record: Dict[str, Any],
+        family: str,
+        side: str,
+    ) -> List[Tuple[str, str, str, float]]:
+        hierarchy = (record.get("triple_attributions") or {}).get("hierarchy") or {}
+        payload = dict(hierarchy.get(family) or {})
+        out: List[Tuple[str, str, str, float]] = []
+        for item in list(payload.get(side) or []):
+            triple = list(item.get("triple") or [])
+            if len(triple) < 3:
+                continue
+            out.append(
+                (
+                    self._normalize_text(triple[0]),
+                    self._normalize_text(triple[1]),
+                    self._normalize_text(triple[2]),
+                    float(item.get("specificity", 0.0)),
+                )
+            )
+        return out
+
+    def _saved_record_object_items(
+        self,
+        record: Dict[str, Any],
+        channel: str,
+        side: str,
+    ) -> List[Dict[str, Any]]:
+        payload = (record.get("triple_attributions") or {}).get(channel) or {}
+        out: List[Dict[str, Any]] = []
+        for item in list(payload.get(side) or []):
+            triple = list(item.get("triple") or [])
+            if len(triple) < 3:
+                continue
+            out.append(
+                {
+                    "triple": (
+                        self._normalize_text(triple[0]),
+                        self._normalize_text(triple[1]),
+                        self._normalize_text(triple[2]),
+                    ),
+                    "score": float(item.get("edge_ic", item.get("unsupported_mass", 0.0))),
+                }
+            )
+        return out
+
+    def _saved_record_attribute_items(
+        self,
+        record: Dict[str, Any],
+        side: str,
+    ) -> List[Dict[str, Any]]:
+        attributes = (record.get("attributes") or {}).get(side) or []
+        out: List[Dict[str, Any]] = []
+        for item in list(attributes):
+            out.append(
+                {
+                    "prop": self._normalize_text(item.get("property", item.get("prop"))),
+                    "value": self._normalize_text(item.get("value")),
+                    "text": self._normalize_text(item.get("text")),
+                    "weight": float(item.get("weight", 0.0)),
+                }
+            )
+        return out
+
+    def reconstruct_explanation_fields_from_record(self, record: Dict[str, Any]) -> Dict[str, Any]:
+        hydrated = self._hydrate_record_item_ids(record)
+        labels = dict(hydrated.get("selected_labels") or {})
+        src_label = self._normalize_text(labels.get("source", hydrated.get("src_iri")))
+        tgt_label = self._normalize_text(labels.get("target", hydrated.get("tgt_iri")))
+        family_names = self._explanation_family_names_from_record(hydrated)
+        hierarchy_payloads: Dict[str, Dict[str, Any]] = {}
+        for family in family_names:
+            hierarchy_payloads[family] = self._score_hierarchy_family(
+                family,
+                self._saved_record_hierarchy_items(hydrated, family, "source"),
+                self._saved_record_hierarchy_items(hydrated, family, "target"),
+            )
+        sim_payload = self._score_similarity_channel(
+            self._saved_record_object_items(hydrated, "similarity", "source"),
+            self._saved_record_object_items(hydrated, "similarity", "target"),
+        )
+        diff_payload = self._score_difference_channel(
+            self._saved_record_object_items(hydrated, "difference", "source"),
+            self._saved_record_object_items(hydrated, "difference", "target"),
+            support_mat=sim_payload.get("support_matrix"),
+        )
+        attr_payload = self._score_attribute_channel(
+            self._saved_record_attribute_items(hydrated, "source"),
+            self._saved_record_attribute_items(hydrated, "target"),
+            [src_label] if src_label else [],
+            [tgt_label] if tgt_label else [],
+            hierarchy_payloads,
+            sim_payload,
+        )
+        s_label_value = float(
+            (hydrated.get("confidences") or {}).get("s_label", self.tau)
+        )
+        hydrated["cross_side_provenance"] = self._build_cross_side_provenance(
+            s_label_value,
+            hierarchy_payloads,
+            sim_payload,
+            diff_payload,
+            attr_payload,
+        )
+        return hydrated
+
+    def reconstruct_explanation_fields_for_pair(
+        self,
+        src_iri: str,
+        tgt_iri: str,
+        src_labels: Optional[List[str]] = None,
+        tgt_labels: Optional[List[str]] = None,
+    ) -> Dict[str, Any]:
+        dataset = self._attached_dataset
+        if dataset is None:
+            raise RuntimeError("PairAdaptiveSemanticScorer requires an attached dataset.")
+        src_feats = dataset.get_entity_features(src_iri, "src")
+        tgt_feats = dataset.get_entity_features(tgt_iri, "tgt")
+        src_label_list = list(src_labels or src_feats.get("labels") or [src_iri])
+        tgt_label_list = list(tgt_labels or tgt_feats.get("labels") or [tgt_iri])
+        out = self.forward(
+            src_iris=[src_iri],
+            tgt_iris=[tgt_iri],
+            src_label_lists=[src_label_list],
+            tgt_label_lists=[tgt_label_list],
+            label=None,
+        )
+        explanations = list(out.get("explanations") or [])
+        if not explanations:
+            raise RuntimeError(f"Failed to rehydrate explanation for pair ({src_iri}, {tgt_iri}).")
+        return dict(explanations[0])
 
     def _family_display_name(self, family: str) -> str:
         return family.replace("_", " ").strip()
@@ -373,6 +677,7 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
             "tgt_selected": [],
             "src_sentences": [],
             "tgt_sentences": [],
+            "links": [],
         }
         if not self.use_context or not src_items or not tgt_items:
             return payload
@@ -421,6 +726,34 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
         src_imp = [float(value) for value in src_support]
         tgt_imp = [float(value) for value in tgt_support]
         total_imp = sum(src_imp) + sum(tgt_imp) or 1.0
+        src_selected_rows = [
+            self._with_item_id(
+                "hierarchy",
+                "source",
+                {
+                    "triple": list(item[:3]),
+                    "specificity": float(item[3]),
+                    "support": float(src_support[pos]),
+                    "importance": float(src_imp[pos] / total_imp),
+                },
+                family=family,
+            )
+            for pos, item in enumerate(src_selected)
+        ]
+        tgt_selected_rows = [
+            self._with_item_id(
+                "hierarchy",
+                "target",
+                {
+                    "triple": list(item[:3]),
+                    "specificity": float(item[3]),
+                    "support": float(tgt_support[pos]),
+                    "importance": float(tgt_imp[pos] / total_imp),
+                },
+                family=family,
+            )
+            for pos, item in enumerate(tgt_selected)
+        ]
         payload.update(
             {
                 "score": s_f,
@@ -429,26 +762,11 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
                 "coverage": cov_f,
                 "specificity": inf_f,
                 "embedding": emb_f,
-                "src_selected": [
-                    {
-                        "triple": list(item[:3]),
-                        "specificity": float(item[3]),
-                        "support": float(src_support[pos]),
-                        "importance": float(src_imp[pos] / total_imp),
-                    }
-                    for pos, item in enumerate(src_selected)
-                ],
-                "tgt_selected": [
-                    {
-                        "triple": list(item[:3]),
-                        "specificity": float(item[3]),
-                        "support": float(tgt_support[pos]),
-                        "importance": float(tgt_imp[pos] / total_imp),
-                    }
-                    for pos, item in enumerate(tgt_selected)
-                ],
+                "src_selected": src_selected_rows,
+                "tgt_selected": tgt_selected_rows,
                 "src_sentences": src_sentences,
                 "tgt_sentences": tgt_sentences,
+                "links": self._matrix_provenance_links(src_selected_rows, tgt_selected_rows, reduced),
             }
         )
         return payload
@@ -485,6 +803,7 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
             "src_sentences": [],
             "tgt_sentences": [],
             "support_matrix": None,
+            "links": [],
         }
         if not self.use_context or not src_items or not tgt_items:
             return payload
@@ -528,6 +847,32 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
         src_imp = [float(value) for value in src_support]
         tgt_imp = [float(value) for value in tgt_support]
         total_imp = sum(src_imp) + sum(tgt_imp) or 1.0
+        src_selected_rows = [
+            self._with_item_id(
+                "similarity",
+                "source",
+                {
+                    "triple": list(item["triple"]),
+                    "support": float(src_support[pos]),
+                    "edge_ic": float(item.get("score", 0.0)),
+                    "importance": float(src_imp[pos] / total_imp),
+                },
+            )
+            for pos, item in enumerate(src_selected)
+        ]
+        tgt_selected_rows = [
+            self._with_item_id(
+                "similarity",
+                "target",
+                {
+                    "triple": list(item["triple"]),
+                    "support": float(tgt_support[pos]),
+                    "edge_ic": float(item.get("score", 0.0)),
+                    "importance": float(tgt_imp[pos] / total_imp),
+                },
+            )
+            for pos, item in enumerate(tgt_selected)
+        ]
         payload.update(
             {
                 "score": s_sim,
@@ -536,29 +881,14 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
                 "coverage": cov_sim,
                 "stability": stab_sim,
                 "embedding": emb_sim,
-                "src_selected": [
-                    {
-                        "triple": list(item["triple"]),
-                        "support": float(src_support[pos]),
-                        "edge_ic": float(item.get("score", 0.0)),
-                        "importance": float(src_imp[pos] / total_imp),
-                    }
-                    for pos, item in enumerate(src_selected)
-                ],
-                "tgt_selected": [
-                    {
-                        "triple": list(item["triple"]),
-                        "support": float(tgt_support[pos]),
-                        "edge_ic": float(item.get("score", 0.0)),
-                        "importance": float(tgt_imp[pos] / total_imp),
-                    }
-                    for pos, item in enumerate(tgt_selected)
-                ],
+                "src_selected": src_selected_rows,
+                "tgt_selected": tgt_selected_rows,
                 "src_sentences": src_sentences,
                 "tgt_sentences": tgt_sentences,
                 "support_matrix": support_mat,
                 "row_best": row_best.detach().cpu().tolist(),
                 "col_best": col_best.detach().cpu().tolist(),
+                "links": self._matrix_provenance_links(src_selected_rows, tgt_selected_rows, reduced),
             }
         )
         return payload
@@ -580,6 +910,8 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
             "tgt_selected": [],
             "src_sentences": [],
             "tgt_sentences": [],
+            "source_links": [],
+            "target_links": [],
         }
         if not self.use_context:
             return payload
@@ -644,6 +976,32 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
         src_sentences = self._verbalize_object_items(src_selected)
         tgt_sentences = self._verbalize_object_items(tgt_selected)
         total_imp = sum(src_vals) + sum(tgt_vals) or 1.0
+        src_selected_rows = [
+            self._with_item_id(
+                "difference",
+                "source",
+                {
+                    "triple": list(item["triple"]),
+                    "edge_ic": float(item.get("score", 0.0)),
+                    "unsupported_mass": float(src_vals[pos]),
+                    "importance": float(src_vals[pos] / total_imp),
+                },
+            )
+            for pos, item in enumerate(src_selected)
+        ]
+        tgt_selected_rows = [
+            self._with_item_id(
+                "difference",
+                "target",
+                {
+                    "triple": list(item["triple"]),
+                    "edge_ic": float(item.get("score", 0.0)),
+                    "unsupported_mass": float(tgt_vals[pos]),
+                    "importance": float(tgt_vals[pos] / total_imp),
+                },
+            )
+            for pos, item in enumerate(tgt_selected)
+        ]
         payload.update(
             {
                 "score": s_diff,
@@ -652,26 +1010,30 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
                 "coverage": cov_diff,
                 "strength": str_diff,
                 "stability": stab_diff,
-                "src_selected": [
-                    {
-                        "triple": list(item["triple"]),
-                        "edge_ic": float(item.get("score", 0.0)),
-                        "unsupported_mass": float(src_vals[pos]),
-                        "importance": float(src_vals[pos] / total_imp),
-                    }
-                    for pos, item in enumerate(src_selected)
-                ],
-                "tgt_selected": [
-                    {
-                        "triple": list(item["triple"]),
-                        "edge_ic": float(item.get("score", 0.0)),
-                        "unsupported_mass": float(tgt_vals[pos]),
-                        "importance": float(tgt_vals[pos] / total_imp),
-                    }
-                    for pos, item in enumerate(tgt_selected)
-                ],
+                "src_selected": src_selected_rows,
+                "tgt_selected": tgt_selected_rows,
                 "src_sentences": src_sentences,
                 "tgt_sentences": tgt_sentences,
+                "source_links": [
+                    {
+                        "item_id": self._normalize_text(item.get("item_id")),
+                        "anchor_kind": "endpoint",
+                        "anchor_ref": "__target__",
+                        "score": float(item.get("unsupported_mass", 0.0)),
+                    }
+                    for item in src_selected_rows
+                    if self._normalize_text(item.get("item_id"))
+                ],
+                "target_links": [
+                    {
+                        "item_id": self._normalize_text(item.get("item_id")),
+                        "anchor_kind": "endpoint",
+                        "anchor_ref": "__source__",
+                        "score": float(item.get("unsupported_mass", 0.0)),
+                    }
+                    for item in tgt_selected_rows
+                    if self._normalize_text(item.get("item_id"))
+                ],
             }
         )
         return payload
@@ -713,44 +1075,123 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
             "stability": 0.0,
             "src_selected": [],
             "tgt_selected": [],
+            "source_links": [],
+            "target_links": [],
         }
         if not self.use_context:
             return payload
 
-        src_items = list(src_attrs[: self.max_attr_items])
-        tgt_items = list(tgt_attrs[: self.max_attr_items])
+        src_items = [
+            self._with_item_id("attribute", "source", item)
+            for item in list(src_attrs[: self.max_attr_items])
+        ]
+        tgt_items = [
+            self._with_item_id("attribute", "target", item)
+            for item in list(tgt_attrs[: self.max_attr_items])
+        ]
         if not src_items and not tgt_items:
             return payload
 
-        tgt_bank = list(tgt_labels)
-        src_bank = list(src_labels)
+        tgt_bank = [
+            {"kind": "label", "anchor_ref": "__target__", "text": self._normalize_text(label)}
+            for label in tgt_labels
+            if self._normalize_text(label)
+        ]
+        src_bank = [
+            {"kind": "label", "anchor_ref": "__source__", "text": self._normalize_text(label)}
+            for label in src_labels
+            if self._normalize_text(label)
+        ]
         for family_payload in hierarchy_payloads.values():
-            tgt_bank.extend(family_payload.get("tgt_sentences", []))
-            src_bank.extend(family_payload.get("src_sentences", []))
-        tgt_bank.extend(sim_payload.get("tgt_sentences", []))
-        src_bank.extend(sim_payload.get("src_sentences", []))
-        tgt_bank.extend([self._normalize_text(item.get("text")) for item in tgt_items])
-        src_bank.extend([self._normalize_text(item.get("text")) for item in src_items])
-        tgt_bank = [text for text in tgt_bank if text]
-        src_bank = [text for text in src_bank if text]
+            tgt_bank.extend(
+                {
+                    "kind": "hierarchy",
+                    "anchor_ref": self._normalize_text(item.get("item_id")),
+                    "text": self._normalize_text(sentence),
+                }
+                for item, sentence in zip(
+                    list(family_payload.get("tgt_selected", [])),
+                    list(family_payload.get("tgt_sentences", [])),
+                )
+                if self._normalize_text(item.get("item_id")) and self._normalize_text(sentence)
+            )
+            src_bank.extend(
+                {
+                    "kind": "hierarchy",
+                    "anchor_ref": self._normalize_text(item.get("item_id")),
+                    "text": self._normalize_text(sentence),
+                }
+                for item, sentence in zip(
+                    list(family_payload.get("src_selected", [])),
+                    list(family_payload.get("src_sentences", [])),
+                )
+                if self._normalize_text(item.get("item_id")) and self._normalize_text(sentence)
+            )
+        tgt_bank.extend(
+            {
+                "kind": "similarity",
+                "anchor_ref": self._normalize_text(item.get("item_id")),
+                "text": self._normalize_text(sentence),
+            }
+            for item, sentence in zip(
+                list(sim_payload.get("tgt_selected", [])),
+                list(sim_payload.get("tgt_sentences", [])),
+            )
+            if self._normalize_text(item.get("item_id")) and self._normalize_text(sentence)
+        )
+        src_bank.extend(
+            {
+                "kind": "similarity",
+                "anchor_ref": self._normalize_text(item.get("item_id")),
+                "text": self._normalize_text(sentence),
+            }
+            for item, sentence in zip(
+                list(sim_payload.get("src_selected", [])),
+                list(sim_payload.get("src_sentences", [])),
+            )
+            if self._normalize_text(item.get("item_id")) and self._normalize_text(sentence)
+        )
+        tgt_bank.extend(
+            {
+                "kind": "attribute",
+                "anchor_ref": self._normalize_text(item.get("item_id")),
+                "text": self._normalize_text(item.get("text")),
+            }
+            for item in tgt_items
+            if self._normalize_text(item.get("item_id")) and self._normalize_text(item.get("text"))
+        )
+        src_bank.extend(
+            {
+                "kind": "attribute",
+                "anchor_ref": self._normalize_text(item.get("item_id")),
+                "text": self._normalize_text(item.get("text")),
+            }
+            for item in src_items
+            if self._normalize_text(item.get("item_id")) and self._normalize_text(item.get("text"))
+        )
 
         def _side_support(
             side_items: Sequence[Dict[str, Any]],
-            bank: Sequence[str],
-        ) -> Tuple[float, List[Dict[str, Any]], List[float], List[float]]:
+            bank: Sequence[Dict[str, Any]],
+        ) -> Tuple[float, List[Dict[str, Any]], List[float], List[float], List[Dict[str, Any]]]:
             if not side_items or not bank:
-                return 0.0, [], [], []
+                return 0.0, [], [], [], []
             texts = [self._normalize_text(item.get("text")) for item in side_items]
             weights = [self._attribute_weight(item) for item in side_items]
-            mat = self._encode_context_matrix(texts, list(bank))
+            bank_texts = [self._normalize_text(item.get("text")) for item in bank]
+            mat = self._encode_context_matrix(texts, bank_texts)
             best = mat.max(dim=1).values.detach().cpu().tolist() if mat.numel() else [0.0 for _ in texts]
+            best_idx = mat.argmax(dim=1).detach().cpu().tolist() if mat.numel() else [0 for _ in texts]
             denom = sum(weights) or 1.0
             score = sum(w * s for w, s in zip(weights, best)) / denom
             weighted_support = [w * s for w, s in zip(weights, best)]
             selected = []
-            for item, weight, support, weighted in zip(side_items, weights, best, weighted_support):
+            links = []
+            for item, weight, support, weighted, anchor_idx in zip(side_items, weights, best, weighted_support, best_idx):
+                anchor = dict(bank[anchor_idx]) if bank and 0 <= int(anchor_idx) < len(bank) else {}
                 selected.append(
                     {
+                        "item_id": self._normalize_text(item.get("item_id")),
                         "property": self._normalize_text(item.get("prop")),
                         "value": self._normalize_text(item.get("value")),
                         "text": self._normalize_text(item.get("text")),
@@ -759,10 +1200,22 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
                         "importance": float(weighted),
                     }
                 )
-            return float(score), selected, weights, best
+                item_id = self._normalize_text(item.get("item_id"))
+                anchor_kind = self._normalize_text(anchor.get("kind"))
+                anchor_ref = self._normalize_text(anchor.get("anchor_ref"))
+                if item_id and anchor_kind and anchor_ref:
+                    links.append(
+                        {
+                            "item_id": item_id,
+                            "anchor_kind": anchor_kind,
+                            "anchor_ref": anchor_ref,
+                            "score": float(support),
+                        }
+                    )
+            return float(score), selected, weights, best, links
 
-        src_score, src_selected, src_weights, src_supports = _side_support(src_items, tgt_bank)
-        tgt_score, tgt_selected, tgt_weights, tgt_supports = _side_support(tgt_items, src_bank)
+        src_score, src_selected, src_weights, src_supports, src_links = _side_support(src_items, tgt_bank)
+        tgt_score, tgt_selected, tgt_weights, tgt_supports, tgt_links = _side_support(tgt_items, src_bank)
         side_scores = [score for score, items in [(src_score, src_selected), (tgt_score, tgt_selected)] if items]
         if not side_scores:
             return payload
@@ -787,6 +1240,8 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
                 "stability": stab_attr,
                 "src_selected": src_selected,
                 "tgt_selected": tgt_selected,
+                "source_links": src_links,
+                "target_links": tgt_links,
             }
         )
         return payload
@@ -1475,6 +1930,7 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
                 }
                 explanations.append(
                     {
+                        "explanation_schema_version": 2,
                         "src_iri": src_iris[idx],
                         "tgt_iri": tgt_iris[idx],
                         "models": {
@@ -1595,6 +2051,13 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
                             "source": list(payload["attr"].get("src_selected", [])),
                             "target": list(payload["attr"].get("tgt_selected", [])),
                         },
+                        "cross_side_provenance": self._build_cross_side_provenance(
+                            float(s_label[idx]),
+                            payload["hierarchy"],
+                            payload["sim"],
+                            payload["diff"],
+                            payload["attr"],
+                        ),
                         "llm_pair_evidence_packet": pair_packets[idx],
                         "llm_pair_brief": pair_briefs[idx],
                         "llm_summaries": {

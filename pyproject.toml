@@ -37,6 +37,7 @@ httpx = "^0.28.1"
 exact = "exact.delivery.cli.align:main"
 bioml-eval = "exact.delivery.cli.eval:main"
 exact-llm-debug = "exact.delivery.cli.llm_debug:main"
+exact-user-study = "exact.delivery.cli.user_study:main"
 
 
 [tool.poetry.group.prebuild.dependencies]
