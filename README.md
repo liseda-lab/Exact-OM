@@ -1,105 +1,104 @@
-# **EXACT-OM: An Explainable Context-Aware Matching Model for Ontology Alignment**
+# EXACT-OM
 
-**EXACT-OM** is a hybrid ontology matching model that integrates lexical, structural, and language model-based signals within a unified, interpretable architecture.
-It combines the strengths of **language models** and **ontology semantics** to align entities across heterogeneous knowledge bases while preserving explainability.
+EXACT-OM is a tool for explainable, context-aware ontology matching.
+It combines lexical similarity, ontology structure, and optional language-model
+reasoning to predict mappings between entities while keeping the decision process
+inspectable.
 
-The current default runtime uses a **pair-adaptive scorer**:
+The repository currently defaults to a pair-adaptive scorer: lexical matching is
+still the main signal, structural evidence is split into separate channels, and
+the LLM sees a compact pair brief built from pair-specific evidence. The earlier
+single-context scorer is still available as a legacy mode.
 
-- lexical similarity is still the primary signal
-- structural evidence is split into separate channels instead of one pooled context
-- the LLM sees one **pair brief** built from the pair-specific evidence
+## Citation
 
-The original **single-context scorer** is still available as an opt-in legacy mode.
+If you use this repository in academic work, please cite:
 
-### **Core Principles**
+Cotovio, P. G., Nunes, S., Jiménez-Ruiz, E., & Pesquita, C. (2026).
+*Interpretable Context-Aware Models Improve Expert Validation in Ontology
+Matching*. In *The Semantic Web: 23rd European Semantic Web Conference*.
+Springer.
 
-1. **Lexical Understanding**
-   Entities are represented through all label variants and embedded using **SapBERT**, capturing synonymy and abbreviation patterns. The highest pairwise similarity defines the lexical correspondence.
+## How EXACT-OM Works
 
-2. **Pair-Adaptive Structural Semantics**
-   Instead of relying only on one cached context subgraph per entity, the default scorer builds pair-specific evidence from multiple channels: ontology-native hierarchy families, non-hierarchical similarity triples, distinctive difference triples, and auxiliary literal/annotation attributes.
+At a high level, EXACT-OM follows four steps:
 
-3. **Hierarchical Adaptive Fusion**
-   Structural channels are first aggregated into one structural score, then fused with lexical similarity through a **confidence-weighted function**, granting higher influence to the most reliable signal for each pair.
+1. **Lexical matching**
+   Label variants are embedded with SapBERT, and the strongest pairwise
+   similarity is used as the lexical signal.
+2. **Pair-adaptive structural evidence**
+   For each candidate pair, the model gathers multiple structural views instead
+   of relying on a single pooled context. The current scorer separates:
+   hierarchy-based evidence, non-hierarchical similarity triples, distinctive
+   difference triples, and auxiliary literal or annotation attributes.
+3. **Confidence-weighted fusion**
+   Structural channels are first combined into one structural score. That score
+   is then fused with lexical similarity using a confidence-aware function so
+   that stronger evidence has more influence on the final prediction.
+4. **Optional LLM arbitration**
+   When a pair remains ambiguous, the system can build a short pair brief and
+   ask an LLM for a binary decision. This can be done with local Hugging Face
+   models or hosted OpenRouter models, depending on configuration.
 
-4. **Uncertainty-Driven Language Model Inference**
-   When ambiguity remains high, configurable LLM backends compress the pair evidence into a **pair brief** and issue a **binary decision** whose probability is incorporated into the final score. The verbaliser, brief-generation model, decision model, and rationale model can now be routed independently to either **local Hugging Face models** or **hosted OpenRouter models**.
+One of the main goals of the project is interpretability. For each evaluated
+mapping, EXACT-OM can export:
 
-### **Explainability**
+- the lexical, structural, and LLM contributions to the final score
+- the per-channel structural breakdown
+- natural-language rationales aligned with the final outcome
+- structured JSON outputs for downstream inspection and analysis
 
-For every evaluated mapping, EXACT-OM provides:
+## Installation
 
-* Top-level lexical, structural, and LLM contributions with their confidence and weight.
-* Structural breakdowns over hierarchy, similarity, difference, and attribute channels.
-* Natural-language rationales aligned with the final model outcome.
-  All results are exported as structured JSON explanations, ensuring transparent and traceable alignment decisions.
+The project is managed with Poetry.
 
-### **Outcome**
+### Requirements
 
-By integrating structured semantics, adaptive weighting, and interpretable reasoning, EXACT-OM delivers high-quality ontology alignments with explicit, human-readable evidence of how and why each mapping was made.
+- Python 3.10
+- Java available on the system path for JVM-based preprocessing
+- Poetry
+- CUDA-capable GPU if you want GPU execution; CPU-only runs are also supported
 
+### Setup
 
-## Running Exact-OM
+```bash
+poetry install
+poetry run exact --help
+```
 
-### CLI (`exact`)
+The package exposes these main entry points:
 
-`exact` (defined in `exact/delivery/cli/align.py`) exposes the following key flags:
+- `exact` for ontology matching runs
+- `bioml-eval` for standalone evaluation
+- `exact-user-study` for post-run user-study analysis
 
-- `-s/--source_ontology_file`, `-t/--target_ontology_file`: required OWL inputs.
-- `-o/--output_dir`: target directory (created automatically) for checkpoints, plots, and logs.
-- `-y/--config_file`: path to a YAML configuration (defaults to built-in settings if omitted).
-- `-r/--training_reference_file`, `-f/--full_reference_file`: TSV ground-truth mappings. `-r` is used for supervised tasks; `-f` unlocks evaluation and certain context caches.
-- `-c/--candidates_file`: optional `test.cands*.tsv` restricting the search space.
-- `-l/--save_logs`: write `exact.log` inside the output dir; stdout only otherwise.
-- `-e/--run_eval`: run the evaluation stage after inference (requires `-f` when no candidates file is used).
-- `-m/--jvm_heap_size`: heap passed to the JVM-based preprocessing (accepts sizes like `32G`).
-- `-d/--device`: CUDA device id; omit to run entirely on CPU.
+## Running EXACT-OM
 
-Typical workflow:
+The matching CLI lives in `exact/delivery/cli/align.py`.
 
-1. Prepare ontologies (`*.owl`), references (`train.tsv`, `test.tsv`), and candidates (`test.cands.val.tsv`).
-2. Adjust a config (copy `exp/debug_new_approach/full_ncit2doid_local_small/config.yaml` and edit thresholds, model names, etc.).
-3. Invoke `exact` with the paths above; include `-c` when running on validation slices, drop it for full-test inference.
+The core inputs are:
 
-### Hosted LLM configuration
+- `-s` / `--source_ontology_file`: source ontology in OWL format
+- `-t` / `--target_ontology_file`: target ontology in OWL format
+- `-o` / `--output_dir`: directory for outputs, logs, and artifacts
+- `-y` / `--config_file`: YAML configuration file
 
-The default config now supports both local and hosted LLM backends.
+Useful optional inputs:
 
-- `llm_profiles` defines named backend profiles.
-- `llm_routing` decides which profile is used for each task:
-  - verbaliser
-  - summary task, which generates pair briefs in the default scorer
-  - decision
-  - rationale
-
-Hosted profiles use OpenRouter and resolve the API key in this order:
-
-1. `OPENROUTER_API_KEY`
-2. the profile-specific `api_key_path`
-3. `~/.config/openrouter/api_key`
-4. an interactive prompt for a key-file path
-5. local fallback with a warning
-
-The decision path is stricter than the other LLM tasks: if the selected hosted
-model cannot support the configured binary-head chat-logprob scoring path,
-EXACT-OM falls back to the configured local decision model.
-
-Hosted decision scoring now uses OpenRouter `/chat/completions` with a
-constrained binary head. The runtime asks the model to emit exactly one label
-(default: `A` or `B`), applies equal positive `logit_bias` to both label
-tokens, reads first-token `top_logprobs`, and normalizes the two label scores
-into the positive-class probability used by the scorer. A runtime probe checks
-whether the selected model/provider route exposes usable chat logprobs for both
-labels before the hosted decision path is used.
-
-Hosted summary, rationale, and verbaliser calls still send one prompt per API
-request, but the runtime now executes them with bounded concurrency using the
-corresponding batch-size settings as the concurrency cap.
+- `-r` / `--training_reference_file`: training mappings for supervised settings
+- `-f` / `--full_reference_file`: reference mappings for evaluation and some
+  context-building steps
+- `-c` / `--candidates_file`: candidate restriction file, useful for validation
+  slices
+- `-e` / `--run_eval`: run evaluation after inference
+- `-d` / `--device`: CUDA device id; omit for CPU
+- `-m` / `--jvm_heap_size`: heap size passed to the JVM, for example `32G`
+- `-l` / `--save_logs`: write `exact.log` inside the output directory
 
 Example:
 
 ```bash
-exact \
+poetry run exact \
   -s data/ncit-doid/ncit.owl \
   -t data/ncit-doid/doid.owl \
   -o exp/runs/ncit_doid/manual \
@@ -109,35 +108,67 @@ exact \
   -l -e -m 60G -d 0
 ```
 
-### Threshold and rationale semantics
+A typical workflow is:
+
+1. Prepare the ontologies, reference mappings, and optional candidate file.
+2. Copy and edit a YAML config, for example
+   `exp/debug_new_approach/full_ncit2doid_local_small/config.yaml`.
+3. Run `exact` and inspect the output directory for alignments, logs, plots, and
+   explanations.
+
+## Configuration Notes
+
+### Threshold semantics
 
 `alignment_params.threshold` is the shared final decision threshold.
 
-- In **global mode**, it filters saved alignments and also defines positive vs
+- In global mode, it filters saved alignments and also determines positive vs.
   negative rationale polarity together with `cardinality`.
-- In **local mode**, all candidates remain in the ranking output, but the same
+- In local mode, all candidates remain in the ranking output, but the same
   threshold is still used to label rationales as positive or negative.
 
-### Python API (`exact.delivery.api`)
+### LLM routing
 
-For programmatic control:
+LLM behavior is split into two configuration blocks:
 
-- `AlignmentRunner` mirrors the CLI parameters. Constructor arguments map 1:1 to the flags listed above (e.g., `source_ontology_file`, `target_ontology_file`, `output_dir`, `config_file`, `training_reference_file`, `full_reference_file`, `candidates_file`, `save_logs`, `run_eval`, `device`, `jvm_heap_size`). Call `runner.run()` to validate, boot the JVM, and execute the alignment.
-- `EvalutionRunner` (note spelling) encapsulates the standalone evaluation tool. Key args are `alignment_file`, `output_dir`, `full_reference_file`, optional ontologies/references for contextual metrics, `K` (list of cutoffs), `log_level`, `save_logs`, and `jvm_heap_size`. Call `run()` to produce precision/recall scores and CSV summaries.
+- `llm_profiles` defines named local or hosted backends
+- `llm_routing` selects which profile is used for each task:
+  `verbaliser`, `summary`, `decision`, and `rationale`
 
-### Evaluation CLI (`bioml-eval`)
+Hosted profiles use OpenRouter. The API key is resolved in this order:
 
-`bioml-eval` (defined in `exact/delivery/cli/eval.py`) accepts the same fields as `EvalutionRunner`:
+1. `OPENROUTER_API_KEY`
+2. the profile-specific `api_key_path`
+3. `~/.config/openrouter/api_key`
+4. an interactive prompt for a key-file path
+5. local fallback with a warning
 
-- `--alignment_file/-a`: TSV with predictions.
-- `--output_dir/-o`: destination for metrics and logs.
-- Optional: `--source_ontology_file`, `--target_ontology_file`, `--train_reference_file`, `--full_reference_file`, `--reference_candidates`, `--K`, `--log_level`, `--save_logs`, `--jvm_heap_size`.
-- `--error_on_fail/-e`: make evaluation raise on missing references instead of logging warnings.
+For decision scoring, the hosted path is stricter than the others. EXACT-OM uses
+a constrained binary decision head and relies on usable chat logprobs for both
+labels. If the selected hosted route does not support that path, the runtime
+falls back to the configured local decision model.
 
-Example:
+## Outputs
+
+Depending on the run mode, a typical output directory includes:
+
+- alignment TSV files
+- logs and runtime artifacts
+- evaluation summaries
+- `full_explanations.json` with detailed per-pair explanations
+
+User-study analysis expects a run directory containing
+`src2tgt.maps_local.tsv` and `full_explanations.json`.
+
+## Evaluation And Analysis
+
+### Standalone evaluation
+
+`bioml-eval` mirrors the evaluation API and can be used on an existing alignment
+file.
 
 ```bash
-bioml-eval \
+poetry run bioml-eval \
   --alignment_file exp/runs/ncit_doid/manual/model/alignment.tsv \
   --output_dir exp/runs/ncit_doid/manual \
   --full_reference_file data/ncit-doid/test.tsv \
@@ -146,66 +177,51 @@ bioml-eval \
   --save_logs -m 32G
 ```
 
-### YAML-driven runner
+### Python API
 
-`tools/run_exact_job.py` lets you express runs declaratively. A config consists of:
+For programmatic use, `exact.delivery.api` exposes:
 
-- `dataset`: `data_dir`, `source`, `target`, `train_reference`, `full_reference`, `candidates`, plus optional runtime knobs forwarded to the runner (`memory`, `device`, `run_eval`, `save_logs`).
-- `job`: `name`, `output_dir`, `config_file`, `memory`, `device`, `save_logs`, `run_eval`.
+- `AlignmentRunner`, which mirrors the main matching CLI
+- `EvalutionRunner`, which wraps the standalone evaluation flow
 
-Usage:
+### User-study analysis
 
-- `python3 tools/run_exact_job.py --run-config exp/run_configs/ncit_doid_val.yaml --dry-run` shows the resolved `exact` command.
-- Drop `--dry-run` to execute locally.
-- Pass `--sbatch-script deploy/sbatch/exact_tune_run.sh` to submit the same run through Slurm.
+`exact-user-study` is the post-run analysis CLI used to build balanced study
+selections, export mappings, generate failure taxonomies, and produce the
+notebook used for expert validation analysis.
 
-### Slurm helper scripts
+The helper `tools/run_user_study_job.py` wraps this flow from a YAML run config.
 
-- `deploy/sbatch/exact_single_run.sh`: minimal template with hard-coded paths for quick manual edits (e.g., update the variables at the top and call `sbatch …`).
-- `deploy/sbatch/exact_tune_run.sh`: argument-driven script used by the tuner and YAML runner. Supports overrides via `--data-dir`, `--source`, `--target`, `--candidates`, `--config-file`, `--run-eval`, `--save-logs`, etc., or the equivalent environment variables when invoking `sbatch`.
+## YAML Runners And Slurm Helpers
 
-## Hyperparameter tuning helper
+For repeatable runs, the repository includes small wrappers around the main CLI:
 
-The `tools/hparam_tuner.py` utility creates per-trial experiment folders, configs, and
-corresponding `sbatch` commands. Describe your dataset, base config, and search space
-in a tuner file (see `exp/tuning/ncit_doid_val/tuner.yaml` for an example), then pick a
-strategy:
+- `tools/run_exact_job.py` builds and runs an `exact` command from a YAML file
+- `tools/run_user_study_job.py` does the same for `exact-user-study`
 
-Tuner YAML layout:
+These can be executed locally with `--dry-run` to inspect the resolved command,
+or submitted through Slurm by passing the corresponding wrapper script:
 
-- `base_config`: path to the reference config that every trial will clone and mutate.
-- `experiment_root`: directory where per-trial folders, manifests, and submit scripts are written.
-- `job_name_prefix`: label applied to each generated job (suffixed with trial index + params).
-- `dataset`: values forwarded to the Slurm runner (`data_dir`, ontology filenames, references, candidates, memory, device, run_eval, save_logs).
-- `slurm`: `script` (defaults to `deploy/sbatch/exact_tune_run.sh`) plus optional `sbatch_args` (partition, nodes, etc.).
-- `search_space`: keys reference dotted config paths (e.g., `model.params.gamma`). For each parameter:
-  - `type`: `float`, `int`, or `categorical`.
-  - `values`: explicit list used during grid search (and as anchor points for smart sampling).
-  - `bounds`: `[min, max]` interval for the smart sampler; combine with `scale: log` for log-space sampling and `quantize`
-    to snap results (e.g., batch sizes) to sensible increments.
-- `smart`: knobs for the low-discrepancy sampler: `num_samples`, `exploit_fraction` (portion of configs perturbed around
-  anchor configs), `exploit_noise` (relative perturbation magnitude), `random_seed`, and explicit `anchor_configs`
-  (each providing `values` per parameter). When omitted, the sampler centers exploitation around the base config.
+- `deploy/sbatch/exact_tune_run.sh`
+- `deploy/sbatch/exact_user_study_run.sh`
+- `deploy/sbatch/exact_single_run.sh`
 
-Common command-line options:
+## Hyperparameter Tuning
+
+`tools/hparam_tuner.py` generates per-trial experiment folders, trial configs,
+and `sbatch` commands from a tuner YAML file such as
+`exp/tuning/ncit_doid_val/tuner.yaml`.
+
+Two common modes are supported:
+
+- grid search over explicit parameter values
+- a lightweight smart sampler for low-discrepancy exploration with local
+  exploitation
+
+Example:
 
 ```bash
-# Dense, exhaustive combinations over the provided discrete values.
-python3 tools/hparam_tuner.py \
+poetry run python tools/hparam_tuner.py \
   --tuner-config exp/tuning/ncit_doid_val/tuner.yaml \
   --strategy grid --dry-run
-
-# Lightweight low-discrepancy sampling with local exploitation.
-python3 tools/hparam_tuner.py \
-  --tuner-config exp/tuning/ncit_doid_val/tuner.yaml \
-  --strategy smart --num-samples 24
 ```
-
-Running without `--dry-run` writes trial configs under `experiment_root`, generates a
-`submit_all.sh` helper with ready-to-run `sbatch` lines, and produces a manifest of the
-sampled hyperparameters. Use `--submit` if you want the script to enqueue every job
-immediately after generation.
-
-The tuning Slurm wrapper (`deploy/sbatch/exact_tune_run.sh`) honors environment overrides
-for the dataset, config path, candidates file, and memory budget, so every generated job
-can stay self-contained without duplicating shell scripts.
