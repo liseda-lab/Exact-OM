@@ -5,6 +5,8 @@ export type NodeType =
   | "target-context"
   | "ontology-extra";
 
+export type StudyMode = "app" | "study";
+
 export type EdgeType =
   | "hierarchy"
   | "similarity"
@@ -85,6 +87,19 @@ export interface SourceBundle {
   source_label: string;
   targets: TargetBundle[];
   default_target_rank: number;
+}
+
+export interface SourceOption {
+  source_id: string;
+  source_label: string;
+}
+
+export interface GraphViewportState {
+  zoom: number;
+  pan: {
+    x: number;
+    y: number;
+  };
 }
 
 export interface NodeInfoResponse {

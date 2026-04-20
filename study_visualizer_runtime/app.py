@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 from fastapi import FastAPI, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from .helpers import (
@@ -211,6 +212,7 @@ class StudyVisualizerService:
         self._path_cache: Dict[Tuple[str, str], Dict[str, Any]] = {}
         self._pair_mapping_lookup: Dict[Tuple[str, str], Dict[str, Any]] = {}
         self._selected_sources: List[str] = []
+        self._source_label_lookup: Dict[str, str] = {}
         self._build_mapping_indexes()
 
     def _resolve_selected_records_path(self) -> Path:
@@ -267,11 +269,16 @@ class StudyVisualizerService:
             if not src:
                 continue
             self._selected_sources.append(src)
+            source_label = self._source_label_lookup.get(src, "")
             for path in list(pair.get("paths") or []):
                 tgt = safe_text(path.get("id"))
                 if tgt:
                     self._pair_mapping_lookup[(src, tgt)] = dict(path)
-        self._selected_sources = sorted(dict.fromkeys(self._selected_sources))
+                    if not source_label:
+                        record = self.selected_record_index.get((src, tgt)) or {}
+                        source_label = safe_text(((record.get("selected_labels") or {})).get("source"))
+            self._source_label_lookup[src] = source_label or src
+        self._selected_sources = list(dict.fromkeys(self._selected_sources))
         self.logger.info(
             "Study visualizer indexed %d selected sources and %d selected source-target paths",
             len(self._selected_sources),
@@ -280,6 +287,15 @@ class StudyVisualizerService:
 
     def available_sources(self) -> List[str]:
         return list(self._selected_sources)
+
+    def source_options(self) -> List[Dict[str, str]]:
+        return [
+            {
+                "source_id": source_id,
+                "source_label": self._source_label_lookup.get(source_id) or source_id,
+            }
+            for source_id in self._selected_sources
+        ]
 
     @staticmethod
     def _endpoint_node_id(side: str, entity_iri: str) -> str:
@@ -834,6 +850,13 @@ def create_study_visualizer_app(
         logger=logger,
     )
     app = FastAPI(title="Exact Study Visualizer")
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?$",
+        allow_credentials=False,
+        allow_methods=["GET", "OPTIONS"],
+        allow_headers=["*"],
+    )
     app.state.study_service = service
 
     @app.get("/api/health")
@@ -846,6 +869,10 @@ def create_study_visualizer_app(
             return service.get_source_bundle(source)
         except KeyError as exc:
             raise HTTPException(status_code=404, detail=f"Unknown study source: {source}") from exc
+
+    @app.get("/api/study/sources")
+    def api_study_sources() -> List[Dict[str, str]]:
+        return service.source_options()
 
     @app.get("/api/study/node-info")
     def api_study_node_info(

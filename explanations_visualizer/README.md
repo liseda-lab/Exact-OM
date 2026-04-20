@@ -120,6 +120,19 @@ path is:
 1. build the frontend bundle in this directory
 2. serve it through `python -m study_visualizer_runtime.cli`
 
+If you do want to point the frontend at a separately running backend during
+frontend iteration, you can set:
+
+```bash
+NEXT_PUBLIC_STUDY_API_BASE_URL=http://localhost:8000
+```
+
+That makes the app request `${NEXT_PUBLIC_STUDY_API_BASE_URL}/api/study/*`
+instead of same-origin `/api/study/*`.
+
+Without that env var, the frontend also falls back to `http://localhost:8000`
+when it detects a localhost frontend running on any port other than `8000`.
+
 ## Configuration
 
 The backend can be configured either through CLI flags or environment

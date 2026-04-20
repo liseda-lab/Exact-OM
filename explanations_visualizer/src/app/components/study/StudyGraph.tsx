@@ -1,25 +1,65 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef } from "react";
-import cytoscape, { Core, ElementDefinition } from "cytoscape";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import cytoscape, { Core, ElementDefinition, NodeSingular } from "cytoscape";
 
 import graphStyles from "@/app/hooks/graphStyles";
-import { StudyEdge, StudyNode } from "@/app/hooks/types";
+import { GraphViewportState, StudyEdge, StudyMode, StudyNode } from "@/app/hooks/types";
 
 
 type StudyGraphProps = {
   nodes: StudyNode[];
   edges: StudyEdge[];
+  mode: StudyMode;
   selectedNodeId: string | null;
   selectedEdgeId: string | null;
   expandedNodeId: string | null;
-  viewportKey: string;
+  layoutResetKey: string;
+  viewportStateKey: string;
+  savedViewportState: GraphViewportState | null;
+  allowInspection: boolean;
+  graphExpanded: boolean;
+  canToggleGraphExpanded: boolean;
+  onToggleGraphExpanded?: () => void;
+  onViewportChange?: (nextViewportState: GraphViewportState) => void;
   onNodeClick: (nodeId: string) => void;
   onEdgeClick: (edgeId: string) => void;
   onBackgroundClick: () => void;
 };
 
+type ViewportSize = {
+  width: number;
+  height: number;
+};
+
+type GraphLayoutMetrics = {
+  width: number;
+  height: number;
+  sourceAnchor: { x: number; y: number };
+  targetAnchor: { x: number; y: number };
+  baseRadius: number;
+  ringGap: number;
+  itemsPerRing: number;
+  sectorGapDegrees: number;
+  expansionBaseRadius: number;
+  expansionGap: number;
+  expansionItemsPerRing: number;
+  fitPadding: number;
+  fitZoomMultiplier: number;
+};
+
+type GraphFitPadding = {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+};
+
 const CHANNEL_ORDER = ["hierarchy", "similarity", "difference", "attribute", "other"] as const;
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
+}
 
 function primaryChannel(node: StudyNode): string {
   const counts = new Map<string, number>();
@@ -33,6 +73,33 @@ function primaryChannel(node: StudyNode): string {
     if (right[1] !== left[1]) return right[1] - left[1];
     return left[0].localeCompare(right[0]);
   })[0][0];
+}
+
+function buildLayoutMetrics(viewport: ViewportSize, mode: StudyMode): GraphLayoutMetrics {
+  const width = Math.max(viewport.width || 1320, 640);
+  const height = Math.max(viewport.height || 860, 420);
+  const centerX = width / 2;
+  const centerY = mode === "study" ? height * 0.46 : height / 2;
+  const desiredSeparation = width * (mode === "study" ? 0.48 : 0.54);
+  const maxSeparation = Math.max(340, width - 140);
+  const separation = clamp(desiredSeparation, 360, Math.min(1120, maxSeparation));
+  const minDim = Math.min(width, height);
+
+  return {
+    width,
+    height,
+    sourceAnchor: { x: centerX - separation / 2, y: centerY },
+    targetAnchor: { x: centerX + separation / 2, y: centerY },
+    baseRadius: clamp(minDim * (mode === "study" ? 0.29 : 0.275), 210, 420),
+    ringGap: clamp(minDim * 0.105, 86, 148),
+    itemsPerRing: Math.round(clamp(Math.round(width / 300), 4, 7)),
+    sectorGapDegrees: clamp(width / 190, 5, 10),
+    expansionBaseRadius: clamp(minDim * 0.18, 155, 270),
+    expansionGap: clamp(minDim * 0.075, 74, 112),
+    expansionItemsPerRing: Math.round(clamp(Math.round(width / 340), 3, 6)),
+    fitPadding: clamp(minDim * 0.055, 36, 82),
+    fitZoomMultiplier: mode === "study" ? 0.98 : 0.95,
+  };
 }
 
 function placeArc(
@@ -135,7 +202,11 @@ function placeGroupedArc(
   });
 }
 
-function buildPositions(nodes: StudyNode[], expandedNodeId: string | null): Record<string, { x: number; y: number }> {
+function buildPositions(
+  nodes: StudyNode[],
+  expandedNodeId: string | null,
+  layoutMetrics: GraphLayoutMetrics,
+): Record<string, { x: number; y: number }> {
   const positions: Record<string, { x: number; y: number }> = {};
   const sourceNodes = nodes.filter((node) => node.type === "Source");
   const targetNodes = nodes.filter((node) => node.type === "Target");
@@ -145,19 +216,38 @@ function buildPositions(nodes: StudyNode[], expandedNodeId: string | null): Reco
     .filter((node) => node.type === "ontology-extra")
     .sort((left, right) => left.label.localeCompare(right.label));
 
-  const sourceAnchor = { x: 500, y: 760 };
-  const targetAnchor = { x: 2480, y: 760 };
+  if (sourceNodes[0]) positions[sourceNodes[0].id] = layoutMetrics.sourceAnchor;
+  if (targetNodes[0]) positions[targetNodes[0].id] = layoutMetrics.targetAnchor;
 
-  if (sourceNodes[0]) positions[sourceNodes[0].id] = sourceAnchor;
-  if (targetNodes[0]) positions[targetNodes[0].id] = targetAnchor;
-
-  placeGroupedArc(positions, sourceContext, sourceAnchor.x, sourceAnchor.y, 48, 312, 390, 118, 4, 10);
-  placeGroupedArc(positions, targetContext, targetAnchor.x, targetAnchor.y, -132, 132, 390, 118, 4, 10);
+  placeGroupedArc(
+    positions,
+    sourceContext,
+    layoutMetrics.sourceAnchor.x,
+    layoutMetrics.sourceAnchor.y,
+    34,
+    326,
+    layoutMetrics.baseRadius,
+    layoutMetrics.ringGap,
+    layoutMetrics.itemsPerRing,
+    layoutMetrics.sectorGapDegrees,
+  );
+  placeGroupedArc(
+    positions,
+    targetContext,
+    layoutMetrics.targetAnchor.x,
+    layoutMetrics.targetAnchor.y,
+    -146,
+    146,
+    layoutMetrics.baseRadius,
+    layoutMetrics.ringGap,
+    layoutMetrics.itemsPerRing,
+    layoutMetrics.sectorGapDegrees,
+  );
 
   const expandedNode = expandedNodeId ? nodes.find((node) => node.id === expandedNodeId) : null;
   const fallbackAnchor = expandedNodeId && positions[expandedNodeId]
     ? positions[expandedNodeId]
-    : { x: 1490, y: 760 };
+    : { x: layoutMetrics.width / 2, y: layoutMetrics.height / 2 };
 
   const expansionSide =
     expandedNode?.ontology_side ??
@@ -168,36 +258,190 @@ function buildPositions(nodes: StudyNode[], expandedNodeId: string | null): Reco
         : null);
 
   if (expansionSide === "source") {
-    placeArc(positions, ontologyExtra, fallbackAnchor.x, fallbackAnchor.y, 90, 270, 240, 96, 4);
+    placeArc(
+      positions,
+      ontologyExtra,
+      fallbackAnchor.x,
+      fallbackAnchor.y,
+      90,
+      270,
+      layoutMetrics.expansionBaseRadius,
+      layoutMetrics.expansionGap,
+      layoutMetrics.expansionItemsPerRing,
+    );
   } else if (expansionSide === "target") {
-    placeArc(positions, ontologyExtra, fallbackAnchor.x, fallbackAnchor.y, -90, 90, 240, 96, 4);
+    placeArc(
+      positions,
+      ontologyExtra,
+      fallbackAnchor.x,
+      fallbackAnchor.y,
+      -90,
+      90,
+      layoutMetrics.expansionBaseRadius,
+      layoutMetrics.expansionGap,
+      layoutMetrics.expansionItemsPerRing,
+    );
   } else {
-    placeArc(positions, ontologyExtra, fallbackAnchor.x, fallbackAnchor.y, 0, 330, 240, 96, 5);
+    placeArc(
+      positions,
+      ontologyExtra,
+      fallbackAnchor.x,
+      fallbackAnchor.y,
+      0,
+      330,
+      layoutMetrics.expansionBaseRadius,
+      layoutMetrics.expansionGap,
+      layoutMetrics.expansionItemsPerRing,
+    );
   }
 
   return positions;
 }
 
+function graphFitPadding(metrics: GraphLayoutMetrics, mode: StudyMode): GraphFitPadding {
+  if (mode === "study") {
+    return {
+      top: clamp(metrics.height * 0.1, 78, 116),
+      right: clamp(metrics.width * 0.21, 132, 260),
+      bottom: clamp(metrics.height * 0.24, 150, 220),
+      left: clamp(metrics.width * 0.19, 132, 240),
+    };
+  }
+  return {
+    top: metrics.fitPadding,
+    right: metrics.fitPadding,
+    bottom: metrics.fitPadding,
+    left: metrics.fitPadding,
+  };
+}
+
+function defaultFit(cy: Core, metrics: GraphLayoutMetrics, mode: StudyMode) {
+  if (!cy.elements().length) return;
+  try {
+    const padding = graphFitPadding(metrics, mode);
+    const boundingBox = cy.elements().boundingBox();
+    const width = Math.max(1, boundingBox.w);
+    const height = Math.max(1, boundingBox.h);
+    const availableWidth = Math.max(80, cy.width() - padding.left - padding.right);
+    const availableHeight = Math.max(80, cy.height() - padding.top - padding.bottom);
+    const zoom = clamp(
+      Math.min(availableWidth / width, availableHeight / height) * metrics.fitZoomMultiplier,
+      cy.minZoom(),
+      cy.maxZoom(),
+    );
+    const pan = {
+      x: padding.left + (availableWidth - width * zoom) / 2 - boundingBox.x1 * zoom,
+      y: padding.top + (availableHeight - height * zoom) / 2 - boundingBox.y1 * zoom,
+    };
+    cy.zoom(zoom);
+    cy.pan(pan);
+  } catch {}
+}
+
+function applyViewportState(cy: Core, nextViewportState: GraphViewportState) {
+  cy.zoom(clamp(nextViewportState.zoom, cy.minZoom(), cy.maxZoom()));
+  cy.pan(nextViewportState.pan);
+}
+
+function zoomAboutCenter(cy: Core, factor: number) {
+  const nextZoom = clamp(cy.zoom() * factor, cy.minZoom(), cy.maxZoom());
+  cy.zoom({
+    level: nextZoom,
+    renderedPosition: {
+      x: cy.width() / 2,
+      y: cy.height() / 2,
+    },
+  });
+}
+
+function centerOnNode(cy: Core, node: NodeSingular) {
+  const position = node.position();
+  const zoom = cy.zoom();
+  const nextPan = {
+    x: cy.width() / 2 - position.x * zoom,
+    y: cy.height() / 2 - position.y * zoom,
+  };
+  cy.animate(
+    {
+      pan: nextPan,
+    },
+    {
+      duration: 240,
+      easing: "ease-out-cubic",
+    },
+  );
+}
+
+function GraphControlButton({
+  label,
+  onClick,
+  title,
+}: {
+  label: React.ReactNode;
+  onClick: () => void;
+  title: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      aria-label={title}
+      style={{
+        border: "1px solid rgba(40, 58, 72, 0.14)",
+        background: "rgba(255, 255, 255, 0.94)",
+        color: "#233744",
+        borderRadius: "14px",
+        minWidth: "2.1rem",
+        minHeight: "2.1rem",
+        padding: "0.46rem 0.66rem",
+        boxShadow: "0 10px 24px rgba(32, 49, 61, 0.12)",
+        cursor: "pointer",
+        fontWeight: 700,
+        fontSize: "0.88rem",
+        backdropFilter: "blur(10px)",
+      }}
+    >
+      {label}
+    </button>
+  );
+}
+
 export default function StudyGraph({
   nodes,
   edges,
+  mode,
   selectedNodeId,
   selectedEdgeId,
   expandedNodeId,
-  viewportKey,
+  layoutResetKey,
+  viewportStateKey,
+  savedViewportState,
+  allowInspection,
+  graphExpanded,
+  canToggleGraphExpanded,
+  onToggleGraphExpanded,
+  onViewportChange,
   onNodeClick,
   onEdgeClick,
   onBackgroundClick,
 }: StudyGraphProps) {
-  const containerRef = useRef<HTMLDivElement | null>(null);
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
+  const cyContainerRef = useRef<HTMLDivElement | null>(null);
   const cyRef = useRef<Core | null>(null);
+  const layoutResetKeyRef = useRef<string | null>(null);
+  const viewportStateKeyRef = useRef<string | null>(null);
+  const viewportRef = useRef<ViewportSize>({ width: 0, height: 0 });
+  const lastReportedViewportRef = useRef<GraphViewportState | null>(null);
   const onNodeClickRef = useRef(onNodeClick);
   const onEdgeClickRef = useRef(onEdgeClick);
   const onBackgroundClickRef = useRef(onBackgroundClick);
+  const onViewportChangeRef = useRef(onViewportChange);
+  const allowInspectionRef = useRef(allowInspection);
   const selectedNodeIdRef = useRef<string | null>(selectedNodeId);
   const selectedEdgeIdRef = useRef<string | null>(selectedEdgeId);
-  const viewportKeyRef = useRef<string | null>(null);
-  const viewportStateRef = useRef<Record<string, { zoom: number; pan: { x: number; y: number } }>>({});
+  const lastTapRef = useRef<{ nodeId: string | null; at: number }>({ nodeId: null, at: 0 });
+  const [viewport, setViewport] = useState<ViewportSize>({ width: 0, height: 0 });
 
   useEffect(() => {
     onNodeClickRef.current = onNodeClick;
@@ -212,6 +456,14 @@ export default function StudyGraph({
   }, [onBackgroundClick]);
 
   useEffect(() => {
+    onViewportChangeRef.current = onViewportChange;
+  }, [onViewportChange]);
+
+  useEffect(() => {
+    allowInspectionRef.current = allowInspection;
+  }, [allowInspection]);
+
+  useEffect(() => {
     selectedNodeIdRef.current = selectedNodeId;
   }, [selectedNodeId]);
 
@@ -219,8 +471,30 @@ export default function StudyGraph({
     selectedEdgeIdRef.current = selectedEdgeId;
   }, [selectedEdgeId]);
 
+  useEffect(() => {
+    if (!wrapperRef.current) return;
+    const target = wrapperRef.current;
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+      const width = Math.round(entry.contentRect.width);
+      const height = Math.round(entry.contentRect.height);
+      setViewport((prev) => {
+        if (prev.width === width && prev.height === height) return prev;
+        return { width, height };
+      });
+    });
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, []);
+
+  const layoutMetrics = useMemo(
+    () => buildLayoutMetrics(viewport, mode),
+    [mode, viewport],
+  );
+
   const elements = useMemo(() => {
-    const positions = buildPositions(nodes, expandedNodeId);
+    const positions = buildPositions(nodes, expandedNodeId, layoutMetrics);
     const nodeElements: ElementDefinition[] = nodes.map((node) => ({
       data: {
         ...node,
@@ -234,16 +508,16 @@ export default function StudyGraph({
       },
     }));
     return [...nodeElements, ...edgeElements];
-  }, [nodes, edges, expandedNodeId]);
+  }, [nodes, edges, expandedNodeId, layoutMetrics]);
 
   useEffect(() => {
-    if (!containerRef.current || cyRef.current) return;
+    if (!cyContainerRef.current || cyRef.current) return;
     const cy = cytoscape({
-      container: containerRef.current,
+      container: cyContainerRef.current,
       elements: [],
-      style: graphStyles() as any,
-      layout: { name: "preset", fit: false, padding: 160 },
-      minZoom: 0.10,
+      style: graphStyles({ mode, viewportWidth: layoutMetrics.width, viewportHeight: layoutMetrics.height }) as any,
+      layout: { name: "preset", fit: false, padding: layoutMetrics.fitPadding },
+      minZoom: 0.1,
       maxZoom: 2.4,
       wheelSensitivity: 0.18,
     });
@@ -255,6 +529,7 @@ export default function StudyGraph({
 
     const applySelectionState = (focusNodeId: string | null, focusEdgeId: string | null) => {
       cy.elements().removeClass("selected");
+      if (!allowInspectionRef.current) return;
       if (focusNodeId) {
         const node = cy.getElementById(focusNodeId);
         if (node.nonempty()) node.addClass("selected");
@@ -267,11 +542,21 @@ export default function StudyGraph({
 
     cy.on("tap", "node", (event) => {
       const nodeId = String(event.target.id());
-      applySelectionState(nodeId, null);
-      onNodeClickRef.current(nodeId);
+      const now = Date.now();
+      const isDoubleTap = lastTapRef.current.nodeId === nodeId && now - lastTapRef.current.at < 280;
+      lastTapRef.current = { nodeId, at: now };
+
+      if (allowInspectionRef.current) {
+        applySelectionState(nodeId, null);
+        onNodeClickRef.current(nodeId);
+      }
+      if (isDoubleTap) {
+        centerOnNode(cy, event.target);
+      }
     });
 
     cy.on("tap", "edge", (event) => {
+      if (!allowInspectionRef.current) return;
       const edgeId = String(event.target.id());
       applySelectionState(null, edgeId);
       onEdgeClickRef.current(edgeId);
@@ -280,6 +565,7 @@ export default function StudyGraph({
     cy.on("tap", (event) => {
       if (event.target !== cy) return;
       clearInteractiveState();
+      if (!allowInspectionRef.current) return;
       applySelectionState(null, null);
       onBackgroundClickRef.current();
     });
@@ -298,55 +584,85 @@ export default function StudyGraph({
       applySelectionState(selectedNodeIdRef.current, selectedEdgeIdRef.current);
     });
 
-    const persistViewport = () => {
-      const key = viewportKeyRef.current;
-      if (!key) return;
-      viewportStateRef.current[key] = {
-        zoom: cy.zoom(),
-        pan: cy.pan(),
+    const reportViewport = () => {
+      if (!onViewportChangeRef.current) return;
+      const nextViewportState = {
+        zoom: Number(cy.zoom().toFixed(4)),
+        pan: {
+          x: Number(cy.pan().x.toFixed(2)),
+          y: Number(cy.pan().y.toFixed(2)),
+        },
       };
+      const previousViewportState = lastReportedViewportRef.current;
+      if (
+        previousViewportState &&
+        previousViewportState.zoom === nextViewportState.zoom &&
+        previousViewportState.pan.x === nextViewportState.pan.x &&
+        previousViewportState.pan.y === nextViewportState.pan.y
+      ) {
+        return;
+      }
+      lastReportedViewportRef.current = nextViewportState;
+      onViewportChangeRef.current(nextViewportState);
     };
 
-    cy.on("zoom pan dragfree", persistViewport);
+    cy.on("zoom", reportViewport);
+    cy.on("pan", reportViewport);
 
     return () => {
       cy.destroy();
       cyRef.current = null;
     };
-  }, []);
+  }, [layoutMetrics.fitPadding, layoutMetrics.height, layoutMetrics.width, mode]);
 
   useEffect(() => {
     const cy = cyRef.current;
     if (!cy) return;
+    cy.style().fromJson(
+      graphStyles({ mode, viewportWidth: layoutMetrics.width, viewportHeight: layoutMetrics.height }) as any,
+    ).update();
+  }, [layoutMetrics.height, layoutMetrics.width, mode]);
 
-    const sameViewport = viewportKeyRef.current === viewportKey;
+  useEffect(() => {
+    const cy = cyRef.current;
+    if (!cy || viewport.width === 0 || viewport.height === 0) return;
+
+    const previousViewport = viewportRef.current;
+    const sizeChanged =
+      previousViewport.width === 0 ||
+      previousViewport.height === 0 ||
+      previousViewport.width !== viewport.width ||
+      previousViewport.height !== viewport.height;
+    const shouldReset = layoutResetKeyRef.current !== layoutResetKey || sizeChanged;
+    const targetChanged = viewportStateKeyRef.current !== viewportStateKey;
     const savedZoom = cy.zoom();
     const savedPan = cy.pan();
-    const savedForTarget = viewportStateRef.current[viewportKey];
 
+    cy.resize();
     cy.elements().remove();
     cy.add(elements);
-    cy.layout({ name: "preset", fit: false, padding: 160 }).run();
+    cy.layout({ name: "preset", fit: false, padding: layoutMetrics.fitPadding }).run();
 
-    if (sameViewport && Number.isFinite(savedZoom)) {
+    if (targetChanged && savedViewportState && !sizeChanged) {
+      applyViewportState(cy, savedViewportState);
+    } else if (shouldReset) {
+      defaultFit(cy, layoutMetrics, mode);
+    } else if (Number.isFinite(savedZoom)) {
       cy.zoom(savedZoom);
       cy.pan(savedPan);
-    } else if (savedForTarget && Number.isFinite(savedForTarget.zoom)) {
-      cy.zoom(savedForTarget.zoom);
-      cy.pan(savedForTarget.pan);
-    } else {
-      try {
-        cy.fit(undefined, 210);
-        cy.zoom(cy.zoom() * 1.10);
-      } catch {}
     }
-    viewportKeyRef.current = viewportKey;
-  }, [elements, viewportKey]);
+
+    layoutResetKeyRef.current = layoutResetKey;
+    viewportStateKeyRef.current = viewportStateKey;
+    viewportRef.current = viewport;
+  }, [elements, layoutMetrics, layoutResetKey, mode, savedViewportState, viewport, viewportStateKey]);
 
   useEffect(() => {
     const cy = cyRef.current;
     if (!cy) return;
     cy.elements().removeClass("selected");
+    cy.elements().removeClass("dimmed hovered-node hovered-edge");
+    if (!allowInspection) return;
     if (selectedNodeId) {
       const node = cy.getElementById(selectedNodeId);
       if (node.nonempty()) node.addClass("selected");
@@ -355,7 +671,52 @@ export default function StudyGraph({
       const edge = cy.getElementById(selectedEdgeId);
       if (edge.nonempty()) edge.addClass("selected");
     }
-  }, [selectedNodeId, selectedEdgeId]);
+  }, [allowInspection, selectedEdgeId, selectedNodeId]);
 
-  return <div ref={containerRef} style={{ width: "100%", height: "100%" }} />;
+  return (
+    <div ref={wrapperRef} style={{ position: "relative", width: "100%", height: "100%" }}>
+      <div ref={cyContainerRef} style={{ position: "absolute", inset: 0 }} />
+
+      <div
+        style={{
+          position: "absolute",
+          ...(mode === "study"
+            ? {
+                right: "1rem",
+                top: viewport.width > 0 && viewport.width < 760 ? "7.9rem" : "7.25rem",
+                zIndex: 5,
+              }
+            : {
+                right: "0.95rem",
+                top: "0.95rem",
+                zIndex: 3,
+              }),
+          display: "flex",
+          gap: "0.5rem",
+          alignItems: "center",
+          pointerEvents: "none",
+        }}
+      >
+        <div style={{ display: "flex", gap: "0.45rem", pointerEvents: "auto" }}>
+          <GraphControlButton
+            label="+"
+            onClick={() => cyRef.current && zoomAboutCenter(cyRef.current, 1.12)}
+            title="Zoom in"
+          />
+          <GraphControlButton
+            label="-"
+            onClick={() => cyRef.current && zoomAboutCenter(cyRef.current, 0.9)}
+            title="Zoom out"
+          />
+          {canToggleGraphExpanded && onToggleGraphExpanded ? (
+            <GraphControlButton
+              label={graphExpanded ? "Exit expanded" : "Expand graph"}
+              onClick={onToggleGraphExpanded}
+              title={graphExpanded ? "Exit expanded graph view" : "Expand graph view"}
+            />
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
 }

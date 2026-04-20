@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 
 import StudyGraph from "@/app/components/study/StudyGraph";
 import {
@@ -12,166 +12,205 @@ import {
 import {
   EdgeType,
   ExpandNodeResponse,
+  GraphViewportState,
   NodeInfoResponse,
   NodeType,
   SourceBundle,
+  SourceOption,
   StudyEdge,
+  StudyMode,
   TargetBundle,
+  TargetMetric,
 } from "@/app/hooks/types";
+import {
+  buildEndpointNodeId,
+  createDefaultFilter,
+  EDGE_TYPE_OPTIONS,
+  extractDefinitionTexts,
+  filterGraph,
+  formatNodeDetail,
+  formatScore,
+  LEVEL_OPTIONS,
+  NODE_TYPE_OPTIONS,
+} from "@/app/components/study/studyUtils";
 
 
-const NODE_TYPE_OPTIONS: NodeType[] = [
-  "Source",
-  "Target",
-  "source-context",
-  "target-context",
-];
+const ONTOLOGY_EXPANSION_ENABLED = false;
+const API_BASE_URL = (process.env.NEXT_PUBLIC_STUDY_API_BASE_URL || "").replace(/\/$/, "");
+const FETCH_TIMEOUT_MS = 20000;
 
-const EDGE_TYPE_OPTIONS: EdgeType[] = [
-  "hierarchy",
-  "similarity",
-  "difference",
-  "attribute",
-  "bridge-support",
-  "bridge-contrast",
-];
+type ScreenClass = "wide" | "medium" | "narrow";
+type PanelKey = "candidate" | "targets" | "controls";
+type PanelSide = "left" | "right";
+type FloatingPosition = { x: number; y: number };
 
-const LEVEL_OPTIONS = [
-  { value: 1, label: "Explanation only" },
-  { value: 2, label: "Explanation + core links" },
-  { value: 3, label: "Explanation + main support links" },
-  { value: 4, label: "All explanation links" },
-];
+const PANEL_LABELS: Record<PanelKey, string> = {
+  candidate: "candidate",
+  targets: "targets",
+  controls: "controls",
+};
 
-function createDefaultFilter<T extends string>(values: T[]): Record<T, boolean> {
-  return values.reduce((acc, value) => {
-    acc[value] = true;
-    return acc;
-  }, {} as Record<T, boolean>);
+const METRIC_META = {
+  decision_basis: {
+    title: "Decision basis",
+    help: "Which kind of evidence most strongly drove the current candidate decision.",
+  },
+  evidence_strength: {
+    title: "Evidence strength",
+    help: "How much support the available evidence provides for the current candidate.",
+  },
+  evidence_agreement: {
+    title: "Evidence agreement",
+    help: "How consistently the available evidence sources point in the same direction.",
+  },
+} as const;
+
+function normalizeMode(value: string | null): StudyMode {
+  return value === "study" ? "study" : "app";
 }
 
-function formatScore(value: number | undefined): string {
-  if (value === undefined || Number.isNaN(value)) return "n/a";
-  return value.toFixed(2);
-}
-
-function extractDefinitionTexts(info: NodeInfoResponse | null): string[] {
-  if (!info) return [];
-  const ontologyDefinitions = (info.ontology?.definitions || []).filter(Boolean);
-  if (ontologyDefinitions.length) return ontologyDefinitions;
-  const attrs = info.explanation?.attributes || [];
-  return attrs
-    .filter((item) => {
-      const property = String(item.property || "").toLowerCase().replace(/[_-]/g, " ");
-      const text = String(item.value || item.text || "").trim().toLowerCase();
-      return (
-        property === "definition" ||
-        property === "description" ||
-        text.startsWith("definition:") ||
-        text.startsWith("description:")
-      );
-    })
-    .map((item) => {
-      const text = String(item.value || item.text || "").trim();
-      if (text.includes(":")) {
-        return text.split(":").slice(1).join(":").trim() || text;
-      }
-      return text;
-    })
-    .filter(Boolean);
-}
-
-function filterGraph(
-  target: TargetBundle | null,
-  level: number,
-  showOntologyExtra: boolean,
-  nodeFilters: Record<NodeType, boolean>,
-  edgeFilters: Record<EdgeType, boolean>,
-  expansion: ExpandNodeResponse | null,
-) {
-  if (!target) return { nodes: [], edges: [] };
-  const baseNodes = [...target.graph.nodes];
-  const baseEdges = target.graph.edges.filter((edge) => {
-    if (edge.origin === "ontology-extra") return false;
-    if ((edge.level ?? 1) > level) return false;
-    return edgeFilters[edge.type];
-  });
-
-  const mergedNodes = [...baseNodes];
-  const mergedEdges = [...baseEdges];
-
-  if (showOntologyExtra && expansion && expansion.expandable) {
-    expansion.nodes.forEach((node) => {
-      mergedNodes.push(node);
-    });
-    expansion.edges.forEach((edge) => {
-      if (edgeFilters[edge.type]) mergedEdges.push(edge);
-    });
+function readQueryState(): { mode: StudyMode; source: string } {
+  if (typeof window === "undefined") {
+    return { mode: "app", source: "" };
   }
-
-  const visibleNodeIds = new Set(
-    mergedNodes
-      .filter((node) => nodeFilters[node.type])
-      .map((node) => node.id),
-  );
-  const visibleNodeLookup = new Map(
-    mergedNodes
-      .filter((node) => visibleNodeIds.has(node.id))
-      .map((node) => [node.id, node] as const),
-  );
-
-  const candidateEdges = mergedEdges.filter(
-    (edge) =>
-      edgeFilters[edge.type] &&
-      visibleNodeIds.has(edge.source) &&
-      visibleNodeIds.has(edge.target),
-  );
-
-  const nonBridgeIncidentNodeIds = new Set<string>();
-  candidateEdges
-    .filter((edge) => !edge.bridge)
-    .forEach((edge) => {
-      nonBridgeIncidentNodeIds.add(edge.source);
-      nonBridgeIncidentNodeIds.add(edge.target);
-    });
-
-  const bridgeSupportedEdges = candidateEdges.filter((edge) => {
-    if (!edge.bridge) return true;
-    const sourceNode = visibleNodeLookup.get(edge.source);
-    const targetNode = visibleNodeLookup.get(edge.target);
-    const sourceAnchored =
-      sourceNode?.type === "Source" ||
-      sourceNode?.type === "Target" ||
-      nonBridgeIncidentNodeIds.has(edge.source);
-    const targetAnchored =
-      targetNode?.type === "Source" ||
-      targetNode?.type === "Target" ||
-      nonBridgeIncidentNodeIds.has(edge.target);
-    return sourceAnchored && targetAnchored;
-  });
-
-  const incidentNodeIds = new Set<string>();
-  bridgeSupportedEdges.forEach((edge) => {
-    incidentNodeIds.add(edge.source);
-    incidentNodeIds.add(edge.target);
-  });
-
-  const prunedNodes = mergedNodes.filter((node) => {
-    if (!visibleNodeIds.has(node.id)) return false;
-    if (node.type === "Source" || node.type === "Target") return true;
-    return incidentNodeIds.has(node.id);
-  });
-
-  const prunedNodeIds = new Set(prunedNodes.map((node) => node.id));
-
+  const params = new URLSearchParams(window.location.search);
   return {
-    nodes: prunedNodes,
-    edges: bridgeSupportedEdges.filter(
-      (edge) =>
-        prunedNodeIds.has(edge.source) &&
-        prunedNodeIds.has(edge.target),
-    ),
+    mode: normalizeMode(params.get("mode")),
+    source: params.get("source") ?? "",
   };
+}
+
+function localDevApiBaseUrl(): string {
+  if (typeof window === "undefined") return "";
+  const { hostname, port, protocol } = window.location;
+  const isLocalHost = hostname === "localhost" || hostname === "127.0.0.1";
+  if (!isLocalHost || port === "8000") return "";
+  return `${protocol}//${hostname}:8000`;
+}
+
+function isLocalHostLocation(): boolean {
+  if (typeof window === "undefined") return false;
+  const { hostname } = window.location;
+  return hostname === "localhost" || hostname === "127.0.0.1";
+}
+
+function apiUrl(path: string): string {
+  const normalized = path.startsWith("/") ? path : `/${path}`;
+  const base = API_BASE_URL || localDevApiBaseUrl();
+  return `${base}${normalized}`;
+}
+
+function formatSourcesLoadError(endpoint: string, response: Response): string {
+  const message = `Failed to load sources from ${endpoint} (${response.status} ${response.statusText}).`;
+  if (response.status !== 404 || !isLocalHostLocation()) {
+    return message;
+  }
+  return `${message} If this page is being served by a frontend-only dev server, start the Python study runtime on localhost:8000 or set NEXT_PUBLIC_STUDY_API_BASE_URL to the study runtime.`;
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === "AbortError";
+}
+
+async function fetchWithTimeout(endpoint: string, resourceLabel: string): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  try {
+    return await fetch(endpoint, { signal: controller.signal });
+  } catch (error) {
+    if (isAbortError(error)) {
+      throw new Error(
+        `Timed out loading ${resourceLabel} from ${endpoint} after ${Math.round(FETCH_TIMEOUT_MS / 1000)}s.`,
+      );
+    }
+    if (error instanceof Error && error.message) {
+      throw error;
+    }
+    throw new Error(`Failed to load ${resourceLabel} from ${endpoint}.`);
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+}
+
+function writeQueryState(mode: StudyMode, source: string) {
+  if (typeof window === "undefined") return;
+  const url = new URL(window.location.href);
+  if (mode === "study") {
+    url.searchParams.set("mode", "study");
+  } else {
+    url.searchParams.delete("mode");
+  }
+  if (source) {
+    url.searchParams.set("source", source);
+  } else {
+    url.searchParams.delete("source");
+  }
+  window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+}
+
+function deriveScreenClass(width: number): ScreenClass {
+  if (width >= 1540) return "wide";
+  if (width >= 1100) return "medium";
+  return "narrow";
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
+}
+
+function clampFloatingPosition(
+  position: FloatingPosition,
+  boxSize: { width: number; height: number },
+  containerSize: { width: number; height: number },
+  inset = 16,
+): FloatingPosition {
+  const maxX = Math.max(inset, containerSize.width - boxSize.width - inset);
+  const maxY = Math.max(inset, containerSize.height - boxSize.height - inset);
+  return {
+    x: clamp(position.x, inset, maxX),
+    y: clamp(position.y, inset, maxY),
+  };
+}
+
+function matchesSourceOption(option: SourceOption, query: string): boolean {
+  const normalized = query.trim().toLowerCase();
+  if (!normalized) return true;
+  return (
+    option.source_label.toLowerCase().includes(normalized) ||
+    option.source_id.toLowerCase().includes(normalized)
+  );
+}
+
+function shortenMiddle(value: string, maxLength = 72): string {
+  if (value.length <= maxLength) return value;
+  const keep = Math.max(18, Math.floor((maxLength - 3) / 2));
+  return `${value.slice(0, keep)}...${value.slice(-keep)}`;
+}
+
+function useScrollCue(containerRef: React.RefObject<HTMLElement | null>): boolean {
+  const [showCue, setShowCue] = useState(false);
+
+  useEffect(() => {
+    const node = containerRef.current;
+    if (!node) return;
+
+    const updateCue = () => {
+      const scrollRemaining = node.scrollHeight - node.clientHeight - node.scrollTop;
+      setShowCue(scrollRemaining > 8);
+    };
+
+    updateCue();
+    node.addEventListener("scroll", updateCue);
+    const resizeObserver = new ResizeObserver(updateCue);
+    resizeObserver.observe(node);
+
+    return () => {
+      node.removeEventListener("scroll", updateCue);
+      resizeObserver.disconnect();
+    };
+  }, [containerRef]);
+
+  return showCue;
 }
 
 function LegendNode({
@@ -185,15 +224,15 @@ function LegendNode({
     <div style={{ display: "flex", alignItems: "center", gap: "0.55rem", whiteSpace: "nowrap" }}>
       <span
         style={{
-          width: "0.95rem",
-          height: "0.95rem",
-          borderRadius: "0.35rem",
+          width: "0.9rem",
+          height: "0.9rem",
+          borderRadius: "0.32rem",
           background: color,
           border: "1px solid rgba(61,79,95,0.22)",
           flexShrink: 0,
         }}
       />
-      <span style={{ color: "#516570" }}>{label}</span>
+      <span style={{ color: "#4f6270", fontSize: "0.9rem" }}>{label}</span>
     </div>
   );
 }
@@ -216,45 +255,81 @@ function LegendEdge({
           flexShrink: 0,
         }}
       />
-      <span style={{ color: "#516570" }}>{label}</span>
+      <span style={{ color: "#4f6270", fontSize: "0.9rem" }}>{label}</span>
     </div>
   );
 }
 
-function MetricCard({
-  title,
+function SmallLogo() {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: "0.7rem" }}>
+      <div
+        style={{
+          width: "2.15rem",
+          height: "2.15rem",
+          borderRadius: "0.8rem",
+          background: "linear-gradient(140deg, #3f6179 0%, #8fb5d2 100%)",
+          color: "#ffffff",
+          display: "grid",
+          placeItems: "center",
+          fontWeight: 800,
+          fontSize: "0.9rem",
+          boxShadow: "0 12px 28px rgba(58, 89, 114, 0.22)",
+        }}
+      >
+        E
+      </div>
+      <div>
+        <div style={{ fontWeight: 800, color: "#20323d", lineHeight: 1 }}>Exact-OM</div>
+        <div style={{ color: "#60717d", fontSize: "0.9rem", marginTop: "0.18rem" }}>
+          Explanation visualizer
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DetailPill({
   label,
-  description,
+  value,
+  tone = "neutral",
 }: {
-  title: string;
-  label?: string;
-  description?: string;
+  label: string;
+  value?: string | null;
+  tone?: "neutral" | "source" | "target";
 }) {
-  if (!label && !description) return null;
+  if (!value) return null;
+  const tones = {
+    neutral: {
+      background: "rgba(242, 246, 248, 0.96)",
+      border: "rgba(84, 105, 120, 0.14)",
+      label: "#6c7e8a",
+      value: "#28404d",
+    },
+    source: {
+      background: "rgba(221, 235, 244, 0.96)",
+      border: "rgba(77, 105, 132, 0.2)",
+      label: "#5b7488",
+      value: "#29475f",
+    },
+    target: {
+      background: "rgba(233, 240, 245, 0.98)",
+      border: "rgba(88, 110, 128, 0.18)",
+      label: "#6a7d8b",
+      value: "#334957",
+    },
+  }[tone];
   return (
     <div
       style={{
-        borderRadius: "16px",
-        border: "1px solid rgba(74,96,109,0.12)",
-        background: "#fafcfd",
-        padding: "0.82rem 0.9rem",
+        borderRadius: "999px",
+        border: `1px solid ${tones.border}`,
+        background: tones.background,
+        padding: "0.32rem 0.56rem",
       }}
     >
-      <div
-        style={{
-          fontSize: "0.72rem",
-          letterSpacing: "0.06em",
-          textTransform: "uppercase",
-          color: "#7a8995",
-          marginBottom: "0.35rem",
-        }}
-      >
-        {title}
-      </div>
-      {label ? <div style={{ fontWeight: 800, color: "#304452" }}>{label}</div> : null}
-      {description ? (
-        <div style={{ marginTop: "0.35rem", color: "#566874", lineHeight: 1.45 }}>{description}</div>
-      ) : null}
+      <span style={{ color: tones.label, fontSize: "0.78rem", marginRight: "0.35rem" }}>{label}</span>
+      <span style={{ color: tones.value, fontWeight: 700 }}>{value}</span>
     </div>
   );
 }
@@ -269,153 +344,766 @@ function InspectorCard({
   return (
     <div
       style={{
-        borderRadius: "16px",
-        border: "1px solid rgba(74,96,109,0.12)",
-        background: "#fafcfd",
-        padding: "0.8rem 0.88rem",
+        borderRadius: "18px",
+        border: "1px solid rgba(67, 88, 103, 0.12)",
+        background: "rgba(250, 252, 253, 0.98)",
+        padding: "0.84rem 0.9rem",
         minWidth: 0,
       }}
     >
-      <div style={{ fontWeight: 700, color: "#304452", marginBottom: "0.32rem" }}>{title}</div>
+      <div style={{ fontWeight: 700, color: "#2d4351", marginBottom: "0.36rem" }}>{title}</div>
       {children}
     </div>
   );
 }
 
-function DetailPill({
-  label,
-  value,
-}: {
-  label: string;
-  value?: string | null;
-}) {
-  if (!value) return null;
-  return (
-    <div
-      style={{
-        borderRadius: "999px",
-        border: "1px solid rgba(74,96,109,0.14)",
-        background: "#f7fafc",
-        padding: "0.38rem 0.6rem",
-      }}
-    >
-      <span style={{ color: "#73828e", fontSize: "0.78rem", marginRight: "0.35rem" }}>{label}</span>
-      <span style={{ color: "#304452", fontWeight: 700 }}>{value}</span>
-    </div>
-  );
-}
-
-function ScrollPanel({
+function PanelShell({
+  eyebrow,
+  title,
   children,
-  minWidth,
+  onHide,
+  collapseSide = "right",
 }: {
+  eyebrow: string;
+  title?: string;
   children: React.ReactNode;
-  minWidth?: number;
+  onHide?: () => void;
+  collapseSide?: PanelSide;
 }) {
+  const bodyRef = useRef<HTMLDivElement | null>(null);
+  const showScrollCue = useScrollCue(bodyRef);
+
   return (
     <section
       style={{
         position: "relative",
-        minWidth,
         minHeight: 0,
-        borderRadius: "24px",
-        border: "1px solid rgba(74,96,109,0.12)",
-        background: "rgba(255,255,255,0.94)",
-        boxShadow: "0 18px 42px rgba(74,96,109,0.06)",
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        borderRadius: "26px",
+        border: "1px solid rgba(70, 92, 107, 0.12)",
+        background: "rgba(255, 255, 255, 0.94)",
+        boxShadow: "0 22px 44px rgba(54, 74, 90, 0.08)",
         overflow: "hidden",
       }}
     >
       <div
         style={{
-          height: "100%",
+          display: "flex",
+          justifyContent: "space-between",
+          gap: "0.75rem",
+          alignItems: "flex-start",
+          padding: "0.88rem 0.9rem 0.16rem",
+          flexShrink: 0,
+        }}
+      >
+        <div>
+          <div style={{ fontSize: "0.76rem", letterSpacing: "0.08em", textTransform: "uppercase", color: "#73838f" }}>
+            {eyebrow}
+          </div>
+          {title ? (
+            <div style={{ marginTop: "0.28rem", fontWeight: 800, color: "#223441", fontSize: "1.02rem" }}>
+              {title}
+            </div>
+          ) : null}
+        </div>
+        {onHide ? (
+          <button
+            type="button"
+            onClick={onHide}
+            title="Hide panel"
+            aria-label="Hide panel"
+            style={{
+              borderRadius: "999px",
+              border: "1px solid rgba(70, 92, 107, 0.12)",
+              background: "rgba(255,255,255,0.96)",
+              color: "#48606f",
+              width: "1.95rem",
+              height: "1.95rem",
+              padding: 0,
+              cursor: "pointer",
+              fontWeight: 700,
+              flexShrink: 0,
+              display: "grid",
+              placeItems: "center",
+              fontSize: "1rem",
+              boxShadow: "0 10px 22px rgba(38, 57, 70, 0.1)",
+              backdropFilter: "blur(10px)",
+            }}
+          >
+            {collapseSide === "left" ? "←" : "→"}
+          </button>
+        ) : null}
+      </div>
+      <div
+        ref={bodyRef}
+        style={{
+          flex: 1,
+          minHeight: 0,
           overflowY: "auto",
-          padding: "1rem 1rem 3rem 1rem",
+          padding: "0.58rem 0.9rem 2.6rem",
           boxSizing: "border-box",
         }}
       >
         {children}
       </div>
-      <div
-        style={{
-          position: "absolute",
-          left: 0,
-          right: 0,
-          bottom: 0,
-          height: "4.2rem",
-          background: "linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.96) 72%, rgba(255,255,255,1) 100%)",
-          pointerEvents: "none",
-        }}
-      />
-      <div
-        style={{
-          position: "absolute",
-          left: "50%",
-          bottom: "0.62rem",
-          transform: "translateX(-50%)",
-          fontSize: "0.76rem",
-          letterSpacing: "0.04em",
-          color: "#7b8a95",
-          pointerEvents: "none",
-          whiteSpace: "nowrap",
-        }}
-      >
-        Scroll for more
-      </div>
+      {showScrollCue ? (
+        <div
+          style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            bottom: 0,
+            height: "3.8rem",
+            background: "linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.96) 72%, rgba(255,255,255,1) 100%)",
+            pointerEvents: "none",
+            display: "grid",
+            placeItems: "end center",
+            paddingBottom: "0.6rem",
+            color: "#71818d",
+            fontSize: "0.76rem",
+            letterSpacing: "0.03em",
+          }}
+        >
+          Scroll for more
+        </div>
+      ) : null}
     </section>
   );
 }
 
-function formatNodeDetail(detail: {
-  triple?: string;
-  text?: string;
-  property?: string;
-}): string {
-  const triple = String(detail.triple || "").trim();
-  if (triple) return triple;
-  const property = String(detail.property || "").trim();
-  const text = String(detail.text || "").trim();
-  if (property && text) return `${property}: ${text}`;
-  if (text) return text;
-  if (property) return property;
-  return "";
-}
+function FloatingPanel({
+  title,
+  position,
+  onClose,
+  children,
+}: {
+  title: string;
+  position: "left" | "right";
+  onClose: () => void;
+  children: React.ReactNode;
+}) {
+  const bodyRef = useRef<HTMLDivElement | null>(null);
+  const showScrollCue = useScrollCue(bodyRef);
 
-function SmallLogo() {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: "0.65rem" }}>
+    <div
+      style={{
+        position: "absolute",
+        top: "1rem",
+        bottom: "1rem",
+        ...(position === "left" ? { left: "1rem" } : { right: "1rem" }),
+        width: "min(26rem, calc(100% - 4.5rem))",
+        borderRadius: "24px",
+        border: "1px solid rgba(69, 90, 105, 0.14)",
+        background: "rgba(255, 255, 255, 0.96)",
+        boxShadow: "0 24px 48px rgba(42, 61, 75, 0.18)",
+        overflow: "hidden",
+        zIndex: 5,
+        backdropFilter: "blur(14px)",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
       <div
         style={{
-          width: "1.9rem",
-          height: "1.9rem",
-          borderRadius: "0.7rem",
-          background: "linear-gradient(135deg, #4d6984 0%, #7fa2c0 100%)",
-          color: "#ffffff",
-          display: "grid",
-          placeItems: "center",
-          fontWeight: 800,
-          fontSize: "0.82rem",
-          boxShadow: "0 8px 18px rgba(77,105,132,0.18)",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: "0.75rem",
+          padding: "0.9rem 1rem 0.4rem",
         }}
       >
-        E
+        <div style={{ fontWeight: 800, color: "#243743" }}>{title}</div>
+        <button
+          type="button"
+          onClick={onClose}
+          style={{
+            borderRadius: "999px",
+            border: "1px solid rgba(70, 92, 107, 0.12)",
+            background: "#f7fafb",
+            color: "#48606f",
+            padding: "0.32rem 0.62rem",
+            cursor: "pointer",
+            fontWeight: 700,
+          }}
+        >
+          Close
+        </button>
       </div>
-      <div>
-        <div style={{ fontWeight: 800, color: "#304452", lineHeight: 1 }}>Exact-OM</div>
-        <div style={{ color: "#6f7f8b", fontSize: "0.88rem", marginTop: "0.15rem" }}>
-          Explanation visualization
+      <div ref={bodyRef} style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "0.3rem 0.9rem 2.2rem" }}>
+        {children}
+      </div>
+      {showScrollCue ? (
+        <div
+          style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            bottom: 0,
+            height: "3.5rem",
+            background: "linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.96) 72%, rgba(255,255,255,1) 100%)",
+            pointerEvents: "none",
+            display: "grid",
+            placeItems: "end center",
+            paddingBottom: "0.55rem",
+            color: "#71818d",
+            fontSize: "0.76rem",
+          }}
+        >
+          Scroll for more
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function HiddenPanelEdgeButton({
+  side,
+  title,
+  onClick,
+}: {
+  side: PanelSide;
+  title: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      aria-label={title}
+      style={{
+        width: "2rem",
+        height: "2rem",
+        borderRadius: "999px",
+        border: "1px solid rgba(70, 92, 107, 0.12)",
+        background: "rgba(255,255,255,0.96)",
+        color: "#48606f",
+        cursor: "pointer",
+        fontWeight: 700,
+        display: "grid",
+        placeItems: "center",
+        boxShadow: "0 10px 22px rgba(38, 57, 70, 0.1)",
+        backdropFilter: "blur(10px)",
+      }}
+    >
+      {side === "left" ? "→" : "←"}
+    </button>
+  );
+}
+
+function ResizableSidebar({
+  side,
+  width,
+  minWidth,
+  maxWidth,
+  onWidthChange,
+  children,
+}: {
+  side: PanelSide;
+  width: number;
+  minWidth: number;
+  maxWidth: number;
+  onWidthChange: (nextWidth: number) => void;
+  children: React.ReactNode;
+}) {
+  const dragRef = useRef<{ startX: number; startWidth: number } | null>(null);
+
+  useEffect(() => {
+    const handlePointerMove = (event: PointerEvent) => {
+      if (!dragRef.current) return;
+      const delta = side === "left" ? event.clientX - dragRef.current.startX : dragRef.current.startX - event.clientX;
+      onWidthChange(clamp(dragRef.current.startWidth + delta, minWidth, maxWidth));
+    };
+    const handlePointerUp = () => {
+      dragRef.current = null;
+    };
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp);
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+    };
+  }, [maxWidth, minWidth, onWidthChange, side]);
+
+  const handle = (
+    <div
+      onPointerDown={(event) => {
+        dragRef.current = {
+          startX: event.clientX,
+          startWidth: width,
+        };
+      }}
+      style={{
+        position: "absolute",
+        top: 0,
+        bottom: 0,
+        width: "14px",
+        cursor: "ew-resize",
+        zIndex: 3,
+        touchAction: "none",
+        ...(side === "left" ? { right: "-7px" } : { left: "-7px" }),
+        display: "grid",
+        placeItems: "center",
+      }}
+      title="Resize panel"
+      aria-label="Resize panel"
+    >
+      <div
+        style={{
+          width: "4px",
+          height: "4.8rem",
+          borderRadius: "999px",
+          background: "rgba(102, 122, 137, 0.18)",
+          boxShadow: "0 0 0 1px rgba(255,255,255,0.7)",
+        }}
+      />
+    </div>
+  );
+
+  return (
+    <div style={{ position: "relative", width, minWidth: 0, minHeight: 0, height: "100%" }}>
+      {side === "right" ? handle : null}
+      <div style={{ height: "100%" }}>{children}</div>
+      {side === "left" ? handle : null}
+    </div>
+  );
+}
+
+function MetricCard({
+  title,
+  helpText,
+  metric,
+  onOpen,
+}: {
+  title: string;
+  helpText: string;
+  metric?: TargetMetric;
+  onOpen: () => void;
+}) {
+  const [showHelp, setShowHelp] = useState(false);
+  if (!metric?.label && !metric?.description) return null;
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      onMouseEnter={() => setShowHelp(true)}
+      onMouseLeave={() => setShowHelp(false)}
+      onFocus={() => setShowHelp(true)}
+      onBlur={() => setShowHelp(false)}
+      style={{
+        textAlign: "left",
+        position: "relative",
+        borderRadius: "18px",
+        border: "1px solid rgba(76, 97, 112, 0.14)",
+        background: "linear-gradient(180deg, rgba(245,249,251,0.98) 0%, rgba(255,255,255,0.98) 100%)",
+        padding: "0.82rem 0.9rem",
+        cursor: "pointer",
+        width: "100%",
+      }}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", gap: "0.75rem", alignItems: "flex-start" }}>
+        <div style={{ fontWeight: 800, color: "#28404d", fontSize: "1rem" }}>{title}</div>
+        {metric.label ? (
+          <span
+            style={{
+              borderRadius: "999px",
+              background: "rgba(76, 111, 139, 0.1)",
+              color: "#4a6780",
+              padding: "0.24rem 0.55rem",
+              fontSize: "0.82rem",
+              fontWeight: 800,
+              whiteSpace: "nowrap",
+            }}
+          >
+            {metric.label}
+          </span>
+        ) : null}
+      </div>
+      {showHelp ? (
+        <div
+          style={{
+            marginTop: "0.58rem",
+            borderRadius: "14px",
+            border: "1px solid rgba(77, 105, 132, 0.14)",
+            background: "rgba(234, 242, 247, 0.8)",
+            padding: "0.58rem 0.66rem",
+            color: "#4c6271",
+            lineHeight: 1.45,
+            fontSize: "0.9rem",
+          }}
+        >
+          <span style={{ fontWeight: 800, color: "#385163" }}>Metric meaning:</span> {helpText}
+        </div>
+      ) : null}
+      {metric.description ? (
+        <div style={{ marginTop: "0.55rem", color: "#5e7280", lineHeight: 1.5 }}>{metric.description}</div>
+      ) : null}
+    </button>
+  );
+}
+
+function MetricDialog({
+  title,
+  helpText,
+  metric,
+  onClose,
+}: {
+  title: string;
+  helpText: string;
+  metric?: TargetMetric;
+  onClose: () => void;
+}) {
+  if (!metric) return null;
+  return (
+    <div
+      onMouseDown={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(18, 28, 36, 0.28)",
+        display: "grid",
+        placeItems: "center",
+        zIndex: 40,
+        padding: "1.25rem",
+      }}
+    >
+      <div
+        onMouseDown={(event) => event.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        style={{
+          width: "min(30rem, 100%)",
+          borderRadius: "24px",
+          border: "1px solid rgba(70, 92, 107, 0.12)",
+          background: "rgba(255,255,255,0.98)",
+          boxShadow: "0 28px 60px rgba(27, 42, 51, 0.22)",
+          padding: "1.2rem 1.25rem 1.15rem",
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", gap: "1rem", alignItems: "flex-start" }}>
+          <div>
+            <div style={{ fontSize: "0.76rem", letterSpacing: "0.08em", textTransform: "uppercase", color: "#758590" }}>
+              Metric detail
+            </div>
+            <div style={{ marginTop: "0.28rem", fontWeight: 900, color: "#253743", fontSize: "1.15rem" }}>
+              {title}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              borderRadius: "999px",
+              border: "1px solid rgba(70, 92, 107, 0.12)",
+              background: "#f8fbfc",
+              color: "#46606f",
+              padding: "0.42rem 0.74rem",
+              cursor: "pointer",
+              fontWeight: 700,
+            }}
+          >
+            Close
+          </button>
+        </div>
+
+        <div style={{ marginTop: "0.95rem", display: "grid", gap: "0.82rem" }}>
+          <InspectorCard title="What it means">
+            <div style={{ color: "#526570", lineHeight: 1.5 }}>{helpText}</div>
+          </InspectorCard>
+          <InspectorCard title="Current label">
+            <div style={{ fontWeight: 800, color: "#2d4351" }}>{metric.label || "n/a"}</div>
+          </InspectorCard>
+          <InspectorCard title="Current description">
+            <div style={{ color: "#526570", lineHeight: 1.5 }}>
+              {metric.description || "No description available for this metric."}
+            </div>
+          </InspectorCard>
         </div>
       </div>
     </div>
   );
 }
 
+function SourcePicker({
+  options,
+  selectedSourceId,
+  onSelect,
+  disabled,
+}: {
+  options: SourceOption[];
+  selectedSourceId: string;
+  onSelect: (sourceId: string) => void;
+  disabled?: boolean;
+}) {
+  const pickerRef = useRef<HTMLDivElement | null>(null);
+  const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const [highlightedIndex, setHighlightedIndex] = useState(0);
+
+  const filtered = useMemo(
+    () => options.filter((option) => matchesSourceOption(option, query)).slice(0, 18),
+    [options, query],
+  );
+  const selectedOption = options.find((option) => option.source_id === selectedSourceId) || null;
+
+  useEffect(() => {
+    if (!open) return;
+    const selectedIndex = filtered.findIndex((option) => option.source_id === selectedSourceId);
+    setHighlightedIndex(selectedIndex >= 0 ? selectedIndex : 0);
+  }, [filtered, open, selectedSourceId]);
+
+  useEffect(() => {
+    if (!open) return;
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!pickerRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+    window.addEventListener("mousedown", handlePointerDown);
+    return () => window.removeEventListener("mousedown", handlePointerDown);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    optionRefs.current[highlightedIndex]?.scrollIntoView({ block: "nearest" });
+  }, [highlightedIndex, open]);
+
+  const chooseOption = (option: SourceOption) => {
+    onSelect(option.source_id);
+    setQuery("");
+    setOpen(false);
+  };
+
+  return (
+    <div ref={pickerRef} style={{ position: "relative", minWidth: "min(20rem, 100%)", flex: "0.95 1 24rem" }}>
+      <div style={{ fontSize: "0.76rem", letterSpacing: "0.08em", textTransform: "uppercase", color: "#6f818f" }}>
+        Browse sources
+      </div>
+      <div
+        style={{
+          marginTop: "0.42rem",
+          borderRadius: "18px",
+          border: open ? "1px solid rgba(77, 105, 132, 0.28)" : "1px solid rgba(66, 89, 104, 0.14)",
+          background: "linear-gradient(180deg, rgba(249,252,253,0.98) 0%, rgba(243,248,250,0.94) 100%)",
+          boxShadow: open ? "0 12px 28px rgba(54, 74, 90, 0.1)" : "inset 0 1px 0 rgba(255,255,255,0.6)",
+          overflow: "hidden",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: "0.65rem", padding: "0.68rem 0.8rem 0.48rem" }}>
+          <span style={{ color: "#6a7d8a", fontSize: "0.92rem" }}>⌕</span>
+          <input
+            disabled={disabled}
+            value={query}
+            onFocus={() => setOpen(true)}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              setOpen(true);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "ArrowDown") {
+                event.preventDefault();
+                setOpen(true);
+                setHighlightedIndex((prev) => Math.min(prev + 1, Math.max(filtered.length - 1, 0)));
+                return;
+              }
+              if (event.key === "ArrowUp") {
+                event.preventDefault();
+                setOpen(true);
+                setHighlightedIndex((prev) => Math.max(prev - 1, 0));
+                return;
+              }
+              if (event.key === "Enter") {
+                const option = filtered[highlightedIndex] || filtered[0];
+                if (option) {
+                  event.preventDefault();
+                  chooseOption(option);
+                }
+                return;
+              }
+              if (event.key === "Escape") {
+                setOpen(false);
+              }
+            }}
+            placeholder="Search labels or IRIs"
+            style={{
+              width: "100%",
+              border: "none",
+              outline: "none",
+              background: "transparent",
+              color: "#223644",
+              padding: 0,
+            }}
+          />
+        </div>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "0.8rem",
+            padding: "0 0.8rem 0.62rem",
+            color: "#6d808d",
+            fontSize: "0.83rem",
+          }}
+        >
+          <span>{selectedOption ? `Current: ${selectedOption.source_label}` : "Choose a source"}</span>
+          <span>{filtered.length} shown</span>
+        </div>
+      </div>
+      {open ? (
+        <div
+          style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            top: "calc(100% + 0.45rem)",
+            zIndex: 12,
+            borderRadius: "20px",
+            border: "1px solid rgba(69, 91, 106, 0.14)",
+            background: "rgba(255,255,255,0.98)",
+            boxShadow: "0 20px 44px rgba(39, 58, 72, 0.16)",
+            maxHeight: "20rem",
+            overflowY: "auto",
+            padding: "0.45rem",
+          }}
+        >
+          {filtered.length ? (
+            filtered.map((option, index) => {
+              const active = option.source_id === selectedSourceId;
+              const highlighted = index === highlightedIndex;
+              return (
+                <button
+                  ref={(node) => {
+                    optionRefs.current[index] = node;
+                  }}
+                  key={option.source_id}
+                  type="button"
+                  onClick={() => chooseOption(option)}
+                  onMouseEnter={() => setHighlightedIndex(index)}
+                  style={{
+                    display: "block",
+                    width: "100%",
+                    textAlign: "left",
+                    borderRadius: "16px",
+                    border:
+                      active || highlighted
+                        ? "1px solid rgba(77, 105, 132, 0.22)"
+                        : "1px solid transparent",
+                    background:
+                      active
+                        ? "rgba(230, 239, 246, 0.92)"
+                        : highlighted
+                          ? "rgba(241, 247, 250, 0.96)"
+                          : "transparent",
+                    padding: "0.7rem 0.78rem",
+                    cursor: "pointer",
+                    transition: "background 120ms ease, border-color 120ms ease",
+                  }}
+                >
+                  <div style={{ fontWeight: highlighted ? 700 : 600, color: "#233744" }}>{option.source_label}</div>
+                  <div style={{ marginTop: "0.2rem", color: "#647480", fontSize: "0.84rem", wordBreak: "break-word" }}>
+                    {option.source_id}
+                  </div>
+                </button>
+              );
+            })
+          ) : (
+            <div style={{ padding: "0.7rem 0.78rem", color: "#667783" }}>No matching sources.</div>
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function CandidateContent({
+  target,
+  onOpenMetric,
+}: {
+  target: TargetBundle | null;
+  onOpenMetric: (metricKey: keyof typeof METRIC_META) => void;
+}) {
+  if (!target) {
+    return <div style={{ color: "#61727d", marginTop: "0.8rem" }}>No candidate selected.</div>;
+  }
+
+  return (
+    <>
+      <div
+        style={{
+          borderRadius: "20px",
+          border: "1px solid rgba(77, 105, 132, 0.14)",
+          background: "linear-gradient(180deg, rgba(235,244,249,0.98) 0%, rgba(255,255,255,0.98) 100%)",
+          padding: "0.88rem 0.92rem",
+          boxShadow: "inset 0 1px 0 rgba(255,255,255,0.65)",
+        }}
+      >
+        <div style={{ fontWeight: 900, color: "#284458", lineHeight: 1.32, fontSize: "1.02rem" }}>
+          {target.target_label}
+        </div>
+        <div style={{ marginTop: "0.4rem", color: "#607484", lineHeight: 1.45, fontSize: "0.94rem" }}>
+          Rank #{target.rank} • confidence {formatScore(target.score)}
+        </div>
+        <div style={{ marginTop: "0.68rem", display: "flex", flexWrap: "wrap", gap: "0.45rem" }}>
+          <DetailPill label="Candidate" value={target.ground_truth ? "Ground truth" : "Alternative"} tone="target" />
+          <DetailPill label="LLM" value={target.llm.decision || "not used"} tone="target" />
+        </div>
+      </div>
+
+      <div style={{ marginTop: "1rem", display: "grid", gap: "0.76rem" }}>
+        <MetricCard
+          title={METRIC_META.decision_basis.title}
+          helpText={METRIC_META.decision_basis.help}
+          metric={target.metrics.decision_basis}
+          onOpen={() => onOpenMetric("decision_basis")}
+        />
+        <MetricCard
+          title={METRIC_META.evidence_strength.title}
+          helpText={METRIC_META.evidence_strength.help}
+          metric={target.metrics.evidence_strength}
+          onOpen={() => onOpenMetric("evidence_strength")}
+        />
+        <MetricCard
+          title={METRIC_META.evidence_agreement.title}
+          helpText={METRIC_META.evidence_agreement.help}
+          metric={target.metrics.evidence_agreement}
+          onOpen={() => onOpenMetric("evidence_agreement")}
+        />
+      </div>
+
+      <div
+        style={{
+          marginTop: "1rem",
+          borderRadius: "18px",
+          border: "1px solid rgba(77, 105, 132, 0.14)",
+          background: "rgba(244, 249, 252, 0.96)",
+          padding: "0.84rem 0.9rem",
+        }}
+      >
+        <div style={{ fontWeight: 800, color: "#2d4759", marginBottom: "0.45rem" }}>Textual rationale</div>
+        <div style={{ color: "#586c7a", lineHeight: 1.58 }}>
+          {target.llm.rationale || "No rationale available for this candidate."}
+        </div>
+      </div>
+    </>
+  );
+}
+
 export default function Home() {
-  const ONTOLOGY_EXPANSION_ENABLED = false;
-  const [sourceId, setSourceId] = useState<string>("");
+  const [queryReady, setQueryReady] = useState(false);
+  const [mode, setMode] = useState<StudyMode>("app");
+  const [sourceId, setSourceId] = useState("");
+  const [sourceOptions, setSourceOptions] = useState<SourceOption[]>([]);
+  const [sourcesLoading, setSourcesLoading] = useState(true);
+  const [sourcesError, setSourcesError] = useState("");
   const [bundle, setBundle] = useState<SourceBundle | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string>("");
-  const [selectedTargetId, setSelectedTargetId] = useState<string>("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [selectedTargetId, setSelectedTargetId] = useState("");
   const [selectedLevel, setSelectedLevel] = useState<number>(2);
   const [nodeFilters, setNodeFilters] = useState<Record<NodeType, boolean>>(
     createDefaultFilter(NODE_TYPE_OPTIONS),
@@ -428,26 +1116,212 @@ export default function Home() {
   const [nodeInfoCache, setNodeInfoCache] = useState<Record<string, NodeInfoResponse>>({});
   const [expandedNodeId, setExpandedNodeId] = useState<string | null>(null);
   const [expansion, setExpansion] = useState<ExpandNodeResponse | null>(null);
+  const [windowWidth, setWindowWidth] = useState(0);
+  const [graphExpanded, setGraphExpanded] = useState(false);
+  const [panelVisibility, setPanelVisibility] = useState<Record<PanelKey, boolean>>({
+    candidate: true,
+    targets: true,
+    controls: true,
+  });
+  const [mobilePanel, setMobilePanel] = useState<PanelKey | null>(null);
+  const [activeMetricKey, setActiveMetricKey] = useState<keyof typeof METRIC_META | null>(null);
+  const [inspectorHeight, setInspectorHeight] = useState(168);
+  const [candidatePanelWidth, setCandidatePanelWidth] = useState(292);
+  const [rightPanelWidth, setRightPanelWidth] = useState(308);
+  const [studyTargetBoxPosition, setStudyTargetBoxPosition] = useState<FloatingPosition | null>(null);
+  const [studyBottomPanelHeight, setStudyBottomPanelHeight] = useState(218);
+  const [studyBottomPanelVisible, setStudyBottomPanelVisible] = useState(true);
+  const inspectorDragRef = useRef<{ startY: number; startHeight: number } | null>(null);
+  const graphShellRef = useRef<HTMLElement | null>(null);
+  const studyTargetBoxRef = useRef<HTMLDivElement | null>(null);
+  const studyTargetDragRef = useRef<{
+    startX: number;
+    startY: number;
+    startLeft: number;
+    startTop: number;
+    width: number;
+    height: number;
+  } | null>(null);
+  const studyBottomPanelDragRef = useRef<{ startY: number; startHeight: number } | null>(null);
+  const graphViewportStoreRef = useRef<Record<string, GraphViewportState>>({});
+  const activeLevel = mode === "study" ? 2 : selectedLevel;
+  const screenClass = deriveScreenClass(windowWidth || 1600);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    setSourceId(params.get("source") ?? "");
+    const syncFromLocation = () => {
+      const next = readQueryState();
+      setMode(next.mode);
+      setSourceId(next.source);
+      setQueryReady(true);
+    };
+    syncFromLocation();
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    handleResize();
+    window.addEventListener("popstate", syncFromLocation);
+    window.addEventListener("resize", handleResize);
+    return () => {
+      window.removeEventListener("popstate", syncFromLocation);
+      window.removeEventListener("resize", handleResize);
+    };
   }, []);
 
   useEffect(() => {
-    if (!sourceId) {
-      setLoading(false);
-      setError("Missing source query parameter. Use ?source=<exact_source_iri>.");
+    if (mode !== "app") {
+      setSourcesLoading(false);
+      setSourcesError("");
+      setSourceOptions([]);
       return;
     }
+
+    let cancelled = false;
+    setSourcesLoading(true);
+    setSourcesError("");
+    const sourcesEndpoint = apiUrl("/api/study/sources");
+    fetchWithTimeout(sourcesEndpoint, "sources")
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error(formatSourcesLoadError(sourcesEndpoint, response));
+        }
+        return response.json();
+      })
+      .then((payload: SourceOption[]) => {
+        if (cancelled) return;
+        setSourceOptions(payload);
+      })
+      .catch((err: Error) => {
+        if (!cancelled) {
+          setSourceOptions([]);
+          setSourcesError(err.message || `Failed to load sources from ${sourcesEndpoint}.`);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setSourcesLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [mode]);
+
+  useEffect(() => {
+    if (!queryReady || sourcesLoading) return;
+    if (mode === "app" && !sourceId && sourceOptions.length) {
+      const nextSource = sourceOptions[0].source_id;
+      setSourceId(nextSource);
+      writeQueryState("app", nextSource);
+    }
+  }, [mode, queryReady, sourceId, sourceOptions, sourcesLoading]);
+
+  useEffect(() => {
+    if (mode === "study") {
+      setGraphExpanded(false);
+    }
+  }, [mode]);
+
+  useEffect(() => {
+    if (mode !== "app") {
+      setMobilePanel(null);
+      return;
+    }
+    if (screenClass === "narrow") {
+      setPanelVisibility({
+        candidate: false,
+        targets: false,
+        controls: false,
+      });
+      setMobilePanel(null);
+      return;
+    }
+    setPanelVisibility({
+      candidate: true,
+      targets: true,
+      controls: true,
+    });
+    setMobilePanel(null);
+  }, [mode, screenClass]);
+
+  useEffect(() => {
+    if (graphExpanded) {
+      setMobilePanel(null);
+    }
+  }, [graphExpanded]);
+
+  useEffect(() => {
+    if (!windowWidth) return;
+    setCandidatePanelWidth((prev) => clamp(prev, 240, clamp(windowWidth * 0.3, 270, 380)));
+    setRightPanelWidth((prev) => clamp(prev, 240, clamp(windowWidth * 0.3, 270, 390)));
+  }, [windowWidth]);
+
+  useEffect(() => {
+    if (mode !== "study") return;
+    const syncStudyOverlayBounds = () => {
+      const shellRect = graphShellRef.current?.getBoundingClientRect();
+      const boxRect = studyTargetBoxRef.current?.getBoundingClientRect();
+      if (!shellRect || !boxRect) return;
+
+      if (!studyTargetBoxPosition) {
+        setStudyTargetBoxPosition(
+          clampFloatingPosition(
+            {
+              x: shellRect.width - boxRect.width - 16,
+              y: 16,
+            },
+            { width: boxRect.width, height: boxRect.height },
+            { width: shellRect.width, height: shellRect.height },
+          ),
+        );
+        return;
+      }
+
+      const nextPosition = clampFloatingPosition(
+        studyTargetBoxPosition,
+        { width: boxRect.width, height: boxRect.height },
+        { width: shellRect.width, height: shellRect.height },
+      );
+      if (nextPosition.x !== studyTargetBoxPosition.x || nextPosition.y !== studyTargetBoxPosition.y) {
+        setStudyTargetBoxPosition(nextPosition);
+      }
+    };
+
+    const frameId = window.requestAnimationFrame(syncStudyOverlayBounds);
+    return () => window.cancelAnimationFrame(frameId);
+  }, [mode, studyTargetBoxPosition, windowWidth]);
+
+  useEffect(() => {
+    if (!queryReady) return;
+
+    if (mode === "study" && !sourceId) {
+      setLoading(false);
+      setBundle(null);
+      setSelectedTargetId("");
+      setError("Missing source query parameter. Use ?mode=study&source=<exact_source_iri>.");
+      return;
+    }
+
+    if (mode === "app" && !sourceId) {
+      if (!sourcesLoading && sourcesError) {
+        setLoading(false);
+        setBundle(null);
+        setSelectedTargetId("");
+        setError(sourcesError);
+      } else if (!sourcesLoading && sourceOptions.length === 0) {
+        setLoading(false);
+        setBundle(null);
+        setSelectedTargetId("");
+        setError("No sources are available for this study.");
+      }
+      return;
+    }
+
     let cancelled = false;
     setLoading(true);
     setError("");
-    fetch(`/api/study/source?source=${encodeURIComponent(sourceId)}`)
+    const sourceEndpoint = apiUrl(`/api/study/source?source=${encodeURIComponent(sourceId)}`);
+
+    fetchWithTimeout(sourceEndpoint, "study source")
       .then(async (response) => {
         if (!response.ok) {
           const payload = await response.json().catch(() => ({}));
-          throw new Error(payload.detail || "Failed to load study source.");
+          throw new Error(payload.detail || `Failed to load study source from ${sourceEndpoint}.`);
         }
         return response.json();
       })
@@ -467,15 +1341,22 @@ export default function Home() {
       .catch((err: Error) => {
         if (cancelled) return;
         setBundle(null);
+        setSelectedTargetId("");
         setError(err.message);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
+
     return () => {
       cancelled = true;
     };
-  }, [sourceId]);
+  }, [mode, queryReady, sourceId, sourceOptions.length, sourcesError, sourcesLoading]);
+
+  const selectedSourceOption = useMemo(
+    () => sourceOptions.find((option) => option.source_id === sourceId) || null,
+    [sourceId, sourceOptions],
+  );
 
   const selectedTarget = useMemo(() => {
     if (!bundle) return null;
@@ -483,11 +1364,14 @@ export default function Home() {
   }, [bundle, selectedTargetId]);
 
   useEffect(() => {
-    setSelectedNodeId(null);
-    setSelectedEdgeId(null);
     setExpandedNodeId(null);
     setExpansion(null);
-  }, [selectedTargetId]);
+    setActiveMetricKey(null);
+    if (mode === "study") {
+      setSelectedNodeId(null);
+      setSelectedEdgeId(null);
+    }
+  }, [mode, selectedTargetId]);
 
   const cacheKey = (targetId: string, nodeId: string) => `${targetId}::${nodeId}`;
 
@@ -496,9 +1380,9 @@ export default function Home() {
     const key = cacheKey(selectedTarget.target_id, nodeId);
     if (nodeInfoCache[key]) return nodeInfoCache[key];
     const response = await fetch(
-      `/api/study/node-info?source=${encodeURIComponent(bundle.source_id)}&target=${encodeURIComponent(
+      apiUrl(`/api/study/node-info?source=${encodeURIComponent(bundle.source_id)}&target=${encodeURIComponent(
         selectedTarget.target_id,
-      )}&node_id=${encodeURIComponent(nodeId)}`,
+      )}&node_id=${encodeURIComponent(nodeId)}`),
     );
     if (!response.ok) return null;
     const payload = (await response.json()) as NodeInfoResponse;
@@ -506,8 +1390,21 @@ export default function Home() {
     return payload;
   };
 
+  useEffect(() => {
+    if (mode !== "app" || !selectedTarget || !bundle) return;
+    const endpointId = buildEndpointNodeId("target", selectedTarget.target_id);
+    setSelectedEdgeId(null);
+    setSelectedNodeId(endpointId);
+    void ensureNodeInfo(endpointId);
+  }, [bundle, mode, selectedTarget]);
+
+  const handleSourceSelect = (nextSourceId: string) => {
+    setSourceId(nextSourceId);
+    writeQueryState(mode, nextSourceId);
+  };
+
   const handleNodeClick = async (nodeId: string) => {
-    if (!bundle || !selectedTarget) return;
+    if (mode !== "app" || !bundle || !selectedTarget) return;
     setSelectedEdgeId(null);
     setSelectedNodeId(nodeId);
     const info = await ensureNodeInfo(nodeId);
@@ -518,9 +1415,9 @@ export default function Home() {
       return;
     }
     const response = await fetch(
-      `/api/study/expand-node?source=${encodeURIComponent(bundle.source_id)}&target=${encodeURIComponent(
+      apiUrl(`/api/study/expand-node?source=${encodeURIComponent(bundle.source_id)}&target=${encodeURIComponent(
         selectedTarget.target_id,
-      )}&node_id=${encodeURIComponent(nodeId)}`,
+      )}&node_id=${encodeURIComponent(nodeId)}`),
     );
     if (!response.ok) return;
     const payload = (await response.json()) as ExpandNodeResponse;
@@ -529,11 +1426,13 @@ export default function Home() {
   };
 
   const handleEdgeClick = (edgeId: string) => {
+    if (mode !== "app") return;
     setSelectedNodeId(null);
     setSelectedEdgeId(edgeId);
   };
 
   const handleBackgroundClick = () => {
+    if (mode !== "app") return;
     setSelectedNodeId(null);
     setSelectedEdgeId(null);
   };
@@ -542,13 +1441,14 @@ export default function Home() {
     () =>
       filterGraph(
         selectedTarget,
-        selectedLevel,
+        activeLevel,
         ONTOLOGY_EXPANSION_ENABLED,
         nodeFilters,
         edgeFilters,
         expansion,
+        mode,
       ),
-    [selectedTarget, selectedLevel, nodeFilters, edgeFilters, expansion],
+    [activeLevel, edgeFilters, expansion, mode, nodeFilters, selectedTarget],
   );
 
   const selectedNodeInfo =
@@ -567,421 +1467,1196 @@ export default function Home() {
   const selectedEdge: StudyEdge | null =
     selectedEdgeId ? visibleGraph.edges.find((edge) => edge.id === selectedEdgeId) || null : null;
 
-  return (
-    <main
-      style={{
-        height: "100vh",
-        background: "linear-gradient(135deg, #f6f2ec 0%, #f8fbfd 48%, #eef4f8 100%)",
-        color: "#273945",
-        padding: "1rem",
-        boxSizing: "border-box",
-        overflow: "hidden",
-        fontFamily: "\"Avenir Next\", \"Segoe UI\", sans-serif",
-        display: "grid",
-        gridTemplateRows: "auto minmax(0, 1fr) auto",
-        gap: "1rem",
-      }}
+  const activeMetric = activeMetricKey && selectedTarget ? selectedTarget.metrics[activeMetricKey] : undefined;
+  const activeLevelOption = LEVEL_OPTIONS.find((option) => option.value === selectedLevel) || LEVEL_OPTIONS[0];
+  const graphViewportKey = [mode, sourceId, selectedTarget?.target_id || ""].join("|");
+  const savedGraphViewport = graphViewportStoreRef.current[graphViewportKey] || null;
+  const layoutResetKey = [
+    mode,
+    sourceId,
+    selectedTarget?.target_id || "",
+    String(graphExpanded),
+    screenClass,
+    String(panelVisibility.candidate),
+    String(panelVisibility.targets),
+    String(panelVisibility.controls),
+  ].join("|");
+
+  const leftHiddenPanels: PanelKey[] = [];
+  const rightHiddenPanels: PanelKey[] = [];
+  if (!graphExpanded && screenClass !== "narrow") {
+    if (screenClass === "wide" && !panelVisibility.candidate) {
+      leftHiddenPanels.push("candidate");
+    }
+    if ((screenClass === "wide" || screenClass === "medium") && !panelVisibility.targets) {
+      rightHiddenPanels.push("targets");
+    }
+    if ((screenClass === "wide" || screenClass === "medium") && !panelVisibility.controls) {
+      rightHiddenPanels.push("controls");
+    }
+    if (screenClass === "medium" && !panelVisibility.candidate) {
+      rightHiddenPanels.push("candidate");
+    }
+  }
+
+  const openMetric = (metricKey: keyof typeof METRIC_META) => setActiveMetricKey(metricKey);
+
+  const togglePanelVisibility = (key: PanelKey, value: boolean) => {
+    setPanelVisibility((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handleStudyTargetBoxDragStart = (event: React.PointerEvent<HTMLDivElement>) => {
+    const shellRect = graphShellRef.current?.getBoundingClientRect();
+    const boxRect = studyTargetBoxRef.current?.getBoundingClientRect();
+    if (!shellRect || !boxRect) return;
+    event.preventDefault();
+    studyTargetDragRef.current = {
+      startX: event.clientX,
+      startY: event.clientY,
+      startLeft: boxRect.left - shellRect.left,
+      startTop: boxRect.top - shellRect.top,
+      width: boxRect.width,
+      height: boxRect.height,
+    };
+  };
+
+  const handleStudyBottomPanelResizeStart = (event: React.PointerEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    studyBottomPanelDragRef.current = {
+      startY: event.clientY,
+      startHeight: studyBottomPanelHeight,
+    };
+  };
+
+  const handleInspectorResizeStart = (event: React.PointerEvent<HTMLDivElement>) => {
+    inspectorDragRef.current = {
+      startY: event.clientY,
+      startHeight: inspectorHeight,
+    };
+  };
+
+  useEffect(() => {
+    const handlePointerMove = (event: PointerEvent) => {
+      if (!studyTargetDragRef.current || !graphShellRef.current) return;
+      const shellRect = graphShellRef.current.getBoundingClientRect();
+      const drag = studyTargetDragRef.current;
+      const nextPosition = clampFloatingPosition(
+        {
+          x: drag.startLeft + (event.clientX - drag.startX),
+          y: drag.startTop + (event.clientY - drag.startY),
+        },
+        { width: drag.width, height: drag.height },
+        { width: shellRect.width, height: shellRect.height },
+      );
+      setStudyTargetBoxPosition(nextPosition);
+    };
+    const handlePointerUp = () => {
+      studyTargetDragRef.current = null;
+    };
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp);
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+    };
+  }, []);
+
+  useEffect(() => {
+    const handlePointerMove = (event: PointerEvent) => {
+      if (!studyBottomPanelDragRef.current) return;
+      const delta = studyBottomPanelDragRef.current.startY - event.clientY;
+      const maxHeight = clamp(window.innerHeight * 0.46, 240, 420);
+      const nextHeight = clamp(studyBottomPanelDragRef.current.startHeight + delta, 156, maxHeight);
+      setStudyBottomPanelHeight(nextHeight);
+    };
+    const handlePointerUp = () => {
+      studyBottomPanelDragRef.current = null;
+    };
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp);
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+    };
+  }, [studyBottomPanelHeight]);
+
+  useEffect(() => {
+    const handlePointerMove = (event: PointerEvent) => {
+      if (!inspectorDragRef.current) return;
+      const delta = inspectorDragRef.current.startY - event.clientY;
+      const maxHeight = clamp(window.innerHeight * 0.42, 220, 360);
+      const nextHeight = clamp(inspectorDragRef.current.startHeight + delta, 132, maxHeight);
+      setInspectorHeight(nextHeight);
+    };
+    const handlePointerUp = () => {
+      inspectorDragRef.current = null;
+    };
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp);
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+    };
+  }, [inspectorHeight]);
+
+  const candidatePanel = (
+    <PanelShell
+      eyebrow="Selected candidate"
+      collapseSide={screenClass === "wide" ? "left" : "right"}
+      onHide={screenClass === "narrow" ? undefined : () => togglePanelVisibility("candidate", false)}
     >
-      <header
+      <CandidateContent target={selectedTarget} onOpenMetric={openMetric} />
+    </PanelShell>
+  );
+
+  const targetsPanel = (
+    <PanelShell
+      eyebrow="Target selection"
+      title={selectedTarget ? `${bundle?.targets.length || 0} candidates` : undefined}
+      collapseSide="right"
+      onHide={screenClass === "narrow" ? undefined : () => togglePanelVisibility("targets", false)}
+    >
+      <div style={{ display: "grid", gap: "0.52rem" }}>
+        {(bundle?.targets || []).map((target) => {
+          const active = target.target_id === selectedTargetId;
+          return (
+            <button
+              key={target.target_id}
+              type="button"
+              onClick={() => setSelectedTargetId(target.target_id)}
+              style={{
+                textAlign: "left",
+                padding: "0.7rem 0.78rem",
+                borderRadius: "16px",
+                border: active ? "2px solid rgba(110, 134, 151, 0.84)" : "1px solid rgba(71, 91, 105, 0.12)",
+                background: active ? "rgba(236, 244, 248, 0.94)" : "#ffffff",
+                cursor: "pointer",
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", gap: "0.75rem" }}>
+                <div style={{ fontWeight: 600, color: "#29404e" }}>#{target.rank}</div>
+                <div style={{ color: "#49657b", fontWeight: 600 }}>{formatScore(target.score)}</div>
+              </div>
+              <div style={{ marginTop: "0.32rem", fontWeight: 600, color: "#2a404e", lineHeight: 1.34, fontSize: "0.95rem" }}>
+                {target.target_label}
+              </div>
+              <div style={{ marginTop: "0.24rem", color: "#6b7b87", fontSize: "0.86rem" }}>
+                {target.ground_truth ? "Ground truth candidate" : "Candidate"}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </PanelShell>
+  );
+
+  const controlsPanel = (
+    <PanelShell
+      eyebrow="Display controls"
+      collapseSide="right"
+      onHide={screenClass === "narrow" ? undefined : () => togglePanelVisibility("controls", false)}
+    >
+      <label style={{ display: "block", fontWeight: 800, color: "#243643" }}>Explanation granularity</label>
+      <select
+        value={selectedLevel}
+        onChange={(event) => setSelectedLevel(Number(event.target.value))}
         style={{
-          borderRadius: "22px",
-          border: "1px solid rgba(74,96,109,0.12)",
-          background: "rgba(255,255,255,0.92)",
-          boxShadow: "0 14px 32px rgba(74,96,109,0.06)",
-          padding: "0.9rem 1rem",
-          display: "flex",
-          justifyContent: "space-between",
-          gap: "1rem",
-          alignItems: "flex-start",
-          flexWrap: "wrap",
+          width: "100%",
+          marginTop: "0.42rem",
+          padding: "0.62rem 0.72rem",
+          borderRadius: "14px",
+          border: "1px solid rgba(70, 92, 107, 0.18)",
+          background: "#ffffff",
+          color: "#2a404e",
         }}
       >
-        <SmallLogo />
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "0.95rem 1.25rem", alignItems: "center" }}>
-          <LegendNode color={NODE_COLORS.Source} label={NODE_TYPE_LABELS.Source} />
-          <LegendNode color={NODE_COLORS.Target} label={NODE_TYPE_LABELS.Target} />
-          <LegendNode color={NODE_COLORS["source-context"]} label={NODE_TYPE_LABELS["source-context"]} />
-          <LegendNode color={NODE_COLORS["target-context"]} label={NODE_TYPE_LABELS["target-context"]} />
-          <LegendEdge color={EDGE_COLORS.hierarchy} label={EDGE_TYPE_LABELS.hierarchy} />
-          <LegendEdge color={EDGE_COLORS.similarity} label={EDGE_TYPE_LABELS.similarity} />
-          <LegendEdge color={EDGE_COLORS.difference} label={EDGE_TYPE_LABELS.difference} />
-          <LegendEdge color={EDGE_COLORS.attribute} label={EDGE_TYPE_LABELS.attribute} />
-          <LegendEdge color={EDGE_COLORS["bridge-support"]} dashed label={EDGE_TYPE_LABELS["bridge-support"]} />
-          <LegendEdge color={EDGE_COLORS["bridge-contrast"]} dashed label={EDGE_TYPE_LABELS["bridge-contrast"]} />
-        </div>
-      </header>
+        {LEVEL_OPTIONS.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "340px minmax(0, 1fr) 360px",
-          gap: "1rem",
-          minHeight: 0,
-        }}
-      >
-        <ScrollPanel minWidth={340}>
-          <div style={{ fontSize: "0.78rem", letterSpacing: "0.08em", textTransform: "uppercase", color: "#70808c" }}>
-            Selected candidate
-          </div>
-          {selectedTarget ? (
-            <>
-              <div
-                style={{
-                  marginTop: "0.7rem",
-                  borderRadius: "18px",
-                  border: "1px solid rgba(74,96,109,0.12)",
-                  background: "#fafcfd",
-                  padding: "0.95rem 1rem",
-                }}
-              >
-                <div style={{ fontWeight: 800, color: "#304452", lineHeight: 1.3 }}>
-                  {selectedTarget.target_label}
-                </div>
-                <div style={{ marginTop: "0.45rem", color: "#61727d", lineHeight: 1.45 }}>
-                  Rank #{selectedTarget.rank} • confidence {formatScore(selectedTarget.score)}
-                </div>
-                <div style={{ marginTop: "0.75rem", display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
-                  <DetailPill label="Candidate" value={selectedTarget.ground_truth ? "Ground truth" : "Alternative"} />
-                  <DetailPill label="LLM" value={selectedTarget.llm.decision || "not used"} />
-                </div>
-              </div>
+      <div style={{ marginTop: "0.68rem", color: "#5e7484", lineHeight: 1.45, fontSize: "0.9rem" }}>
+        {activeLevelOption.description}
+      </div>
 
-              <div style={{ marginTop: "1rem", display: "grid", gap: "0.75rem" }}>
-                <MetricCard
-                  title="Decision basis"
-                  label={selectedTarget.metrics.decision_basis?.label}
-                  description={selectedTarget.metrics.decision_basis?.description}
-                />
-                <MetricCard
-                  title="Evidence strength"
-                  label={selectedTarget.metrics.evidence_strength?.label}
-                  description={selectedTarget.metrics.evidence_strength?.description}
-                />
-                <MetricCard
-                  title="Evidence agreement"
-                  label={selectedTarget.metrics.evidence_agreement?.label}
-                  description={selectedTarget.metrics.evidence_agreement?.description}
-                />
-              </div>
+      <div style={{ marginTop: "0.45rem", color: "#7a8994", lineHeight: 1.45, fontSize: "0.85rem" }}>
+        Ontology expansion is temporarily disabled in this viewer revision.
+      </div>
 
-              <div
-                style={{
-                  marginTop: "1rem",
-                  borderRadius: "16px",
-                  border: "1px solid rgba(74,96,109,0.12)",
-                  background: "#fafcfd",
-                  padding: "0.88rem 0.95rem",
-                }}
-              >
-                <div style={{ fontWeight: 700, color: "#304452", marginBottom: "0.45rem" }}>Rationale</div>
-                <div style={{ color: "#526570", lineHeight: 1.58 }}>
-                  {selectedTarget.llm.rationale || "No rationale available for this candidate."}
-                </div>
-              </div>
-            </>
-          ) : (
-            <div style={{ marginTop: "0.8rem", color: "#61727d" }}>No candidate selected.</div>
-          )}
-        </ScrollPanel>
-
-        <section
-          style={{
-            position: "relative",
-            borderRadius: "24px",
-            overflow: "hidden",
-            border: "1px solid rgba(74,96,109,0.12)",
-            background: "rgba(255,255,255,0.9)",
-            boxShadow: "0 18px 42px rgba(74,96,109,0.08)",
-            minHeight: 0,
-          }}
-        >
-          {loading ? (
-            <div style={{ padding: "2rem" }}>Loading study case…</div>
-          ) : error ? (
-            <div style={{ padding: "2rem", color: "#8a5b4f" }}>{error}</div>
-          ) : !bundle || !selectedTarget ? (
-            <div style={{ padding: "2rem" }}>No study panel available.</div>
-          ) : (
-            <div style={{ position: "absolute", inset: 0, padding: "1rem" }}>
-              <StudyGraph
-                nodes={visibleGraph.nodes}
-                edges={visibleGraph.edges}
-                selectedNodeId={selectedNodeId}
-                selectedEdgeId={selectedEdgeId}
-                expandedNodeId={expandedNodeId}
-                viewportKey={selectedTarget.target_id}
-                onNodeClick={handleNodeClick}
-                onEdgeClick={handleEdgeClick}
-                onBackgroundClick={handleBackgroundClick}
-              />
-            </div>
-          )}
-        </section>
-
-        <ScrollPanel minWidth={360}>
-          <div style={{ marginBottom: "1rem" }}>
-            <div style={{ fontSize: "0.78rem", letterSpacing: "0.08em", textTransform: "uppercase", color: "#70808c" }}>
-              Source summary
-            </div>
-            <div style={{ fontSize: "1.12rem", fontWeight: 800, marginTop: "0.35rem" }}>
-              {bundle?.source_label || sourceId || "Unknown source"}
-            </div>
-            {bundle?.source_id ? (
-              <div style={{ marginTop: "0.4rem", color: "#61727d", wordBreak: "break-word" }}>
-                {bundle.source_id}
-              </div>
-            ) : null}
-          </div>
-
-          <div style={{ marginBottom: "1rem" }}>
-            <div style={{ fontSize: "0.78rem", letterSpacing: "0.08em", textTransform: "uppercase", color: "#70808c" }}>
-              Target selection
-            </div>
-            <div style={{ display: "grid", gap: "0.55rem", marginTop: "0.65rem" }}>
-              {(bundle?.targets || []).map((target) => {
-                const active = target.target_id === selectedTargetId;
-                return (
-                  <button
-                    key={target.target_id}
-                    type="button"
-                    onClick={() => setSelectedTargetId(target.target_id)}
-                    style={{
-                      textAlign: "left",
-                      padding: "0.78rem 0.88rem",
-                      borderRadius: "16px",
-                      border: active ? "2px solid #617e92" : "1px solid rgba(74,96,109,0.12)",
-                      background: active ? "#eef5f8" : "#ffffff",
-                      cursor: "pointer",
-                    }}
-                  >
-                    <div style={{ display: "flex", justifyContent: "space-between", gap: "0.75rem" }}>
-                      <div style={{ fontWeight: 700, color: "#304452" }}>#{target.rank}</div>
-                      <div style={{ color: "#4d6984", fontWeight: 700 }}>{formatScore(target.score)}</div>
-                    </div>
-                    <div style={{ marginTop: "0.35rem", fontWeight: 700, color: "#304452" }}>{target.target_label}</div>
-                    <div style={{ marginTop: "0.3rem", color: "#6d7b86", fontSize: "0.92rem" }}>
-                      {target.ground_truth ? "Ground truth candidate" : "Candidate"}
-                    </div>
-                  </button>
-                );
-              })}
+      <details open style={{ marginTop: "1rem" }}>
+        <summary style={{ fontWeight: 800, cursor: "pointer", color: "#2a404e" }}>Filters</summary>
+        <div style={{ display: "grid", gap: "1rem", marginTop: "0.8rem" }}>
+          <div>
+            <div style={{ fontWeight: 800, marginBottom: "0.45rem", color: "#2a404e" }}>Node filters</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.4rem 0.65rem" }}>
+              {NODE_TYPE_OPTIONS.map((type) => (
+                <label key={type} style={{ display: "flex", gap: "0.48rem", alignItems: "center", fontSize: "0.94rem" }}>
+                  <input
+                    type="checkbox"
+                    checked={nodeFilters[type]}
+                    onChange={() => setNodeFilters((prev) => ({ ...prev, [type]: !prev[type] }))}
+                  />
+                  <span>{NODE_TYPE_LABELS[type]}</span>
+                </label>
+              ))}
             </div>
           </div>
 
           <div>
-            <div style={{ fontSize: "0.78rem", letterSpacing: "0.08em", textTransform: "uppercase", color: "#70808c" }}>
-              Display controls
-            </div>
-
-            <label style={{ display: "block", marginTop: "0.7rem", fontWeight: 700 }}>Explanation granularity</label>
-            <select
-              value={selectedLevel}
-              onChange={(event) => setSelectedLevel(Number(event.target.value))}
-              style={{
-                width: "100%",
-                marginTop: "0.4rem",
-                padding: "0.65rem 0.75rem",
-                borderRadius: "12px",
-                border: "1px solid rgba(74,96,109,0.18)",
-                background: "#ffffff",
-                color: "#304452",
-              }}
-            >
-              {LEVEL_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
+            <div style={{ fontWeight: 800, marginBottom: "0.45rem", color: "#2a404e" }}>Edge filters</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.4rem 0.65rem" }}>
+              {EDGE_TYPE_OPTIONS.map((type) => (
+                <label key={type} style={{ display: "flex", gap: "0.48rem", alignItems: "center", fontSize: "0.94rem" }}>
+                  <input
+                    type="checkbox"
+                    checked={edgeFilters[type]}
+                    onChange={() => setEdgeFilters((prev) => ({ ...prev, [type]: !prev[type] }))}
+                  />
+                  <span>{EDGE_TYPE_LABELS[type]}</span>
+                </label>
               ))}
-            </select>
-
-            <div style={{ marginTop: "0.75rem", color: "#687985", lineHeight: 1.45, fontSize: "0.92rem" }}>
-              Ontology expansion is temporarily disabled in this viewer revision.
             </div>
-
-            <details open style={{ marginTop: "1rem" }}>
-              <summary style={{ fontWeight: 700, cursor: "pointer" }}>Filters</summary>
-              <div style={{ display: "grid", gap: "1rem", marginTop: "0.8rem" }}>
-                <div>
-                  <div style={{ fontWeight: 700, marginBottom: "0.45rem" }}>Node filters</div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.35rem 0.6rem" }}>
-                    {NODE_TYPE_OPTIONS.map((type) => (
-                      <label key={type} style={{ display: "flex", gap: "0.45rem", alignItems: "center", fontSize: "0.94rem" }}>
-                        <input
-                          type="checkbox"
-                          checked={nodeFilters[type]}
-                          onChange={() => setNodeFilters((prev) => ({ ...prev, [type]: !prev[type] }))}
-                        />
-                        <span>{NODE_TYPE_LABELS[type]}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <div style={{ fontWeight: 700, marginBottom: "0.45rem" }}>Edge filters</div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.35rem 0.6rem" }}>
-                    {EDGE_TYPE_OPTIONS.map((type) => (
-                      <label key={type} style={{ display: "flex", gap: "0.45rem", alignItems: "center", fontSize: "0.94rem" }}>
-                        <input
-                          type="checkbox"
-                          checked={edgeFilters[type]}
-                          onChange={() => setEdgeFilters((prev) => ({ ...prev, [type]: !prev[type] }))}
-                        />
-                        <span>{EDGE_TYPE_LABELS[type]}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </details>
           </div>
-        </ScrollPanel>
-      </div>
+        </div>
+      </details>
+    </PanelShell>
+  );
 
-      <footer
+  const graphLegend = (
+    <div
+      style={{
+        position: "absolute",
+        left: "1rem",
+        top: "1rem",
+        zIndex: 3,
+        borderRadius: "18px",
+        border: "1px solid rgba(70, 92, 107, 0.12)",
+        background: "rgba(255,255,255,0.9)",
+        boxShadow: "0 14px 28px rgba(38, 57, 70, 0.1)",
+        padding: "0.72rem 0.84rem",
+        display: "flex",
+        gap: "0.85rem",
+        alignItems: "center",
+        flexWrap: "wrap",
+        backdropFilter: "blur(10px)",
+        maxWidth: "calc(100% - 10rem)",
+      }}
+    >
+      <div style={{ fontSize: "0.76rem", letterSpacing: "0.08em", textTransform: "uppercase", color: "#71818d" }}>
+        Graph legend
+      </div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.65rem 0.9rem" }}>
+        <LegendNode color={NODE_COLORS.Source} label={NODE_TYPE_LABELS.Source} />
+        <LegendNode color={NODE_COLORS.Target} label={NODE_TYPE_LABELS.Target} />
+        <LegendNode color={NODE_COLORS["source-context"]} label={NODE_TYPE_LABELS["source-context"]} />
+        <LegendNode color={NODE_COLORS["target-context"]} label={NODE_TYPE_LABELS["target-context"]} />
+      </div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.65rem 0.9rem" }}>
+        <LegendEdge color={EDGE_COLORS.hierarchy} label={EDGE_TYPE_LABELS.hierarchy} />
+        <LegendEdge color={EDGE_COLORS.similarity} label={EDGE_TYPE_LABELS.similarity} />
+        <LegendEdge color={EDGE_COLORS.difference} label={EDGE_TYPE_LABELS.difference} />
+        <LegendEdge color={EDGE_COLORS.attribute} label={EDGE_TYPE_LABELS.attribute} />
+        <LegendEdge color={EDGE_COLORS["bridge-support"]} dashed label={EDGE_TYPE_LABELS["bridge-support"]} />
+        <LegendEdge color={EDGE_COLORS["bridge-contrast"]} dashed label={EDGE_TYPE_LABELS["bridge-contrast"]} />
+      </div>
+    </div>
+  );
+
+  const studyLegend = (
+    <div
+      style={{
+        position: "absolute",
+        left: "1rem",
+        top: windowWidth > 0 && windowWidth < 1180 ? "5.8rem" : "1rem",
+        right: windowWidth > 0 && windowWidth < 1180 ? "1rem" : "22rem",
+        zIndex: 4,
+        borderRadius: "18px",
+        border: "1px solid rgba(70, 92, 107, 0.12)",
+        background: "rgba(255,255,255,0.9)",
+        boxShadow: "0 14px 28px rgba(38, 57, 70, 0.1)",
+        padding: "0.72rem 0.84rem",
+        display: "flex",
+        flexWrap: "wrap",
+        gap: "0.65rem 0.95rem",
+        alignItems: "center",
+        backdropFilter: "blur(10px)",
+      }}
+    >
+      <div
         style={{
-          borderRadius: "22px",
-          border: "1px solid rgba(74,96,109,0.12)",
-          background: "rgba(255,255,255,0.94)",
-          boxShadow: "0 14px 32px rgba(74,96,109,0.06)",
-          padding: "0.9rem 1rem",
-          maxHeight: "22vh",
-          minHeight: "126px",
-          overflowY: "auto",
+          fontSize: "0.72rem",
+          letterSpacing: "0.08em",
+          textTransform: "uppercase",
+          color: "#6e8393",
           flexShrink: 0,
         }}
       >
-        {selectedNodeInfo ? (
-          <>
-            <div style={{ fontSize: "0.78rem", letterSpacing: "0.08em", textTransform: "uppercase", color: "#70808c", marginBottom: "0.7rem" }}>
-              Node inspector
-            </div>
+        Legend
+      </div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.55rem 0.85rem", alignItems: "center" }}>
+        <LegendNode color={NODE_COLORS.Source} label={NODE_TYPE_LABELS.Source} />
+        <LegendNode color={NODE_COLORS.Target} label={NODE_TYPE_LABELS.Target} />
+        <LegendNode color={NODE_COLORS["source-context"]} label={NODE_TYPE_LABELS["source-context"]} />
+        <LegendNode color={NODE_COLORS["target-context"]} label={NODE_TYPE_LABELS["target-context"]} />
+        <LegendEdge color={EDGE_COLORS.hierarchy} label={EDGE_TYPE_LABELS.hierarchy} />
+        <LegendEdge color={EDGE_COLORS.similarity} label={EDGE_TYPE_LABELS.similarity} />
+        <LegendEdge color={EDGE_COLORS.difference} label={EDGE_TYPE_LABELS.difference} />
+        <LegendEdge color={EDGE_COLORS.attribute} label={EDGE_TYPE_LABELS.attribute} />
+        <LegendEdge color={EDGE_COLORS["bridge-support"]} dashed label={EDGE_TYPE_LABELS["bridge-support"]} />
+        <LegendEdge color={EDGE_COLORS["bridge-contrast"]} dashed label={EDGE_TYPE_LABELS["bridge-contrast"]} />
+      </div>
+    </div>
+  );
+
+  const hiddenPanelButtons = !graphExpanded && screenClass !== "narrow" && (leftHiddenPanels.length || rightHiddenPanels.length) ? (
+    <>
+      {leftHiddenPanels.length ? (
+        <div
+          style={{
+            position: "absolute",
+            left: "-0.95rem",
+            top: "50%",
+            transform: "translateY(-50%)",
+            zIndex: 4,
+            display: "grid",
+            gap: "0.45rem",
+          }}
+        >
+          {leftHiddenPanels.map((panelKey) => (
+            <HiddenPanelEdgeButton
+              key={panelKey}
+              side="left"
+              title={`Show ${PANEL_LABELS[panelKey]}`}
+              onClick={() => togglePanelVisibility(panelKey, true)}
+            />
+          ))}
+        </div>
+      ) : null}
+      {rightHiddenPanels.length ? (
+        <div
+          style={{
+            position: "absolute",
+            right: "-0.95rem",
+            top: "50%",
+            transform: "translateY(-50%)",
+            zIndex: 4,
+            display: "grid",
+            gap: "0.45rem",
+          }}
+        >
+          {rightHiddenPanels.map((panelKey) => (
+            <HiddenPanelEdgeButton
+              key={panelKey}
+              side="right"
+              title={`Show ${PANEL_LABELS[panelKey]}`}
+              onClick={() => togglePanelVisibility(panelKey, true)}
+            />
+          ))}
+        </div>
+      ) : null}
+    </>
+  ) : null;
+
+  const narrowPanelButtons = mode === "app" && screenClass === "narrow" && !graphExpanded ? (
+    <div
+      style={{
+        position: "absolute",
+        left: "1rem",
+        bottom: "1rem",
+        zIndex: 4,
+        display: "flex",
+        flexWrap: "wrap",
+        gap: "0.55rem",
+        maxWidth: "calc(100% - 2rem)",
+      }}
+    >
+      {(["targets", "controls", "candidate"] as PanelKey[]).map((panelKey) => {
+        const active = mobilePanel === panelKey;
+        return (
+          <button
+            key={panelKey}
+            type="button"
+            onClick={() => setMobilePanel((prev) => (prev === panelKey ? null : panelKey))}
+            style={{
+              borderRadius: "999px",
+              border: "1px solid rgba(70, 92, 107, 0.14)",
+              background: active ? "rgba(235,243,247,0.98)" : "rgba(255,255,255,0.94)",
+              color: "#29404e",
+              padding: "0.46rem 0.72rem",
+              cursor: "pointer",
+              fontWeight: 700,
+              fontSize: "0.88rem",
+              boxShadow: "0 12px 24px rgba(38, 57, 70, 0.12)",
+            }}
+          >
+            {active ? "Hide" : "Show"} {PANEL_LABELS[panelKey]}
+          </button>
+        );
+      })}
+    </div>
+  ) : null;
+
+  const graphStatus = loading ? (
+    <div style={{ padding: "2rem", color: "#425662" }}>Loading study case…</div>
+  ) : error ? (
+    <div style={{ padding: "2rem", color: "#8a5b4f", lineHeight: 1.5 }}>{error}</div>
+  ) : !bundle || !selectedTarget ? (
+    <div style={{ padding: "2rem", color: "#516570" }}>No study panel available.</div>
+  ) : null;
+
+  const graphShell = (
+    <section
+      ref={graphShellRef}
+      style={{
+        position: "relative",
+        borderRadius: "30px",
+        overflow: "hidden",
+        border: "1px solid rgba(70, 92, 107, 0.12)",
+        background: "linear-gradient(180deg, rgba(255,255,255,0.92) 0%, rgba(248,251,252,0.96) 100%)",
+        boxShadow: "0 22px 50px rgba(44, 63, 77, 0.12)",
+        minHeight: 0,
+      }}
+    >
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          background:
+            "radial-gradient(circle at 12% 14%, rgba(107, 151, 188, 0.1) 0%, rgba(107, 151, 188, 0) 34%), radial-gradient(circle at 88% 10%, rgba(133, 166, 188, 0.1) 0%, rgba(133, 166, 188, 0) 30%), linear-gradient(180deg, rgba(255,255,255,0.56) 0%, rgba(248,251,252,0.18) 100%)",
+          pointerEvents: "none",
+        }}
+      />
+
+      {graphStatus ? (
+        <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", zIndex: 2 }}>
+          <div
+            style={{
+              width: "min(32rem, calc(100% - 2rem))",
+              borderRadius: "24px",
+              border: "1px solid rgba(70, 92, 107, 0.12)",
+              background: "rgba(255,255,255,0.95)",
+              boxShadow: "0 18px 36px rgba(46, 64, 76, 0.1)",
+            }}
+          >
+            {graphStatus}
+          </div>
+        </div>
+      ) : (
+        <div style={{ position: "absolute", inset: 0 }}>
+          <StudyGraph
+            nodes={visibleGraph.nodes}
+            edges={visibleGraph.edges}
+            mode={mode}
+            selectedNodeId={selectedNodeId}
+            selectedEdgeId={selectedEdgeId}
+            expandedNodeId={expandedNodeId}
+            layoutResetKey={layoutResetKey}
+            viewportStateKey={graphViewportKey}
+            savedViewportState={savedGraphViewport}
+            allowInspection={mode === "app"}
+            graphExpanded={graphExpanded}
+            canToggleGraphExpanded={mode === "app"}
+            onToggleGraphExpanded={() => setGraphExpanded((prev) => !prev)}
+            onViewportChange={(nextViewportState) => {
+              if (!graphViewportKey) return;
+              graphViewportStoreRef.current[graphViewportKey] = nextViewportState;
+            }}
+            onNodeClick={handleNodeClick}
+            onEdgeClick={handleEdgeClick}
+            onBackgroundClick={handleBackgroundClick}
+          />
+        </div>
+      )}
+
+      {mode === "app" ? graphLegend : null}
+      {mode === "study" && selectedTarget ? studyLegend : null}
+      {hiddenPanelButtons}
+      {narrowPanelButtons}
+
+      {mode === "app" && mobilePanel === "candidate" ? (
+        <FloatingPanel title="Selected candidate" position="left" onClose={() => setMobilePanel(null)}>
+          <CandidateContent target={selectedTarget} onOpenMetric={openMetric} />
+        </FloatingPanel>
+      ) : null}
+      {mode === "app" && mobilePanel === "targets" ? (
+        <FloatingPanel title="Target selection" position="right" onClose={() => setMobilePanel(null)}>
+          {targetsPanel}
+        </FloatingPanel>
+      ) : null}
+      {mode === "app" && mobilePanel === "controls" ? (
+        <FloatingPanel title="Display controls" position="right" onClose={() => setMobilePanel(null)}>
+          {controlsPanel}
+        </FloatingPanel>
+      ) : null}
+
+      {mode === "study" && selectedTarget ? (
+        <>
+          <div
+            ref={studyTargetBoxRef}
+            style={{
+              position: "absolute",
+              top: studyTargetBoxPosition ? `${studyTargetBoxPosition.y}px` : "1rem",
+              left: studyTargetBoxPosition ? `${studyTargetBoxPosition.x}px` : undefined,
+              right: studyTargetBoxPosition ? undefined : "1rem",
+              zIndex: 4,
+              borderRadius: "18px",
+              border: "1px solid rgba(70, 92, 107, 0.12)",
+              background: "rgba(255,255,255,0.92)",
+              boxShadow: "0 14px 28px rgba(40, 58, 72, 0.12)",
+              padding: "0.82rem 0.88rem",
+              backdropFilter: "blur(10px)",
+              maxWidth: "min(25rem, calc(100% - 2rem))",
+            }}
+          >
             <div
+              onPointerDown={handleStudyTargetBoxDragStart}
+              title="Drag target panel"
+              aria-label="Drag target panel"
               style={{
-                display: "grid",
-                gridTemplateColumns: "minmax(260px, 320px) minmax(320px, 1.25fr) minmax(260px, 0.95fr)",
-                gap: "0.7rem",
-                alignItems: "start",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: "0.8rem",
+                cursor: "grab",
+                userSelect: "none",
+                touchAction: "none",
               }}
             >
-              <InspectorCard title="Selected node">
-                <div style={{ fontWeight: 800, color: "#304452" }}>{selectedNodeInfo.node.label}</div>
-                <div style={{ marginTop: "0.5rem", display: "flex", flexWrap: "wrap", gap: "0.4rem" }}>
-                  <DetailPill label="Type" value={NODE_TYPE_LABELS[selectedNodeInfo.node.type]} />
-                  <DetailPill label="Node kind" value={selectedNodeInfo.node.node_kind || "context"} />
-                  <DetailPill label="Side" value={selectedNodeInfo.node.ontology_side || "n/a"} />
-                  <DetailPill label="Expandable" value={selectedNodeInfo.expandable ? "Yes" : "No"} />
-                </div>
-              </InspectorCard>
-
-              <InspectorCard title="Explanation details">
-                {selectedNodeDetailItems.length ? (
-                  <ul style={{ margin: 0, paddingLeft: "1rem", color: "#526570", lineHeight: 1.42 }}>
-                    {selectedNodeDetailItems.slice(0, 4).map((item) => (
-                      <li key={item}>{item}</li>
-                    ))}
-                  </ul>
-                ) : (
-                  <div style={{ color: "#6f7f8b", lineHeight: 1.45 }}>No explanation-local details available for this node.</div>
-                )}
-              </InspectorCard>
-
-              <div style={{ display: "grid", gap: "0.7rem", minWidth: 0 }}>
-                <InspectorCard title="Description">
-                  {selectedNodeDefinitions.length ? (
-                    <div
-                      style={{
-                        color: "#526570",
-                        lineHeight: 1.42,
-                        display: "-webkit-box",
-                        WebkitLineClamp: 3,
-                        WebkitBoxOrient: "vertical",
-                        overflow: "hidden",
-                      }}
-                    >
-                      {selectedNodeDefinitions[0]}
-                    </div>
-                  ) : (
-                    <div style={{ color: "#6f7f8b" }}>No description available.</div>
-                  )}
-                </InspectorCard>
-                <InspectorCard title="Synonyms">
-                  {selectedNodeSynonyms.length ? (
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem" }}>
-                      {selectedNodeSynonyms.slice(0, 5).map((item) => (
-                        <span
-                          key={item}
-                          style={{
-                            borderRadius: "999px",
-                            background: "#eef5f8",
-                            color: "#425967",
-                            padding: "0.28rem 0.55rem",
-                            fontSize: "0.88rem",
-                          }}
-                        >
-                          {item}
-                        </span>
-                      ))}
-                    </div>
-                  ) : (
-                    <div style={{ color: "#6f7f8b" }}>No synonyms available.</div>
-                  )}
-                </InspectorCard>
+              <div style={{ fontSize: "0.74rem", letterSpacing: "0.08em", textTransform: "uppercase", color: "#72818d" }}>
+                Target
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", color: "#72818d", fontSize: "0.78rem" }}>
+                <span>Drag</span>
+                <span
+                  aria-hidden="true"
+                  style={{
+                    width: "1.8rem",
+                    height: "0.38rem",
+                    borderRadius: "999px",
+                    background: "rgba(102, 122, 137, 0.24)",
+                  }}
+                />
               </div>
             </div>
-          </>
-        ) : selectedEdge ? (
-          <>
-            <div style={{ fontSize: "0.78rem", letterSpacing: "0.08em", textTransform: "uppercase", color: "#70808c", marginBottom: "0.7rem" }}>
-              Edge inspector
+            <select
+              value={selectedTargetId}
+              onChange={(event) => setSelectedTargetId(event.target.value)}
+              style={{
+                width: "100%",
+                marginTop: "0.42rem",
+                padding: "0.68rem 0.72rem",
+                borderRadius: "12px",
+                border: "1px solid rgba(70, 92, 107, 0.16)",
+                background: "#ffffff",
+                color: "#2a404e",
+              }}
+            >
+              {(bundle?.targets || []).map((target) => (
+                <option key={target.target_id} value={target.target_id}>
+                  #{target.rank} {target.target_label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {studyBottomPanelVisible ? (
+            <div
+              style={{
+                position: "absolute",
+                left: 0,
+                right: 0,
+                bottom: 0,
+                height: `${studyBottomPanelHeight}px`,
+                zIndex: 4,
+                background: "linear-gradient(180deg, rgba(241,247,251,0.18) 0%, rgba(248,252,254,0.96) 22%, rgba(255,255,255,0.98) 100%)",
+                borderTop: "1px solid rgba(77, 105, 132, 0.12)",
+                backdropFilter: "blur(12px)",
+                overflow: "hidden",
+              }}
+            >
+              <div
+                style={{
+                  position: "absolute",
+                  left: 0,
+                  right: 0,
+                  top: 0,
+                  height: "28px",
+                  zIndex: 2,
+                }}
+              >
+                <div
+                  onPointerDown={handleStudyBottomPanelResizeStart}
+                  title="Resize bottom panel"
+                  aria-label="Resize bottom panel"
+                  style={{
+                    position: "absolute",
+                    left: "50%",
+                    top: 0,
+                    transform: "translateX(-50%)",
+                    width: "6rem",
+                    height: "100%",
+                    cursor: "ns-resize",
+                    display: "grid",
+                    placeItems: "center",
+                    touchAction: "none",
+                  }}
+                >
+                  <div
+                    style={{
+                      width: "4.1rem",
+                      height: "0.34rem",
+                      borderRadius: "999px",
+                      background: "rgba(102, 122, 137, 0.26)",
+                    }}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setStudyBottomPanelVisible(false)}
+                  title="Hide bottom panel"
+                  aria-label="Hide bottom panel"
+                  style={{
+                    position: "absolute",
+                    right: "0.9rem",
+                    top: "0.2rem",
+                    width: "1.9rem",
+                    height: "1.9rem",
+                    borderRadius: "999px",
+                    border: "1px solid rgba(70, 92, 107, 0.12)",
+                    background: "rgba(255,255,255,0.96)",
+                    color: "#48606f",
+                    cursor: "pointer",
+                    fontWeight: 800,
+                    display: "grid",
+                    placeItems: "center",
+                    boxShadow: "0 10px 22px rgba(38, 57, 70, 0.1)",
+                    backdropFilter: "blur(10px)",
+                  }}
+                >
+                  ↓
+                </button>
+              </div>
+
+              <div
+                style={{
+                  height: "100%",
+                  overflowY: "auto",
+                  padding: "1.55rem 1rem 1rem",
+                  boxSizing: "border-box",
+                }}
+              >
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: windowWidth && windowWidth < 980 ? "1fr" : "minmax(18rem, 24rem) minmax(0, 1fr)",
+                    gap: "1rem 1.2rem",
+                    alignItems: "start",
+                  }}
+                >
+                  <div
+                    style={{
+                      minWidth: 0,
+                      borderRadius: "18px",
+                      border: "1px solid rgba(77, 105, 132, 0.14)",
+                      background: "rgba(247, 251, 253, 0.96)",
+                      padding: "0.88rem 0.92rem",
+                    }}
+                  >
+                    <div style={{ display: "grid", gap: "0.58rem" }}>
+                      <div style={{ fontSize: "0.72rem", letterSpacing: "0.08em", textTransform: "uppercase", color: "#6e8393" }}>
+                        Target
+                      </div>
+                      <div style={{ fontWeight: 900, color: "#2d4759", fontSize: "1rem", lineHeight: 1.3 }}>
+                        {selectedTarget.target_label}
+                      </div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.45rem" }}>
+                        <DetailPill label="Rank" value={`#${selectedTarget.rank}`} tone="target" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      minWidth: 0,
+                      borderRadius: "18px",
+                      border: "1px solid rgba(77, 105, 132, 0.14)",
+                      background: "rgba(250, 252, 254, 0.98)",
+                      padding: "0.88rem 0.98rem",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        borderRadius: "999px",
+                        border: "1px solid rgba(77, 105, 132, 0.18)",
+                        background: "rgba(220, 233, 243, 0.92)",
+                        color: "#29475f",
+                        fontSize: "0.78rem",
+                        fontWeight: 900,
+                        letterSpacing: "0.05em",
+                        textTransform: "uppercase",
+                        padding: "0.34rem 0.68rem",
+                        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.65)",
+                      }}
+                    >
+                      Textual rationale
+                    </div>
+                    <div
+                      style={{
+                        marginTop: "0.68rem",
+                        color: "#445b6c",
+                        lineHeight: 1.62,
+                        maxHeight: "none",
+                        overflowY: "visible",
+                        paddingRight: "0.1rem",
+                        fontSize: "0.95rem",
+                      }}
+                    >
+                      {selectedTarget.llm.rationale || "No rationale available for this candidate."}
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setStudyBottomPanelVisible(true)}
+              title="Show bottom panel"
+              aria-label="Show bottom panel"
+              style={{
+                position: "absolute",
+                right: "1rem",
+                bottom: "1rem",
+                zIndex: 4,
+                width: "2rem",
+                height: "2rem",
+                borderRadius: "999px",
+                border: "1px solid rgba(70, 92, 107, 0.12)",
+                background: "rgba(255,255,255,0.96)",
+                color: "#48606f",
+                cursor: "pointer",
+                fontWeight: 800,
+                display: "grid",
+                placeItems: "center",
+                boxShadow: "0 10px 22px rgba(38, 57, 70, 0.1)",
+                backdropFilter: "blur(10px)",
+              }}
+            >
+              ↑
+            </button>
+          )}
+        </>
+      ) : null}
+    </section>
+  );
+
+  if (!queryReady) {
+    return (
+      <main
+        style={{
+          height: "100vh",
+          display: "grid",
+          placeItems: "center",
+          background:
+            "linear-gradient(135deg, #f4efe8 0%, #f8fbfd 48%, #edf4f8 100%)",
+          color: "#2a3d49",
+          fontFamily: "\"Avenir Next\", var(--font-geist-sans), sans-serif",
+        }}
+      >
+        Loading visualizer…
+      </main>
+    );
+  }
+
+  const mainColumns = (() => {
+    if (mode === "study" || graphExpanded) return "minmax(0, 1fr)";
+    if (screenClass === "wide") {
+      const columns = [];
+      if (panelVisibility.candidate) columns.push(`${candidatePanelWidth}px`);
+      columns.push("minmax(0, 1fr)");
+      if (panelVisibility.targets || panelVisibility.controls) columns.push(`${rightPanelWidth}px`);
+      return columns.join(" ");
+    }
+    if (screenClass === "medium") {
+      const columns = ["minmax(0, 1fr)"];
+      if (panelVisibility.candidate || panelVisibility.targets || panelVisibility.controls) {
+        columns.push(`${rightPanelWidth}px`);
+      }
+      return columns.join(" ");
+    }
+    return "minmax(0, 1fr)";
+  })();
+
+  const rightPanels: React.ReactNode[] = [];
+  if (mode === "app" && !graphExpanded) {
+    if (screenClass === "medium" && panelVisibility.candidate) {
+      rightPanels.push(<React.Fragment key="candidate">{candidatePanel}</React.Fragment>);
+    }
+    if (panelVisibility.targets) {
+      rightPanels.push(<React.Fragment key="targets">{targetsPanel}</React.Fragment>);
+    }
+    if (panelVisibility.controls) {
+      rightPanels.push(<React.Fragment key="controls">{controlsPanel}</React.Fragment>);
+    }
+  }
+
+  return (
+    <main
+      style={{
+        height: "100vh",
+        background:
+          "linear-gradient(135deg, #f4efe8 0%, #f8fbfd 48%, #edf4f8 100%)",
+        color: "#273945",
+        padding: mode === "study" ? "0.8rem" : "0.85rem",
+        boxSizing: "border-box",
+        overflow: "hidden",
+        fontFamily: "\"Avenir Next\", var(--font-geist-sans), sans-serif",
+        display: "grid",
+        gridTemplateRows:
+          mode === "study"
+            ? "minmax(0, 1fr)"
+            : graphExpanded
+              ? "minmax(0, 1fr) auto"
+              : "auto minmax(0, 1fr) auto",
+        gap: "0.85rem",
+      }}
+    >
+      {mode === "app" && !graphExpanded ? (
+        <header
+          style={{
+            borderRadius: "28px",
+            border: "1px solid rgba(70, 92, 107, 0.12)",
+            background: "rgba(255,255,255,0.9)",
+            boxShadow: "0 18px 36px rgba(52, 71, 84, 0.08)",
+            padding: "0.82rem 0.88rem",
+            display: "flex",
+            justifyContent: "space-between",
+            gap: "0.85rem",
+            alignItems: "center",
+            flexWrap: "wrap",
+          }}
+        >
+          <div
+            style={{
+              flex: "1.15 1 34rem",
+              minWidth: "min(24rem, 100%)",
+              borderRadius: "20px",
+              border: "1px solid rgba(77, 105, 132, 0.18)",
+              background: "linear-gradient(135deg, rgba(228,239,247,0.98) 0%, rgba(255,255,255,0.98) 100%)",
+              padding: "0.72rem 0.84rem",
+              boxShadow: "inset 0 1px 0 rgba(255,255,255,0.62)",
+              display: "flex",
+              alignItems: "flex-start",
+              gap: "1rem",
+            }}
+          >
+            <SmallLogo />
+            <div
+              style={{
+                width: "1px",
+                alignSelf: "stretch",
+                background: "linear-gradient(180deg, rgba(109,130,145,0.08) 0%, rgba(109,130,145,0.22) 50%, rgba(109,130,145,0.08) 100%)",
+                flexShrink: 0,
+              }}
+            />
+            <div style={{ minWidth: 0, marginLeft: "auto", display: "flex", flexDirection: "column", alignItems: "flex-end", textAlign: "right" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "0.55rem", flexWrap: "wrap" }}>
+                <div style={{ fontSize: "0.74rem", letterSpacing: "0.08em", textTransform: "uppercase", color: "#60798d" }}>
+                  Current source
+                </div>
+                <DetailPill label="Sources" value={String(sourceOptions.length || "0")} tone="source" />
+              </div>
+              <div
+                style={{
+                  marginTop: "0.2rem",
+                  display: "flex",
+                  alignItems: "baseline",
+                  justifyContent: "flex-end",
+                  gap: "0.55rem",
+                  flexWrap: "wrap",
+                  minWidth: 0,
+                }}
+              >
+                <span
+                  style={{
+                    fontWeight: 900,
+                    color: "#28475f",
+                    fontSize: "1rem",
+                    lineHeight: 1.2,
+                    minWidth: 0,
+                  }}
+                >
+                  {bundle?.source_label || selectedSourceOption?.source_label || sourceId || "Select a source"}
+                </span>
+                {(bundle?.source_id || selectedSourceOption?.source_id || sourceId) ? (
+                  <span
+                    style={{
+                      color: "#617684",
+                      fontSize: "0.84rem",
+                      minWidth: 0,
+                    }}
+                    title={bundle?.source_id || selectedSourceOption?.source_id || sourceId}
+                  >
+                    {shortenMiddle(bundle?.source_id || selectedSourceOption?.source_id || sourceId, 56)}
+                  </span>
+                ) : null}
+              </div>
+            </div>
+          </div>
+
+          <SourcePicker
+            options={sourceOptions}
+            selectedSourceId={sourceId}
+            onSelect={handleSourceSelect}
+            disabled={sourcesLoading}
+          />
+        </header>
+      ) : null}
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: mainColumns,
+          gap: "0.9rem",
+          minHeight: 0,
+        }}
+      >
+        {mode === "app" && !graphExpanded && screenClass === "wide" && panelVisibility.candidate ? (
+          <ResizableSidebar
+            side="left"
+            width={candidatePanelWidth}
+            minWidth={240}
+            maxWidth={clamp(windowWidth * 0.3, 270, 380)}
+            onWidthChange={setCandidatePanelWidth}
+          >
+            {candidatePanel}
+          </ResizableSidebar>
+        ) : null}
+
+        {graphShell}
+
+        {mode === "app" && !graphExpanded && screenClass !== "narrow" && rightPanels.length ? (
+          <ResizableSidebar
+            side="right"
+            width={rightPanelWidth}
+            minWidth={240}
+            maxWidth={clamp(windowWidth * 0.3, 270, 390)}
+            onWidthChange={setRightPanelWidth}
+          >
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "minmax(260px, 1fr) minmax(260px, 1fr) minmax(260px, 0.9fr)",
-                gap: "0.7rem",
-                alignItems: "start",
+                gap: "0.85rem",
+                minHeight: 0,
+                alignContent: "start",
+                overflowY: "auto",
+                paddingRight: "0.1rem",
+                height: "100%",
               }}
             >
-              <InspectorCard title="Source">
-                <div style={{ color: "#304452", fontWeight: 700, lineHeight: 1.4 }}>
-                  {visibleGraph.nodes.find((node) => node.id === selectedEdge.source)?.label || selectedEdge.source}
-                </div>
-              </InspectorCard>
-              <InspectorCard title="Target">
-                <div style={{ color: "#304452", fontWeight: 700, lineHeight: 1.4 }}>
-                  {visibleGraph.nodes.find((node) => node.id === selectedEdge.target)?.label || selectedEdge.target}
-                </div>
-              </InspectorCard>
-              <InspectorCard title="Edge details">
-                <div style={{ fontWeight: 800, color: "#304452", lineHeight: 1.35 }}>{selectedEdge.label}</div>
-                <div style={{ marginTop: "0.5rem", display: "flex", flexWrap: "wrap", gap: "0.4rem" }}>
-                  <DetailPill label="Type" value={EDGE_TYPE_LABELS[selectedEdge.type]} />
-                  <DetailPill
-                    label="Score"
-                    value={
-                      selectedEdge.score !== undefined && selectedEdge.score !== null && selectedEdge.score !== ""
-                        ? String(selectedEdge.score)
-                        : "n/a"
-                    }
-                  />
-                  <DetailPill label="Level" value={selectedEdge.level_label || "Context edge"} />
-                  <DetailPill label="Bridge" value={selectedEdge.bridge ? "Yes" : "No"} />
-                </div>
-              </InspectorCard>
+              {rightPanels}
             </div>
-          </>
-        ) : (
-          <>
-            <div style={{ fontSize: "0.78rem", letterSpacing: "0.08em", textTransform: "uppercase", color: "#70808c", marginBottom: "0.7rem" }}>
-              Inspector
-            </div>
-            <div style={{ color: "#61727d", lineHeight: 1.55 }}>
-              Click a node or edge in the graph to inspect its label, type, score, and explanation details here.
-            </div>
-          </>
-        )}
-      </footer>
+          </ResizableSidebar>
+        ) : null}
+      </div>
+
+      {mode === "app" ? (
+        <footer
+          style={{
+            position: "relative",
+            borderRadius: "26px",
+            border: "1px solid rgba(70, 92, 107, 0.12)",
+            background: "rgba(255,255,255,0.94)",
+            boxShadow: "0 18px 36px rgba(52, 71, 84, 0.08)",
+            height: inspectorHeight,
+            minHeight: "132px",
+            maxHeight: "42vh",
+            overflow: "hidden",
+            flexShrink: 0,
+          }}
+        >
+          <div
+            onPointerDown={handleInspectorResizeStart}
+            style={{
+              position: "absolute",
+              left: 0,
+              right: 0,
+              top: 0,
+              height: "16px",
+              cursor: "ns-resize",
+              display: "grid",
+              placeItems: "center",
+              touchAction: "none",
+            }}
+          >
+            <div
+              style={{
+                width: "4.1rem",
+                height: "0.34rem",
+                borderRadius: "999px",
+                background: "rgba(102, 122, 137, 0.26)",
+              }}
+            />
+          </div>
+
+          <div style={{ height: "100%", overflowY: "auto", padding: "1rem 1rem 1rem", boxSizing: "border-box" }}>
+            {selectedNodeInfo ? (
+              <>
+                <div style={{ fontSize: "0.76rem", letterSpacing: "0.08em", textTransform: "uppercase", color: "#71818d", marginBottom: "0.72rem" }}>
+                  Node inspector
+                </div>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "minmax(240px, 320px) minmax(280px, 1.2fr) minmax(240px, 0.95fr)",
+                    gap: "0.72rem",
+                    alignItems: "start",
+                  }}
+                >
+                  <InspectorCard title="Selected node">
+                    <div style={{ fontWeight: 800, color: "#2d4351" }}>{selectedNodeInfo.node.label}</div>
+                    <div style={{ marginTop: "0.5rem", display: "flex", flexWrap: "wrap", gap: "0.4rem" }}>
+                      <DetailPill label="Type" value={NODE_TYPE_LABELS[selectedNodeInfo.node.type]} />
+                      <DetailPill label="Node kind" value={selectedNodeInfo.node.node_kind || "context"} />
+                      <DetailPill label="Side" value={selectedNodeInfo.node.ontology_side || "n/a"} />
+                      <DetailPill label="Expandable" value={selectedNodeInfo.expandable ? "Yes" : "No"} />
+                    </div>
+                  </InspectorCard>
+
+                  <InspectorCard title="Explanation details">
+                    {selectedNodeDetailItems.length ? (
+                      <ul style={{ margin: 0, paddingLeft: "1rem", color: "#526570", lineHeight: 1.45 }}>
+                        {selectedNodeDetailItems.slice(0, 5).map((item) => (
+                          <li key={item}>{item}</li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <div style={{ color: "#6f7f8b", lineHeight: 1.45 }}>
+                        No explanation-local details available for this node.
+                      </div>
+                    )}
+                  </InspectorCard>
+
+                  <div style={{ display: "grid", gap: "0.72rem", minWidth: 0 }}>
+                    <InspectorCard title="Description">
+                      {selectedNodeDefinitions.length ? (
+                        <div
+                          style={{
+                            color: "#526570",
+                            lineHeight: 1.45,
+                            display: "-webkit-box",
+                            WebkitLineClamp: 4,
+                            WebkitBoxOrient: "vertical",
+                            overflow: "hidden",
+                          }}
+                        >
+                          {selectedNodeDefinitions[0]}
+                        </div>
+                      ) : (
+                        <div style={{ color: "#6f7f8b" }}>No description available.</div>
+                      )}
+                    </InspectorCard>
+                    <InspectorCard title="Synonyms">
+                      {selectedNodeSynonyms.length ? (
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem" }}>
+                          {selectedNodeSynonyms.slice(0, 6).map((item) => (
+                            <span
+                              key={item}
+                              style={{
+                                borderRadius: "999px",
+                                background: "#eef5f8",
+                                color: "#425967",
+                                padding: "0.28rem 0.55rem",
+                                fontSize: "0.88rem",
+                              }}
+                            >
+                              {item}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <div style={{ color: "#6f7f8b" }}>No synonyms available.</div>
+                      )}
+                    </InspectorCard>
+                  </div>
+                </div>
+              </>
+            ) : selectedEdge ? (
+              <>
+                <div style={{ fontSize: "0.76rem", letterSpacing: "0.08em", textTransform: "uppercase", color: "#71818d", marginBottom: "0.72rem" }}>
+                  Edge inspector
+                </div>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "minmax(240px, 1fr) minmax(240px, 1fr) minmax(240px, 0.9fr)",
+                    gap: "0.72rem",
+                    alignItems: "start",
+                  }}
+                >
+                  <InspectorCard title="Source">
+                    <div style={{ color: "#2d4351", fontWeight: 700, lineHeight: 1.42 }}>
+                      {visibleGraph.nodes.find((node) => node.id === selectedEdge.source)?.label || selectedEdge.source}
+                    </div>
+                  </InspectorCard>
+                  <InspectorCard title="Target">
+                    <div style={{ color: "#2d4351", fontWeight: 700, lineHeight: 1.42 }}>
+                      {visibleGraph.nodes.find((node) => node.id === selectedEdge.target)?.label || selectedEdge.target}
+                    </div>
+                  </InspectorCard>
+                  <InspectorCard title="Edge details">
+                    <div style={{ fontWeight: 800, color: "#2d4351", lineHeight: 1.35 }}>{selectedEdge.label}</div>
+                    <div style={{ marginTop: "0.5rem", display: "flex", flexWrap: "wrap", gap: "0.4rem" }}>
+                      <DetailPill label="Type" value={EDGE_TYPE_LABELS[selectedEdge.type]} />
+                      <DetailPill
+                        label="Score"
+                        value={
+                          selectedEdge.score !== undefined && selectedEdge.score !== null && selectedEdge.score !== ""
+                            ? String(selectedEdge.score)
+                            : "n/a"
+                        }
+                      />
+                      <DetailPill label="Level" value={selectedEdge.level_label || "Context edge"} />
+                      <DetailPill label="Bridge" value={selectedEdge.bridge ? "Yes" : "No"} />
+                    </div>
+                  </InspectorCard>
+                </div>
+              </>
+            ) : selectedNodeId ? (
+              <>
+                <div style={{ fontSize: "0.76rem", letterSpacing: "0.08em", textTransform: "uppercase", color: "#71818d", marginBottom: "0.72rem" }}>
+                  Inspector
+                </div>
+                <div style={{ color: "#61727d", lineHeight: 1.56 }}>
+                  Loading node details…
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{ fontSize: "0.76rem", letterSpacing: "0.08em", textTransform: "uppercase", color: "#71818d", marginBottom: "0.72rem" }}>
+                  Inspector
+                </div>
+                <div style={{ color: "#61727d", lineHeight: 1.56 }}>
+                  Click a node or edge in the graph to inspect its label, type, score, and explanation details here.
+                </div>
+              </>
+            )}
+          </div>
+        </footer>
+      ) : null}
+
+      {activeMetricKey ? (
+        <MetricDialog
+          title={METRIC_META[activeMetricKey].title}
+          helpText={METRIC_META[activeMetricKey].help}
+          metric={activeMetric}
+          onClose={() => setActiveMetricKey(null)}
+        />
+      ) : null}
     </main>
   );
 }

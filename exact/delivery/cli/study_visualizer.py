@@ -102,7 +102,7 @@ def main() -> None:
                 "Install a JDK/JRE and set JAVA_HOME so libjvm.so is available, or rerun with --disable-ontology-info."
             ) from exc
 
-    from exact.analysis.study_visualizer import create_study_visualizer_app
+    from study_visualizer_runtime.app import create_study_visualizer_app
 
     app = create_study_visualizer_app(
         run_dir=run_dir,

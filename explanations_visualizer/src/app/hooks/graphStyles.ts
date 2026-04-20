@@ -1,3 +1,6 @@
+import { StudyMode } from "@/app/hooks/types";
+
+
 export const NODE_COLORS: Record<string, string> = {
   Source: "#4d6984",
   Target: "#8b6a55",
@@ -35,31 +38,51 @@ export const EDGE_TYPE_LABELS: Record<string, string> = {
 };
 
 function wrapText(label: string): string {
-  const cleaned = String(label ?? "").trim();
-  if (!cleaned) return "";
-  const words = cleaned.split(/\s+/);
-  if (words.length <= 3) return cleaned;
-  const midpoint = Math.ceil(words.length / 2);
-  return `${words.slice(0, midpoint).join(" ")}\n${words.slice(midpoint).join(" ")}`;
+  return String(label ?? "").trim();
 }
 
-export default function graphStyles(): Array<Record<string, unknown>> {
+type GraphStyleOptions = {
+  mode?: StudyMode;
+  viewportWidth?: number;
+  viewportHeight?: number;
+};
+
+export default function graphStyles(options: GraphStyleOptions = {}): Array<Record<string, unknown>> {
+  const width = Math.max(options.viewportWidth ?? 1440, 640);
+  const height = Math.max(options.viewportHeight ?? 860, 480);
+  const minDim = Math.min(width, height);
+  const baseScale = Math.max(0.78, Math.min(1.02, minDim / 900));
+  const modeBoost = options.mode === "study" ? 0.04 : 0;
+  const nodeScale = Math.max(0.78, Math.min(1.04, baseScale + modeBoost));
+  const endpointScale = Math.max(0.82, Math.min(1.06, nodeScale + 0.04));
+  const nodeWidth = Math.round(184 * nodeScale);
+  const nodeHeight = Math.round(88 * nodeScale);
+  const endpointWidth = Math.round(222 * endpointScale);
+  const endpointHeight = Math.round(98 * endpointScale);
+  const nodeFontSize = Math.round(14 * nodeScale);
+  const endpointFontSize = Math.round(15 * endpointScale);
+  const edgeFontSize = Math.round(11.5 * nodeScale);
+  const nodeTextWidth = Math.max(124, nodeWidth - Math.round(30 * nodeScale));
+  const endpointTextWidth = Math.max(nodeTextWidth, endpointWidth - Math.round(32 * endpointScale));
+  const edgeTextWidth = Math.round(158 * nodeScale);
+
   return [
     {
       selector: "node",
       style: {
         label: (ele: any) => wrapText(String(ele.data("label") ?? "")),
         shape: "round-rectangle",
-        padding: 16,
-        width: 196,
-        height: 94,
+        padding: Math.round(16 * nodeScale),
+        width: nodeWidth,
+        height: nodeHeight,
         "background-color": (ele: any) => NODE_COLORS[String(ele.data("type"))] ?? "#e4e8ec",
         color: "#2f4452",
         "font-family": "\"Avenir Next\", \"Segoe UI\", sans-serif",
-        "font-size": 15,
-        "font-weight": 600,
+        "font-size": nodeFontSize,
+        "font-weight": 500,
+        "min-zoomed-font-size": 9,
         "text-wrap": "wrap",
-        "text-max-width": 164,
+        "text-max-width": nodeTextWidth,
         "border-width": 1.5,
         "border-color": "#a6b4bf",
         "text-valign": "center",
@@ -69,9 +92,10 @@ export default function graphStyles(): Array<Record<string, unknown>> {
     {
       selector: 'node[type = "Source"], node[type = "Target"]',
       style: {
-        width: 238,
-        height: 104,
-        "font-size": 16,
+        width: endpointWidth,
+        height: endpointHeight,
+        "font-size": endpointFontSize,
+        "text-max-width": endpointTextWidth,
         color: "#ffffff",
         "border-width": 2.5,
       },
@@ -124,9 +148,11 @@ export default function graphStyles(): Array<Record<string, unknown>> {
         },
         color: "#4f616d",
         "font-family": "\"Avenir Next\", \"Segoe UI\", sans-serif",
-        "font-size": 12,
+        "font-size": edgeFontSize,
+        "font-weight": 400,
+        "min-zoomed-font-size": 8,
         "text-wrap": "wrap",
-        "text-max-width": 158,
+        "text-max-width": edgeTextWidth,
         "text-background-color": "#ffffff",
         "text-background-opacity": 0.9,
         "text-background-padding": 3,
