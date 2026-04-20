@@ -2,10 +2,11 @@ services:
   - type: web
     name: study-viz-omim-ordo
     env: docker
+    branch: app-dev
     dockerfilePath: ./deploy/render/study_visualizer.Dockerfile
     dockerContext: .
     plan: free
-    autoDeploy: false
+    autoDeployTrigger: commit
     healthCheckPath: /api/health
     envVars:
       - key: EXACT_STUDY_RUN_DIR

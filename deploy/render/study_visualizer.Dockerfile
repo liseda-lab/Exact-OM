@@ -2,13 +2,27 @@ FROM node:20-bookworm-slim AS frontend-build
 
 WORKDIR /frontend
 
-COPY explanations_visualizer /frontend
+COPY explanations_visualizer/package*.json /frontend/
 
-RUN if [ -f package-lock.json ]; then \
+RUN --mount=type=cache,target=/root/.npm \
+    npm config set fetch-retries 5 && \
+    npm config set fetch-retry-factor 2 && \
+    npm config set fetch-retry-mintimeout 10000 && \
+    npm config set fetch-retry-maxtimeout 120000 && \
+    npm config set prefer-offline true && \
+    if [ -f package-lock.json ]; then \
       npm ci --no-audit --no-fund; \
     else \
       npm install --no-audit --no-fund; \
-    fi && \
+    fi
+
+COPY explanations_visualizer/next-env.d.ts /frontend/
+COPY explanations_visualizer/next.config.ts /frontend/
+COPY explanations_visualizer/postcss.config.mjs /frontend/
+COPY explanations_visualizer/tsconfig.json /frontend/
+COPY explanations_visualizer/src /frontend/src
+
+RUN \
     npm run build
 
 
