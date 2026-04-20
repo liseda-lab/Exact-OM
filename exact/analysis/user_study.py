@@ -754,7 +754,12 @@ def _resolve_run_dataset_paths(run_dir: Path, logger: logging.Logger) -> Tuple[O
             continue
         data_dir_path = Path(str(data_dir))
         if not data_dir_path.is_absolute():
-            data_dir_path = (PROJECT_ROOT / data_dir_path).resolve()
+            candidate_roots = [
+                (spec_path.parent / data_dir_path).resolve(),
+                (PROJECT_ROOT / data_dir_path).resolve(),
+            ]
+            existing_root = next((root for root in candidate_roots if root.exists()), None)
+            data_dir_path = existing_root or candidate_roots[0]
         source_path = Path(str(source_name))
         target_path = Path(str(target_name))
         if not source_path.is_absolute():
@@ -868,14 +873,40 @@ def _attributes_missing_item_ids(record: Mapping[str, Any]) -> bool:
     return False
 
 
+def _record_missing_entity_provenance(record: Mapping[str, Any]) -> bool:
+    triple_attributions = record.get("triple_attributions") or {}
+    hierarchy = triple_attributions.get("hierarchy") or {}
+    for family_payload in hierarchy.values():
+        payload = dict(family_payload or {})
+        for side in ["source", "target"]:
+            for item in list(payload.get(side) or []):
+                triple = list(item.get("triple") or [])
+                if len(triple) < 3:
+                    continue
+                if not _safe_text(item.get("subject_iri")) or not _safe_text(item.get("object_iri")):
+                    return True
+    for channel in ["similarity", "difference"]:
+        payload = dict(triple_attributions.get(channel) or {})
+        for side in ["source", "target"]:
+            for item in list(payload.get(side) or []):
+                triple = list(item.get("triple") or [])
+                if len(triple) < 3:
+                    continue
+                if not _safe_text(item.get("subject_iri")) or not _safe_text(item.get("object_iri")):
+                    return True
+    return False
+
+
 def _record_has_missing_item_ids(record: Mapping[str, Any]) -> bool:
     return _triple_attributions_missing_item_ids(record) or _attributes_missing_item_ids(record)
 
 
 def _record_needs_explanation_backfill(record: Mapping[str, Any]) -> bool:
-    if int(record.get("explanation_schema_version", 0) or 0) < 2:
+    if int(record.get("explanation_schema_version", 0) or 0) < 3:
         return True
     if _record_has_missing_item_ids(record):
+        return True
+    if _record_missing_entity_provenance(record):
         return True
     provenance = record.get("cross_side_provenance") or {}
     return not bool(provenance)
@@ -886,9 +917,13 @@ def _merge_missing_explanation_fields(
     repaired: Mapping[str, Any],
 ) -> Dict[str, Any]:
     merged = copy.deepcopy(original)
-    if int(merged.get("explanation_schema_version", 0) or 0) < 2:
-        merged["explanation_schema_version"] = int(repaired.get("explanation_schema_version", 2) or 2)
+    if int(merged.get("explanation_schema_version", 0) or 0) < 3:
+        merged["explanation_schema_version"] = int(repaired.get("explanation_schema_version", 3) or 3)
     if _triple_attributions_missing_item_ids(merged) or not merged.get("triple_attributions"):
+        triple_attributions = repaired.get("triple_attributions")
+        if triple_attributions:
+            merged["triple_attributions"] = copy.deepcopy(triple_attributions)
+    elif _record_missing_entity_provenance(merged):
         triple_attributions = repaired.get("triple_attributions")
         if triple_attributions:
             merged["triple_attributions"] = copy.deepcopy(triple_attributions)

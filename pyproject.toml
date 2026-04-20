@@ -31,6 +31,8 @@ sentencepiece = "^0.2.0"
 gensim = "^4.3.3"
 rdflib = "^7.5.0"
 httpx = "^0.28.1"
+fastapi = "^0.116.1"
+uvicorn = {version = "^0.35.0", extras = ["standard"]}
 
 
 [tool.poetry.scripts]
@@ -38,6 +40,7 @@ exact = "exact.delivery.cli.align:main"
 bioml-eval = "exact.delivery.cli.eval:main"
 exact-llm-debug = "exact.delivery.cli.llm_debug:main"
 exact-user-study = "exact.delivery.cli.user_study:main"
+exact-study-viz = "exact.delivery.cli.study_visualizer:main"
 
 
 [tool.poetry.group.prebuild.dependencies]

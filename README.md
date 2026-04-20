@@ -71,6 +71,7 @@ The package exposes these main entry points:
 - `exact` for ontology matching runs
 - `bioml-eval` for standalone evaluation
 - `exact-user-study` for post-run user-study analysis
+- `exact-study-viz` for the FastAPI-hosted embedded study visualizer
 
 ## Running EXACT-OM
 
@@ -191,6 +192,56 @@ selections, export mappings, generate failure taxonomies, and produce the
 notebook used for expert validation analysis.
 
 The helper `tools/run_user_study_job.py` wraps this flow from a YAML run config.
+
+### Embedded study visualizer
+
+The repository also includes a Render-friendly study visualizer that serves one
+fixed user-study run through FastAPI and a static React/Cytoscape frontend.
+
+The visualizer is read-only and is meant to be embedded into LimeSurvey via an
+iframe:
+
+```text
+/?source=<exact_source_iri>
+```
+
+At runtime it loads:
+
+- `analysis/user_study/study_mapping.json`
+- `analysis/user_study/study_selected_records_with_rationales.json`
+  or `study_selected_records.json`
+- `analysis/user_study/ontology_cache.json` when precomputed one-hop ontology
+  expansion is enabled
+
+Required environment variable:
+
+- `EXACT_STUDY_RUN_DIR`
+
+Optional environment variables:
+
+- `EXACT_STUDY_ANALYSIS_DIR`
+- `EXACT_STUDY_ENABLE_ONTOLOGY_INFO`
+- `EXACT_STUDY_PORT`
+- `EXACT_STUDY_HOST`
+- `EXACT_STUDY_LOG_LEVEL`
+
+Typical local workflow:
+
+```bash
+cd explanations_visualizer
+npm install
+npm run build
+
+cd ..
+poetry install
+poetry run python -m study_visualizer_runtime.cli \
+  --run-dir exp/test/Full_local_bioml_with_exp/omim-ordo \
+  --analysis-dir exp/test/Full_local_bioml_with_exp/omim-ordo/analysis/user_study \
+  --port 8000
+```
+
+The frontend is exported as static files under `explanations_visualizer/out`,
+and FastAPI serves those files together with the `/api/study/*` endpoints.
 
 ## YAML Runners And Slurm Helpers
 

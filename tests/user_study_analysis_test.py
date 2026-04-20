@@ -17,17 +17,31 @@ def _record(
     include_similarity: bool = False,
 ) -> dict:
     similarity_items = (
-        [{"item_id": f"{src}->{tgt}:sim:source", "triple": [src_label, "label", "shared term"], "support": 0.9, "importance": 0.2}]
+        [{
+            "item_id": f"{src}->{tgt}:sim:source",
+            "triple": [src_label, "label", "shared term"],
+            "subject_iri": src,
+            "object_iri": f"{src}#shared",
+            "support": 0.9,
+            "importance": 0.2,
+        }]
         if include_similarity
         else []
     )
     similarity_target_items = (
-        [{"item_id": f"{src}->{tgt}:sim:target", "triple": [tgt_label, "label", "shared term"], "support": 0.9, "importance": 0.2}]
+        [{
+            "item_id": f"{src}->{tgt}:sim:target",
+            "triple": [tgt_label, "label", "shared term"],
+            "subject_iri": tgt,
+            "object_iri": f"{tgt}#shared",
+            "support": 0.9,
+            "importance": 0.2,
+        }]
         if include_similarity
         else []
     )
     return {
-        "explanation_schema_version": 2,
+        "explanation_schema_version": 3,
         "src_iri": src,
         "tgt_iri": tgt,
         "selected_labels": {"source": src_label, "target": tgt_label},
@@ -66,6 +80,7 @@ def _record(
                     "property": "label",
                     "value": src_label,
                     "text": f"label: {src_label}",
+                    "entity_iri": src,
                     "support": 0.8,
                     "importance": 0.12,
                 }
@@ -76,6 +91,7 @@ def _record(
                     "property": "definition",
                     "value": f"Definition for {tgt_label}",
                     "text": f"definition: Definition for {tgt_label}",
+                    "entity_iri": tgt,
                     "support": 0.82,
                     "importance": 0.15,
                 }
@@ -96,6 +112,8 @@ def _record(
                         {
                             "item_id": f"{src}->{tgt}:hier:source",
                             "triple": [src_label, "is_a", f"{src_label} parent"],
+                            "subject_iri": src,
+                            "object_iri": f"{src}#parent",
                             "support": 0.7,
                             "importance": 0.2,
                         }
@@ -104,6 +122,8 @@ def _record(
                         {
                             "item_id": f"{src}->{tgt}:hier:target",
                             "triple": [tgt_label, "is_a", f"{tgt_label} parent"],
+                            "subject_iri": tgt,
+                            "object_iri": f"{tgt}#parent",
                             "support": 0.7,
                             "importance": 0.2,
                         }
@@ -121,6 +141,8 @@ def _record(
                     {
                         "item_id": f"{src}->{tgt}:diff:source",
                         "triple": [src_label, "has_trait", f"{src_label} trait"],
+                        "subject_iri": src,
+                        "object_iri": f"{src}#trait",
                         "support": 0.6,
                         "importance": 0.25,
                     }
@@ -129,6 +151,8 @@ def _record(
                     {
                         "item_id": f"{src}->{tgt}:diff:target",
                         "triple": [tgt_label, "has_trait", f"{tgt_label} trait"],
+                        "subject_iri": tgt,
+                        "object_iri": f"{tgt}#trait",
                         "support": 0.6,
                         "importance": 0.25,
                     }
@@ -672,7 +696,7 @@ def test_backfill_explanation_fields_repairs_from_saved_record_only(tmp_path, mo
         backfill_explanations=True,
     )
     assert "explanation_schema_version" not in damaged
-    assert updated[0]["explanation_schema_version"] == 2
+    assert updated[0]["explanation_schema_version"] == 3
     assert updated[0]["cross_side_provenance"]["lexical"]
     assert updated[0]["triple_attributions"]["hierarchy"]["is_a"]["source"][0]["item_id"]
     assert updated[0]["attributes"]["source"][0]["item_id"]
@@ -715,7 +739,7 @@ def test_backfill_explanation_fields_can_fall_back_to_targeted_pair_rehydrate(tm
         backfill_explanations=True,
     )
     assert state["targeted_calls"] == 1
-    assert updated[0]["explanation_schema_version"] == 2
+    assert updated[0]["explanation_schema_version"] == 3
     assert updated[0]["cross_side_provenance"]["hierarchy"]["is_a"]
     assert updated[0]["attributes"]["target"][0]["item_id"]
 

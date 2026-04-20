@@ -197,6 +197,47 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
             row["family"] = family
         return row
 
+    def _hier_item_triple(self, item: Any) -> Tuple[str, str, str]:
+        if isinstance(item, dict):
+            triple = list(item.get("triple") or ["", "", ""])
+            triple = (triple + ["", "", ""])[:3]
+            return (
+                self._normalize_text(triple[0]),
+                self._normalize_text(triple[1]),
+                self._normalize_text(triple[2]),
+            )
+        triple = list(item[:3]) if item is not None else ["", "", ""]
+        triple = (triple + ["", "", ""])[:3]
+        return (
+            self._normalize_text(triple[0]),
+            self._normalize_text(triple[1]),
+            self._normalize_text(triple[2]),
+        )
+
+    def _hier_item_specificity(self, item: Any) -> float:
+        if isinstance(item, dict):
+            return float(item.get("specificity", 0.0))
+        try:
+            return float(item[3])
+        except Exception:
+            return 0.0
+
+    def _hier_item_subject_iri(self, item: Any) -> str:
+        if isinstance(item, dict):
+            return self._normalize_text(item.get("subject_iri"))
+        try:
+            return self._normalize_text(item[4])
+        except Exception:
+            return ""
+
+    def _hier_item_object_iri(self, item: Any) -> str:
+        if isinstance(item, dict):
+            return self._normalize_text(item.get("object_iri"))
+        try:
+            return self._normalize_text(item[5])
+        except Exception:
+            return ""
+
     def _matrix_provenance_links(
         self,
         src_items: Sequence[Dict[str, Any]],
@@ -317,7 +358,7 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
         ]
         hydrated["attributes"] = attributes
         hydrated["explanation_schema_version"] = max(
-            2,
+            3,
             int(hydrated.get("explanation_schema_version", 0) or 0),
         )
         return hydrated
@@ -337,21 +378,25 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
         record: Dict[str, Any],
         family: str,
         side: str,
-    ) -> List[Tuple[str, str, str, float]]:
+    ) -> List[Dict[str, Any]]:
         hierarchy = (record.get("triple_attributions") or {}).get("hierarchy") or {}
         payload = dict(hierarchy.get(family) or {})
-        out: List[Tuple[str, str, str, float]] = []
+        out: List[Dict[str, Any]] = []
         for item in list(payload.get(side) or []):
             triple = list(item.get("triple") or [])
             if len(triple) < 3:
                 continue
             out.append(
-                (
-                    self._normalize_text(triple[0]),
-                    self._normalize_text(triple[1]),
-                    self._normalize_text(triple[2]),
-                    float(item.get("specificity", 0.0)),
-                )
+                {
+                    "triple": (
+                        self._normalize_text(triple[0]),
+                        self._normalize_text(triple[1]),
+                        self._normalize_text(triple[2]),
+                    ),
+                    "specificity": float(item.get("specificity", 0.0)),
+                    "subject_iri": self._normalize_text(item.get("subject_iri")),
+                    "object_iri": self._normalize_text(item.get("object_iri")),
+                }
             )
         return out
 
@@ -375,6 +420,9 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
                         self._normalize_text(triple[2]),
                     ),
                     "score": float(item.get("edge_ic", item.get("unsupported_mass", 0.0))),
+                    "subject_iri": self._normalize_text(item.get("subject_iri")),
+                    "object_iri": self._normalize_text(item.get("object_iri")),
+                    "rel_iri": self._normalize_text(item.get("rel_iri")),
                 }
             )
         return out
@@ -393,6 +441,7 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
                     "value": self._normalize_text(item.get("value")),
                     "text": self._normalize_text(item.get("text")),
                     "weight": float(item.get("weight", 0.0)),
+                    "entity_iri": self._normalize_text(item.get("entity_iri")),
                 }
             )
         return out
@@ -566,11 +615,12 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
     def _verbalize_hierarchy_items(
         self,
         family: str,
-        items: Sequence[Tuple[str, str, str, float]],
+        items: Sequence[Any],
     ) -> List[str]:
         template = self._hierarchy_template(family)
         out: List[str] = []
-        for head, _, tail, _ in items:
+        for item in items:
+            head, _, tail = self._hier_item_triple(item)
             out.append(template.replace("$SRC", str(head)).replace("$TGT", str(tail)))
         return out
 
@@ -663,8 +713,8 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
     def _score_hierarchy_family(
         self,
         family: str,
-        src_items: Sequence[Tuple[str, str, str, float]],
-        tgt_items: Sequence[Tuple[str, str, str, float]],
+        src_items: Sequence[Any],
+        tgt_items: Sequence[Any],
     ) -> Dict[str, Any]:
         payload = {
             "score": self.tau,
@@ -682,8 +732,8 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
         if not self.use_context or not src_items or not tgt_items:
             return payload
 
-        src_tails = [item[2] for item in src_items]
-        tgt_tails = [item[2] for item in tgt_items]
+        src_tails = [self._hier_item_triple(item)[2] for item in src_items]
+        tgt_tails = [self._hier_item_triple(item)[2] for item in tgt_items]
         support_mat = self._encode_label_matrix(src_tails, tgt_tails)
         row_best = support_mat.max(dim=1).values if support_mat.numel() else torch.zeros(len(src_items), device=self.device)
         col_best = support_mat.max(dim=0).values if support_mat.numel() else torch.zeros(len(tgt_items), device=self.device)
@@ -694,7 +744,7 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
             self.max_hierarchy_triples_per_family,
             per_relation_cap=None,
             relation_getter=lambda _: family,
-            tie_breaker=lambda item: float(item[3]),
+            tie_breaker=lambda item: self._hier_item_specificity(item),
         )
         tgt_idx = self._select_diverse_indices(
             tgt_items,
@@ -702,7 +752,7 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
             self.max_hierarchy_triples_per_family,
             per_relation_cap=None,
             relation_getter=lambda _: family,
-            tie_breaker=lambda item: float(item[3]),
+            tie_breaker=lambda item: self._hier_item_specificity(item),
         )
 
         if not src_idx or not tgt_idx:
@@ -717,7 +767,9 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
         tgt_support = reduced.max(dim=0).values.detach().cpu().tolist()
         str_f = 0.5 * (self._safe_mean(src_support) + self._safe_mean(tgt_support))
         emb_f = self._context_similarity_from_sentences(src_sentences, tgt_sentences, self.max_input_tokens_hier)
-        spec_vals = [float(item[3]) for item in src_selected] + [float(item[3]) for item in tgt_selected]
+        spec_vals = [self._hier_item_specificity(item) for item in src_selected] + [
+            self._hier_item_specificity(item) for item in tgt_selected
+        ]
         inf_f = self._safe_mean(spec_vals)
         cov_f = self._clip01((len(src_selected) + len(tgt_selected)) / max(1.0, 2.0 * self.max_hierarchy_triples_per_family))
         q_f = self._clip01((cov_f + str_f + inf_f) / 3.0)
@@ -731,8 +783,10 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
                 "hierarchy",
                 "source",
                 {
-                    "triple": list(item[:3]),
-                    "specificity": float(item[3]),
+                    "triple": list(self._hier_item_triple(item)),
+                    "specificity": self._hier_item_specificity(item),
+                    "subject_iri": self._hier_item_subject_iri(item),
+                    "object_iri": self._hier_item_object_iri(item),
                     "support": float(src_support[pos]),
                     "importance": float(src_imp[pos] / total_imp),
                 },
@@ -745,8 +799,10 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
                 "hierarchy",
                 "target",
                 {
-                    "triple": list(item[:3]),
-                    "specificity": float(item[3]),
+                    "triple": list(self._hier_item_triple(item)),
+                    "specificity": self._hier_item_specificity(item),
+                    "subject_iri": self._hier_item_subject_iri(item),
+                    "object_iri": self._hier_item_object_iri(item),
                     "support": float(tgt_support[pos]),
                     "importance": float(tgt_imp[pos] / total_imp),
                 },
@@ -855,6 +911,9 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
                     "triple": list(item["triple"]),
                     "support": float(src_support[pos]),
                     "edge_ic": float(item.get("score", 0.0)),
+                    "subject_iri": self._normalize_text(item.get("subject_iri")),
+                    "object_iri": self._normalize_text(item.get("object_iri")),
+                    "rel_iri": self._normalize_text(item.get("rel_iri")),
                     "importance": float(src_imp[pos] / total_imp),
                 },
             )
@@ -868,6 +927,9 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
                     "triple": list(item["triple"]),
                     "support": float(tgt_support[pos]),
                     "edge_ic": float(item.get("score", 0.0)),
+                    "subject_iri": self._normalize_text(item.get("subject_iri")),
+                    "object_iri": self._normalize_text(item.get("object_iri")),
+                    "rel_iri": self._normalize_text(item.get("rel_iri")),
                     "importance": float(tgt_imp[pos] / total_imp),
                 },
             )
@@ -983,6 +1045,9 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
                 {
                     "triple": list(item["triple"]),
                     "edge_ic": float(item.get("score", 0.0)),
+                    "subject_iri": self._normalize_text(item.get("subject_iri")),
+                    "object_iri": self._normalize_text(item.get("object_iri")),
+                    "rel_iri": self._normalize_text(item.get("rel_iri")),
                     "unsupported_mass": float(src_vals[pos]),
                     "importance": float(src_vals[pos] / total_imp),
                 },
@@ -996,6 +1061,9 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
                 {
                     "triple": list(item["triple"]),
                     "edge_ic": float(item.get("score", 0.0)),
+                    "subject_iri": self._normalize_text(item.get("subject_iri")),
+                    "object_iri": self._normalize_text(item.get("object_iri")),
+                    "rel_iri": self._normalize_text(item.get("rel_iri")),
                     "unsupported_mass": float(tgt_vals[pos]),
                     "importance": float(tgt_vals[pos] / total_imp),
                 },
@@ -1195,6 +1263,7 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
                         "property": self._normalize_text(item.get("prop")),
                         "value": self._normalize_text(item.get("value")),
                         "text": self._normalize_text(item.get("text")),
+                        "entity_iri": self._normalize_text(item.get("entity_iri")),
                         "support": float(support),
                         "weight": float(weight),
                         "importance": float(weighted),
@@ -1930,7 +1999,7 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
                 }
                 explanations.append(
                     {
-                        "explanation_schema_version": 2,
+                        "explanation_schema_version": 3,
                         "src_iri": src_iris[idx],
                         "tgt_iri": tgt_iris[idx],
                         "models": {

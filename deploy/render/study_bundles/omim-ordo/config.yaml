@@ -1,0 +1,32 @@
+logging_level: DEBUG 
+
+alignment_params:
+
+  # Review band used in reports and plots.
+  review_low: 0.0 # Lower score bound for "needs review".
+  review_high: 1.0 # Upper score bound for "needs review".
+
+inference_params:
+  # Inference runner settings.
+  log_every: 1 # Emit inference progress logs every N batches.
+  checkpoint_every: 1 # Write an inference checkpoint every N batches.
+
+
+llm_routing:
+  # Task-to-profile routing.
+  # Each task can use a different hosted or local model.
+  # `fallback_*` entries are used when the selected hosted profile is unavailable,
+  # misconfigured, missing credentials, or unsupported for the requested task.
+  default_profile: openrouter_gpt4o_mini
+  verbaliser_profile: openrouter_gpt4o_mini
+  summary_profile: openrouter_gpt4o_mini
+  decision_profile: openrouter_gpt4o_mini # Decision should point to a logprob-capable profile.
+  rationale_profile: openrouter_gpt4o_mini
+  verbaliser_fallback_profile: local_verbaliser_default # Fallback used only for verbaliser calls.
+  fallback_profile: local_llm_default # Shared fallback for summary and rationale.
+  decision_fallback_profile: local_llm_default # Fallback used when hosted decision scoring cannot provide logprobs.
+
+model:
+  params:
+    tau_LLM: 0.5
+    generate_llm_rationales: False

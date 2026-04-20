@@ -281,8 +281,8 @@ class PairAdaptiveContextDataset(ContextDataset):
         self._hierarchy_axiom_targets_cache[cache_key] = list(deduped)
         return deduped
 
-    def _hierarchy_bundle(self, iri: str, graph: OntologyGraph, side: str) -> Dict[str, List[Tuple[str, str, str, float]]]:
-        out: Dict[str, List[Tuple[str, str, str, float]]] = defaultdict(list)
+    def _hierarchy_bundle(self, iri: str, graph: OntologyGraph, side: str) -> Dict[str, List[Dict[str, Any]]]:
+        out: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
         frontier = [(iri, 0)]
         seen = {iri}
         while frontier:
@@ -295,7 +295,14 @@ class PairAdaptiveContextDataset(ContextDataset):
                 seen.add(sup)
                 frontier.append((sup, depth + 1))
                 spec = 1.0 / float(depth + 1)
-                out["is_a"].append((graph.get_labels(node)[0], "is_a", graph.get_labels(sup)[0], spec))
+                out["is_a"].append(
+                    {
+                        "triple": (graph.get_labels(node)[0], "is_a", graph.get_labels(sup)[0]),
+                        "specificity": spec,
+                        "subject_iri": node,
+                        "object_iri": sup,
+                    }
+                )
 
         family_frontier = [(iri, 0)]
         family_seen = {(family, iri) for family in self.hierarchical_relation_families if family != "is_a"}
@@ -312,10 +319,17 @@ class PairAdaptiveContextDataset(ContextDataset):
                 family_seen.add(key)
                 family_frontier.append((target_iri, depth + 1))
                 spec = 1.0 / float(depth + 1)
-                out[family].append((graph.get_labels(node)[0], family, graph.get_labels(target_iri)[0], spec))
+                out[family].append(
+                    {
+                        "triple": (graph.get_labels(node)[0], family, graph.get_labels(target_iri)[0]),
+                        "specificity": spec,
+                        "subject_iri": node,
+                        "object_iri": target_iri,
+                    }
+                )
 
         for family, triples in list(out.items()):
-            triples.sort(key=lambda item: item[3], reverse=True)
+            triples.sort(key=lambda item: float(item.get("specificity", 0.0)), reverse=True)
             out[family] = triples[: self.max_hierarchy_triples_per_family]
         return dict(out)
 
@@ -341,6 +355,8 @@ class PairAdaptiveContextDataset(ContextDataset):
                     "triple": (head, rel_label, tail),
                     "rel_iri": rel,
                     "score": graph.edge_ic_norm((src, rel, dst)),
+                    "subject_iri": src,
+                    "object_iri": dst,
                 }
             )
         triples.sort(key=lambda item: item["score"], reverse=True)
@@ -378,6 +394,7 @@ class PairAdaptiveContextDataset(ContextDataset):
                         "value": literal,
                         "text": f"{prop_label}: {literal}",
                         "weight": min(1.0, max(0.1, len(literal.split()) / 12.0)),
+                        "entity_iri": iri,
                     }
                 )
         except Exception:
@@ -408,6 +425,7 @@ class PairAdaptiveContextDataset(ContextDataset):
                         "value": literal,
                         "text": f"{prop_label}: {literal}",
                         "weight": min(1.0, max(0.1, len(literal.split()) / 12.0)),
+                        "entity_iri": iri,
                     }
                 )
         items.sort(key=lambda item: item["weight"], reverse=True)
@@ -724,13 +742,21 @@ class PairAdaptiveContextDataset(ContextDataset):
                 if src_hier:
                     _show_lines(
                         f"SRC hierarchy[{family}]",
-                        [f"{head} --{rel}--> {tail} (spec={spec:.2f})" for head, rel, tail, spec in src_hier],
+                        [
+                            f"{item['triple'][0]} --{item['triple'][1]}--> {item['triple'][2]} "
+                            f"(spec={float(item.get('specificity', 0.0)):.2f})"
+                            for item in src_hier
+                        ],
                         max_ctx_show,
                     )
                 if tgt_hier:
                     _show_lines(
                         f"TGT hierarchy[{family}]",
-                        [f"{head} --{rel}--> {tail} (spec={spec:.2f})" for head, rel, tail, spec in tgt_hier],
+                        [
+                            f"{item['triple'][0]} --{item['triple'][1]}--> {item['triple'][2]} "
+                            f"(spec={float(item.get('specificity', 0.0)):.2f})"
+                            for item in tgt_hier
+                        ],
                         max_ctx_show,
                     )
 

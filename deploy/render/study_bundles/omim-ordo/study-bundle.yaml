@@ -1,0 +1,10 @@
+dataset:
+  data_dir: data/omim-ordo
+  source: omim.owl
+  target: ordo.owl
+  full_reference: test.tsv
+  candidates: test.cands.tsv
+bundle:
+  name: omim-ordo
+  source_run_dir: /home/pgcotovio/Exact-OM/exp/test/Full_local_bioml_with_exp/omim-ordo
+  source_dataset_spec: /home/pgcotovio/Exact-OM/exp/test/Full_local_bioml_with_exp/omim-ordo/omim-ordo.yaml

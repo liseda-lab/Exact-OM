@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: study-viz-omim-ordo
+    env: docker
+    dockerfilePath: ./deploy/render/study_visualizer.Dockerfile
+    dockerContext: .
+    plan: starter
+    autoDeploy: false
+    healthCheckPath: /api/health
+    envVars:
+      - key: EXACT_STUDY_RUN_DIR
+        value: /app/deploy/render/study_bundles/omim-ordo
+      - key: EXACT_STUDY_ANALYSIS_DIR
+        value: /app/deploy/render/study_bundles/omim-ordo/analysis/user_study
+      - key: EXACT_STUDY_ENABLE_ONTOLOGY_INFO
+        value: "true"
+      - key: EXACT_STUDY_LOG_LEVEL
+        value: INFO

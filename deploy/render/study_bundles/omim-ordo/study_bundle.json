@@ -1,0 +1,12 @@
+{
+  "bundle_name": "omim-ordo",
+  "exported_at_utc": "2026-04-19T16:39:18.496661+00:00",
+  "source_run_dir": "/home/pgcotovio/Exact-OM/exp/test/Full_local_bioml_with_exp/omim-ordo",
+  "source_analysis_dir": "/home/pgcotovio/Exact-OM/exp/test/Full_local_bioml_with_exp/omim-ordo/analysis/user_study",
+  "config_path": "config.yaml",
+  "dataset_spec_path": "study-bundle.yaml",
+  "analysis_dir": "analysis/user_study",
+  "study_mapping_path": "analysis/user_study/study_mapping.json",
+  "selected_records_path": "analysis/user_study/study_selected_records_with_rationales.json",
+  "ontology_cache_path": "analysis/user_study/ontology_cache.json"
+}
