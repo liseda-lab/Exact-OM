@@ -16,11 +16,7 @@ RUN --mount=type=cache,target=/root/.npm \
       npm install --no-audit --no-fund; \
     fi
 
-COPY explanations_visualizer/next-env.d.ts /frontend/
-COPY explanations_visualizer/next.config.ts /frontend/
-COPY explanations_visualizer/postcss.config.mjs /frontend/
-COPY explanations_visualizer/tsconfig.json /frontend/
-COPY explanations_visualizer/src /frontend/src
+COPY explanations_visualizer /frontend
 
 RUN \
     npm run build
