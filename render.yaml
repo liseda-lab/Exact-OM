@@ -4,7 +4,7 @@ services:
     env: docker
     dockerfilePath: ./deploy/render/study_visualizer.Dockerfile
     dockerContext: .
-    plan: starter
+    plan: free
     autoDeploy: false
     healthCheckPath: /api/health
     envVars:
