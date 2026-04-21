@@ -41,6 +41,7 @@ const FETCH_TIMEOUT_MS = 20000;
 
 type ScreenClass = "wide" | "medium" | "narrow";
 type PanelKey = "candidate" | "targets" | "controls";
+type MobilePanelKey = PanelKey | "source" | "legend" | "inspector";
 type PanelSide = "left" | "right";
 type FloatingPosition = { x: number; y: number };
 
@@ -48,6 +49,12 @@ const PANEL_LABELS: Record<PanelKey, string> = {
   candidate: "candidate",
   targets: "targets",
   controls: "controls",
+};
+
+const PANEL_SHORT_LABELS: Record<PanelKey, string> = {
+  candidate: "Candidate",
+  targets: "Targets",
+  controls: "Controls",
 };
 
 const METRIC_META = {
@@ -367,12 +374,14 @@ function PanelShell({
   children,
   onHide,
   collapseSide = "right",
+  compact = false,
 }: {
   eyebrow: string;
   title?: string;
   children: React.ReactNode;
   onHide?: () => void;
   collapseSide?: PanelSide;
+  compact?: boolean;
 }) {
   const bodyRef = useRef<HTMLDivElement | null>(null);
   const showScrollCue = useScrollCue(bodyRef);
@@ -385,7 +394,7 @@ function PanelShell({
         height: "100%",
         display: "flex",
         flexDirection: "column",
-        borderRadius: "26px",
+        borderRadius: compact ? "20px" : "26px",
         border: "1px solid rgba(70, 92, 107, 0.12)",
         background: "rgba(255, 255, 255, 0.94)",
         boxShadow: "0 22px 44px rgba(54, 74, 90, 0.08)",
@@ -396,18 +405,18 @@ function PanelShell({
         style={{
           display: "flex",
           justifyContent: "space-between",
-          gap: "0.75rem",
+          gap: compact ? "0.38rem" : "0.75rem",
           alignItems: "flex-start",
-          padding: "0.88rem 0.9rem 0.16rem",
+          padding: compact ? "0.46rem 0.54rem 0.04rem" : "0.88rem 0.9rem 0.16rem",
           flexShrink: 0,
         }}
       >
         <div>
-          <div style={{ fontSize: "0.76rem", letterSpacing: "0.08em", textTransform: "uppercase", color: "#73838f" }}>
+          <div style={{ fontSize: compact ? "0.68rem" : "0.76rem", letterSpacing: "0.08em", textTransform: "uppercase", color: "#73838f" }}>
             {eyebrow}
           </div>
           {title ? (
-            <div style={{ marginTop: "0.28rem", fontWeight: 800, color: "#223441", fontSize: "1.02rem" }}>
+            <div style={{ marginTop: compact ? "0.18rem" : "0.28rem", fontWeight: 800, color: "#223441", fontSize: compact ? "0.88rem" : "1.02rem" }}>
               {title}
             </div>
           ) : null}
@@ -423,15 +432,15 @@ function PanelShell({
               border: "1px solid rgba(70, 92, 107, 0.12)",
               background: "rgba(255,255,255,0.96)",
               color: "#48606f",
-              width: "1.95rem",
-              height: "1.95rem",
+              width: compact ? "1.55rem" : "1.95rem",
+              height: compact ? "1.55rem" : "1.95rem",
               padding: 0,
               cursor: "pointer",
               fontWeight: 700,
               flexShrink: 0,
               display: "grid",
               placeItems: "center",
-              fontSize: "1rem",
+              fontSize: compact ? "0.84rem" : "1rem",
               boxShadow: "0 10px 22px rgba(38, 57, 70, 0.1)",
               backdropFilter: "blur(10px)",
             }}
@@ -446,8 +455,9 @@ function PanelShell({
           flex: 1,
           minHeight: 0,
           overflowY: "auto",
-          padding: "0.58rem 0.9rem 2.6rem",
+          padding: compact ? "0.34rem 0.5rem 1.15rem" : "0.58rem 0.9rem 2.6rem",
           boxSizing: "border-box",
+          fontSize: compact ? "0.88rem" : undefined,
         }}
       >
         {children}
@@ -482,11 +492,13 @@ function FloatingPanel({
   position,
   onClose,
   children,
+  compact = false,
 }: {
   title: string;
   position: "left" | "right";
   onClose: () => void;
   children: React.ReactNode;
+  compact?: boolean;
 }) {
   const bodyRef = useRef<HTMLDivElement | null>(null);
   const showScrollCue = useScrollCue(bodyRef);
@@ -496,10 +508,11 @@ function FloatingPanel({
       style={{
         position: "absolute",
         top: "1rem",
-        bottom: "1rem",
+        bottom: compact ? undefined : "1rem",
         ...(position === "left" ? { left: "1rem" } : { right: "1rem" }),
-        width: "min(26rem, calc(100% - 4.5rem))",
-        borderRadius: "24px",
+        width: compact ? "min(22rem, calc(100% - 2rem))" : "min(26rem, calc(100% - 4.5rem))",
+        maxHeight: compact ? "min(70vh, 28rem)" : undefined,
+        borderRadius: compact ? "18px" : "24px",
         border: "1px solid rgba(69, 90, 105, 0.14)",
         background: "rgba(255, 255, 255, 0.96)",
         boxShadow: "0 24px 48px rgba(42, 61, 75, 0.18)",
@@ -516,7 +529,7 @@ function FloatingPanel({
           justifyContent: "space-between",
           alignItems: "center",
           gap: "0.75rem",
-          padding: "0.9rem 1rem 0.4rem",
+          padding: compact ? "0.62rem 0.68rem 0.28rem" : "0.9rem 1rem 0.4rem",
         }}
       >
         <div style={{ fontWeight: 800, color: "#243743" }}>{title}</div>
@@ -528,15 +541,28 @@ function FloatingPanel({
             border: "1px solid rgba(70, 92, 107, 0.12)",
             background: "#f7fafb",
             color: "#48606f",
-            padding: "0.32rem 0.62rem",
+            width: compact ? "1.55rem" : "1.75rem",
+            height: compact ? "1.55rem" : "1.75rem",
+            padding: 0,
             cursor: "pointer",
-            fontWeight: 700,
+            fontWeight: 900,
+            display: "grid",
+            placeItems: "center",
+            lineHeight: 1,
           }}
         >
-          Close
+          ×
         </button>
       </div>
-      <div ref={bodyRef} style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "0.3rem 0.9rem 2.2rem" }}>
+      <div
+        ref={bodyRef}
+        style={{
+          flex: compact ? "0 1 auto" : 1,
+          minHeight: 0,
+          overflowY: "auto",
+          padding: compact ? "0.3rem 0.68rem 0.72rem" : "0.3rem 0.9rem 2.2rem",
+        }}
+      >
         {children}
       </div>
       {showScrollCue ? (
@@ -681,11 +707,13 @@ function MetricCard({
   helpText,
   metric,
   onOpen,
+  compact = false,
 }: {
   title: string;
   helpText: string;
   metric?: TargetMetric;
   onOpen: () => void;
+  compact?: boolean;
 }) {
   const [showHelp, setShowHelp] = useState(false);
   if (!metric?.label && !metric?.description) return null;
@@ -700,24 +728,24 @@ function MetricCard({
       style={{
         textAlign: "left",
         position: "relative",
-        borderRadius: "18px",
+        borderRadius: compact ? "13px" : "18px",
         border: "1px solid rgba(76, 97, 112, 0.14)",
         background: "linear-gradient(180deg, rgba(245,249,251,0.98) 0%, rgba(255,255,255,0.98) 100%)",
-        padding: "0.82rem 0.9rem",
+        padding: compact ? "0.52rem 0.58rem" : "0.82rem 0.9rem",
         cursor: "pointer",
         width: "100%",
       }}
     >
-      <div style={{ display: "flex", justifyContent: "space-between", gap: "0.75rem", alignItems: "flex-start" }}>
-        <div style={{ fontWeight: 800, color: "#28404d", fontSize: "1rem" }}>{title}</div>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: compact ? "0.45rem" : "0.75rem", alignItems: "flex-start" }}>
+        <div style={{ fontWeight: 800, color: "#28404d", fontSize: compact ? "0.86rem" : "1rem" }}>{title}</div>
         {metric.label ? (
           <span
             style={{
               borderRadius: "999px",
               background: "rgba(76, 111, 139, 0.1)",
               color: "#4a6780",
-              padding: "0.24rem 0.55rem",
-              fontSize: "0.82rem",
+              padding: compact ? "0.18rem 0.4rem" : "0.24rem 0.55rem",
+              fontSize: compact ? "0.72rem" : "0.82rem",
               fontWeight: 800,
               whiteSpace: "nowrap",
             }}
@@ -729,21 +757,21 @@ function MetricCard({
       {showHelp ? (
         <div
           style={{
-            marginTop: "0.58rem",
-            borderRadius: "14px",
+            marginTop: compact ? "0.36rem" : "0.58rem",
+            borderRadius: compact ? "10px" : "14px",
             border: "1px solid rgba(77, 105, 132, 0.14)",
             background: "rgba(234, 242, 247, 0.8)",
-            padding: "0.58rem 0.66rem",
+            padding: compact ? "0.4rem 0.46rem" : "0.58rem 0.66rem",
             color: "#4c6271",
-            lineHeight: 1.45,
-            fontSize: "0.9rem",
+            lineHeight: compact ? 1.34 : 1.45,
+            fontSize: compact ? "0.76rem" : "0.9rem",
           }}
         >
           <span style={{ fontWeight: 800, color: "#385163" }}>Metric meaning:</span> {helpText}
         </div>
       ) : null}
       {metric.description ? (
-        <div style={{ marginTop: "0.55rem", color: "#5e7280", lineHeight: 1.5 }}>{metric.description}</div>
+        <div style={{ marginTop: compact ? "0.34rem" : "0.55rem", color: "#5e7280", lineHeight: compact ? 1.36 : 1.5, fontSize: compact ? "0.78rem" : undefined }}>{metric.description}</div>
       ) : null}
     </button>
   );
@@ -836,11 +864,13 @@ function SourcePicker({
   selectedSourceId,
   onSelect,
   disabled,
+  compact = false,
 }: {
   options: SourceOption[];
   selectedSourceId: string;
   onSelect: (sourceId: string) => void;
   disabled?: boolean;
+  compact?: boolean;
 }) {
   const pickerRef = useRef<HTMLDivElement | null>(null);
   const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
@@ -883,22 +913,22 @@ function SourcePicker({
   };
 
   return (
-    <div ref={pickerRef} style={{ position: "relative", minWidth: "min(20rem, 100%)", flex: "0.95 1 24rem" }}>
-      <div style={{ fontSize: "0.76rem", letterSpacing: "0.08em", textTransform: "uppercase", color: "#6f818f" }}>
+    <div ref={pickerRef} style={{ position: "relative", minWidth: compact ? "min(16rem, 100%)" : "min(20rem, 100%)", flex: compact ? "1 1 18rem" : "0.95 1 24rem" }}>
+      <div style={{ fontSize: compact ? "0.68rem" : "0.76rem", letterSpacing: "0.08em", textTransform: "uppercase", color: "#6f818f" }}>
         Browse sources
       </div>
       <div
         style={{
-          marginTop: "0.42rem",
-          borderRadius: "18px",
+          marginTop: compact ? "0.28rem" : "0.42rem",
+          borderRadius: compact ? "14px" : "18px",
           border: open ? "1px solid rgba(77, 105, 132, 0.28)" : "1px solid rgba(66, 89, 104, 0.14)",
           background: "linear-gradient(180deg, rgba(249,252,253,0.98) 0%, rgba(243,248,250,0.94) 100%)",
           boxShadow: open ? "0 12px 28px rgba(54, 74, 90, 0.1)" : "inset 0 1px 0 rgba(255,255,255,0.6)",
           overflow: "hidden",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: "0.65rem", padding: "0.68rem 0.8rem 0.48rem" }}>
-          <span style={{ color: "#6a7d8a", fontSize: "0.92rem" }}>⌕</span>
+        <div style={{ display: "flex", alignItems: "center", gap: compact ? "0.45rem" : "0.65rem", padding: compact ? "0.46rem 0.56rem 0.34rem" : "0.68rem 0.8rem 0.48rem" }}>
+          <span style={{ color: "#6a7d8a", fontSize: compact ? "0.82rem" : "0.92rem" }}>⌕</span>
           <input
             disabled={disabled}
             value={query}
@@ -940,6 +970,7 @@ function SourcePicker({
               background: "transparent",
               color: "#223644",
               padding: 0,
+              fontSize: compact ? "0.88rem" : undefined,
             }}
           />
         </div>
@@ -948,13 +979,13 @@ function SourcePicker({
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            gap: "0.8rem",
-            padding: "0 0.8rem 0.62rem",
+            gap: compact ? "0.55rem" : "0.8rem",
+            padding: compact ? "0 0.56rem 0.42rem" : "0 0.8rem 0.62rem",
             color: "#6d808d",
-            fontSize: "0.83rem",
+            fontSize: compact ? "0.74rem" : "0.83rem",
           }}
         >
-          <span>{selectedOption ? `Current: ${selectedOption.source_label}` : "Choose a source"}</span>
+          <span>{selectedOption ? `${compact ? "" : "Current: "}${selectedOption.source_label}` : "Choose a source"}</span>
           <span>{filtered.length} shown</span>
         </div>
       </div>
@@ -1027,9 +1058,11 @@ function SourcePicker({
 function CandidateContent({
   target,
   onOpenMetric,
+  compact = false,
 }: {
   target: TargetBundle | null;
   onOpenMetric: (metricKey: keyof typeof METRIC_META) => void;
+  compact?: boolean;
 }) {
   if (!target) {
     return <div style={{ color: "#61727d", marginTop: "0.8rem" }}>No candidate selected.</div>;
@@ -1039,57 +1072,60 @@ function CandidateContent({
     <>
       <div
         style={{
-          borderRadius: "20px",
+          borderRadius: compact ? "14px" : "20px",
           border: "1px solid rgba(77, 105, 132, 0.14)",
           background: "linear-gradient(180deg, rgba(235,244,249,0.98) 0%, rgba(255,255,255,0.98) 100%)",
-          padding: "0.88rem 0.92rem",
+          padding: compact ? "0.58rem 0.62rem" : "0.88rem 0.92rem",
           boxShadow: "inset 0 1px 0 rgba(255,255,255,0.65)",
         }}
       >
-        <div style={{ fontWeight: 900, color: "#284458", lineHeight: 1.32, fontSize: "1.02rem" }}>
+        <div style={{ fontWeight: 900, color: "#284458", lineHeight: 1.24, fontSize: compact ? "0.88rem" : "1.02rem" }}>
           {target.target_label}
         </div>
-        <div style={{ marginTop: "0.4rem", color: "#607484", lineHeight: 1.45, fontSize: "0.94rem" }}>
+        <div style={{ marginTop: compact ? "0.24rem" : "0.4rem", color: "#607484", lineHeight: 1.34, fontSize: compact ? "0.78rem" : "0.94rem" }}>
           Rank #{target.rank} • confidence {formatScore(target.score)}
         </div>
-        <div style={{ marginTop: "0.68rem", display: "flex", flexWrap: "wrap", gap: "0.45rem" }}>
+        <div style={{ marginTop: compact ? "0.42rem" : "0.68rem", display: "flex", flexWrap: "wrap", gap: compact ? "0.28rem" : "0.45rem" }}>
           <DetailPill label="Candidate" value={target.ground_truth ? "Ground truth" : "Alternative"} tone="target" />
           <DetailPill label="LLM" value={target.llm.decision || "not used"} tone="target" />
         </div>
       </div>
 
-      <div style={{ marginTop: "1rem", display: "grid", gap: "0.76rem" }}>
+      <div style={{ marginTop: compact ? "0.58rem" : "1rem", display: "grid", gap: compact ? "0.48rem" : "0.76rem" }}>
         <MetricCard
           title={METRIC_META.decision_basis.title}
           helpText={METRIC_META.decision_basis.help}
           metric={target.metrics.decision_basis}
           onOpen={() => onOpenMetric("decision_basis")}
+          compact={compact}
         />
         <MetricCard
           title={METRIC_META.evidence_strength.title}
           helpText={METRIC_META.evidence_strength.help}
           metric={target.metrics.evidence_strength}
           onOpen={() => onOpenMetric("evidence_strength")}
+          compact={compact}
         />
         <MetricCard
           title={METRIC_META.evidence_agreement.title}
           helpText={METRIC_META.evidence_agreement.help}
           metric={target.metrics.evidence_agreement}
           onOpen={() => onOpenMetric("evidence_agreement")}
+          compact={compact}
         />
       </div>
 
       <div
         style={{
-          marginTop: "1rem",
-          borderRadius: "18px",
+          marginTop: compact ? "0.58rem" : "1rem",
+          borderRadius: compact ? "14px" : "18px",
           border: "1px solid rgba(77, 105, 132, 0.14)",
           background: "rgba(244, 249, 252, 0.96)",
-          padding: "0.84rem 0.9rem",
+          padding: compact ? "0.58rem 0.62rem" : "0.84rem 0.9rem",
         }}
       >
-        <div style={{ fontWeight: 800, color: "#2d4759", marginBottom: "0.45rem" }}>Textual rationale</div>
-        <div style={{ color: "#586c7a", lineHeight: 1.58 }}>
+        <div style={{ fontWeight: 800, color: "#2d4759", marginBottom: compact ? "0.28rem" : "0.45rem", fontSize: compact ? "0.86rem" : undefined }}>Textual rationale</div>
+        <div style={{ color: "#586c7a", lineHeight: compact ? 1.42 : 1.58, fontSize: compact ? "0.8rem" : undefined }}>
           {target.llm.rationale || "No rationale available for this candidate."}
         </div>
       </div>
@@ -1128,21 +1164,35 @@ export default function Home() {
     targets: true,
     controls: true,
   });
-  const [mobilePanel, setMobilePanel] = useState<PanelKey | null>(null);
+  const [mobilePanel, setMobilePanel] = useState<MobilePanelKey | null>(null);
   const [activeMetricKey, setActiveMetricKey] = useState<keyof typeof METRIC_META | null>(null);
   const [inspectorHeight, setInspectorHeight] = useState(168);
   const [candidatePanelWidth, setCandidatePanelWidth] = useState(292);
   const [rightPanelWidth, setRightPanelWidth] = useState(308);
+  const [appLegendPosition, setAppLegendPosition] = useState<FloatingPosition | null>(null);
+  const [appLegendVisible, setAppLegendVisible] = useState(true);
+  const [appHeaderVisible, setAppHeaderVisible] = useState(true);
   const [studyTargetBoxPosition, setStudyTargetBoxPosition] = useState<FloatingPosition | null>(null);
   const [studyLegendPosition, setStudyLegendPosition] = useState<FloatingPosition | null>(null);
   const [studyTargetBoxVisible, setStudyTargetBoxVisible] = useState(true);
   const [studyLegendVisible, setStudyLegendVisible] = useState(true);
   const [studyBottomPanelHeight, setStudyBottomPanelHeight] = useState(218);
   const [studyBottomPanelVisible, setStudyBottomPanelVisible] = useState(true);
+  const [appInspectorVisible, setAppInspectorVisible] = useState(true);
   const inspectorDragRef = useRef<{ startY: number; startHeight: number } | null>(null);
+  const inspectorVisibilityUserSetRef = useRef(false);
   const graphShellRef = useRef<HTMLElement | null>(null);
+  const appLegendRef = useRef<HTMLDivElement | null>(null);
   const studyTargetBoxRef = useRef<HTMLDivElement | null>(null);
   const studyLegendRef = useRef<HTMLDivElement | null>(null);
+  const appLegendDragRef = useRef<{
+    startX: number;
+    startY: number;
+    startLeft: number;
+    startTop: number;
+    width: number;
+    height: number;
+  } | null>(null);
   const studyTargetDragRef = useRef<{
     startX: number;
     startY: number;
@@ -1160,6 +1210,9 @@ export default function Home() {
     height: number;
   } | null>(null);
   const studyBottomPanelDragRef = useRef<{ startY: number; startHeight: number } | null>(null);
+  const inspectorUserSizedRef = useRef(false);
+  const appLegendVisibilityUserSetRef = useRef(false);
+  const appHeaderVisibilityUserSetRef = useRef(false);
   const studyBottomPanelUserSizedRef = useRef(false);
   const studyTargetVisibilityUserSetRef = useRef(false);
   const studyLegendVisibilityUserSetRef = useRef(false);
@@ -1169,10 +1222,22 @@ export default function Home() {
   const constrainedStudyViewport =
     mode === "study" &&
     ((windowWidth > 0 && windowWidth < 760) || (windowHeight > 0 && windowHeight < 700));
+  const constrainedAppViewport =
+    mode === "app" &&
+    ((windowWidth > 0 && windowWidth < 980) || (windowHeight > 0 && windowHeight < 740));
   const veryConstrainedStudyViewport =
     mode === "study" &&
     ((windowWidth > 0 && windowWidth < 560) || (windowHeight > 0 && windowHeight < 560));
+  const veryConstrainedAppViewport =
+    mode === "app" &&
+    ((windowWidth > 0 && windowWidth < 640) || (windowHeight > 0 && windowHeight < 600));
   const compactStudyPanel = mode === "study" && (constrainedStudyViewport || (windowWidth > 0 && windowWidth < 980));
+  const compactAppInspector = mode === "app" && (constrainedAppViewport || (windowWidth > 0 && windowWidth < 1120));
+  const compactAppSidePanels = mode === "app" && screenClass === "medium";
+  const appInspectorAsWindow = mode === "app" && (veryConstrainedAppViewport || screenClass === "medium");
+  const compactAppLegend = mode === "app" && (constrainedAppViewport || screenClass === "medium");
+  const wideStudyViewport = mode === "study" && windowWidth >= 1280 && windowHeight >= 720;
+  const appOverlayInset = constrainedAppViewport ? 10 : 16;
   const studyOverlayInset = constrainedStudyViewport ? 10 : 16;
   const studyAutoPanelHeight = (() => {
     const availableHeight = Math.max(windowHeight || 900, 420);
@@ -1184,12 +1249,28 @@ export default function Home() {
         : clamp(availableHeight * 0.34, 190, 260);
       return Math.round(clamp(ideal, minHeight, maxHeight));
     }
+    if (wideStudyViewport) {
+      const ideal = availableHeight * 0.18;
+      return Math.round(clamp(ideal, 156, 230));
+    }
     const ideal = compactStudyPanel ? availableHeight * 0.34 : availableHeight * 0.25;
     const minHeight = compactStudyPanel ? 282 : 220;
     const maxHeight = compactStudyPanel
       ? clamp(availableHeight * 0.42, 320, 430)
       : clamp(availableHeight * 0.34, 260, 360);
     return Math.round(clamp(ideal, minHeight, maxHeight));
+  })();
+  const appAutoInspectorHeight = (() => {
+    const availableHeight = Math.max(windowHeight || 900, 420);
+    if (constrainedAppViewport) {
+      const ideal = availableHeight * (veryConstrainedAppViewport ? 0.18 : 0.22);
+      const minHeight = veryConstrainedAppViewport ? 112 : 132;
+      const maxHeight = veryConstrainedAppViewport
+        ? clamp(availableHeight * 0.28, 130, 190)
+        : clamp(availableHeight * 0.32, 170, 250);
+      return Math.round(clamp(ideal, minHeight, maxHeight));
+    }
+    return 168;
   })();
 
   useEffect(() => {
@@ -1270,6 +1351,15 @@ export default function Home() {
       setMobilePanel(null);
       return;
     }
+    if (constrainedAppViewport) {
+      setPanelVisibility({
+        candidate: false,
+        targets: false,
+        controls: false,
+      });
+      setMobilePanel(null);
+      return;
+    }
     if (screenClass === "narrow") {
       setPanelVisibility({
         candidate: false,
@@ -1285,7 +1375,7 @@ export default function Home() {
       controls: true,
     });
     setMobilePanel(null);
-  }, [mode, screenClass]);
+  }, [constrainedAppViewport, mode, screenClass]);
 
   useEffect(() => {
     if (graphExpanded) {
@@ -1305,6 +1395,28 @@ export default function Home() {
   }, [mode, studyAutoPanelHeight]);
 
   useEffect(() => {
+    if (mode !== "app" || inspectorUserSizedRef.current) return;
+    setInspectorHeight(appAutoInspectorHeight);
+  }, [appAutoInspectorHeight, mode]);
+
+  useEffect(() => {
+    if (mode !== "app" || !windowWidth || !windowHeight) return;
+    if (!inspectorVisibilityUserSetRef.current && appInspectorAsWindow) {
+      setAppInspectorVisible(false);
+    }
+  }, [appInspectorAsWindow, mode, windowHeight, windowWidth]);
+
+  useEffect(() => {
+    if (mode !== "app" || !windowWidth || !windowHeight) return;
+    if (!appLegendVisibilityUserSetRef.current) {
+      setAppLegendVisible(!constrainedAppViewport);
+    }
+    if (!appHeaderVisibilityUserSetRef.current) {
+      setAppHeaderVisible(!veryConstrainedAppViewport);
+    }
+  }, [constrainedAppViewport, mode, veryConstrainedAppViewport, windowHeight, windowWidth]);
+
+  useEffect(() => {
     if (mode !== "study" || !windowWidth || !windowHeight) return;
     if (!studyTargetVisibilityUserSetRef.current) {
       setStudyTargetBoxVisible(!constrainedStudyViewport);
@@ -1313,6 +1425,28 @@ export default function Home() {
       setStudyLegendVisible(!constrainedStudyViewport);
     }
   }, [constrainedStudyViewport, mode, windowHeight, windowWidth]);
+
+  useEffect(() => {
+    if (mode !== "app") return;
+    const syncAppOverlayBounds = () => {
+      const shellRect = graphShellRef.current?.getBoundingClientRect();
+      const legendRect = appLegendRef.current?.getBoundingClientRect();
+      if (!shellRect || !legendRect || !appLegendPosition) return;
+
+      const nextLegendPosition = clampFloatingPosition(
+        appLegendPosition,
+        { width: legendRect.width, height: legendRect.height },
+        { width: shellRect.width, height: shellRect.height },
+        appOverlayInset,
+      );
+      if (nextLegendPosition.x !== appLegendPosition.x || nextLegendPosition.y !== appLegendPosition.y) {
+        setAppLegendPosition(nextLegendPosition);
+      }
+    };
+
+    const frameId = window.requestAnimationFrame(syncAppOverlayBounds);
+    return () => window.cancelAnimationFrame(frameId);
+  }, [appLegendPosition, appOverlayInset, mode, windowWidth]);
 
   useEffect(() => {
     if (mode !== "study") return;
@@ -1477,12 +1611,27 @@ export default function Home() {
   const handleSourceSelect = (nextSourceId: string) => {
     setSourceId(nextSourceId);
     writeQueryState(mode, nextSourceId);
+    if (mode === "app" && veryConstrainedAppViewport) {
+      setMobilePanel(null);
+      setAppHeaderOverlayVisible(false);
+    }
+  };
+
+  const handleTargetSelect = (nextTargetId: string) => {
+    setSelectedTargetId(nextTargetId);
+    if (mode === "app" && veryConstrainedAppViewport) {
+      setMobilePanel(null);
+    }
   };
 
   const handleNodeClick = async (nodeId: string) => {
     if (mode !== "app" || !bundle || !selectedTarget) return;
     setSelectedEdgeId(null);
     setSelectedNodeId(nodeId);
+    if (appInspectorAsWindow) {
+      setAppInspectorVisible(false);
+      setMobilePanel("inspector");
+    }
     const info = await ensureNodeInfo(nodeId);
     if (!ONTOLOGY_EXPANSION_ENABLED || !info?.expandable) return;
     if (expandedNodeId === nodeId) {
@@ -1505,12 +1654,19 @@ export default function Home() {
     if (mode !== "app") return;
     setSelectedNodeId(null);
     setSelectedEdgeId(edgeId);
+    if (appInspectorAsWindow) {
+      setAppInspectorVisible(false);
+      setMobilePanel("inspector");
+    }
   };
 
   const handleBackgroundClick = () => {
     if (mode !== "app") return;
     setSelectedNodeId(null);
     setSelectedEdgeId(null);
+    if (appInspectorAsWindow && mobilePanel === "inspector") {
+      setMobilePanel(null);
+    }
   };
 
   const visibleGraph = useMemo(
@@ -1586,9 +1742,35 @@ export default function Home() {
     setStudyTargetBoxVisible(visible);
   };
 
+  const setAppLegendOverlayVisible = (visible: boolean) => {
+    appLegendVisibilityUserSetRef.current = true;
+    setAppLegendVisible(visible);
+  };
+
+  const setAppHeaderOverlayVisible = (visible: boolean) => {
+    appHeaderVisibilityUserSetRef.current = true;
+    setAppHeaderVisible(visible);
+  };
+
   const setStudyLegendOverlayVisible = (visible: boolean) => {
     studyLegendVisibilityUserSetRef.current = true;
     setStudyLegendVisible(visible);
+  };
+
+  const handleAppLegendDragStart = (event: React.PointerEvent<HTMLElement>) => {
+    const shellRect = graphShellRef.current?.getBoundingClientRect();
+    const legendRect = appLegendRef.current?.getBoundingClientRect();
+    if (!shellRect || !legendRect) return;
+    event.preventDefault();
+    event.stopPropagation();
+    appLegendDragRef.current = {
+      startX: event.clientX,
+      startY: event.clientY,
+      startLeft: legendRect.left - shellRect.left,
+      startTop: legendRect.top - shellRect.top,
+      width: legendRect.width,
+      height: legendRect.height,
+    };
   };
 
   const handleStudyTargetBoxDragStart = (event: React.PointerEvent<HTMLElement>) => {
@@ -1632,6 +1814,7 @@ export default function Home() {
   };
 
   const handleInspectorResizeStart = (event: React.PointerEvent<HTMLDivElement>) => {
+    inspectorUserSizedRef.current = true;
     inspectorDragRef.current = {
       startY: event.clientY,
       startHeight: inspectorHeight,
@@ -1642,6 +1825,19 @@ export default function Home() {
     const handlePointerMove = (event: PointerEvent) => {
       if (!graphShellRef.current) return;
       const shellRect = graphShellRef.current.getBoundingClientRect();
+      if (appLegendDragRef.current) {
+        const drag = appLegendDragRef.current;
+        const nextPosition = clampFloatingPosition(
+          {
+            x: drag.startLeft + (event.clientX - drag.startX),
+            y: drag.startTop + (event.clientY - drag.startY),
+          },
+          { width: drag.width, height: drag.height },
+          { width: shellRect.width, height: shellRect.height },
+          appOverlayInset,
+        );
+        setAppLegendPosition(nextPosition);
+      }
       if (studyTargetDragRef.current) {
         const drag = studyTargetDragRef.current;
         const nextPosition = clampFloatingPosition(
@@ -1668,6 +1864,7 @@ export default function Home() {
       }
     };
     const handlePointerUp = () => {
+      appLegendDragRef.current = null;
       studyTargetDragRef.current = null;
       studyLegendDragRef.current = null;
     };
@@ -1677,7 +1874,7 @@ export default function Home() {
       window.removeEventListener("pointermove", handlePointerMove);
       window.removeEventListener("pointerup", handlePointerUp);
     };
-  }, []);
+  }, [appOverlayInset]);
 
   useEffect(() => {
     const handlePointerMove = (event: PointerEvent) => {
@@ -1705,8 +1902,11 @@ export default function Home() {
     const handlePointerMove = (event: PointerEvent) => {
       if (!inspectorDragRef.current) return;
       const delta = inspectorDragRef.current.startY - event.clientY;
-      const maxHeight = clamp(window.innerHeight * 0.42, 220, 360);
-      const nextHeight = clamp(inspectorDragRef.current.startHeight + delta, 132, maxHeight);
+      const maxHeight = constrainedAppViewport
+        ? clamp((windowHeight || window.innerHeight) * 0.34, 170, 270)
+        : clamp((windowHeight || window.innerHeight) * 0.42, 220, 360);
+      const minHeight = constrainedAppViewport ? 104 : 132;
+      const nextHeight = clamp(inspectorDragRef.current.startHeight + delta, minHeight, maxHeight);
       setInspectorHeight(nextHeight);
     };
     const handlePointerUp = () => {
@@ -1718,15 +1918,16 @@ export default function Home() {
       window.removeEventListener("pointermove", handlePointerMove);
       window.removeEventListener("pointerup", handlePointerUp);
     };
-  }, [inspectorHeight]);
+  }, [constrainedAppViewport, inspectorHeight, windowHeight]);
 
   const candidatePanel = (
     <PanelShell
       eyebrow="Selected candidate"
       collapseSide={screenClass === "wide" ? "left" : "right"}
       onHide={screenClass === "narrow" ? undefined : () => togglePanelVisibility("candidate", false)}
+      compact={compactAppSidePanels}
     >
-      <CandidateContent target={selectedTarget} onOpenMetric={openMetric} />
+      <CandidateContent target={selectedTarget} onOpenMetric={openMetric} compact={compactAppSidePanels} />
     </PanelShell>
   );
 
@@ -1736,32 +1937,33 @@ export default function Home() {
       title={selectedTarget ? `${bundle?.targets.length || 0} candidates` : undefined}
       collapseSide="right"
       onHide={screenClass === "narrow" ? undefined : () => togglePanelVisibility("targets", false)}
+      compact={compactAppSidePanels}
     >
-      <div style={{ display: "grid", gap: "0.52rem" }}>
+      <div style={{ display: "grid", gap: compactAppSidePanels ? "0.36rem" : "0.52rem" }}>
         {(bundle?.targets || []).map((target) => {
           const active = target.target_id === selectedTargetId;
           return (
             <button
               key={target.target_id}
               type="button"
-              onClick={() => setSelectedTargetId(target.target_id)}
+              onClick={() => handleTargetSelect(target.target_id)}
               style={{
                 textAlign: "left",
-                padding: "0.7rem 0.78rem",
-                borderRadius: "16px",
+                padding: compactAppSidePanels ? "0.46rem 0.54rem" : "0.7rem 0.78rem",
+                borderRadius: compactAppSidePanels ? "12px" : "16px",
                 border: active ? "2px solid rgba(110, 134, 151, 0.84)" : "1px solid rgba(71, 91, 105, 0.12)",
                 background: active ? "rgba(236, 244, 248, 0.94)" : "#ffffff",
                 cursor: "pointer",
               }}
             >
-              <div style={{ display: "flex", justifyContent: "space-between", gap: "0.75rem" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: compactAppSidePanels ? "0.45rem" : "0.75rem" }}>
                 <div style={{ fontWeight: 600, color: "#29404e" }}>#{target.rank}</div>
                 <div style={{ color: "#49657b", fontWeight: 600 }}>{formatScore(target.score)}</div>
               </div>
-              <div style={{ marginTop: "0.32rem", fontWeight: 600, color: "#2a404e", lineHeight: 1.34, fontSize: "0.95rem" }}>
+              <div style={{ marginTop: compactAppSidePanels ? "0.2rem" : "0.32rem", fontWeight: 600, color: "#2a404e", lineHeight: 1.28, fontSize: compactAppSidePanels ? "0.84rem" : "0.95rem" }}>
                 {target.target_label}
               </div>
-              <div style={{ marginTop: "0.24rem", color: "#6b7b87", fontSize: "0.86rem" }}>
+              <div style={{ marginTop: compactAppSidePanels ? "0.16rem" : "0.24rem", color: "#6b7b87", fontSize: compactAppSidePanels ? "0.74rem" : "0.86rem" }}>
                 {target.ground_truth ? "Ground truth candidate" : "Candidate"}
               </div>
             </button>
@@ -1776,16 +1978,17 @@ export default function Home() {
       eyebrow="Display controls"
       collapseSide="right"
       onHide={screenClass === "narrow" ? undefined : () => togglePanelVisibility("controls", false)}
+      compact={compactAppSidePanels}
     >
-      <label style={{ display: "block", fontWeight: 800, color: "#243643" }}>Explanation granularity</label>
+      <label style={{ display: "block", fontWeight: 800, color: "#243643", fontSize: compactAppSidePanels ? "0.86rem" : undefined }}>Explanation granularity</label>
       <select
         value={selectedLevel}
         onChange={(event) => setSelectedLevel(Number(event.target.value))}
         style={{
           width: "100%",
-          marginTop: "0.42rem",
-          padding: "0.62rem 0.72rem",
-          borderRadius: "14px",
+          marginTop: compactAppSidePanels ? "0.28rem" : "0.42rem",
+          padding: compactAppSidePanels ? "0.44rem 0.52rem" : "0.62rem 0.72rem",
+          borderRadius: compactAppSidePanels ? "11px" : "14px",
           border: "1px solid rgba(70, 92, 107, 0.18)",
           background: "#ffffff",
           color: "#2a404e",
@@ -1798,22 +2001,22 @@ export default function Home() {
         ))}
       </select>
 
-      <div style={{ marginTop: "0.68rem", color: "#5e7484", lineHeight: 1.45, fontSize: "0.9rem" }}>
+      <div style={{ marginTop: compactAppSidePanels ? "0.42rem" : "0.68rem", color: "#5e7484", lineHeight: 1.36, fontSize: compactAppSidePanels ? "0.78rem" : "0.9rem" }}>
         {activeLevelOption.description}
       </div>
 
-      <div style={{ marginTop: "0.45rem", color: "#7a8994", lineHeight: 1.45, fontSize: "0.85rem" }}>
+      <div style={{ marginTop: compactAppSidePanels ? "0.28rem" : "0.45rem", color: "#7a8994", lineHeight: 1.36, fontSize: compactAppSidePanels ? "0.74rem" : "0.85rem" }}>
         Ontology expansion is temporarily disabled in this viewer revision.
       </div>
 
-      <details open style={{ marginTop: "1rem" }}>
-        <summary style={{ fontWeight: 800, cursor: "pointer", color: "#2a404e" }}>Filters</summary>
-        <div style={{ display: "grid", gap: "1rem", marginTop: "0.8rem" }}>
+      <details open style={{ marginTop: compactAppSidePanels ? "0.58rem" : "1rem" }}>
+        <summary style={{ fontWeight: 800, cursor: "pointer", color: "#2a404e", fontSize: compactAppSidePanels ? "0.86rem" : undefined }}>Filters</summary>
+        <div style={{ display: "grid", gap: compactAppSidePanels ? "0.56rem" : "1rem", marginTop: compactAppSidePanels ? "0.48rem" : "0.8rem" }}>
           <div>
-            <div style={{ fontWeight: 800, marginBottom: "0.45rem", color: "#2a404e" }}>Node filters</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.4rem 0.65rem" }}>
+            <div style={{ fontWeight: 800, marginBottom: compactAppSidePanels ? "0.28rem" : "0.45rem", color: "#2a404e", fontSize: compactAppSidePanels ? "0.82rem" : undefined }}>Node filters</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: compactAppSidePanels ? "0.26rem 0.42rem" : "0.4rem 0.65rem" }}>
               {NODE_TYPE_OPTIONS.map((type) => (
-                <label key={type} style={{ display: "flex", gap: "0.48rem", alignItems: "center", fontSize: "0.94rem" }}>
+                <label key={type} style={{ display: "flex", gap: compactAppSidePanels ? "0.32rem" : "0.48rem", alignItems: "center", fontSize: compactAppSidePanels ? "0.78rem" : "0.94rem" }}>
                   <input
                     type="checkbox"
                     checked={nodeFilters[type]}
@@ -1826,10 +2029,10 @@ export default function Home() {
           </div>
 
           <div>
-            <div style={{ fontWeight: 800, marginBottom: "0.45rem", color: "#2a404e" }}>Edge filters</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.4rem 0.65rem" }}>
+            <div style={{ fontWeight: 800, marginBottom: compactAppSidePanels ? "0.28rem" : "0.45rem", color: "#2a404e", fontSize: compactAppSidePanels ? "0.82rem" : undefined }}>Edge filters</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: compactAppSidePanels ? "0.26rem 0.42rem" : "0.4rem 0.65rem" }}>
               {EDGE_TYPE_OPTIONS.map((type) => (
-                <label key={type} style={{ display: "flex", gap: "0.48rem", alignItems: "center", fontSize: "0.94rem" }}>
+                <label key={type} style={{ display: "flex", gap: compactAppSidePanels ? "0.32rem" : "0.48rem", alignItems: "center", fontSize: compactAppSidePanels ? "0.78rem" : "0.94rem" }}>
                   <input
                     type="checkbox"
                     checked={edgeFilters[type]}
@@ -1845,43 +2048,116 @@ export default function Home() {
     </PanelShell>
   );
 
-  const graphLegend = (
+  const appLegendItems = (
     <div
       style={{
+        display: "flex",
+        flexWrap: "wrap",
+        gap: compactAppLegend ? "0.3rem 0.48rem" : "0.55rem 0.85rem",
+        alignItems: "center",
+      }}
+    >
+      <LegendNode color={NODE_COLORS.Source} label={NODE_TYPE_LABELS.Source} compact={compactAppLegend} />
+      <LegendNode color={NODE_COLORS.Target} label={NODE_TYPE_LABELS.Target} compact={compactAppLegend} />
+      <LegendNode color={NODE_COLORS["source-context"]} label={NODE_TYPE_LABELS["source-context"]} compact={compactAppLegend} />
+      <LegendNode color={NODE_COLORS["target-context"]} label={NODE_TYPE_LABELS["target-context"]} compact={compactAppLegend} />
+      <LegendEdge color={EDGE_COLORS.hierarchy} label={EDGE_TYPE_LABELS.hierarchy} compact={compactAppLegend} />
+      <LegendEdge color={EDGE_COLORS.similarity} label={EDGE_TYPE_LABELS.similarity} compact={compactAppLegend} />
+      <LegendEdge color={EDGE_COLORS.difference} label={EDGE_TYPE_LABELS.difference} compact={compactAppLegend} />
+      <LegendEdge color={EDGE_COLORS.attribute} label={EDGE_TYPE_LABELS.attribute} compact={compactAppLegend} />
+      <LegendEdge color={EDGE_COLORS["bridge-support"]} dashed label={EDGE_TYPE_LABELS["bridge-support"]} compact={compactAppLegend} />
+      <LegendEdge color={EDGE_COLORS["bridge-contrast"]} dashed label={EDGE_TYPE_LABELS["bridge-contrast"]} compact={compactAppLegend} />
+    </div>
+  );
+
+  const graphLegend = (
+    <div
+      ref={appLegendRef}
+      style={{
         position: "absolute",
-        left: "1rem",
-        top: "1rem",
-        zIndex: 3,
-        borderRadius: "18px",
+        left: appLegendPosition ? `${appLegendPosition.x}px` : `${appOverlayInset}px`,
+        top: appLegendPosition || !appInspectorAsWindow || veryConstrainedAppViewport ? (appLegendPosition ? `${appLegendPosition.y}px` : `${appOverlayInset}px`) : undefined,
+        bottom: !appLegendPosition && appInspectorAsWindow && !veryConstrainedAppViewport ? `${appOverlayInset}px` : undefined,
+        right: appLegendPosition ? undefined : `${appOverlayInset}px`,
+        zIndex: 4,
+        borderRadius: constrainedAppViewport ? "14px" : "18px",
         border: "1px solid rgba(70, 92, 107, 0.12)",
         background: "rgba(255,255,255,0.9)",
         boxShadow: "0 14px 28px rgba(38, 57, 70, 0.1)",
-        padding: "0.72rem 0.84rem",
+        padding: constrainedAppViewport ? "0.46rem 0.54rem" : "0.72rem 0.84rem",
         display: "flex",
-        gap: "0.85rem",
-        alignItems: "center",
         flexWrap: "wrap",
+        gap: compactAppLegend ? "0.36rem 0.48rem" : "0.65rem 0.95rem",
+        alignItems: "center",
         backdropFilter: "blur(10px)",
-        maxWidth: "calc(100% - 10rem)",
+        maxHeight: constrainedAppViewport ? "7.2rem" : undefined,
+        maxWidth: appLegendPosition
+          ? `calc(100% - ${appLegendPosition.x + appOverlayInset}px)`
+          : `calc(100% - ${appOverlayInset * 2}px)`,
+        overflowY: constrainedAppViewport ? "auto" : undefined,
       }}
     >
-      <div style={{ fontSize: "0.76rem", letterSpacing: "0.08em", textTransform: "uppercase", color: "#71818d" }}>
-        Graph legend
+      <button
+        type="button"
+        onClick={() => setAppLegendOverlayVisible(false)}
+        title="Hide legend"
+        aria-label="Hide legend"
+        style={{
+          borderRadius: "999px",
+          border: "1px solid rgba(77, 105, 132, 0.14)",
+          background: "rgba(255,255,255,0.76)",
+          color: "#536b7b",
+          width: compactAppLegend ? "1.3rem" : "1.5rem",
+          height: compactAppLegend ? "1.3rem" : "1.5rem",
+          padding: 0,
+          cursor: "pointer",
+          fontWeight: 800,
+          fontSize: compactAppLegend ? "0.82rem" : "0.92rem",
+          flexShrink: 0,
+          display: "grid",
+          placeItems: "center",
+          lineHeight: 1,
+        }}
+      >
+        ×
+      </button>
+      <button
+        type="button"
+        onPointerDown={handleAppLegendDragStart}
+        title="Drag legend"
+        aria-label="Drag legend"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: "#5d7280",
+          fontSize: compactAppLegend ? "0.68rem" : "0.76rem",
+          borderRadius: "10px",
+          border: "1px solid rgba(77, 105, 132, 0.14)",
+          background: "rgba(255,255,255,0.7)",
+          width: compactAppLegend ? "2rem" : "2.55rem",
+          height: compactAppLegend ? "1.24rem" : "1.48rem",
+          padding: 0,
+          cursor: "grab",
+          userSelect: "none",
+          touchAction: "none",
+          flexShrink: 0,
+        }}
+      >
+        <span
+          aria-hidden="true"
+          style={{
+            width: compactAppLegend ? "1.2rem" : "1.55rem",
+            height: compactAppLegend ? "0.28rem" : "0.34rem",
+            borderRadius: "999px",
+            background: "rgba(102, 122, 137, 0.24)",
+          }}
+        />
+      </button>
+      <div style={{ fontSize: compactAppLegend ? "0.66rem" : "0.72rem", letterSpacing: "0.08em", textTransform: "uppercase", color: "#6e8393", flexShrink: 0 }}>
+        Legend
       </div>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.65rem 0.9rem" }}>
-        <LegendNode color={NODE_COLORS.Source} label={NODE_TYPE_LABELS.Source} />
-        <LegendNode color={NODE_COLORS.Target} label={NODE_TYPE_LABELS.Target} />
-        <LegendNode color={NODE_COLORS["source-context"]} label={NODE_TYPE_LABELS["source-context"]} />
-        <LegendNode color={NODE_COLORS["target-context"]} label={NODE_TYPE_LABELS["target-context"]} />
-      </div>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.65rem 0.9rem" }}>
-        <LegendEdge color={EDGE_COLORS.hierarchy} label={EDGE_TYPE_LABELS.hierarchy} />
-        <LegendEdge color={EDGE_COLORS.similarity} label={EDGE_TYPE_LABELS.similarity} />
-        <LegendEdge color={EDGE_COLORS.difference} label={EDGE_TYPE_LABELS.difference} />
-        <LegendEdge color={EDGE_COLORS.attribute} label={EDGE_TYPE_LABELS.attribute} />
-        <LegendEdge color={EDGE_COLORS["bridge-support"]} dashed label={EDGE_TYPE_LABELS["bridge-support"]} />
-        <LegendEdge color={EDGE_COLORS["bridge-contrast"]} dashed label={EDGE_TYPE_LABELS["bridge-contrast"]} />
-      </div>
+      {appLegendItems}
     </div>
   );
 
@@ -2075,7 +2351,7 @@ export default function Home() {
         zIndex: 4,
         display: "flex",
         flexWrap: "wrap",
-        gap: "0.55rem",
+        gap: constrainedAppViewport ? "0.38rem" : "0.55rem",
         maxWidth: "calc(100% - 2rem)",
       }}
     >
@@ -2091,15 +2367,15 @@ export default function Home() {
               border: "1px solid rgba(70, 92, 107, 0.14)",
               background: active ? "rgba(235,243,247,0.98)" : "rgba(255,255,255,0.94)",
               color: "#29404e",
-              padding: "0.46rem 0.72rem",
+              padding: constrainedAppViewport ? "0.34rem 0.54rem" : "0.46rem 0.72rem",
               cursor: "pointer",
               fontWeight: 700,
-              fontSize: "0.88rem",
+              fontSize: constrainedAppViewport ? "0.76rem" : "0.88rem",
               boxShadow: "0 12px 24px rgba(38, 57, 70, 0.12)",
             }}
-          >
-            {active ? "Hide" : "Show"} {PANEL_LABELS[panelKey]}
-          </button>
+        >
+          {PANEL_SHORT_LABELS[panelKey]}
+        </button>
         );
       })}
     </div>
@@ -2134,7 +2410,7 @@ export default function Home() {
             zIndex: 5,
           }}
         >
-          Show legend
+          Legend
         </button>
       ) : null}
       {!studyTargetBoxVisible ? (
@@ -2151,11 +2427,158 @@ export default function Home() {
             zIndex: 5,
           }}
         >
-          Show target
+          Target
         </button>
       ) : null}
     </>
   ) : null;
+
+  const appInspectorRevealButton = mode === "app" && !appInspectorAsWindow && !appInspectorVisible ? (
+    <button
+      type="button"
+      onClick={() => {
+        inspectorVisibilityUserSetRef.current = true;
+        setAppInspectorVisible(true);
+      }}
+      title="Show inspector"
+      aria-label="Show inspector"
+      style={{
+        position: "absolute",
+        right: constrainedAppViewport ? "0.6rem" : "1rem",
+        bottom: constrainedAppViewport ? "0.6rem" : "1rem",
+        zIndex: 5,
+        width: constrainedAppViewport ? "1.8rem" : "2rem",
+        height: constrainedAppViewport ? "1.8rem" : "2rem",
+        borderRadius: "999px",
+        border: "1px solid rgba(70, 92, 107, 0.12)",
+        background: "rgba(255,255,255,0.96)",
+        color: "#48606f",
+        cursor: "pointer",
+        fontWeight: 800,
+        display: "grid",
+        placeItems: "center",
+        boxShadow: "0 10px 22px rgba(38, 57, 70, 0.1)",
+        backdropFilter: "blur(10px)",
+      }}
+    >
+      ↑
+    </button>
+  ) : null;
+
+  const appOverlayRevealButtons = mode === "app" ? (
+    <>
+      {!appLegendVisible ? (
+        <button
+          type="button"
+          onClick={() => {
+            if (veryConstrainedAppViewport) {
+              setMobilePanel("legend");
+              return;
+            }
+            setAppLegendOverlayVisible(true);
+          }}
+          title="Show legend"
+          aria-label="Show legend"
+          style={{
+            ...studyRevealButtonStyle,
+            position: "absolute",
+            left: `${appOverlayInset}px`,
+            top: `${appOverlayInset}px`,
+            zIndex: 5,
+          }}
+        >
+          Legend
+        </button>
+      ) : null}
+      {!appHeaderVisible ? (
+        <button
+          type="button"
+          onClick={() => {
+            if (veryConstrainedAppViewport) {
+              setMobilePanel("source");
+              return;
+            }
+            setAppHeaderOverlayVisible(true);
+          }}
+          title="Show source selector"
+          aria-label="Show source selector"
+          style={{
+            ...studyRevealButtonStyle,
+            position: "absolute",
+            left: `${appOverlayInset}px`,
+            top: appLegendVisible ? `calc(${appOverlayInset}px + 8.4rem)` : `calc(${appOverlayInset}px + 2.7rem)`,
+            zIndex: appLegendVisible ? 3 : 5,
+          }}
+        >
+          Source
+        </button>
+      ) : null}
+    </>
+  ) : null;
+
+  const appInspectorWindowContent = selectedNodeInfo ? (
+    <div style={{ display: "grid", gap: "0.72rem" }}>
+      <InspectorCard title="Selected node">
+        <div style={{ fontWeight: 800, color: "#2d4351" }}>{selectedNodeInfo.node.label}</div>
+        <div style={{ marginTop: "0.5rem", display: "flex", flexWrap: "wrap", gap: "0.4rem" }}>
+          <DetailPill label="Type" value={NODE_TYPE_LABELS[selectedNodeInfo.node.type]} />
+          <DetailPill label="Node kind" value={selectedNodeInfo.node.node_kind || "context"} />
+          <DetailPill label="Side" value={selectedNodeInfo.node.ontology_side || "n/a"} />
+        </div>
+      </InspectorCard>
+      <InspectorCard title="Explanation details">
+        {selectedNodeDetailItems.length ? (
+          <ul style={{ margin: 0, paddingLeft: "1rem", color: "#526570", lineHeight: 1.45 }}>
+            {selectedNodeDetailItems.slice(0, 8).map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        ) : (
+          <div style={{ color: "#6f7f8b", lineHeight: 1.45 }}>
+            No explanation-local details available for this node.
+          </div>
+        )}
+      </InspectorCard>
+      <InspectorCard title="Description">
+        <div style={{ color: "#526570", lineHeight: 1.5 }}>
+          {selectedNodeDefinitions[0] || "No description available."}
+        </div>
+      </InspectorCard>
+    </div>
+  ) : selectedEdge ? (
+    <div style={{ display: "grid", gap: "0.72rem" }}>
+      <InspectorCard title="Source">
+        <div style={{ color: "#2d4351", fontWeight: 700, lineHeight: 1.42 }}>
+          {visibleGraph.nodes.find((node) => node.id === selectedEdge.source)?.label || selectedEdge.source}
+        </div>
+      </InspectorCard>
+      <InspectorCard title="Target">
+        <div style={{ color: "#2d4351", fontWeight: 700, lineHeight: 1.42 }}>
+          {visibleGraph.nodes.find((node) => node.id === selectedEdge.target)?.label || selectedEdge.target}
+        </div>
+      </InspectorCard>
+      <InspectorCard title="Edge details">
+        <div style={{ fontWeight: 800, color: "#2d4351", lineHeight: 1.35 }}>{selectedEdge.label}</div>
+        <div style={{ marginTop: "0.5rem", display: "flex", flexWrap: "wrap", gap: "0.4rem" }}>
+          <DetailPill label="Type" value={EDGE_TYPE_LABELS[selectedEdge.type]} />
+          <DetailPill
+            label="Score"
+            value={
+              selectedEdge.score !== undefined && selectedEdge.score !== null && selectedEdge.score !== ""
+                ? String(selectedEdge.score)
+                : "n/a"
+            }
+          />
+        </div>
+      </InspectorCard>
+    </div>
+  ) : selectedNodeId ? (
+    <div style={{ color: "#61727d", lineHeight: 1.56 }}>Loading node details…</div>
+  ) : (
+    <div style={{ color: "#61727d", lineHeight: 1.56 }}>
+      Click a node or edge in the graph to inspect its label, type, score, and explanation details here.
+    </div>
+  );
 
   const graphStatus = loading ? (
     <div style={{ padding: "2rem", color: "#425662" }}>Loading study case…</div>
@@ -2170,7 +2593,7 @@ export default function Home() {
       ref={graphShellRef}
       style={{
         position: "relative",
-        borderRadius: constrainedStudyViewport ? "18px" : "30px",
+        borderRadius: constrainedStudyViewport || constrainedAppViewport ? "18px" : "30px",
         overflow: "hidden",
         border: "1px solid rgba(70, 92, 107, 0.12)",
         background: "linear-gradient(180deg, rgba(255,255,255,0.92) 0%, rgba(248,251,252,0.96) 100%)",
@@ -2216,7 +2639,7 @@ export default function Home() {
             savedViewportState={savedGraphViewport}
             allowInspection={mode === "app"}
             graphExpanded={graphExpanded}
-            canToggleGraphExpanded={mode === "app"}
+            canToggleGraphExpanded={mode === "app" && (!veryConstrainedAppViewport || graphExpanded)}
             onToggleGraphExpanded={() => setGraphExpanded((prev) => !prev)}
             onViewportChange={(nextViewportState) => {
               if (!graphViewportKey) return;
@@ -2229,9 +2652,11 @@ export default function Home() {
         </div>
       )}
 
-      {mode === "app" ? graphLegend : null}
+      {mode === "app" && appLegendVisible ? graphLegend : null}
+      {appOverlayRevealButtons}
       {mode === "study" && selectedTarget && studyLegendVisible ? studyLegend : null}
       {studyOverlayRevealButtons}
+      {appInspectorRevealButton}
       {hiddenPanelButtons}
       {narrowPanelButtons}
 
@@ -2248,6 +2673,26 @@ export default function Home() {
       {mode === "app" && mobilePanel === "controls" ? (
         <FloatingPanel title="Display controls" position="right" onClose={() => setMobilePanel(null)}>
           {controlsPanel}
+        </FloatingPanel>
+      ) : null}
+      {mode === "app" && mobilePanel === "source" ? (
+        <FloatingPanel title="Source" position="right" onClose={() => setMobilePanel(null)}>
+          <SourcePicker
+            options={sourceOptions}
+            selectedSourceId={sourceId}
+            onSelect={handleSourceSelect}
+            disabled={sourcesLoading}
+          />
+        </FloatingPanel>
+      ) : null}
+      {mode === "app" && mobilePanel === "legend" ? (
+        <FloatingPanel title="Legend" position="left" onClose={() => setMobilePanel(null)} compact>
+          {appLegendItems}
+        </FloatingPanel>
+      ) : null}
+      {mode === "app" && mobilePanel === "inspector" ? (
+        <FloatingPanel title="Inspector" position="left" onClose={() => setMobilePanel(null)}>
+          {appInspectorWindowContent}
         </FloatingPanel>
       ) : null}
 
@@ -2638,6 +3083,7 @@ export default function Home() {
     }
     return "minmax(0, 1fr)";
   })();
+  const showAppInspectorFooter = mode === "app" && appInspectorVisible && !appInspectorAsWindow;
 
   const rightPanels: React.ReactNode[] = [];
   if (mode === "app" && !graphExpanded) {
@@ -2659,7 +3105,14 @@ export default function Home() {
         background:
           "linear-gradient(135deg, #f4efe8 0%, #f8fbfd 48%, #edf4f8 100%)",
         color: "#273945",
-        padding: mode === "study" ? (constrainedStudyViewport ? "0.35rem" : "0.8rem") : "0.85rem",
+        padding:
+          mode === "study"
+            ? constrainedStudyViewport
+              ? "0.35rem"
+              : "0.8rem"
+            : constrainedAppViewport
+              ? "0.45rem"
+              : "0.85rem",
         boxSizing: "border-box",
         overflow: "hidden",
         fontFamily: "\"Avenir Next\", var(--font-geist-sans), sans-serif",
@@ -2668,49 +3121,90 @@ export default function Home() {
           mode === "study"
             ? "minmax(0, 1fr)"
             : graphExpanded
-              ? "minmax(0, 1fr) auto"
-              : "auto minmax(0, 1fr) auto",
-        gap: constrainedStudyViewport ? "0.45rem" : "0.85rem",
+              ? showAppInspectorFooter
+                ? "minmax(0, 1fr) auto"
+                : "minmax(0, 1fr)"
+              : appHeaderVisible && showAppInspectorFooter
+                ? "auto minmax(0, 1fr) auto"
+                : appHeaderVisible
+                  ? "auto minmax(0, 1fr)"
+                  : showAppInspectorFooter
+                    ? "minmax(0, 1fr) auto"
+                    : "minmax(0, 1fr)",
+        gap: constrainedStudyViewport || constrainedAppViewport ? "0.45rem" : "0.85rem",
       }}
     >
-      {mode === "app" && !graphExpanded ? (
+      {mode === "app" && !graphExpanded && appHeaderVisible ? (
         <header
           style={{
-            borderRadius: "28px",
+            position: "relative",
+            borderRadius: constrainedAppViewport ? "18px" : "28px",
             border: "1px solid rgba(70, 92, 107, 0.12)",
             background: "rgba(255,255,255,0.9)",
             boxShadow: "0 18px 36px rgba(52, 71, 84, 0.08)",
-            padding: "0.82rem 0.88rem",
+            padding: constrainedAppViewport ? "0.5rem 0.56rem" : "0.82rem 0.88rem",
             display: "flex",
             justifyContent: "space-between",
-            gap: "0.85rem",
+            gap: constrainedAppViewport ? "0.5rem" : "0.85rem",
             alignItems: "center",
             flexWrap: "wrap",
           }}
         >
+          <button
+            type="button"
+            onClick={() => setAppHeaderOverlayVisible(false)}
+            title="Hide source selector"
+            aria-label="Hide source selector"
+            style={{
+              position: "absolute",
+              right: constrainedAppViewport ? "0.45rem" : "0.62rem",
+              top: constrainedAppViewport ? "0.42rem" : "0.55rem",
+              zIndex: 2,
+              width: constrainedAppViewport ? "1.45rem" : "1.65rem",
+              height: constrainedAppViewport ? "1.45rem" : "1.65rem",
+              borderRadius: "999px",
+              border: "1px solid rgba(77, 105, 132, 0.14)",
+              background: "rgba(255,255,255,0.78)",
+              color: "#536b7b",
+              padding: 0,
+              cursor: "pointer",
+              fontWeight: 800,
+              fontSize: constrainedAppViewport ? "0.88rem" : "0.96rem",
+              display: "grid",
+              placeItems: "center",
+              lineHeight: 1,
+              boxShadow: "0 8px 18px rgba(38, 57, 70, 0.08)",
+            }}
+          >
+            ×
+          </button>
           <div
             style={{
               flex: "1.15 1 34rem",
               minWidth: "min(24rem, 100%)",
-              borderRadius: "20px",
+              borderRadius: constrainedAppViewport ? "16px" : "20px",
               border: "1px solid rgba(77, 105, 132, 0.18)",
               background: "linear-gradient(135deg, rgba(228,239,247,0.98) 0%, rgba(255,255,255,0.98) 100%)",
-              padding: "0.72rem 0.84rem",
+              padding: constrainedAppViewport ? "0.48rem 0.56rem" : "0.72rem 0.84rem",
               boxShadow: "inset 0 1px 0 rgba(255,255,255,0.62)",
               display: "flex",
               alignItems: "flex-start",
-              gap: "1rem",
+              gap: constrainedAppViewport ? "0.65rem" : "1rem",
             }}
           >
-            <SmallLogo />
-            <div
-              style={{
-                width: "1px",
-                alignSelf: "stretch",
-                background: "linear-gradient(180deg, rgba(109,130,145,0.08) 0%, rgba(109,130,145,0.22) 50%, rgba(109,130,145,0.08) 100%)",
-                flexShrink: 0,
-              }}
-            />
+            {!constrainedAppViewport ? (
+              <>
+                <SmallLogo />
+                <div
+                  style={{
+                    width: "1px",
+                    alignSelf: "stretch",
+                    background: "linear-gradient(180deg, rgba(109,130,145,0.08) 0%, rgba(109,130,145,0.22) 50%, rgba(109,130,145,0.08) 100%)",
+                    flexShrink: 0,
+                  }}
+                />
+              </>
+            ) : null}
             <div style={{ minWidth: 0, marginLeft: "auto", display: "flex", flexDirection: "column", alignItems: "flex-end", textAlign: "right" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "0.55rem", flexWrap: "wrap" }}>
                 <div style={{ fontSize: "0.74rem", letterSpacing: "0.08em", textTransform: "uppercase", color: "#60798d" }}>
@@ -2740,7 +3234,7 @@ export default function Home() {
                 >
                   {bundle?.source_label || selectedSourceOption?.source_label || sourceId || "Select a source"}
                 </span>
-                {(bundle?.source_id || selectedSourceOption?.source_id || sourceId) ? (
+                {!veryConstrainedAppViewport && (bundle?.source_id || selectedSourceOption?.source_id || sourceId) ? (
                   <span
                     style={{
                       color: "#617684",
@@ -2761,6 +3255,7 @@ export default function Home() {
             selectedSourceId={sourceId}
             onSelect={handleSourceSelect}
             disabled={sourcesLoading}
+            compact={constrainedAppViewport}
           />
         </header>
       ) : null}
@@ -2769,7 +3264,7 @@ export default function Home() {
         style={{
           display: "grid",
           gridTemplateColumns: mainColumns,
-          gap: "0.9rem",
+          gap: constrainedAppViewport ? "0.45rem" : "0.9rem",
           minHeight: 0,
         }}
       >
@@ -2812,17 +3307,17 @@ export default function Home() {
         ) : null}
       </div>
 
-      {mode === "app" ? (
+      {showAppInspectorFooter ? (
         <footer
           style={{
             position: "relative",
-            borderRadius: "26px",
+            borderRadius: constrainedAppViewport ? "18px" : "26px",
             border: "1px solid rgba(70, 92, 107, 0.12)",
             background: "rgba(255,255,255,0.94)",
             boxShadow: "0 18px 36px rgba(52, 71, 84, 0.08)",
             height: inspectorHeight,
-            minHeight: "132px",
-            maxHeight: "42vh",
+            minHeight: constrainedAppViewport ? "104px" : "132px",
+            maxHeight: constrainedAppViewport ? "34vh" : "42vh",
             overflow: "hidden",
             flexShrink: 0,
           }}
@@ -2850,8 +3345,44 @@ export default function Home() {
               }}
             />
           </div>
+          <button
+            type="button"
+            onClick={() => {
+              inspectorVisibilityUserSetRef.current = true;
+              setAppInspectorVisible(false);
+            }}
+            title="Hide inspector"
+            aria-label="Hide inspector"
+            style={{
+              position: "absolute",
+              right: constrainedAppViewport ? "0.55rem" : "0.9rem",
+              top: constrainedAppViewport ? "0.12rem" : "0.2rem",
+              width: constrainedAppViewport ? "1.65rem" : "1.9rem",
+              height: constrainedAppViewport ? "1.65rem" : "1.9rem",
+              borderRadius: "999px",
+              border: "1px solid rgba(70, 92, 107, 0.12)",
+              background: "rgba(255,255,255,0.96)",
+              color: "#48606f",
+              cursor: "pointer",
+              fontWeight: 800,
+              display: "grid",
+              placeItems: "center",
+              boxShadow: "0 10px 22px rgba(38, 57, 70, 0.1)",
+              backdropFilter: "blur(10px)",
+              zIndex: 2,
+            }}
+          >
+            ↓
+          </button>
 
-          <div style={{ height: "100%", overflowY: "auto", padding: "1rem 1rem 1rem", boxSizing: "border-box" }}>
+          <div
+            style={{
+              height: "100%",
+              overflowY: "auto",
+              padding: constrainedAppViewport ? "0.88rem 0.65rem 0.72rem" : "1rem 1rem 1rem",
+              boxSizing: "border-box",
+            }}
+          >
             {selectedNodeInfo ? (
               <>
                 <div style={{ fontSize: "0.76rem", letterSpacing: "0.08em", textTransform: "uppercase", color: "#71818d", marginBottom: "0.72rem" }}>
@@ -2860,8 +3391,10 @@ export default function Home() {
                 <div
                   style={{
                     display: "grid",
-                    gridTemplateColumns: "minmax(240px, 320px) minmax(280px, 1.2fr) minmax(240px, 0.95fr)",
-                    gap: "0.72rem",
+                    gridTemplateColumns: compactAppInspector
+                      ? "minmax(0, 1fr)"
+                      : "minmax(240px, 320px) minmax(280px, 1.2fr) minmax(240px, 0.95fr)",
+                    gap: constrainedAppViewport ? "0.5rem" : "0.72rem",
                     alignItems: "start",
                   }}
                 >
@@ -2941,8 +3474,10 @@ export default function Home() {
                 <div
                   style={{
                     display: "grid",
-                    gridTemplateColumns: "minmax(240px, 1fr) minmax(240px, 1fr) minmax(240px, 0.9fr)",
-                    gap: "0.72rem",
+                    gridTemplateColumns: compactAppInspector
+                      ? "minmax(0, 1fr)"
+                      : "minmax(240px, 1fr) minmax(240px, 1fr) minmax(240px, 0.9fr)",
+                    gap: constrainedAppViewport ? "0.5rem" : "0.72rem",
                     alignItems: "start",
                   }}
                 >

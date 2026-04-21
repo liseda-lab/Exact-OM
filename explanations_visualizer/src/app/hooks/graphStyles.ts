@@ -54,7 +54,7 @@ export default function graphStyles(options: GraphStyleOptions = {}): Array<Reco
   const fontScale = Math.max(0.84, Math.min(1.26, options.fontScale ?? 1));
   const minDim = Math.min(width, height);
   const baseScale = Math.max(0.78, Math.min(1.02, minDim / 900));
-  const modeBoost = options.mode === "study" ? 0.04 : 0;
+  const modeBoost = options.mode === "study" ? 0.04 : 0.02;
   const nodeScale = Math.max(0.78, Math.min(1.04, baseScale + modeBoost));
   const endpointScale = Math.max(0.82, Math.min(1.06, nodeScale + 0.04));
   const nodeWidth = Math.round(184 * nodeScale);
@@ -67,8 +67,8 @@ export default function graphStyles(options: GraphStyleOptions = {}): Array<Reco
   const nodeTextWidth = Math.max(124, nodeWidth - Math.round(30 * nodeScale));
   const endpointTextWidth = Math.max(nodeTextWidth, endpointWidth - Math.round(32 * endpointScale));
   const edgeTextWidth = Math.round(158 * nodeScale);
-  const minNodeZoomedFontSize = options.mode === "study" ? 6 : 9;
-  const minEdgeZoomedFontSize = options.mode === "study" ? 5.5 : 8;
+  const minNodeZoomedFontSize = 6;
+  const minEdgeZoomedFontSize = 5.5;
 
   return [
     {
