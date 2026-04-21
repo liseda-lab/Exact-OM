@@ -3050,6 +3050,7 @@ export default function Home() {
   if (!queryReady) {
     return (
       <main
+        className="study-visualizer-root"
         style={{
           height: "100vh",
           display: "grid",
@@ -3100,6 +3101,7 @@ export default function Home() {
 
   return (
     <main
+      className="study-visualizer-root"
       style={{
         height: "100vh",
         background:

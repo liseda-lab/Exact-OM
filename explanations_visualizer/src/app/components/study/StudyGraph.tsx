@@ -520,6 +520,7 @@ export default function StudyGraph({
   const lastTapRef = useRef<{ nodeId: string | null; at: number }>({ nodeId: null, at: 0 });
   const [viewport, setViewport] = useState<ViewportSize>({ width: 0, height: 0 });
   const [graphFontScale, setGraphFontScale] = useState(1);
+  const [prefersDarkMode, setPrefersDarkMode] = useState(false);
 
   useEffect(() => {
     onNodeClickRef.current = onNodeClick;
@@ -548,6 +549,15 @@ export default function StudyGraph({
   useEffect(() => {
     selectedEdgeIdRef.current = selectedEdgeId;
   }, [selectedEdgeId]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    const syncDarkMode = () => setPrefersDarkMode(mediaQuery.matches);
+    syncDarkMode();
+    mediaQuery.addEventListener("change", syncDarkMode);
+    return () => mediaQuery.removeEventListener("change", syncDarkMode);
+  }, []);
 
   useEffect(() => {
     if (!wrapperRef.current) return;
@@ -598,6 +608,7 @@ export default function StudyGraph({
         viewportWidth: layoutMetrics.width,
         viewportHeight: layoutMetrics.height,
         fontScale: graphFontScale,
+        darkMode: prefersDarkMode,
       }) as any,
       layout: { name: "preset", fit: false, padding: layoutMetrics.fitPadding },
       minZoom: 0.1,
@@ -696,7 +707,7 @@ export default function StudyGraph({
       cy.destroy();
       cyRef.current = null;
     };
-  }, [layoutMetrics.fitPadding, layoutMetrics.height, layoutMetrics.width, mode]);
+  }, [graphFontScale, layoutMetrics.fitPadding, layoutMetrics.height, layoutMetrics.width, mode, prefersDarkMode]);
 
   useEffect(() => {
     const cy = cyRef.current;
@@ -707,9 +718,10 @@ export default function StudyGraph({
         viewportWidth: layoutMetrics.width,
         viewportHeight: layoutMetrics.height,
         fontScale: graphFontScale,
+        darkMode: prefersDarkMode,
       }) as any,
     ).update();
-  }, [graphFontScale, layoutMetrics.height, layoutMetrics.width, mode]);
+  }, [graphFontScale, layoutMetrics.height, layoutMetrics.width, mode, prefersDarkMode]);
 
   useEffect(() => {
     const cy = cyRef.current;

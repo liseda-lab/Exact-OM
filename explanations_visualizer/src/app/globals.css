@@ -14,6 +14,22 @@
   --study-text: #273945;
 }
 
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --study-bg-warm: #071018;
+    --study-bg-cool: #101b24;
+    --study-surface: rgba(18, 27, 35, 0.94);
+    --study-border: rgba(156, 179, 195, 0.18);
+    --study-shadow: 0 18px 42px rgba(0, 0, 0, 0.32);
+    --study-source: #5f83a2;
+    --study-source-soft: #20384c;
+    --study-target: #b48768;
+    --study-target-soft: #3f2b22;
+    --study-text: #dce8f1;
+  }
+}
+
 * {
   box-sizing: border-box;
 }
@@ -29,6 +45,84 @@ body {
   font-family: var(--font-geist-sans), "Segoe UI", sans-serif;
   background: linear-gradient(135deg, var(--study-bg-warm) 0%, #f8fbfd 48%, var(--study-bg-cool) 100%);
   color: var(--study-text);
+}
+
+@media (prefers-color-scheme: dark) {
+  body {
+    background: radial-gradient(circle at 16% 8%, rgba(76, 113, 143, 0.24) 0%, rgba(76, 113, 143, 0) 34%),
+      radial-gradient(circle at 88% 12%, rgba(150, 108, 76, 0.16) 0%, rgba(150, 108, 76, 0) 30%),
+      linear-gradient(135deg, #071018 0%, #0b131b 48%, #101b24 100%);
+    color: var(--study-text);
+  }
+
+  .study-visualizer-root,
+  .study-visualizer-root[style*="linear-gradient"] {
+    background: radial-gradient(circle at 14% 10%, rgba(76, 113, 143, 0.22) 0%, rgba(76, 113, 143, 0) 32%),
+      radial-gradient(circle at 88% 14%, rgba(172, 124, 86, 0.15) 0%, rgba(172, 124, 86, 0) 30%),
+      linear-gradient(135deg, #071018 0%, #0b131b 48%, #101b24 100%) !important;
+    color: var(--study-text) !important;
+  }
+
+  .study-visualizer-root :is(section, header, footer, [role="dialog"]) {
+    background: rgba(18, 27, 35, 0.9) !important;
+    border-color: var(--study-border) !important;
+    box-shadow: var(--study-shadow) !important;
+    color: var(--study-text) !important;
+  }
+
+  .study-visualizer-root [style*="rgba(255,255,255"],
+  .study-visualizer-root [style*="rgba(255, 255, 255"],
+  .study-visualizer-root [style*="rgba(250"],
+  .study-visualizer-root [style*="rgba(249"],
+  .study-visualizer-root [style*="rgba(248"],
+  .study-visualizer-root [style*="rgba(247"],
+  .study-visualizer-root [style*="rgba(244"],
+  .study-visualizer-root [style*="rgba(243"],
+  .study-visualizer-root [style*="rgba(242"],
+  .study-visualizer-root [style*="rgba(236"],
+  .study-visualizer-root [style*="rgba(235"],
+  .study-visualizer-root [style*="rgba(234"],
+  .study-visualizer-root [style*="rgba(233"],
+  .study-visualizer-root [style*="rgba(228"],
+  .study-visualizer-root [style*="rgba(221"],
+  .study-visualizer-root [style*="rgba(220"],
+  .study-visualizer-root [style*="#ffffff"],
+  .study-visualizer-root [style*="#f7fafb"],
+  .study-visualizer-root [style*="#f8fbfc"],
+  .study-visualizer-root [style*="#eef5f8"] {
+    background: rgba(18, 27, 35, 0.88) !important;
+    border-color: var(--study-border) !important;
+    color: var(--study-text) !important;
+  }
+
+  .study-visualizer-root [style*="linear-gradient"] {
+    background: linear-gradient(180deg, rgba(22, 33, 42, 0.94) 0%, rgba(13, 22, 30, 0.94) 100%) !important;
+    border-color: var(--study-border) !important;
+    color: var(--study-text) !important;
+  }
+
+  .study-visualizer-root :is(div, span, label, summary, li, button, select, input, textarea) {
+    color: var(--study-text) !important;
+  }
+
+  .study-visualizer-root :is(button, select, input, textarea) {
+    background-color: rgba(15, 24, 32, 0.92) !important;
+    border-color: var(--study-border) !important;
+  }
+
+  .study-visualizer-root input::placeholder,
+  .study-visualizer-root textarea::placeholder {
+    color: #8fa2b1 !important;
+  }
+
+  .study-visualizer-root option {
+    background: #101923;
+    color: var(--study-text);
+  }
+
+  .study-visualizer-root [style*="box-shadow"] {
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.34) !important;
+  }
 }
 
 button,
