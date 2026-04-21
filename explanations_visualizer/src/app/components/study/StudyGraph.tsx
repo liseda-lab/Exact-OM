@@ -707,7 +707,7 @@ export default function StudyGraph({
       cy.destroy();
       cyRef.current = null;
     };
-  }, [graphFontScale, layoutMetrics.fitPadding, layoutMetrics.height, layoutMetrics.width, mode, prefersDarkMode]);
+  }, []);
 
   useEffect(() => {
     const cy = cyRef.current;
