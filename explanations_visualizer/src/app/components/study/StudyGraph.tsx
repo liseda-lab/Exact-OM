@@ -46,6 +46,7 @@ type GraphLayoutMetrics = {
   expansionItemsPerRing: number;
   fitPadding: number;
   fitZoomMultiplier: number;
+  radialStagger: number;
 };
 
 type GraphFitPadding = {
@@ -56,6 +57,7 @@ type GraphFitPadding = {
 };
 
 const CHANNEL_ORDER = ["hierarchy", "similarity", "difference", "attribute", "other"] as const;
+const STUDY_MIN_READABLE_AUTO_ZOOM = 0.58;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
@@ -79,8 +81,8 @@ function buildLayoutMetrics(viewport: ViewportSize, mode: StudyMode): GraphLayou
   const width = Math.max(viewport.width || 1320, 640);
   const height = Math.max(viewport.height || 860, 420);
   const centerX = width / 2;
-  const centerY = mode === "study" ? height * 0.46 : height / 2;
-  const desiredSeparation = width * (mode === "study" ? 0.48 : 0.54);
+  const centerY = mode === "study" ? height * 0.43 : height / 2;
+  const desiredSeparation = width * (mode === "study" ? 0.5 : 0.54);
   const maxSeparation = Math.max(340, width - 140);
   const separation = clamp(desiredSeparation, 360, Math.min(1120, maxSeparation));
   const minDim = Math.min(width, height);
@@ -90,15 +92,18 @@ function buildLayoutMetrics(viewport: ViewportSize, mode: StudyMode): GraphLayou
     height,
     sourceAnchor: { x: centerX - separation / 2, y: centerY },
     targetAnchor: { x: centerX + separation / 2, y: centerY },
-    baseRadius: clamp(minDim * (mode === "study" ? 0.29 : 0.275), 210, 420),
-    ringGap: clamp(minDim * 0.105, 86, 148),
-    itemsPerRing: Math.round(clamp(Math.round(width / 300), 4, 7)),
-    sectorGapDegrees: clamp(width / 190, 5, 10),
+    baseRadius: clamp(minDim * (mode === "study" ? 0.34 : 0.275), mode === "study" ? 230 : 210, mode === "study" ? 470 : 420),
+    ringGap: clamp(minDim * (mode === "study" ? 0.135 : 0.105), mode === "study" ? 96 : 86, mode === "study" ? 180 : 148),
+    itemsPerRing: Math.round(
+      clamp(Math.round(width / (mode === "study" ? 360 : 300)), mode === "study" ? 3 : 4, mode === "study" ? 5 : 7),
+    ),
+    sectorGapDegrees: mode === "study" ? clamp(width / 132, 8, 16) : clamp(width / 190, 5, 10),
     expansionBaseRadius: clamp(minDim * 0.18, 155, 270),
     expansionGap: clamp(minDim * 0.075, 74, 112),
     expansionItemsPerRing: Math.round(clamp(Math.round(width / 340), 3, 6)),
     fitPadding: clamp(minDim * 0.055, 36, 82),
-    fitZoomMultiplier: mode === "study" ? 0.98 : 0.95,
+    fitZoomMultiplier: mode === "study" ? 0.93 : 0.95,
+    radialStagger: mode === "study" ? clamp(minDim * 0.045, 36, 72) : 0,
   };
 }
 
@@ -112,12 +117,14 @@ function placeArc(
   baseRadius: number,
   ringGap: number,
   itemsPerRing: number,
+  radialStagger = 0,
 ) {
   items.forEach((item, index) => {
     const ring = Math.floor(index / itemsPerRing);
     const slot = index % itemsPerRing;
     const countInRing = Math.min(itemsPerRing, items.length - ring * itemsPerRing);
-    const radius = baseRadius + ring * ringGap;
+    const stagger = radialStagger ? ((slot + ring) % 2 === 0 ? 0 : radialStagger) : 0;
+    const radius = baseRadius + ring * ringGap + stagger;
     const start = (startDegrees * Math.PI) / 180;
     const end = (endDegrees * Math.PI) / 180;
     const theta = (() => {
@@ -144,6 +151,7 @@ function placeGroupedArc(
   ringGap: number,
   itemsPerRing: number,
   sectorGapDegrees: number,
+  radialStagger = 0,
 ) {
   const grouped = new Map<string, StudyNode[]>();
   CHANNEL_ORDER.forEach((channel) => grouped.set(channel, []));
@@ -173,6 +181,7 @@ function placeGroupedArc(
       baseRadius,
       ringGap,
       itemsPerRing,
+      radialStagger,
     );
     return;
   }
@@ -197,6 +206,7 @@ function placeGroupedArc(
       baseRadius,
       ringGap,
       itemsPerRing,
+      radialStagger,
     );
     cursor += span + sectorGapDegrees;
   });
@@ -224,24 +234,26 @@ function buildPositions(
     sourceContext,
     layoutMetrics.sourceAnchor.x,
     layoutMetrics.sourceAnchor.y,
-    34,
-    326,
+    24,
+    336,
     layoutMetrics.baseRadius,
     layoutMetrics.ringGap,
     layoutMetrics.itemsPerRing,
     layoutMetrics.sectorGapDegrees,
+    layoutMetrics.radialStagger,
   );
   placeGroupedArc(
     positions,
     targetContext,
     layoutMetrics.targetAnchor.x,
     layoutMetrics.targetAnchor.y,
-    -146,
-    146,
+    -156,
+    156,
     layoutMetrics.baseRadius,
     layoutMetrics.ringGap,
     layoutMetrics.itemsPerRing,
     layoutMetrics.sectorGapDegrees,
+    layoutMetrics.radialStagger,
   );
 
   const expandedNode = expandedNodeId ? nodes.find((node) => node.id === expandedNodeId) : null;
@@ -300,10 +312,19 @@ function buildPositions(
 
 function graphFitPadding(metrics: GraphLayoutMetrics, mode: StudyMode): GraphFitPadding {
   if (mode === "study") {
+    const constrained = metrics.width < 760 || metrics.height < 700;
+    if (constrained) {
+      return {
+        top: clamp(metrics.height * 0.08, 54, 86),
+        right: clamp(metrics.width * 0.14, 72, 150),
+        bottom: clamp(metrics.height * 0.22, 110, 180),
+        left: clamp(metrics.width * 0.14, 72, 150),
+      };
+    }
     return {
       top: clamp(metrics.height * 0.1, 78, 116),
       right: clamp(metrics.width * 0.21, 132, 260),
-      bottom: clamp(metrics.height * 0.24, 150, 220),
+      bottom: clamp(metrics.height * 0.3, 170, 290),
       left: clamp(metrics.width * 0.19, 132, 240),
     };
   }
@@ -324,9 +345,13 @@ function defaultFit(cy: Core, metrics: GraphLayoutMetrics, mode: StudyMode) {
     const height = Math.max(1, boundingBox.h);
     const availableWidth = Math.max(80, cy.width() - padding.left - padding.right);
     const availableHeight = Math.max(80, cy.height() - padding.top - padding.bottom);
+    const minReadableZoom =
+      mode === "study"
+        ? Math.min(cy.maxZoom(), Math.max(cy.minZoom(), STUDY_MIN_READABLE_AUTO_ZOOM))
+        : cy.minZoom();
     const zoom = clamp(
       Math.min(availableWidth / width, availableHeight / height) * metrics.fitZoomMultiplier,
-      cy.minZoom(),
+      minReadableZoom,
       cy.maxZoom(),
     );
     const pan = {
@@ -376,10 +401,12 @@ function GraphControlButton({
   label,
   onClick,
   title,
+  compact = false,
 }: {
   label: React.ReactNode;
   onClick: () => void;
   title: string;
+  compact?: boolean;
 }) {
   return (
     <button
@@ -392,9 +419,9 @@ function GraphControlButton({
         background: "rgba(255, 255, 255, 0.94)",
         color: "#233744",
         borderRadius: "14px",
-        minWidth: "2.1rem",
-        minHeight: "2.1rem",
-        padding: "0.46rem 0.66rem",
+        minWidth: compact ? "2rem" : "2.1rem",
+        minHeight: compact ? "2rem" : "2.1rem",
+        padding: compact ? "0.4rem 0.52rem" : "0.46rem 0.66rem",
         boxShadow: "0 10px 24px rgba(32, 49, 61, 0.12)",
         cursor: "pointer",
         fontWeight: 700,
@@ -442,6 +469,7 @@ export default function StudyGraph({
   const selectedEdgeIdRef = useRef<string | null>(selectedEdgeId);
   const lastTapRef = useRef<{ nodeId: string | null; at: number }>({ nodeId: null, at: 0 });
   const [viewport, setViewport] = useState<ViewportSize>({ width: 0, height: 0 });
+  const [graphFontScale, setGraphFontScale] = useState(1);
 
   useEffect(() => {
     onNodeClickRef.current = onNodeClick;
@@ -515,7 +543,12 @@ export default function StudyGraph({
     const cy = cytoscape({
       container: cyContainerRef.current,
       elements: [],
-      style: graphStyles({ mode, viewportWidth: layoutMetrics.width, viewportHeight: layoutMetrics.height }) as any,
+      style: graphStyles({
+        mode,
+        viewportWidth: layoutMetrics.width,
+        viewportHeight: layoutMetrics.height,
+        fontScale: graphFontScale,
+      }) as any,
       layout: { name: "preset", fit: false, padding: layoutMetrics.fitPadding },
       minZoom: 0.1,
       maxZoom: 2.4,
@@ -619,9 +652,14 @@ export default function StudyGraph({
     const cy = cyRef.current;
     if (!cy) return;
     cy.style().fromJson(
-      graphStyles({ mode, viewportWidth: layoutMetrics.width, viewportHeight: layoutMetrics.height }) as any,
+      graphStyles({
+        mode,
+        viewportWidth: layoutMetrics.width,
+        viewportHeight: layoutMetrics.height,
+        fontScale: graphFontScale,
+      }) as any,
     ).update();
-  }, [layoutMetrics.height, layoutMetrics.width, mode]);
+  }, [graphFontScale, layoutMetrics.height, layoutMetrics.width, mode]);
 
   useEffect(() => {
     const cy = cyRef.current;
@@ -683,7 +721,8 @@ export default function StudyGraph({
           ...(mode === "study"
             ? {
                 right: "1rem",
-                top: viewport.width > 0 && viewport.width < 760 ? "7.9rem" : "7.25rem",
+                top: "50%",
+                transform: "translateY(-50%)",
                 zIndex: 5,
               }
             : {
@@ -692,21 +731,31 @@ export default function StudyGraph({
                 zIndex: 3,
               }),
           display: "flex",
+          flexDirection: mode === "study" ? "column" : "row",
           gap: "0.5rem",
-          alignItems: "center",
+          alignItems: "flex-end",
           pointerEvents: "none",
         }}
       >
-        <div style={{ display: "flex", gap: "0.45rem", pointerEvents: "auto" }}>
+        <div
+          style={{
+            display: "flex",
+            gap: "0.45rem",
+            pointerEvents: "auto",
+            flexDirection: mode === "study" ? "column" : "row",
+          }}
+        >
           <GraphControlButton
             label="+"
             onClick={() => cyRef.current && zoomAboutCenter(cyRef.current, 1.12)}
             title="Zoom in"
+            compact={mode === "study"}
           />
           <GraphControlButton
             label="-"
             onClick={() => cyRef.current && zoomAboutCenter(cyRef.current, 0.9)}
             title="Zoom out"
+            compact={mode === "study"}
           />
           {canToggleGraphExpanded && onToggleGraphExpanded ? (
             <GraphControlButton
@@ -716,6 +765,29 @@ export default function StudyGraph({
             />
           ) : null}
         </div>
+        {mode === "study" ? (
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "0.35rem",
+              pointerEvents: "auto",
+            }}
+          >
+            <GraphControlButton
+              label="A+"
+              onClick={() => setGraphFontScale((prev) => clamp(prev + 0.08, 0.84, 1.26))}
+              title="Increase graph label size"
+              compact
+            />
+            <GraphControlButton
+              label="A-"
+              onClick={() => setGraphFontScale((prev) => clamp(prev - 0.08, 0.84, 1.26))}
+              title="Decrease graph label size"
+              compact
+            />
+          </div>
+        ) : null}
       </div>
     </div>
   );

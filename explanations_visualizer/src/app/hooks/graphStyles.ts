@@ -45,11 +45,13 @@ type GraphStyleOptions = {
   mode?: StudyMode;
   viewportWidth?: number;
   viewportHeight?: number;
+  fontScale?: number;
 };
 
 export default function graphStyles(options: GraphStyleOptions = {}): Array<Record<string, unknown>> {
   const width = Math.max(options.viewportWidth ?? 1440, 640);
   const height = Math.max(options.viewportHeight ?? 860, 480);
+  const fontScale = Math.max(0.84, Math.min(1.26, options.fontScale ?? 1));
   const minDim = Math.min(width, height);
   const baseScale = Math.max(0.78, Math.min(1.02, minDim / 900));
   const modeBoost = options.mode === "study" ? 0.04 : 0;
@@ -59,12 +61,14 @@ export default function graphStyles(options: GraphStyleOptions = {}): Array<Reco
   const nodeHeight = Math.round(88 * nodeScale);
   const endpointWidth = Math.round(222 * endpointScale);
   const endpointHeight = Math.round(98 * endpointScale);
-  const nodeFontSize = Math.round(14 * nodeScale);
-  const endpointFontSize = Math.round(15 * endpointScale);
-  const edgeFontSize = Math.round(11.5 * nodeScale);
+  const nodeFontSize = Math.round(14 * nodeScale * fontScale);
+  const endpointFontSize = Math.round(15 * endpointScale * fontScale);
+  const edgeFontSize = Math.round(11.5 * nodeScale * fontScale);
   const nodeTextWidth = Math.max(124, nodeWidth - Math.round(30 * nodeScale));
   const endpointTextWidth = Math.max(nodeTextWidth, endpointWidth - Math.round(32 * endpointScale));
   const edgeTextWidth = Math.round(158 * nodeScale);
+  const minNodeZoomedFontSize = options.mode === "study" ? 6 : 9;
+  const minEdgeZoomedFontSize = options.mode === "study" ? 5.5 : 8;
 
   return [
     {
@@ -80,7 +84,7 @@ export default function graphStyles(options: GraphStyleOptions = {}): Array<Reco
         "font-family": "\"Avenir Next\", \"Segoe UI\", sans-serif",
         "font-size": nodeFontSize,
         "font-weight": 500,
-        "min-zoomed-font-size": 9,
+        "min-zoomed-font-size": minNodeZoomedFontSize,
         "text-wrap": "wrap",
         "text-max-width": nodeTextWidth,
         "border-width": 1.5,
@@ -150,7 +154,7 @@ export default function graphStyles(options: GraphStyleOptions = {}): Array<Reco
         "font-family": "\"Avenir Next\", \"Segoe UI\", sans-serif",
         "font-size": edgeFontSize,
         "font-weight": 400,
-        "min-zoomed-font-size": 8,
+        "min-zoomed-font-size": minEdgeZoomedFontSize,
         "text-wrap": "wrap",
         "text-max-width": edgeTextWidth,
         "text-background-color": "#ffffff",

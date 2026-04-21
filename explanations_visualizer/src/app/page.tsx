@@ -216,23 +216,25 @@ function useScrollCue(containerRef: React.RefObject<HTMLElement | null>): boolea
 function LegendNode({
   color,
   label,
+  compact = false,
 }: {
   color: string;
   label: string;
+  compact?: boolean;
 }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: "0.55rem", whiteSpace: "nowrap" }}>
+    <div style={{ display: "flex", alignItems: "center", gap: compact ? "0.38rem" : "0.55rem", whiteSpace: "nowrap" }}>
       <span
         style={{
-          width: "0.9rem",
-          height: "0.9rem",
+          width: compact ? "0.72rem" : "0.9rem",
+          height: compact ? "0.72rem" : "0.9rem",
           borderRadius: "0.32rem",
           background: color,
           border: "1px solid rgba(61,79,95,0.22)",
           flexShrink: 0,
         }}
       />
-      <span style={{ color: "#4f6270", fontSize: "0.9rem" }}>{label}</span>
+      <span style={{ color: "#4f6270", fontSize: compact ? "0.78rem" : "0.9rem" }}>{label}</span>
     </div>
   );
 }
@@ -241,21 +243,23 @@ function LegendEdge({
   color,
   dashed,
   label,
+  compact = false,
 }: {
   color: string;
   dashed?: boolean;
   label: string;
+  compact?: boolean;
 }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: "0.55rem", whiteSpace: "nowrap" }}>
+    <div style={{ display: "flex", alignItems: "center", gap: compact ? "0.38rem" : "0.55rem", whiteSpace: "nowrap" }}>
       <span
         style={{
-          width: "1.45rem",
-          borderTop: `3px ${dashed ? "dashed" : "solid"} ${color}`,
+          width: compact ? "1.1rem" : "1.45rem",
+          borderTop: `${compact ? 2 : 3}px ${dashed ? "dashed" : "solid"} ${color}`,
           flexShrink: 0,
         }}
       />
-      <span style={{ color: "#4f6270", fontSize: "0.9rem" }}>{label}</span>
+      <span style={{ color: "#4f6270", fontSize: compact ? "0.78rem" : "0.9rem" }}>{label}</span>
     </div>
   );
 }
@@ -1117,6 +1121,7 @@ export default function Home() {
   const [expandedNodeId, setExpandedNodeId] = useState<string | null>(null);
   const [expansion, setExpansion] = useState<ExpandNodeResponse | null>(null);
   const [windowWidth, setWindowWidth] = useState(0);
+  const [windowHeight, setWindowHeight] = useState(0);
   const [graphExpanded, setGraphExpanded] = useState(false);
   const [panelVisibility, setPanelVisibility] = useState<Record<PanelKey, boolean>>({
     candidate: true,
@@ -1129,11 +1134,15 @@ export default function Home() {
   const [candidatePanelWidth, setCandidatePanelWidth] = useState(292);
   const [rightPanelWidth, setRightPanelWidth] = useState(308);
   const [studyTargetBoxPosition, setStudyTargetBoxPosition] = useState<FloatingPosition | null>(null);
+  const [studyLegendPosition, setStudyLegendPosition] = useState<FloatingPosition | null>(null);
+  const [studyTargetBoxVisible, setStudyTargetBoxVisible] = useState(true);
+  const [studyLegendVisible, setStudyLegendVisible] = useState(true);
   const [studyBottomPanelHeight, setStudyBottomPanelHeight] = useState(218);
   const [studyBottomPanelVisible, setStudyBottomPanelVisible] = useState(true);
   const inspectorDragRef = useRef<{ startY: number; startHeight: number } | null>(null);
   const graphShellRef = useRef<HTMLElement | null>(null);
   const studyTargetBoxRef = useRef<HTMLDivElement | null>(null);
+  const studyLegendRef = useRef<HTMLDivElement | null>(null);
   const studyTargetDragRef = useRef<{
     startX: number;
     startY: number;
@@ -1142,10 +1151,46 @@ export default function Home() {
     width: number;
     height: number;
   } | null>(null);
+  const studyLegendDragRef = useRef<{
+    startX: number;
+    startY: number;
+    startLeft: number;
+    startTop: number;
+    width: number;
+    height: number;
+  } | null>(null);
   const studyBottomPanelDragRef = useRef<{ startY: number; startHeight: number } | null>(null);
+  const studyBottomPanelUserSizedRef = useRef(false);
+  const studyTargetVisibilityUserSetRef = useRef(false);
+  const studyLegendVisibilityUserSetRef = useRef(false);
   const graphViewportStoreRef = useRef<Record<string, GraphViewportState>>({});
   const activeLevel = mode === "study" ? 2 : selectedLevel;
   const screenClass = deriveScreenClass(windowWidth || 1600);
+  const constrainedStudyViewport =
+    mode === "study" &&
+    ((windowWidth > 0 && windowWidth < 760) || (windowHeight > 0 && windowHeight < 700));
+  const veryConstrainedStudyViewport =
+    mode === "study" &&
+    ((windowWidth > 0 && windowWidth < 560) || (windowHeight > 0 && windowHeight < 560));
+  const compactStudyPanel = mode === "study" && (constrainedStudyViewport || (windowWidth > 0 && windowWidth < 980));
+  const studyOverlayInset = constrainedStudyViewport ? 10 : 16;
+  const studyAutoPanelHeight = (() => {
+    const availableHeight = Math.max(windowHeight || 900, 420);
+    if (constrainedStudyViewport) {
+      const ideal = availableHeight * (veryConstrainedStudyViewport ? 0.2 : 0.24);
+      const minHeight = veryConstrainedStudyViewport ? 126 : 156;
+      const maxHeight = veryConstrainedStudyViewport
+        ? clamp(availableHeight * 0.3, 150, 210)
+        : clamp(availableHeight * 0.34, 190, 260);
+      return Math.round(clamp(ideal, minHeight, maxHeight));
+    }
+    const ideal = compactStudyPanel ? availableHeight * 0.34 : availableHeight * 0.25;
+    const minHeight = compactStudyPanel ? 282 : 220;
+    const maxHeight = compactStudyPanel
+      ? clamp(availableHeight * 0.42, 320, 430)
+      : clamp(availableHeight * 0.34, 260, 360);
+    return Math.round(clamp(ideal, minHeight, maxHeight));
+  })();
 
   useEffect(() => {
     const syncFromLocation = () => {
@@ -1155,7 +1200,10 @@ export default function Home() {
       setQueryReady(true);
     };
     syncFromLocation();
-    const handleResize = () => setWindowWidth(window.innerWidth);
+    const handleResize = () => {
+      setWindowWidth(window.innerWidth);
+      setWindowHeight(window.innerHeight);
+    };
     handleResize();
     window.addEventListener("popstate", syncFromLocation);
     window.addEventListener("resize", handleResize);
@@ -1252,39 +1300,67 @@ export default function Home() {
   }, [windowWidth]);
 
   useEffect(() => {
+    if (mode !== "study" || studyBottomPanelUserSizedRef.current) return;
+    setStudyBottomPanelHeight(studyAutoPanelHeight);
+  }, [mode, studyAutoPanelHeight]);
+
+  useEffect(() => {
+    if (mode !== "study" || !windowWidth || !windowHeight) return;
+    if (!studyTargetVisibilityUserSetRef.current) {
+      setStudyTargetBoxVisible(!constrainedStudyViewport);
+    }
+    if (!studyLegendVisibilityUserSetRef.current) {
+      setStudyLegendVisible(!constrainedStudyViewport);
+    }
+  }, [constrainedStudyViewport, mode, windowHeight, windowWidth]);
+
+  useEffect(() => {
     if (mode !== "study") return;
     const syncStudyOverlayBounds = () => {
       const shellRect = graphShellRef.current?.getBoundingClientRect();
       const boxRect = studyTargetBoxRef.current?.getBoundingClientRect();
-      if (!shellRect || !boxRect) return;
+      const legendRect = studyLegendRef.current?.getBoundingClientRect();
+      if (!shellRect) return;
 
-      if (!studyTargetBoxPosition) {
-        setStudyTargetBoxPosition(
-          clampFloatingPosition(
-            {
-              x: shellRect.width - boxRect.width - 16,
-              y: 16,
-            },
+      if (boxRect) {
+        if (!studyTargetBoxPosition) {
+          setStudyTargetBoxPosition(
+            clampFloatingPosition(
+              {
+                x: shellRect.width - boxRect.width - studyOverlayInset,
+                y: studyOverlayInset,
+              },
+              { width: boxRect.width, height: boxRect.height },
+              { width: shellRect.width, height: shellRect.height },
+            ),
+          );
+        } else {
+          const nextTargetPosition = clampFloatingPosition(
+            studyTargetBoxPosition,
             { width: boxRect.width, height: boxRect.height },
             { width: shellRect.width, height: shellRect.height },
-          ),
-        );
-        return;
+          );
+          if (nextTargetPosition.x !== studyTargetBoxPosition.x || nextTargetPosition.y !== studyTargetBoxPosition.y) {
+            setStudyTargetBoxPosition(nextTargetPosition);
+          }
+        }
       }
 
-      const nextPosition = clampFloatingPosition(
-        studyTargetBoxPosition,
-        { width: boxRect.width, height: boxRect.height },
-        { width: shellRect.width, height: shellRect.height },
-      );
-      if (nextPosition.x !== studyTargetBoxPosition.x || nextPosition.y !== studyTargetBoxPosition.y) {
-        setStudyTargetBoxPosition(nextPosition);
+      if (legendRect && studyLegendPosition) {
+        const nextLegendPosition = clampFloatingPosition(
+          studyLegendPosition,
+          { width: legendRect.width, height: legendRect.height },
+          { width: shellRect.width, height: shellRect.height },
+        );
+        if (nextLegendPosition.x !== studyLegendPosition.x || nextLegendPosition.y !== studyLegendPosition.y) {
+          setStudyLegendPosition(nextLegendPosition);
+        }
       }
     };
 
     const frameId = window.requestAnimationFrame(syncStudyOverlayBounds);
     return () => window.cancelAnimationFrame(frameId);
-  }, [mode, studyTargetBoxPosition, windowWidth]);
+  }, [mode, studyLegendPosition, studyOverlayInset, studyTargetBoxPosition, windowWidth]);
 
   useEffect(() => {
     if (!queryReady) return;
@@ -1505,7 +1581,17 @@ export default function Home() {
     setPanelVisibility((prev) => ({ ...prev, [key]: value }));
   };
 
-  const handleStudyTargetBoxDragStart = (event: React.PointerEvent<HTMLDivElement>) => {
+  const setStudyTargetOverlayVisible = (visible: boolean) => {
+    studyTargetVisibilityUserSetRef.current = true;
+    setStudyTargetBoxVisible(visible);
+  };
+
+  const setStudyLegendOverlayVisible = (visible: boolean) => {
+    studyLegendVisibilityUserSetRef.current = true;
+    setStudyLegendVisible(visible);
+  };
+
+  const handleStudyTargetBoxDragStart = (event: React.PointerEvent<HTMLElement>) => {
     const shellRect = graphShellRef.current?.getBoundingClientRect();
     const boxRect = studyTargetBoxRef.current?.getBoundingClientRect();
     if (!shellRect || !boxRect) return;
@@ -1520,8 +1606,25 @@ export default function Home() {
     };
   };
 
+  const handleStudyLegendDragStart = (event: React.PointerEvent<HTMLElement>) => {
+    const shellRect = graphShellRef.current?.getBoundingClientRect();
+    const legendRect = studyLegendRef.current?.getBoundingClientRect();
+    if (!shellRect || !legendRect) return;
+    event.preventDefault();
+    event.stopPropagation();
+    studyLegendDragRef.current = {
+      startX: event.clientX,
+      startY: event.clientY,
+      startLeft: legendRect.left - shellRect.left,
+      startTop: legendRect.top - shellRect.top,
+      width: legendRect.width,
+      height: legendRect.height,
+    };
+  };
+
   const handleStudyBottomPanelResizeStart = (event: React.PointerEvent<HTMLDivElement>) => {
     event.preventDefault();
+    studyBottomPanelUserSizedRef.current = true;
     studyBottomPanelDragRef.current = {
       startY: event.clientY,
       startHeight: studyBottomPanelHeight,
@@ -1537,21 +1640,36 @@ export default function Home() {
 
   useEffect(() => {
     const handlePointerMove = (event: PointerEvent) => {
-      if (!studyTargetDragRef.current || !graphShellRef.current) return;
+      if (!graphShellRef.current) return;
       const shellRect = graphShellRef.current.getBoundingClientRect();
-      const drag = studyTargetDragRef.current;
-      const nextPosition = clampFloatingPosition(
-        {
-          x: drag.startLeft + (event.clientX - drag.startX),
-          y: drag.startTop + (event.clientY - drag.startY),
-        },
-        { width: drag.width, height: drag.height },
-        { width: shellRect.width, height: shellRect.height },
-      );
-      setStudyTargetBoxPosition(nextPosition);
+      if (studyTargetDragRef.current) {
+        const drag = studyTargetDragRef.current;
+        const nextPosition = clampFloatingPosition(
+          {
+            x: drag.startLeft + (event.clientX - drag.startX),
+            y: drag.startTop + (event.clientY - drag.startY),
+          },
+          { width: drag.width, height: drag.height },
+          { width: shellRect.width, height: shellRect.height },
+        );
+        setStudyTargetBoxPosition(nextPosition);
+      }
+      if (studyLegendDragRef.current) {
+        const drag = studyLegendDragRef.current;
+        const nextPosition = clampFloatingPosition(
+          {
+            x: drag.startLeft + (event.clientX - drag.startX),
+            y: drag.startTop + (event.clientY - drag.startY),
+          },
+          { width: drag.width, height: drag.height },
+          { width: shellRect.width, height: shellRect.height },
+        );
+        setStudyLegendPosition(nextPosition);
+      }
     };
     const handlePointerUp = () => {
       studyTargetDragRef.current = null;
+      studyLegendDragRef.current = null;
     };
     window.addEventListener("pointermove", handlePointerMove);
     window.addEventListener("pointerup", handlePointerUp);
@@ -1565,8 +1683,11 @@ export default function Home() {
     const handlePointerMove = (event: PointerEvent) => {
       if (!studyBottomPanelDragRef.current) return;
       const delta = studyBottomPanelDragRef.current.startY - event.clientY;
-      const maxHeight = clamp(window.innerHeight * 0.46, 240, 420);
-      const nextHeight = clamp(studyBottomPanelDragRef.current.startHeight + delta, 156, maxHeight);
+      const maxHeight = constrainedStudyViewport
+        ? clamp((windowHeight || window.innerHeight) * 0.34, 180, 280)
+        : clamp((windowHeight || window.innerHeight) * 0.48, 260, 450);
+      const minHeight = constrainedStudyViewport ? 118 : 150;
+      const nextHeight = clamp(studyBottomPanelDragRef.current.startHeight + delta, minHeight, maxHeight);
       setStudyBottomPanelHeight(nextHeight);
     };
     const handlePointerUp = () => {
@@ -1578,7 +1699,7 @@ export default function Home() {
       window.removeEventListener("pointermove", handlePointerMove);
       window.removeEventListener("pointerup", handlePointerUp);
     };
-  }, [studyBottomPanelHeight]);
+  }, [constrainedStudyViewport, studyBottomPanelHeight, windowHeight]);
 
   useEffect(() => {
     const handlePointerMove = (event: PointerEvent) => {
@@ -1766,24 +1887,103 @@ export default function Home() {
 
   const studyLegend = (
     <div
+      ref={studyLegendRef}
       style={{
         position: "absolute",
-        left: "1rem",
-        top: windowWidth > 0 && windowWidth < 1180 ? "5.8rem" : "1rem",
-        right: windowWidth > 0 && windowWidth < 1180 ? "1rem" : "22rem",
+        left: studyLegendPosition ? `${studyLegendPosition.x}px` : `${studyOverlayInset}px`,
+        top: studyLegendPosition
+          ? `${studyLegendPosition.y}px`
+          : windowWidth > 0 && windowWidth < 1180 && studyTargetBoxVisible
+            ? constrainedStudyViewport
+              ? "4.8rem"
+              : "5.8rem"
+            : `${studyOverlayInset}px`,
+        right: studyLegendPosition
+          ? undefined
+          : windowWidth > 0 && windowWidth < 1180
+            ? `${studyOverlayInset}px`
+            : studyTargetBoxVisible && !constrainedStudyViewport
+              ? "22rem"
+              : `${studyOverlayInset}px`,
         zIndex: 4,
-        borderRadius: "18px",
+        borderRadius: constrainedStudyViewport ? "14px" : "18px",
         border: "1px solid rgba(70, 92, 107, 0.12)",
         background: "rgba(255,255,255,0.9)",
         boxShadow: "0 14px 28px rgba(38, 57, 70, 0.1)",
-        padding: "0.72rem 0.84rem",
+        padding: constrainedStudyViewport ? "0.46rem 0.54rem" : "0.72rem 0.84rem",
         display: "flex",
         flexWrap: "wrap",
-        gap: "0.65rem 0.95rem",
+        gap: constrainedStudyViewport ? "0.42rem 0.62rem" : "0.65rem 0.95rem",
         alignItems: "center",
         backdropFilter: "blur(10px)",
+        maxHeight: constrainedStudyViewport ? "7.2rem" : undefined,
+        maxWidth: studyLegendPosition
+          ? `calc(100% - ${studyLegendPosition.x + studyOverlayInset}px)`
+          : windowWidth > 0 && windowWidth < 1180
+            ? `calc(100% - ${studyOverlayInset * 2}px)`
+            : studyTargetBoxVisible && !constrainedStudyViewport
+              ? "calc(100% - 24rem)"
+              : `calc(100% - ${studyOverlayInset * 2}px)`,
+        overflowY: constrainedStudyViewport ? "auto" : undefined,
       }}
     >
+      <button
+        type="button"
+        onClick={() => setStudyLegendOverlayVisible(false)}
+        title="Hide legend"
+        aria-label="Hide legend"
+        style={{
+          borderRadius: "999px",
+          border: "1px solid rgba(77, 105, 132, 0.14)",
+          background: "rgba(255,255,255,0.76)",
+          color: "#536b7b",
+          width: constrainedStudyViewport ? "1.36rem" : "1.5rem",
+          height: constrainedStudyViewport ? "1.36rem" : "1.5rem",
+          padding: 0,
+          cursor: "pointer",
+          fontWeight: 800,
+          fontSize: constrainedStudyViewport ? "0.86rem" : "0.92rem",
+          flexShrink: 0,
+          display: "grid",
+          placeItems: "center",
+          lineHeight: 1,
+        }}
+      >
+        ×
+      </button>
+      <button
+        type="button"
+        onPointerDown={handleStudyLegendDragStart}
+        title="Drag legend"
+        aria-label="Drag legend"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: "#5d7280",
+          fontSize: constrainedStudyViewport ? "0.72rem" : "0.76rem",
+          borderRadius: "10px",
+          border: "1px solid rgba(77, 105, 132, 0.14)",
+          background: "rgba(255,255,255,0.7)",
+          width: constrainedStudyViewport ? "2.2rem" : "2.55rem",
+          height: constrainedStudyViewport ? "1.32rem" : "1.48rem",
+          padding: 0,
+          cursor: "grab",
+          userSelect: "none",
+          touchAction: "none",
+          flexShrink: 0,
+        }}
+      >
+        <span
+          aria-hidden="true"
+          style={{
+            width: constrainedStudyViewport ? "1.35rem" : "1.55rem",
+            height: "0.34rem",
+            borderRadius: "999px",
+            background: "rgba(102, 122, 137, 0.24)",
+          }}
+        />
+      </button>
       <div
         style={{
           fontSize: "0.72rem",
@@ -1795,17 +1995,24 @@ export default function Home() {
       >
         Legend
       </div>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.55rem 0.85rem", alignItems: "center" }}>
-        <LegendNode color={NODE_COLORS.Source} label={NODE_TYPE_LABELS.Source} />
-        <LegendNode color={NODE_COLORS.Target} label={NODE_TYPE_LABELS.Target} />
-        <LegendNode color={NODE_COLORS["source-context"]} label={NODE_TYPE_LABELS["source-context"]} />
-        <LegendNode color={NODE_COLORS["target-context"]} label={NODE_TYPE_LABELS["target-context"]} />
-        <LegendEdge color={EDGE_COLORS.hierarchy} label={EDGE_TYPE_LABELS.hierarchy} />
-        <LegendEdge color={EDGE_COLORS.similarity} label={EDGE_TYPE_LABELS.similarity} />
-        <LegendEdge color={EDGE_COLORS.difference} label={EDGE_TYPE_LABELS.difference} />
-        <LegendEdge color={EDGE_COLORS.attribute} label={EDGE_TYPE_LABELS.attribute} />
-        <LegendEdge color={EDGE_COLORS["bridge-support"]} dashed label={EDGE_TYPE_LABELS["bridge-support"]} />
-        <LegendEdge color={EDGE_COLORS["bridge-contrast"]} dashed label={EDGE_TYPE_LABELS["bridge-contrast"]} />
+      <div
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          gap: constrainedStudyViewport ? "0.38rem 0.58rem" : "0.55rem 0.85rem",
+          alignItems: "center",
+        }}
+      >
+        <LegendNode color={NODE_COLORS.Source} label={NODE_TYPE_LABELS.Source} compact={constrainedStudyViewport} />
+        <LegendNode color={NODE_COLORS.Target} label={NODE_TYPE_LABELS.Target} compact={constrainedStudyViewport} />
+        <LegendNode color={NODE_COLORS["source-context"]} label={NODE_TYPE_LABELS["source-context"]} compact={constrainedStudyViewport} />
+        <LegendNode color={NODE_COLORS["target-context"]} label={NODE_TYPE_LABELS["target-context"]} compact={constrainedStudyViewport} />
+        <LegendEdge color={EDGE_COLORS.hierarchy} label={EDGE_TYPE_LABELS.hierarchy} compact={constrainedStudyViewport} />
+        <LegendEdge color={EDGE_COLORS.similarity} label={EDGE_TYPE_LABELS.similarity} compact={constrainedStudyViewport} />
+        <LegendEdge color={EDGE_COLORS.difference} label={EDGE_TYPE_LABELS.difference} compact={constrainedStudyViewport} />
+        <LegendEdge color={EDGE_COLORS.attribute} label={EDGE_TYPE_LABELS.attribute} compact={constrainedStudyViewport} />
+        <LegendEdge color={EDGE_COLORS["bridge-support"]} dashed label={EDGE_TYPE_LABELS["bridge-support"]} compact={constrainedStudyViewport} />
+        <LegendEdge color={EDGE_COLORS["bridge-contrast"]} dashed label={EDGE_TYPE_LABELS["bridge-contrast"]} compact={constrainedStudyViewport} />
       </div>
     </div>
   );
@@ -1898,6 +2105,58 @@ export default function Home() {
     </div>
   ) : null;
 
+  const studyRevealButtonStyle: React.CSSProperties = {
+    borderRadius: "999px",
+    border: "1px solid rgba(70, 92, 107, 0.14)",
+    background: "rgba(255,255,255,0.94)",
+    color: "#29404e",
+    padding: constrainedStudyViewport ? "0.36rem 0.58rem" : "0.46rem 0.72rem",
+    cursor: "pointer",
+    fontWeight: 800,
+    fontSize: constrainedStudyViewport ? "0.78rem" : "0.86rem",
+    boxShadow: "0 12px 24px rgba(38, 57, 70, 0.12)",
+    backdropFilter: "blur(10px)",
+  };
+
+  const studyOverlayRevealButtons = mode === "study" && selectedTarget ? (
+    <>
+      {!studyLegendVisible ? (
+        <button
+          type="button"
+          onClick={() => setStudyLegendOverlayVisible(true)}
+          title="Show legend"
+          aria-label="Show legend"
+          style={{
+            ...studyRevealButtonStyle,
+            position: "absolute",
+            left: `${studyOverlayInset}px`,
+            top: `${studyOverlayInset}px`,
+            zIndex: 5,
+          }}
+        >
+          Show legend
+        </button>
+      ) : null}
+      {!studyTargetBoxVisible ? (
+        <button
+          type="button"
+          onClick={() => setStudyTargetOverlayVisible(true)}
+          title="Show target selector"
+          aria-label="Show target selector"
+          style={{
+            ...studyRevealButtonStyle,
+            position: "absolute",
+            right: `${studyOverlayInset}px`,
+            top: `${studyOverlayInset}px`,
+            zIndex: 5,
+          }}
+        >
+          Show target
+        </button>
+      ) : null}
+    </>
+  ) : null;
+
   const graphStatus = loading ? (
     <div style={{ padding: "2rem", color: "#425662" }}>Loading study case…</div>
   ) : error ? (
@@ -1911,7 +2170,7 @@ export default function Home() {
       ref={graphShellRef}
       style={{
         position: "relative",
-        borderRadius: "30px",
+        borderRadius: constrainedStudyViewport ? "18px" : "30px",
         overflow: "hidden",
         border: "1px solid rgba(70, 92, 107, 0.12)",
         background: "linear-gradient(180deg, rgba(255,255,255,0.92) 0%, rgba(248,251,252,0.96) 100%)",
@@ -1971,7 +2230,8 @@ export default function Home() {
       )}
 
       {mode === "app" ? graphLegend : null}
-      {mode === "study" && selectedTarget ? studyLegend : null}
+      {mode === "study" && selectedTarget && studyLegendVisible ? studyLegend : null}
+      {studyOverlayRevealButtons}
       {hiddenPanelButtons}
       {narrowPanelButtons}
 
@@ -1993,73 +2253,137 @@ export default function Home() {
 
       {mode === "study" && selectedTarget ? (
         <>
-          <div
-            ref={studyTargetBoxRef}
-            style={{
-              position: "absolute",
-              top: studyTargetBoxPosition ? `${studyTargetBoxPosition.y}px` : "1rem",
-              left: studyTargetBoxPosition ? `${studyTargetBoxPosition.x}px` : undefined,
-              right: studyTargetBoxPosition ? undefined : "1rem",
-              zIndex: 4,
-              borderRadius: "18px",
-              border: "1px solid rgba(70, 92, 107, 0.12)",
-              background: "rgba(255,255,255,0.92)",
-              boxShadow: "0 14px 28px rgba(40, 58, 72, 0.12)",
-              padding: "0.82rem 0.88rem",
-              backdropFilter: "blur(10px)",
-              maxWidth: "min(25rem, calc(100% - 2rem))",
+          {studyTargetBoxVisible ? (
+            <div
+              ref={studyTargetBoxRef}
+              style={{
+                position: "absolute",
+                top: studyTargetBoxPosition ? `${studyTargetBoxPosition.y}px` : `${studyOverlayInset}px`,
+                left: studyTargetBoxPosition ? `${studyTargetBoxPosition.x}px` : undefined,
+                right: studyTargetBoxPosition ? undefined : `${studyOverlayInset}px`,
+                zIndex: 4,
+                borderRadius: constrainedStudyViewport ? "14px" : "18px",
+                border: "1px solid rgba(70, 92, 107, 0.12)",
+                background: "rgba(255,255,255,0.92)",
+                boxShadow: "0 14px 28px rgba(40, 58, 72, 0.12)",
+                padding: constrainedStudyViewport ? "0.54rem 0.58rem" : "0.82rem 0.88rem",
+                backdropFilter: "blur(10px)",
+                maxWidth: constrainedStudyViewport ? "min(19rem, calc(100% - 1.25rem))" : "min(25rem, calc(100% - 2rem))",
             }}
           >
             <div
-              onPointerDown={handleStudyTargetBoxDragStart}
-              title="Drag target panel"
-              aria-label="Drag target panel"
               style={{
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
-                gap: "0.8rem",
-                cursor: "grab",
-                userSelect: "none",
-                touchAction: "none",
+                gap: constrainedStudyViewport ? "0.45rem" : "0.8rem",
               }}
             >
-              <div style={{ fontSize: "0.74rem", letterSpacing: "0.08em", textTransform: "uppercase", color: "#72818d" }}>
-                Target
+              <div
+                style={{
+                  borderRadius: "999px",
+                    background: "rgba(77, 105, 132, 0.14)",
+                    color: "#28475f",
+                    fontSize: constrainedStudyViewport ? "0.7rem" : "0.76rem",
+                    fontWeight: 900,
+                  letterSpacing: "0.07em",
+                  textTransform: "uppercase",
+                  padding: constrainedStudyViewport ? "0.24rem 0.46rem" : "0.32rem 0.62rem",
+                  minWidth: 0,
+                }}
+              >
+                Select target
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", color: "#72818d", fontSize: "0.78rem" }}>
-                <span>Drag</span>
-                <span
-                  aria-hidden="true"
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "flex-end",
+                  gap: constrainedStudyViewport ? "0.32rem" : "0.42rem",
+                  flexShrink: 0,
+                }}
+              >
+                <button
+                  type="button"
+                  onPointerDown={handleStudyTargetBoxDragStart}
+                  title="Drag target panel"
+                  aria-label="Drag target panel"
                   style={{
-                    width: "1.8rem",
-                    height: "0.38rem",
-                    borderRadius: "999px",
-                    background: "rgba(102, 122, 137, 0.24)",
+                    width: constrainedStudyViewport ? "2.2rem" : "2.55rem",
+                    height: constrainedStudyViewport ? "1.32rem" : "1.48rem",
+                    borderRadius: "10px",
+                    border: "1px solid rgba(77, 105, 132, 0.14)",
+                    background: "rgba(255,255,255,0.68)",
+                    padding: 0,
+                    cursor: "grab",
+                    display: "grid",
+                    placeItems: "center",
+                    userSelect: "none",
+                    touchAction: "none",
                   }}
-                />
+                >
+                  <span
+                    aria-hidden="true"
+                    style={{
+                      width: constrainedStudyViewport ? "1.35rem" : "1.55rem",
+                      height: constrainedStudyViewport ? "0.3rem" : "0.34rem",
+                      borderRadius: "999px",
+                      background: "rgba(102, 122, 137, 0.24)",
+                    }}
+                  />
+                </button>
+                <button
+                  type="button"
+                  onPointerDown={(event) => event.stopPropagation()}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setStudyTargetOverlayVisible(false);
+                  }}
+                  title="Hide target selector"
+                  aria-label="Hide target selector"
+                  style={{
+                    borderRadius: "999px",
+                    border: "1px solid rgba(77, 105, 132, 0.14)",
+                    background: "rgba(255,255,255,0.76)",
+                    color: "#536b7b",
+                    width: constrainedStudyViewport ? "1.36rem" : "1.5rem",
+                    height: constrainedStudyViewport ? "1.36rem" : "1.5rem",
+                    padding: 0,
+                    cursor: "pointer",
+                    fontWeight: 800,
+                    fontSize: constrainedStudyViewport ? "0.86rem" : "0.92rem",
+                    flexShrink: 0,
+                    display: "grid",
+                    placeItems: "center",
+                    lineHeight: 1,
+                  }}
+                >
+                  ×
+                </button>
               </div>
             </div>
-            <select
-              value={selectedTargetId}
-              onChange={(event) => setSelectedTargetId(event.target.value)}
-              style={{
-                width: "100%",
-                marginTop: "0.42rem",
-                padding: "0.68rem 0.72rem",
-                borderRadius: "12px",
-                border: "1px solid rgba(70, 92, 107, 0.16)",
-                background: "#ffffff",
-                color: "#2a404e",
-              }}
-            >
-              {(bundle?.targets || []).map((target) => (
-                <option key={target.target_id} value={target.target_id}>
-                  #{target.rank} {target.target_label}
-                </option>
-              ))}
-            </select>
-          </div>
+              <select
+                value={selectedTargetId}
+                onChange={(event) => setSelectedTargetId(event.target.value)}
+                style={{
+                  width: "100%",
+                  marginTop: constrainedStudyViewport ? "0.34rem" : "0.42rem",
+                  padding: constrainedStudyViewport ? "0.48rem 0.54rem" : "0.68rem 0.72rem",
+                  borderRadius: "12px",
+                  border: "1px solid rgba(70, 92, 107, 0.16)",
+                  background: "#ffffff",
+                  color: "#2a404e",
+                  fontSize: constrainedStudyViewport ? "0.86rem" : undefined,
+                }}
+              >
+                {(bundle?.targets || []).map((target) => (
+                  <option key={target.target_id} value={target.target_id}>
+                    #{target.rank} {target.target_label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : null}
 
           {studyBottomPanelVisible ? (
             <div
@@ -2082,7 +2406,7 @@ export default function Home() {
                   left: 0,
                   right: 0,
                   top: 0,
-                  height: "28px",
+                  height: constrainedStudyViewport ? "24px" : "28px",
                   zIndex: 2,
                 }}
               >
@@ -2095,7 +2419,7 @@ export default function Home() {
                     left: "50%",
                     top: 0,
                     transform: "translateX(-50%)",
-                    width: "6rem",
+                    width: constrainedStudyViewport ? "4.8rem" : "6rem",
                     height: "100%",
                     cursor: "ns-resize",
                     display: "grid",
@@ -2105,8 +2429,8 @@ export default function Home() {
                 >
                   <div
                     style={{
-                      width: "4.1rem",
-                      height: "0.34rem",
+                      width: constrainedStudyViewport ? "3.2rem" : "4.1rem",
+                      height: constrainedStudyViewport ? "0.28rem" : "0.34rem",
                       borderRadius: "999px",
                       background: "rgba(102, 122, 137, 0.26)",
                     }}
@@ -2119,10 +2443,10 @@ export default function Home() {
                   aria-label="Hide bottom panel"
                   style={{
                     position: "absolute",
-                    right: "0.9rem",
-                    top: "0.2rem",
-                    width: "1.9rem",
-                    height: "1.9rem",
+                    right: constrainedStudyViewport ? "0.55rem" : "0.9rem",
+                    top: constrainedStudyViewport ? "0.12rem" : "0.2rem",
+                    width: constrainedStudyViewport ? "1.65rem" : "1.9rem",
+                    height: constrainedStudyViewport ? "1.65rem" : "1.9rem",
                     borderRadius: "999px",
                     border: "1px solid rgba(70, 92, 107, 0.12)",
                     background: "rgba(255,255,255,0.96)",
@@ -2143,47 +2467,58 @@ export default function Home() {
                 style={{
                   height: "100%",
                   overflowY: "auto",
-                  padding: "1.55rem 1rem 1rem",
+                  padding: constrainedStudyViewport ? "1.28rem 0.58rem 0.62rem" : "1.55rem 1rem 1rem",
                   boxSizing: "border-box",
                 }}
               >
                 <div
                   style={{
                     display: "grid",
-                    gridTemplateColumns: windowWidth && windowWidth < 980 ? "1fr" : "minmax(18rem, 24rem) minmax(0, 1fr)",
-                    gap: "1rem 1.2rem",
+                    gridTemplateColumns: compactStudyPanel ? "minmax(0, 1fr)" : "minmax(18rem, 24rem) minmax(0, 1fr)",
+                    gap: constrainedStudyViewport ? "0.44rem" : compactStudyPanel ? "0.72rem" : "1rem 1.2rem",
                     alignItems: "start",
                   }}
                 >
-                  <div
-                    style={{
-                      minWidth: 0,
-                      borderRadius: "18px",
-                      border: "1px solid rgba(77, 105, 132, 0.14)",
-                      background: "rgba(247, 251, 253, 0.96)",
-                      padding: "0.88rem 0.92rem",
-                    }}
-                  >
-                    <div style={{ display: "grid", gap: "0.58rem" }}>
-                      <div style={{ fontSize: "0.72rem", letterSpacing: "0.08em", textTransform: "uppercase", color: "#6e8393" }}>
-                        Target
-                      </div>
-                      <div style={{ fontWeight: 900, color: "#2d4759", fontSize: "1rem", lineHeight: 1.3 }}>
-                        {selectedTarget.target_label}
-                      </div>
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.45rem" }}>
-                        <DetailPill label="Rank" value={`#${selectedTarget.rank}`} tone="target" />
+                  {!constrainedStudyViewport ? (
+                    <div
+                      style={{
+                        order: compactStudyPanel ? 2 : 1,
+                        minWidth: 0,
+                        borderRadius: "18px",
+                        border: "1px solid rgba(77, 105, 132, 0.14)",
+                        background: "rgba(247, 251, 253, 0.96)",
+                        padding: compactStudyPanel ? "0.58rem 0.72rem" : "0.88rem 0.92rem",
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: compactStudyPanel ? "flex" : "grid",
+                          gap: compactStudyPanel ? "0.5rem" : "0.58rem",
+                          alignItems: compactStudyPanel ? "center" : undefined,
+                          flexWrap: "wrap",
+                        }}
+                      >
+                        <div style={{ fontSize: "0.72rem", letterSpacing: "0.08em", textTransform: "uppercase", color: "#6e8393" }}>
+                          Target
+                        </div>
+                        <div style={{ fontWeight: 900, color: "#2d4759", fontSize: compactStudyPanel ? "0.92rem" : "1rem", lineHeight: 1.3 }}>
+                          {selectedTarget.target_label}
+                        </div>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: "0.45rem" }}>
+                          <DetailPill label="Rank" value={`#${selectedTarget.rank}`} tone="target" />
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  ) : null}
 
                   <div
                     style={{
+                      order: compactStudyPanel ? 1 : 2,
                       minWidth: 0,
-                      borderRadius: "18px",
+                      borderRadius: constrainedStudyViewport ? "14px" : "18px",
                       border: "1px solid rgba(77, 105, 132, 0.14)",
                       background: "rgba(250, 252, 254, 0.98)",
-                      padding: "0.88rem 0.98rem",
+                      padding: constrainedStudyViewport ? "0.54rem 0.62rem" : compactStudyPanel ? "0.72rem 0.82rem" : "0.88rem 0.98rem",
                     }}
                   >
                     <div
@@ -2194,25 +2529,38 @@ export default function Home() {
                         border: "1px solid rgba(77, 105, 132, 0.18)",
                         background: "rgba(220, 233, 243, 0.92)",
                         color: "#29475f",
-                        fontSize: "0.78rem",
+                        fontSize: constrainedStudyViewport ? "0.7rem" : "0.78rem",
                         fontWeight: 900,
                         letterSpacing: "0.05em",
                         textTransform: "uppercase",
-                        padding: "0.34rem 0.68rem",
+                        padding: constrainedStudyViewport ? "0.24rem 0.48rem" : "0.34rem 0.68rem",
                         boxShadow: "inset 0 1px 0 rgba(255,255,255,0.65)",
                       }}
                     >
                       Textual rationale
                     </div>
+                    {constrainedStudyViewport ? (
+                      <div
+                        style={{
+                          marginTop: "0.4rem",
+                          color: "#516779",
+                          fontSize: "0.78rem",
+                          fontWeight: 800,
+                          lineHeight: 1.25,
+                        }}
+                      >
+                        Target: {selectedTarget.target_label}
+                      </div>
+                    ) : null}
                     <div
                       style={{
-                        marginTop: "0.68rem",
+                        marginTop: constrainedStudyViewport ? "0.42rem" : "0.68rem",
                         color: "#445b6c",
-                        lineHeight: 1.62,
+                        lineHeight: constrainedStudyViewport ? 1.45 : 1.62,
                         maxHeight: "none",
                         overflowY: "visible",
                         paddingRight: "0.1rem",
-                        fontSize: "0.95rem",
+                        fontSize: constrainedStudyViewport ? "0.86rem" : "0.95rem",
                       }}
                     >
                       {selectedTarget.llm.rationale || "No rationale available for this candidate."}
@@ -2229,11 +2577,11 @@ export default function Home() {
               aria-label="Show bottom panel"
               style={{
                 position: "absolute",
-                right: "1rem",
-                bottom: "1rem",
+                right: constrainedStudyViewport ? "0.6rem" : "1rem",
+                bottom: constrainedStudyViewport ? "0.6rem" : "1rem",
                 zIndex: 4,
-                width: "2rem",
-                height: "2rem",
+                width: constrainedStudyViewport ? "1.8rem" : "2rem",
+                height: constrainedStudyViewport ? "1.8rem" : "2rem",
                 borderRadius: "999px",
                 border: "1px solid rgba(70, 92, 107, 0.12)",
                 background: "rgba(255,255,255,0.96)",
@@ -2311,7 +2659,7 @@ export default function Home() {
         background:
           "linear-gradient(135deg, #f4efe8 0%, #f8fbfd 48%, #edf4f8 100%)",
         color: "#273945",
-        padding: mode === "study" ? "0.8rem" : "0.85rem",
+        padding: mode === "study" ? (constrainedStudyViewport ? "0.35rem" : "0.8rem") : "0.85rem",
         boxSizing: "border-box",
         overflow: "hidden",
         fontFamily: "\"Avenir Next\", var(--font-geist-sans), sans-serif",
@@ -2322,7 +2670,7 @@ export default function Home() {
             : graphExpanded
               ? "minmax(0, 1fr) auto"
               : "auto minmax(0, 1fr) auto",
-        gap: "0.85rem",
+        gap: constrainedStudyViewport ? "0.45rem" : "0.85rem",
       }}
     >
       {mode === "app" && !graphExpanded ? (
