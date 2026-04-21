@@ -5,7 +5,7 @@ services:
     branch: app-dev
     dockerfilePath: ./deploy/render/study_visualizer.Dockerfile
     dockerContext: .
-    plan: free
+    plan: starter
     autoDeployTrigger: commit
     healthCheckPath: /api/health
     envVars:
