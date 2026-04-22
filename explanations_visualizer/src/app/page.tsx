@@ -38,6 +38,9 @@ import {
 const ONTOLOGY_EXPANSION_ENABLED = false;
 const API_BASE_URL = (process.env.NEXT_PUBLIC_STUDY_API_BASE_URL || "").replace(/\/$/, "");
 const FETCH_TIMEOUT_MS = 20000;
+const LOCAL_DEV_API_PORTS = ["8000", "8001"] as const;
+
+let discoveredLocalApiBaseUrl: string | null = null;
 
 type ScreenClass = "wide" | "medium" | "narrow";
 type PanelKey = "candidate" | "targets" | "controls";
@@ -91,8 +94,40 @@ function localDevApiBaseUrl(): string {
   if (typeof window === "undefined") return "";
   const { hostname, port, protocol } = window.location;
   const isLocalHost = hostname === "localhost" || hostname === "127.0.0.1";
-  if (!isLocalHost || port === "8000") return "";
-  return `${protocol}//${hostname}:8000`;
+  if (!isLocalHost || LOCAL_DEV_API_PORTS.includes(port as (typeof LOCAL_DEV_API_PORTS)[number])) return "";
+  return `${protocol}//${hostname}:${LOCAL_DEV_API_PORTS[0]}`;
+}
+
+function configuredApiBaseUrl(): string {
+  if (API_BASE_URL) return API_BASE_URL;
+  if (discoveredLocalApiBaseUrl !== null) return discoveredLocalApiBaseUrl;
+  return localDevApiBaseUrl();
+}
+
+function uniqueApiBases(values: string[]): string[] {
+  const seen = new Set<string>();
+  return values.filter((value) => {
+    if (seen.has(value)) return false;
+    seen.add(value);
+    return true;
+  });
+}
+
+function localDevApiBaseCandidates(): string[] {
+  if (API_BASE_URL) return [API_BASE_URL];
+  if (typeof window === "undefined") return [""];
+  const { hostname, port, protocol } = window.location;
+  const isLocalHost = hostname === "localhost" || hostname === "127.0.0.1";
+  if (!isLocalHost) return [""];
+
+  const candidates: string[] = [];
+  if (discoveredLocalApiBaseUrl !== null) candidates.push(discoveredLocalApiBaseUrl);
+  if (LOCAL_DEV_API_PORTS.includes(port as (typeof LOCAL_DEV_API_PORTS)[number])) candidates.push("");
+  LOCAL_DEV_API_PORTS.forEach((candidatePort) => {
+    if (port !== candidatePort) candidates.push(`${protocol}//${hostname}:${candidatePort}`);
+  });
+  candidates.push("");
+  return uniqueApiBases(candidates);
 }
 
 function isLocalHostLocation(): boolean {
@@ -101,9 +136,9 @@ function isLocalHostLocation(): boolean {
   return hostname === "localhost" || hostname === "127.0.0.1";
 }
 
-function apiUrl(path: string): string {
+function apiUrl(path: string, baseUrl?: string): string {
   const normalized = path.startsWith("/") ? path : `/${path}`;
-  const base = API_BASE_URL || localDevApiBaseUrl();
+  const base = baseUrl ?? configuredApiBaseUrl();
   return `${base}${normalized}`;
 }
 
@@ -112,7 +147,7 @@ function formatSourcesLoadError(endpoint: string, response: Response): string {
   if (response.status !== 404 || !isLocalHostLocation()) {
     return message;
   }
-  return `${message} If this page is being served by a frontend-only dev server, start the Python study runtime on localhost:8000 or set NEXT_PUBLIC_STUDY_API_BASE_URL to the study runtime.`;
+  return `${message} If this page is being served by a frontend-only dev server, start the Python study runtime on localhost:8000 or localhost:8001, or set NEXT_PUBLIC_STUDY_API_BASE_URL to the study runtime.`;
 }
 
 function isAbortError(error: unknown): boolean {
@@ -137,6 +172,25 @@ async function fetchWithTimeout(endpoint: string, resourceLabel: string): Promis
   } finally {
     window.clearTimeout(timeoutId);
   }
+}
+
+async function fetchSourcesWithApiFallback(): Promise<SourceOption[]> {
+  let lastError: Error | null = null;
+  for (const baseUrl of localDevApiBaseCandidates()) {
+    const endpoint = apiUrl("/api/study/sources", baseUrl);
+    try {
+      const response = await fetchWithTimeout(endpoint, "sources");
+      if (!response.ok) {
+        throw new Error(formatSourcesLoadError(endpoint, response));
+      }
+      const payload = (await response.json()) as SourceOption[];
+      discoveredLocalApiBaseUrl = baseUrl;
+      return payload;
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(`Failed to load sources from ${endpoint}.`);
+    }
+  }
+  throw lastError || new Error("Failed to load sources from the study runtime.");
 }
 
 function writeQueryState(mode: StudyMode, source: string) {
@@ -1305,14 +1359,7 @@ export default function Home() {
     let cancelled = false;
     setSourcesLoading(true);
     setSourcesError("");
-    const sourcesEndpoint = apiUrl("/api/study/sources");
-    fetchWithTimeout(sourcesEndpoint, "sources")
-      .then(async (response) => {
-        if (!response.ok) {
-          throw new Error(formatSourcesLoadError(sourcesEndpoint, response));
-        }
-        return response.json();
-      })
+    fetchSourcesWithApiFallback()
       .then((payload: SourceOption[]) => {
         if (cancelled) return;
         setSourceOptions(payload);
@@ -1320,7 +1367,7 @@ export default function Home() {
       .catch((err: Error) => {
         if (!cancelled) {
           setSourceOptions([]);
-          setSourcesError(err.message || `Failed to load sources from ${sourcesEndpoint}.`);
+          setSourcesError(err.message || "Failed to load sources from the study runtime.");
         }
       })
       .finally(() => {
@@ -1667,6 +1714,12 @@ export default function Home() {
     if (appInspectorAsWindow && mobilePanel === "inspector") {
       setMobilePanel(null);
     }
+  };
+
+  const handleStudyEndpointDefinitionRequest = async (nodeId: string): Promise<string | null> => {
+    if (mode !== "study") return null;
+    const info = await ensureNodeInfo(nodeId);
+    return extractDefinitionTexts(info)[0] || null;
   };
 
   const visibleGraph = useMemo(
@@ -2650,6 +2703,7 @@ export default function Home() {
               if (!graphViewportKey) return;
               graphViewportStoreRef.current[graphViewportKey] = nextViewportState;
             }}
+            onEndpointDefinitionRequest={mode === "study" ? handleStudyEndpointDefinitionRequest : undefined}
             onNodeClick={handleNodeClick}
             onEdgeClick={handleEdgeClick}
             onBackgroundClick={handleBackgroundClick}

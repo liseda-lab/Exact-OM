@@ -22,6 +22,7 @@ type StudyGraphProps = {
   canToggleGraphExpanded: boolean;
   onToggleGraphExpanded?: () => void;
   onViewportChange?: (nextViewportState: GraphViewportState) => void;
+  onEndpointDefinitionRequest?: (nodeId: string) => Promise<string | null>;
   onNodeClick: (nodeId: string) => void;
   onEdgeClick: (edgeId: string) => void;
   onBackgroundClick: () => void;
@@ -499,6 +500,7 @@ export default function StudyGraph({
   canToggleGraphExpanded,
   onToggleGraphExpanded,
   onViewportChange,
+  onEndpointDefinitionRequest,
   onNodeClick,
   onEdgeClick,
   onBackgroundClick,
@@ -514,13 +516,23 @@ export default function StudyGraph({
   const onEdgeClickRef = useRef(onEdgeClick);
   const onBackgroundClickRef = useRef(onBackgroundClick);
   const onViewportChangeRef = useRef(onViewportChange);
+  const onEndpointDefinitionRequestRef = useRef(onEndpointDefinitionRequest);
   const allowInspectionRef = useRef(allowInspection);
+  const modeRef = useRef(mode);
   const selectedNodeIdRef = useRef<string | null>(selectedNodeId);
   const selectedEdgeIdRef = useRef<string | null>(selectedEdgeId);
   const lastTapRef = useRef<{ nodeId: string | null; at: number }>({ nodeId: null, at: 0 });
+  const definitionTooltipRequestRef = useRef(0);
   const [viewport, setViewport] = useState<ViewportSize>({ width: 0, height: 0 });
   const [graphFontScale, setGraphFontScale] = useState(1);
   const [prefersDarkMode, setPrefersDarkMode] = useState(false);
+  const [definitionTooltip, setDefinitionTooltip] = useState<{
+    nodeId: string;
+    label: string;
+    definition: string;
+    x: number;
+    y: number;
+  } | null>(null);
 
   useEffect(() => {
     onNodeClickRef.current = onNodeClick;
@@ -539,8 +551,16 @@ export default function StudyGraph({
   }, [onViewportChange]);
 
   useEffect(() => {
+    onEndpointDefinitionRequestRef.current = onEndpointDefinitionRequest;
+  }, [onEndpointDefinitionRequest]);
+
+  useEffect(() => {
     allowInspectionRef.current = allowInspection;
   }, [allowInspection]);
+
+  useEffect(() => {
+    modeRef.current = mode;
+  }, [mode]);
 
   useEffect(() => {
     selectedNodeIdRef.current = selectedNodeId;
@@ -621,6 +641,32 @@ export default function StudyGraph({
       cy.elements().removeClass("dimmed hovered-node hovered-edge");
     };
 
+    const hideDefinitionTooltip = () => {
+      definitionTooltipRequestRef.current += 1;
+      setDefinitionTooltip(null);
+    };
+
+    const showDefinitionTooltip = async (node: NodeSingular) => {
+      if (modeRef.current !== "study") return;
+      const nodeType = String(node.data("type") || "");
+      if (nodeType !== "Source" && nodeType !== "Target") return;
+      const requestDefinition = onEndpointDefinitionRequestRef.current;
+      if (!requestDefinition) return;
+      const nodeId = String(node.id());
+      const requestId = definitionTooltipRequestRef.current + 1;
+      definitionTooltipRequestRef.current = requestId;
+      const renderedPosition = node.renderedPosition();
+      const definition = await requestDefinition(nodeId);
+      if (definitionTooltipRequestRef.current !== requestId || !definition) return;
+      setDefinitionTooltip({
+        nodeId,
+        label: String(node.data("label") || nodeId),
+        definition,
+        x: renderedPosition.x,
+        y: renderedPosition.y,
+      });
+    };
+
     const applySelectionState = (focusNodeId: string | null, focusEdgeId: string | null) => {
       cy.elements().removeClass("selected");
       if (!allowInspectionRef.current) return;
@@ -659,6 +705,7 @@ export default function StudyGraph({
     cy.on("tap", (event) => {
       if (event.target !== cy) return;
       clearInteractiveState();
+      hideDefinitionTooltip();
       if (!allowInspectionRef.current) return;
       applySelectionState(null, null);
       onBackgroundClickRef.current();
@@ -671,9 +718,11 @@ export default function StudyGraph({
       node.removeClass("dimmed").addClass("hovered-node");
       node.connectedEdges().removeClass("dimmed").addClass("hovered-edge");
       node.connectedEdges().connectedNodes().removeClass("dimmed").addClass("hovered-node");
+      void showDefinitionTooltip(node);
     });
 
     cy.on("mouseout", "node", () => {
+      hideDefinitionTooltip();
       clearInteractiveState();
       applySelectionState(selectedNodeIdRef.current, selectedEdgeIdRef.current);
     });
@@ -773,9 +822,69 @@ export default function StudyGraph({
     }
   }, [allowInspection, selectedEdgeId, selectedNodeId]);
 
+  const tooltipMaxWidth = viewport.width < 560 ? 230 : 300;
+  const tooltipMaxHeight = clamp(viewport.height * 0.34, 120, 260);
+  const tooltipLeft = definitionTooltip
+    ? clamp(definitionTooltip.x + 18, 12, Math.max(12, viewport.width - tooltipMaxWidth - 12))
+    : 0;
+  const tooltipTop = definitionTooltip
+    ? clamp(definitionTooltip.y - 30, 12, Math.max(12, viewport.height - tooltipMaxHeight - 24))
+    : 0;
+
   return (
     <div ref={wrapperRef} style={{ position: "relative", width: "100%", height: "100%" }}>
       <div ref={cyContainerRef} style={{ position: "absolute", inset: 0 }} />
+
+      {definitionTooltip ? (
+        <div
+          key={definitionTooltip.nodeId}
+          title={definitionTooltip.label}
+          style={{
+            position: "absolute",
+            left: `${tooltipLeft}px`,
+            top: `${tooltipTop}px`,
+            zIndex: 6,
+            width: `min(${tooltipMaxWidth}px, calc(100% - 24px))`,
+            pointerEvents: "auto",
+            borderRadius: "14px",
+            border: prefersDarkMode ? "1px solid rgba(156, 177, 190, 0.22)" : "1px solid rgba(70, 92, 107, 0.16)",
+            background: prefersDarkMode ? "rgba(22, 30, 36, 0.96)" : "rgba(255, 255, 255, 0.97)",
+            color: prefersDarkMode ? "#dce7ed" : "#2d4351",
+            boxShadow: prefersDarkMode
+              ? "0 18px 40px rgba(0, 0, 0, 0.42)"
+              : "0 18px 40px rgba(38, 57, 70, 0.16)",
+            padding: "0.68rem 0.76rem",
+            backdropFilter: "blur(12px)",
+            maxHeight: `${tooltipMaxHeight}px`,
+            overflow: "hidden",
+          }}
+        >
+          <div
+            style={{
+              marginBottom: "0.28rem",
+              color: prefersDarkMode ? "#9fb4c1" : "#657985",
+              fontSize: "0.68rem",
+              fontWeight: 800,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+            }}
+          >
+            Definition
+          </div>
+          <div
+            style={{
+              fontSize: "0.82rem",
+              lineHeight: 1.42,
+              maxHeight: `${Math.max(72, tooltipMaxHeight - 42)}px`,
+              overflowY: "auto",
+              overscrollBehavior: "contain",
+              paddingRight: "0.25rem",
+            }}
+          >
+            {definitionTooltip.definition}
+          </div>
+        </div>
+      ) : null}
 
       <div
         style={{
