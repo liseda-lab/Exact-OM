@@ -2367,10 +2367,15 @@ export default function Home() {
               border: "1px solid rgba(70, 92, 107, 0.14)",
               background: active ? "rgba(235,243,247,0.98)" : "rgba(255,255,255,0.94)",
               color: "#29404e",
-              padding: constrainedAppViewport ? "0.34rem 0.54rem" : "0.46rem 0.72rem",
+              padding: constrainedAppViewport ? "0.56rem 0.78rem" : "0.5rem 0.78rem",
+              minHeight: constrainedAppViewport ? "2.75rem" : "2.55rem",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
               cursor: "pointer",
               fontWeight: 700,
-              fontSize: constrainedAppViewport ? "0.76rem" : "0.88rem",
+              fontSize: constrainedAppViewport ? "0.84rem" : "0.9rem",
+              lineHeight: 1.1,
               boxShadow: "0 12px 24px rgba(38, 57, 70, 0.12)",
             }}
         >
