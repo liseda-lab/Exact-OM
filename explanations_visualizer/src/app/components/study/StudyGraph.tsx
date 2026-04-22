@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import cytoscape, { Core, ElementDefinition, NodeSingular } from "cytoscape";
+import cytoscape, { Core, EdgeSingular, ElementDefinition, NodeSingular } from "cytoscape";
 
 import graphStyles from "@/app/hooks/graphStyles";
 import { GraphViewportState, StudyEdge, StudyMode, StudyNode } from "@/app/hooks/types";
@@ -18,6 +18,7 @@ type StudyGraphProps = {
   viewportStateKey: string;
   savedViewportState: GraphViewportState | null;
   allowInspection: boolean;
+  inspectOnSingleTap?: boolean;
   graphExpanded: boolean;
   canToggleGraphExpanded: boolean;
   onToggleGraphExpanded?: () => void;
@@ -392,8 +393,7 @@ function zoomAboutCenter(cy: Core, factor: number) {
   });
 }
 
-function centerOnNode(cy: Core, node: NodeSingular) {
-  const position = node.position();
+function centerOnPosition(cy: Core, position: { x: number; y: number }) {
   const zoom = cy.zoom();
   const nextPan = {
     x: cy.width() / 2 - position.x * zoom,
@@ -408,6 +408,37 @@ function centerOnNode(cy: Core, node: NodeSingular) {
       easing: "ease-out-cubic",
     },
   );
+}
+
+function centerOnNode(cy: Core, node: NodeSingular) {
+  centerOnPosition(cy, node.position());
+}
+
+function edgeMidpoint(edge: EdgeSingular) {
+  const source = edge.source().position();
+  const target = edge.target().position();
+  return {
+    x: (source.x + target.x) / 2,
+    y: (source.y + target.y) / 2,
+  };
+}
+
+function edgeRenderedMidpoint(edge: EdgeSingular) {
+  const source = edge.source().renderedPosition();
+  const target = edge.target().renderedPosition();
+  return {
+    x: (source.x + target.x) / 2,
+    y: (source.y + target.y) / 2,
+  };
+}
+
+function centerOnEdge(cy: Core, edge: EdgeSingular) {
+  centerOnPosition(cy, edgeMidpoint(edge));
+}
+
+function isRenderedPositionCentered(cy: Core, position: { x: number; y: number }) {
+  const distance = Math.hypot(position.x - cy.width() / 2, position.y - cy.height() / 2);
+  return distance <= 54;
 }
 
 function GraphControlButton({
@@ -496,6 +527,7 @@ export default function StudyGraph({
   viewportStateKey,
   savedViewportState,
   allowInspection,
+  inspectOnSingleTap = false,
   graphExpanded,
   canToggleGraphExpanded,
   onToggleGraphExpanded,
@@ -518,10 +550,15 @@ export default function StudyGraph({
   const onViewportChangeRef = useRef(onViewportChange);
   const onEndpointDefinitionRequestRef = useRef(onEndpointDefinitionRequest);
   const allowInspectionRef = useRef(allowInspection);
+  const inspectOnSingleTapRef = useRef(inspectOnSingleTap);
   const modeRef = useRef(mode);
   const selectedNodeIdRef = useRef<string | null>(selectedNodeId);
   const selectedEdgeIdRef = useRef<string | null>(selectedEdgeId);
-  const lastTapRef = useRef<{ nodeId: string | null; at: number }>({ nodeId: null, at: 0 });
+  const lastTapRef = useRef<{ elementId: string | null; type: "node" | "edge" | null; at: number }>({
+    elementId: null,
+    type: null,
+    at: 0,
+  });
   const definitionTooltipRequestRef = useRef(0);
   const [viewport, setViewport] = useState<ViewportSize>({ width: 0, height: 0 });
   const [graphFontScale, setGraphFontScale] = useState(1);
@@ -557,6 +594,10 @@ export default function StudyGraph({
   useEffect(() => {
     allowInspectionRef.current = allowInspection;
   }, [allowInspection]);
+
+  useEffect(() => {
+    inspectOnSingleTapRef.current = inspectOnSingleTap;
+  }, [inspectOnSingleTap]);
 
   useEffect(() => {
     modeRef.current = mode;
@@ -683,21 +724,57 @@ export default function StudyGraph({
     cy.on("tap", "node", (event) => {
       const nodeId = String(event.target.id());
       const now = Date.now();
-      const isDoubleTap = lastTapRef.current.nodeId === nodeId && now - lastTapRef.current.at < 280;
-      lastTapRef.current = { nodeId, at: now };
+      const node = event.target;
+      const isDoubleTap =
+        lastTapRef.current.type === "node" &&
+        lastTapRef.current.elementId === nodeId &&
+        now - lastTapRef.current.at < 280;
+      lastTapRef.current = { elementId: nodeId, type: "node", at: now };
 
-      if (allowInspectionRef.current) {
+      if (modeRef.current === "app") {
+        const shouldInspect =
+          allowInspectionRef.current &&
+          (inspectOnSingleTapRef.current || isRenderedPositionCentered(cy, node.renderedPosition()));
+        centerOnNode(cy, node);
+        if (shouldInspect) {
+          applySelectionState(nodeId, null);
+          onNodeClickRef.current(nodeId);
+        }
+        return;
+      }
+
+      if (isDoubleTap) {
+        centerOnNode(cy, node);
+      }
+      if (allowInspectionRef.current && isDoubleTap) {
         applySelectionState(nodeId, null);
         onNodeClickRef.current(nodeId);
-      }
-      if (isDoubleTap) {
-        centerOnNode(cy, event.target);
       }
     });
 
     cy.on("tap", "edge", (event) => {
-      if (!allowInspectionRef.current) return;
       const edgeId = String(event.target.id());
+      const now = Date.now();
+      const edge = event.target;
+      const isDoubleTap =
+        lastTapRef.current.type === "edge" &&
+        lastTapRef.current.elementId === edgeId &&
+        now - lastTapRef.current.at < 280;
+      lastTapRef.current = { elementId: edgeId, type: "edge", at: now };
+
+      if (modeRef.current === "app") {
+        const shouldInspect =
+          allowInspectionRef.current &&
+          (inspectOnSingleTapRef.current || isRenderedPositionCentered(cy, edgeRenderedMidpoint(edge)));
+        centerOnEdge(cy, edge);
+        if (shouldInspect) {
+          applySelectionState(null, edgeId);
+          onEdgeClickRef.current(edgeId);
+        }
+        return;
+      }
+
+      if (!allowInspectionRef.current || !isDoubleTap) return;
       applySelectionState(null, edgeId);
       onEdgeClickRef.current(edgeId);
     });

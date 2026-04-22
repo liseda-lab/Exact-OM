@@ -23,7 +23,6 @@ import {
   TargetMetric,
 } from "@/app/hooks/types";
 import {
-  buildEndpointNodeId,
   createDefaultFilter,
   EDGE_TYPE_OPTIONS,
   extractDefinitionTexts,
@@ -402,9 +401,11 @@ function DetailPill({
 function InspectorCard({
   title,
   children,
+  style,
 }: {
   title: string;
   children: React.ReactNode;
+  style?: React.CSSProperties;
 }) {
   return (
     <div
@@ -414,6 +415,7 @@ function InspectorCard({
         background: "rgba(250, 252, 253, 0.98)",
         padding: "0.84rem 0.9rem",
         minWidth: 0,
+        ...style,
       }}
     >
       <div style={{ fontWeight: 700, color: "#2d4351", marginBottom: "0.36rem" }}>{title}</div>
@@ -1232,7 +1234,7 @@ export default function Home() {
   const [studyLegendVisible, setStudyLegendVisible] = useState(true);
   const [studyBottomPanelHeight, setStudyBottomPanelHeight] = useState(218);
   const [studyBottomPanelVisible, setStudyBottomPanelVisible] = useState(true);
-  const [appInspectorVisible, setAppInspectorVisible] = useState(true);
+  const [appInspectorVisible, setAppInspectorVisible] = useState(false);
   const inspectorDragRef = useRef<{ startY: number; startHeight: number } | null>(null);
   const inspectorVisibilityUserSetRef = useRef(false);
   const graphShellRef = useRef<HTMLElement | null>(null);
@@ -1286,9 +1288,9 @@ export default function Home() {
     mode === "app" &&
     ((windowWidth > 0 && windowWidth < 640) || (windowHeight > 0 && windowHeight < 600));
   const compactStudyPanel = mode === "study" && (constrainedStudyViewport || (windowWidth > 0 && windowWidth < 980));
-  const compactAppInspector = mode === "app" && (constrainedAppViewport || (windowWidth > 0 && windowWidth < 1120));
+  const appInspectorAsPanel = mode === "app" && windowWidth >= 1540 && windowHeight >= 880;
   const compactAppSidePanels = mode === "app" && screenClass === "medium";
-  const appInspectorAsWindow = mode === "app" && (veryConstrainedAppViewport || screenClass === "medium");
+  const appInspectorAsWindow = mode === "app" && !appInspectorAsPanel;
   const compactAppLegend = mode === "app" && (constrainedAppViewport || screenClass === "medium");
   const wideStudyViewport = mode === "study" && windowWidth >= 1280 && windowHeight >= 720;
   const appOverlayInset = constrainedAppViewport ? 10 : 16;
@@ -1316,6 +1318,9 @@ export default function Home() {
   })();
   const appAutoInspectorHeight = (() => {
     const availableHeight = Math.max(windowHeight || 900, 420);
+    if (appInspectorAsPanel) {
+      return Math.round(clamp(availableHeight * 0.22, 190, 260));
+    }
     if (constrainedAppViewport) {
       const ideal = availableHeight * (veryConstrainedAppViewport ? 0.18 : 0.22);
       const minHeight = veryConstrainedAppViewport ? 112 : 132;
@@ -1448,10 +1453,10 @@ export default function Home() {
 
   useEffect(() => {
     if (mode !== "app" || !windowWidth || !windowHeight) return;
-    if (!inspectorVisibilityUserSetRef.current && appInspectorAsWindow) {
+    if (!inspectorVisibilityUserSetRef.current) {
       setAppInspectorVisible(false);
     }
-  }, [appInspectorAsWindow, mode, windowHeight, windowWidth]);
+  }, [mode, windowHeight, windowWidth]);
 
   useEffect(() => {
     if (mode !== "app" || !windowWidth || !windowHeight) return;
@@ -1624,11 +1629,9 @@ export default function Home() {
     setExpandedNodeId(null);
     setExpansion(null);
     setActiveMetricKey(null);
-    if (mode === "study") {
-      setSelectedNodeId(null);
-      setSelectedEdgeId(null);
-    }
-  }, [mode, selectedTargetId]);
+    setSelectedNodeId(null);
+    setSelectedEdgeId(null);
+  }, [mode, selectedTargetId, sourceId]);
 
   const cacheKey = (targetId: string, nodeId: string) => `${targetId}::${nodeId}`;
 
@@ -1646,14 +1649,6 @@ export default function Home() {
     setNodeInfoCache((prev) => ({ ...prev, [key]: payload }));
     return payload;
   };
-
-  useEffect(() => {
-    if (mode !== "app" || !selectedTarget || !bundle) return;
-    const endpointId = buildEndpointNodeId("target", selectedTarget.target_id);
-    setSelectedEdgeId(null);
-    setSelectedNodeId(endpointId);
-    void ensureNodeInfo(endpointId);
-  }, [bundle, mode, selectedTarget]);
 
   const handleSourceSelect = (nextSourceId: string) => {
     setSourceId(nextSourceId);
@@ -1678,6 +1673,9 @@ export default function Home() {
     if (appInspectorAsWindow) {
       setAppInspectorVisible(false);
       setMobilePanel("inspector");
+    } else {
+      inspectorVisibilityUserSetRef.current = true;
+      setAppInspectorVisible(true);
     }
     const info = await ensureNodeInfo(nodeId);
     if (!ONTOLOGY_EXPANSION_ENABLED || !info?.expandable) return;
@@ -1704,6 +1702,9 @@ export default function Home() {
     if (appInspectorAsWindow) {
       setAppInspectorVisible(false);
       setMobilePanel("inspector");
+    } else {
+      inspectorVisibilityUserSetRef.current = true;
+      setAppInspectorVisible(true);
     }
   };
 
@@ -1748,7 +1749,6 @@ export default function Home() {
         .filter(Boolean),
     ),
   );
-  const selectedNodeSynonyms = Array.from(new Set((selectedNodeInfo?.ontology.synonyms || []).filter(Boolean)));
   const selectedEdge: StudyEdge | null =
     selectedEdgeId ? visibleGraph.edges.find((edge) => edge.id === selectedEdgeId) || null : null;
 
@@ -2491,7 +2491,9 @@ export default function Home() {
     </>
   ) : null;
 
-  const appInspectorRevealButton = mode === "app" && !appInspectorAsWindow && !appInspectorVisible ? (
+  const showAppInspectorPanel = mode === "app" && appInspectorAsPanel && appInspectorVisible;
+
+  const appInspectorRevealButton = mode === "app" && appInspectorAsPanel && !appInspectorVisible ? (
     <button
       type="button"
       onClick={() => {
@@ -2634,9 +2636,209 @@ export default function Home() {
     <div style={{ color: "#61727d", lineHeight: 1.56 }}>Loading node details…</div>
   ) : (
     <div style={{ color: "#61727d", lineHeight: 1.56 }}>
-      Click a node or edge in the graph to inspect its label, type, score, and explanation details here.
+      Click a node or edge once to center it, then click it again while centered to inspect its details here.
     </div>
   );
+
+  const appInspectorPanelCardStyle: React.CSSProperties = {
+    height: "100%",
+    boxSizing: "border-box",
+    overflow: "hidden",
+    display: "flex",
+    flexDirection: "column",
+  };
+  const appInspectorPanelScrollStyle: React.CSSProperties = {
+    minHeight: 0,
+    overflowY: "auto",
+    overscrollBehavior: "contain",
+    paddingRight: "0.25rem",
+  };
+  const appInspectorPanelContent = selectedNodeInfo ? (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "minmax(220px, 0.85fr) minmax(300px, 1.05fr) minmax(320px, 1.2fr)",
+        gap: "0.72rem",
+        alignItems: "stretch",
+        minHeight: 0,
+        height: "100%",
+        overflow: "hidden",
+      }}
+    >
+      <InspectorCard title="Selected node" style={appInspectorPanelCardStyle}>
+        <div style={appInspectorPanelScrollStyle}>
+          <div style={{ fontWeight: 800, color: "#2d4351", lineHeight: 1.32 }}>{selectedNodeInfo.node.label}</div>
+          <div style={{ marginTop: "0.5rem", display: "flex", flexWrap: "wrap", gap: "0.4rem" }}>
+            <DetailPill label="Type" value={NODE_TYPE_LABELS[selectedNodeInfo.node.type]} />
+            <DetailPill label="Kind" value={selectedNodeInfo.node.node_kind || "context"} />
+            <DetailPill label="Side" value={selectedNodeInfo.node.ontology_side || "n/a"} />
+            <DetailPill label="Expandable" value={selectedNodeInfo.expandable ? "Yes" : "No"} />
+          </div>
+        </div>
+      </InspectorCard>
+      <InspectorCard title="Explanation details" style={appInspectorPanelCardStyle}>
+        <div style={appInspectorPanelScrollStyle}>
+          {selectedNodeDetailItems.length ? (
+            <ul style={{ margin: 0, paddingLeft: "1rem", color: "#526570", lineHeight: 1.45 }}>
+              {selectedNodeDetailItems.slice(0, 10).map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          ) : (
+            <div style={{ color: "#6f7f8b", lineHeight: 1.45 }}>
+              No explanation-local details available for this node.
+            </div>
+          )}
+        </div>
+      </InspectorCard>
+      <InspectorCard title="Description" style={appInspectorPanelCardStyle}>
+        <div style={{ ...appInspectorPanelScrollStyle, color: "#526570", lineHeight: 1.48 }}>
+          {selectedNodeDefinitions[0] || "No description available."}
+        </div>
+      </InspectorCard>
+    </div>
+  ) : selectedEdge ? (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "minmax(260px, 1fr) minmax(260px, 1fr) minmax(300px, 0.95fr)",
+        gap: "0.72rem",
+        alignItems: "stretch",
+        minHeight: 0,
+        height: "100%",
+        overflow: "hidden",
+      }}
+    >
+      <InspectorCard title="Source" style={appInspectorPanelCardStyle}>
+        <div style={{ ...appInspectorPanelScrollStyle, color: "#2d4351", fontWeight: 700, lineHeight: 1.42 }}>
+          {visibleGraph.nodes.find((node) => node.id === selectedEdge.source)?.label || selectedEdge.source}
+        </div>
+      </InspectorCard>
+      <InspectorCard title="Target" style={appInspectorPanelCardStyle}>
+        <div style={{ ...appInspectorPanelScrollStyle, color: "#2d4351", fontWeight: 700, lineHeight: 1.42 }}>
+          {visibleGraph.nodes.find((node) => node.id === selectedEdge.target)?.label || selectedEdge.target}
+        </div>
+      </InspectorCard>
+      <InspectorCard title="Edge details" style={appInspectorPanelCardStyle}>
+        <div style={appInspectorPanelScrollStyle}>
+          <div style={{ fontWeight: 800, color: "#2d4351", lineHeight: 1.35 }}>{selectedEdge.label}</div>
+          <div style={{ marginTop: "0.5rem", display: "flex", flexWrap: "wrap", gap: "0.4rem" }}>
+            <DetailPill label="Type" value={EDGE_TYPE_LABELS[selectedEdge.type]} />
+            <DetailPill
+              label="Score"
+              value={
+                selectedEdge.score !== undefined && selectedEdge.score !== null && selectedEdge.score !== ""
+                  ? String(selectedEdge.score)
+                  : "n/a"
+              }
+            />
+            <DetailPill label="Level" value={selectedEdge.level_label || "Context edge"} />
+            <DetailPill label="Bridge" value={selectedEdge.bridge ? "Yes" : "No"} />
+          </div>
+        </div>
+      </InspectorCard>
+    </div>
+  ) : selectedNodeId ? (
+    <InspectorCard title="Inspector">
+      <div style={{ color: "#61727d", lineHeight: 1.56 }}>Loading node details...</div>
+    </InspectorCard>
+  ) : (
+    <InspectorCard title="Inspector">
+      <div style={{ color: "#61727d", lineHeight: 1.56 }}>
+        Single-click a node or edge in the graph to inspect its label, type, score, and explanation details here.
+      </div>
+    </InspectorCard>
+  );
+
+  const appInspectorPanel = showAppInspectorPanel ? (
+    <div
+      style={{
+        position: "absolute",
+        left: constrainedAppViewport ? "0.45rem" : "0.85rem",
+        right: constrainedAppViewport ? "0.45rem" : "0.85rem",
+        bottom: constrainedAppViewport ? "0.45rem" : "0.85rem",
+        zIndex: 6,
+        borderRadius: constrainedAppViewport ? "18px" : "24px",
+        border: "1px solid rgba(70, 92, 107, 0.12)",
+        background: "rgba(255,255,255,0.95)",
+        boxShadow: "0 20px 44px rgba(38, 57, 70, 0.16)",
+        height: inspectorHeight,
+        minHeight: constrainedAppViewport ? "104px" : "132px",
+        maxHeight: constrainedAppViewport ? "34vh" : "42vh",
+        overflow: "hidden",
+        backdropFilter: "blur(14px)",
+      }}
+    >
+      <div
+        onPointerDown={handleInspectorResizeStart}
+        style={{
+          position: "absolute",
+          left: 0,
+          right: 0,
+          top: 0,
+          height: "16px",
+          cursor: "ns-resize",
+          display: "grid",
+          placeItems: "center",
+          touchAction: "none",
+        }}
+      >
+        <div
+          style={{
+            width: "4.1rem",
+            height: "0.34rem",
+            borderRadius: "999px",
+            background: "rgba(102, 122, 137, 0.26)",
+          }}
+        />
+      </div>
+      <button
+        type="button"
+        onClick={() => {
+          inspectorVisibilityUserSetRef.current = true;
+          setAppInspectorVisible(false);
+        }}
+        title="Hide inspector"
+        aria-label="Hide inspector"
+        style={{
+          position: "absolute",
+          right: constrainedAppViewport ? "0.55rem" : "0.82rem",
+          top: constrainedAppViewport ? "0.12rem" : "0.2rem",
+          width: constrainedAppViewport ? "1.65rem" : "1.9rem",
+          height: constrainedAppViewport ? "1.65rem" : "1.9rem",
+          borderRadius: "999px",
+          border: "1px solid rgba(70, 92, 107, 0.12)",
+          background: "rgba(255,255,255,0.96)",
+          color: "#48606f",
+          cursor: "pointer",
+          fontWeight: 800,
+          display: "grid",
+          placeItems: "center",
+          boxShadow: "0 10px 22px rgba(38, 57, 70, 0.1)",
+          backdropFilter: "blur(10px)",
+          zIndex: 2,
+        }}
+      >
+        ↓
+      </button>
+      <div
+        style={{
+          height: "100%",
+          minHeight: 0,
+          overflow: "hidden",
+          padding: constrainedAppViewport ? "0.88rem 0.65rem 0.72rem" : "0.95rem 3.1rem 0.9rem 1rem",
+          boxSizing: "border-box",
+          display: "grid",
+          gridTemplateRows: "auto minmax(0, 1fr)",
+        }}
+      >
+        <div style={{ fontSize: "0.76rem", letterSpacing: "0.08em", textTransform: "uppercase", color: "#71818d", marginBottom: "0.58rem" }}>
+          Inspector
+        </div>
+        {appInspectorPanelContent}
+      </div>
+    </div>
+  ) : null;
 
   const graphStatus = loading ? (
     <div style={{ padding: "2rem", color: "#425662" }}>Loading study case…</div>
@@ -2696,6 +2898,7 @@ export default function Home() {
             viewportStateKey={graphViewportKey}
             savedViewportState={savedGraphViewport}
             allowInspection={mode === "app"}
+            inspectOnSingleTap={mode === "app" && appInspectorAsPanel}
             graphExpanded={graphExpanded}
             canToggleGraphExpanded={mode === "app" && (!veryConstrainedAppViewport || graphExpanded)}
             onToggleGraphExpanded={() => setGraphExpanded((prev) => !prev)}
@@ -2718,6 +2921,7 @@ export default function Home() {
       {appInspectorRevealButton}
       {hiddenPanelButtons}
       {narrowPanelButtons}
+      {appInspectorPanel}
 
       {mode === "app" && mobilePanel === "candidate" ? (
         <FloatingPanel title="Selected candidate" position="left" onClose={() => setMobilePanel(null)}>
@@ -3143,8 +3347,6 @@ export default function Home() {
     }
     return "minmax(0, 1fr)";
   })();
-  const showAppInspectorFooter = mode === "app" && appInspectorVisible && !appInspectorAsWindow;
-
   const rightPanels: React.ReactNode[] = [];
   if (mode === "app" && !graphExpanded) {
     if (screenClass === "medium" && panelVisibility.candidate) {
@@ -3182,16 +3384,10 @@ export default function Home() {
           mode === "study"
             ? "minmax(0, 1fr)"
             : graphExpanded
-              ? showAppInspectorFooter
-                ? "minmax(0, 1fr) auto"
-                : "minmax(0, 1fr)"
-              : appHeaderVisible && showAppInspectorFooter
-                ? "auto minmax(0, 1fr) auto"
-                : appHeaderVisible
-                  ? "auto minmax(0, 1fr)"
-                  : showAppInspectorFooter
-                    ? "minmax(0, 1fr) auto"
-                    : "minmax(0, 1fr)",
+              ? "minmax(0, 1fr)"
+              : appHeaderVisible
+                ? "auto minmax(0, 1fr)"
+                : "minmax(0, 1fr)",
         gap: constrainedStudyViewport || constrainedAppViewport ? "0.45rem" : "0.85rem",
       }}
     >
@@ -3367,231 +3563,6 @@ export default function Home() {
           </ResizableSidebar>
         ) : null}
       </div>
-
-      {showAppInspectorFooter ? (
-        <footer
-          style={{
-            position: "relative",
-            borderRadius: constrainedAppViewport ? "18px" : "26px",
-            border: "1px solid rgba(70, 92, 107, 0.12)",
-            background: "rgba(255,255,255,0.94)",
-            boxShadow: "0 18px 36px rgba(52, 71, 84, 0.08)",
-            height: inspectorHeight,
-            minHeight: constrainedAppViewport ? "104px" : "132px",
-            maxHeight: constrainedAppViewport ? "34vh" : "42vh",
-            overflow: "hidden",
-            flexShrink: 0,
-          }}
-        >
-          <div
-            onPointerDown={handleInspectorResizeStart}
-            style={{
-              position: "absolute",
-              left: 0,
-              right: 0,
-              top: 0,
-              height: "16px",
-              cursor: "ns-resize",
-              display: "grid",
-              placeItems: "center",
-              touchAction: "none",
-            }}
-          >
-            <div
-              style={{
-                width: "4.1rem",
-                height: "0.34rem",
-                borderRadius: "999px",
-                background: "rgba(102, 122, 137, 0.26)",
-              }}
-            />
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              inspectorVisibilityUserSetRef.current = true;
-              setAppInspectorVisible(false);
-            }}
-            title="Hide inspector"
-            aria-label="Hide inspector"
-            style={{
-              position: "absolute",
-              right: constrainedAppViewport ? "0.55rem" : "0.9rem",
-              top: constrainedAppViewport ? "0.12rem" : "0.2rem",
-              width: constrainedAppViewport ? "1.65rem" : "1.9rem",
-              height: constrainedAppViewport ? "1.65rem" : "1.9rem",
-              borderRadius: "999px",
-              border: "1px solid rgba(70, 92, 107, 0.12)",
-              background: "rgba(255,255,255,0.96)",
-              color: "#48606f",
-              cursor: "pointer",
-              fontWeight: 800,
-              display: "grid",
-              placeItems: "center",
-              boxShadow: "0 10px 22px rgba(38, 57, 70, 0.1)",
-              backdropFilter: "blur(10px)",
-              zIndex: 2,
-            }}
-          >
-            ↓
-          </button>
-
-          <div
-            style={{
-              height: "100%",
-              overflowY: "auto",
-              padding: constrainedAppViewport ? "0.88rem 0.65rem 0.72rem" : "1rem 1rem 1rem",
-              boxSizing: "border-box",
-            }}
-          >
-            {selectedNodeInfo ? (
-              <>
-                <div style={{ fontSize: "0.76rem", letterSpacing: "0.08em", textTransform: "uppercase", color: "#71818d", marginBottom: "0.72rem" }}>
-                  Node inspector
-                </div>
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: compactAppInspector
-                      ? "minmax(0, 1fr)"
-                      : "minmax(240px, 320px) minmax(280px, 1.2fr) minmax(240px, 0.95fr)",
-                    gap: constrainedAppViewport ? "0.5rem" : "0.72rem",
-                    alignItems: "start",
-                  }}
-                >
-                  <InspectorCard title="Selected node">
-                    <div style={{ fontWeight: 800, color: "#2d4351" }}>{selectedNodeInfo.node.label}</div>
-                    <div style={{ marginTop: "0.5rem", display: "flex", flexWrap: "wrap", gap: "0.4rem" }}>
-                      <DetailPill label="Type" value={NODE_TYPE_LABELS[selectedNodeInfo.node.type]} />
-                      <DetailPill label="Node kind" value={selectedNodeInfo.node.node_kind || "context"} />
-                      <DetailPill label="Side" value={selectedNodeInfo.node.ontology_side || "n/a"} />
-                      <DetailPill label="Expandable" value={selectedNodeInfo.expandable ? "Yes" : "No"} />
-                    </div>
-                  </InspectorCard>
-
-                  <InspectorCard title="Explanation details">
-                    {selectedNodeDetailItems.length ? (
-                      <ul style={{ margin: 0, paddingLeft: "1rem", color: "#526570", lineHeight: 1.45 }}>
-                        {selectedNodeDetailItems.slice(0, 5).map((item) => (
-                          <li key={item}>{item}</li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <div style={{ color: "#6f7f8b", lineHeight: 1.45 }}>
-                        No explanation-local details available for this node.
-                      </div>
-                    )}
-                  </InspectorCard>
-
-                  <div style={{ display: "grid", gap: "0.72rem", minWidth: 0 }}>
-                    <InspectorCard title="Description">
-                      {selectedNodeDefinitions.length ? (
-                        <div
-                          style={{
-                            color: "#526570",
-                            lineHeight: 1.45,
-                            display: "-webkit-box",
-                            WebkitLineClamp: 4,
-                            WebkitBoxOrient: "vertical",
-                            overflow: "hidden",
-                          }}
-                        >
-                          {selectedNodeDefinitions[0]}
-                        </div>
-                      ) : (
-                        <div style={{ color: "#6f7f8b" }}>No description available.</div>
-                      )}
-                    </InspectorCard>
-                    <InspectorCard title="Synonyms">
-                      {selectedNodeSynonyms.length ? (
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem" }}>
-                          {selectedNodeSynonyms.slice(0, 6).map((item) => (
-                            <span
-                              key={item}
-                              style={{
-                                borderRadius: "999px",
-                                background: "#eef5f8",
-                                color: "#425967",
-                                padding: "0.28rem 0.55rem",
-                                fontSize: "0.88rem",
-                              }}
-                            >
-                              {item}
-                            </span>
-                          ))}
-                        </div>
-                      ) : (
-                        <div style={{ color: "#6f7f8b" }}>No synonyms available.</div>
-                      )}
-                    </InspectorCard>
-                  </div>
-                </div>
-              </>
-            ) : selectedEdge ? (
-              <>
-                <div style={{ fontSize: "0.76rem", letterSpacing: "0.08em", textTransform: "uppercase", color: "#71818d", marginBottom: "0.72rem" }}>
-                  Edge inspector
-                </div>
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: compactAppInspector
-                      ? "minmax(0, 1fr)"
-                      : "minmax(240px, 1fr) minmax(240px, 1fr) minmax(240px, 0.9fr)",
-                    gap: constrainedAppViewport ? "0.5rem" : "0.72rem",
-                    alignItems: "start",
-                  }}
-                >
-                  <InspectorCard title="Source">
-                    <div style={{ color: "#2d4351", fontWeight: 700, lineHeight: 1.42 }}>
-                      {visibleGraph.nodes.find((node) => node.id === selectedEdge.source)?.label || selectedEdge.source}
-                    </div>
-                  </InspectorCard>
-                  <InspectorCard title="Target">
-                    <div style={{ color: "#2d4351", fontWeight: 700, lineHeight: 1.42 }}>
-                      {visibleGraph.nodes.find((node) => node.id === selectedEdge.target)?.label || selectedEdge.target}
-                    </div>
-                  </InspectorCard>
-                  <InspectorCard title="Edge details">
-                    <div style={{ fontWeight: 800, color: "#2d4351", lineHeight: 1.35 }}>{selectedEdge.label}</div>
-                    <div style={{ marginTop: "0.5rem", display: "flex", flexWrap: "wrap", gap: "0.4rem" }}>
-                      <DetailPill label="Type" value={EDGE_TYPE_LABELS[selectedEdge.type]} />
-                      <DetailPill
-                        label="Score"
-                        value={
-                          selectedEdge.score !== undefined && selectedEdge.score !== null && selectedEdge.score !== ""
-                            ? String(selectedEdge.score)
-                            : "n/a"
-                        }
-                      />
-                      <DetailPill label="Level" value={selectedEdge.level_label || "Context edge"} />
-                      <DetailPill label="Bridge" value={selectedEdge.bridge ? "Yes" : "No"} />
-                    </div>
-                  </InspectorCard>
-                </div>
-              </>
-            ) : selectedNodeId ? (
-              <>
-                <div style={{ fontSize: "0.76rem", letterSpacing: "0.08em", textTransform: "uppercase", color: "#71818d", marginBottom: "0.72rem" }}>
-                  Inspector
-                </div>
-                <div style={{ color: "#61727d", lineHeight: 1.56 }}>
-                  Loading node details…
-                </div>
-              </>
-            ) : (
-              <>
-                <div style={{ fontSize: "0.76rem", letterSpacing: "0.08em", textTransform: "uppercase", color: "#71818d", marginBottom: "0.72rem" }}>
-                  Inspector
-                </div>
-                <div style={{ color: "#61727d", lineHeight: 1.56 }}>
-                  Click a node or edge in the graph to inspect its label, type, score, and explanation details here.
-                </div>
-              </>
-            )}
-          </div>
-        </footer>
-      ) : null}
 
       {activeMetricKey ? (
         <MetricDialog
