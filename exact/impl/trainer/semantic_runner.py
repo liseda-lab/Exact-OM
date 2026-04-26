@@ -137,7 +137,10 @@ class SemanticAlignmentRunner(ITrainer):
         generate_llm_rationales_override: Optional[bool] = None,
     ) -> Dict[str, Any]:
         dataset_signature = getattr(self.dataset, "dataset_signature", None)
-        models = getattr(self, "models", None) or [getattr(self, "model", None)]
+        # Checkpoints contain primary inference outputs. Extra models in the
+        # chain are post-inference transforms and are reapplied after restore,
+        # so they must not invalidate an otherwise reusable checkpoint.
+        models = [getattr(self, "model", None)]
         model_payloads: List[Dict[str, Any]] = []
         for model in models:
             if model is None:
@@ -450,7 +453,7 @@ class SemanticAlignmentRunner(ITrainer):
     ) -> None:
         payload = {
             "kind": kind.name,
-            "dataset_signature": getattr(self.dataset, "dataset_signature", None),
+            "dataset_signature": getattr(getattr(self, "_dataset", None), "dataset_signature", None),
             "checkpoint_fingerprint": self._checkpoint_fingerprint,
             "checkpoint_fingerprint_payload": getattr(
                 self,
@@ -479,6 +482,238 @@ class SemanticAlignmentRunner(ITrainer):
             )
         except OSError as exc:
             self.log(f"Failed to write checkpoint {checkpoint_path}: {exc}", "warning")
+
+    def _model_fingerprint_entry(self, model: Any) -> Dict[str, Any]:
+        fingerprint_payload: Optional[Dict[str, Any]] = None
+        fingerprint = None
+        if hasattr(model, "runtime_fingerprint_payload"):
+            try:
+                fingerprint_payload = model.runtime_fingerprint_payload()
+            except TypeError:
+                fingerprint_payload = model.runtime_fingerprint_payload(generate_llm_rationales_override=None)
+            fingerprint = self._hash_checkpoint_fingerprint_payload(fingerprint_payload)
+        elif hasattr(model, "runtime_fingerprint"):
+            fingerprint = model.runtime_fingerprint()
+        elif hasattr(model, "_cache_fingerprint"):
+            fingerprint = getattr(model, "_cache_fingerprint")
+        entry: Dict[str, Any] = {"class": model.__class__.__name__, "fingerprint": fingerprint}
+        if fingerprint_payload is not None:
+            entry["payload"] = fingerprint_payload
+        return entry
+
+    def _postprocess_fingerprint_payload(
+        self,
+        kind: DatasetMask,
+        local_alignment: bool,
+        threshold: Optional[float],
+        cardinality: Optional[int],
+    ) -> Dict[str, Any]:
+        models = [model for model in (getattr(self, "models", None) or []) if model is not None]
+        if not models:
+            models = [getattr(self, "model", None)]
+        return {
+            "dataset_signature": getattr(getattr(self, "_dataset", None), "dataset_signature", None),
+            "kind": kind.name,
+            "local_alignment": bool(local_alignment),
+            "threshold": threshold,
+            "cardinality": cardinality,
+            "models": [self._model_fingerprint_entry(model) for model in models if model is not None],
+        }
+
+    def _stage_checkpoint_path(
+        self,
+        kind: DatasetMask,
+        stage: str,
+        local_alignment: bool,
+        threshold: Optional[float],
+        cardinality: Optional[int],
+    ) -> Path:
+        payload = self._postprocess_fingerprint_payload(kind, local_alignment, threshold, cardinality)
+        fingerprint = self._hash_checkpoint_fingerprint_payload(payload)
+        return (self.checkpoint_dir / f"{kind.name.lower()}_{stage}_{fingerprint[:12]}.json").resolve()
+
+    def _write_json_atomic(self, path: Path, payload: Dict[str, Any]) -> None:
+        tmp_path = path.with_suffix(path.suffix + ".tmp")
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            json.dump(payload, f, indent=2, ensure_ascii=False, default=str)
+        tmp_path.replace(path)
+
+    def _load_additional_models_checkpoint(
+        self,
+        kind: DatasetMask,
+        local_alignment: bool,
+        threshold: Optional[float],
+        cardinality: Optional[int],
+    ) -> Optional[pd.DataFrame]:
+        if not bool(getattr(self, "_postprocess_checkpoints_enabled", False)):
+            return None
+        path = self._stage_checkpoint_path(kind, "additional_models", local_alignment, threshold, cardinality)
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                payload = json.load(f)
+        except FileNotFoundError:
+            return None
+        except (OSError, json.JSONDecodeError) as exc:
+            self.log(f"Failed to load additional-model checkpoint {path}: {exc}", "warning")
+            return None
+        expected = self._postprocess_fingerprint_payload(kind, local_alignment, threshold, cardinality)
+        if payload.get("fingerprint_payload") != expected:
+            self.log(f"Ignoring stale additional-model checkpoint {path}.", "warning")
+            return None
+        if payload.get("complete") is False:
+            self.log(f"Ignoring incomplete additional-model checkpoint {path}.", "debug")
+            return None
+        records = payload.get("candidate_records") or []
+        if not records:
+            return None
+        df = pd.DataFrame.from_records(records)
+        self._sync_selector_fields_from_candidate_df(df)
+        self.log(f"Loaded additional-model checkpoint from {path}", "info")
+        return df
+
+    def _write_additional_models_checkpoint(
+        self,
+        kind: DatasetMask,
+        candidate_df: pd.DataFrame,
+        local_alignment: bool,
+        threshold: Optional[float],
+        cardinality: Optional[int],
+        log_level: str = "info",
+        complete: bool = True,
+    ) -> None:
+        if not bool(getattr(self, "_postprocess_checkpoints_enabled", False)):
+            return
+        if candidate_df.empty or len(getattr(self, "models", [])) <= 1:
+            return
+        stage = "additional_models" if complete else "additional_models_partial"
+        path = self._stage_checkpoint_path(kind, stage, local_alignment, threshold, cardinality)
+        payload = {
+            "stage": stage,
+            "complete": bool(complete),
+            "fingerprint_payload": self._postprocess_fingerprint_payload(kind, local_alignment, threshold, cardinality),
+            "candidate_records": candidate_df.to_dict(orient="records"),
+        }
+        try:
+            self._write_json_atomic(path, payload)
+            self.log(f"Wrote additional-model checkpoint to {path}", log_level)
+        except OSError as exc:
+            self.log(f"Failed to write additional-model checkpoint {path}: {exc}", "warning")
+
+    def _sync_selector_fields_from_candidate_df(self, df: pd.DataFrame) -> None:
+        if not self.results_json or df.empty or "Src" not in df.columns or "Tgt" not in df.columns:
+            return
+        row_lookup = {(str(row["Src"]), str(row["Tgt"])): row for _, row in df.iterrows()}
+        for record in self.results_json:
+            row = row_lookup.get((str(record.get("src_iri")), str(record.get("tgt_iri"))))
+            if row is None:
+                continue
+            conf = record.get("confidences") or {}
+            for key in [
+                "S_pair_final",
+                "S_select",
+                "P_select",
+                "selection_margin",
+                "selection_entropy",
+                "selection_no_match_prob",
+                "selection_distinctive",
+                "selection_utility",
+                "P_rank",
+                "P_match",
+                "selection_accept_threshold",
+                "S_final",
+            ]:
+                if key in row:
+                    conf[key] = float(row.get(key, 0.0))
+            record["confidences"] = conf
+            pred = record.get("prediction") or {}
+            if "selection_abstained" in row:
+                pred["selector_abstained"] = bool(row.get("selection_abstained", False))
+            if "selection_llm_used" in row:
+                pred["selector_llm_used"] = bool(row.get("selection_llm_used", False))
+            if "selection_reason" in row:
+                pred["selector_reason"] = str(row.get("selection_reason", ""))
+            if "selection_winner" in row:
+                pred["selector_winner"] = bool(row.get("selection_winner", False))
+            record["prediction"] = pred
+
+    @staticmethod
+    def _rationale_record_key(record: Dict[str, Any]) -> str:
+        return f"{record.get('src_iri', '')}\u241F{record.get('tgt_iri', '')}"
+
+    def _rationale_checkpoint_path(
+        self,
+        kind: DatasetMask,
+        local_alignment: bool,
+        threshold: Optional[float],
+        cardinality: Optional[int],
+    ) -> Path:
+        payload = self._postprocess_fingerprint_payload(kind, local_alignment, threshold, cardinality)
+        fingerprint = self._hash_checkpoint_fingerprint_payload(payload)
+        return (self.checkpoint_dir / f"{kind.name.lower()}_rationales_{fingerprint[:12]}.json").resolve()
+
+    def _load_rationale_checkpoint(
+        self,
+        kind: DatasetMask,
+        local_alignment: bool,
+        threshold: Optional[float],
+        cardinality: Optional[int],
+    ) -> Dict[str, str]:
+        if not bool(getattr(self, "_postprocess_checkpoints_enabled", False)):
+            return {}
+        path = self._rationale_checkpoint_path(kind, local_alignment, threshold, cardinality)
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                payload = json.load(f)
+        except FileNotFoundError:
+            return {}
+        except (OSError, json.JSONDecodeError) as exc:
+            self.log(f"Failed to load rationale checkpoint {path}: {exc}", "warning")
+            return {}
+        expected = self._postprocess_fingerprint_payload(kind, local_alignment, threshold, cardinality)
+        if payload.get("fingerprint_payload") != expected:
+            self.log(f"Ignoring stale rationale checkpoint {path}.", "warning")
+            return {}
+        rationales = payload.get("rationales") or {}
+        if not isinstance(rationales, dict):
+            return {}
+        restored = 0
+        for record in self.results_json:
+            key = self._rationale_record_key(record)
+            rationale = rationales.get(key)
+            if not rationale:
+                continue
+            pred = record.get("prediction") or {}
+            if not pred.get("llm_rationale"):
+                pred["llm_rationale"] = str(rationale)
+                record["prediction"] = pred
+                restored += 1
+        if restored:
+            self.log(f"Loaded {restored} rationales from checkpoint {path}", "info")
+        return {str(key): str(value) for key, value in rationales.items() if value}
+
+    def _write_rationale_checkpoint(
+        self,
+        kind: DatasetMask,
+        local_alignment: bool,
+        threshold: Optional[float],
+        cardinality: Optional[int],
+        rationales: Dict[str, str],
+    ) -> None:
+        if not bool(getattr(self, "_postprocess_checkpoints_enabled", False)):
+            return
+        if not rationales:
+            return
+        path = self._rationale_checkpoint_path(kind, local_alignment, threshold, cardinality)
+        payload = {
+            "stage": "rationales",
+            "fingerprint_payload": self._postprocess_fingerprint_payload(kind, local_alignment, threshold, cardinality),
+            "rationales": rationales,
+        }
+        try:
+            self._write_json_atomic(path, payload)
+            self.log(f"Wrote rationale checkpoint ({len(rationales)} records) to {path}", "debug")
+        except OSError as exc:
+            self.log(f"Failed to write rationale checkpoint {path}: {exc}", "warning")
 
     def _maybe_persist_model_cache(self, reason: str, force: bool = False) -> None:
         models = getattr(self, "models", None) or [getattr(self, "model", None)]
@@ -540,7 +775,14 @@ class SemanticAlignmentRunner(ITrainer):
             pred["rationale_decision_label"] = "Match" if rationale_positive else "No match"
             rec["prediction"] = pred
 
-    def _generate_final_rationales(self, log_every: int = 10) -> None:
+    def _generate_final_rationales(
+        self,
+        log_every: int = 10,
+        kind: DatasetMask = DatasetMask.inference,
+        local_alignment: bool = False,
+        threshold: Optional[float] = None,
+        cardinality: Optional[int] = None,
+    ) -> None:
         if not self.results_json:
             return
         model = getattr(self, "model", None)
@@ -548,10 +790,12 @@ class SemanticAlignmentRunner(ITrainer):
             return
         if not bool(getattr(model, "generate_llm_rationales", True)):
             return
+        rationale_checkpoint = self._load_rationale_checkpoint(kind, local_alignment, threshold, cardinality)
         progress_state: Dict[str, Any] = {
             "started": False,
             "start_time": None,
             "last_logged_uncached": 0,
+            "last_saved": len(rationale_checkpoint),
             "interval_uncached_records": 0,
             "cached_records": 0,
             "uncached_records": 0,
@@ -621,19 +865,65 @@ class SemanticAlignmentRunner(ITrainer):
                 level="info",
             )
 
-        rationales = model.generate_final_rationales_for_records(
-            self.results_json,
-            progress_callback=_progress_callback,
-        )
-        rationale_meta = getattr(model, "_last_rationale_backend_meta", {}) or {}
-        for rec, rationale in zip(self.results_json, rationales):
+        pending_indices: List[int] = []
+        pending_records: List[Dict[str, Any]] = []
+        for rec_idx, record in enumerate(self.results_json):
+            pred = record.get("prediction") or {}
+            if pred.get("llm_rationale"):
+                continue
+            pending_indices.append(rec_idx)
+            pending_records.append(record)
+        if not pending_records:
+            if rationale_checkpoint:
+                self._write_rationale_checkpoint(kind, local_alignment, threshold, cardinality, rationale_checkpoint)
+            return
+
+        def _apply_rationale(record_idx: int, rationale: str, rationale_meta: Optional[Dict[str, Any]] = None) -> None:
+            rec = self.results_json[record_idx]
             pred = rec.get("prediction") or {}
             pred["llm_rationale"] = rationale
             rec["prediction"] = pred
-            backend_usage = rec.get("backend_usage") or {}
-            backend_usage["rationale"] = dict(rationale_meta)
-            rec["backend_usage"] = backend_usage
+            if rationale_meta is not None:
+                backend_usage = rec.get("backend_usage") or {}
+                backend_usage["rationale"] = dict(rationale_meta)
+                rec["backend_usage"] = backend_usage
             self._sync_record_model_usage(rec)
+            if rationale:
+                rationale_checkpoint[self._rationale_record_key(rec)] = rationale
+
+        def _completion_callback(event: Dict[str, Any]) -> None:
+            if not event or event.get("stage") != "rationale" or event.get("event") != "completion":
+                return
+            rationale = str(event.get("rationale") or "")
+            rationale_meta = getattr(model, "_last_rationale_backend_meta", {}) or {}
+            for pending_idx in event.get("indices") or []:
+                try:
+                    original_idx = pending_indices[int(pending_idx)]
+                except (TypeError, ValueError, IndexError):
+                    continue
+                _apply_rationale(original_idx, rationale, rationale_meta)
+            completed = len(rationale_checkpoint)
+            interval = max(1, int(progress_state.get("interval_uncached_records") or log_every or 1))
+            last_saved = int(progress_state.get("last_saved") or 0)
+            if completed - last_saved >= interval:
+                self._write_rationale_checkpoint(kind, local_alignment, threshold, cardinality, rationale_checkpoint)
+                if hasattr(model, "persist_caches"):
+                    try:
+                        model.persist_caches(force=True, reason="rationale_checkpoint")
+                    except Exception as exc:  # noqa: BLE001
+                        self.log(f"Failed to persist model cache during rationale checkpoint: {exc}", "warning")
+                progress_state["last_saved"] = completed
+
+        rationale_sig = inspect.signature(model.generate_final_rationales_for_records)
+        accepts_var_kw = any(p.kind == inspect.Parameter.VAR_KEYWORD for p in rationale_sig.parameters.values())
+        rationale_kwargs: Dict[str, Any] = {"progress_callback": _progress_callback}
+        if accepts_var_kw or "completion_callback" in rationale_sig.parameters:
+            rationale_kwargs["completion_callback"] = _completion_callback
+        rationales = model.generate_final_rationales_for_records(pending_records, **rationale_kwargs)
+        rationale_meta = getattr(model, "_last_rationale_backend_meta", {}) or {}
+        for original_idx, rationale in zip(pending_indices, rationales):
+            _apply_rationale(original_idx, rationale, rationale_meta)
+        self._write_rationale_checkpoint(kind, local_alignment, threshold, cardinality, rationale_checkpoint)
         if progress_state["started"]:
             elapsed = max(0.0, time.perf_counter() - float(progress_state["start_time"]))
             duration = _format_duration(elapsed)
@@ -643,7 +933,7 @@ class SemanticAlignmentRunner(ITrainer):
             self.log(
                 (
                     "Rationale stage completed: "
-                    f"records={len(self.results_json)}, "
+                    f"records={len(pending_records)}, "
                     f"uncached_records={uncached_records}, "
                     f"cached_records={int(progress_state['cached_records'] or 0)}, "
                     f"duration={duration}, "
@@ -746,6 +1036,7 @@ class SemanticAlignmentRunner(ITrainer):
             }
 
         checkpoint_enabled = enable_checkpoints
+        self._postprocess_checkpoints_enabled = bool(checkpoint_enabled)
         checkpoint_every = max(1, int(checkpoint_every))
 
         cp_path: Optional[Path] = None
@@ -781,11 +1072,38 @@ class SemanticAlignmentRunner(ITrainer):
                 ),
                 level="info",
             )
+            candidate_df = self._build_candidate_dataframe_from_records(self.results_json)
+            if not candidate_df.empty:
+                checkpointed_df = self._load_additional_models_checkpoint(
+                    kind, local_alignment, threshold, cardinality
+                )
+                if checkpointed_df is not None:
+                    candidate_df = checkpointed_df
+                else:
+                    candidate_df = self._apply_additional_models(
+                        candidate_df,
+                        kind=kind,
+                        local_alignment=local_alignment,
+                        threshold=threshold,
+                        cardinality=cardinality,
+                        results_json=self.results_json,
+                        log_every=log_every,
+                    )
+                    self._write_additional_models_checkpoint(
+                        kind, candidate_df, local_alignment, threshold, cardinality
+                    )
+                all_mappings = list(zip(candidate_df["Src"], candidate_df["Tgt"], candidate_df["S_final"]))
             df = pd.DataFrame(all_mappings, columns=["Src", "Tgt", "Scores"])
             preds = EntityMapping.read_table_mappings(df, threshold=threshold, cardinality=cardinality)
             self._annotate_final_prediction_records(preds, threshold=threshold, local_alignment=local_alignment)
             rationale_start = time.perf_counter()
-            self._generate_final_rationales(log_every=log_every)
+            self._generate_final_rationales(
+                log_every=log_every,
+                kind=kind,
+                local_alignment=local_alignment,
+                threshold=threshold,
+                cardinality=cardinality,
+            )
             rationale_elapsed = time.perf_counter() - rationale_start
             self.results_df = self._make_summary_dataframe(self.results_json)
             self._last_stage_timings = {
@@ -1077,13 +1395,32 @@ class SemanticAlignmentRunner(ITrainer):
 
         post_inference_start = time.perf_counter()
         candidate_df = self._build_candidate_dataframe()
-        if self.results_json:
-            # Prefer the richer JSON (includes importances and LLM info) for plotting/summary
-            self.results_df = self._make_summary_dataframe(self.results_json)
-        elif not candidate_df.empty:
-            candidate_df = self._apply_additional_models(candidate_df)
+        if not candidate_df.empty:
+            checkpointed_df = self._load_additional_models_checkpoint(
+                kind, local_alignment, threshold, cardinality
+            )
+            if checkpointed_df is not None:
+                candidate_df = checkpointed_df
+            else:
+                candidate_df = self._apply_additional_models(
+                    candidate_df,
+                    kind=kind,
+                    local_alignment=local_alignment,
+                    threshold=threshold,
+                    cardinality=cardinality,
+                    results_json=self.results_json,
+                    log_every=log_every,
+                )
+                self._write_additional_models_checkpoint(
+                    kind, candidate_df, local_alignment, threshold, cardinality
+                )
             all_mappings = list(zip(candidate_df["Src"], candidate_df["Tgt"], candidate_df["S_final"]))
-            self.results_df = candidate_df
+            if self.results_json:
+                # Prefer the richer JSON (includes importances and LLM info) for plotting/summary.
+                # Additional models are expected to sync their public metrics back into records.
+                self.results_df = self._make_summary_dataframe(self.results_json)
+            else:
+                self.results_df = candidate_df
         else:
             self.results_df = self._make_summary_dataframe(self.results_json)
 
@@ -1091,7 +1428,13 @@ class SemanticAlignmentRunner(ITrainer):
         preds = EntityMapping.read_table_mappings(df_scores, threshold=threshold, cardinality=cardinality)
         self._annotate_final_prediction_records(preds, threshold=threshold, local_alignment=local_alignment)
         rationale_start = time.perf_counter()
-        self._generate_final_rationales(log_every=log_every)
+        self._generate_final_rationales(
+            log_every=log_every,
+            kind=kind,
+            local_alignment=local_alignment,
+            threshold=threshold,
+            cardinality=cardinality,
+        )
         rationale_elapsed_seconds = time.perf_counter() - rationale_start
         post_inference_elapsed_seconds = time.perf_counter() - post_inference_start - rationale_elapsed_seconds
         if self.results_json:
@@ -1112,9 +1455,75 @@ class SemanticAlignmentRunner(ITrainer):
     def _build_candidate_dataframe(self) -> pd.DataFrame:
         if not self._candidate_rows:
             return pd.DataFrame()
-        return pd.DataFrame(self._candidate_rows)
+        df = pd.DataFrame(self._candidate_rows)
+        return self._merge_dataset_candidate_columns(df)
 
-    def _apply_additional_models(self, df: pd.DataFrame) -> pd.DataFrame:
+    def _build_candidate_dataframe_from_records(self, records: List[Dict[str, Any]]) -> pd.DataFrame:
+        rows: List[Dict[str, Any]] = []
+        for record in records or []:
+            src = record.get("src_iri")
+            tgt = record.get("tgt_iri")
+            if src is None or tgt is None:
+                continue
+            pred = record.get("prediction") or {}
+            row: Dict[str, Any] = {
+                "Src": src,
+                "Tgt": tgt,
+                "ground_truth": pred.get("ground_truth"),
+                "src_label_text": (record.get("selected_labels") or {}).get("source", ""),
+                "tgt_label_text": (record.get("selected_labels") or {}).get("target", ""),
+                "llm_pair_brief": record.get("llm_pair_brief", ""),
+            }
+            for payload_name in ["confidences", "qualities", "weights", "importances"]:
+                payload = record.get(payload_name) or {}
+                for key, value in payload.items():
+                    if isinstance(value, (dict, list, tuple)):
+                        continue
+                    row[key] = value
+            if "S_final" in row:
+                rows.append(row)
+        if not rows:
+            return pd.DataFrame()
+        return self._merge_dataset_candidate_columns(pd.DataFrame(rows))
+
+    def _merge_dataset_candidate_columns(self, df: pd.DataFrame) -> pd.DataFrame:
+        dataset_df = getattr(self.dataset, "dataframe", None)
+        if dataset_df is None or dataset_df.empty:
+            return df
+        prefixes = (
+            "cand_",
+            "src_hier",
+            "tgt_hier",
+            "src_obj",
+            "tgt_obj",
+            "src_attr",
+            "tgt_attr",
+            "src_lab",
+            "tgt_lab",
+        )
+        extra_cols = [
+            col
+            for col in dataset_df.columns
+            if col in {"Src", "Tgt"} or any(str(col).startswith(prefix) for prefix in prefixes)
+        ]
+        if len(extra_cols) <= 2:
+            return df
+        extra_df = dataset_df[extra_cols].drop_duplicates(subset=["Src", "Tgt"])
+        merge_cols = [col for col in extra_df.columns if col not in df.columns or col in {"Src", "Tgt"}]
+        if len(merge_cols) <= 2:
+            return df
+        return df.merge(extra_df[merge_cols], on=["Src", "Tgt"], how="left")
+
+    def _apply_additional_models(
+        self,
+        df: pd.DataFrame,
+        kind: DatasetMask = DatasetMask.inference,
+        local_alignment: bool = False,
+        threshold: Optional[float] = None,
+        cardinality: Optional[int] = None,
+        results_json: Optional[List[Dict[str, Any]]] = None,
+        log_every: int = 10,
+    ) -> pd.DataFrame:
         """
         Run any additional models (beyond the first) sequentially.
         Each model is expected to accept the candidate dataframe and return
@@ -1123,6 +1532,24 @@ class SemanticAlignmentRunner(ITrainer):
         current = df
         if len(getattr(self, "models", [])) <= 1:
             return current
+        checkpoint_every_groups = max(50000, max(1, int(log_every)) * 5000)
+
+        def _checkpoint_current(candidate_df: pd.DataFrame) -> None:
+            self._write_additional_models_checkpoint(
+                kind,
+                candidate_df,
+                local_alignment,
+                threshold,
+                cardinality,
+                log_level="debug",
+                complete=False,
+            )
+
+        checkpoint_callback = (
+            _checkpoint_current
+            if bool(getattr(self, "_postprocess_checkpoints_enabled", False))
+            else None
+        )
         for idx, extra_model in enumerate(self.models[1:], start=2):
             extra_model.eval()
             sig = inspect.signature(extra_model.forward)
@@ -1134,14 +1561,33 @@ class SemanticAlignmentRunner(ITrainer):
                 call_kwargs["logger"] = getattr(self, "logger", None)
             if accepts_var_kw or "primary_model" in sig.parameters:
                 call_kwargs["primary_model"] = self.model
+            if accepts_var_kw or "results_json" in sig.parameters:
+                call_kwargs["results_json"] = results_json
+            if accepts_var_kw or "local_alignment" in sig.parameters:
+                call_kwargs["local_alignment"] = local_alignment
+            if accepts_var_kw or "threshold" in sig.parameters:
+                call_kwargs["threshold"] = threshold
+            if accepts_var_kw or "cardinality" in sig.parameters:
+                call_kwargs["cardinality"] = cardinality
+            if accepts_var_kw or "log_every" in sig.parameters:
+                call_kwargs["log_every"] = log_every
+            if checkpoint_callback is not None and (
+                accepts_var_kw or "checkpoint_callback" in sig.parameters
+            ):
+                call_kwargs["checkpoint_callback"] = checkpoint_callback
+            if checkpoint_callback is not None and (
+                accepts_var_kw or "checkpoint_every_groups" in sig.parameters
+            ):
+                call_kwargs["checkpoint_every_groups"] = checkpoint_every_groups
             out = extra_model.forward(**call_kwargs)
             if isinstance(out, pd.DataFrame):
                 current = out
             elif isinstance(out, dict) and "candidate_df" in out:
                 current = out["candidate_df"]
                 extra_json = out.get("results_json")
-                if extra_json:
+                if extra_json and extra_json is not self.results_json:
                     self.results_json.extend(extra_json)
+                    results_json = self.results_json
             else:
                 self.log(
                     f"Additional model #{idx} returned unsupported type {type(out)}; ignoring its output.",
