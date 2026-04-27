@@ -35,10 +35,6 @@ class CandidateSetSelector(IModel):
         "trigger_acceptance_margin": 0.025,
         "trigger_rank_margin": 0.03,
         "min_confidence": 0.75,
-        "trigger_rejected_high_support": True,
-        "rejected_high_support_pair_min": 0.91,
-        "rejected_high_support_acceptance_gap": 0.25,
-        "rejected_high_support_rank_margin_max": 0.12,
     }
     DEFAULT_CALIBRATION = {
         "enabled": "auto",
@@ -212,18 +208,6 @@ class CandidateSetSelector(IModel):
         )
         normalized["trigger_rank_margin"] = self._clip01(float(normalized["trigger_rank_margin"]))
         normalized["min_confidence"] = self._clip01(float(normalized["min_confidence"]))
-        normalized["trigger_rejected_high_support"] = self._safe_bool(
-            normalized["trigger_rejected_high_support"]
-        )
-        normalized["rejected_high_support_pair_min"] = self._clip01(
-            float(normalized["rejected_high_support_pair_min"])
-        )
-        normalized["rejected_high_support_acceptance_gap"] = self._clip01(
-            float(normalized["rejected_high_support_acceptance_gap"])
-        )
-        normalized["rejected_high_support_rank_margin_max"] = self._clip01(
-            float(normalized["rejected_high_support_rank_margin_max"])
-        )
         return normalized
 
     def _normalize_calibration(self, calibration: Dict[str, Any]) -> Dict[str, Any]:
@@ -300,6 +284,7 @@ class CandidateSetSelector(IModel):
             "selection_margin": 0.0,
             "selection_entropy": 0.0,
             "selection_no_match_prob": 0.0,
+            "selection_evidence_support": 0.0,
             "selection_abstained": False,
             "selection_llm_used": False,
             "selection_reason": "not_selected",
@@ -519,6 +504,10 @@ class CandidateSetSelector(IModel):
         checkpoint_interval = self._checkpoint_interval(checkpoint_every_groups)
         progress_start = time.perf_counter()
         score_threshold = float(threshold) if threshold is not None else accept_threshold
+        evidence_support_floor = self._evidence_support_floor(
+            score_threshold=score_threshold,
+            accept_threshold=accept_threshold,
+        )
 
         for n_groups, (src, group) in enumerate(df.groupby("Src", sort=False), start=1):
             decision = source_decisions.get(str(src))
@@ -527,6 +516,7 @@ class CandidateSetSelector(IModel):
             p_match = float(decision["p_match"])
             accepted = p_match >= accept_threshold
             winner_idx = int(decision["winner_idx"])
+            evidence_support = float(decision.get("evidence_support", 0.0))
             reason = "calibrated" if accepted else "calibrated_no_match"
             llm_used = False
 
@@ -535,7 +525,8 @@ class CandidateSetSelector(IModel):
                 rank_margin=float(decision["rank_prob_margin"]),
                 primary_model=primary_model,
                 accepted=accepted,
-                top_pair_score=float(decision.get("top_pair_score", 0.0)),
+                evidence_support=evidence_support,
+                evidence_support_floor=evidence_support_floor,
             ):
                 llm_choice = self._llm_direct_choice_group(
                     src=str(src),
@@ -580,6 +571,7 @@ class CandidateSetSelector(IModel):
                 df.at[row_idx, "selection_margin"] = float(decision["utility_margin"])
                 df.at[row_idx, "selection_entropy"] = float(decision["rank_entropy"])
                 df.at[row_idx, "selection_no_match_prob"] = float(1.0 - p_match)
+                df.at[row_idx, "selection_evidence_support"] = evidence_support
                 df.at[row_idx, "selection_abstained"] = bool(not accepted)
                 df.at[row_idx, "selection_llm_used"] = bool(llm_used)
                 df.at[row_idx, "selection_reason"] = reason
@@ -856,8 +848,9 @@ class CandidateSetSelector(IModel):
                 distinctive.get(winner_idx, 0.0),
                 self._safe_float(top_row.get("s_label"), 0.0),
                 self._safe_float(top_row.get("S_struct"), 0.0),
-                self._safe_float(top_row.get("s_diff"), 0.0),
+                self._safe_float(top_row.get("s_diff"), 0.5),
             ]
+            evidence_support = self._evidence_support_from_features(accept_features)
             src_text = str(src)
             winner_pair = (src_text, str(top_row.get("Tgt")))
             if src_text in ref_sources:
@@ -875,6 +868,7 @@ class CandidateSetSelector(IModel):
                 "rank_entropy": float(entropy),
                 "top_pair_score": float(top_pair_score),
                 "accept_features": accept_features,
+                "evidence_support": float(evidence_support),
                 "label": label,
                 "sample_weight": sample_weight,
                 "rank_feature": rank_features[winner_idx],
@@ -1058,6 +1052,43 @@ class CandidateSetSelector(IModel):
         if score_threshold is None:
             return self._clip01(p_match)
         return self._clip01(float(score_threshold) + (float(p_match) - float(accept_threshold)))
+
+    def _evidence_support_floor(
+        self,
+        score_threshold: Optional[float],
+        accept_threshold: float,
+    ) -> float:
+        floors = [0.5, self._clip01(float(accept_threshold))]
+        if score_threshold is not None:
+            floors.append(self._clip01(float(score_threshold)))
+        min_precision = self.calibration.get("min_precision")
+        if min_precision is not None:
+            floors.append(self._clip01(float(min_precision)))
+        return float(max(floors))
+
+    def _evidence_support_from_features(self, accept_features: Sequence[float]) -> float:
+        features = {
+            name: self._clip01(self._safe_float(value, 0.0))
+            for name, value in zip(self.ACCEPT_FEATURE_NAMES, accept_features)
+        }
+        rank_confidence = max(
+            features.get("top_rank_prob", 0.0),
+            1.0 - features.get("rank_entropy", 1.0),
+        )
+        terms = [
+            features.get("top_pair_score", 0.0),
+            features.get("top_label", 0.0),
+            features.get("top_struct", 0.0),
+            rank_confidence,
+        ]
+        support = sum(terms) / max(1, len(terms))
+
+        # The difference channel is neutral at 0.5. Values below neutral are
+        # treated as explicit conflict and dampen otherwise strong support.
+        diff = features.get("top_diff", 0.5)
+        if diff < 0.5:
+            support *= diff / 0.5
+        return float(self._clip01(support))
 
     def _feature_mean_scale(self, rows: Sequence[Sequence[float]]) -> Tuple[List[float], List[float]]:
         if not rows:
@@ -1280,7 +1311,8 @@ class CandidateSetSelector(IModel):
         rank_margin: float,
         primary_model: Optional[IModel],
         accepted: bool = True,
-        top_pair_score: float = 0.0,
+        evidence_support: float = 0.0,
+        evidence_support_floor: float = 1.0,
     ) -> bool:
         if not bool(self.llm.get("enabled", True)):
             return False
@@ -1292,12 +1324,15 @@ class CandidateSetSelector(IModel):
         )
         if near_boundary_or_tie:
             return True
-        if not bool(self.llm.get("trigger_rejected_high_support", True)) or bool(accepted):
+        if bool(accepted):
             return False
+        disagreement_margin = (
+            float(self.llm.get("ambiguity_margin", 0.08))
+            + float(self.llm.get("trigger_acceptance_margin", 0.025))
+        )
         return (
-            float(top_pair_score) >= float(self.llm.get("rejected_high_support_pair_min", 0.91))
-            and float(acceptance_margin) <= float(self.llm.get("rejected_high_support_acceptance_gap", 0.25))
-            and float(rank_margin) <= float(self.llm.get("rejected_high_support_rank_margin_max", 0.12))
+            float(evidence_support) >= float(evidence_support_floor)
+            and float(acceptance_margin) <= disagreement_margin
         )
 
     def _llm_arbitrate_group(
@@ -1783,6 +1818,7 @@ class CandidateSetSelector(IModel):
             conf["selection_margin"] = float(row.get("selection_margin", 0.0))
             conf["selection_entropy"] = float(row.get("selection_entropy", 0.0))
             conf["selection_no_match_prob"] = float(row.get("selection_no_match_prob", 0.0))
+            conf["selection_evidence_support"] = float(row.get("selection_evidence_support", 0.0))
             conf["selection_distinctive"] = float(row.get("selection_distinctive", 0.0))
             conf["selection_utility"] = float(row.get("selection_utility", 0.0))
             conf["P_rank"] = float(row.get("P_rank", 0.0))

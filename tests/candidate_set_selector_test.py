@@ -439,43 +439,61 @@ def test_accept_threshold_recall_at_precision_falls_back_to_f1_when_floor_imposs
     assert metrics["recall_at_precision"] == {}
 
 
-def test_calibrated_llm_trigger_rejected_high_support_case():
+def test_calibrated_llm_trigger_rejected_evidence_disagreement():
     module = _load_selector_module()
     selector = module.CandidateSetSelector(llm={"enabled": True})
 
     assert selector._should_use_llm_calibrated(
-        acceptance_margin=0.20,
-        rank_margin=0.10,
+        acceptance_margin=0.10,
+        rank_margin=0.90,
         primary_model=object(),
         accepted=False,
-        top_pair_score=0.92,
+        evidence_support=0.90,
+        evidence_support_floor=0.82,
     )
 
 
-def test_calibrated_llm_trigger_ignores_low_support_rejection():
+def test_calibrated_llm_trigger_ignores_low_evidence_rejection():
+    module = _load_selector_module()
+    selector = module.CandidateSetSelector(llm={"enabled": True})
+
+    assert not selector._should_use_llm_calibrated(
+        acceptance_margin=0.10,
+        rank_margin=0.10,
+        primary_model=object(),
+        accepted=False,
+        evidence_support=0.80,
+        evidence_support_floor=0.82,
+    )
+
+
+def test_calibrated_llm_trigger_ignores_far_rejected_evidence_disagreement():
     module = _load_selector_module()
     selector = module.CandidateSetSelector(llm={"enabled": True})
 
     assert not selector._should_use_llm_calibrated(
         acceptance_margin=0.20,
-        rank_margin=0.10,
+        rank_margin=0.90,
         primary_model=object(),
         accepted=False,
-        top_pair_score=0.90,
+        evidence_support=0.90,
+        evidence_support_floor=0.82,
     )
 
 
-def test_calibrated_llm_trigger_ignores_confident_rejected_rank_winner():
+def test_evidence_support_uses_broad_agreement_and_penalizes_conflict():
     module = _load_selector_module()
-    selector = module.CandidateSetSelector(llm={"enabled": True})
+    selector = module.CandidateSetSelector()
 
-    assert not selector._should_use_llm_calibrated(
-        acceptance_margin=0.20,
-        rank_margin=0.13,
-        primary_model=object(),
-        accepted=False,
-        top_pair_score=0.92,
+    strong = selector._evidence_support_from_features(
+        [0.0, 0.92, 0.94, 0.0, 0.0, 0.15, 0.0, 0.93, 0.91, 0.5]
     )
+    conflicted = selector._evidence_support_from_features(
+        [0.0, 0.92, 0.94, 0.0, 0.0, 0.15, 0.0, 0.93, 0.91, 0.25]
+    )
+
+    assert strong > 0.82
+    assert conflicted < strong
 
 
 def test_calibrated_selector_treats_train_candidate_miss_as_abstention(tmp_path):

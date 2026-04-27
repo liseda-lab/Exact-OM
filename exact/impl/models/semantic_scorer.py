@@ -1933,6 +1933,7 @@ class SemanticScorer(IModel):
             f"NO_MATCH abstention risk: {_fmt(conf.get('selection_no_match_prob'))}",
             f"Selector margin: {_fmt(conf.get('selection_margin'))}",
             f"Selector entropy: {_fmt(conf.get('selection_entropy'))}",
+            f"Selector evidence agreement: {_fmt(conf.get('selection_evidence_support'))}",
             f"Selector distinctive evidence score: {_fmt(conf.get('selection_distinctive'))}",
             f"Selector abstained: {_yes_no(pred.get('selector_abstained', False))}",
             f"Selector LLM arbitration used: {_yes_no(pred.get('selector_llm_used', False))}",

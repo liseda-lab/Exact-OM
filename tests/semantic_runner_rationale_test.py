@@ -126,6 +126,7 @@ def test_selector_metadata_is_available_to_final_rationale_prompt():
             "selection_no_match_prob": 0.71,
             "selection_margin": 0.09,
             "selection_entropy": 0.88,
+            "selection_evidence_support": 0.83,
             "selection_distinctive": 0.12,
         },
         "prediction": {
@@ -149,6 +150,7 @@ def test_selector_metadata_is_available_to_final_rationale_prompt():
 
     assert "Pairwise score before selector: 0.860" in context
     assert "NO_MATCH abstention risk: 0.710" in context
+    assert "Selector evidence agreement: 0.830" in context
     assert "Selector abstained: yes" in context
     assert "Kept in saved alignment after cardinality filtering: no" in context
     assert "Final alignment context" in prompt["user"]

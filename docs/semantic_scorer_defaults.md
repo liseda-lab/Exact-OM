@@ -382,12 +382,20 @@ primary scorer in global mode and compares each source's candidate set jointly.
 | `calibration.l2` | `0.001` | L2 regularisation for the rank and accept models. |
 | `calibration.learning_rate` | `0.05` | Adam learning rate for the small torch models. |
 | `calibration.max_epochs` | `200` | Maximum calibration training epochs. |
-| `calibration.threshold_grid_step` | `0.005` | Grid resolution for choosing the accept/reject threshold by weighted F1. |
+| `calibration.threshold_grid_step` | `0.005` | Grid resolution for choosing the accept/reject threshold under the configured acceptance objective. |
 | `llm.ambiguity_margin` | `0.08` | Heuristic fallback: trigger arbitration near candidate ties or near the `NO_MATCH` threshold. |
 | `llm.max_candidates` | `5` | Maximum top candidates shown in each LLM arbitration prompt. |
 | `llm.trigger_acceptance_margin` | `0.025` | Calibrated mode: trigger LLM only near the learned accept/reject boundary. |
 | `llm.trigger_rank_margin` | `0.03` | Calibrated mode: trigger LLM only when the top two rank probabilities are close. |
 | `llm.min_confidence` | `0.75` | Minimum confidence required before applying a calibrated-mode LLM decision. |
+
+In calibrated mode, the same LLM arbitration path is also used for model
+disagreement: if the accept/reject calibrator says `NO_MATCH` but the top
+candidate has broad pairwise, label, structural, and rank agreement, the
+selector asks the LLM to verify the source instead of adding another
+task-specific threshold knob. The evidence floor is derived from the existing
+alignment threshold, `calibration.min_precision`, and the learned accept
+threshold.
 
 Use
 [`exact/default_config.yaml`](/home/pgcotovio/Exact-OM/exact/default_config.yaml)

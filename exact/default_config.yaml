@@ -388,11 +388,4 @@ second_model:
       max_candidates: 5 # Maximum top candidates shown in each LLM arbitration prompt.
       trigger_acceptance_margin: 0.025 # Calibrated mode: call LLM when |P_match - accept_threshold| is this small.
       trigger_rank_margin: 0.03 # Calibrated mode: call LLM when the top two rank probabilities are this close.
-      # Extra calibrated-mode LLM trigger for likely false negatives. It fires only when the
-      # selector would reject the source, the top pair score is high, the accept gap is not
-      # too large, and the rank winner is not overwhelmingly ahead.
-      trigger_rejected_high_support: True
-      rejected_high_support_pair_min: 0.91 # Top S_pair_final must be at least this high for rejected-source arbitration.
-      rejected_high_support_acceptance_gap: 0.25 # accept_threshold - P_match must be no larger than this.
-      rejected_high_support_rank_margin_max: 0.12 # Top-vs-second P_rank margin must be no larger than this.
       min_confidence: 0.75 # Ignore low-confidence LLM arbitration responses.
