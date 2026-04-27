@@ -347,6 +347,9 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
             for key in ("threshold_positive", "saved_alignment_member", "rationale_positive"):
                 if key in pred:
                     base[key] = pred.get(key)
+            for key, value in pred.items():
+                if key.startswith("selector_"):
+                    base[key] = value
             conf = rec.get("confidences", {})
             wts = rec.get("weights", {})
             imps = rec.get("importances", {})

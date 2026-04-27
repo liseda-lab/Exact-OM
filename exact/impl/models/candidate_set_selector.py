@@ -35,6 +35,10 @@ class CandidateSetSelector(IModel):
         "trigger_acceptance_margin": 0.025,
         "trigger_rank_margin": 0.03,
         "min_confidence": 0.75,
+        "trigger_rejected_high_support": True,
+        "rejected_high_support_pair_min": 0.91,
+        "rejected_high_support_acceptance_gap": 0.25,
+        "rejected_high_support_rank_margin_max": 0.12,
     }
     DEFAULT_CALIBRATION = {
         "enabled": "auto",
@@ -44,6 +48,10 @@ class CandidateSetSelector(IModel):
         "learning_rate": 0.05,
         "max_epochs": 200,
         "threshold_grid_step": 0.005,
+        "accept_objective": "recall_at_precision",
+        "f_beta": 1.5,
+        "min_precision": 0.82,
+        "min_recall": None,
     }
     RANK_FEATURE_NAMES = [
         "logit_pair",
@@ -204,6 +212,18 @@ class CandidateSetSelector(IModel):
         )
         normalized["trigger_rank_margin"] = self._clip01(float(normalized["trigger_rank_margin"]))
         normalized["min_confidence"] = self._clip01(float(normalized["min_confidence"]))
+        normalized["trigger_rejected_high_support"] = self._safe_bool(
+            normalized["trigger_rejected_high_support"]
+        )
+        normalized["rejected_high_support_pair_min"] = self._clip01(
+            float(normalized["rejected_high_support_pair_min"])
+        )
+        normalized["rejected_high_support_acceptance_gap"] = self._clip01(
+            float(normalized["rejected_high_support_acceptance_gap"])
+        )
+        normalized["rejected_high_support_rank_margin_max"] = self._clip01(
+            float(normalized["rejected_high_support_rank_margin_max"])
+        )
         return normalized
 
     def _normalize_calibration(self, calibration: Dict[str, Any]) -> Dict[str, Any]:
@@ -220,6 +240,13 @@ class CandidateSetSelector(IModel):
         normalized["threshold_grid_step"] = self._clip(
             float(normalized["threshold_grid_step"]), 1.0e-4, 0.5
         )
+        objective = str(normalized["accept_objective"] or "recall_at_precision").lower()
+        if objective not in {"f1", "f_beta", "recall_at_precision"}:
+            objective = "recall_at_precision"
+        normalized["accept_objective"] = objective
+        normalized["f_beta"] = max(1.0e-6, float(normalized["f_beta"]))
+        normalized["min_precision"] = self._optional_probability(normalized["min_precision"])
+        normalized["min_recall"] = self._optional_probability(normalized["min_recall"])
         return normalized
 
     def _log(self, logger: Optional[Any], msg: str, level: str = "info") -> None:
@@ -475,6 +502,16 @@ class CandidateSetSelector(IModel):
             )
 
         accept_threshold, threshold_metrics = self._tune_accept_threshold(source_decisions)
+        if bool(threshold_metrics.get("fallback_to_f1", False)):
+            self._log(
+                logger,
+                (
+                    "Calibrated selector accept objective fell back to F1 because no "
+                    f"threshold satisfied min_precision={threshold_metrics.get('min_precision')} "
+                    f"and min_recall={threshold_metrics.get('min_recall')}."
+                ),
+                "warning",
+            )
         n_sources = int(df["Src"].nunique())
         n_llm = 0
         n_abstained = 0
@@ -497,6 +534,8 @@ class CandidateSetSelector(IModel):
                 acceptance_margin=abs(p_match - accept_threshold),
                 rank_margin=float(decision["rank_prob_margin"]),
                 primary_model=primary_model,
+                accepted=accepted,
+                top_pair_score=float(decision.get("top_pair_score", 0.0)),
             ):
                 llm_choice = self._llm_direct_choice_group(
                     src=str(src),
@@ -578,6 +617,12 @@ class CandidateSetSelector(IModel):
             "rank_feature_names": list(self.RANK_FEATURE_NAMES),
             "accept_feature_names": list(self.ACCEPT_FEATURE_NAMES),
             "accept_threshold": accept_threshold,
+            "accept_objective": threshold_metrics.get("accept_objective"),
+            "accept_selected_metrics": threshold_metrics.get("selected_metrics", {}),
+            "accept_best_f1_metrics": threshold_metrics.get("best_f1", {}),
+            "accept_best_f_beta_metrics": threshold_metrics.get("best_f_beta", {}),
+            "accept_recall_at_precision_metrics": threshold_metrics.get("recall_at_precision", {}),
+            "accept_fallback_to_f1": bool(threshold_metrics.get("fallback_to_f1", False)),
             "threshold_metrics": threshold_metrics,
             "llm_groups": n_llm,
             "abstained_groups": n_abstained,
@@ -588,8 +633,12 @@ class CandidateSetSelector(IModel):
             (
                 "Calibrated selector: "
                 f"usable_positive_sources={n_positive_sources}, "
+                f"accept_objective={threshold_metrics.get('accept_objective')}, "
                 f"accept_threshold={accept_threshold:.3f}, "
-                f"calibration_f1={threshold_metrics.get('F1', 0.0):.3f}, "
+                f"calibration_P={threshold_metrics.get('P', 0.0):.3f}, "
+                f"calibration_R={threshold_metrics.get('R', 0.0):.3f}, "
+                f"calibration_F1={threshold_metrics.get('F1', 0.0):.3f}, "
+                f"calibration_F_beta={threshold_metrics.get('F_beta', 0.0):.3f}, "
                 f"abstained_sources={n_abstained}, llm_sources={n_llm}."
             ),
             "info",
@@ -796,10 +845,11 @@ class CandidateSetSelector(IModel):
             rank_prob_margin = prob_by_idx[winner_idx] - (prob_by_idx[second_idx] if second_idx is not None else 0.0)
             entropy = self._normalized_entropy(probs)
             top_row = group.loc[winner_idx]
+            top_pair_score = self._clip01(self._safe_float(top_row.get("S_pair_final"), 0.0))
             accept_features = [
                 utilities[winner_idx],
                 prob_by_idx[winner_idx],
-                self._clip01(self._safe_float(top_row.get("S_pair_final"), 0.0)),
+                top_pair_score,
                 utility_margin,
                 rank_prob_margin,
                 entropy,
@@ -823,6 +873,7 @@ class CandidateSetSelector(IModel):
                 "utility_margin": float(utility_margin),
                 "rank_prob_margin": float(rank_prob_margin),
                 "rank_entropy": float(entropy),
+                "top_pair_score": float(top_pair_score),
                 "accept_features": accept_features,
                 "label": label,
                 "sample_weight": sample_weight,
@@ -880,20 +931,37 @@ class CandidateSetSelector(IModel):
             "scale": scale,
         }
 
-    def _tune_accept_threshold(self, decisions: Dict[str, Dict[str, Any]]) -> Tuple[float, Dict[str, float]]:
+    def _tune_accept_threshold(self, decisions: Dict[str, Dict[str, Any]]) -> Tuple[float, Dict[str, Any]]:
         samples = [
             decision
             for decision in decisions.values()
             if float(decision.get("sample_weight", 0.0)) > 0.0
         ]
         if not samples:
-            return 0.5, {"P": 0.0, "R": 0.0, "F1": 0.0}
+            return 0.5, {
+                "threshold": 0.5,
+                "selected_threshold": 0.5,
+                "P": 0.0,
+                "R": 0.0,
+                "F1": 0.0,
+                "F_beta": 0.0,
+                "TP": 0.0,
+                "FP": 0.0,
+                "FN": 0.0,
+                "accept_objective": str(self.calibration["accept_objective"]),
+                "fallback_to_f1": False,
+                "selected_metrics": {},
+                "best_f1": {},
+                "best_f_beta": {},
+                "recall_at_precision": {},
+            }
         step = float(self.calibration["threshold_grid_step"])
         thresholds = [round(i * step, 10) for i in range(0, int(1.0 / step) + 1)]
         if thresholds[-1] < 1.0:
             thresholds.append(1.0)
-        best_threshold = 0.5
-        best_metrics = {"P": 0.0, "R": 0.0, "F1": -1.0}
+        beta = max(1.0e-6, float(self.calibration["f_beta"]))
+        beta2 = beta * beta
+        threshold_metrics: List[Dict[str, float]] = []
         for threshold in thresholds:
             tp = fp = fn = 0.0
             for sample in samples:
@@ -909,12 +977,77 @@ class CandidateSetSelector(IModel):
             precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
             recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
             f1 = 2.0 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0.0
-            if f1 > best_metrics["F1"] or (
-                abs(f1 - best_metrics["F1"]) <= 1.0e-12 and threshold > best_threshold
-            ):
-                best_threshold = float(threshold)
-                best_metrics = {"P": precision, "R": recall, "F1": f1}
-        return best_threshold, best_metrics
+            f_beta = (
+                (1.0 + beta2) * precision * recall / ((beta2 * precision) + recall)
+                if ((beta2 * precision) + recall) > 0
+                else 0.0
+            )
+            threshold_metrics.append(
+                {
+                    "threshold": float(threshold),
+                    "P": precision,
+                    "R": recall,
+                    "F1": f1,
+                    "F_beta": f_beta,
+                    "TP": tp,
+                    "FP": fp,
+                    "FN": fn,
+                }
+            )
+
+        best_f1 = max(threshold_metrics, key=lambda item: (item["F1"], item["threshold"]))
+        best_f_beta = max(
+            threshold_metrics,
+            key=lambda item: (item["F_beta"], item["threshold"]),
+        )
+
+        min_precision = self.calibration.get("min_precision")
+        min_recall = self.calibration.get("min_recall")
+        precision_floor = float(min_precision) if min_precision is not None else 0.0
+        recall_floor = float(min_recall) if min_recall is not None else 0.0
+        recall_candidates = [
+            item
+            for item in threshold_metrics
+            if item["P"] >= precision_floor and item["R"] >= recall_floor
+        ]
+        best_recall_at_precision = (
+            max(
+                recall_candidates,
+                key=lambda item: (item["R"], item["F1"], item["P"], item["threshold"]),
+            )
+            if recall_candidates
+            else None
+        )
+
+        objective = str(self.calibration["accept_objective"])
+        fallback_to_f1 = False
+        if objective == "f1":
+            selected = best_f1
+        elif objective == "f_beta":
+            selected = best_f_beta
+        else:
+            if best_recall_at_precision is None:
+                selected = best_f1
+                fallback_to_f1 = True
+            else:
+                selected = best_recall_at_precision
+
+        diagnostics: Dict[str, Any] = dict(selected)
+        diagnostics.update(
+            {
+                "selected_threshold": float(selected["threshold"]),
+                "accept_objective": objective,
+                "f_beta": beta,
+                "min_precision": min_precision,
+                "min_recall": min_recall,
+                "fallback_to_f1": fallback_to_f1,
+                "selected_metrics": dict(selected),
+                "best_f1": dict(best_f1),
+                "best_f_beta": dict(best_f_beta),
+                "recall_at_precision": dict(best_recall_at_precision or {}),
+            }
+        )
+        return float(selected["threshold"]), diagnostics
 
     def _threshold_compatible_score(
         self,
@@ -1146,14 +1279,25 @@ class CandidateSetSelector(IModel):
         acceptance_margin: float,
         rank_margin: float,
         primary_model: Optional[IModel],
+        accepted: bool = True,
+        top_pair_score: float = 0.0,
     ) -> bool:
         if not bool(self.llm.get("enabled", True)):
             return False
         if primary_model is None:
             return False
-        return (
+        near_boundary_or_tie = (
             float(acceptance_margin) <= float(self.llm.get("trigger_acceptance_margin", 0.025))
             or float(rank_margin) <= float(self.llm.get("trigger_rank_margin", 0.03))
+        )
+        if near_boundary_or_tie:
+            return True
+        if not bool(self.llm.get("trigger_rejected_high_support", True)) or bool(accepted):
+            return False
+        return (
+            float(top_pair_score) >= float(self.llm.get("rejected_high_support_pair_min", 0.91))
+            and float(acceptance_margin) <= float(self.llm.get("rejected_high_support_acceptance_gap", 0.25))
+            and float(rank_margin) <= float(self.llm.get("rejected_high_support_rank_margin_max", 0.12))
         )
 
     def _llm_arbitrate_group(
@@ -1712,6 +1856,19 @@ class CandidateSetSelector(IModel):
             return 0.0
         mean = sum(values) / len(values)
         return math.sqrt(sum((value - mean) ** 2 for value in values) / len(values))
+
+    def _optional_probability(self, value: Any) -> Optional[float]:
+        if value is None:
+            return None
+        if isinstance(value, str) and value.strip().lower() in {"", "none", "null"}:
+            return None
+        return self._clip01(self._safe_float(value, 0.0))
+
+    @staticmethod
+    def _safe_bool(value: Any) -> bool:
+        if isinstance(value, str):
+            return value.strip().lower() not in {"", "0", "false", "off", "no", "none", "null"}
+        return bool(value)
 
     @staticmethod
     def _safe_float(value: Any, default: float = 0.0) -> float:

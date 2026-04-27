@@ -148,6 +148,17 @@ def _write_training_reference(tmp_path, pairs):
     return path
 
 
+def _threshold_decisions(prob_labels):
+    return {
+        f"s{idx}": {
+            "p_match": prob,
+            "label": label,
+            "sample_weight": 1.0,
+        }
+        for idx, (prob, label) in enumerate(prob_labels)
+    }
+
+
 def _record(src, tgt, target_attribute=None):
     target_items = []
     if target_attribute:
@@ -306,6 +317,165 @@ def test_calibrated_selector_fits_inside_no_grad_predict_context(tmp_path):
 
     assert not out["candidate_df"].empty
     assert "P_match" in out["candidate_df"].columns
+
+
+def test_accept_threshold_f1_preserves_precision_oriented_selection():
+    module = _load_selector_module()
+    selector = module.CandidateSetSelector(
+        calibration={
+            "accept_objective": "f1",
+            "threshold_grid_step": 0.05,
+        },
+    )
+    decisions = _threshold_decisions(
+        [
+            (0.90, 1.0),
+            (0.45, 1.0),
+            (0.44, 1.0),
+            (0.80, 0.0),
+            (0.70, 0.0),
+            (0.60, 0.0),
+            (0.50, 0.0),
+            (0.43, 0.0),
+            (0.43, 0.0),
+            (0.43, 0.0),
+            (0.43, 0.0),
+            (0.43, 0.0),
+            (0.43, 0.0),
+            (0.43, 0.0),
+            (0.43, 0.0),
+            (0.43, 0.0),
+        ]
+    )
+
+    threshold, metrics = selector._tune_accept_threshold(decisions)
+
+    assert threshold == 0.9
+    assert metrics["accept_objective"] == "f1"
+    assert metrics["P"] == 1.0
+    assert metrics["R"] == 1.0 / 3.0
+    assert metrics["fallback_to_f1"] is False
+
+
+def test_accept_threshold_f_beta_prefers_recall_when_configured():
+    module = _load_selector_module()
+    selector = module.CandidateSetSelector(
+        calibration={
+            "accept_objective": "f_beta",
+            "f_beta": 1.5,
+            "threshold_grid_step": 0.05,
+        },
+    )
+    decisions = _threshold_decisions(
+        [
+            (0.90, 1.0),
+            (0.45, 1.0),
+            (0.44, 1.0),
+            (0.80, 0.0),
+            (0.70, 0.0),
+            (0.60, 0.0),
+            (0.50, 0.0),
+            (0.43, 0.0),
+            (0.43, 0.0),
+            (0.43, 0.0),
+            (0.43, 0.0),
+            (0.43, 0.0),
+            (0.43, 0.0),
+            (0.43, 0.0),
+            (0.43, 0.0),
+            (0.43, 0.0),
+        ]
+    )
+
+    threshold, metrics = selector._tune_accept_threshold(decisions)
+
+    assert threshold == 0.45
+    assert metrics["accept_objective"] == "f_beta"
+    assert metrics["R"] > metrics["best_f1"]["R"]
+
+
+def test_accept_threshold_recall_at_precision_maximizes_recall_under_floor():
+    module = _load_selector_module()
+    selector = module.CandidateSetSelector(
+        calibration={
+            "accept_objective": "recall_at_precision",
+            "min_precision": 0.6,
+            "threshold_grid_step": 0.1,
+        },
+    )
+    decisions = _threshold_decisions(
+        [
+            (0.90, 1.0),
+            (0.60, 1.0),
+            (0.40, 1.0),
+            (0.80, 0.0),
+            (0.50, 0.0),
+        ]
+    )
+
+    threshold, metrics = selector._tune_accept_threshold(decisions)
+
+    assert threshold == 0.4
+    assert metrics["P"] >= 0.6
+    assert metrics["R"] == 1.0
+    assert metrics["fallback_to_f1"] is False
+
+
+def test_accept_threshold_recall_at_precision_falls_back_to_f1_when_floor_impossible():
+    module = _load_selector_module()
+    selector = module.CandidateSetSelector(
+        calibration={
+            "accept_objective": "recall_at_precision",
+            "min_precision": 1.0,
+            "threshold_grid_step": 0.1,
+        },
+    )
+    decisions = _threshold_decisions([(0.80, 1.0), (0.90, 0.0)])
+
+    threshold, metrics = selector._tune_accept_threshold(decisions)
+
+    assert threshold == metrics["best_f1"]["threshold"]
+    assert metrics["fallback_to_f1"] is True
+    assert metrics["recall_at_precision"] == {}
+
+
+def test_calibrated_llm_trigger_rejected_high_support_case():
+    module = _load_selector_module()
+    selector = module.CandidateSetSelector(llm={"enabled": True})
+
+    assert selector._should_use_llm_calibrated(
+        acceptance_margin=0.20,
+        rank_margin=0.10,
+        primary_model=object(),
+        accepted=False,
+        top_pair_score=0.92,
+    )
+
+
+def test_calibrated_llm_trigger_ignores_low_support_rejection():
+    module = _load_selector_module()
+    selector = module.CandidateSetSelector(llm={"enabled": True})
+
+    assert not selector._should_use_llm_calibrated(
+        acceptance_margin=0.20,
+        rank_margin=0.10,
+        primary_model=object(),
+        accepted=False,
+        top_pair_score=0.90,
+    )
+
+
+def test_calibrated_llm_trigger_ignores_confident_rejected_rank_winner():
+    module = _load_selector_module()
+    selector = module.CandidateSetSelector(llm={"enabled": True})
+
+    assert not selector._should_use_llm_calibrated(
+        acceptance_margin=0.20,
+        rank_margin=0.13,
+        primary_model=object(),
+        accepted=False,
+        top_pair_score=0.92,
+    )
 
 
 def test_calibrated_selector_treats_train_candidate_miss_as_abstention(tmp_path):

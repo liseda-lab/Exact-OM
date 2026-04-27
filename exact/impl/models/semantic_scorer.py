@@ -482,15 +482,19 @@ class SemanticScorer(IModel):
         src_summary: str,
         tgt_summary: str,
         decision: str,
+        decision_context: str = "",
     ) -> str:
         sep = "\u241F"
-        payload = sep.join([
+        parts = [
             src_label or "",
             tgt_label or "",
             src_summary or "",
             tgt_summary or "",
             decision or "",
-        ])
+        ]
+        if decision_context:
+            parts.append(decision_context)
+        payload = sep.join(parts)
         return hashlib.sha1(payload.encode("utf-8")).hexdigest()
 
     def _serialize_cache_payload(self) -> Dict[str, Any]:
@@ -652,18 +656,28 @@ class SemanticScorer(IModel):
         src_summary: str,
         tgt_summary: str,
         decision: str,
+        decision_context: str = "",
     ) -> Dict[str, str]:
+        context_block = ""
+        if decision_context:
+            context_block = (
+                "\nFinal alignment context\n"
+                f"{decision_context}\n"
+            )
         return {
             "system": "You are an ontology alignment expert.",
             "user": (
                 "Based only on the information below, write two to four sentences explaining "
                 "why the two entities should or should not be considered equivalent.\n"
                 "Reference specific evidence from the label pair and the summaries. "
+                "When final alignment context is present, use it to explain whether the pair "
+                "was kept or rejected after candidate-set selection and cardinality filtering. "
                 "Do not introduce external knowledge. Return exactly one JSON object with one key: "
                 "\"rationale\".\n\n"
                 f"Source\nLabel: {src_label}\nSummary: {src_summary}\n\n"
                 f"Target\nLabel: {tgt_label}\nSummary: {tgt_summary}\n\n"
                 f"Final decision: {decision}\n\n"
+                f"{context_block}"
                 "Return only JSON."
             ),
         }
@@ -1409,20 +1423,24 @@ class SemanticScorer(IModel):
         src_summaries: List[str],
         tgt_summaries: List[str],
         decisions: List[str],
+        decision_contexts: Optional[List[str]] = None,
         progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+        completion_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
     ) -> List[str]:
         if not (self.use_llm and self.generate_llm_rationales):
             return ["" for _ in src_labels]
         if not src_labels:
             return []
+        if decision_contexts is None:
+            decision_contexts = ["" for _ in src_labels]
         rationale_backend = self._llm_router.resolve_task("rationale")
         self._last_rationale_backend_meta = self._resolved_backend_metadata(rationale_backend)
         outputs = [""] * len(src_labels)
         pending: Dict[str, Dict[str, Any]] = {}
-        for idx, (s_lab, t_lab, s_sum, t_sum, decision) in enumerate(
-            zip(src_labels, tgt_labels, src_summaries, tgt_summaries, decisions)
+        for idx, (s_lab, t_lab, s_sum, t_sum, decision, decision_context) in enumerate(
+            zip(src_labels, tgt_labels, src_summaries, tgt_summaries, decisions, decision_contexts)
         ):
-            key = self._rationale_key(s_lab, t_lab, s_sum, t_sum, decision)
+            key = self._rationale_key(s_lab, t_lab, s_sum, t_sum, decision, decision_context)
             cached = self._rationale_cache.get(key)
             if cached is not None:
                 outputs[idx] = cached
@@ -1435,6 +1453,7 @@ class SemanticScorer(IModel):
                     "src_summary": s_sum,
                     "tgt_summary": t_sum,
                     "decision": decision,
+                    "decision_context": decision_context,
                     "indices": [],
                 },
             )
@@ -1469,9 +1488,30 @@ class SemanticScorer(IModel):
                     pending[key]["src_summary"],
                     pending[key]["tgt_summary"],
                     pending[key]["decision"],
+                    pending[key]["decision_context"],
                 )
                 for key in pending_keys
             ]
+
+            def _on_prompt_completed(prompt_idx: int, raw_text: str) -> None:
+                if prompt_idx < 0 or prompt_idx >= len(pending_keys):
+                    return
+                key = pending_keys[prompt_idx]
+                clean = self._parse_structured_text(raw_text, "rationale", self._clean_rationale_text)
+                self._cache_store(self._rationale_cache, key, clean, self.max_cached_rationales)
+                indices = list(pending[key]["indices"])
+                for idx in indices:
+                    outputs[idx] = clean
+                if completion_callback is not None:
+                    completion_callback(
+                        {
+                            "stage": "rationale",
+                            "event": "completion",
+                            "indices": indices,
+                            "rationale": clean,
+                        }
+                    )
+
             if rationale_backend.backend == "openrouter":
                 self._log_once(
                     "hosted_rationale_stage_start",
@@ -1489,6 +1529,7 @@ class SemanticScorer(IModel):
                 prompt_record_counts=[len(pending[key]["indices"]) for key in pending_keys],
                 total_records=total_records,
                 cached_records=cached_record_count,
+                prompt_completed_callback=_on_prompt_completed,
             )
             if rationale_backend.backend == "openrouter":
                 self._log_once(
@@ -1497,6 +1538,8 @@ class SemanticScorer(IModel):
                     "debug",
                 )
             for key, rationale in zip(pending_keys, generated):
+                if all(outputs[idx] for idx in pending[key]["indices"]):
+                    continue
                 clean = self._parse_structured_text(rationale, "rationale", self._clean_rationale_text)
                 self._cache_store(self._rationale_cache, key, clean, self.max_cached_rationales)
                 for idx in pending[key]["indices"]:
@@ -1527,6 +1570,7 @@ class SemanticScorer(IModel):
         prompt_record_counts: Optional[List[int]] = None,
         total_records: int = 0,
         cached_records: int = 0,
+        prompt_completed_callback: Optional[Callable[[int, str], None]] = None,
     ) -> List[str]:
         if not prompts:
             return []
@@ -1579,6 +1623,8 @@ class SemanticScorer(IModel):
             if workers == 1:
                 for idx, prompt in enumerate(prompts):
                     outputs[idx] = _call(prompt)
+                    if prompt_completed_callback is not None:
+                        prompt_completed_callback(idx, outputs[idx])
                     _emit_progress(prompt_record_counts[idx], 1)
                 return outputs
             with ThreadPoolExecutor(max_workers=workers) as executor:
@@ -1589,6 +1635,8 @@ class SemanticScorer(IModel):
                 for future in as_completed(future_to_idx):
                     idx = future_to_idx[future]
                     outputs[idx] = future.result()
+                    if prompt_completed_callback is not None:
+                        prompt_completed_callback(idx, outputs[idx])
                     _emit_progress(prompt_record_counts[idx], 1)
             return outputs
         self._ensure_local_llm()
@@ -1617,7 +1665,10 @@ class SemanticScorer(IModel):
             new_tokens = self._strip_llm_prompt_tokens(enc, out)
             decoded = self.llm_tok.batch_decode(new_tokens, skip_special_tokens=True)
             for offset, text in enumerate(decoded):
-                outputs[start + offset] = text
+                prompt_idx = start + offset
+                outputs[prompt_idx] = text
+                if prompt_completed_callback is not None:
+                    prompt_completed_callback(prompt_idx, text)
             _emit_progress(sum(prompt_record_counts[start:end]), end - start)
         return outputs
 
@@ -1826,6 +1877,7 @@ class SemanticScorer(IModel):
         self,
         records: List[Dict[str, Any]],
         progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+        completion_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
     ) -> List[str]:
         if not (self.use_llm and self.generate_llm_rationales):
             return ["" for _ in records]
@@ -1834,6 +1886,7 @@ class SemanticScorer(IModel):
         src_summaries: List[str] = []
         tgt_summaries: List[str] = []
         decisions: List[str] = []
+        decision_contexts: List[str] = []
         for rec in records:
             labels = rec.get("selected_labels") or {}
             summaries = rec.get("llm_summaries") or {}
@@ -1843,14 +1896,55 @@ class SemanticScorer(IModel):
             src_summaries.append(str(summaries.get("source", "")))
             tgt_summaries.append(str(summaries.get("target", "")))
             decisions.append(str(prediction.get("rationale_decision_label", "")))
+            decision_contexts.append(self._final_alignment_context_for_rationale(rec))
         return self.generate_rationales_batched(
             src_labels=src_labels,
             tgt_labels=tgt_labels,
             src_summaries=src_summaries,
             tgt_summaries=tgt_summaries,
             decisions=decisions,
+            decision_contexts=decision_contexts,
             progress_callback=progress_callback,
+            completion_callback=completion_callback,
         )
+
+    def _final_alignment_context_for_rationale(self, record: Dict[str, Any]) -> str:
+        conf = record.get("confidences") or {}
+        pred = record.get("prediction") or {}
+        selector_ran = "S_select" in conf or any(str(key).startswith("selector_") for key in pred)
+        if not selector_ran:
+            return ""
+
+        def _fmt(value: Any) -> str:
+            try:
+                if value is None:
+                    return "unavailable"
+                return f"{float(value):.3f}"
+            except (TypeError, ValueError):
+                return "unavailable"
+
+        def _yes_no(value: Any) -> str:
+            return "yes" if bool(value) else "no"
+
+        lines = [
+            f"Pairwise score before selector: {_fmt(conf.get('S_pair_final'))}",
+            f"Selector score used for final alignment: {_fmt(conf.get('S_select', conf.get('S_final')))}",
+            f"Raw selector support before abstention: {_fmt(conf.get('selection_utility'))}",
+            f"NO_MATCH abstention risk: {_fmt(conf.get('selection_no_match_prob'))}",
+            f"Selector margin: {_fmt(conf.get('selection_margin'))}",
+            f"Selector entropy: {_fmt(conf.get('selection_entropy'))}",
+            f"Selector distinctive evidence score: {_fmt(conf.get('selection_distinctive'))}",
+            f"Selector abstained: {_yes_no(pred.get('selector_abstained', False))}",
+            f"Selector LLM arbitration used: {_yes_no(pred.get('selector_llm_used', False))}",
+        ]
+        reason = pred.get("selector_reason")
+        if reason:
+            lines.append(f"Selector reason: {reason}")
+        if "threshold_positive" in pred:
+            lines.append(f"Passed final score threshold: {_yes_no(pred.get('threshold_positive'))}")
+        if "saved_alignment_member" in pred:
+            lines.append(f"Kept in saved alignment after cardinality filtering: {_yes_no(pred.get('saved_alignment_member'))}")
+        return "\n".join(lines)
 
     # -------------------------------------------------------------------------
     # Context attribution helper

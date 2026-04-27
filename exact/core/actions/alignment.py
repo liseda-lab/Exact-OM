@@ -178,7 +178,16 @@ class AlignmentAction(Protocol):
                 continue
             if isinstance(extra.params, dict) and extra.params.get("enabled") is False:
                 continue
-            model_specs.append((extra.name, extra.params))
+            extra_params = dict(extra.params or {})
+            if (
+                training_reference_file_path is not None
+                and getattr(extra.name, "__name__", "") in {"CandidateSetSelector", "SecondPassReranker"}
+            ):
+                extra_params.setdefault(
+                    "training_reference_file_path",
+                    str(training_reference_file_path),
+                )
+            model_specs.append((extra.name, extra_params))
 
         trainer = configs.trainer(
             dataset=dataset,

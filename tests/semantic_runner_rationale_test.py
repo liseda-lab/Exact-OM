@@ -9,6 +9,13 @@ assert _SPEC is not None and _SPEC.loader is not None
 _SPEC.loader.exec_module(_MODULE)
 SemanticAlignmentRunner = _MODULE.SemanticAlignmentRunner
 
+_SCORER_MODULE_PATH = Path(__file__).resolve().parents[1] / "exact" / "impl" / "models" / "semantic_scorer.py"
+_SCORER_SPEC = importlib.util.spec_from_file_location("semantic_scorer_module", _SCORER_MODULE_PATH)
+_SCORER_MODULE = importlib.util.module_from_spec(_SCORER_SPEC)
+assert _SCORER_SPEC is not None and _SCORER_SPEC.loader is not None
+_SCORER_SPEC.loader.exec_module(_SCORER_MODULE)
+SemanticScorer = _SCORER_MODULE.SemanticScorer
+
 
 class _Pred:
     def __init__(self, head: str, tail: str):
@@ -107,6 +114,44 @@ def test_generate_final_rationales_updates_records():
     assert runner.results_json[0]["models"]["llm_decision_model"] == "Qwen/Qwen2.5-7B-Instruct"
     assert runner.results_json[0]["models"]["llm_rationale_model"] == "openai/gpt-4o-mini"
     assert runner.results_json[0]["models"]["llm_model"] == "multiple"
+
+
+def test_selector_metadata_is_available_to_final_rationale_prompt():
+    scorer = object.__new__(SemanticScorer)
+    record = {
+        "confidences": {
+            "S_pair_final": 0.86,
+            "S_select": 0.0,
+            "selection_utility": 0.62,
+            "selection_no_match_prob": 0.71,
+            "selection_margin": 0.09,
+            "selection_entropy": 0.88,
+            "selection_distinctive": 0.12,
+        },
+        "prediction": {
+            "selector_abstained": True,
+            "selector_llm_used": False,
+            "selector_reason": "no_match",
+            "threshold_positive": False,
+            "saved_alignment_member": False,
+        },
+    }
+
+    context = scorer._final_alignment_context_for_rationale(record)
+    prompt = scorer._rationale_prompt(
+        "source label",
+        "target label",
+        "source summary",
+        "target summary",
+        "No match",
+        context,
+    )
+
+    assert "Pairwise score before selector: 0.860" in context
+    assert "NO_MATCH abstention risk: 0.710" in context
+    assert "Selector abstained: yes" in context
+    assert "Kept in saved alignment after cardinality filtering: no" in context
+    assert "Final alignment context" in prompt["user"]
 
 
 def test_checkpoint_with_mismatched_fingerprint_is_ignored(tmp_path):
@@ -238,6 +283,20 @@ def test_checkpoint_with_only_rationale_toggle_change_can_resume_when_enabled(tm
     assert mappings == [("s", "t", 0.9)]
     assert results_json == [{"src_iri": "s", "tgt_iri": "t"}]
     assert processed_examples == 10
+
+
+def test_checkpoint_fingerprint_ignores_post_inference_models():
+    runner = object.__new__(SemanticAlignmentRunner)
+    runner._dataset = type("DatasetStub", (), {"dataset_signature": "dataset-a"})()
+    primary = _FingerprintModel(generate_llm_rationales=False)
+    extra = object()
+    runner._models = [primary, extra]
+    runner._model = primary
+
+    payload = runner._build_checkpoint_fingerprint_payload()
+
+    assert len(payload["models"]) == 1
+    assert payload["models"][0]["class"] == "_FingerprintModel"
 
 
 def test_generate_final_rationales_preserves_existing_values_when_disabled():

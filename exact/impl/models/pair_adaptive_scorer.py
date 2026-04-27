@@ -1421,18 +1421,27 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
         src_summary: str,
         tgt_summary: str,
         decision: str,
+        decision_context: str = "",
     ) -> Dict[str, str]:
         pair_brief = src_summary
+        context_block = ""
+        if decision_context:
+            context_block = (
+                "\nFinal alignment context:\n"
+                f"{decision_context}\n\n"
+            )
         return {
             "system": "You are an ontology alignment expert.",
             "user": (
                 "Write a concise but specific rationale explaining the final alignment decision. "
-                "Use only the pair brief below. Mention supporting and conflicting evidence when available. "
+                "Use only the pair brief and final alignment context below. Mention supporting and conflicting evidence when available. "
+                "When final alignment context is present, explain whether the pair was kept or rejected after candidate-set selection and cardinality filtering. "
                 "Return exactly one JSON object with one key: \"rationale\".\n\n"
                 f"Source entity: {src_label}\n"
                 f"Target entity: {tgt_label}\n"
                 f"Final decision: {decision}\n\n"
                 f"Pair brief:\n{pair_brief}\n\n"
+                f"{context_block}"
                 "Return only JSON."
             ),
         }
@@ -1497,6 +1506,7 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
         self,
         records: List[Dict[str, Any]],
         progress_callback=None,
+        completion_callback=None,
     ) -> List[str]:
         if not (self.use_llm and self.generate_llm_rationales):
             return ["" for _ in records]
@@ -1504,6 +1514,7 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
         tgt_labels: List[str] = []
         pair_briefs: List[str] = []
         decisions: List[str] = []
+        decision_contexts: List[str] = []
         for record in records:
             labels = record.get("selected_labels") or {}
             prediction = record.get("prediction") or {}
@@ -1511,13 +1522,16 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
             tgt_labels.append(str(labels.get("target", "")))
             pair_briefs.append(str(record.get("llm_pair_brief", "")))
             decisions.append(str(prediction.get("rationale_decision_label", "")))
+            decision_contexts.append(self._final_alignment_context_for_rationale(record))
         return self.generate_rationales_batched(
             src_labels=src_labels,
             tgt_labels=tgt_labels,
             src_summaries=pair_briefs,
             tgt_summaries=["" for _ in pair_briefs],
             decisions=decisions,
+            decision_contexts=decision_contexts,
             progress_callback=progress_callback,
+            completion_callback=completion_callback,
         )
 
     def _build_evidence_packet(

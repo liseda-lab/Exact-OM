@@ -38,7 +38,8 @@ warns and falls back to the configured local decision profile.
 ## Model chain
 
 - `model` — primary scorer (default `PairAdaptiveSemanticScorer`)
-- `second_model` — optional chained reranker (default `SecondPassReranker`, disabled)
+- `second_model` — optional chained global candidate-set selector (default
+  `CandidateSetSelector`, enabled in the default config)
 - `model_chain` — advanced override for arbitrary model pipelines
 
 ### Current default scoring flow
@@ -361,23 +362,32 @@ subdecision:
 
 ## Optional second model (`second_model.params`)
 
-Configured via the top-level `second_model` block; the reranker runs after the
-primary scorer on ambiguous sources only.
+Configured via the top-level `second_model` block; the selector runs after the
+primary scorer in global mode and compares each source's candidate set jointly.
+`SecondPassReranker` remains available as a backward-compatible alias.
 
 | Parameter | Default | Explanation |
 |-----------|---------|-------------|
-| `enabled` | `False` | Enable the optional second-stage reranker. |
-| `top_k` | `5` | Number of top candidates per source examined during reranking. |
-| `epsilon` | `0.03` | Score-gap threshold used to deem a source ambiguous. |
-| `min_ties` | `3` | Minimum number of near-tied candidates required before reranking fires. |
-| `ce_model_name` | `null` | Optional cross-encoder used during reranking. |
-| `ce_weight` | `0.5` | Weight assigned to the cross-encoder contribution. |
-| `use_symbolic` | `True` | Apply symbolic reranking features. |
-| `symbolic_weight` | `0.05` | Weight assigned to symbolic reranking features. |
-| `use_llm` | `False` | Enable LLM-assisted reranking inside the second pass. |
-| `llm_trigger_epsilon` | `0.01` | Ambiguity threshold used to trigger LLM reranking. |
-| `max_llm_prompts` | `0` | Hard cap on LLM reranking prompts. |
-| `max_prompt_candidates` | `5` | Maximum number of candidates packed into one reranking prompt. |
+| `enabled` | `True` | Enable the optional second-stage selector. |
+| `strategy` | `calibrated_rank_accept` | Fit a lightweight supervised ranker and accept/reject calibrator from the CLI training reference (`-r/--training_reference_file`) when available; otherwise fall back to the heuristic selector. |
+| `global_only` | `True` | Skip local candidate-file ranking tasks. |
+| `replace_final_score` | `True` | Replace `S_final` with the selector score for threshold/cardinality. |
+| `use_no_match` | `True` | Add an explicit source-level abstention risk. |
+| `temperature` | `0.75` | Temperature for source-local competition probabilities and gap scaling. |
+| `support_weight` | `0.60` | Weight on the original pairwise score; the remaining mass goes to the unweighted average of candidate competition, distinctive evidence, and equivalence safety. |
+| `no_match_threshold` | `0.55` | Abstain when the unweighted average of ambiguity, weak support, generic evidence, and close competition reaches this value. |
+| `calibration.enabled` | `auto` | Use supervised calibration only when a training reference path is wired into the model. |
+| `calibration.min_positive_sources` | `50` | Minimum train sources whose gold target appears in the candidate set before fitting supervised weights. |
+| `calibration.background_negative_weight` | `0.02` | Small pseudo-negative weight for non-training source groups, used only by the accept/reject calibrator. |
+| `calibration.l2` | `0.001` | L2 regularisation for the rank and accept models. |
+| `calibration.learning_rate` | `0.05` | Adam learning rate for the small torch models. |
+| `calibration.max_epochs` | `200` | Maximum calibration training epochs. |
+| `calibration.threshold_grid_step` | `0.005` | Grid resolution for choosing the accept/reject threshold by weighted F1. |
+| `llm.ambiguity_margin` | `0.08` | Heuristic fallback: trigger arbitration near candidate ties or near the `NO_MATCH` threshold. |
+| `llm.max_candidates` | `5` | Maximum top candidates shown in each LLM arbitration prompt. |
+| `llm.trigger_acceptance_margin` | `0.025` | Calibrated mode: trigger LLM only near the learned accept/reject boundary. |
+| `llm.trigger_rank_margin` | `0.03` | Calibrated mode: trigger LLM only when the top two rank probabilities are close. |
+| `llm.min_confidence` | `0.75` | Minimum confidence required before applying a calibrated-mode LLM decision. |
 
 Use
 [`exact/default_config.yaml`](/home/pgcotovio/Exact-OM/exact/default_config.yaml)

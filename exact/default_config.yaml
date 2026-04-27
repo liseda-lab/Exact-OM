@@ -140,7 +140,7 @@ candidates_params:
   lexical_encoder_name: sentence-transformers/all-MiniLM-L6-v2 # Encoder used to embed source/target labels.
   encode_batch_size: 512 # Batch size for lexical embedding generation.
   search_batch_size: 4096 # Batch size for cosine similarity search.
-  top_k: 50 # Number of candidates retained per source after lexical retrieval.
+  top_k: 10 # Number of candidates retained per source after lexical retrieval.
   use_amp: True # Use automatic mixed precision during lexical retrieval when supported.
 
 sanity_check_params:
@@ -353,19 +353,46 @@ model:
     max_cached_summaries: null # Optional in-memory cap for summary-task cache entries. In the default scorer these entries are pair briefs.
     max_cached_rationales: null # Optional in-memory cap for rationale cache entries.
 
-# Optional second-stage reranker (disabled by default).
+# Optional global candidate-set selector.
 second_model:
-  name: SecondPassReranker
+  name: CandidateSetSelector
   params:
-    enabled: False # Enable the reranker after the primary semantic scorer.
-    top_k: 5 # Number of top candidates per source passed into the reranker.
-    epsilon: 0.03 # Score closeness threshold used to decide whether reranking is needed.
-    min_ties: 3 # Minimum number of near-tied candidates required before reranking fires.
-    ce_model_name: null # Optional cross-encoder model name for reranking.
-    ce_weight: 0.5 # Weight assigned to the cross-encoder contribution.
-    use_symbolic: True # Include symbolic reranking features.
-    symbolic_weight: 0.05 # Weight assigned to symbolic reranking features.
-    use_llm: False # Enable LLM-assisted reranking inside the second pass.
-    llm_trigger_epsilon: 0.01 # Ambiguity threshold used to trigger LLM reranking.
-    max_llm_prompts: 0 # Hard cap on LLM reranking prompts.
-    max_prompt_candidates: 5 # Max candidates packed into one reranking prompt.
+    enabled: True # Enable the selector after the primary semantic scorer.
+    strategy: calibrated_rank_accept # Use supervised rank/accept calibration when -r/--training_reference_file is provided; otherwise fall back.
+    global_only: True # Run only for generated global candidate sets; local candidate-file rankings are left unchanged.
+    replace_final_score: True # Replace S_final with the selector score for global threshold/cardinality.
+    use_no_match: True # Include an explicit NO_MATCH abstention risk per source group.
+    temperature: 0.75 # Temperature for source-local competition probabilities and gap scaling.
+    eps: 1.0e-6 # Numerical clamp for probabilities and divisions.
+    support_weight: 0.60 # Weight on the original pairwise score; the remaining mass goes to averaged listwise evidence.
+    no_match_threshold: 0.55 # Abstain when the unweighted NO_MATCH risk average is at or above this value.
+    calibration:
+      enabled: auto # Use the CLI training reference (-r) when available; no full/test reference leakage.
+      min_positive_sources: 50 # Minimum train sources with an in-candidate gold target before fitting supervised weights.
+      background_negative_weight: 0.02 # Small weight for non-train source groups as likely global false positives.
+      l2: 0.001 # L2 regularization for rank and acceptance weights.
+      learning_rate: 0.05 # Adam learning rate for the lightweight calibration models.
+      max_epochs: 200 # Maximum training epochs for calibration.
+      threshold_grid_step: 0.005 # Step size used when sweeping P_match thresholds from 0 to 1.
+      # Acceptance-threshold objective for the source-level match/no-match decision:
+      #   f1: reproduce the old behavior and maximize calibration F1.
+      #   f_beta: maximize F_beta, using f_beta below to weight recall higher when beta > 1.
+      #   recall_at_precision: maximize recall while keeping calibration precision >= min_precision.
+      accept_objective: recall_at_precision
+      f_beta: 1.5 # Used only when accept_objective=f_beta; values >1 favor recall over precision.
+      min_precision: 0.82 # Used by recall_at_precision as the minimum allowed calibration precision.
+      min_recall: null # Optional extra recall floor for recall_at_precision; null means no recall floor.
+    llm:
+      enabled: True
+      ambiguity_margin: 0.08 # Trigger arbitration near candidate ties or near the NO_MATCH threshold.
+      max_candidates: 5 # Maximum top candidates shown in each LLM arbitration prompt.
+      trigger_acceptance_margin: 0.025 # Calibrated mode: call LLM when |P_match - accept_threshold| is this small.
+      trigger_rank_margin: 0.03 # Calibrated mode: call LLM when the top two rank probabilities are this close.
+      # Extra calibrated-mode LLM trigger for likely false negatives. It fires only when the
+      # selector would reject the source, the top pair score is high, the accept gap is not
+      # too large, and the rank winner is not overwhelmingly ahead.
+      trigger_rejected_high_support: True
+      rejected_high_support_pair_min: 0.91 # Top S_pair_final must be at least this high for rejected-source arbitration.
+      rejected_high_support_acceptance_gap: 0.25 # accept_threshold - P_match must be no larger than this.
+      rejected_high_support_rank_margin_max: 0.12 # Top-vs-second P_rank margin must be no larger than this.
+      min_confidence: 0.75 # Ignore low-confidence LLM arbitration responses.
