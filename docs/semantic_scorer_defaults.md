@@ -133,10 +133,11 @@ each template to contain the literal placeholders `$SRC` and `$TGT`.
 
 | Parameter | Default | Explanation |
 |-----------|---------|-------------|
+| `retrieval_strategy` | `hybrid` | Candidate retrieval mode. `hybrid` unions label embedding retrieval with lexical token/char retrieval over labels plus short annotation aliases; `primary_label` keeps the old primary-label embedding search. |
 | `lexical_encoder_name` | `sentence-transformers/all-MiniLM-L6-v2` | Encoder used during lexical candidate generation. |
 | `encode_batch_size` | `512` | Batch size for embedding labels. |
 | `search_batch_size` | `4096` | Batch size for cosine similarity search. |
-| `top_k` | `50` | Number of candidates retained per source. |
+| `top_k` | `20` | Number of candidates retained per source. |
 | `use_amp` | `True` | Use mixed precision during lexical retrieval when supported. |
 
 ## Sanity checks and plotting
@@ -153,7 +154,7 @@ each template to contain the literal placeholders `$SRC` and `$TGT`.
 | Parameter | Default | Explanation |
 |-----------|---------|-------------|
 | `batch_size` | `128` | Candidate-pair batch size for the semantic scorer. |
-| `num_workers` | `5` | DataLoader workers during inference. |
+| `num_workers` | `0` | DataLoader workers during inference. The default avoids fork stalls after JVM and Hugging Face tokenizer initialization. |
 | `log_every` | `10` | Batch interval for progress logging. |
 | `mixed_precision` | `True` | Use autocast on GPU. |
 | `which` | … | Metrics plotted after inference (see YAML). |

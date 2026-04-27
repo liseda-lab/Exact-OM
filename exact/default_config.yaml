@@ -137,10 +137,11 @@ dataset_params:
 
 candidates_params:
   # Candidate generation settings for the lexical prefilter stage.
+  retrieval_strategy: hybrid # hybrid uses labels plus short annotation aliases in lexical retrieval; primary_label keeps the old primary-label embedding search.
   lexical_encoder_name: sentence-transformers/all-MiniLM-L6-v2 # Encoder used to embed source/target labels.
   encode_batch_size: 512 # Batch size for lexical embedding generation.
   search_batch_size: 4096 # Batch size for cosine similarity search.
-  top_k: 10 # Number of candidates retained per source after lexical retrieval.
+  top_k: 20 # Number of candidates retained per source after lexical retrieval.
   use_amp: True # Use automatic mixed precision during lexical retrieval when supported.
 
 sanity_check_params:
@@ -161,7 +162,7 @@ plot_params:
 inference_params:
   # Inference runner settings.
   batch_size: 512 # Candidate-pair batch size passed to the semantic scorer.
-  num_workers: 5 # DataLoader worker count for inference.
+  num_workers: 0 # DataLoader worker count for inference; 0 avoids fork stalls after JVM/HF tokenizer initialization.
   log_every: 10 # Emit inference progress logs every N batches.
   mixed_precision: True # Use torch autocast on GPU where supported.
   which: ["S_final", "S_base", "S_struct", "s_label", "s_hier", "s_sim", "s_diff", "s_attr", "I_label", "I_struct", "I_hier", "I_sim", "I_diff", "I_attr", "I_llm", "w_c", "w_i", "U", "U_ind", "U_dis", "p_llm"]

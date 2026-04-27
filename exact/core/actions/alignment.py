@@ -100,6 +100,10 @@ class AlignmentAction(Protocol):
             llm_profiles={k: v.model_dump() for k, v in configs.llm_profiles.items()},
             llm_routing=configs.llm_routing.model_dump(),
             request_seed=configs.seed,
+            candidate_generation_params={
+                **configs.candidates_params.model_dump(),
+                "candidates_file_path": str(candidates_file_path) if candidates_file_path else None,
+            },
             **configs.dataset_params.model_dump(),
         )
 

@@ -1,12 +1,14 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Callable, Any
+from typing import Dict, List, Optional, Tuple, Callable, Any, Sequence
 from contextlib import nullcontext
 from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import json
+import os
 
 import math
+import re
 import time
 import numpy as np
 import pandas as pd
@@ -22,14 +24,21 @@ from exact.core.contracts.base import SelfRegisteringComponent, LoggingClass
 from exact.core.entities.registry import ComponentType
 from exact.core.entities.configs.dataset import DatasetMask
 from exact.core.entities.ontology import OntologyGraph
+from exact.utils.candidate_generation import (
+    lexical_candidate_pair_scores,
+    make_candidate_labels,
+    rank_channel_scores,
+)
 from exact.utils.data import read_table
 
 from mowl.datasets import PathDataset as OWLDataset
 from mowl.owlapi import OWLOntology
 from org.semanticweb.HermiT import Reasoner
 from org.semanticweb.elk.owlapi import ElkReasonerFactory
+from org.semanticweb.owlapi.model import IRI
 from org.semanticweb.owlapi.reasoner.structural import StructuralReasonerFactory
 from org.semanticweb.owlapi.reasoner import InferenceType
+from org.semanticweb.owlapi.search import EntitySearcher
 
 
 # from jpype import java
@@ -60,6 +69,8 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
         self._df: DataFrame = None
         self._df_save_path: Path = self.output_path / "dataset.csv"
         self._cache_meta_path: Path = self.output_path / "dataset.meta.json"
+        self._active_df_cache_key: Optional[Tuple[int, DatasetMask]] = None
+        self._active_df_cache: Optional[DataFrame] = None
 
         self._num_workers: int = num_workers
 
@@ -82,6 +93,9 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
 
         self._cache_ok = kwargs.get("cache_ok", True)
         self._candidate_share_k: int = int(kwargs.get("candidate_share_k", 1))
+        self._candidate_generation_params: Dict[str, Any] = dict(
+            kwargs.get("candidate_generation_params") or {}
+        )
 
         self._candidates_generated = False
         self._source_path: Optional[Path] = None
@@ -219,6 +233,22 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
     @default_kind.setter
     def default_kind(self, kind: DatasetMask) -> None:
         self._default_kind = kind
+        self._invalidate_active_dataframe_cache()
+
+    def _invalidate_active_dataframe_cache(self) -> None:
+        self._active_df_cache_key = None
+        self._active_df_cache = None
+
+    def _active_dataframe(self) -> DataFrame:
+        if self._df is None:
+            raise RuntimeError("Dataset not processed. Call process() first.")
+        key = (id(self._df), self.default_kind)
+        if self._active_df_cache_key == key and self._active_df_cache is not None:
+            return self._active_df_cache
+        active = self._df[self._df[self.default_kind]].reset_index(drop=True)
+        self._active_df_cache_key = key
+        self._active_df_cache = active
+        return active
 
     @property
     def filter_exact_matches(self) -> bool:
@@ -388,6 +418,8 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
             "drop_exact_match_sources": self.drop_exact_match_sources,
             "cardinality": self._cardinality,
             "candidate_share_k": self._candidate_share_k,
+            "candidate_generation_version": 2,
+            "candidate_generation_params": self._candidate_generation_params,
             "only_taxonomy_hint": self._only_taxonomy_hint,
         }
 
@@ -420,6 +452,7 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
                         encode_batch_size: Optional[int] = 512,
                         search_batch_size: Optional[int] = 4096,
                         use_amp: Optional[bool] = True,
+                        retrieval_strategy: str = "hybrid",
                         device: Optional[torch.device] = None,
                         ) -> None:
 
@@ -465,6 +498,7 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
                 encode_batch_size=encode_batch_size,
                 search_batch_size=search_batch_size,
                 use_amp=use_amp,
+                retrieval_strategy=retrieval_strategy,
                 device=device
             )
 
@@ -476,18 +510,25 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
         encode_batch_size: int = 512,
         search_batch_size: int = 4096,
         use_amp: bool = True,
+        retrieval_strategy: str = "hybrid",
         device: Optional[torch.device] = None,
     ) -> None:
         """
-        Build one-to-many candidate table using GPU torch top-k cosine over MiniLM embeddings.
-        Stores into self._candidates with columns ["Src", "Tgt", "Score"].
+        Build one-to-many candidate table using label embedding and lexical retrieval.
         """
         if self._source is None or self._target is None:
             self.log("Ontologies must be loaded before candidate generation.", level="error")
             raise ValueError("Ontologies not loaded.")
 
+        strategy = str(retrieval_strategy or "hybrid").lower()
+        if strategy not in {"primary_label", "hybrid"}:
+            raise ValueError(
+                f"Unsupported candidate retrieval_strategy={retrieval_strategy!r}; "
+                "expected 'primary_label' or 'hybrid'."
+            )
+
         dev = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.log("#Candidate generation via torch top-k cosine…", level="info")
+        self.log(f"#Candidate generation strategy={strategy} via torch top-k cosine…", level="info")
         self.log(f"  Encoder: {lexical_encoder_name}", level="debug")
         self.log(f"  Device:  {dev}", level="debug")
 
@@ -502,45 +543,217 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
             src_iris = [iri for iri in src_iris if iri not in set(self._exact_matches["Src"])]
             self.log(f"## Filtered Source classes for Candidate Generation: {len(src_iris)}", level="debug")
         
-        # 1) Get primary labels
-        self.log("  Extracting primary labels for all classes…", level="debug")
+        if not src_iris or not tgt_iris:
+            self._candidates = pd.DataFrame(
+                columns=[
+                    "Src",
+                    "Tgt",
+                    "Label",
+                    "cand_sim",
+                    "cand_sim_semantic",
+                    "cand_sim_lexical",
+                    "cand_channels",
+                ]
+            )
+            self._candidates_generated = True
+            return
 
-        src_texts = [self.source_graph.get_primary_label(iri) for iri in src_iris]
-        tgt_texts = [self.target_graph.get_primary_label(iri) for iri in tgt_iris]
+        label_scope = "primary labels" if strategy == "primary_label" else "all labels"
+        self.log(f"  Extracting {label_scope} for all classes…", level="debug")
+        if strategy == "primary_label":
+            src_labels_by_iri = {iri: [self.source_graph.get_primary_label(iri)] for iri in src_iris}
+            tgt_labels_by_iri = {iri: [self.target_graph.get_primary_label(iri)] for iri in tgt_iris}
+            src_lexical_texts_by_iri = src_labels_by_iri
+            tgt_lexical_texts_by_iri = tgt_labels_by_iri
+            channel_k = int(top_k)
+        else:
+            src_labels_by_iri = {iri: self.source_graph.get_labels(iri) for iri in src_iris}
+            tgt_labels_by_iri = {iri: self.target_graph.get_labels(iri) for iri in tgt_iris}
+            src_lexical_texts_by_iri = {
+                iri: self._candidate_texts_for_iri(self.source_graph, iri, "src")
+                for iri in src_iris
+            }
+            tgt_lexical_texts_by_iri = {
+                iri: self._candidate_texts_for_iri(self.target_graph, iri, "tgt")
+                for iri in tgt_iris
+            }
+            channel_k = max(int(top_k) * 3, 30)
 
-        # 2) Encode with MiniLM (fast)
-        self.log("  Encoding labels…", level="debug")
+        src_records = make_candidate_labels(src_iris, src_labels_by_iri)
+        tgt_records = make_candidate_labels(tgt_iris, tgt_labels_by_iri)
+        src_lexical_records = make_candidate_labels(src_iris, src_lexical_texts_by_iri)
+        tgt_lexical_records = make_candidate_labels(tgt_iris, tgt_lexical_texts_by_iri)
+
+        self.log(
+            f"  Candidate labels: source={len(src_records)} target={len(tgt_records)}; "
+            f"lexical texts: source={len(src_lexical_records)} target={len(tgt_lexical_records)}; "
+            f"channel_k={channel_k}",
+            level="debug",
+        )
         st = SentenceTransformer(lexical_encoder_name, device=str(dev))
-        # Already does batching internally; normalize embeddings for cosine
-        src_emb = st.encode(src_texts, batch_size=encode_batch_size, convert_to_numpy=True, normalize_embeddings=True)
-        tgt_emb = st.encode(tgt_texts, batch_size=encode_batch_size, convert_to_numpy=True, normalize_embeddings=True)
+        semantic_scores = self._semantic_label_pair_scores(
+            src_records=src_records,
+            tgt_records=tgt_records,
+            encoder=st,
+            top_k=channel_k,
+            encode_batch_size=encode_batch_size,
+            search_batch_size=search_batch_size,
+            use_amp=use_amp,
+            device=dev,
+        )
+        lexical_scores = {}
+        if strategy == "hybrid":
+            self.log("  Running lexical token/char candidate retrieval…", level="debug")
+            lexical_scores = lexical_candidate_pair_scores(
+                src_records=src_lexical_records,
+                tgt_records=tgt_lexical_records,
+                per_source_limit=channel_k,
+            )
 
-        # 3) Search Top-K with batched torch matmul
+        self.log("  Assembling candidate DataFrame…", level="debug")
+        rows = rank_channel_scores(
+            sources=[str(iri) for iri in src_iris],
+            semantic_scores=semantic_scores,
+            lexical_scores=lexical_scores,
+            top_k=int(top_k),
+        )
+        cand_df = pd.DataFrame(
+            rows,
+            columns=[
+                "Src",
+                "Tgt",
+                "Label",
+                "cand_sim",
+                "cand_sim_semantic",
+                "cand_sim_lexical",
+                "cand_channels",
+            ],
+        )
+
+        self._candidates = cand_df
+        self._annotate_candidate_similarity_stats()
+        self._candidates_generated = True
+        self.log(f"#Candidate generation complete: {len(self._candidates)} rows (Top-{top_k} per source).", level="debug")
+
+    def _candidate_texts_for_iri(self, graph: OntologyGraph, iri: str, side: str) -> List[str]:
+        labels = list(graph.get_labels(iri) or [])
+        texts: List[str] = []
+        seen = set()
+
+        def _add(text: Any) -> None:
+            normalized = OntologyGraph.normalize_label(str(text or ""))
+            if not normalized or normalized in seen:
+                return
+            seen.add(normalized)
+            texts.append(str(text).strip())
+
+        for label in labels:
+            _add(label)
+
+        ontology = self.source.ontology if side == "src" else self.target.ontology
+        factory = ontology.getOWLOntologyManager().getOWLDataFactory()
+        owl_class = factory.getOWLClass(IRI.create(str(iri)))
+        label_prop = str(factory.getRDFSLabel().getIRI().toString())
+        annotation_candidates: List[Tuple[float, str]] = []
+        try:
+            annotations = EntitySearcher.getAnnotations(owl_class, ontology)
+            iterator = annotations.iterator()
+            while iterator.hasNext():
+                ann = iterator.next()
+                prop_iri = str(ann.getProperty().getIRI().toString())
+                if prop_iri == label_prop:
+                    continue
+                value = ann.getValue()
+                if not value.isLiteral():
+                    continue
+                literal = str(value.asLiteral().get().getLiteral()).strip()
+                priority = self._candidate_annotation_priority(literal, prop_iri)
+                if priority is None:
+                    continue
+                annotation_candidates.append((priority, literal))
+        except Exception:
+            return texts
+
+        annotation_candidates.sort(key=lambda item: (item[0], OntologyGraph.normalize_label(item[1])))
+        for _, literal in annotation_candidates[:8]:
+            _add(literal)
+        return texts
+
+    @staticmethod
+    def _candidate_annotation_priority(literal: str, prop_iri: str) -> Optional[float]:
+        text = str(literal or "").strip()
+        normalized = OntologyGraph.normalize_label(text)
+        if not normalized:
+            return None
+        tokens = [token for token in normalized.split() if token]
+        if not tokens or len(tokens) > 16:
+            return None
+        if any(token.startswith("http") for token in tokens):
+            return None
+        if re.match(r"^[A-Za-z_]+:[A-Za-z0-9_.:-]+$", text):
+            return None
+        if len(tokens) <= 2 and normalized.endswith("ontology"):
+            return None
+
+        prop_name = str(prop_iri or "").rsplit("#", 1)[-1].rsplit("/", 1)[-1]
+        prop_norm = OntologyGraph.normalize_label(prop_name)
+        alias_prop = any(
+            key in prop_norm
+            for key in ("label", "synonym", "term", "name", "title", "pref", "alt")
+        )
+        length_penalty = abs(min(len(tokens), 8) - 4) / 8.0
+        return (0.0 if alias_prop else 0.5) + length_penalty
+
+    def _semantic_label_pair_scores(
+        self,
+        src_records: Sequence[Any],
+        tgt_records: Sequence[Any],
+        encoder: SentenceTransformer,
+        top_k: int,
+        encode_batch_size: int,
+        search_batch_size: int,
+        use_amp: bool,
+        device: torch.device,
+    ) -> Dict[Tuple[str, str], float]:
+        if not src_records or not tgt_records or top_k <= 0:
+            return {}
+
+        self.log("  Encoding labels…", level="debug")
+        os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+        src_texts = [record.text for record in src_records]
+        tgt_texts = [record.text for record in tgt_records]
+        src_emb = encoder.encode(
+            src_texts,
+            batch_size=encode_batch_size,
+            convert_to_numpy=True,
+            normalize_embeddings=True,
+        )
+        tgt_emb = encoder.encode(
+            tgt_texts,
+            batch_size=encode_batch_size,
+            convert_to_numpy=True,
+            normalize_embeddings=True,
+        )
+
         self.log("  Running torch Top-K cosine search…", level="debug")
         idxs, sims = self.topk_cosine_search_torch(
             E_src=src_emb.astype(np.float32, copy=False),
             E_tgt=tgt_emb.astype(np.float32, copy=False),
             top_k=top_k,
             batch_size_src=search_batch_size,
-            device=dev,
-            amp=use_amp
+            device=device,
+            amp=use_amp,
         )
 
-        # 4) Build candidate rows
-        self.log("  Assembling candidate DataFrame…", level="debug")
-        rows = []
-        for i, s_iri in enumerate(src_iris):
-            tgt_idx_row = idxs[i]
-            sim_row = sims[i]
-            for j, score in zip(tgt_idx_row, sim_row):
-                rows.append([str(s_iri), str(tgt_iris[int(j)]), 0, float(score)])
-
-        cand_df = pd.DataFrame(rows, columns=["Src", "Tgt", "Label", "cand_sim"])
-
-        self._candidates = cand_df
-        self._annotate_candidate_similarity_stats()
-        self._candidates_generated = True
-        self.log(f"#Candidate generation complete: {len(self._candidates)} rows (Top-{top_k} per source).", level="debug")
+        scores: Dict[Tuple[str, str], float] = {}
+        for i, src_record in enumerate(src_records):
+            for tgt_idx, score in zip(idxs[i], sims[i]):
+                tgt_record = tgt_records[int(tgt_idx)]
+                key = (str(src_record.iri), str(tgt_record.iri))
+                current = scores.get(key, -1.0)
+                if float(score) > current:
+                    scores[key] = float(score)
+        return scores
 
     @torch.inference_mode()
     def topk_cosine_search_torch(
@@ -567,7 +780,13 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
         T = torch.nn.functional.normalize(T, dim=-1)
 
         Ns, d = E_src.shape
-        K = top_k
+        if E_src.shape[0] == 0 or E_tgt.shape[0] == 0 or top_k <= 0:
+            return (
+                np.empty((E_src.shape[0], 0), dtype=np.int64),
+                np.empty((E_src.shape[0], 0), dtype=np.float32),
+            )
+
+        K = min(int(top_k), int(E_tgt.shape[0]))
         all_idx = np.empty((Ns, K), dtype=np.int64)
         all_scr = np.empty((Ns, K), dtype=np.float32)
 

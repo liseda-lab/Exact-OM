@@ -102,6 +102,14 @@ class CandidatesParams(BaseModel):
     search_batch_size: int = Field(config["candidates_params"]["search_batch_size"])
     top_k: int = Field(config["candidates_params"]["top_k"])
     use_amp: bool = Field(config["candidates_params"]["use_amp"])
+    retrieval_strategy: str = Field(config["candidates_params"].get("retrieval_strategy", "hybrid"))
+
+    @field_validator("retrieval_strategy", mode="before")
+    def validate_retrieval_strategy(cls, value: str) -> str:
+        strategy = str(value or "hybrid").lower()
+        if strategy not in {"primary_label", "hybrid"}:
+            raise ValueError("retrieval_strategy must be 'primary_label' or 'hybrid'")
+        return strategy
 
 class SanityCheckParams(BaseModel):
     sanity_check: bool = Field(config["sanity_check_params"]["sanity_check"])

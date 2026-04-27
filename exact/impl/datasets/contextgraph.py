@@ -605,10 +605,7 @@ class ContextDataset(IDataset):
     # Dataset plumbing
     # ------------------------------------------------------------------
     def __len__(self) -> int:
-        if self._df is None:
-            raise RuntimeError("Dataset not processed. Call process() first.")
-        # Align length with the boolean mask used by __getitem__.
-        return len(self._df[self._df[self.default_kind]])
+        return len(self._active_dataframe())
 
     def __getitem__(self, idx: int) -> Any:
         """
@@ -620,10 +617,7 @@ class ContextDataset(IDataset):
           - tgt_ctx_triples: List[str]
           - label: Optional[int]
         """
-        if self._df is None:
-            raise RuntimeError("Dataset not processed. Call process() first.")
-
-        dfk = self._df[self._df[self.default_kind]].reset_index(drop=True)
+        dfk = self._active_dataframe()
         row = dfk.iloc[idx]
 
         feats = row.get("Features")

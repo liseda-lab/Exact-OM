@@ -137,6 +137,7 @@ class SemanticAlignmentRunner(ITrainer):
         generate_llm_rationales_override: Optional[bool] = None,
     ) -> Dict[str, Any]:
         dataset_signature = getattr(self.dataset, "dataset_signature", None)
+        dataset_fingerprint = getattr(self.dataset, "cache_fingerprint", None)
         # Checkpoints contain primary inference outputs. Extra models in the
         # chain are post-inference transforms and are reapplied after restore,
         # so they must not invalidate an otherwise reusable checkpoint.
@@ -167,6 +168,7 @@ class SemanticAlignmentRunner(ITrainer):
             model_payloads.append(model_entry)
         return {
             "dataset_signature": dataset_signature,
+            "dataset_fingerprint": dataset_fingerprint,
             "models": model_payloads,
         }
 
@@ -454,6 +456,7 @@ class SemanticAlignmentRunner(ITrainer):
         payload = {
             "kind": kind.name,
             "dataset_signature": getattr(getattr(self, "_dataset", None), "dataset_signature", None),
+            "dataset_fingerprint": getattr(getattr(self, "_dataset", None), "cache_fingerprint", None),
             "checkpoint_fingerprint": self._checkpoint_fingerprint,
             "checkpoint_fingerprint_payload": getattr(
                 self,
