@@ -380,10 +380,13 @@ primary scorer in global mode and compares each source's candidate set jointly.
 | `calibration.enabled` | `auto` | Use supervised calibration only when a training reference path is wired into the model. |
 | `calibration.min_positive_sources` | `50` | Minimum train sources whose gold target appears in the candidate set before fitting supervised weights. |
 | `calibration.background_negative_weight` | `0.02` | Small pseudo-negative weight for non-training source groups, used only by the accept/reject calibrator. |
+| `calibration.validation_fraction` | `0.2` | Enables source-disjoint validation for selector tuning; set to `0.0` to tune on all calibration references. |
+| `calibration.validation_folds` | `5` | Number of source-disjoint out-of-fold validation folds; set to `1` for the older single-split path. OOF metrics select calibration settings; the final accept threshold is retuned after refitting on all calibration references so probabilities stay on the deployed model's scale. |
 | `calibration.l2` | `0.001` | L2 regularisation for the rank and accept models. |
 | `calibration.learning_rate` | `0.05` | Adam learning rate for the small torch models. |
 | `calibration.max_epochs` | `200` | Maximum calibration training epochs. |
 | `calibration.threshold_grid_step` | `0.005` | Grid resolution for choosing the accept/reject threshold under the configured acceptance objective. |
+| `llm.enabled` / `llm.mode` | `False` / `off` | Selector LLM arbitration is disabled by default. Use `mode: veto` to allow near-boundary `NO_MATCH` vetoes only. |
 | `llm.ambiguity_margin` | `0.08` | Heuristic fallback: trigger arbitration near candidate ties or near the `NO_MATCH` threshold. |
 | `llm.max_candidates` | `5` | Maximum top candidates shown in each LLM arbitration prompt. |
 | `llm.trigger_acceptance_margin` | `0.025` | Calibrated mode: trigger LLM only near the learned accept/reject boundary. |

@@ -30,8 +30,8 @@ class CandidateSetSelector(IModel):
     DEFAULT_NO_MATCH_THRESHOLD = 0.55
     FIXED_LLM_BOOST = 0.15
     DEFAULT_LLM = {
-        "enabled": True,
-        "mode": "veto",
+        "enabled": False,
+        "mode": "off",
         "ambiguity_margin": 0.08,
         "max_candidates": 5,
         "max_new_tokens": 256,
@@ -45,6 +45,7 @@ class CandidateSetSelector(IModel):
         "background_negative_weight": 0.02,
         "background_negative_weight_grid": [0.02, 0.05, 0.10, 0.20, 0.40],
         "validation_fraction": 0.2,
+        "validation_folds": 5,
         "l2": 1.0e-3,
         "learning_rate": 0.05,
         "max_epochs": 200,
@@ -212,7 +213,13 @@ class CandidateSetSelector(IModel):
     def _normalize_llm(self, llm: Dict[str, Any]) -> Dict[str, Any]:
         normalized = dict(self.DEFAULT_LLM)
         normalized.update({key: value for key, value in llm.items() if key in normalized})
-        mode = str(normalized.get("mode") or "veto").strip().lower()
+        explicit_enabled = "enabled" in llm
+        explicit_mode = "mode" in llm
+        mode = str(normalized.get("mode") or "off").strip().lower()
+        if explicit_enabled and not bool(normalized.get("enabled")):
+            mode = "off"
+        elif explicit_enabled and bool(normalized.get("enabled")) and not explicit_mode and mode == "off":
+            mode = "veto"
         if mode in {"false", "0", "disabled", "none"}:
             mode = "off"
         if mode not in {"off", "veto", "choose"}:
@@ -220,6 +227,8 @@ class CandidateSetSelector(IModel):
         normalized["mode"] = mode
         if mode == "off":
             normalized["enabled"] = False
+        else:
+            normalized["enabled"] = bool(normalized.get("enabled", True))
         if "ambiguity_margin" in llm:
             normalized["ambiguity_margin"] = float(llm["ambiguity_margin"])
         else:
@@ -278,6 +287,7 @@ class CandidateSetSelector(IModel):
             0.0,
             0.5,
         )
+        normalized["validation_folds"] = max(1, int(normalized["validation_folds"]))
         normalized["l2"] = max(0.0, float(normalized["l2"]))
         normalized["learning_rate"] = max(1.0e-6, float(normalized["learning_rate"]))
         normalized["max_epochs"] = max(1, int(normalized["max_epochs"]))
@@ -537,13 +547,10 @@ class CandidateSetSelector(IModel):
                 exact_prefiltered_ref_sources,
             ) = self._exclude_exact_prefiltered_reference_sources(ref_pairs, dataset, logger)
 
-        train_ref_pairs, validation_ref_pairs, split_meta = self._split_reference_pairs_by_source(
-            calibration_ref_pairs
-        )
-
         rank_features = self._rank_feature_rows(df, distinctive, reciprocity)
-        rank_groups, n_positive_sources = self._rank_training_groups(df, train_ref_pairs)
+        _, n_positive_sources = self._rank_training_groups(df, calibration_ref_pairs)
         min_positive = int(self.calibration["min_positive_sources"])
+        utilities: Dict[int, float] = {}
         if n_positive_sources < min_positive:
             self._log(
                 logger,
@@ -555,22 +562,11 @@ class CandidateSetSelector(IModel):
             )
             return None
 
-        rank_model = self._fit_rank_model(rank_features, rank_groups)
-        if rank_model is None:
-            self._log(logger, "Calibrated selector failed to fit rank model; using heuristic selector.", "warning")
-            return None
-        utilities = {
-            idx: self._linear_score(rank_features[idx], rank_model)
-            for idx in rank_features
-        }
-
-        calibration_choice = self._select_accept_model_by_validation(
+        calibration_choice = self._select_accept_model_by_oof_validation(
             df=df,
-            utilities=utilities,
             rank_features=rank_features,
             distinctive=distinctive,
-            train_ref_pairs=train_ref_pairs,
-            validation_ref_pairs=validation_ref_pairs,
+            calibration_ref_pairs=calibration_ref_pairs,
             exact_prefiltered_sources=exact_prefiltered_ref_sources,
             primary_model=primary_model,
             logger=logger,
@@ -579,15 +575,63 @@ class CandidateSetSelector(IModel):
             protected_exact_pairs=exact_pairs_for_reporting,
         )
         if calibration_choice is None:
+            train_ref_pairs, validation_ref_pairs, split_meta = self._split_reference_pairs_by_source(
+                calibration_ref_pairs
+            )
+            rank_groups, split_positive_sources = self._rank_training_groups(df, train_ref_pairs)
+            if split_positive_sources < min_positive:
+                self._log(
+                    logger,
+                    (
+                        "Calibrated selector skipped because usable positive training sources "
+                        f"({split_positive_sources}) are below min_positive_sources={min_positive} "
+                        "after the validation split."
+                    ),
+                    "warning",
+                )
+                return None
+
+            rank_model = self._fit_rank_model(rank_features, rank_groups)
+            if rank_model is None:
+                self._log(logger, "Calibrated selector failed to fit rank model; using heuristic selector.", "warning")
+                return None
+            utilities = {
+                idx: self._linear_score(rank_features[idx], rank_model)
+                for idx in rank_features
+            }
+
+            calibration_choice = self._select_accept_model_by_validation(
+                df=df,
+                utilities=utilities,
+                rank_features=rank_features,
+                distinctive=distinctive,
+                train_ref_pairs=train_ref_pairs,
+                validation_ref_pairs=validation_ref_pairs,
+                exact_prefiltered_sources=exact_prefiltered_ref_sources,
+                primary_model=primary_model,
+                logger=logger,
+                record_lookup=record_lookup,
+                target_cardinality=target_cardinality,
+                protected_exact_pairs=exact_pairs_for_reporting,
+            )
+        else:
+            train_ref_pairs = set(calibration_ref_pairs)
+            validation_ref_pairs = set(calibration_ref_pairs)
+            split_meta = dict(calibration_choice.get("validation_split", {}))
+        if calibration_choice is None:
             self._log(
                 logger,
                 "Calibrated selector failed to fit acceptance model; using heuristic selector.",
                 "warning",
             )
             return None
+        utilities = calibration_choice.get("utilities", utilities)
         source_decisions = calibration_choice["source_decisions"]
         accept_threshold = float(calibration_choice["accept_threshold"])
         threshold_metrics = dict(calibration_choice["threshold_metrics"])
+        oof_accept_threshold = calibration_choice.get("oof_accept_threshold")
+        oof_threshold_metrics = dict(calibration_choice.get("oof_threshold_metrics", {}))
+        final_refit_threshold_metrics = dict(calibration_choice.get("final_refit_threshold_metrics", {}))
         target_conflict_enabled = bool(calibration_choice.get("target_conflict_enabled", False))
         if bool(threshold_metrics.get("fallback_to_f1", False)):
             self._log(
@@ -726,6 +770,7 @@ class CandidateSetSelector(IModel):
             "rank_feature_names": list(self.RANK_FEATURE_NAMES),
             "accept_feature_names": list(self.ACCEPT_FEATURE_NAMES),
             "accept_threshold": accept_threshold,
+            "oof_accept_threshold": oof_accept_threshold,
             "accept_objective": threshold_metrics.get("accept_objective"),
             "accept_selected_metrics": threshold_metrics.get("selected_metrics", {}),
             "accept_best_f1_metrics": threshold_metrics.get("best_f1", {}),
@@ -733,10 +778,21 @@ class CandidateSetSelector(IModel):
             "accept_recall_at_precision_metrics": threshold_metrics.get("recall_at_precision", {}),
             "accept_fallback_to_f1": bool(threshold_metrics.get("fallback_to_f1", False)),
             "threshold_metrics": threshold_metrics,
+            "oof_threshold_metrics": oof_threshold_metrics,
+            "final_refit_threshold_metrics": final_refit_threshold_metrics,
             "llm_groups": n_llm,
             "abstained_groups": n_abstained,
             "calibration": dict(self.calibration),
         }
+        refit_diagnostic = ""
+        if oof_accept_threshold is not None:
+            refit_diagnostic = (
+                f"oof_accept_threshold={float(oof_accept_threshold):.3f}, "
+                f"oof_validation_P={oof_threshold_metrics.get('P', 0.0):.3f}, "
+                f"oof_validation_R={oof_threshold_metrics.get('R', 0.0):.3f}, "
+                f"oof_validation_F1={oof_threshold_metrics.get('F1', 0.0):.3f}, "
+                f"final_refit_selected_sources={threshold_metrics.get('final_refit_selected_sources', 0)}, "
+            )
         self._log(
             logger,
             (
@@ -751,14 +807,16 @@ class CandidateSetSelector(IModel):
                 f"llm_mode={self.llm.get('mode')}, "
                 f"target_conflict_enabled={target_conflict_enabled}, "
                 f"accept_objective={threshold_metrics.get('accept_objective')}, "
+                f"metrics_scope={threshold_metrics.get('validation_scope', 'validation')}, "
+                f"{refit_diagnostic}"
                 f"accept_threshold={accept_threshold:.3f}, "
-                f"validation_P={threshold_metrics.get('P', 0.0):.3f}, "
-                f"validation_R={threshold_metrics.get('R', 0.0):.3f}, "
-                f"validation_F1={threshold_metrics.get('F1', 0.0):.3f}, "
-                f"validation_TP={threshold_metrics.get('TP', 0.0):.1f}, "
-                f"validation_FP={threshold_metrics.get('FP', 0.0):.1f}, "
-                f"validation_FN={threshold_metrics.get('FN', 0.0):.1f}, "
-                f"validation_F_beta={threshold_metrics.get('F_beta', 0.0):.3f}, "
+                f"selected_P={threshold_metrics.get('P', 0.0):.3f}, "
+                f"selected_R={threshold_metrics.get('R', 0.0):.3f}, "
+                f"selected_F1={threshold_metrics.get('F1', 0.0):.3f}, "
+                f"selected_TP={threshold_metrics.get('TP', 0.0):.1f}, "
+                f"selected_FP={threshold_metrics.get('FP', 0.0):.1f}, "
+                f"selected_FN={threshold_metrics.get('FN', 0.0):.1f}, "
+                f"selected_F_beta={threshold_metrics.get('F_beta', 0.0):.3f}, "
                 f"abstained_sources={n_abstained}, llm_sources={n_llm}."
             ),
             "info",
@@ -994,6 +1052,296 @@ class CandidateSetSelector(IModel):
             }
         )
         return train_ref_pairs, validation_ref_pairs, meta
+
+    def _reference_source_folds(
+        self,
+        ref_pairs: set[Tuple[str, str]],
+    ) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+        clean_pairs = {
+            (str(src), str(tgt))
+            for src, tgt in ref_pairs
+            if str(src) and str(tgt)
+        }
+        sources = sorted({src for src, _ in clean_pairs})
+        requested_folds = max(1, int(self.calibration.get("validation_folds", 1)))
+        validation_fraction = float(self.calibration.get("validation_fraction", 0.0))
+        meta: Dict[str, Any] = {
+            "seed": int(self.request_seed),
+            "validation_fraction": validation_fraction,
+            "validation_folds": requested_folds,
+            "source_disjoint": True,
+            "held_out": False,
+            "strategy": "kfold",
+            "n_sources": len(sources),
+            "n_folds": 0,
+            "fold_source_counts": [],
+        }
+        if requested_folds <= 1 or validation_fraction <= 0.0 or len(sources) <= 1:
+            meta["source_disjoint"] = False
+            return [], meta
+
+        n_folds = min(requested_folds, len(sources))
+        if n_folds <= 1:
+            meta["source_disjoint"] = False
+            return [], meta
+
+        shuffled_sources = list(sources)
+        random.Random(int(self.request_seed)).shuffle(shuffled_sources)
+        source_folds = [
+            set(shuffled_sources[fold_idx::n_folds])
+            for fold_idx in range(n_folds)
+        ]
+        folds: List[Dict[str, Any]] = []
+        for fold_idx, validation_sources in enumerate(source_folds):
+            if not validation_sources:
+                continue
+            train_sources = set(sources).difference(validation_sources)
+            train_ref_pairs = {pair for pair in clean_pairs if pair[0] in train_sources}
+            validation_ref_pairs = {pair for pair in clean_pairs if pair[0] in validation_sources}
+            if not train_ref_pairs or not validation_ref_pairs:
+                continue
+            folds.append(
+                {
+                    "fold": fold_idx,
+                    "train_ref_pairs": train_ref_pairs,
+                    "validation_ref_pairs": validation_ref_pairs,
+                    "validation_sources": set(validation_sources),
+                }
+            )
+
+        if len(folds) <= 1:
+            meta["source_disjoint"] = False
+            return [], meta
+
+        meta.update(
+            {
+                "held_out": True,
+                "n_folds": len(folds),
+                "fold_source_counts": [
+                    len(fold["validation_sources"])
+                    for fold in folds
+                ],
+                "n_train_sources": len(sources),
+                "n_validation_sources": len(sources),
+                "n_train_pairs": len(clean_pairs),
+                "n_validation_pairs": len(clean_pairs),
+            }
+        )
+        return folds, meta
+
+    def _select_accept_model_by_oof_validation(
+        self,
+        df: pd.DataFrame,
+        rank_features: Dict[int, List[float]],
+        distinctive: Dict[int, float],
+        calibration_ref_pairs: set[Tuple[str, str]],
+        exact_prefiltered_sources: set[str],
+        primary_model: Optional[IModel],
+        logger: Optional[Any],
+        record_lookup: Dict[Tuple[str, str], Dict[str, Any]],
+        target_cardinality: Optional[int],
+        protected_exact_pairs: set[Tuple[str, str]],
+    ) -> Optional[Dict[str, Any]]:
+        folds, fold_meta = self._reference_source_folds(calibration_ref_pairs)
+        if not folds:
+            return None
+
+        original_background_weight = float(self.calibration["background_negative_weight"])
+        original_llm_mode = str(self.llm.get("mode", "veto"))
+        min_positive = int(self.calibration["min_positive_sources"])
+        best_choice: Optional[Dict[str, Any]] = None
+
+        for background_weight in self.calibration.get("background_negative_weight_grid", []):
+            self.calibration["background_negative_weight"] = float(background_weight)
+            eval_decisions: Dict[str, Dict[str, Any]] = {}
+            fold_failed = False
+            fold_positive_sources: List[int] = []
+
+            for fold in folds:
+                train_ref_pairs = set(fold["train_ref_pairs"])
+                validation_ref_pairs = set(fold["validation_ref_pairs"])
+                validation_sources = set(fold["validation_sources"])
+                rank_groups, n_positive_sources = self._rank_training_groups(df, train_ref_pairs)
+                fold_positive_sources.append(n_positive_sources)
+                if n_positive_sources < min_positive:
+                    fold_failed = True
+                    break
+                rank_model = self._fit_rank_model(rank_features, rank_groups)
+                if rank_model is None:
+                    fold_failed = True
+                    break
+                utilities = {
+                    idx: self._linear_score(rank_features[idx], rank_model)
+                    for idx in rank_features
+                }
+
+                train_decisions = self._source_decisions(
+                    df,
+                    utilities,
+                    rank_features,
+                    distinctive,
+                    train_ref_pairs,
+                    exact_prefiltered_sources=exact_prefiltered_sources,
+                )
+                for src in validation_sources:
+                    if src in train_decisions:
+                        train_decisions[src]["sample_weight"] = 0.0
+                accept_model = self._fit_accept_model(train_decisions)
+                if accept_model is None:
+                    fold_failed = True
+                    break
+
+                validation_decisions_all = self._source_decisions(
+                    df,
+                    utilities,
+                    rank_features,
+                    distinctive,
+                    validation_ref_pairs,
+                    exact_prefiltered_sources=exact_prefiltered_sources,
+                )
+                validation_decisions = {
+                    src: decision
+                    for src, decision in validation_decisions_all.items()
+                    if src in validation_sources and float(decision.get("sample_weight", 0.0)) > 0.0
+                }
+                if not validation_decisions:
+                    continue
+                self._assign_p_match(validation_decisions, accept_model)
+                for src, decision in validation_decisions.items():
+                    decision["validation_fold"] = int(fold["fold"])
+                    eval_decisions[src] = decision
+
+            if fold_failed or not eval_decisions:
+                continue
+
+            accept_threshold, threshold_metrics = self._tune_accept_threshold(eval_decisions)
+            for llm_mode in self._validation_llm_mode_candidates(primary_model):
+                mode_metrics = dict(threshold_metrics)
+                if llm_mode == "veto":
+                    mode_metrics = self._metrics_with_llm_veto(
+                        df=df,
+                        decisions=eval_decisions,
+                        threshold=accept_threshold,
+                        primary_model=primary_model,
+                        logger=logger,
+                        record_lookup=record_lookup,
+                    )
+                for target_conflict_enabled in self._target_conflict_mode_candidates(target_cardinality):
+                    target_metrics = dict(mode_metrics)
+                    if target_conflict_enabled:
+                        target_metrics = self._metrics_with_target_conflict(
+                            decisions=eval_decisions,
+                            threshold=accept_threshold,
+                            target_cardinality=int(target_cardinality or 1),
+                            protected_exact_pairs=protected_exact_pairs,
+                            vetoed_sources=set(mode_metrics.get("llm_vetoed_source_ids", [])),
+                        )
+                    target_metrics["background_negative_weight"] = float(background_weight)
+                    target_metrics["llm_mode"] = llm_mode
+                    target_metrics["target_conflict_enabled"] = bool(target_conflict_enabled)
+                    target_metrics["validation_scope"] = "oof"
+                    target_metrics["validation_folds"] = int(fold_meta.get("n_folds", 0))
+                    target_metrics["validation_sources"] = len(eval_decisions)
+                    target_metrics["fold_positive_sources_min"] = min(fold_positive_sources or [0])
+                    choice_key = (
+                        float(target_metrics.get("F1", 0.0)),
+                        float(target_metrics.get("P", 0.0)),
+                        float(accept_threshold),
+                        -float(background_weight),
+                        1.0 if llm_mode == "veto" else 0.0,
+                        1.0 if target_conflict_enabled else 0.0,
+                    )
+                    if best_choice is None or choice_key > best_choice["choice_key"]:
+                        best_choice = {
+                            "choice_key": choice_key,
+                            "accept_threshold": float(accept_threshold),
+                            "threshold_metrics": target_metrics,
+                            "background_negative_weight": float(background_weight),
+                            "llm_mode": llm_mode,
+                            "target_conflict_enabled": bool(target_conflict_enabled),
+                            "validation_split": dict(fold_meta),
+                        }
+
+        if best_choice is None:
+            self.calibration["background_negative_weight"] = original_background_weight
+            self.llm["mode"] = original_llm_mode
+            return None
+
+        self.calibration["background_negative_weight"] = float(best_choice["background_negative_weight"])
+        self.llm["mode"] = str(best_choice["llm_mode"])
+        rank_groups, _ = self._rank_training_groups(df, calibration_ref_pairs)
+        rank_model = self._fit_rank_model(rank_features, rank_groups)
+        if rank_model is None:
+            self.calibration["background_negative_weight"] = original_background_weight
+            self.llm["mode"] = original_llm_mode
+            return None
+        utilities = {
+            idx: self._linear_score(rank_features[idx], rank_model)
+            for idx in rank_features
+        }
+        source_decisions = self._source_decisions(
+            df,
+            utilities,
+            rank_features,
+            distinctive,
+            calibration_ref_pairs,
+            exact_prefiltered_sources=exact_prefiltered_sources,
+        )
+        accept_model = self._fit_accept_model(source_decisions)
+        if accept_model is None:
+            self.calibration["background_negative_weight"] = original_background_weight
+            self.llm["mode"] = original_llm_mode
+            return None
+        self._assign_p_match(source_decisions, accept_model)
+
+        oof_accept_threshold = float(best_choice["accept_threshold"])
+        oof_threshold_metrics = dict(best_choice["threshold_metrics"])
+        final_accept_threshold, final_threshold_metrics = self._tune_accept_threshold(source_decisions)
+        final_mode_metrics = dict(final_threshold_metrics)
+        if str(best_choice["llm_mode"]) == "veto":
+            final_mode_metrics = self._metrics_with_llm_veto(
+                df=df,
+                decisions=source_decisions,
+                threshold=final_accept_threshold,
+                primary_model=primary_model,
+                logger=logger,
+                record_lookup=record_lookup,
+            )
+        if bool(best_choice["target_conflict_enabled"]):
+            final_mode_metrics = self._metrics_with_target_conflict(
+                decisions=source_decisions,
+                threshold=final_accept_threshold,
+                target_cardinality=int(target_cardinality or 1),
+                protected_exact_pairs=protected_exact_pairs,
+                vetoed_sources=set(final_mode_metrics.get("llm_vetoed_source_ids", [])),
+            )
+        final_mode_metrics["background_negative_weight"] = float(best_choice["background_negative_weight"])
+        final_mode_metrics["llm_mode"] = str(best_choice["llm_mode"])
+        final_mode_metrics["target_conflict_enabled"] = bool(best_choice["target_conflict_enabled"])
+        final_mode_metrics["validation_scope"] = "final_refit"
+        final_mode_metrics["oof_selected_threshold"] = oof_accept_threshold
+        final_mode_metrics["oof_validation_F1"] = float(oof_threshold_metrics.get("F1", 0.0))
+        final_mode_metrics["oof_validation_P"] = float(oof_threshold_metrics.get("P", 0.0))
+        final_mode_metrics["oof_validation_R"] = float(oof_threshold_metrics.get("R", 0.0))
+        final_mode_metrics["oof_validation_sources"] = int(oof_threshold_metrics.get("validation_sources", 0))
+        final_mode_metrics["final_refit_selected_sources"] = int(
+            sum(
+                1
+                for decision in source_decisions.values()
+                if float(decision.get("p_match", 0.0)) >= float(final_accept_threshold)
+            )
+        )
+
+        best_choice["rank_model"] = rank_model
+        best_choice["accept_model"] = accept_model
+        best_choice["oof_accept_threshold"] = oof_accept_threshold
+        best_choice["oof_threshold_metrics"] = oof_threshold_metrics
+        best_choice["accept_threshold"] = float(final_accept_threshold)
+        best_choice["threshold_metrics"] = final_mode_metrics
+        best_choice["final_refit_threshold_metrics"] = dict(final_mode_metrics)
+        best_choice["utilities"] = utilities
+        best_choice["source_decisions"] = source_decisions
+        return best_choice
 
     def _select_accept_model_by_validation(
         self,

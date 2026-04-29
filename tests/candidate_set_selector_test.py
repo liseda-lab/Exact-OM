@@ -154,6 +154,47 @@ def _selector_training_df(include_candidate_miss=False):
     return pd.DataFrame(rows)
 
 
+def _kfold_selector_training_df(n_sources=6):
+    rows = []
+    for idx in range(n_sources):
+        src = f"s{idx}"
+        rows.extend(
+            [
+                {
+                    "Src": src,
+                    "Tgt": f"t_gold_{idx}",
+                    "S_final": 0.70,
+                    "s_label": 0.96,
+                    "S_struct": 0.96,
+                    "s_hier": 0.96,
+                    "s_sim": 0.95,
+                    "s_attr": 0.95,
+                    "s_diff": 0.98,
+                    "cand_sim": 0.70,
+                    "cand_sim_prob": 0.45,
+                    "src_obj_ic_mean": 0.5,
+                    "tgt_obj_ic_mean": 0.5,
+                },
+                {
+                    "Src": src,
+                    "Tgt": f"t_bad_{idx}",
+                    "S_final": 0.80,
+                    "s_label": 0.10,
+                    "S_struct": 0.12,
+                    "s_hier": 0.12,
+                    "s_sim": 0.12,
+                    "s_attr": 0.10,
+                    "s_diff": 0.45,
+                    "cand_sim": 0.80,
+                    "cand_sim_prob": 0.55,
+                    "src_obj_ic_mean": 0.5,
+                    "tgt_obj_ic_mean": 0.5,
+                },
+            ]
+        )
+    return pd.DataFrame(rows)
+
+
 def _write_training_reference(tmp_path, pairs):
     path = tmp_path / "train.tsv"
     pd.DataFrame(pairs, columns=["Src", "Tgt"]).to_csv(path, sep="\t", index=False)
@@ -312,6 +353,45 @@ def test_calibrated_selector_learns_rank_accept_from_training_reference(tmp_path
     assert scored.loc[("s_eval", "t_gold_eval"), "P_match"] >= scored.loc[("s_eval", "t_gold_eval"), "selection_accept_threshold"]
     assert scored.loc[("s_eval", "t_bad_eval"), "S_select"] == 0.0
     assert scored.loc[("s_eval", "t_gold_eval"), "P_rank"] > scored.loc[("s_eval", "t_bad_eval"), "P_rank"]
+
+
+def test_calibrated_selector_uses_source_disjoint_oof_calibration(tmp_path):
+    module = _load_selector_module()
+    pairs = [(f"s{idx}", f"t_gold_{idx}") for idx in range(6)]
+    train_ref = _write_training_reference(tmp_path, pairs)
+    selector = module.CandidateSetSelector(
+        enabled=True,
+        strategy="calibrated_rank_accept",
+        use_no_match=True,
+        llm={"enabled": False},
+        training_reference_file_path=train_ref,
+        request_seed=7,
+        calibration={
+            "min_positive_sources": 1,
+            "background_negative_weight": 0.0,
+            "background_negative_weight_grid": [0.0],
+            "validation_fraction": 0.2,
+            "validation_folds": 3,
+            "max_epochs": 40,
+        },
+    )
+
+    out = selector.forward(_kfold_selector_training_df(), threshold=0.7)
+    scored = out["candidate_df"].set_index(["Src", "Tgt"])
+
+    assert selector._calibration_meta["validation_split"]["strategy"] == "kfold"
+    assert selector._calibration_meta["validation_split"]["n_folds"] == 3
+    assert selector._calibration_meta["threshold_metrics"]["validation_scope"] == "final_refit"
+    assert selector._calibration_meta["oof_threshold_metrics"]["validation_scope"] == "oof"
+    assert selector._calibration_meta["oof_accept_threshold"] is not None
+    assert (
+        selector._calibration_meta["accept_threshold"]
+        == selector._calibration_meta["threshold_metrics"]["selected_threshold"]
+    )
+    assert "final_refit_selected_sources" in selector._calibration_meta["threshold_metrics"]
+    assert selector._calibration_meta["n_calibration_train_reference_pairs"] == 6
+    assert selector._calibration_meta["n_validation_reference_pairs"] == 6
+    assert scored.loc[("s0", "t_gold_0"), "P_match"] >= 0.0
 
 
 def test_calibrated_selector_fits_inside_no_grad_predict_context(tmp_path):
@@ -724,6 +804,18 @@ def test_legacy_selector_weights_map_to_support_weight():
     assert selector.support_weight == 0.25
     assert selector.no_match_threshold == 0.55
     assert selector.llm["max_candidates"] == 5
+
+
+def test_selector_llm_defaults_off_but_can_be_enabled_explicitly():
+    module = _load_selector_module()
+
+    default_selector = module.CandidateSetSelector()
+    enabled_selector = module.CandidateSetSelector(llm={"enabled": True})
+
+    assert default_selector.llm["enabled"] is False
+    assert default_selector.llm["mode"] == "off"
+    assert enabled_selector.llm["enabled"] is True
+    assert enabled_selector.llm["mode"] == "veto"
 
 
 def test_runner_applies_additional_model_with_results_json():

@@ -376,7 +376,8 @@ second_model:
       min_positive_sources: 50 # Minimum train sources with an in-candidate gold target before fitting supervised weights.
       background_negative_weight: 0.02 # Small weight for non-train source groups as likely global false positives.
       background_negative_weight_grid: [0.02, 0.05, 0.10, 0.20, 0.40] # Values swept on validation F1.
-      validation_fraction: 0.2 # Held-out fraction of training-reference sources used for selector tuning.
+      validation_fraction: 0.2 # Enables source-disjoint validation; set 0.0 to tune on all calibration references.
+      validation_folds: 5 # Source-disjoint folds for out-of-fold selector tuning; set 1 to use one held-out split.
       l2: 0.001 # L2 regularization for rank and acceptance weights.
       learning_rate: 0.05 # Adam learning rate for the lightweight calibration models.
       max_epochs: 200 # Maximum training epochs for calibration.
@@ -392,8 +393,8 @@ second_model:
       exact_prefiltered_source_policy: hard_negative # hard_negative keeps exact-solved train sources as accept negatives; exclude gives zero weight; legacy disables exact-aware calibration.
       exact_prefiltered_negative_weight: 1.0 # Acceptance weight for leftover non-exact candidates from exact-solved train sources.
     llm:
-      enabled: True
-      mode: veto # In calibrated selector mode, LLM may only veto a near-boundary winner as NO_MATCH.
+      enabled: False
+      mode: off # Selector LLM arbitration is off by default; use veto to only allow near-boundary NO_MATCH vetoes.
       ambiguity_margin: 0.08 # Trigger arbitration near candidate ties or near the NO_MATCH threshold.
       max_candidates: 5 # Maximum top candidates shown in each LLM arbitration prompt.
       trigger_acceptance_margin: 0.025 # Calibrated mode: call LLM when |P_match - accept_threshold| is this small.
