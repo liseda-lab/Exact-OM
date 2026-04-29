@@ -140,6 +140,16 @@ each template to contain the literal placeholders `$SRC` and `$TGT`.
 | `top_k` | `20` | Number of candidates retained per source. |
 | `use_amp` | `True` | Use mixed precision during lexical retrieval when supported. |
 
+Hybrid candidate generation keeps labels plus conservative short aliases for
+lexical retrieval. NCIT `P90`/`P107`/`P108`, OBO exact/related/narrow/broad
+synonyms, and clear generic label/name/synonym properties are allowed; IDs,
+definitions, comments, namespaces, semantic types, status/provenance fields,
+URLs, and long definition-like literals are excluded.
+
+Use `tools/run_candidate_recall_experiment.py` or the Slurm wrapper
+`deploy/sbatch/exact_candidate_recall_experiment.sh` to run candidate-only
+top-k recall sweeps without invoking the scorer or selector.
+
 ## Sanity checks and plotting
 
 | Parameter | Default | Explanation |

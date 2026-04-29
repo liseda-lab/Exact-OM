@@ -26,10 +26,12 @@ from exact.core.entities.configs.dataset import DatasetMask
 from exact.core.values import ANNOTATION_IRI
 from exact.core.entities.ontology import OntologyGraph
 from exact.utils.candidate_generation import (
+    candidate_annotation_priority,
     candidate_token_key,
     lexical_candidate_pair_scores,
     make_candidate_labels,
     rank_channel_scores,
+    select_candidate_annotation_literals,
 )
 from exact.utils.data import read_table
 
@@ -567,7 +569,7 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
             "filter_ignored_alignment_classes": self.filter_ignored_alignment_classes,
             "cardinality": self._cardinality,
             "candidate_share_k": self._candidate_share_k,
-            "candidate_generation_version": 4,
+            "candidate_generation_version": 5,
             "exact_prefilter_materialization_version": 2,
             "ignored_alignment_filter_version": 1,
             "candidate_generation_params": self._candidate_generation_params,
@@ -826,7 +828,7 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
         factory = ontology.getOWLOntologyManager().getOWLDataFactory()
         owl_class = factory.getOWLClass(IRI.create(str(iri)))
         label_prop = str(factory.getRDFSLabel().getIRI().toString())
-        annotation_candidates: List[Tuple[float, str]] = []
+        annotation_values: List[Tuple[str, str]] = []
         try:
             annotations = EntitySearcher.getAnnotations(owl_class, ontology)
             iterator = annotations.iterator()
@@ -839,42 +841,21 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
                 if not value.isLiteral():
                     continue
                 literal = str(value.asLiteral().get().getLiteral()).strip()
-                priority = self._candidate_annotation_priority(literal, prop_iri)
-                if priority is None:
-                    continue
-                annotation_candidates.append((priority, literal))
+                annotation_values.append((prop_iri, literal))
         except Exception:
             return texts
 
-        annotation_candidates.sort(key=lambda item: (item[0], OntologyGraph.normalize_label(item[1])))
-        for _, literal in annotation_candidates[:8]:
+        for literal in select_candidate_annotation_literals(
+            annotation_values,
+            seen_normalized=set(seen),
+            overall_cap=12,
+        ):
             _add(literal)
         return texts
 
     @staticmethod
     def _candidate_annotation_priority(literal: str, prop_iri: str) -> Optional[float]:
-        text = str(literal or "").strip()
-        normalized = OntologyGraph.normalize_label(text)
-        if not normalized:
-            return None
-        tokens = [token for token in normalized.split() if token]
-        if not tokens or len(tokens) > 16:
-            return None
-        if any(token.startswith("http") for token in tokens):
-            return None
-        if re.match(r"^[A-Za-z_]+:[A-Za-z0-9_.:-]+$", text):
-            return None
-        if len(tokens) <= 2 and normalized.endswith("ontology"):
-            return None
-
-        prop_name = str(prop_iri or "").rsplit("#", 1)[-1].rsplit("/", 1)[-1]
-        prop_norm = OntologyGraph.normalize_label(prop_name)
-        alias_prop = any(
-            key in prop_norm
-            for key in ("label", "synonym", "term", "name", "title", "pref", "alt")
-        )
-        length_penalty = abs(min(len(tokens), 8) - 4) / 8.0
-        return (0.0 if alias_prop else 0.5) + length_penalty
+        return candidate_annotation_priority(literal, prop_iri)
 
     def _semantic_label_pair_scores(
         self,

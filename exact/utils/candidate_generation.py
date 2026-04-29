@@ -5,7 +5,7 @@ from dataclasses import dataclass
 import math
 import re
 import unicodedata
-from typing import Dict, Iterable, List, Mapping, Sequence, Tuple
+from typing import Dict, Iterable, List, Mapping, Optional, Sequence, Set, Tuple
 
 
 @dataclass(frozen=True)
@@ -36,6 +36,143 @@ def candidate_tokens(normalized: str) -> Tuple[str, ...]:
 def candidate_token_key(text: str) -> Tuple[str, ...]:
     normalized = normalize_candidate_text(text)
     return candidate_tokens(normalized)
+
+
+def compact_candidate_text_key(text: str) -> str:
+    raw = "" if text is None else str(text)
+    return re.sub(r"[\W_]+", "", raw.lower())
+
+
+def candidate_annotation_property_key(prop_iri: str) -> str:
+    local = str(prop_iri or "").strip().rsplit("#", 1)[-1].rsplit("/", 1)[-1]
+    return normalize_candidate_text(local)
+
+
+def candidate_annotation_priority(literal: str, prop_iri: str) -> Optional[float]:
+    text = str(literal or "").strip()
+    normalized = normalize_candidate_text(text)
+    if not normalized:
+        return None
+    tokens = [token for token in normalized.split() if token]
+    if not tokens or len(tokens) > 12:
+        return None
+    if re.search(r"https?://|www\.", text, flags=re.IGNORECASE):
+        return None
+    if re.match(r"^[A-Za-z_]+:[A-Za-z0-9_.:-]+$", text):
+        return None
+    if len(tokens) <= 2 and normalized.endswith("ontology"):
+        return None
+
+    prop_text = str(prop_iri or "")
+    prop_key = candidate_annotation_property_key(prop_text)
+    prop_compact = compact_candidate_text_key(prop_text.rsplit("#", 1)[-1].rsplit("/", 1)[-1])
+    prop_terms = set(prop_key.split())
+
+    if prop_compact == "p90":
+        base_priority = 0.0
+    elif prop_compact in {"p107", "p108"}:
+        base_priority = 0.05
+    elif prop_key == "has exact synonym":
+        base_priority = 0.0
+    elif prop_key in {"has related synonym", "has narrow synonym", "has broad synonym"}:
+        base_priority = 0.15
+    else:
+        rejected_terms = {
+            "alternativeid",
+            "comment",
+            "created",
+            "creator",
+            "curator",
+            "date",
+            "definition",
+            "deprecated",
+            "description",
+            "editor",
+            "format",
+            "id",
+            "identifier",
+            "namespace",
+            "note",
+            "provenance",
+            "review",
+            "reviewer",
+            "semantic",
+            "slim",
+            "source",
+            "status",
+            "subset",
+            "type",
+            "version",
+            "xref",
+        }
+        explicit_rejected = {
+            "nhc0",
+            "p97",
+            "p106",
+            "p207",
+            "p322",
+            "p325",
+            "p363",
+            "iao0000115",
+            "iao0000231",
+        }
+        if prop_compact in explicit_rejected:
+            return None
+        if prop_terms.intersection(rejected_terms):
+            return None
+        alias_terms = {"alt", "label", "name", "pref", "synonym", "term", "title"}
+        if not prop_terms.intersection(alias_terms):
+            return None
+        base_priority = 0.30
+
+    length_penalty = abs(min(len(tokens), 6) - 3) / 30.0
+    return float(base_priority + length_penalty)
+
+
+def candidate_annotation_property_cap(prop_iri: str) -> int:
+    prop_text = str(prop_iri or "")
+    prop_key = candidate_annotation_property_key(prop_text)
+    prop_compact = compact_candidate_text_key(prop_text.rsplit("#", 1)[-1].rsplit("/", 1)[-1])
+    if prop_compact == "p90" or prop_key == "has exact synonym":
+        return 8
+    if prop_compact in {"p107", "p108"}:
+        return 2
+    if prop_key in {"has related synonym", "has narrow synonym", "has broad synonym"}:
+        return 4
+    return 4
+
+
+def select_candidate_annotation_literals(
+    annotations: Sequence[Tuple[str, str]],
+    seen_normalized: Optional[Set[str]] = None,
+    overall_cap: int = 12,
+) -> List[str]:
+    ranked: List[Tuple[float, str, int, str, str]] = []
+    for prop_iri, literal in annotations:
+        priority = candidate_annotation_priority(literal, prop_iri)
+        if priority is None:
+            continue
+        prop_key = candidate_annotation_property_key(prop_iri)
+        cap = candidate_annotation_property_cap(prop_iri)
+        ranked.append((float(priority), prop_key, int(cap), normalize_candidate_text(literal), str(literal).strip()))
+
+    ranked.sort(key=lambda item: (item[0], item[1], item[3], item[4]))
+    selected: List[str] = []
+    selected_seen = set(seen_normalized or set())
+    per_property_counts: Dict[str, int] = defaultdict(int)
+    limit = max(0, int(overall_cap))
+    for _, prop_key, cap, _, literal in ranked:
+        if len(selected) >= limit:
+            break
+        normalized = compact_candidate_text_key(literal)
+        if not normalized or normalized in selected_seen:
+            continue
+        if per_property_counts[prop_key] >= cap:
+            continue
+        selected_seen.add(normalized)
+        per_property_counts[prop_key] += 1
+        selected.append(literal)
+    return selected
 
 
 def candidate_char_grams(normalized: str, n: int = 3) -> Tuple[str, ...]:

@@ -1,8 +1,10 @@
 from exact.utils.candidate_generation import (
+    candidate_annotation_priority,
     candidate_token_key,
     lexical_candidate_pair_scores,
     make_candidate_labels,
     rank_channel_scores,
+    select_candidate_annotation_literals,
 )
 
 
@@ -44,3 +46,50 @@ def test_candidate_token_key_matches_order_and_possessive_variants_only():
     assert candidate_token_key("Congenital Mesoblastic Nephroma") != candidate_token_key(
         "classic congenital mesoblastic nephroma"
     )
+
+
+def test_candidate_annotation_priority_keeps_synonyms_and_rejects_noise():
+    assert candidate_annotation_priority("Adult Malignant Fibrous Histiocytoma", "http://x#P90") is not None
+    assert candidate_annotation_priority("Adult Unclassified Pleomorphic Sarcoma", "http://x#P107") is not None
+    assert candidate_annotation_priority("LPFS1", "http://www.geneontology.org/formats/oboInOwl#hasExactSynonym") is not None
+    assert candidate_annotation_priority("alternate disease name", "http://example.org#altLabel") is not None
+
+    assert candidate_annotation_priority("Disease or Syndrome", "http://x#P106") is None
+    assert candidate_annotation_priority("C3272295", "http://x#P207") is None
+    assert candidate_annotation_priority("Malignant", "http://x#P363") is None
+    assert candidate_annotation_priority("disease_ontology", "http://www.geneontology.org/formats/oboInOwl#hasOBONamespace") is None
+    assert candidate_annotation_priority("DOID:1234", "http://www.geneontology.org/formats/oboInOwl#hasAlternativeId") is None
+    assert candidate_annotation_priority("This is a comment", "http://www.w3.org/2000/01/rdf-schema#comment") is None
+    assert candidate_annotation_priority("http://example.org/noise", "http://example.org#hasExactSynonym") is None
+    assert (
+        candidate_annotation_priority(
+            "A rare disorder with a long explanatory sentence that describes symptoms rather than naming the entity",
+            "http://example.org#hasExactSynonym",
+        )
+        is None
+    )
+
+
+def test_select_candidate_annotation_literals_applies_caps_and_existing_labels():
+    annotations = [
+        ("http://x#P108", "Primary Label"),
+        ("http://x#P97", "A definition should not be selected."),
+        ("http://www.geneontology.org/formats/oboInOwl#hasOBONamespace", "disease_ontology"),
+    ]
+    annotations.extend(("http://x#P90", f"Alias {idx}") for idx in range(10))
+    annotations.extend(
+        ("http://www.geneontology.org/formats/oboInOwl#hasExactSynonym", f"Exact Synonym {idx}")
+        for idx in range(3)
+    )
+
+    selected = select_candidate_annotation_literals(
+        annotations,
+        seen_normalized={"primarylabel"},
+        overall_cap=20,
+    )
+
+    assert "Primary Label" not in selected
+    assert "A definition should not be selected." not in selected
+    assert "disease_ontology" not in selected
+    assert len([value for value in selected if value.startswith("Alias ")]) == 8
+    assert len([value for value in selected if value.startswith("Exact Synonym ")]) == 3
