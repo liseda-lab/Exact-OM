@@ -13,18 +13,21 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Report candidate-oracle and miss-bucket diagnostics for an Exact run.")
     parser.add_argument("run_dir", type=Path, help="Run output directory.")
     parser.add_argument("--reference", type=Path, default=None, help="Full reference TSV/CSV path.")
+    parser.add_argument("--train-reference", type=Path, default=None, help="Training/null reference TSV/CSV path.")
     parser.add_argument("--summary", type=Path, default=None, help="summary_metrics.csv path.")
     parser.add_argument("--alignment", type=Path, default=None, help="Saved alignment TSV/CSV path.")
     parser.add_argument("--json-output", type=Path, default=None, help="Optional path for machine-readable diagnostics.")
     args = parser.parse_args()
 
-    reference = args.reference or _infer_reference_path(args.run_dir)
+    reference = args.reference or _infer_dataset_path(args.run_dir, "full_reference")
     if reference is None:
         raise SystemExit("Could not infer reference path; pass --reference.")
+    train_reference = args.train_reference or _infer_dataset_path(args.run_dir, "train_reference")
 
     diagnostics = analyze_alignment_run(
         run_dir=args.run_dir,
         reference_path=reference,
+        train_reference_path=train_reference,
         summary_path=args.summary,
         alignment_path=args.alignment,
     )
@@ -33,7 +36,7 @@ def main() -> None:
         args.json_output.write_text(json.dumps(diagnostics, indent=2, sort_keys=True), encoding="utf-8")
 
 
-def _infer_reference_path(run_dir: Path) -> Optional[Path]:
+def _infer_dataset_path(run_dir: Path, key: str) -> Optional[Path]:
     try:
         import yaml
     except ImportError:
@@ -48,9 +51,9 @@ def _infer_reference_path(run_dir: Path) -> Optional[Path]:
         if not isinstance(dataset, dict):
             continue
         data_dir = dataset.get("data_dir")
-        full_reference = dataset.get("full_reference")
-        if data_dir and full_reference:
-            candidate = Path(data_dir) / str(full_reference)
+        value = dataset.get(key)
+        if data_dir and value:
+            candidate = Path(data_dir) / str(value)
             return candidate
     return None
 

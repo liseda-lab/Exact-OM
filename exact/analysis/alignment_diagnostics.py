@@ -12,6 +12,7 @@ Pair = Tuple[str, str]
 def analyze_alignment_run(
     run_dir: Path,
     reference_path: Path,
+    train_reference_path: Optional[Path] = None,
     summary_path: Optional[Path] = None,
     alignment_path: Optional[Path] = None,
 ) -> Dict[str, Any]:
@@ -21,17 +22,21 @@ def analyze_alignment_run(
     alignment_path = alignment_path or _find_alignment_path(run_dir)
 
     reference_df = _read_table(reference_path)
+    train_reference_df = _read_table(train_reference_path) if train_reference_path is not None else pd.DataFrame()
     summary_df = _read_table(summary_path) if summary_path is not None else pd.DataFrame()
     alignment_df = _read_table(alignment_path) if alignment_path is not None else pd.DataFrame()
 
-    reference_pairs = _pairs_from_columns(reference_df, reference_df.columns[:2])
+    raw_reference_pairs = _pairs_from_columns(reference_df, reference_df.columns[:2])
+    null_reference_pairs = _pairs_from_columns(train_reference_df, train_reference_df.columns[:2])
+    reference_pairs = raw_reference_pairs.difference(null_reference_pairs)
     candidate_pairs = _pairs_from_columns(summary_df, ("src_iri", "tgt_iri"))
     if not alignment_df.empty:
-        prediction_pairs = _pairs_from_columns(alignment_df, alignment_df.columns[:2])
+        raw_prediction_pairs = _pairs_from_columns(alignment_df, alignment_df.columns[:2])
     else:
-        prediction_pairs = _saved_pairs_from_summary(summary_df)
+        raw_prediction_pairs = _saved_pairs_from_summary(summary_df)
+    prediction_pairs = raw_prediction_pairs.difference(null_reference_pairs)
 
-    selected_pairs = _saved_pairs_from_summary(summary_df) or prediction_pairs
+    selected_pairs = (_saved_pairs_from_summary(summary_df) or raw_prediction_pairs).difference(null_reference_pairs)
     tp = reference_pairs.intersection(prediction_pairs)
     fp = prediction_pairs.difference(reference_pairs)
     fn = reference_pairs.difference(prediction_pairs)
@@ -56,6 +61,7 @@ def analyze_alignment_run(
         "paths": {
             "run_dir": str(run_dir),
             "reference": str(reference_path),
+            "train_reference": str(train_reference_path) if train_reference_path else None,
             "summary": str(summary_path) if summary_path else None,
             "alignment": str(alignment_path) if alignment_path else None,
         },
@@ -66,6 +72,10 @@ def analyze_alignment_run(
             "true_positive_pairs": len(tp),
             "false_positive_pairs": len(fp),
             "false_negative_pairs": len(fn),
+            "raw_reference_pairs": len(raw_reference_pairs),
+            "raw_prediction_pairs": len(raw_prediction_pairs),
+            "null_reference_pairs": len(null_reference_pairs),
+            "null_prediction_pairs": len(raw_prediction_pairs.intersection(null_reference_pairs)),
         },
         "metrics": _precision_recall_f1(len(tp), len(fp), len(fn)),
         "oracle": {
@@ -81,7 +91,7 @@ def analyze_alignment_run(
             "present_rejected_or_filtered": len(present_rejected),
         },
         "gold_rank": _gold_rank_summary(summary_df, fn),
-        "llm": _llm_summary(summary_df, reference_pairs),
+        "llm": _llm_summary(summary_df, reference_pairs, null_reference_pairs),
     }
     return diagnostics
 
@@ -229,7 +239,11 @@ def _rank_lookup(df: pd.DataFrame, score_col: str) -> Dict[Pair, int]:
     return lookup
 
 
-def _llm_summary(df: pd.DataFrame, reference_pairs: set[Pair]) -> Dict[str, Any]:
+def _llm_summary(
+    df: pd.DataFrame,
+    reference_pairs: set[Pair],
+    null_reference_pairs: set[Pair],
+) -> Dict[str, Any]:
     if df.empty or "selector_llm_used" not in df.columns:
         return {}
     llm_rows = df.loc[_bool_series(df["selector_llm_used"])]
@@ -237,7 +251,7 @@ def _llm_summary(df: pd.DataFrame, reference_pairs: set[Pair]) -> Dict[str, Any]
         return {"rows": 0, "selected_tp": 0, "selected_fp": 0, "reasons": {}}
     saved = _bool_series(llm_rows.get("saved_alignment_member", pd.Series(False, index=llm_rows.index)))
     selected_rows = llm_rows.loc[saved]
-    selected_pairs = _pairs_from_columns(selected_rows, ("src_iri", "tgt_iri"))
+    selected_pairs = _pairs_from_columns(selected_rows, ("src_iri", "tgt_iri")).difference(null_reference_pairs)
     reasons = (
         llm_rows["selector_reason"].astype(str).value_counts().sort_index().to_dict()
         if "selector_reason" in llm_rows.columns

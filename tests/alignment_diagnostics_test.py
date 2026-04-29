@@ -94,3 +94,62 @@ def test_alignment_diagnostics_reports_oracle_and_miss_buckets(tmp_path: Path):
     assert diagnostics["miss_buckets"]["present_wrong_selected"] == 1
     assert diagnostics["miss_buckets"]["present_abstained"] == 1
     assert diagnostics["llm"]["selected_fp"] == 1
+
+
+def test_alignment_diagnostics_applies_train_reference_as_null_mappings(tmp_path: Path):
+    run_dir = tmp_path / "run"
+    align_dir = run_dir / "model" / "alignment"
+    align_dir.mkdir(parents=True)
+
+    reference_path = tmp_path / "ref.tsv"
+    reference_path.write_text(
+        "\n".join(
+            [
+                "SrcEntity\tTgtEntity\tScore",
+                "s1\tt1\t1.0",
+                "s2\tt2\t1.0",
+                "s_train\tt_train\t1.0",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    train_reference_path = tmp_path / "train.tsv"
+    train_reference_path.write_text(
+        "\n".join(
+            [
+                "SrcEntity\tTgtEntity\tScore",
+                "s_train\tt_train\t1.0",
+                "s_null\tt_null\t1.0",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    alignment_path = align_dir / "src2tgt.maps_global.tsv"
+    alignment_path.write_text(
+        "\n".join(
+            [
+                "SrcEntity\tTgtEntity\tScore",
+                "s1\tt1\t0.9",
+                "s2\tt_wrong\t0.8",
+                "s_train\tt_train\t1.0",
+                "s_null\tt_null\t1.0",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    diagnostics = analyze_alignment_run(
+        run_dir=run_dir,
+        reference_path=reference_path,
+        train_reference_path=train_reference_path,
+    )
+
+    assert diagnostics["counts"]["raw_reference_pairs"] == 3
+    assert diagnostics["counts"]["raw_prediction_pairs"] == 4
+    assert diagnostics["counts"]["null_reference_pairs"] == 2
+    assert diagnostics["counts"]["null_prediction_pairs"] == 2
+    assert diagnostics["counts"]["reference_pairs"] == 2
+    assert diagnostics["counts"]["prediction_pairs"] == 2
+    assert diagnostics["counts"]["true_positive_pairs"] == 1
+    assert diagnostics["counts"]["false_positive_pairs"] == 1
+    assert diagnostics["counts"]["false_negative_pairs"] == 1
