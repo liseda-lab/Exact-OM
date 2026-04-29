@@ -19,6 +19,9 @@ class CandidateLabel:
 
 def normalize_candidate_text(text: str) -> str:
     raw = "" if text is None else str(text)
+    raw = raw.replace("\u2019", "'").replace("\u2018", "'").replace("\u02bc", "'")
+    raw = re.sub(r"\b([A-Za-z0-9]+)'s\b", r"\1", raw)
+    raw = re.sub(r"\b([A-Za-z0-9]+)s'\b", r"\1s", raw)
     raw = re.sub(r"([a-z])([A-Z])", r"\1 \2", raw)
     raw = unicodedata.normalize("NFKD", raw).encode("ascii", "ignore").decode("ascii")
     raw = raw.lower().replace("_", " ").replace("-", " ")
@@ -28,6 +31,11 @@ def normalize_candidate_text(text: str) -> str:
 
 def candidate_tokens(normalized: str) -> Tuple[str, ...]:
     return tuple(sorted({token for token in normalized.split() if token}))
+
+
+def candidate_token_key(text: str) -> Tuple[str, ...]:
+    normalized = normalize_candidate_text(text)
+    return candidate_tokens(normalized)
 
 
 def candidate_char_grams(normalized: str, n: int = 3) -> Tuple[str, ...]:

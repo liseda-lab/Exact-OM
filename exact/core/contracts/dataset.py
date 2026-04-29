@@ -23,8 +23,10 @@ from sentence_transformers import SentenceTransformer
 from exact.core.contracts.base import SelfRegisteringComponent, LoggingClass
 from exact.core.entities.registry import ComponentType
 from exact.core.entities.configs.dataset import DatasetMask
+from exact.core.values import ANNOTATION_IRI
 from exact.core.entities.ontology import OntologyGraph
 from exact.utils.candidate_generation import (
+    candidate_token_key,
     lexical_candidate_pair_scores,
     make_candidate_labels,
     rank_channel_scores,
@@ -57,6 +59,7 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
                  cardinality: int = 1,
                  num_workers: Optional[int] = None,
                  drop_exact_match_sources: bool = True,
+                 filter_ignored_alignment_classes: bool = False,
                  **kwargs
         ) -> None:
 
@@ -88,6 +91,9 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
 
         self._filter_exact_matches: bool = filter_exact_matches
         self._drop_exact_match_sources: bool = drop_exact_match_sources
+        self._filter_ignored_alignment_classes: bool = bool(filter_ignored_alignment_classes)
+        self._source_ignored_alignment_classes: Optional[set[str]] = None
+        self._target_ignored_alignment_classes: Optional[set[str]] = None
 
         self._cardinality: int = cardinality
 
@@ -259,6 +265,18 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
         return self._drop_exact_match_sources
 
     @property
+    def filter_ignored_alignment_classes(self) -> bool:
+        return self._filter_ignored_alignment_classes
+
+    @property
+    def source_ignored_alignment_classes(self) -> set[str]:
+        return self._ignored_alignment_class_iris("src")
+
+    @property
+    def target_ignored_alignment_classes(self) -> set[str]:
+        return self._ignored_alignment_class_iris("tgt")
+
+    @property
     def source(self) -> OWLDataset:
         return self._source
     
@@ -322,6 +340,107 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
             self._target_graph = OntologyGraph(self.target.ontology, self.target_reasoner)
         return self._target_graph
 
+    def _ignored_alignment_class_iris(self, side: str) -> set[str]:
+        if not self.filter_ignored_alignment_classes:
+            return set()
+
+        side_key = "src" if side in {"src", "source"} else "tgt"
+        cached = (
+            self._source_ignored_alignment_classes
+            if side_key == "src"
+            else self._target_ignored_alignment_classes
+        )
+        if cached is not None:
+            return cached
+
+        dataset = self.source if side_key == "src" else self.target
+        if dataset is None:
+            return set()
+        ontology = dataset.ontology
+        ignored: set[str] = set()
+        try:
+            for owl_class in ontology.getClassesInSignature():
+                class_iri = str(owl_class.getIRI().toString())
+                axioms = ontology.getAnnotationAssertionAxioms(owl_class.getIRI())
+                iterator = axioms.iterator()
+                while iterator.hasNext():
+                    axiom = iterator.next()
+                    try:
+                        prop_iri = str(axiom.getProperty().getIRI().toString())
+                    except Exception:
+                        continue
+                    if prop_iri != ANNOTATION_IRI:
+                        continue
+                    value = axiom.getValue()
+                    literal = None
+                    if hasattr(value, "isLiteral") and value.isLiteral():
+                        literal = str(value.asLiteral().get().getLiteral())
+                    elif hasattr(value, "getLiteral"):
+                        literal = str(value.getLiteral())
+                    if literal is not None and literal.strip().lower() == "false":
+                        ignored.add(class_iri)
+        except Exception as exc:
+            self.log(
+                f"Failed to read use_in_alignment annotations for {side_key}: {exc}",
+                level="warning",
+            )
+            ignored = set()
+
+        if side_key == "src":
+            self._source_ignored_alignment_classes = ignored
+        else:
+            self._target_ignored_alignment_classes = ignored
+        if ignored:
+            self.log(
+                f"#Ignored alignment classes ({side_key}): {len(ignored)} use_in_alignment=false",
+                level="info",
+            )
+        return ignored
+
+    def _filter_ignored_iris(self, iris: Sequence[Any], side: str) -> List[Any]:
+        if not self.filter_ignored_alignment_classes:
+            return list(iris)
+        ignored = self._ignored_alignment_class_iris(side)
+        if not ignored:
+            return list(iris)
+        return [iri for iri in iris if str(iri) not in ignored]
+
+    def _filter_candidates_ignored_classes(self, df: Optional[DataFrame]) -> Optional[DataFrame]:
+        if df is None or df.empty or not self.filter_ignored_alignment_classes:
+            return df
+        if not {"Src", "Tgt"}.issubset(df.columns):
+            return df
+        src_ignored = self.source_ignored_alignment_classes
+        tgt_ignored = self.target_ignored_alignment_classes
+        if not src_ignored and not tgt_ignored:
+            return df
+        keep = ~(
+            df["Src"].astype(str).isin(src_ignored)
+            | df["Tgt"].astype(str).isin(tgt_ignored)
+        )
+        removed = int((~keep).sum())
+        if removed:
+            self.log(f"#Filtered {removed} candidate rows with ignored alignment classes.", level="info")
+        return df.loc[keep].reset_index(drop=True)
+
+    def _filter_mappings_ignored_classes(self, df: Optional[DataFrame], label: str) -> Optional[DataFrame]:
+        if df is None or df.empty or not self.filter_ignored_alignment_classes:
+            return df
+        if not {"Src", "Tgt"}.issubset(df.columns):
+            return df
+        src_ignored = self.source_ignored_alignment_classes
+        tgt_ignored = self.target_ignored_alignment_classes
+        if not src_ignored and not tgt_ignored:
+            return df
+        keep = ~(
+            df["Src"].astype(str).isin(src_ignored)
+            | df["Tgt"].astype(str).isin(tgt_ignored)
+        )
+        removed = int((~keep).sum())
+        if removed:
+            self.log(f"#Filtered {removed} {label} rows with ignored alignment classes.", level="info")
+        return df.loc[keep].reset_index(drop=True)
+
     def get_exact_matches(self) -> None:
         """
         Extract exact equivalence mappings by normalizing labels on both ontologies
@@ -348,31 +467,60 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
             src_map = self.source_graph.get_labels_map()
             tgt_map = self.target_graph.get_labels_map()
 
-        # Build normalized label→IRIs indexes
+        if self.filter_ignored_alignment_classes:
+            src_ignored = self.source_ignored_alignment_classes
+            tgt_ignored = self.target_ignored_alignment_classes
+            if src_ignored:
+                src_map = {iri: labels for iri, labels in src_map.items() if str(iri) not in src_ignored}
+            if tgt_ignored:
+                tgt_map = {iri: labels for iri, labels in tgt_map.items() if str(iri) not in tgt_ignored}
+
+        # Build normalized label→IRIs indexes. The compact key preserves the
+        # historical exact-match behavior; the token key adds conservative
+        # near-exact rescue for punctuation and word-order variants.
         self.log("#Indexing normalized labels for exact matching...", level="debug")
-        def index_norm(map_) -> Dict[str, List[str]]:
-            idx = {}
+        def index_norm(map_, key_fn: Callable[[str], Any]) -> Dict[Any, List[str]]:
+            idx: Dict[Any, List[str]] = {}
             for iri, labels in map_.items():
                 for lab in labels:
-                    nl = OntologyGraph.normalize_label(lab)
+                    nl = key_fn(lab)
                     if not nl:
                         continue
                     idx.setdefault(nl, []).append(iri)
             return idx
 
-        src_idx = index_norm(src_map)
-        tgt_idx = index_norm(tgt_map)
+        def token_exact_key(label: str) -> Tuple[str, ...]:
+            key = candidate_token_key(label)
+            return key if len(key) >= 2 else tuple()
 
-        # Intersect by normalized label keys
-        shared = set(src_idx.keys()).intersection(tgt_idx.keys())
-        exact_rows = []
-        for key in shared:
-            for s in src_idx[key]:
-                for t in tgt_idx[key]:
-                    exact_rows.append([s, t, 1.0])
+        def pairs_from_indexes(src_idx: Dict[Any, List[str]], tgt_idx: Dict[Any, List[str]]) -> set[Tuple[str, str]]:
+            pairs: set[Tuple[str, str]] = set()
+            shared = set(src_idx.keys()).intersection(tgt_idx.keys())
+            for key in shared:
+                for s in src_idx[key]:
+                    for t in tgt_idx[key]:
+                        pairs.add((s, t))
+            return pairs
+
+        compact_pairs = pairs_from_indexes(
+            index_norm(src_map, OntologyGraph.normalize_label),
+            index_norm(tgt_map, OntologyGraph.normalize_label),
+        )
+        token_pairs = pairs_from_indexes(
+            index_norm(src_map, token_exact_key),
+            index_norm(tgt_map, token_exact_key),
+        )
+        near_exact_pairs = token_pairs.difference(compact_pairs)
+        exact_rows = [[s, t, 1.0] for s, t in sorted(compact_pairs.union(token_pairs))]
 
         self._exact_matches = pd.DataFrame(exact_rows, columns=["Src", "Tgt", "Score"])
-        self.log(f"#Exact matches found: {len(self._exact_matches)}", level="info")
+        self._exact_matches = self._filter_mappings_ignored_classes(self._exact_matches, label="exact")
+        self.log(
+            "#Exact matches found: "
+            f"{len(self._exact_matches)} "
+            f"(compact={len(compact_pairs)}, token_near_exact={len(near_exact_pairs)})",
+            level="info",
+        )
 
     def load_ontologies(self, source_path: Path, target_path: Path) -> None:
         
@@ -416,9 +564,12 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
             "dataset_signature": self.dataset_signature,
             "filter_exact_matches": self.filter_exact_matches,
             "drop_exact_match_sources": self.drop_exact_match_sources,
+            "filter_ignored_alignment_classes": self.filter_ignored_alignment_classes,
             "cardinality": self._cardinality,
             "candidate_share_k": self._candidate_share_k,
-            "candidate_generation_version": 2,
+            "candidate_generation_version": 4,
+            "exact_prefilter_materialization_version": 2,
+            "ignored_alignment_filter_version": 1,
             "candidate_generation_params": self._candidate_generation_params,
             "only_taxonomy_hint": self._only_taxonomy_hint,
         }
@@ -477,7 +628,7 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
             self.log("#Loaded Candidates Path...", level="debug")
 
             # Get One2One candidates df
-            self._candidates = get_cands(candidates)
+            self._candidates = self._filter_candidates_ignored_classes(get_cands(candidates))
             self._annotate_candidate_similarity_stats()
             self.log("#Loaded Candidates...", level="info")
 
@@ -534,14 +685,35 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
 
         src_iris = self.source_graph.get_all_classes()
         tgt_iris = self.target_graph.get_all_classes()
+        if self.filter_ignored_alignment_classes:
+            n_src_before = len(src_iris)
+            n_tgt_before = len(tgt_iris)
+            src_iris = self._filter_ignored_iris(src_iris, "src")
+            tgt_iris = self._filter_ignored_iris(tgt_iris, "tgt")
+            self.log(
+                (
+                    "## Alignment-use class filter: "
+                    f"source={len(src_iris)}/{n_src_before}, target={len(tgt_iris)}/{n_tgt_before}"
+                ),
+                level="debug",
+            )
         self.log(f"## Source classes: {len(src_iris)} | Target classes: {len(tgt_iris)}", level="debug")
 
         if (not self.cardinality_1_to_many 
                 and self.drop_exact_match_sources 
                 and self._exact_matches is not None):
-            self.log("#Filtering Exact Matches from Candidate Generation...", level="debug")
-            src_iris = [iri for iri in src_iris if iri not in set(self._exact_matches["Src"])]
-            self.log(f"## Filtered Source classes for Candidate Generation: {len(src_iris)}", level="debug")
+            exact_sources = set(self._exact_matches["Src"].dropna().astype(str))
+            n_src_before = len(src_iris)
+            self.log("#Skipping exact-match sources during candidate generation...", level="debug")
+            src_iris = [iri for iri in src_iris if str(iri) not in exact_sources]
+            n_removed = n_src_before - len(src_iris)
+            self.log(
+                (
+                    "## Candidate-generation sources: "
+                    f"{len(src_iris)}/{n_src_before} (skipped_exact={n_removed})"
+                ),
+                level="debug",
+            )
         
         if not src_iris or not tgt_iris:
             self._candidates = pd.DataFrame(
@@ -630,7 +802,7 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
             ],
         )
 
-        self._candidates = cand_df
+        self._candidates = self._filter_candidates_ignored_classes(cand_df)
         self._annotate_candidate_similarity_stats()
         self._candidates_generated = True
         self.log(f"#Candidate generation complete: {len(self._candidates)} rows (Top-{top_k} per source).", level="debug")
@@ -839,6 +1011,7 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
 
         self._reference = read_table(file_path)
         self._reference.columns = ["Src", "Tgt", "Label"]
+        self._reference = self._filter_mappings_ignored_classes(self._reference, label="reference")
         self.log("#Loaded Reference...", level="debug")
 
     def save(self) -> Path:
@@ -882,6 +1055,11 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
 
     def process(self) -> "IDataset":
 
+        self._candidates = self._filter_candidates_ignored_classes(self._candidates)
+        if self._reference is not None:
+            self._reference = self._filter_mappings_ignored_classes(self._reference, label="reference")
+        if self._exact_matches is not None:
+            self._exact_matches = self._filter_mappings_ignored_classes(self._exact_matches, label="exact")
         self._annotate_candidate_similarity_stats()
 
         if self.has_cache():
@@ -905,77 +1083,88 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
             inference_set["Label"] = inference_set["Label_y"].combine_first(inference_set["Label"])
             inference_set.drop(columns=["Label_y"], inplace=True)
 
-            # Warn how many unique source-target pairs full reference has that are not in the candidates with percentage
-            unique_pairs_inference = set(zip(inference_set["Src"], inference_set["Tgt"]))
-            unique_pairs_full_ref = set(zip(self.reference["Src"], self.reference["Tgt"]))
-            missing_pairs = unique_pairs_full_ref - unique_pairs_inference  
+            exact_prefilter_pairs = self._exact_mapping_pairs()
+            # Warn how many unique source-target pairs full reference has that are not
+            # recoverable either by scored candidates or by exact prefiltering.
+            unique_pairs_inference = set(zip(inference_set["Src"].astype(str), inference_set["Tgt"].astype(str)))
+            unique_pairs_full_ref = set(zip(self.reference["Src"].astype(str), self.reference["Tgt"].astype(str)))
+            raw_missing_pairs = unique_pairs_full_ref - unique_pairs_inference
+            missing_pairs = raw_missing_pairs.difference(exact_prefilter_pairs)
 
             if missing_pairs:
                 missing_percentage = len(missing_pairs) / len(unique_pairs_full_ref) * 100
-                self.log(f"#Warning: {len(missing_pairs)} unique source-target pairs from full reference are not in the candidates ({missing_percentage:.2f}%)", level="warning")
+                self.log(f"#Warning: {len(missing_pairs)} reference pairs are not covered by candidates or exact prefiltering ({missing_percentage:.2f}%)", level="warning")
 
                 # Warn how many unique source entities full reference has that are not in the candidates with percentage
-                unique_src_inference = set(inference_set["Src"].unique())
-                unique_src_full_ref = set(self.reference["Src"].unique())
-                missing_src = unique_src_full_ref - unique_src_inference
+                unique_src_inference = set(inference_set["Src"].astype(str).unique())
+                unique_src_full_ref = set(self.reference["Src"].astype(str).unique())
+                missing_src = {src for src, _ in missing_pairs if src not in unique_src_inference}
 
                 if missing_src:
                     missing_percentage = len(missing_src) / len(unique_src_full_ref) * 100
-                    self.log(f"#Warning: {len(missing_src)} unique source entities from full reference are not in the candidates ({missing_percentage:.2f}%)", level="warning")
+                    self.log(f"#Warning: {len(missing_src)} reference sources are not covered by candidates or exact prefiltering ({missing_percentage:.2f}%)", level="warning")
 
                 # Warn how many unique target entities full reference has that are not in the candidates with percentage
-                unique_tgt_inference = set(inference_set["Tgt"].unique())
-                unique_tgt_full_ref = set(self.reference["Tgt"].unique())
-                missing_tgt = unique_tgt_full_ref - unique_tgt_inference
+                unique_tgt_inference = set(inference_set["Tgt"].astype(str).unique())
+                unique_tgt_full_ref = set(self.reference["Tgt"].astype(str).unique())
+                missing_tgt = {tgt for _, tgt in missing_pairs if tgt not in unique_tgt_inference}
 
                 if missing_tgt:
                     missing_percentage = len(missing_tgt) / len(unique_tgt_full_ref) * 100
-                    self.log(f"#Warning: {len(missing_tgt)} unique target entities from full reference are not in the candidates ({missing_percentage:.2f}%)", level="warning")
+                    self.log(f"#Warning: {len(missing_tgt)} reference targets are not covered by candidates or exact prefiltering ({missing_percentage:.2f}%)", level="warning")
 
-        pre_filtered_set = pd.DataFrame(columns=inference_set.columns)
+        pre_filtered_set = pd.DataFrame()
         pre_filtered_mappings = self.exact_matches
 
         if pre_filtered_mappings is not None and not pre_filtered_mappings.empty:
             pre_filtered_mappings = pre_filtered_mappings.drop_duplicates(subset=["Src", "Tgt"])
+            exact_prefilter_rows = self._exact_prefilter_rows(pre_filtered_mappings)
 
             pair_filtering = self.cardinality_1_to_many or not self.drop_exact_match_sources
 
             if pair_filtering:
                 # Remove only the exact (Src, Tgt) matches from the inference pool.
-                self.log("#Filtering Exact (Src, Tgt) matches from Inference Set...", level="debug")
                 exact_pairs_idx = pd.MultiIndex.from_frame(pre_filtered_mappings[["Src", "Tgt"]])
                 inference_pairs_idx = pd.MultiIndex.from_frame(inference_set[["Src", "Tgt"]])
                 match_mask = pd.Series(inference_pairs_idx.isin(exact_pairs_idx), index=inference_set.index)
+                n_removed = int(match_mask.sum())
 
-                if match_mask.any():
-                    pre_filtered_set = inference_set[match_mask].copy()
-                    pre_filtered_set["Scores"] = 1.0
+                if n_removed:
                     inference_set = inference_set[~match_mask]
+                pre_filtered_set = exact_prefilter_rows
+                self.log(
+                    (
+                        "#Exact prefilter: "
+                        f"mappings={len(pre_filtered_set)}, removed_candidate_rows={n_removed}"
+                    ),
+                    level="debug",
+                )
 
             else:
                 # Ranking task or cardinality=1-to-1: drop every candidate for sources with an exact match.
-                self.log("#Filtering Exact-match sources from Inference Set...", level="debug")
-                inference_pairs_idx = pd.MultiIndex.from_frame(inference_set[["Src", "Tgt"]])
-                exact_pairs_idx = pd.MultiIndex.from_frame(pre_filtered_mappings[["Src", "Tgt"]])
-                exact_pair_mask = pd.Series(inference_pairs_idx.isin(exact_pairs_idx), index=inference_set.index)
-
-                if exact_pair_mask.any():
-                    matched_pairs = (
-                        inference_set.loc[exact_pair_mask, ["Src", "Tgt"]]
-                        .drop_duplicates(subset=["Src"])
-                        .set_index("Src")["Tgt"]
-                    )
-
-                    src_mask = inference_set["Src"].isin(matched_pairs.index)
-                    pre_filtered_set = inference_set[src_mask].copy()
-                    expected_tgt = pre_filtered_set["Src"].map(matched_pairs)
-                    pre_filtered_set["Scores"] = (pre_filtered_set["Tgt"] == expected_tgt).astype(float)
+                exact_sources = set(pre_filtered_mappings["Src"].dropna().astype(str))
+                src_mask = inference_set["Src"].astype(str).isin(exact_sources)
+                n_removed = int(src_mask.sum())
+                n_sources_removed = int(inference_set.loc[src_mask, "Src"].nunique()) if n_removed else 0
+                if n_removed:
                     inference_set = inference_set[~src_mask]
+                pre_filtered_set = exact_prefilter_rows
+                removal_note = (
+                    "source_candidates_already_skipped"
+                    if n_removed == 0
+                    else f"removed_candidate_rows={n_removed}, removed_sources={n_sources_removed}"
+                )
+                self.log(
+                    (
+                        "#Exact prefilter: "
+                        f"mappings={len(pre_filtered_set)}, {removal_note}"
+                    ),
+                    level="debug",
+                )
 
-        pre_filtered_set[DatasetMask.inference] = False
-        pre_filtered_set[DatasetMask.prefiltered] = True
-
-        self.log(f"#Filtered {len(pre_filtered_set)} mappings from Inference Set", level="debug")
+        if not pre_filtered_set.empty:
+            pre_filtered_set[DatasetMask.inference] = False
+            pre_filtered_set[DatasetMask.prefiltered] = True
 
         inference_set = self.get_features(inference_set)
         inference_set[DatasetMask.inference] = True
@@ -983,11 +1172,43 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
 
         self.log(f"#Inference Set: {len(inference_set)} samples", level="debug")
 
-        self._df = pd.concat([inference_set, pre_filtered_set], ignore_index=True)
+        if pre_filtered_set.empty:
+            self._df = inference_set.reset_index(drop=True)
+        else:
+            self._df = pd.concat([inference_set, pre_filtered_set], ignore_index=True, sort=False)
 
         self.log("#Processing Done", level="debug")
 
         return self
+
+    def _exact_mapping_pairs(self) -> set[Tuple[str, str]]:
+        if not self.filter_exact_matches:
+            return set()
+        exact_matches = self.exact_matches
+        if exact_matches is None or exact_matches.empty or not {"Src", "Tgt"}.issubset(exact_matches.columns):
+            return set()
+        return {
+            (str(src), str(tgt))
+            for src, tgt in exact_matches[["Src", "Tgt"]].dropna().itertuples(index=False)
+        }
+
+    def _exact_prefilter_rows(self, exact_mappings: DataFrame) -> DataFrame:
+        rows = exact_mappings[["Src", "Tgt"]].dropna().copy()
+        if rows.empty:
+            return rows
+
+        score_column = None
+        for candidate in ("Scores", "Score"):
+            if candidate in exact_mappings.columns:
+                score_column = candidate
+                break
+        if score_column is None:
+            scores = pd.Series(1.0, index=rows.index)
+        else:
+            scores = pd.to_numeric(exact_mappings.loc[rows.index, score_column], errors="coerce").fillna(1.0)
+
+        rows["Scores"] = scores.astype(float)
+        return rows
 
     @abstractmethod
     def get_features(self, df: DataFrame) -> DataFrame:

@@ -301,6 +301,38 @@ def test_checkpoint_fingerprint_ignores_post_inference_models():
     assert payload["models"][0]["class"] == "_FingerprintModel"
 
 
+def test_additional_model_checkpoint_resume_can_be_disabled(tmp_path):
+    runner = object.__new__(SemanticAlignmentRunner)
+    runner._output_dir = tmp_path
+    runner._dataset = type("DatasetStub", (), {"dataset_signature": "dataset-a"})()
+    runner._model = _FingerprintModel(generate_llm_rationales=False)
+    runner._models = [runner._model]
+    runner._postprocess_checkpoints_enabled = True
+    runner._additional_model_checkpoint_resume_enabled = False
+    runner._additional_model_checkpoint_skip_logged = False
+    logs = []
+    runner.log = lambda msg, level="info", traceback=False: logs.append((level, msg))
+
+    kind = type("Kind", (), {"name": "inference"})()
+    path = runner._stage_checkpoint_path(kind, "additional_models", False, 0.7, 1)
+    path.write_text(
+        json.dumps(
+            {
+                "stage": "additional_models",
+                "complete": True,
+                "fingerprint_payload": runner._postprocess_fingerprint_payload(kind, False, 0.7, 1),
+                "candidate_records": [{"Src": "s", "Tgt": "t", "S_final": 0.9}],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    restored = runner._load_additional_models_checkpoint(kind, False, 0.7, 1)
+
+    assert restored is None
+    assert any("resume_additional_model_checkpoints=False" in message for _, message in logs)
+
+
 def test_generate_final_rationales_preserves_existing_values_when_disabled():
     runner = object.__new__(SemanticAlignmentRunner)
     runner._results_json = [

@@ -54,6 +54,9 @@ class DatasetParams(BaseModel):
     num_workers: Optional[int] = Field(config["dataset_params"]["num_workers"])
     filter_exact_matches: bool = Field(config["dataset_params"]["filter_exact_matches"])
     drop_exact_match_sources: bool = Field(config["dataset_params"]["drop_exact_match_sources"])
+    filter_ignored_alignment_classes: bool = Field(
+        config["dataset_params"].get("filter_ignored_alignment_classes", False)
+    )
     candidate_share_k: int = Field(config["dataset_params"].get("candidate_share_k", 1))
 
     # Context Main Params
@@ -134,6 +137,9 @@ class InferenceParams(BaseModel):
     checkpoint_every: int = Field(config["inference_params"]["checkpoint_every"])
     resume_from_checkpoint: bool = Field(config["inference_params"]["resume_from_checkpoint"])
     enable_checkpoints: bool = Field(config["inference_params"]["enable_checkpoints"])
+    resume_additional_model_checkpoints: bool = Field(
+        config["inference_params"].get("resume_additional_model_checkpoints", True)
+    )
     allow_rationale_toggle_checkpoint_resume: bool = Field(
         config["inference_params"].get("allow_rationale_toggle_checkpoint_resume", False)
     )
@@ -142,6 +148,7 @@ class InferenceParams(BaseModel):
 class AlignmentParams(BaseModel):
     threshold: Optional[float] = Field(config["alignment_params"]["threshold"])
     cardinality: Optional[int] = Field(config["alignment_params"]["cardinality"])
+    target_cardinality: Optional[int] = Field(config["alignment_params"].get("target_cardinality", None))
     save_json: bool = Field(config["alignment_params"]["save_json"])
     save_csv: bool = Field(config["alignment_params"]["save_csv"])
     save_stats_csv: bool = Field(config["alignment_params"]["save_stats_csv"])

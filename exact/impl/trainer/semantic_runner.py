@@ -550,6 +550,15 @@ class SemanticAlignmentRunner(ITrainer):
     ) -> Optional[pd.DataFrame]:
         if not bool(getattr(self, "_postprocess_checkpoints_enabled", False)):
             return None
+        if not bool(getattr(self, "_additional_model_checkpoint_resume_enabled", True)):
+            if not bool(getattr(self, "_additional_model_checkpoint_skip_logged", False)):
+                self.log(
+                    "Skipping additional-model checkpoint resume because "
+                    "resume_additional_model_checkpoints=False.",
+                    "info",
+                )
+                self._additional_model_checkpoint_skip_logged = True
+            return None
         path = self._stage_checkpoint_path(kind, "additional_models", local_alignment, threshold, cardinality)
         try:
             with open(path, "r", encoding="utf-8") as f:
@@ -995,6 +1004,7 @@ class SemanticAlignmentRunner(ITrainer):
         kind: DatasetMask = DatasetMask.inference,
         threshold: Optional[float] = 0.7,
         cardinality: Optional[int] = None,
+        target_cardinality: Optional[int] = None,
         local_alignment: bool = False,
         batch_size: int = 8,
         num_workers: int = 0,
@@ -1004,6 +1014,7 @@ class SemanticAlignmentRunner(ITrainer):
         checkpoint_every: int = 10,
         resume_from_checkpoint: bool = True,
         enable_checkpoints: bool = True,
+        resume_additional_model_checkpoints: bool = True,
         allow_rationale_toggle_checkpoint_resume: bool = False,
         **kwargs,
     ) -> Tuple[List[EntityMapping], float]:
@@ -1040,6 +1051,10 @@ class SemanticAlignmentRunner(ITrainer):
 
         checkpoint_enabled = enable_checkpoints
         self._postprocess_checkpoints_enabled = bool(checkpoint_enabled)
+        self._additional_model_checkpoint_resume_enabled = bool(
+            checkpoint_enabled and resume_additional_model_checkpoints
+        )
+        self._additional_model_checkpoint_skip_logged = False
         checkpoint_every = max(1, int(checkpoint_every))
 
         cp_path: Optional[Path] = None
@@ -1089,6 +1104,7 @@ class SemanticAlignmentRunner(ITrainer):
                         local_alignment=local_alignment,
                         threshold=threshold,
                         cardinality=cardinality,
+                        target_cardinality=target_cardinality,
                         results_json=self.results_json,
                         log_every=log_every,
                     )
@@ -1096,6 +1112,8 @@ class SemanticAlignmentRunner(ITrainer):
                         kind, candidate_df, local_alignment, threshold, cardinality
                     )
                 all_mappings = list(zip(candidate_df["Src"], candidate_df["Tgt"], candidate_df["S_final"]))
+                self._selector_target_conflict_enabled = self._selector_target_conflict_enabled_from_df(candidate_df)
+                threshold = self._effective_alignment_threshold(candidate_df, threshold)
             df = pd.DataFrame(all_mappings, columns=["Src", "Tgt", "Scores"])
             preds = EntityMapping.read_table_mappings(df, threshold=threshold, cardinality=cardinality)
             self._annotate_final_prediction_records(preds, threshold=threshold, local_alignment=local_alignment)
@@ -1411,6 +1429,7 @@ class SemanticAlignmentRunner(ITrainer):
                     local_alignment=local_alignment,
                     threshold=threshold,
                     cardinality=cardinality,
+                    target_cardinality=target_cardinality,
                     results_json=self.results_json,
                     log_every=log_every,
                 )
@@ -1418,6 +1437,8 @@ class SemanticAlignmentRunner(ITrainer):
                     kind, candidate_df, local_alignment, threshold, cardinality
                 )
             all_mappings = list(zip(candidate_df["Src"], candidate_df["Tgt"], candidate_df["S_final"]))
+            self._selector_target_conflict_enabled = self._selector_target_conflict_enabled_from_df(candidate_df)
+            threshold = self._effective_alignment_threshold(candidate_df, threshold)
             if self.results_json:
                 # Prefer the richer JSON (includes importances and LLM info) for plotting/summary.
                 # Additional models are expected to sync their public metrics back into records.
@@ -1450,6 +1471,35 @@ class SemanticAlignmentRunner(ITrainer):
             "Postprocess.Rationales": rationale_elapsed_seconds / 60.0,
         }
         return preds, avg_t
+
+    @staticmethod
+    def _effective_alignment_threshold(
+        candidate_df: pd.DataFrame,
+        threshold: Optional[float],
+    ) -> Optional[float]:
+        if threshold is None or candidate_df.empty:
+            return threshold
+        if "selection_accept_threshold" not in candidate_df.columns:
+            return threshold
+        selected = pd.to_numeric(candidate_df["selection_accept_threshold"], errors="coerce")
+        selected = selected[selected.notna() & (selected > 0.0)]
+        if selected.empty:
+            return threshold
+        return float(selected.median())
+
+    @staticmethod
+    def _selector_target_conflict_enabled_from_df(candidate_df: pd.DataFrame) -> Optional[bool]:
+        if candidate_df.empty or "selection_target_conflict_enabled" not in candidate_df.columns:
+            return None
+        if "selection_accept_threshold" in candidate_df.columns:
+            thresholds = pd.to_numeric(candidate_df["selection_accept_threshold"], errors="coerce")
+            if thresholds[thresholds.notna() & (thresholds > 0.0)].empty:
+                return None
+        values = candidate_df["selection_target_conflict_enabled"]
+        if values.empty:
+            return None
+        normalized = values.astype(str).str.lower().isin({"true", "1", "yes", "y"})
+        return bool(normalized.any())
 
     @property
     def last_stage_timings(self) -> Dict[str, float]:
@@ -1524,6 +1574,7 @@ class SemanticAlignmentRunner(ITrainer):
         local_alignment: bool = False,
         threshold: Optional[float] = None,
         cardinality: Optional[int] = None,
+        target_cardinality: Optional[int] = None,
         results_json: Optional[List[Dict[str, Any]]] = None,
         log_every: int = 10,
     ) -> pd.DataFrame:
@@ -1572,6 +1623,8 @@ class SemanticAlignmentRunner(ITrainer):
                 call_kwargs["threshold"] = threshold
             if accepts_var_kw or "cardinality" in sig.parameters:
                 call_kwargs["cardinality"] = cardinality
+            if accepts_var_kw or "target_cardinality" in sig.parameters:
+                call_kwargs["target_cardinality"] = target_cardinality
             if accepts_var_kw or "log_every" in sig.parameters:
                 call_kwargs["log_every"] = log_every
             if checkpoint_callback is not None and (

@@ -2,6 +2,10 @@
 *.DS_Store
 *.pyc
 
+# Local secrets and run scratch artifacts
+/api_key
+/mapping_example*.json
+
 # Matcha folder
 
 /matcha_dl/impl/matcha/matcha/*

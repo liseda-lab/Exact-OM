@@ -146,17 +146,32 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
                         alignment: List[EntityMapping],
                         threshold: Optional[float] = None,
                         cardinality: Optional[int] = None,
+                        target_cardinality: Optional[int] = None,
                         **kwargs
     ) -> List[EntityMapping]:
         """
         Apply prefiltering to the dataset based on the features.
         """
+        selector_target_conflict_enabled = getattr(self, "_selector_target_conflict_enabled", None)
+        if selector_target_conflict_enabled is False:
+            target_cardinality = None
         
         df = self.dataset.dataframe.copy()
         df = df[df[DatasetMask.prefiltered] == True]
 
         if df.empty:
             self.log("No data to prefilter", level="warning")
+            if target_cardinality is not None:
+                filtered = EntityMapping.filter_top_n_target_entity_mappings(alignment, target_cardinality)
+                self.log(
+                    (
+                        "Target conflict resolver: "
+                        f"target_cardinality={target_cardinality}, protected_exact_mappings=0, "
+                        f"removed_mappings={len(alignment) - len(filtered)}"
+                    ),
+                    level="info",
+                )
+                return filtered
             return alignment
 
         score_column = None
@@ -172,11 +187,35 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
         prefilter_df = df[["Src", "Tgt", score_column]].copy()
         prefilter_df.columns = ["Src", "Tgt", "Score"]
 
-        prefiltered_mappings = EntityMapping.read_table_mappings(prefilter_df, threshold=threshold, cardinality=cardinality)
-        final_alignment = alignment + prefiltered_mappings
+        prefiltered_mappings = EntityMapping.read_table_mappings(prefilter_df, threshold=threshold)
+        protected_pairs = {
+            (mapping.head, mapping.tail)
+            for mapping in prefiltered_mappings
+        }
+        final_alignment = prefiltered_mappings + alignment
         
         if cardinality is not None:
-            return EntityMapping.filter_top_n_entity_mappings(final_alignment, cardinality)
+            final_alignment = EntityMapping.filter_top_n_entity_mappings(
+                final_alignment,
+                cardinality,
+                protected_pairs=protected_pairs,
+            )
+        if target_cardinality is not None:
+            before_target_conflicts = len(final_alignment)
+            final_alignment = EntityMapping.filter_top_n_target_entity_mappings(
+                final_alignment,
+                target_cardinality,
+                protected_pairs=protected_pairs,
+            )
+            self.log(
+                (
+                    "Target conflict resolver: "
+                    f"target_cardinality={target_cardinality}, "
+                    f"protected_exact_mappings={len(protected_pairs)}, "
+                    f"removed_mappings={before_target_conflicts - len(final_alignment)}"
+                ),
+                level="info",
+            )
         
         return final_alignment
 

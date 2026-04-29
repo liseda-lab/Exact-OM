@@ -191,6 +191,8 @@ class AlignmentAction(Protocol):
                     "training_reference_file_path",
                     str(training_reference_file_path),
                 )
+            if getattr(extra.name, "__name__", "") == "CandidateSetSelector":
+                extra_params.setdefault("request_seed", configs.seed)
             model_specs.append((extra.name, extra_params))
 
         trainer = configs.trainer(

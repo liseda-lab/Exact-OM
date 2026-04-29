@@ -1,4 +1,5 @@
 from exact.utils.candidate_generation import (
+    candidate_token_key,
     lexical_candidate_pair_scores,
     make_candidate_labels,
     rank_channel_scores,
@@ -33,3 +34,13 @@ def test_rank_channel_scores_unions_channels_and_respects_top_k():
     assert rows[0]["Tgt"] == "t_lexical"
     assert rows[0]["cand_sim"] == 0.82
     assert rows[0]["cand_channels"] == "lexical"
+
+
+def test_candidate_token_key_matches_order_and_possessive_variants_only():
+    assert candidate_token_key("Clear Cell Renal Cell Carcinoma") == candidate_token_key(
+        "renal clear cell carcinoma"
+    )
+    assert candidate_token_key("Crohn Disease") == candidate_token_key("Crohn's disease")
+    assert candidate_token_key("Congenital Mesoblastic Nephroma") != candidate_token_key(
+        "classic congenital mesoblastic nephroma"
+    )

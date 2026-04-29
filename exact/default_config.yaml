@@ -27,6 +27,7 @@ alignment_params:
   # Maximum number of targets retained per source in the final global alignment.
   # If null, no cardinality filter is applied.
   cardinality: 1
+  target_cardinality: 1 # Maximum number of sources retained per target after exact+selector mappings are merged.
 
   # Output artifacts.
   save_json: True # Save full candidate-level explanations as JSON.
@@ -56,6 +57,7 @@ dataset_params:
   num_workers: null # Dataset loading worker count. Null means "let the system decide".
   filter_exact_matches: True # Remove exact lexical matches before scoring.
   drop_exact_match_sources: False # If True, remove all candidates for sources with an exact exact-match hit.
+  filter_ignored_alignment_classes: True # Remove use_in_alignment=false ontology classes before candidate generation and exact matching.
   reasoner_timeout_secs: 120 # Timeout for ontology reasoner construction, in seconds.
   reasoner_force_hermit: False # If True, force a HermiT retry after lighter reasoners.
   projection_include_literals: True # Pair-adaptive: if True, projected literal/annotation edges can feed attribute/support evidence in addition to ontology-native annotations.
@@ -169,6 +171,7 @@ inference_params:
   checkpoint_every: 10 # Write an inference checkpoint every N batches.
   resume_from_checkpoint: True # Resume from the latest checkpoint when available.
   enable_checkpoints: True # Enable checkpoint creation during inference.
+  resume_additional_model_checkpoints: True # Reuse post-inference selector/reranker checkpoints when available.
   allow_rationale_toggle_checkpoint_resume: True # If True, resume a checkpoint when the only model/config difference is `generate_llm_rationales`.
 
 llm_profiles:
@@ -362,6 +365,7 @@ second_model:
     strategy: calibrated_rank_accept # Use supervised rank/accept calibration when -r/--training_reference_file is provided; otherwise fall back.
     global_only: True # Run only for generated global candidate sets; local candidate-file rankings are left unchanged.
     replace_final_score: True # Replace S_final with the selector score for global threshold/cardinality.
+    score_mode: p_match # Accepted winners keep raw P_match as final selector score; rejected/non-winners get 0.
     use_no_match: True # Include an explicit NO_MATCH abstention risk per source group.
     temperature: 0.75 # Temperature for source-local competition probabilities and gap scaling.
     eps: 1.0e-6 # Numerical clamp for probabilities and divisions.
@@ -371,20 +375,25 @@ second_model:
       enabled: auto # Use the CLI training reference (-r) when available; no full/test reference leakage.
       min_positive_sources: 50 # Minimum train sources with an in-candidate gold target before fitting supervised weights.
       background_negative_weight: 0.02 # Small weight for non-train source groups as likely global false positives.
+      background_negative_weight_grid: [0.02, 0.05, 0.10, 0.20, 0.40] # Values swept on validation F1.
+      validation_fraction: 0.2 # Held-out fraction of training-reference sources used for selector tuning.
       l2: 0.001 # L2 regularization for rank and acceptance weights.
       learning_rate: 0.05 # Adam learning rate for the lightweight calibration models.
       max_epochs: 200 # Maximum training epochs for calibration.
       threshold_grid_step: 0.005 # Step size used when sweeping P_match thresholds from 0 to 1.
       # Acceptance-threshold objective for the source-level match/no-match decision:
-      #   f1: reproduce the old behavior and maximize calibration F1.
+      #   f1: maximize held-out validation F1.
       #   f_beta: maximize F_beta, using f_beta below to weight recall higher when beta > 1.
       #   recall_at_precision: maximize recall while keeping calibration precision >= min_precision.
-      accept_objective: recall_at_precision
+      accept_objective: f1
       f_beta: 1.5 # Used only when accept_objective=f_beta; values >1 favor recall over precision.
-      min_precision: 0.82 # Used by recall_at_precision as the minimum allowed calibration precision.
+      min_precision: null # Used only by recall_at_precision as the minimum allowed calibration precision.
       min_recall: null # Optional extra recall floor for recall_at_precision; null means no recall floor.
+      exact_prefiltered_source_policy: hard_negative # hard_negative keeps exact-solved train sources as accept negatives; exclude gives zero weight; legacy disables exact-aware calibration.
+      exact_prefiltered_negative_weight: 1.0 # Acceptance weight for leftover non-exact candidates from exact-solved train sources.
     llm:
       enabled: True
+      mode: veto # In calibrated selector mode, LLM may only veto a near-boundary winner as NO_MATCH.
       ambiguity_margin: 0.08 # Trigger arbitration near candidate ties or near the NO_MATCH threshold.
       max_candidates: 5 # Maximum top candidates shown in each LLM arbitration prompt.
       trigger_acceptance_margin: 0.025 # Calibrated mode: call LLM when |P_match - accept_threshold| is this small.

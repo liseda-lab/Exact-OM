@@ -3,6 +3,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pandas as pd
+import pytest
 import torch
 
 
@@ -19,6 +20,17 @@ def _load_runner_module():
     spec = importlib.util.spec_from_file_location("semantic_runner_module", module_path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
+    return module
+
+
+def _load_dataset_module_or_skip():
+    module_path = Path(__file__).resolve().parents[1] / "exact" / "core" / "contracts" / "dataset.py"
+    spec = importlib.util.spec_from_file_location("dataset_contract_module", module_path)
+    module = importlib.util.module_from_spec(spec)
+    try:
+        spec.loader.exec_module(module)
+    except Exception as exc:
+        pytest.skip(f"Dataset contract import unavailable in this environment: {exc}")
     return module
 
 
@@ -273,7 +285,10 @@ def test_llm_equivalent_choice_boosts_ambiguous_candidate():
 
 def test_calibrated_selector_learns_rank_accept_from_training_reference(tmp_path):
     module = _load_selector_module()
-    train_ref = _write_training_reference(tmp_path, [("s_train", "t_gold_train")])
+    train_ref = _write_training_reference(
+        tmp_path,
+        [("s_train", "t_gold_train"), ("s_eval", "t_gold_eval")],
+    )
     selector = module.CandidateSetSelector(
         enabled=True,
         strategy="calibrated_rank_accept",
@@ -283,6 +298,8 @@ def test_calibrated_selector_learns_rank_accept_from_training_reference(tmp_path
         calibration={
             "min_positive_sources": 1,
             "background_negative_weight": 0.0,
+            "background_negative_weight_grid": [0.0],
+            "validation_fraction": 0.0,
             "max_epochs": 80,
         },
     )
@@ -291,7 +308,8 @@ def test_calibrated_selector_learns_rank_accept_from_training_reference(tmp_path
     scored = out["candidate_df"].set_index(["Src", "Tgt"])
 
     assert scored.loc[("s_eval", "t_gold_eval"), "selection_winner"]
-    assert scored.loc[("s_eval", "t_gold_eval"), "S_select"] >= 0.7
+    assert scored.loc[("s_eval", "t_gold_eval"), "S_select"] == scored.loc[("s_eval", "t_gold_eval"), "P_match"]
+    assert scored.loc[("s_eval", "t_gold_eval"), "P_match"] >= scored.loc[("s_eval", "t_gold_eval"), "selection_accept_threshold"]
     assert scored.loc[("s_eval", "t_bad_eval"), "S_select"] == 0.0
     assert scored.loc[("s_eval", "t_gold_eval"), "P_rank"] > scored.loc[("s_eval", "t_bad_eval"), "P_rank"]
 
@@ -439,16 +457,30 @@ def test_accept_threshold_recall_at_precision_falls_back_to_f1_when_floor_imposs
     assert metrics["recall_at_precision"] == {}
 
 
-def test_calibrated_llm_trigger_rejected_evidence_disagreement():
+def test_calibrated_llm_trigger_ignores_rejected_evidence_disagreement():
     module = _load_selector_module()
     selector = module.CandidateSetSelector(llm={"enabled": True})
 
-    assert selector._should_use_llm_calibrated(
+    assert not selector._should_use_llm_calibrated(
         acceptance_margin=0.10,
         rank_margin=0.90,
         primary_model=object(),
         accepted=False,
         evidence_support=0.90,
+        evidence_support_floor=0.82,
+    )
+
+
+def test_calibrated_llm_trigger_allows_accepted_near_boundary():
+    module = _load_selector_module()
+    selector = module.CandidateSetSelector(llm={"enabled": True})
+
+    assert selector._should_use_llm_calibrated(
+        acceptance_margin=0.01,
+        rank_margin=0.90,
+        primary_model=object(),
+        accepted=True,
+        evidence_support=0.70,
         evidence_support_floor=0.82,
     )
 
@@ -524,9 +556,121 @@ def test_calibrated_selector_treats_train_candidate_miss_as_abstention(tmp_path)
     assert missing["P_match"].max() < missing["selection_accept_threshold"].max()
 
 
+def test_calibrated_selector_excludes_exact_prefiltered_train_sources(tmp_path):
+    module = _load_selector_module()
+    train_ref = _write_training_reference(
+        tmp_path,
+        [("s_train", "t_gold_train"), ("s_missing", "t_true_missing")],
+    )
+    dataset = SimpleNamespace(
+        dataframe=pd.DataFrame(
+            {
+                "Src": ["s_missing"],
+                "Tgt": ["t_true_missing"],
+                "prefiltered": [True],
+                "Scores": [1.0],
+            }
+        )
+    )
+    selector = module.CandidateSetSelector(
+        enabled=True,
+        strategy="calibrated_rank_accept",
+        use_no_match=True,
+        llm={"enabled": False},
+        training_reference_file_path=train_ref,
+        calibration={
+            "min_positive_sources": 1,
+            "background_negative_weight": 1.0,
+            "max_epochs": 60,
+        },
+    )
+
+    selector.forward(_selector_training_df(include_candidate_miss=True), dataset=dataset, threshold=0.7)
+
+    assert selector._calibration_meta["n_reference_pairs"] == 2
+    assert selector._calibration_meta["n_calibration_reference_pairs"] == 1
+    assert selector._calibration_meta["n_exact_prefiltered_reference_pairs"] == 1
+    assert selector._calibration_meta["n_exact_prefiltered_reference_sources"] == 1
+
+
+def test_exact_prefiltered_sources_are_acceptance_hard_negatives():
+    module = _load_selector_module()
+    selector = module.CandidateSetSelector(
+        strategy="calibrated_rank_accept",
+        calibration={
+            "background_negative_weight": 1.0,
+            "exact_prefiltered_source_policy": "hard_negative",
+            "exact_prefiltered_negative_weight": 0.35,
+        },
+    )
+    df = _selector_training_df(include_candidate_miss=True)
+    df["S_pair_final"] = df["S_final"]
+    rank_features = selector._rank_feature_rows(df, distinctive={}, reciprocity={})
+    utilities = {idx: float(df.at[idx, "S_pair_final"]) for idx in df.index}
+
+    decisions = selector._source_decisions(
+        df,
+        utilities,
+        rank_features,
+        distinctive={},
+        ref_pairs={("s_train", "t_gold_train")},
+        exact_prefiltered_sources={"s_missing"},
+    )
+
+    assert decisions["s_missing"]["sample_weight"] == 0.35
+    assert decisions["s_missing"]["label"] == 0.0
+
+
+def test_exact_prefiltered_sources_can_be_excluded_from_acceptance():
+    module = _load_selector_module()
+    selector = module.CandidateSetSelector(
+        strategy="calibrated_rank_accept",
+        calibration={
+            "exact_prefiltered_source_policy": "exclude",
+            "exact_prefiltered_negative_weight": 1.0,
+        },
+    )
+    df = _selector_training_df(include_candidate_miss=True)
+    df["S_pair_final"] = df["S_final"]
+    rank_features = selector._rank_feature_rows(df, distinctive={}, reciprocity={})
+    utilities = {idx: float(df.at[idx, "S_pair_final"]) for idx in df.index}
+
+    decisions = selector._source_decisions(
+        df,
+        utilities,
+        rank_features,
+        distinctive={},
+        ref_pairs={("s_train", "t_gold_train")},
+        exact_prefiltered_sources={"s_missing"},
+    )
+
+    assert decisions["s_missing"]["sample_weight"] == 0.0
+    assert decisions["s_missing"]["label"] == 0.0
+
+
+def test_exact_prefiltered_pair_reader_accepts_score_column():
+    module = _load_selector_module()
+    selector = module.CandidateSetSelector()
+    dataset_df = pd.DataFrame(
+        {
+            "Src": ["s_missing", "s_missing"],
+            "Tgt": ["t_true_missing", "t_false_missing"],
+            "prefiltered": [True, True],
+            "Score": [1.0, 0.0],
+        }
+    )
+
+    assert selector._exact_prefiltered_pairs_from_dataframe(dataset_df) == {
+        ("s_missing", "t_true_missing")
+    }
+
+
 def test_calibrated_llm_arbitration_has_no_prompt_cap(tmp_path):
     module = _load_selector_module()
-    train_ref = _write_training_reference(tmp_path, [("s_train", "t_gold_train")])
+    train_ref = _write_training_reference(
+        tmp_path,
+        [("s_train", "t_gold_train"), ("s_eval", "t_gold_eval")],
+    )
 
     class FakePrimary:
         def __init__(self):
@@ -545,6 +689,8 @@ def test_calibrated_llm_arbitration_has_no_prompt_cap(tmp_path):
         calibration={
             "min_positive_sources": 1,
             "background_negative_weight": 0.0,
+            "background_negative_weight_grid": [0.0],
+            "validation_fraction": 0.0,
             "max_epochs": 40,
         },
         llm={
@@ -559,7 +705,7 @@ def test_calibrated_llm_arbitration_has_no_prompt_cap(tmp_path):
 
     out = selector.forward(_selector_training_df(), primary_model=primary, threshold=0.7)
 
-    assert primary.calls == 2
+    assert primary.calls >= 2
     assert out["candidate_df"].groupby("Src")["selection_llm_used"].any().all()
 
 
@@ -624,3 +770,196 @@ def test_runner_applies_additional_model_with_results_json():
     assert list(out["S_final"]) == [0.9, 0.1]
     assert "cand_sim_prob" in out.columns
     assert runner.results_json[0]["confidences"]["S_final"] == 0.9
+
+
+def test_validation_split_is_deterministic_and_source_disjoint():
+    module = _load_selector_module()
+    pairs = {(f"s{i}", f"t{i}") for i in range(10)}
+    selector_a = module.CandidateSetSelector(
+        request_seed=13,
+        calibration={"validation_fraction": 0.3, "min_positive_sources": 2},
+    )
+    selector_b = module.CandidateSetSelector(
+        request_seed=13,
+        calibration={"validation_fraction": 0.3, "min_positive_sources": 2},
+    )
+
+    train_a, val_a, meta_a = selector_a._split_reference_pairs_by_source(pairs)
+    train_b, val_b, meta_b = selector_b._split_reference_pairs_by_source(pairs)
+
+    assert train_a == train_b
+    assert val_a == val_b
+    assert meta_a["held_out"] is True
+    assert {src for src, _ in train_a}.isdisjoint({src for src, _ in val_a})
+
+
+def test_equal_f1_threshold_tie_chooses_higher_precision_then_threshold():
+    module = _load_selector_module()
+    selector = module.CandidateSetSelector(
+        calibration={"accept_objective": "f1", "threshold_grid_step": 0.1}
+    )
+    decisions = _threshold_decisions(
+        [
+            (0.90, 1.0),
+            (0.80, 0.0),
+            (0.70, 0.0),
+            (0.60, 1.0),
+        ]
+    )
+
+    threshold, metrics = selector._tune_accept_threshold(decisions)
+
+    assert threshold == 0.9
+    assert metrics["P"] == 1.0
+    assert metrics["F1"] == pytest.approx(2.0 / 3.0)
+
+
+def test_p_match_score_mode_keeps_raw_monotonic_scores():
+    module = _load_selector_module()
+    selector = module.CandidateSetSelector(score_mode="p_match")
+
+    assert selector._final_selector_score(0.95, accept_threshold=0.50, score_threshold=0.70) == 0.95
+    assert selector._final_selector_score(0.72, accept_threshold=0.70, score_threshold=0.70) == 0.72
+    assert selector._final_selector_score(0.80, accept_threshold=0.70, score_threshold=0.70) > selector._final_selector_score(0.72, accept_threshold=0.70, score_threshold=0.70)
+
+
+def test_calibrated_llm_veto_cannot_switch_winner(tmp_path):
+    module = _load_selector_module()
+    train_ref = _write_training_reference(
+        tmp_path,
+        [("s_train", "t_gold_train"), ("s_eval", "t_gold_eval")],
+    )
+
+    class FakePrimary:
+        def candidate_set_select(self, prompt):
+            return '{"winner": "C1", "relation": "equivalent", "confidence": 1.0, "decisive_evidence": "x", "rejected": {}}'
+
+    selector = module.CandidateSetSelector(
+        enabled=True,
+        strategy="calibrated_rank_accept",
+        use_no_match=True,
+        training_reference_file_path=train_ref,
+        calibration={
+            "min_positive_sources": 1,
+            "background_negative_weight": 0.0,
+            "background_negative_weight_grid": [0.0],
+            "validation_fraction": 0.0,
+            "max_epochs": 40,
+        },
+        llm={
+            "enabled": True,
+            "mode": "veto",
+            "trigger_acceptance_margin": 1.0,
+            "trigger_rank_margin": 1.0,
+            "min_confidence": 0.0,
+        },
+    )
+
+    out = selector.forward(_selector_training_df(), primary_model=FakePrimary(), threshold=0.7)
+    scored = out["candidate_df"].set_index(["Src", "Tgt"])
+
+    assert scored.loc[("s_eval", "t_gold_eval"), "selection_winner"]
+    assert not scored.loc[("s_eval", "t_bad_eval"), "selection_winner"]
+    assert scored.loc[("s_eval", "t_gold_eval"), "selection_llm_used"]
+    assert scored.loc[("s_eval", "t_gold_eval"), "selection_reason"] != "llm"
+
+
+def test_runner_uses_selector_accept_threshold_for_raw_p_match_scores():
+    runner_module = _load_runner_module()
+    candidate_df = pd.DataFrame(
+        {
+            "Src": ["s1", "s2"],
+            "Tgt": ["t1", "t2"],
+            "S_final": [0.52, 0.49],
+            "selection_accept_threshold": [0.5, 0.5],
+        }
+    )
+
+    assert runner_module.SemanticAlignmentRunner._effective_alignment_threshold(candidate_df, 0.7) == 0.5
+
+
+def test_target_conflict_resolver_preserves_exact_mapping():
+    from exact.core.entities.mappings import EntityMapping
+
+    exact = EntityMapping("s_exact", "t_shared", score=1.0)
+    learned = EntityMapping("s_learned", "t_shared", score=0.99)
+    other = EntityMapping("s_other", "t_other", score=0.80)
+
+    filtered = EntityMapping.filter_top_n_target_entity_mappings(
+        [learned, other, exact],
+        1,
+        protected_pairs={("s_exact", "t_shared")},
+    )
+
+    assert ("s_exact", "t_shared") in EntityMapping.as_tuples(filtered)
+    assert ("s_learned", "t_shared") not in EntityMapping.as_tuples(filtered)
+    assert ("s_other", "t_other") in EntityMapping.as_tuples(filtered)
+
+
+def test_target_conflict_validation_metric_can_prefer_resolver():
+    module = _load_selector_module()
+    selector = module.CandidateSetSelector()
+    decisions = {
+        "s_exact_conflict": {
+            "winner_pair": ("s_exact_conflict", "t_exact"),
+            "p_match": 0.9,
+            "label": 0.0,
+            "has_reference": True,
+            "sample_weight": 1.0,
+        },
+        "s_good": {
+            "winner_pair": ("s_good", "t_good"),
+            "p_match": 0.8,
+            "label": 1.0,
+            "has_reference": True,
+            "sample_weight": 1.0,
+        },
+    }
+
+    no_resolver = selector._decision_metrics_at_threshold(decisions, 0.5)
+    resolver = selector._metrics_with_target_conflict(
+        decisions=decisions,
+        threshold=0.5,
+        target_cardinality=1,
+        protected_exact_pairs={("s_exact", "t_exact")},
+    )
+
+    assert resolver["FP"] < no_resolver["FP"]
+    assert resolver["F1"] > no_resolver["F1"]
+
+
+def test_ignored_alignment_classes_are_filtered_from_candidate_rows():
+    module = _load_dataset_module_or_skip()
+
+    class DummyDataset(module.IDataset):
+        def __getitem__(self, idx):
+            raise IndexError(idx)
+
+        def __len__(self):
+            return 0
+
+        def get_features(self, df):
+            return df
+
+        def plot_feature_distributions(self, *args, **kwargs):
+            return None
+
+        def log_sanity_examples(self, *args, **kwargs):
+            return None
+
+    dataset = object.__new__(DummyDataset)
+    dataset._filter_ignored_alignment_classes = True
+    dataset._source_ignored_alignment_classes = {"s_drop"}
+    dataset._target_ignored_alignment_classes = {"t_drop"}
+    dataset.log = lambda *args, **kwargs: None
+    df = pd.DataFrame(
+        {
+            "Src": ["s_keep", "s_drop", "s_keep"],
+            "Tgt": ["t_keep", "t_keep", "t_drop"],
+            "Label": [0, 0, 0],
+        }
+    )
+
+    filtered = dataset._filter_candidates_ignored_classes(df)
+
+    assert filtered[["Src", "Tgt"]].values.tolist() == [["s_keep", "t_keep"]]

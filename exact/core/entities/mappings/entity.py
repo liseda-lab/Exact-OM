@@ -1,6 +1,6 @@
 # Adapted from https://github.com/KRR-Oxford/DeepOnto
 
-from typing import List, Optional, Union, TYPE_CHECKING
+from typing import List, Optional, Union, TYPE_CHECKING, Set, Tuple
 from pathlib import Path
 
 from collections import defaultdict
@@ -86,7 +86,11 @@ class EntityMapping:
         return [m for m in entity_mappings if m.score >= threshold]
     
     @staticmethod
-    def filter_top_n_entity_mappings(preds: List['EntityMapping'], n: int) -> List['EntityMapping']:
+    def filter_top_n_entity_mappings(
+        preds: List['EntityMapping'],
+        n: int,
+        protected_pairs: Optional[Set[Tuple[str, str]]] = None,
+    ) -> List['EntityMapping']:
         r"""Filter the entity mappings in a list by their scores.
         Args:
             preds (List[EntityMapping]): A list entity mappings to filter.
@@ -99,11 +103,40 @@ class EntityMapping:
         for ent_map in preds:
             all_sources[ent_map.head].append(ent_map)
         
+        protected = set(protected_pairs or set())
         filtered_mappings = []
         for head, mappings in all_sources.items():
-            top_n_mappings = nlargest(n, mappings, key=lambda x: x.score)
+            top_n_mappings = nlargest(
+                n,
+                mappings,
+                key=lambda x: ((x.head, x.tail) in protected, x.score),
+            )
             filtered_mappings.extend(top_n_mappings)
         
+        return filtered_mappings
+
+    @staticmethod
+    def filter_top_n_target_entity_mappings(
+        preds: List['EntityMapping'],
+        n: int,
+        protected_pairs: Optional[Set[Tuple[str, str]]] = None,
+    ) -> List['EntityMapping']:
+        r"""Keep the top n source mappings per target."""
+        all_targets = defaultdict(list)
+        protected = set(protected_pairs or set())
+
+        for ent_map in preds:
+            all_targets[ent_map.tail].append(ent_map)
+
+        filtered_mappings = []
+        for tail, mappings in all_targets.items():
+            top_n_mappings = nlargest(
+                n,
+                mappings,
+                key=lambda x: ((x.head, x.tail) in protected, x.score),
+            )
+            filtered_mappings.extend(top_n_mappings)
+
         return filtered_mappings
 
     def __repr__(self):
