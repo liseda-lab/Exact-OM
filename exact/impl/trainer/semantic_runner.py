@@ -3,7 +3,7 @@ import json
 import hashlib
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Set
+from typing import Any, Dict, Iterable, List, Optional, Tuple, Set
 
 import pandas as pd
 import torch
@@ -12,6 +12,11 @@ from torch.utils.data._utils.collate import default_collate
 from exact.core.contracts.trainer import ITrainer
 from exact.core.entities.mappings import EntityMapping
 from exact.core.entities.configs.dataset import DatasetMask
+
+try:
+    import zstandard as zstd
+except ImportError:  # pragma: no cover - exercised only when optional dependency is absent
+    zstd = None
 
 
 def _semantic_collate_fn(batch):
@@ -59,6 +64,10 @@ def _format_duration(total_seconds: float) -> str:
     hours, remainder = divmod(remainder, 3600)
     minutes, seconds = divmod(remainder, 60)
     return f"{days}d:{hours:02d}:{minutes:02d}:{seconds:02d}"
+
+
+def _json_default(value: Any) -> str:
+    return str(value)
 
 
 class SemanticAlignmentRunner(ITrainer):
@@ -116,6 +125,27 @@ class SemanticAlignmentRunner(ITrainer):
         self._checkpoint_fingerprint: str = self._hash_checkpoint_fingerprint_payload(
             self._checkpoint_fingerprint_payload
         )
+        self._audit_shards_enabled: bool = True
+        self._audit_shard_compression: str = "zstd"
+        self._audit_shard_records: int = 50000
+        self._audit_manifest_path: Optional[Path] = None
+        self._audit_shard_dir: Optional[Path] = None
+        self._audit_shards: List[Dict[str, Any]] = []
+        self._audit_total_records: int = 0
+        self._audit_current_writer: Optional[Any] = None
+        self._audit_current_shard: Optional[Dict[str, Any]] = None
+        self._candidate_records_enabled: bool = True
+        self._candidate_manifest_path: Optional[Path] = None
+        self._candidate_shard_dir: Optional[Path] = None
+        self._candidate_shards: List[Dict[str, Any]] = []
+        self._candidate_total_records: int = 0
+        self._candidate_current_writer: Optional[Any] = None
+        self._candidate_current_shard: Optional[Dict[str, Any]] = None
+        self._overlay_manifest_path: Optional[Path] = None
+        self._checkpoint_payload_mode: str = "compact"
+        self._cache_persist_policy: str = "finalize"
+        self._cache_persist_skip_logged: Set[str] = set()
+        self._restored_candidate_rows: List[Dict[str, Any]] = []
 
     @staticmethod
     def _hash_checkpoint_fingerprint_payload(payload: Dict[str, Any]) -> str:
@@ -345,6 +375,11 @@ class SemanticAlignmentRunner(ITrainer):
             seen.add(path)
             ordered.append(path)
 
+        if ordered:
+            self.log(
+                f"Scanning {len(ordered)} checkpoint candidate(s) for {kind.name} resume.",
+                "debug",
+            )
         for path in ordered:
             mappings, results_json, processed_examples = self._load_checkpoint_state(
                 path,
@@ -352,6 +387,14 @@ class SemanticAlignmentRunner(ITrainer):
                 allow_rationale_toggle_checkpoint_resume=allow_rationale_toggle_checkpoint_resume,
             )
             if processed_examples > 0:
+                self.log(
+                    (
+                        f"Accepted checkpoint {path.name}: "
+                        f"processed_examples={processed_examples}, mappings={len(mappings)}, "
+                        f"full_records_in_memory={len(results_json)}."
+                    ),
+                    "info",
+                )
                 return path, mappings, results_json, processed_examples
         return None, [], [], 0
 
@@ -428,7 +471,43 @@ class SemanticAlignmentRunner(ITrainer):
                 )
                 return [], [], 0
 
+        self._restored_candidate_rows = []
+        results_json = payload.get("results_json") or []
         mappings: List[Tuple[str, str, float]] = []
+
+        candidate_manifest_value = payload.get("candidate_records_manifest_path")
+        if candidate_manifest_value:
+            candidate_manifest_path = Path(str(candidate_manifest_value))
+            if not candidate_manifest_path.is_absolute():
+                candidate_manifest_path = (checkpoint_path.parent / candidate_manifest_path).resolve()
+            self._candidate_manifest_path = candidate_manifest_path
+            candidate_rows = self._read_candidate_records_from_manifest(candidate_manifest_path)
+            self._restored_candidate_rows = candidate_rows
+            for row in candidate_rows:
+                src = row.get("Src")
+                tgt = row.get("Tgt")
+                score = row.get("S_final")
+                if src is None or tgt is None or score is None:
+                    continue
+                try:
+                    mappings.append((str(src), str(tgt), float(score)))
+                except (TypeError, ValueError):
+                    continue
+            self.log(
+                (
+                    f"Loaded {len(candidate_rows)} slim candidate records from "
+                    f"{candidate_manifest_path}"
+                ),
+                "debug",
+            )
+
+        overlay_value = payload.get("final_overlay_manifest_path")
+        if overlay_value:
+            overlay_path = Path(str(overlay_value))
+            if not overlay_path.is_absolute():
+                overlay_path = (checkpoint_path.parent / overlay_path).resolve()
+            self._overlay_manifest_path = overlay_path
+
         for rec in payload.get("mappings", []):
             src = rec.get("src")
             tgt = rec.get("tgt")
@@ -440,8 +519,57 @@ class SemanticAlignmentRunner(ITrainer):
             except (TypeError, ValueError):
                 continue
 
-        results_json = payload.get("results_json") or []
+        if not self._restored_candidate_rows and results_json:
+            candidate_rows = []
+            for rec in results_json:
+                row = self._candidate_row_from_explanation_record(rec)
+                if row is None:
+                    continue
+                candidate_rows.append(row)
+                try:
+                    mappings.append((str(row["Src"]), str(row["Tgt"]), float(row["S_final"])))
+                except (TypeError, ValueError):
+                    continue
+            self._restored_candidate_rows = candidate_rows
+
+        manifest_value = payload.get("audit_manifest_path")
+        if manifest_value:
+            manifest_path = Path(str(manifest_value))
+            if not manifest_path.is_absolute():
+                manifest_path = (checkpoint_path.parent / manifest_path).resolve()
+            self._audit_manifest_path = manifest_path
+        else:
+            manifest_path = None
+        if manifest_path is not None and not results_json:
+            results_json = self._read_audit_records_from_manifest(manifest_path)
+            if results_json:
+                self.log(
+                    f"Loaded {len(results_json)} audit records from {manifest_path}",
+                    "debug",
+                )
+        if not mappings and manifest_path is not None:
+            migrated_rows = self._migrate_legacy_audit_checkpoint(
+                checkpoint_path,
+                payload,
+                manifest_path,
+            )
+            self._restored_candidate_rows = migrated_rows
+            for row in migrated_rows:
+                try:
+                    mappings.append((str(row["Src"]), str(row["Tgt"]), float(row["S_final"])))
+                except (KeyError, TypeError, ValueError):
+                    continue
+
         processed_examples = int(payload.get("processed_examples", len(mappings)))
+        if processed_examples > 0 and not mappings and not results_json and not self._restored_candidate_rows:
+            self.log(
+                (
+                    f"Ignoring checkpoint '{checkpoint_path.name}' because it records "
+                    f"{processed_examples} processed examples but no restorable mappings or candidate rows."
+                ),
+                "warning",
+            )
+            return [], [], 0
         return mappings, results_json, processed_examples
 
     def _write_checkpoint_state(
@@ -453,7 +581,10 @@ class SemanticAlignmentRunner(ITrainer):
         mappings: List[Tuple[str, str, float]],
         results_json: List[Dict[str, Any]],
     ) -> None:
+        audit_manifest_path = self._write_audit_manifest()
+        candidate_manifest_path = self._write_candidate_manifest()
         payload = {
+            "checkpoint_schema_version": 2,
             "kind": kind.name,
             "dataset_signature": getattr(getattr(self, "_dataset", None), "dataset_signature", None),
             "dataset_fingerprint": getattr(getattr(self, "_dataset", None), "cache_fingerprint", None),
@@ -465,16 +596,36 @@ class SemanticAlignmentRunner(ITrainer):
             ),
             "total_examples": total_examples,
             "processed_examples": processed_examples,
-            "mappings": [
-                {"src": s, "tgt": t, "score": score} for s, t, score in mappings
-            ],
-            "results_json": results_json,
+            "checkpoint_payload": self._checkpoint_payload_mode,
+            "mappings_count": len(mappings),
+            "results_json_count": len(results_json),
         }
+        if audit_manifest_path is not None:
+            payload["audit_manifest_path"] = self._relative_to_checkpoint(audit_manifest_path, checkpoint_path)
+        if candidate_manifest_path is not None:
+            payload["candidate_records_manifest_path"] = self._relative_to_checkpoint(
+                candidate_manifest_path,
+                checkpoint_path,
+            )
+            payload["candidate_records_count"] = int(getattr(self, "_candidate_total_records", 0) or 0)
+        overlay_manifest_path = getattr(self, "_overlay_manifest_path", None)
+        if overlay_manifest_path is not None and Path(overlay_manifest_path).exists():
+            payload["final_overlay_manifest_path"] = self._relative_to_checkpoint(
+                Path(overlay_manifest_path),
+                checkpoint_path,
+            )
+        if self._checkpoint_payload_mode == "full" or (
+            audit_manifest_path is None and candidate_manifest_path is None
+        ):
+            payload["mappings"] = [
+                {"src": s, "tgt": t, "score": score} for s, t, score in mappings
+            ]
+            payload["results_json"] = results_json
 
         tmp_path = checkpoint_path.with_suffix(checkpoint_path.suffix + ".tmp")
         try:
             with open(tmp_path, "w", encoding="utf-8") as f:
-                json.dump(payload, f, indent=2, ensure_ascii=False)
+                json.dump(payload, f, indent=2, ensure_ascii=False, default=_json_default)
             tmp_path.replace(checkpoint_path)
             self.log(
                 (
@@ -538,8 +689,596 @@ class SemanticAlignmentRunner(ITrainer):
     def _write_json_atomic(self, path: Path, payload: Dict[str, Any]) -> None:
         tmp_path = path.with_suffix(path.suffix + ".tmp")
         with open(tmp_path, "w", encoding="utf-8") as f:
-            json.dump(payload, f, indent=2, ensure_ascii=False, default=str)
+            json.dump(payload, f, indent=2, ensure_ascii=False, default=_json_default)
         tmp_path.replace(path)
+
+    def _resolve_text_compression(self, compression: Optional[str]) -> str:
+        resolved = str(compression or "none").lower()
+        if resolved == "zstd" and zstd is None:
+            skip_logged = getattr(self, "_cache_persist_skip_logged", set())
+            if "zstd_missing" not in skip_logged:
+                self.log(
+                    "zstandard is not installed; writing audit artifacts as plain JSONL.",
+                    "warning",
+                )
+                skip_logged.add("zstd_missing")
+                self._cache_persist_skip_logged = skip_logged
+            return "none"
+        return resolved if resolved in {"zstd", "none"} else "none"
+
+    @staticmethod
+    def _jsonl_suffix(compression: str) -> str:
+        return ".jsonl.zst" if compression == "zstd" else ".jsonl"
+
+    def _open_jsonl_writer(self, path: Path, compression: str):
+        if compression == "zstd":
+            return zstd.open(path, mode="wt", encoding="utf-8")  # type: ignore[union-attr]
+        return open(path, "w", encoding="utf-8")
+
+    def _open_jsonl_reader(self, path: Path, compression: str):
+        if compression == "zstd":
+            return zstd.open(path, mode="rt", encoding="utf-8")  # type: ignore[union-attr]
+        return open(path, "r", encoding="utf-8")
+
+    def _write_jsonl_records_atomic(
+        self,
+        path: Path,
+        records: Iterable[Dict[str, Any]],
+        compression: Optional[str] = None,
+    ) -> int:
+        resolved = self._resolve_text_compression(compression or self._audit_shard_compression)
+        tmp_path = path.with_suffix(path.suffix + ".tmp")
+        count = 0
+        with self._open_jsonl_writer(tmp_path, resolved) as f:
+            for record in records:
+                f.write(json.dumps(record, ensure_ascii=False, separators=(",", ":"), default=_json_default))
+                f.write("\n")
+                count += 1
+        tmp_path.replace(path)
+        return count
+
+    def _read_jsonl_records(self, path: Path, compression: Optional[str] = None) -> List[Dict[str, Any]]:
+        resolved = self._resolve_text_compression(compression or ("zstd" if path.suffix == ".zst" else "none"))
+        records: List[Dict[str, Any]] = []
+        with self._open_jsonl_reader(path, resolved) as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                records.append(json.loads(line))
+        return records
+
+    def _iter_jsonl_records(self, path: Path, compression: Optional[str] = None):
+        resolved = self._resolve_text_compression(compression or ("zstd" if path.suffix == ".zst" else "none"))
+        with self._open_jsonl_reader(path, resolved) as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    yield json.loads(line)
+
+    def _iter_records_from_manifest(
+        self,
+        manifest_path: Path,
+        label: str,
+        progress_every: int = 50000,
+    ):
+        manifest = self._load_audit_manifest(manifest_path)
+        if not manifest:
+            return
+        compression = self._resolve_text_compression(manifest.get("compression", "none"))
+        total_records = int(manifest.get("total_records", 0) or 0)
+        shards = list(manifest.get("shards") or [])
+        start = time.perf_counter()
+        seen = 0
+        self.log(
+            (
+                f"{label}: streaming {total_records or 'unknown'} records "
+                f"from {len(shards)} shard(s) at {manifest_path}"
+            ),
+            "debug",
+        )
+        for shard_index, shard in enumerate(shards, start=1):
+            rel_path = shard.get("path")
+            if not rel_path:
+                continue
+            shard_path = (manifest_path.parent / str(rel_path)).resolve()
+            try:
+                for record in self._iter_jsonl_records(shard_path, compression=compression):
+                    seen += 1
+                    if progress_every > 0 and seen % progress_every == 0:
+                        elapsed = max(1.0e-8, time.perf_counter() - start)
+                        rate = seen / elapsed
+                        remaining = max(0, total_records - seen) if total_records else 0
+                        eta = _format_duration(remaining / rate) if total_records and rate > 0 else "unknown"
+                        self.log(
+                            (
+                                f"{label} progress: records={seen}/{total_records or '?'}, "
+                                f"shard={shard_index}/{len(shards)}, avg={rate:.1f} records/s, ETA {eta}"
+                            ),
+                            "debug",
+                        )
+                    yield record
+            except (OSError, json.JSONDecodeError) as exc:
+                self.log(f"{label}: failed to read shard {shard_path}: {exc}", "warning")
+                return
+        elapsed = max(0.0, time.perf_counter() - start)
+        rate = seen / elapsed if elapsed > 1.0e-8 else 0.0
+        self.log(
+            (
+                f"{label}: streamed {seen} records in {_format_duration(elapsed)} "
+                f"({rate:.1f} records/s)"
+            ),
+            "debug",
+        )
+
+    def _candidate_manifest_for_checkpoint(self, checkpoint_path: Path) -> Path:
+        return checkpoint_path.parent / f"{checkpoint_path.stem}_candidates" / "manifest.json"
+
+    def _overlay_manifest_for_checkpoint(self, checkpoint_path: Path) -> Path:
+        return checkpoint_path.parent / f"{checkpoint_path.stem}_overlay" / "manifest.json"
+
+    def _close_candidate_writer(self) -> None:
+        writer = getattr(self, "_candidate_current_writer", None)
+        if writer is None:
+            return
+        try:
+            writer.close()
+        finally:
+            self._candidate_current_writer = None
+            self._candidate_current_shard = None
+
+    def _prepare_candidate_shards(
+        self,
+        checkpoint_path: Optional[Path],
+        enabled: bool,
+        compression: str,
+        records_per_shard: int,
+        append_existing: bool = True,
+    ) -> None:
+        self._close_candidate_writer()
+        self._candidate_records_enabled = bool(enabled and checkpoint_path is not None)
+        self._candidate_manifest_path = None
+        self._candidate_shard_dir = None
+        self._candidate_shards = []
+        self._candidate_total_records = 0
+        if not self._candidate_records_enabled or checkpoint_path is None:
+            return
+        self._candidate_manifest_path = self._candidate_manifest_for_checkpoint(checkpoint_path)
+        self._candidate_shard_dir = self._candidate_manifest_path.parent
+        self._candidate_shard_dir.mkdir(parents=True, exist_ok=True)
+        if not append_existing:
+            for path in self._candidate_shard_dir.glob("shard-*.jsonl*"):
+                try:
+                    path.unlink()
+                except OSError as exc:
+                    self.log(f"Failed to remove stale candidate shard {path}: {exc}", "warning")
+            if self._candidate_manifest_path.exists():
+                try:
+                    self._candidate_manifest_path.unlink()
+                except OSError as exc:
+                    self.log(f"Failed to remove stale candidate manifest {self._candidate_manifest_path}: {exc}", "warning")
+        manifest = self._load_audit_manifest(self._candidate_manifest_path) if append_existing else {}
+        self._candidate_shards = list(manifest.get("shards") or [])
+        self._candidate_total_records = int(manifest.get("total_records", 0) or 0)
+        manifest_compression = manifest.get("compression")
+        if manifest_compression:
+            self._audit_shard_compression = self._resolve_text_compression(manifest_compression)
+        else:
+            self._audit_shard_compression = self._resolve_text_compression(compression)
+        self._audit_shard_records = max(1, int(records_per_shard or 50000))
+
+    def _start_new_candidate_shard(self) -> None:
+        if not self._candidate_records_enabled or self._candidate_shard_dir is None:
+            return
+        self._close_candidate_writer()
+        idx = len(self._candidate_shards)
+        suffix = self._jsonl_suffix(self._audit_shard_compression)
+        shard_name = f"shard-{idx:06d}{suffix}"
+        shard_path = self._candidate_shard_dir / shard_name
+        shard = {"path": shard_name, "records": 0}
+        self._candidate_shards.append(shard)
+        self._candidate_current_shard = shard
+        self._candidate_current_writer = self._open_jsonl_writer(shard_path, self._audit_shard_compression)
+
+    def _append_candidate_records(self, records: List[Dict[str, Any]]) -> None:
+        if not records or not self._candidate_records_enabled:
+            return
+        for record in records:
+            if (
+                self._candidate_current_writer is None
+                or self._candidate_current_shard is None
+                or int(self._candidate_current_shard.get("records", 0)) >= self._audit_shard_records
+            ):
+                self._start_new_candidate_shard()
+            if self._candidate_current_writer is None or self._candidate_current_shard is None:
+                return
+            self._candidate_current_writer.write(
+                json.dumps(record, ensure_ascii=False, separators=(",", ":"), default=_json_default)
+            )
+            self._candidate_current_writer.write("\n")
+            self._candidate_current_shard["records"] = int(self._candidate_current_shard.get("records", 0)) + 1
+            self._candidate_total_records += 1
+
+    def _write_candidate_manifest(self) -> Optional[Path]:
+        if not self._candidate_records_enabled or self._candidate_manifest_path is None:
+            return None
+        self._close_candidate_writer()
+        payload = {
+            "version": 1,
+            "format": "jsonl",
+            "compression": self._audit_shard_compression,
+            "records_per_shard": self._audit_shard_records,
+            "total_records": self._candidate_total_records,
+            "shards": self._candidate_shards,
+        }
+        self._write_json_atomic(self._candidate_manifest_path, payload)
+        return self._candidate_manifest_path
+
+    def _read_candidate_records_from_manifest(self, manifest_path: Path) -> List[Dict[str, Any]]:
+        return list(self._iter_records_from_manifest(manifest_path, "Checkpoint candidate restore"))
+
+    def _selector_evidence_items_for_record(self, record: Dict[str, Any]) -> List[Dict[str, float]]:
+        for extra_model in getattr(self, "models", [])[1:]:
+            extractor = getattr(extra_model, "_record_evidence_items", None)
+            if not callable(extractor):
+                continue
+            try:
+                return [
+                    {"key": str(key), "strength": float(strength)}
+                    for key, strength in extractor(record)
+                    if key
+                ]
+            except Exception as exc:  # noqa: BLE001
+                self.log(f"Failed to compact selector evidence for audit record: {exc}", "debug")
+                return []
+        return []
+
+    def _candidate_row_from_explanation_record(self, record: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        src = record.get("src_iri")
+        tgt = record.get("tgt_iri")
+        if src is None or tgt is None:
+            return None
+        row: Dict[str, Any] = {
+            "Src": str(src),
+            "Tgt": str(tgt),
+            "ground_truth": (record.get("prediction") or {}).get("ground_truth"),
+            "src_label_text": (record.get("selected_labels") or {}).get("source", ""),
+            "tgt_label_text": (record.get("selected_labels") or {}).get("target", ""),
+            "llm_pair_brief": record.get("llm_pair_brief", ""),
+        }
+        for payload_name in ["confidences", "qualities", "weights", "importances"]:
+            payload = record.get(payload_name) or {}
+            for key, value in payload.items():
+                if isinstance(value, (dict, list, tuple)):
+                    continue
+                row[key] = value
+        if "S_final" not in row:
+            return None
+        evidence_items = self._selector_evidence_items_for_record(record)
+        if evidence_items:
+            row["selector_evidence_items"] = evidence_items
+        return row
+
+    def _migrate_legacy_audit_checkpoint(
+        self,
+        checkpoint_path: Path,
+        payload: Dict[str, Any],
+        audit_manifest_path: Path,
+    ) -> List[Dict[str, Any]]:
+        self.log(
+            (
+                f"Checkpoint {checkpoint_path.name} has only full audit shards for resume. "
+                "Streaming them once to build slim candidate sidecars."
+            ),
+            "info",
+        )
+        compression = self._resolve_text_compression(
+            (self._load_audit_manifest(audit_manifest_path) or {}).get("compression", self._audit_shard_compression)
+        )
+        records_per_shard = int(
+            (self._load_audit_manifest(audit_manifest_path) or {}).get(
+                "records_per_shard",
+                self._audit_shard_records,
+            )
+            or 50000
+        )
+        candidate_dir = self._candidate_manifest_for_checkpoint(checkpoint_path).parent
+        if candidate_dir.exists():
+            for stale_path in candidate_dir.glob("shard-*.jsonl*"):
+                try:
+                    stale_path.unlink()
+                except OSError as exc:
+                    self.log(f"Failed to remove stale candidate shard {stale_path}: {exc}", "warning")
+            stale_manifest = candidate_dir / "manifest.json"
+            if stale_manifest.exists():
+                try:
+                    stale_manifest.unlink()
+                except OSError as exc:
+                    self.log(f"Failed to remove stale candidate manifest {stale_manifest}: {exc}", "warning")
+        self._prepare_candidate_shards(
+            checkpoint_path,
+            enabled=True,
+            compression=compression,
+            records_per_shard=records_per_shard,
+        )
+        candidate_rows: List[Dict[str, Any]] = []
+        batch: List[Dict[str, Any]] = []
+        for record in self._iter_records_from_manifest(
+            audit_manifest_path,
+            "Legacy audit migration",
+        ):
+            row = self._candidate_row_from_explanation_record(record)
+            if row is None:
+                continue
+            candidate_rows.append(row)
+            batch.append(row)
+            if len(batch) >= 1000:
+                self._append_candidate_records(batch)
+                batch = []
+        if batch:
+            self._append_candidate_records(batch)
+        candidate_manifest_path = self._write_candidate_manifest()
+        if candidate_manifest_path is not None:
+            payload = dict(payload)
+            payload["checkpoint_schema_version"] = 2
+            payload["candidate_records_manifest_path"] = self._relative_to_checkpoint(
+                candidate_manifest_path,
+                checkpoint_path,
+            )
+            payload["candidate_records_count"] = len(candidate_rows)
+            payload.setdefault("checkpoint_payload", self._checkpoint_payload_mode)
+            self._write_json_atomic(checkpoint_path, payload)
+            self.log(
+                (
+                    f"Legacy audit migration complete: wrote {len(candidate_rows)} slim candidate "
+                    f"records to {candidate_manifest_path}"
+                ),
+                "info",
+            )
+        return candidate_rows
+
+    def _relative_to_checkpoint(self, path: Path, checkpoint_path: Path) -> str:
+        try:
+            return str(path.relative_to(checkpoint_path.parent))
+        except ValueError:
+            return str(path)
+
+    def _audit_manifest_for_checkpoint(self, checkpoint_path: Path) -> Path:
+        return checkpoint_path.parent / f"{checkpoint_path.stem}_audit" / "manifest.json"
+
+    def _close_audit_writer(self) -> None:
+        writer = getattr(self, "_audit_current_writer", None)
+        if writer is None:
+            return
+        try:
+            writer.close()
+        finally:
+            self._audit_current_writer = None
+            self._audit_current_shard = None
+
+    def _load_audit_manifest(self, manifest_path: Path) -> Dict[str, Any]:
+        try:
+            with open(manifest_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except FileNotFoundError:
+            return {}
+        except (OSError, json.JSONDecodeError) as exc:
+            self.log(f"Failed to load audit manifest {manifest_path}: {exc}", "warning")
+            return {}
+
+    def _prepare_audit_shards(
+        self,
+        checkpoint_path: Optional[Path],
+        enabled: bool,
+        compression: str,
+        records_per_shard: int,
+        append_existing: bool = True,
+    ) -> None:
+        self._close_audit_writer()
+        self._audit_shards_enabled = bool(enabled and checkpoint_path is not None)
+        self._audit_shard_compression = self._resolve_text_compression(compression)
+        self._audit_shard_records = max(1, int(records_per_shard or 50000))
+        self._audit_manifest_path = None
+        self._audit_shard_dir = None
+        self._audit_shards = []
+        self._audit_total_records = 0
+        if not self._audit_shards_enabled or checkpoint_path is None:
+            return
+        self._audit_manifest_path = self._audit_manifest_for_checkpoint(checkpoint_path)
+        self._audit_shard_dir = self._audit_manifest_path.parent
+        self._audit_shard_dir.mkdir(parents=True, exist_ok=True)
+        if not append_existing:
+            for path in self._audit_shard_dir.glob("shard-*.jsonl*"):
+                try:
+                    path.unlink()
+                except OSError as exc:
+                    self.log(f"Failed to remove stale audit shard {path}: {exc}", "warning")
+            if self._audit_manifest_path.exists():
+                try:
+                    self._audit_manifest_path.unlink()
+                except OSError as exc:
+                    self.log(f"Failed to remove stale audit manifest {self._audit_manifest_path}: {exc}", "warning")
+        manifest = self._load_audit_manifest(self._audit_manifest_path) if append_existing else {}
+        self._audit_shards = list(manifest.get("shards") or [])
+        self._audit_total_records = int(manifest.get("total_records", 0) or 0)
+        manifest_compression = manifest.get("compression")
+        if manifest_compression:
+            self._audit_shard_compression = self._resolve_text_compression(manifest_compression)
+
+    def _start_new_audit_shard(self) -> None:
+        if not self._audit_shards_enabled or self._audit_shard_dir is None:
+            return
+        self._close_audit_writer()
+        idx = len(self._audit_shards)
+        suffix = self._jsonl_suffix(self._audit_shard_compression)
+        shard_name = f"shard-{idx:06d}{suffix}"
+        shard_path = self._audit_shard_dir / shard_name
+        shard = {"path": shard_name, "records": 0}
+        self._audit_shards.append(shard)
+        self._audit_current_shard = shard
+        self._audit_current_writer = self._open_jsonl_writer(shard_path, self._audit_shard_compression)
+
+    def _append_audit_records(self, records: List[Dict[str, Any]]) -> None:
+        if not records or not self._audit_shards_enabled:
+            return
+        for record in records:
+            if (
+                self._audit_current_writer is None
+                or self._audit_current_shard is None
+                or int(self._audit_current_shard.get("records", 0)) >= self._audit_shard_records
+            ):
+                self._start_new_audit_shard()
+            if self._audit_current_writer is None or self._audit_current_shard is None:
+                return
+            self._audit_current_writer.write(
+                json.dumps(record, ensure_ascii=False, separators=(",", ":"), default=_json_default)
+            )
+            self._audit_current_writer.write("\n")
+            self._audit_current_shard["records"] = int(self._audit_current_shard.get("records", 0)) + 1
+            self._audit_total_records += 1
+
+    def _write_audit_manifest(self) -> Optional[Path]:
+        if not self._audit_shards_enabled or self._audit_manifest_path is None:
+            return None
+        self._close_audit_writer()
+        payload = {
+            "version": 1,
+            "format": "jsonl",
+            "compression": self._audit_shard_compression,
+            "records_per_shard": self._audit_shard_records,
+            "total_records": self._audit_total_records,
+            "shards": self._audit_shards,
+        }
+        self._write_json_atomic(self._audit_manifest_path, payload)
+        return self._audit_manifest_path
+
+    def _rewrite_audit_shards(self, records: List[Dict[str, Any]]) -> None:
+        if not self._audit_shards_enabled or self._audit_shard_dir is None:
+            return
+        self._close_audit_writer()
+        for path in self._audit_shard_dir.glob("shard-*.jsonl*"):
+            try:
+                path.unlink()
+            except OSError as exc:
+                self.log(f"Failed to remove stale audit shard {path}: {exc}", "warning")
+        self._audit_shards = []
+        self._audit_total_records = 0
+        self._append_audit_records(records)
+        self._write_audit_manifest()
+
+    def _read_audit_records_from_manifest(self, manifest_path: Path) -> List[Dict[str, Any]]:
+        manifest = self._load_audit_manifest(manifest_path)
+        if not manifest:
+            return []
+        compression = self._resolve_text_compression(manifest.get("compression", "none"))
+        records: List[Dict[str, Any]] = []
+        for shard in manifest.get("shards") or []:
+            rel_path = shard.get("path")
+            if not rel_path:
+                continue
+            shard_path = (manifest_path.parent / str(rel_path)).resolve()
+            try:
+                records.extend(self._read_jsonl_records(shard_path, compression=compression))
+            except (OSError, json.JSONDecodeError) as exc:
+                self.log(f"Failed to read audit shard {shard_path}: {exc}", "warning")
+                return []
+        return records
+
+    def has_streamed_explanations(self) -> bool:
+        manifest_path = getattr(self, "_audit_manifest_path", None)
+        return bool(manifest_path and Path(manifest_path).exists())
+
+    def _load_overlay_lookup(self) -> Dict[Tuple[str, str], Dict[str, Any]]:
+        manifest_path = getattr(self, "_overlay_manifest_path", None)
+        if not manifest_path or not Path(manifest_path).exists():
+            return {}
+        lookup: Dict[Tuple[str, str], Dict[str, Any]] = {}
+        for record in self._iter_records_from_manifest(Path(manifest_path), "Final overlay load"):
+            src = record.get("Src")
+            tgt = record.get("Tgt")
+            if src is None or tgt is None:
+                continue
+            lookup[(str(src), str(tgt))] = record
+        return lookup
+
+    @staticmethod
+    def _merge_overlay_record(record: Dict[str, Any], overlay: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+        if not overlay:
+            return record
+        merged = dict(record)
+        for section in ["confidences", "prediction", "models", "backend_usage"]:
+            payload = overlay.get(section)
+            if not isinstance(payload, dict):
+                continue
+            current = dict(merged.get(section) or {})
+            current.update(payload)
+            merged[section] = current
+        return merged
+
+    def write_full_explanations_json(self, path: Path) -> None:
+        manifest_path = getattr(self, "_audit_manifest_path", None)
+        manifest = self._load_audit_manifest(manifest_path) if manifest_path else {}
+        if not manifest:
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(
+                    self.results_json,
+                    f,
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                    default=_json_default,
+                )
+            return
+
+        compression = self._resolve_text_compression(manifest.get("compression", "none"))
+        overlay_lookup = self._load_overlay_lookup()
+        first = True
+        written = 0
+        start = time.perf_counter()
+        self.log(f"Streaming full explanations JSON to {path}", "info")
+        with open(path, "w", encoding="utf-8") as out:
+            out.write("[")
+            for shard in manifest.get("shards") or []:
+                rel_path = shard.get("path")
+                if not rel_path:
+                    continue
+                shard_path = (manifest_path.parent / str(rel_path)).resolve()
+                with self._open_jsonl_reader(shard_path, compression) as source:
+                    for line in source:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        if not first:
+                            out.write(",")
+                        record = json.loads(line)
+                        overlay = overlay_lookup.get(
+                            (str(record.get("src_iri")), str(record.get("tgt_iri")))
+                        )
+                        out.write(
+                            json.dumps(
+                                self._merge_overlay_record(record, overlay),
+                                ensure_ascii=False,
+                                separators=(",", ":"),
+                                default=_json_default,
+                            )
+                        )
+                        first = False
+                        written += 1
+                        if written % 50000 == 0:
+                            elapsed = max(1.0e-8, time.perf_counter() - start)
+                            self.log(
+                                (
+                                    f"Full explanations export progress: records={written}/"
+                                    f"{int(manifest.get('total_records', 0) or 0) or '?'}, "
+                                    f"avg={written / elapsed:.1f} records/s"
+                                ),
+                                "debug",
+                            )
+            out.write("]")
+        elapsed = max(0.0, time.perf_counter() - start)
+        self.log(
+            f"Finished full explanations JSON export: records={written}, duration={_format_duration(elapsed)}",
+            "info",
+        )
 
     def _load_additional_models_checkpoint(
         self,
@@ -555,7 +1294,7 @@ class SemanticAlignmentRunner(ITrainer):
                 self.log(
                     "Skipping additional-model checkpoint resume because "
                     "resume_additional_model_checkpoints=False.",
-                    "info",
+                    "debug",
                 )
                 self._additional_model_checkpoint_skip_logged = True
             return None
@@ -576,6 +1315,30 @@ class SemanticAlignmentRunner(ITrainer):
             self.log(f"Ignoring incomplete additional-model checkpoint {path}.", "debug")
             return None
         records = payload.get("candidate_records") or []
+        records_path_value = payload.get("candidate_records_path")
+        if not records and records_path_value:
+            records_path = Path(str(records_path_value))
+            if not records_path.is_absolute():
+                records_path = (path.parent / records_path).resolve()
+            try:
+                start = time.perf_counter()
+                compression = payload.get("candidate_records_compression", "none")
+                records = []
+                for record in self._iter_jsonl_records(records_path, compression=compression):
+                    records.append(record)
+                    if len(records) % 50000 == 0:
+                        elapsed = max(1.0e-8, time.perf_counter() - start)
+                        self.log(
+                            (
+                                f"Additional-model checkpoint load progress: "
+                                f"records={len(records)}/{payload.get('candidate_records_count', '?')}, "
+                                f"avg={len(records) / elapsed:.1f} records/s"
+                            ),
+                            "debug",
+                        )
+            except (OSError, json.JSONDecodeError) as exc:
+                self.log(f"Failed to load additional-model records {records_path}: {exc}", "warning")
+                return None
         if not records:
             return None
         df = pd.DataFrame.from_records(records)
@@ -590,7 +1353,7 @@ class SemanticAlignmentRunner(ITrainer):
         local_alignment: bool,
         threshold: Optional[float],
         cardinality: Optional[int],
-        log_level: str = "info",
+        log_level: str = "debug",
         complete: bool = True,
     ) -> None:
         if not bool(getattr(self, "_postprocess_checkpoints_enabled", False)):
@@ -599,13 +1362,23 @@ class SemanticAlignmentRunner(ITrainer):
             return
         stage = "additional_models" if complete else "additional_models_partial"
         path = self._stage_checkpoint_path(kind, stage, local_alignment, threshold, cardinality)
+        compression = self._resolve_text_compression(getattr(self, "_audit_shard_compression", "zstd"))
+        records_path = path.with_suffix(self._jsonl_suffix(compression))
         payload = {
             "stage": stage,
             "complete": bool(complete),
             "fingerprint_payload": self._postprocess_fingerprint_payload(kind, local_alignment, threshold, cardinality),
-            "candidate_records": candidate_df.to_dict(orient="records"),
+            "candidate_records_path": records_path.name,
+            "candidate_records_format": "jsonl",
+            "candidate_records_compression": compression,
+            "candidate_records_count": int(len(candidate_df)),
         }
         try:
+            self._write_jsonl_records_atomic(
+                records_path,
+                candidate_df.to_dict(orient="records"),
+                compression=compression,
+            )
             self._write_json_atomic(path, payload)
             self.log(f"Wrote additional-model checkpoint to {path}", log_level)
         except OSError as exc:
@@ -621,6 +1394,9 @@ class SemanticAlignmentRunner(ITrainer):
                 continue
             conf = record.get("confidences") or {}
             for key in [
+                "cand_sim",
+                "cand_sim_semantic",
+                "cand_sim_lexical",
                 "S_pair_final",
                 "S_select",
                 "P_select",
@@ -700,7 +1476,7 @@ class SemanticAlignmentRunner(ITrainer):
                 record["prediction"] = pred
                 restored += 1
         if restored:
-            self.log(f"Loaded {restored} rationales from checkpoint {path}", "info")
+            self.log(f"Loaded {restored} rationales from checkpoint {path}", "debug")
         return {str(key): str(value) for key, value in rationales.items() if value}
 
     def _write_rationale_checkpoint(
@@ -728,14 +1504,43 @@ class SemanticAlignmentRunner(ITrainer):
             self.log(f"Failed to write rationale checkpoint {path}: {exc}", "warning")
 
     def _maybe_persist_model_cache(self, reason: str, force: bool = False) -> None:
+        policy = str(getattr(self, "_cache_persist_policy", "checkpoint") or "checkpoint").lower()
+        if policy == "never":
+            return
+        if reason == "checkpoint" and policy != "checkpoint":
+            if reason not in self._cache_persist_skip_logged:
+                self.log(
+                    f"Skipping model cache persistence during {reason}; cache_persist_policy={policy}.",
+                    "debug",
+                )
+                self._cache_persist_skip_logged.add(reason)
+            return
+        if reason == "finalize" and policy not in {"checkpoint", "finalize"}:
+            return
         models = getattr(self, "models", None) or [getattr(self, "model", None)]
         for model in models:
             if model is None or not hasattr(model, "persist_caches"):
                 continue
+            log_level = "debug"
+            model_name = model.__class__.__name__
+            start = time.perf_counter()
+            self.log(
+                f"Persisting model cache for {model_name} (reason={reason}, force={bool(force)}).",
+                log_level,
+            )
             try:
                 model.persist_caches(force=force, reason=reason)
             except Exception as exc:  # noqa: BLE001
                 self.log(f"Failed to persist model cache during {reason}: {exc}", "warning")
+                continue
+            elapsed = max(0.0, time.perf_counter() - start)
+            self.log(
+                (
+                    f"Persisted model cache for {model_name} "
+                    f"in {_format_duration(elapsed)} (reason={reason})."
+                ),
+                log_level,
+            )
 
     def _record_llm_calibration(self, calib: Optional[Dict[str, Any]]) -> None:
         if not calib or self._llm_calibration_report is None:
@@ -786,6 +1591,394 @@ class SemanticAlignmentRunner(ITrainer):
             pred["rationale_positive"] = rationale_positive
             pred["rationale_decision_label"] = "Match" if rationale_positive else "No match"
             rec["prediction"] = pred
+
+    def _annotate_candidate_dataframe(
+        self,
+        candidate_df: pd.DataFrame,
+        preds: List[EntityMapping],
+        threshold: Optional[float],
+        local_alignment: bool,
+    ) -> None:
+        if candidate_df.empty or "Src" not in candidate_df.columns or "Tgt" not in candidate_df.columns:
+            return
+        kept_pairs = {(m.head, m.tail) for m in preds}
+        threshold_value = float(threshold) if threshold is not None else None
+        saved_values = []
+        threshold_values = []
+        rationale_values = []
+        labels = []
+        for _, row in candidate_df.iterrows():
+            src = str(row.get("Src"))
+            tgt = str(row.get("Tgt"))
+            s_final = row.get("S_final")
+            threshold_positive = False
+            if s_final is not None and threshold_value is not None:
+                threshold_positive = float(s_final) >= threshold_value
+            elif s_final is not None and threshold_value is None:
+                threshold_positive = True
+            saved = (src, tgt) in kept_pairs
+            rationale_positive = bool(threshold_positive) if local_alignment else bool(saved)
+            saved_values.append(bool(saved))
+            threshold_values.append(bool(threshold_positive))
+            rationale_values.append(bool(rationale_positive))
+            labels.append("Match" if rationale_positive else "No match")
+        candidate_df["saved_alignment_member"] = saved_values
+        candidate_df["threshold_positive"] = threshold_values
+        candidate_df["rationale_positive"] = rationale_values
+        candidate_df["rationale_decision_label"] = labels
+
+    @staticmethod
+    def _row_scalar(row: pd.Series, key: str, default: Any = None) -> Any:
+        if key not in row:
+            return default
+        value = row.get(key)
+        if value is None:
+            return default
+        try:
+            missing = pd.isna(value)
+            if isinstance(missing, bool) and missing:
+                return default
+        except (TypeError, ValueError):
+            pass
+        return value
+
+    def _should_generate_final_rationales(self) -> bool:
+        model = getattr(self, "model", None)
+        if model is None or not hasattr(model, "generate_final_rationales_for_records"):
+            return False
+        return bool(getattr(model, "generate_llm_rationales", True))
+
+    def _ensure_compact_rationale_records(self, candidate_df: pd.DataFrame) -> bool:
+        if self.results_json or candidate_df.empty or not self._should_generate_final_rationales():
+            return False
+        records: List[Dict[str, Any]] = []
+        confidence_keys = [
+            "S_pair_final",
+            "S_select",
+            "P_select",
+            "selection_margin",
+            "selection_entropy",
+            "selection_no_match_prob",
+            "selection_evidence_support",
+            "selection_distinctive",
+            "selection_utility",
+            "P_rank",
+            "P_match",
+            "selection_accept_threshold",
+            "selection_target_conflict_enabled",
+            "selection_target_cardinality",
+            "S_final",
+            "s_label",
+            "s_label_star",
+            "s_ctx",
+            "S_lctx",
+            "S_base",
+            "S_struct",
+            "s_hier",
+            "s_sim",
+            "s_diff",
+            "s_attr",
+            "cand_sim",
+            "cand_sim_semantic",
+            "cand_sim_lexical",
+            "p_llm",
+        ]
+        weight_keys = ["w_c", "w_struct", "w_i", "U", "U_ind", "U_dis"]
+        importance_keys = [
+            "I_label",
+            "I_struct",
+            "I_ctx",
+            "I_hier",
+            "I_sim",
+            "I_diff",
+            "I_attr",
+            "I_llm",
+        ]
+        for _, row in candidate_df.iterrows():
+            src = self._row_scalar(row, "Src")
+            tgt = self._row_scalar(row, "Tgt")
+            if src is None or tgt is None:
+                continue
+            confidences: Dict[str, Any] = {}
+            for key in confidence_keys:
+                value = self._row_scalar(row, key)
+                if value is None:
+                    continue
+                if key == "selection_target_conflict_enabled":
+                    confidences[key] = bool(value)
+                elif key == "selection_target_cardinality":
+                    confidences[key] = int(value or 0)
+                else:
+                    try:
+                        confidences[key] = float(value)
+                    except (TypeError, ValueError):
+                        continue
+            weights: Dict[str, float] = {}
+            for key in weight_keys:
+                value = self._row_scalar(row, key)
+                if value is None:
+                    continue
+                try:
+                    weights[key] = float(value)
+                except (TypeError, ValueError):
+                    continue
+            importances: Dict[str, float] = {}
+            for key in importance_keys:
+                value = self._row_scalar(row, key)
+                if value is None:
+                    continue
+                try:
+                    importances[key] = float(value)
+                except (TypeError, ValueError):
+                    continue
+            prediction: Dict[str, Any] = {}
+            ground_truth = self._row_scalar(row, "ground_truth")
+            if ground_truth is not None:
+                prediction["ground_truth"] = ground_truth
+            for key in [
+                "threshold_positive",
+                "saved_alignment_member",
+                "rationale_positive",
+                "rationale_decision_label",
+                "selection_abstained",
+                "selection_llm_used",
+                "selection_reason",
+                "selection_winner",
+            ]:
+                value = self._row_scalar(row, key)
+                if value is None:
+                    continue
+                if key in {
+                    "threshold_positive",
+                    "saved_alignment_member",
+                    "rationale_positive",
+                    "selection_abstained",
+                    "selection_llm_used",
+                    "selection_winner",
+                }:
+                    prediction[key] = bool(value)
+                else:
+                    prediction[key] = str(value)
+            if "selection_reason" in prediction:
+                prediction["selector_reason"] = prediction.pop("selection_reason")
+            if "selection_abstained" in prediction:
+                prediction["selector_abstained"] = prediction.pop("selection_abstained")
+            if "selection_llm_used" in prediction:
+                prediction["selector_llm_used"] = prediction.pop("selection_llm_used")
+            if "selection_winner" in prediction:
+                prediction["selector_winner"] = prediction.pop("selection_winner")
+            record = {
+                "src_iri": str(src),
+                "tgt_iri": str(tgt),
+                "selected_labels": {
+                    "source": str(self._row_scalar(row, "src_label_text", "") or ""),
+                    "target": str(self._row_scalar(row, "tgt_label_text", "") or ""),
+                },
+                "llm_summaries": {
+                    "source": str(self._row_scalar(row, "src_context_text", "") or ""),
+                    "target": str(self._row_scalar(row, "tgt_context_text", "") or ""),
+                },
+                "llm_pair_brief": str(self._row_scalar(row, "llm_pair_brief", "") or ""),
+                "confidences": confidences,
+                "weights": weights,
+                "importances": importances,
+                "prediction": prediction,
+            }
+            records.append(record)
+        if not records:
+            return False
+        self.results_json.extend(records)
+        self.log(
+            (
+                f"Prepared {len(records)} compact records for final rationale generation "
+                "without loading full audit JSON into memory."
+            ),
+            "debug",
+        )
+        return True
+
+    @staticmethod
+    def _result_record_lookup(records: List[Dict[str, Any]]) -> Dict[Tuple[str, str], Dict[str, Any]]:
+        lookup: Dict[Tuple[str, str], Dict[str, Any]] = {}
+        for record in records or []:
+            src = record.get("src_iri")
+            tgt = record.get("tgt_iri")
+            if src is None or tgt is None:
+                continue
+            lookup[(str(src), str(tgt))] = record
+        return lookup
+
+    def _overlay_record_from_candidate_row(
+        self,
+        row: pd.Series,
+        result_record_lookup: Optional[Dict[Tuple[str, str], Dict[str, Any]]] = None,
+    ) -> Dict[str, Any]:
+        src = str(row.get("Src"))
+        tgt = str(row.get("Tgt"))
+        confidence_keys = [
+            "S_pair_final",
+            "S_select",
+            "P_select",
+            "selection_margin",
+            "selection_entropy",
+            "selection_no_match_prob",
+            "selection_evidence_support",
+            "selection_distinctive",
+            "selection_utility",
+            "P_rank",
+            "P_match",
+            "selection_accept_threshold",
+            "selection_target_conflict_enabled",
+            "selection_target_cardinality",
+            "S_final",
+            "cand_sim",
+            "cand_sim_semantic",
+            "cand_sim_lexical",
+        ]
+        confidences: Dict[str, Any] = {}
+        for key in confidence_keys:
+            if key not in row or pd.isna(row.get(key)):
+                continue
+            value = row.get(key)
+            if key in {"selection_target_conflict_enabled"}:
+                confidences[key] = bool(value)
+            elif key in {"selection_target_cardinality"}:
+                confidences[key] = int(value or 0)
+            else:
+                confidences[key] = float(value)
+        prediction_keys = [
+            "threshold_positive",
+            "saved_alignment_member",
+            "rationale_positive",
+            "rationale_decision_label",
+            "selection_abstained",
+            "selection_llm_used",
+            "selection_reason",
+            "selection_winner",
+        ]
+        prediction: Dict[str, Any] = {}
+        for key in prediction_keys:
+            if key not in row or pd.isna(row.get(key)):
+                continue
+            value = row.get(key)
+            if key in {
+                "threshold_positive",
+                "saved_alignment_member",
+                "rationale_positive",
+                "selection_abstained",
+                "selection_llm_used",
+                "selection_winner",
+            }:
+                prediction[key] = bool(value)
+            else:
+                prediction[key] = str(value)
+        if "selection_reason" in prediction:
+            prediction["selector_reason"] = prediction.pop("selection_reason")
+        if "selection_abstained" in prediction:
+            prediction["selector_abstained"] = prediction.pop("selection_abstained")
+        if "selection_llm_used" in prediction:
+            prediction["selector_llm_used"] = prediction.pop("selection_llm_used")
+        if "selection_winner" in prediction:
+            prediction["selector_winner"] = prediction.pop("selection_winner")
+        overlay: Dict[str, Any] = {
+            "Src": src,
+            "Tgt": tgt,
+            "confidences": confidences,
+            "prediction": prediction,
+        }
+        source_record = (result_record_lookup or {}).get((src, tgt))
+        if source_record:
+            source_prediction = source_record.get("prediction") or {}
+            if source_prediction.get("llm_rationale"):
+                prediction["llm_rationale"] = str(source_prediction.get("llm_rationale"))
+            backend_usage = source_record.get("backend_usage")
+            if isinstance(backend_usage, dict) and backend_usage:
+                overlay["backend_usage"] = backend_usage
+            models = source_record.get("models")
+            if isinstance(models, dict) and models:
+                overlay["models"] = models
+        return overlay
+
+    def _write_final_overlay(
+        self,
+        checkpoint_path: Path,
+        candidate_df: pd.DataFrame,
+        preds: List[EntityMapping],
+        threshold: Optional[float],
+        local_alignment: bool,
+        compression: str,
+        records_per_shard: int,
+    ) -> Optional[Path]:
+        if candidate_df.empty:
+            return None
+        self._annotate_candidate_dataframe(candidate_df, preds, threshold, local_alignment)
+        overlay_manifest_path = self._overlay_manifest_for_checkpoint(checkpoint_path)
+        overlay_dir = overlay_manifest_path.parent
+        overlay_dir.mkdir(parents=True, exist_ok=True)
+        for path in overlay_dir.glob("shard-*.jsonl*"):
+            try:
+                path.unlink()
+            except OSError as exc:
+                self.log(f"Failed to remove stale overlay shard {path}: {exc}", "warning")
+        resolved = self._resolve_text_compression(compression)
+        shard_limit = max(1, int(records_per_shard or 50000))
+        shards: List[Dict[str, Any]] = []
+        total = 0
+        start = time.perf_counter()
+        writer = None
+        current_shard: Optional[Dict[str, Any]] = None
+        result_record_lookup = self._result_record_lookup(self.results_json)
+        try:
+            for _, row in candidate_df.iterrows():
+                if writer is None or current_shard is None or int(current_shard.get("records", 0)) >= shard_limit:
+                    if writer is not None:
+                        writer.close()
+                    shard_name = f"shard-{len(shards):06d}{self._jsonl_suffix(resolved)}"
+                    current_shard = {"path": shard_name, "records": 0}
+                    shards.append(current_shard)
+                    writer = self._open_jsonl_writer(overlay_dir / shard_name, resolved)
+                writer.write(
+                    json.dumps(
+                        self._overlay_record_from_candidate_row(row, result_record_lookup),
+                        ensure_ascii=False,
+                        separators=(",", ":"),
+                        default=_json_default,
+                    )
+                )
+                writer.write("\n")
+                current_shard["records"] = int(current_shard.get("records", 0)) + 1
+                total += 1
+                if total % 50000 == 0:
+                    elapsed = max(1.0e-8, time.perf_counter() - start)
+                    self.log(
+                        (
+                            f"Final overlay write progress: records={total}/{len(candidate_df)}, "
+                            f"avg={total / elapsed:.1f} records/s"
+                        ),
+                        "debug",
+                    )
+        finally:
+            if writer is not None:
+                writer.close()
+        payload = {
+            "version": 1,
+            "format": "jsonl",
+            "compression": resolved,
+            "records_per_shard": shard_limit,
+            "total_records": total,
+            "shards": shards,
+        }
+        self._write_json_atomic(overlay_manifest_path, payload)
+        self._overlay_manifest_path = overlay_manifest_path
+        elapsed = max(0.0, time.perf_counter() - start)
+        self.log(
+            (
+                f"Wrote final overlay for {total} records to {overlay_manifest_path} "
+                f"in {_format_duration(elapsed)}"
+            ),
+            "info",
+        )
+        return overlay_manifest_path
 
     def _generate_final_rationales(
         self,
@@ -1016,6 +2209,12 @@ class SemanticAlignmentRunner(ITrainer):
         enable_checkpoints: bool = True,
         resume_additional_model_checkpoints: bool = True,
         allow_rationale_toggle_checkpoint_resume: bool = False,
+        audit_shards_enabled: bool = True,
+        audit_shard_compression: str = "zstd",
+        audit_shard_records: int = 50000,
+        checkpoint_payload: str = "compact",
+        cache_persist_policy: str = "finalize",
+        save_json: bool = False,
         **kwargs,
     ) -> Tuple[List[EntityMapping], float]:
         self.dataset.default_kind = kind
@@ -1032,6 +2231,8 @@ class SemanticAlignmentRunner(ITrainer):
         self._llm_calibration_report: Optional[Dict[str, Any]] = None
         self._candidate_rows: List[Dict[str, Any]] = []
         self._last_stage_timings = {}
+        self._restored_candidate_rows = []
+        self._overlay_manifest_path = None
         if hasattr(self.model, "reset_llm_calibration_tracking"):
             self.model.reset_llm_calibration_tracking()
         if hasattr(self.model, "reset_summary_stats"):
@@ -1050,6 +2251,25 @@ class SemanticAlignmentRunner(ITrainer):
             }
 
         checkpoint_enabled = enable_checkpoints
+        self._checkpoint_payload_mode = str(checkpoint_payload or "compact").lower()
+        if self._checkpoint_payload_mode not in {"compact", "full"}:
+            self._checkpoint_payload_mode = "compact"
+        self._cache_persist_policy = str(cache_persist_policy or "finalize").lower()
+        if self._cache_persist_policy not in {"checkpoint", "finalize", "never"}:
+            self._cache_persist_policy = "finalize"
+        self._cache_persist_skip_logged = set()
+        self._prepare_audit_shards(
+            None,
+            enabled=False,
+            compression=audit_shard_compression,
+            records_per_shard=audit_shard_records,
+        )
+        self._prepare_candidate_shards(
+            None,
+            enabled=False,
+            compression=audit_shard_compression,
+            records_per_shard=audit_shard_records,
+        )
         self._postprocess_checkpoints_enabled = bool(checkpoint_enabled)
         self._additional_model_checkpoint_resume_enabled = bool(
             checkpoint_enabled and resume_additional_model_checkpoints
@@ -1077,12 +2297,31 @@ class SemanticAlignmentRunner(ITrainer):
                     level="info",
                 )
             all_mappings.extend(restored_mappings)
-            self.results_json.extend(restored_json)
+            if restored_json:
+                self.results_json.extend(restored_json)
+            restored_candidate_rows = getattr(self, "_restored_candidate_rows", []) or []
+            if restored_candidate_rows:
+                self._candidate_rows.extend(restored_candidate_rows)
 
         total_examples = len(self.dataset)
         remaining_examples = max(0, total_examples - restored_examples)
 
         if remaining_examples == 0:
+            if checkpoint_enabled and cp_path is not None:
+                self._prepare_audit_shards(
+                    cp_path,
+                    enabled=bool(audit_shards_enabled),
+                    compression=audit_shard_compression,
+                    records_per_shard=audit_shard_records,
+                    append_existing=True,
+                )
+                self._prepare_candidate_shards(
+                    cp_path,
+                    enabled=True,
+                    compression=audit_shard_compression,
+                    records_per_shard=audit_shard_records,
+                    append_existing=True,
+                )
             self.log(
                 (
                     "Checkpoint already contains predictions for all samples. "
@@ -1090,8 +2329,18 @@ class SemanticAlignmentRunner(ITrainer):
                 ),
                 level="info",
             )
-            candidate_df = self._build_candidate_dataframe_from_records(self.results_json)
+            candidate_df = self._build_candidate_dataframe()
+            if candidate_df.empty and self.results_json:
+                candidate_df = self._build_candidate_dataframe_from_records(self.results_json)
             if not candidate_df.empty:
+                n_sources = int(candidate_df["Src"].nunique()) if "Src" in candidate_df.columns else 0
+                self.log(
+                    (
+                        "Post-inference processing restored candidate scores: "
+                        f"rows={len(candidate_df)}, sources={n_sources}."
+                    ),
+                    "debug",
+                )
                 checkpointed_df = self._load_additional_models_checkpoint(
                     kind, local_alignment, threshold, cardinality
                 )
@@ -1116,6 +2365,10 @@ class SemanticAlignmentRunner(ITrainer):
                 threshold = self._effective_alignment_threshold(candidate_df, threshold)
             df = pd.DataFrame(all_mappings, columns=["Src", "Tgt", "Scores"])
             preds = EntityMapping.read_table_mappings(df, threshold=threshold, cardinality=cardinality)
+            compact_rationale_records = False
+            if not candidate_df.empty:
+                self._annotate_candidate_dataframe(candidate_df, preds, threshold, local_alignment)
+                compact_rationale_records = self._ensure_compact_rationale_records(candidate_df)
             self._annotate_final_prediction_records(preds, threshold=threshold, local_alignment=local_alignment)
             rationale_start = time.perf_counter()
             self._generate_final_rationales(
@@ -1126,7 +2379,30 @@ class SemanticAlignmentRunner(ITrainer):
                 cardinality=cardinality,
             )
             rationale_elapsed = time.perf_counter() - rationale_start
-            self.results_df = self._make_summary_dataframe(self.results_json)
+            self.results_df = (
+                self._make_summary_dataframe(self.results_json)
+                if self.results_json and not compact_rationale_records
+                else candidate_df
+            )
+            if not candidate_df.empty and cp_path is not None:
+                self._write_final_overlay(
+                    cp_path,
+                    candidate_df,
+                    preds,
+                    threshold,
+                    local_alignment,
+                    compression=audit_shard_compression,
+                    records_per_shard=audit_shard_records,
+                )
+            if checkpoint_enabled and cp_path is not None:
+                self._write_checkpoint_state(
+                    cp_path,
+                    kind,
+                    total_examples=total_examples,
+                    processed_examples=restored_examples,
+                    mappings=all_mappings,
+                    results_json=self.results_json,
+                )
             self._last_stage_timings = {
                 "Alignment.Inference": 0.0,
                 "Alignment.PostInference": 0.0,
@@ -1143,6 +2419,21 @@ class SemanticAlignmentRunner(ITrainer):
                     f"Checkpoint file {cp_path} will be overwritten for this run.",
                     level="info",
                 )
+        if checkpoint_enabled and cp_path is not None:
+            self._prepare_audit_shards(
+                cp_path,
+                enabled=bool(audit_shards_enabled),
+                compression=audit_shard_compression,
+                records_per_shard=audit_shard_records,
+                append_existing=restored_examples > 0,
+            )
+            self._prepare_candidate_shards(
+                cp_path,
+                enabled=True,
+                compression=audit_shard_compression,
+                records_per_shard=audit_shard_records,
+                append_existing=restored_examples > 0,
+            )
 
         dataset_for_dl = self.dataset
         if restored_examples > 0:
@@ -1224,7 +2515,7 @@ class SemanticAlignmentRunner(ITrainer):
                         f"{evidence.get('diff_selected', 0)}/{pair_batch_stats.get('pairs', len(src_iri))},"
                         f"{evidence.get('attr_selected', 0)}/{pair_batch_stats.get('pairs', len(src_iri))}."
                     ),
-                    "info",
+                    "debug",
                 )
 
             # Accumulate mappings
@@ -1268,6 +2559,7 @@ class SemanticAlignmentRunner(ITrainer):
             i_llm_vals = _tensor_list("I_llm")
             llm_pair_briefs = list(out.get("llm_pair_briefs") or [""] * len(src_iri))
             ground_truth = labels or [None] * len(src_iri)
+            candidate_start_idx = len(self._candidate_rows)
 
             for idx, (s, t, score) in enumerate(zip(src_iri, tgt_iri, s_final)):
                 all_mappings.append((s, t, float(score)))
@@ -1319,7 +2611,17 @@ class SemanticAlignmentRunner(ITrainer):
 
             # Accumulate full JSONs 
             if "explanations" in out:
-                self.results_json.extend(out["explanations"])
+                explanations = list(out["explanations"])
+                for local_idx, record in enumerate(explanations):
+                    candidate_idx = candidate_start_idx + local_idx
+                    if candidate_idx >= len(self._candidate_rows):
+                        continue
+                    evidence_items = self._selector_evidence_items_for_record(record)
+                    if evidence_items:
+                        self._candidate_rows[candidate_idx]["selector_evidence_items"] = evidence_items
+                self.results_json.extend(explanations)
+                self._append_audit_records(explanations)
+            self._append_candidate_records(self._candidate_rows[candidate_start_idx:])
 
             if (
                 checkpoint_enabled
@@ -1397,7 +2699,7 @@ class SemanticAlignmentRunner(ITrainer):
                     "info",
                 )
             else:
-                self.log("LLM summaries/briefs were not requested for this run.", "info")
+                self.log("LLM summaries/briefs were not requested for this run.", "debug")
 
         # Normalize LLM importance: if the LLM did not run (p_llm == 0 or no decision),
         # clamp I_llm to 0 so downstream summaries/plots are consistent with behavior.
@@ -1415,8 +2717,17 @@ class SemanticAlignmentRunner(ITrainer):
         self._maybe_persist_model_cache(reason="finalize", force=True)
 
         post_inference_start = time.perf_counter()
+        self.log("Post-inference processing started: assembling candidate dataframe.", "info")
         candidate_df = self._build_candidate_dataframe()
         if not candidate_df.empty:
+            n_sources = int(candidate_df["Src"].nunique()) if "Src" in candidate_df.columns else 0
+            self.log(
+                (
+                    "Candidate dataframe assembled for post-inference processing: "
+                    f"rows={len(candidate_df)}, sources={n_sources}."
+                ),
+                "debug",
+            )
             checkpointed_df = self._load_additional_models_checkpoint(
                 kind, local_alignment, threshold, cardinality
             )
@@ -1450,6 +2761,10 @@ class SemanticAlignmentRunner(ITrainer):
 
         df_scores = pd.DataFrame(all_mappings, columns=["Src", "Tgt", "Scores"])
         preds = EntityMapping.read_table_mappings(df_scores, threshold=threshold, cardinality=cardinality)
+        compact_rationale_records = False
+        if not candidate_df.empty:
+            self._annotate_candidate_dataframe(candidate_df, preds, threshold, local_alignment)
+            compact_rationale_records = self._ensure_compact_rationale_records(candidate_df)
         self._annotate_final_prediction_records(preds, threshold=threshold, local_alignment=local_alignment)
         rationale_start = time.perf_counter()
         self._generate_final_rationales(
@@ -1461,10 +2776,31 @@ class SemanticAlignmentRunner(ITrainer):
         )
         rationale_elapsed_seconds = time.perf_counter() - rationale_start
         post_inference_elapsed_seconds = time.perf_counter() - post_inference_start - rationale_elapsed_seconds
-        if self.results_json:
+        if self.results_json and not compact_rationale_records:
             self.results_df = self._make_summary_dataframe(self.results_json)
             for rec in self.results_json:
                 self._sync_record_model_usage(rec)
+        elif not candidate_df.empty:
+            self.results_df = candidate_df
+        if not candidate_df.empty and checkpoint_enabled and cp_path is not None:
+            self._write_final_overlay(
+                cp_path,
+                candidate_df,
+                preds,
+                threshold,
+                local_alignment,
+                compression=audit_shard_compression,
+                records_per_shard=audit_shard_records,
+            )
+        if checkpoint_enabled and cp_path is not None:
+            self._write_checkpoint_state(
+                cp_path,
+                kind,
+                total_examples=total_examples,
+                processed_examples=processed_examples,
+                mappings=all_mappings,
+                results_json=self.results_json,
+            )
         self._last_stage_timings = {
             "Alignment.Inference": inference_elapsed_seconds / 60.0,
             "Alignment.PostInference": max(0.0, post_inference_elapsed_seconds) / 60.0,
@@ -1606,6 +2942,15 @@ class SemanticAlignmentRunner(ITrainer):
         )
         for idx, extra_model in enumerate(self.models[1:], start=2):
             extra_model.eval()
+            model_name = extra_model.__class__.__name__
+            model_start = time.perf_counter()
+            self.log(
+                (
+                    f"Running additional model #{idx} ({model_name}) on "
+                    f"{len(current)} candidate rows."
+                ),
+                "info",
+            )
             sig = inspect.signature(extra_model.forward)
             accepts_var_kw = any(p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values())
             call_kwargs = {"candidate_df": current}
@@ -1649,4 +2994,12 @@ class SemanticAlignmentRunner(ITrainer):
                     f"Additional model #{idx} returned unsupported type {type(out)}; ignoring its output.",
                     level="warning",
                 )
+            elapsed = max(0.0, time.perf_counter() - model_start)
+            self.log(
+                (
+                    f"Additional model #{idx} ({model_name}) finished in "
+                    f"{_format_duration(elapsed)} with {len(current)} candidate rows."
+                ),
+                "info",
+            )
         return current

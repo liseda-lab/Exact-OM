@@ -143,6 +143,32 @@ class InferenceParams(BaseModel):
     allow_rationale_toggle_checkpoint_resume: bool = Field(
         config["inference_params"].get("allow_rationale_toggle_checkpoint_resume", False)
     )
+    audit_shards_enabled: bool = Field(config["inference_params"].get("audit_shards_enabled", True))
+    audit_shard_compression: str = Field(config["inference_params"].get("audit_shard_compression", "zstd"))
+    audit_shard_records: int = Field(config["inference_params"].get("audit_shard_records", 50000))
+    checkpoint_payload: str = Field(config["inference_params"].get("checkpoint_payload", "compact"))
+    cache_persist_policy: str = Field(config["inference_params"].get("cache_persist_policy", "finalize"))
+
+    @field_validator("audit_shard_compression", mode="before")
+    def validate_audit_shard_compression(cls, value: str) -> str:
+        compression = str(value or "zstd").lower()
+        if compression not in {"zstd", "none"}:
+            raise ValueError("audit_shard_compression must be 'zstd' or 'none'")
+        return compression
+
+    @field_validator("checkpoint_payload", mode="before")
+    def validate_checkpoint_payload(cls, value: str) -> str:
+        payload = str(value or "compact").lower()
+        if payload not in {"compact", "full"}:
+            raise ValueError("checkpoint_payload must be 'compact' or 'full'")
+        return payload
+
+    @field_validator("cache_persist_policy", mode="before")
+    def validate_cache_persist_policy(cls, value: str) -> str:
+        policy = str(value or "finalize").lower()
+        if policy not in {"checkpoint", "finalize", "never"}:
+            raise ValueError("cache_persist_policy must be 'checkpoint', 'finalize', or 'never'")
+        return policy
 
 
 class AlignmentParams(BaseModel):

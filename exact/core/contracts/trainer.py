@@ -250,22 +250,32 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
         out_dir.mkdir(parents=True, exist_ok=True)
 
         # ---- Explanations JSON
-        if save_json and self.results_json:
+        writer = getattr(self, "write_full_explanations_json", None)
+        has_streamed_explanations = getattr(self, "has_streamed_explanations", None)
+        can_stream_explanations = callable(writer) and (
+            bool(self.results_json)
+            or (callable(has_streamed_explanations) and bool(has_streamed_explanations()))
+        )
+        if save_json and (self.results_json or can_stream_explanations):
             json_path = out_dir / "full_explanations.json"
-            with open(json_path, "w", encoding="utf-8") as f:
-                json.dump(self.results_json, f, indent=2, ensure_ascii=False)
+            if callable(writer):
+                writer(json_path)
+            else:
+                with open(json_path, "w", encoding="utf-8") as f:
+                    json.dump(self.results_json, f, ensure_ascii=False, separators=(",", ":"), default=str)
             self.log(f"Saved full explanations JSON → {json_path}", level="info")
             output_paths["explanations_json"] = json_path
 
         # ---- Summary CSV
-        if save_csv and self.results_json:
+        results_df = self.results_df
+        if save_csv and results_df is not None and not results_df.empty:
             csv_path = out_dir / "summary_metrics.csv"
-            self.results_df.to_csv(csv_path, sep="\t", index=False)
+            results_df.to_csv(csv_path, sep="\t", index=False)
             self.log(f"Saved numeric summary CSV → {csv_path}", level="info")
             output_paths["summary_csv"] = csv_path
 
             # ---- Run-level stats
-            stats = self._compute_run_stats(self.results_df, review_low=review_low, review_high=review_high)
+            stats = self._compute_run_stats(results_df, review_low=review_low, review_high=review_high)
             summary_stats = getattr(self, "_llm_summary_stats", None)
             if summary_stats is not None:
                 stats["llm_summary_stats"] = summary_stats

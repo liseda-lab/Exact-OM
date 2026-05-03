@@ -2,6 +2,8 @@ import importlib.util
 import json
 from pathlib import Path
 
+import pandas as pd
+
 _MODULE_PATH = Path(__file__).resolve().parents[1] / "exact" / "impl" / "trainer" / "semantic_runner.py"
 _SPEC = importlib.util.spec_from_file_location("semantic_runner_module", _MODULE_PATH)
 _MODULE = importlib.util.module_from_spec(_SPEC)
@@ -114,6 +116,36 @@ def test_generate_final_rationales_updates_records():
     assert runner.results_json[0]["models"]["llm_decision_model"] == "Qwen/Qwen2.5-7B-Instruct"
     assert runner.results_json[0]["models"]["llm_rationale_model"] == "openai/gpt-4o-mini"
     assert runner.results_json[0]["models"]["llm_model"] == "multiple"
+
+
+def test_compact_candidate_records_support_final_rationales_without_full_audit():
+    runner = object.__new__(SemanticAlignmentRunner)
+    runner._results_json = []
+    runner._model = _DummyModel()
+    runner.log = lambda *args, **kwargs: None
+    candidate_df = pd.DataFrame(
+        [
+            {
+                "Src": "s1",
+                "Tgt": "t1",
+                "S_final": 0.91,
+                "src_label_text": "source label",
+                "tgt_label_text": "target label",
+                "llm_pair_brief": "pair evidence",
+                "threshold_positive": True,
+                "saved_alignment_member": True,
+                "rationale_positive": True,
+                "rationale_decision_label": "Match",
+            }
+        ]
+    )
+
+    created = runner._ensure_compact_rationale_records(candidate_df)
+    runner._generate_final_rationales()
+
+    assert created is True
+    assert runner.results_json[0]["selected_labels"]["source"] == "source label"
+    assert runner.results_json[0]["prediction"]["llm_rationale"] == "rationale:Match"
 
 
 def test_selector_metadata_is_available_to_final_rationale_prompt():

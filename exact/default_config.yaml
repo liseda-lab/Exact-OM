@@ -30,7 +30,7 @@ alignment_params:
   target_cardinality: 1 # Maximum number of sources retained per target after exact+selector mappings are merged.
 
   # Output artifacts.
-  save_json: True # Save full candidate-level explanations as JSON.
+  save_json: False # Assemble full candidate-level explanations JSON; compressed audit shards remain enabled by default.
   save_csv: True # Save the flattened summary table as TSV/CSV-style output.
   save_stats_csv: True # Save one-row run statistics for spreadsheet use.
   append_stats_to_summary_csv: True # Append human-readable run stats to the summary file.
@@ -173,6 +173,11 @@ inference_params:
   enable_checkpoints: True # Enable checkpoint creation during inference.
   resume_additional_model_checkpoints: True # Reuse post-inference selector/reranker checkpoints when available.
   allow_rationale_toggle_checkpoint_resume: True # If True, resume a checkpoint when the only model/config difference is `generate_llm_rationales`.
+  audit_shards_enabled: True # Write auditable explanation shards incrementally for compact checkpoint resume.
+  audit_shard_compression: zstd # Compression for audit and post-inference JSONL artifacts; falls back to plain JSONL if unavailable.
+  audit_shard_records: 50000 # Maximum records per audit shard before rotating.
+  checkpoint_payload: compact # compact stores manifests and counts; full retains legacy in-checkpoint mappings/results JSON.
+  cache_persist_policy: finalize # Persist model caches at finalize, checkpoint, or never.
 
 llm_profiles:
   # Named LLM backend profiles.

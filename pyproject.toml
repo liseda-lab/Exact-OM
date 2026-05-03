@@ -33,6 +33,7 @@ rdflib = "^7.5.0"
 httpx = "^0.28.1"
 fastapi = "^0.116.1"
 uvicorn = {version = "^0.35.0", extras = ["standard"]}
+zstandard = "^0.23.0"
 
 
 [tool.poetry.scripts]
