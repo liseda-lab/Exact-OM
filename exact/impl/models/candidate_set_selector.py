@@ -353,8 +353,19 @@ class CandidateSetSelector(IModel):
         if "S_pair_final" not in df.columns:
             df["S_pair_final"] = df["S_final"]
 
+        n_rows = int(len(df))
+        n_sources = int(df["Src"].nunique()) if "Src" in df.columns else 0
+        self._log(
+            logger,
+            (
+                "Candidate-set selector started: "
+                f"strategy={self.strategy}, rows={n_rows}, sources={n_sources}, "
+                f"use_no_match={self.use_no_match}, llm_enabled={bool(self.llm.get('enabled', False))}."
+            ),
+            "info",
+        )
         record_lookup = self._record_lookup(results_json)
-        distinctive = self._distinctive_scores(df, record_lookup)
+        distinctive = self._distinctive_scores(df, record_lookup, logger=logger, log_every=log_every)
         reciprocity = self._reciprocity_scores(df)
 
         defaults = {
@@ -562,6 +573,15 @@ class CandidateSetSelector(IModel):
             )
             return None
 
+        self._log(
+            logger,
+            (
+                "Calibrated selector fitting started: "
+                f"candidate_rows={len(df)}, candidate_sources={int(df['Src'].nunique())}, "
+                f"reference_pairs={len(ref_pairs)}, usable_positive_sources={n_positive_sources}."
+            ),
+            "info",
+        )
         calibration_choice = self._select_accept_model_by_oof_validation(
             df=df,
             rank_features=rank_features,
@@ -591,7 +611,12 @@ class CandidateSetSelector(IModel):
                 )
                 return None
 
-            rank_model = self._fit_rank_model(rank_features, rank_groups)
+            rank_model = self._fit_rank_model(
+                rank_features,
+                rank_groups,
+                logger=logger,
+                label="held-out rank",
+            )
             if rank_model is None:
                 self._log(logger, "Calibrated selector failed to fit rank model; using heuristic selector.", "warning")
                 return None
@@ -899,7 +924,7 @@ class CandidateSetSelector(IModel):
             self._log(
                 logger,
                 f"Calibrated selector filtered {removed} training references with ignored alignment classes.",
-                "info",
+                "debug",
             )
         return filtered
 
@@ -927,7 +952,7 @@ class CandidateSetSelector(IModel):
                 "Calibrated selector excluded exact-prefiltered training references: "
                 f"pairs={len(exact_ref_pairs)}, sources={len(exact_ref_sources)}."
             ),
-            "info",
+            "debug",
         )
         return filtered_ref_pairs, exact_ref_pairs, exact_ref_sources
 
@@ -1150,31 +1175,76 @@ class CandidateSetSelector(IModel):
         original_llm_mode = str(self.llm.get("mode", "veto"))
         min_positive = int(self.calibration["min_positive_sources"])
         best_choice: Optional[Dict[str, Any]] = None
+        weights_grid = list(self.calibration.get("background_negative_weight_grid", []))
+        self._log(
+            logger,
+            (
+                "Calibrated selector OOF validation started: "
+                f"background_weights={weights_grid}, folds={len(folds)}, "
+                f"rank_features={len(rank_features)}."
+            ),
+            "debug",
+        )
 
-        for background_weight in self.calibration.get("background_negative_weight_grid", []):
+        for weight_idx, background_weight in enumerate(weights_grid, start=1):
+            weight_start = time.perf_counter()
             self.calibration["background_negative_weight"] = float(background_weight)
             eval_decisions: Dict[str, Dict[str, Any]] = {}
             fold_failed = False
             fold_positive_sources: List[int] = []
+            self._log(
+                logger,
+                (
+                    "Calibrated selector OOF background weight started: "
+                    f"{weight_idx}/{len(weights_grid)} weight={float(background_weight):.3f}."
+                ),
+                "debug",
+            )
 
-            for fold in folds:
+            for fold_pos, fold in enumerate(folds, start=1):
+                fold_start = time.perf_counter()
                 train_ref_pairs = set(fold["train_ref_pairs"])
                 validation_ref_pairs = set(fold["validation_ref_pairs"])
                 validation_sources = set(fold["validation_sources"])
                 rank_groups, n_positive_sources = self._rank_training_groups(df, train_ref_pairs)
                 fold_positive_sources.append(n_positive_sources)
+                self._log(
+                    logger,
+                    (
+                        "Calibrated selector OOF fold started: "
+                        f"weight={float(background_weight):.3f}, fold={fold_pos}/{len(folds)}, "
+                        f"rank_groups={len(rank_groups)}, positive_sources={n_positive_sources}, "
+                        f"validation_sources={len(validation_sources)}."
+                    ),
+                    "debug",
+                )
                 if n_positive_sources < min_positive:
                     fold_failed = True
+                    self._log(
+                        logger,
+                        (
+                            "Calibrated selector OOF fold failed: "
+                            f"positive_sources={n_positive_sources} below min_positive_sources={min_positive}."
+                        ),
+                        "warning",
+                    )
                     break
-                rank_model = self._fit_rank_model(rank_features, rank_groups)
+                rank_model = self._fit_rank_model(
+                    rank_features,
+                    rank_groups,
+                    logger=logger,
+                    label=f"OOF weight={float(background_weight):.3f} fold={fold_pos}/{len(folds)} rank",
+                )
                 if rank_model is None:
                     fold_failed = True
+                    self._log(logger, "Calibrated selector OOF fold failed to fit rank model.", "warning")
                     break
                 utilities = {
                     idx: self._linear_score(rank_features[idx], rank_model)
                     for idx in rank_features
                 }
 
+                decision_start = time.perf_counter()
                 train_decisions = self._source_decisions(
                     df,
                     utilities,
@@ -1183,14 +1253,28 @@ class CandidateSetSelector(IModel):
                     train_ref_pairs,
                     exact_prefiltered_sources=exact_prefiltered_sources,
                 )
+                self._log(
+                    logger,
+                    (
+                        "Calibrated selector OOF train decisions built: "
+                        f"sources={len(train_decisions)}, duration={self._format_duration(time.perf_counter() - decision_start)}."
+                    ),
+                    "debug",
+                )
                 for src in validation_sources:
                     if src in train_decisions:
                         train_decisions[src]["sample_weight"] = 0.0
-                accept_model = self._fit_accept_model(train_decisions)
+                accept_model = self._fit_accept_model(
+                    train_decisions,
+                    logger=logger,
+                    label=f"OOF weight={float(background_weight):.3f} fold={fold_pos}/{len(folds)} accept",
+                )
                 if accept_model is None:
                     fold_failed = True
+                    self._log(logger, "Calibrated selector OOF fold failed to fit accept model.", "warning")
                     break
 
+                decision_start = time.perf_counter()
                 validation_decisions_all = self._source_decisions(
                     df,
                     utilities,
@@ -1198,6 +1282,15 @@ class CandidateSetSelector(IModel):
                     distinctive,
                     validation_ref_pairs,
                     exact_prefiltered_sources=exact_prefiltered_sources,
+                )
+                self._log(
+                    logger,
+                    (
+                        "Calibrated selector OOF validation decisions built: "
+                        f"sources={len(validation_decisions_all)}, "
+                        f"duration={self._format_duration(time.perf_counter() - decision_start)}."
+                    ),
+                    "debug",
                 )
                 validation_decisions = {
                     src: decision
@@ -1210,11 +1303,32 @@ class CandidateSetSelector(IModel):
                 for src, decision in validation_decisions.items():
                     decision["validation_fold"] = int(fold["fold"])
                     eval_decisions[src] = decision
+                self._log(
+                    logger,
+                    (
+                        "Calibrated selector OOF fold completed: "
+                        f"weight={float(background_weight):.3f}, fold={fold_pos}/{len(folds)}, "
+                        f"eval_sources={len(eval_decisions)}, "
+                        f"duration={self._format_duration(time.perf_counter() - fold_start)}."
+                    ),
+                    "debug",
+                )
 
             if fold_failed or not eval_decisions:
                 continue
 
+            threshold_start = time.perf_counter()
             accept_threshold, threshold_metrics = self._tune_accept_threshold(eval_decisions)
+            self._log(
+                logger,
+                (
+                    "Calibrated selector OOF threshold tuned: "
+                    f"weight={float(background_weight):.3f}, threshold={accept_threshold:.3f}, "
+                    f"F1={threshold_metrics.get('F1', 0.0):.3f}, "
+                    f"duration={self._format_duration(time.perf_counter() - threshold_start)}."
+                ),
+                "debug",
+            )
             for llm_mode in self._validation_llm_mode_candidates(primary_model):
                 mode_metrics = dict(threshold_metrics)
                 if llm_mode == "veto":
@@ -1261,6 +1375,16 @@ class CandidateSetSelector(IModel):
                             "target_conflict_enabled": bool(target_conflict_enabled),
                             "validation_split": dict(fold_meta),
                         }
+            self._log(
+                logger,
+                (
+                    "Calibrated selector OOF background weight completed: "
+                    f"{weight_idx}/{len(weights_grid)} weight={float(background_weight):.3f}, "
+                    f"eval_sources={len(eval_decisions)}, "
+                    f"duration={self._format_duration(time.perf_counter() - weight_start)}."
+                ),
+                "debug",
+            )
 
         if best_choice is None:
             self.calibration["background_negative_weight"] = original_background_weight
@@ -1270,7 +1394,12 @@ class CandidateSetSelector(IModel):
         self.calibration["background_negative_weight"] = float(best_choice["background_negative_weight"])
         self.llm["mode"] = str(best_choice["llm_mode"])
         rank_groups, _ = self._rank_training_groups(df, calibration_ref_pairs)
-        rank_model = self._fit_rank_model(rank_features, rank_groups)
+        rank_model = self._fit_rank_model(
+            rank_features,
+            rank_groups,
+            logger=logger,
+            label="final OOF refit rank",
+        )
         if rank_model is None:
             self.calibration["background_negative_weight"] = original_background_weight
             self.llm["mode"] = original_llm_mode
@@ -1287,7 +1416,11 @@ class CandidateSetSelector(IModel):
             calibration_ref_pairs,
             exact_prefiltered_sources=exact_prefiltered_sources,
         )
-        accept_model = self._fit_accept_model(source_decisions)
+        accept_model = self._fit_accept_model(
+            source_decisions,
+            logger=logger,
+            label="final OOF refit accept",
+        )
         if accept_model is None:
             self.calibration["background_negative_weight"] = original_background_weight
             self.llm["mode"] = original_llm_mode
@@ -1364,9 +1497,29 @@ class CandidateSetSelector(IModel):
         validation_sources = {src for src, _ in validation_ref_pairs}
         heldout_validation_sources = validation_sources.difference(train_sources)
         best_choice: Optional[Dict[str, Any]] = None
+        weights_grid = list(self.calibration.get("background_negative_weight_grid", []))
+        self._log(
+            logger,
+            (
+                "Calibrated selector held-out validation started: "
+                f"background_weights={weights_grid}, train_pairs={len(train_ref_pairs)}, "
+                f"validation_pairs={len(validation_ref_pairs)}."
+            ),
+            "debug",
+        )
 
-        for background_weight in self.calibration.get("background_negative_weight_grid", []):
+        for weight_idx, background_weight in enumerate(weights_grid, start=1):
+            weight_start = time.perf_counter()
             self.calibration["background_negative_weight"] = float(background_weight)
+            self._log(
+                logger,
+                (
+                    "Calibrated selector held-out background weight started: "
+                    f"{weight_idx}/{len(weights_grid)} weight={float(background_weight):.3f}."
+                ),
+                "debug",
+            )
+            decision_start = time.perf_counter()
             train_decisions = self._source_decisions(
                 df,
                 utilities,
@@ -1375,13 +1528,26 @@ class CandidateSetSelector(IModel):
                 train_ref_pairs,
                 exact_prefiltered_sources=exact_prefiltered_sources,
             )
+            self._log(
+                logger,
+                (
+                    "Calibrated selector held-out train decisions built: "
+                    f"sources={len(train_decisions)}, duration={self._format_duration(time.perf_counter() - decision_start)}."
+                ),
+                "debug",
+            )
             for src in heldout_validation_sources:
                 if src in train_decisions:
                     train_decisions[src]["sample_weight"] = 0.0
-            accept_model = self._fit_accept_model(train_decisions)
+            accept_model = self._fit_accept_model(
+                train_decisions,
+                logger=logger,
+                label=f"held-out weight={float(background_weight):.3f} accept",
+            )
             if accept_model is None:
                 continue
 
+            decision_start = time.perf_counter()
             validation_decisions_all = self._source_decisions(
                 df,
                 utilities,
@@ -1389,6 +1555,15 @@ class CandidateSetSelector(IModel):
                 distinctive,
                 validation_ref_pairs,
                 exact_prefiltered_sources=exact_prefiltered_sources,
+            )
+            self._log(
+                logger,
+                (
+                        "Calibrated selector held-out validation decisions built: "
+                        f"sources={len(validation_decisions_all)}, "
+                        f"duration={self._format_duration(time.perf_counter() - decision_start)}."
+                    ),
+                "debug",
             )
             validation_decisions = {
                 src: decision
@@ -1404,7 +1579,18 @@ class CandidateSetSelector(IModel):
                 continue
 
             self._assign_p_match(eval_decisions, accept_model)
+            threshold_start = time.perf_counter()
             accept_threshold, threshold_metrics = self._tune_accept_threshold(eval_decisions)
+            self._log(
+                logger,
+                (
+                    "Calibrated selector held-out threshold tuned: "
+                    f"weight={float(background_weight):.3f}, threshold={accept_threshold:.3f}, "
+                    f"F1={threshold_metrics.get('F1', 0.0):.3f}, "
+                    f"duration={self._format_duration(time.perf_counter() - threshold_start)}."
+                ),
+                "debug",
+            )
 
             for llm_mode in self._validation_llm_mode_candidates(primary_model):
                 mode_metrics = dict(threshold_metrics)
@@ -1449,6 +1635,16 @@ class CandidateSetSelector(IModel):
                             "llm_mode": llm_mode,
                             "target_conflict_enabled": bool(target_conflict_enabled),
                         }
+            self._log(
+                logger,
+                (
+                    "Calibrated selector held-out background weight completed: "
+                    f"{weight_idx}/{len(weights_grid)} weight={float(background_weight):.3f}, "
+                    f"eval_sources={len(eval_decisions)}, "
+                    f"duration={self._format_duration(time.perf_counter() - weight_start)}."
+                ),
+                "debug",
+            )
 
         if best_choice is None:
             self.calibration["background_negative_weight"] = original_background_weight
@@ -1765,12 +1961,25 @@ class CandidateSetSelector(IModel):
         self,
         features: Dict[int, List[float]],
         groups: List[Dict[str, Any]],
+        logger: Optional[Any] = None,
+        label: str = "rank",
     ) -> Optional[Dict[str, Any]]:
         train_indices = sorted({idx for group in groups for idx in group["indices"]})
         if not train_indices:
             return None
         mean, scale = self._feature_mean_scale([features[idx] for idx in train_indices])
         local_pos = {idx: pos for pos, idx in enumerate(train_indices)}
+        max_epochs = int(self.calibration["max_epochs"])
+        log_interval = max(25, max(1, max_epochs // 4))
+        start = time.perf_counter()
+        self._log(
+            logger,
+            (
+                f"Calibrated selector {label} model fit started: "
+                f"groups={len(groups)}, rows={len(train_indices)}, epochs={max_epochs}."
+            ),
+            "debug",
+        )
         # predict() runs under torch.no_grad(); calibration still needs autograd.
         with torch.enable_grad():
             x = torch.tensor(
@@ -1783,7 +1992,7 @@ class CandidateSetSelector(IModel):
             opt = torch.optim.Adam([weights, bias], lr=float(self.calibration["learning_rate"]))
             l2 = float(self.calibration["l2"])
             n_groups = max(1, len(groups))
-            for _ in range(int(self.calibration["max_epochs"])):
+            for epoch in range(1, max_epochs + 1):
                 opt.zero_grad()
                 loss = torch.zeros((), dtype=torch.float32)
                 for group in groups:
@@ -1804,6 +2013,25 @@ class CandidateSetSelector(IModel):
                 loss = loss / n_groups + l2 * torch.sum(weights * weights)
                 loss.backward()
                 opt.step()
+                if epoch == max_epochs or epoch % log_interval == 0:
+                    elapsed = max(1.0e-8, time.perf_counter() - start)
+                    self._log(
+                        logger,
+                        (
+                            f"Calibrated selector {label} model fit progress: "
+                            f"epoch={epoch}/{max_epochs}, loss={float(loss.detach().cpu().item()):.6f}, "
+                            f"duration={self._format_duration(elapsed)}."
+                        ),
+                        "debug",
+                    )
+        self._log(
+            logger,
+            (
+                f"Calibrated selector {label} model fit completed: "
+                f"duration={self._format_duration(time.perf_counter() - start)}."
+            ),
+            "debug",
+        )
         return {
             "weights": weights.detach().cpu().tolist(),
             "bias": float(bias.detach().cpu().item()),
@@ -1883,7 +2111,12 @@ class CandidateSetSelector(IModel):
             }
         return decisions
 
-    def _fit_accept_model(self, decisions: Dict[str, Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    def _fit_accept_model(
+        self,
+        decisions: Dict[str, Dict[str, Any]],
+        logger: Optional[Any] = None,
+        label: str = "accept",
+    ) -> Optional[Dict[str, Any]]:
         samples = [
             decision
             for decision in decisions.values()
@@ -1894,6 +2127,17 @@ class CandidateSetSelector(IModel):
         positives = sum(1 for sample in samples if float(sample.get("label", 0.0)) > 0.5)
         if positives <= 0:
             return None
+        max_epochs = int(self.calibration["max_epochs"])
+        log_interval = max(25, max(1, max_epochs // 4))
+        start = time.perf_counter()
+        self._log(
+            logger,
+            (
+                f"Calibrated selector {label} model fit started: "
+                f"samples={len(samples)}, positives={positives}, epochs={max_epochs}."
+            ),
+            "debug",
+        )
         mean, scale = self._feature_mean_scale([sample["accept_features"] for sample in samples])
         x = torch.tensor(
             [self._standardize(sample["accept_features"], mean, scale) for sample in samples],
@@ -1915,7 +2159,7 @@ class CandidateSetSelector(IModel):
             opt = torch.optim.Adam([weights, bias], lr=float(self.calibration["learning_rate"]))
             l2 = float(self.calibration["l2"])
             denom = torch.clamp(sample_weight.sum(), min=1.0e-6)
-            for _ in range(int(self.calibration["max_epochs"])):
+            for epoch in range(1, max_epochs + 1):
                 opt.zero_grad()
                 logits = x.matmul(weights) + bias
                 losses = torch.nn.functional.binary_cross_entropy_with_logits(
@@ -1926,6 +2170,25 @@ class CandidateSetSelector(IModel):
                 loss = torch.sum(losses * sample_weight) / denom + l2 * torch.sum(weights * weights)
                 loss.backward()
                 opt.step()
+                if epoch == max_epochs or epoch % log_interval == 0:
+                    elapsed = max(1.0e-8, time.perf_counter() - start)
+                    self._log(
+                        logger,
+                        (
+                            f"Calibrated selector {label} model fit progress: "
+                            f"epoch={epoch}/{max_epochs}, loss={float(loss.detach().cpu().item()):.6f}, "
+                            f"duration={self._format_duration(elapsed)}."
+                        ),
+                        "debug",
+                    )
+        self._log(
+            logger,
+            (
+                f"Calibrated selector {label} model fit completed: "
+                f"duration={self._format_duration(time.perf_counter() - start)}."
+            ),
+            "debug",
+        )
         return {
             "weights": weights.detach().cpu().tolist(),
             "bias": float(bias.detach().cpu().item()),
@@ -2693,9 +2956,20 @@ class CandidateSetSelector(IModel):
         self,
         df: pd.DataFrame,
         record_lookup: Dict[Tuple[str, str], Dict[str, Any]],
+        logger: Optional[Any] = None,
+        log_every: int = 10,
     ) -> Dict[int, float]:
         result: Dict[int, float] = {}
-        for _, group in df.groupby("Src", sort=False):
+        n_sources = int(df["Src"].nunique()) if "Src" in df.columns else 0
+        progress_interval = self._progress_interval(log_every)
+        start = time.perf_counter()
+        if n_sources:
+            self._log(
+                logger,
+                f"Candidate-set selector distinctive-evidence scan started: sources={n_sources}.",
+                "debug",
+            )
+        for group_idx, (_, group) in enumerate(df.groupby("Src", sort=False), start=1):
             idxs = list(group.index)
             item_map: Dict[int, List[Tuple[str, float]]] = {}
             document_frequency: Dict[str, int] = {}
@@ -2716,6 +2990,19 @@ class CandidateSetSelector(IModel):
             max_score = max(raw_scores.values(), default=0.0)
             for idx, value in raw_scores.items():
                 result[idx] = float(value / max_score) if max_score > self.eps else 0.0
+            if n_sources and (group_idx == n_sources or group_idx % progress_interval == 0):
+                elapsed = max(1.0e-8, time.perf_counter() - start)
+                rate = group_idx / elapsed
+                remaining = max(0, n_sources - group_idx)
+                eta = self._format_duration(remaining / rate) if rate > 0 else self._format_duration(0.0)
+                self._log(
+                    logger,
+                    (
+                        "Candidate-set selector distinctive-evidence progress: "
+                        f"sources={group_idx}/{n_sources}, avg={rate:.2f} sources/s, ETA {eta}"
+                    ),
+                    "debug",
+                )
         return result
 
     def _record_evidence_items(self, record: Mapping[str, Any]) -> List[Tuple[str, float]]:
@@ -2836,6 +3123,13 @@ class CandidateSetSelector(IModel):
             if row is None:
                 continue
             conf = record.get("confidences") or {}
+            for key in [
+                "cand_sim",
+                "cand_sim_semantic",
+                "cand_sim_lexical",
+            ]:
+                if key in row:
+                    conf[key] = float(row.get(key, 0.0))
             if "S_pair_final" not in conf:
                 conf["S_pair_final"] = float(row.get("S_pair_final", conf.get("S_final", 0.0)))
             conf["S_select"] = float(row.get("S_select", 0.0))
