@@ -2215,6 +2215,7 @@ class SemanticAlignmentRunner(ITrainer):
         checkpoint_payload: str = "compact",
         cache_persist_policy: str = "finalize",
         save_json: bool = False,
+        run_progress: Optional[Any] = None,
         **kwargs,
     ) -> Tuple[List[EntityMapping], float]:
         self.dataset.default_kind = kind
@@ -2329,11 +2330,17 @@ class SemanticAlignmentRunner(ITrainer):
                 ),
                 level="info",
             )
+            if run_progress is not None:
+                run_progress.finish("Inference", "checkpoint already complete")
             candidate_df = self._build_candidate_dataframe()
             if candidate_df.empty and self.results_json:
                 candidate_df = self._build_candidate_dataframe_from_records(self.results_json)
             if not candidate_df.empty:
                 n_sources = int(candidate_df["Src"].nunique()) if "Src" in candidate_df.columns else 0
+                post_progress_started = False
+                if run_progress is not None and len(getattr(self, "models", [])) > 1:
+                    run_progress.start("PostInference", f"rows={len(candidate_df)}, sources={n_sources}")
+                    post_progress_started = True
                 self.log(
                     (
                         "Post-inference processing restored candidate scores: "
@@ -2356,10 +2363,13 @@ class SemanticAlignmentRunner(ITrainer):
                         target_cardinality=target_cardinality,
                         results_json=self.results_json,
                         log_every=log_every,
+                        run_progress=run_progress,
                     )
                     self._write_additional_models_checkpoint(
                         kind, candidate_df, local_alignment, threshold, cardinality
                     )
+                if post_progress_started:
+                    run_progress.finish("PostInference", f"rows={len(candidate_df)}")
                 all_mappings = list(zip(candidate_df["Src"], candidate_df["Tgt"], candidate_df["S_final"]))
                 self._selector_target_conflict_enabled = self._selector_target_conflict_enabled_from_df(candidate_df)
                 threshold = self._effective_alignment_threshold(candidate_df, threshold)
@@ -2667,6 +2677,13 @@ class SemanticAlignmentRunner(ITrainer):
                     ),
                     "debug",
                 )
+                if run_progress is not None:
+                    run_progress.update(
+                        "Inference",
+                        completed=processed_examples,
+                        total=total_examples,
+                        detail=f"pairs={processed_examples}/{total_examples}, batches={step}/{total_batches}",
+                    )
 
         self._finalize_llm_calibration()
 
@@ -2683,6 +2700,8 @@ class SemanticAlignmentRunner(ITrainer):
             ),
             "info",
         )
+        if run_progress is not None:
+            run_progress.finish("Inference", f"processed={processed_examples}/{total_examples}")
         if hasattr(self.model, "llm_summary_stats"):
             self._llm_summary_stats = self.model.llm_summary_stats()
             stats = self._llm_summary_stats or {}
@@ -2717,10 +2736,21 @@ class SemanticAlignmentRunner(ITrainer):
         self._maybe_persist_model_cache(reason="finalize", force=True)
 
         post_inference_start = time.perf_counter()
+        post_progress_started = False
+        if run_progress is not None and len(getattr(self, "models", [])) > 1:
+            run_progress.start("PostInference", "assembling candidate dataframe")
+            post_progress_started = True
         self.log("Post-inference processing started: assembling candidate dataframe.", "info")
         candidate_df = self._build_candidate_dataframe()
         if not candidate_df.empty:
             n_sources = int(candidate_df["Src"].nunique()) if "Src" in candidate_df.columns else 0
+            if post_progress_started:
+                run_progress.update(
+                    "PostInference",
+                    fraction=0.15,
+                    detail=f"rows={len(candidate_df)}, sources={n_sources}",
+                    force=True,
+                )
             self.log(
                 (
                     "Candidate dataframe assembled for post-inference processing: "
@@ -2743,6 +2773,7 @@ class SemanticAlignmentRunner(ITrainer):
                     target_cardinality=target_cardinality,
                     results_json=self.results_json,
                     log_every=log_every,
+                    run_progress=run_progress,
                 )
                 self._write_additional_models_checkpoint(
                     kind, candidate_df, local_alignment, threshold, cardinality
@@ -2758,6 +2789,8 @@ class SemanticAlignmentRunner(ITrainer):
                 self.results_df = candidate_df
         else:
             self.results_df = self._make_summary_dataframe(self.results_json)
+        if post_progress_started:
+            run_progress.finish("PostInference", f"rows={len(candidate_df)}")
 
         df_scores = pd.DataFrame(all_mappings, columns=["Src", "Tgt", "Scores"])
         preds = EntityMapping.read_table_mappings(df_scores, threshold=threshold, cardinality=cardinality)
@@ -2913,6 +2946,7 @@ class SemanticAlignmentRunner(ITrainer):
         target_cardinality: Optional[int] = None,
         results_json: Optional[List[Dict[str, Any]]] = None,
         log_every: int = 10,
+        run_progress: Optional[Any] = None,
     ) -> pd.DataFrame:
         """
         Run any additional models (beyond the first) sequentially.
@@ -2951,6 +2985,13 @@ class SemanticAlignmentRunner(ITrainer):
                 ),
                 "info",
             )
+            if run_progress is not None:
+                run_progress.update(
+                    "PostInference",
+                    fraction=0.25,
+                    detail=f"model={model_name}, rows={len(current)}",
+                    force=True,
+                )
             sig = inspect.signature(extra_model.forward)
             accepts_var_kw = any(p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values())
             call_kwargs = {"candidate_df": current}
@@ -2972,6 +3013,8 @@ class SemanticAlignmentRunner(ITrainer):
                 call_kwargs["target_cardinality"] = target_cardinality
             if accepts_var_kw or "log_every" in sig.parameters:
                 call_kwargs["log_every"] = log_every
+            if accepts_var_kw or "run_progress" in sig.parameters:
+                call_kwargs["run_progress"] = run_progress
             if checkpoint_callback is not None and (
                 accepts_var_kw or "checkpoint_callback" in sig.parameters
             ):
@@ -3002,4 +3045,11 @@ class SemanticAlignmentRunner(ITrainer):
                 ),
                 "info",
             )
+            if run_progress is not None:
+                run_progress.update(
+                    "PostInference",
+                    fraction=0.85,
+                    detail=f"model={model_name} finished, rows={len(current)}",
+                    force=True,
+                )
         return current

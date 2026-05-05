@@ -7,6 +7,7 @@ from typing import Optional, Protocol, Union, List, Tuple
 from exact.core.contracts.dataset import OWLDataset
 from exact.impl.evaluator import Evaluator
 from exact.core.entities.mappings import EntityMapping, ReferenceMapping
+from exact.utils.logs import configure_exact_logger
 
 class EvaluationAction(Protocol):
     @staticmethod
@@ -30,21 +31,14 @@ class EvaluationAction(Protocol):
         # Load logging configuration
 
         if logger is None:
-            logger = logging.getLogger("OAEI-BIO-ML:eval")
+            resolved_log_level = getattr(logging, log_level) if log_level is not None else logging.INFO
+            logger = configure_exact_logger(
+                logging.getLogger("OAEI-BIO-ML:eval"),
+                resolved_log_level,
+                log_file_path=log_file_path,
+            )
 
-            if log_level is not None:
-                log_level = getattr(logging, log_level)
-                logger.setLevel(log_level)
-
-            if log_file_path is not None:
-                file_handler = logging.FileHandler(log_file_path)
-                file_handler.setLevel(log_level)
-                formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-                file_handler.setFormatter(formatter)
-                logger.addHandler(file_handler)
-                logger.info(f"Logging to file {log_file_path}")
-
-            logger.debug(f"Logging level set to {log_level}")
+            logger.debug(f"Logging level set to {resolved_log_level}")
 
         # Start evaluation
 

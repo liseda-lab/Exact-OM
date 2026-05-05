@@ -7,6 +7,12 @@ import pandas as pd
 from exact.core.actions.evaluation import EvaluationAction
 from exact.core.entities.configs.config import ConfigModel
 from exact.impl.seed import SeedSetter
+from exact.utils.logs import (
+    ProgressTask,
+    RunProgressLogger,
+    configure_exact_logger,
+    summarize_progress_estimates,
+)
 from exact.utils.timing import load_recorded_timings, update_recorded_timings, write_recorded_timings
 
 import torch
@@ -44,16 +50,11 @@ class AlignmentAction(Protocol):
 
         # Loading logging configuration from configs
 
-        logger = logging.getLogger("exact")
-        logger.setLevel(configs.logging_level)
-
-        if log_file_path is not None:
-            file_handler = logging.FileHandler(log_file_path)
-            file_handler.setLevel(configs.logging_level)
-            formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-            file_handler.setFormatter(formatter)
-            logger.addHandler(file_handler)
-            logger.info(f"Logging to file {log_file_path}")
+        logger = configure_exact_logger(
+            logging.getLogger("exact"),
+            configs.logging_level,
+            log_file_path=log_file_path,
+        )
 
         logger.debug(f"Logging level set to {configs.logging_level}")
 
@@ -65,8 +66,39 @@ class AlignmentAction(Protocol):
             logger.info(f"Using default configuration")
 
         # Resolve dependencies
-
         configs.resolve_dependencies()
+        model_sequence = configs.get_model_sequence()
+        if not model_sequence:
+            raise ValueError("No models configured for alignment.")
+        has_post_inference = any(
+            extra.name is not None
+            and not (isinstance(extra.params, dict) and extra.params.get("enabled") is False)
+            for extra in model_sequence[1:]
+        )
+        progress_tasks = [
+            ProgressTask("Setup", "Setup", estimate_seconds=12.0),
+            ProgressTask("Dataset", "Dataset", estimate_seconds=300.0),
+            ProgressTask("Trainer", "Trainer/model", estimate_seconds=30.0),
+            ProgressTask("Inference", "Inference", estimate_seconds=600.0),
+        ]
+        if has_post_inference:
+            progress_tasks.append(ProgressTask("PostInference", "Post-inference", estimate_seconds=60.0))
+        if configs.dataset_params.filter_exact_matches:
+            progress_tasks.append(ProgressTask("Prefilter", "Exact prefilter", estimate_seconds=30.0))
+        progress_tasks.extend(
+            [
+                ProgressTask("Outputs", "Outputs", estimate_seconds=60.0),
+                ProgressTask("Plots", "Plots", estimate_seconds=60.0),
+            ]
+        )
+        if run_eval:
+            progress_tasks.append(ProgressTask("Evaluation", "Evaluation", estimate_seconds=60.0))
+        progress = RunProgressLogger(
+            logger,
+            progress_tasks,
+            estimates_minutes=summarize_progress_estimates(load_recorded_timings(times_file_path)),
+        )
+        progress.start("Setup", "configuration resolved")
         logger.info(
             "Dataset params: only_taxonomy=%s all_labels=%s filter_exact_matches=%s use_file_cache=%s",
             configs.dataset_params.only_taxonomy,
@@ -85,9 +117,11 @@ class AlignmentAction(Protocol):
             logger.warning(f"CUDA device specified but not available. Using CPU instead.")
 
         device = torch.device(device) if device is not None and torch.cuda.is_available() else torch.device('cpu')
+        progress.finish("Setup", f"device={device}")
 
         # Create Dataset
 
+        progress.start("Dataset", "building dataset inputs")
         logger.info(f'Building Dataset...')
         dataset_start = time.time()
         dataset_stage_timings: dict[str, float] = {}
@@ -157,16 +191,15 @@ class AlignmentAction(Protocol):
             stage_timings.update(dataset_stage_timings)
         update_recorded_timings(times_file_path, stage_timings)
         logger.debug(f"Persisted dataset timings to {times_file_path}")
+        progress.finish("Dataset", f"loaded_from_cache={dataset_loaded_from_cache}")
 
 
         # Trainer module
 
         ## Train Model
+        progress.start("Trainer", "constructing trainer and model chain")
         logger.info(f"Building Trainer and Model...")
 
-        model_sequence = configs.get_model_sequence()
-        if not model_sequence:
-            raise ValueError("No models configured for alignment.")
         model_specs = []
         primary = model_sequence[0]
         primary_params = {
@@ -202,6 +235,7 @@ class AlignmentAction(Protocol):
             output_dir= output_dir_path / "model",
             logger=logger,
         )
+        progress.finish("Trainer", f"models={len(model_specs)}")
 
         logger.info(f"Computing alignment...")
 
@@ -211,11 +245,17 @@ class AlignmentAction(Protocol):
         inference_kwargs["local_alignment"] = candidates_file_path is not None
 
         predict_start = time.time()
+        progress.start("Inference", f"pairs={len(dataset)}")
+        inference_kwargs["run_progress"] = progress
         if candidates_file_path is None:
             inference_kwargs.update(configs.alignment_params.model_dump())
             alignment, avg_t = trainer.predict(**inference_kwargs)
         else:
             alignment, avg_t = trainer.predict(**inference_kwargs)
+        if getattr(progress, "fractions", {}).get("Inference", 0.0) < 1.0:
+            progress.finish("Inference", f"avg={avg_t:.4f}s/example")
+        if has_post_inference and getattr(progress, "fractions", {}).get("PostInference", 0.0) < 1.0:
+            progress.finish("PostInference", "post-inference completed")
         predict_elapsed = (time.time() - predict_start) / 60
         trainer_stage_timings = getattr(trainer, "last_stage_timings", {}) or {}
         inference_minutes = trainer_stage_timings.get("Alignment.Inference", predict_elapsed)
@@ -231,6 +271,7 @@ class AlignmentAction(Protocol):
         logger.info(f"Average inference time per example: {avg_t:.4f} seconds")
 
         if dataset.filter_exact_matches:
+            progress.start("Prefilter", "applying exact matches")
             logger.info(f"Applying Exact Matches to alignment...")
             prefilter_start = time.time()
 
@@ -242,6 +283,7 @@ class AlignmentAction(Protocol):
             prefilter_minutes = (time.time() - prefilter_start) / 60
             stage_timings["Alignment.Prefilter"] = prefilter_minutes
             alignment_core_minutes += prefilter_minutes
+            progress.finish("Prefilter", f"mappings={len(alignment)}")
 
         alignment_elapsed = alignment_core_minutes
         stage_timings["Alignment"] = alignment_elapsed
@@ -251,6 +293,7 @@ class AlignmentAction(Protocol):
 
         # Save Alignment
         
+        progress.start("Outputs", "writing alignment artifacts")
         logger.info(f"Writing alignment...")
         save_results_start = time.time()
         alignment_file_path = trainer.save_results(alignment, 
@@ -267,8 +310,10 @@ class AlignmentAction(Protocol):
         logger.debug(f"Persisted output timings to {times_file_path}")
 
         logger.info(f"Alignment written to {alignment_file_path}")
+        progress.finish("Outputs", str(alignment_file_path))
 
         # Plot Distributions
+        progress.start("Plots", "writing plots")
         plot_start = time.time()
         trainer.plot_distributions(
             which=configs.inference_params.which,
@@ -288,12 +333,14 @@ class AlignmentAction(Protocol):
         )
         update_recorded_timings(times_file_path, stage_timings)
         logger.debug(f"Persisted plotting timings to {times_file_path}")
+        progress.finish("Plots", "plots written")
 
         # Evaluate Alignment
 
         results = None
 
         if run_eval:
+            progress.start("Evaluation", "evaluating alignment")
             logger.info(f"Evaluating alignment...")
             eval_start = time.time()
 
@@ -318,6 +365,7 @@ class AlignmentAction(Protocol):
             )
             update_recorded_timings(times_file_path, stage_timings)
             logger.debug(f"Persisted evaluation timings to {times_file_path}")
+            progress.finish("Evaluation", "evaluation completed")
 
         end_time = time.time()
         elapsed_time = (end_time - start_time)/ 60
@@ -339,6 +387,7 @@ class AlignmentAction(Protocol):
 
         write_recorded_timings(times_file_path, timings)
         logger.info(f"Times updated at {times_file_path}")
+        progress.complete(f"total={elapsed_time:.1f} minutes")
 
         timmings = {
             "Alignment": alignment_elapsed,

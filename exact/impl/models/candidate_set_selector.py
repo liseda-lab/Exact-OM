@@ -332,6 +332,7 @@ class CandidateSetSelector(IModel):
         log_every: int = 10,
         checkpoint_callback: Optional[Callable[[pd.DataFrame], None]] = None,
         checkpoint_every_groups: Optional[int] = None,
+        run_progress: Optional[Any] = None,
         **kwargs: Any,
     ) -> Dict[str, Any]:
         if not self.enabled or candidate_df.empty:
@@ -364,8 +365,22 @@ class CandidateSetSelector(IModel):
             ),
             "info",
         )
+        if run_progress is not None:
+            run_progress.update(
+                "PostInference",
+                fraction=0.30,
+                detail=f"selector={self.strategy}, rows={n_rows}, sources={n_sources}",
+                force=True,
+            )
         record_lookup = self._record_lookup(results_json)
         distinctive = self._distinctive_scores(df, record_lookup, logger=logger, log_every=log_every)
+        if run_progress is not None:
+            run_progress.update(
+                "PostInference",
+                fraction=0.40,
+                detail="selector evidence scan completed",
+                force=True,
+            )
         reciprocity = self._reciprocity_scores(df)
 
         defaults = {
@@ -405,6 +420,7 @@ class CandidateSetSelector(IModel):
                 log_every=log_every,
                 checkpoint_callback=checkpoint_callback,
                 checkpoint_every_groups=checkpoint_every_groups,
+                run_progress=run_progress,
             )
             if calibrated_df is not None:
                 df = calibrated_df
@@ -419,6 +435,7 @@ class CandidateSetSelector(IModel):
                     log_every=log_every,
                     checkpoint_callback=checkpoint_callback,
                     checkpoint_every_groups=checkpoint_every_groups,
+                    run_progress=run_progress,
                 )
         else:
             df = self._run_heuristic_selector(
@@ -431,6 +448,7 @@ class CandidateSetSelector(IModel):
                 log_every=log_every,
                 checkpoint_callback=checkpoint_callback,
                 checkpoint_every_groups=checkpoint_every_groups,
+                run_progress=run_progress,
             )
 
         if self.replace_final_score:
@@ -464,6 +482,7 @@ class CandidateSetSelector(IModel):
         log_every: int,
         checkpoint_callback: Optional[Callable[[pd.DataFrame], None]],
         checkpoint_every_groups: Optional[int],
+        run_progress: Optional[Any],
     ) -> pd.DataFrame:
         n_sources = int(df["Src"].nunique())
         n_groups = 0
@@ -507,6 +526,13 @@ class CandidateSetSelector(IModel):
                     ),
                     "debug",
                 )
+                if run_progress is not None:
+                    run_progress.update(
+                        "PostInference",
+                        fraction=0.40 + 0.45 * (n_groups / max(1, n_sources)),
+                        detail=f"selector sources={n_groups}/{n_sources}",
+                        force=n_groups == n_sources,
+                    )
             self._maybe_checkpoint_progress(
                 df=df,
                 n_groups=n_groups,
@@ -531,6 +557,7 @@ class CandidateSetSelector(IModel):
         log_every: int,
         checkpoint_callback: Optional[Callable[[pd.DataFrame], None]],
         checkpoint_every_groups: Optional[int],
+        run_progress: Optional[Any],
     ) -> Optional[pd.DataFrame]:
         if self.calibration.get("enabled") in {"false", "0", "off", "disabled"}:
             self._log(logger, "Calibrated selector disabled; using heuristic selector.", "info")
@@ -763,6 +790,16 @@ class CandidateSetSelector(IModel):
                     ),
                     "debug",
                 )
+                if run_progress is not None:
+                    run_progress.update(
+                        "PostInference",
+                        fraction=0.40 + 0.45 * (n_groups / max(1, n_sources)),
+                        detail=(
+                            f"calibrated selector sources={n_groups}/{n_sources}, "
+                            f"abstained={n_abstained}, llm={n_llm}"
+                        ),
+                        force=n_groups == n_sources,
+                    )
             self._maybe_checkpoint_progress(
                 df=df,
                 n_groups=n_groups,
@@ -1972,14 +2009,16 @@ class CandidateSetSelector(IModel):
         max_epochs = int(self.calibration["max_epochs"])
         log_interval = max(25, max(1, max_epochs // 4))
         start = time.perf_counter()
-        self._log(
-            logger,
-            (
-                f"Calibrated selector {label} model fit started: "
-                f"groups={len(groups)}, rows={len(train_indices)}, epochs={max_epochs}."
-            ),
-            "debug",
-        )
+        log_fit_detail = max_epochs >= 500 or len(groups) >= 500 or len(train_indices) >= 1000
+        if log_fit_detail:
+            self._log(
+                logger,
+                (
+                    f"Calibrated selector {label} model fit started: "
+                    f"groups={len(groups)}, rows={len(train_indices)}, epochs={max_epochs}."
+                ),
+                "debug",
+            )
         # predict() runs under torch.no_grad(); calibration still needs autograd.
         with torch.enable_grad():
             x = torch.tensor(
@@ -2015,23 +2054,26 @@ class CandidateSetSelector(IModel):
                 opt.step()
                 if epoch == max_epochs or epoch % log_interval == 0:
                     elapsed = max(1.0e-8, time.perf_counter() - start)
-                    self._log(
-                        logger,
-                        (
-                            f"Calibrated selector {label} model fit progress: "
-                            f"epoch={epoch}/{max_epochs}, loss={float(loss.detach().cpu().item()):.6f}, "
-                            f"duration={self._format_duration(elapsed)}."
-                        ),
-                        "debug",
-                    )
-        self._log(
-            logger,
-            (
-                f"Calibrated selector {label} model fit completed: "
-                f"duration={self._format_duration(time.perf_counter() - start)}."
-            ),
-            "debug",
-        )
+                    if elapsed >= 2.0 or (log_fit_detail and epoch == max_epochs):
+                        self._log(
+                            logger,
+                            (
+                                f"Calibrated selector {label} model fit progress: "
+                                f"epoch={epoch}/{max_epochs}, loss={float(loss.detach().cpu().item()):.6f}, "
+                                f"duration={self._format_duration(elapsed)}."
+                            ),
+                            "debug",
+                        )
+        elapsed_total = time.perf_counter() - start
+        if log_fit_detail or elapsed_total >= 1.0:
+            self._log(
+                logger,
+                (
+                    f"Calibrated selector {label} model fit completed: "
+                    f"duration={self._format_duration(elapsed_total)}."
+                ),
+                "debug",
+            )
         return {
             "weights": weights.detach().cpu().tolist(),
             "bias": float(bias.detach().cpu().item()),
@@ -2130,14 +2172,16 @@ class CandidateSetSelector(IModel):
         max_epochs = int(self.calibration["max_epochs"])
         log_interval = max(25, max(1, max_epochs // 4))
         start = time.perf_counter()
-        self._log(
-            logger,
-            (
-                f"Calibrated selector {label} model fit started: "
-                f"samples={len(samples)}, positives={positives}, epochs={max_epochs}."
-            ),
-            "debug",
-        )
+        log_fit_detail = max_epochs >= 500 or len(samples) >= 500
+        if log_fit_detail:
+            self._log(
+                logger,
+                (
+                    f"Calibrated selector {label} model fit started: "
+                    f"samples={len(samples)}, positives={positives}, epochs={max_epochs}."
+                ),
+                "debug",
+            )
         mean, scale = self._feature_mean_scale([sample["accept_features"] for sample in samples])
         x = torch.tensor(
             [self._standardize(sample["accept_features"], mean, scale) for sample in samples],
@@ -2172,23 +2216,26 @@ class CandidateSetSelector(IModel):
                 opt.step()
                 if epoch == max_epochs or epoch % log_interval == 0:
                     elapsed = max(1.0e-8, time.perf_counter() - start)
-                    self._log(
-                        logger,
-                        (
-                            f"Calibrated selector {label} model fit progress: "
-                            f"epoch={epoch}/{max_epochs}, loss={float(loss.detach().cpu().item()):.6f}, "
-                            f"duration={self._format_duration(elapsed)}."
-                        ),
-                        "debug",
-                    )
-        self._log(
-            logger,
-            (
-                f"Calibrated selector {label} model fit completed: "
-                f"duration={self._format_duration(time.perf_counter() - start)}."
-            ),
-            "debug",
-        )
+                    if elapsed >= 2.0 or (log_fit_detail and epoch == max_epochs):
+                        self._log(
+                            logger,
+                            (
+                                f"Calibrated selector {label} model fit progress: "
+                                f"epoch={epoch}/{max_epochs}, loss={float(loss.detach().cpu().item()):.6f}, "
+                                f"duration={self._format_duration(elapsed)}."
+                            ),
+                            "debug",
+                        )
+        elapsed_total = time.perf_counter() - start
+        if log_fit_detail or elapsed_total >= 1.0:
+            self._log(
+                logger,
+                (
+                    f"Calibrated selector {label} model fit completed: "
+                    f"duration={self._format_duration(elapsed_total)}."
+                ),
+                "debug",
+            )
         return {
             "weights": weights.detach().cpu().tolist(),
             "bias": float(bias.detach().cpu().item()),
