@@ -10,6 +10,11 @@ still the main signal, structural evidence is split into separate channels, and
 the LLM sees a compact pair brief built from pair-specific evidence. The earlier
 single-context scorer is still available as a legacy mode.
 
+## Documentation
+
+The practical documentation site is available at
+[liseda-lab.github.io/Exact-OM](https://liseda-lab.github.io/Exact-OM/).
+
 ## Citation
 
 If you use this repository in academic work, please cite:

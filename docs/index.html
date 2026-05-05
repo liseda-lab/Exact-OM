@@ -36,10 +36,6 @@
               <dt>Default scorer</dt>
               <dd><code>PairAdaptiveSemanticScorer</code></dd>
             </div>
-            <div>
-              <dt>Docs hosting</dt>
-              <dd>Static GitHub Pages from <code>/docs</code></dd>
-            </div>
           </dl>
         </div>
       </div>
@@ -61,7 +57,6 @@
           <a href="#api">Python API</a>
           <a href="#operations">Operations</a>
           <a href="#troubleshooting">Troubleshooting</a>
-          <a href="#pages">GitHub Pages</a>
         </nav>
       </aside>
 
@@ -77,24 +72,19 @@
             structural evidence split into hierarchy, similarity, difference, and attribute
             channels.
           </p>
-          <div class="callout">
-            <strong>Use the global mode</strong> when you want the system to generate and
-            filter candidate mappings itself. <strong>Use the local mode</strong> when you
-            already have a candidate set and want a ranked list for each source entity.
-          </div>
-          <div class="quick-grid" aria-label="Common workflows">
-            <article>
-              <h3>Global alignment</h3>
-              <p>Provide source and target OWL files. EXACT-OM generates candidates, scores them, applies threshold and cardinality filters, and writes a mapping TSV.</p>
-            </article>
-            <article>
-              <h3>Candidate ranking</h3>
-              <p>Provide a candidate TSV with <code>-c</code>. EXACT-OM ranks the supplied target candidates and keeps the full ranking output.</p>
-            </article>
-            <article>
-              <h3>Audit and review</h3>
-              <p>Enable summary and JSON outputs to inspect per-pair scores, channel importances, selected triples, rationales, and run statistics.</p>
-            </article>
+          <div class="overview-flow" aria-label="Common workflows">
+            <div class="overview-row">
+              <span class="overview-label">Global mode</span>
+              <p>Use this when you want EXACT-OM to generate candidates, score them, apply threshold and cardinality filters, and write a mapping TSV.</p>
+            </div>
+            <div class="overview-row">
+              <span class="overview-label">Local mode</span>
+              <p>Use this when you already have a candidate TSV. Pass <code>-c</code> and the system keeps the full ranked target list for each source.</p>
+            </div>
+            <div class="overview-row">
+              <span class="overview-label">Audit and review</span>
+              <p>Enable summary and JSON outputs to inspect scores, channel importances, selected triples, rationales, and run statistics.</p>
+            </div>
           </div>
         </section>
 
@@ -518,16 +508,6 @@ runner.run()</code></pre>
           </table>
         </section>
 
-        <section id="pages" class="doc-section">
-          <h2>GitHub Pages</h2>
-          <p>This documentation site is static and lives entirely under <code>docs/</code>.</p>
-          <ol class="steps">
-            <li>Commit <code>docs/index.html</code>, <code>docs/styles.css</code>, <code>docs/.nojekyll</code>, and <code>docs/assets/</code>.</li>
-            <li>In the repository settings, configure GitHub Pages to deploy from the branch that contains this repository and the <code>/docs</code> folder.</li>
-            <li>After GitHub Pages publishes, the documentation root will serve this page as <code>index.html</code>.</li>
-          </ol>
-          <p>For local inspection without a build step, open <code>docs/index.html</code> directly in a browser.</p>
-        </section>
       </main>
     </div>
   </body>
