@@ -20,6 +20,10 @@
 
 /exp/*
 
+# Paper folder
+
+/Paper/*
+
 # Ignore dist folder
 
 /dist/*
