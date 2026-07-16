@@ -23,7 +23,9 @@ def build_parser() -> argparse.ArgumentParser:
     default_parser.add_argument(
         "--format", choices=("yaml",), default="yaml", help="output serialization format"
     )
-    default_parser.add_argument("-o", "--output", type=Path, help="write to a file instead of stdout")
+    default_parser.add_argument(
+        "-o", "--output", type=Path, help="write to a file instead of stdout"
+    )
 
     migrate_parser = commands.add_parser("migrate", help="migrate an unversioned v1 YAML config")
     migrate_parser.add_argument("input", type=Path, help="v1 or already-v2 YAML configuration")

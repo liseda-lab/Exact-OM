@@ -58,23 +58,15 @@ V1_TO_V2: Dict[str, MigrationTarget] = {
     "dataset_params.num_workers": "dataset.num_workers",
     "dataset_params.filter_exact_matches": "dataset.filter_exact_matches",
     "dataset_params.drop_exact_match_sources": "dataset.drop_exact_match_sources",
-    "dataset_params.filter_ignored_alignment_classes": (
-        "dataset.filter_ignored_alignment_classes"
-    ),
+    "dataset_params.filter_ignored_alignment_classes": ("dataset.filter_ignored_alignment_classes"),
     "dataset_params.projection_include_literals": "dataset.projection_include_literals",
     "dataset_params.hierarchy_max_depth": "dataset.hierarchy_max_depth",
-    "dataset_params.max_hierarchy_triples_per_family": (
-        "dataset.max_hierarchy_triples_per_family"
-    ),
+    "dataset_params.max_hierarchy_triples_per_family": ("dataset.max_hierarchy_triples_per_family"),
     "dataset_params.max_object_triples": "dataset.max_object_triples",
     "dataset_params.max_diff_triples": "dataset.max_diff_triples",
     "dataset_params.max_attr_items": "dataset.max_attr_items",
-    "dataset_params.pair_adaptive_feature_log_every": (
-        "dataset.pair_adaptive_feature_log_every"
-    ),
-    "dataset_params.hierarchical_relation_families": (
-        "dataset.hierarchical_relation_families"
-    ),
+    "dataset_params.pair_adaptive_feature_log_every": ("dataset.pair_adaptive_feature_log_every"),
+    "dataset_params.hierarchical_relation_families": ("dataset.hierarchical_relation_families"),
     "dataset_params.n_hops": "dataset.n_hops",
     "dataset_params.max_input_tokens_context": "dataset.max_input_tokens_context",
     "dataset_params.all_labels": "dataset.all_labels",
@@ -171,19 +163,13 @@ class MigrationReport:
         lines = ["Configuration migration report:"]
         if self.moved:
             lines.append("Moved:")
-            lines.extend(
-                f"  {item.source} -> {item.destination}" for item in self.moved
-            )
+            lines.extend(f"  {item.source} -> {item.destination}" for item in self.moved)
         if self.transformed:
             lines.append("Transformed:")
-            lines.extend(
-                f"  {item.source} -> {item.destination}" for item in self.transformed
-            )
+            lines.extend(f"  {item.source} -> {item.destination}" for item in self.transformed)
         if self.dropped:
             lines.append("Dropped:")
-            lines.extend(
-                f"  {item.source}: {item.reason}" for item in self.dropped
-            )
+            lines.extend(f"  {item.source}: {item.reason}" for item in self.dropped)
         if not (self.moved or self.transformed or self.dropped):
             lines.append("  No v1 keys required migration.")
         return "\n".join(lines)
@@ -273,7 +259,14 @@ def _merge_registry_entry(
 ) -> Dict[str, Any]:
     base = deepcopy(dict(default_entry))
     override = dict(raw_entry or {})
-    merged = {**base, **{key: deepcopy(value) for key, value in override.items() if key not in {"params", "component_type"}}}
+    merged = {
+        **base,
+        **{
+            key: deepcopy(value)
+            for key, value in override.items()
+            if key not in {"params", "component_type"}
+        },
+    }
     merged["params"] = {
         **deepcopy(dict(base.get("params") or {})),
         **deepcopy(dict(override.get("params") or {})),
@@ -352,13 +345,9 @@ def migrate_v1_mapping(raw: Mapping[str, Any]) -> tuple[Dict[str, Any], Migratio
         else:
             sources = [key for key in ("model", "second_model") if key in raw]
             if sources:
-                report.transformed.append(
-                    MigrationChange(" + ".join(sources), "pipeline")
-                )
+                report.transformed.append(MigrationChange(" + ".join(sources), "pipeline"))
         if "second_pass_params" in raw:
-            report.transformed.append(
-                MigrationChange("second_pass_params", "pipeline")
-            )
+            report.transformed.append(MigrationChange("second_pass_params", "pipeline"))
 
     for index, entry in enumerate(raw.get("model_chain") or []):
         if "component_type" in entry:

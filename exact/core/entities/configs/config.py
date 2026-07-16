@@ -13,7 +13,7 @@ import importlib
 import json
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, Optional, Tuple, Type, Union
+from typing import Any, Dict, List, Mapping, Optional, Tuple, Type
 
 from pydantic import (
     BaseModel,
@@ -25,7 +25,6 @@ from pydantic import (
 )
 
 from exact.core.contracts.dataset import IDataset
-from exact.core.contracts.model import IModel
 from exact.core.contracts.trainer import ITrainer
 from exact.core.entities.configs.dataset import BestPathMethod, ContextMethod
 from exact.core.entities.registry import ComponentRegistry, ComponentType
@@ -786,7 +785,8 @@ class LLMVerbaliserConfig(StrictConfigModel):
 
 class LLMConfig(StrictConfigModel):
     profiles: Dict[str, LLMProfileConfig] = Field(
-        default_factory=_default_llm_profiles, description="Named local and hosted backend profiles."
+        default_factory=_default_llm_profiles,
+        description="Named local and hosted backend profiles.",
     )
     routing: LLMRoutingConfig = Field(
         default=LLMRoutingConfig.model_validate({}),

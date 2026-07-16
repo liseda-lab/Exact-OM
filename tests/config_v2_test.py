@@ -178,7 +178,5 @@ def test_job_runner_supports_v2_data_paths_and_tracks(tmp_path: Path) -> None:
 
 
 def test_default_yaml_is_valid_yaml_12() -> None:
-    payload = YAML(typ="safe").load(
-        Path("exact/default_config.yaml").read_text(encoding="utf-8")
-    )
+    payload = YAML(typ="safe").load(Path("exact/default_config.yaml").read_text(encoding="utf-8"))
     assert payload["config_version"] == 2

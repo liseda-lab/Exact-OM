@@ -6,16 +6,20 @@ from copy import copy, deepcopy
 from enum import Enum
 from io import StringIO
 from pathlib import Path
-from typing import Any, Mapping, MutableMapping, Optional, Tuple
+from typing import Any, Mapping, Optional, Tuple
 
 from pydantic import BaseModel
 from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap, CommentedSeq
 
-from exact.core.entities.configs.config import CONFIG_VERSION, ConfigModel, DEFAULT_CONFIG_PATH
+from exact.core.entities.configs.config import (
+    CONFIG_VERSION,
+    DEFAULT_CONFIG_PATH,
+    ConfigModel,
+)
 from exact.core.entities.configs.migration import (
-    MigrationReport,
     V1_TO_V2,
+    MigrationReport,
     migrate_v1_mapping,
 )
 
@@ -81,9 +85,7 @@ def _model_to_commented(model: BaseModel, *, indent: int = 0) -> CommentedMap:
         key = info.alias if isinstance(info.alias, str) else name
         result[key] = _commented_value(getattr(model, name), indent=indent + 2)
         if info.description:
-            result.yaml_set_comment_before_after_key(
-                key, before=info.description, indent=indent
-            )
+            result.yaml_set_comment_before_after_key(key, before=info.description, indent=indent)
     return result
 
 
@@ -126,7 +128,10 @@ def _parent_and_key(mapping: Mapping[str, Any], path: str) -> Tuple[Optional[Any
 
 
 def _copy_key_comment(
-    source: Mapping[str, Any], source_path: str, destination: Mapping[str, Any], destination_path: str
+    source: Mapping[str, Any],
+    source_path: str,
+    destination: Mapping[str, Any],
+    destination_path: str,
 ) -> None:
     src_parent, src_key = _parent_and_key(source, source_path)
     dst_parent, dst_key = _parent_and_key(destination, destination_path)

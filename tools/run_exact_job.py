@@ -96,10 +96,10 @@ def build_exact_command(cfg: Dict) -> List[str]:
         raise ValueError("data must provide source/target paths or a track")
 
     refs = dataset_cfg.get("refs") or {}
-    train_reference = dataset_cfg.get("train_reference") or refs.get("train") or refs.get("training")
-    full_reference = (
-        dataset_cfg.get("full_reference") or refs.get("full") or refs.get("test")
+    train_reference = (
+        dataset_cfg.get("train_reference") or refs.get("train") or refs.get("training")
     )
+    full_reference = dataset_cfg.get("full_reference") or refs.get("full") or refs.get("test")
     if train_reference:
         key = "train_reference" if dataset_cfg.get("train_reference") else None
         value = dataset_path(key) if key else resolve(str(train_reference), data_dir)
