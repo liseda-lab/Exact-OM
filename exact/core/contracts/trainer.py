@@ -15,6 +15,7 @@ from exact.core.contracts import LoggingClass, SelfRegisteringComponent
 from exact.core.entities.configs.dataset import DatasetMask
 from exact.core.entities.mappings import EntityMapping
 from exact.core.entities.registry import ComponentType
+from exact.runs.layout import RunLayout
 from exact.utils.data import read_table
 from exact.utils.mappings import fill_anchored_scores
 
@@ -24,7 +25,6 @@ if TYPE_CHECKING:
 
 
 class ITrainer(SelfRegisteringComponent, LoggingClass):
-
     component_type = ComponentType.TRAINER
 
     def __init__(
@@ -51,7 +51,9 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
         elif model is not None:
             model_specs = [(model, model_params or {})]
         else:
-            raise ValueError("At least one model definition must be provided to the trainer.")
+            raise ValueError(
+                "At least one model definition must be provided to the trainer."
+            )
 
         def _bind_logger(obj: Any) -> None:
             if logger is None:
@@ -82,7 +84,10 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
         self._results_json: List[Dict[str, Any]] = []
         self._results_df: Optional[pd.DataFrame] = None
 
-        self._output_dir = output_dir
+        if output_dir is None:
+            raise ValueError("Trainer output_dir is required")
+        self._run_layout = RunLayout.create(output_dir)
+        self._output_dir = self._run_layout.root
 
         # Create output directories
         self.alignment_dir.mkdir(parents=True, exist_ok=True)
@@ -109,16 +114,20 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
         return self._output_dir
 
     @property
+    def run_layout(self) -> RunLayout:
+        return self._run_layout
+
+    @property
     def plot_dir(self) -> Path:
-        return (self._output_dir / "plots").resolve()
+        return self._run_layout.plots_dir
 
     @property
     def alignment_dir(self) -> Path:
-        return (self._output_dir / "alignment").resolve()
+        return self._run_layout.alignment_dir
 
     @property
     def checkpoint_dir(self) -> Path:
-        path = (self._output_dir / "checkpoints").resolve()
+        path = self._run_layout.checkpoints_dir
         path.mkdir(parents=True, exist_ok=True)
         return path
 
@@ -136,7 +145,10 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
 
     @abstractmethod
     def predict(
-        self, kind: DatasetMask = DatasetMask.inference, threshold: Optional[float] = 0.7, **kwargs
+        self,
+        kind: DatasetMask = DatasetMask.inference,
+        threshold: Optional[float] = 0.7,
+        **kwargs,
     ) -> Tuple[List[EntityMapping], float]:
 
         pass
@@ -152,7 +164,9 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
         """
         Apply prefiltering to the dataset based on the features.
         """
-        selector_target_conflict_enabled = getattr(self, "_selector_target_conflict_enabled", None)
+        selector_target_conflict_enabled = getattr(
+            self, "_selector_target_conflict_enabled", None
+        )
         if selector_target_conflict_enabled is False:
             target_cardinality = None
 
@@ -192,8 +206,12 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
         prefilter_df = df[["Src", "Tgt", score_column]].copy()
         prefilter_df.columns = ["Src", "Tgt", "Score"]
 
-        prefiltered_mappings = EntityMapping.read_table_mappings(prefilter_df, threshold=threshold)
-        protected_pairs = {(mapping.head, mapping.tail) for mapping in prefiltered_mappings}
+        prefiltered_mappings = EntityMapping.read_table_mappings(
+            prefilter_df, threshold=threshold
+        )
+        protected_pairs = {
+            (mapping.head, mapping.tail) for mapping in prefiltered_mappings
+        }
         final_alignment = prefiltered_mappings + alignment
 
         if cardinality is not None:
@@ -248,24 +266,31 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
         )
         output_paths["alignment_tsv"] = Path(align_path)
 
-        out_dir = (self.alignment_dir / (sub_dir or "default")).resolve()
-        out_dir.mkdir(parents=True, exist_ok=True)
+        stats_dir = self._run_layout.stats_dir
+        stats_dir.mkdir(parents=True, exist_ok=True)
 
         # ---- Explanations JSON
         writer = getattr(self, "write_full_explanations_json", None)
         has_streamed_explanations = getattr(self, "has_streamed_explanations", None)
         can_stream_explanations = callable(writer) and (
             bool(self.results_json)
-            or (callable(has_streamed_explanations) and bool(has_streamed_explanations()))
+            or (
+                callable(has_streamed_explanations)
+                and bool(has_streamed_explanations())
+            )
         )
         if save_json and (self.results_json or can_stream_explanations):
-            json_path = out_dir / "full_explanations.json"
+            json_path = self._run_layout.full_explanations_path
             if callable(writer):
                 writer(json_path)
             else:
                 with open(json_path, "w", encoding="utf-8") as f:
                     json.dump(
-                        self.results_json, f, ensure_ascii=False, separators=(",", ":"), default=str
+                        self.results_json,
+                        f,
+                        ensure_ascii=False,
+                        separators=(",", ":"),
+                        default=str,
                     )
             self.log(f"Saved full explanations JSON → {json_path}", level="info")
             output_paths["explanations_json"] = json_path
@@ -273,7 +298,7 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
         # ---- Summary CSV
         results_df = self.results_df
         if save_csv and results_df is not None and not results_df.empty:
-            csv_path = out_dir / "summary_metrics.csv"
+            csv_path = self._run_layout.summary_metrics_path
             results_df.to_csv(csv_path, sep="\t", index=False)
             self.log(f"Saved numeric summary CSV → {csv_path}", level="info")
             output_paths["summary_csv"] = csv_path
@@ -297,7 +322,7 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
                     selector_calibration.append(metadata)
             if selector_calibration:
                 stats["selector_calibration"] = selector_calibration
-            stats_json_path = out_dir / "run_stats.json"
+            stats_json_path = self._run_layout.run_stats_path
             with open(stats_json_path, "w", encoding="utf-8") as f:
                 json.dump(stats, f, indent=2, ensure_ascii=False)
             self.log(f"Saved run-level stats JSON → {stats_json_path}", level="info")
@@ -323,9 +348,11 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
                     flat["llm_summary_requested"] = summary_stats.get("requested")
                     flat["llm_summary_usable"] = summary_stats.get("usable")
                     flat["llm_summary_empty"] = summary_stats.get("empty")
-                    flat["llm_summary_empty_fraction"] = summary_stats.get("empty_fraction")
+                    flat["llm_summary_empty_fraction"] = summary_stats.get(
+                        "empty_fraction"
+                    )
 
-                stats_csv_path = out_dir / "run_stats.csv"
+                stats_csv_path = stats_dir / "run_stats.csv"
                 pd.DataFrame([flat]).to_csv(stats_csv_path, index=False)
                 self.log(f"Saved run-level stats CSV → {stats_csv_path}", level="info")
                 output_paths["run_stats_csv"] = stats_csv_path
@@ -338,8 +365,10 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
                 self.log("Appended run stats as footer to summary CSV.", level="info")
 
         calib_report = getattr(self, "_llm_calibration_report", None)
-        if calib_report and (calib_report.get("messages") or calib_report.get("learned")):
-            calib_path = out_dir / "llm_calibration.json"
+        if calib_report and (
+            calib_report.get("messages") or calib_report.get("learned")
+        ):
+            calib_path = stats_dir / "llm_calibration.json"
             with open(calib_path, "w", encoding="utf-8") as f:
                 json.dump(calib_report, f, indent=2, ensure_ascii=False)
             self.log(f"Saved LLM calibration metadata → {calib_path}", level="info")
@@ -352,14 +381,9 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
         preds: List[EntityMapping],
         candidates_one2many_path: Optional[Path] = None,
         sub_dir: Optional[str] = None,
-    ) -> None:
+    ) -> Path:
 
-        if sub_dir is not None:
-            alignment_dir = self.alignment_dir / sub_dir
-            alignment_dir.mkdir(parents=True, exist_ok=True)
-
-        else:
-            alignment_dir = self.alignment_dir
+        alignment_dir = self.alignment_dir
 
         if candidates_one2many_path is not None:
             candidates_one2many = read_table(candidates_one2many_path)
@@ -369,7 +393,9 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
         else:
             return self._save_global_alignment(preds, alignment_dir)
 
-    def _save_global_alignment(self, preds: List[EntityMapping], save_dir: Optional[Path] = None):
+    def _save_global_alignment(
+        self, preds: List[EntityMapping], save_dir: Optional[Path] = None
+    ):
 
         # Extract the mappings as tuples
 
@@ -377,11 +403,16 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
 
         # Save the global alignment
 
-        global_dir = str(save_dir) + f"/{'src2tgt.maps'}_global.tsv"
-
-        pd.DataFrame(global_alignment, columns=["SrcEntity", "TgtEntity", "Score"]).to_csv(
-            global_dir, sep="\t", index=False
+        resolved_save_dir = Path(save_dir or self.alignment_dir).resolve()
+        global_dir = (
+            self._run_layout.mapping_path("global")
+            if resolved_save_dir == self.alignment_dir
+            else resolved_save_dir / "maps_global.tsv"
         )
+
+        pd.DataFrame(
+            global_alignment, columns=["SrcEntity", "TgtEntity", "Score"]
+        ).to_csv(global_dir, sep="\t", index=False)
 
         return global_dir
 
@@ -396,11 +427,16 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
 
         ranking_results = fill_anchored_scores(candidates_one2many.values, preds)
 
-        local_dir = str(save_dir) + f"/{'src2tgt.maps'}_local.tsv"
-
-        pd.DataFrame(ranking_results, columns=["SrcEntity", "TgtEntity", "TgtCandidates"]).to_csv(
-            local_dir, sep="\t", index=False
+        resolved_save_dir = Path(save_dir or self.alignment_dir).resolve()
+        local_dir = (
+            self._run_layout.mapping_path("local")
+            if resolved_save_dir == self.alignment_dir
+            else resolved_save_dir / "maps_local.tsv"
         )
+
+        pd.DataFrame(
+            ranking_results, columns=["SrcEntity", "TgtEntity", "TgtCandidates"]
+        ).to_csv(local_dir, sep="\t", index=False)
 
         return local_dir
 
@@ -417,7 +453,11 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
             pred = rec.get("prediction") or {}
             if "ground_truth" in pred:
                 base["ground_truth"] = pred.get("ground_truth")
-            for key in ("threshold_positive", "saved_alignment_member", "rationale_positive"):
+            for key in (
+                "threshold_positive",
+                "saved_alignment_member",
+                "rationale_positive",
+            ):
                 if key in pred:
                     base[key] = pred.get(key)
             for key, value in pred.items():
@@ -430,7 +470,9 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
             if imps and "I_llm" in imps:
                 p_llm = conf.get("p_llm")
                 llm_decision = pred.get("llm_decision")
-                if (p_llm is None or float(p_llm) == 0.0) or (llm_decision in ("", None)):
+                if (p_llm is None or float(p_llm) == 0.0) or (
+                    llm_decision in ("", None)
+                ):
                     imps = dict(imps)
                     imps["I_llm"] = 0.0
             base.update({**conf, **wts, **imps})
@@ -463,7 +505,9 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
 
         for col in metrics:
             if col not in self.results_df.columns:
-                self.log(f"Column {col} missing in summary DF; skipping.", level="warning")
+                self.log(
+                    f"Column {col} missing in summary DF; skipping.", level="warning"
+                )
                 continue
 
             plt.figure(figsize=figsize)
@@ -512,17 +556,23 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
         for col in metrics:
             if col not in self.results_df.columns:
                 self.log(
-                    f"Column {col} missing in summary DF; skipping label plot.", level="warning"
+                    f"Column {col} missing in summary DF; skipping label plot.",
+                    level="warning",
                 )
                 continue
 
             plot_df = self.results_df[["ground_truth", col]].dropna()
             if plot_df.empty:
-                self.log(f"No data to plot for column {col} vs ground_truth.", level="warning")
+                self.log(
+                    f"No data to plot for column {col} vs ground_truth.",
+                    level="warning",
+                )
                 continue
 
             try:
-                plot_df = plot_df.assign(ground_truth=plot_df["ground_truth"].astype(int))
+                plot_df = plot_df.assign(
+                    ground_truth=plot_df["ground_truth"].astype(int)
+                )
             except (ValueError, TypeError):
                 plot_df = plot_df.assign(ground_truth=plot_df["ground_truth"])
 
@@ -575,8 +625,15 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
 
         # review band if thresholds are recorded in rows (optional)
         frac_review = None
-        if review_low is not None and review_high is not None and "S_final" in df.columns and n > 0:
-            in_band = ((df["S_final"] >= review_low) & (df["S_final"] <= review_high)).sum()
+        if (
+            review_low is not None
+            and review_high is not None
+            and "S_final" in df.columns
+            and n > 0
+        ):
+            in_band = (
+                (df["S_final"] >= review_low) & (df["S_final"] <= review_high)
+            ).sum()
             frac_review = in_band / n
         stats["frac_review_band"] = frac_review
 
@@ -604,7 +661,9 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
         for rec in getattr(self, "results_json", []) or []:
             ctx = rec.get("context", {})
             # support either list of importances or list of triples-with-importance
-            if "triple_importances" in ctx and isinstance(ctx["triple_importances"], list):
+            if "triple_importances" in ctx and isinstance(
+                ctx["triple_importances"], list
+            ):
                 # format: [{"triple": "...", "importance": float, ...}, ...] OR [float, ...]
                 vals = []
                 for entry in ctx["triple_importances"]:
