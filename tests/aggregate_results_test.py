@@ -24,18 +24,12 @@ def test_collect_runs_resolves_layout_v1_and_v2_evaluation_artifacts(
 
     legacy = runs / "legacy"
     legacy.mkdir(parents=True)
-    (legacy / "trial.json").write_text(
-        json.dumps({"params": {"threshold": 0.7}}), encoding="utf-8"
-    )
-    (legacy / "evaluation_results.csv").write_text(
-        "metric,value\nf1,0.8\n", encoding="utf-8"
-    )
+    (legacy / "trial.json").write_text(json.dumps({"params": {"threshold": 0.7}}), encoding="utf-8")
+    (legacy / "evaluation_results.csv").write_text("metric,value\nf1,0.8\n", encoding="utf-8")
 
     modern = runs / "modern"
     layout = RunLayout.create(modern)
-    (modern / "trial.json").write_text(
-        json.dumps({"params": {"threshold": 0.8}}), encoding="utf-8"
-    )
+    (modern / "trial.json").write_text(json.dumps({"params": {"threshold": 0.8}}), encoding="utf-8")
     layout.evaluation_path("csv").write_text("metric,value\nf1,0.9\n", encoding="utf-8")
     refresh_manifest(layout, run_id="fixture")
 

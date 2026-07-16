@@ -20,9 +20,7 @@ from exact.utils.timing import CacheStatus, StageRecord  # noqa: F401
 
 try:
     import zstandard as zstd  # noqa: F401
-except (
-    ImportError
-):  # pragma: no cover - exercised only when optional dependency is absent
+except ImportError:  # pragma: no cover - exercised only when optional dependency is absent
     zstd = None
 
 from .audit_io import _json_default
@@ -64,9 +62,7 @@ class CheckpointingMixin:
                     fingerprint_payload = model.runtime_fingerprint_payload(
                         generate_llm_rationales_override=generate_llm_rationales_override
                     )
-                    fingerprint = self._hash_checkpoint_fingerprint_payload(
-                        fingerprint_payload
-                    )
+                    fingerprint = self._hash_checkpoint_fingerprint_payload(fingerprint_payload)
                 else:
                     fingerprint = model.runtime_fingerprint()
             elif hasattr(model, "_cache_fingerprint"):
@@ -167,9 +163,7 @@ class CheckpointingMixin:
         current_payload: Optional[Dict[str, Any]],
         max_diffs: int = 8,
     ) -> Optional[str]:
-        if not isinstance(checkpoint_payload, dict) or not isinstance(
-            current_payload, dict
-        ):
+        if not isinstance(checkpoint_payload, dict) or not isinstance(current_payload, dict):
             return None
         diffs: List[str] = []
         self._collect_checkpoint_fingerprint_diffs(
@@ -339,9 +333,7 @@ class CheckpointingMixin:
         if payload_fingerprint != self._checkpoint_fingerprint:
             if (
                 allow_rationale_toggle_checkpoint_resume
-                and self._checkpoint_matches_rationale_toggle_override(
-                    payload_fingerprint
-                )
+                and self._checkpoint_matches_rationale_toggle_override(payload_fingerprint)
             ):
                 self.log(
                     (
@@ -355,9 +347,7 @@ class CheckpointingMixin:
                     payload_fingerprint_payload,
                     getattr(self, "_checkpoint_fingerprint_payload", None),
                 )
-                detail_suffix = (
-                    f" Mismatch details: {mismatch_details}" if mismatch_details else ""
-                )
+                detail_suffix = f" Mismatch details: {mismatch_details}" if mismatch_details else ""
                 self.log(
                     (
                         f"Ignoring checkpoint '{checkpoint_path.name}' because its model/config "
@@ -375,9 +365,7 @@ class CheckpointingMixin:
         if explanation_index_value:
             explanation_index_path = Path(str(explanation_index_value))
             if not explanation_index_path.is_absolute():
-                explanation_index_path = (
-                    checkpoint_path.parent / explanation_index_path
-                ).resolve()
+                explanation_index_path = (checkpoint_path.parent / explanation_index_path).resolve()
             if explanation_index_path != self.run_layout.explanation_index_path:
                 self.log(
                     f"Ignoring checkpoint '{checkpoint_path.name}': explanation index escapes the run layout.",
@@ -423,17 +411,13 @@ class CheckpointingMixin:
                     continue
                 candidate_rows.append(row)
                 try:
-                    mappings.append(
-                        (str(row["Src"]), str(row["Tgt"]), float(row["S_final"]))
-                    )
+                    mappings.append((str(row["Src"]), str(row["Tgt"]), float(row["S_final"])))
                 except (KeyError, TypeError, ValueError):
                     continue
             self._restored_candidate_rows = candidate_rows
 
         candidate_manifest_value = (
-            None
-            if explanation_index_value
-            else payload.get("candidate_records_manifest_path")
+            None if explanation_index_value else payload.get("candidate_records_manifest_path")
         )
         if candidate_manifest_value:
             candidate_manifest_path = Path(str(candidate_manifest_value))
@@ -442,9 +426,7 @@ class CheckpointingMixin:
                     checkpoint_path.parent / candidate_manifest_path
                 ).resolve()
             self._candidate_manifest_path = candidate_manifest_path
-            candidate_rows = self._read_candidate_records_from_manifest(
-                candidate_manifest_path
-            )
+            candidate_rows = self._read_candidate_records_from_manifest(candidate_manifest_path)
             self._restored_candidate_rows = candidate_rows
             for row in candidate_rows:
                 src = row.get("Src")
@@ -490,9 +472,7 @@ class CheckpointingMixin:
                     continue
                 candidate_rows.append(row)
                 try:
-                    mappings.append(
-                        (str(row["Src"]), str(row["Tgt"]), float(row["S_final"]))
-                    )
+                    mappings.append((str(row["Src"]), str(row["Tgt"]), float(row["S_final"])))
                 except (TypeError, ValueError):
                     continue
             self._restored_candidate_rows = candidate_rows
@@ -520,9 +500,7 @@ class CheckpointingMixin:
                     continue
                 candidate_rows.append(row)
                 try:
-                    mappings.append(
-                        (str(row["Src"]), str(row["Tgt"]), float(row["S_final"]))
-                    )
+                    mappings.append((str(row["Src"]), str(row["Tgt"]), float(row["S_final"])))
                 except (KeyError, TypeError, ValueError):
                     continue
             self._restored_candidate_rows = candidate_rows
@@ -535,9 +513,7 @@ class CheckpointingMixin:
             self._restored_candidate_rows = migrated_rows
             for row in migrated_rows:
                 try:
-                    mappings.append(
-                        (str(row["Src"]), str(row["Tgt"]), float(row["S_final"]))
-                    )
+                    mappings.append((str(row["Src"]), str(row["Tgt"]), float(row["S_final"])))
                 except (KeyError, TypeError, ValueError):
                     continue
 
@@ -566,9 +542,7 @@ class CheckpointingMixin:
             return [], [], 0
         timing_payload = payload.get("timing") or {}
         try:
-            restored_seconds = float(
-                timing_payload.get("inference_seconds_cumulative", 0.0) or 0.0
-            )
+            restored_seconds = float(timing_payload.get("inference_seconds_cumulative", 0.0) or 0.0)
         except (TypeError, ValueError):
             restored_seconds = 0.0
         if not 0.0 <= restored_seconds < float("inf"):
@@ -663,17 +637,13 @@ class CheckpointingMixin:
             and audit_manifest_path is None
             and candidate_manifest_path is None
         ):
-            payload["mappings"] = [
-                {"src": s, "tgt": t, "score": score} for s, t, score in mappings
-            ]
+            payload["mappings"] = [{"src": s, "tgt": t, "score": score} for s, t, score in mappings]
             payload["results_json"] = results_json
 
         tmp_path = checkpoint_path.with_suffix(checkpoint_path.suffix + ".tmp")
         try:
             with open(tmp_path, "w", encoding="utf-8") as f:
-                json.dump(
-                    payload, f, indent=2, ensure_ascii=False, default=_json_default
-                )
+                json.dump(payload, f, indent=2, ensure_ascii=False, default=_json_default)
             tmp_path.replace(checkpoint_path)
             self.log(
                 (
@@ -715,11 +685,7 @@ class CheckpointingMixin:
         threshold: Optional[float],
         cardinality: Optional[int],
     ) -> Dict[str, Any]:
-        models = [
-            model
-            for model in (getattr(self, "models", None) or [])
-            if model is not None
-        ]
+        models = [model for model in (getattr(self, "models", None) or []) if model is not None]
         if not models:
             models = [getattr(self, "model", None)]
         return {
@@ -731,9 +697,7 @@ class CheckpointingMixin:
             "threshold": threshold,
             "cardinality": cardinality,
             "models": [
-                self._model_fingerprint_entry(model)
-                for model in models
-                if model is not None
+                self._model_fingerprint_entry(model) for model in models if model is not None
             ],
         }
 
@@ -783,9 +747,7 @@ class CheckpointingMixin:
         if not bool(getattr(self, "_postprocess_checkpoints_enabled", False)):
             return None
         if not bool(getattr(self, "_additional_model_checkpoint_resume_enabled", True)):
-            if not bool(
-                getattr(self, "_additional_model_checkpoint_skip_logged", False)
-            ):
+            if not bool(getattr(self, "_additional_model_checkpoint_skip_logged", False)):
                 self.log(
                     "Skipping additional-model checkpoint resume because "
                     "resume_additional_model_checkpoints=False.",
@@ -802,9 +764,7 @@ class CheckpointingMixin:
         except FileNotFoundError:
             return None
         except (OSError, json.JSONDecodeError) as exc:
-            self.log(
-                f"Failed to load additional-model checkpoint {path}: {exc}", "warning"
-            )
+            self.log(f"Failed to load additional-model checkpoint {path}: {exc}", "warning")
             return None
         expected = self._postprocess_fingerprint_payload(
             kind, local_alignment, threshold, cardinality
@@ -813,9 +773,7 @@ class CheckpointingMixin:
             self.log(f"Ignoring stale additional-model checkpoint {path}.", "warning")
             return None
         if payload.get("complete") is False:
-            self.log(
-                f"Ignoring incomplete additional-model checkpoint {path}.", "debug"
-            )
+            self.log(f"Ignoring incomplete additional-model checkpoint {path}.", "debug")
             return None
         records = payload.get("candidate_records") or []
         records_path_value = payload.get("candidate_records_path")
@@ -827,9 +785,7 @@ class CheckpointingMixin:
                 start = time.perf_counter()
                 compression = payload.get("candidate_records_compression", "none")
                 records = []
-                for record in self._iter_jsonl_records(
-                    records_path, compression=compression
-                ):
+                for record in self._iter_jsonl_records(records_path, compression=compression):
                     records.append(record)
                     if len(records) % 50000 == 0:
                         elapsed = max(1.0e-8, time.perf_counter() - start)
@@ -869,9 +825,7 @@ class CheckpointingMixin:
         if candidate_df.empty or len(getattr(self, "models", [])) <= 1:
             return
         stage = "additional_models" if complete else "additional_models_partial"
-        path = self._stage_checkpoint_path(
-            kind, stage, local_alignment, threshold, cardinality
-        )
+        path = self._stage_checkpoint_path(kind, stage, local_alignment, threshold, cardinality)
         compression = self._resolve_text_compression(
             getattr(self, "_audit_shard_compression", "zstd")
         )
@@ -896,6 +850,4 @@ class CheckpointingMixin:
             self._write_json_atomic(path, payload)
             self.log(f"Wrote additional-model checkpoint to {path}", log_level)
         except OSError as exc:
-            self.log(
-                f"Failed to write additional-model checkpoint {path}: {exc}", "warning"
-            )
+            self.log(f"Failed to write additional-model checkpoint {path}: {exc}", "warning")

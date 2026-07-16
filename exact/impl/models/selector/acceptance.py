@@ -71,9 +71,7 @@ class AcceptanceMixin:
         original_mode = str(self.llm.get("mode", "veto"))
         self.llm["mode"] = "veto"
         vetoed_sources: set[str] = set()
-        grouped = {
-            source_group_id(key): group for key, group in groupby_source(df)
-        }
+        grouped = {source_group_id(key): group for key, group in groupby_source(df)}
         try:
             for group_id, decision in decisions.items():
                 p_match = float(decision.get("p_match", 0.0))

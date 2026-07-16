@@ -42,12 +42,8 @@ class PairAdaptiveChannelsMixin:
             ]
             return neutral, q_label, best_pairs
 
-        e_src = torch.nn.functional.normalize(
-            self.encode_labels_batch(flat_src), dim=-1
-        )
-        e_tgt = torch.nn.functional.normalize(
-            self.encode_labels_batch(flat_tgt), dim=-1
-        )
+        e_src = torch.nn.functional.normalize(self.encode_labels_batch(flat_src), dim=-1)
+        e_tgt = torch.nn.functional.normalize(self.encode_labels_batch(flat_tgt), dim=-1)
 
         src_slices = []
         start = 0
@@ -81,11 +77,7 @@ class PairAdaptiveChannelsMixin:
             mat = self._sim01(src_embs @ tgt_embs.T)
             score, pair = self._select_label_pair(mat, src_labels, tgt_labels)
             z1, z2 = self._top_two_scores(mat)
-            q_label = (
-                1.0
-                if mat.numel() <= 1
-                else self._clip01((z1 - z2) / max(1e-8, (1.0 - z2)))
-            )
+            q_label = 1.0 if mat.numel() <= 1 else self._clip01((z1 - z2) / max(1e-8, (1.0 - z2)))
             s_vals.append(score)
             q_vals.append(q_label)
             best_pairs.append(pair)
@@ -172,8 +164,7 @@ class PairAdaptiveChannelsMixin:
         )
         q_f = self._clip01((cov_f + str_f + inf_f) / 3.0)
         s_f = self._clip01(
-            self.hierarchy_embedding_weight * emb_f
-            + self.hierarchy_support_weight * str_f
+            self.hierarchy_embedding_weight * emb_f + self.hierarchy_support_weight * str_f
         )
 
         src_imp = [float(value) for value in src_support]
@@ -309,8 +300,7 @@ class PairAdaptiveChannelsMixin:
             src_sentences, tgt_sentences, self.max_input_tokens_sim
         )
         cov_sim = self._clip01(
-            (len(src_selected) + len(tgt_selected))
-            / max(1.0, 2.0 * self.max_object_triples)
+            (len(src_selected) + len(tgt_selected)) / max(1.0, 2.0 * self.max_object_triples)
         )
         stability_vals = list(src_support) + list(tgt_support)
         stab_sim = self._clip01(
@@ -318,8 +308,7 @@ class PairAdaptiveChannelsMixin:
         )
         q_sim = self._clip01((cov_sim + str_sim + stab_sim) / 3.0)
         s_sim = self._clip01(
-            self.similarity_embedding_weight * emb_sim
-            + self.similarity_support_weight * str_sim
+            self.similarity_embedding_weight * emb_sim + self.similarity_support_weight * str_sim
         )
         src_imp = [float(value) for value in src_support]
         tgt_imp = [float(value) for value in tgt_support]
@@ -447,9 +436,7 @@ class PairAdaptiveChannelsMixin:
         if not src_selected and not tgt_selected:
             return payload
 
-        def _conflict(
-            selected_items: Sequence[Dict[str, Any]], values: Sequence[float]
-        ) -> float:
+        def _conflict(selected_items: Sequence[Dict[str, Any]], values: Sequence[float]) -> float:
             if not selected_items:
                 return 0.0
             weights = [float(item.get("score", 0.0)) for item in selected_items]
@@ -463,17 +450,14 @@ class PairAdaptiveChannelsMixin:
         c_diff = self._clip01(0.5 * (c_x + c_y))
         s_diff = self._clip01(1.0 - c_diff)
         cov_diff = self._clip01(
-            (len(src_selected) + len(tgt_selected))
-            / max(1.0, 2.0 * self.max_diff_triples)
+            (len(src_selected) + len(tgt_selected)) / max(1.0, 2.0 * self.max_diff_triples)
         )
         str_diff = 0.5 * (
             self._safe_mean([float(item.get("score", 0.0)) for item in src_selected])
             + self._safe_mean([float(item.get("score", 0.0)) for item in tgt_selected])
         )
         stab_vals = list(src_vals) + list(tgt_vals)
-        stab_diff = self._clip01(
-            1.0 - min(1.0, self.stability_factor * self._safe_std(stab_vals))
-        )
+        stab_diff = self._clip01(1.0 - min(1.0, self.stability_factor * self._safe_std(stab_vals)))
         q_diff = self._clip01((cov_diff + str_diff + stab_diff) / 3.0)
         src_sentences = self._verbalize_object_items(src_selected)
         tgt_sentences = self._verbalize_object_items(tgt_selected)
@@ -554,9 +538,7 @@ class PairAdaptiveChannelsMixin:
                 continue
             if key.lower() in normalized:
                 return float(weight)
-        if any(
-            token in normalized for token in ["definition", "def", "synopsis", "xref"]
-        ):
+        if any(token in normalized for token in ["definition", "def", "synopsis", "xref"]):
             return float(self.attribute_property_weights.get("definition", 1.0))
         if any(token in normalized for token in ["identifier", "id", "code", "dbxref"]):
             return float(self.attribute_property_weights.get("identifier", 0.8))
@@ -642,8 +624,7 @@ class PairAdaptiveChannelsMixin:
                     list(family_payload.get("tgt_selected", [])),
                     list(family_payload.get("tgt_sentences", [])),
                 )
-                if self._normalize_text(item.get("item_id"))
-                and self._normalize_text(sentence)
+                if self._normalize_text(item.get("item_id")) and self._normalize_text(sentence)
             )
             src_bank.extend(
                 {
@@ -655,8 +636,7 @@ class PairAdaptiveChannelsMixin:
                     list(family_payload.get("src_selected", [])),
                     list(family_payload.get("src_sentences", [])),
                 )
-                if self._normalize_text(item.get("item_id"))
-                and self._normalize_text(sentence)
+                if self._normalize_text(item.get("item_id")) and self._normalize_text(sentence)
             )
         tgt_bank.extend(
             {
@@ -668,8 +648,7 @@ class PairAdaptiveChannelsMixin:
                 list(sim_payload.get("tgt_selected", [])),
                 list(sim_payload.get("tgt_sentences", [])),
             )
-            if self._normalize_text(item.get("item_id"))
-            and self._normalize_text(sentence)
+            if self._normalize_text(item.get("item_id")) and self._normalize_text(sentence)
         )
         src_bank.extend(
             {
@@ -681,8 +660,7 @@ class PairAdaptiveChannelsMixin:
                 list(sim_payload.get("src_selected", [])),
                 list(sim_payload.get("src_sentences", [])),
             )
-            if self._normalize_text(item.get("item_id"))
-            and self._normalize_text(sentence)
+            if self._normalize_text(item.get("item_id")) and self._normalize_text(sentence)
         )
         tgt_bank.extend(
             {
@@ -691,8 +669,7 @@ class PairAdaptiveChannelsMixin:
                 "text": self._normalize_text(item.get("text")),
             }
             for item in tgt_items
-            if self._normalize_text(item.get("item_id"))
-            and self._normalize_text(item.get("text"))
+            if self._normalize_text(item.get("item_id")) and self._normalize_text(item.get("text"))
         )
         src_bank.extend(
             {
@@ -701,16 +678,13 @@ class PairAdaptiveChannelsMixin:
                 "text": self._normalize_text(item.get("text")),
             }
             for item in src_items
-            if self._normalize_text(item.get("item_id"))
-            and self._normalize_text(item.get("text"))
+            if self._normalize_text(item.get("item_id")) and self._normalize_text(item.get("text"))
         )
 
         def _side_support(
             side_items: Sequence[Dict[str, Any]],
             bank: Sequence[Dict[str, Any]],
-        ) -> Tuple[
-            float, List[Dict[str, Any]], List[float], List[float], List[Dict[str, Any]]
-        ]:
+        ) -> Tuple[float, List[Dict[str, Any]], List[float], List[float], List[Dict[str, Any]]]:
             if not side_items or not bank:
                 return 0.0, [], [], [], []
             texts = [self._normalize_text(item.get("text")) for item in side_items]
@@ -723,9 +697,7 @@ class PairAdaptiveChannelsMixin:
                 else [0.0 for _ in texts]
             )
             best_idx = (
-                mat.argmax(dim=1).detach().cpu().tolist()
-                if mat.numel()
-                else [0 for _ in texts]
+                mat.argmax(dim=1).detach().cpu().tolist() if mat.numel() else [0 for _ in texts]
             )
             denom = sum(weights) or 1.0
             score = sum(w * s for w, s in zip(weights, best)) / denom
@@ -735,11 +707,7 @@ class PairAdaptiveChannelsMixin:
             for item, weight, support, weighted, anchor_idx in zip(
                 side_items, weights, best, weighted_support, best_idx
             ):
-                anchor = (
-                    dict(bank[anchor_idx])
-                    if bank and 0 <= int(anchor_idx) < len(bank)
-                    else {}
-                )
+                anchor = dict(bank[anchor_idx]) if bank and 0 <= int(anchor_idx) < len(bank) else {}
                 selected.append(
                     {
                         "item_id": self._normalize_text(item.get("item_id")),
@@ -790,14 +758,11 @@ class PairAdaptiveChannelsMixin:
             1.0
             - min(
                 1.0,
-                self.stability_factor
-                * self._safe_std(list(src_supports) + list(tgt_supports)),
+                self.stability_factor * self._safe_std(list(src_supports) + list(tgt_supports)),
             )
         )
         q_attr = self._clip01((cov_attr + inf_attr + stab_attr) / 3.0)
-        total_imp = (
-            sum(item["importance"] for item in src_selected + tgt_selected) or 1.0
-        )
+        total_imp = sum(item["importance"] for item in src_selected + tgt_selected) or 1.0
         for item in src_selected:
             item["importance"] = float(item["importance"] / total_imp)
         for item in tgt_selected:

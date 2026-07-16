@@ -11,11 +11,7 @@ from exact.core.entities.mappings import EntityMapping
 
 def _load_runner_module():
     module_path = (
-        Path(__file__).resolve().parents[1]
-        / "exact"
-        / "impl"
-        / "trainer"
-        / "semantic_runner.py"
+        Path(__file__).resolve().parents[1] / "exact" / "impl" / "trainer" / "semantic_runner.py"
     )
     spec = importlib.util.spec_from_file_location("semantic_runner_module", module_path)
     module = importlib.util.module_from_spec(spec)
@@ -88,9 +84,7 @@ def test_compact_checkpoint_restores_from_single_explanation_store(tmp_path: Pat
         records_per_shard=2,
     )
     runner._append_audit_records(records)
-    candidate_rows = [
-        runner._candidate_row_from_explanation_record(record) for record in records
-    ]
+    candidate_rows = [runner._candidate_row_from_explanation_record(record) for record in records]
     runner._append_candidate_records([row for row in candidate_rows if row is not None])
     runner._inference_seconds_cumulative = 812.4
     runner._examples_per_second_ema = 1.48
@@ -336,10 +330,7 @@ def test_final_overlay_uses_store_and_compacts_without_checkpoint_sidecars(
 
     assert overlay_path == runner.run_layout.explanation_index_path
     assert runner._explanation_store.overlay_count == 1
-    assert (
-        runner._explanation_store.get("s1")[0]["prediction"]["saved_alignment_member"]
-        is True
-    )
+    assert runner._explanation_store.get("s1")[0]["prediction"]["saved_alignment_member"] is True
     runner._explanation_store.compact()
     assert runner._explanation_store.overlay_count == 0
     assert not runner._explanation_store.overlays_dir.exists()

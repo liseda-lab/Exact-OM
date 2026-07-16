@@ -768,9 +768,7 @@ class CandidateSetSelector(CalibrationMixin, AcceptanceMixin, FeatureEngineering
             accept_threshold=accept_threshold,
         )
 
-        for n_groups, (group_id, src, _, group) in enumerate(
-            iter_source_groups(df), start=1
-        ):
+        for n_groups, (group_id, src, _, group) in enumerate(iter_source_groups(df), start=1):
             decision = source_decisions.get(group_id)
             if decision is None:
                 continue

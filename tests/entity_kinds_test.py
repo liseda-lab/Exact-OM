@@ -37,9 +37,7 @@ class _FakeSentenceTransformer:
 
 class KindDataset(BaseAlignmentDataset):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
-        self.semantic_index_calls: list[
-            tuple[set[EntityKind], int, set[EntityKind], int]
-        ] = []
+        self.semantic_index_calls: list[tuple[set[EntityKind], int, set[EntityKind], int]] = []
         super().__init__(*args, **kwargs)
 
     def __getitem__(self, idx: int):
@@ -67,9 +65,7 @@ class KindDataset(BaseAlignmentDataset):
             )
         )
         return {
-            (source.iri, target.iri): (
-                1.0 if source.normalized == target.normalized else 0.1
-            )
+            (source.iri, target.iri): (1.0 if source.normalized == target.normalized else 0.1)
             for source in src_records
             for target in tgt_records
         }
@@ -134,12 +130,7 @@ def test_candidate_labels_and_dataset_indexes_are_partitioned_by_kind(
         {"same-target": ["same label"]},
         kind=EntityKind.OBJECT_PROPERTY,
     )
-    assert (
-        lexical_candidate_pair_scores(
-            class_records, property_records, per_source_limit=5
-        )
-        == {}
-    )
+    assert lexical_candidate_pair_scores(class_records, property_records, per_source_limit=5) == {}
 
     kinds = [
         EntityKind.CLASS,
@@ -159,9 +150,7 @@ def test_candidate_labels_and_dataset_indexes_are_partitioned_by_kind(
     assert set(candidates["SrcKind"]) == {kind.value for kind in kinds}
     assert all(
         src_kinds == {kind} and tgt_kinds == {kind}
-        for kind, (src_kinds, _, tgt_kinds, _) in zip(
-            kinds, dataset.semantic_index_calls
-        )
+        for kind, (src_kinds, _, tgt_kinds, _) in zip(kinds, dataset.semantic_index_calls)
     )
     assert dataset.candidate_pool_sizes["object_property"]["source_entities"] == 4
     assert dataset.candidate_pool_sizes["data_property"]["source_entities"] == 1
@@ -204,10 +193,7 @@ def test_individual_features_use_type_closure_abox_and_data_values(
     features = dataset.get_entity_features(SRC + "alice", "src", EntityKind.INDIVIDUAL)
     hierarchy = features["hierarchy"]["is_a"]
     assert any(item["object_iri"] == SRC + "Patient" for item in hierarchy)
-    assert any(
-        item["object_iri"] == SRC + "Person" and item["type_closure"]
-        for item in hierarchy
-    )
+    assert any(item["object_iri"] == SRC + "Person" and item["type_closure"] for item in hierarchy)
     assert any(
         item["subject_iri"] == SRC + "alice" and item["object_iri"] == SRC + "trial1"
         for item in features["object_triples"]
@@ -234,9 +220,7 @@ def test_entity_kind_change_invalidates_dataset_cache(
 
     assert classes.cache_fingerprint != properties.cache_fingerprint
     assert classes._cache_fingerprint_payload()["entity_kinds"] == ["class"]
-    assert properties._cache_fingerprint_payload()["entity_kinds"] == [
-        "object_property"
-    ]
+    assert properties._cache_fingerprint_payload()["entity_kinds"] == ["object_property"]
 
 
 def test_base_dataset_uses_run_layout_and_source_registry(tmp_path: Path) -> None:

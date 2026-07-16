@@ -12,10 +12,7 @@ def _group_columns(
     entity_column: str,
     kind_column: str,
 ) -> str | list[str]:
-    if (
-        kind_column in frame.columns
-        and frame[kind_column].nunique(dropna=False) > 1
-    ):
+    if kind_column in frame.columns and frame[kind_column].nunique(dropna=False) > 1:
         return [entity_column, kind_column]
     return entity_column
 
@@ -23,17 +20,13 @@ def _group_columns(
 def groupby_source(frame: pd.DataFrame):
     """Group candidate rows by source and, for mixed runs, source kind."""
 
-    return frame.groupby(
-        _group_columns(frame, "Src", "SrcKind"), sort=False
-    )
+    return frame.groupby(_group_columns(frame, "Src", "SrcKind"), sort=False)
 
 
 def groupby_target(frame: pd.DataFrame):
     """Group candidate rows by target and, for mixed runs, target kind."""
 
-    return frame.groupby(
-        _group_columns(frame, "Tgt", "TgtKind"), sort=False
-    )
+    return frame.groupby(_group_columns(frame, "Tgt", "TgtKind"), sort=False)
 
 
 def source_from_group_key(key: Any) -> str:

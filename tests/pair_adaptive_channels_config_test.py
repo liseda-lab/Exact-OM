@@ -77,14 +77,10 @@ def test_matching_channel_defaults_and_overrides_drive_channel_math(
         "triple": ("child", "subClassOf", "parent"),
         "specificity": 0.5,
     }
-    hierarchy = configured._score_hierarchy_family(
-        "is_a", [hierarchy_item], [hierarchy_item]
-    )
+    hierarchy = configured._score_hierarchy_family("is_a", [hierarchy_item], [hierarchy_item])
     assert hierarchy["score"] == pytest.approx(0.2)
 
-    object_items = [
-        {"triple": (f"s{i}", "relatedTo", f"o{i}"), "score": 1.0} for i in range(3)
-    ]
+    object_items = [{"triple": (f"s{i}", "relatedTo", f"o{i}"), "score": 1.0} for i in range(3)]
     similarity = configured._score_similarity_channel(object_items, object_items)
     assert len(similarity["src_selected"]) == 1
     assert len(similarity["tgt_selected"]) == 1

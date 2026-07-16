@@ -14,9 +14,7 @@ from exact.runs import RunReader
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="Aggregate Exact hparam tuning results."
-    )
+    parser = argparse.ArgumentParser(description="Aggregate Exact hparam tuning results.")
     parser.add_argument(
         "--exp-dir",
         required=True,
@@ -89,9 +87,7 @@ def load_metrics(path: Path) -> Dict[str, str]:
             # Interpret other layouts as a single summary row.
             rows = list(reader)
             if rows:
-                metrics = {
-                    key: value for key, value in rows[0].items() if key is not None
-                }
+                metrics = {key: value for key, value in rows[0].items() if key is not None}
     return metrics
 
 
@@ -124,12 +120,8 @@ def collect_runs(runs_dir: Path, results_filename: str) -> List[RunRecord]:
             print(f"[WARN] Skipping {entry} (missing {results_filename})")
             continue
         params = load_params(trial_path)
-        metrics = {
-            f"metric.{key}": value for key, value in load_metrics(results_path).items()
-        }
-        records.append(
-            RunRecord(name=entry.name, path=entry, params=params, metrics=metrics)
-        )
+        metrics = {f"metric.{key}": value for key, value in load_metrics(results_path).items()}
+        records.append(RunRecord(name=entry.name, path=entry, params=params, metrics=metrics))
     return records
 
 

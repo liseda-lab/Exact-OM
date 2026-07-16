@@ -96,11 +96,7 @@ def test_mixed_kind_runner_persists_and_exports_typed_explanations(
     stored = list(runner._explanation_store.iter_all())
     assert len(stored) == 4
     assert {record["kind"] for record in stored} == expected_kinds
-    assert all(
-        record["kind"] == record["src_kind"] == record["tgt_kind"] for record in stored
-    )
+    assert all(record["kind"] == record["src_kind"] == record["tgt_kind"] for record in stored)
 
-    exported = json.loads(
-        runner.run_layout.full_explanations_path.read_text(encoding="utf-8")
-    )
+    exported = json.loads(runner.run_layout.full_explanations_path.read_text(encoding="utf-8"))
     assert {record["kind"] for record in exported} == expected_kinds

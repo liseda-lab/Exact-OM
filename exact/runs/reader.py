@@ -100,8 +100,7 @@ class RunReader:
     @property
     def _has_store(self) -> bool:
         return (
-            self.layout.version == LAYOUT_VERSION
-            and self.layout.explanation_index_path.is_file()
+            self.layout.version == LAYOUT_VERSION and self.layout.explanation_index_path.is_file()
         )
 
     @property

@@ -25,42 +25,30 @@ def analyze_alignment_run(
 
     reference_df = _read_table(reference_path)
     train_reference_df = (
-        _read_table(train_reference_path)
-        if train_reference_path is not None
-        else pd.DataFrame()
+        _read_table(train_reference_path) if train_reference_path is not None else pd.DataFrame()
     )
-    summary_df = (
-        _read_table(summary_path) if summary_path is not None else pd.DataFrame()
-    )
-    alignment_df = (
-        _read_table(alignment_path) if alignment_path is not None else pd.DataFrame()
-    )
+    summary_df = _read_table(summary_path) if summary_path is not None else pd.DataFrame()
+    alignment_df = _read_table(alignment_path) if alignment_path is not None else pd.DataFrame()
 
     raw_reference_pairs = _pairs_from_columns(reference_df, reference_df.columns[:2])
-    null_reference_pairs = _pairs_from_columns(
-        train_reference_df, train_reference_df.columns[:2]
-    )
+    null_reference_pairs = _pairs_from_columns(train_reference_df, train_reference_df.columns[:2])
     reference_pairs = raw_reference_pairs.difference(null_reference_pairs)
     candidate_pairs = _pairs_from_columns(summary_df, ("src_iri", "tgt_iri"))
     if not alignment_df.empty:
-        raw_prediction_pairs = _pairs_from_columns(
-            alignment_df, alignment_df.columns[:2]
-        )
+        raw_prediction_pairs = _pairs_from_columns(alignment_df, alignment_df.columns[:2])
     else:
         raw_prediction_pairs = _saved_pairs_from_summary(summary_df)
     prediction_pairs = raw_prediction_pairs.difference(null_reference_pairs)
 
-    selected_pairs = (
-        _saved_pairs_from_summary(summary_df) or raw_prediction_pairs
-    ).difference(null_reference_pairs)
+    selected_pairs = (_saved_pairs_from_summary(summary_df) or raw_prediction_pairs).difference(
+        null_reference_pairs
+    )
     tp = reference_pairs.intersection(prediction_pairs)
     fp = prediction_pairs.difference(reference_pairs)
     fn = reference_pairs.difference(prediction_pairs)
     present_missed = fn.intersection(candidate_pairs)
     absent_missed = fn.difference(candidate_pairs)
-    oracle_recoverable_pairs = reference_pairs.intersection(
-        candidate_pairs.union(prediction_pairs)
-    )
+    oracle_recoverable_pairs = reference_pairs.intersection(candidate_pairs.union(prediction_pairs))
 
     source_predictions: Dict[str, set[str]] = {}
     for src, tgt in prediction_pairs:
@@ -69,8 +57,7 @@ def analyze_alignment_run(
     present_wrong_selected = {
         pair
         for pair in present_missed
-        if source_predictions.get(pair[0])
-        and pair[1] not in source_predictions[pair[0]]
+        if source_predictions.get(pair[0]) and pair[1] not in source_predictions[pair[0]]
     }
     present_no_prediction = present_missed.difference(present_wrong_selected)
     present_abstained = _present_abstained_misses(summary_df, present_no_prediction)
@@ -80,9 +67,7 @@ def analyze_alignment_run(
         "paths": {
             "run_dir": str(run_dir),
             "reference": str(reference_path),
-            "train_reference": str(train_reference_path)
-            if train_reference_path
-            else None,
+            "train_reference": str(train_reference_path) if train_reference_path else None,
             "summary": str(summary_path) if summary_path else None,
             "alignment": str(alignment_path) if alignment_path else None,
         },
@@ -96,9 +81,7 @@ def analyze_alignment_run(
             "raw_reference_pairs": len(raw_reference_pairs),
             "raw_prediction_pairs": len(raw_prediction_pairs),
             "null_reference_pairs": len(null_reference_pairs),
-            "null_prediction_pairs": len(
-                raw_prediction_pairs.intersection(null_reference_pairs)
-            ),
+            "null_prediction_pairs": len(raw_prediction_pairs.intersection(null_reference_pairs)),
         },
         "metrics": _precision_recall_f1(len(tp), len(fp), len(fn)),
         "oracle": {
@@ -199,9 +182,7 @@ def _pairs_from_columns(df: pd.DataFrame, columns: Sequence[str]) -> set[Pair]:
     if src_col not in df.columns or tgt_col not in df.columns:
         return set()
     return {
-        (str(src), str(tgt))
-        for src, tgt in zip(df[src_col], df[tgt_col])
-        if str(src) and str(tgt)
+        (str(src), str(tgt)) for src, tgt in zip(df[src_col], df[tgt_col]) if str(src) and str(tgt)
     }
 
 
@@ -212,9 +193,7 @@ def _saved_pairs_from_summary(df: pd.DataFrame) -> set[Pair]:
     return _pairs_from_columns(df.loc[saved], ("src_iri", "tgt_iri"))
 
 
-def _present_abstained_misses(
-    df: pd.DataFrame, present_misses: Iterable[Pair]
-) -> set[Pair]:
+def _present_abstained_misses(df: pd.DataFrame, present_misses: Iterable[Pair]) -> set[Pair]:
     if df.empty or "selector_abstained" not in df.columns:
         return set()
     miss_set = set(present_misses)
@@ -230,22 +209,13 @@ def _present_abstained_misses(
 
 
 def _gold_rank_summary(df: pd.DataFrame, missed_pairs: set[Pair]) -> Dict[str, Any]:
-    if (
-        df.empty
-        or not missed_pairs
-        or "src_iri" not in df.columns
-        or "tgt_iri" not in df.columns
-    ):
+    if df.empty or not missed_pairs or "src_iri" not in df.columns or "tgt_iri" not in df.columns:
         return {}
 
     pair_ranks = _rank_lookup(df, "S_pair_final")
     utility_ranks = _rank_lookup(df, "selection_utility")
-    present_pair_ranks = [
-        pair_ranks[pair] for pair in missed_pairs if pair in pair_ranks
-    ]
-    present_utility_ranks = [
-        utility_ranks[pair] for pair in missed_pairs if pair in utility_ranks
-    ]
+    present_pair_ranks = [pair_ranks[pair] for pair in missed_pairs if pair in pair_ranks]
+    present_utility_ranks = [utility_ranks[pair] for pair in missed_pairs if pair in utility_ranks]
     return {
         "present_missed_with_pair_rank": len(present_pair_ranks),
         "pair_rank_median": quantile(present_pair_ranks, 0.5),
@@ -281,9 +251,9 @@ def _llm_summary(
         llm_rows.get("saved_alignment_member", pd.Series(False, index=llm_rows.index))
     )
     selected_rows = llm_rows.loc[saved]
-    selected_pairs = _pairs_from_columns(
-        selected_rows, ("src_iri", "tgt_iri")
-    ).difference(null_reference_pairs)
+    selected_pairs = _pairs_from_columns(selected_rows, ("src_iri", "tgt_iri")).difference(
+        null_reference_pairs
+    )
     reasons = (
         llm_rows["selector_reason"].astype(str).value_counts().sort_index().to_dict()
         if "selector_reason" in llm_rows.columns

@@ -137,4 +137,4 @@ documented duplicate-path unification.
 ## Deviations
 
 No design deviations. `exact/impl/datasets/base.py`, the largest adjacent WP-B/F-owned module,
-is 1,493 lines and therefore also meets the approximate 1,500-line soft ceiling.
+is 1,403 lines and therefore also meets the approximate 1,500-line soft ceiling.

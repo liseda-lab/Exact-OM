@@ -27,6 +27,7 @@ from exact.core.entities.kinds import (
     normalize_entity_kinds,
 )
 from exact.core.entities.ontology import OntologyGraph
+from exact.impl.datasets.options import candidate_config, mapping_options
 from exact.io.sources import resolve as resolve_source
 from exact.runs.layout import RunLayout
 from exact.utils.candidate_generation import (
@@ -38,8 +39,6 @@ from exact.utils.candidate_generation import (
     select_candidate_annotation_literals,
 )
 from exact.utils.data import read_table
-
-from exact.impl.datasets.options import candidate_config, mapping_options
 
 DataFrame = pd.DataFrame
 
@@ -81,9 +80,7 @@ class BaseAlignmentDataset(IDataset):
 
         self._filter_exact_matches: bool = filter_exact_matches
         self._drop_exact_match_sources: bool = drop_exact_match_sources
-        self._filter_ignored_alignment_classes: bool = bool(
-            filter_ignored_alignment_classes
-        )
+        self._filter_ignored_alignment_classes: bool = bool(filter_ignored_alignment_classes)
         self._source_ignored_alignment_classes: Optional[set[str]] = None
         self._target_ignored_alignment_classes: Optional[set[str]] = None
 
@@ -227,9 +224,7 @@ class BaseAlignmentDataset(IDataset):
     def candidate_pool_sizes(self) -> Dict[str, Dict[str, int]]:
         """Return defensive per-kind retrieval pool statistics."""
 
-        return {
-            kind: dict(values) for kind, values in self._candidate_pool_sizes.items()
-        }
+        return {kind: dict(values) for kind, values in self._candidate_pool_sizes.items()}
 
     @property
     def reference(self) -> DataFrame:
@@ -275,9 +270,7 @@ class BaseAlignmentDataset(IDataset):
         if source is None:
             return self.primary_entity_kind
         index = (
-            self._source_entity_kind_index
-            if side_key == "src"
-            else self._target_entity_kind_index
+            self._source_entity_kind_index if side_key == "src" else self._target_entity_kind_index
         )
         warning_key = (side_key, str(iri))
 
@@ -330,9 +323,7 @@ class BaseAlignmentDataset(IDataset):
         keep = pd.Series(True, index=normalized.index)
         if filter_selected:
             allowed = {kind.value for kind in self.entity_kinds}
-            keep &= normalized["SrcKind"].isin(allowed) & normalized["TgtKind"].isin(
-                allowed
-            )
+            keep &= normalized["SrcKind"].isin(allowed) & normalized["TgtKind"].isin(allowed)
         if filter_cross_kind:
             keep &= normalized["SrcKind"] == normalized["TgtKind"]
         removed = int((~keep).sum())
@@ -347,8 +338,7 @@ class BaseAlignmentDataset(IDataset):
     def _mapping_key_columns(*frames: Optional[DataFrame]) -> List[str]:
         columns = ["Src", "Tgt"]
         if all(
-            frame is not None and {"SrcKind", "TgtKind"}.issubset(frame.columns)
-            for frame in frames
+            frame is not None and {"SrcKind", "TgtKind"}.issubset(frame.columns) for frame in frames
         ):
             columns.extend(["SrcKind", "TgtKind"])
         return columns
@@ -390,9 +380,7 @@ class BaseAlignmentDataset(IDataset):
             return list(iris)
         return [iri for iri in iris if str(iri) not in ignored]
 
-    def _filter_candidates_ignored_classes(
-        self, df: Optional[DataFrame]
-    ) -> Optional[DataFrame]:
+    def _filter_candidates_ignored_classes(self, df: Optional[DataFrame]) -> Optional[DataFrame]:
         if df is None or df.empty or not self.filter_ignored_alignment_classes:
             return df
         if not {"Src", "Tgt"}.issubset(df.columns):
@@ -401,10 +389,7 @@ class BaseAlignmentDataset(IDataset):
         tgt_ignored = self.target_ignored_alignment_classes
         if not src_ignored and not tgt_ignored:
             return df
-        keep = ~(
-            df["Src"].astype(str).isin(src_ignored)
-            | df["Tgt"].astype(str).isin(tgt_ignored)
-        )
+        keep = ~(df["Src"].astype(str).isin(src_ignored) | df["Tgt"].astype(str).isin(tgt_ignored))
         removed = int((~keep).sum())
         if removed:
             self.log(
@@ -424,10 +409,7 @@ class BaseAlignmentDataset(IDataset):
         tgt_ignored = self.target_ignored_alignment_classes
         if not src_ignored and not tgt_ignored:
             return df
-        keep = ~(
-            df["Src"].astype(str).isin(src_ignored)
-            | df["Tgt"].astype(str).isin(tgt_ignored)
-        )
+        keep = ~(df["Src"].astype(str).isin(src_ignored) | df["Tgt"].astype(str).isin(tgt_ignored))
         removed = int((~keep).sum())
         if removed:
             self.log(
@@ -491,14 +473,10 @@ class BaseAlignmentDataset(IDataset):
                     label="candidate",
                 )
                 src_iris = set(
-                    candidates.loc[candidates["SrcKind"] == kind.value, "Src"].astype(
-                        str
-                    )
+                    candidates.loc[candidates["SrcKind"] == kind.value, "Src"].astype(str)
                 )
                 tgt_iris = set(
-                    candidates.loc[candidates["TgtKind"] == kind.value, "Tgt"].astype(
-                        str
-                    )
+                    candidates.loc[candidates["TgtKind"] == kind.value, "Tgt"].astype(str)
                 )
             else:
                 src_iris = set(self.source.entities(kind))
@@ -510,14 +488,10 @@ class BaseAlignmentDataset(IDataset):
                 src_ignored = self.source_ignored_alignment_classes
                 tgt_ignored = self.target_ignored_alignment_classes
                 src_map = {
-                    iri: labels
-                    for iri, labels in src_map.items()
-                    if str(iri) not in src_ignored
+                    iri: labels for iri, labels in src_map.items() if str(iri) not in src_ignored
                 }
                 tgt_map = {
-                    iri: labels
-                    for iri, labels in tgt_map.items()
-                    if str(iri) not in tgt_ignored
+                    iri: labels for iri, labels in tgt_map.items() if str(iri) not in tgt_ignored
                 }
 
             compact_pairs = pairs_from_indexes(
@@ -651,9 +625,7 @@ class BaseAlignmentDataset(IDataset):
             "dataset_signature": self.dataset_signature,
             "component": self.__class__.__name__,
         }
-        self._cache_meta_path.write_text(
-            json.dumps(payload, indent=2), encoding="utf-8"
-        )
+        self._cache_meta_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
     def load_candidates(
         self,
@@ -705,9 +677,7 @@ class BaseAlignmentDataset(IDataset):
                 self.get_exact_matches()
 
         else:
-            self.log(
-                "#No Candidates file provided, generation candidates...", level="info"
-            )
+            self.log("#No Candidates file provided, generation candidates...", level="info")
 
             if self.filter_exact_matches:
                 self.log("Get Exact Matches...", level="info")
@@ -741,9 +711,7 @@ class BaseAlignmentDataset(IDataset):
         Build one-to-many candidate table using label embedding and lexical retrieval.
         """
         if self._source is None or self._target is None:
-            self.log(
-                "Ontologies must be loaded before candidate generation.", level="error"
-            )
+            self.log("Ontologies must be loaded before candidate generation.", level="error")
             raise ValueError("Ontologies not loaded.")
 
         strategy = str(retrieval_strategy or "hybrid").lower()
@@ -753,12 +721,8 @@ class BaseAlignmentDataset(IDataset):
                 "expected 'primary_label' or 'hybrid'."
             )
 
-        fusion_config = candidate_config(
-            self._candidate_generation_params, "fusion", fusion
-        )
-        alias_config = candidate_config(
-            self._candidate_generation_params, "aliases", aliases
-        )
+        fusion_config = candidate_config(self._candidate_generation_params, "fusion", fusion)
+        alias_config = candidate_config(self._candidate_generation_params, "aliases", aliases)
 
         dev = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.log(
@@ -902,9 +866,7 @@ class BaseAlignmentDataset(IDataset):
         """Build one isolated semantic/lexical retrieval index for a kind."""
 
         label_scope = "primary labels" if strategy == "primary_label" else "all labels"
-        self.log(
-            f"  Extracting {label_scope} for {kind.value} entities…", level="debug"
-        )
+        self.log(f"  Extracting {label_scope} for {kind.value} entities…", level="debug")
         if strategy == "primary_label":
             src_labels_by_iri = {
                 iri: [self.source_graph.get_primary_label(iri)] for iri in src_iris
@@ -916,34 +878,22 @@ class BaseAlignmentDataset(IDataset):
             tgt_lexical_texts_by_iri = tgt_labels_by_iri
             channel_k = int(top_k)
         else:
-            src_labels_by_iri = {
-                iri: self.source_graph.get_labels(iri) for iri in src_iris
-            }
-            tgt_labels_by_iri = {
-                iri: self.target_graph.get_labels(iri) for iri in tgt_iris
-            }
+            src_labels_by_iri = {iri: self.source_graph.get_labels(iri) for iri in src_iris}
+            tgt_labels_by_iri = {iri: self.target_graph.get_labels(iri) for iri in tgt_iris}
             src_lexical_texts_by_iri = {
-                iri: self._candidate_texts_for_iri(
-                    self.source_graph, iri, "src", alias_config
-                )
+                iri: self._candidate_texts_for_iri(self.source_graph, iri, "src", alias_config)
                 for iri in src_iris
             }
             tgt_lexical_texts_by_iri = {
-                iri: self._candidate_texts_for_iri(
-                    self.target_graph, iri, "tgt", alias_config
-                )
+                iri: self._candidate_texts_for_iri(self.target_graph, iri, "tgt", alias_config)
                 for iri in tgt_iris
             }
             channel_k = max(int(top_k) * 3, 30)
 
         src_records = make_candidate_labels(src_iris, src_labels_by_iri, kind=kind)
         tgt_records = make_candidate_labels(tgt_iris, tgt_labels_by_iri, kind=kind)
-        src_lexical_records = make_candidate_labels(
-            src_iris, src_lexical_texts_by_iri, kind=kind
-        )
-        tgt_lexical_records = make_candidate_labels(
-            tgt_iris, tgt_lexical_texts_by_iri, kind=kind
-        )
+        src_lexical_records = make_candidate_labels(src_iris, src_lexical_texts_by_iri, kind=kind)
+        tgt_lexical_records = make_candidate_labels(tgt_iris, tgt_lexical_texts_by_iri, kind=kind)
         self._candidate_pool_sizes[kind.value].update(
             {
                 "source_labels": len(src_lexical_records),
@@ -1012,8 +962,7 @@ class BaseAlignmentDataset(IDataset):
 
         source = self.source if side == "src" else self.target
         annotation_values = [
-            (value.property_iri, value.value.strip())
-            for value in source.attributes(str(iri))
+            (value.property_iri, value.value.strip()) for value in source.attributes(str(iri))
         ]
 
         for literal in select_candidate_annotation_literals(
@@ -1167,9 +1116,7 @@ class BaseAlignmentDataset(IDataset):
         share_rest = (1.0 - share_top).clip(lower=0.0)
         self._candidates["cand_share_top"] = share_top
         self._candidates["cand_share_rest"] = share_rest
-        self._candidates["cand_share_log_ratio"] = np.log(
-            (share_top + eps) / (share_rest + eps)
-        )
+        self._candidates["cand_share_log_ratio"] = np.log((share_top + eps) / (share_rest + eps))
 
     def load_reference(self, file_path: Path) -> None:
 
@@ -1179,9 +1126,7 @@ class BaseAlignmentDataset(IDataset):
             self._reference,
             label="reference",
         )
-        self._reference = self._filter_mappings_ignored_classes(
-            self._reference, label="reference"
-        )
+        self._reference = self._filter_mappings_ignored_classes(self._reference, label="reference")
         self.log("#Loaded Reference...", level="debug")
 
     def save(self) -> Path:
@@ -1202,9 +1147,7 @@ class BaseAlignmentDataset(IDataset):
         return self._df_save_path
 
     def load(self):
-        self._df = pd.read_csv(
-            self._df_save_path, converters={"Features": literal_eval}
-        )
+        self._df = pd.read_csv(self._df_save_path, converters={"Features": literal_eval})
         self._df = self._ensure_mapping_kinds(
             self._df,
             label="cached dataset",
@@ -1279,9 +1222,7 @@ class BaseAlignmentDataset(IDataset):
                 how="left",
                 suffixes=("", "_y"),
             )
-            inference_set["Label"] = inference_set["Label_y"].combine_first(
-                inference_set["Label"]
-            )
+            inference_set["Label"] = inference_set["Label_y"].combine_first(inference_set["Label"])
             inference_set.drop(columns=["Label_y"], inplace=True)
 
             exact_prefilter_pairs = self._exact_mapping_pairs()
@@ -1291,17 +1232,13 @@ class BaseAlignmentDataset(IDataset):
                 zip(inference_set["Src"].astype(str), inference_set["Tgt"].astype(str))
             )
             unique_pairs_full_ref = set(
-                zip(
-                    self.reference["Src"].astype(str), self.reference["Tgt"].astype(str)
-                )
+                zip(self.reference["Src"].astype(str), self.reference["Tgt"].astype(str))
             )
             raw_missing_pairs = unique_pairs_full_ref - unique_pairs_inference
             missing_pairs = raw_missing_pairs.difference(exact_prefilter_pairs)
 
             if missing_pairs:
-                missing_percentage = (
-                    len(missing_pairs) / len(unique_pairs_full_ref) * 100
-                )
+                missing_percentage = len(missing_pairs) / len(unique_pairs_full_ref) * 100
                 self.log(
                     f"#Warning: {len(missing_pairs)} reference pairs are not covered by candidates or exact prefiltering ({missing_percentage:.2f}%)",
                     level="warning",
@@ -1310,14 +1247,10 @@ class BaseAlignmentDataset(IDataset):
                 # Warn how many unique source entities full reference has that are not in the candidates with percentage
                 unique_src_inference = set(inference_set["Src"].astype(str).unique())
                 unique_src_full_ref = set(self.reference["Src"].astype(str).unique())
-                missing_src = {
-                    src for src, _ in missing_pairs if src not in unique_src_inference
-                }
+                missing_src = {src for src, _ in missing_pairs if src not in unique_src_inference}
 
                 if missing_src:
-                    missing_percentage = (
-                        len(missing_src) / len(unique_src_full_ref) * 100
-                    )
+                    missing_percentage = len(missing_src) / len(unique_src_full_ref) * 100
                     self.log(
                         f"#Warning: {len(missing_src)} reference sources are not covered by candidates or exact prefiltering ({missing_percentage:.2f}%)",
                         level="warning",
@@ -1326,14 +1259,10 @@ class BaseAlignmentDataset(IDataset):
                 # Warn how many unique target entities full reference has that are not in the candidates with percentage
                 unique_tgt_inference = set(inference_set["Tgt"].astype(str).unique())
                 unique_tgt_full_ref = set(self.reference["Tgt"].astype(str).unique())
-                missing_tgt = {
-                    tgt for _, tgt in missing_pairs if tgt not in unique_tgt_inference
-                }
+                missing_tgt = {tgt for _, tgt in missing_pairs if tgt not in unique_tgt_inference}
 
                 if missing_tgt:
-                    missing_percentage = (
-                        len(missing_tgt) / len(unique_tgt_full_ref) * 100
-                    )
+                    missing_percentage = len(missing_tgt) / len(unique_tgt_full_ref) * 100
                     self.log(
                         f"#Warning: {len(missing_tgt)} reference targets are not covered by candidates or exact prefiltering ({missing_percentage:.2f}%)",
                         level="warning",
@@ -1344,23 +1273,15 @@ class BaseAlignmentDataset(IDataset):
 
         if pre_filtered_mappings is not None and not pre_filtered_mappings.empty:
             exact_key_columns = self._mapping_key_columns(pre_filtered_mappings)
-            pre_filtered_mappings = pre_filtered_mappings.drop_duplicates(
-                subset=exact_key_columns
-            )
+            pre_filtered_mappings = pre_filtered_mappings.drop_duplicates(subset=exact_key_columns)
             exact_prefilter_rows = self._exact_prefilter_rows(pre_filtered_mappings)
 
-            pair_filtering = (
-                self.cardinality_1_to_many or not self.drop_exact_match_sources
-            )
+            pair_filtering = self.cardinality_1_to_many or not self.drop_exact_match_sources
 
             if pair_filtering:
                 # Remove only the exact (Src, Tgt) matches from the inference pool.
-                exact_pairs_idx = pd.MultiIndex.from_frame(
-                    pre_filtered_mappings[exact_key_columns]
-                )
-                inference_pairs_idx = pd.MultiIndex.from_frame(
-                    inference_set[exact_key_columns]
-                )
+                exact_pairs_idx = pd.MultiIndex.from_frame(pre_filtered_mappings[exact_key_columns])
+                inference_pairs_idx = pd.MultiIndex.from_frame(inference_set[exact_key_columns])
                 match_mask = pd.Series(
                     inference_pairs_idx.isin(exact_pairs_idx), index=inference_set.index
                 )
@@ -1388,22 +1309,18 @@ class BaseAlignmentDataset(IDataset):
                     src_mask = pd.Series(
                         [
                             (src, kind) in exact_sources
-                            for src, kind in inference_set[
-                                ["Src", "SrcKind"]
-                            ].itertuples(index=False, name=None)
+                            for src, kind in inference_set[["Src", "SrcKind"]].itertuples(
+                                index=False, name=None
+                            )
                         ],
                         index=inference_set.index,
                     )
                 else:
-                    exact_sources = set(
-                        pre_filtered_mappings["Src"].dropna().astype(str)
-                    )
+                    exact_sources = set(pre_filtered_mappings["Src"].dropna().astype(str))
                     src_mask = inference_set["Src"].astype(str).isin(exact_sources)
                 n_removed = int(src_mask.sum())
                 n_sources_removed = (
-                    int(inference_set.loc[src_mask, "Src"].nunique())
-                    if n_removed
-                    else 0
+                    int(inference_set.loc[src_mask, "Src"].nunique()) if n_removed else 0
                 )
                 if n_removed:
                     inference_set = inference_set[~src_mask]
@@ -1414,10 +1331,7 @@ class BaseAlignmentDataset(IDataset):
                     else f"removed_candidate_rows={n_removed}, removed_sources={n_sources_removed}"
                 )
                 self.log(
-                    (
-                        "#Exact prefilter: "
-                        f"mappings={len(pre_filtered_set)}, {removal_note}"
-                    ),
+                    ("#Exact prefilter: " f"mappings={len(pre_filtered_set)}, {removal_note}"),
                     level="debug",
                 )
 
@@ -1434,9 +1348,7 @@ class BaseAlignmentDataset(IDataset):
         if pre_filtered_set.empty:
             self._df = inference_set.reset_index(drop=True)
         else:
-            self._df = pd.concat(
-                [inference_set, pre_filtered_set], ignore_index=True, sort=False
-            )
+            self._df = pd.concat([inference_set, pre_filtered_set], ignore_index=True, sort=False)
 
         self.log("#Processing Done", level="debug")
 
@@ -1454,9 +1366,7 @@ class BaseAlignmentDataset(IDataset):
             return set()
         return {
             (str(src), str(tgt))
-            for src, tgt in exact_matches[["Src", "Tgt"]]
-            .dropna()
-            .itertuples(index=False)
+            for src, tgt in exact_matches[["Src", "Tgt"]].dropna().itertuples(index=False)
         }
 
     def _exact_prefilter_rows(self, exact_mappings: DataFrame) -> DataFrame:

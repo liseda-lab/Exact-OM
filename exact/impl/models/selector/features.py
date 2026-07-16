@@ -312,9 +312,7 @@ class FeatureEngineeringMixin:
                 f"Candidate-set selector distinctive-evidence scan started: sources={n_sources}.",
                 "debug",
             )
-        for group_idx, (_, _, _, group) in enumerate(
-            iter_source_groups(df), start=1
-        ):
+        for group_idx, (_, _, _, group) in enumerate(iter_source_groups(df), start=1):
             idxs = list(group.index)
             item_map: Dict[int, List[Tuple[str, float]]] = {}
             document_frequency: Dict[str, int] = {}

@@ -11,7 +11,6 @@ from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Set, 
 
 from exact.core.entities.kinds import EntityKind
 
-
 _DEFAULT_REJECTED_ALIAS_TERMS = {
     "alternativeid",
     "comment",
@@ -134,17 +133,11 @@ def candidate_annotation_priority(
 
     prop_text = str(prop_iri or "")
     prop_key = candidate_annotation_property_key(prop_text)
-    prop_compact = compact_candidate_text_key(
-        prop_text.rsplit("#", 1)[-1].rsplit("/", 1)[-1]
-    )
+    prop_compact = compact_candidate_text_key(prop_text.rsplit("#", 1)[-1].rsplit("/", 1)[-1])
     prop_terms = set(prop_key.split())
 
-    exact_properties = set(
-        _option(alias_config, "exact_properties", ["p90", "has exact synonym"])
-    )
-    preferred_properties = set(
-        _option(alias_config, "preferred_properties", ["p107", "p108"])
-    )
+    exact_properties = set(_option(alias_config, "exact_properties", ["p90", "has exact synonym"]))
+    preferred_properties = set(_option(alias_config, "preferred_properties", ["p107", "p108"]))
     related_properties = set(
         _option(
             alias_config,
@@ -160,9 +153,7 @@ def candidate_annotation_priority(
         base_priority = float(_option(alias_config, "related_priority", 0.15))
     else:
         rejected_terms = set(
-            _option(
-                alias_config, "rejected_property_terms", _DEFAULT_REJECTED_ALIAS_TERMS
-            )
+            _option(alias_config, "rejected_property_terms", _DEFAULT_REJECTED_ALIAS_TERMS)
         )
         explicit_rejected = set(
             _option(
@@ -200,9 +191,7 @@ def candidate_annotation_property_cap(
 
     prop_text = str(prop_iri or "")
     prop_key = candidate_annotation_property_key(prop_text)
-    prop_compact = compact_candidate_text_key(
-        prop_text.rsplit("#", 1)[-1].rsplit("/", 1)[-1]
-    )
+    prop_compact = compact_candidate_text_key(prop_text.rsplit("#", 1)[-1].rsplit("/", 1)[-1])
     exact = set(_option(alias_config, "exact_properties", ["p90", "has exact synonym"]))
     preferred = set(_option(alias_config, "preferred_properties", ["p107", "p108"]))
     related = set(
@@ -348,24 +337,14 @@ def _lexical_candidate_pair_scores_one_kind(
     if not src_records or not tgt_records:
         return {}
 
-    token_index, token_df = _build_inverted_index(
-        [record.tokens for record in tgt_records]
-    )
-    gram_index, gram_df = _build_inverted_index(
-        [record.grams for record in tgt_records]
-    )
-    token_index = _drop_overly_common_features(
-        token_index, len(tgt_records), fusion_config
-    )
-    gram_index = _drop_overly_common_features(
-        gram_index, len(tgt_records), fusion_config
-    )
+    token_index, token_df = _build_inverted_index([record.tokens for record in tgt_records])
+    gram_index, gram_df = _build_inverted_index([record.grams for record in tgt_records])
+    token_index = _drop_overly_common_features(token_index, len(tgt_records), fusion_config)
+    gram_index = _drop_overly_common_features(gram_index, len(tgt_records), fusion_config)
 
     token_idf = _idf_by_feature(token_df, len(tgt_records), set(token_index))
     gram_idf = _idf_by_feature(gram_df, len(tgt_records), set(gram_index))
-    tgt_token_norms = [
-        _feature_norm(record.tokens, token_idf) for record in tgt_records
-    ]
+    tgt_token_norms = [_feature_norm(record.tokens, token_idf) for record in tgt_records]
     tgt_gram_norms = [_feature_norm(record.grams, gram_idf) for record in tgt_records]
 
     by_source: Dict[str, Dict[str, float]] = defaultdict(dict)
@@ -401,9 +380,7 @@ def _lexical_candidate_pair_scores_one_kind(
             )
             token_weight = float(_option(fusion_config, "token_weight", 1.0))
             gram_weight = float(_option(fusion_config, "gram_weight", 0.85))
-            blend_token_weight = float(
-                _option(fusion_config, "blend_token_weight", 0.65)
-            )
+            blend_token_weight = float(_option(fusion_config, "blend_token_weight", 0.65))
             blend_gram_weight = float(_option(fusion_config, "blend_gram_weight", 0.35))
             score = max(
                 token_weight * token_score,
@@ -441,12 +418,8 @@ def rank_channel_scores(
         for tgt, channel_scores in by_source.get(str(src), {}).items():
             semantic = float(channel_scores.get("semantic", 0.0))
             lexical = float(channel_scores.get("lexical", 0.0))
-            semantic_weight = float(
-                _option(fusion_config, "semantic_channel_weight", 1.0)
-            )
-            lexical_weight = float(
-                _option(fusion_config, "lexical_channel_weight", 1.0)
-            )
+            semantic_weight = float(_option(fusion_config, "semantic_channel_weight", 1.0))
+            lexical_weight = float(_option(fusion_config, "lexical_channel_weight", 1.0))
             score = max(semantic_weight * semantic, lexical_weight * lexical)
             channels = [
                 name
@@ -491,16 +464,10 @@ def _drop_overly_common_features(
     floor = int(_option(fusion_config, "df_ceiling_floor", 10))
     ratio = float(_option(fusion_config, "df_ceiling_ratio", 0.20))
     max_df = max(floor, int(math.ceil(ratio * max(1, n_records))))
-    return {
-        feature: list(indices)
-        for feature, indices in index.items()
-        if len(indices) <= max_df
-    }
+    return {feature: list(indices) for feature, indices in index.items() if len(indices) <= max_df}
 
 
-def _idf_by_feature(
-    df: Counter, n_records: int, allowed: Iterable[str]
-) -> Dict[str, float]:
+def _idf_by_feature(df: Counter, n_records: int, allowed: Iterable[str]) -> Dict[str, float]:
     n = max(1, int(n_records))
     return {
         feature: math.log((1.0 + n) / (1.0 + float(df.get(feature, 0)))) + 1.0

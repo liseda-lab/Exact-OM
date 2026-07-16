@@ -19,9 +19,7 @@ from exact.utils.timing import CacheStatus, StageRecord  # noqa: F401
 
 try:
     import zstandard as zstd  # noqa: F401
-except (
-    ImportError
-):  # pragma: no cover - exercised only when optional dependency is absent
+except ImportError:  # pragma: no cover - exercised only when optional dependency is absent
     zstd = None
 
 from .audit_io import _json_default
@@ -29,20 +27,11 @@ from .audit_io import _json_default
 
 class OverlaysMixin:
     def _sync_selector_fields_from_candidate_df(self, df: pd.DataFrame) -> None:
-        if (
-            not self.results_json
-            or df.empty
-            or "Src" not in df.columns
-            or "Tgt" not in df.columns
-        ):
+        if not self.results_json or df.empty or "Src" not in df.columns or "Tgt" not in df.columns:
             return
-        row_lookup = {
-            (str(row["Src"]), str(row["Tgt"])): row for _, row in df.iterrows()
-        }
+        row_lookup = {(str(row["Src"]), str(row["Tgt"])): row for _, row in df.iterrows()}
         for record in self.results_json:
-            row = row_lookup.get(
-                (str(record.get("src_iri")), str(record.get("tgt_iri")))
-            )
+            row = row_lookup.get((str(record.get("src_iri")), str(record.get("tgt_iri"))))
             if row is None:
                 continue
             conf = record.get("confidences") or {}
@@ -78,9 +67,7 @@ class OverlaysMixin:
             record["prediction"] = pred
 
     def _maybe_persist_model_cache(self, reason: str, force: bool = False) -> None:
-        policy = str(
-            getattr(self, "_cache_persist_policy", "checkpoint") or "checkpoint"
-        ).lower()
+        policy = str(getattr(self, "_cache_persist_policy", "checkpoint") or "checkpoint").lower()
         if policy == "never":
             return
         if reason == "checkpoint" and policy != "checkpoint":
@@ -107,9 +94,7 @@ class OverlaysMixin:
             try:
                 model.persist_caches(force=force, reason=reason)
             except Exception as exc:  # noqa: BLE001
-                self.log(
-                    f"Failed to persist model cache during {reason}: {exc}", "warning"
-                )
+                self.log(f"Failed to persist model cache during {reason}: {exc}", "warning")
                 continue
             elapsed = max(0.0, time.perf_counter() - start)
             self.log(
@@ -167,9 +152,7 @@ class OverlaysMixin:
             else:
                 rationale_positive = bool(saved_alignment_member)
             pred["rationale_positive"] = rationale_positive
-            pred["rationale_decision_label"] = (
-                "Match" if rationale_positive else "No match"
-            )
+            pred["rationale_decision_label"] = "Match" if rationale_positive else "No match"
             rec["prediction"] = pred
 
     def _annotate_candidate_dataframe(
@@ -201,9 +184,7 @@ class OverlaysMixin:
             elif s_final is not None and threshold_value is None:
                 threshold_positive = True
             saved = (src, tgt) in kept_pairs
-            rationale_positive = (
-                bool(threshold_positive) if local_alignment else bool(saved)
-            )
+            rationale_positive = bool(threshold_positive) if local_alignment else bool(saved)
             saved_values.append(bool(saved))
             threshold_values.append(bool(threshold_positive))
             rationale_values.append(bool(rationale_positive))
@@ -323,9 +304,7 @@ class OverlaysMixin:
         if source_record:
             source_prediction = source_record.get("prediction") or {}
             if source_prediction.get("llm_rationale"):
-                prediction["llm_rationale"] = str(
-                    source_prediction.get("llm_rationale")
-                )
+                prediction["llm_rationale"] = str(source_prediction.get("llm_rationale"))
             backend_usage = source_record.get("backend_usage")
             if isinstance(backend_usage, dict) and backend_usage:
                 overlay["backend_usage"] = backend_usage
@@ -346,9 +325,7 @@ class OverlaysMixin:
     ) -> Optional[Path]:
         if candidate_df.empty:
             return None
-        self._annotate_candidate_dataframe(
-            candidate_df, preds, threshold, local_alignment
-        )
+        self._annotate_candidate_dataframe(candidate_df, preds, threshold, local_alignment)
         store = getattr(self, "_explanation_store", None)
         if store is not None:
             start = time.perf_counter()
@@ -356,9 +333,7 @@ class OverlaysMixin:
             chunk: List[Dict[str, Any]] = []
             result_record_lookup = self._result_record_lookup(self.results_json)
             for _, row in candidate_df.iterrows():
-                chunk.append(
-                    self._overlay_record_from_candidate_row(row, result_record_lookup)
-                )
+                chunk.append(self._overlay_record_from_candidate_row(row, result_record_lookup))
                 if len(chunk) >= 5000:
                     total += store.append_overlay(chunk)
                     chunk = []
@@ -381,9 +356,7 @@ class OverlaysMixin:
             try:
                 path.unlink()
             except OSError as exc:
-                self.log(
-                    f"Failed to remove stale overlay shard {path}: {exc}", "warning"
-                )
+                self.log(f"Failed to remove stale overlay shard {path}: {exc}", "warning")
         resolved = self._resolve_text_compression(compression)
         shard_limit = max(1, int(records_per_shard or 50000))
         shards: List[Dict[str, Any]] = []
@@ -401,17 +374,13 @@ class OverlaysMixin:
                 ):
                     if writer is not None:
                         writer.close()
-                    shard_name = (
-                        f"shard-{len(shards):06d}{self._jsonl_suffix(resolved)}"
-                    )
+                    shard_name = f"shard-{len(shards):06d}{self._jsonl_suffix(resolved)}"
                     current_shard = {"path": shard_name, "records": 0}
                     shards.append(current_shard)
                     writer = self._open_jsonl_writer(overlay_dir / shard_name, resolved)
                 writer.write(
                     json.dumps(
-                        self._overlay_record_from_candidate_row(
-                            row, result_record_lookup
-                        ),
+                        self._overlay_record_from_candidate_row(row, result_record_lookup),
                         ensure_ascii=False,
                         separators=(",", ":"),
                         default=_json_default,

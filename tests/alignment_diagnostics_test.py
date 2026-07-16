@@ -100,9 +100,7 @@ def test_alignment_diagnostics_reports_oracle_and_miss_buckets(tmp_path: Path):
 def test_alignment_diagnostics_resolves_layout_v2_paths(tmp_path: Path):
     layout = RunLayout.create(tmp_path / "run-v2")
     reference_path = tmp_path / "reference.tsv"
-    reference_path.write_text(
-        "SrcEntity\tTgtEntity\tScore\ns1\tt1\t1.0\n", encoding="utf-8"
-    )
+    reference_path.write_text("SrcEntity\tTgtEntity\tScore\ns1\tt1\t1.0\n", encoding="utf-8")
     layout.mapping_path("global").write_text(
         "SrcEntity\tTgtEntity\tScore\ns1\tt1\t0.9\n", encoding="utf-8"
     )

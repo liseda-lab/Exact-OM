@@ -39,28 +39,22 @@ def test_rank_channel_scores_unions_channels_and_respects_top_k():
 
 
 def test_candidate_token_key_matches_order_and_possessive_variants_only():
-    assert candidate_token_key(
-        "Clear Cell Renal Cell Carcinoma"
-    ) == candidate_token_key("renal clear cell carcinoma")
-    assert candidate_token_key("Crohn Disease") == candidate_token_key(
-        "Crohn's disease"
+    assert candidate_token_key("Clear Cell Renal Cell Carcinoma") == candidate_token_key(
+        "renal clear cell carcinoma"
     )
-    assert candidate_token_key(
-        "Congenital Mesoblastic Nephroma"
-    ) != candidate_token_key("classic congenital mesoblastic nephroma")
+    assert candidate_token_key("Crohn Disease") == candidate_token_key("Crohn's disease")
+    assert candidate_token_key("Congenital Mesoblastic Nephroma") != candidate_token_key(
+        "classic congenital mesoblastic nephroma"
+    )
 
 
 def test_candidate_annotation_priority_keeps_synonyms_and_rejects_noise():
     assert (
-        candidate_annotation_priority(
-            "Adult Malignant Fibrous Histiocytoma", "http://x#P90"
-        )
+        candidate_annotation_priority("Adult Malignant Fibrous Histiocytoma", "http://x#P90")
         is not None
     )
     assert (
-        candidate_annotation_priority(
-            "Adult Unclassified Pleomorphic Sarcoma", "http://x#P107"
-        )
+        candidate_annotation_priority("Adult Unclassified Pleomorphic Sarcoma", "http://x#P107")
         is not None
     )
     assert (
@@ -70,9 +64,7 @@ def test_candidate_annotation_priority_keeps_synonyms_and_rejects_noise():
         is not None
     )
     assert (
-        candidate_annotation_priority(
-            "alternate disease name", "http://example.org#altLabel"
-        )
+        candidate_annotation_priority("alternate disease name", "http://example.org#altLabel")
         is not None
     )
 

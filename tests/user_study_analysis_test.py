@@ -2,9 +2,9 @@ import json
 from pathlib import Path
 
 import pandas as pd
-from exact.runs import ExplanationStore, RunLayout
 
 from exact.analysis import user_study as mod
+from exact.runs import ExplanationStore, RunLayout
 
 
 def _record(
@@ -322,13 +322,11 @@ def test_loader_sorts_candidates_by_score_and_computes_rank(tmp_path):
 def test_loader_reads_layout_v2_explanation_store(tmp_path):
     legacy = _build_run_dir(tmp_path / "legacy")
     records = json.loads(
-        (
-            legacy / "model" / "alignment" / "default" / "full_explanations.json"
-        ).read_text(encoding="utf-8")
+        (legacy / "model" / "alignment" / "default" / "full_explanations.json").read_text(
+            encoding="utf-8"
+        )
     )
-    ranking = pd.read_csv(
-        legacy / "model" / "alignment" / "src2tgt.maps_local.tsv", sep="\t"
-    )
+    ranking = pd.read_csv(legacy / "model" / "alignment" / "src2tgt.maps_local.tsv", sep="\t")
 
     run_dir = tmp_path / "v2"
     layout = RunLayout.create(run_dir)
@@ -341,9 +339,7 @@ def test_loader_reads_layout_v2_explanation_store(tmp_path):
     assert artifacts.explanations_path == layout.explanation_index_path
     assert len(artifacts.record_index) == len(records)
     assert (
-        artifacts.source_df.loc[
-            artifacts.source_df["src_iri"] == "src-r2-0", "gold_rank"
-        ].item()
+        artifacts.source_df.loc[artifacts.source_df["src_iri"] == "src-r2-0", "gold_rank"].item()
         == 2
     )
 
@@ -652,13 +648,9 @@ def test_failure_taxonomy_assignment_order():
             },
         ]
     )
-    pair_df = pd.DataFrame(
-        [{"nonlex_total": 2}, {"nonlex_total": 6}, {"nonlex_total": 8}]
-    )
+    pair_df = pd.DataFrame([{"nonlex_total": 2}, {"nonlex_total": 6}, {"nonlex_total": 8}])
     failure_df = mod._failure_taxonomy(source_df, pair_df, top_k=5)
-    categories = dict(
-        zip(failure_df["src_iri"], failure_df["primary_failure_category"])
-    )
+    categories = dict(zip(failure_df["src_iri"], failure_df["primary_failure_category"]))
     assert categories["s-missing"] == "missing_panel_record"
     assert categories["s-below"] == "gold_below_top5"
     assert categories["s-near"] == "near_tie"
@@ -744,16 +736,12 @@ def test_backfill_rationales_updates_only_missing_records(tmp_path, monkeypatch)
     assert updated[1]["models"]["llm_rationale_model"] == "gpt-test"
 
 
-def test_backfill_explanation_fields_repairs_from_saved_record_only(
-    tmp_path, monkeypatch
-):
+def test_backfill_explanation_fields_repairs_from_saved_record_only(tmp_path, monkeypatch):
     original = _record("s1", "t1", "Source 1", "Target 1", 0.9, ground_truth=True)
     damaged = json.loads(json.dumps(original))
     damaged.pop("explanation_schema_version", None)
     damaged.pop("cross_side_provenance", None)
-    damaged["triple_attributions"]["hierarchy"]["is_a"]["source"][0].pop(
-        "item_id", None
-    )
+    damaged["triple_attributions"]["hierarchy"]["is_a"]["source"][0].pop("item_id", None)
     damaged["attributes"]["source"][0].pop("item_id", None)
 
     class DummyModel:
@@ -792,9 +780,7 @@ def test_backfill_explanation_fields_repairs_from_saved_record_only(
     assert "explanation_schema_version" not in damaged
     assert updated[0]["explanation_schema_version"] == 3
     assert updated[0]["cross_side_provenance"]["lexical"]
-    assert updated[0]["triple_attributions"]["hierarchy"]["is_a"]["source"][0][
-        "item_id"
-    ]
+    assert updated[0]["triple_attributions"]["hierarchy"]["is_a"]["source"][0]["item_id"]
     assert updated[0]["attributes"]["source"][0]["item_id"]
     assert updated[0]["prediction"] == damaged["prediction"]
 
@@ -855,9 +841,7 @@ def test_full_pipeline_writes_balanced_mapping_and_notebook(tmp_path):
         shortlist_per_rank=4,
         generate_rationales=False,
     )
-    mapping = json.loads(
-        (output_dir / "study_mapping.json").read_text(encoding="utf-8")
-    )
+    mapping = json.loads((output_dir / "study_mapping.json").read_text(encoding="utf-8"))
     assert "pairs" in mapping
     assert len(mapping["pairs"]) == 20
     saw_context_edge = False
@@ -942,9 +926,7 @@ def test_full_pipeline_writes_balanced_mapping_and_notebook(tmp_path):
                 if str(edge["type"]).startswith("bridge-")
             ]
             assert len(bridge_keys) == len(set(bridge_keys))
-            saw_context_edge = saw_context_edge or any(
-                not edge["bridge"] for edge in path["edges"]
-            )
+            saw_context_edge = saw_context_edge or any(not edge["bridge"] for edge in path["edges"])
             saw_core_bridge = saw_core_bridge or any(
                 edge["level"] == 2 for edge in path["edges"] if edge["bridge"]
             )
@@ -968,12 +950,8 @@ def test_full_pipeline_writes_balanced_mapping_and_notebook(tmp_path):
                 for node in path["nodes"]
                 if node["type"] in {"source-context", "target-context"}
             }
-            assert all(
-                not node_id.startswith("label: ") for node_id in context_node_ids
-            )
-            assert all(
-                not node_id.startswith("definition: ") for node_id in context_node_ids
-            )
+            assert all(not node_id.startswith("label: ") for node_id in context_node_ids)
+            assert all(not node_id.startswith("definition: ") for node_id in context_node_ids)
     assert saw_context_edge
     assert saw_core_bridge
     assert saw_supporting_bridge

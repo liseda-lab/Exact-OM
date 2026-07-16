@@ -8,8 +8,8 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 
-from exact.core.entities.ontology import OntologyGraph
 from exact.core.entities.kinds import EntityKind
+from exact.core.entities.ontology import OntologyGraph
 from exact.impl.datasets.contextgraph import ContextDataset
 from exact.utils.formatting import safe_mean
 
@@ -183,9 +183,7 @@ class PairAdaptiveContextDataset(ContextDataset):
             node, depth = frontier.pop(0)
             if depth >= self.hierarchy_max_depth:
                 continue
-            for sup in self._direct_superclass_iris(
-                node, graph, side, EntityKind.CLASS
-            ):
+            for sup in self._direct_superclass_iris(node, graph, side, EntityKind.CLASS):
                 if sup in seen:
                     continue
                 seen.add(sup)
@@ -480,12 +478,8 @@ class PairAdaptiveContextDataset(ContextDataset):
             "attributes": self._annotation_bundle(iri, graph, side),
         }
 
-    def _bundle_for_class(
-        self, iri: str, graph: OntologyGraph, side: str
-    ) -> Dict[str, Any]:
-        features = self._base_entity_features(
-            iri, graph, side, EntityKind.CLASS
-        )
+    def _bundle_for_class(self, iri: str, graph: OntologyGraph, side: str) -> Dict[str, Any]:
+        features = self._base_entity_features(iri, graph, side, EntityKind.CLASS)
         features["object_triples"] = self._object_bundle(iri, graph)
         return features
 
@@ -500,12 +494,8 @@ class PairAdaptiveContextDataset(ContextDataset):
         features["object_triples"] = self._property_object_bundle(iri, graph, side)
         return features
 
-    def _bundle_for_individual(
-        self, iri: str, graph: OntologyGraph, side: str
-    ) -> Dict[str, Any]:
-        features = self._base_entity_features(
-            iri, graph, side, EntityKind.INDIVIDUAL
-        )
+    def _bundle_for_individual(self, iri: str, graph: OntologyGraph, side: str) -> Dict[str, Any]:
+        features = self._base_entity_features(iri, graph, side, EntityKind.INDIVIDUAL)
         features["object_triples"] = self._object_bundle(iri, graph)
         return features
 
@@ -515,9 +505,7 @@ class PairAdaptiveContextDataset(ContextDataset):
         side: str,
         kind: EntityKind | str | None = None,
     ) -> Dict[str, Any]:
-        resolved_kind = (
-            EntityKind(kind) if kind is not None else self.entity_kind_for(iri, side)
-        )
+        resolved_kind = EntityKind(kind) if kind is not None else self.entity_kind_for(iri, side)
         key = (side, resolved_kind.value, iri)
         cached = self._entity_feature_cache.get(key)
         if cached is not None:
@@ -529,15 +517,11 @@ class PairAdaptiveContextDataset(ContextDataset):
             EntityKind.OBJECT_PROPERTY,
             EntityKind.DATA_PROPERTY,
         }:
-            feats = self._bundle_for_property(
-                iri, graph, side, resolved_kind
-            )
+            feats = self._bundle_for_property(iri, graph, side, resolved_kind)
         elif resolved_kind == EntityKind.INDIVIDUAL:
             feats = self._bundle_for_individual(iri, graph, side)
         else:
-            raise ValueError(
-                f"Feature extraction is not implemented for {resolved_kind.value!r}"
-            )
+            raise ValueError(f"Feature extraction is not implemented for {resolved_kind.value!r}")
         self._entity_feature_cache[key] = feats
         return feats
 
@@ -547,9 +531,7 @@ class PairAdaptiveContextDataset(ContextDataset):
         side: str,
         kind: EntityKind | str | None = None,
     ) -> bool:
-        resolved_kind = (
-            EntityKind(kind) if kind is not None else self.entity_kind_for(iri, side)
-        )
+        resolved_kind = EntityKind(kind) if kind is not None else self.entity_kind_for(iri, side)
         return (side, resolved_kind.value, iri) in self._entity_feature_cache
 
     _safe_mean = staticmethod(safe_mean)
@@ -657,9 +639,7 @@ class PairAdaptiveContextDataset(ContextDataset):
                 level="info",
             )
             for idx, (iri, kind) in enumerate(entities, start=1):
-                feat_map[(iri, kind)] = self.get_entity_features(
-                    iri, side, kind
-                )
+                feat_map[(iri, kind)] = self.get_entity_features(iri, side, kind)
                 if idx == total or idx % progress_every == 0:
                     elapsed = time.time() - side_started
                     rate = idx / elapsed if elapsed > 1e-8 else 0.0
@@ -676,12 +656,8 @@ class PairAdaptiveContextDataset(ContextDataset):
         tgt_feat_map = _build_feature_map(utgt, "tgt")
         src_lab_map = {key: src_feat_map[key]["labels"] for key in usrc}
         tgt_lab_map = {key: tgt_feat_map[key]["labels"] for key in utgt}
-        src_pool_metrics_map = {
-            key: self._entity_pool_metrics(src_feat_map[key]) for key in usrc
-        }
-        tgt_pool_metrics_map = {
-            key: self._entity_pool_metrics(tgt_feat_map[key]) for key in utgt
-        }
+        src_pool_metrics_map = {key: self._entity_pool_metrics(src_feat_map[key]) for key in usrc}
+        tgt_pool_metrics_map = {key: self._entity_pool_metrics(tgt_feat_map[key]) for key in utgt}
 
         df = df.copy()
         df["SrcLabels"] = [src_lab_map[key] for key in src_keys]
@@ -723,13 +699,9 @@ class PairAdaptiveContextDataset(ContextDataset):
         df["src_ctx_is_empty"] = 1.0
         df["tgt_ctx_is_empty"] = 1.0
         for key in sorted(src_pool_metrics_map[usrc[0]].keys()) if usrc else []:
-            df[f"src_{key}"] = [
-                src_pool_metrics_map[entity_key][key] for entity_key in src_keys
-            ]
+            df[f"src_{key}"] = [src_pool_metrics_map[entity_key][key] for entity_key in src_keys]
         for key in sorted(tgt_pool_metrics_map[utgt[0]].keys()) if utgt else []:
-            df[f"tgt_{key}"] = [
-                tgt_pool_metrics_map[entity_key][key] for entity_key in tgt_keys
-            ]
+            df[f"tgt_{key}"] = [tgt_pool_metrics_map[entity_key][key] for entity_key in tgt_keys]
         self.log(
             f"Pair-adaptive feature generation finished in {time.time() - build_started:.2f}s",
             level="info",
