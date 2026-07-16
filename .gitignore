@@ -29,3 +29,6 @@
 
 /.mypy_cache/*
 /site/
+
+# Release-wheel artifact produced by `make build-frontend`.
+/exact_inspect/static/

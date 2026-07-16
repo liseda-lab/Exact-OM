@@ -1,9 +1,9 @@
 services:
   - type: web
-    name: study-viz-omim-ordo
+    name: exact-inspect-omim-ordo
     env: docker
     branch: app-dev
-    dockerfilePath: ./deploy/render/study_visualizer.Dockerfile
+    dockerfilePath: ./deploy/render/exact_inspect.Dockerfile
     dockerContext: .
     plan: starter
     autoDeployTrigger: commit

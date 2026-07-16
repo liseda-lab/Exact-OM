@@ -10,7 +10,7 @@ set -euo pipefail
 
 usage() {
   cat <<'EOF'
-Usage: sbatch deploy/sbatch/prepare_study_visualizer_bundle.sh [options]
+Usage: sbatch deploy/sbatch/exact_inspect_bundle.sh [options]
 
 Options (all may also be provided via env vars):
   --job-name NAME
@@ -24,20 +24,20 @@ Options (all may also be provided via env vars):
   --help
 
 Examples:
-  sbatch deploy/sbatch/prepare_study_visualizer_bundle.sh \
+  sbatch deploy/sbatch/exact_inspect_bundle.sh \
     --run-dir /home/pgcotovio/Exact-OM/exp/test/Full_local_bioml_with_exp/omim-ordo \
     --bundle-dir /home/pgcotovio/Exact-OM/deploy/render/study_bundles/omim-ordo \
     --overwrite
 
   srun --cpus-per-task=8 --mem=32G --time=06:00:00 \
-    bash deploy/sbatch/prepare_study_visualizer_bundle.sh \
+    bash deploy/sbatch/exact_inspect_bundle.sh \
       --run-dir /home/pgcotovio/Exact-OM/exp/test/Full_local_bioml_with_exp/omim-ordo \
       --bundle-dir /home/pgcotovio/Exact-OM/deploy/render/study_bundles/omim-ordo \
       --overwrite
 EOF
 }
 
-JOB_NAME=${JOB_NAME:-prepare_study_bundle}
+JOB_NAME=${JOB_NAME:-exact_inspect_bundle}
 RUN_DIR=${RUN_DIR:-}
 BUNDLE_DIR=${BUNDLE_DIR:-}
 ANALYSIS_DIR=${ANALYSIS_DIR:-}
@@ -76,7 +76,7 @@ if [[ -n "${SLURM_JOB_ID:-}" && -n "$JOB_NAME" ]]; then
   scontrol update JobId="$SLURM_JOB_ID" JobName="$JOB_NAME" >/dev/null 2>&1 || true
 fi
 
-cmd=(poetry run python tools/prepare_study_visualizer_bundle.py --run-dir "$RUN_DIR" --bundle-dir "$BUNDLE_DIR" --logging-level "$LOGGING_LEVEL")
+cmd=(poetry run exact-inspect bundle "$RUN_DIR" "$BUNDLE_DIR" --log-level "$LOGGING_LEVEL")
 
 if [[ -n "$ANALYSIS_DIR" ]]; then
   cmd+=(--analysis-dir "$ANALYSIS_DIR")
@@ -91,7 +91,7 @@ if [[ "$OVERWRITE" == "1" ]]; then
   cmd+=(--overwrite)
 fi
 
-echo "[prepare_study_visualizer_bundle] Running:"
+echo "[exact-inspect bundle] Running:"
 printf ' %q' "${cmd[@]}"
 echo
 

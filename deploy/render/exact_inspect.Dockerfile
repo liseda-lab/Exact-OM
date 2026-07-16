@@ -33,16 +33,17 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-COPY deploy/render/study_visualizer_requirements.txt /app/deploy/render/study_visualizer_requirements.txt
+COPY deploy/render/exact_inspect_requirements.txt /app/deploy/render/exact_inspect_requirements.txt
 RUN python -m venv /opt/venv && \
     pip install --upgrade pip setuptools wheel && \
-    pip install -r /app/deploy/render/study_visualizer_requirements.txt
+    pip install -r /app/deploy/render/exact_inspect_requirements.txt
 
 COPY deploy/render /app/deploy/render
-COPY study_visualizer_runtime /app/study_visualizer_runtime
-COPY --from=frontend-build /frontend/out /app/explanations_visualizer/out
+COPY exact /app/exact
+COPY exact_inspect /app/exact_inspect
+COPY --from=frontend-build /frontend/out /app/exact_inspect/static
 
-RUN chmod +x /app/deploy/render/start_study_visualizer.sh
+RUN chmod +x /app/deploy/render/start_exact_inspect.sh
 
 ENV EXACT_STUDY_ENABLE_ONTOLOGY_INFO=true \
     EXACT_STUDY_HOST=0.0.0.0 \
@@ -50,4 +51,4 @@ ENV EXACT_STUDY_ENABLE_ONTOLOGY_INFO=true \
 
 EXPOSE 10000
 
-CMD ["/app/deploy/render/start_study_visualizer.sh"]
+CMD ["/app/deploy/render/start_exact_inspect.sh"]
