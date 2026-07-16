@@ -12,7 +12,6 @@ from typing import Any, Iterable, Optional
 
 from .layout import LAYOUT_VERSION, RunLayout
 
-
 MANIFEST_SCHEMA_VERSION = 1
 DELIVERABLE_KINDS = {"alignment", "evaluation"}
 
@@ -27,10 +26,7 @@ def _known_checkpoint_artifact(path: Path, checkpoint_dir: Path) -> bool:
             relative.name.startswith(
                 ("inference_", "train_", "validation_", "test_", "prefiltered_")
             )
-            or any(
-                token in relative.name
-                for token in ("_additional_models_", "_rationales_")
-            )
+            or any(token in relative.name for token in ("_additional_models_", "_rationales_"))
         )
     if not relative.parts[0].endswith(("_audit", "_candidates", "_overlay")):
         return False
@@ -98,29 +94,20 @@ class RunManifest:
         try:
             payload = json.loads(layout.manifest_path.read_text(encoding="utf-8"))
         except FileNotFoundError as exc:
-            raise FileNotFoundError(
-                f"Run manifest not found: {layout.manifest_path}"
-            ) from exc
+            raise FileNotFoundError(f"Run manifest not found: {layout.manifest_path}") from exc
         except (OSError, json.JSONDecodeError) as exc:
-            raise ValueError(
-                f"Invalid run manifest at {layout.manifest_path}: {exc}"
-            ) from exc
+            raise ValueError(f"Invalid run manifest at {layout.manifest_path}: {exc}") from exc
         if int(payload.get("schema_version", -1)) != MANIFEST_SCHEMA_VERSION:
             raise ValueError(
-                "Unsupported run manifest schema version: "
-                f"{payload.get('schema_version')!r}"
+                "Unsupported run manifest schema version: " f"{payload.get('schema_version')!r}"
             )
         if int(payload.get("layout_version", -1)) != layout.version:
-            raise ValueError(
-                "Manifest layout version does not match the detected run layout"
-            )
+            raise ValueError("Manifest layout version does not match the detected run layout")
         artifacts = payload.get("artifacts")
         if not isinstance(artifacts, list):
             raise ValueError("Run manifest 'artifacts' must be a list")
         for artifact in artifacts:
-            if not isinstance(artifact, dict) or not isinstance(
-                artifact.get("path"), str
-            ):
+            if not isinstance(artifact, dict) or not isinstance(artifact.get("path"), str):
                 raise ValueError("Every manifest artifact must have a string path")
             layout.resolve_relative(artifact["path"])
         return cls(layout, payload)
@@ -199,9 +186,7 @@ def refresh_manifest(
     """Register every known v2 artifact currently present in ``layout``."""
 
     current = manifest or (
-        RunManifest.open(layout)
-        if layout.manifest_path.exists()
-        else RunManifest.create(layout)
+        RunManifest.open(layout) if layout.manifest_path.exists() else RunManifest.create(layout)
     )
     if run_id:
         current.add_session(run_id)
@@ -209,6 +194,7 @@ def refresh_manifest(
     candidates: list[tuple[Path, str, Optional[int], Optional[bool]]] = [
         (layout.config_path, "config", 2, False),
         (layout.timings_path, "timing", 1, False),
+        (layout.legacy_times_path, "timing_render", None, False),
         (layout.log_path, "log", None, False),
         (layout.mapping_path("global"), "alignment", None, True),
         (layout.mapping_path("local"), "alignment", None, True),
@@ -237,7 +223,8 @@ def refresh_manifest(
         (layout.explanation_shards_dir, "explanations"),
         (layout.plots_dir, "plot"),
         (layout.checkpoints_dir, "checkpoint"),
-        (layout.root / "cache", "dataset_cache"),
+        (layout.dataset_dir, "dataset"),
+        (layout.cache_dir, "dataset_cache"),
     ):
         if not directory.is_dir():
             continue
@@ -258,7 +245,7 @@ def refresh_manifest(
 
 
 def finalize_artifacts(
-    run_dir: Path,
+    run_dir: Path | RunLayout,
     *,
     run_id: Optional[str] = None,
     save_full_explanations: bool = False,
@@ -269,13 +256,11 @@ def finalize_artifacts(
     from .gc import prune_checkpoints
     from .store import ExplanationStore
 
-    layout = RunLayout.open(run_dir)
+    layout = run_dir if isinstance(run_dir, RunLayout) else RunLayout.open(run_dir)
     if layout.version != LAYOUT_VERSION:
         raise ValueError("Only layout-v2 runs can be finalized")
     before = {
-        name: sum(
-            path.stat().st_size for path in directory.rglob("*") if path.is_file()
-        )
+        name: sum(path.stat().st_size for path in directory.rglob("*") if path.is_file())
         for name, directory in (
             ("alignment", layout.alignment_dir),
             ("evaluation", layout.evaluation_dir),
@@ -283,6 +268,8 @@ def finalize_artifacts(
             ("stats", layout.stats_dir),
             ("plots", layout.plots_dir),
             ("checkpoints", layout.checkpoints_dir),
+            ("dataset", layout.dataset_dir),
+            ("cache", layout.cache_dir),
         )
         if directory.is_dir()
     }
@@ -299,12 +286,10 @@ def finalize_artifacts(
             }
         if save_full_explanations:
             store.export(layout.full_explanations_path, format="json")
-    retention = prune_checkpoints(run_dir, policy=checkpoint_retention)  # type: ignore[arg-type]
+    retention = prune_checkpoints(layout.root, policy=checkpoint_retention)  # type: ignore[arg-type]
     manifest = refresh_manifest(layout, run_id=run_id)
     after = {
-        name: sum(
-            path.stat().st_size for path in directory.rglob("*") if path.is_file()
-        )
+        name: sum(path.stat().st_size for path in directory.rglob("*") if path.is_file())
         for name, directory in (
             ("alignment", layout.alignment_dir),
             ("evaluation", layout.evaluation_dir),
@@ -312,6 +297,8 @@ def finalize_artifacts(
             ("stats", layout.stats_dir),
             ("plots", layout.plots_dir),
             ("checkpoints", layout.checkpoints_dir),
+            ("dataset", layout.dataset_dir),
+            ("cache", layout.cache_dir),
         )
         if directory.is_dir()
     }

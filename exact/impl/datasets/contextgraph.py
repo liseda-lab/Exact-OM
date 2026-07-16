@@ -649,6 +649,8 @@ class ContextDataset(BaseAlignmentDataset):
         item = {
             "src_iri": row["Src"],
             "tgt_iri": row["Tgt"],
+            "src_kind": row.get("SrcKind", "class"),
+            "tgt_kind": row.get("TgtKind", row.get("SrcKind", "class")),
             "src_labels": src_labels,  # List[str]
             "tgt_labels": tgt_labels,  # List[str]
             "src_ctx_triples": src_ctx_list,  # List[str] sentences

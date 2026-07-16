@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import warnings
 from dataclasses import dataclass
@@ -51,6 +52,80 @@ def warn_ignored_jvm(value: Optional[str], option: str) -> None:
         )
 
 
+def parse_adapter_options(
+    values: Optional[Sequence[str]],
+    *,
+    label: str,
+) -> Optional[dict[str, Any]]:
+    """Parse adapter options from ``key=value`` tokens or one YAML file."""
+
+    if values is None:
+        return None
+    tokens = [str(value) for value in values]
+    if len(tokens) == 1 and "=" not in tokens[0]:
+        path = require_file(tokens[0], f"{label} options file")
+        assert path is not None
+        from exact.core.entities.configs.yaml_io import load_yaml_mapping
+
+        return dict(load_yaml_mapping(path))
+    parsed: dict[str, Any] = {}
+    for token in tokens:
+        if "=" not in token:
+            raise ValueError(
+                f"{label} options must be key=value pairs or one YAML file; got {token!r}"
+            )
+        key, raw_value = token.split("=", 1)
+        key = key.strip()
+        if not key:
+            raise ValueError(f"{label} option keys cannot be empty")
+        try:
+            value = json.loads(raw_value)
+        except json.JSONDecodeError:
+            value = raw_value
+        parsed[key] = value
+    return parsed
+
+
+def _override_alignment_config(
+    configs: ConfigModel,
+    *,
+    input_format: Optional[str],
+    source_options: Optional[Mapping[str, Any]],
+    target_options: Optional[Mapping[str, Any]],
+    output_formats: Optional[Sequence[str]],
+    relation_prediction: Optional[str],
+) -> ConfigModel:
+    """Apply delivery-only I/O overrides through normal schema validation."""
+
+    if all(
+        value is None
+        for value in (
+            input_format,
+            source_options,
+            target_options,
+            output_formats,
+            relation_prediction,
+        )
+    ):
+        return configs
+    payload = configs.model_dump(mode="python")
+    io_config = dict(payload["io"])
+    matching_config = dict(payload["matching"])
+    if input_format is not None:
+        io_config["input_format"] = input_format
+    if source_options is not None:
+        io_config["source_options"] = dict(source_options)
+    if target_options is not None:
+        io_config["target_options"] = dict(target_options)
+    if output_formats is not None:
+        io_config["output_formats"] = list(output_formats)
+    if relation_prediction is not None:
+        matching_config["relation_prediction"] = relation_prediction
+    payload["io"] = io_config
+    payload["matching"] = matching_config
+    return ConfigModel.model_validate(payload)
+
+
 @dataclass(frozen=True)
 class AlignmentInvocation:
     source_file_path: Optional[Path]
@@ -97,6 +172,11 @@ def prepare_alignment(
     task_name: Optional[str] = None,
     device: Optional[int] = None,
     full_reference_label: str = "Full reference file",
+    input_format: Optional[str] = None,
+    source_options: Optional[Mapping[str, Any]] = None,
+    target_options: Optional[Mapping[str, Any]] = None,
+    output_formats: Optional[Sequence[str]] = None,
+    relation_prediction: Optional[str] = None,
 ) -> AlignmentInvocation:
     """Validate and assemble one alignment invocation for any delivery surface."""
     source = require_file(source_ontology_file, "Source ontology file")
@@ -110,6 +190,14 @@ def prepare_alignment(
         ConfigModel.load_config(config_path)
         if config_path is not None
         else ConfigModel.model_validate({})
+    )
+    configs = _override_alignment_config(
+        configs,
+        input_format=input_format,
+        source_options=source_options,
+        target_options=target_options,
+        output_formats=output_formats,
+        relation_prediction=relation_prediction,
     )
     log_path = output / "exact.log" if save_logs else None
     configure_exact_logger(
@@ -146,6 +234,11 @@ def prepare_alignment_namespace(args: Any) -> AlignmentInvocation:
         save_logs=args.save_logs,
         run_eval=args.run_eval,
         device=args.device,
+        input_format=args.input_format,
+        source_options=parse_adapter_options(args.source_options, label="Source adapter"),
+        target_options=parse_adapter_options(args.target_options, label="Target adapter"),
+        output_formats=args.output_formats,
+        relation_prediction=args.relation_prediction,
     )
 
 
@@ -281,6 +374,7 @@ __all__ = [
     "execute_alignment",
     "execute_evaluation",
     "optional_path",
+    "parse_adapter_options",
     "prepare_alignment",
     "prepare_alignment_namespace",
     "prepare_evaluation",

@@ -90,6 +90,34 @@ def parse_arguments(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
         required=False,
         help="GPU device ID to use (leave empty for CPU)",
     )
+    parser.add_argument(
+        "--input-format",
+        choices=["auto", "owl", "rdf", "csv-kg"],
+        help="Input adapter for both source and target (default: infer from each path)",
+    )
+    parser.add_argument(
+        "--source-options",
+        nargs="+",
+        metavar="KEY=VALUE|YAML",
+        help="Source adapter key=value options, or one YAML mapping file",
+    )
+    parser.add_argument(
+        "--target-options",
+        nargs="+",
+        metavar="KEY=VALUE|YAML",
+        help="Target adapter key=value options, or one YAML mapping file",
+    )
+    parser.add_argument(
+        "--output-formats",
+        nargs="+",
+        metavar="FORMAT",
+        help="Alignment writers, such as tsv-global, oaei-rdf, typed-tsv, or json",
+    )
+    parser.add_argument(
+        "--relation-prediction",
+        choices=["none", "hierarchy_heuristic"],
+        help="Post-scoring relation typing mode",
+    )
     return parser.parse_args(argv)
 
 

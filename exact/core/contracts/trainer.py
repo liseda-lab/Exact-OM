@@ -1,3 +1,5 @@
+"""Trainer orchestration contract and shared artifact helpers."""
+
 import json
 import logging
 from abc import abstractmethod
@@ -12,6 +14,10 @@ import torch as th
 from torch import device as tdevice
 
 from exact.core.contracts import LoggingClass, SelfRegisteringComponent
+from exact.core.contracts.alignment_io import (
+    type_alignment_relations,
+    write_alignment_format,
+)
 from exact.core.entities.configs.dataset import DatasetMask
 from exact.core.entities.mappings import EntityMapping
 from exact.core.entities.registry import ComponentType
@@ -25,6 +31,8 @@ if TYPE_CHECKING:
 
 
 class ITrainer(SelfRegisteringComponent, LoggingClass):
+    """Base trainer that binds datasets, models, and run artifacts."""
+
     component_type = ComponentType.TRAINER
 
     def __init__(
@@ -38,6 +46,7 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
         logger: Optional[logging.Logger] = None,
         **kwargs,
     ):
+        """Instantiate model components and prepare a versioned run layout."""
 
         LoggingClass.__init__(self, logger=logger)
 
@@ -51,9 +60,7 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
         elif model is not None:
             model_specs = [(model, model_params or {})]
         else:
-            raise ValueError(
-                "At least one model definition must be provided to the trainer."
-            )
+            raise ValueError("At least one model definition must be provided to the trainer.")
 
         def _bind_logger(obj: Any) -> None:
             if logger is None:
@@ -154,6 +161,7 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
         threshold: Optional[float] = 0.7,
         **kwargs,
     ) -> Tuple[List[EntityMapping], float]:
+        """Run inference and return retained mappings plus average pair latency."""
 
         pass
 
@@ -168,9 +176,7 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
         """
         Apply prefiltering to the dataset based on the features.
         """
-        selector_target_conflict_enabled = getattr(
-            self, "_selector_target_conflict_enabled", None
-        )
+        selector_target_conflict_enabled = getattr(self, "_selector_target_conflict_enabled", None)
         if selector_target_conflict_enabled is False:
             target_cardinality = None
 
@@ -210,12 +216,8 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
         prefilter_df = df[["Src", "Tgt", score_column]].copy()
         prefilter_df.columns = ["Src", "Tgt", "Score"]
 
-        prefiltered_mappings = EntityMapping.read_table_mappings(
-            prefilter_df, threshold=threshold
-        )
-        protected_pairs = {
-            (mapping.head, mapping.tail) for mapping in prefiltered_mappings
-        }
+        prefiltered_mappings = EntityMapping.read_table_mappings(prefilter_df, threshold=threshold)
+        protected_pairs = {(mapping.head, mapping.tail) for mapping in prefiltered_mappings}
         final_alignment = prefiltered_mappings + alignment
 
         if cardinality is not None:
@@ -254,6 +256,10 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
         append_stats_to_summary_csv: bool = False,
         review_low: Optional[float] = None,
         review_high: Optional[float] = None,
+        output_formats: Optional[List[str]] = None,
+        relation_prediction: str = "none",
+        source_uri: Optional[str] = None,
+        target_uri: Optional[str] = None,
         **kwargs,
     ) -> Dict[str, Path]:
         """
@@ -262,13 +268,16 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
         """
         output_paths = {}
 
-        # ---- Alignments (existing behavior)
-        align_path = self.save_alignment(
+        # ---- Alignments
+        alignment_paths = self._save_alignment_formats(
             preds=preds,
             candidates_one2many_path=candidates_one2many_path,
-            sub_dir=sub_dir,
+            output_formats=output_formats,
+            relation_prediction=relation_prediction,
+            source_uri=source_uri,
+            target_uri=target_uri,
         )
-        output_paths["alignment_tsv"] = Path(align_path)
+        output_paths.update(alignment_paths)
 
         stats_dir = self._run_layout.stats_dir
         stats_dir.mkdir(parents=True, exist_ok=True)
@@ -278,10 +287,7 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
         has_streamed_explanations = getattr(self, "has_streamed_explanations", None)
         can_stream_explanations = callable(writer) and (
             bool(self.results_json)
-            or (
-                callable(has_streamed_explanations)
-                and bool(has_streamed_explanations())
-            )
+            or (callable(has_streamed_explanations) and bool(has_streamed_explanations()))
         )
         if save_json and (self.results_json or can_stream_explanations):
             json_path = self._run_layout.full_explanations_path
@@ -352,9 +358,7 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
                     flat["llm_summary_requested"] = summary_stats.get("requested")
                     flat["llm_summary_usable"] = summary_stats.get("usable")
                     flat["llm_summary_empty"] = summary_stats.get("empty")
-                    flat["llm_summary_empty_fraction"] = summary_stats.get(
-                        "empty_fraction"
-                    )
+                    flat["llm_summary_empty_fraction"] = summary_stats.get("empty_fraction")
 
                 stats_csv_path = stats_dir / "run_stats.csv"
                 pd.DataFrame([flat]).to_csv(stats_csv_path, index=False)
@@ -369,9 +373,7 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
                 self.log("Appended run stats as footer to summary CSV.", level="info")
 
         calib_report = getattr(self, "_llm_calibration_report", None)
-        if calib_report and (
-            calib_report.get("messages") or calib_report.get("learned")
-        ):
+        if calib_report and (calib_report.get("messages") or calib_report.get("learned")):
             calib_path = stats_dir / "llm_calibration.json"
             with open(calib_path, "w", encoding="utf-8") as f:
                 json.dump(calib_report, f, indent=2, ensure_ascii=False)
@@ -380,12 +382,191 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
 
         return output_paths
 
+    @staticmethod
+    def _entity_kind_value(value: Any) -> str:
+        """Return a stable string for an ``EntityKind``-like value."""
+
+        return str(getattr(value, "value", value))
+
+    def _scored_alignment_frame(
+        self,
+        preds: List[EntityMapping],
+        *,
+        relation_prediction: str,
+    ) -> pd.DataFrame:
+        """Build the canonical scored frame and apply optional relation typing."""
+
+        frame = pd.DataFrame(
+            [
+                {
+                    "SrcEntity": mapping.head,
+                    "TgtEntity": mapping.tail,
+                    "Score": mapping.score,
+                    "Relation": mapping.relation,
+                    "Kind": self._entity_kind_value(mapping.kind),
+                    "SrcKind": self._entity_kind_value(mapping.src_kind),
+                    "TgtKind": self._entity_kind_value(mapping.tgt_kind),
+                }
+                for mapping in preds
+            ],
+            columns=[
+                "SrcEntity",
+                "TgtEntity",
+                "Score",
+                "Relation",
+                "Kind",
+                "SrcKind",
+                "TgtKind",
+            ],
+        )
+        typed = type_alignment_relations(
+            frame,
+            getattr(self.dataset, "source", None),
+            getattr(self.dataset, "target", None),
+            mode=relation_prediction,
+        )
+        # ``none`` is the compatibility mode: relations remain equality and
+        # historical explanation payloads must stay byte-identical.  Only an
+        # enabled typer contributes new relation metadata and overlays.
+        if str(relation_prediction).strip().lower() != "none":
+            self._apply_relation_metadata(preds, typed)
+        return typed
+
+    def _apply_relation_metadata(
+        self,
+        preds: List[EntityMapping],
+        frame: pd.DataFrame,
+    ) -> None:
+        """Synchronize typed relations into mappings, summaries, and explanations."""
+
+        metadata = {
+            (str(row.SrcEntity), str(row.TgtEntity)): (
+                str(row.Relation),
+                float(row.relation_confidence),
+            )
+            for row in frame.itertuples(index=False)
+        }
+        for mapping in preds:
+            relation = metadata.get((mapping.head, mapping.tail))
+            if relation is not None:
+                mapping.relation = relation[0]
+
+        for record in self.results_json:
+            key = (str(record.get("src_iri")), str(record.get("tgt_iri")))
+            relation = metadata.get(key)
+            if relation is None:
+                continue
+            symbol, confidence = relation
+            record["relation"] = symbol
+            record["relation_confidence"] = confidence
+            confidences = dict(record.get("confidences") or {})
+            confidences["relation_confidence"] = confidence
+            record["confidences"] = confidences
+            prediction = dict(record.get("prediction") or {})
+            prediction["relation"] = symbol
+            record["prediction"] = prediction
+
+        results_df = self.results_df
+        if results_df is not None and not results_df.empty:
+            source_column = "src_iri" if "src_iri" in results_df.columns else "Src"
+            target_column = "tgt_iri" if "tgt_iri" in results_df.columns else "Tgt"
+            if source_column in results_df.columns and target_column in results_df.columns:
+                values = [
+                    metadata.get((str(src), str(tgt)), (None, None))
+                    for src, tgt in zip(results_df[source_column], results_df[target_column])
+                ]
+                results_df["Relation"] = [value[0] for value in values]
+                results_df["relation_confidence"] = [value[1] for value in values]
+
+        store = getattr(self, "_explanation_store", None)
+        if store is not None and metadata:
+            store.append_overlay(
+                {
+                    "Src": source,
+                    "Tgt": target,
+                    "relation": relation,
+                    "relation_confidence": confidence,
+                    "confidences": {"relation_confidence": confidence},
+                    "prediction": {"relation": relation},
+                }
+                for (source, target), (relation, confidence) in metadata.items()
+            )
+
+    def _save_alignment_formats(
+        self,
+        preds: List[EntityMapping],
+        *,
+        candidates_one2many_path: Optional[Path],
+        output_formats: Optional[List[str]],
+        relation_prediction: str,
+        source_uri: Optional[str],
+        target_uri: Optional[str],
+    ) -> Dict[str, Path]:
+        """Write the configured alignment formats and select the primary artifact."""
+
+        formats = ["tsv-global", "tsv-local"] if output_formats is None else list(output_formats)
+        if not formats:
+            raise ValueError("At least one alignment output format must be configured")
+        scored = self._scored_alignment_frame(preds, relation_prediction=relation_prediction)
+        local_frame: Optional[pd.DataFrame] = None
+        is_local = candidates_one2many_path is not None
+        if candidates_one2many_path is not None:
+            candidates_one2many = read_table(candidates_one2many_path)
+            candidates_one2many.columns = ["Src", "Tgt", "Candidates"]
+            local_frame = pd.DataFrame(
+                fill_anchored_scores(candidates_one2many.values, preds),
+                columns=["SrcEntity", "TgtEntity", "TgtCandidates"],
+            )
+
+        paths: Dict[str, Path] = {}
+        primary: Optional[Path] = None
+        for format_name in formats:
+            normalized = str(format_name).strip().lower()
+            if normalized == "tsv-global" and is_local:
+                continue
+            if normalized == "tsv-local" and not is_local:
+                continue
+            mappings: Any = local_frame if normalized == "tsv-local" else scored
+            options: Optional[Dict[str, Any]] = None
+            filename: Optional[str] = None
+            if normalized == "tsv-global":
+                filename = self.run_layout.mapping_path("global").name
+            elif normalized == "tsv-local":
+                filename = self.run_layout.mapping_path("local").name
+            elif normalized == "oaei-rdf":
+                options = {
+                    key: value
+                    for key, value in {
+                        "source_uri": source_uri,
+                        "target_uri": target_uri,
+                    }.items()
+                    if value is not None
+                }
+            path = write_alignment_format(
+                normalized,
+                mappings,
+                self.alignment_dir,
+                options=options,
+                filename=filename,
+            )
+            key = f"alignment_{normalized.replace('-', '_')}"
+            paths[key] = Path(path)
+            if primary is None or normalized in {"tsv-global", "tsv-local"}:
+                primary = Path(path)
+        if primary is None:
+            raise ValueError(
+                "Configured output formats did not produce an artifact for this alignment mode"
+            )
+        paths["alignment_tsv"] = primary
+        return paths
+
     def save_alignment(
         self,
         preds: List[EntityMapping],
         candidates_one2many_path: Optional[Path] = None,
         sub_dir: Optional[str] = None,
     ) -> Path:
+        """Write the legacy global or local TSV alignment artifact."""
 
         alignment_dir = self.alignment_dir
 
@@ -397,9 +578,7 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
         else:
             return self._save_global_alignment(preds, alignment_dir)
 
-    def _save_global_alignment(
-        self, preds: List[EntityMapping], save_dir: Optional[Path] = None
-    ):
+    def _save_global_alignment(self, preds: List[EntityMapping], save_dir: Optional[Path] = None):
 
         # Extract the mappings as tuples
 
@@ -414,9 +593,9 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
             else resolved_save_dir / "maps_global.tsv"
         )
 
-        pd.DataFrame(
-            global_alignment, columns=["SrcEntity", "TgtEntity", "Score"]
-        ).to_csv(global_dir, sep="\t", index=False)
+        pd.DataFrame(global_alignment, columns=["SrcEntity", "TgtEntity", "Score"]).to_csv(
+            global_dir, sep="\t", index=False
+        )
 
         return global_dir
 
@@ -438,9 +617,9 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
             else resolved_save_dir / "maps_local.tsv"
         )
 
-        pd.DataFrame(
-            ranking_results, columns=["SrcEntity", "TgtEntity", "TgtCandidates"]
-        ).to_csv(local_dir, sep="\t", index=False)
+        pd.DataFrame(ranking_results, columns=["SrcEntity", "TgtEntity", "TgtCandidates"]).to_csv(
+            local_dir, sep="\t", index=False
+        )
 
         return local_dir
 
@@ -474,9 +653,7 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
             if imps and "I_llm" in imps:
                 p_llm = conf.get("p_llm")
                 llm_decision = pred.get("llm_decision")
-                if (p_llm is None or float(p_llm) == 0.0) or (
-                    llm_decision in ("", None)
-                ):
+                if (p_llm is None or float(p_llm) == 0.0) or (llm_decision in ("", None)):
                     imps = dict(imps)
                     imps["I_llm"] = 0.0
             base.update({**conf, **wts, **imps})
@@ -509,9 +686,7 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
 
         for col in metrics:
             if col not in self.results_df.columns:
-                self.log(
-                    f"Column {col} missing in summary DF; skipping.", level="warning"
-                )
+                self.log(f"Column {col} missing in summary DF; skipping.", level="warning")
                 continue
 
             plt.figure(figsize=figsize)
@@ -543,6 +718,8 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
         dpi: int = 300,
         jitter: float = 0.2,
     ) -> None:
+        """Plot configured scores against binary ground-truth labels."""
+
         if self.results_df is None or self.results_df.empty:
             self.log("No numeric results to plot.", level="warning")
             return
@@ -574,9 +751,7 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
                 continue
 
             try:
-                plot_df = plot_df.assign(
-                    ground_truth=plot_df["ground_truth"].astype(int)
-                )
+                plot_df = plot_df.assign(ground_truth=plot_df["ground_truth"].astype(int))
             except (ValueError, TypeError):
                 plot_df = plot_df.assign(ground_truth=plot_df["ground_truth"])
 
@@ -629,15 +804,8 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
 
         # review band if thresholds are recorded in rows (optional)
         frac_review = None
-        if (
-            review_low is not None
-            and review_high is not None
-            and "S_final" in df.columns
-            and n > 0
-        ):
-            in_band = (
-                (df["S_final"] >= review_low) & (df["S_final"] <= review_high)
-            ).sum()
+        if review_low is not None and review_high is not None and "S_final" in df.columns and n > 0:
+            in_band = ((df["S_final"] >= review_low) & (df["S_final"] <= review_high)).sum()
             frac_review = in_band / n
         stats["frac_review_band"] = frac_review
 
@@ -665,9 +833,7 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
         for rec in getattr(self, "results_json", []) or []:
             ctx = rec.get("context", {})
             # support either list of importances or list of triples-with-importance
-            if "triple_importances" in ctx and isinstance(
-                ctx["triple_importances"], list
-            ):
+            if "triple_importances" in ctx and isinstance(ctx["triple_importances"], list):
                 # format: [{"triple": "...", "importance": float, ...}, ...] OR [float, ...]
                 vals = []
                 for entry in ctx["triple_importances"]:

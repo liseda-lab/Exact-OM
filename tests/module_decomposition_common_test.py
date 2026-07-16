@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import inspect
+import json
 from pathlib import Path
 
 import pytest
@@ -11,6 +12,7 @@ from exact.core.entities.configs.config import ConfigModel
 from exact.delivery.api.align import AlignmentRunner
 from exact.delivery.api.eval import EvaluationRunner
 from exact.delivery.cli.align import main as align_main
+from exact.delivery.cli.align import parse_arguments as parse_align_arguments
 from exact.delivery.cli.eval import main as eval_main
 
 
@@ -60,6 +62,9 @@ def test_plain_alignment_function_uses_the_functional_session_hook(
     assert timings["Total"] >= 0.0
     assert captured[0]["source_file_path"] == source.resolve()
     assert captured[0]["target_file_path"] == target.resolve()
+    run_dir = tmp_path / "run"
+    assert json.loads((run_dir / "run_manifest.json").read_text())["layout_version"] == 2
+    assert "config_version: 2" in (run_dir / "config.yaml").read_text()
 
 
 def test_cli_and_api_alignment_share_preparation_and_action_assembly(
@@ -104,7 +109,7 @@ def test_cli_and_api_alignment_share_preparation_and_action_assembly(
         save_logs=True,
         run_eval=True,
     )
-    assert runner.run() is None
+    runner.run()
 
     assert len(captured) == 2
     for request, output in zip(captured, (cli_output, api_output)):
@@ -115,6 +120,59 @@ def test_cli_and_api_alignment_share_preparation_and_action_assembly(
         assert request["log_file_path"] == output.resolve() / "exact.log"
         assert request["run_eval"] is True
         assert isinstance(request["configs_file_path"], ConfigModel)
+
+
+def test_alignment_cli_format_overrides_flow_through_shared_config(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = tmp_path / "source"
+    target = tmp_path / "target"
+    source.mkdir()
+    target.mkdir()
+    options = tmp_path / "target-options.yaml"
+    options.write_text("hierarchy_relations: [broader]\n", encoding="utf-8")
+    captured: list[dict] = []
+    monkeypatch.setattr(
+        delivery_common,
+        "run_alignment",
+        lambda **kwargs: captured.append(kwargs),
+    )
+
+    args = parse_align_arguments(
+        [
+            "-s",
+            str(source),
+            "-t",
+            str(target),
+            "-o",
+            str(tmp_path / "run"),
+            "--input-format",
+            "csv-kg",
+            "--source-options",
+            "include_abox=true",
+            'hierarchy_relations=["subclass_of"]',
+            "--target-options",
+            str(options),
+            "--output-formats",
+            "typed-tsv",
+            "json",
+            "--relation-prediction",
+            "hierarchy_heuristic",
+        ]
+    )
+    invocation = delivery_common.prepare_alignment_namespace(args)
+    delivery_common.execute_alignment(invocation)
+
+    config = captured[0]["configs_file_path"]
+    assert config.io.input_format == "csv-kg"
+    assert config.io.source_options == {
+        "include_abox": True,
+        "hierarchy_relations": ["subclass_of"],
+    }
+    assert config.io.target_options == {"hierarchy_relations": ["broader"]}
+    assert config.io.output_formats == ["typed-tsv", "json"]
+    assert config.matching.relation_prediction == "hierarchy_heuristic"
 
 
 def test_cli_and_api_evaluation_share_preparation_but_keep_output_policy(

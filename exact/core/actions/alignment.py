@@ -1,6 +1,7 @@
 import functools
 import json
 import logging
+import os
 import warnings
 from dataclasses import dataclass
 from pathlib import Path
@@ -12,6 +13,7 @@ from exact.core.actions.evaluation import run_evaluation
 from exact.core.entities.configs.config import ConfigModel
 from exact.impl import bootstrap_components
 from exact.impl.seed import SeedSetter
+from exact.runs import RunLayout, finalize_artifacts
 from exact.tracks import get_track, provider_from_descriptor
 from exact.utils.logs import (
     ProgressTask,
@@ -83,6 +85,17 @@ def _merge_run_stats(path: Path, additions: Mapping[str, Any]) -> None:
     temporary.replace(path)
 
 
+def _write_resolved_config(configs: ConfigModel, layout: RunLayout) -> None:
+    """Persist the canonical v2 settings used by this run."""
+
+    from exact.core.entities.configs.yaml_io import dump_yaml_document
+
+    rendered = dump_yaml_document(configs.model_dump(mode="json", by_alias=True))
+    temporary = layout.config_path.with_name(f".{layout.config_path.name}.{os.getpid()}.tmp")
+    temporary.write_text(rendered, encoding="utf-8")
+    os.replace(temporary, layout.config_path)
+
+
 def run_alignment(
     source_file_path: Optional[Path] = None,
     target_file_path: Optional[Path] = None,
@@ -96,13 +109,14 @@ def run_alignment(
     run_eval: bool = False,
     task_name: Optional[str] = None,
     device: Optional[int] = None,
-) -> Optional[dict]:
+) -> tuple[Optional[dict[str, Any]], dict[str, float]]:
     """Resolve inputs, run the alignment pipeline, and persist timing metadata."""
 
     if output_dir_path is None:
         raise ValueError("output_dir_path is required")
     output_dir_path = Path(output_dir_path).expanduser().resolve()
     output_dir_path.mkdir(parents=True, exist_ok=True)
+    run_layout = RunLayout.create(output_dir_path)
 
     bootstrap_components()
     if configs_file_path is None:
@@ -112,6 +126,7 @@ def run_alignment(
     else:
         configs = ConfigModel.load_config(configs_file_path)
     configs.resolve_dependencies()
+    _write_resolved_config(configs, run_layout)
     configure_exact_logger(
         logging.getLogger("exact"),
         configs.logging_level,
@@ -209,6 +224,13 @@ def run_alignment(
                 exc,
             )
 
+    size_report = finalize_artifacts(
+        run_layout,
+        run_id=timing_session.run_id,
+        save_full_explanations=configs.output.save.full_explanations_json,
+        checkpoint_retention=configs.output.retention.checkpoints,
+    )
+
     total_stage = totals["Total"]
     logger = logging.getLogger("exact")
     logger.info(
@@ -218,6 +240,22 @@ def run_alignment(
         (total_span.seconds or 0.0) / 60.0,
     )
     logger.info("Times updated at %s", ledger.times_path)
+    logger.info(
+        "Run artifacts finalized at %s (checkpoints removed: %d, bytes freed: %.2f MiB)",
+        size_report["manifest"],
+        size_report["checkpoints_removed"],
+        size_report["checkpoint_bytes_removed"] / (1024 * 1024),
+    )
+    before_sizes = size_report["before_bytes"]
+    after_sizes = size_report["after_bytes"]
+    logger.info(
+        "Artifact sizes before → after (MiB): %s",
+        ", ".join(
+            f"{name}={before_sizes.get(name, 0) / (1024 * 1024):.2f}→"
+            f"{after_sizes.get(name, 0) / (1024 * 1024):.2f}"
+            for name in sorted(set(before_sizes) | set(after_sizes))
+        ),
+    )
     return results, timings_result
 
 
@@ -416,7 +454,10 @@ def _run_alignment_session(
     progress.start("Dataset", "building dataset inputs")
     logger.info("Building Dataset...")
     with timing_session.stage("Dataset") as dataset_span:
-        dataset = configs.dataset(
+        dataset_factory = configs.dataset_runtime
+        if dataset_factory is None:
+            raise RuntimeError("Dataset dependency was not resolved")
+        dataset = dataset_factory(
             output_path=output_dir_path,
             logger=logger,
             cache_ok=configs.use_file_cache,
@@ -425,11 +466,15 @@ def _run_alignment_session(
             llm_routing=configs.llm_routing.model_dump(),
             request_seed=configs.seed,
             candidate_generation_params={
-                **configs.candidates_params.model_dump(),
+                **configs.candidates.model_dump(mode="python"),
                 "candidates_file_path": (
                     str(candidates_file_path) if candidates_file_path else None
                 ),
             },
+            input_format=configs.io.input_format,
+            source_options=configs.io.source_options,
+            target_options=configs.io.target_options,
+            entity_kinds=configs.matching.entity_kinds,
             **configs.dataset_params.model_dump(),
         )
 
@@ -476,7 +521,7 @@ def _run_alignment_session(
                 dataset.load_candidates(
                     candidates_file_path,
                     device=device,
-                    **configs.candidates_params.model_dump(),
+                    **configs.candidates.model_dump(mode="python"),
                 )
             with timing_session.stage("Dataset.Process"):
                 dataset.process()
@@ -486,7 +531,8 @@ def _run_alignment_session(
             if getattr(dataset, "emit_feature_metrics_on_build", lambda: False)():
                 dataset.save_feature_metrics()
 
-            dataset.log_sanity_examples(**configs.sanity_check_params.model_dump())
+            if configs.output.sanity_checks.enabled:
+                dataset.log_sanity_examples(**configs.sanity_check_params.model_dump())
             with timing_session.stage("Dataset.Plotting"):
                 dataset.plot_feature_distributions(
                     which=configs.dataset_params.which,
@@ -509,6 +555,7 @@ def _run_alignment_session(
     primary = model_sequence[0]
     primary_params = {
         **primary.params,
+        **configs.matching.channels.model_dump(mode="python"),
         "llm_profiles": {k: v.model_dump() for k, v in configs.llm_profiles.items()},
         "llm_routing": configs.llm_routing.model_dump(),
         "request_seed": configs.seed,
@@ -538,11 +585,14 @@ def _run_alignment_session(
             extra_params.setdefault("request_seed", configs.seed)
         model_specs.append((extra.name, extra_params))
 
-    trainer = configs.trainer(
+    trainer_factory = configs.trainer_runtime
+    if trainer_factory is None:
+        raise RuntimeError("Trainer dependency was not resolved")
+    trainer = trainer_factory(
         dataset=dataset,
         models=model_specs,
         device=device,
-        output_dir=output_dir_path / "model",
+        output_dir=output_dir_path,
         logger=logger,
     )
     progress.finish("Trainer", f"models={len(model_specs)}")
@@ -550,6 +600,7 @@ def _run_alignment_session(
     logger.info("Computing alignment...")
     inference_kwargs = configs.inference_params.model_dump()
     inference_kwargs["local_alignment"] = candidates_file_path is not None
+    inference_kwargs["explanation_shard_mb"] = configs.output.explanations.shard_mb
 
     with timing_session.stage("Alignment") as alignment_span:
         progress.start("Inference", f"pairs={len(dataset)}")
@@ -625,11 +676,19 @@ def _run_alignment_session(
     progress.start("Outputs", "writing alignment artifacts")
     logger.info("Writing alignment...")
     with timing_session.stage("Postprocess.Outputs") as outputs_span:
+        save_params = configs.alignment_params.model_dump()
+        # The monolithic explanation JSON is a derived v2 export assembled after
+        # overlays are compacted, rather than a second write-time source of truth.
+        save_params["save_json"] = False
         output_paths = trainer.save_results(
             alignment,
             candidates_one2many_path=candidates_file_path,
             sub_dir=task_name,
-            **configs.alignment_params.model_dump(),
+            output_formats=configs.io.output_formats,
+            relation_prediction=configs.matching.relation_prediction,
+            source_uri=source_file_path.resolve().as_uri(),
+            target_uri=target_file_path.resolve().as_uri(),
+            **save_params,
         )
     alignment_file_path = output_paths["alignment_tsv"]
     run_stats_path = output_paths.get("run_stats_json") or (
@@ -664,9 +723,7 @@ def _run_alignment_session(
         with timing_session.stage("Postprocess.Evaluation") as evaluation_span:
             results = run_evaluation(
                 alignment=Path(alignment_file_path),
-                output_dir_path=(
-                    output_dir_path / task_name if task_name is not None else output_dir_path
-                ),
+                output_dir_path=RunLayout.open(output_dir_path).evaluation_dir,
                 error_on_fail=False,
                 K=configs.k,
                 source_file_path=dataset.source,
@@ -678,7 +735,10 @@ def _run_alignment_session(
                 reference_candidates=candidates_file_path,
                 logger=logger,
                 backends=configs.evaluation.backends,
-                backend_options={"bioml": configs.evaluation.bioml},
+                backend_options={
+                    "builtin": {"entity_kinds": configs.matching.entity_kinds},
+                    "bioml": configs.evaluation.bioml,
+                },
                 run_stats_path=run_stats_path,
             )
         progress.finish("Evaluation", "evaluation completed")

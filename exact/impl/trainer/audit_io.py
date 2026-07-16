@@ -21,9 +21,7 @@ from exact.utils.timing import CacheStatus, StageRecord  # noqa: F401
 
 try:
     import zstandard as zstd  # noqa: F401
-except (
-    ImportError
-):  # pragma: no cover - exercised only when optional dependency is absent
+except ImportError:  # pragma: no cover - exercised only when optional dependency is absent
     zstd = None
 
 
@@ -88,9 +86,7 @@ class AuditIOMixin:
         records: Iterable[Dict[str, Any]],
         compression: Optional[str] = None,
     ) -> int:
-        resolved = self._resolve_text_compression(
-            compression or self._audit_shard_compression
-        )
+        resolved = self._resolve_text_compression(compression or self._audit_shard_compression)
         tmp_path = path.with_suffix(path.suffix + ".tmp")
         count = 0
         with self._open_jsonl_writer(tmp_path, resolved) as f:
@@ -142,9 +138,7 @@ class AuditIOMixin:
         manifest = self._load_audit_manifest(manifest_path)
         if not manifest:
             return
-        compression = self._resolve_text_compression(
-            manifest.get("compression", "none")
-        )
+        compression = self._resolve_text_compression(manifest.get("compression", "none"))
         total_records = int(manifest.get("total_records", 0) or 0)
         shards = list(manifest.get("shards") or [])
         start = time.perf_counter()
@@ -162,9 +156,7 @@ class AuditIOMixin:
                 continue
             shard_path = (manifest_path.parent / str(rel_path)).resolve()
             try:
-                for record in self._iter_jsonl_records(
-                    shard_path, compression=compression
-                ):
+                for record in self._iter_jsonl_records(shard_path, compression=compression):
                     seen += 1
                     if progress_every > 0 and seen % progress_every == 0:
                         elapsed = max(1.0e-8, time.perf_counter() - start)
@@ -184,9 +176,7 @@ class AuditIOMixin:
                         )
                     yield record
             except (OSError, json.JSONDecodeError) as exc:
-                self.log(
-                    f"{label}: failed to read shard {shard_path}: {exc}", "warning"
-                )
+                self.log(f"{label}: failed to read shard {shard_path}: {exc}", "warning")
                 return
         elapsed = max(0.0, time.perf_counter() - start)
         rate = seen / elapsed if elapsed > 1.0e-8 else 0.0
@@ -199,16 +189,10 @@ class AuditIOMixin:
         )
 
     def _candidate_manifest_for_checkpoint(self, checkpoint_path: Path) -> Path:
-        return (
-            checkpoint_path.parent
-            / f"{checkpoint_path.stem}_candidates"
-            / "manifest.json"
-        )
+        return checkpoint_path.parent / f"{checkpoint_path.stem}_candidates" / "manifest.json"
 
     def _overlay_manifest_for_checkpoint(self, checkpoint_path: Path) -> Path:
-        return (
-            checkpoint_path.parent / f"{checkpoint_path.stem}_overlay" / "manifest.json"
-        )
+        return checkpoint_path.parent / f"{checkpoint_path.stem}_overlay" / "manifest.json"
 
     def _close_candidate_writer(self) -> None:
         writer = getattr(self, "_candidate_current_writer", None)
@@ -244,9 +228,7 @@ class AuditIOMixin:
         self._candidate_total_records = 0
         if not self._candidate_records_enabled or checkpoint_path is None:
             return
-        self._candidate_manifest_path = self._candidate_manifest_for_checkpoint(
-            checkpoint_path
-        )
+        self._candidate_manifest_path = self._candidate_manifest_for_checkpoint(checkpoint_path)
         self._candidate_shard_dir = self._candidate_manifest_path.parent
         self._candidate_shard_dir.mkdir(parents=True, exist_ok=True)
         if not append_existing:
@@ -267,17 +249,13 @@ class AuditIOMixin:
                         "warning",
                     )
         manifest = (
-            self._load_audit_manifest(self._candidate_manifest_path)
-            if append_existing
-            else {}
+            self._load_audit_manifest(self._candidate_manifest_path) if append_existing else {}
         )
         self._candidate_shards = list(manifest.get("shards") or [])
         self._candidate_total_records = int(manifest.get("total_records", 0) or 0)
         manifest_compression = manifest.get("compression")
         if manifest_compression:
-            self._audit_shard_compression = self._resolve_text_compression(
-                manifest_compression
-            )
+            self._audit_shard_compression = self._resolve_text_compression(manifest_compression)
         else:
             self._audit_shard_compression = self._resolve_text_compression(compression)
         self._audit_shard_records = max(1, int(records_per_shard or 50000))
@@ -306,14 +284,10 @@ class AuditIOMixin:
             if (
                 self._candidate_current_writer is None
                 or self._candidate_current_shard is None
-                or int(self._candidate_current_shard.get("records", 0))
-                >= self._audit_shard_records
+                or int(self._candidate_current_shard.get("records", 0)) >= self._audit_shard_records
             ):
                 self._start_new_candidate_shard()
-            if (
-                self._candidate_current_writer is None
-                or self._candidate_current_shard is None
-            ):
+            if self._candidate_current_writer is None or self._candidate_current_shard is None:
                 return
             self._candidate_current_writer.write(
                 json.dumps(
@@ -346,18 +320,10 @@ class AuditIOMixin:
         self._write_json_atomic(self._candidate_manifest_path, payload)
         return self._candidate_manifest_path
 
-    def _read_candidate_records_from_manifest(
-        self, manifest_path: Path
-    ) -> List[Dict[str, Any]]:
-        return list(
-            self._iter_records_from_manifest(
-                manifest_path, "Checkpoint candidate restore"
-            )
-        )
+    def _read_candidate_records_from_manifest(self, manifest_path: Path) -> List[Dict[str, Any]]:
+        return list(self._iter_records_from_manifest(manifest_path, "Checkpoint candidate restore"))
 
-    def _selector_evidence_items_for_record(
-        self, record: Dict[str, Any]
-    ) -> List[Dict[str, float]]:
+    def _selector_evidence_items_for_record(self, record: Dict[str, Any]) -> List[Dict[str, float]]:
         for extra_model in getattr(self, "models", [])[1:]:
             extractor = getattr(extra_model, "_record_evidence_items", None)
             if not callable(extractor):
@@ -391,6 +357,12 @@ class AuditIOMixin:
             "tgt_label_text": (record.get("selected_labels") or {}).get("target", ""),
             "llm_pair_brief": record.get("llm_pair_brief", ""),
         }
+        src_kind = record.get("src_kind", record.get("kind"))
+        tgt_kind = record.get("tgt_kind", src_kind)
+        if src_kind is not None:
+            row["SrcKind"] = src_kind
+        if tgt_kind is not None:
+            row["TgtKind"] = tgt_kind
         for payload_name in ["confidences", "qualities", "weights", "importances"]:
             payload = record.get(payload_name) or {}
             for key, value in payload.items():
@@ -415,6 +387,11 @@ class AuditIOMixin:
         record.setdefault("explanation_schema_version", 1)
         record.setdefault("src_iri", str(candidate.get("Src", "")))
         record.setdefault("tgt_iri", str(candidate.get("Tgt", "")))
+        record.setdefault("src_kind", str(candidate.get("SrcKind", "class")))
+        record.setdefault(
+            "tgt_kind", str(candidate.get("TgtKind", candidate.get("SrcKind", "class")))
+        )
+        record.setdefault("kind", record["src_kind"])
         record.setdefault("llm_pair_brief", candidate.get("llm_pair_brief", ""))
 
         prediction = dict(record.get("prediction") or {})
@@ -434,6 +411,8 @@ class AuditIOMixin:
         ignored = {
             "Src",
             "Tgt",
+            "SrcKind",
+            "TgtKind",
             "ground_truth",
             "src_label_text",
             "tgt_label_text",
@@ -552,9 +531,7 @@ class AuditIOMixin:
         return os.path.relpath(path.resolve(), checkpoint_path.parent.resolve())
 
     def _audit_manifest_for_checkpoint(self, checkpoint_path: Path) -> Path:
-        return (
-            checkpoint_path.parent / f"{checkpoint_path.stem}_audit" / "manifest.json"
-        )
+        return checkpoint_path.parent / f"{checkpoint_path.stem}_audit" / "manifest.json"
 
     def _close_audit_writer(self) -> None:
         writer = getattr(self, "_audit_current_writer", None)
@@ -627,9 +604,7 @@ class AuditIOMixin:
                 try:
                     path.unlink()
                 except OSError as exc:
-                    self.log(
-                        f"Failed to remove stale audit shard {path}: {exc}", "warning"
-                    )
+                    self.log(f"Failed to remove stale audit shard {path}: {exc}", "warning")
             if self._audit_manifest_path.exists():
                 try:
                     self._audit_manifest_path.unlink()
@@ -638,18 +613,12 @@ class AuditIOMixin:
                         f"Failed to remove stale audit manifest {self._audit_manifest_path}: {exc}",
                         "warning",
                     )
-        manifest = (
-            self._load_audit_manifest(self._audit_manifest_path)
-            if append_existing
-            else {}
-        )
+        manifest = self._load_audit_manifest(self._audit_manifest_path) if append_existing else {}
         self._audit_shards = list(manifest.get("shards") or [])
         self._audit_total_records = int(manifest.get("total_records", 0) or 0)
         manifest_compression = manifest.get("compression")
         if manifest_compression:
-            self._audit_shard_compression = self._resolve_text_compression(
-                manifest_compression
-            )
+            self._audit_shard_compression = self._resolve_text_compression(manifest_compression)
 
     def _start_new_audit_shard(self) -> None:
         if not self._audit_shards_enabled or self._audit_shard_dir is None:
@@ -681,8 +650,7 @@ class AuditIOMixin:
             if (
                 self._audit_current_writer is None
                 or self._audit_current_shard is None
-                or int(self._audit_current_shard.get("records", 0))
-                >= self._audit_shard_records
+                or int(self._audit_current_shard.get("records", 0)) >= self._audit_shard_records
             ):
                 self._start_new_audit_shard()
             if self._audit_current_writer is None or self._audit_current_shard is None:
@@ -741,9 +709,7 @@ class AuditIOMixin:
         self._append_audit_records(records)
         self._write_audit_manifest()
 
-    def _read_audit_records_from_manifest(
-        self, manifest_path: Path
-    ) -> List[Dict[str, Any]]:
+    def _read_audit_records_from_manifest(self, manifest_path: Path) -> List[Dict[str, Any]]:
         if manifest_path.name == "index.json":
             try:
                 store = ExplanationStore(manifest_path.parent)
@@ -760,9 +726,7 @@ class AuditIOMixin:
         manifest = self._load_audit_manifest(manifest_path)
         if not manifest:
             return []
-        compression = self._resolve_text_compression(
-            manifest.get("compression", "none")
-        )
+        compression = self._resolve_text_compression(manifest.get("compression", "none"))
         records: List[Dict[str, Any]] = []
         for shard in manifest.get("shards") or []:
             rel_path = shard.get("path")
@@ -770,9 +734,7 @@ class AuditIOMixin:
                 continue
             shard_path = (manifest_path.parent / str(rel_path)).resolve()
             try:
-                records.extend(
-                    self._read_jsonl_records(shard_path, compression=compression)
-                )
+                records.extend(self._read_jsonl_records(shard_path, compression=compression))
             except (OSError, json.JSONDecodeError) as exc:
                 self.log(f"Failed to read audit shard {shard_path}: {exc}", "warning")
                 return []
@@ -790,9 +752,7 @@ class AuditIOMixin:
         if not manifest_path or not Path(manifest_path).exists():
             return {}
         lookup: Dict[Tuple[str, str], Dict[str, Any]] = {}
-        for record in self._iter_records_from_manifest(
-            Path(manifest_path), "Final overlay load"
-        ):
+        for record in self._iter_records_from_manifest(Path(manifest_path), "Final overlay load"):
             src = record.get("Src")
             tgt = record.get("Tgt")
             if src is None or tgt is None:
@@ -834,9 +794,7 @@ class AuditIOMixin:
                 )
             return
 
-        compression = self._resolve_text_compression(
-            manifest.get("compression", "none")
-        )
+        compression = self._resolve_text_compression(manifest.get("compression", "none"))
         overlay_lookup = self._load_overlay_lookup()
         first = True
         written = 0

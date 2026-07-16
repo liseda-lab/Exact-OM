@@ -53,9 +53,7 @@ def test_layout_resolves_v1_and_v2_artifacts(tmp_path: Path) -> None:
     mapping.write_text("SrcEntity\tTgtEntity\nsource\ttarget\n", encoding="utf-8")
     explanations = legacy_alignment / "default" / "full_explanations.json"
     explanations.parent.mkdir()
-    explanations.write_text(
-        '[{"src_iri":"source","tgt_iri":"target"}]', encoding="utf-8"
-    )
+    explanations.write_text('[{"src_iri":"source","tgt_iri":"target"}]', encoding="utf-8")
 
     legacy = RunLayout.open(v1)
     assert legacy.version == 1
@@ -279,9 +277,7 @@ def test_finalize_does_not_rewrite_already_compacted_store(tmp_path: Path) -> No
     layout = RunLayout.create(tmp_path / "run")
     store = ExplanationStore(layout.explanations_dir, run_id="session")
     store.append(_records())
-    shards_before = sorted(
-        path.name for path in layout.explanation_shards_dir.iterdir()
-    )
+    shards_before = sorted(path.name for path in layout.explanation_shards_dir.iterdir())
 
     report = finalize_artifacts(
         layout.root,
@@ -291,10 +287,7 @@ def test_finalize_does_not_rewrite_already_compacted_store(tmp_path: Path) -> No
 
     assert report["compaction"]["records"] == len(_records())
     assert report["compaction"]["before_bytes"] == report["compaction"]["after_bytes"]
-    assert (
-        sorted(path.name for path in layout.explanation_shards_dir.iterdir())
-        == shards_before
-    )
+    assert sorted(path.name for path in layout.explanation_shards_dir.iterdir()) == shards_before
 
 
 def test_manifest_indexes_dynamic_deliverables_and_dataset_cache(
@@ -305,9 +298,13 @@ def test_manifest_indexes_dynamic_deliverables_and_dataset_cache(
     alignment.write_text("<rdf:RDF />\n", encoding="utf-8")
     evaluation = layout.evaluation_dir / "backend-report.txt"
     evaluation.write_text("report\n", encoding="utf-8")
-    cache = layout.root / "cache" / "dataset.bin"
+    cache = layout.cache_dir / "dataset.bin"
     cache.parent.mkdir()
     cache.write_bytes(b"cache")
+    dataset = layout.dataset_dir / "dataset.csv"
+    dataset.parent.mkdir()
+    dataset.write_text("Src,Tgt\nsource,target\n", encoding="utf-8")
+    layout.legacy_times_path.write_text("# derived\nTotal: 1.0 minutes\n", encoding="utf-8")
 
     manifest = refresh_manifest(layout, run_id="session")
     artifacts = {item["path"]: item for item in manifest.payload["artifacts"]}
@@ -315,6 +312,8 @@ def test_manifest_indexes_dynamic_deliverables_and_dataset_cache(
     assert len(artifacts["alignment/alignment.rdf"]["sha256"]) == 64
     assert len(artifacts["evaluation/backend-report.txt"]["sha256"]) == 64
     assert artifacts["cache/dataset.bin"]["kind"] == "dataset_cache"
+    assert artifacts["dataset/dataset.csv"]["kind"] == "dataset"
+    assert artifacts["times.txt"]["kind"] == "timing_render"
 
 
 def test_compressed_store_is_smaller_than_legacy_monolith(tmp_path: Path) -> None:
@@ -330,9 +329,7 @@ def test_compressed_store_is_smaller_than_legacy_monolith(tmp_path: Path) -> Non
     ]
     store = ExplanationStore.create(tmp_path / "run", run_id="size-test")
     store.append(records)
-    stored_bytes = sum(
-        path.stat().st_size for path in store.directory.rglob("*") if path.is_file()
-    )
+    stored_bytes = sum(path.stat().st_size for path in store.directory.rglob("*") if path.is_file())
     legacy_bytes = len(
         json.dumps(records, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
     )

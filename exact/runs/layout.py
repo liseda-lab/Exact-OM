@@ -7,7 +7,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-
 LAYOUT_VERSION = 2
 MANIFEST_FILENAME = "run_manifest.json"
 
@@ -44,9 +43,10 @@ class RunLayout:
         if (resolved / "explanations" / "index.json").is_file():
             return cls(resolved, LAYOUT_VERSION)
         v2_directories = {"alignment", "evaluation", "explanations", "stats", "checkpoints"}
-        if all((resolved / name).is_dir() for name in v2_directories) and not (
-            resolved / "model"
-        ).exists():
+        if (
+            all((resolved / name).is_dir() for name in v2_directories)
+            and not (resolved / "model").exists()
+        ):
             return cls(resolved, LAYOUT_VERSION)
         return cls(resolved, 1)
 
@@ -65,6 +65,12 @@ class RunLayout:
     @property
     def timings_path(self) -> Path:
         return self.root / "timings.json"
+
+    @property
+    def legacy_times_path(self) -> Path:
+        """Return the deprecated human-readable timing projection path."""
+
+        return self.root / "times.txt"
 
     @property
     def log_path(self) -> Path:
@@ -146,6 +152,18 @@ class RunLayout:
         if self.version == LAYOUT_VERSION:
             return self.root / "checkpoints"
         return self.root / "model" / "checkpoints"
+
+    @property
+    def dataset_dir(self) -> Path:
+        """Return the materialized dataset-feature directory."""
+
+        return self.root / "dataset"
+
+    @property
+    def cache_dir(self) -> Path:
+        """Return the run-local dataset and model cache directory."""
+
+        return self.root / "cache"
 
     def mapping_path(self, kind: Literal["global", "local"]) -> Path:
         """Return the canonical or existing mapping path for ``kind``."""
