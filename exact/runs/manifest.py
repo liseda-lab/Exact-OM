@@ -17,6 +17,25 @@ MANIFEST_SCHEMA_VERSION = 1
 DELIVERABLE_KINDS = {"alignment", "evaluation"}
 
 
+def _known_checkpoint_artifact(path: Path, checkpoint_dir: Path) -> bool:
+    try:
+        relative = path.relative_to(checkpoint_dir)
+    except ValueError:
+        return False
+    if len(relative.parts) == 1:
+        return relative.suffix == ".json" and (
+            relative.name.startswith(
+                ("inference_", "train_", "validation_", "test_", "prefiltered_")
+            )
+            or any(
+                token in relative.name for token in ("_additional_models_", "_rationales_")
+            )
+        )
+    if not relative.parts[0].endswith(("_audit", "_candidates", "_overlay")):
+        return False
+    return relative.name == "manifest.json" or relative.name.startswith("shard-")
+
+
 def _exact_version() -> str:
     try:
         return version("exact-om")
@@ -207,6 +226,10 @@ def refresh_manifest(
         if not directory.is_dir():
             continue
         for path in sorted(item for item in directory.rglob("*") if item.is_file()):
+            if kind == "checkpoint" and not _known_checkpoint_artifact(
+                path, layout.checkpoints_dir
+            ):
+                continue
             current.register(path, kind=kind, run_id=run_id, checksum=False)
     current.remove_missing()
     current.write()
