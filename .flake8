@@ -1,5 +1,6 @@
 [flake8]
 max-line-length = 100
-# compliant with black
-extend-ignore = E203, E704  
-exclude = .venv/*, build/*, setup.py
+extend-ignore = E203,E501,W503
+per-file-ignores =
+    **/__init__.py:F401,E402
+    tools/prepare_study_visualizer_bundle.py:E402

@@ -1,16 +1,16 @@
 # Adapted from https://github.com/KRR-Oxford/DeepOnto
 
 import pprint
-from typing import List, Optional, Union, TYPE_CHECKING
 from pathlib import Path
+from typing import TYPE_CHECKING, List, Optional, Union
 
-from exact.core.values import DEFAULT_REL
-
-from exact.utils.data import read_table
 from exact.core.entities.mappings import EntityMapping
+from exact.core.values import DEFAULT_REL
+from exact.utils.data import read_table
 
 if TYPE_CHECKING:
     from exact.core.contracts.dataset import DataFrame
+
 
 class ReferenceMapping(EntityMapping):
     r"""A datastructure for entity mapping that acts as a reference mapping.
@@ -63,15 +63,17 @@ class ReferenceMapping(EntityMapping):
                 f"Expect relation of candidate mapping to be {self.relation} but got {candidate_mapping.relation}"
             )
         if self.head != candidate_mapping.head:
-            raise ValueError("Candidate mapping does not have the same head entity as the anchor mapping.")
+            raise ValueError(
+                "Candidate mapping does not have the same head entity as the anchor mapping."
+            )
         self.candidates.append(candidate_mapping)
 
     @classmethod
     def read_table_mappings(
         cls,
-        table_of_mappings_file: Union[Path, 'DataFrame'],
+        table_of_mappings_file: Union[Path, "DataFrame"],
         relation: str = DEFAULT_REL,
-    ) -> List['ReferenceMapping']:
+    ) -> List["ReferenceMapping"]:
         r"""Read reference mappings from `.csv` or `.tsv` files."""
 
         if isinstance(table_of_mappings_file, Path):
@@ -79,4 +81,6 @@ class ReferenceMapping(EntityMapping):
 
         table_of_mappings_file.columns = ["SrcEntity", "TgtEntity", "Score"]
 
-        return [cls(dp.SrcEntity, dp.TgtEntity, relation) for dp in table_of_mappings_file.itertuples()]
+        return [
+            cls(dp.SrcEntity, dp.TgtEntity, relation) for dp in table_of_mappings_file.itertuples()
+        ]

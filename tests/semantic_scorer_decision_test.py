@@ -4,8 +4,9 @@ from types import SimpleNamespace
 
 import torch
 
-
-_MODULE_PATH = Path(__file__).resolve().parents[1] / "exact" / "impl" / "models" / "semantic_scorer.py"
+_MODULE_PATH = (
+    Path(__file__).resolve().parents[1] / "exact" / "impl" / "models" / "semantic_scorer.py"
+)
 _SPEC = importlib.util.spec_from_file_location("semantic_scorer_module", _MODULE_PATH)
 _MODULE = importlib.util.module_from_spec(_SPEC)
 assert _SPEC is not None and _SPEC.loader is not None
@@ -14,7 +15,20 @@ SemanticScorer = _MODULE.SemanticScorer
 
 
 class _DummyHosted:
-    def chat_completion(self, profile, messages, max_tokens, temperature=None, top_p=None, stop=None, logprobs=None, top_logprobs=None, logit_bias=None, provider=None, seed=None):
+    def chat_completion(
+        self,
+        profile,
+        messages,
+        max_tokens,
+        temperature=None,
+        top_p=None,
+        stop=None,
+        logprobs=None,
+        top_logprobs=None,
+        logit_bias=None,
+        provider=None,
+        seed=None,
+    ):
         user_text = messages[-1]["content"]
         if "Source entity: src" not in user_text:
             raise AssertionError(f"Unexpected user prompt: {user_text}")
@@ -75,9 +89,14 @@ def test_hosted_chat_binary_head_returns_binary_probability():
         "provider": "unit-test-provider",
         "error": None,
     }
-    scorer._hosted_decision_logit_bias = lambda profile: ({"11": 20.0, "12": 20.0}, {"A": [11], "B": [12]})
+    scorer._hosted_decision_logit_bias = lambda profile: (
+        {"11": 20.0, "12": 20.0},
+        {"A": [11], "B": [12]},
+    )
     scorer._record_hosted_decision_chat_debug = lambda *args, **kwargs: None
-    scorer._ensure_local_llm = lambda: (_ for _ in ()).throw(AssertionError("Local fallback was not expected"))
+    scorer._ensure_local_llm = lambda: (_ for _ in ()).throw(
+        AssertionError("Local fallback was not expected")
+    )
     scorer.llm_decision_batch_size = 8
     scorer.request_seed = 123
 
@@ -93,7 +112,9 @@ def test_hosted_chat_binary_head_returns_binary_probability():
     assert scorer._last_decision_backend_meta["endpoint"] == "chat/completions"
     assert scorer._last_decision_backend_meta["decision_probe_passed"] is True
     assert scorer._last_decision_backend_meta["provider"] == "unit-test-provider"
-    assert scorer._last_decision_backend_meta["decision_scoring_mode"] == "chat_logprobs_binary_head"
+    assert (
+        scorer._last_decision_backend_meta["decision_scoring_mode"] == "chat_logprobs_binary_head"
+    )
     assert scorer.llm_decision_stats()["hosted_attempted"] == 1
     assert scorer.llm_decision_stats()["hosted_scored"] == 1
     assert scorer.llm_decision_stats()["local_fallbacks"] == 0
@@ -104,8 +125,12 @@ def test_clean_summary_text_drops_fence_only_response():
 
 
 def test_clean_rationale_text_keeps_only_complete_sentences():
-    text = '```json\n{"rationale":"First sentence. Second sentence. Third sentence without ending"\n'
-    cleaned = SemanticScorer._parse_structured_text(text, "rationale", SemanticScorer._clean_rationale_text)
+    text = (
+        '```json\n{"rationale":"First sentence. Second sentence. Third sentence without ending"\n'
+    )
+    cleaned = SemanticScorer._parse_structured_text(
+        text, "rationale", SemanticScorer._clean_rationale_text
+    )
     assert cleaned == "First sentence. Second sentence."
 
 

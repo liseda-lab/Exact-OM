@@ -6,11 +6,6 @@
 /api_key
 /mapping_example*.json
 
-# Matcha folder
-
-/matcha_dl/impl/matcha/matcha/*
-!/matcha_dl/impl/matcha/matcha/*.py
-
 # Data folder
 
 /data/*
@@ -23,10 +18,12 @@
 # Paper folder
 
 /Paper/*
+/Repair Ideas/*
 
 # Ignore dist folder
 
 /dist/*
+/error.log
 
 # Ignore mypy cache
 

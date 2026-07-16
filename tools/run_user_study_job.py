@@ -2,6 +2,7 @@
 """
 Helper to launch a user-study analysis job from a YAML description.
 """
+
 import argparse
 import shlex
 import subprocess
@@ -12,7 +13,9 @@ import yaml
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run Exact user-study analysis from a YAML config.")
+    parser = argparse.ArgumentParser(
+        description="Run Exact user-study analysis from a YAML config."
+    )
     parser.add_argument(
         "--run-config",
         type=Path,
@@ -158,7 +161,9 @@ def main() -> None:
             "CONFIG_FILE": _stringify(analysis_cfg.get("config_file")),
             "DEVICE": _stringify(analysis_cfg.get("device")),
             "JVM_HEAP_SIZE": _stringify(analysis_cfg.get("jvm_heap_size", "32G")),
-            "LOGGING_LEVEL": _stringify(job_cfg.get("logging_level", analysis_cfg.get("logging_level", "INFO"))),
+            "LOGGING_LEVEL": _stringify(
+                job_cfg.get("logging_level", analysis_cfg.get("logging_level", "INFO"))
+            ),
         }
 
         log_dir = run_dir

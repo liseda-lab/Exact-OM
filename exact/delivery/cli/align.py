@@ -1,5 +1,4 @@
 import argparse
-import os
 from pathlib import Path
 
 from exact import init_jvm
@@ -13,12 +12,16 @@ def run_alignment(args):
         target_file_path=Path(args.target_ontology_file).resolve(),
         output_dir_path=Path(args.output_dir).resolve(),
         configs_file_path=Path(args.config_file).resolve() if args.config_file else None,
-        training_reference_file_path=Path(args.training_reference_file).resolve() if args.training_reference_file else None,
-        full_reference_file_path=Path(args.full_reference_file).resolve() if args.full_reference_file else None,
+        training_reference_file_path=(
+            Path(args.training_reference_file).resolve() if args.training_reference_file else None
+        ),
+        full_reference_file_path=(
+            Path(args.full_reference_file).resolve() if args.full_reference_file else None
+        ),
         candidates_file_path=Path(args.candidates_file).resolve() if args.candidates_file else None,
         log_file_path=Path(args.output_dir).resolve() / "exact.log" if args.save_logs else None,
         run_eval=args.run_eval,
-        device=args.device
+        device=args.device,
     )
 
 
@@ -80,10 +83,10 @@ def parse_arguments():
         help="Whether to save logs",
     )
     parser.add_argument(
-        '--run_eval',
-        '-e',
-        action='store_true',
-        help='Whether to run evaluation',
+        "--run_eval",
+        "-e",
+        action="store_true",
+        help="Whether to run evaluation",
     )
     parser.add_argument(
         "--jvm_heap_size",
@@ -97,7 +100,7 @@ def parse_arguments():
         "-d",
         type=int,
         required=False,
-        help="GPU device ID to use (leave empty for CPU)"
+        help="GPU device ID to use (leave empty for CPU)",
     )
     return parser.parse_args()
 
@@ -122,14 +125,16 @@ def main():
         config_file = Path(args.config_file)
         if not config_file.exists():
             raise Exception(f"Configuration file {args.config_file} does not exist")
-        
+
     if args.jvm_heap_size:
         if args.jvm_heap_size.isdigit():
-            args.jvm_heap_size += 'G'
-        elif not (args.jvm_heap_size[:-1].isdigit() and args.jvm_heap_size[-1].lower() == 'g'):
-            raise Exception(f"JVM heap size {args.jvm_heap_size} is not valid, please provide a valid format")
+            args.jvm_heap_size += "G"
+        elif not (args.jvm_heap_size[:-1].isdigit() and args.jvm_heap_size[-1].lower() == "g"):
+            raise Exception(
+                f"JVM heap size {args.jvm_heap_size} is not valid, please provide a valid format"
+            )
     else:
-        args.jvm_heap_size = '32G'
+        args.jvm_heap_size = "32G"
 
     print(f"[exact-cli] init_jvm heap={args.jvm_heap_size}", flush=True)
 

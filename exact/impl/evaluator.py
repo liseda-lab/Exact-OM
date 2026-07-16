@@ -1,12 +1,11 @@
-
-from typing import Dict, List, Optional, Union, Tuple, TYPE_CHECKING
 from pathlib import Path
+from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Union
 
 from exact.core.contracts.evaluator import IEvaluator
 from exact.core.entities.evaluation import EvaluationData, MetricNames
 from exact.core.entities.mappings import EntityMapping, ReferenceMapping
-from exact.utils.eval import MetricUtils
 from exact.utils.data import save_dict_to_csv
+from exact.utils.eval import MetricUtils
 
 if TYPE_CHECKING:
     from mowl.owlapi import OWLOntology
@@ -25,21 +24,21 @@ class Evaluator(IEvaluator):
             for partial_data in prepared_data:
                 results.update(metric.compute(partial_data))
         return results
-    
+
     @classmethod
     def global_eval(
-        cls, 
+        cls,
         predictions: Union[List[EntityMapping], Path],
         full_reference: Union[List[ReferenceMapping], Path],
         train_reference: Optional[Union[List[ReferenceMapping], Path]] = None,
-        source_ontology: Optional['OWLOntology'] = None,
-        target_ontology: Optional['OWLOntology'] = None,
+        source_ontology: Optional["OWLOntology"] = None,
+        target_ontology: Optional["OWLOntology"] = None,
         threshold: Optional[float] = None,
     ) -> Dict[str, float]:
-        
+
         if (source_ontology and not target_ontology) or (target_ontology and not source_ontology):
             raise ValueError("Both source_ontology and target_ontology must be provided together.")
-        
+
         if isinstance(predictions, Path):
             predictions = EntityMapping.read_table_mappings(predictions, threshold=threshold)
 
@@ -60,7 +59,7 @@ class Evaluator(IEvaluator):
         return cls([MetricNames.F1]).evaluate(
             EvaluationData(predictions, full_reference, null_reference_mappings=train_reference)
         )
-    
+
     @classmethod
     def local_eval(
         cls,
@@ -68,22 +67,36 @@ class Evaluator(IEvaluator):
         reference_candidates: Optional[Path] = None,
         K: Optional[List[int]] = None,
     ) -> Dict[str, float]:
-        
+
         if isinstance(reference_and_candidates, Path):
 
             if reference_candidates is not None:
 
                 try:
-                    MetricUtils.ranking_result_file_check(cand_maps_file=reference_and_candidates, ref_cand_maps_file=reference_candidates)
+                    MetricUtils.ranking_result_file_check(
+                        cand_maps_file=reference_and_candidates,
+                        ref_cand_maps_file=reference_candidates,
+                    )
                 except AssertionError:
-                    raise ValueError("The file does not have the correct format for ranking results.")
-            
-            reference_and_candidates = MetricUtils.read_candidate_mappings(str(reference_and_candidates))
+                    raise ValueError(
+                        "The file does not have the correct format for ranking results."
+                    )
+
+            reference_and_candidates = MetricUtils.read_candidate_mappings(
+                str(reference_and_candidates)
+            )
 
         return cls([MetricNames.HITS_AT_K, MetricNames.MRR]).evaluate(
-            EvaluationData(reference_and_candidates=reference_and_candidates, K=K)
+            EvaluationData(
+                reference_and_candidates=reference_and_candidates,
+                K=K if K is not None else [1, 5, 10],
+            )
         )
-    
+
     @staticmethod
     def save_results(results: Dict[str, float], output_dir: Path) -> None:
-        save_dict_to_csv(data=results, file_path=output_dir / "evaluation_results.csv", columns=["Metric", "Value"])
+        save_dict_to_csv(
+            data=results,
+            file_path=output_dir / "evaluation_results.csv",
+            columns=["Metric", "Value"],
+        )

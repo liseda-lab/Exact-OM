@@ -1,2 +1,1 @@
-
-from .base import SelfRegisteringComponent, LoggingClass
+from .base import LoggingClass, SelfRegisteringComponent

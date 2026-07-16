@@ -3,6 +3,7 @@ from pathlib import Path
 
 from exact import init_jvm
 
+
 def run_evaluation(args):
     from exact.core.actions.evaluation import EvaluationAction
 
@@ -11,14 +12,27 @@ def run_evaluation(args):
         output_dir_path=Path(args.output_dir).resolve(),
         error_on_fail=args.error_on_fail,
         K=args.K,
-        source_file_path=Path(args.source_ontology_file).resolve() if args.source_ontology_file else None,
-        target_file_path=Path(args.target_ontology_file).resolve() if args.target_ontology_file else None,
-        train_reference_file_path=Path(args.train_reference_file).resolve() if args.train_reference_file else None,
-        full_reference_file_path=Path(args.full_reference_file).resolve() if args.full_reference_file else None,
-        reference_candidates=Path(args.reference_candidates).resolve() if args.reference_candidates else None,
-        log_file_path=Path(args.output_dir).resolve() / "OAEI_bio_ml_eval.log" if args.save_logs else None,
+        source_file_path=(
+            Path(args.source_ontology_file).resolve() if args.source_ontology_file else None
+        ),
+        target_file_path=(
+            Path(args.target_ontology_file).resolve() if args.target_ontology_file else None
+        ),
+        train_reference_file_path=(
+            Path(args.train_reference_file).resolve() if args.train_reference_file else None
+        ),
+        full_reference_file_path=(
+            Path(args.full_reference_file).resolve() if args.full_reference_file else None
+        ),
+        reference_candidates=(
+            Path(args.reference_candidates).resolve() if args.reference_candidates else None
+        ),
+        log_file_path=(
+            Path(args.output_dir).resolve() / "OAEI_bio_ml_eval.log" if args.save_logs else None
+        ),
         log_level=args.log_level,
     )
+
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Evaluate the alignment between two ontologies")
@@ -107,6 +121,7 @@ def parse_arguments():
     )
     return parser.parse_args()
 
+
 def main():
 
     args = parse_arguments()
@@ -125,18 +140,21 @@ def main():
         raise Exception(f"Full reference file {args.full_reference_file} does not exist")
     if args.reference_candidates and not Path(args.reference_candidates).exists():
         raise Exception(f"Reference candidates file {args.reference_candidates} does not exist")
-    
+
     if args.jvm_heap_size:
         if args.jvm_heap_size.isdigit():
-            args.jvm_heap_size += 'G'
-        elif not (args.jvm_heap_size[:-1].isdigit() and args.jvm_heap_size[-1].lower() == 'g'):
-            raise Exception(f"JVM heap size {args.jvm_heap_size} is not valid, please provide a valid format")
+            args.jvm_heap_size += "G"
+        elif not (args.jvm_heap_size[:-1].isdigit() and args.jvm_heap_size[-1].lower() == "g"):
+            raise Exception(
+                f"JVM heap size {args.jvm_heap_size} is not valid, please provide a valid format"
+            )
     else:
-        args.jvm_heap_size = '32G'
+        args.jvm_heap_size = "32G"
 
     init_jvm(args.jvm_heap_size)
 
     run_evaluation(args)
+
 
 if __name__ == "__main__":
     main()

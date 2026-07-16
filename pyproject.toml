@@ -4,16 +4,15 @@ version = "1.0.0"
 description = "Exact is a deep learning framework for explainable ontology matching."
 authors = ["Pedro Cotovio <pgcotovio@gmail.com>"]
 readme = "README.md"
-repository = "https://github.com/liseda-lab/Matcha-DL"
+repository = "https://github.com/liseda-lab/Exact-OM"
 packages = [
     { include = "exact" },
+    { include = "study_visualizer_runtime" },
 ]
-
-exclude = ["matcha_dl/impl/matcha/matcha/**/*"]
 
 [tool.poetry.dependencies]
 python = "^3.10"
-torch = {version = "2.7.0+cu128", source = "pytorch-gpu"}
+torch = "^2.7.0"
 tensorboard = "^2.16.2"
 dill = "^0.3.8"
 lxml = "^5.2.1"
@@ -39,6 +38,7 @@ zstandard = "^0.23.0"
 [tool.poetry.scripts]
 exact = "exact.delivery.cli.align:main"
 bioml-eval = "exact.delivery.cli.eval:main"
+exact-eval = "exact.delivery.cli.eval:main"
 exact-llm-debug = "exact.delivery.cli.llm_debug:main"
 exact-user-study = "exact.delivery.cli.user_study:main"
 exact-study-viz = "exact.delivery.cli.study_visualizer:main"
@@ -50,12 +50,9 @@ isort = "^5.13.2"
 mypy = "^1.9.0"
 pytest = "^8.1.1"
 black = "^24.4.2"
+import-linter = "^2.1"
+pytest-cov = "^6.0"
 
-
-[[tool.poetry.source]]
-name = "pytorch-gpu"
-url = "https://download.pytorch.org/whl/cu128"
-priority = "explicit"
 
 [build-system]
 requires = ["poetry-core"]
@@ -64,15 +61,63 @@ build-backend = "poetry.core.masonry.api"
 # isort
 [tool.isort]
 profile = "black"
+multi_line_output = 3
+force_grid_wrap = 0
+
 # black
 [tool.black]
 line_length = 100
-extend_skip = [".md", ".json"]
-multi_line_output=3
-force_grid_wrap = 0
 
 # mypy
 [tool.mypy]
 warn_return_any = true
 warn_unused_configs = true
-files = ["tests/**/*.py"]
+files = ["exact", "study_visualizer_runtime"]
+ignore_missing_imports = true
+check_untyped_defs = false
+
+# The first production-code baseline deliberately quarantines only the legacy
+# modules that already contain incompatible annotations.  Everything else,
+# including new modules, remains checked; follow-up work packages can shrink
+# this list as they replace or split the affected code.
+[[tool.mypy.overrides]]
+module = [
+    "exact.analysis.study_visualizer",
+    "exact.analysis.user_study",
+    "exact.core.actions.alignment",
+    "exact.core.actions.evaluation",
+    "exact.core.contracts.dataset",
+    "exact.core.contracts.model",
+    "exact.core.contracts.trainer",
+    "exact.core.entities.configs.config",
+    "exact.core.entities.mappings.reference",
+    "exact.core.entities.ontology",
+    "exact.core.entities.registry.registry",
+    "exact.delivery.cli.llm_debug",
+    "exact.impl.datasets.contextgraph",
+    "exact.impl.datasets.pair_adaptive_context",
+    "exact.impl.evaluator",
+    "exact.impl.metrics.full",
+    "exact.impl.metrics.local",
+    "exact.impl.models.candidate_set_selector",
+    "exact.impl.models.pair_adaptive_scorer",
+    "exact.impl.models.semantic_scorer",
+    "exact.impl.trainer.semantic_runner",
+    "exact.utils.candidate_generation",
+    "exact.utils.data",
+    "exact.utils.eval",
+    "exact.utils.graph_search",
+    "exact.utils.llm_routing",
+    "exact.utils.logs",
+    "study_visualizer_runtime.app",
+]
+ignore_errors = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+markers = [
+    "requires_data: requires external or licensed ontology data",
+    "slow: long-running integration or performance test",
+    "requires_llm: requires a real local or hosted language model",
+]

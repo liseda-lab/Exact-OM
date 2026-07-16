@@ -17,26 +17,30 @@ def _record(
     include_similarity: bool = False,
 ) -> dict:
     similarity_items = (
-        [{
-            "item_id": f"{src}->{tgt}:sim:source",
-            "triple": [src_label, "label", "shared term"],
-            "subject_iri": src,
-            "object_iri": f"{src}#shared",
-            "support": 0.9,
-            "importance": 0.2,
-        }]
+        [
+            {
+                "item_id": f"{src}->{tgt}:sim:source",
+                "triple": [src_label, "label", "shared term"],
+                "subject_iri": src,
+                "object_iri": f"{src}#shared",
+                "support": 0.9,
+                "importance": 0.2,
+            }
+        ]
         if include_similarity
         else []
     )
     similarity_target_items = (
-        [{
-            "item_id": f"{src}->{tgt}:sim:target",
-            "triple": [tgt_label, "label", "shared term"],
-            "subject_iri": tgt,
-            "object_iri": f"{tgt}#shared",
-            "support": 0.9,
-            "importance": 0.2,
-        }]
+        [
+            {
+                "item_id": f"{src}->{tgt}:sim:target",
+                "triple": [tgt_label, "label", "shared term"],
+                "subject_iri": tgt,
+                "object_iri": f"{tgt}#shared",
+                "support": 0.9,
+                "importance": 0.2,
+            }
+        ]
         if include_similarity
         else []
     )
@@ -71,7 +75,10 @@ def _record(
             "llm_rationale": llm_rationale,
         },
         "llm_pair_brief": f"Brief for {src_label} vs {tgt_label}",
-        "backend_usage": {"summary": {"model": "summary-model"}, "decision": {"model": "decision-model"}},
+        "backend_usage": {
+            "summary": {"model": "summary-model"},
+            "decision": {"model": "decision-model"},
+        },
         "models": {},
         "attributes": {
             "source": [
@@ -98,10 +105,22 @@ def _record(
             ],
         },
         "context_triples": {
-            "hierarchy_source": {"is_a": [[src_label, "is_a", f"{src_label} parent"]], "part_of": [], "has_part": []},
-            "hierarchy_target": {"is_a": [[tgt_label, "is_a", f"{tgt_label} parent"]], "part_of": [], "has_part": []},
-            "similarity_source": [[src_label, "label", "shared term"]] if include_similarity else [],
-            "similarity_target": [[tgt_label, "label", "shared term"]] if include_similarity else [],
+            "hierarchy_source": {
+                "is_a": [[src_label, "is_a", f"{src_label} parent"]],
+                "part_of": [],
+                "has_part": [],
+            },
+            "hierarchy_target": {
+                "is_a": [[tgt_label, "is_a", f"{tgt_label} parent"]],
+                "part_of": [],
+                "has_part": [],
+            },
+            "similarity_source": (
+                [[src_label, "label", "shared term"]] if include_similarity else []
+            ),
+            "similarity_target": (
+                [[tgt_label, "label", "shared term"]] if include_similarity else []
+            ),
             "difference_source": [[src_label, "has_trait", f"{src_label} trait"]],
             "difference_target": [[tgt_label, "has_trait", f"{tgt_label} trait"]],
         },
@@ -160,7 +179,13 @@ def _record(
             },
         },
         "cross_side_provenance": {
-            "lexical": [{"source_ref": "__source__", "target_ref": "__target__", "score": max(0.0, score - 0.05)}],
+            "lexical": [
+                {
+                    "source_ref": "__source__",
+                    "target_ref": "__target__",
+                    "score": max(0.0, score - 0.05),
+                }
+            ],
             "hierarchy": {
                 "is_a": [
                     {
@@ -241,7 +266,9 @@ def _build_run_dir(
                 tgt = f"tgt-r{rank}-{source_idx}-{cand_rank}"
                 score = 1.0 - (cand_rank * 0.01)
                 candidates.append((tgt, score))
-            raw_order = [candidates[rank - 1]] + [cand for idx, cand in enumerate(candidates) if idx != rank - 1]
+            raw_order = [candidates[rank - 1]] + [
+                cand for idx, cand in enumerate(candidates) if idx != rank - 1
+            ]
             gold_tgt = candidates[rank - 1][0]
             ranking_rows.append(
                 {
@@ -265,7 +292,9 @@ def _build_run_dir(
                         score=score,
                         ground_truth=(tgt == gold_tgt),
                         llm_rationale=llm_rationale,
-                        include_similarity=(rank == 1 and source_idx == 0 and tgt == candidates[0][0]),
+                        include_similarity=(
+                            rank == 1 and source_idx == 0 and tgt == candidates[0][0]
+                        ),
                     )
                 )
 
@@ -607,7 +636,15 @@ def test_failure_taxonomy_assignment_order():
 
 def test_backfill_rationales_updates_only_missing_records(tmp_path, monkeypatch):
     records = [
-        _record("s1", "t1", "Source 1", "Target 1", 0.9, ground_truth=True, llm_rationale="existing rationale"),
+        _record(
+            "s1",
+            "t1",
+            "Source 1",
+            "Target 1",
+            0.9,
+            ground_truth=True,
+            llm_rationale="existing rationale",
+        ),
         _record("s1", "t2", "Source 1", "Target 2", 0.8, ground_truth=False, llm_rationale=""),
     ]
 
@@ -644,7 +681,9 @@ def test_backfill_rationales_updates_only_missing_records(tmp_path, monkeypatch)
                 )
             return [f"generated:{row['tgt_iri']}" for row in rows]
 
-    monkeypatch.setattr(mod, "_build_rationale_model", lambda configs, cache_dir, device, logger: DummyModel())
+    monkeypatch.setattr(
+        mod, "_build_rationale_model", lambda configs, cache_dir, device, logger: DummyModel()
+    )
     updated = mod._backfill_rationales(
         records,
         configs=object(),
@@ -686,7 +725,9 @@ def test_backfill_explanation_fields_repairs_from_saved_record_only(tmp_path, mo
         def get_model_sequence(self):
             return [self._ModelSpec()]
 
-    monkeypatch.setattr(mod, "_build_explanation_backfill_model", lambda *args, **kwargs: DummyModel(original))
+    monkeypatch.setattr(
+        mod, "_build_explanation_backfill_model", lambda *args, **kwargs: DummyModel(original)
+    )
     updated = mod._backfill_explanation_fields(
         [damaged],
         run_dir=tmp_path,
@@ -703,7 +744,9 @@ def test_backfill_explanation_fields_repairs_from_saved_record_only(tmp_path, mo
     assert updated[0]["prediction"] == damaged["prediction"]
 
 
-def test_backfill_explanation_fields_can_fall_back_to_targeted_pair_rehydrate(tmp_path, monkeypatch):
+def test_backfill_explanation_fields_can_fall_back_to_targeted_pair_rehydrate(
+    tmp_path, monkeypatch
+):
     original = _record("s1", "t1", "Source 1", "Target 1", 0.9, ground_truth=True)
     damaged = json.loads(json.dumps(original))
     damaged.pop("explanation_schema_version", None)
@@ -729,7 +772,9 @@ def test_backfill_explanation_fields_can_fall_back_to_targeted_pair_rehydrate(tm
         def get_model_sequence(self):
             return [self._ModelSpec()]
 
-    monkeypatch.setattr(mod, "_build_explanation_backfill_model", lambda *args, **kwargs: DummyModel())
+    monkeypatch.setattr(
+        mod, "_build_explanation_backfill_model", lambda *args, **kwargs: DummyModel()
+    )
     updated = mod._backfill_explanation_fields(
         [damaged],
         run_dir=tmp_path,
@@ -765,7 +810,9 @@ def test_full_pipeline_writes_balanced_mapping_and_notebook(tmp_path):
     for pair in mapping["pairs"]:
         assert len(pair["paths"]) == 5
         for path in pair["paths"]:
-            assert set(["id", "rank", "ground_truth", "score", "metrics", "llm", "nodes", "edges"]).issubset(path.keys())
+            assert set(
+                ["id", "rank", "ground_truth", "score", "metrics", "llm", "nodes", "edges"]
+            ).issubset(path.keys())
             assert set(
                 [
                     "decision_basis",
@@ -778,12 +825,17 @@ def test_full_pipeline_writes_balanced_mapping_and_notebook(tmp_path):
             assert path["nodes"][0]["type"] == "Source"
             assert path["nodes"][-1]["type"] == "Target"
             assert all(
-                set(["source", "target", "label", "score", "type", "bridge", "level", "level_label"]).issubset(edge.keys())
+                set(
+                    ["source", "target", "label", "score", "type", "bridge", "level", "level_label"]
+                ).issubset(edge.keys())
                 for edge in path["edges"]
             )
             assert all(isinstance(edge["bridge"], bool) for edge in path["edges"])
             assert all(isinstance(edge["level"], int) for edge in path["edges"])
-            assert all(isinstance(edge["level_label"], str) and edge["level_label"] for edge in path["edges"])
+            assert all(
+                isinstance(edge["level_label"], str) and edge["level_label"]
+                for edge in path["edges"]
+            )
             assert {edge["type"] for edge in path["edges"]}.issubset(
                 {
                     "hierarchy",
@@ -799,7 +851,11 @@ def test_full_pipeline_writes_balanced_mapping_and_notebook(tmp_path):
                     assert edge["score"] in {"weak", "moderate", "strong"}
                     assert edge["bridge"] is True
                     assert edge["level"] in {2, 3, 4}
-                    assert edge["level_label"] in {"Core bridge", "Supporting bridge", "Optional bridge"}
+                    assert edge["level_label"] in {
+                        "Core bridge",
+                        "Supporting bridge",
+                        "Optional bridge",
+                    }
                 else:
                     assert isinstance(edge["score"], (int, float))
                     assert edge["bridge"] is False
@@ -812,9 +868,15 @@ def test_full_pipeline_writes_balanced_mapping_and_notebook(tmp_path):
             ]
             assert len(bridge_keys) == len(set(bridge_keys))
             saw_context_edge = saw_context_edge or any(not edge["bridge"] for edge in path["edges"])
-            saw_core_bridge = saw_core_bridge or any(edge["level"] == 2 for edge in path["edges"] if edge["bridge"])
-            saw_supporting_bridge = saw_supporting_bridge or any(edge["level"] in {3, 4} for edge in path["edges"] if edge["bridge"])
-            saw_bridge_edge = saw_bridge_edge or any(str(edge["type"]).startswith("bridge-") for edge in path["edges"])
+            saw_core_bridge = saw_core_bridge or any(
+                edge["level"] == 2 for edge in path["edges"] if edge["bridge"]
+            )
+            saw_supporting_bridge = saw_supporting_bridge or any(
+                edge["level"] in {3, 4} for edge in path["edges"] if edge["bridge"]
+            )
+            saw_bridge_edge = saw_bridge_edge or any(
+                str(edge["type"]).startswith("bridge-") for edge in path["edges"]
+            )
             node_types = {node["type"] for node in path["nodes"]}
             assert node_types.issubset(
                 {
@@ -835,7 +897,9 @@ def test_full_pipeline_writes_balanced_mapping_and_notebook(tmp_path):
     assert saw_core_bridge
     assert saw_supporting_bridge
     assert saw_bridge_edge
-    selected_records = json.loads((output_dir / "study_selected_records.json").read_text(encoding="utf-8"))
+    selected_records = json.loads(
+        (output_dir / "study_selected_records.json").read_text(encoding="utf-8")
+    )
     assert len(selected_records) == 100
     assert Path(outputs["notebook"]).exists()
     notebook = json.loads(Path(outputs["notebook"]).read_text(encoding="utf-8"))

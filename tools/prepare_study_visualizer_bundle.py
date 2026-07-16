@@ -130,7 +130,9 @@ def _resolve_dataset_spec(run_dir: Path, logger: logging.Logger) -> Tuple[Path, 
         dataset_cfg = dict(payload.get("dataset") or {})
         if dataset_cfg.get("data_dir") and dataset_cfg.get("source") and dataset_cfg.get("target"):
             return spec_path, dict(payload)
-    raise FileNotFoundError(f"Could not resolve a dataset spec with dataset.data_dir/source/target under {run_dir}")
+    raise FileNotFoundError(
+        f"Could not resolve a dataset spec with dataset.data_dir/source/target under {run_dir}"
+    )
 
 
 def _copy_file(src: Path, dst: Path) -> None:
@@ -182,7 +184,9 @@ def _build_precomputed_ontology_cache(
     logger: logging.Logger,
 ) -> Dict[str, Dict[str, Dict[str, Any]]]:
     side_to_iris = _collect_entity_iris(selected_records)
-    lookup = StudyOntologyLookup(run_dir=run_dir, config_path=config_path, logger=logger, enabled=True)
+    lookup = StudyOntologyLookup(
+        run_dir=run_dir, config_path=config_path, logger=logger, enabled=True
+    )
     cache: Dict[str, Dict[str, Dict[str, Any]]] = {"source": {}, "target": {}}
 
     total = len(side_to_iris["source"]) + len(side_to_iris["target"])
@@ -238,13 +242,19 @@ def main() -> None:
     run_dir = Path(args.run_dir).resolve()
     if not run_dir.exists():
         raise FileNotFoundError(f"Run directory not found: {run_dir}")
-    analysis_dir = Path(args.analysis_dir).resolve() if args.analysis_dir else (run_dir / "analysis" / "user_study")
+    analysis_dir = (
+        Path(args.analysis_dir).resolve()
+        if args.analysis_dir
+        else (run_dir / "analysis" / "user_study")
+    )
     if not analysis_dir.exists():
         raise FileNotFoundError(f"Analysis directory not found: {analysis_dir}")
     bundle_dir = Path(args.bundle_dir).resolve()
     if bundle_dir.exists():
         if not args.overwrite:
-            raise FileExistsError(f"Bundle directory already exists: {bundle_dir}. Use --overwrite to replace it.")
+            raise FileExistsError(
+                f"Bundle directory already exists: {bundle_dir}. Use --overwrite to replace it."
+            )
         shutil.rmtree(bundle_dir)
     bundle_dir.mkdir(parents=True, exist_ok=True)
 
@@ -254,7 +264,9 @@ def main() -> None:
         raise FileNotFoundError(f"Study mapping not found: {study_mapping_path}")
     selected_records = json.loads(selected_records_path.read_text(encoding="utf-8"))
 
-    config_path = _resolve_config_path(run_dir, Path(args.config_path) if args.config_path else None)
+    config_path = _resolve_config_path(
+        run_dir, Path(args.config_path) if args.config_path else None
+    )
     dataset_spec_path, dataset_spec = _resolve_dataset_spec(run_dir, logger)
     bundle_name = args.bundle_name or run_dir.name
     bundle_analysis_dir = bundle_dir / "analysis" / "user_study"

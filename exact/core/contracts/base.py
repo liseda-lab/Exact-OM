@@ -1,22 +1,27 @@
-
-from abc import ABC
-from typing import Optional, TYPE_CHECKING
-
 import logging
+from abc import ABC
+from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
     from exact.core.entities.registry import ComponentType
 
-#TODO on debug check if all modules are being curretly registered, non imported implementations might not be registered.
+# TODO on debug check if all modules are being curretly registered, non imported implementations might not be registered.
 
 
 class SelfRegisteringComponent(ABC):
-    
     """Base class for self-registering components."""
-    component_type: 'ComponentType'  # To be defined in subclasses
+
+    component_type: "ComponentType"  # To be defined in subclasses
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
+
+        # Interface classes such as IDataset and IMetric declare abstract
+        # methods and are not runnable registry components.  Register only
+        # concrete subclasses; otherwise callers must rely on registration
+        # order to skip the interface entry.
+        if any(getattr(member, "__isabstractmethod__", False) for member in cls.__dict__.values()):
+            return
 
         # Ensure the subclass defines the component_type
         if not hasattr(cls, "component_type") or not cls.component_type:
@@ -31,13 +36,15 @@ class SelfRegisteringComponent(ABC):
         import_path = f"{module_name}.{class_name}"
 
         # Register the class using the ComponentRegistry
-        
+
         from exact.core.entities.registry import ComponentRegistry
+
         ComponentRegistry.register(cls.component_type, class_name, import_path)
 
 
 class LoggingClass:
     """Base class for logging classes."""
+
     def __init__(self, logger: Optional[logging.Logger] = None):
         self.logger = logger
 

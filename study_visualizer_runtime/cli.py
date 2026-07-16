@@ -87,7 +87,13 @@ def main() -> None:
         enable_ontology_info=args.enable_ontology_info,
         logger=logger,
     )
-    uvicorn.run(app, host=args.host, port=args.port, reload=args.reload, log_level=str(args.logging_level).lower())
+    uvicorn.run(
+        app,
+        host=args.host,
+        port=args.port,
+        reload=args.reload,
+        log_level=str(args.logging_level).lower(),
+    )
 
 
 if __name__ == "__main__":

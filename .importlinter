@@ -1,0 +1,26 @@
+[importlinter]
+root_package = exact
+
+[importlinter:contract:core-boundary]
+name = Core does not depend on implementations, delivery, or analysis
+type = forbidden
+source_modules =
+    exact.core
+forbidden_modules =
+    exact.impl
+    exact.delivery
+    exact.analysis
+ignore_imports =
+    exact.core.actions.alignment -> exact.impl.seed
+    exact.core.actions.evaluation -> exact.impl.evaluator
+
+[importlinter:contract:delivery-boundary]
+name = Library subsystems do not depend on delivery
+type = forbidden
+source_modules =
+    exact.core
+    exact.impl
+    exact.utils
+    exact.analysis
+forbidden_modules =
+    exact.delivery

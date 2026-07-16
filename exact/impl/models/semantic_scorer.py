@@ -1,24 +1,24 @@
-import math
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from enum import Enum
-from typing import List, Optional, Tuple, Dict, Any, Iterable, Callable
+import hashlib
+import json
 import re
 import time
-import json
-import hashlib
-from pathlib import Path
 from collections import OrderedDict
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from enum import Enum
+from pathlib import Path
+from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
 from urllib import error as urlerror
 
 import torch
 from torch import nn
 from transformers import (
-    AutoTokenizer,
     AutoModel,
     AutoModelForCausalLM,
+    AutoTokenizer,
 )
 
 from exact.core.contracts.model import IModel
+from exact.utils.data import read_table
 from exact.utils.llm_routing import (
     LLMRouter,
     extract_chat_text,
@@ -54,18 +54,14 @@ class SemanticScorer(IModel):
         lexical_model_name: str = "cambridgeltl/SapBERT-from-PubMedBERT-fulltext",
         context_model_name: str = "BAAI/bge-large-en-v1.5",
         llm_model_name: Optional[str] = "Qwen/Qwen2.5-7B-Instruct",
-
         # ---- Precision / device ----
         fp16_inference: bool = True,
         device: Optional[str] = None,
-
         # ---- Pooling for encoders ----
         pooling_method: PoolingMethod = PoolingMethod.MEAN,
         label_pair_pooling: LabelPairPooling = LabelPairPooling.MAX,
-
         # ---- Context sentence delimiter ----
         ctx_sentence_delimiter: Optional[str] = " || ",
-
         # ---- Token limits ----
         max_input_tokens_lexical: int = 32,
         max_input_tokens_context: int = 256,
@@ -74,22 +70,17 @@ class SemanticScorer(IModel):
         max_total_tokens_llm_rationale: int = 512,
         max_new_tokens_llm: int = 64,
         max_new_tokens_llm_rationale: Optional[int] = None,
-
         # ---- Ablations / toggles ----
         use_lexical: bool = True,
         use_context: bool = True,
         use_llm: bool = True,
-
         # ---- Adaptive weighting thresholds ----
         tau: float = 0.5,
-
         # ---- Adaptive context weighting ----
         gamma: float = 2.0,
-
         # ---- LLM gating and mixing ----
         beta: float = 0.8,
         tau_LLM: float = 0.35,
-
         # ---- LLM generation knobs ----
         llm_temperature: float = 0.1,
         llm_top_p: float = 0.9,
@@ -100,7 +91,6 @@ class SemanticScorer(IModel):
         hosted_decision_labels: Optional[List[str]] = None,
         hosted_decision_logit_bias: float = 20.0,
         force_llm_summaries: bool = False,
-
         # ---- Explanations / review band ----
         return_explanations: bool = False,
         generate_llm_rationales: bool = False,
@@ -108,10 +98,10 @@ class SemanticScorer(IModel):
         llm_calibration_a: Optional[float] = None,
         llm_calibration_b: Optional[float] = None,
         llm_calibration_info: Optional[str] = None,
+        llm_calibration_reference_file_path: Optional[str] = None,
         review_low: float = 0.35,
         review_high: float = 0.75,
         threshold: float = 0.7,
-
         # ---- Caching ----
         cache_dir: Optional[str] = None,
         cache_namespace: Optional[str] = None,
@@ -124,13 +114,14 @@ class SemanticScorer(IModel):
         llm_profiles: Optional[Dict[str, Any]] = None,
         llm_routing: Optional[Dict[str, Any]] = None,
         request_seed: Optional[int] = None,
-
         **kwargs,
     ):
         super().__init__()
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
         self.device_type = (
-            self.device.type if isinstance(self.device, torch.device) else torch.device(self.device).type
+            self.device.type
+            if isinstance(self.device, torch.device)
+            else torch.device(self.device).type
         )
         self.fp16 = fp16_inference
         self.pooling_method = PoolingMethod(pooling_method)
@@ -155,9 +146,14 @@ class SemanticScorer(IModel):
         self.llm_decision_batch_size = llm_decision_batch_size
         self.llm_rationale_batch_size = llm_rationale_batch_size
         raw_hosted_labels = list(hosted_decision_labels or ["A", "B"])
-        if len(raw_hosted_labels) != 2 or any(not str(label).strip() for label in raw_hosted_labels):
+        if len(raw_hosted_labels) != 2 or any(
+            not str(label).strip() for label in raw_hosted_labels
+        ):
             raise ValueError("hosted_decision_labels must contain exactly two non-empty labels.")
-        self.hosted_decision_labels = (str(raw_hosted_labels[0]).strip(), str(raw_hosted_labels[1]).strip())
+        self.hosted_decision_labels = (
+            str(raw_hosted_labels[0]).strip(),
+            str(raw_hosted_labels[1]).strip(),
+        )
         if self.hosted_decision_labels[0] == self.hosted_decision_labels[1]:
             raise ValueError("hosted_decision_labels must contain two distinct labels.")
         self.hosted_decision_logit_bias = float(hosted_decision_logit_bias)
@@ -176,6 +172,37 @@ class SemanticScorer(IModel):
             and (self.llm_calibration_a is not None)
             and (self.llm_calibration_b is not None)
         )
+        self._llm_calibration_reference_pairs: set[tuple[str, str]] = set()
+        self._llm_calibration_reference_sources: set[str] = set()
+        self._llm_calibration_reference_fingerprint: Optional[str] = None
+        if self.use_llm_calibration and not self._llm_calibration_can_apply:
+            if not llm_calibration_reference_file_path:
+                raise ValueError(
+                    "use_llm_calibration requires a training reference file; full/test "
+                    "reference labels must not be used for calibration"
+                )
+            reference_path = Path(llm_calibration_reference_file_path).expanduser().resolve()
+            reference = read_table(reference_path)
+            if reference.shape[1] < 2:
+                raise ValueError(
+                    f"LLM calibration training reference must have at least two columns: {reference_path}"
+                )
+            self._llm_calibration_reference_pairs = {
+                (str(src), str(tgt))
+                for src, tgt in reference.iloc[:, :2].itertuples(index=False, name=None)
+            }
+            self._llm_calibration_reference_sources = {
+                src for src, _ in self._llm_calibration_reference_pairs
+            }
+            if not self._llm_calibration_reference_pairs:
+                raise ValueError(f"LLM calibration training reference is empty: {reference_path}")
+            reference_blob = json.dumps(
+                sorted(self._llm_calibration_reference_pairs),
+                separators=(",", ":"),
+            )
+            self._llm_calibration_reference_fingerprint = hashlib.sha1(
+                reference_blob.encode("utf-8")
+            ).hexdigest()
 
         self.tau = tau
         self.gamma = gamma
@@ -190,7 +217,11 @@ class SemanticScorer(IModel):
         self.dataset_signature = dataset_signature
         self.cache_namespace = (cache_namespace or "default").strip() or "default"
         self.persist_cache_to_disk = bool(persist_cache_to_disk)
-        default_cache_dir = Path(cache_dir).expanduser() if cache_dir else (Path.home() / ".cache" / "exact" / "semantic_scorer")
+        default_cache_dir = (
+            Path(cache_dir).expanduser()
+            if cache_dir
+            else (Path.home() / ".cache" / "exact" / "semantic_scorer")
+        )
         self.cache_dir = default_cache_dir
         self._cache_tensor_dtype = torch.float16 if self.fp16 else torch.float32
         self.max_cached_labels = max_cached_labels
@@ -205,7 +236,8 @@ class SemanticScorer(IModel):
         self._cache_dirty = False
         self._cache_file_path = (
             (self.cache_dir / f"{self.cache_namespace}_cache.pt").resolve()
-            if self.persist_cache_to_disk else None
+            if self.persist_cache_to_disk
+            else None
         )
         self._log_once_keys = set()
         self._computed_llm_calibration: Optional[Dict[str, Any]] = None
@@ -220,7 +252,9 @@ class SemanticScorer(IModel):
         self.lexical_model_name = lexical_model_name
         self.context_model_name = context_model_name
         self.llm_model_name = llm_model_name
-        self._llm_router = LLMRouter(llm_profiles=llm_profiles, llm_routing=llm_routing, log=self.log)
+        self._llm_router = LLMRouter(
+            llm_profiles=llm_profiles, llm_routing=llm_routing, log=self.log
+        )
         self._local_llm_profile_name = "__semantic_local_llm__"
         self._llm_router.ensure_profile(
             self._local_llm_profile_name,
@@ -272,8 +306,7 @@ class SemanticScorer(IModel):
         self.log("Loading local LLM fallback...", "info")
         self.llm_tok = AutoTokenizer.from_pretrained(self.llm_model_name)
         self.llm = AutoModelForCausalLM.from_pretrained(
-            self.llm_model_name,
-            torch_dtype=torch.float16 if self.fp16 else torch.float32
+            self.llm_model_name, torch_dtype=torch.float16 if self.fp16 else torch.float32
         ).to(self.device)
         self.yes_token_ids = self._candidate_token_ids([" Yes", "Yes", "yes"])
         self.no_token_ids = self._candidate_token_ids([" No", "No", "no"])
@@ -341,7 +374,11 @@ class SemanticScorer(IModel):
     def _join_context(self, triples: List[str]) -> str:
         if not triples:
             return ""
-        return self.ctx_sentence_delimiter.join(triples) if self.ctx_sentence_delimiter else " ".join(triples)
+        return (
+            self.ctx_sentence_delimiter.join(triples)
+            if self.ctx_sentence_delimiter
+            else " ".join(triples)
+        )
 
     # -------------------------------------------------------------------------
     # Cache helpers
@@ -379,6 +416,11 @@ class SemanticScorer(IModel):
             "llm_calibration_a": self.llm_calibration_a,
             "llm_calibration_b": self.llm_calibration_b,
             "llm_calibration_info": self.llm_calibration_info,
+            "llm_calibration_reference": {
+                "sha1": self._llm_calibration_reference_fingerprint,
+                "pairs": len(self._llm_calibration_reference_pairs),
+                "sources": len(self._llm_calibration_reference_sources),
+            },
             "force_llm_summaries": self.force_llm_summaries,
         }
 
@@ -472,7 +514,7 @@ class SemanticScorer(IModel):
 
     @staticmethod
     def _summary_key(label: str, context: str) -> str:
-        payload = (label or "") + "\u241F" + (context or "")
+        payload = (label or "") + "\u241f" + (context or "")
         return hashlib.sha1(payload.encode("utf-8")).hexdigest()
 
     @staticmethod
@@ -484,7 +526,7 @@ class SemanticScorer(IModel):
         decision: str,
         decision_context: str = "",
     ) -> str:
-        sep = "\u241F"
+        sep = "\u241f"
         parts = [
             src_label or "",
             tgt_label or "",
@@ -506,8 +548,12 @@ class SemanticScorer(IModel):
                 "namespace": self.cache_namespace,
                 "timestamp": time.time(),
             },
-            "lexical": [(k, v.cpu().to(self._cache_tensor_dtype)) for k, v in self._lex_cache.items()],
-            "context": [(k, v.cpu().to(self._cache_tensor_dtype)) for k, v in self._ctx_cache.items()],
+            "lexical": [
+                (k, v.cpu().to(self._cache_tensor_dtype)) for k, v in self._lex_cache.items()
+            ],
+            "context": [
+                (k, v.cpu().to(self._cache_tensor_dtype)) for k, v in self._ctx_cache.items()
+            ],
             "summaries": list(self._summary_cache.items()),
             "rationales": list(self._rationale_cache.items()),
         }
@@ -520,7 +566,9 @@ class SemanticScorer(IModel):
         try:
             payload = torch.load(self._cache_file_path, map_location="cpu")
         except Exception as exc:  # noqa: BLE001
-            self.log(f"Failed to load SemanticScorer cache at {self._cache_file_path}: {exc}", "warning")
+            self.log(
+                f"Failed to load SemanticScorer cache at {self._cache_file_path}: {exc}", "warning"
+            )
             return
 
         meta = (payload or {}).get("metadata") or {}
@@ -574,16 +622,15 @@ class SemanticScorer(IModel):
             torch.save(payload, self._cache_file_path)
             model_name = self.__class__.__name__
             self.log(
-                (
-                    f"Persisted {model_name} cache to {self._cache_file_path} "
-                    f"(reason={reason})."
-                ),
+                (f"Persisted {model_name} cache to {self._cache_file_path} " f"(reason={reason})."),
                 "debug",
             )
             self._cache_dirty = False
         except OSError as exc:
             model_name = self.__class__.__name__
-            self.log(f"Failed to persist {model_name} cache to {self._cache_file_path}: {exc}", "warning")
+            self.log(
+                f"Failed to persist {model_name} cache to {self._cache_file_path}: {exc}", "warning"
+            )
 
     # -------------------------------------------------------------------------
     # Encoders
@@ -622,7 +669,7 @@ class SemanticScorer(IModel):
             self._ctx_cache,
             self.max_cached_contexts,
         )
-    
+
     # -------------------------------------------------------------------------
     # Generative Models
     # -------------------------------------------------------------------------
@@ -633,11 +680,13 @@ class SemanticScorer(IModel):
                 f"Given the following context subgraph describing the entity '{label}', "
                 "provide one concise and informative summary capturing its key characteristics.\n\n"
                 f"Context: {ctx}\n\n"
-                "Return exactly one JSON object with one key: \"summary\"."
+                'Return exactly one JSON object with one key: "summary".'
             ),
         }
 
-    def _decision_prompt(self, src_label: str, tgt_label: str, src_summary: str, tgt_summary: str) -> Dict[str, str]:
+    def _decision_prompt(
+        self, src_label: str, tgt_label: str, src_summary: str, tgt_summary: str
+    ) -> Dict[str, str]:
         return {
             "system": "You are an ontology alignment expert.",
             "user": (
@@ -660,10 +709,7 @@ class SemanticScorer(IModel):
     ) -> Dict[str, str]:
         context_block = ""
         if decision_context:
-            context_block = (
-                "\nFinal alignment context\n"
-                f"{decision_context}\n"
-            )
+            context_block = "\nFinal alignment context\n" f"{decision_context}\n"
         return {
             "system": "You are an ontology alignment expert.",
             "user": (
@@ -673,7 +719,7 @@ class SemanticScorer(IModel):
                 "When final alignment context is present, use it to explain whether the pair "
                 "was kept or rejected after candidate-set selection and cardinality filtering. "
                 "Do not introduce external knowledge. Return exactly one JSON object with one key: "
-                "\"rationale\".\n\n"
+                '"rationale".\n\n'
                 f"Source\nLabel: {src_label}\nSummary: {src_summary}\n\n"
                 f"Target\nLabel: {tgt_label}\nSummary: {tgt_summary}\n\n"
                 f"Final decision: {decision}\n\n"
@@ -701,7 +747,9 @@ class SemanticScorer(IModel):
         segments = [seg for seg in [system, user] if seg]
         return "\n\n".join(segments)
 
-    def _strip_llm_prompt_tokens(self, enc: Dict[str, torch.Tensor], gen: torch.Tensor) -> List[torch.Tensor]:
+    def _strip_llm_prompt_tokens(
+        self, enc: Dict[str, torch.Tensor], gen: torch.Tensor
+    ) -> List[torch.Tensor]:
         prompt_lens = enc["attention_mask"].sum(dim=1)
         outputs: List[torch.Tensor] = []
         for row, plen in zip(gen, prompt_lens):
@@ -882,7 +930,9 @@ class SemanticScorer(IModel):
         return {
             "length": len(value),
             "non_ascii": sum(1 for ch in value if ord(ch) > 127),
-            "control": sum(1 for ch in value if ((ord(ch) < 32 and ch not in "\n\r\t") or ord(ch) == 127)),
+            "control": sum(
+                1 for ch in value if ((ord(ch) < 32 and ch not in "\n\r\t") or ord(ch) == 127)
+            ),
             "nul": value.count("\x00"),
             "surrogates": sum(1 for ch in value if 0xD800 <= ord(ch) <= 0xDFFF),
         }
@@ -1181,7 +1231,7 @@ class SemanticScorer(IModel):
             self._log_once(
                 f"hosted_decision_probe_failed:{profile.name}",
                 (
-                f"OpenRouter decision chat-logprob probe failed for profile '{profile.name}'. "
+                    f"OpenRouter decision chat-logprob probe failed for profile '{profile.name}'. "
                     f"Falling back to local decision scoring. Error: {exc}"
                 ),
                 "warning",
@@ -1226,24 +1276,23 @@ class SemanticScorer(IModel):
         self,
         idxs: List[int],
         probs: torch.Tensor,
-        labels: Optional[List[float]],
+        src_iris: List[str],
+        tgt_iris: List[str],
     ) -> Optional[Tuple[torch.Tensor, torch.Tensor]]:
-        if labels is None:
-            self._calibration_messages.append("LLM calibration skipped: ground-truth labels not provided.")
-            return None
         xs: List[float] = []
         ys: List[float] = []
         for offset, idx in enumerate(idxs):
-            if idx >= len(labels):
+            if idx >= len(src_iris) or idx >= len(tgt_iris):
                 continue
-            gt = labels[idx]
-            if gt is None:
+            src = str(src_iris[idx])
+            tgt = str(tgt_iris[idx])
+            if src not in self._llm_calibration_reference_sources:
                 continue
             xs.append(float(probs[offset].item()))
-            ys.append(float(gt))
+            ys.append(float((src, tgt) in self._llm_calibration_reference_pairs))
         if len(xs) < 2:
             self._calibration_messages.append(
-                f"LLM calibration skipped: insufficient labelled pairs ({len(xs)})."
+                f"LLM calibration skipped: insufficient training-reference pairs ({len(xs)})."
             )
             return None
         x_t = torch.tensor(xs, dtype=torch.float64)
@@ -1370,7 +1419,9 @@ class SemanticScorer(IModel):
         self._record_summary_stats(outputs)
         return outputs
 
-    def _generate_summaries_uncached(self, labels: List[str], contexts: List[str], resolved_backend) -> List[str]:
+    def _generate_summaries_uncached(
+        self, labels: List[str], contexts: List[str], resolved_backend
+    ) -> List[str]:
         if not labels:
             return []
         if resolved_backend.backend == "openrouter":
@@ -1387,7 +1438,10 @@ class SemanticScorer(IModel):
                 concurrency=self.llm_summary_batch_size,
             )
         self._ensure_local_llm()
-        prompts = [self._render_llm_prompt(self._summary_prompt(l, c)) for l, c in zip(labels, contexts)]
+        prompts = [
+            self._render_llm_prompt(self._summary_prompt(label_text, context))
+            for label_text, context in zip(labels, contexts)
+        ]
         outputs = [""] * len(prompts)
         chunk = self.llm_summary_batch_size or len(prompts)
         chunk = chunk if chunk > 0 else len(prompts)
@@ -1497,7 +1551,9 @@ class SemanticScorer(IModel):
                 if prompt_idx < 0 or prompt_idx >= len(pending_keys):
                     return
                 key = pending_keys[prompt_idx]
-                clean = self._parse_structured_text(raw_text, "rationale", self._clean_rationale_text)
+                clean = self._parse_structured_text(
+                    raw_text, "rationale", self._clean_rationale_text
+                )
                 self._cache_store(self._rationale_cache, key, clean, self.max_cached_rationales)
                 indices = list(pending[key]["indices"])
                 for idx in indices:
@@ -1540,7 +1596,9 @@ class SemanticScorer(IModel):
             for key, rationale in zip(pending_keys, generated):
                 if all(outputs[idx] for idx in pending[key]["indices"]):
                     continue
-                clean = self._parse_structured_text(rationale, "rationale", self._clean_rationale_text)
+                clean = self._parse_structured_text(
+                    rationale, "rationale", self._clean_rationale_text
+                )
                 self._cache_store(self._rationale_cache, key, clean, self.max_cached_rationales)
                 for idx in pending[key]["indices"]:
                     outputs[idx] = clean
@@ -1629,8 +1687,7 @@ class SemanticScorer(IModel):
                 return outputs
             with ThreadPoolExecutor(max_workers=workers) as executor:
                 future_to_idx = {
-                    executor.submit(_call, prompt): idx
-                    for idx, prompt in enumerate(prompts)
+                    executor.submit(_call, prompt): idx for idx, prompt in enumerate(prompts)
                 }
                 for future in as_completed(future_to_idx):
                     idx = future_to_idx[future]
@@ -1701,7 +1758,9 @@ class SemanticScorer(IModel):
                     "debug",
                 )
                 probe = self._probe_hosted_decision_profile(profile)
-                self._last_decision_backend_meta["decision_probe_passed"] = bool(probe.get("passed"))
+                self._last_decision_backend_meta["decision_probe_passed"] = bool(
+                    probe.get("passed")
+                )
                 self._last_decision_backend_meta["decision_probe_error"] = probe.get("error")
                 if probe.get("provider"):
                     self._last_decision_backend_meta["provider"] = probe.get("provider")
@@ -1712,7 +1771,8 @@ class SemanticScorer(IModel):
                             f"Hosted decision probe passed for profile '{profile.name}'"
                             + (
                                 f" via provider '{probe.get('provider')}'."
-                                if probe.get("provider") else "."
+                                if probe.get("provider")
+                                else "."
                             )
                         ),
                         "debug",
@@ -1759,7 +1819,9 @@ class SemanticScorer(IModel):
                                 "debug",
                             )
 
-                        def _score_prompt(index_prompt: Tuple[int, Dict[str, str]]) -> Dict[str, Any]:
+                        def _score_prompt(
+                            index_prompt: Tuple[int, Dict[str, str]],
+                        ) -> Dict[str, Any]:
                             idx, prompt = index_prompt
                             request_payload = {
                                 "messages": [
@@ -1804,7 +1866,9 @@ class SemanticScorer(IModel):
                                 ) from exc
 
                         if workers == 1:
-                            payloads = [_score_prompt((idx, prompt)) for idx, prompt in enumerate(prompts)]
+                            payloads = [
+                                _score_prompt((idx, prompt)) for idx, prompt in enumerate(prompts)
+                            ]
                         else:
                             with ThreadPoolExecutor(max_workers=workers) as executor:
                                 payloads = list(executor.map(_score_prompt, enumerate(prompts)))
@@ -1831,11 +1895,18 @@ class SemanticScorer(IModel):
                         self._last_decision_backend_meta["provider"] = last_provider
                         return torch.tensor(outputs, dtype=torch.float32, device=self.device)
                     except (RuntimeError, ValueError, KeyError, OSError, urlerror.URLError) as exc:
-                        self.log(f"Hosted decision backend failed; falling back to local LLM. Error: {exc}", "warning")
-                        if 'payloads' in locals() and payloads:
-                            self._record_hosted_decision_chat_debug(profile.name, payloads[0], str(exc))
+                        self.log(
+                            f"Hosted decision backend failed; falling back to local LLM. Error: {exc}",
+                            "warning",
+                        )
+                        if "payloads" in locals() and payloads:
+                            self._record_hosted_decision_chat_debug(
+                                profile.name, payloads[0], str(exc)
+                            )
                         self._last_decision_backend_meta["fallback_triggered"] = True
-                        self._last_decision_backend_meta["fallback_reason"] = "decision_scoring_failed"
+                        self._last_decision_backend_meta["fallback_reason"] = (
+                            "decision_scoring_failed"
+                        )
                         self._last_decision_backend_meta["fallback_error"] = str(exc)
                         self._last_decision_backend_meta["backend"] = "local_hf"
                         self._last_decision_backend_meta["model"] = self.llm_model_name
@@ -1849,7 +1920,9 @@ class SemanticScorer(IModel):
                 self._decision_prompt(s_lab, t_lab, s_sum, t_sum),
                 add_generation_prompt=True,
             )
-            for s_lab, t_lab, s_sum, t_sum in zip(src_labels, tgt_labels, src_summaries, tgt_summaries)
+            for s_lab, t_lab, s_sum, t_sum in zip(
+                src_labels, tgt_labels, src_summaries, tgt_summaries
+            )
         ]
         probs = torch.zeros(len(prompts), device=self.device)
         chunk = self.llm_decision_batch_size or len(prompts)
@@ -1944,7 +2017,9 @@ class SemanticScorer(IModel):
         if "threshold_positive" in pred:
             lines.append(f"Passed final score threshold: {_yes_no(pred.get('threshold_positive'))}")
         if "saved_alignment_member" in pred:
-            lines.append(f"Kept in saved alignment after cardinality filtering: {_yes_no(pred.get('saved_alignment_member'))}")
+            lines.append(
+                f"Kept in saved alignment after cardinality filtering: {_yes_no(pred.get('saved_alignment_member'))}"
+            )
         return "\n".join(lines)
 
     # -------------------------------------------------------------------------
@@ -1962,14 +2037,14 @@ class SemanticScorer(IModel):
     ) -> List[Dict[str, Any]]:
         drops, tags = [], []
         for i, s in enumerate(src_triples):
-            mod_src = self._join_context(src_triples[:i] + src_triples[i+1:])
+            mod_src = self._join_context(src_triples[:i] + src_triples[i + 1 :])
             mod_tgt = self._join_context(tgt_triples)
             s_minus = self._context_similarity_texts(mod_src, mod_tgt)
             drops.append(max(0.0, s_ctx_orig - s_minus))
             tags.append(("source", i, s))
         for j, s in enumerate(tgt_triples):
             mod_src = self._join_context(src_triples)
-            mod_tgt = self._join_context(tgt_triples[:j] + tgt_triples[j+1:])
+            mod_tgt = self._join_context(tgt_triples[:j] + tgt_triples[j + 1 :])
             s_minus = self._context_similarity_texts(mod_src, mod_tgt)
             drops.append(max(0.0, s_ctx_orig - s_minus))
             tags.append(("target", j, s))
@@ -2039,15 +2114,21 @@ class SemanticScorer(IModel):
             else:
                 e_src = self.encode_labels_batch(flat_src)
                 e_tgt = self.encode_labels_batch(flat_tgt)
-                idx = 0; src_emb_slices = []
+                idx = 0
+                src_emb_slices = []
                 for labs in src_label_lists:
-                    src_emb_slices.append(e_src[idx: idx + len(labs)] if len(labs) else e_src[0:0]); idx += len(labs)
-                idx = 0; tgt_emb_slices = []
+                    src_emb_slices.append(e_src[idx : idx + len(labs)] if len(labs) else e_src[0:0])
+                    idx += len(labs)
+                idx = 0
+                tgt_emb_slices = []
                 for labs in tgt_label_lists:
-                    tgt_emb_slices.append(e_tgt[idx: idx + len(labs)] if len(labs) else e_tgt[0:0]); idx += len(labs)
+                    tgt_emb_slices.append(e_tgt[idx : idx + len(labs)] if len(labs) else e_tgt[0:0])
+                    idx += len(labs)
 
                 sims, best_pairs = [], []
-                for labs_s, labs_t, Es, Et in zip(src_label_lists, tgt_label_lists, src_emb_slices, tgt_emb_slices):
+                for labs_s, labs_t, Es, Et in zip(
+                    src_label_lists, tgt_label_lists, src_emb_slices, tgt_emb_slices
+                ):
                     if Es.shape[0] == 0 or Et.shape[0] == 0:
                         sims.append(torch.tensor(0.0, device=self.device))
                         best_pairs.append(("", ""))
@@ -2079,7 +2160,7 @@ class SemanticScorer(IModel):
         sigma_label = (s_label_star - self.tau).abs()
         sigma_ctx = (s_ctx - self.tau).abs()
         denom = (sigma_ctx.pow(self.gamma) + sigma_label.pow(self.gamma)).clamp_min(1e-8)
-        w_c_adaptive = (sigma_ctx.pow(self.gamma) / denom)
+        w_c_adaptive = sigma_ctx.pow(self.gamma) / denom
 
         if not self.use_context and self.use_lexical:
             w_c = torch.zeros_like(w_c_adaptive)
@@ -2098,14 +2179,17 @@ class SemanticScorer(IModel):
         # ---------- LLM GATING ----------
         if self.use_context:
             ctx_pair_mask_float = ctx_pair_mask.to(s_label_star.dtype)
-            m = ctx_pair_mask_float * (0.5 * (s_label_star + s_ctx)) + (1.0 - ctx_pair_mask_float) * s_label_star
+            m = (
+                ctx_pair_mask_float * (0.5 * (s_label_star + s_ctx))
+                + (1.0 - ctx_pair_mask_float) * s_label_star
+            )
         else:
             m = s_label_star
         U = (2.0 * (self.tau - (m - self.tau).abs())).clamp(0.0, 1.0)
 
         if self.use_llm:
             w_i = (self.beta * U).clamp(0.0, 1.0)
-            need_llm = (U >= self.tau_LLM)
+            need_llm = U >= self.tau_LLM
         else:
             w_i = torch.zeros_like(U)
             need_llm = torch.zeros_like(U, dtype=torch.bool)
@@ -2145,8 +2229,12 @@ class SemanticScorer(IModel):
             src_best_summary = [best_pairs[i][0] for i in summary_idxs]
             tgt_best_summary = [best_pairs[i][1] for i in summary_idxs]
 
-            src_sum = self.generate_summaries_batched(src_best_summary, [src_ctx_joined[i] for i in summary_idxs])
-            tgt_sum = self.generate_summaries_batched(tgt_best_summary, [tgt_ctx_joined[i] for i in summary_idxs])
+            src_sum = self.generate_summaries_batched(
+                src_best_summary, [src_ctx_joined[i] for i in summary_idxs]
+            )
+            tgt_sum = self.generate_summaries_batched(
+                tgt_best_summary, [tgt_ctx_joined[i] for i in summary_idxs]
+            )
             for offset, idx in enumerate(summary_idxs):
                 src_llm_summaries[idx] = src_sum[offset]
                 tgt_llm_summaries[idx] = tgt_sum[offset]
@@ -2165,18 +2253,18 @@ class SemanticScorer(IModel):
             if self.use_llm_calibration:
                 if self._llm_calibration_can_apply:
                     p_yes_needed = self._apply_llm_calibration(p_yes_needed)
-                    self._calibration_messages.append("Applied configured LLM calibration coefficients.")
+                    self._calibration_messages.append(
+                        "Applied configured LLM calibration coefficients."
+                    )
                 else:
-                    samples = self._collect_calibration_samples(decision_idxs, p_yes_needed, label)
+                    samples = self._collect_calibration_samples(
+                        decision_idxs, p_yes_needed, src_iris, tgt_iris
+                    )
                     if samples is not None:
                         probs_fit, labels_fit = samples
                         count = int(probs_fit.shape[0])
-                        self._calibration_pending_probs.extend(
-                            probs_fit.detach().cpu().tolist()
-                        )
-                        self._calibration_pending_labels.extend(
-                            labels_fit.detach().cpu().tolist()
-                        )
+                        self._calibration_pending_probs.extend(probs_fit.detach().cpu().tolist())
+                        self._calibration_pending_labels.extend(labels_fit.detach().cpu().tolist())
                         batch_calibration_samples += count
                         self._calibration_messages.append(
                             (
@@ -2190,7 +2278,9 @@ class SemanticScorer(IModel):
                 llm_decisions[idx] = decisions_needed[offset]
 
             S_final = S_lctx.clone()
-            S_final[need_llm] = (1.0 - w_i[need_llm]) * S_lctx[need_llm] + w_i[need_llm] * p_llm[need_llm]
+            S_final[need_llm] = (1.0 - w_i[need_llm]) * S_lctx[need_llm] + w_i[need_llm] * p_llm[
+                need_llm
+            ]
 
         llm_used_mask = torch.zeros(N, dtype=torch.bool, device=self.device)
         if decision_idxs:
@@ -2219,7 +2309,9 @@ class SemanticScorer(IModel):
             "I_llm": I_llm,
             "llm_decisions": llm_decisions,
             "llm_rationales": llm_rationales,
-            "llm_calibration": self._llm_calibration_payload(batch_samples=batch_calibration_samples),
+            "llm_calibration": self._llm_calibration_payload(
+                batch_samples=batch_calibration_samples
+            ),
             "llm_summary_stats": self.llm_summary_stats(),
             "llm_decision_stats": self.llm_decision_stats(),
             "llm_summaries": {
@@ -2242,99 +2334,117 @@ class SemanticScorer(IModel):
                         src_contexts[i], tgt_contexts[i], float(s_ctx[i])
                     )
 
-                in_review_band = (self.review_low <= float(S_final[i]) <= self.review_high)
-                explanations.append({
-                    "src_iri": src_iris[i],
-                    "tgt_iri": tgt_iris[i],
-                    "models": {
-                        "lexical_model": self.lexical_model_name if self.use_lexical else None,
-                        "context_model": self.context_model_name if self.use_context else None,
-                        "llm_model": None,
-                        "llm_summary_model": self._last_summary_backend_meta.get("model") if self.use_llm else None,
-                        "llm_decision_model": self._last_decision_backend_meta.get("model") if self.use_llm else None,
-                        "llm_rationale_model": self._last_rationale_backend_meta.get("model") if self.use_llm else None,
-                        "llm_local_fallback_model": self.llm_model_name if self.use_llm else None,
-                    },
-                    "llm_calibration": self._llm_calibration_payload(batch_samples=0),
-                    "confidences": {
-                        "s_label": float(s_label[i]),
-                        "s_label_star": float(s_label_star[i]),
-                        "s_ctx": float(s_ctx[i]),
-                        "p_llm": float(p_llm[i]),
-                        "S_lctx": float(S_lctx[i]),
-                        "S_final": float(S_final[i]),
-                    },
-                    "weights": {
-                        "w_c": float(w_c[i]),
-                        "w_i": float(w_i[i]),
-                        "U": float(U[i]),
-                    },
-                    "importances": {
-                        "I_label": float(I_label[i]),
-                        "I_ctx": float(I_ctx[i]),
-                        "I_llm": float(I_llm[i]),
-                    },
-                    "review_band": {
-                        "in_band": bool(in_review_band),
-                        "low": self.review_low,
-                        "high": self.review_high,
-                    },
-                    "prediction": {
-                        "global_match": bool(S_final[i] >= self.threshold),
-                        "ground_truth": label[i] if label is not None and i < len(label) else None,
-                        "llm_decision": llm_decisions[i],
-                        "llm_rationale": llm_rationales[i],
-                        "threshold_positive": bool(S_final[i] >= self.threshold),
-                        "saved_alignment_member": False,
-                        "rationale_decision_label": "",
-                    },
-                    "selected_labels": {
-                        "source": best_pairs[i][0],
-                        "target": best_pairs[i][1],
-                    },
-                    "backend_usage": {
-                        "summary": dict(self._last_summary_backend_meta),
-                        "decision": dict(self._last_decision_backend_meta),
-                        "rationale": dict(self._last_rationale_backend_meta),
-                    },
-                    "context_sentences": {
-                        "source": list(src_contexts[i]),
-                        "target": list(tgt_contexts[i]),
-                        "delimiter": self.ctx_sentence_delimiter,
-                    },
-                    "context_triples": {
-                        "source": [list(t) for t in (src_ctx_raw[i] or [])],
-                        "target": [list(t) for t in (tgt_ctx_raw[i] or [])],
-                        "note": "Context triples used by the model; connectors omitted.",
-                    },
-                    "connectivity_bridges": {
-                        "source": [
-                            {
-                                "triple": list(t),
-                                "used_by_model": False,
-                                "info_score": 0.0,
-                                "verbalized": False,
-                                "reason": "connectivity_bridge",
-                            }
-                            for t in (src_ctx_bridges[i] or [])
-                        ],
-                        "target": [
-                            {
-                                "triple": list(t),
-                                "used_by_model": False,
-                                "info_score": 0.0,
-                                "verbalized": False,
-                                "reason": "connectivity_bridge",
-                            }
-                            for t in (tgt_ctx_bridges[i] or [])
-                        ],
-                    },
-                    "llm_summaries": {
-                        "source": src_llm_summaries[i],
-                        "target": tgt_llm_summaries[i],
-                    },
-                    "triple_attributions": triple_attrib,
-                })
+                in_review_band = self.review_low <= float(S_final[i]) <= self.review_high
+                explanations.append(
+                    {
+                        "src_iri": src_iris[i],
+                        "tgt_iri": tgt_iris[i],
+                        "models": {
+                            "lexical_model": self.lexical_model_name if self.use_lexical else None,
+                            "context_model": self.context_model_name if self.use_context else None,
+                            "llm_model": None,
+                            "llm_summary_model": (
+                                self._last_summary_backend_meta.get("model")
+                                if self.use_llm
+                                else None
+                            ),
+                            "llm_decision_model": (
+                                self._last_decision_backend_meta.get("model")
+                                if self.use_llm
+                                else None
+                            ),
+                            "llm_rationale_model": (
+                                self._last_rationale_backend_meta.get("model")
+                                if self.use_llm
+                                else None
+                            ),
+                            "llm_local_fallback_model": (
+                                self.llm_model_name if self.use_llm else None
+                            ),
+                        },
+                        "llm_calibration": self._llm_calibration_payload(batch_samples=0),
+                        "confidences": {
+                            "s_label": float(s_label[i]),
+                            "s_label_star": float(s_label_star[i]),
+                            "s_ctx": float(s_ctx[i]),
+                            "p_llm": float(p_llm[i]),
+                            "S_lctx": float(S_lctx[i]),
+                            "S_final": float(S_final[i]),
+                        },
+                        "weights": {
+                            "w_c": float(w_c[i]),
+                            "w_i": float(w_i[i]),
+                            "U": float(U[i]),
+                        },
+                        "importances": {
+                            "I_label": float(I_label[i]),
+                            "I_ctx": float(I_ctx[i]),
+                            "I_llm": float(I_llm[i]),
+                        },
+                        "review_band": {
+                            "in_band": bool(in_review_band),
+                            "low": self.review_low,
+                            "high": self.review_high,
+                        },
+                        "prediction": {
+                            "global_match": bool(S_final[i] >= self.threshold),
+                            "ground_truth": (
+                                label[i] if label is not None and i < len(label) else None
+                            ),
+                            "llm_decision": llm_decisions[i],
+                            "llm_rationale": llm_rationales[i],
+                            "threshold_positive": bool(S_final[i] >= self.threshold),
+                            "saved_alignment_member": False,
+                            "rationale_decision_label": "",
+                        },
+                        "selected_labels": {
+                            "source": best_pairs[i][0],
+                            "target": best_pairs[i][1],
+                        },
+                        "backend_usage": {
+                            "summary": dict(self._last_summary_backend_meta),
+                            "decision": dict(self._last_decision_backend_meta),
+                            "rationale": dict(self._last_rationale_backend_meta),
+                        },
+                        "context_sentences": {
+                            "source": list(src_contexts[i]),
+                            "target": list(tgt_contexts[i]),
+                            "delimiter": self.ctx_sentence_delimiter,
+                        },
+                        "context_triples": {
+                            "source": [list(t) for t in (src_ctx_raw[i] or [])],
+                            "target": [list(t) for t in (tgt_ctx_raw[i] or [])],
+                            "note": "Context triples used by the model; connectors omitted.",
+                        },
+                        "connectivity_bridges": {
+                            "source": [
+                                {
+                                    "triple": list(t),
+                                    "used_by_model": False,
+                                    "info_score": 0.0,
+                                    "verbalized": False,
+                                    "reason": "connectivity_bridge",
+                                }
+                                for t in (src_ctx_bridges[i] or [])
+                            ],
+                            "target": [
+                                {
+                                    "triple": list(t),
+                                    "used_by_model": False,
+                                    "info_score": 0.0,
+                                    "verbalized": False,
+                                    "reason": "connectivity_bridge",
+                                }
+                                for t in (tgt_ctx_bridges[i] or [])
+                            ],
+                        },
+                        "llm_summaries": {
+                            "source": src_llm_summaries[i],
+                            "target": tgt_llm_summaries[i],
+                        },
+                        "triple_attributions": triple_attrib,
+                    }
+                )
             result["explanations"] = explanations
 
         return result

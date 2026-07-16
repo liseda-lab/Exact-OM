@@ -1,4 +1,4 @@
-from .semantic_scorer import SemanticScorer
-from .pair_adaptive_scorer import PairAdaptiveSemanticScorer
 from .candidate_set_selector import CandidateSetSelector
+from .pair_adaptive_scorer import PairAdaptiveSemanticScorer
 from .second_pass_reranker import SecondPassReranker
+from .semantic_scorer import SemanticScorer

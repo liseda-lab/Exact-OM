@@ -49,18 +49,52 @@ def test_candidate_token_key_matches_order_and_possessive_variants_only():
 
 
 def test_candidate_annotation_priority_keeps_synonyms_and_rejects_noise():
-    assert candidate_annotation_priority("Adult Malignant Fibrous Histiocytoma", "http://x#P90") is not None
-    assert candidate_annotation_priority("Adult Unclassified Pleomorphic Sarcoma", "http://x#P107") is not None
-    assert candidate_annotation_priority("LPFS1", "http://www.geneontology.org/formats/oboInOwl#hasExactSynonym") is not None
-    assert candidate_annotation_priority("alternate disease name", "http://example.org#altLabel") is not None
+    assert (
+        candidate_annotation_priority("Adult Malignant Fibrous Histiocytoma", "http://x#P90")
+        is not None
+    )
+    assert (
+        candidate_annotation_priority("Adult Unclassified Pleomorphic Sarcoma", "http://x#P107")
+        is not None
+    )
+    assert (
+        candidate_annotation_priority(
+            "LPFS1", "http://www.geneontology.org/formats/oboInOwl#hasExactSynonym"
+        )
+        is not None
+    )
+    assert (
+        candidate_annotation_priority("alternate disease name", "http://example.org#altLabel")
+        is not None
+    )
 
     assert candidate_annotation_priority("Disease or Syndrome", "http://x#P106") is None
     assert candidate_annotation_priority("C3272295", "http://x#P207") is None
     assert candidate_annotation_priority("Malignant", "http://x#P363") is None
-    assert candidate_annotation_priority("disease_ontology", "http://www.geneontology.org/formats/oboInOwl#hasOBONamespace") is None
-    assert candidate_annotation_priority("DOID:1234", "http://www.geneontology.org/formats/oboInOwl#hasAlternativeId") is None
-    assert candidate_annotation_priority("This is a comment", "http://www.w3.org/2000/01/rdf-schema#comment") is None
-    assert candidate_annotation_priority("http://example.org/noise", "http://example.org#hasExactSynonym") is None
+    assert (
+        candidate_annotation_priority(
+            "disease_ontology", "http://www.geneontology.org/formats/oboInOwl#hasOBONamespace"
+        )
+        is None
+    )
+    assert (
+        candidate_annotation_priority(
+            "DOID:1234", "http://www.geneontology.org/formats/oboInOwl#hasAlternativeId"
+        )
+        is None
+    )
+    assert (
+        candidate_annotation_priority(
+            "This is a comment", "http://www.w3.org/2000/01/rdf-schema#comment"
+        )
+        is None
+    )
+    assert (
+        candidate_annotation_priority(
+            "http://example.org/noise", "http://example.org#hasExactSynonym"
+        )
+        is None
+    )
     assert (
         candidate_annotation_priority(
             "A rare disorder with a long explanatory sentence that describes symptoms rather than naming the entity",

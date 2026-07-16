@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from collections import Counter, defaultdict
-from dataclasses import dataclass
 import math
 import re
 import unicodedata
+from collections import Counter, defaultdict
+from dataclasses import dataclass
 from typing import Dict, Iterable, List, Mapping, Optional, Sequence, Set, Tuple
 
 
@@ -154,7 +154,15 @@ def select_candidate_annotation_literals(
             continue
         prop_key = candidate_annotation_property_key(prop_iri)
         cap = candidate_annotation_property_cap(prop_iri)
-        ranked.append((float(priority), prop_key, int(cap), normalize_candidate_text(literal), str(literal).strip()))
+        ranked.append(
+            (
+                float(priority),
+                prop_key,
+                int(cap),
+                normalize_candidate_text(literal),
+                str(literal).strip(),
+            )
+        )
 
     ranked.sort(key=lambda item: (item[0], item[1], item[3], item[4]))
     selected: List[str] = []
@@ -227,14 +235,8 @@ def lexical_candidate_pair_scores(
 
     token_idf = _idf_by_feature(token_df, len(tgt_records), set(token_index))
     gram_idf = _idf_by_feature(gram_df, len(tgt_records), set(gram_index))
-    tgt_token_norms = [
-        _feature_norm(record.tokens, token_idf)
-        for record in tgt_records
-    ]
-    tgt_gram_norms = [
-        _feature_norm(record.grams, gram_idf)
-        for record in tgt_records
-    ]
+    tgt_token_norms = [_feature_norm(record.tokens, token_idf) for record in tgt_records]
+    tgt_gram_norms = [_feature_norm(record.grams, gram_idf) for record in tgt_records]
 
     by_source: Dict[str, Dict[str, float]] = defaultdict(dict)
     for record in src_records:
@@ -319,7 +321,9 @@ def rank_channel_scores(
     return rows
 
 
-def _build_inverted_index(features_by_record: Sequence[Sequence[str]]) -> Tuple[Dict[str, List[int]], Counter]:
+def _build_inverted_index(
+    features_by_record: Sequence[Sequence[str]],
+) -> Tuple[Dict[str, List[int]], Counter]:
     index: Dict[str, List[int]] = defaultdict(list)
     df: Counter = Counter()
     for idx, features in enumerate(features_by_record):
@@ -330,13 +334,11 @@ def _build_inverted_index(features_by_record: Sequence[Sequence[str]]) -> Tuple[
     return dict(index), df
 
 
-def _drop_overly_common_features(index: Mapping[str, Sequence[int]], n_records: int) -> Dict[str, List[int]]:
+def _drop_overly_common_features(
+    index: Mapping[str, Sequence[int]], n_records: int
+) -> Dict[str, List[int]]:
     max_df = max(10, int(math.ceil(0.20 * max(1, n_records))))
-    return {
-        feature: list(indices)
-        for feature, indices in index.items()
-        if len(indices) <= max_df
-    }
+    return {feature: list(indices) for feature, indices in index.items() if len(indices) <= max_df}
 
 
 def _idf_by_feature(df: Counter, n_records: int, allowed: Iterable[str]) -> Dict[str, float]:

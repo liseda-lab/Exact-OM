@@ -4,7 +4,7 @@ import hashlib
 import json
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Mapping, Optional, Tuple
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -22,7 +22,6 @@ from .helpers import (
     safe_float,
     safe_text,
 )
-
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 FRONTEND_BUILD_DIR = PROJECT_ROOT / "explanations_visualizer" / "out"
@@ -120,7 +119,9 @@ class PrecomputedOntologyLookup:
         try:
             return dict(json.loads(self.bundle_manifest_path.read_text(encoding="utf-8")) or {})
         except Exception as exc:  # noqa: BLE001
-            self.logger.warning("Failed to parse study bundle manifest %s: %s", self.bundle_manifest_path, exc)
+            self.logger.warning(
+                "Failed to parse study bundle manifest %s: %s", self.bundle_manifest_path, exc
+            )
             return {}
 
     def _resolve_cache_path(self) -> Path:
@@ -167,13 +168,19 @@ class PrecomputedOntologyLookup:
         }
 
     def direct_parents(self, entity_iri: str, side: str, limit: int = 3) -> List[Dict[str, Any]]:
-        return [dict(row) for row in list(self._entry(entity_iri, side).get("parents") or [])[:limit]]
+        return [
+            dict(row) for row in list(self._entry(entity_iri, side).get("parents") or [])[:limit]
+        ]
 
     def direct_children(self, entity_iri: str, side: str, limit: int = 3) -> List[Dict[str, Any]]:
-        return [dict(row) for row in list(self._entry(entity_iri, side).get("children") or [])[:limit]]
+        return [
+            dict(row) for row in list(self._entry(entity_iri, side).get("children") or [])[:limit]
+        ]
 
     def direct_neighbors(self, entity_iri: str, side: str, limit: int = 4) -> List[Dict[str, Any]]:
-        return [dict(row) for row in list(self._entry(entity_iri, side).get("neighbors") or [])[:limit]]
+        return [
+            dict(row) for row in list(self._entry(entity_iri, side).get("neighbors") or [])[:limit]
+        ]
 
 
 class StudyVisualizerService:
@@ -232,7 +239,9 @@ class StudyVisualizerService:
         try:
             payload = json.loads(self.bundle_manifest_path.read_text(encoding="utf-8"))
         except Exception as exc:  # noqa: BLE001
-            self.logger.warning("Failed to parse study bundle manifest %s: %s", self.bundle_manifest_path, exc)
+            self.logger.warning(
+                "Failed to parse study bundle manifest %s: %s", self.bundle_manifest_path, exc
+            )
             return {}
         return dict(payload or {})
 
@@ -276,7 +285,9 @@ class StudyVisualizerService:
                     self._pair_mapping_lookup[(src, tgt)] = dict(path)
                     if not source_label:
                         record = self.selected_record_index.get((src, tgt)) or {}
-                        source_label = safe_text(((record.get("selected_labels") or {})).get("source"))
+                        source_label = safe_text(
+                            ((record.get("selected_labels") or {})).get("source")
+                        )
             self._source_label_lookup[src] = source_label or src
         self._selected_sources = list(dict.fromkeys(self._selected_sources))
         self.logger.info(
@@ -330,7 +341,9 @@ class StudyVisualizerService:
                 existing["label"] = label
             if entity_iri and not existing.get("entity_iri"):
                 existing["entity_iri"] = entity_iri
-                existing["expandable"] = bool(entity_iri and existing.get("origin") == "explanation")
+                existing["expandable"] = bool(
+                    entity_iri and existing.get("origin") == "explanation"
+                )
             return node_id
         payload = {
             "id": node_id,
@@ -347,7 +360,9 @@ class StudyVisualizerService:
         node_lookup[node_id] = payload
         return node_id
 
-    def _add_detail(self, node_lookup: Dict[str, Dict[str, Any]], node_id: str, detail: Mapping[str, Any]) -> None:
+    def _add_detail(
+        self, node_lookup: Dict[str, Dict[str, Any]], node_id: str, detail: Mapping[str, Any]
+    ) -> None:
         node = node_lookup.get(node_id)
         if node is None:
             return
@@ -355,7 +370,13 @@ class StudyVisualizerService:
         details.append(dict(detail))
         node["details"] = details[:20]
 
-    def _endpoint_node(self, record: Mapping[str, Any], side: str, nodes: List[Dict[str, Any]], node_lookup: Dict[str, Dict[str, Any]]) -> str:
+    def _endpoint_node(
+        self,
+        record: Mapping[str, Any],
+        side: str,
+        nodes: List[Dict[str, Any]],
+        node_lookup: Dict[str, Dict[str, Any]],
+    ) -> str:
         entity_iri = safe_text(record.get("src_iri" if side == "source" else "tgt_iri"))
         label = safe_text((record.get("selected_labels") or {}).get(side)) or entity_iri
         node_id = self._endpoint_node_id(side, entity_iri)
@@ -500,11 +521,21 @@ class StudyVisualizerService:
             )
             _remember_entity(side, safe_text(item.get("subject_iri")), subject_id)
             _remember_entity(side, safe_text(item.get("object_iri")), object_id)
-            score = safe_float(item.get("importance", item.get("support", item.get("unsupported_mass", 1.0))), 1.0)
+            score = safe_float(
+                item.get("importance", item.get("support", item.get("unsupported_mass", 1.0))), 1.0
+            )
             _append_unique_edge(edges, edge_index, subject_id, object_id, relation, channel, score)
             verbalized = f"{safe_text(triple[0])} --{relation}--> {safe_text(triple[2])}"
-            self._add_detail(node_lookup, subject_id, {"channel": channel, "role": "subject", "triple": verbalized, "score": score})
-            self._add_detail(node_lookup, object_id, {"channel": channel, "role": "object", "triple": verbalized, "score": score})
+            self._add_detail(
+                node_lookup,
+                subject_id,
+                {"channel": channel, "role": "subject", "triple": verbalized, "score": score},
+            )
+            self._add_detail(
+                node_lookup,
+                object_id,
+                {"channel": channel, "role": "object", "triple": verbalized, "score": score},
+            )
             item_id = safe_text(item.get("item_id"))
             if item_id:
                 item_node_lookup[item_id] = _triple_item_anchor(subject_id, object_id, endpoint_id)
@@ -531,7 +562,9 @@ class StudyVisualizerService:
                 node_id = self._attribute_context_node(item, side, nodes, node_lookup)
                 relation = safe_text(item.get("property")) or "attribute"
                 score = safe_float(item.get("importance", item.get("support", 1.0)), 1.0)
-                _append_unique_edge(edges, edge_index, endpoint_id, node_id, relation, "attribute", score)
+                _append_unique_edge(
+                    edges, edge_index, endpoint_id, node_id, relation, "attribute", score
+                )
                 self._add_detail(
                     node_lookup,
                     node_id,
@@ -557,7 +590,15 @@ class StudyVisualizerService:
 
         for _link in list(provenance.get("lexical") or []):
             score = _bridge_strength(i_label, 1.0)
-            _append_unique_edge(edges, edge_index, src_endpoint, tgt_endpoint, "label match", "bridge-support", score)
+            _append_unique_edge(
+                edges,
+                edge_index,
+                src_endpoint,
+                tgt_endpoint,
+                "label match",
+                "bridge-support",
+                score,
+            )
 
         for family, links in dict(provenance.get("hierarchy") or {}).items():
             family_importance = safe_float(family_importances.get(family), i_hier)
@@ -574,7 +615,15 @@ class StudyVisualizerService:
                     default=0.0,
                 )
                 score = _bridge_strength(family_importance, local_mass)
-                _append_unique_edge(edges, edge_index, src_node, tgt_node, "shared hierarchy", "bridge-support", score)
+                _append_unique_edge(
+                    edges,
+                    edge_index,
+                    src_node,
+                    tgt_node,
+                    "shared hierarchy",
+                    "bridge-support",
+                    score,
+                )
 
         for link in list(provenance.get("similarity") or []):
             src_node = item_node_lookup.get(safe_text(link.get("source_item_id")))
@@ -589,7 +638,9 @@ class StudyVisualizerService:
                 default=0.0,
             )
             score = _bridge_strength(i_sim, local_mass)
-            _append_unique_edge(edges, edge_index, src_node, tgt_node, "similar evidence", "bridge-support", score)
+            _append_unique_edge(
+                edges, edge_index, src_node, tgt_node, "similar evidence", "bridge-support", score
+            )
 
         for side in ["source", "target"]:
             opposite = tgt_endpoint if side == "source" else src_endpoint
@@ -604,21 +655,53 @@ class StudyVisualizerService:
                         item_importance_lookup.get(safe_text(link.get("item_id"))),
                         item_importance_lookup.get(anchor_ref),
                     ],
-                    default=safe_float(item_importance_lookup.get(safe_text(link.get("item_id"))), 0.0),
+                    default=safe_float(
+                        item_importance_lookup.get(safe_text(link.get("item_id"))), 0.0
+                    ),
                 )
                 score = _bridge_strength(i_attr, local_mass)
-                _append_unique_edge(edges, edge_index, item_node, anchor_node, "attribute evidence", "bridge-support", score)
+                _append_unique_edge(
+                    edges,
+                    edge_index,
+                    item_node,
+                    anchor_node,
+                    "attribute evidence",
+                    "bridge-support",
+                    score,
+                )
 
         for link in list((dict(provenance.get("difference") or {})).get("source") or []):
             item_node = item_node_lookup.get(safe_text(link.get("item_id")))
             if item_node:
-                score = _bridge_strength(i_diff, safe_float(item_importance_lookup.get(safe_text(link.get("item_id"))), 0.0))
-                _append_unique_edge(edges, edge_index, item_node, tgt_endpoint, "distinctive evidence", "bridge-contrast", score)
+                score = _bridge_strength(
+                    i_diff,
+                    safe_float(item_importance_lookup.get(safe_text(link.get("item_id"))), 0.0),
+                )
+                _append_unique_edge(
+                    edges,
+                    edge_index,
+                    item_node,
+                    tgt_endpoint,
+                    "distinctive evidence",
+                    "bridge-contrast",
+                    score,
+                )
         for link in list((dict(provenance.get("difference") or {})).get("target") or []):
             item_node = item_node_lookup.get(safe_text(link.get("item_id")))
             if item_node:
-                score = _bridge_strength(i_diff, safe_float(item_importance_lookup.get(safe_text(link.get("item_id"))), 0.0))
-                _append_unique_edge(edges, edge_index, item_node, src_endpoint, "distinctive evidence", "bridge-contrast", score)
+                score = _bridge_strength(
+                    i_diff,
+                    safe_float(item_importance_lookup.get(safe_text(link.get("item_id"))), 0.0),
+                )
+                _append_unique_edge(
+                    edges,
+                    edge_index,
+                    item_node,
+                    src_endpoint,
+                    "distinctive evidence",
+                    "bridge-contrast",
+                    score,
+                )
 
         for edge in edges:
             is_bridge, level, level_label = edge_display_level(edge)
@@ -650,10 +733,14 @@ class StudyVisualizerService:
         pair_key = (src_iri, tgt_iri)
         payload = {
             "target_id": tgt_iri,
-            "target_label": safe_text((record.get("selected_labels") or {}).get("target")) or tgt_iri,
+            "target_label": safe_text((record.get("selected_labels") or {}).get("target"))
+            or tgt_iri,
             "rank": int(mapping_path.get("rank", 0) or 0),
             "ground_truth": int(mapping_path.get("ground_truth", 0) or 0),
-            "score": safe_float(mapping_path.get("score", (record.get("confidences") or {}).get("S_final", 0.0)), 0.0),
+            "score": safe_float(
+                mapping_path.get("score", (record.get("confidences") or {}).get("S_final", 0.0)),
+                0.0,
+            ),
             "metrics": dict(mapping_path.get("metrics") or {}),
             "llm": {
                 "pair_brief": safe_text(record.get("llm_pair_brief")),
@@ -666,7 +753,9 @@ class StudyVisualizerService:
                 "edges": graph["edges"],
             },
             "prediction": {
-                "threshold_positive": bool((record.get("prediction") or {}).get("threshold_positive")),
+                "threshold_positive": bool(
+                    (record.get("prediction") or {}).get("threshold_positive")
+                ),
                 "global_match": bool((record.get("prediction") or {}).get("global_match")),
             },
             "record": record,
@@ -683,16 +772,24 @@ class StudyVisualizerService:
         if cached is not None:
             return cached
         pair = next(
-            (dict(pair) for pair in list(self.study_mapping.get("pairs") or []) if safe_text(pair.get("id")) == source_iri),
+            (
+                dict(pair)
+                for pair in list(self.study_mapping.get("pairs") or [])
+                if safe_text(pair.get("id")) == source_iri
+            ),
             None,
         )
         if pair is None:
             raise KeyError(source_iri)
         paths = sorted(list(pair.get("paths") or []), key=lambda row: int(row.get("rank", 0) or 0))
-        targets = [self._build_target_bundle(source_iri, safe_text(path.get("id")), path) for path in paths]
+        targets = [
+            self._build_target_bundle(source_iri, safe_text(path.get("id")), path) for path in paths
+        ]
         source_label = ""
         if targets:
-            source_label = safe_text(((targets[0].get("record") or {}).get("selected_labels") or {}).get("source"))
+            source_label = safe_text(
+                ((targets[0].get("record") or {}).get("selected_labels") or {}).get("source")
+            )
         bundle = {
             "source_id": source_iri,
             "source_label": source_label or source_iri,
@@ -738,7 +835,9 @@ class StudyVisualizerService:
             "details": list(node.get("details") or []),
         }
         if node.get("node_kind") == "endpoint":
-            explanation_payload["attributes"] = list((record.get("attributes") or {}).get(side) or [])
+            explanation_payload["attributes"] = list(
+                (record.get("attributes") or {}).get(side) or []
+            )
         return {
             "node": {key: value for key, value in node.items() if key != "details"},
             "explanation": explanation_payload,
@@ -770,7 +869,8 @@ class StudyVisualizerService:
         existing_side_labels = {
             " ".join(safe_text(existing.get("label")).lower().split())
             for existing in node_lookup.values()
-            if safe_text(existing.get("ontology_side")) == side or safe_text(existing.get("type")) == same_side_endpoint_type
+            if safe_text(existing.get("ontology_side")) == side
+            or safe_text(existing.get("type")) == same_side_endpoint_type
         }
 
         def _new_extra_node(entity_iri_value: str, label: str) -> Optional[str]:
@@ -800,13 +900,31 @@ class StudyVisualizerService:
             parent_id = _new_extra_node(parent["entity_iri"], parent["label"])
             if not parent_id:
                 continue
-            _append_unique_edge(edges, edge_index, node_id, parent_id, parent.get("relation", "is_a"), "ontology-extra", None, origin="ontology-extra")
+            _append_unique_edge(
+                edges,
+                edge_index,
+                node_id,
+                parent_id,
+                parent.get("relation", "is_a"),
+                "ontology-extra",
+                None,
+                origin="ontology-extra",
+            )
 
         for child in self.ontology.direct_children(entity_iri, side, limit=3):
             child_id = _new_extra_node(child["entity_iri"], child["label"])
             if not child_id:
                 continue
-            _append_unique_edge(edges, edge_index, child_id, node_id, child.get("relation", "is_a"), "ontology-extra", None, origin="ontology-extra")
+            _append_unique_edge(
+                edges,
+                edge_index,
+                child_id,
+                node_id,
+                child.get("relation", "is_a"),
+                "ontology-extra",
+                None,
+                origin="ontology-extra",
+            )
 
         for nbr in self.ontology.direct_neighbors(entity_iri, side, limit=4):
             nbr_id = _new_extra_node(nbr["entity_iri"], nbr["label"])
@@ -864,7 +982,9 @@ def create_study_visualizer_app(
         return service.health_payload()
 
     @app.get("/api/study/source")
-    def api_study_source(source: str = Query(..., description="Exact source IRI/ID")) -> Dict[str, Any]:
+    def api_study_source(
+        source: str = Query(..., description="Exact source IRI/ID")
+    ) -> Dict[str, Any]:
         try:
             return service.get_source_bundle(source)
         except KeyError as exc:

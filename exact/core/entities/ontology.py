@@ -1,26 +1,25 @@
-from collections import defaultdict, deque
-from typing import List, Optional, Union, Dict, Set, Tuple, Any
-from concurrent.futures import ThreadPoolExecutor, as_completed
-
+import logging
 import math
 import re
 import sys
-import time
-import logging
 import threading
-from collections import Counter, namedtuple
-from typing import Union, Tuple, Callable
+import time
+from collections import Counter, defaultdict, deque
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Callable, Dict, List, Optional, Set, Tuple, Union
 
 from mowl.owlapi import OWLOntology
-from org.semanticweb.owlapi.search import EntitySearcher
+from mowl.projection import Edge, OWL2VecStarProjector, TaxonomyProjector
 from org.semanticweb.HermiT import Reasoner
-from org.semanticweb.owlapi.reasoner import InferenceType
 from org.semanticweb.owlapi.model import IRI, OWLClass
+from org.semanticweb.owlapi.search import EntitySearcher
 
-from mowl.projection import OWL2VecStarProjector, TaxonomyProjector, Edge
-
-from exact.utils.paths import best_path_dp, best_path_lagrangian_relaxation, best_path_local
-from exact.core.entities.configs.dataset import ContextMethod, BestPathMethod
+from exact.core.entities.configs.dataset import BestPathMethod, ContextMethod
+from exact.utils.graph_search import (
+    best_path_dp,
+    best_path_lagrangian_relaxation,
+    best_path_local,
+)
 
 
 class OntologyGraph:
@@ -28,6 +27,7 @@ class OntologyGraph:
     Builds a cached graph structure for an ontology by projecting it using OWL2VecStarProjector.
     The edges are stored with IRIs. Label extractions are cached for efficiency.
     """
+
     def __init__(
         self,
         ontology: OWLOntology,
@@ -47,20 +47,20 @@ class OntologyGraph:
 
         # caches (IRI-based)
         self._relations_cache: Optional[Set[str]] = None
-        self._dr_cache: Optional[Dict[str,Dict[str,List[str]]]] = None
+        self._dr_cache: Optional[Dict[str, Dict[str, List[str]]]] = None
         self._missing_dom_cache: Optional[List[str]] = None
         self._missing_rng_cache: Optional[List[str]] = None
         self._example_triples_cache: Optional[Dict[str, List[Tuple[str]]]] = None
-        self._context_subgraph_cache: Dict[Tuple[str,int,bool], List[Tuple[str]]] = {}
+        self._context_subgraph_cache: Dict[Tuple[str, int, bool], List[Tuple[str]]] = {}
 
         # IC caches
 
-        self._node_ic_cache: Optional[Dict[Tuple[str,str], float]]    = None
-        self._edge_ic_cache: Optional[Dict[Tuple[str,str,str], float]] = None
+        self._node_ic_cache: Optional[Dict[Tuple[str, str], float]] = None
+        self._edge_ic_cache: Optional[Dict[Tuple[str, str, str], float]] = None
         self._edge_ic_max_cache: Optional[float] = None
 
         # edge cost cache
-        self._edge_cost_cache: Dict[Tuple[str,str,str], int] = None
+        self._edge_cost_cache: Dict[Tuple[str, str, str], int] = None
 
         # adjacency cache including relation labels (for shortest paths)
         self._rel_adj_cache: Optional[Dict[str, List[Tuple[str, str]]]] = None
@@ -71,12 +71,15 @@ class OntologyGraph:
         self.precompute_all_labels()
 
     def __repr__(self) -> str:
-        return (f"OntologyGraph(ontology={self.ontology.getOntologyID().getOntologyIRI()}, "
-                f"NumberOfEdges={len(self.edges) if self.edges else 0}, "
-                f"NumberOfNodes={len(self.graph) if self.graph else 0})")
+        return (
+            f"OntologyGraph(ontology={self.ontology.getOntologyID().getOntologyIRI()}, "
+            f"NumberOfEdges={len(self.edges) if self.edges else 0}, "
+            f"NumberOfNodes={len(self.graph) if self.graph else 0})"
+        )
+
     def __len__(self) -> int:
         return len(self.edges) if self.edges is not None else 0
-    
+
     def __getitem__(self, item: str) -> Set[str]:
         """
         Allows access to the graph structure using the IRI as a key.
@@ -85,37 +88,37 @@ class OntologyGraph:
         if self.graph is None:
             raise ValueError("Graph has not been built yet.")
         return self.graph.get(item, set())
-    
+
     @property
-    def node_ic(self) -> Dict[Tuple[str,str], float]:
+    def node_ic(self) -> Dict[Tuple[str, str], float]:
         """Relation-local node surprisal: ICr(x) = −log(deg_r(x)/|E_r|)."""
         if self._node_ic_cache is None:
-             rel2counts = defaultdict(Counter)
-             rel2size   = defaultdict(int)
-             for e in self.edges:
-                 rel2counts[e.rel][e.src] += 1
-                 rel2counts[e.rel][e.dst] += 1
-                 rel2size[e.rel]    += 1
-             self._node_ic_cache = {}
-             for r, counts in rel2counts.items():
-                 m = rel2size[r]
-                 for x, deg in counts.items():
-                     self._node_ic_cache[(r,x)] = -math.log(deg / m)
+            rel2counts = defaultdict(Counter)
+            rel2size = defaultdict(int)
+            for e in self.edges:
+                rel2counts[e.rel][e.src] += 1
+                rel2counts[e.rel][e.dst] += 1
+                rel2size[e.rel] += 1
+            self._node_ic_cache = {}
+            for r, counts in rel2counts.items():
+                m = rel2size[r]
+                for x, deg in counts.items():
+                    self._node_ic_cache[(r, x)] = -math.log(deg / m)
         return self._node_ic_cache
- 
+
     @property
-    def edge_ic(self) -> Dict[Tuple[str,str,str], float]:
+    def edge_ic(self) -> Dict[Tuple[str, str, str], float]:
         """Per-edge IC = avg of endpoints’ relation-local surprisal."""
         if self._edge_ic_cache is None:
-             # ensure node_ic is populated
-             _ = self.node_ic
-             self._edge_ic_cache = {}
-             for e in self.edges:
-                 u,r,v = e.astuple()
-                 ic_u = self._node_ic_cache[(r,u)]
-                 ic_v = self._node_ic_cache[(r,v)]
-                 self._edge_ic_cache[(u,r,v)] = 0.5 * (ic_u + ic_v)
-             self._edge_ic_max_cache = max(self._edge_ic_cache.values(), default=1.0) or 1.0
+            # ensure node_ic is populated
+            _ = self.node_ic
+            self._edge_ic_cache = {}
+            for e in self.edges:
+                u, r, v = e.astuple()
+                ic_u = self._node_ic_cache[(r, u)]
+                ic_v = self._node_ic_cache[(r, v)]
+                self._edge_ic_cache[(u, r, v)] = 0.5 * (ic_u + ic_v)
+            self._edge_ic_max_cache = max(self._edge_ic_cache.values(), default=1.0) or 1.0
         return self._edge_ic_cache
 
     @property
@@ -123,19 +126,18 @@ class OntologyGraph:
         """Average edge IC across all edges in the graph."""
         return sum(self.edge_ic.values()) / len(self.edge_ic)
 
-
     @property
-    def cost_fn(self) -> Callable[[Tuple[str,str,str]], int]:
-         """
-         Returns a fast lookup into the precomputed edge‐cost cache.
-         """
-         if self._edge_cost_cache is None:
+    def cost_fn(self) -> Callable[[Tuple[str, str, str]], int]:
+        """
+        Returns a fast lookup into the precomputed edge‐cost cache.
+        """
+        if self._edge_cost_cache is None:
             raise ValueError("Cost function has not been set or edges have not been built yet.")
-        
-         return lambda triple: self._edge_cost_cache[triple]
- 
+
+        return lambda triple: self._edge_cost_cache[triple]
+
     @cost_fn.setter
-    def cost_fn(self, fn: Callable[[Tuple[str,str,str]], int]):
+    def cost_fn(self, fn: Callable[[Tuple[str, str, str]], int]):
         """
         When the user assigns a new cost function, precompute its value
         for every edge in the graph and cache it for O(1) lookup.
@@ -143,7 +145,7 @@ class OntologyGraph:
         self._cost_fn = fn
         # Build the cache once
         self._edge_cost_cache = {}
-        for e in self.edges: 
+        for e in self.edges:
             t = e.astuple()
             human_readable = (self.get_labels(i)[0] for i in t)
             self._edge_cost_cache[t] = fn(human_readable)
@@ -205,7 +207,7 @@ class OntologyGraph:
         """
         if self.edges is None:
             raise ValueError("Edges have not been built yet.")
-        
+
         out_edges = defaultdict(list)
         for edge in self.edges:
             out_edges[edge.src].append(edge)
@@ -219,91 +221,81 @@ class OntologyGraph:
             graph[edge.src].add(edge.dst)
             graph[edge.dst].add(edge.src)
         return dict(graph)
-    
+
     def get_relations(self, human_readable: bool = True) -> Set[str]:
         if self._relations_cache is None:
-            self._relations_cache = { e.rel for e in self.edges }
+            self._relations_cache = {e.rel for e in self.edges}
         if not human_readable:
             return set(self._relations_cache)
         # human_readable: return each relation’s full-label tuple
-        return {self.get_labels(rel)[0] for rel in self._relations_cache }
+        return {self.get_labels(rel)[0] for rel in self._relations_cache}
 
     def get_property_domains_and_ranges(
         self, human_readable: bool = True
-    ) -> Dict[
-        Union[str, Tuple[str,...]],
-        Dict[str, List[Union[str, List[str]]]]
-    ]:
+    ) -> Dict[Union[str, Tuple[str, ...]], Dict[str, List[Union[str, List[str]]]]]:
         """
         Returns a map from relation → {'domain': [...], 'range': [...]}
         If human_readable=True, keys and all class IRIs become label-lists.
         """
         if self._dr_cache is None:
             factory = self.ontology.getOWLOntologyManager().getOWLDataFactory()
-            dr: Dict[str,Dict[str,List[str]]] = {}
+            dr: Dict[str, Dict[str, List[str]]] = {}
             for rel in self.get_relations(human_readable=False):
                 prop = factory.getOWLObjectProperty(IRI.create(rel))
                 # collect domains
                 doms = []
                 for ax in self.ontology.getObjectPropertyDomainAxioms(prop):
                     d = ax.getDomain()
-                    doms.append(
-                        d.asOWLClass().getIRI().toString() if d.isNamed()
-                        else str(d)
-                    )
+                    doms.append(d.asOWLClass().getIRI().toString() if d.isNamed() else str(d))
                 # collect ranges
                 rngs = []
                 for ax in self.ontology.getObjectPropertyRangeAxioms(prop):
                     r = ax.getRange()
-                    rngs.append(
-                        r.asOWLClass().getIRI().toString() if r.isNamed()
-                        else str(r)
-                    )
-                dr[rel] = {'domain': doms, 'range': rngs}
+                    rngs.append(r.asOWLClass().getIRI().toString() if r.isNamed() else str(r))
+                dr[rel] = {"domain": doms, "range": rngs}
             self._dr_cache = dr
 
         if not human_readable:
             return self._dr_cache
 
         # convert IRIs → lists of labels
-        hr: Dict[Tuple[str,...], Dict[str, List[List[str]]]] = {}
+        hr: Dict[Tuple[str, ...], Dict[str, List[List[str]]]] = {}
         for rel_iri, drmap in self._dr_cache.items():
             rel_lbl = tuple(self.get_labels(rel_iri))
             hr[rel_lbl] = {
-                'domain': [ self.get_labels(iri) for iri in drmap['domain'] ],
-                'range':  [ self.get_labels(iri) for iri in drmap['range'] ]
+                "domain": [self.get_labels(iri) for iri in drmap["domain"]],
+                "range": [self.get_labels(iri) for iri in drmap["range"]],
             }
         return hr
 
     def get_relations_missing_domain(self, human_readable: bool = True) -> List[str]:
         if self._missing_dom_cache is None:
             self._missing_dom_cache = [
-                rel for rel, dr in self.get_property_domains_and_ranges(human_readable=False).items()
-                if not dr['domain']
+                rel
+                for rel, dr in self.get_property_domains_and_ranges(human_readable=False).items()
+                if not dr["domain"]
             ]
         if not human_readable:
             return list(self._missing_dom_cache)
-        return [ self.get_labels(rel)[0] for rel in self._missing_dom_cache ]
+        return [self.get_labels(rel)[0] for rel in self._missing_dom_cache]
 
     def get_relations_missing_range(self, human_readable: bool = True) -> List[str]:
         if self._missing_rng_cache is None:
             self._missing_rng_cache = [
-                rel for rel, dr in self.get_property_domains_and_ranges(human_readable=False).items()
-                if not dr['range']
+                rel
+                for rel, dr in self.get_property_domains_and_ranges(human_readable=False).items()
+                if not dr["range"]
             ]
         if not human_readable:
             return list(self._missing_rng_cache)
-        return [self.get_labels(rel)[0] for rel in self._missing_rng_cache ]
-    
+        return [self.get_labels(rel)[0] for rel in self._missing_rng_cache]
+
     def get_example_triples(
-        self,
-        n: int,
-        exclude_missing_dr: bool = False,
-        human_readable: bool = True
+        self, n: int, exclude_missing_dr: bool = False, human_readable: bool = True
     ) -> Dict[str, List[Tuple[str]]]:
         """
         For each unique relation, return up to `n` example triples (src, rel, dst).
-        
+
         :param n: number of examples per relation
         :param exclude_missing_dr: if True, skip relations that have no declared domain or no declared range
         :param human_readable: if True, convert IRIs to their full list of labels
@@ -312,7 +304,9 @@ class OntologyGraph:
         if self._example_triples_cache is None:
             rels = set(self.get_relations(human_readable=False))
             if exclude_missing_dr:
-                missing = set(self.get_relations_missing_domain(human_readable=False)) | set(self.get_relations_missing_range(human_readable=False))
+                missing = set(self.get_relations_missing_domain(human_readable=False)) | set(
+                    self.get_relations_missing_range(human_readable=False)
+                )
                 rels = rels - missing
 
             examples: Dict = {}
@@ -343,7 +337,7 @@ class OntologyGraph:
                     for src, rel_lbl, dst in exs
                 ]
             return examples
-        
+
         else:
             # return IRIs
             return self._example_triples_cache
@@ -363,10 +357,14 @@ class OntologyGraph:
                 return self.label_cache[iri]
             factory = self.ontology.getOWLOntologyManager().getOWLDataFactory()
             owl_class = factory.getOWLClass(IRI.create(iri_text))
-            label_property = self.ontology.getOWLOntologyManager().getOWLDataFactory().getRDFSLabel()
+            label_property = (
+                self.ontology.getOWLOntologyManager().getOWLDataFactory().getRDFSLabel()
+            )
             labels = [
                 str(annotation.getValue().asLiteral().get().getLiteral())
-                for annotation in EntitySearcher.getAnnotations(owl_class, self.ontology, label_property)
+                for annotation in EntitySearcher.getAnnotations(
+                    owl_class, self.ontology, label_property
+                )
                 if annotation.getValue().isLiteral()
             ]
             self.label_cache[iri] = labels if labels else [str(owl_class.getIRI().getShortForm())]
@@ -462,7 +460,7 @@ class OntologyGraph:
             iris.add(edge.src)
             iris.add(edge.dst)
             iris.add(edge.rel)
-        
+
         # Use ThreadPoolExecutor to extract labels concurrently.
         with ThreadPoolExecutor() as executor:
             # Submit a task for each IRI.
@@ -478,10 +476,10 @@ class OntologyGraph:
         human_readable: bool = True,
         method: ContextMethod = ContextMethod.bfs,  # "bfs" or "greedy"
         best_path_method: Optional[BestPathMethod] = None,  # "dp", "lagrangian", "greedy"
-        budget: Optional[int] = None,               # token budget
-        hop_penalty: Optional[float] = 0.0,                   # α
-        all_labels: bool = False  # If True, return all labels for each node and relation
-    ) -> List[Tuple[str,str,str]]:
+        budget: Optional[int] = None,  # token budget
+        hop_penalty: Optional[float] = 0.0,  # α
+        all_labels: bool = False,  # If True, return all labels for each node and relation
+    ) -> List[Tuple[str, str, str]]:
         """
         If method="bfs": original n-hop BFS (cached).
         If method="greedy": runs budget-aware greedy extraction.
@@ -490,8 +488,8 @@ class OntologyGraph:
         key = (start, n, method, human_readable)
         if key in self._context_subgraph_cache:
             return self._context_subgraph_cache[key]
-        
-        if method is ContextMethod.bfs: 
+
+        if method is ContextMethod.bfs:
 
             visited = {start: 0}
             queue = deque([start])
@@ -505,15 +503,15 @@ class OntologyGraph:
                             queue.append(nbr)
             reachable = set(visited.keys())
 
-            subgraph_edges: List[Tuple[str,str,str]] = []
+            subgraph_edges: List[Tuple[str, str, str]] = []
 
             for edge in self.edges:
                 if edge.src in reachable and edge.dst in reachable:
                     # get either IRIs or labels
                     if human_readable:
-                            src = self.get_labels(edge.src)
-                            dst = self.get_labels(edge.dst)
-                            rel = self.get_labels(edge.rel)
+                        src = self.get_labels(edge.src)
+                        dst = self.get_labels(edge.dst)
+                        rel = self.get_labels(edge.rel)
                     else:
                         src, dst, rel = [str(edge.src)], [str(edge.dst)], [str(edge.rel)]
 
@@ -532,9 +530,9 @@ class OntologyGraph:
             return subgraph_edges
 
         else:
-            
+
             # Adjusting hop penalty based on average edge IC
-            hop_penalty = hop_penalty*self.avg_edge_ic
+            hop_penalty = hop_penalty * self.avg_edge_ic
 
             triples = self._greedy_context_subgraph(
                 start, n, best_path_method, human_readable, budget, hop_penalty, self.cost_fn
@@ -552,12 +550,11 @@ class OntologyGraph:
         human_readable: bool,
         budget: Optional[int],
         hop_penalty: float,
-        token_cost_fn: Optional[callable]
-    ) -> List[Tuple[str,str,str]]:
-        
+        token_cost_fn: Optional[callable],
+    ) -> List[Tuple[str, str, str]]:
 
         E_used = set()
-        C_rem  = budget if budget is not None else float("inf")
+        C_rem = budget if budget is not None else float("inf")
 
         if method is BestPathMethod.dp:
             best_path_fn = best_path_dp
@@ -569,11 +566,7 @@ class OntologyGraph:
         selected = []
         while C_rem > 0:
             path, delta_c = best_path_fn(
-                self.out_edges,
-                self.edge_ic,
-                start, n,
-                E_used, C_rem,
-                hop_penalty, token_cost_fn
+                self.out_edges, self.edge_ic, start, n, E_used, C_rem, hop_penalty, token_cost_fn
             )
             if path is None or delta_c == 0 or delta_c > C_rem:
                 break
@@ -581,8 +574,10 @@ class OntologyGraph:
             E_used.update(path)
             C_rem -= delta_c
         return self._format_subgraph(E_used, human_readable)
-    
-    def _format_subgraph(self, selected: List[Tuple[str,str,str]], human_readable: bool) -> List[Tuple[str,str,str]]:
+
+    def _format_subgraph(
+        self, selected: List[Tuple[str, str, str]], human_readable: bool
+    ) -> List[Tuple[str, str, str]]:
         """
         Formats the selected subgraph edges based on whether human-readable labels are requested.
         """
@@ -695,9 +690,7 @@ class OntologyGraph:
                         dq.append(nbr)
             visited.update(comp_nodes)
 
-            comp_edges = [
-                (u, r, v) for (u, r, v) in selected if u in comp_nodes or v in comp_nodes
-            ]
+            comp_edges = [(u, r, v) for (u, r, v) in selected if u in comp_nodes or v in comp_nodes]
             # Taxonomy components: add a direct subclass bridge to the start
             if comp_edges and all(self._is_subclass_rel(r) for _, r, _ in comp_edges):
                 bridge_rel = comp_edges[0][1]
@@ -746,11 +739,12 @@ class OntologyGraph:
         selected_fmt = self._format_subgraph(raw_selected, human_readable)
         bridges_fmt = self._format_subgraph(bridges_raw, human_readable)
         return selected_fmt, bridges_fmt
-    
+
     @staticmethod
     def normalize_label(text: str) -> str:
         """Lowercase and remove spaces/punctuation for exact-matching."""
         import re
+
         if text is None:
             return ""
         t = text.lower()
@@ -787,8 +781,14 @@ class Entity:
     subclasses, and superclasses leverage the cached graph; otherwise, they
     use the reasoner and ontology directly.
     """
-    def __init__(self, class_iri: str, ontology: OWLOntology, reasoner: Optional[Reasoner] = None,
-                 ontology_graph: Optional[OntologyGraph] = None) -> None:
+
+    def __init__(
+        self,
+        class_iri: str,
+        ontology: OWLOntology,
+        reasoner: Optional[Reasoner] = None,
+        ontology_graph: Optional[OntologyGraph] = None,
+    ) -> None:
         self._owl_class = self._get_owl_class(class_iri, ontology)
         self.ontology = ontology
         self.reasoner = reasoner
@@ -800,8 +800,10 @@ class Entity:
         self._reasoner_warned = False
 
     def __repr__(self) -> str:
-        return (f"Entity(name={self.name}, labels={self.labels}, subclasses={self.subclasses}, "
-                f"top_superclass={self.top_superclass}, superclasses={self.superclasses})")
+        return (
+            f"Entity(name={self.name}, labels={self.labels}, subclasses={self.subclasses}, "
+            f"top_superclass={self.top_superclass}, superclasses={self.superclasses})"
+        )
 
     @property
     def owl_class(self) -> OWLClass:
@@ -830,7 +832,10 @@ class Entity:
         if self._subclasses is None:
             if self.reasoner is None:
                 if not self._reasoner_warned:
-                    print("Entity subclasses requested without reasoner; returning empty list.", file=sys.stderr)
+                    print(
+                        "Entity subclasses requested without reasoner; returning empty list.",
+                        file=sys.stderr,
+                    )
                     self._reasoner_warned = True
                 self._subclasses = []
             else:
@@ -846,13 +851,18 @@ class Entity:
         if self._superclasses is None:
             if self.reasoner is None:
                 if not self._reasoner_warned:
-                    print("Entity superclasses requested without reasoner; returning empty list.", file=sys.stderr)
+                    print(
+                        "Entity superclasses requested without reasoner; returning empty list.",
+                        file=sys.stderr,
+                    )
                     self._reasoner_warned = True
                 self._superclasses = []
             else:
                 self._superclasses = [
                     self._extract_labels(supercls.getIRI(), self.ontology)[0]
-                    for supercls in self.reasoner.getSuperClasses(self.owl_class, True).getFlattened()
+                    for supercls in self.reasoner.getSuperClasses(
+                        self.owl_class, True
+                    ).getFlattened()
                     if not supercls.isOWLThing()
                 ]
         return self._superclasses
@@ -860,13 +870,18 @@ class Entity:
     @property
     def top_superclass(self) -> List[str]:
         if self._top_superclass is None:
-            self._top_superclass = self._extract_labels(self._find_top_superclass(), self.ontology)[0]
+            self._top_superclass = self._extract_labels(self._find_top_superclass(), self.ontology)[
+                0
+            ]
         return [self._top_superclass]
 
     def _find_top_superclass(self) -> str:
         if self.reasoner is None:
             if not self._reasoner_warned:
-                print("Entity top_superclass requested without reasoner; returning self.", file=sys.stderr)
+                print(
+                    "Entity top_superclass requested without reasoner; returning self.",
+                    file=sys.stderr,
+                )
                 self._reasoner_warned = True
             return self.owl_class.getIRI()
         owl_class = self.owl_class
@@ -897,44 +912,61 @@ class Entity:
         ]
 
     @classmethod
-    def load_from_list(cls, class_iris: List[str], ontology: OWLOntology,
-                       reasoner: Optional[Reasoner] = None,
-                       ontology_graph: Optional[OntologyGraph] = None, load_onto_graph: bool = False) -> List['Entity']:
+    def load_from_list(
+        cls,
+        class_iris: List[str],
+        ontology: OWLOntology,
+        reasoner: Optional[Reasoner] = None,
+        ontology_graph: Optional[OntologyGraph] = None,
+        load_onto_graph: bool = False,
+    ) -> List["Entity"]:
         if reasoner is None and ontology_graph is not None:
             reasoner = ontology_graph.reasoner
         if load_onto_graph and ontology_graph is None:
             ontology_graph = OntologyGraph(ontology, reasoner)
-        return [cls(class_iri=ci, ontology=ontology, reasoner=reasoner, ontology_graph=ontology_graph)
-                for ci in class_iris]
+        return [
+            cls(class_iri=ci, ontology=ontology, reasoner=reasoner, ontology_graph=ontology_graph)
+            for ci in class_iris
+        ]
 
-    def get_context_subgraph(self, n: int, human_readable: bool = True, **kwargs) -> List[Tuple[Union[str, List[str]], Union[str, List[str]], Union[str, List[str]]]]:
+    def get_context_subgraph(
+        self, n: int, human_readable: bool = True, **kwargs
+    ) -> List[Tuple[Union[str, List[str]], Union[str, List[str]], Union[str, List[str]]]]:
         """
         Returns the subgraph (as a list of triples) for the current entity up to n hops.
         If an OntologyGraph is provided, uses the cached projection (converting IRIs to labels
         if human_readable is True); otherwise, builds a subgraph from immediate reasoner queries
         only considering subclass and superclass relations.
-        
+
         :param n: Maximum hop distance.
         :param human_readable: If True, output human readable labels for nodes and relations.
         :return: List of triples (src, rel, dst). When human_readable is True, each element is a list of labels.
         """
         if self.ontology_graph is not None:
-            return self.ontology_graph.get_context_subgraph(self.class_iri, n, human_readable, **kwargs)
+            return self.ontology_graph.get_context_subgraph(
+                self.class_iri, n, human_readable, **kwargs
+            )
         else:
             local_graph = defaultdict(set)
             current_label = self.labels[0] if self.labels else self.name
             for sup in self.reasoner.getSuperClasses(self.owl_class, True).getFlattened():
                 if sup.isOWLThing():
                     continue
-                sup_label = (self._extract_labels(sup, self.ontology)[0]
-                             if self._extract_labels(sup, self.ontology) else sup.getIRI().getShortForm())
+                sup_label = (
+                    self._extract_labels(sup, self.ontology)[0]
+                    if self._extract_labels(sup, self.ontology)
+                    else sup.getIRI().getShortForm()
+                )
                 local_graph[current_label].add(sup_label)
                 local_graph[sup_label].add(current_label)
             for sub in self.reasoner.getSubClasses(self.owl_class, True).getFlattened():
                 if sub.isOWLNothing():
                     continue
-                sub_label = (self._extract_labels(sub, self.ontology)[0]
-                             if self._extract_labels(sub, self.ontology) else sub.getIRI().getShortForm())
+                sub_label = (
+                    self._extract_labels(sub, self.ontology)[0]
+                    if self._extract_labels(sub, self.ontology)
+                    else sub.getIRI().getShortForm()
+                )
                 local_graph[current_label].add(sub_label)
                 local_graph[sub_label].add(current_label)
             visited = {current_label: 0}
@@ -951,6 +983,9 @@ class Entity:
             subgraph_edges = []
             for node in reachable:
                 for neighbor in local_graph[node]:
-                    if neighbor in reachable and (neighbor, node, "subClassOf") not in subgraph_edges:
+                    if (
+                        neighbor in reachable
+                        and (neighbor, node, "subClassOf") not in subgraph_edges
+                    ):
                         subgraph_edges.append((node, "subClassOf", neighbor))
             return subgraph_edges

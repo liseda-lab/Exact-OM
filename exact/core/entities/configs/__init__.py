@@ -1,7 +1,1 @@
-
-
-
-
-
-
-
+"""Configuration entities."""

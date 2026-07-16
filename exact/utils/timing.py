@@ -26,10 +26,7 @@ def write_recorded_timings(times_file_path: Path, timings: dict[str, float]) -> 
     times_file_path.parent.mkdir(parents=True, exist_ok=True)
     ordered_steps = [step for step in TIMING_STEP_ORDER if step in timings]
     remaining_steps = sorted(step for step in timings if step not in TIMING_STEP_ORDER)
-    lines = [
-        f"{step}: {timings[step]:.1f} minutes"
-        for step in [*ordered_steps, *remaining_steps]
-    ]
+    lines = [f"{step}: {timings[step]:.1f} minutes" for step in [*ordered_steps, *remaining_steps]]
     times_file_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 

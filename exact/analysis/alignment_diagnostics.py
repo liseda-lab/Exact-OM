@@ -5,6 +5,7 @@ from typing import Any, Dict, Iterable, Mapping, Optional, Sequence, Tuple
 
 import pandas as pd
 
+from exact.utils.formatting import quantile, safe_div
 
 Pair = Tuple[str, str]
 
@@ -22,7 +23,9 @@ def analyze_alignment_run(
     alignment_path = alignment_path or _find_alignment_path(run_dir)
 
     reference_df = _read_table(reference_path)
-    train_reference_df = _read_table(train_reference_path) if train_reference_path is not None else pd.DataFrame()
+    train_reference_df = (
+        _read_table(train_reference_path) if train_reference_path is not None else pd.DataFrame()
+    )
     summary_df = _read_table(summary_path) if summary_path is not None else pd.DataFrame()
     alignment_df = _read_table(alignment_path) if alignment_path is not None else pd.DataFrame()
 
@@ -36,7 +39,9 @@ def analyze_alignment_run(
         raw_prediction_pairs = _saved_pairs_from_summary(summary_df)
     prediction_pairs = raw_prediction_pairs.difference(null_reference_pairs)
 
-    selected_pairs = (_saved_pairs_from_summary(summary_df) or raw_prediction_pairs).difference(null_reference_pairs)
+    selected_pairs = (_saved_pairs_from_summary(summary_df) or raw_prediction_pairs).difference(
+        null_reference_pairs
+    )
     tp = reference_pairs.intersection(prediction_pairs)
     fp = prediction_pairs.difference(reference_pairs)
     fn = reference_pairs.difference(prediction_pairs)
@@ -79,8 +84,12 @@ def analyze_alignment_run(
         },
         "metrics": _precision_recall_f1(len(tp), len(fp), len(fn)),
         "oracle": {
-            "candidate_oracle_recall": _safe_div(len(oracle_recoverable_pairs), len(reference_pairs)),
-            "selected_recall": _safe_div(len(reference_pairs.intersection(selected_pairs)), len(reference_pairs)),
+            "candidate_oracle_recall": safe_div(
+                len(oracle_recoverable_pairs), len(reference_pairs)
+            ),
+            "selected_recall": safe_div(
+                len(reference_pairs.intersection(selected_pairs)), len(reference_pairs)
+            ),
             "missed_present_in_candidates": len(present_missed),
             "missed_absent_from_candidates": len(absent_missed),
         },
@@ -174,9 +183,7 @@ def _pairs_from_columns(df: pd.DataFrame, columns: Sequence[str]) -> set[Pair]:
     if src_col not in df.columns or tgt_col not in df.columns:
         return set()
     return {
-        (str(src), str(tgt))
-        for src, tgt in zip(df[src_col], df[tgt_col])
-        if str(src) and str(tgt)
+        (str(src), str(tgt)) for src, tgt in zip(df[src_col], df[tgt_col]) if str(src) and str(tgt)
     }
 
 
@@ -208,23 +215,15 @@ def _gold_rank_summary(df: pd.DataFrame, missed_pairs: set[Pair]) -> Dict[str, A
 
     pair_ranks = _rank_lookup(df, "S_pair_final")
     utility_ranks = _rank_lookup(df, "selection_utility")
-    present_pair_ranks = [
-        pair_ranks[pair]
-        for pair in missed_pairs
-        if pair in pair_ranks
-    ]
-    present_utility_ranks = [
-        utility_ranks[pair]
-        for pair in missed_pairs
-        if pair in utility_ranks
-    ]
+    present_pair_ranks = [pair_ranks[pair] for pair in missed_pairs if pair in pair_ranks]
+    present_utility_ranks = [utility_ranks[pair] for pair in missed_pairs if pair in utility_ranks]
     return {
         "present_missed_with_pair_rank": len(present_pair_ranks),
-        "pair_rank_median": _quantile(present_pair_ranks, 0.5),
-        "pair_rank_p90": _quantile(present_pair_ranks, 0.9),
+        "pair_rank_median": quantile(present_pair_ranks, 0.5),
+        "pair_rank_p90": quantile(present_pair_ranks, 0.9),
         "present_missed_with_utility_rank": len(present_utility_ranks),
-        "utility_rank_median": _quantile(present_utility_ranks, 0.5),
-        "utility_rank_p90": _quantile(present_utility_ranks, 0.9),
+        "utility_rank_median": quantile(present_utility_ranks, 0.5),
+        "utility_rank_p90": quantile(present_utility_ranks, 0.9),
     }
 
 
@@ -249,9 +248,13 @@ def _llm_summary(
     llm_rows = df.loc[_bool_series(df["selector_llm_used"])]
     if llm_rows.empty:
         return {"rows": 0, "selected_tp": 0, "selected_fp": 0, "reasons": {}}
-    saved = _bool_series(llm_rows.get("saved_alignment_member", pd.Series(False, index=llm_rows.index)))
+    saved = _bool_series(
+        llm_rows.get("saved_alignment_member", pd.Series(False, index=llm_rows.index))
+    )
     selected_rows = llm_rows.loc[saved]
-    selected_pairs = _pairs_from_columns(selected_rows, ("src_iri", "tgt_iri")).difference(null_reference_pairs)
+    selected_pairs = _pairs_from_columns(selected_rows, ("src_iri", "tgt_iri")).difference(
+        null_reference_pairs
+    )
     reasons = (
         llm_rows["selector_reason"].astype(str).value_counts().sort_index().to_dict()
         if "selector_reason" in llm_rows.columns
@@ -266,23 +269,13 @@ def _llm_summary(
 
 
 def _precision_recall_f1(tp: int, fp: int, fn: int) -> Dict[str, float]:
-    precision = _safe_div(tp, tp + fp)
-    recall = _safe_div(tp, tp + fn)
-    f1 = _safe_div(2.0 * precision * recall, precision + recall)
+    precision = safe_div(tp, tp + fp)
+    recall = safe_div(tp, tp + fn)
+    f1 = safe_div(2.0 * precision * recall, precision + recall)
     return {"precision": precision, "recall": recall, "f1": f1}
-
-
-def _safe_div(num: float, denom: float) -> float:
-    return float(num) / float(denom) if denom else 0.0
 
 
 def _bool_series(series: pd.Series) -> pd.Series:
     if series.dtype == bool:
         return series.fillna(False)
     return series.astype(str).str.lower().isin({"1", "true", "yes", "y"})
-
-
-def _quantile(values: Sequence[int], q: float) -> Optional[float]:
-    if not values:
-        return None
-    return float(pd.Series(values).quantile(q))

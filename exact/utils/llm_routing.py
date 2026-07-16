@@ -10,8 +10,10 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
+
 import httpx
 
+from exact.utils.formatting import strip_code_fences
 
 DEFAULT_OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 DEFAULT_OPENROUTER_KEY_PATH = "~/.config/openrouter/api_key"
@@ -25,7 +27,9 @@ def _noop_logger(*args, **kwargs) -> None:
     return None
 
 
-def _json_headers(api_key: Optional[str] = None, extra: Optional[Dict[str, str]] = None) -> Dict[str, str]:
+def _json_headers(
+    api_key: Optional[str] = None, extra: Optional[Dict[str, str]] = None
+) -> Dict[str, str]:
     headers = {
         "Content-Type": "application/json",
         "Accept": "application/json",
@@ -50,17 +54,8 @@ def _load_json_from_text(text: str) -> Dict[str, Any]:
         return json.loads(match.group(0))
 
 
-def _strip_code_fences(text: str) -> str:
-    blob = (text or "").strip()
-    if not blob:
-        return ""
-    blob = re.sub(r"^\s*```(?:json)?\s*", "", blob, flags=re.IGNORECASE)
-    blob = re.sub(r"\s*```\s*$", "", blob)
-    return blob.strip()
-
-
 def _extract_json_string_value(text: str, required_key: str) -> Optional[str]:
-    blob = _strip_code_fences(text)
+    blob = strip_code_fences(text)
     if not blob:
         return None
     pattern = re.compile(
@@ -127,8 +122,7 @@ def _sanitize_json_payload(value: Any, path: str = "$") -> Any:
         return out
     if isinstance(value, (list, tuple)):
         return [
-            _sanitize_json_payload(item, path=f"{path}[{idx}]")
-            for idx, item in enumerate(value)
+            _sanitize_json_payload(item, path=f"{path}[{idx}]") for idx, item in enumerate(value)
         ]
     return _sanitize_json_string(value)
 
@@ -167,7 +161,8 @@ class LLMProfile:
             model=raw.get("model"),
             tokenizer=raw.get("tokenizer"),
             api_base=str(raw.get("api_base", DEFAULT_OPENROUTER_BASE_URL)).rstrip("/"),
-            api_key_env=str(raw.get("api_key_env", "OPENROUTER_API_KEY")).strip() or "OPENROUTER_API_KEY",
+            api_key_env=str(raw.get("api_key_env", "OPENROUTER_API_KEY")).strip()
+            or "OPENROUTER_API_KEY",
             api_key_path=raw.get("api_key_path"),
             timeout_secs=float(raw.get("timeout_secs", 60.0)),
             extra_headers={str(k): str(v) for k, v in dict(headers).items()},
@@ -259,7 +254,7 @@ class OpenRouterClient:
         return int(status_code) in TRANSIENT_HTTP_STATUS_CODES
 
     def _sleep_before_retry(self, attempt: int) -> None:
-        delay = min(2.0, 0.25 * (2 ** attempt)) + random.uniform(0.0, 0.05)
+        delay = min(2.0, 0.25 * (2**attempt)) + random.uniform(0.0, 0.05)
         time.sleep(delay)
 
     def _http_json(
@@ -304,7 +299,9 @@ class OpenRouterClient:
                 except json.JSONDecodeError:
                     return _load_json_from_text(body)
             except httpx.HTTPStatusError as exc:
-                body_excerpt = _truncate_http_body(exc.response.text if exc.response is not None else "")
+                body_excerpt = _truncate_http_body(
+                    exc.response.text if exc.response is not None else ""
+                )
                 details = (
                     f"OpenRouter HTTP {exc.response.status_code} {exc.response.reason_phrase} for {method} {url}"
                     + (f" model={model!r}" if model is not None else "")
@@ -312,7 +309,9 @@ class OpenRouterClient:
                 )
                 if body_excerpt:
                     details += f" body={body_excerpt}"
-                if attempt < self.max_retries and self._should_retry_status(exc.response.status_code):
+                if attempt < self.max_retries and self._should_retry_status(
+                    exc.response.status_code
+                ):
                     self.log(
                         f"{details}; retrying ({attempt + 1}/{self.max_retries}).",
                         "debug",
@@ -344,7 +343,9 @@ class OpenRouterClient:
                     self._sleep_before_retry(attempt)
                     continue
                 raise RuntimeError(details) from exc
-        raise RuntimeError(f"OpenRouter request failed for {method} {url} after retries were exhausted.")
+        raise RuntimeError(
+            f"OpenRouter request failed for {method} {url} after retries were exhausted."
+        )
 
     def _prompt_key_path(self, env_name: str) -> Optional[str]:
         if env_name in self._prompted_key_paths:
@@ -404,7 +405,9 @@ class OpenRouterClient:
         return str(parameter) in set(str(p) for p in params)
 
     @staticmethod
-    def _merged_provider(profile: LLMProfile, provider: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
+    def _merged_provider(
+        profile: LLMProfile, provider: Optional[Dict[str, Any]] = None
+    ) -> Optional[Dict[str, Any]]:
         merged: Dict[str, Any] = {}
         if profile.provider:
             merged.update(dict(profile.provider))
@@ -517,8 +520,7 @@ class LLMRouter:
         self.log = log or _noop_logger
         raw_profiles = dict(llm_profiles or {})
         self.profiles = {
-            str(name): LLMProfile.from_raw(str(name), raw)
-            for name, raw in raw_profiles.items()
+            str(name): LLMProfile.from_raw(str(name), raw) for name, raw in raw_profiles.items()
         }
         self.routing = LLMRouting.from_raw(llm_routing)
         self.hosted = OpenRouterClient(log=self.log)
@@ -570,7 +572,9 @@ class LLMRouter:
 
         if primary is None:
             if fallback is None:
-                return ResolvedLLMTask(task, "none", None, None, False, False, "no_profile_configured")
+                return ResolvedLLMTask(
+                    task, "none", None, None, False, False, "no_profile_configured"
+                )
             self.log(
                 (
                     f"LLM routing selected profile '{primary_name}' for task '{task}', "
@@ -578,10 +582,26 @@ class LLMRouter:
                 ),
                 "warning",
             )
-            return ResolvedLLMTask(task, fallback.backend, fallback.name, fallback.model, not require_logprobs, True, "missing_primary_profile")
+            return ResolvedLLMTask(
+                task,
+                fallback.backend,
+                fallback.name,
+                fallback.model,
+                not require_logprobs,
+                True,
+                "missing_primary_profile",
+            )
 
         if primary.backend != "openrouter":
-            return ResolvedLLMTask(task, primary.backend, primary.name, primary.model, not require_logprobs, False, None)
+            return ResolvedLLMTask(
+                task,
+                primary.backend,
+                primary.name,
+                primary.model,
+                not require_logprobs,
+                False,
+                None,
+            )
 
         api_key = self.hosted.resolve_api_key(primary)
         if not api_key:
@@ -593,8 +613,18 @@ class LLMRouter:
                     ),
                     "warning",
                 )
-                return ResolvedLLMTask(task, fallback.backend, fallback.name, fallback.model, False, True, "missing_api_key")
-            return ResolvedLLMTask(task, "openrouter", primary.name, primary.model, False, False, "missing_api_key")
+                return ResolvedLLMTask(
+                    task,
+                    fallback.backend,
+                    fallback.name,
+                    fallback.model,
+                    False,
+                    True,
+                    "missing_api_key",
+                )
+            return ResolvedLLMTask(
+                task, "openrouter", primary.name, primary.model, False, False, "missing_api_key"
+            )
 
         if require_logprobs and not self.hosted.supports_parameter(primary, "logprobs"):
             if fallback is not None:
@@ -605,10 +635,29 @@ class LLMRouter:
                     ),
                     "warning",
                 )
-                return ResolvedLLMTask(task, fallback.backend, fallback.name, fallback.model, False, True, "logprobs_unsupported")
-            return ResolvedLLMTask(task, "openrouter", primary.name, primary.model, False, False, "logprobs_unsupported", api_key=api_key)
+                return ResolvedLLMTask(
+                    task,
+                    fallback.backend,
+                    fallback.name,
+                    fallback.model,
+                    False,
+                    True,
+                    "logprobs_unsupported",
+                )
+            return ResolvedLLMTask(
+                task,
+                "openrouter",
+                primary.name,
+                primary.model,
+                False,
+                False,
+                "logprobs_unsupported",
+                api_key=api_key,
+            )
 
-        return ResolvedLLMTask(task, "openrouter", primary.name, primary.model, True, False, None, api_key=api_key)
+        return ResolvedLLMTask(
+            task, "openrouter", primary.name, primary.model, True, False, None, api_key=api_key
+        )
 
 
 def extract_chat_text(payload: Dict[str, Any]) -> str:
@@ -694,7 +743,9 @@ def extract_completion_suffix_logprob(
 ) -> float:
     overlaps = extract_completion_span_logprobs(payload, suffix_start, suffix_end)
     if not overlaps:
-        raise ValueError("OpenRouter completion response lacked echoed token logprobs for the suffix span.")
+        raise ValueError(
+            "OpenRouter completion response lacked echoed token logprobs for the suffix span."
+        )
     return float(sum(float(item["logprob"]) for item in overlaps))
 
 
@@ -719,7 +770,7 @@ def split_completion_choices(payload: Dict[str, Any]) -> List[Dict[str, Any]]:
 
 
 def parse_structured_json(text: str, required_key: str) -> str:
-    normalized = _strip_code_fences(text)
+    normalized = strip_code_fences(text)
     try:
         payload = _load_json_from_text(normalized)
         value = payload.get(required_key)

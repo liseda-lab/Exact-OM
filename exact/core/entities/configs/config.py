@@ -1,24 +1,25 @@
 import logging
 from pathlib import Path
-from typing import Any, Optional, Tuple, Type, Union, List, Dict
-import itertools
-import random
+from typing import Any, Dict, List, Optional, Tuple, Type
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator
 
-from exact import config, read_yaml
-from exact.core.entities.registry import ComponentType, ComponentRegistry
-from exact.core.entities.configs.dataset import ContextMethod, BestPathMethod
-
+from exact.core.contracts.dataset import IDataset
 from exact.core.contracts.model import IModel
 from exact.core.contracts.trainer import ITrainer
-from exact.core.contracts.dataset import IDataset
+from exact.core.entities.configs.dataset import BestPathMethod, ContextMethod
+from exact.core.entities.registry import ComponentRegistry, ComponentType
+from exact.utils.data import read_yaml
+
+DEFAULT_CONFIG_PATH = Path(__file__).resolve().parents[3] / "default_config.yaml"
+config = read_yaml(DEFAULT_CONFIG_PATH)
 
 
 class RegistryParams(BaseModel):
     """Base model for components managed via the ComponentRegistry."""
+
     component_type: ComponentType
-    name: str 
+    name: str
     params: dict
 
     @field_validator("name", mode="before")
@@ -26,11 +27,12 @@ class RegistryParams(BaseModel):
         """Validate and load the component from the registry."""
         if name is None:
             return None
-        
+
         component_type = values.data.get("component_type")
         if not component_type:
             raise ValueError("Component type is required for registry-based parameters.")
         return ComponentRegistry.get(component_type, name)
+
 
 class ModelParams(RegistryParams):
     component_type: ComponentType = ComponentType.MODEL
@@ -40,7 +42,9 @@ class ModelParams(RegistryParams):
 
 class SecondModelParams(RegistryParams):
     component_type: ComponentType = ComponentType.MODEL
-    name: Optional[Type[IModel]] = Field(config.get("second_model", {}).get("name", None), validate_default=True)
+    name: Optional[Type[IModel]] = Field(
+        config.get("second_model", {}).get("name", None), validate_default=True
+    )
     params: dict = Field(config.get("second_model", {}).get("params", {}))
 
 
@@ -48,6 +52,7 @@ class ModelChainEntry(RegistryParams):
     component_type: ComponentType = ComponentType.MODEL
     name: Type[IModel]
     params: dict = Field(default_factory=dict)
+
 
 class DatasetParams(BaseModel):
     # General Params
@@ -61,28 +66,44 @@ class DatasetParams(BaseModel):
 
     # Context Main Params
     n_hops: int = Field(config["dataset_params"]["n_hops"])
-    context_method: ContextMethod = Field(config["dataset_params"]["context_method"], validate_default=True)
-    best_path_method: BestPathMethod = Field(config["dataset_params"]["best_path_method"], validate_default=True)
+    context_method: ContextMethod = Field(
+        config["dataset_params"]["context_method"], validate_default=True
+    )
+    best_path_method: BestPathMethod = Field(
+        config["dataset_params"]["best_path_method"], validate_default=True
+    )
     context_hop_penalty: float = Field(config["dataset_params"]["context_hop_penalty"])
     context_token_ratio: float = Field(config["dataset_params"]["context_token_ratio"])
     context_safety: float = Field(config["dataset_params"]["context_safety"])
     max_input_tokens_context: int = Field(config["dataset_params"]["max_input_tokens_context"])
     only_taxonomy: bool = Field(config["dataset_params"]["only_taxonomy"])
     all_labels: bool = Field(config["dataset_params"]["all_labels"])
-    add_connectivity_bridges: bool = Field(config["dataset_params"].get("add_connectivity_bridges", True))
+    add_connectivity_bridges: bool = Field(
+        config["dataset_params"].get("add_connectivity_bridges", True)
+    )
     bridge_max_hops: Optional[int] = Field(config["dataset_params"].get("bridge_max_hops", None))
     reasoner_timeout_secs: float = Field(config["dataset_params"].get("reasoner_timeout_secs", 120))
-    reasoner_force_hermit: bool = Field(config["dataset_params"].get("reasoner_force_hermit", False))
-    projection_include_literals: bool = Field(config["dataset_params"].get("projection_include_literals", False))
+    reasoner_force_hermit: bool = Field(
+        config["dataset_params"].get("reasoner_force_hermit", False)
+    )
+    projection_include_literals: bool = Field(
+        config["dataset_params"].get("projection_include_literals", False)
+    )
     hierarchical_relation_families: Dict[str, Dict[str, Any]] = Field(
-        default_factory=lambda: dict(config["dataset_params"].get("hierarchical_relation_families", {}))
+        default_factory=lambda: dict(
+            config["dataset_params"].get("hierarchical_relation_families", {})
+        )
     )
     hierarchy_max_depth: int = Field(config["dataset_params"].get("hierarchy_max_depth", 2))
-    max_hierarchy_triples_per_family: int = Field(config["dataset_params"].get("max_hierarchy_triples_per_family", 6))
+    max_hierarchy_triples_per_family: int = Field(
+        config["dataset_params"].get("max_hierarchy_triples_per_family", 6)
+    )
     max_object_triples: int = Field(config["dataset_params"].get("max_object_triples", 48))
     max_diff_triples: int = Field(config["dataset_params"].get("max_diff_triples", 24))
     max_attr_items: int = Field(config["dataset_params"].get("max_attr_items", 12))
-    pair_adaptive_feature_log_every: int = Field(config["dataset_params"].get("pair_adaptive_feature_log_every", 1000))
+    pair_adaptive_feature_log_every: int = Field(
+        config["dataset_params"].get("pair_adaptive_feature_log_every", 1000)
+    )
     # Verbaliser Params
     verbaliser_name: Optional[str] = Field(config["dataset_params"]["verbaliser_name"])
     gen_max_new_tokens: int = Field(config["dataset_params"]["gen_max_new_tokens"])
@@ -99,6 +120,7 @@ class DatasetParams(BaseModel):
     # Plotting Params
     which: Optional[List[str]] = Field(config["dataset_params"]["which"])
 
+
 class CandidatesParams(BaseModel):
     lexical_encoder_name: Optional[str] = Field(config["candidates_params"]["lexical_encoder_name"])
     encode_batch_size: int = Field(config["candidates_params"]["encode_batch_size"])
@@ -114,11 +136,13 @@ class CandidatesParams(BaseModel):
             raise ValueError("retrieval_strategy must be 'primary_label' or 'hybrid'")
         return strategy
 
+
 class SanityCheckParams(BaseModel):
     sanity_check: bool = Field(config["sanity_check_params"]["sanity_check"])
     n: int = Field(config["sanity_check_params"]["n"])
     max_ctx_show: int = Field(config["sanity_check_params"]["max_ctx_show"])
     max_label_show: int = Field(config["sanity_check_params"]["max_label_show"])
+
 
 class PlotParams(BaseModel):
     bins: int = Field(config["plot_params"]["bins"])
@@ -144,10 +168,14 @@ class InferenceParams(BaseModel):
         config["inference_params"].get("allow_rationale_toggle_checkpoint_resume", False)
     )
     audit_shards_enabled: bool = Field(config["inference_params"].get("audit_shards_enabled", True))
-    audit_shard_compression: str = Field(config["inference_params"].get("audit_shard_compression", "zstd"))
+    audit_shard_compression: str = Field(
+        config["inference_params"].get("audit_shard_compression", "zstd")
+    )
     audit_shard_records: int = Field(config["inference_params"].get("audit_shard_records", 50000))
     checkpoint_payload: str = Field(config["inference_params"].get("checkpoint_payload", "compact"))
-    cache_persist_policy: str = Field(config["inference_params"].get("cache_persist_policy", "finalize"))
+    cache_persist_policy: str = Field(
+        config["inference_params"].get("cache_persist_policy", "finalize")
+    )
 
     @field_validator("audit_shard_compression", mode="before")
     def validate_audit_shard_compression(cls, value: str) -> str:
@@ -174,11 +202,15 @@ class InferenceParams(BaseModel):
 class AlignmentParams(BaseModel):
     threshold: Optional[float] = Field(config["alignment_params"]["threshold"])
     cardinality: Optional[int] = Field(config["alignment_params"]["cardinality"])
-    target_cardinality: Optional[int] = Field(config["alignment_params"].get("target_cardinality", None))
+    target_cardinality: Optional[int] = Field(
+        config["alignment_params"].get("target_cardinality", None)
+    )
     save_json: bool = Field(config["alignment_params"]["save_json"])
     save_csv: bool = Field(config["alignment_params"]["save_csv"])
     save_stats_csv: bool = Field(config["alignment_params"]["save_stats_csv"])
-    append_stats_to_summary_csv: bool = Field(config["alignment_params"]["append_stats_to_summary_csv"])
+    append_stats_to_summary_csv: bool = Field(
+        config["alignment_params"]["append_stats_to_summary_csv"]
+    )
     review_low: Optional[float] = Field(config["alignment_params"]["review_low"])
     review_high: Optional[float] = Field(config["alignment_params"]["review_high"])
 
@@ -206,6 +238,7 @@ class LLMRoutingConfig(BaseModel):
     rationale_fallback_profile: Optional[str] = None
     fallback_profile: Optional[str] = None
     decision_fallback_profile: Optional[str] = None
+
 
 class ConfigModel(BaseModel):
 
@@ -237,11 +270,11 @@ class ConfigModel(BaseModel):
     @field_validator("logging_level", mode="before")
     def parse_logging_level(logging_level: str) -> int:
         return getattr(logging, logging_level.upper())
-    
-    @field_validator('k', mode="before")
+
+    @field_validator("k", mode="before")
     def ensure_unique_k(cls, k):
         return list(set(k))
-    
+
     def resolve_dependencies(self) -> None:
         primary_model = None
         if self.model_chain and len(self.model_chain) > 0:
@@ -249,11 +282,17 @@ class ConfigModel(BaseModel):
         else:
             primary_model = self.model
         dependencies = ComponentRegistry.get_dependency(primary_model.name.__name__)
-        self.dataset = ComponentRegistry.get(ComponentType.DATASET, dependencies[ComponentType.DATASET])
-        self.trainer = ComponentRegistry.get(ComponentType.TRAINER, dependencies[ComponentType.TRAINER])
+        self.dataset = ComponentRegistry.get(
+            ComponentType.DATASET, dependencies[ComponentType.DATASET]
+        )
+        self.trainer = ComponentRegistry.get(
+            ComponentType.TRAINER, dependencies[ComponentType.TRAINER]
+        )
 
     @staticmethod
-    def _merge_registry_entry(raw_entry: Optional[Dict[str, Any]], default_entry: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    def _merge_registry_entry(
+        raw_entry: Optional[Dict[str, Any]], default_entry: Optional[Dict[str, Any]]
+    ) -> Dict[str, Any]:
         """
         Merge registry-backed config entries while preserving default params.
 
@@ -286,8 +325,7 @@ class ConfigModel(BaseModel):
             **(yaml_config.get("llm_profiles", {}) or {}),
         }
         llm_profiles = {
-            name: LLMProfileConfig(**payload)
-            for name, payload in merged_llm_profiles.items()
+            name: LLMProfileConfig(**payload) for name, payload in merged_llm_profiles.items()
         }
         llm_routing = LLMRoutingConfig(
             **{
@@ -296,7 +334,9 @@ class ConfigModel(BaseModel):
             }
         )
         model_params = ModelParams(
-            **cls._merge_registry_entry(yaml_config.get("model", {}) or {}, config.get("model", {}) or {})
+            **cls._merge_registry_entry(
+                yaml_config.get("model", {}) or {}, config.get("model", {}) or {}
+            )
         )
         second_model_raw = yaml_config.get("second_model", {}) or {}
         legacy_second_pass = yaml_config.get("second_pass_params")
@@ -308,7 +348,9 @@ class ConfigModel(BaseModel):
         model_chain = None
         if "model_chain" in yaml_config:
             entries = yaml_config.get("model_chain") or []
-            model_chain = [ModelChainEntry(**cls._merge_registry_entry(entry, None)) for entry in entries]
+            model_chain = [
+                ModelChainEntry(**cls._merge_registry_entry(entry, None)) for entry in entries
+            ]
 
         # filter config for set keys
         filtered_config = {
@@ -316,7 +358,8 @@ class ConfigModel(BaseModel):
             for k, v in yaml_config.items()
             if v is not None
             and k in cls.model_fields
-            and k not in [
+            and k
+            not in [
                 "dataset_params",
                 "candidates_params",
                 "alignment_params",

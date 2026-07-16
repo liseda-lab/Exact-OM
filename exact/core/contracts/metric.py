@@ -1,10 +1,9 @@
-
 from abc import abstractmethod
 from typing import Dict, List
 
 from exact.core.contracts import SelfRegisteringComponent
-from exact.core.entities.registry import ComponentType
 from exact.core.entities.evaluation import EvaluationData, MetricNames
+from exact.core.entities.registry import ComponentType
 
 
 class IMetric(SelfRegisteringComponent):
@@ -17,7 +16,7 @@ class IMetric(SelfRegisteringComponent):
         Optionally preprocess the data. Default behavior is to return the input data as-is.
         """
         return [data]
-    
+
     @abstractmethod
     def compute(self, data: EvaluationData) -> Dict[str, float]:
         """

@@ -1,30 +1,35 @@
-from abc import ABC, abstractmethod
-from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Callable, Any, Sequence
-from contextlib import nullcontext
-from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import json
-import os
-
 import math
-import re
+import os
 import time
+from abc import abstractmethod
+from ast import literal_eval
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import nullcontext
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
+
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
-from torch.utils.data import Dataset
-from torch import Tensor
-from ast import literal_eval
 import torch
+from mowl.datasets import PathDataset as OWLDataset
+from mowl.owlapi import OWLOntology
+from org.semanticweb.elk.owlapi import ElkReasonerFactory
+from org.semanticweb.HermiT import Reasoner
+from org.semanticweb.owlapi.model import IRI
+from org.semanticweb.owlapi.reasoner import InferenceType
+from org.semanticweb.owlapi.reasoner.structural import StructuralReasonerFactory
+from org.semanticweb.owlapi.search import EntitySearcher
 from sentence_transformers import SentenceTransformer
+from torch import Tensor
+from torch.utils.data import Dataset
 
-from exact.core.contracts.base import SelfRegisteringComponent, LoggingClass
-from exact.core.entities.registry import ComponentType
+from exact.core.contracts.base import LoggingClass, SelfRegisteringComponent
 from exact.core.entities.configs.dataset import DatasetMask
-from exact.core.values import ANNOTATION_IRI
 from exact.core.entities.ontology import OntologyGraph
+from exact.core.entities.registry import ComponentType
+from exact.core.values import ANNOTATION_IRI
 from exact.utils.candidate_generation import (
     candidate_annotation_priority,
     candidate_token_key,
@@ -34,16 +39,6 @@ from exact.utils.candidate_generation import (
     select_candidate_annotation_literals,
 )
 from exact.utils.data import read_table
-
-from mowl.datasets import PathDataset as OWLDataset
-from mowl.owlapi import OWLOntology
-from org.semanticweb.HermiT import Reasoner
-from org.semanticweb.elk.owlapi import ElkReasonerFactory
-from org.semanticweb.owlapi.model import IRI
-from org.semanticweb.owlapi.reasoner.structural import StructuralReasonerFactory
-from org.semanticweb.owlapi.reasoner import InferenceType
-from org.semanticweb.owlapi.search import EntitySearcher
-
 
 # from jpype import java
 
@@ -55,16 +50,16 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
 
     component_type = ComponentType.DATASET
 
-    def __init__(self, 
-                 output_path: Path,
-                 filter_exact_matches: bool = False,
-                 cardinality: int = 1,
-                 num_workers: Optional[int] = None,
-                 drop_exact_match_sources: bool = True,
-                 filter_ignored_alignment_classes: bool = False,
-                 **kwargs
-        ) -> None:
-
+    def __init__(
+        self,
+        output_path: Path,
+        filter_exact_matches: bool = False,
+        cardinality: int = 1,
+        num_workers: Optional[int] = None,
+        drop_exact_match_sources: bool = True,
+        filter_ignored_alignment_classes: bool = False,
+        **kwargs,
+    ) -> None:
 
         self._output_path: Path = output_path / "dataset"
         self._output_path.mkdir(parents=True, exist_ok=True)
@@ -125,7 +120,11 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
     # ------------------------------------------------------------------
     def _get_reasoner(self, label: str, ontology: OWLOntology) -> Optional[Reasoner]:
         cache = self._source_reasoner if label == "source" else self._target_reasoner
-        attempted = self._source_reasoner_attempted if label == "source" else self._target_reasoner_attempted
+        attempted = (
+            self._source_reasoner_attempted
+            if label == "source"
+            else self._target_reasoner_attempted
+        )
 
         if cache is not None or attempted:
             return cache
@@ -238,6 +237,7 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
     @property
     def default_kind(self) -> DatasetMask:
         return self._default_kind
+
     @default_kind.setter
     def default_kind(self, kind: DatasetMask) -> None:
         self._default_kind = kind
@@ -281,11 +281,11 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
     @property
     def source(self) -> OWLDataset:
         return self._source
-    
+
     @property
     def target(self) -> OWLDataset:
         return self._target
-    
+
     @property
     def source_reasoner(self) -> Reasoner:
         if self.source is None:
@@ -299,11 +299,11 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
             self.log("Target ontology not loaded.", level="error")
             raise ValueError("Target ontology not loaded.")
         return self._get_reasoner(label="target", ontology=self.target.ontology)
-    
+
     @property
     def exact_matches(self) -> DataFrame:
         return self._exact_matches
-    
+
     @property
     def candidates(self) -> DataFrame:
         return self._candidates
@@ -315,15 +315,15 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
     @property
     def reference(self) -> DataFrame:
         return self._reference
-    
+
     @property
     def output_path(self) -> Path:
         return self._output_path
-    
+
     @property
     def num_workers(self) -> Optional[int]:
         return self._num_workers
-    
+
     @property
     def source_graph(self) -> OntologyGraph:
         if self.source is None:
@@ -332,7 +332,7 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
         elif self._source_graph is None:
             self._source_graph = OntologyGraph(self.source.ontology, self.source_reasoner)
         return self._source_graph
-    
+
     @property
     def target_graph(self) -> OntologyGraph:
         if self.target is None:
@@ -416,16 +416,17 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
         tgt_ignored = self.target_ignored_alignment_classes
         if not src_ignored and not tgt_ignored:
             return df
-        keep = ~(
-            df["Src"].astype(str).isin(src_ignored)
-            | df["Tgt"].astype(str).isin(tgt_ignored)
-        )
+        keep = ~(df["Src"].astype(str).isin(src_ignored) | df["Tgt"].astype(str).isin(tgt_ignored))
         removed = int((~keep).sum())
         if removed:
-            self.log(f"#Filtered {removed} candidate rows with ignored alignment classes.", level="info")
+            self.log(
+                f"#Filtered {removed} candidate rows with ignored alignment classes.", level="info"
+            )
         return df.loc[keep].reset_index(drop=True)
 
-    def _filter_mappings_ignored_classes(self, df: Optional[DataFrame], label: str) -> Optional[DataFrame]:
+    def _filter_mappings_ignored_classes(
+        self, df: Optional[DataFrame], label: str
+    ) -> Optional[DataFrame]:
         if df is None or df.empty or not self.filter_ignored_alignment_classes:
             return df
         if not {"Src", "Tgt"}.issubset(df.columns):
@@ -434,13 +435,12 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
         tgt_ignored = self.target_ignored_alignment_classes
         if not src_ignored and not tgt_ignored:
             return df
-        keep = ~(
-            df["Src"].astype(str).isin(src_ignored)
-            | df["Tgt"].astype(str).isin(tgt_ignored)
-        )
+        keep = ~(df["Src"].astype(str).isin(src_ignored) | df["Tgt"].astype(str).isin(tgt_ignored))
         removed = int((~keep).sum())
         if removed:
-            self.log(f"#Filtered {removed} {label} rows with ignored alignment classes.", level="info")
+            self.log(
+                f"#Filtered {removed} {label} rows with ignored alignment classes.", level="info"
+            )
         return df.loc[keep].reset_index(drop=True)
 
     def get_exact_matches(self) -> None:
@@ -460,10 +460,8 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
             src_iris = set(self.candidates["Src"].unique())
             tgt_iris = set(self.candidates["Tgt"].unique())
 
-            src_map = {iri: self.source_graph.get_labels(iri)
-                        for iri in src_iris}
-            tgt_map = {iri: self.target_graph.get_labels(iri)
-                        for iri in tgt_iris}
+            src_map = {iri: self.source_graph.get_labels(iri) for iri in src_iris}
+            tgt_map = {iri: self.target_graph.get_labels(iri) for iri in tgt_iris}
 
         else:
             src_map = self.source_graph.get_labels_map()
@@ -473,14 +471,19 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
             src_ignored = self.source_ignored_alignment_classes
             tgt_ignored = self.target_ignored_alignment_classes
             if src_ignored:
-                src_map = {iri: labels for iri, labels in src_map.items() if str(iri) not in src_ignored}
+                src_map = {
+                    iri: labels for iri, labels in src_map.items() if str(iri) not in src_ignored
+                }
             if tgt_ignored:
-                tgt_map = {iri: labels for iri, labels in tgt_map.items() if str(iri) not in tgt_ignored}
+                tgt_map = {
+                    iri: labels for iri, labels in tgt_map.items() if str(iri) not in tgt_ignored
+                }
 
         # Build normalized label→IRIs indexes. The compact key preserves the
         # historical exact-match behavior; the token key adds conservative
         # near-exact rescue for punctuation and word-order variants.
         self.log("#Indexing normalized labels for exact matching...", level="debug")
+
         def index_norm(map_, key_fn: Callable[[str], Any]) -> Dict[Any, List[str]]:
             idx: Dict[Any, List[str]] = {}
             for iri, labels in map_.items():
@@ -495,7 +498,9 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
             key = candidate_token_key(label)
             return key if len(key) >= 2 else tuple()
 
-        def pairs_from_indexes(src_idx: Dict[Any, List[str]], tgt_idx: Dict[Any, List[str]]) -> set[Tuple[str, str]]:
+        def pairs_from_indexes(
+            src_idx: Dict[Any, List[str]], tgt_idx: Dict[Any, List[str]]
+        ) -> set[Tuple[str, str]]:
             pairs: set[Tuple[str, str]] = set()
             shared = set(src_idx.keys()).intersection(tgt_idx.keys())
             for key in shared:
@@ -516,7 +521,9 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
         exact_rows = [[s, t, 1.0] for s, t in sorted(compact_pairs.union(token_pairs))]
 
         self._exact_matches = pd.DataFrame(exact_rows, columns=["Src", "Tgt", "Score"])
-        self._exact_matches = self._filter_mappings_ignored_classes(self._exact_matches, label="exact")
+        self._exact_matches = self._filter_mappings_ignored_classes(
+            self._exact_matches, label="exact"
+        )
         self.log(
             "#Exact matches found: "
             f"{len(self._exact_matches)} "
@@ -525,7 +532,7 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
         )
 
     def load_ontologies(self, source_path: Path, target_path: Path) -> None:
-        
+
         self._source_path = Path(source_path).resolve()
         self._target_path = Path(target_path).resolve()
         self._dataset_signature = None
@@ -536,11 +543,11 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
         )
 
         self._source = OWLDataset(str(self._source_path))
-        
+
         self.log("#Loaded Source...", level="debug")
-        
+
         self._target = OWLDataset(str(self._target_path))
-        
+
         self.log("#Loaded Target...", level="debug")
 
     def _path_fingerprint(self, path: Path) -> str:
@@ -598,16 +605,17 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
         }
         self._cache_meta_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
-    def load_candidates(self, 
-                        file_path: Optional[Path] = None,
-                        top_k: Optional[int] = 100,
-                        lexical_encoder_name: Optional[str] = "sentence-transformers/all-MiniLM-L6-v2",
-                        encode_batch_size: Optional[int] = 512,
-                        search_batch_size: Optional[int] = 4096,
-                        use_amp: Optional[bool] = True,
-                        retrieval_strategy: str = "hybrid",
-                        device: Optional[torch.device] = None,
-                        ) -> None:
+    def load_candidates(
+        self,
+        file_path: Optional[Path] = None,
+        top_k: Optional[int] = 100,
+        lexical_encoder_name: Optional[str] = "sentence-transformers/all-MiniLM-L6-v2",
+        encode_batch_size: Optional[int] = 512,
+        search_batch_size: Optional[int] = 4096,
+        use_amp: Optional[bool] = True,
+        retrieval_strategy: str = "hybrid",
+        device: Optional[torch.device] = None,
+    ) -> None:
 
         if file_path is not None:
 
@@ -617,11 +625,14 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
 
             def get_cands(df: pd.DataFrame) -> pd.DataFrame:
 
-                return pd.DataFrame([
+                return pd.DataFrame(
+                    [
                         [source, cand, 0]
                         for source, _, target_cands in df.values
                         for cand in literal_eval(target_cands)
-                    ], columns=["Src", "Tgt", "Label"])
+                    ],
+                    columns=["Src", "Tgt", "Label"],
+                )
 
             # Load One2Many candidates file
             candidates = read_table(str(file_path))
@@ -635,14 +646,14 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
             self.log("#Loaded Candidates...", level="info")
 
             if self.filter_exact_matches:
-                self.log(f"Get Exact Matches...", level="info")
+                self.log("Get Exact Matches...", level="info")
                 self.get_exact_matches()
 
         else:
             self.log("#No Candidates file provided, generation candidates...", level="info")
 
             if self.filter_exact_matches:
-                self.log(f"Get Exact Matches...", level="info")
+                self.log("Get Exact Matches...", level="info")
                 self.get_exact_matches()
 
             self.generate_candidates(
@@ -652,9 +663,8 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
                 search_batch_size=search_batch_size,
                 use_amp=use_amp,
                 retrieval_strategy=retrieval_strategy,
-                device=device
+                device=device,
             )
-
 
     def generate_candidates(
         self,
@@ -699,11 +709,15 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
                 ),
                 level="debug",
             )
-        self.log(f"## Source classes: {len(src_iris)} | Target classes: {len(tgt_iris)}", level="debug")
+        self.log(
+            f"## Source classes: {len(src_iris)} | Target classes: {len(tgt_iris)}", level="debug"
+        )
 
-        if (not self.cardinality_1_to_many 
-                and self.drop_exact_match_sources 
-                and self._exact_matches is not None):
+        if (
+            not self.cardinality_1_to_many
+            and self.drop_exact_match_sources
+            and self._exact_matches is not None
+        ):
             exact_sources = set(self._exact_matches["Src"].dropna().astype(str))
             n_src_before = len(src_iris)
             self.log("#Skipping exact-match sources during candidate generation...", level="debug")
@@ -716,7 +730,7 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
                 ),
                 level="debug",
             )
-        
+
         if not src_iris or not tgt_iris:
             self._candidates = pd.DataFrame(
                 columns=[
@@ -735,8 +749,12 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
         label_scope = "primary labels" if strategy == "primary_label" else "all labels"
         self.log(f"  Extracting {label_scope} for all classes…", level="debug")
         if strategy == "primary_label":
-            src_labels_by_iri = {iri: [self.source_graph.get_primary_label(iri)] for iri in src_iris}
-            tgt_labels_by_iri = {iri: [self.target_graph.get_primary_label(iri)] for iri in tgt_iris}
+            src_labels_by_iri = {
+                iri: [self.source_graph.get_primary_label(iri)] for iri in src_iris
+            }
+            tgt_labels_by_iri = {
+                iri: [self.target_graph.get_primary_label(iri)] for iri in tgt_iris
+            }
             src_lexical_texts_by_iri = src_labels_by_iri
             tgt_lexical_texts_by_iri = tgt_labels_by_iri
             channel_k = int(top_k)
@@ -807,7 +825,10 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
         self._candidates = self._filter_candidates_ignored_classes(cand_df)
         self._annotate_candidate_similarity_stats()
         self._candidates_generated = True
-        self.log(f"#Candidate generation complete: {len(self._candidates)} rows (Top-{top_k} per source).", level="debug")
+        self.log(
+            f"#Candidate generation complete: {len(self._candidates)} rows (Top-{top_k} per source).",
+            level="debug",
+        )
 
     def _candidate_texts_for_iri(self, graph: OntologyGraph, iri: str, side: str) -> List[str]:
         labels = list(graph.get_labels(iri) or [])
@@ -911,12 +932,12 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
     @torch.inference_mode()
     def topk_cosine_search_torch(
         self,
-        E_src: np.ndarray,           # [Ns, d], float32
-        E_tgt: np.ndarray,           # [Nt, d], float32
+        E_src: np.ndarray,  # [Ns, d], float32
+        E_tgt: np.ndarray,  # [Nt, d], float32
         top_k: int = 10,
         batch_size_src: int = 2048,  # tune per VRAM; 2–8K typical for d=384
         device: Optional[torch.device] = None,
-        amp: bool = True
+        amp: bool = True,
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Return (indices, scores) where:
@@ -978,9 +999,7 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
         ranks = groups.cumcount()
         top_mask = ranks < k_share
         share_top_series = (
-            self._candidates.loc[top_mask]
-            .groupby("Src", sort=False)["cand_sim_prob"]
-            .sum()
+            self._candidates.loc[top_mask].groupby("Src", sort=False)["cand_sim_prob"].sum()
         )
         share_top = self._candidates["Src"].map(share_top_series).fillna(0.0)
         share_rest = (1.0 - share_top).clip(lower=0.0)
@@ -1000,9 +1019,9 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
         if self.dataframe is None:
             self.log("Dataset is empty.", level="error")
             raise ValueError("Dataset is empty.")
-        
+
         if self.has_cache():
-            self.log("#Dataset already saved skyping...", level="debug")
+            self.log("#Dataset already saved; skipping...", level="debug")
             return self._df_save_path
 
         self.dataframe.to_csv(str(self._df_save_path), index=False)
@@ -1011,11 +1030,11 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
         self.log(f"#Dataset saved to {self._df_save_path}", level="debug")
 
         return self._df_save_path
-    
+
     def load(self):
         self._df = pd.read_csv(self._df_save_path, converters={"Features": literal_eval})
 
-        self.log("#Loaded Cached Dataset...", level="info")
+        self.log("#Loaded cached dataset...", level="info")
         if "cand_sim" in self._df.columns:
             self._candidates_generated = True
 
@@ -1038,15 +1057,19 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
 
         self._candidates = self._filter_candidates_ignored_classes(self._candidates)
         if self._reference is not None:
-            self._reference = self._filter_mappings_ignored_classes(self._reference, label="reference")
+            self._reference = self._filter_mappings_ignored_classes(
+                self._reference, label="reference"
+            )
         if self._exact_matches is not None:
-            self._exact_matches = self._filter_mappings_ignored_classes(self._exact_matches, label="exact")
+            self._exact_matches = self._filter_mappings_ignored_classes(
+                self._exact_matches, label="exact"
+            )
         self._annotate_candidate_similarity_stats()
 
         if self.has_cache():
             self.load()
             return self
-        
+
         # Inference set
 
         self.log("Creating Inference set", level="debug")
@@ -1060,21 +1083,30 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
         if self.reference is not None:
             # Update Labels based on full_reference
             self.log("#Updating Labels based on Reference...", level="debug")
-            inference_set = inference_set.merge(self.reference, on=["Src", "Tgt"], how="left", suffixes=("", "_y"))
+            inference_set = inference_set.merge(
+                self.reference, on=["Src", "Tgt"], how="left", suffixes=("", "_y")
+            )
             inference_set["Label"] = inference_set["Label_y"].combine_first(inference_set["Label"])
             inference_set.drop(columns=["Label_y"], inplace=True)
 
             exact_prefilter_pairs = self._exact_mapping_pairs()
             # Warn how many unique source-target pairs full reference has that are not
             # recoverable either by scored candidates or by exact prefiltering.
-            unique_pairs_inference = set(zip(inference_set["Src"].astype(str), inference_set["Tgt"].astype(str)))
-            unique_pairs_full_ref = set(zip(self.reference["Src"].astype(str), self.reference["Tgt"].astype(str)))
+            unique_pairs_inference = set(
+                zip(inference_set["Src"].astype(str), inference_set["Tgt"].astype(str))
+            )
+            unique_pairs_full_ref = set(
+                zip(self.reference["Src"].astype(str), self.reference["Tgt"].astype(str))
+            )
             raw_missing_pairs = unique_pairs_full_ref - unique_pairs_inference
             missing_pairs = raw_missing_pairs.difference(exact_prefilter_pairs)
 
             if missing_pairs:
                 missing_percentage = len(missing_pairs) / len(unique_pairs_full_ref) * 100
-                self.log(f"#Warning: {len(missing_pairs)} reference pairs are not covered by candidates or exact prefiltering ({missing_percentage:.2f}%)", level="warning")
+                self.log(
+                    f"#Warning: {len(missing_pairs)} reference pairs are not covered by candidates or exact prefiltering ({missing_percentage:.2f}%)",
+                    level="warning",
+                )
 
                 # Warn how many unique source entities full reference has that are not in the candidates with percentage
                 unique_src_inference = set(inference_set["Src"].astype(str).unique())
@@ -1083,7 +1115,10 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
 
                 if missing_src:
                     missing_percentage = len(missing_src) / len(unique_src_full_ref) * 100
-                    self.log(f"#Warning: {len(missing_src)} reference sources are not covered by candidates or exact prefiltering ({missing_percentage:.2f}%)", level="warning")
+                    self.log(
+                        f"#Warning: {len(missing_src)} reference sources are not covered by candidates or exact prefiltering ({missing_percentage:.2f}%)",
+                        level="warning",
+                    )
 
                 # Warn how many unique target entities full reference has that are not in the candidates with percentage
                 unique_tgt_inference = set(inference_set["Tgt"].astype(str).unique())
@@ -1092,7 +1127,10 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
 
                 if missing_tgt:
                     missing_percentage = len(missing_tgt) / len(unique_tgt_full_ref) * 100
-                    self.log(f"#Warning: {len(missing_tgt)} reference targets are not covered by candidates or exact prefiltering ({missing_percentage:.2f}%)", level="warning")
+                    self.log(
+                        f"#Warning: {len(missing_tgt)} reference targets are not covered by candidates or exact prefiltering ({missing_percentage:.2f}%)",
+                        level="warning",
+                    )
 
         pre_filtered_set = pd.DataFrame()
         pre_filtered_mappings = self.exact_matches
@@ -1107,7 +1145,9 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
                 # Remove only the exact (Src, Tgt) matches from the inference pool.
                 exact_pairs_idx = pd.MultiIndex.from_frame(pre_filtered_mappings[["Src", "Tgt"]])
                 inference_pairs_idx = pd.MultiIndex.from_frame(inference_set[["Src", "Tgt"]])
-                match_mask = pd.Series(inference_pairs_idx.isin(exact_pairs_idx), index=inference_set.index)
+                match_mask = pd.Series(
+                    inference_pairs_idx.isin(exact_pairs_idx), index=inference_set.index
+                )
                 n_removed = int(match_mask.sum())
 
                 if n_removed:
@@ -1126,7 +1166,9 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
                 exact_sources = set(pre_filtered_mappings["Src"].dropna().astype(str))
                 src_mask = inference_set["Src"].astype(str).isin(exact_sources)
                 n_removed = int(src_mask.sum())
-                n_sources_removed = int(inference_set.loc[src_mask, "Src"].nunique()) if n_removed else 0
+                n_sources_removed = (
+                    int(inference_set.loc[src_mask, "Src"].nunique()) if n_removed else 0
+                )
                 if n_removed:
                     inference_set = inference_set[~src_mask]
                 pre_filtered_set = exact_prefilter_rows
@@ -1136,10 +1178,7 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
                     else f"removed_candidate_rows={n_removed}, removed_sources={n_sources_removed}"
                 )
                 self.log(
-                    (
-                        "#Exact prefilter: "
-                        f"mappings={len(pre_filtered_set)}, {removal_note}"
-                    ),
+                    ("#Exact prefilter: " f"mappings={len(pre_filtered_set)}, {removal_note}"),
                     level="debug",
                 )
 
@@ -1166,7 +1205,11 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
         if not self.filter_exact_matches:
             return set()
         exact_matches = self.exact_matches
-        if exact_matches is None or exact_matches.empty or not {"Src", "Tgt"}.issubset(exact_matches.columns):
+        if (
+            exact_matches is None
+            or exact_matches.empty
+            or not {"Src", "Tgt"}.issubset(exact_matches.columns)
+        ):
             return set()
         return {
             (str(src), str(tgt))
@@ -1186,7 +1229,9 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
         if score_column is None:
             scores = pd.Series(1.0, index=rows.index)
         else:
-            scores = pd.to_numeric(exact_mappings.loc[rows.index, score_column], errors="coerce").fillna(1.0)
+            scores = pd.to_numeric(
+                exact_mappings.loc[rows.index, score_column], errors="coerce"
+            ).fillna(1.0)
 
         rows["Scores"] = scores.astype(float)
         return rows

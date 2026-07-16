@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Tuple
 
 import pandas as pd
 
+from exact.utils.formatting import quantile, safe_div
 
 Pair = Tuple[str, str]
 
@@ -23,7 +24,11 @@ def analyze_candidate_recall(
     effective_reference = reference_set.difference(train_set)
     exact_set = _normalize_pairs(exact_pairs or []).difference(train_set)
 
-    candidate_df = candidates if isinstance(candidates, pd.DataFrame) else _pairs_to_frame(candidates, src_col, tgt_col)
+    candidate_df = (
+        candidates
+        if isinstance(candidates, pd.DataFrame)
+        else _pairs_to_frame(candidates, src_col, tgt_col)
+    )
     candidate_pairs = _pairs_from_frame(candidate_df, src_col, tgt_col).difference(train_set)
     generated_hits = effective_reference.intersection(candidate_pairs)
     oracle_pairs = candidate_pairs.union(exact_set)
@@ -44,10 +49,12 @@ def analyze_candidate_recall(
             "absent_gold_pairs_after_exact": len(absent_oracle),
         },
         "metrics": {
-            "generated_candidate_recall": _safe_div(len(generated_hits), len(effective_reference)),
-            "exact_prefilter_oracle_recall": _safe_div(len(oracle_hits), len(effective_reference)),
+            "generated_candidate_recall": safe_div(len(generated_hits), len(effective_reference)),
+            "exact_prefilter_oracle_recall": safe_div(len(oracle_hits), len(effective_reference)),
         },
-        "gold_rank": _gold_rank_summary(candidate_df, effective_reference, src_col, tgt_col, score_col),
+        "gold_rank": _gold_rank_summary(
+            candidate_df, effective_reference, src_col, tgt_col, score_col
+        ),
         "absent_gold_pairs": _pair_records(absent_generated),
         "absent_gold_pairs_after_exact": _pair_records(absent_oracle),
     }
@@ -58,7 +65,9 @@ def absent_gold_dataframe(analysis: Mapping[str, Any], after_exact: bool = False
     return pd.DataFrame(list(analysis.get(key, [])), columns=["Src", "Tgt"])
 
 
-def write_absent_gold_tsv(path: Path, analysis: Mapping[str, Any], after_exact: bool = False) -> None:
+def write_absent_gold_tsv(
+    path: Path, analysis: Mapping[str, Any], after_exact: bool = False
+) -> None:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     absent_gold_dataframe(analysis, after_exact=after_exact).to_csv(path, sep="\t", index=False)
@@ -94,18 +103,11 @@ def _pairs_from_frame(df: pd.DataFrame, src_col: str, tgt_col: str) -> set[Pair]
 
 
 def _normalize_pairs(pairs: Iterable[Pair]) -> set[Pair]:
-    return {
-        (str(src), str(tgt))
-        for src, tgt in pairs
-        if str(src) and str(tgt)
-    }
+    return {(str(src), str(tgt)) for src, tgt in pairs if str(src) and str(tgt)}
 
 
 def _pair_records(pairs: Iterable[Pair]) -> List[Dict[str, str]]:
-    return [
-        {"Src": src, "Tgt": tgt}
-        for src, tgt in sorted(_normalize_pairs(pairs))
-    ]
+    return [{"Src": src, "Tgt": tgt} for src, tgt in sorted(_normalize_pairs(pairs))]
 
 
 def _gold_rank_summary(
@@ -122,15 +124,11 @@ def _gold_rank_summary(
             "rank_p90": None,
         }
     ranks = _rank_lookup(df, src_col, tgt_col, score_col)
-    present_ranks = [
-        ranks[pair]
-        for pair in sorted(reference_pairs)
-        if pair in ranks
-    ]
+    present_ranks = [ranks[pair] for pair in sorted(reference_pairs) if pair in ranks]
     return {
         "present_pairs": len(present_ranks),
-        "rank_median": _quantile(present_ranks, 0.5),
-        "rank_p90": _quantile(present_ranks, 0.9),
+        "rank_median": quantile(present_ranks, 0.5),
+        "rank_p90": quantile(present_ranks, 0.9),
     }
 
 
@@ -147,14 +145,3 @@ def _rank_lookup(df: pd.DataFrame, src_col: str, tgt_col: str, score_col: str) -
         for rank, (_, row) in enumerate(ranked.iterrows(), start=1):
             lookup[(str(row[src_col]), str(row[tgt_col]))] = rank
     return lookup
-
-
-def _quantile(values: Sequence[int], q: float) -> Optional[float]:
-    if not values:
-        return None
-    series = pd.Series(list(values), dtype=float)
-    return float(series.quantile(float(q)))
-
-
-def _safe_div(num: int, denom: int) -> float:
-    return float(num) / float(denom) if denom else 0.0

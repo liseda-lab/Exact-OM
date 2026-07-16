@@ -22,11 +22,19 @@ from exact.analysis.candidate_recall import (
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run candidate-only recall experiments for Exact.")
-    parser.add_argument("--run-config", type=Path, required=True, help="Run YAML with dataset/job paths.")
-    parser.add_argument("--top-k", type=int, nargs="+", default=[20, 40, 60], help="Candidate top-k values.")
-    parser.add_argument("--output-dir", type=Path, required=True, help="Directory for recall outputs.")
+    parser.add_argument(
+        "--run-config", type=Path, required=True, help="Run YAML with dataset/job paths."
+    )
+    parser.add_argument(
+        "--top-k", type=int, nargs="+", default=[20, 40, 60], help="Candidate top-k values."
+    )
+    parser.add_argument(
+        "--output-dir", type=Path, required=True, help="Directory for recall outputs."
+    )
     parser.add_argument("--jvm-heap-size", default="32G", help="Heap size for exact.init_jvm.")
-    parser.add_argument("--device", default=None, help="CUDA device id; CPU is used when CUDA is unavailable.")
+    parser.add_argument(
+        "--device", default=None, help="CUDA device id; CPU is used when CUDA is unavailable."
+    )
     return parser.parse_args()
 
 
@@ -51,9 +59,13 @@ def main() -> None:
     source_path = _dataset_path(data_dir, dataset_cfg.get("source"))
     target_path = _dataset_path(data_dir, dataset_cfg.get("target"))
     reference_path = _dataset_path(data_dir, dataset_cfg.get("full_reference"))
-    train_reference_path = _dataset_path(data_dir, dataset_cfg.get("train_reference"), required=False)
+    train_reference_path = _dataset_path(
+        data_dir, dataset_cfg.get("train_reference"), required=False
+    )
     if reference_path is None:
-        raise ValueError("Run config must provide dataset.full_reference for candidate recall analysis.")
+        raise ValueError(
+            "Run config must provide dataset.full_reference for candidate recall analysis."
+        )
 
     reference_pairs = pairs_from_table(reference_path)
     train_pairs = pairs_from_table(train_reference_path) if train_reference_path else set()

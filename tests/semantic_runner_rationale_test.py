@@ -4,14 +4,18 @@ from pathlib import Path
 
 import pandas as pd
 
-_MODULE_PATH = Path(__file__).resolve().parents[1] / "exact" / "impl" / "trainer" / "semantic_runner.py"
+_MODULE_PATH = (
+    Path(__file__).resolve().parents[1] / "exact" / "impl" / "trainer" / "semantic_runner.py"
+)
 _SPEC = importlib.util.spec_from_file_location("semantic_runner_module", _MODULE_PATH)
 _MODULE = importlib.util.module_from_spec(_SPEC)
 assert _SPEC is not None and _SPEC.loader is not None
 _SPEC.loader.exec_module(_MODULE)
 SemanticAlignmentRunner = _MODULE.SemanticAlignmentRunner
 
-_SCORER_MODULE_PATH = Path(__file__).resolve().parents[1] / "exact" / "impl" / "models" / "semantic_scorer.py"
+_SCORER_MODULE_PATH = (
+    Path(__file__).resolve().parents[1] / "exact" / "impl" / "models" / "semantic_scorer.py"
+)
 _SCORER_SPEC = importlib.util.spec_from_file_location("semantic_scorer_module", _SCORER_MODULE_PATH)
 _SCORER_MODULE = importlib.util.module_from_spec(_SCORER_SPEC)
 assert _SCORER_SPEC is not None and _SCORER_SPEC.loader is not None
@@ -49,7 +53,9 @@ class _FingerprintModel:
         }
 
     def runtime_fingerprint(self):
-        raise AssertionError("runner should use runtime_fingerprint_payload for compatibility checks")
+        raise AssertionError(
+            "runner should use runtime_fingerprint_payload for compatibility checks"
+        )
 
 
 def test_global_annotation_uses_saved_alignment_membership():
@@ -68,7 +74,9 @@ def test_global_annotation_uses_saved_alignment_membership():
             "prediction": {},
         },
     ]
-    runner._annotate_final_prediction_records([_Pred("s1", "t1")], threshold=0.7, local_alignment=False)
+    runner._annotate_final_prediction_records(
+        [_Pred("s1", "t1")], threshold=0.7, local_alignment=False
+    )
     assert runner.results_json[0]["prediction"]["saved_alignment_member"] is True
     assert runner.results_json[0]["prediction"]["rationale_decision_label"] == "Match"
     assert runner.results_json[1]["prediction"]["saved_alignment_member"] is False
@@ -254,7 +262,9 @@ def test_checkpoint_mismatch_logs_payload_details_when_available(tmp_path):
                             "fingerprint": "old-fingerprint",
                             "payload": {
                                 "generate_llm_rationales": True,
-                                "llm_router": {"routing": {"decision_profile": "local_llm_default"}},
+                                "llm_router": {
+                                    "routing": {"decision_profile": "local_llm_default"}
+                                },
                             },
                         }
                     ],

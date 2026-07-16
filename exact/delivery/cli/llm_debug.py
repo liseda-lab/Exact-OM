@@ -49,18 +49,28 @@ def run_llm_debug(args) -> None:
     init_jvm(args.jvm_heap_size)
     from exact.core.entities.configs.config import ConfigModel
 
-    configs = ConfigModel.load_config(Path(args.config_file).resolve()) if args.config_file else ConfigModel()
+    configs = (
+        ConfigModel.load_config(Path(args.config_file).resolve())
+        if args.config_file
+        else ConfigModel()
+    )
     logger = logging.getLogger("exact")
     logger.setLevel(getattr(logging, str(args.logging_level).upper()))
     handler = logging.StreamHandler()
     handler.setFormatter(logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
     logger.handlers = [handler]
 
-    device = torch.device(args.device) if args.device is not None and torch.cuda.is_available() else torch.device("cpu")
+    device = (
+        torch.device(args.device)
+        if args.device is not None and torch.cuda.is_available()
+        else torch.device("cpu")
+    )
     model = _build_model(configs, device)
+
     def _model_log(message, level="info", *extra, **kwargs):
         log_fn = getattr(logger, str(level).lower(), logger.info)
         log_fn(str(message))
+
     model.log = _model_log
 
     examples = _load_examples(Path(args.input_file).resolve())
@@ -70,21 +80,29 @@ def run_llm_debug(args) -> None:
         task = str(example.get("task", "")).strip().lower()
         result: Dict[str, Any] = {"index": idx, "task": task, "input": example}
         if task == "summary":
-            src_label = str(example.get("src_label", example.get("source_label", example.get("label", ""))))
+            src_label = str(
+                example.get("src_label", example.get("source_label", example.get("label", "")))
+            )
             tgt_label = str(example.get("tgt_label", example.get("target_label", "")))
             context = str(example.get("context", ""))
             pair_packet = str(example.get("pair_packet", example.get("brief_input", context)))
             if hasattr(model, "generate_pair_briefs_batched") and tgt_label:
-                brief = model.generate_pair_briefs_batched([src_label], [tgt_label], [pair_packet])[0]
+                brief = model.generate_pair_briefs_batched([src_label], [tgt_label], [pair_packet])[
+                    0
+                ]
                 result["output"] = {"pair_brief": brief}
             else:
                 summary = model.generate_summaries_batched([src_label], [context])[0]
                 result["output"] = {"summary": summary}
-            result["backend_usage"] = {"summary": dict(getattr(model, "_last_summary_backend_meta", {}))}
+            result["backend_usage"] = {
+                "summary": dict(getattr(model, "_last_summary_backend_meta", {}))
+            }
         elif task == "rationale":
             src_label = str(example.get("src_label", example.get("source_label", "")))
             tgt_label = str(example.get("tgt_label", example.get("target_label", "")))
-            decision = _normalize_decision(example.get("decision", example.get("rationale_decision_label", "")))
+            decision = _normalize_decision(
+                example.get("decision", example.get("rationale_decision_label", ""))
+            )
             src_summary = str(example.get("src_summary", example.get("source_summary", "")))
             tgt_summary = str(example.get("tgt_summary", example.get("target_summary", "")))
             pair_brief = str(example.get("pair_brief", example.get("brief", "")))
@@ -92,7 +110,9 @@ def run_llm_debug(args) -> None:
                 if not pair_brief:
                     pair_packet = str(example.get("pair_packet", example.get("brief_input", "")))
                     if pair_packet:
-                        pair_brief = model.generate_pair_briefs_batched([src_label], [tgt_label], [pair_packet])[0]
+                        pair_brief = model.generate_pair_briefs_batched(
+                            [src_label], [tgt_label], [pair_packet]
+                        )[0]
                     elif src_summary:
                         pair_brief = src_summary
                 rationale = model.generate_rationales_batched(
@@ -146,13 +166,31 @@ def run_llm_debug(args) -> None:
 
 
 def parse_arguments():
-    parser = argparse.ArgumentParser(description="Run a few summary/rationale LLM calls without the full alignment pipeline.")
-    parser.add_argument("--input_file", "-i", type=str, required=True, help="Path to a JSON list of debug examples.")
-    parser.add_argument("--output_file", "-o", type=str, required=False, help="Where to write the JSON outputs.")
-    parser.add_argument("--config_file", "-y", type=str, required=False, help="Path to the YAML config file.")
-    parser.add_argument("--device", "-d", type=int, required=False, help="GPU device ID to use for local fallback.")
-    parser.add_argument("--jvm_heap_size", "-m", type=str, required=False, help="JVM heap size, e.g. 16G or 32G.")
-    parser.add_argument("--logging_level", "-l", type=str, default="INFO", help="Logger level: DEBUG, INFO, WARNING, ERROR.")
+    parser = argparse.ArgumentParser(
+        description="Run a few summary/rationale LLM calls without the full alignment pipeline."
+    )
+    parser.add_argument(
+        "--input_file", "-i", type=str, required=True, help="Path to a JSON list of debug examples."
+    )
+    parser.add_argument(
+        "--output_file", "-o", type=str, required=False, help="Where to write the JSON outputs."
+    )
+    parser.add_argument(
+        "--config_file", "-y", type=str, required=False, help="Path to the YAML config file."
+    )
+    parser.add_argument(
+        "--device", "-d", type=int, required=False, help="GPU device ID to use for local fallback."
+    )
+    parser.add_argument(
+        "--jvm_heap_size", "-m", type=str, required=False, help="JVM heap size, e.g. 16G or 32G."
+    )
+    parser.add_argument(
+        "--logging_level",
+        "-l",
+        type=str,
+        default="INFO",
+        help="Logger level: DEBUG, INFO, WARNING, ERROR.",
+    )
     return parser.parse_args()
 
 
@@ -162,7 +200,9 @@ def main():
         if args.jvm_heap_size.isdigit():
             args.jvm_heap_size += "G"
         elif not (args.jvm_heap_size[:-1].isdigit() and args.jvm_heap_size[-1].lower() == "g"):
-            raise Exception(f"JVM heap size {args.jvm_heap_size} is not valid, please provide a valid format")
+            raise Exception(
+                f"JVM heap size {args.jvm_heap_size} is not valid, please provide a valid format"
+            )
     else:
         args.jvm_heap_size = "32G"
     try:

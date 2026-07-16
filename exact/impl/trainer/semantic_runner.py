@@ -1,17 +1,19 @@
+import hashlib
 import inspect
 import json
-import hashlib
 import time
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Tuple, Set
+from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
 import pandas as pd
 import torch
 from torch.utils.data import DataLoader, Subset
 from torch.utils.data._utils.collate import default_collate
+
 from exact.core.contracts.trainer import ITrainer
-from exact.core.entities.mappings import EntityMapping
 from exact.core.entities.configs.dataset import DatasetMask
+from exact.core.entities.mappings import EntityMapping
+from exact.utils.formatting import format_duration as _format_duration
 
 try:
     import zstandard as zstd
@@ -53,17 +55,6 @@ def _semantic_collate_fn(batch):
     if "tgt_ctx_triples" in collated:
         collated["tgt_contexts"] = collated["tgt_ctx_triples"]
     return collated
-
-
-def _format_duration(total_seconds: float) -> str:
-    """
-    Convert seconds into a days:hours:minutes:seconds string for readable ETAs.
-    """
-    seconds = max(0, int(round(total_seconds)))
-    days, remainder = divmod(seconds, 86400)
-    hours, remainder = divmod(remainder, 3600)
-    minutes, seconds = divmod(remainder, 60)
-    return f"{days}d:{hours:02d}:{minutes:02d}:{seconds:02d}"
 
 
 def _json_default(value: Any) -> str:
@@ -121,7 +112,9 @@ class SemanticAlignmentRunner(ITrainer):
             **kwargs,
         )
         self._last_stage_timings: Dict[str, float] = {}
-        self._checkpoint_fingerprint_payload: Dict[str, Any] = self._build_checkpoint_fingerprint_payload()
+        self._checkpoint_fingerprint_payload: Dict[str, Any] = (
+            self._build_checkpoint_fingerprint_payload()
+        )
         self._checkpoint_fingerprint: str = self._hash_checkpoint_fingerprint_payload(
             self._checkpoint_fingerprint_payload
         )
@@ -479,7 +472,9 @@ class SemanticAlignmentRunner(ITrainer):
         if candidate_manifest_value:
             candidate_manifest_path = Path(str(candidate_manifest_value))
             if not candidate_manifest_path.is_absolute():
-                candidate_manifest_path = (checkpoint_path.parent / candidate_manifest_path).resolve()
+                candidate_manifest_path = (
+                    checkpoint_path.parent / candidate_manifest_path
+                ).resolve()
             self._candidate_manifest_path = candidate_manifest_path
             candidate_rows = self._read_candidate_records_from_manifest(candidate_manifest_path)
             self._restored_candidate_rows = candidate_rows
@@ -561,7 +556,12 @@ class SemanticAlignmentRunner(ITrainer):
                     continue
 
         processed_examples = int(payload.get("processed_examples", len(mappings)))
-        if processed_examples > 0 and not mappings and not results_json and not self._restored_candidate_rows:
+        if (
+            processed_examples > 0
+            and not mappings
+            and not results_json
+            and not self._restored_candidate_rows
+        ):
             self.log(
                 (
                     f"Ignoring checkpoint '{checkpoint_path.name}' because it records "
@@ -586,8 +586,12 @@ class SemanticAlignmentRunner(ITrainer):
         payload = {
             "checkpoint_schema_version": 2,
             "kind": kind.name,
-            "dataset_signature": getattr(getattr(self, "_dataset", None), "dataset_signature", None),
-            "dataset_fingerprint": getattr(getattr(self, "_dataset", None), "cache_fingerprint", None),
+            "dataset_signature": getattr(
+                getattr(self, "_dataset", None), "dataset_signature", None
+            ),
+            "dataset_fingerprint": getattr(
+                getattr(self, "_dataset", None), "cache_fingerprint", None
+            ),
             "checkpoint_fingerprint": self._checkpoint_fingerprint,
             "checkpoint_fingerprint_payload": getattr(
                 self,
@@ -601,13 +605,17 @@ class SemanticAlignmentRunner(ITrainer):
             "results_json_count": len(results_json),
         }
         if audit_manifest_path is not None:
-            payload["audit_manifest_path"] = self._relative_to_checkpoint(audit_manifest_path, checkpoint_path)
+            payload["audit_manifest_path"] = self._relative_to_checkpoint(
+                audit_manifest_path, checkpoint_path
+            )
         if candidate_manifest_path is not None:
             payload["candidate_records_manifest_path"] = self._relative_to_checkpoint(
                 candidate_manifest_path,
                 checkpoint_path,
             )
-            payload["candidate_records_count"] = int(getattr(self, "_candidate_total_records", 0) or 0)
+            payload["candidate_records_count"] = int(
+                getattr(self, "_candidate_total_records", 0) or 0
+            )
         overlay_manifest_path = getattr(self, "_overlay_manifest_path", None)
         if overlay_manifest_path is not None and Path(overlay_manifest_path).exists():
             payload["final_overlay_manifest_path"] = self._relative_to_checkpoint(
@@ -617,9 +625,7 @@ class SemanticAlignmentRunner(ITrainer):
         if self._checkpoint_payload_mode == "full" or (
             audit_manifest_path is None and candidate_manifest_path is None
         ):
-            payload["mappings"] = [
-                {"src": s, "tgt": t, "score": score} for s, t, score in mappings
-            ]
+            payload["mappings"] = [{"src": s, "tgt": t, "score": score} for s, t, score in mappings]
             payload["results_json"] = results_json
 
         tmp_path = checkpoint_path.with_suffix(checkpoint_path.suffix + ".tmp")
@@ -644,7 +650,9 @@ class SemanticAlignmentRunner(ITrainer):
             try:
                 fingerprint_payload = model.runtime_fingerprint_payload()
             except TypeError:
-                fingerprint_payload = model.runtime_fingerprint_payload(generate_llm_rationales_override=None)
+                fingerprint_payload = model.runtime_fingerprint_payload(
+                    generate_llm_rationales_override=None
+                )
             fingerprint = self._hash_checkpoint_fingerprint_payload(fingerprint_payload)
         elif hasattr(model, "runtime_fingerprint"):
             fingerprint = model.runtime_fingerprint()
@@ -666,12 +674,16 @@ class SemanticAlignmentRunner(ITrainer):
         if not models:
             models = [getattr(self, "model", None)]
         return {
-            "dataset_signature": getattr(getattr(self, "_dataset", None), "dataset_signature", None),
+            "dataset_signature": getattr(
+                getattr(self, "_dataset", None), "dataset_signature", None
+            ),
             "kind": kind.name,
             "local_alignment": bool(local_alignment),
             "threshold": threshold,
             "cardinality": cardinality,
-            "models": [self._model_fingerprint_entry(model) for model in models if model is not None],
+            "models": [
+                self._model_fingerprint_entry(model) for model in models if model is not None
+            ],
         }
 
     def _stage_checkpoint_path(
@@ -682,9 +694,13 @@ class SemanticAlignmentRunner(ITrainer):
         threshold: Optional[float],
         cardinality: Optional[int],
     ) -> Path:
-        payload = self._postprocess_fingerprint_payload(kind, local_alignment, threshold, cardinality)
+        payload = self._postprocess_fingerprint_payload(
+            kind, local_alignment, threshold, cardinality
+        )
         fingerprint = self._hash_checkpoint_fingerprint_payload(payload)
-        return (self.checkpoint_dir / f"{kind.name.lower()}_{stage}_{fingerprint[:12]}.json").resolve()
+        return (
+            self.checkpoint_dir / f"{kind.name.lower()}_{stage}_{fingerprint[:12]}.json"
+        ).resolve()
 
     def _write_json_atomic(self, path: Path, payload: Dict[str, Any]) -> None:
         tmp_path = path.with_suffix(path.suffix + ".tmp")
@@ -731,14 +747,22 @@ class SemanticAlignmentRunner(ITrainer):
         count = 0
         with self._open_jsonl_writer(tmp_path, resolved) as f:
             for record in records:
-                f.write(json.dumps(record, ensure_ascii=False, separators=(",", ":"), default=_json_default))
+                f.write(
+                    json.dumps(
+                        record, ensure_ascii=False, separators=(",", ":"), default=_json_default
+                    )
+                )
                 f.write("\n")
                 count += 1
         tmp_path.replace(path)
         return count
 
-    def _read_jsonl_records(self, path: Path, compression: Optional[str] = None) -> List[Dict[str, Any]]:
-        resolved = self._resolve_text_compression(compression or ("zstd" if path.suffix == ".zst" else "none"))
+    def _read_jsonl_records(
+        self, path: Path, compression: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        resolved = self._resolve_text_compression(
+            compression or ("zstd" if path.suffix == ".zst" else "none")
+        )
         records: List[Dict[str, Any]] = []
         with self._open_jsonl_reader(path, resolved) as f:
             for line in f:
@@ -749,7 +773,9 @@ class SemanticAlignmentRunner(ITrainer):
         return records
 
     def _iter_jsonl_records(self, path: Path, compression: Optional[str] = None):
-        resolved = self._resolve_text_compression(compression or ("zstd" if path.suffix == ".zst" else "none"))
+        resolved = self._resolve_text_compression(
+            compression or ("zstd" if path.suffix == ".zst" else "none")
+        )
         with self._open_jsonl_reader(path, resolved) as f:
             for line in f:
                 line = line.strip()
@@ -789,7 +815,11 @@ class SemanticAlignmentRunner(ITrainer):
                         elapsed = max(1.0e-8, time.perf_counter() - start)
                         rate = seen / elapsed
                         remaining = max(0, total_records - seen) if total_records else 0
-                        eta = _format_duration(remaining / rate) if total_records and rate > 0 else "unknown"
+                        eta = (
+                            _format_duration(remaining / rate)
+                            if total_records and rate > 0
+                            else "unknown"
+                        )
                         self.log(
                             (
                                 f"{label} progress: records={seen}/{total_records or '?'}, "
@@ -856,8 +886,13 @@ class SemanticAlignmentRunner(ITrainer):
                 try:
                     self._candidate_manifest_path.unlink()
                 except OSError as exc:
-                    self.log(f"Failed to remove stale candidate manifest {self._candidate_manifest_path}: {exc}", "warning")
-        manifest = self._load_audit_manifest(self._candidate_manifest_path) if append_existing else {}
+                    self.log(
+                        f"Failed to remove stale candidate manifest {self._candidate_manifest_path}: {exc}",
+                        "warning",
+                    )
+        manifest = (
+            self._load_audit_manifest(self._candidate_manifest_path) if append_existing else {}
+        )
         self._candidate_shards = list(manifest.get("shards") or [])
         self._candidate_total_records = int(manifest.get("total_records", 0) or 0)
         manifest_compression = manifest.get("compression")
@@ -878,7 +913,9 @@ class SemanticAlignmentRunner(ITrainer):
         shard = {"path": shard_name, "records": 0}
         self._candidate_shards.append(shard)
         self._candidate_current_shard = shard
-        self._candidate_current_writer = self._open_jsonl_writer(shard_path, self._audit_shard_compression)
+        self._candidate_current_writer = self._open_jsonl_writer(
+            shard_path, self._audit_shard_compression
+        )
 
     def _append_candidate_records(self, records: List[Dict[str, Any]]) -> None:
         if not records or not self._candidate_records_enabled:
@@ -896,7 +933,9 @@ class SemanticAlignmentRunner(ITrainer):
                 json.dumps(record, ensure_ascii=False, separators=(",", ":"), default=_json_default)
             )
             self._candidate_current_writer.write("\n")
-            self._candidate_current_shard["records"] = int(self._candidate_current_shard.get("records", 0)) + 1
+            self._candidate_current_shard["records"] = (
+                int(self._candidate_current_shard.get("records", 0)) + 1
+            )
             self._candidate_total_records += 1
 
     def _write_candidate_manifest(self) -> Optional[Path]:
@@ -933,7 +972,9 @@ class SemanticAlignmentRunner(ITrainer):
                 return []
         return []
 
-    def _candidate_row_from_explanation_record(self, record: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def _candidate_row_from_explanation_record(
+        self, record: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
         src = record.get("src_iri")
         tgt = record.get("tgt_iri")
         if src is None or tgt is None:
@@ -973,7 +1014,9 @@ class SemanticAlignmentRunner(ITrainer):
             "info",
         )
         compression = self._resolve_text_compression(
-            (self._load_audit_manifest(audit_manifest_path) or {}).get("compression", self._audit_shard_compression)
+            (self._load_audit_manifest(audit_manifest_path) or {}).get(
+                "compression", self._audit_shard_compression
+            )
         )
         records_per_shard = int(
             (self._load_audit_manifest(audit_manifest_path) or {}).get(
@@ -988,13 +1031,18 @@ class SemanticAlignmentRunner(ITrainer):
                 try:
                     stale_path.unlink()
                 except OSError as exc:
-                    self.log(f"Failed to remove stale candidate shard {stale_path}: {exc}", "warning")
+                    self.log(
+                        f"Failed to remove stale candidate shard {stale_path}: {exc}", "warning"
+                    )
             stale_manifest = candidate_dir / "manifest.json"
             if stale_manifest.exists():
                 try:
                     stale_manifest.unlink()
                 except OSError as exc:
-                    self.log(f"Failed to remove stale candidate manifest {stale_manifest}: {exc}", "warning")
+                    self.log(
+                        f"Failed to remove stale candidate manifest {stale_manifest}: {exc}",
+                        "warning",
+                    )
         self._prepare_candidate_shards(
             checkpoint_path,
             enabled=True,
@@ -1097,7 +1145,10 @@ class SemanticAlignmentRunner(ITrainer):
                 try:
                     self._audit_manifest_path.unlink()
                 except OSError as exc:
-                    self.log(f"Failed to remove stale audit manifest {self._audit_manifest_path}: {exc}", "warning")
+                    self.log(
+                        f"Failed to remove stale audit manifest {self._audit_manifest_path}: {exc}",
+                        "warning",
+                    )
         manifest = self._load_audit_manifest(self._audit_manifest_path) if append_existing else {}
         self._audit_shards = list(manifest.get("shards") or [])
         self._audit_total_records = int(manifest.get("total_records", 0) or 0)
@@ -1116,7 +1167,9 @@ class SemanticAlignmentRunner(ITrainer):
         shard = {"path": shard_name, "records": 0}
         self._audit_shards.append(shard)
         self._audit_current_shard = shard
-        self._audit_current_writer = self._open_jsonl_writer(shard_path, self._audit_shard_compression)
+        self._audit_current_writer = self._open_jsonl_writer(
+            shard_path, self._audit_shard_compression
+        )
 
     def _append_audit_records(self, records: List[Dict[str, Any]]) -> None:
         if not records or not self._audit_shards_enabled:
@@ -1134,7 +1187,9 @@ class SemanticAlignmentRunner(ITrainer):
                 json.dumps(record, ensure_ascii=False, separators=(",", ":"), default=_json_default)
             )
             self._audit_current_writer.write("\n")
-            self._audit_current_shard["records"] = int(self._audit_current_shard.get("records", 0)) + 1
+            self._audit_current_shard["records"] = (
+                int(self._audit_current_shard.get("records", 0)) + 1
+            )
             self._audit_total_records += 1
 
     def _write_audit_manifest(self) -> Optional[Path]:
@@ -1202,7 +1257,9 @@ class SemanticAlignmentRunner(ITrainer):
         return lookup
 
     @staticmethod
-    def _merge_overlay_record(record: Dict[str, Any], overlay: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    def _merge_overlay_record(
+        record: Dict[str, Any], overlay: Optional[Dict[str, Any]]
+    ) -> Dict[str, Any]:
         if not overlay:
             return record
         merged = dict(record)
@@ -1298,7 +1355,9 @@ class SemanticAlignmentRunner(ITrainer):
                 )
                 self._additional_model_checkpoint_skip_logged = True
             return None
-        path = self._stage_checkpoint_path(kind, "additional_models", local_alignment, threshold, cardinality)
+        path = self._stage_checkpoint_path(
+            kind, "additional_models", local_alignment, threshold, cardinality
+        )
         try:
             with open(path, "r", encoding="utf-8") as f:
                 payload = json.load(f)
@@ -1307,7 +1366,9 @@ class SemanticAlignmentRunner(ITrainer):
         except (OSError, json.JSONDecodeError) as exc:
             self.log(f"Failed to load additional-model checkpoint {path}: {exc}", "warning")
             return None
-        expected = self._postprocess_fingerprint_payload(kind, local_alignment, threshold, cardinality)
+        expected = self._postprocess_fingerprint_payload(
+            kind, local_alignment, threshold, cardinality
+        )
         if payload.get("fingerprint_payload") != expected:
             self.log(f"Ignoring stale additional-model checkpoint {path}.", "warning")
             return None
@@ -1337,7 +1398,9 @@ class SemanticAlignmentRunner(ITrainer):
                             "debug",
                         )
             except (OSError, json.JSONDecodeError) as exc:
-                self.log(f"Failed to load additional-model records {records_path}: {exc}", "warning")
+                self.log(
+                    f"Failed to load additional-model records {records_path}: {exc}", "warning"
+                )
                 return None
         if not records:
             return None
@@ -1362,12 +1425,16 @@ class SemanticAlignmentRunner(ITrainer):
             return
         stage = "additional_models" if complete else "additional_models_partial"
         path = self._stage_checkpoint_path(kind, stage, local_alignment, threshold, cardinality)
-        compression = self._resolve_text_compression(getattr(self, "_audit_shard_compression", "zstd"))
+        compression = self._resolve_text_compression(
+            getattr(self, "_audit_shard_compression", "zstd")
+        )
         records_path = path.with_suffix(self._jsonl_suffix(compression))
         payload = {
             "stage": stage,
             "complete": bool(complete),
-            "fingerprint_payload": self._postprocess_fingerprint_payload(kind, local_alignment, threshold, cardinality),
+            "fingerprint_payload": self._postprocess_fingerprint_payload(
+                kind, local_alignment, threshold, cardinality
+            ),
             "candidate_records_path": records_path.name,
             "candidate_records_format": "jsonl",
             "candidate_records_compression": compression,
@@ -1426,7 +1493,7 @@ class SemanticAlignmentRunner(ITrainer):
 
     @staticmethod
     def _rationale_record_key(record: Dict[str, Any]) -> str:
-        return f"{record.get('src_iri', '')}\u241F{record.get('tgt_iri', '')}"
+        return f"{record.get('src_iri', '')}\u241f{record.get('tgt_iri', '')}"
 
     def _rationale_checkpoint_path(
         self,
@@ -1435,9 +1502,13 @@ class SemanticAlignmentRunner(ITrainer):
         threshold: Optional[float],
         cardinality: Optional[int],
     ) -> Path:
-        payload = self._postprocess_fingerprint_payload(kind, local_alignment, threshold, cardinality)
+        payload = self._postprocess_fingerprint_payload(
+            kind, local_alignment, threshold, cardinality
+        )
         fingerprint = self._hash_checkpoint_fingerprint_payload(payload)
-        return (self.checkpoint_dir / f"{kind.name.lower()}_rationales_{fingerprint[:12]}.json").resolve()
+        return (
+            self.checkpoint_dir / f"{kind.name.lower()}_rationales_{fingerprint[:12]}.json"
+        ).resolve()
 
     def _load_rationale_checkpoint(
         self,
@@ -1457,7 +1528,9 @@ class SemanticAlignmentRunner(ITrainer):
         except (OSError, json.JSONDecodeError) as exc:
             self.log(f"Failed to load rationale checkpoint {path}: {exc}", "warning")
             return {}
-        expected = self._postprocess_fingerprint_payload(kind, local_alignment, threshold, cardinality)
+        expected = self._postprocess_fingerprint_payload(
+            kind, local_alignment, threshold, cardinality
+        )
         if payload.get("fingerprint_payload") != expected:
             self.log(f"Ignoring stale rationale checkpoint {path}.", "warning")
             return {}
@@ -1494,7 +1567,9 @@ class SemanticAlignmentRunner(ITrainer):
         path = self._rationale_checkpoint_path(kind, local_alignment, threshold, cardinality)
         payload = {
             "stage": "rationales",
-            "fingerprint_payload": self._postprocess_fingerprint_payload(kind, local_alignment, threshold, cardinality),
+            "fingerprint_payload": self._postprocess_fingerprint_payload(
+                kind, local_alignment, threshold, cardinality
+            ),
             "rationales": rationales,
         }
         try:
@@ -1599,7 +1674,11 @@ class SemanticAlignmentRunner(ITrainer):
         threshold: Optional[float],
         local_alignment: bool,
     ) -> None:
-        if candidate_df.empty or "Src" not in candidate_df.columns or "Tgt" not in candidate_df.columns:
+        if (
+            candidate_df.empty
+            or "Src" not in candidate_df.columns
+            or "Tgt" not in candidate_df.columns
+        ):
             return
         kept_pairs = {(m.head, m.tail) for m in preds}
         threshold_value = float(threshold) if threshold is not None else None
@@ -1798,7 +1877,9 @@ class SemanticAlignmentRunner(ITrainer):
         return True
 
     @staticmethod
-    def _result_record_lookup(records: List[Dict[str, Any]]) -> Dict[Tuple[str, str], Dict[str, Any]]:
+    def _result_record_lookup(
+        records: List[Dict[str, Any]],
+    ) -> Dict[Tuple[str, str], Dict[str, Any]]:
         lookup: Dict[Tuple[str, str], Dict[str, Any]] = {}
         for record in records or []:
             src = record.get("src_iri")
@@ -1930,7 +2011,11 @@ class SemanticAlignmentRunner(ITrainer):
         result_record_lookup = self._result_record_lookup(self.results_json)
         try:
             for _, row in candidate_df.iterrows():
-                if writer is None or current_shard is None or int(current_shard.get("records", 0)) >= shard_limit:
+                if (
+                    writer is None
+                    or current_shard is None
+                    or int(current_shard.get("records", 0)) >= shard_limit
+                ):
                     if writer is not None:
                         writer.close()
                     shard_name = f"shard-{len(shards):06d}{self._jsonl_suffix(resolved)}"
@@ -1995,7 +2080,9 @@ class SemanticAlignmentRunner(ITrainer):
             return
         if not bool(getattr(model, "generate_llm_rationales", True)):
             return
-        rationale_checkpoint = self._load_rationale_checkpoint(kind, local_alignment, threshold, cardinality)
+        rationale_checkpoint = self._load_rationale_checkpoint(
+            kind, local_alignment, threshold, cardinality
+        )
         progress_state: Dict[str, Any] = {
             "started": False,
             "start_time": None,
@@ -2020,7 +2107,9 @@ class SemanticAlignmentRunner(ITrainer):
                 progress_state["start_time"] = start_time
                 progress_state["cached_records"] = int(event.get("cached_records", 0) or 0)
                 progress_state["uncached_records"] = int(event.get("uncached_records", 0) or 0)
-                progress_state["uncached_unique_prompts"] = int(event.get("uncached_unique_prompts", 0) or 0)
+                progress_state["uncached_unique_prompts"] = int(
+                    event.get("uncached_unique_prompts", 0) or 0
+                )
                 progress_state["backend"] = event.get("backend")
                 progress_state["model"] = event.get("model")
                 progress_state["concurrency"] = int(event.get("concurrency", 0) or 0)
@@ -2049,7 +2138,10 @@ class SemanticAlignmentRunner(ITrainer):
                 return
             last_logged = int(progress_state["last_logged_uncached"] or 0)
             interval = int(progress_state["interval_uncached_records"] or 1)
-            if completed_uncached < total_uncached and (completed_uncached - last_logged) < interval:
+            if (
+                completed_uncached < total_uncached
+                and (completed_uncached - last_logged) < interval
+            ):
                 return
 
             progress_state["last_logged_uncached"] = completed_uncached
@@ -2080,10 +2172,14 @@ class SemanticAlignmentRunner(ITrainer):
             pending_records.append(record)
         if not pending_records:
             if rationale_checkpoint:
-                self._write_rationale_checkpoint(kind, local_alignment, threshold, cardinality, rationale_checkpoint)
+                self._write_rationale_checkpoint(
+                    kind, local_alignment, threshold, cardinality, rationale_checkpoint
+                )
             return
 
-        def _apply_rationale(record_idx: int, rationale: str, rationale_meta: Optional[Dict[str, Any]] = None) -> None:
+        def _apply_rationale(
+            record_idx: int, rationale: str, rationale_meta: Optional[Dict[str, Any]] = None
+        ) -> None:
             rec = self.results_json[record_idx]
             pred = rec.get("prediction") or {}
             pred["llm_rationale"] = rationale
@@ -2108,32 +2204,47 @@ class SemanticAlignmentRunner(ITrainer):
                     continue
                 _apply_rationale(original_idx, rationale, rationale_meta)
             completed = len(rationale_checkpoint)
-            interval = max(1, int(progress_state.get("interval_uncached_records") or log_every or 1))
+            interval = max(
+                1, int(progress_state.get("interval_uncached_records") or log_every or 1)
+            )
             last_saved = int(progress_state.get("last_saved") or 0)
             if completed - last_saved >= interval:
-                self._write_rationale_checkpoint(kind, local_alignment, threshold, cardinality, rationale_checkpoint)
+                self._write_rationale_checkpoint(
+                    kind, local_alignment, threshold, cardinality, rationale_checkpoint
+                )
                 if hasattr(model, "persist_caches"):
                     try:
                         model.persist_caches(force=True, reason="rationale_checkpoint")
                     except Exception as exc:  # noqa: BLE001
-                        self.log(f"Failed to persist model cache during rationale checkpoint: {exc}", "warning")
+                        self.log(
+                            f"Failed to persist model cache during rationale checkpoint: {exc}",
+                            "warning",
+                        )
                 progress_state["last_saved"] = completed
 
         rationale_sig = inspect.signature(model.generate_final_rationales_for_records)
-        accepts_var_kw = any(p.kind == inspect.Parameter.VAR_KEYWORD for p in rationale_sig.parameters.values())
+        accepts_var_kw = any(
+            p.kind == inspect.Parameter.VAR_KEYWORD for p in rationale_sig.parameters.values()
+        )
         rationale_kwargs: Dict[str, Any] = {"progress_callback": _progress_callback}
         if accepts_var_kw or "completion_callback" in rationale_sig.parameters:
             rationale_kwargs["completion_callback"] = _completion_callback
-        rationales = model.generate_final_rationales_for_records(pending_records, **rationale_kwargs)
+        rationales = model.generate_final_rationales_for_records(
+            pending_records, **rationale_kwargs
+        )
         rationale_meta = getattr(model, "_last_rationale_backend_meta", {}) or {}
         for original_idx, rationale in zip(pending_indices, rationales):
             _apply_rationale(original_idx, rationale, rationale_meta)
-        self._write_rationale_checkpoint(kind, local_alignment, threshold, cardinality, rationale_checkpoint)
+        self._write_rationale_checkpoint(
+            kind, local_alignment, threshold, cardinality, rationale_checkpoint
+        )
         if progress_state["started"]:
             elapsed = max(0.0, time.perf_counter() - float(progress_state["start_time"]))
             duration = _format_duration(elapsed)
             uncached_records = int(progress_state["uncached_records"] or 0)
-            throughput = (uncached_records / elapsed) if elapsed > 1e-8 and uncached_records > 0 else 0.0
+            throughput = (
+                (uncached_records / elapsed) if elapsed > 1e-8 and uncached_records > 0 else 0.0
+            )
             avg_seconds = (elapsed / uncached_records) if uncached_records > 0 else 0.0
             self.log(
                 (
@@ -2284,10 +2395,12 @@ class SemanticAlignmentRunner(ITrainer):
         restored_json: List[Dict[str, Any]] = []
 
         if checkpoint_enabled and resume_from_checkpoint:
-            cp_path, restored_mappings, restored_json, restored_examples = self._restore_from_available_checkpoints(
-                kind,
-                checkpoint_file,
-                allow_rationale_toggle_checkpoint_resume=allow_rationale_toggle_checkpoint_resume,
+            cp_path, restored_mappings, restored_json, restored_examples = (
+                self._restore_from_available_checkpoints(
+                    kind,
+                    checkpoint_file,
+                    allow_rationale_toggle_checkpoint_resume=allow_rationale_toggle_checkpoint_resume,
+                )
             )
             if restored_examples and cp_path:
                 self.log(
@@ -2324,10 +2437,7 @@ class SemanticAlignmentRunner(ITrainer):
                     append_existing=True,
                 )
             self.log(
-                (
-                    "Checkpoint already contains predictions for all samples. "
-                    "Skipping inference."
-                ),
+                ("Checkpoint already contains predictions for all samples. " "Skipping inference."),
                 level="info",
             )
             if run_progress is not None:
@@ -2336,10 +2446,14 @@ class SemanticAlignmentRunner(ITrainer):
             if candidate_df.empty and self.results_json:
                 candidate_df = self._build_candidate_dataframe_from_records(self.results_json)
             if not candidate_df.empty:
-                n_sources = int(candidate_df["Src"].nunique()) if "Src" in candidate_df.columns else 0
+                n_sources = (
+                    int(candidate_df["Src"].nunique()) if "Src" in candidate_df.columns else 0
+                )
                 post_progress_started = False
                 if run_progress is not None and len(getattr(self, "models", [])) > 1:
-                    run_progress.start("PostInference", f"rows={len(candidate_df)}, sources={n_sources}")
+                    run_progress.start(
+                        "PostInference", f"rows={len(candidate_df)}, sources={n_sources}"
+                    )
                     post_progress_started = True
                 self.log(
                     (
@@ -2370,16 +2484,24 @@ class SemanticAlignmentRunner(ITrainer):
                     )
                 if post_progress_started:
                     run_progress.finish("PostInference", f"rows={len(candidate_df)}")
-                all_mappings = list(zip(candidate_df["Src"], candidate_df["Tgt"], candidate_df["S_final"]))
-                self._selector_target_conflict_enabled = self._selector_target_conflict_enabled_from_df(candidate_df)
+                all_mappings = list(
+                    zip(candidate_df["Src"], candidate_df["Tgt"], candidate_df["S_final"])
+                )
+                self._selector_target_conflict_enabled = (
+                    self._selector_target_conflict_enabled_from_df(candidate_df)
+                )
                 threshold = self._effective_alignment_threshold(candidate_df, threshold)
             df = pd.DataFrame(all_mappings, columns=["Src", "Tgt", "Scores"])
-            preds = EntityMapping.read_table_mappings(df, threshold=threshold, cardinality=cardinality)
+            preds = EntityMapping.read_table_mappings(
+                df, threshold=threshold, cardinality=cardinality
+            )
             compact_rationale_records = False
             if not candidate_df.empty:
                 self._annotate_candidate_dataframe(candidate_df, preds, threshold, local_alignment)
                 compact_rationale_records = self._ensure_compact_rationale_records(candidate_df)
-            self._annotate_final_prediction_records(preds, threshold=threshold, local_alignment=local_alignment)
+            self._annotate_final_prediction_records(
+                preds, threshold=threshold, local_alignment=local_alignment
+            )
             rationale_start = time.perf_counter()
             self._generate_final_rationales(
                 log_every=log_every,
@@ -2573,53 +2695,59 @@ class SemanticAlignmentRunner(ITrainer):
 
             for idx, (s, t, score) in enumerate(zip(src_iri, tgt_iri, s_final)):
                 all_mappings.append((s, t, float(score)))
-                self._candidate_rows.append({
-                    "Src": s,
-                    "Tgt": t,
-                    "ground_truth": ground_truth[idx],
-                    "s_label": float(s_label_vals[idx]),
-                    "s_label_star": float(s_label_star_vals[idx]),
-                    "s_ctx": float(s_ctx_vals[idx]),
-                    "S_lctx": float(s_lctx_vals[idx]),
-                    "S_base": float(s_base_vals[idx]),
-                    "S_struct": float(s_struct_vals[idx]),
-                    "s_hier": float(s_hier_vals[idx]),
-                    "s_sim": float(s_sim_vals[idx]),
-                    "s_diff": float(s_diff_vals[idx]),
-                    "s_attr": float(s_attr_vals[idx]),
-                    "q_label": float(q_label_vals[idx]),
-                    "Q_struct": float(q_struct_vals[idx]),
-                    "q_hier": float(q_hier_vals[idx]),
-                    "q_sim": float(q_sim_vals[idx]),
-                    "q_diff": float(q_diff_vals[idx]),
-                    "q_attr": float(q_attr_vals[idx]),
-                    "S_final": float(score),
-                    "w_c": float(w_c_vals[idx]),
-                    "w_struct": float(w_struct_vals[idx]),
-                    "w_i": float(w_i_vals[idx]),
-                    "U": float(u_vals[idx]),
-                    "U_ind": float(u_ind_vals[idx]),
-                    "U_dis": float(u_dis_vals[idx]),
-                    "p_llm": float(p_llm_vals[idx]),
-                    "I_label": float(i_label_vals[idx]),
-                    "I_struct": float(i_struct_vals[idx]),
-                    "I_ctx": float(i_ctx_vals[idx]),
-                    "I_hier": float(i_hier_vals[idx]),
-                    "I_sim": float(i_sim_vals[idx]),
-                    "I_diff": float(i_diff_vals[idx]),
-                    "I_attr": float(i_attr_vals[idx]),
-                    "I_llm": float(i_llm_vals[idx]),
-                    "llm_pair_brief": llm_pair_briefs[idx],
-                    "src_label_text": self._summarize_label(src_labels[idx]),
-                    "tgt_label_text": self._summarize_label(tgt_labels[idx]),
-                    "src_context_text": self._summarize_context(src_ctxs[idx] if src_ctxs else []),
-                    "tgt_context_text": self._summarize_context(tgt_ctxs[idx] if tgt_ctxs else []),
-                })
+                self._candidate_rows.append(
+                    {
+                        "Src": s,
+                        "Tgt": t,
+                        "ground_truth": ground_truth[idx],
+                        "s_label": float(s_label_vals[idx]),
+                        "s_label_star": float(s_label_star_vals[idx]),
+                        "s_ctx": float(s_ctx_vals[idx]),
+                        "S_lctx": float(s_lctx_vals[idx]),
+                        "S_base": float(s_base_vals[idx]),
+                        "S_struct": float(s_struct_vals[idx]),
+                        "s_hier": float(s_hier_vals[idx]),
+                        "s_sim": float(s_sim_vals[idx]),
+                        "s_diff": float(s_diff_vals[idx]),
+                        "s_attr": float(s_attr_vals[idx]),
+                        "q_label": float(q_label_vals[idx]),
+                        "Q_struct": float(q_struct_vals[idx]),
+                        "q_hier": float(q_hier_vals[idx]),
+                        "q_sim": float(q_sim_vals[idx]),
+                        "q_diff": float(q_diff_vals[idx]),
+                        "q_attr": float(q_attr_vals[idx]),
+                        "S_final": float(score),
+                        "w_c": float(w_c_vals[idx]),
+                        "w_struct": float(w_struct_vals[idx]),
+                        "w_i": float(w_i_vals[idx]),
+                        "U": float(u_vals[idx]),
+                        "U_ind": float(u_ind_vals[idx]),
+                        "U_dis": float(u_dis_vals[idx]),
+                        "p_llm": float(p_llm_vals[idx]),
+                        "I_label": float(i_label_vals[idx]),
+                        "I_struct": float(i_struct_vals[idx]),
+                        "I_ctx": float(i_ctx_vals[idx]),
+                        "I_hier": float(i_hier_vals[idx]),
+                        "I_sim": float(i_sim_vals[idx]),
+                        "I_diff": float(i_diff_vals[idx]),
+                        "I_attr": float(i_attr_vals[idx]),
+                        "I_llm": float(i_llm_vals[idx]),
+                        "llm_pair_brief": llm_pair_briefs[idx],
+                        "src_label_text": self._summarize_label(src_labels[idx]),
+                        "tgt_label_text": self._summarize_label(tgt_labels[idx]),
+                        "src_context_text": self._summarize_context(
+                            src_ctxs[idx] if src_ctxs else []
+                        ),
+                        "tgt_context_text": self._summarize_context(
+                            tgt_ctxs[idx] if tgt_ctxs else []
+                        ),
+                    }
+                )
 
             processed_examples += len(src_iri)
             batches_run += 1
 
-            # Accumulate full JSONs 
+            # Accumulate full JSONs
             if "explanations" in out:
                 explanations = list(out["explanations"])
                 for local_idx, record in enumerate(explanations):
@@ -2628,7 +2756,9 @@ class SemanticAlignmentRunner(ITrainer):
                         continue
                     evidence_items = self._selector_evidence_items_for_record(record)
                     if evidence_items:
-                        self._candidate_rows[candidate_idx]["selector_evidence_items"] = evidence_items
+                        self._candidate_rows[candidate_idx][
+                            "selector_evidence_items"
+                        ] = evidence_items
                 self.results_json.extend(explanations)
                 self._append_audit_records(explanations)
             self._append_candidate_records(self._candidate_rows[candidate_start_idx:])
@@ -2778,8 +2908,12 @@ class SemanticAlignmentRunner(ITrainer):
                 self._write_additional_models_checkpoint(
                     kind, candidate_df, local_alignment, threshold, cardinality
                 )
-            all_mappings = list(zip(candidate_df["Src"], candidate_df["Tgt"], candidate_df["S_final"]))
-            self._selector_target_conflict_enabled = self._selector_target_conflict_enabled_from_df(candidate_df)
+            all_mappings = list(
+                zip(candidate_df["Src"], candidate_df["Tgt"], candidate_df["S_final"])
+            )
+            self._selector_target_conflict_enabled = self._selector_target_conflict_enabled_from_df(
+                candidate_df
+            )
             threshold = self._effective_alignment_threshold(candidate_df, threshold)
             if self.results_json:
                 # Prefer the richer JSON (includes importances and LLM info) for plotting/summary.
@@ -2793,12 +2927,16 @@ class SemanticAlignmentRunner(ITrainer):
             run_progress.finish("PostInference", f"rows={len(candidate_df)}")
 
         df_scores = pd.DataFrame(all_mappings, columns=["Src", "Tgt", "Scores"])
-        preds = EntityMapping.read_table_mappings(df_scores, threshold=threshold, cardinality=cardinality)
+        preds = EntityMapping.read_table_mappings(
+            df_scores, threshold=threshold, cardinality=cardinality
+        )
         compact_rationale_records = False
         if not candidate_df.empty:
             self._annotate_candidate_dataframe(candidate_df, preds, threshold, local_alignment)
             compact_rationale_records = self._ensure_compact_rationale_records(candidate_df)
-        self._annotate_final_prediction_records(preds, threshold=threshold, local_alignment=local_alignment)
+        self._annotate_final_prediction_records(
+            preds, threshold=threshold, local_alignment=local_alignment
+        )
         rationale_start = time.perf_counter()
         self._generate_final_rationales(
             log_every=log_every,
@@ -2808,7 +2946,9 @@ class SemanticAlignmentRunner(ITrainer):
             cardinality=cardinality,
         )
         rationale_elapsed_seconds = time.perf_counter() - rationale_start
-        post_inference_elapsed_seconds = time.perf_counter() - post_inference_start - rationale_elapsed_seconds
+        post_inference_elapsed_seconds = (
+            time.perf_counter() - post_inference_start - rationale_elapsed_seconds
+        )
         if self.results_json and not compact_rationale_records:
             self.results_df = self._make_summary_dataframe(self.results_json)
             for rec in self.results_json:
@@ -2880,7 +3020,9 @@ class SemanticAlignmentRunner(ITrainer):
         df = pd.DataFrame(self._candidate_rows)
         return self._merge_dataset_candidate_columns(df)
 
-    def _build_candidate_dataframe_from_records(self, records: List[Dict[str, Any]]) -> pd.DataFrame:
+    def _build_candidate_dataframe_from_records(
+        self, records: List[Dict[str, Any]]
+    ) -> pd.DataFrame:
         rows: List[Dict[str, Any]] = []
         for record in records or []:
             src = record.get("src_iri")
@@ -2931,7 +3073,9 @@ class SemanticAlignmentRunner(ITrainer):
         if len(extra_cols) <= 2:
             return df
         extra_df = dataset_df[extra_cols].drop_duplicates(subset=["Src", "Tgt"])
-        merge_cols = [col for col in extra_df.columns if col not in df.columns or col in {"Src", "Tgt"}]
+        merge_cols = [
+            col for col in extra_df.columns if col not in df.columns or col in {"Src", "Tgt"}
+        ]
         if len(merge_cols) <= 2:
             return df
         return df.merge(extra_df[merge_cols], on=["Src", "Tgt"], how="left")
@@ -2993,7 +3137,9 @@ class SemanticAlignmentRunner(ITrainer):
                     force=True,
                 )
             sig = inspect.signature(extra_model.forward)
-            accepts_var_kw = any(p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values())
+            accepts_var_kw = any(
+                p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values()
+            )
             call_kwargs = {"candidate_df": current}
             if accepts_var_kw or "dataset" in sig.parameters:
                 call_kwargs["dataset"] = self.dataset

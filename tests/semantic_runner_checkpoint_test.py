@@ -1,6 +1,6 @@
-from pathlib import Path
 import importlib.util
 import json
+from pathlib import Path
 
 import torch
 
@@ -8,7 +8,9 @@ from exact.core.contracts.model import IModel
 
 
 def _load_runner_module():
-    module_path = Path(__file__).resolve().parents[1] / "exact" / "impl" / "trainer" / "semantic_runner.py"
+    module_path = (
+        Path(__file__).resolve().parents[1] / "exact" / "impl" / "trainer" / "semantic_runner.py"
+    )
     spec = importlib.util.spec_from_file_location("semantic_runner_module", module_path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -158,6 +160,22 @@ def test_legacy_compact_checkpoint_migrates_audit_to_candidate_sidecar(tmp_path:
     assert migrated_payload["checkpoint_schema_version"] == 2
     assert migrated_payload["candidate_records_manifest_path"]
     assert runner._restored_candidate_rows == [
-        {"Src": "s1", "Tgt": "t1", "ground_truth": None, "src_label_text": "", "tgt_label_text": "", "llm_pair_brief": "", "S_final": 0.8},
-        {"Src": "s2", "Tgt": "t2", "ground_truth": None, "src_label_text": "", "tgt_label_text": "", "llm_pair_brief": "", "S_final": 0.7},
+        {
+            "Src": "s1",
+            "Tgt": "t1",
+            "ground_truth": None,
+            "src_label_text": "",
+            "tgt_label_text": "",
+            "llm_pair_brief": "",
+            "S_final": 0.8,
+        },
+        {
+            "Src": "s2",
+            "Tgt": "t2",
+            "ground_truth": None,
+            "src_label_text": "",
+            "tgt_label_text": "",
+            "llm_pair_brief": "",
+            "S_final": 0.7,
+        },
     ]

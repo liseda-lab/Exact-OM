@@ -5,6 +5,7 @@ Utility to generate Exact experiments for hyperparameter sweeps.
 Supports traditional grid search as well as a lightweight low-discrepancy sampler
 with optional local exploitation to cover the space with fewer trials.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -44,7 +45,14 @@ class ParamSpec:
             raise ValueError(f"Param '{name}' of type categorical needs explicit values.")
         if values is not None and not isinstance(values, list):
             raise ValueError(f"Param '{name}' values must be a list.")
-        return cls(name=name, dtype=dtype, values=values or [], bounds=bounds, scale=scale, quantize=quantize)
+        return cls(
+            name=name,
+            dtype=dtype,
+            values=values or [],
+            bounds=bounds,
+            scale=scale,
+            quantize=quantize,
+        )
 
     def convert(self, raw):
         if self.dtype == "int":
@@ -132,9 +140,7 @@ def grid_trials(params: Sequence[ParamSpec]) -> List[Dict[str, object]]:
     for spec in params:
         if not spec.values:
             raise ValueError(f"Param '{spec.name}' requires explicit values for grid search.")
-    all_values = [
-        [(spec.name, spec.convert(value)) for value in spec.values] for spec in params
-    ]
+    all_values = [[(spec.name, spec.convert(value)) for value in spec.values] for spec in params]
     combinations = []
     for combo in itertools.product(*all_values):
         trial = {name: value for name, value in combo}
@@ -147,7 +153,9 @@ def per_param_trials(params: Sequence[ParamSpec]) -> List[Dict[str, object]]:
     trials: List[Dict[str, object]] = []
     for spec in params:
         if not spec.values:
-            raise ValueError(f"Param '{spec.name}' requires explicit values for per-parameter sweeps.")
+            raise ValueError(
+                f"Param '{spec.name}' requires explicit values for per-parameter sweeps."
+            )
         for value in spec.values:
             trials.append({spec.name: spec.convert(value)})
     return trials
@@ -251,7 +259,9 @@ def smart_trials(
             else:
                 if spec.values:
                     base_value = spec.values[idx % len(spec.values)]
-                point[spec.name] = spec.convert(base_value) if spec.dtype != "categorical" else base_value
+                point[spec.name] = (
+                    spec.convert(base_value) if spec.dtype != "categorical" else base_value
+                )
         trials.append(point)
 
     return trials
@@ -287,7 +297,12 @@ def resolve_extra_files(entries: Iterable, config_dir: Path) -> List[Tuple[Path,
             src_str = entry.get("source") or entry.get("src")
             if not src_str:
                 raise ValueError(f"extra_files[{idx}] is missing 'source'.")
-            dst_str = entry.get("destination") or entry.get("dest") or entry.get("target") or Path(src_str).name
+            dst_str = (
+                entry.get("destination")
+                or entry.get("dest")
+                or entry.get("target")
+                or Path(src_str).name
+            )
         else:
             raise ValueError("extra_files entries must be strings or mappings with 'source'.")
         src_path = Path(src_str).expanduser()
@@ -304,12 +319,18 @@ def resolve_extra_files(entries: Iterable, config_dir: Path) -> List[Tuple[Path,
                 resolved_src = candidate_resolved
                 break
         if resolved_src is None:
-            raise FileNotFoundError(f"Extra file '{src_str}' was not found relative to the current working directory or {config_dir}.")
+            raise FileNotFoundError(
+                f"Extra file '{src_str}' was not found relative to the current working directory or {config_dir}."
+            )
         dst_path = Path(dst_str)
         if dst_path.is_absolute():
-            raise ValueError(f"Destination path '{dst_str}' for extra_files[{idx}] must be relative.")
+            raise ValueError(
+                f"Destination path '{dst_str}' for extra_files[{idx}] must be relative."
+            )
         if any(part == ".." for part in dst_path.parts):
-            raise ValueError(f"Destination path '{dst_str}' for extra_files[{idx}] cannot contain '..'.")
+            raise ValueError(
+                f"Destination path '{dst_str}' for extra_files[{idx}] cannot contain '..'."
+            )
         normalized.append((resolved_src, dst_path))
     return normalized
 
@@ -341,7 +362,9 @@ def create_trial_files(
     return config_path
 
 
-def build_export_vars(dataset_cfg: dict, config_path: Path, trial_dir: Path, job_name: str) -> Dict[str, str]:
+def build_export_vars(
+    dataset_cfg: dict, config_path: Path, trial_dir: Path, job_name: str
+) -> Dict[str, str]:
     export = {
         "JOB_NAME": job_name,
         "EXP_DIR": str(trial_dir),
@@ -395,7 +418,9 @@ def main() -> None:
     extra_files = resolve_extra_files(tuner_cfg.get("extra_files"), config_dir)
     base_config_path = Path(tuner_cfg["base_config"]).resolve()
     base_config = load_yaml(base_config_path)
-    params = [ParamSpec.from_mapping(name, spec) for name, spec in tuner_cfg["search_space"].items()]
+    params = [
+        ParamSpec.from_mapping(name, spec) for name, spec in tuner_cfg["search_space"].items()
+    ]
     experiment_root = Path(tuner_cfg["experiment_root"]).resolve()
     if args.dry_run:
         print(f"[DRY RUN] Would generate experiments under {experiment_root}")
@@ -410,7 +435,9 @@ def main() -> None:
     elif args.strategy == "per_param":
         trial_params = per_param_trials(params)
     else:
-        trial_params = smart_trials(params, tuner_cfg.get("smart", {}), base_config, args.num_samples)
+        trial_params = smart_trials(
+            params, tuner_cfg.get("smart", {}), base_config, args.num_samples
+        )
 
     if not trial_params:
         raise SystemExit("No trials generated.")
@@ -437,7 +464,9 @@ def main() -> None:
             f"--export=ALL,{export_string(export_vars)} {slurm_script}"
         )
         commands.append(" ".join(cmd.split()))
-        manifest.append({"job_name": job_name, "params": param_values, "config_path": str(config_path)})
+        manifest.append(
+            {"job_name": job_name, "params": param_values, "config_path": str(config_path)}
+        )
 
     if args.dry_run:
         for item in manifest:

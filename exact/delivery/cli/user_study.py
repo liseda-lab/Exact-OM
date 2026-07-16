@@ -9,22 +9,36 @@ def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Build reusable user-study and failure-analysis artifacts from an existing Exact run."
     )
-    parser.add_argument("--run-dir", type=str, required=True, help="Path to the existing run directory.")
+    parser.add_argument(
+        "--run-dir", type=str, required=True, help="Path to the existing run directory."
+    )
     parser.add_argument(
         "--output-dir",
         type=str,
         required=False,
         help="Optional output directory for the analysis artifacts. Defaults to <run-dir>/analysis/user_study.",
     )
-    parser.add_argument("--top-k", type=int, default=5, help="Number of ranked target candidates per source to analyze.")
-    parser.add_argument("--per-rank", type=int, default=4, help="Final number of selected sources per gold-rank bucket.")
+    parser.add_argument(
+        "--top-k",
+        type=int,
+        default=5,
+        help="Number of ranked target candidates per source to analyze.",
+    )
+    parser.add_argument(
+        "--per-rank",
+        type=int,
+        default=4,
+        help="Final number of selected sources per gold-rank bucket.",
+    )
     parser.add_argument(
         "--shortlist-per-rank",
         type=int,
         default=8,
         help="Automatic shortlist size per gold-rank bucket before manual review.",
     )
-    parser.add_argument("--seed", type=int, default=0, help="Deterministic seed placeholder for stable selection.")
+    parser.add_argument(
+        "--seed", type=int, default=0, help="Deterministic seed placeholder for stable selection."
+    )
     parser.add_argument(
         "--skip-explanation-backfill",
         dest="backfill_explanations",
@@ -78,7 +92,11 @@ def main() -> None:
     if not run_dir.exists():
         raise FileNotFoundError(f"Run directory does not exist: {run_dir}")
 
-    output_dir = Path(args.output_dir).resolve() if args.output_dir else (run_dir / "analysis" / "user_study")
+    output_dir = (
+        Path(args.output_dir).resolve()
+        if args.output_dir
+        else (run_dir / "analysis" / "user_study")
+    )
     output_dir.mkdir(parents=True, exist_ok=True)
 
     level = getattr(logging, str(args.logging_level).upper())

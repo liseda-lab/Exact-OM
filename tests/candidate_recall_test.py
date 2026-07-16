@@ -30,7 +30,9 @@ def test_candidate_recall_excludes_train_and_counts_exact_oracle():
     train_pairs = {("s_train", "t_train")}
     exact_pairs = {("s4", "t4"), ("s_train", "t_train")}
 
-    analysis = analyze_candidate_recall(candidates, reference_pairs, train_pairs=train_pairs, exact_pairs=exact_pairs)
+    analysis = analyze_candidate_recall(
+        candidates, reference_pairs, train_pairs=train_pairs, exact_pairs=exact_pairs
+    )
 
     assert analysis["counts"]["reference_pairs"] == 4
     assert analysis["counts"]["candidate_pairs"] == 4

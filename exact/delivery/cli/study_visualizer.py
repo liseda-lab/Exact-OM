@@ -53,7 +53,10 @@ def parse_arguments() -> argparse.Namespace:
         action="store_false",
         help="Disable ontology-backed node info and one-hop expansion.",
     )
-    parser.set_defaults(enable_ontology_info=os.getenv("EXACT_STUDY_ENABLE_ONTOLOGY_INFO", "true").lower() in {"1", "true", "yes", "y", "on"})
+    parser.set_defaults(
+        enable_ontology_info=os.getenv("EXACT_STUDY_ENABLE_ONTOLOGY_INFO", "true").lower()
+        in {"1", "true", "yes", "y", "on"}
+    )
     parser.add_argument(
         "--logging-level",
         type=str,
@@ -110,7 +113,13 @@ def main() -> None:
         enable_ontology_info=args.enable_ontology_info,
         logger=logger,
     )
-    uvicorn.run(app, host=args.host, port=args.port, reload=args.reload, log_level=str(args.logging_level).lower())
+    uvicorn.run(
+        app,
+        host=args.host,
+        port=args.port,
+        reload=args.reload,
+        log_level=str(args.logging_level).lower(),
+    )
 
 
 if __name__ == "__main__":

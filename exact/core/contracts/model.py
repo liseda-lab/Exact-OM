@@ -10,7 +10,7 @@ Tensor = torch.Tensor
 class IModel(nn.Module, SelfRegisteringComponent):
 
     component_type = ComponentType.MODEL
-    
+
     def __init__(self, **kwargs):
         super(IModel, self).__init__()
 

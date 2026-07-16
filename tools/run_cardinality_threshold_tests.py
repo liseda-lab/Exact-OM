@@ -8,7 +8,7 @@ import argparse
 import csv
 from itertools import product
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple, Union
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Union
 
 from exact import init_jvm
 
@@ -108,8 +108,12 @@ def parse_args() -> argparse.Namespace:
         help="Optional target ontology file (required for global evaluation if source is provided).",
     )
     parser.add_argument("--train-reference-file", help="Training reference mappings (optional).")
-    parser.add_argument("--full-reference-file", help="Gold/test reference mappings for global evaluation.")
-    parser.add_argument("--reference-candidates-file", help="Reference candidates file for local evaluation.")
+    parser.add_argument(
+        "--full-reference-file", help="Gold/test reference mappings for global evaluation."
+    )
+    parser.add_argument(
+        "--reference-candidates-file", help="Reference candidates file for local evaluation."
+    )
     parser.add_argument(
         "--k-values",
         nargs="*",
@@ -227,7 +231,8 @@ def run() -> None:
     summary_file = output_dir / "cardinality_threshold_summary.csv"
     with summary_file.open("w", newline="") as csv_file:
         writer = csv.DictWriter(
-            csv_file, fieldnames=["threshold", "cardinality", "metric", "value", "status", "output_dir"]
+            csv_file,
+            fieldnames=["threshold", "cardinality", "metric", "value", "status", "output_dir"],
         )
         writer.writeheader()
         for row in summary_rows:

@@ -14,6 +14,7 @@ import torch
 
 from exact.core.contracts.model import IModel
 from exact.utils.data import read_table
+from exact.utils.formatting import clip01, format_duration, strip_code_fences
 
 
 class CandidateSetSelector(IModel):
@@ -117,9 +118,14 @@ class CandidateSetSelector(IModel):
         self.temperature = max(float(temperature), float(eps))
         self.eps = max(float(eps), 1.0e-12)
         self.support_weight = self._resolve_support_weight(support_weight, weights or {})
-        self.no_match_threshold = self._resolve_no_match_threshold(no_match_threshold, no_match or {})
+        self.no_match_threshold = self._resolve_no_match_threshold(
+            no_match_threshold, no_match or {}
+        )
         # Compatibility attributes for external callers that inspect model params.
-        self.weights = {"support_weight": self.support_weight, "auxiliary_evidence": 1.0 - self.support_weight}
+        self.weights = {
+            "support_weight": self.support_weight,
+            "auxiliary_evidence": 1.0 - self.support_weight,
+        }
         self.no_match = {"threshold": self.no_match_threshold}
         self.llm = self._normalize_llm(llm or {})
         self.strategy = str(strategy or "heuristic")
@@ -176,17 +182,28 @@ class CandidateSetSelector(IModel):
             return self._clip01(float(weights["support_weight"]))
 
         competition_keys = ["zscore", "gap", "channel_gap", "candidate_generation", "reciprocity"]
-        competition_fallback = max([float(weights[key]) for key in competition_keys if key in weights] or [0.0])
-        penalty_fallback = max([float(weights[key]) for key in ["granularity", "contradiction"] if key in weights] or [0.0])
+        competition_fallback = max(
+            [float(weights[key]) for key in competition_keys if key in weights] or [0.0]
+        )
+        penalty_fallback = max(
+            [float(weights[key]) for key in ["granularity", "contradiction"] if key in weights]
+            or [0.0]
+        )
         legacy = {
             "absolute_support": float(
-                weights.get("absolute_support", weights.get("pairwise", weights.get("absolute", 0.0)))
+                weights.get(
+                    "absolute_support", weights.get("pairwise", weights.get("absolute", 0.0))
+                )
             ),
             "candidate_competition": float(
-                weights.get("candidate_competition", weights.get("competition", competition_fallback))
+                weights.get(
+                    "candidate_competition", weights.get("competition", competition_fallback)
+                )
             ),
             "distinctive_evidence": float(
-                weights.get("distinctive_evidence", weights.get("evidence", weights.get("distinctive", 0.0)))
+                weights.get(
+                    "distinctive_evidence", weights.get("evidence", weights.get("distinctive", 0.0))
+                )
             ),
             "equivalence_safety": float(
                 weights.get("equivalence_safety", weights.get("penalty", penalty_fallback))
@@ -218,7 +235,12 @@ class CandidateSetSelector(IModel):
         mode = str(normalized.get("mode") or "off").strip().lower()
         if explicit_enabled and not bool(normalized.get("enabled")):
             mode = "off"
-        elif explicit_enabled and bool(normalized.get("enabled")) and not explicit_mode and mode == "off":
+        elif (
+            explicit_enabled
+            and bool(normalized.get("enabled"))
+            and not explicit_mode
+            and mode == "off"
+        ):
             mode = "veto"
         if mode in {"false", "0", "disabled", "none"}:
             mode = "off"
@@ -270,11 +292,7 @@ class CandidateSetSelector(IModel):
         if grid_values is None:
             grid_values = [normalized["background_negative_weight"]]
         if isinstance(grid_values, str):
-            grid_values = [
-                value.strip()
-                for value in grid_values.split(",")
-                if value.strip()
-            ]
+            grid_values = [value.strip() for value in grid_values.split(",") if value.strip()]
         try:
             grid = [max(0.0, float(value)) for value in list(grid_values)]
         except (TypeError, ValueError):
@@ -373,7 +391,9 @@ class CandidateSetSelector(IModel):
                 force=True,
             )
         record_lookup = self._record_lookup(results_json)
-        distinctive = self._distinctive_scores(df, record_lookup, logger=logger, log_every=log_every)
+        distinctive = self._distinctive_scores(
+            df, record_lookup, logger=logger, log_every=log_every
+        )
         if run_progress is not None:
             run_progress.update(
                 "PostInference",
@@ -515,7 +535,11 @@ class CandidateSetSelector(IModel):
                 elapsed_progress = max(1.0e-8, time.perf_counter() - progress_start)
                 rate = n_groups / elapsed_progress
                 remaining = max(0, n_sources - n_groups)
-                eta = self._format_duration(remaining / rate) if rate > 0 else self._format_duration(0.0)
+                eta = (
+                    self._format_duration(remaining / rate)
+                    if rate > 0
+                    else self._format_duration(0.0)
+                )
                 self._log(
                     logger,
                     (
@@ -622,8 +646,8 @@ class CandidateSetSelector(IModel):
             protected_exact_pairs=exact_pairs_for_reporting,
         )
         if calibration_choice is None:
-            train_ref_pairs, validation_ref_pairs, split_meta = self._split_reference_pairs_by_source(
-                calibration_ref_pairs
+            train_ref_pairs, validation_ref_pairs, split_meta = (
+                self._split_reference_pairs_by_source(calibration_ref_pairs)
             )
             rank_groups, split_positive_sources = self._rank_training_groups(df, train_ref_pairs)
             if split_positive_sources < min_positive:
@@ -645,11 +669,14 @@ class CandidateSetSelector(IModel):
                 label="held-out rank",
             )
             if rank_model is None:
-                self._log(logger, "Calibrated selector failed to fit rank model; using heuristic selector.", "warning")
+                self._log(
+                    logger,
+                    "Calibrated selector failed to fit rank model; using heuristic selector.",
+                    "warning",
+                )
                 return None
             utilities = {
-                idx: self._linear_score(rank_features[idx], rank_model)
-                for idx in rank_features
+                idx: self._linear_score(rank_features[idx], rank_model) for idx in rank_features
             }
 
             calibration_choice = self._select_accept_model_by_validation(
@@ -683,7 +710,9 @@ class CandidateSetSelector(IModel):
         threshold_metrics = dict(calibration_choice["threshold_metrics"])
         oof_accept_threshold = calibration_choice.get("oof_accept_threshold")
         oof_threshold_metrics = dict(calibration_choice.get("oof_threshold_metrics", {}))
-        final_refit_threshold_metrics = dict(calibration_choice.get("final_refit_threshold_metrics", {}))
+        final_refit_threshold_metrics = dict(
+            calibration_choice.get("final_refit_threshold_metrics", {})
+        )
         target_conflict_enabled = bool(calibration_choice.get("target_conflict_enabled", False))
         if bool(threshold_metrics.get("fallback_to_f1", False)):
             self._log(
@@ -780,7 +809,11 @@ class CandidateSetSelector(IModel):
                 elapsed_progress = max(1.0e-8, time.perf_counter() - progress_start)
                 rate = n_groups / elapsed_progress
                 remaining = max(0, n_sources - n_groups)
-                eta = self._format_duration(remaining / rate) if rate > 0 else self._format_duration(0.0)
+                eta = (
+                    self._format_duration(remaining / rate)
+                    if rate > 0
+                    else self._format_duration(0.0)
+                )
                 self._log(
                     logger,
                     (
@@ -822,7 +855,9 @@ class CandidateSetSelector(IModel):
             "exact_training_reference_tp": len(exact_pairs_for_reporting.intersection(ref_pairs)),
             "exact_training_reference_fp": len(exact_pairs_for_reporting.difference(ref_pairs)),
             "exact_prefiltered_source_policy": self.calibration["exact_prefiltered_source_policy"],
-            "exact_prefiltered_negative_weight": self.calibration["exact_prefiltered_negative_weight"],
+            "exact_prefiltered_negative_weight": self.calibration[
+                "exact_prefiltered_negative_weight"
+            ],
             "selected_background_negative_weight": self.calibration["background_negative_weight"],
             "selected_llm_mode": self.llm.get("mode"),
             "selected_target_conflict_enabled": target_conflict_enabled,
@@ -926,7 +961,9 @@ class CandidateSetSelector(IModel):
             self._log(logger, f"Failed to read training reference file {path}: {exc}", "warning")
             return set()
         if ref_df.shape[1] < 2:
-            self._log(logger, f"Training reference file {path} has fewer than two columns.", "warning")
+            self._log(
+                logger, f"Training reference file {path} has fewer than two columns.", "warning"
+            )
             return set()
         src_col, tgt_col = ref_df.columns[:2]
         pairs = {
@@ -980,9 +1017,7 @@ class CandidateSetSelector(IModel):
         if not exact_ref_sources:
             return set(ref_pairs), set(), set()
 
-        filtered_ref_pairs = {
-            pair for pair in ref_pairs if pair[0] not in exact_ref_sources
-        }
+        filtered_ref_pairs = {pair for pair in ref_pairs if pair[0] not in exact_ref_sources}
         self._log(
             logger,
             (
@@ -1018,7 +1053,9 @@ class CandidateSetSelector(IModel):
                     pairs.add((str(src), str(tgt)))
         return pairs
 
-    def _exact_prefiltered_pairs_from_dataframe(self, dataset_df: pd.DataFrame) -> set[Tuple[str, str]]:
+    def _exact_prefiltered_pairs_from_dataframe(
+        self, dataset_df: pd.DataFrame
+    ) -> set[Tuple[str, str]]:
         if not {"Src", "Tgt"}.issubset(dataset_df.columns):
             return set()
         if "prefiltered" not in dataset_df.columns:
@@ -1065,11 +1102,7 @@ class CandidateSetSelector(IModel):
         self,
         ref_pairs: set[Tuple[str, str]],
     ) -> Tuple[set[Tuple[str, str]], set[Tuple[str, str]], Dict[str, Any]]:
-        clean_pairs = {
-            (str(src), str(tgt))
-            for src, tgt in ref_pairs
-            if str(src) and str(tgt)
-        }
+        clean_pairs = {(str(src), str(tgt)) for src, tgt in ref_pairs if str(src) and str(tgt)}
         sources = sorted({src for src, _ in clean_pairs})
         validation_fraction = float(self.calibration.get("validation_fraction", 0.0))
         min_positive = int(self.calibration.get("min_positive_sources", 1))
@@ -1119,11 +1152,7 @@ class CandidateSetSelector(IModel):
         self,
         ref_pairs: set[Tuple[str, str]],
     ) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
-        clean_pairs = {
-            (str(src), str(tgt))
-            for src, tgt in ref_pairs
-            if str(src) and str(tgt)
-        }
+        clean_pairs = {(str(src), str(tgt)) for src, tgt in ref_pairs if str(src) and str(tgt)}
         sources = sorted({src for src, _ in clean_pairs})
         requested_folds = max(1, int(self.calibration.get("validation_folds", 1)))
         validation_fraction = float(self.calibration.get("validation_fraction", 0.0))
@@ -1149,10 +1178,7 @@ class CandidateSetSelector(IModel):
 
         shuffled_sources = list(sources)
         random.Random(int(self.request_seed)).shuffle(shuffled_sources)
-        source_folds = [
-            set(shuffled_sources[fold_idx::n_folds])
-            for fold_idx in range(n_folds)
-        ]
+        source_folds = [set(shuffled_sources[fold_idx::n_folds]) for fold_idx in range(n_folds)]
         folds: List[Dict[str, Any]] = []
         for fold_idx, validation_sources in enumerate(source_folds):
             if not validation_sources:
@@ -1179,10 +1205,7 @@ class CandidateSetSelector(IModel):
             {
                 "held_out": True,
                 "n_folds": len(folds),
-                "fold_source_counts": [
-                    len(fold["validation_sources"])
-                    for fold in folds
-                ],
+                "fold_source_counts": [len(fold["validation_sources"]) for fold in folds],
                 "n_train_sources": len(sources),
                 "n_validation_sources": len(sources),
                 "n_train_pairs": len(clean_pairs),
@@ -1274,11 +1297,12 @@ class CandidateSetSelector(IModel):
                 )
                 if rank_model is None:
                     fold_failed = True
-                    self._log(logger, "Calibrated selector OOF fold failed to fit rank model.", "warning")
+                    self._log(
+                        logger, "Calibrated selector OOF fold failed to fit rank model.", "warning"
+                    )
                     break
                 utilities = {
-                    idx: self._linear_score(rank_features[idx], rank_model)
-                    for idx in rank_features
+                    idx: self._linear_score(rank_features[idx], rank_model) for idx in rank_features
                 }
 
                 decision_start = time.perf_counter()
@@ -1308,7 +1332,11 @@ class CandidateSetSelector(IModel):
                 )
                 if accept_model is None:
                     fold_failed = True
-                    self._log(logger, "Calibrated selector OOF fold failed to fit accept model.", "warning")
+                    self._log(
+                        logger,
+                        "Calibrated selector OOF fold failed to fit accept model.",
+                        "warning",
+                    )
                     break
 
                 decision_start = time.perf_counter()
@@ -1377,7 +1405,9 @@ class CandidateSetSelector(IModel):
                         logger=logger,
                         record_lookup=record_lookup,
                     )
-                for target_conflict_enabled in self._target_conflict_mode_candidates(target_cardinality):
+                for target_conflict_enabled in self._target_conflict_mode_candidates(
+                    target_cardinality
+                ):
                     target_metrics = dict(mode_metrics)
                     if target_conflict_enabled:
                         target_metrics = self._metrics_with_target_conflict(
@@ -1428,7 +1458,9 @@ class CandidateSetSelector(IModel):
             self.llm["mode"] = original_llm_mode
             return None
 
-        self.calibration["background_negative_weight"] = float(best_choice["background_negative_weight"])
+        self.calibration["background_negative_weight"] = float(
+            best_choice["background_negative_weight"]
+        )
         self.llm["mode"] = str(best_choice["llm_mode"])
         rank_groups, _ = self._rank_training_groups(df, calibration_ref_pairs)
         rank_model = self._fit_rank_model(
@@ -1442,8 +1474,7 @@ class CandidateSetSelector(IModel):
             self.llm["mode"] = original_llm_mode
             return None
         utilities = {
-            idx: self._linear_score(rank_features[idx], rank_model)
-            for idx in rank_features
+            idx: self._linear_score(rank_features[idx], rank_model) for idx in rank_features
         }
         source_decisions = self._source_decisions(
             df,
@@ -1466,7 +1497,9 @@ class CandidateSetSelector(IModel):
 
         oof_accept_threshold = float(best_choice["accept_threshold"])
         oof_threshold_metrics = dict(best_choice["threshold_metrics"])
-        final_accept_threshold, final_threshold_metrics = self._tune_accept_threshold(source_decisions)
+        final_accept_threshold, final_threshold_metrics = self._tune_accept_threshold(
+            source_decisions
+        )
         final_mode_metrics = dict(final_threshold_metrics)
         if str(best_choice["llm_mode"]) == "veto":
             final_mode_metrics = self._metrics_with_llm_veto(
@@ -1485,7 +1518,9 @@ class CandidateSetSelector(IModel):
                 protected_exact_pairs=protected_exact_pairs,
                 vetoed_sources=set(final_mode_metrics.get("llm_vetoed_source_ids", [])),
             )
-        final_mode_metrics["background_negative_weight"] = float(best_choice["background_negative_weight"])
+        final_mode_metrics["background_negative_weight"] = float(
+            best_choice["background_negative_weight"]
+        )
         final_mode_metrics["llm_mode"] = str(best_choice["llm_mode"])
         final_mode_metrics["target_conflict_enabled"] = bool(best_choice["target_conflict_enabled"])
         final_mode_metrics["validation_scope"] = "final_refit"
@@ -1493,7 +1528,9 @@ class CandidateSetSelector(IModel):
         final_mode_metrics["oof_validation_F1"] = float(oof_threshold_metrics.get("F1", 0.0))
         final_mode_metrics["oof_validation_P"] = float(oof_threshold_metrics.get("P", 0.0))
         final_mode_metrics["oof_validation_R"] = float(oof_threshold_metrics.get("R", 0.0))
-        final_mode_metrics["oof_validation_sources"] = int(oof_threshold_metrics.get("validation_sources", 0))
+        final_mode_metrics["oof_validation_sources"] = int(
+            oof_threshold_metrics.get("validation_sources", 0)
+        )
         final_mode_metrics["final_refit_selected_sources"] = int(
             sum(
                 1
@@ -1596,10 +1633,10 @@ class CandidateSetSelector(IModel):
             self._log(
                 logger,
                 (
-                        "Calibrated selector held-out validation decisions built: "
-                        f"sources={len(validation_decisions_all)}, "
-                        f"duration={self._format_duration(time.perf_counter() - decision_start)}."
-                    ),
+                    "Calibrated selector held-out validation decisions built: "
+                    f"sources={len(validation_decisions_all)}, "
+                    f"duration={self._format_duration(time.perf_counter() - decision_start)}."
+                ),
                 "debug",
             )
             validation_decisions = {
@@ -1640,7 +1677,9 @@ class CandidateSetSelector(IModel):
                         logger=logger,
                         record_lookup=record_lookup,
                     )
-                for target_conflict_enabled in self._target_conflict_mode_candidates(target_cardinality):
+                for target_conflict_enabled in self._target_conflict_mode_candidates(
+                    target_cardinality
+                ):
                     target_metrics = dict(mode_metrics)
                     if target_conflict_enabled:
                         target_metrics = self._metrics_with_target_conflict(
@@ -1653,7 +1692,9 @@ class CandidateSetSelector(IModel):
                     target_metrics["background_negative_weight"] = float(background_weight)
                     target_metrics["llm_mode"] = llm_mode
                     target_metrics["target_conflict_enabled"] = bool(target_conflict_enabled)
-                    target_metrics["validation_scope"] = "validation" if validation_decisions else "train"
+                    target_metrics["validation_scope"] = (
+                        "validation" if validation_decisions else "train"
+                    )
                     choice_key = (
                         float(target_metrics.get("F1", 0.0)),
                         float(target_metrics.get("P", 0.0)),
@@ -1688,7 +1729,9 @@ class CandidateSetSelector(IModel):
             self.llm["mode"] = original_llm_mode
             return None
 
-        self.calibration["background_negative_weight"] = float(best_choice["background_negative_weight"])
+        self.calibration["background_negative_weight"] = float(
+            best_choice["background_negative_weight"]
+        )
         self.llm["mode"] = str(best_choice["llm_mode"])
         source_decisions = self._source_decisions(
             df,
@@ -1769,7 +1812,9 @@ class CandidateSetSelector(IModel):
         finally:
             self.llm["mode"] = original_mode
 
-        metrics = self._decision_metrics_at_threshold(decisions, threshold, vetoed_sources=vetoed_sources)
+        metrics = self._decision_metrics_at_threshold(
+            decisions, threshold, vetoed_sources=vetoed_sources
+        )
         metrics["llm_vetoed_sources"] = len(vetoed_sources)
         metrics["llm_vetoed_source_ids"] = sorted(vetoed_sources)
         return metrics
@@ -1853,7 +1898,8 @@ class CandidateSetSelector(IModel):
                     for decision in decisions.values()
                     if decision.get("winner_pair")
                     and float(decision.get("p_match", 0.0)) >= float(threshold)
-                    and (str(decision["winner_pair"][0]), str(decision["winner_pair"][1])) not in kept_pairs
+                    and (str(decision["winner_pair"][0]), str(decision["winner_pair"][1]))
+                    not in kept_pairs
                 )
             ),
         }
@@ -1943,15 +1989,20 @@ class CandidateSetSelector(IModel):
         for _, group in df.groupby("Src", sort=False):
             idxs = list(group.index)
             pair_scores = [
-                self._clip01(self._safe_float(group.at[idx, "S_pair_final"], 0.0))
-                for idx in idxs
+                self._clip01(self._safe_float(group.at[idx, "S_pair_final"], 0.0)) for idx in idxs
             ]
             mean_score = sum(pair_scores) / max(1, len(pair_scores))
             std_score = self._std(pair_scores)
             order_by_pair = {
                 idx: rank
                 for rank, idx in enumerate(
-                    sorted(idxs, key=lambda row_idx: self._safe_float(group.at[row_idx, "S_pair_final"], 0.0), reverse=True),
+                    sorted(
+                        idxs,
+                        key=lambda row_idx: self._safe_float(
+                            group.at[row_idx, "S_pair_final"], 0.0
+                        ),
+                        reverse=True,
+                    ),
                     start=1,
                 )
             }
@@ -2093,7 +2144,9 @@ class CandidateSetSelector(IModel):
         ref_sources = {src for src, _ in ref_pairs}
         exact_sources = set(exact_prefiltered_sources or set())
         exact_policy = str(self.calibration.get("exact_prefiltered_source_policy", "hard_negative"))
-        exact_negative_weight = float(self.calibration.get("exact_prefiltered_negative_weight", 1.0))
+        exact_negative_weight = float(
+            self.calibration.get("exact_prefiltered_negative_weight", 1.0)
+        )
         decisions: Dict[str, Dict[str, Any]] = {}
         for src, group in df.groupby("Src", sort=False):
             idxs = list(group.index)
@@ -2103,8 +2156,12 @@ class CandidateSetSelector(IModel):
             order = sorted(idxs, key=lambda idx: utilities[idx], reverse=True)
             winner_idx = order[0]
             second_idx = order[1] if len(order) > 1 else None
-            utility_margin = utilities[winner_idx] - (utilities[second_idx] if second_idx is not None else 0.0)
-            rank_prob_margin = prob_by_idx[winner_idx] - (prob_by_idx[second_idx] if second_idx is not None else 0.0)
+            utility_margin = utilities[winner_idx] - (
+                utilities[second_idx] if second_idx is not None else 0.0
+            )
+            rank_prob_margin = prob_by_idx[winner_idx] - (
+                prob_by_idx[second_idx] if second_idx is not None else 0.0
+            )
             entropy = self._normalized_entropy(probs)
             top_row = group.loc[winner_idx]
             top_pair_score = self._clip01(self._safe_float(top_row.get("S_pair_final"), 0.0))
@@ -2196,7 +2253,9 @@ class CandidateSetSelector(IModel):
         weights = torch.zeros(dim, dtype=torch.float32, requires_grad=True)
         positive_weight = max(1.0e-6, float(torch.sum(sample_weight * y).item()))
         negative_weight = max(1.0e-6, float(torch.sum(sample_weight * (1.0 - y)).item()))
-        prior = self._clip(positive_weight / (positive_weight + negative_weight), self.eps, 1.0 - self.eps)
+        prior = self._clip(
+            positive_weight / (positive_weight + negative_weight), self.eps, 1.0 - self.eps
+        )
         # predict() runs under torch.no_grad(); calibration still needs autograd.
         with torch.enable_grad():
             bias = torch.tensor(self._logit(prior), dtype=torch.float32, requires_grad=True)
@@ -2243,7 +2302,9 @@ class CandidateSetSelector(IModel):
             "scale": scale,
         }
 
-    def _tune_accept_threshold(self, decisions: Dict[str, Dict[str, Any]]) -> Tuple[float, Dict[str, Any]]:
+    def _tune_accept_threshold(
+        self, decisions: Dict[str, Dict[str, Any]]
+    ) -> Tuple[float, Dict[str, Any]]:
         samples = [
             decision
             for decision in decisions.values()
@@ -2293,7 +2354,9 @@ class CandidateSetSelector(IModel):
                     fn += weight
             precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
             recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
-            f1 = 2.0 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0.0
+            f1 = (
+                2.0 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0.0
+            )
             f_beta = (
                 (1.0 + beta2) * precision * recall / ((beta2 * precision) + recall)
                 if ((beta2 * precision) + recall) > 0
@@ -2430,7 +2493,9 @@ class CandidateSetSelector(IModel):
             support *= diff / 0.5
         return float(self._clip01(support))
 
-    def _feature_mean_scale(self, rows: Sequence[Sequence[float]]) -> Tuple[List[float], List[float]]:
+    def _feature_mean_scale(
+        self, rows: Sequence[Sequence[float]]
+    ) -> Tuple[List[float], List[float]]:
         if not rows:
             return [], []
         n_cols = len(rows[0])
@@ -2477,8 +2542,7 @@ class CandidateSetSelector(IModel):
         idxs = list(group.index)
         n = len(idxs)
         pair_scores = [
-            self._clip01(self._safe_float(group.at[idx, "S_pair_final"], 0.0))
-            for idx in idxs
+            self._clip01(self._safe_float(group.at[idx, "S_pair_final"], 0.0)) for idx in idxs
         ]
         mean_score = sum(pair_scores) / max(1, n)
         std_score = self._std(pair_scores)
@@ -2486,8 +2550,7 @@ class CandidateSetSelector(IModel):
             zscore_terms = [0.5 for _ in pair_scores]
         else:
             zscore_terms = [
-                self._sigmoid((value - mean_score) / std_score)
-                for value in pair_scores
+                self._sigmoid((value - mean_score) / std_score) for value in pair_scores
             ]
 
         gaps = []
@@ -2558,13 +2621,19 @@ class CandidateSetSelector(IModel):
 
         no_match_prob = float(no_match_risk) if self.use_no_match else 0.0
         no_match_wins = bool(self.use_no_match and no_match_risk >= self.no_match_threshold)
-        final_candidate_scores = [0.0 for _ in selector_scores] if no_match_wins else list(selector_scores)
+        final_candidate_scores = (
+            [0.0 for _ in selector_scores] if no_match_wins else list(selector_scores)
+        )
 
         best_real = max(final_candidate_scores or [0.0])
         winner_pos = None
         if final_candidate_scores and not no_match_wins:
-            winner_pos = max(range(len(final_candidate_scores)), key=lambda pos: final_candidate_scores[pos])
-        sorted_final = sorted(selector_scores + ([no_match_prob] if self.use_no_match else []), reverse=True)
+            winner_pos = max(
+                range(len(final_candidate_scores)), key=lambda pos: final_candidate_scores[pos]
+            )
+        sorted_final = sorted(
+            selector_scores + ([no_match_prob] if self.use_no_match else []), reverse=True
+        )
         margin = sorted_final[0] - (sorted_final[1] if len(sorted_final) > 1 else 0.0)
         final_entropy = self._normalized_entropy(selector_probs)
         llm_used = bool(llm_payload and llm_payload.get("applied"))
@@ -2642,10 +2711,7 @@ class CandidateSetSelector(IModel):
         if self.use_no_match:
             no_match_margin = abs(float(no_match_risk) - self.no_match_threshold)
         ambiguity_margin = float(self.llm.get("ambiguity_margin", 0.08))
-        return (
-            top2_margin < ambiguity_margin
-            or no_match_margin < ambiguity_margin
-        )
+        return top2_margin < ambiguity_margin or no_match_margin < ambiguity_margin
 
     def _should_use_llm_calibrated(
         self,
@@ -2664,10 +2730,9 @@ class CandidateSetSelector(IModel):
             return False
         if not bool(accepted):
             return False
-        near_boundary_or_tie = (
-            float(acceptance_margin) <= float(self.llm.get("trigger_acceptance_margin", 0.025))
-            or float(rank_margin) <= float(self.llm.get("trigger_rank_margin", 0.03))
-        )
+        near_boundary_or_tie = float(acceptance_margin) <= float(
+            self.llm.get("trigger_acceptance_margin", 0.025)
+        ) or float(rank_margin) <= float(self.llm.get("trigger_rank_margin", 0.03))
         return near_boundary_or_tie
 
     def _llm_arbitrate_group(
@@ -2688,7 +2753,9 @@ class CandidateSetSelector(IModel):
             payload = self._parse_llm_payload(text)
         except Exception as exc:  # noqa: BLE001
             if not self._llm_warning_logged:
-                self._log(logger, f"Candidate-set selector LLM arbitration failed: {exc}", "warning")
+                self._log(
+                    logger, f"Candidate-set selector LLM arbitration failed: {exc}", "warning"
+                )
                 self._llm_warning_logged = True
             return None
 
@@ -2704,7 +2771,13 @@ class CandidateSetSelector(IModel):
         updated_no_match = float(no_match_risk)
         boost = self.FIXED_LLM_BOOST * confidence
         applied = False
-        if winner.upper() == "NO_MATCH" or relation in {"broader", "narrower", "sibling", "related", "none"}:
+        if winner.upper() == "NO_MATCH" or relation in {
+            "broader",
+            "narrower",
+            "sibling",
+            "related",
+            "none",
+        }:
             if not self.use_no_match:
                 return None
             updated_no_match = self._clip01(updated_no_match + boost)
@@ -2753,7 +2826,9 @@ class CandidateSetSelector(IModel):
             payload = self._parse_llm_payload(text)
         except Exception as exc:  # noqa: BLE001
             if not self._llm_warning_logged:
-                self._log(logger, f"Candidate-set selector LLM arbitration failed: {exc}", "warning")
+                self._log(
+                    logger, f"Candidate-set selector LLM arbitration failed: {exc}", "warning"
+                )
                 self._llm_warning_logged = True
             return None
         if not payload:
@@ -2764,7 +2839,13 @@ class CandidateSetSelector(IModel):
         winner = str(payload.get("winner", "")).strip()
         relation = str(payload.get("relation", "")).strip().lower()
         self._llm_prompts_used += 1
-        if winner.upper() == "NO_MATCH" or relation in {"broader", "narrower", "sibling", "related", "none"}:
+        if winner.upper() == "NO_MATCH" or relation in {
+            "broader",
+            "narrower",
+            "sibling",
+            "related",
+            "none",
+        }:
             return {"applied": True, "no_match": True, "raw": payload}
         if relation != "equivalent":
             return None
@@ -2833,10 +2914,14 @@ class CandidateSetSelector(IModel):
         lines.append(
             'JSON schema: {"winner":"C1|C2|NO_MATCH","relation":"equivalent|broader|narrower|sibling|related|none","confidence":0.0,"decisive_evidence":"...","rejected":{"C2":"..."}}'
         )
-        return {
-            "system": "You are an ontology alignment expert.",
-            "user": "\n".join(lines),
-        }, id_to_index, id_to_tgt
+        return (
+            {
+                "system": "You are an ontology alignment expert.",
+                "user": "\n".join(lines),
+            },
+            id_to_index,
+            id_to_tgt,
+        )
 
     def _run_llm_prompt(self, primary_model: IModel, prompt: Dict[str, str]) -> str:
         custom = getattr(primary_model, "candidate_set_select", None)
@@ -2859,7 +2944,9 @@ class CandidateSetSelector(IModel):
                     )
                     return outputs[0] if outputs else ""
 
-        if not all(hasattr(primary_model, name) for name in ("_ensure_local_llm", "llm_tok", "llm")):
+        if not all(
+            hasattr(primary_model, name) for name in ("_ensure_local_llm", "llm_tok", "llm")
+        ):
             raise RuntimeError("Primary model does not expose a usable LLM arbitration backend.")
         primary_model._ensure_local_llm()
         rendered = primary_model._render_llm_prompt(prompt)
@@ -2905,21 +2992,8 @@ class CandidateSetSelector(IModel):
             return None
         return payload
 
-    @staticmethod
-    def _strip_code_fences(text: str) -> str:
-        stripped = text.strip()
-        if stripped.startswith("```"):
-            stripped = re.sub(r"^```(?:json)?\s*", "", stripped, flags=re.IGNORECASE)
-            stripped = re.sub(r"\s*```$", "", stripped)
-        return stripped.strip()
-
-    @staticmethod
-    def _format_duration(total_seconds: float) -> str:
-        seconds = max(0, int(round(total_seconds)))
-        days, remainder = divmod(seconds, 86400)
-        hours, remainder = divmod(remainder, 3600)
-        minutes, seconds = divmod(remainder, 60)
-        return f"{days}d:{hours:02d}:{minutes:02d}:{seconds:02d}"
+    _strip_code_fences = staticmethod(strip_code_fences)
+    _format_duration = staticmethod(format_duration)
 
     @staticmethod
     def _count_source_groups(df: pd.DataFrame, column: str) -> int:
@@ -3041,7 +3115,11 @@ class CandidateSetSelector(IModel):
                 elapsed = max(1.0e-8, time.perf_counter() - start)
                 rate = group_idx / elapsed
                 remaining = max(0, n_sources - group_idx)
-                eta = self._format_duration(remaining / rate) if rate > 0 else self._format_duration(0.0)
+                eta = (
+                    self._format_duration(remaining / rate)
+                    if rate > 0
+                    else self._format_duration(0.0)
+                )
                 self._log(
                     logger,
                     (
@@ -3160,10 +3238,7 @@ class CandidateSetSelector(IModel):
     ) -> None:
         if not results_json:
             return
-        row_lookup = {
-            (str(row["Src"]), str(row["Tgt"])): row
-            for _, row in df.iterrows()
-        }
+        row_lookup = {(str(row["Src"]), str(row["Tgt"])): row for _, row in df.iterrows()}
         for record in results_json:
             key = (str(record.get("src_iri")), str(record.get("tgt_iri")))
             row = row_lookup.get(key)
@@ -3193,7 +3268,9 @@ class CandidateSetSelector(IModel):
             conf["selection_target_conflict_enabled"] = bool(
                 row.get("selection_target_conflict_enabled", False)
             )
-            conf["selection_target_cardinality"] = int(row.get("selection_target_cardinality", 0) or 0)
+            conf["selection_target_cardinality"] = int(
+                row.get("selection_target_cardinality", 0) or 0
+            )
             if self.replace_final_score:
                 conf["S_final"] = float(row.get("S_select", 0.0))
             record["confidences"] = conf
@@ -3249,8 +3326,7 @@ class CandidateSetSelector(IModel):
         z = math.exp(value)
         return z / (1.0 + z)
 
-    def _clip01(self, value: float) -> float:
-        return self._clip(value, 0.0, 1.0)
+    _clip01 = staticmethod(clip01)
 
     @staticmethod
     def _clip(value: float, low: float, high: float) -> float:

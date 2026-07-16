@@ -1,39 +1,21 @@
-from typing import Any, Dict, Type, TYPE_CHECKING
+from typing import Any, Dict, Type
 
 from exact.core.entities.registry import ComponentType
-
-if TYPE_CHECKING:
-    from exact.core.contracts.base import SelfRegisteringComponent
 
 
 class ComponentRegistry:
     """A registry for managing components and dependencies with lazy loading and type validation."""
+
     _registries: Dict[ComponentType, Dict[str, str]] = {}  # Store components by type
     _dependencies: Dict[str, Dict[ComponentType, str]] = {}  # Dependency mappings
-
-    @classmethod
-    def register_validator(cls, component_type: ComponentType, base_class: Type['SelfRegisteringComponent']):
-        """Register a base class validator for a specific component type."""
-        if not isinstance(component_type, ComponentType):
-            raise ValueError(f"Invalid component type '{component_type}'. Must be a ComponentType Enum value.")
-
-        # Check if a validator is already registered
-        if component_type in cls._type_validators:
-            if cls._type_validators[component_type] == base_class:
-                return  # Ignore duplicate validator registration
-            else:
-                raise ValueError(
-                    f"Validator for component type '{component_type.value}' is already registered with a different class: "
-                    f"{cls._type_validators[component_type].__name__}."
-                )
-
-        cls._type_validators[component_type] = base_class
 
     @classmethod
     def register(cls, component_type: ComponentType, name: str, component_path: str):
         """Register a component under a specific type."""
         if not isinstance(component_type, ComponentType):
-            raise ValueError(f"Invalid component type '{component_type}'. Must be a ComponentType Enum value.")
+            raise ValueError(
+                f"Invalid component type '{component_type}'. Must be a ComponentType Enum value."
+            )
 
         # Check if the component is already registered
         if component_type in cls._registries and name in cls._registries[component_type]:
@@ -69,7 +51,10 @@ class ComponentRegistry:
             )
 
         for component_type, component_name in dependencies.items():
-            if component_type not in cls._registries or component_name not in cls._registries[component_type]:
+            if (
+                component_type not in cls._registries
+                or component_name not in cls._registries[component_type]
+            ):
                 raise ValueError(
                     f"Dependency '{component_name}' is not registered under type '{component_type.value}'.\n"
                     f"Available {component_type.value}s: {', '.join(cls.list(component_type)) or 'None'}."
@@ -91,6 +76,7 @@ class ComponentRegistry:
     def _load_class(cls, module_name: str, class_name: str) -> Type[Any]:
         """Dynamically load a class from its module and name."""
         import importlib
+
         module = importlib.import_module(module_name)
         return getattr(module, class_name)
 
@@ -101,7 +87,9 @@ class ComponentRegistry:
             raise ValueError(f"Component type '{component_type.value}' is not recognized.")
 
         if name not in cls._registries[component_type]:
-            raise ValueError(f"Component '{name}' is not registered under type '{component_type.value}'.")
+            raise ValueError(
+                f"Component '{name}' is not registered under type '{component_type.value}'."
+            )
 
         # Retrieve the component path
         component_path = cls._registries[component_type][name]

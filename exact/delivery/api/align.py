@@ -1,8 +1,8 @@
 from pathlib import Path
 from typing import Optional
-import os
 
 from exact import init_jvm
+
 
 class AlignmentRunner:
     """
@@ -21,7 +21,9 @@ class AlignmentRunner:
         save_logs: bool = False,
         jvm_heap_size: str = "32g",
         run_eval: bool = False,
-        device: Optional[int] = None  # Device for running the alignment, e.g., 0 for GPU 0, None for CPU
+        device: Optional[
+            int
+        ] = None,  # Device for running the alignment, e.g., 0 for GPU 0, None for CPU
     ):
         """
 
@@ -30,7 +32,7 @@ class AlignmentRunner:
             target_ontology_file (str): Path to the target ontology file.
             output_dir (str): Path to the output directory.
             training_reference_file (str, optional): Path to the training reference file. Defaults to None.
-            full_reference_file (str, optional): Path to the full reference file. Defaults to None. 
+            full_reference_file (str, optional): Path to the full reference file. Defaults to None.
             If full reference is provided, it will be used for evaluation. If not provided, no evaluation will be performed.
             candidates_file (str, optional): Path to the candidates file. Defaults to None.
             config_file (str, optional): Path to the configuration file. Defaults to None.
@@ -58,12 +60,20 @@ class AlignmentRunner:
             target_file_path=Path(self.target_ontology_file).resolve(),
             output_dir_path=Path(self.output_dir).resolve(),
             configs_file_path=Path(self.config_file).resolve() if self.config_file else None,
-            training_reference_file_path=Path(self.training_reference_file).resolve() if self.training_reference_file else None,
-            full_reference_file_path=Path(self.full_reference_file).resolve() if self.full_reference_file else None,
-            candidates_file_path=Path(self.candidates_file).resolve() if self.candidates_file else None,
+            training_reference_file_path=(
+                Path(self.training_reference_file).resolve()
+                if self.training_reference_file
+                else None
+            ),
+            full_reference_file_path=(
+                Path(self.full_reference_file).resolve() if self.full_reference_file else None
+            ),
+            candidates_file_path=(
+                Path(self.candidates_file).resolve() if self.candidates_file else None
+            ),
             log_file_path=Path(self.output_dir).resolve() / "exact.log" if self.save_logs else None,
             run_eval=self.run_eval,
-            device=self.device
+            device=self.device,
         )
 
     def validate_files(self) -> None:
@@ -73,7 +83,9 @@ class AlignmentRunner:
         if not Path(self.target_ontology_file).exists():
             raise Exception(f"Target ontology file {self.target_ontology_file} does not exist")
         if self.training_reference_file and not Path(self.training_reference_file).exists():
-            raise Exception(f"Training reference file {self.training_reference_file} does not exist")
+            raise Exception(
+                f"Training reference file {self.training_reference_file} does not exist"
+            )
         if self.full_reference_file and not Path(self.full_reference_file).exists():
             raise Exception(f"Test reference file {self.full_reference_file} does not exist")
         if self.candidates_file and not Path(self.candidates_file).exists():
@@ -85,16 +97,18 @@ class AlignmentRunner:
             config_file = Path(self.config_file)
             if not config_file.exists():
                 raise Exception(f"Configuration file {self.config_file} does not exist")
-            
+
         if self.jvm_heap_size.isdigit():
-            self.jvm_heap_size += 'G'
-        elif not (self.jvm_heap_size[:-1].isdigit() and self.jvm_heap_size[-1].lower() == 'g'):
-            raise Exception(f"JVM heap size {self.jvm_heap_size} is not valid, please provide a valid format")
+            self.jvm_heap_size += "G"
+        elif not (self.jvm_heap_size[:-1].isdigit() and self.jvm_heap_size[-1].lower() == "g"):
+            raise Exception(
+                f"JVM heap size {self.jvm_heap_size} is not valid, please provide a valid format"
+            )
 
     def run(self) -> None:
 
         self.validate_files()
-        
+
         print(f"[exact-api] init_jvm heap={self.jvm_heap_size}", flush=True)
         init_jvm(self.jvm_heap_size)
 

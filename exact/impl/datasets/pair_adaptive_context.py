@@ -1,19 +1,18 @@
 from __future__ import annotations
 
+import time
 from collections import defaultdict
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
-import torch
-import time
-
 from org.semanticweb.owlapi.model import IRI
 from org.semanticweb.owlapi.search import EntitySearcher
 
-from exact.impl.datasets.contextgraph import ContextDataset
 from exact.core.entities.ontology import OntologyGraph
+from exact.impl.datasets.contextgraph import ContextDataset
+from exact.utils.formatting import safe_mean
 
 
 class PairAdaptiveContextDataset(ContextDataset):
@@ -211,7 +210,11 @@ class PairAdaptiveContextDataset(ContextDataset):
         except Exception:
             expr_type = ""
 
-        if "Intersection" in expr_type or hasattr(expr, "getOperandsAsList") or hasattr(expr, "getOperands"):
+        if (
+            "Intersection" in expr_type
+            or hasattr(expr, "getOperandsAsList")
+            or hasattr(expr, "getOperands")
+        ):
             operands = []
             try:
                 operands = self._iter_java_items(expr.getOperandsAsList())
@@ -281,7 +284,9 @@ class PairAdaptiveContextDataset(ContextDataset):
         self._hierarchy_axiom_targets_cache[cache_key] = list(deduped)
         return deduped
 
-    def _hierarchy_bundle(self, iri: str, graph: OntologyGraph, side: str) -> Dict[str, List[Dict[str, Any]]]:
+    def _hierarchy_bundle(
+        self, iri: str, graph: OntologyGraph, side: str
+    ) -> Dict[str, List[Dict[str, Any]]]:
         out: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
         frontier = [(iri, 0)]
         seen = {iri}
@@ -305,7 +310,9 @@ class PairAdaptiveContextDataset(ContextDataset):
                 )
 
         family_frontier = [(iri, 0)]
-        family_seen = {(family, iri) for family in self.hierarchical_relation_families if family != "is_a"}
+        family_seen = {
+            (family, iri) for family in self.hierarchical_relation_families if family != "is_a"
+        }
         while family_frontier:
             node, depth = family_frontier.pop(0)
             if depth >= self.hierarchy_max_depth:
@@ -321,7 +328,11 @@ class PairAdaptiveContextDataset(ContextDataset):
                 spec = 1.0 / float(depth + 1)
                 out[family].append(
                     {
-                        "triple": (graph.get_labels(node)[0], family, graph.get_labels(target_iri)[0]),
+                        "triple": (
+                            graph.get_labels(node)[0],
+                            family,
+                            graph.get_labels(target_iri)[0],
+                        ),
                         "specificity": spec,
                         "subject_iri": node,
                         "object_iri": target_iri,
@@ -449,11 +460,7 @@ class PairAdaptiveContextDataset(ContextDataset):
     def has_entity_features_cached(self, iri: str, side: str) -> bool:
         return (side, iri) in self._entity_feature_cache
 
-    @staticmethod
-    def _safe_mean(values: List[float]) -> float:
-        if not values:
-            return 0.0
-        return float(sum(values) / max(1, len(values)))
+    _safe_mean = staticmethod(safe_mean)
 
     def _entity_pool_metrics(self, feats: Dict[str, Any]) -> Dict[str, float]:
         hierarchy = feats.get("hierarchy", {}) or {}
@@ -492,25 +499,37 @@ class PairAdaptiveContextDataset(ContextDataset):
 
     def _pair_adaptive_metric_columns(self) -> List[str]:
         cols = [
-            "src_hier_total_count", "tgt_hier_total_count",
-            "src_hier_is_empty", "tgt_hier_is_empty",
-            "src_obj_count", "tgt_obj_count",
-            "src_obj_relation_count", "tgt_obj_relation_count",
-            "src_obj_ic_mean", "tgt_obj_ic_mean",
-            "src_obj_ic_max", "tgt_obj_ic_max",
-            "src_obj_is_empty", "tgt_obj_is_empty",
-            "src_attr_count", "tgt_attr_count",
-            "src_attr_weight_mean", "tgt_attr_weight_mean",
-            "src_attr_is_empty", "tgt_attr_is_empty",
+            "src_hier_total_count",
+            "tgt_hier_total_count",
+            "src_hier_is_empty",
+            "tgt_hier_is_empty",
+            "src_obj_count",
+            "tgt_obj_count",
+            "src_obj_relation_count",
+            "tgt_obj_relation_count",
+            "src_obj_ic_mean",
+            "tgt_obj_ic_mean",
+            "src_obj_ic_max",
+            "tgt_obj_ic_max",
+            "src_obj_is_empty",
+            "tgt_obj_is_empty",
+            "src_attr_count",
+            "tgt_attr_count",
+            "src_attr_weight_mean",
+            "tgt_attr_weight_mean",
+            "src_attr_is_empty",
+            "tgt_attr_is_empty",
         ]
         for family in self._hierarchy_family_names():
-            cols.extend([
-                f"src_hier_{family}_count",
-                f"tgt_hier_{family}_count",
-            ])
+            cols.extend(
+                [
+                    f"src_hier_{family}_count",
+                    f"tgt_hier_{family}_count",
+                ]
+            )
         return cols
 
-    def get_features(self, df) -> "DataFrame":
+    def get_features(self, df) -> "pd.DataFrame":
         self.log("Generating labels for pair-adaptive dataset…", level="info")
         src_iris: List[str] = df["Src"].tolist()
         tgt_iris: List[str] = df["Tgt"].tolist()
@@ -547,14 +566,8 @@ class PairAdaptiveContextDataset(ContextDataset):
         tgt_feat_map = _build_feature_map(utgt, "tgt")
         src_lab_map = {iri: src_feat_map[iri]["labels"] for iri in usrc}
         tgt_lab_map = {iri: tgt_feat_map[iri]["labels"] for iri in utgt}
-        src_pool_metrics_map = {
-            iri: self._entity_pool_metrics(src_feat_map[iri])
-            for iri in usrc
-        }
-        tgt_pool_metrics_map = {
-            iri: self._entity_pool_metrics(tgt_feat_map[iri])
-            for iri in utgt
-        }
+        src_pool_metrics_map = {iri: self._entity_pool_metrics(src_feat_map[iri]) for iri in usrc}
+        tgt_pool_metrics_map = {iri: self._entity_pool_metrics(tgt_feat_map[iri]) for iri in utgt}
 
         df = df.copy()
         df["SrcLabels"] = [src_lab_map[iri] for iri in src_iris]
@@ -571,14 +584,19 @@ class PairAdaptiveContextDataset(ContextDataset):
         ]
 
         src_label_metrics_map = {
-            iri: self._compute_metrics_for_label_list(src_lab_map[iri])
-            for iri in usrc
+            iri: self._compute_metrics_for_label_list(src_lab_map[iri]) for iri in usrc
         }
         tgt_label_metrics_map = {
-            iri: self._compute_metrics_for_label_list(tgt_lab_map[iri])
-            for iri in utgt
+            iri: self._compute_metrics_for_label_list(tgt_lab_map[iri]) for iri in utgt
         }
-        for key in ["n_labels", "char_len", "word_len", "max_label_words", "avg_label_words", "is_empty"]:
+        for key in [
+            "n_labels",
+            "char_len",
+            "word_len",
+            "max_label_words",
+            "avg_label_words",
+            "is_empty",
+        ]:
             df[f"src_lab_{key}"] = [src_label_metrics_map[iri][key] for iri in src_iris]
             df[f"tgt_lab_{key}"] = [tgt_label_metrics_map[iri][key] for iri in tgt_iris]
         for key in ["n_triples", "char_len", "word_len", "tok_len"]:
@@ -596,15 +614,32 @@ class PairAdaptiveContextDataset(ContextDataset):
         )
         return df
 
-    def save_feature_metrics(self, df: Optional["DataFrame"] = None, filename: str = "feature_metrics.csv"):
+    def save_feature_metrics(
+        self, df: Optional["pd.DataFrame"] = None, filename: str = "feature_metrics.csv"
+    ):
         if df is None:
             df = self.dataframe
         cols = [
-            "Src", "Tgt",
-            "cand_sim", "cand_sim_src_mean", "cand_sim_prob",
-            "cand_share_top", "cand_share_rest", "cand_share_log_ratio",
-            "src_lab_n_labels", "src_lab_char_len", "src_lab_word_len", "src_lab_max_label_words", "src_lab_avg_label_words", "src_lab_is_empty",
-            "tgt_lab_n_labels", "tgt_lab_char_len", "tgt_lab_word_len", "tgt_lab_max_label_words", "tgt_lab_avg_label_words", "tgt_lab_is_empty",
+            "Src",
+            "Tgt",
+            "cand_sim",
+            "cand_sim_src_mean",
+            "cand_sim_prob",
+            "cand_share_top",
+            "cand_share_rest",
+            "cand_share_log_ratio",
+            "src_lab_n_labels",
+            "src_lab_char_len",
+            "src_lab_word_len",
+            "src_lab_max_label_words",
+            "src_lab_avg_label_words",
+            "src_lab_is_empty",
+            "tgt_lab_n_labels",
+            "tgt_lab_char_len",
+            "tgt_lab_word_len",
+            "tgt_lab_max_label_words",
+            "tgt_lab_avg_label_words",
+            "tgt_lab_is_empty",
         ]
         cols.extend(self._pair_adaptive_metric_columns())
         cols = [col for col in cols if col in df.columns]
@@ -615,34 +650,54 @@ class PairAdaptiveContextDataset(ContextDataset):
 
     def supported_plot_metrics(self) -> List[str]:
         metrics = [
-            "src_lab_n_labels", "tgt_lab_n_labels",
-            "src_lab_word_len", "tgt_lab_word_len",
-            "src_lab_char_len", "tgt_lab_char_len",
-            "src_lab_max_label_words", "tgt_lab_max_label_words",
-            "src_lab_avg_label_words", "tgt_lab_avg_label_words",
-            "cand_sim", "cand_sim_src_mean", "cand_sim_prob",
-            "cand_share_top", "cand_share_rest", "cand_share_log_ratio",
+            "src_lab_n_labels",
+            "tgt_lab_n_labels",
+            "src_lab_word_len",
+            "tgt_lab_word_len",
+            "src_lab_char_len",
+            "tgt_lab_char_len",
+            "src_lab_max_label_words",
+            "tgt_lab_max_label_words",
+            "src_lab_avg_label_words",
+            "tgt_lab_avg_label_words",
+            "cand_sim",
+            "cand_sim_src_mean",
+            "cand_sim_prob",
+            "cand_share_top",
+            "cand_share_rest",
+            "cand_share_log_ratio",
         ]
         metrics.extend(self._pair_adaptive_metric_columns())
         return metrics
 
     def default_plot_metrics(self) -> List[str]:
         metrics = [
-            "src_lab_n_labels", "tgt_lab_n_labels",
-            "src_lab_word_len", "tgt_lab_word_len",
-            "src_hier_total_count", "tgt_hier_total_count",
-            "src_obj_count", "tgt_obj_count",
-            "src_obj_relation_count", "tgt_obj_relation_count",
-            "src_obj_ic_mean", "tgt_obj_ic_mean",
-            "src_attr_count", "tgt_attr_count",
-            "src_attr_weight_mean", "tgt_attr_weight_mean",
-            "cand_sim", "cand_sim_src_mean",
+            "src_lab_n_labels",
+            "tgt_lab_n_labels",
+            "src_lab_word_len",
+            "tgt_lab_word_len",
+            "src_hier_total_count",
+            "tgt_hier_total_count",
+            "src_obj_count",
+            "tgt_obj_count",
+            "src_obj_relation_count",
+            "tgt_obj_relation_count",
+            "src_obj_ic_mean",
+            "tgt_obj_ic_mean",
+            "src_attr_count",
+            "tgt_attr_count",
+            "src_attr_weight_mean",
+            "tgt_attr_weight_mean",
+            "cand_sim",
+            "cand_sim_src_mean",
         ]
         for family in self._hierarchy_family_names():
-            metrics.extend([
-                f"src_hier_{family}_count",
-                f"tgt_hier_{family}_count",
-            ])
+            metrics.extend(
+                [
+                    f"src_hier_{family}_count",
+                    f"tgt_hier_{family}_count",
+                ]
+            )
         return metrics
 
     def plot_feature_distributions(
@@ -657,7 +712,10 @@ class PairAdaptiveContextDataset(ContextDataset):
         df = self.dataframe
         selected = self._resolve_plot_metrics(which, df)
         if not selected:
-            self.log("No pair-adaptive dataset plot metrics available; skipping feature plots.", level="warning")
+            self.log(
+                "No pair-adaptive dataset plot metrics available; skipping feature plots.",
+                level="warning",
+            )
             return
         plot_dir = (self.plot_dir / "features").resolve()
         plot_dir.mkdir(parents=True, exist_ok=True)
@@ -668,7 +726,10 @@ class PairAdaptiveContextDataset(ContextDataset):
                 self.log(f"Skipping empty pair-adaptive metric '{col}'.", level="info")
                 continue
             if int(series.nunique(dropna=True)) <= 1:
-                self.log(f"Skipping non-informative pair-adaptive plot '{col}' (constant values).", level="info")
+                self.log(
+                    f"Skipping non-informative pair-adaptive plot '{col}' (constant values).",
+                    level="info",
+                )
                 continue
             plt.figure(figsize=(7, 5))
             sns.histplot(series, bins=bins, kde=kde, stat="probability", alpha=alpha)
@@ -681,7 +742,9 @@ class PairAdaptiveContextDataset(ContextDataset):
             plt.close()
             self.log(f"Saved plot: {out}", level="debug")
 
-    def log_sanity_examples(self, n: int = 6, max_ctx_show: int = 3, max_label_show: int = 5, **kwargs) -> None:
+    def log_sanity_examples(
+        self, n: int = 6, max_ctx_show: int = 3, max_label_show: int = 5, **kwargs
+    ) -> None:
         df = self.dataframe
         if df is None or df.empty:
             self.log("Dataset empty; no pair-adaptive sanity examples.", level="warning")
@@ -700,7 +763,9 @@ class PairAdaptiveContextDataset(ContextDataset):
         if len(problematic) < n:
             rest = df.drop(problematic.index)
             if not rest.empty:
-                extra = rest.sample(min(n - len(problematic), len(rest)), random_state=self.request_seed)
+                extra = rest.sample(
+                    min(n - len(problematic), len(rest)), random_state=self.request_seed
+                )
                 problematic = pd.concat([problematic, extra])
         show = problematic.head(n)
         family_names = self._hierarchy_family_names()
@@ -726,12 +791,10 @@ class PairAdaptiveContextDataset(ContextDataset):
             _show_lines("TGT labels", list(tgt_feats.get("labels", [])), max_label_show)
 
             src_family_counts = {
-                family: int(row.get(f"src_hier_{family}_count", 0))
-                for family in family_names
+                family: int(row.get(f"src_hier_{family}_count", 0)) for family in family_names
             }
             tgt_family_counts = {
-                family: int(row.get(f"tgt_hier_{family}_count", 0))
-                for family in family_names
+                family: int(row.get(f"tgt_hier_{family}_count", 0)) for family in family_names
             }
             self.log(f"  SRC hierarchy counts: {src_family_counts}", level="info")
             self.log(f"  TGT hierarchy counts: {tgt_family_counts}", level="info")

@@ -1,25 +1,22 @@
-import random
+import json
+import logging
 from abc import abstractmethod
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Type, Tuple, TYPE_CHECKING, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type
 
-import logging
-
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import seaborn as sns
 import torch as th
 from torch import device as tdevice
-import json
 
-import seaborn as sns
-import matplotlib.pyplot as plt
-
-from exact.core.contracts import SelfRegisteringComponent, LoggingClass
-from exact.core.entities.registry import ComponentType
-from exact.core.entities.mappings import EntityMapping
-from exact.utils.mappings import fill_anchored_scores
-from exact.utils.data import read_table
+from exact.core.contracts import LoggingClass, SelfRegisteringComponent
 from exact.core.entities.configs.dataset import DatasetMask
+from exact.core.entities.mappings import EntityMapping
+from exact.core.entities.registry import ComponentType
+from exact.utils.data import read_table
+from exact.utils.mappings import fill_anchored_scores
 
 if TYPE_CHECKING:
     from exact.core.contracts.dataset import IDataset
@@ -32,23 +29,23 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
 
     def __init__(
         self,
-        dataset: 'IDataset',
-        model: Optional[Type['IModel']] = None,
+        dataset: "IDataset",
+        model: Optional[Type["IModel"]] = None,
         model_params: Optional[Dict[str, Any]] = None,
-        models: Optional[List[Tuple[Type['IModel'], Dict[str, Any]]]] = None,
+        models: Optional[List[Tuple[Type["IModel"], Dict[str, Any]]]] = None,
         device: tdevice = tdevice("cuda" if th.cuda.is_available() else "cpu"),
         output_dir: Optional[Path] = None,
         logger: Optional[logging.Logger] = None,
         **kwargs,
     ):
-        
+
         LoggingClass.__init__(self, logger=logger)
 
         # Load Args
 
         self._dataset = dataset
         self._device = device
-        model_specs: List[Tuple[Type['IModel'], Dict[str, Any]]] = []
+        model_specs: List[Tuple[Type["IModel"], Dict[str, Any]]] = []
         if models:
             model_specs = [(m, params or {}) for m, params in models]
         elif model is not None:
@@ -67,7 +64,7 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
 
             obj.log = _log
 
-        self._models: List['IModel'] = []
+        self._models: List["IModel"] = []
         for model_cls, params in model_specs:
             instance = model_cls(device=device, **params)
             _bind_logger(instance)
@@ -75,13 +72,16 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
                 try:
                     instance.attach_dataset(dataset)
                 except Exception as exc:
-                    self.log(f"Failed to attach dataset to model {model_cls.__name__}: {exc}", level="warning")
+                    self.log(
+                        f"Failed to attach dataset to model {model_cls.__name__}: {exc}",
+                        level="warning",
+                    )
             self._models.append(instance.to(self.device))
         self._model = self._models[0]
 
         self._results_json: List[Dict[str, Any]] = []
         self._results_df: Optional[pd.DataFrame] = None
-        
+
         self._output_dir = output_dir
 
         # Create output directories
@@ -93,21 +93,21 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
         return th.device(self._device if th.cuda.is_available() else "cpu")
 
     @property
-    def dataset(self) -> 'IDataset':
+    def dataset(self) -> "IDataset":
         return self._dataset
 
     @property
-    def model(self) -> 'IModel':
+    def model(self) -> "IModel":
         return self._model
 
     @property
-    def models(self) -> List['IModel']:
+    def models(self) -> List["IModel"]:
         return self._models
 
     @property
     def output_dir(self) -> Path:
         return self._output_dir
-    
+
     @property
     def plot_dir(self) -> Path:
         return (self._output_dir / "plots").resolve()
@@ -135,19 +135,19 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
         self._results_df = value
 
     @abstractmethod
-    def predict(self, kind: DatasetMask = DatasetMask.inference, 
-                threshold: Optional[float] = 0.7,
-                **kwargs
+    def predict(
+        self, kind: DatasetMask = DatasetMask.inference, threshold: Optional[float] = 0.7, **kwargs
     ) -> Tuple[List[EntityMapping], float]:
-        
+
         pass
 
-    def apply_prefilter(self,
-                        alignment: List[EntityMapping],
-                        threshold: Optional[float] = None,
-                        cardinality: Optional[int] = None,
-                        target_cardinality: Optional[int] = None,
-                        **kwargs
+    def apply_prefilter(
+        self,
+        alignment: List[EntityMapping],
+        threshold: Optional[float] = None,
+        cardinality: Optional[int] = None,
+        target_cardinality: Optional[int] = None,
+        **kwargs,
     ) -> List[EntityMapping]:
         """
         Apply prefiltering to the dataset based on the features.
@@ -155,14 +155,16 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
         selector_target_conflict_enabled = getattr(self, "_selector_target_conflict_enabled", None)
         if selector_target_conflict_enabled is False:
             target_cardinality = None
-        
+
         df = self.dataset.dataframe.copy()
-        df = df[df[DatasetMask.prefiltered] == True]
+        df = df[df[DatasetMask.prefiltered]]
 
         if df.empty:
             self.log("No data to prefilter", level="warning")
             if target_cardinality is not None:
-                filtered = EntityMapping.filter_top_n_target_entity_mappings(alignment, target_cardinality)
+                filtered = EntityMapping.filter_top_n_target_entity_mappings(
+                    alignment, target_cardinality
+                )
                 self.log(
                     (
                         "Target conflict resolver: "
@@ -181,19 +183,19 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
                 break
 
         if score_column is None:
-            self.log("Prefiltered dataframe missing score column; skipping prefilter step.", level="warning")
+            self.log(
+                "Prefiltered dataframe missing score column; skipping prefilter step.",
+                level="warning",
+            )
             return alignment
 
         prefilter_df = df[["Src", "Tgt", score_column]].copy()
         prefilter_df.columns = ["Src", "Tgt", "Score"]
 
         prefiltered_mappings = EntityMapping.read_table_mappings(prefilter_df, threshold=threshold)
-        protected_pairs = {
-            (mapping.head, mapping.tail)
-            for mapping in prefiltered_mappings
-        }
+        protected_pairs = {(mapping.head, mapping.tail) for mapping in prefiltered_mappings}
         final_alignment = prefiltered_mappings + alignment
-        
+
         if cardinality is not None:
             final_alignment = EntityMapping.filter_top_n_entity_mappings(
                 final_alignment,
@@ -216,7 +218,7 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
                 ),
                 level="info",
             )
-        
+
         return final_alignment
 
     def save_results(
@@ -230,7 +232,7 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
         append_stats_to_summary_csv: bool = False,
         review_low: Optional[float] = None,
         review_high: Optional[float] = None,
-        **kwargs
+        **kwargs,
     ) -> Dict[str, Path]:
         """
         Saves TSVs (alignment), JSON (explanations), CSV (summary), and run-level stats.
@@ -262,7 +264,9 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
                 writer(json_path)
             else:
                 with open(json_path, "w", encoding="utf-8") as f:
-                    json.dump(self.results_json, f, ensure_ascii=False, separators=(",", ":"), default=str)
+                    json.dump(
+                        self.results_json, f, ensure_ascii=False, separators=(",", ":"), default=str
+                    )
             self.log(f"Saved full explanations JSON → {json_path}", level="info")
             output_paths["explanations_json"] = json_path
 
@@ -275,7 +279,9 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
             output_paths["summary_csv"] = csv_path
 
             # ---- Run-level stats
-            stats = self._compute_run_stats(results_df, review_low=review_low, review_high=review_high)
+            stats = self._compute_run_stats(
+                results_df, review_low=review_low, review_high=review_high
+            )
             summary_stats = getattr(self, "_llm_summary_stats", None)
             if summary_stats is not None:
                 stats["llm_summary_stats"] = summary_stats
@@ -329,12 +335,13 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
 
         return output_paths
 
-    def save_alignment(self, 
-                       preds: List[EntityMapping], 
-                       candidates_one2many_path: Optional[Path] = None,
-                       sub_dir: Optional[str] = None
-                       ) -> None:
-        
+    def save_alignment(
+        self,
+        preds: List[EntityMapping],
+        candidates_one2many_path: Optional[Path] = None,
+        sub_dir: Optional[str] = None,
+    ) -> None:
+
         if sub_dir is not None:
             alignment_dir = self.alignment_dir / sub_dir
             alignment_dir.mkdir(parents=True, exist_ok=True)
@@ -366,7 +373,12 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
 
         return global_dir
 
-    def _save_local_alignment(self, preds: List[EntityMapping], candidates_one2many: pd.DataFrame, save_dir: Optional[Path] = None):
+    def _save_local_alignment(
+        self,
+        preds: List[EntityMapping],
+        candidates_one2many: pd.DataFrame,
+        save_dir: Optional[Path] = None,
+    ):
 
         # candidates is now a 1-1 format for this the original candidates are required
 
@@ -379,7 +391,7 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
         )
 
         return local_dir
-    
+
     def _make_summary_dataframe(self, records: List[Dict[str, Any]]) -> pd.DataFrame:
         """
         Extracts numeric metrics and weights into a flat DataFrame for plotting.
@@ -413,7 +425,6 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
             rows.append(base)
         return pd.DataFrame(rows)
 
-    
     def plot_distributions(
         self,
         which: List[str] = ["S_final", "I_label", "I_ctx", "I_llm", "w_c", "w_i"],
@@ -476,7 +487,10 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
             self.log("No numeric results to plot.", level="warning")
             return
         if "ground_truth" not in self.results_df.columns:
-            self.log("Summary DF lacks ground_truth column; skipping score-vs-label plots.", level="warning")
+            self.log(
+                "Summary DF lacks ground_truth column; skipping score-vs-label plots.",
+                level="warning",
+            )
             return
         metrics = which or []
         if not metrics:
@@ -485,7 +499,9 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
 
         for col in metrics:
             if col not in self.results_df.columns:
-                self.log(f"Column {col} missing in summary DF; skipping label plot.", level="warning")
+                self.log(
+                    f"Column {col} missing in summary DF; skipping label plot.", level="warning"
+                )
                 continue
 
             plot_df = self.results_df[["ground_truth", col]].dropna()

@@ -1,36 +1,35 @@
 from __future__ import annotations
-from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass
-from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Any, Union
 
-import random
-import json
 import hashlib
+import json
 import re
-import torch
-
-from torch.utils.data import Dataset
-
-from transformers import AutoTokenizer, AutoModelForCausalLM
+from ast import literal_eval
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import matplotlib.pyplot as plt
-import seaborn as sns
 import pandas as pd
-from ast import literal_eval
+import seaborn as sns
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer
 
+from exact.core.contracts.dataset import DataFrame, IDataset
+from exact.core.entities.configs.dataset import (
+    BestPathMethod,
+    ContextMethod,
+)
+from exact.core.entities.ontology import Entity, OntologyGraph
 from exact.core.entities.registry import ComponentType
-from exact.core.entities.configs.dataset import DatasetMask, ContextMethod, BestPathMethod
-from exact.core.contracts.dataset import IDataset, DataFrame
-from exact.core.entities.ontology import OntologyGraph, Entity
 from exact.utils.llm_routing import LLMRouter, extract_chat_text, parse_structured_json
+
 
 def _prompt_verbalize(head: str, rel: str, tail: str) -> Dict[str, str]:
     return {
         "system": "You are an ontology expert natural language generator that returns strict JSON.",
         "user": (
             "Given the relation and example triple below, return one JSON object with exactly one key: "
-            "\"template\".\n"
+            '"template".\n'
             "The template must be one complete sentence and must contain the literal placeholders $SRC and $TGT "
             "exactly once each. Do not use the concrete entity names in the template.\n\n"
             f"HEAD example: {head}\nRELATION: {rel}\nTAIL example: {tail}\n\n"
@@ -38,13 +37,14 @@ def _prompt_verbalize(head: str, rel: str, tail: str) -> Dict[str, str]:
         ),
     }
 
+
 def _prompt_corrective(prev_sentence: str, head: str, rel: str, tail: str) -> Dict[str, str]:
     return {
         "system": "You are an ontology expert natural language generator that returns strict JSON.",
         "user": (
             "Your previous output did not follow the requested template format.\n"
             f"Previous output: {prev_sentence}\n\n"
-            "Regenerate and return one JSON object with exactly one key: \"template\".\n"
+            'Regenerate and return one JSON object with exactly one key: "template".\n'
             "The template must contain literal $SRC and $TGT exactly once each and must not contain the example entity names.\n\n"
             f"HEAD example: {head}\nRELATION: {rel}\nTAIL example: {tail}\n\n"
             "Return only JSON."
@@ -78,16 +78,16 @@ class ContextDataset(IDataset):
         self,
         # Ontology/context extraction
         n_hops: int = 2,
-        context_method: ContextMethod = ContextMethod.greedy,            # bfs | greedy
-        best_path_method: BestPathMethod = BestPathMethod.dp,            # dp | lagrangian | greedy (when context_method=greedy)
-        context_hop_penalty: float = 0.1,                             # α (scaled inside OntologyGraph helper)
-        context_token_ratio: float = 1.3,                             # tokens≈words*ratio (if you set a budget externally)
-        context_safety: float = 0.8,   
-        max_input_tokens_context: int = 256,                          # budget safety
-        only_taxonomy: bool = False,                                  # if True, fixed templates for subclass
-        all_labels: bool = True,                                     # if True, pass all labels; else use best label only
-        add_connectivity_bridges: bool = True,                        # if True, add explanation-only connectors to keep contexts connected
-        bridge_max_hops: Optional[int] = None,                        # cap for bridge path search (None = unbounded)
+        context_method: ContextMethod = ContextMethod.greedy,  # bfs | greedy
+        best_path_method: BestPathMethod = BestPathMethod.dp,  # dp | lagrangian | greedy (when context_method=greedy)
+        context_hop_penalty: float = 0.1,  # α (scaled inside OntologyGraph helper)
+        context_token_ratio: float = 1.3,  # tokens≈words*ratio (if you set a budget externally)
+        context_safety: float = 0.8,
+        max_input_tokens_context: int = 256,  # budget safety
+        only_taxonomy: bool = False,  # if True, fixed templates for subclass
+        all_labels: bool = True,  # if True, pass all labels; else use best label only
+        add_connectivity_bridges: bool = True,  # if True, add explanation-only connectors to keep contexts connected
+        bridge_max_hops: Optional[int] = None,  # cap for bridge path search (None = unbounded)
         # Verbalisation LLM
         device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
         verbaliser_name: Optional[str] = "Qwen/Qwen2.5-3B-Instruct",
@@ -121,7 +121,6 @@ class ContextDataset(IDataset):
         self.exclude_missing_dr = bool(exclude_missing_dr)
         self.add_connectivity_bridges = bool(add_connectivity_bridges)
         self.bridge_max_hops = bridge_max_hops
-    
 
         # Verbaliser LLM
         self.device = device
@@ -139,7 +138,9 @@ class ContextDataset(IDataset):
         self._default_verbaliser_system_prompt = "You are a helpful ontology expert."
         self._taxonomy_warning_emitted = False
         self._taxonomy_template_log_emitted = False
-        self._llm_router = LLMRouter(llm_profiles=llm_profiles, llm_routing=llm_routing, log=self.log)
+        self._llm_router = LLMRouter(
+            llm_profiles=llm_profiles, llm_routing=llm_routing, log=self.log
+        )
         self._local_verbaliser_profile_name = "__context_local_verbaliser__"
         self._llm_router.ensure_profile(
             self._local_verbaliser_profile_name,
@@ -181,7 +182,7 @@ class ContextDataset(IDataset):
                 sentences = [sentences]
             word_count = sum(len(sentence.split()) for sentence in sentences if sentence)
             return int(word_count * self.context_token_ratio)
-        
+
         self.context_cost_fn = _triple_token_cost
 
     def _cache_fingerprint_payload(self) -> Dict[str, Any]:
@@ -284,7 +285,9 @@ class ContextDataset(IDataset):
                 self.log("Loading source graph (taxonomy only)…", level="info")
             else:
                 self.log("Loading source graph (OWL2Vec*)…", level="info")
-            self._source_graph = OntologyGraph(self.source.ontology, self.source_reasoner, self.only_taxonomy)
+            self._source_graph = OntologyGraph(
+                self.source.ontology, self.source_reasoner, self.only_taxonomy
+            )
             self.log(f"Source graph edges: {len(self._source_graph)}", level="debug")
         return self._source_graph
 
@@ -295,7 +298,9 @@ class ContextDataset(IDataset):
                 self.log("Loading target graph (taxonomy only)…", level="info")
             else:
                 self.log("Loading target graph (OWL2Vec*)…", level="info")
-            self._target_graph = OntologyGraph(self.target.ontology, self.target_reasoner, self.only_taxonomy)
+            self._target_graph = OntologyGraph(
+                self.target.ontology, self.target_reasoner, self.only_taxonomy
+            )
             self.log(f"Target graph edges: {len(self._target_graph)}", level="debug")
         return self._target_graph
 
@@ -304,16 +309,21 @@ class ContextDataset(IDataset):
     # ------------------------------------------------------------------
     def _ensure_verbaliser(self):
         if self.only_taxonomy:
-            return # no LLM needed
+            return  # no LLM needed
         if self._verbaliser_backend.backend == "openrouter":
             return
         if self._verbaliser is None or self._verbaliser_tok is None:
             if self.verbaliser_name is None:
-                self.log("verbaliser_name is None but only_taxonomy=False; cannot generate templates.", level="error")
+                self.log(
+                    "verbaliser_name is None but only_taxonomy=False; cannot generate templates.",
+                    level="error",
+                )
                 raise ValueError("Set verbaliser_name or only_taxonomy=True.")
             self.log(f"Loading verbaliser LLM: {self.verbaliser_name}", level="info")
             self._verbaliser_tok = AutoTokenizer.from_pretrained(self.verbaliser_name)
-            self._verbaliser = AutoModelForCausalLM.from_pretrained(self.verbaliser_name).to(self.device)
+            self._verbaliser = AutoModelForCausalLM.from_pretrained(self.verbaliser_name).to(
+                self.device
+            )
 
     # ------------------------------------------------------------------
     # Templates (LLM-generated except taxonomy-only)
@@ -331,7 +341,7 @@ class ContextDataset(IDataset):
                 "subClassOf": "$SRC is a subclass of $TGT",
             }
             return self._verbalization_templates
-        
+
         if self._verbalization_templates is not None:
             return self._verbalization_templates
 
@@ -351,8 +361,12 @@ class ContextDataset(IDataset):
         self._ensure_verbaliser()
         self.log("Generating verbalisation templates from ontology relations…", level="info")
 
-        examples = self.source_graph.get_example_triples(1, exclude_missing_dr=self.exclude_missing_dr, human_readable=True)
-        tgt_examples = self.target_graph.get_example_triples(1, exclude_missing_dr=self.exclude_missing_dr, human_readable=True)
+        examples = self.source_graph.get_example_triples(
+            1, exclude_missing_dr=self.exclude_missing_dr, human_readable=True
+        )
+        tgt_examples = self.target_graph.get_example_triples(
+            1, exclude_missing_dr=self.exclude_missing_dr, human_readable=True
+        )
         for k, v in tgt_examples.items():
             if k not in examples:
                 examples[k] = v
@@ -434,11 +448,8 @@ class ContextDataset(IDataset):
         outs_sorted: List[str] = []
         B = self.batch_size_verbaliser
         for i in range(0, len(sorted_prompts), B):
-            batch = sorted_prompts[i:i+B]
-            enc = tok(
-                batch, padding=True, truncation=True,
-                return_tensors="pt"
-            ).to(self.device)
+            batch = sorted_prompts[i : i + B]
+            enc = tok(batch, padding=True, truncation=True, return_tensors="pt").to(self.device)
             gen = model.generate(
                 **enc,
                 max_new_tokens=self.gen_max_new_tokens,
@@ -527,7 +538,9 @@ class ContextDataset(IDataset):
         segments = [seg for seg in [system, user] if seg]
         return "\n\n".join(segments)
 
-    def _strip_prompt_tokens(self, enc: Dict[str, torch.Tensor], gen: torch.Tensor) -> List[torch.Tensor]:
+    def _strip_prompt_tokens(
+        self, enc: Dict[str, torch.Tensor], gen: torch.Tensor
+    ) -> List[torch.Tensor]:
         attn = enc["attention_mask"].sum(dim=1)
         outputs: List[torch.Tensor] = []
         for row, plen in zip(gen, attn):
@@ -550,7 +563,9 @@ class ContextDataset(IDataset):
             txt = txt.split("Sentence:", 1)[-1].strip()
             lines = txt.splitlines() or lines
         first_line = lines[0].strip()
-        prefix_pattern = re.compile(r"^(assistant|assistant:|assistant,|ai[- ]generated sentence:)", re.IGNORECASE)
+        prefix_pattern = re.compile(
+            r"^(assistant|assistant:|assistant,|ai[- ]generated sentence:)", re.IGNORECASE
+        )
         first_line = prefix_pattern.sub("", first_line).strip(" :,-\t")
         if not first_line:
             first_line = txt
@@ -636,13 +651,13 @@ class ContextDataset(IDataset):
         item = {
             "src_iri": row["Src"],
             "tgt_iri": row["Tgt"],
-            "src_labels": src_labels,          # List[str]
-            "tgt_labels": tgt_labels,          # List[str]
-            "src_ctx_triples": src_ctx_list,        # List[str] sentences
-            "tgt_ctx_triples": tgt_ctx_list,        # List[str] sentences
-            "src_ctx_raw_triples": src_ctx_raw,     # List[Tuple[str,str,str]]
+            "src_labels": src_labels,  # List[str]
+            "tgt_labels": tgt_labels,  # List[str]
+            "src_ctx_triples": src_ctx_list,  # List[str] sentences
+            "tgt_ctx_triples": tgt_ctx_list,  # List[str] sentences
+            "src_ctx_raw_triples": src_ctx_raw,  # List[Tuple[str,str,str]]
             "tgt_ctx_raw_triples": tgt_ctx_raw,
-            "src_ctx_bridge_triples": src_ctx_bridge, # Explanation-only connectors
+            "src_ctx_bridge_triples": src_ctx_bridge,  # Explanation-only connectors
             "tgt_ctx_bridge_triples": tgt_ctx_bridge,
             "label": row.get("Label", None),
         }
@@ -660,7 +675,6 @@ class ContextDataset(IDataset):
           - SrcCtx:    List[str] verbalised sentences (each triple separate)
           - TgtCtx:    List[str]
         """
-        import pandas as pd
 
         self.log("Generating labels and context triples…", level="info")
 
@@ -675,15 +689,33 @@ class ContextDataset(IDataset):
         src_lab_map: Dict[str, List[str]] = {}
         for iri in usrc:
             lbls = self.source_graph.get_labels(iri)
-            src_lab_map[iri] = lbls[:] if self.all_labels else [lbls[0]] if lbls else [Entity._get_owl_class(iri, self.source.ontology).getIRI().getShortForm()]
+            src_lab_map[iri] = (
+                lbls[:]
+                if self.all_labels
+                else (
+                    [lbls[0]]
+                    if lbls
+                    else [Entity._get_owl_class(iri, self.source.ontology).getIRI().getShortForm()]
+                )
+            )
 
         tgt_lab_map: Dict[str, List[str]] = {}
         for iri in utgt:
             lbls = self.target_graph.get_labels(iri)
-            tgt_lab_map[iri] = lbls[:] if self.all_labels else [lbls[0]] if lbls else [Entity._get_owl_class(iri, self.target.ontology).getIRI().getShortForm()]
+            tgt_lab_map[iri] = (
+                lbls[:]
+                if self.all_labels
+                else (
+                    [lbls[0]]
+                    if lbls
+                    else [Entity._get_owl_class(iri, self.target.ontology).getIRI().getShortForm()]
+                )
+            )
 
         # Context subgraphs (triples) and verbalisation
-        def _ctx(iri: str, graph: OntologyGraph) -> Tuple[List[str], List[Tuple[str, str, str]], List[Tuple[str, str, str]]]:
+        def _ctx(
+            iri: str, graph: OntologyGraph
+        ) -> Tuple[List[str], List[Tuple[str, str, str]], List[Tuple[str, str, str]]]:
             if self.add_connectivity_bridges:
                 triples, bridge_triples = graph.get_context_subgraph_with_bridges(
                     iri,
@@ -716,10 +748,15 @@ class ContextDataset(IDataset):
                 self.log("####No best path source method set, using default 'dp'.", level="debug")
                 self.best_path_method = BestPathMethod.dp
             else:
-                self.log(f"####Using best path source method: '{self.best_path_method}'.", level="debug")
+                self.log(
+                    f"####Using best path source method: '{self.best_path_method}'.", level="debug"
+                )
 
             # Set cost function for greedy extraction
-            self.log("####Setting cost function for context extraction. Computing cost for every triple..", level="debug")
+            self.log(
+                "####Setting cost function for context extraction. Computing cost for every triple..",
+                level="debug",
+            )
             self.source_graph.cost_fn = self.context_cost_fn
             self.target_graph.cost_fn = self.context_cost_fn
 
@@ -748,15 +785,13 @@ class ContextDataset(IDataset):
 
         # ---- Context metrics per row ----
         src_ctx_metrics_map = {
-            iri: self._compute_metrics_for_context_list(src_ctx_map[iri])
-            for iri in usrc
+            iri: self._compute_metrics_for_context_list(src_ctx_map[iri]) for iri in usrc
         }
         tgt_ctx_metrics_map = {
-            iri: self._compute_metrics_for_context_list(tgt_ctx_map[iri])
-            for iri in utgt
+            iri: self._compute_metrics_for_context_list(tgt_ctx_map[iri]) for iri in utgt
         }
 
-        for key in ["n_triples","char_len","word_len","tok_len","is_empty"]:
+        for key in ["n_triples", "char_len", "word_len", "tok_len", "is_empty"]:
             df[f"src_ctx_{key}"] = [src_ctx_metrics_map[iri][key] for iri in src_iris]
             df[f"tgt_ctx_{key}"] = [tgt_ctx_metrics_map[iri][key] for iri in tgt_iris]
 
@@ -764,21 +799,32 @@ class ContextDataset(IDataset):
         empty_src_ctx = int(df["src_ctx_is_empty"].sum())
         empty_tgt_ctx = int(df["tgt_ctx_is_empty"].sum())
         if empty_src_ctx:
-            self.log(f"#### Empty source contexts: {empty_src_ctx} ({empty_src_ctx/len(df):.1%})", level="warning")
+            self.log(
+                f"#### Empty source contexts: {empty_src_ctx} ({empty_src_ctx/len(df):.1%})",
+                level="warning",
+            )
         if empty_tgt_ctx:
-            self.log(f"#### Empty target contexts: {empty_tgt_ctx} ({empty_tgt_ctx/len(df):.1%})", level="warning")
+            self.log(
+                f"#### Empty target contexts: {empty_tgt_ctx} ({empty_tgt_ctx/len(df):.1%})",
+                level="warning",
+            )
 
         # ---- Label metrics per row ----
         src_label_metrics_map = {
-            iri: self._compute_metrics_for_label_list(src_lab_map[iri])
-            for iri in usrc
+            iri: self._compute_metrics_for_label_list(src_lab_map[iri]) for iri in usrc
         }
         tgt_label_metrics_map = {
-            iri: self._compute_metrics_for_label_list(tgt_lab_map[iri])
-            for iri in utgt
+            iri: self._compute_metrics_for_label_list(tgt_lab_map[iri]) for iri in utgt
         }
 
-        for key in ["n_labels","char_len","word_len","max_label_words","avg_label_words","is_empty"]:
+        for key in [
+            "n_labels",
+            "char_len",
+            "word_len",
+            "max_label_words",
+            "avg_label_words",
+            "is_empty",
+        ]:
             df[f"src_lab_{key}"] = [src_label_metrics_map[iri][key] for iri in src_iris]
             df[f"tgt_lab_{key}"] = [tgt_label_metrics_map[iri][key] for iri in tgt_iris]
 
@@ -787,10 +833,8 @@ class ContextDataset(IDataset):
         empty_tgt_lab = int(df["tgt_lab_is_empty"].sum())
         if empty_src_lab or empty_tgt_lab:
             self.log(
-                f"#### Empty labels — src: {empty_src_lab}, tgt: {empty_tgt_lab}",
-                level="warning"
+                f"#### Empty labels — src: {empty_src_lab}, tgt: {empty_tgt_lab}", level="warning"
             )
-
 
         # Assemble per row
         df = df.copy()
@@ -814,21 +858,18 @@ class ContextDataset(IDataset):
         df["Features"] = [
             [src_labels, src_ctx, tgt_labels, tgt_ctx]
             for src_labels, src_ctx, tgt_labels, tgt_ctx in zip(
-                src_labels_per_row,
-                src_ctx_per_row,
-                tgt_labels_per_row,
-                tgt_ctx_per_row
+                src_labels_per_row, src_ctx_per_row, tgt_labels_per_row, tgt_ctx_per_row
             )
         ]
 
         return df
-    
+
     # ------------------------------------------------------------------
     # Feature metrics computation
     # ------------------------------------------------------------------
 
     def _estimate_tokens(self, text: str) -> int:
-    # Use the same heuristic you rely on elsewhere
+        # Use the same heuristic you rely on elsewhere
         return int(len(text.split()) * self.context_token_ratio)
 
     def _compute_metrics_for_context_list(self, ctx_list: List[str]) -> Dict[str, float]:
@@ -862,18 +903,39 @@ class ContextDataset(IDataset):
             "avg_label_words": avg_label_words,
             "is_empty": int(n_labels == 0),
         }
-    
-    def save_feature_metrics(self, df: Optional[DataFrame] = None, filename: str = "feature_metrics.csv") -> Path:
+
+    def save_feature_metrics(
+        self, df: Optional[DataFrame] = None, filename: str = "feature_metrics.csv"
+    ) -> Path:
         if df is None:
             df = self.dataframe
         cols = [
-            "Src","Tgt",
+            "Src",
+            "Tgt",
             # context metrics
-            "src_ctx_n_triples","src_ctx_char_len","src_ctx_word_len","src_ctx_tok_len","src_ctx_is_empty",
-            "tgt_ctx_n_triples","tgt_ctx_char_len","tgt_ctx_word_len","tgt_ctx_tok_len","tgt_ctx_is_empty",
+            "src_ctx_n_triples",
+            "src_ctx_char_len",
+            "src_ctx_word_len",
+            "src_ctx_tok_len",
+            "src_ctx_is_empty",
+            "tgt_ctx_n_triples",
+            "tgt_ctx_char_len",
+            "tgt_ctx_word_len",
+            "tgt_ctx_tok_len",
+            "tgt_ctx_is_empty",
             # label metrics
-            "src_lab_n_labels","src_lab_char_len","src_lab_word_len","src_lab_max_label_words","src_lab_avg_label_words","src_lab_is_empty",
-            "tgt_lab_n_labels","tgt_lab_char_len","tgt_lab_word_len","tgt_lab_max_label_words","tgt_lab_avg_label_words","tgt_lab_is_empty",
+            "src_lab_n_labels",
+            "src_lab_char_len",
+            "src_lab_word_len",
+            "src_lab_max_label_words",
+            "src_lab_avg_label_words",
+            "src_lab_is_empty",
+            "tgt_lab_n_labels",
+            "tgt_lab_char_len",
+            "tgt_lab_word_len",
+            "tgt_lab_max_label_words",
+            "tgt_lab_avg_label_words",
+            "tgt_lab_is_empty",
         ]
         cols = [c for c in cols if c in df.columns]
         out_path = (self.output_path / filename).resolve()
@@ -886,27 +948,46 @@ class ContextDataset(IDataset):
 
     def supported_plot_metrics(self) -> List[str]:
         return [
-            "src_ctx_n_triples", "tgt_ctx_n_triples",
-            "src_ctx_tok_len", "tgt_ctx_tok_len",
-            "src_ctx_word_len", "tgt_ctx_word_len",
-            "src_ctx_char_len", "tgt_ctx_char_len",
-            "src_lab_n_labels", "tgt_lab_n_labels",
-            "src_lab_word_len", "tgt_lab_word_len",
-            "src_lab_char_len", "tgt_lab_char_len",
-            "src_lab_max_label_words", "tgt_lab_max_label_words",
-            "src_lab_avg_label_words", "tgt_lab_avg_label_words",
-            "cand_sim", "cand_sim_src_mean",
-            "cand_sim_prob", "cand_share_top", "cand_share_rest", "cand_share_log_ratio",
+            "src_ctx_n_triples",
+            "tgt_ctx_n_triples",
+            "src_ctx_tok_len",
+            "tgt_ctx_tok_len",
+            "src_ctx_word_len",
+            "tgt_ctx_word_len",
+            "src_ctx_char_len",
+            "tgt_ctx_char_len",
+            "src_lab_n_labels",
+            "tgt_lab_n_labels",
+            "src_lab_word_len",
+            "tgt_lab_word_len",
+            "src_lab_char_len",
+            "tgt_lab_char_len",
+            "src_lab_max_label_words",
+            "tgt_lab_max_label_words",
+            "src_lab_avg_label_words",
+            "tgt_lab_avg_label_words",
+            "cand_sim",
+            "cand_sim_src_mean",
+            "cand_sim_prob",
+            "cand_share_top",
+            "cand_share_rest",
+            "cand_share_log_ratio",
         ]
 
     def default_plot_metrics(self) -> List[str]:
         return [
-            "src_ctx_n_triples", "tgt_ctx_n_triples",
-            "src_ctx_tok_len", "tgt_ctx_tok_len",
-            "src_lab_n_labels", "tgt_lab_n_labels",
-            "src_lab_word_len", "tgt_lab_word_len",
-            "src_lab_max_label_words", "tgt_lab_max_label_words",
-            "cand_sim", "cand_sim_src_mean",
+            "src_ctx_n_triples",
+            "tgt_ctx_n_triples",
+            "src_ctx_tok_len",
+            "tgt_ctx_tok_len",
+            "src_lab_n_labels",
+            "tgt_lab_n_labels",
+            "src_lab_word_len",
+            "tgt_lab_word_len",
+            "src_lab_max_label_words",
+            "tgt_lab_max_label_words",
+            "cand_sim",
+            "cand_sim_src_mean",
         ]
 
     def _resolve_plot_metrics(self, which: Optional[List[str]], df: DataFrame) -> List[str]:
@@ -931,46 +1012,48 @@ class ContextDataset(IDataset):
                 level="warning",
             )
         return fallback
-    
+
     def plot_feature_distributions(
-            self,
-            which: Optional[List[str]] = None,
-            bins: int = 30,
-            kde: bool = False,
-            dpi: int = 300,
-            alpha: float = 0.6,
-            **kwargs
-        ) -> None:
-            """
-            Provide any of these (examples):
-            Context: "src_ctx_n_triples","tgt_ctx_n_triples","src_ctx_tok_len","tgt_ctx_tok_len","src_ctx_word_len","tgt_ctx_word_len","src_ctx_char_len","tgt_ctx_char_len"
-            Labels:  "src_lab_n_labels","tgt_lab_n_labels","src_lab_word_len","tgt_lab_word_len","src_lab_char_len","tgt_lab_char_len","src_lab_max_label_words","tgt_lab_max_label_words","src_lab_avg_label_words","tgt_lab_avg_label_words"
-            Candidates: "cand_sim"
-            """
-            df = self.dataframe
-            which = self._resolve_plot_metrics(which, df)
-            if not which:
-                self.log(
-                    f"No dataset plot metrics available for {self.__class__.__name__}; skipping feature plots.",
-                    level="warning",
-                )
-                return
-            plot_dir = (self.plot_dir / "features").resolve()
-            plot_dir.mkdir(parents=True, exist_ok=True)
+        self,
+        which: Optional[List[str]] = None,
+        bins: int = 30,
+        kde: bool = False,
+        dpi: int = 300,
+        alpha: float = 0.6,
+        **kwargs,
+    ) -> None:
+        """
+        Provide any of these (examples):
+        Context: "src_ctx_n_triples","tgt_ctx_n_triples","src_ctx_tok_len","tgt_ctx_tok_len","src_ctx_word_len","tgt_ctx_word_len","src_ctx_char_len","tgt_ctx_char_len"
+        Labels:  "src_lab_n_labels","tgt_lab_n_labels","src_lab_word_len","tgt_lab_word_len","src_lab_char_len","tgt_lab_char_len","src_lab_max_label_words","tgt_lab_max_label_words","src_lab_avg_label_words","tgt_lab_avg_label_words"
+        Candidates: "cand_sim"
+        """
+        df = self.dataframe
+        which = self._resolve_plot_metrics(which, df)
+        if not which:
+            self.log(
+                f"No dataset plot metrics available for {self.__class__.__name__}; skipping feature plots.",
+                level="warning",
+            )
+            return
+        plot_dir = (self.plot_dir / "features").resolve()
+        plot_dir.mkdir(parents=True, exist_ok=True)
 
-            for col in which:
-                plt.figure(figsize=(7,5))
-                sns.histplot(df[col], bins=bins, kde=kde, stat="probability", alpha=alpha)
-                plt.title(col.replace("_", " ").title())
-                plt.xlabel(col)
-                plt.ylabel("Probability")
-                out = plot_dir / f"{col}.png"
-                plt.tight_layout()
-                plt.savefig(out, dpi=dpi)
-                plt.close()
-                self.log(f"Saved plot: {out}", level="debug")
+        for col in which:
+            plt.figure(figsize=(7, 5))
+            sns.histplot(df[col], bins=bins, kde=kde, stat="probability", alpha=alpha)
+            plt.title(col.replace("_", " ").title())
+            plt.xlabel(col)
+            plt.ylabel("Probability")
+            out = plot_dir / f"{col}.png"
+            plt.tight_layout()
+            plt.savefig(out, dpi=dpi)
+            plt.close()
+            self.log(f"Saved plot: {out}", level="debug")
 
-    def log_sanity_examples(self, n: int = 6, max_ctx_show: int = 3, max_label_show: int = 5, **kwargs) -> None:
+    def log_sanity_examples(
+        self, n: int = 6, max_ctx_show: int = 3, max_label_show: int = 5, **kwargs
+    ) -> None:
         df = self.dataframe
         total = len(df)
         if total == 0:
@@ -978,12 +1061,18 @@ class ContextDataset(IDataset):
             return
 
         # Prefer edge cases first (empty contexts or empty labels)
-        problematic = df[(df.get("src_ctx_is_empty", 0) == 1) | (df.get("tgt_ctx_is_empty", 0) == 1) |
-                        (df.get("src_lab_is_empty", 0) == 1) | (df.get("tgt_lab_is_empty", 0) == 1)]
+        problematic = df[
+            (df.get("src_ctx_is_empty", 0) == 1)
+            | (df.get("tgt_ctx_is_empty", 0) == 1)
+            | (df.get("src_lab_is_empty", 0) == 1)
+            | (df.get("tgt_lab_is_empty", 0) == 1)
+        ]
         if len(problematic) < n:
             rest = df.drop(problematic.index)
             if not rest.empty:
-                problematic = pd.concat([problematic, rest.sample(min(n-len(problematic), len(rest)))])
+                problematic = pd.concat(
+                    [problematic, rest.sample(min(n - len(problematic), len(rest)))]
+                )
         show = problematic.head(n)
 
         def _coerce_seq(value):
@@ -1052,13 +1141,12 @@ class ContextDataset(IDataset):
                 "tgt_lab_n_labels": row.get("tgt_lab_n_labels"),
             }
             self.log(f"  Metrics: {m}", level="info")
-            
-    
+
     def load(self) -> "DataFrame":
 
         if self._df is not None:
             return self._df
-        
+
         df = pd.read_csv(self._df_save_path)
 
         def _parse_column(column: str, fallback_factory):

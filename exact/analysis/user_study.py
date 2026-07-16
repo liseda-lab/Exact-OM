@@ -7,13 +7,13 @@ import logging
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 import pandas as pd
 import torch
 
 from exact.utils.data import read_yaml
-
+from exact.utils.formatting import format_duration as _format_duration
 
 TRUTHY_STRINGS = {"1", "true", "yes", "y", "keep", "selected"}
 DEFAULT_TOP_K = 5
@@ -36,7 +36,10 @@ class RunAnalysisArtifacts:
     source_df: pd.DataFrame
     ranked_candidates_by_source: Dict[str, List[Tuple[str, float]]]
 
-def _resolve_run_paths(run_dir: Path, config_path: Optional[Path] = None) -> Tuple[Path, Path, Path, Optional[Path]]:
+
+def _resolve_run_paths(
+    run_dir: Path, config_path: Optional[Path] = None
+) -> Tuple[Path, Path, Path, Optional[Path]]:
     ranking_path = run_dir / "model" / "alignment" / "src2tgt.maps_local.tsv"
     explanations_path = run_dir / "model" / "alignment" / "default" / "full_explanations.json"
     summary_metrics_path = run_dir / "model" / "alignment" / "default" / "summary_metrics.csv"
@@ -47,7 +50,12 @@ def _resolve_run_paths(run_dir: Path, config_path: Optional[Path] = None) -> Tup
         raise FileNotFoundError(f"Full explanations JSON not found: {explanations_path}")
     if not resolved_config.exists():
         raise FileNotFoundError(f"Config file not found: {resolved_config}")
-    return ranking_path, explanations_path, resolved_config, summary_metrics_path if summary_metrics_path.exists() else None
+    return (
+        ranking_path,
+        explanations_path,
+        resolved_config,
+        summary_metrics_path if summary_metrics_path.exists() else None,
+    )
 
 
 def _default_output_dir(run_dir: Path) -> Path:
@@ -59,17 +67,11 @@ def _setup_logger(level: int = logging.INFO) -> logging.Logger:
     logger.setLevel(level)
     if not logger.handlers:
         handler = logging.StreamHandler()
-        handler.setFormatter(logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
+        handler.setFormatter(
+            logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+        )
         logger.addHandler(handler)
     return logger
-
-
-def _format_duration(total_seconds: float) -> str:
-    seconds = max(0, int(round(total_seconds)))
-    days, remainder = divmod(seconds, 86400)
-    hours, remainder = divmod(remainder, 3600)
-    minutes, seconds = divmod(remainder, 60)
-    return f"{days}d:{hours:02d}:{minutes:02d}:{seconds:02d}"
 
 
 def _read_summary_metrics(path: Optional[Path]) -> Optional[pd.DataFrame]:
@@ -91,7 +93,11 @@ def _summary_index(summary_df: Optional[pd.DataFrame]) -> Dict[Tuple[str, str], 
 
 
 def _normalize_candidate_list(raw_candidates: Any) -> List[Tuple[str, float]]:
-    values = ast.literal_eval(raw_candidates) if isinstance(raw_candidates, str) else list(raw_candidates or [])
+    values = (
+        ast.literal_eval(raw_candidates)
+        if isinstance(raw_candidates, str)
+        else list(raw_candidates or [])
+    )
     normalized: List[Tuple[str, float]] = []
     total = max(1, len(values))
     for idx, item in enumerate(values):
@@ -171,11 +177,24 @@ def _attribute_items(record: Mapping[str, Any], side: str) -> List[Dict[str, Any
 
 
 def _structural_evidence_counts(record: Mapping[str, Any]) -> Dict[str, int]:
-    hierarchy_count = len(_hierarchy_items(record, "source")) + len(_hierarchy_items(record, "target"))
-    similarity_count = len(_channel_items(record, "similarity", "source")) + len(_channel_items(record, "similarity", "target"))
-    difference_count = len(_channel_items(record, "difference", "source")) + len(_channel_items(record, "difference", "target"))
-    attribute_count = len(_attribute_items(record, "source")) + len(_attribute_items(record, "target"))
-    present_channels = int(hierarchy_count > 0) + int(similarity_count > 0) + int(difference_count > 0) + int(attribute_count > 0)
+    hierarchy_count = len(_hierarchy_items(record, "source")) + len(
+        _hierarchy_items(record, "target")
+    )
+    similarity_count = len(_channel_items(record, "similarity", "source")) + len(
+        _channel_items(record, "similarity", "target")
+    )
+    difference_count = len(_channel_items(record, "difference", "source")) + len(
+        _channel_items(record, "difference", "target")
+    )
+    attribute_count = len(_attribute_items(record, "source")) + len(
+        _attribute_items(record, "target")
+    )
+    present_channels = (
+        int(hierarchy_count > 0)
+        + int(similarity_count > 0)
+        + int(difference_count > 0)
+        + int(attribute_count > 0)
+    )
     return {
         "hierarchy_count": hierarchy_count,
         "similarity_count": similarity_count,
@@ -190,14 +209,17 @@ def _bridge_metrics(record: Mapping[str, Any]) -> Dict[str, int]:
     provenance = record.get("cross_side_provenance") or {}
     lexical_count = len(list(provenance.get("lexical") or []))
     hierarchy_count = sum(
-        len(list(links or []))
-        for links in dict(provenance.get("hierarchy") or {}).values()
+        len(list(links or [])) for links in dict(provenance.get("hierarchy") or {}).values()
     )
     similarity_count = len(list(provenance.get("similarity") or []))
     attribute_payload = dict(provenance.get("attributes") or {})
-    attribute_count = len(list(attribute_payload.get("source") or [])) + len(list(attribute_payload.get("target") or []))
+    attribute_count = len(list(attribute_payload.get("source") or [])) + len(
+        list(attribute_payload.get("target") or [])
+    )
     difference_payload = dict(provenance.get("difference") or {})
-    difference_count = len(list(difference_payload.get("source") or [])) + len(list(difference_payload.get("target") or []))
+    difference_count = len(list(difference_payload.get("source") or [])) + len(
+        list(difference_payload.get("target") or [])
+    )
     support_count = lexical_count + hierarchy_count + similarity_count + attribute_count
     contrast_count = difference_count
     total = support_count + contrast_count
@@ -210,7 +232,9 @@ def _bridge_metrics(record: Mapping[str, Any]) -> Dict[str, int]:
         "bridge_difference_count": int(difference_count),
         "bridge_support_count": int(support_count),
         "bridge_contrast_count": int(contrast_count),
-        "has_nonlexical_bridge": int((hierarchy_count + similarity_count + attribute_count + difference_count) > 0),
+        "has_nonlexical_bridge": int(
+            (hierarchy_count + similarity_count + attribute_count + difference_count) > 0
+        ),
     }
 
 
@@ -236,12 +260,16 @@ def _categorize_decision_basis(i_label: float, i_struct: float, i_llm: float) ->
     }
 
 
-def _categorize_evidence_strength(i_struct: float, q_struct: float, total_evidence: int) -> Dict[str, Any]:
+def _categorize_evidence_strength(
+    i_struct: float, q_struct: float, total_evidence: int
+) -> Dict[str, Any]:
     volume_ratio = min(1.0, total_evidence / 10.0)
     strength_value = 0.45 * i_struct + 0.35 * q_struct + 0.20 * volume_ratio
     if strength_value >= 0.60:
         label = "Strong"
-        description = "The candidate is supported by substantial and reasonably reliable contextual evidence."
+        description = (
+            "The candidate is supported by substantial and reasonably reliable contextual evidence."
+        )
     elif strength_value >= 0.32:
         label = "Moderate"
         description = "There is some useful contextual support, but it is not overwhelming."
@@ -278,16 +306,22 @@ def _categorize_evidence_agreement(u_dis: float, total_evidence: int) -> Dict[st
     }
 
 
-def _categorize_explanation_coverage(present_channels: int, counts: Mapping[str, int]) -> Dict[str, Any]:
+def _categorize_explanation_coverage(
+    present_channels: int, counts: Mapping[str, int]
+) -> Dict[str, Any]:
     if present_channels >= 3:
         label = "Rich"
         description = "The explanation draws from several different kinds of contextual evidence."
     elif present_channels == 2:
         label = "Balanced"
-        description = "The explanation includes more than one evidence type, but it is not especially broad."
+        description = (
+            "The explanation includes more than one evidence type, but it is not especially broad."
+        )
     else:
         label = "Narrow"
-        description = "The explanation relies on only one evidence family or very limited contextual support."
+        description = (
+            "The explanation relies on only one evidence family or very limited contextual support."
+        )
     return {
         "label": label,
         "channels_present": int(present_channels),
@@ -314,7 +348,9 @@ def _categorize_lead_over_next(score: float, next_score: Optional[float]) -> Dic
         description = "This candidate is only marginally ahead of the next one."
     elif margin <= 0.08:
         label = "Close call"
-        description = "This candidate is ahead, but the separation from the next one is still fairly small."
+        description = (
+            "This candidate is ahead, but the separation from the next one is still fairly small."
+        )
     else:
         label = "Clear lead"
         description = "This candidate is comfortably ahead of the next displayed alternative."
@@ -332,7 +368,9 @@ def _ordered_path_nodes(nodes: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]
     return source_nodes + middle_nodes + target_nodes
 
 
-def _normalize_pair_row(record: Mapping[str, Any], summary_row: Optional[Mapping[str, Any]] = None) -> Dict[str, Any]:
+def _normalize_pair_row(
+    record: Mapping[str, Any], summary_row: Optional[Mapping[str, Any]] = None
+) -> Dict[str, Any]:
     summary_row = summary_row or {}
     confidences = record.get("confidences") or {}
     importances = record.get("importances") or {}
@@ -363,10 +401,20 @@ def _normalize_pair_row(record: Mapping[str, Any], summary_row: Optional[Mapping
         "tgt_iri": _safe_text(record.get("tgt_iri")),
         "source_label": _safe_text(labels.get("source")),
         "target_label": _safe_text(labels.get("target")),
-        "ground_truth": int(_safe_float(prediction.get("ground_truth", summary_row.get("ground_truth", 0)))),
-        "threshold_positive": bool(prediction.get("threshold_positive", summary_row.get("threshold_positive", False))),
-        "saved_alignment_member": bool(prediction.get("saved_alignment_member", summary_row.get("saved_alignment_member", False))),
-        "rationale_positive": bool(prediction.get("rationale_positive", summary_row.get("rationale_positive", False))),
+        "ground_truth": int(
+            _safe_float(prediction.get("ground_truth", summary_row.get("ground_truth", 0)))
+        ),
+        "threshold_positive": bool(
+            prediction.get("threshold_positive", summary_row.get("threshold_positive", False))
+        ),
+        "saved_alignment_member": bool(
+            prediction.get(
+                "saved_alignment_member", summary_row.get("saved_alignment_member", False)
+            )
+        ),
+        "rationale_positive": bool(
+            prediction.get("rationale_positive", summary_row.get("rationale_positive", False))
+        ),
         "llm_decision": llm_decision,
         "llm_rationale_present": bool(_safe_text(prediction.get("llm_rationale"))),
         "pair_brief_present": bool(_safe_text(record.get("llm_pair_brief"))),
@@ -436,7 +484,9 @@ def _build_source_dataframe(
         gold = _safe_text(row.get("TgtEntity"))
         ranked = _normalize_candidate_list(row.get("TgtCandidates"))
         ranked_candidates_by_source[src] = ranked
-        gold_rank = next((idx for idx, (tgt, _score) in enumerate(ranked, start=1) if tgt == gold), None)
+        gold_rank = next(
+            (idx for idx, (tgt, _score) in enumerate(ranked, start=1) if tgt == gold), None
+        )
         top_candidates = list(ranked[:top_k])
         missing_topk_records = 0
         pair_rows: List[Mapping[str, Any]] = []
@@ -484,17 +534,37 @@ def _build_source_dataframe(
             ]
         )
         mean_ambiguity = _mean([_safe_float(item.get("U")) for item in pair_rows])
-        mean_bridge_total_count = _mean([_safe_float(item.get("bridge_total_count")) for item in pair_rows])
-        mean_bridge_support_count = _mean([_safe_float(item.get("bridge_support_count")) for item in pair_rows])
-        mean_bridge_contrast_count = _mean([_safe_float(item.get("bridge_contrast_count")) for item in pair_rows])
-        panel_has_hierarchy = any(_safe_float(item.get("hierarchy_count")) > 0 for item in pair_rows)
-        panel_has_difference = any(_safe_float(item.get("difference_count")) > 0 for item in pair_rows)
-        panel_has_attributes = any(_safe_float(item.get("attribute_count")) > 0 for item in pair_rows)
-        panel_has_similarity = any(_safe_float(item.get("similarity_count")) > 0 for item in pair_rows)
-        panel_has_nonlexical_bridge = any(_safe_float(item.get("has_nonlexical_bridge")) > 0 for item in pair_rows)
+        mean_bridge_total_count = _mean(
+            [_safe_float(item.get("bridge_total_count")) for item in pair_rows]
+        )
+        mean_bridge_support_count = _mean(
+            [_safe_float(item.get("bridge_support_count")) for item in pair_rows]
+        )
+        mean_bridge_contrast_count = _mean(
+            [_safe_float(item.get("bridge_contrast_count")) for item in pair_rows]
+        )
+        panel_has_hierarchy = any(
+            _safe_float(item.get("hierarchy_count")) > 0 for item in pair_rows
+        )
+        panel_has_difference = any(
+            _safe_float(item.get("difference_count")) > 0 for item in pair_rows
+        )
+        panel_has_attributes = any(
+            _safe_float(item.get("attribute_count")) > 0 for item in pair_rows
+        )
+        panel_has_similarity = any(
+            _safe_float(item.get("similarity_count")) > 0 for item in pair_rows
+        )
+        panel_has_nonlexical_bridge = any(
+            _safe_float(item.get("has_nonlexical_bridge")) > 0 for item in pair_rows
+        )
 
-        gold_score = _safe_float(gold_row.get("S_final") if gold_row else gold_candidate_score, gold_candidate_score)
-        top1_score = _safe_float(top1_row.get("S_final") if top1_row else top1_candidate_score, top1_candidate_score)
+        gold_score = _safe_float(
+            gold_row.get("S_final") if gold_row else gold_candidate_score, gold_candidate_score
+        )
+        top1_score = _safe_float(
+            top1_row.get("S_final") if top1_row else top1_candidate_score, top1_candidate_score
+        )
 
         source_rows.append(
             {
@@ -508,74 +578,160 @@ def _build_source_dataframe(
                 "top1_score": top1_score,
                 "gold_score": gold_score,
                 "score_gap": top1_score - gold_score,
-                "gold_s_label": _safe_float(gold_row.get("s_label") if gold_row else None, float("nan")),
-                "top1_s_label": _safe_float(top1_row.get("s_label") if top1_row else None, float("nan")),
-                "gold_S_struct": _safe_float(gold_row.get("S_struct") if gold_row else None, float("nan")),
-                "top1_S_struct": _safe_float(top1_row.get("S_struct") if top1_row else None, float("nan")),
-                "gold_I_label": _safe_float(gold_row.get("I_label") if gold_row else None, float("nan")),
-                "top1_I_label": _safe_float(top1_row.get("I_label") if top1_row else None, float("nan")),
-                "gold_I_struct": _safe_float(gold_row.get("I_struct") if gold_row else None, float("nan")),
-                "top1_I_struct": _safe_float(top1_row.get("I_struct") if top1_row else None, float("nan")),
+                "gold_s_label": _safe_float(
+                    gold_row.get("s_label") if gold_row else None, float("nan")
+                ),
+                "top1_s_label": _safe_float(
+                    top1_row.get("s_label") if top1_row else None, float("nan")
+                ),
+                "gold_S_struct": _safe_float(
+                    gold_row.get("S_struct") if gold_row else None, float("nan")
+                ),
+                "top1_S_struct": _safe_float(
+                    top1_row.get("S_struct") if top1_row else None, float("nan")
+                ),
+                "gold_I_label": _safe_float(
+                    gold_row.get("I_label") if gold_row else None, float("nan")
+                ),
+                "top1_I_label": _safe_float(
+                    top1_row.get("I_label") if top1_row else None, float("nan")
+                ),
+                "gold_I_struct": _safe_float(
+                    gold_row.get("I_struct") if gold_row else None, float("nan")
+                ),
+                "top1_I_struct": _safe_float(
+                    top1_row.get("I_struct") if top1_row else None, float("nan")
+                ),
                 "gold_U": _safe_float(gold_row.get("U") if gold_row else None, float("nan")),
                 "top1_U": _safe_float(top1_row.get("U") if top1_row else None, float("nan")),
-                "gold_U_dis": _safe_float(gold_row.get("U_dis") if gold_row else None, float("nan")),
-                "top1_U_dis": _safe_float(top1_row.get("U_dis") if top1_row else None, float("nan")),
+                "gold_U_dis": _safe_float(
+                    gold_row.get("U_dis") if gold_row else None, float("nan")
+                ),
+                "top1_U_dis": _safe_float(
+                    top1_row.get("U_dis") if top1_row else None, float("nan")
+                ),
                 "gold_llm_active": bool(gold_row.get("llm_active")) if gold_row else False,
                 "top1_llm_active": bool(top1_row.get("llm_active")) if top1_row else False,
-                "gold_hierarchy_count": _safe_float(gold_row.get("hierarchy_count") if gold_row else None, float("nan")),
-                "top1_hierarchy_count": _safe_float(top1_row.get("hierarchy_count") if top1_row else None, float("nan")),
-                "gold_similarity_count": _safe_float(gold_row.get("similarity_count") if gold_row else None, float("nan")),
-                "top1_similarity_count": _safe_float(top1_row.get("similarity_count") if top1_row else None, float("nan")),
-                "gold_difference_count": _safe_float(gold_row.get("difference_count") if gold_row else None, float("nan")),
-                "top1_difference_count": _safe_float(top1_row.get("difference_count") if top1_row else None, float("nan")),
-                "gold_attribute_count": _safe_float(gold_row.get("attribute_count") if gold_row else None, float("nan")),
-                "top1_attribute_count": _safe_float(top1_row.get("attribute_count") if top1_row else None, float("nan")),
-                "gold_bridge_total_count": _safe_float(gold_row.get("bridge_total_count") if gold_row else None, float("nan")),
-                "top1_bridge_total_count": _safe_float(top1_row.get("bridge_total_count") if top1_row else None, float("nan")),
-                "gold_bridge_support_count": _safe_float(gold_row.get("bridge_support_count") if gold_row else None, float("nan")),
-                "top1_bridge_support_count": _safe_float(top1_row.get("bridge_support_count") if top1_row else None, float("nan")),
-                "gold_bridge_contrast_count": _safe_float(gold_row.get("bridge_contrast_count") if gold_row else None, float("nan")),
-                "top1_bridge_contrast_count": _safe_float(top1_row.get("bridge_contrast_count") if top1_row else None, float("nan")),
-                "gold_has_nonlexical_bridge": bool(gold_row.get("has_nonlexical_bridge")) if gold_row else False,
-                "top1_has_nonlexical_bridge": bool(top1_row.get("has_nonlexical_bridge")) if top1_row else False,
-                "delta_s_label": _safe_float(gold_row.get("s_label") if gold_row else None, float("nan"))
+                "gold_hierarchy_count": _safe_float(
+                    gold_row.get("hierarchy_count") if gold_row else None, float("nan")
+                ),
+                "top1_hierarchy_count": _safe_float(
+                    top1_row.get("hierarchy_count") if top1_row else None, float("nan")
+                ),
+                "gold_similarity_count": _safe_float(
+                    gold_row.get("similarity_count") if gold_row else None, float("nan")
+                ),
+                "top1_similarity_count": _safe_float(
+                    top1_row.get("similarity_count") if top1_row else None, float("nan")
+                ),
+                "gold_difference_count": _safe_float(
+                    gold_row.get("difference_count") if gold_row else None, float("nan")
+                ),
+                "top1_difference_count": _safe_float(
+                    top1_row.get("difference_count") if top1_row else None, float("nan")
+                ),
+                "gold_attribute_count": _safe_float(
+                    gold_row.get("attribute_count") if gold_row else None, float("nan")
+                ),
+                "top1_attribute_count": _safe_float(
+                    top1_row.get("attribute_count") if top1_row else None, float("nan")
+                ),
+                "gold_bridge_total_count": _safe_float(
+                    gold_row.get("bridge_total_count") if gold_row else None, float("nan")
+                ),
+                "top1_bridge_total_count": _safe_float(
+                    top1_row.get("bridge_total_count") if top1_row else None, float("nan")
+                ),
+                "gold_bridge_support_count": _safe_float(
+                    gold_row.get("bridge_support_count") if gold_row else None, float("nan")
+                ),
+                "top1_bridge_support_count": _safe_float(
+                    top1_row.get("bridge_support_count") if top1_row else None, float("nan")
+                ),
+                "gold_bridge_contrast_count": _safe_float(
+                    gold_row.get("bridge_contrast_count") if gold_row else None, float("nan")
+                ),
+                "top1_bridge_contrast_count": _safe_float(
+                    top1_row.get("bridge_contrast_count") if top1_row else None, float("nan")
+                ),
+                "gold_has_nonlexical_bridge": (
+                    bool(gold_row.get("has_nonlexical_bridge")) if gold_row else False
+                ),
+                "top1_has_nonlexical_bridge": (
+                    bool(top1_row.get("has_nonlexical_bridge")) if top1_row else False
+                ),
+                "delta_s_label": _safe_float(
+                    gold_row.get("s_label") if gold_row else None, float("nan")
+                )
                 - _safe_float(top1_row.get("s_label") if top1_row else None, float("nan")),
-                "delta_S_struct": _safe_float(gold_row.get("S_struct") if gold_row else None, float("nan"))
+                "delta_S_struct": _safe_float(
+                    gold_row.get("S_struct") if gold_row else None, float("nan")
+                )
                 - _safe_float(top1_row.get("S_struct") if top1_row else None, float("nan")),
-                "delta_I_label": _safe_float(gold_row.get("I_label") if gold_row else None, float("nan"))
+                "delta_I_label": _safe_float(
+                    gold_row.get("I_label") if gold_row else None, float("nan")
+                )
                 - _safe_float(top1_row.get("I_label") if top1_row else None, float("nan")),
-                "delta_I_struct": _safe_float(gold_row.get("I_struct") if gold_row else None, float("nan"))
+                "delta_I_struct": _safe_float(
+                    gold_row.get("I_struct") if gold_row else None, float("nan")
+                )
                 - _safe_float(top1_row.get("I_struct") if top1_row else None, float("nan")),
                 "delta_U": _safe_float(gold_row.get("U") if gold_row else None, float("nan"))
                 - _safe_float(top1_row.get("U") if top1_row else None, float("nan")),
-                "delta_U_dis": _safe_float(gold_row.get("U_dis") if gold_row else None, float("nan"))
+                "delta_U_dis": _safe_float(
+                    gold_row.get("U_dis") if gold_row else None, float("nan")
+                )
                 - _safe_float(top1_row.get("U_dis") if top1_row else None, float("nan")),
-                "delta_hierarchy_count": _safe_float(gold_row.get("hierarchy_count") if gold_row else None, float("nan"))
+                "delta_hierarchy_count": _safe_float(
+                    gold_row.get("hierarchy_count") if gold_row else None, float("nan")
+                )
                 - _safe_float(top1_row.get("hierarchy_count") if top1_row else None, float("nan")),
-                "delta_similarity_count": _safe_float(gold_row.get("similarity_count") if gold_row else None, float("nan"))
+                "delta_similarity_count": _safe_float(
+                    gold_row.get("similarity_count") if gold_row else None, float("nan")
+                )
                 - _safe_float(top1_row.get("similarity_count") if top1_row else None, float("nan")),
-                "delta_difference_count": _safe_float(gold_row.get("difference_count") if gold_row else None, float("nan"))
+                "delta_difference_count": _safe_float(
+                    gold_row.get("difference_count") if gold_row else None, float("nan")
+                )
                 - _safe_float(top1_row.get("difference_count") if top1_row else None, float("nan")),
-                "delta_attribute_count": _safe_float(gold_row.get("attribute_count") if gold_row else None, float("nan"))
+                "delta_attribute_count": _safe_float(
+                    gold_row.get("attribute_count") if gold_row else None, float("nan")
+                )
                 - _safe_float(top1_row.get("attribute_count") if top1_row else None, float("nan")),
-                "delta_bridge_total_count": _safe_float(gold_row.get("bridge_total_count") if gold_row else None, float("nan"))
-                - _safe_float(top1_row.get("bridge_total_count") if top1_row else None, float("nan")),
-                "delta_bridge_support_count": _safe_float(gold_row.get("bridge_support_count") if gold_row else None, float("nan"))
-                - _safe_float(top1_row.get("bridge_support_count") if top1_row else None, float("nan")),
-                "delta_bridge_contrast_count": _safe_float(gold_row.get("bridge_contrast_count") if gold_row else None, float("nan"))
-                - _safe_float(top1_row.get("bridge_contrast_count") if top1_row else None, float("nan")),
+                "delta_bridge_total_count": _safe_float(
+                    gold_row.get("bridge_total_count") if gold_row else None, float("nan")
+                )
+                - _safe_float(
+                    top1_row.get("bridge_total_count") if top1_row else None, float("nan")
+                ),
+                "delta_bridge_support_count": _safe_float(
+                    gold_row.get("bridge_support_count") if gold_row else None, float("nan")
+                )
+                - _safe_float(
+                    top1_row.get("bridge_support_count") if top1_row else None, float("nan")
+                ),
+                "delta_bridge_contrast_count": _safe_float(
+                    gold_row.get("bridge_contrast_count") if gold_row else None, float("nan")
+                )
+                - _safe_float(
+                    top1_row.get("bridge_contrast_count") if top1_row else None, float("nan")
+                ),
                 "panel_complete": bool(missing_topk_records == 0 and len(top_candidates) == top_k),
                 "missing_panel_record_count": int(missing_topk_records),
                 "top1_record_present": bool(top1_row),
                 "gold_record_present": bool(gold_row),
                 "pair_brief_count": int(pair_brief_count),
-                "pair_brief_complete": bool(pair_brief_count == top_k and len(top_candidates) == top_k),
+                "pair_brief_complete": bool(
+                    pair_brief_count == top_k and len(top_candidates) == top_k
+                ),
                 "panel_has_hierarchy": bool(panel_has_hierarchy),
                 "panel_has_difference": bool(panel_has_difference),
                 "panel_has_attributes": bool(panel_has_attributes),
                 "panel_has_similarity": bool(panel_has_similarity),
                 "panel_has_nonlexical_bridge": bool(panel_has_nonlexical_bridge),
-                "panel_structural_coverage": int(panel_has_hierarchy) + int(panel_has_difference) + int(panel_has_attributes),
+                "panel_structural_coverage": int(panel_has_hierarchy)
+                + int(panel_has_difference)
+                + int(panel_has_attributes),
                 "mean_I_struct": mean_i_struct,
                 "mean_evidence_volume": mean_evidence_volume,
                 "mean_ambiguity": mean_ambiguity,
@@ -583,7 +739,9 @@ def _build_source_dataframe(
                 "mean_bridge_support_count": mean_bridge_support_count,
                 "mean_bridge_contrast_count": mean_bridge_contrast_count,
                 "ambiguity_distance_to_mid": abs(mean_ambiguity - 0.5),
-                "topk_targets": json.dumps([tgt for tgt, _score in top_candidates], ensure_ascii=False),
+                "topk_targets": json.dumps(
+                    [tgt for tgt, _score in top_candidates], ensure_ascii=False
+                ),
             }
         )
     return pd.DataFrame(source_rows), ranked_candidates_by_source
@@ -598,7 +756,9 @@ def load_run_analysis(
 ) -> RunAnalysisArtifacts:
     logger = logger or _setup_logger()
     run_dir = run_dir.resolve()
-    ranking_path, explanations_path, resolved_config, summary_metrics_path = _resolve_run_paths(run_dir, config_path)
+    ranking_path, explanations_path, resolved_config, summary_metrics_path = _resolve_run_paths(
+        run_dir, config_path
+    )
     output_dir = (output_dir or _default_output_dir(run_dir)).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -608,10 +768,11 @@ def load_run_analysis(
     summary_df = _read_summary_metrics(summary_metrics_path)
     pair_df, record_index = _build_pair_dataframe(records, _summary_index(summary_df))
     pair_lookup = {
-        (str(row["src_iri"]), str(row["tgt_iri"])): row
-        for row in pair_df.to_dict(orient="records")
+        (str(row["src_iri"]), str(row["tgt_iri"])): row for row in pair_df.to_dict(orient="records")
     }
-    source_df, ranked_candidates_by_source = _build_source_dataframe(ranking_path, pair_lookup, top_k=top_k)
+    source_df, ranked_candidates_by_source = _build_source_dataframe(
+        ranking_path, pair_lookup, top_k=top_k
+    )
     logger.info(
         "Loaded analysis artifacts: explanation_records=%d, pair_rows=%d, source_panels=%d, ranking_sources=%d",
         len(records),
@@ -636,8 +797,7 @@ def load_run_analysis(
 
 def _eligible_panels(source_df: pd.DataFrame, top_k: int) -> pd.DataFrame:
     eligible = source_df[
-        source_df["panel_complete"]
-        & source_df["gold_rank"].between(1, top_k)
+        source_df["panel_complete"] & source_df["gold_rank"].between(1, top_k)
     ].copy()
     eligible["similarity_bonus"] = eligible["panel_has_similarity"].astype(int)
     eligible = eligible.sort_values(
@@ -657,13 +817,17 @@ def _eligible_panels(source_df: pd.DataFrame, top_k: int) -> pd.DataFrame:
     return eligible
 
 
-def _shortlist_panels(eligible_df: pd.DataFrame, shortlist_per_rank: int, per_rank: int) -> pd.DataFrame:
+def _shortlist_panels(
+    eligible_df: pd.DataFrame, shortlist_per_rank: int, per_rank: int
+) -> pd.DataFrame:
     shortlist = eligible_df.groupby("gold_rank", group_keys=False).head(shortlist_per_rank).copy()
     shortlist["recommended_keep"] = shortlist["auto_rank_within_bucket"] <= per_rank
     return shortlist.reset_index(drop=True)
 
 
-def _merge_review_sheet(shortlist_df: pd.DataFrame, review_path: Path, per_rank: int) -> pd.DataFrame:
+def _merge_review_sheet(
+    shortlist_df: pd.DataFrame, review_path: Path, per_rank: int
+) -> pd.DataFrame:
     review_df = shortlist_df.copy()
     review_df["recommended_keep"] = review_df["auto_rank_within_bucket"] <= per_rank
     review_df["keep"] = ""
@@ -714,7 +878,9 @@ def _final_selection(review_df: pd.DataFrame, per_rank: int) -> pd.DataFrame:
             raise ValueError(
                 f"Selection must contain exactly {per_rank} sources for rank {rank}, found {counts.get(rank, 0)}."
             )
-    return selected.sort_values(by=["gold_rank", "auto_rank_within_bucket", "src_iri"]).reset_index(drop=True)
+    return selected.sort_values(by=["gold_rank", "auto_rank_within_bucket", "src_iri"]).reset_index(
+        drop=True
+    )
 
 
 def _bind_model_logger(model: Any, logger: logging.Logger) -> Any:
@@ -727,7 +893,7 @@ def _bind_model_logger(model: Any, logger: logging.Logger) -> Any:
 
 
 def _load_configs_for_rationale(config_path: Path, jvm_heap_size: str) -> Any:
-    from exact import init_jvm
+    from mowl import init_jvm
 
     init_jvm(jvm_heap_size)
     import exact.impl  # noqa: F401
@@ -738,7 +904,9 @@ def _load_configs_for_rationale(config_path: Path, jvm_heap_size: str) -> Any:
     return configs
 
 
-def _resolve_run_dataset_paths(run_dir: Path, logger: logging.Logger) -> Tuple[Optional[Path], Optional[Path]]:
+def _resolve_run_dataset_paths(
+    run_dir: Path, logger: logging.Logger
+) -> Tuple[Optional[Path], Optional[Path]]:
     candidate_specs = sorted(run_dir.glob("*.yaml")) + sorted(run_dir.glob("*.yml"))
     for spec_path in candidate_specs:
         try:
@@ -771,7 +939,9 @@ def _resolve_run_dataset_paths(run_dir: Path, logger: logging.Logger) -> Tuple[O
     return None, None
 
 
-def _build_rationale_model(configs: Any, cache_dir: Path, device: torch.device, logger: logging.Logger) -> Any:
+def _build_rationale_model(
+    configs: Any, cache_dir: Path, device: torch.device, logger: logging.Logger
+) -> Any:
     model_spec = configs.get_model_sequence()[0]
     model_cls = model_spec.name
     params = {
@@ -883,7 +1053,9 @@ def _record_missing_entity_provenance(record: Mapping[str, Any]) -> bool:
                 triple = list(item.get("triple") or [])
                 if len(triple) < 3:
                     continue
-                if not _safe_text(item.get("subject_iri")) or not _safe_text(item.get("object_iri")):
+                if not _safe_text(item.get("subject_iri")) or not _safe_text(
+                    item.get("object_iri")
+                ):
                     return True
     for channel in ["similarity", "difference"]:
         payload = dict(triple_attributions.get(channel) or {})
@@ -892,7 +1064,9 @@ def _record_missing_entity_provenance(record: Mapping[str, Any]) -> bool:
                 triple = list(item.get("triple") or [])
                 if len(triple) < 3:
                     continue
-                if not _safe_text(item.get("subject_iri")) or not _safe_text(item.get("object_iri")):
+                if not _safe_text(item.get("subject_iri")) or not _safe_text(
+                    item.get("object_iri")
+                ):
                     return True
     return False
 
@@ -918,7 +1092,9 @@ def _merge_missing_explanation_fields(
 ) -> Dict[str, Any]:
     merged = copy.deepcopy(original)
     if int(merged.get("explanation_schema_version", 0) or 0) < 3:
-        merged["explanation_schema_version"] = int(repaired.get("explanation_schema_version", 3) or 3)
+        merged["explanation_schema_version"] = int(
+            repaired.get("explanation_schema_version", 3) or 3
+        )
     if _triple_attributions_missing_item_ids(merged) or not merged.get("triple_attributions"):
         triple_attributions = repaired.get("triple_attributions")
         if triple_attributions:
@@ -958,20 +1134,29 @@ def _backfill_explanation_fields(
         logger.info("Explanation-field backfill disabled; keeping selected records as-is.")
         return hydrated
     pending_indices = [
-        idx for idx, record in enumerate(hydrated)
-        if _record_needs_explanation_backfill(record)
+        idx for idx, record in enumerate(hydrated) if _record_needs_explanation_backfill(record)
     ]
     if not pending_indices:
-        logger.info("Selected records already contain provenance-backed explanation fields; skipping explanation backfill.")
+        logger.info(
+            "Selected records already contain provenance-backed explanation fields; skipping explanation backfill."
+        )
         return hydrated
     if configs is None:
         if config_path is None:
-            raise ValueError("config_path is required to backfill explanation fields when configs is not provided.")
+            raise ValueError(
+                "config_path is required to backfill explanation fields when configs is not provided."
+            )
         logger.info("Loading configs for explanation backfill from %s", config_path)
         configs = _load_configs_for_rationale(config_path=config_path, jvm_heap_size=jvm_heap_size)
 
-    device_obj = torch.device(device) if device is not None and torch.cuda.is_available() else torch.device("cpu")
-    model = _build_explanation_backfill_model(configs, run_dir=run_dir, output_dir=output_dir, device=device_obj, logger=logger)
+    device_obj = (
+        torch.device(device)
+        if device is not None and torch.cuda.is_available()
+        else torch.device("cpu")
+    )
+    model = _build_explanation_backfill_model(
+        configs, run_dir=run_dir, output_dir=output_dir, device=device_obj, logger=logger
+    )
     processed = 0
     from_saved_record = 0
     from_pair_rehydrate = 0
@@ -981,7 +1166,11 @@ def _backfill_explanation_fields(
         "Explanation backfill started: records=%d, pending=%d, model=%s, device=%s",
         len(hydrated),
         len(pending_indices),
-        getattr(getattr(configs.get_model_sequence()[0], "name", None), "__name__", "unknown") if configs else "unknown",
+        (
+            getattr(getattr(configs.get_model_sequence()[0], "name", None), "__name__", "unknown")
+            if configs
+            else "unknown"
+        ),
         device_obj,
     )
     for idx in pending_indices:
@@ -999,7 +1188,11 @@ def _backfill_explanation_fields(
                 exc,
             )
             repaired = None
-        if repaired is None and model is not None and hasattr(model, "reconstruct_explanation_fields_for_pair"):
+        if (
+            repaired is None
+            and model is not None
+            and hasattr(model, "reconstruct_explanation_fields_for_pair")
+        ):
             try:
                 repaired = model.reconstruct_explanation_fields_for_pair(
                     _safe_text(record.get("src_iri")),
@@ -1092,10 +1285,16 @@ def _backfill_rationales(
         return hydrated
     if configs is None:
         if config_path is None:
-            raise ValueError("config_path is required to generate rationales when configs is not provided.")
+            raise ValueError(
+                "config_path is required to generate rationales when configs is not provided."
+            )
         logger.info("Loading configs for rationale backfill from %s", config_path)
         configs = _load_configs_for_rationale(config_path=config_path, jvm_heap_size=jvm_heap_size)
-    device_obj = torch.device(device) if device is not None and torch.cuda.is_available() else torch.device("cpu")
+    device_obj = (
+        torch.device(device)
+        if device is not None and torch.cuda.is_available()
+        else torch.device("cpu")
+    )
     logger.info("Initializing rationale model on device=%s", device_obj)
     model = _build_rationale_model(configs, output_dir / "cache", device_obj, logger)
     logger.info("Generating missing rationales for %d selected records", len(pending))
@@ -1123,7 +1322,9 @@ def _backfill_rationales(
             progress_state["start_time"] = start_time
             progress_state["cached_records"] = int(event.get("cached_records", 0) or 0)
             progress_state["uncached_records"] = int(event.get("uncached_records", 0) or 0)
-            progress_state["uncached_unique_prompts"] = int(event.get("uncached_unique_prompts", 0) or 0)
+            progress_state["uncached_unique_prompts"] = int(
+                event.get("uncached_unique_prompts", 0) or 0
+            )
             progress_state["backend"] = event.get("backend")
             progress_state["model"] = event.get("model")
             progress_state["concurrency"] = int(event.get("concurrency", 0) or 0)
@@ -1170,7 +1371,9 @@ def _backfill_rationales(
             eta,
         )
 
-    rationales = model.generate_final_rationales_for_records(pending, progress_callback=_progress_callback)
+    rationales = model.generate_final_rationales_for_records(
+        pending, progress_callback=_progress_callback
+    )
     rationale_meta = dict(getattr(model, "_last_rationale_backend_meta", {}) or {})
     for record, rationale in zip(pending, rationales):
         prediction = dict(record.get("prediction") or {})
@@ -1184,7 +1387,9 @@ def _backfill_rationales(
         elapsed = max(0.0, time.perf_counter() - float(progress_state["start_time"]))
         duration = _format_duration(elapsed)
         uncached_records = int(progress_state["uncached_records"] or 0)
-        throughput = (uncached_records / elapsed) if elapsed > 1e-8 and uncached_records > 0 else 0.0
+        throughput = (
+            (uncached_records / elapsed) if elapsed > 1e-8 and uncached_records > 0 else 0.0
+        )
         avg_seconds = (elapsed / uncached_records) if uncached_records > 0 else 0.0
         logger.info(
             "Rationale stage completed: records=%d, uncached_records=%d, cached_records=%d, duration=%s, "
@@ -1206,7 +1411,9 @@ def _format_triple(triple: Sequence[Any]) -> str:
     return f"{subj} --{rel}--> {obj}"
 
 
-def _node_id(display: str, node_type: str, used: Dict[Tuple[str, str], str], nodes: List[Dict[str, Any]]) -> str:
+def _node_id(
+    display: str, node_type: str, used: Dict[Tuple[str, str], str], nodes: List[Dict[str, Any]]
+) -> str:
     key = (node_type, display)
     if key in used:
         return used[key]
@@ -1417,7 +1624,9 @@ def _make_path_payload(
     i_attr = _safe_float(importances.get("I_attr"), 0.0)
 
     def _bridge_strength(channel_importance: float, local_mass: float) -> str:
-        relevance = _safe_float(channel_importance, 0.0) * (0.5 + 0.5 * _safe_float(local_mass, 0.0))
+        relevance = _safe_float(channel_importance, 0.0) * (
+            0.5 + 0.5 * _safe_float(local_mass, 0.0)
+        )
         return _categorize_bridge_relevance(relevance)
 
     for item in _hierarchy_export_items(record, "source"):
@@ -1649,9 +1858,13 @@ def _make_path_payload(
         "score": score_value,
         "metrics": {
             "decision_basis": _categorize_decision_basis(i_label, i_struct, i_llm),
-            "evidence_strength": _categorize_evidence_strength(i_struct, q_struct, counts["total_evidence"]),
+            "evidence_strength": _categorize_evidence_strength(
+                i_struct, q_struct, counts["total_evidence"]
+            ),
             "evidence_agreement": _categorize_evidence_agreement(u_dis, counts["total_evidence"]),
-            "explanation_coverage": _categorize_explanation_coverage(counts["present_channels"], counts),
+            "explanation_coverage": _categorize_explanation_coverage(
+                counts["present_channels"], counts
+            ),
             "lead_over_next_candidate": _categorize_lead_over_next(score_value, next_score),
         },
         "llm": {
@@ -1699,10 +1912,16 @@ def _build_study_mapping(
                 next_tgt, next_fallback_score = candidates[rank]
                 next_record = record_index.get((src, next_tgt))
                 if next_record is not None:
-                    next_score = _safe_float((next_record.get("confidences") or {}).get("S_final"), next_fallback_score)
+                    next_score = _safe_float(
+                        (next_record.get("confidences") or {}).get("S_final"), next_fallback_score
+                    )
                 else:
                     next_score = float(next_fallback_score)
-            paths.append(_make_path_payload(record, rank=rank, ground_truth=int(tgt == gold), next_score=next_score))
+            paths.append(
+                _make_path_payload(
+                    record, rank=rank, ground_truth=int(tgt == gold), next_score=next_score
+                )
+            )
         pairs.append({"id": src, "paths": _annotate_edge_metadata(paths)})
     return {"pairs": pairs}
 
@@ -1771,13 +1990,27 @@ def _failure_taxonomy(source_df: pd.DataFrame, pair_df: pd.DataFrame, top_k: int
                 "delta_I_struct": _safe_float(row.get("delta_I_struct"), float("nan")),
                 "delta_U": _safe_float(row.get("delta_U"), float("nan")),
                 "delta_U_dis": _safe_float(row.get("delta_U_dis"), float("nan")),
-                "delta_hierarchy_count": _safe_float(row.get("delta_hierarchy_count"), float("nan")),
-                "delta_difference_count": _safe_float(row.get("delta_difference_count"), float("nan")),
-                "delta_similarity_count": _safe_float(row.get("delta_similarity_count"), float("nan")),
-                "delta_attribute_count": _safe_float(row.get("delta_attribute_count"), float("nan")),
-                "delta_bridge_total_count": _safe_float(row.get("delta_bridge_total_count"), float("nan")),
-                "delta_bridge_support_count": _safe_float(row.get("delta_bridge_support_count"), float("nan")),
-                "delta_bridge_contrast_count": _safe_float(row.get("delta_bridge_contrast_count"), float("nan")),
+                "delta_hierarchy_count": _safe_float(
+                    row.get("delta_hierarchy_count"), float("nan")
+                ),
+                "delta_difference_count": _safe_float(
+                    row.get("delta_difference_count"), float("nan")
+                ),
+                "delta_similarity_count": _safe_float(
+                    row.get("delta_similarity_count"), float("nan")
+                ),
+                "delta_attribute_count": _safe_float(
+                    row.get("delta_attribute_count"), float("nan")
+                ),
+                "delta_bridge_total_count": _safe_float(
+                    row.get("delta_bridge_total_count"), float("nan")
+                ),
+                "delta_bridge_support_count": _safe_float(
+                    row.get("delta_bridge_support_count"), float("nan")
+                ),
+                "delta_bridge_contrast_count": _safe_float(
+                    row.get("delta_bridge_contrast_count"), float("nan")
+                ),
                 "primary_failure_category": primary,
                 "llm_active_top1": flags["llm_active_top1"],
                 "llm_active_gold": flags["llm_active_gold"],
@@ -1786,12 +2019,24 @@ def _failure_taxonomy(source_df: pd.DataFrame, pair_df: pd.DataFrame, top_k: int
                 "similarity_present_in_panel": flags["similarity_present_in_panel"],
                 "high_disagreement_gold": flags["high_disagreement_gold"],
                 "high_disagreement_top1": flags["high_disagreement_top1"],
-                "top1_bridge_total_count": _safe_float(row.get("top1_bridge_total_count"), float("nan")),
-                "gold_bridge_total_count": _safe_float(row.get("gold_bridge_total_count"), float("nan")),
-                "top1_bridge_support_count": _safe_float(row.get("top1_bridge_support_count"), float("nan")),
-                "gold_bridge_support_count": _safe_float(row.get("gold_bridge_support_count"), float("nan")),
-                "top1_bridge_contrast_count": _safe_float(row.get("top1_bridge_contrast_count"), float("nan")),
-                "gold_bridge_contrast_count": _safe_float(row.get("gold_bridge_contrast_count"), float("nan")),
+                "top1_bridge_total_count": _safe_float(
+                    row.get("top1_bridge_total_count"), float("nan")
+                ),
+                "gold_bridge_total_count": _safe_float(
+                    row.get("gold_bridge_total_count"), float("nan")
+                ),
+                "top1_bridge_support_count": _safe_float(
+                    row.get("top1_bridge_support_count"), float("nan")
+                ),
+                "gold_bridge_support_count": _safe_float(
+                    row.get("gold_bridge_support_count"), float("nan")
+                ),
+                "top1_bridge_contrast_count": _safe_float(
+                    row.get("top1_bridge_contrast_count"), float("nan")
+                ),
+                "gold_bridge_contrast_count": _safe_float(
+                    row.get("gold_bridge_contrast_count"), float("nan")
+                ),
                 "top1_has_nonlexical_bridge": bool(row.get("top1_has_nonlexical_bridge")),
                 "gold_has_nonlexical_bridge": bool(row.get("gold_has_nonlexical_bridge")),
                 "panel_complete": bool(row.get("panel_complete")),
@@ -1813,7 +2058,9 @@ def _selected_records(
     for row in selected_df.to_dict(orient="records"):
         src = _safe_text(row.get("src_iri"))
         gold = _safe_text(row.get("gold_tgt_iri"))
-        for rank, (tgt, score) in enumerate(ranked_candidates_by_source.get(src, [])[:top_k], start=1):
+        for rank, (tgt, score) in enumerate(
+            ranked_candidates_by_source.get(src, [])[:top_k], start=1
+        ):
             record = record_index.get((src, tgt))
             if record is None:
                 raise ValueError(f"Missing selected record for source={src} target={tgt}")
@@ -1888,7 +2135,7 @@ def _write_notebook(output_dir: Path) -> Path:
                     "except ImportError:\n",
                     "    display = print\n",
                     "\n",
-                    f"ANALYSIS_DIR = Path(r\"{analysis_dir}\")\n",
+                    f'ANALYSIS_DIR = Path(r"{analysis_dir}")\n',
                     "PAIR_METRICS_PATH = ANALYSIS_DIR / 'pair_metrics.csv'\n",
                     "eligible = pd.read_csv(ANALYSIS_DIR / 'eligible_panels.csv')\n",
                     "source_panels = pd.read_csv(ANALYSIS_DIR / 'source_panels.csv')\n",
@@ -2294,8 +2541,8 @@ def _write_notebook(output_dir: Path) -> Path:
                     "        print(f\"Rank {meta.get('rank')} | GT={meta.get('ground_truth')} | target={labels.get('target')}\")\n",
                     "        print(f\"  score={confidences.get('S_final')} s_label={confidences.get('s_label')} S_struct={confidences.get('S_struct')} p_llm={confidences.get('p_llm')}\")\n",
                     "        print(f\"  I_label={importances.get('I_label')} I_struct={importances.get('I_struct')} I_llm={importances.get('I_llm')}\")\n",
-                    "        print(f\"  evidence counts: hierarchy={hier_count} similarity={sim_count} difference={diff_count} attributes={attr_count}\")\n",
-                    "        print(f\"  bridge counts: total={bridge_total} support={bridge_support} contrast={bridge_contrast} nonlexical_bridge={bool(has_nonlex_bridge)}\")\n",
+                    '        print(f"  evidence counts: hierarchy={hier_count} similarity={sim_count} difference={diff_count} attributes={attr_count}")\n',
+                    '        print(f"  bridge counts: total={bridge_total} support={bridge_support} contrast={bridge_contrast} nonlexical_bridge={bool(has_nonlex_bridge)}")\n',
                     "        print(f\"  brief={bool(row.get('llm_pair_brief'))} rationale={bool(prediction.get('llm_rationale'))}\")\n",
                     "        print('  Pair brief:')\n",
                     "        print(row.get('llm_pair_brief', ''))\n",
@@ -2635,12 +2882,16 @@ def run_user_study_analysis(
     for rank in range(1, top_k + 1):
         count = int((eligible_df["gold_rank"] == rank).sum())
         if count < per_rank:
-            raise ValueError(f"Not enough eligible source panels for rank {rank}: need {per_rank}, found {count}.")
+            raise ValueError(
+                f"Not enough eligible source panels for rank {rank}: need {per_rank}, found {count}."
+            )
     eligible_path = output_dir / "eligible_panels.csv"
     eligible_df.to_csv(eligible_path, index=False)
     output_paths["eligible_panels_csv"] = eligible_path
 
-    shortlist_df = _shortlist_panels(eligible_df, shortlist_per_rank=shortlist_per_rank, per_rank=per_rank)
+    shortlist_df = _shortlist_panels(
+        eligible_df, shortlist_per_rank=shortlist_per_rank, per_rank=per_rank
+    )
     logger.info("Shortlisted panels: %d", len(shortlist_df))
     shortlist_path = output_dir / "study_shortlist.csv"
     shortlist_df.to_csv(shortlist_path, index=False)
@@ -2685,9 +2936,13 @@ def run_user_study_analysis(
         generate_rationales=generate_rationales,
         jvm_heap_size=jvm_heap_size,
     )
-    selected_records_with_rationales_path = output_dir / "study_selected_records_with_rationales.json"
+    selected_records_with_rationales_path = (
+        output_dir / "study_selected_records_with_rationales.json"
+    )
     _write_json(selected_records_with_rationales_path, selected_records_with_rationales)
-    output_paths["study_selected_records_with_rationales_json"] = selected_records_with_rationales_path
+    output_paths["study_selected_records_with_rationales_json"] = (
+        selected_records_with_rationales_path
+    )
 
     selected_record_index = {
         (_safe_text(record.get("src_iri")), _safe_text(record.get("tgt_iri"))): record

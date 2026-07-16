@@ -6,17 +6,31 @@ import json
 from pathlib import Path
 from typing import Optional
 
-from exact.analysis.alignment_diagnostics import analyze_alignment_run, format_diagnostics_report
+from exact.analysis.alignment_diagnostics import (
+    analyze_alignment_run,
+    format_diagnostics_report,
+)
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Report candidate-oracle and miss-bucket diagnostics for an Exact run.")
+    parser = argparse.ArgumentParser(
+        description="Report candidate-oracle and miss-bucket diagnostics for an Exact run."
+    )
     parser.add_argument("run_dir", type=Path, help="Run output directory.")
     parser.add_argument("--reference", type=Path, default=None, help="Full reference TSV/CSV path.")
-    parser.add_argument("--train-reference", type=Path, default=None, help="Training/null reference TSV/CSV path.")
+    parser.add_argument(
+        "--train-reference", type=Path, default=None, help="Training/null reference TSV/CSV path."
+    )
     parser.add_argument("--summary", type=Path, default=None, help="summary_metrics.csv path.")
-    parser.add_argument("--alignment", type=Path, default=None, help="Saved alignment TSV/CSV path.")
-    parser.add_argument("--json-output", type=Path, default=None, help="Optional path for machine-readable diagnostics.")
+    parser.add_argument(
+        "--alignment", type=Path, default=None, help="Saved alignment TSV/CSV path."
+    )
+    parser.add_argument(
+        "--json-output",
+        type=Path,
+        default=None,
+        help="Optional path for machine-readable diagnostics.",
+    )
     args = parser.parse_args()
 
     reference = args.reference or _infer_dataset_path(args.run_dir, "full_reference")
@@ -33,7 +47,9 @@ def main() -> None:
     )
     print(format_diagnostics_report(diagnostics))
     if args.json_output:
-        args.json_output.write_text(json.dumps(diagnostics, indent=2, sort_keys=True), encoding="utf-8")
+        args.json_output.write_text(
+            json.dumps(diagnostics, indent=2, sort_keys=True), encoding="utf-8"
+        )
 
 
 def _infer_dataset_path(run_dir: Path, key: str) -> Optional[Path]:

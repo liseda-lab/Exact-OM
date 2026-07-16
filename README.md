@@ -71,6 +71,14 @@ poetry install
 poetry run exact --help
 ```
 
+The default dependency resolves the platform-appropriate PyPI build of PyTorch. To use CUDA
+12.8 wheels explicitly, install PyTorch from its CUDA index after the Poetry environment is
+created:
+
+```bash
+poetry run pip install --index-url https://download.pytorch.org/whl/cu128 "torch>=2.7,<3"
+```
+
 The package exposes these main entry points:
 
 - `exact` for ontology matching runs
@@ -188,7 +196,8 @@ poetry run bioml-eval \
 For programmatic use, `exact.delivery.api` exposes:
 
 - `AlignmentRunner`, which mirrors the main matching CLI
-- `EvalutionRunner`, which wraps the standalone evaluation flow
+- `EvaluationRunner`, which wraps the standalone evaluation flow. The historical
+  `EvalutionRunner` spelling remains as a deprecated compatibility alias.
 
 ### User-study analysis
 

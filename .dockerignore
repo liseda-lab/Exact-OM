@@ -8,8 +8,6 @@ exp
 dist
 data
 docs
-exact
-matcha_dl
 tests
 tools
 slurm-*.out
