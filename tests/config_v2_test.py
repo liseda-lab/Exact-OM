@@ -79,6 +79,36 @@ def test_too_new_version_is_clear() -> None:
         ConfigModel.from_mapping({"config_version": 3}, warn_v1=False)
 
 
+def test_matching_entity_kinds_are_validated_and_deduplicated() -> None:
+    config = ConfigModel.from_mapping(
+        {
+            "config_version": 2,
+            "matching": {
+                "entity_kinds": ["individual", "class", "individual"],
+            },
+        },
+        warn_v1=False,
+    )
+    assert config.matching.entity_kinds == ["individual", "class"]
+
+    with pytest.raises(ValueError, match="annotation_property matching is not implemented"):
+        ConfigModel.from_mapping(
+            {
+                "config_version": 2,
+                "matching": {"entity_kinds": ["annotation_property"]},
+            },
+            warn_v1=False,
+        )
+    with pytest.raises(ValueError, match="Unknown entity kind"):
+        ConfigModel.from_mapping(
+            {
+                "config_version": 2,
+                "matching": {"entity_kinds": ["unknown_kind"]},
+            },
+            warn_v1=False,
+        )
+
+
 def test_second_pass_and_removed_reasoner_controls_are_reported() -> None:
     migrated, report = migrate_v1_mapping(
         {

@@ -50,7 +50,7 @@ V1_TO_V2: Dict[str, MigrationTarget] = {
     "alignment_params.target_cardinality": "matching.target_cardinality",
     "alignment_params.review_low": "matching.review_low",
     "alignment_params.review_high": "matching.review_high",
-    "alignment_params.save_json": "output.save.json",
+    "alignment_params.save_json": "output.save.full_explanations_json",
     "alignment_params.save_csv": "output.save.csv",
     "alignment_params.save_stats_csv": "output.save.stats_csv",
     "alignment_params.append_stats_to_summary_csv": "output.save.append_stats_to_summary",

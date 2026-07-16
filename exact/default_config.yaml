@@ -720,7 +720,7 @@ output:
   # Alignment save switches.
   save:
     # Assemble the optional full candidate-explanations JSON export.
-    json: false
+    full_explanations_json: false
     # Save the flattened alignment summary table.
     csv: true
     # Save one-row run statistics as CSV.
@@ -753,7 +753,7 @@ output:
     max_label_show: 3
   # Explanation store layout controls.
   explanations:
-    # Target uncompressed explanation-shard size in MiB.
+    # Target compressed explanation-shard size in MiB.
     shard_mb: 32
   # Run-artifact retention policies.
   retention:

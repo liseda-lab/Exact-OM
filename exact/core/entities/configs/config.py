@@ -271,6 +271,13 @@ class MatchingConfig(StrictConfigModel):
         description="Pair-adaptive channel constants exposed for reproducible sweeps.",
     )
 
+    @field_validator("entity_kinds", mode="before")
+    @classmethod
+    def validate_entity_kinds(cls, value: Any) -> List[str]:
+        from exact.core.entities.kinds import normalize_entity_kinds
+
+        return [kind.value for kind in normalize_entity_kinds(value)]
+
     @field_validator("relation_prediction", mode="before")
     @classmethod
     def validate_relation_prediction(cls, value: Any) -> str:
@@ -847,7 +854,6 @@ class EvaluationConfig(StrictConfigModel):
 class SaveConfig(StrictConfigModel):
     full_explanations_json: bool = Field(
         False,
-        alias="json",
         description="Assemble the optional full candidate-explanations JSON export.",
     )
     csv: bool = Field(True, description="Save the flattened alignment summary table.")
@@ -873,7 +879,7 @@ class SanityChecksConfig(StrictConfigModel):
 
 
 class ExplanationOutputConfig(StrictConfigModel):
-    shard_mb: int = Field(32, description="Target uncompressed explanation-shard size in MiB.")
+    shard_mb: int = Field(32, description="Target compressed explanation-shard size in MiB.")
 
 
 class RetentionConfig(StrictConfigModel):
