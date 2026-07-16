@@ -10,9 +10,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Sequence
 
+from exact.runs import RunReader
+
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Aggregate Exact hparam tuning results.")
+    parser = argparse.ArgumentParser(
+        description="Aggregate Exact hparam tuning results."
+    )
     parser.add_argument(
         "--exp-dir",
         required=True,
@@ -50,12 +54,18 @@ def normalize_value(value) -> str:
 
 
 def find_results_file(run_dir: Path, filename: str) -> Path | None:
-    direct = run_dir / filename
-    if direct.exists():
-        return direct
-    matches = list(run_dir.rglob(filename))
-    if matches:
-        return matches[0]
+    reader = RunReader.open(run_dir)
+    if filename in {"evaluation_results.csv", "evaluation_results.json"}:
+        suffix = "json" if filename.endswith(".json") else "csv"
+        path = reader.layout.evaluation_path(suffix)
+        return path if path.is_file() else None
+    for artifact in reader.manifest().get("artifacts", []):
+        relative = artifact.get("path")
+        if not isinstance(relative, str) or Path(relative).name != filename:
+            continue
+        path = reader.layout.resolve_relative(relative)
+        if path.is_file():
+            return path
     return None
 
 
@@ -79,7 +89,9 @@ def load_metrics(path: Path) -> Dict[str, str]:
             # Interpret other layouts as a single summary row.
             rows = list(reader)
             if rows:
-                metrics = {key: value for key, value in rows[0].items() if key is not None}
+                metrics = {
+                    key: value for key, value in rows[0].items() if key is not None
+                }
     return metrics
 
 
@@ -112,8 +124,12 @@ def collect_runs(runs_dir: Path, results_filename: str) -> List[RunRecord]:
             print(f"[WARN] Skipping {entry} (missing {results_filename})")
             continue
         params = load_params(trial_path)
-        metrics = {f"metric.{key}": value for key, value in load_metrics(results_path).items()}
-        records.append(RunRecord(name=entry.name, path=entry, params=params, metrics=metrics))
+        metrics = {
+            f"metric.{key}": value for key, value in load_metrics(results_path).items()
+        }
+        records.append(
+            RunRecord(name=entry.name, path=entry, params=params, metrics=metrics)
+        )
     return records
 
 
