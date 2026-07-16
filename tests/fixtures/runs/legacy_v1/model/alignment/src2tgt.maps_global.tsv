@@ -1,0 +1,3 @@
+SrcEntity	TgtEntity	Score
+https://example.org/source/A	https://example.org/target/alpha	0.91
+https://example.org/source/B	https://example.org/target/gamma	0.78

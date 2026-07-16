@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "format": "jsonl",
+  "compression": "none",
+  "records_per_shard": 50000,
+  "total_records": 3,
+  "shards": [
+    {
+      "path": "shard-000000.jsonl",
+      "records": 3
+    }
+  ]
+}

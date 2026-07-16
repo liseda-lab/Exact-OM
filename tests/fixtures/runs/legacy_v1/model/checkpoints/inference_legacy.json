@@ -1,0 +1,33 @@
+{
+  "checkpoint_schema_version": 2,
+  "kind": "inference",
+  "dataset_signature": "wp-l-legacy-golden",
+  "dataset_fingerprint": "wp-l-candidates-v1",
+  "checkpoint_fingerprint": "0ccc1205bb44a11a7ea5b0362aaef4bb4743fc1d",
+  "checkpoint_fingerprint_payload": {
+    "dataset_signature": "wp-l-legacy-golden",
+    "dataset_fingerprint": "wp-l-candidates-v1",
+    "models": [
+      {
+        "class": "_LegacyGoldenModel",
+        "fingerprint": "1f236b528f7a3714388185bf724f1402ecdcbfc3",
+        "payload": {
+          "model": "wp-l-legacy-golden-v1"
+        }
+      }
+    ]
+  },
+  "total_examples": 3,
+  "processed_examples": 3,
+  "timing": {
+    "inference_seconds_cumulative": 4.25,
+    "examples_per_second_ema": 0.71
+  },
+  "checkpoint_payload": "compact",
+  "mappings_count": 3,
+  "results_json_count": 3,
+  "audit_manifest_path": "inference_legacy_audit/manifest.json",
+  "candidate_records_manifest_path": "inference_legacy_candidates/manifest.json",
+  "candidate_records_count": 3,
+  "final_overlay_manifest_path": "inference_legacy_overlay/manifest.json"
+}
