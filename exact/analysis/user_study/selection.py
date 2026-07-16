@@ -13,6 +13,7 @@ from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple  # noqa: 
 import pandas as pd  # noqa: F401
 import torch  # noqa: F401
 
+from exact.runs import RunReader  # noqa: F401
 from exact.utils.data import read_yaml  # noqa: F401
 from exact.utils.formatting import format_duration as _format_duration  # noqa: F401
 
@@ -41,14 +42,20 @@ class RunAnalysisArtifacts:
 def _resolve_run_paths(
     run_dir: Path, config_path: Optional[Path] = None
 ) -> Tuple[Path, Path, Path, Optional[Path]]:
-    ranking_path = run_dir / "model" / "alignment" / "src2tgt.maps_local.tsv"
-    explanations_path = run_dir / "model" / "alignment" / "default" / "full_explanations.json"
-    summary_metrics_path = run_dir / "model" / "alignment" / "default" / "summary_metrics.csv"
-    resolved_config = config_path or (run_dir / "config.yaml")
+    reader = RunReader.open(run_dir)
+    layout = reader.layout
+    ranking_path = layout.mapping_path("local")
+    explanations_path = (
+        layout.explanation_index_path
+        if layout.explanation_index_path.is_file()
+        else layout.full_explanations_path
+    )
+    summary_metrics_path = layout.summary_metrics_path
+    resolved_config = config_path or layout.config_path
     if not ranking_path.exists():
         raise FileNotFoundError(f"Local ranking file not found: {ranking_path}")
     if not explanations_path.exists():
-        raise FileNotFoundError(f"Full explanations JSON not found: {explanations_path}")
+        raise FileNotFoundError(f"Explanation artifact not found: {explanations_path}")
     if not resolved_config.exists():
         raise FileNotFoundError(f"Config file not found: {resolved_config}")
     return (
@@ -81,7 +88,9 @@ def _read_summary_metrics(path: Optional[Path]) -> Optional[pd.DataFrame]:
     return pd.read_csv(path, sep="\t")
 
 
-def _summary_index(summary_df: Optional[pd.DataFrame]) -> Dict[Tuple[str, str], Dict[str, Any]]:
+def _summary_index(
+    summary_df: Optional[pd.DataFrame],
+) -> Dict[Tuple[str, str], Dict[str, Any]]:
     if summary_df is None or summary_df.empty:
         return {}
     rows: Dict[Tuple[str, str], Dict[str, Any]] = {}
@@ -148,7 +157,9 @@ def _coalesce(*values: Any) -> Any:
 
 
 def _hierarchy_items(record: Mapping[str, Any], side: str) -> List[Dict[str, Any]]:
-    triple_attributions = (record.get("triple_attributions") or {}).get("hierarchy") or {}
+    triple_attributions = (record.get("triple_attributions") or {}).get(
+        "hierarchy"
+    ) or {}
     items: List[Dict[str, Any]] = []
     for family, payload in triple_attributions.items():
         for item in payload.get(side, []) or []:
@@ -157,24 +168,32 @@ def _hierarchy_items(record: Mapping[str, Any], side: str) -> List[Dict[str, Any
             items.append(row)
     if items:
         return items
-    context_triples = (record.get("context_triples") or {}).get(f"hierarchy_{side}") or {}
+    context_triples = (record.get("context_triples") or {}).get(
+        f"hierarchy_{side}"
+    ) or {}
     for family, triples in context_triples.items():
         for triple in triples or []:
             items.append({"triple": list(triple), "family": family})
     return items
 
 
-def _channel_items(record: Mapping[str, Any], channel: str, side: str) -> List[Dict[str, Any]]:
+def _channel_items(
+    record: Mapping[str, Any], channel: str, side: str
+) -> List[Dict[str, Any]]:
     triple_attributions = (record.get("triple_attributions") or {}).get(channel) or {}
     items = [dict(item or {}) for item in (triple_attributions.get(side) or [])]
     if items:
         return items
-    context_triples = (record.get("context_triples") or {}).get(f"{channel}_{side}") or []
+    context_triples = (record.get("context_triples") or {}).get(
+        f"{channel}_{side}"
+    ) or []
     return [{"triple": list(triple)} for triple in context_triples]
 
 
 def _attribute_items(record: Mapping[str, Any], side: str) -> List[Dict[str, Any]]:
-    return [dict(item or {}) for item in ((record.get("attributes") or {}).get(side) or [])]
+    return [
+        dict(item or {}) for item in ((record.get("attributes") or {}).get(side) or [])
+    ]
 
 
 def _structural_evidence_counts(record: Mapping[str, Any]) -> Dict[str, int]:
@@ -202,7 +221,10 @@ def _structural_evidence_counts(record: Mapping[str, Any]) -> Dict[str, int]:
         "difference_count": difference_count,
         "attribute_count": attribute_count,
         "present_channels": present_channels,
-        "total_evidence": hierarchy_count + similarity_count + difference_count + attribute_count,
+        "total_evidence": hierarchy_count
+        + similarity_count
+        + difference_count
+        + attribute_count,
     }
 
 
@@ -210,7 +232,8 @@ def _bridge_metrics(record: Mapping[str, Any]) -> Dict[str, int]:
     provenance = record.get("cross_side_provenance") or {}
     lexical_count = len(list(provenance.get("lexical") or []))
     hierarchy_count = sum(
-        len(list(links or [])) for links in dict(provenance.get("hierarchy") or {}).values()
+        len(list(links or []))
+        for links in dict(provenance.get("hierarchy") or {}).values()
     )
     similarity_count = len(list(provenance.get("similarity") or []))
     attribute_payload = dict(provenance.get("attributes") or {})
@@ -234,12 +257,15 @@ def _bridge_metrics(record: Mapping[str, Any]) -> Dict[str, int]:
         "bridge_support_count": int(support_count),
         "bridge_contrast_count": int(contrast_count),
         "has_nonlexical_bridge": int(
-            (hierarchy_count + similarity_count + attribute_count + difference_count) > 0
+            (hierarchy_count + similarity_count + attribute_count + difference_count)
+            > 0
         ),
     }
 
 
-def _categorize_decision_basis(i_label: float, i_struct: float, i_llm: float) -> Dict[str, Any]:
+def _categorize_decision_basis(
+    i_label: float, i_struct: float, i_llm: float
+) -> Dict[str, Any]:
     if i_llm >= 0.20:
         return {
             "label": "LLM-assisted",
@@ -268,12 +294,12 @@ def _categorize_evidence_strength(
     strength_value = 0.45 * i_struct + 0.35 * q_struct + 0.20 * volume_ratio
     if strength_value >= 0.60:
         label = "Strong"
-        description = (
-            "The candidate is supported by substantial and reasonably reliable contextual evidence."
-        )
+        description = "The candidate is supported by substantial and reasonably reliable contextual evidence."
     elif strength_value >= 0.32:
         label = "Moderate"
-        description = "There is some useful contextual support, but it is not overwhelming."
+        description = (
+            "There is some useful contextual support, but it is not overwhelming."
+        )
     else:
         label = "Weak"
         description = "The candidate relies on sparse or low-impact contextual support."
@@ -293,7 +319,9 @@ def _categorize_evidence_agreement(u_dis: float, total_evidence: int) -> Dict[st
         }
     if u_dis >= 0.18:
         label = "Conflicting"
-        description = "Different evidence sources point in noticeably different directions."
+        description = (
+            "Different evidence sources point in noticeably different directions."
+        )
     elif u_dis >= 0.08:
         label = "Mixed"
         description = "The evidence is not fully aligned; some signals support the match more strongly than others."
@@ -312,17 +340,15 @@ def _categorize_explanation_coverage(
 ) -> Dict[str, Any]:
     if present_channels >= 3:
         label = "Rich"
-        description = "The explanation draws from several different kinds of contextual evidence."
+        description = (
+            "The explanation draws from several different kinds of contextual evidence."
+        )
     elif present_channels == 2:
         label = "Balanced"
-        description = (
-            "The explanation includes more than one evidence type, but it is not especially broad."
-        )
+        description = "The explanation includes more than one evidence type, but it is not especially broad."
     else:
         label = "Narrow"
-        description = (
-            "The explanation relies on only one evidence family or very limited contextual support."
-        )
+        description = "The explanation relies on only one evidence family or very limited contextual support."
     return {
         "label": label,
         "channels_present": int(present_channels),
@@ -336,7 +362,9 @@ def _categorize_explanation_coverage(
     }
 
 
-def _categorize_lead_over_next(score: float, next_score: Optional[float]) -> Dict[str, Any]:
+def _categorize_lead_over_next(
+    score: float, next_score: Optional[float]
+) -> Dict[str, Any]:
     if next_score is None:
         return {
             "label": "Last shown",
@@ -349,12 +377,12 @@ def _categorize_lead_over_next(score: float, next_score: Optional[float]) -> Dic
         description = "This candidate is only marginally ahead of the next one."
     elif margin <= 0.08:
         label = "Close call"
-        description = (
-            "This candidate is ahead, but the separation from the next one is still fairly small."
-        )
+        description = "This candidate is ahead, but the separation from the next one is still fairly small."
     else:
         label = "Clear lead"
-        description = "This candidate is comfortably ahead of the next displayed alternative."
+        description = (
+            "This candidate is comfortably ahead of the next displayed alternative."
+        )
     return {
         "label": label,
         "margin": margin,
@@ -365,7 +393,9 @@ def _categorize_lead_over_next(score: float, next_score: Optional[float]) -> Dic
 def _ordered_path_nodes(nodes: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:
     source_nodes = [dict(node) for node in nodes if node.get("type") == "Source"]
     target_nodes = [dict(node) for node in nodes if node.get("type") == "Target"]
-    middle_nodes = [dict(node) for node in nodes if node.get("type") not in {"Source", "Target"}]
+    middle_nodes = [
+        dict(node) for node in nodes if node.get("type") not in {"Source", "Target"}
+    ]
     return source_nodes + middle_nodes + target_nodes
 
 
@@ -403,40 +433,66 @@ def _normalize_pair_row(
         "source_label": _safe_text(labels.get("source")),
         "target_label": _safe_text(labels.get("target")),
         "ground_truth": int(
-            _safe_float(prediction.get("ground_truth", summary_row.get("ground_truth", 0)))
+            _safe_float(
+                prediction.get("ground_truth", summary_row.get("ground_truth", 0))
+            )
         ),
         "threshold_positive": bool(
-            prediction.get("threshold_positive", summary_row.get("threshold_positive", False))
+            prediction.get(
+                "threshold_positive", summary_row.get("threshold_positive", False)
+            )
         ),
         "saved_alignment_member": bool(
             prediction.get(
-                "saved_alignment_member", summary_row.get("saved_alignment_member", False)
+                "saved_alignment_member",
+                summary_row.get("saved_alignment_member", False),
             )
         ),
         "rationale_positive": bool(
-            prediction.get("rationale_positive", summary_row.get("rationale_positive", False))
+            prediction.get(
+                "rationale_positive", summary_row.get("rationale_positive", False)
+            )
         ),
         "llm_decision": llm_decision,
         "llm_rationale_present": bool(_safe_text(prediction.get("llm_rationale"))),
         "pair_brief_present": bool(_safe_text(record.get("llm_pair_brief"))),
-        "S_final": _safe_float(confidences.get("S_final", summary_row.get("S_final", 0.0))),
-        "s_label": _safe_float(confidences.get("s_label", summary_row.get("s_label", 0.0))),
-        "S_struct": _safe_float(confidences.get("S_struct", summary_row.get("S_struct", 0.0))),
+        "S_final": _safe_float(
+            confidences.get("S_final", summary_row.get("S_final", 0.0))
+        ),
+        "s_label": _safe_float(
+            confidences.get("s_label", summary_row.get("s_label", 0.0))
+        ),
+        "S_struct": _safe_float(
+            confidences.get("S_struct", summary_row.get("S_struct", 0.0))
+        ),
         "p_llm": _safe_float(confidences.get("p_llm", summary_row.get("p_llm", 0.0))),
-        "I_label": _safe_float(importances.get("I_label", summary_row.get("I_label", 0.0))),
-        "I_struct": _safe_float(importances.get("I_struct", summary_row.get("I_struct", 0.0))),
+        "I_label": _safe_float(
+            importances.get("I_label", summary_row.get("I_label", 0.0))
+        ),
+        "I_struct": _safe_float(
+            importances.get("I_struct", summary_row.get("I_struct", 0.0))
+        ),
         "I_llm": i_llm,
-        "I_hier": _safe_float(importances.get("I_hier", summary_row.get("I_hier", 0.0))),
+        "I_hier": _safe_float(
+            importances.get("I_hier", summary_row.get("I_hier", 0.0))
+        ),
         "I_sim": _safe_float(importances.get("I_sim", summary_row.get("I_sim", 0.0))),
-        "I_diff": _safe_float(importances.get("I_diff", summary_row.get("I_diff", 0.0))),
-        "I_attr": _safe_float(importances.get("I_attr", summary_row.get("I_attr", 0.0))),
+        "I_diff": _safe_float(
+            importances.get("I_diff", summary_row.get("I_diff", 0.0))
+        ),
+        "I_attr": _safe_float(
+            importances.get("I_attr", summary_row.get("I_attr", 0.0))
+        ),
         "U": _safe_float(weights.get("U", summary_row.get("U", 0.0))),
         "U_dis": _safe_float(weights.get("U_dis", summary_row.get("U_dis", 0.0))),
         "hierarchy_count": hierarchy_count,
         "similarity_count": similarity_count,
         "difference_count": difference_count,
         "attribute_count": attribute_count,
-        "nonlex_total": hierarchy_count + similarity_count + difference_count + attribute_count,
+        "nonlex_total": hierarchy_count
+        + similarity_count
+        + difference_count
+        + attribute_count,
         **bridge_counts,
         "llm_active": bool(i_llm > 0.0 or llm_decision),
         "full_record_present": True,
@@ -486,7 +542,8 @@ def _build_source_dataframe(
         ranked = _normalize_candidate_list(row.get("TgtCandidates"))
         ranked_candidates_by_source[src] = ranked
         gold_rank = next(
-            (idx for idx, (tgt, _score) in enumerate(ranked, start=1) if tgt == gold), None
+            (idx for idx, (tgt, _score) in enumerate(ranked, start=1) if tgt == gold),
+            None,
         )
         top_candidates = list(ranked[:top_k])
         missing_topk_records = 0
@@ -502,7 +559,9 @@ def _build_source_dataframe(
 
         top1_tgt = top_candidates[0][0] if top_candidates else ""
         top1_candidate_score = float(top_candidates[0][1]) if top_candidates else 0.0
-        gold_candidate_score = next((float(score) for tgt, score in ranked if tgt == gold), 0.0)
+        gold_candidate_score = next(
+            (float(score) for tgt, score in ranked if tgt == gold), 0.0
+        )
 
         top1_row = pair_lookup.get((src, top1_tgt))
         gold_row = pair_lookup.get((src, gold))
@@ -524,7 +583,9 @@ def _build_source_dataframe(
             gold,
         )
 
-        pair_brief_count = sum(int(bool(item.get("pair_brief_present"))) for item in pair_rows)
+        pair_brief_count = sum(
+            int(bool(item.get("pair_brief_present"))) for item in pair_rows
+        )
         mean_i_struct = _mean([_safe_float(item.get("I_struct")) for item in pair_rows])
         mean_evidence_volume = _mean(
             [
@@ -561,10 +622,12 @@ def _build_source_dataframe(
         )
 
         gold_score = _safe_float(
-            gold_row.get("S_final") if gold_row else gold_candidate_score, gold_candidate_score
+            gold_row.get("S_final") if gold_row else gold_candidate_score,
+            gold_candidate_score,
         )
         top1_score = _safe_float(
-            top1_row.get("S_final") if top1_row else top1_candidate_score, top1_candidate_score
+            top1_row.get("S_final") if top1_row else top1_candidate_score,
+            top1_candidate_score,
         )
 
         source_rows.append(
@@ -603,16 +666,24 @@ def _build_source_dataframe(
                 "top1_I_struct": _safe_float(
                     top1_row.get("I_struct") if top1_row else None, float("nan")
                 ),
-                "gold_U": _safe_float(gold_row.get("U") if gold_row else None, float("nan")),
-                "top1_U": _safe_float(top1_row.get("U") if top1_row else None, float("nan")),
+                "gold_U": _safe_float(
+                    gold_row.get("U") if gold_row else None, float("nan")
+                ),
+                "top1_U": _safe_float(
+                    top1_row.get("U") if top1_row else None, float("nan")
+                ),
                 "gold_U_dis": _safe_float(
                     gold_row.get("U_dis") if gold_row else None, float("nan")
                 ),
                 "top1_U_dis": _safe_float(
                     top1_row.get("U_dis") if top1_row else None, float("nan")
                 ),
-                "gold_llm_active": bool(gold_row.get("llm_active")) if gold_row else False,
-                "top1_llm_active": bool(top1_row.get("llm_active")) if top1_row else False,
+                "gold_llm_active": bool(gold_row.get("llm_active"))
+                if gold_row
+                else False,
+                "top1_llm_active": bool(top1_row.get("llm_active"))
+                if top1_row
+                else False,
                 "gold_hierarchy_count": _safe_float(
                     gold_row.get("hierarchy_count") if gold_row else None, float("nan")
                 ),
@@ -638,22 +709,28 @@ def _build_source_dataframe(
                     top1_row.get("attribute_count") if top1_row else None, float("nan")
                 ),
                 "gold_bridge_total_count": _safe_float(
-                    gold_row.get("bridge_total_count") if gold_row else None, float("nan")
+                    gold_row.get("bridge_total_count") if gold_row else None,
+                    float("nan"),
                 ),
                 "top1_bridge_total_count": _safe_float(
-                    top1_row.get("bridge_total_count") if top1_row else None, float("nan")
+                    top1_row.get("bridge_total_count") if top1_row else None,
+                    float("nan"),
                 ),
                 "gold_bridge_support_count": _safe_float(
-                    gold_row.get("bridge_support_count") if gold_row else None, float("nan")
+                    gold_row.get("bridge_support_count") if gold_row else None,
+                    float("nan"),
                 ),
                 "top1_bridge_support_count": _safe_float(
-                    top1_row.get("bridge_support_count") if top1_row else None, float("nan")
+                    top1_row.get("bridge_support_count") if top1_row else None,
+                    float("nan"),
                 ),
                 "gold_bridge_contrast_count": _safe_float(
-                    gold_row.get("bridge_contrast_count") if gold_row else None, float("nan")
+                    gold_row.get("bridge_contrast_count") if gold_row else None,
+                    float("nan"),
                 ),
                 "top1_bridge_contrast_count": _safe_float(
-                    top1_row.get("bridge_contrast_count") if top1_row else None, float("nan")
+                    top1_row.get("bridge_contrast_count") if top1_row else None,
+                    float("nan"),
                 ),
                 "gold_has_nonlexical_bridge": (
                     bool(gold_row.get("has_nonlexical_bridge")) if gold_row else False
@@ -664,60 +741,88 @@ def _build_source_dataframe(
                 "delta_s_label": _safe_float(
                     gold_row.get("s_label") if gold_row else None, float("nan")
                 )
-                - _safe_float(top1_row.get("s_label") if top1_row else None, float("nan")),
+                - _safe_float(
+                    top1_row.get("s_label") if top1_row else None, float("nan")
+                ),
                 "delta_S_struct": _safe_float(
                     gold_row.get("S_struct") if gold_row else None, float("nan")
                 )
-                - _safe_float(top1_row.get("S_struct") if top1_row else None, float("nan")),
+                - _safe_float(
+                    top1_row.get("S_struct") if top1_row else None, float("nan")
+                ),
                 "delta_I_label": _safe_float(
                     gold_row.get("I_label") if gold_row else None, float("nan")
                 )
-                - _safe_float(top1_row.get("I_label") if top1_row else None, float("nan")),
+                - _safe_float(
+                    top1_row.get("I_label") if top1_row else None, float("nan")
+                ),
                 "delta_I_struct": _safe_float(
                     gold_row.get("I_struct") if gold_row else None, float("nan")
                 )
-                - _safe_float(top1_row.get("I_struct") if top1_row else None, float("nan")),
-                "delta_U": _safe_float(gold_row.get("U") if gold_row else None, float("nan"))
+                - _safe_float(
+                    top1_row.get("I_struct") if top1_row else None, float("nan")
+                ),
+                "delta_U": _safe_float(
+                    gold_row.get("U") if gold_row else None, float("nan")
+                )
                 - _safe_float(top1_row.get("U") if top1_row else None, float("nan")),
                 "delta_U_dis": _safe_float(
                     gold_row.get("U_dis") if gold_row else None, float("nan")
                 )
-                - _safe_float(top1_row.get("U_dis") if top1_row else None, float("nan")),
+                - _safe_float(
+                    top1_row.get("U_dis") if top1_row else None, float("nan")
+                ),
                 "delta_hierarchy_count": _safe_float(
                     gold_row.get("hierarchy_count") if gold_row else None, float("nan")
                 )
-                - _safe_float(top1_row.get("hierarchy_count") if top1_row else None, float("nan")),
+                - _safe_float(
+                    top1_row.get("hierarchy_count") if top1_row else None, float("nan")
+                ),
                 "delta_similarity_count": _safe_float(
                     gold_row.get("similarity_count") if gold_row else None, float("nan")
                 )
-                - _safe_float(top1_row.get("similarity_count") if top1_row else None, float("nan")),
+                - _safe_float(
+                    top1_row.get("similarity_count") if top1_row else None, float("nan")
+                ),
                 "delta_difference_count": _safe_float(
                     gold_row.get("difference_count") if gold_row else None, float("nan")
                 )
-                - _safe_float(top1_row.get("difference_count") if top1_row else None, float("nan")),
+                - _safe_float(
+                    top1_row.get("difference_count") if top1_row else None, float("nan")
+                ),
                 "delta_attribute_count": _safe_float(
                     gold_row.get("attribute_count") if gold_row else None, float("nan")
                 )
-                - _safe_float(top1_row.get("attribute_count") if top1_row else None, float("nan")),
+                - _safe_float(
+                    top1_row.get("attribute_count") if top1_row else None, float("nan")
+                ),
                 "delta_bridge_total_count": _safe_float(
-                    gold_row.get("bridge_total_count") if gold_row else None, float("nan")
+                    gold_row.get("bridge_total_count") if gold_row else None,
+                    float("nan"),
                 )
                 - _safe_float(
-                    top1_row.get("bridge_total_count") if top1_row else None, float("nan")
+                    top1_row.get("bridge_total_count") if top1_row else None,
+                    float("nan"),
                 ),
                 "delta_bridge_support_count": _safe_float(
-                    gold_row.get("bridge_support_count") if gold_row else None, float("nan")
+                    gold_row.get("bridge_support_count") if gold_row else None,
+                    float("nan"),
                 )
                 - _safe_float(
-                    top1_row.get("bridge_support_count") if top1_row else None, float("nan")
+                    top1_row.get("bridge_support_count") if top1_row else None,
+                    float("nan"),
                 ),
                 "delta_bridge_contrast_count": _safe_float(
-                    gold_row.get("bridge_contrast_count") if gold_row else None, float("nan")
+                    gold_row.get("bridge_contrast_count") if gold_row else None,
+                    float("nan"),
                 )
                 - _safe_float(
-                    top1_row.get("bridge_contrast_count") if top1_row else None, float("nan")
+                    top1_row.get("bridge_contrast_count") if top1_row else None,
+                    float("nan"),
                 ),
-                "panel_complete": bool(missing_topk_records == 0 and len(top_candidates) == top_k),
+                "panel_complete": bool(
+                    missing_topk_records == 0 and len(top_candidates) == top_k
+                ),
                 "missing_panel_record_count": int(missing_topk_records),
                 "top1_record_present": bool(top1_row),
                 "gold_record_present": bool(gold_row),
@@ -757,19 +862,19 @@ def load_run_analysis(
 ) -> RunAnalysisArtifacts:
     logger = logger or _setup_logger()
     run_dir = run_dir.resolve()
-    ranking_path, explanations_path, resolved_config, summary_metrics_path = _resolve_run_paths(
-        run_dir, config_path
+    ranking_path, explanations_path, resolved_config, summary_metrics_path = (
+        _resolve_run_paths(run_dir, config_path)
     )
     output_dir = (output_dir or _default_output_dir(run_dir)).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
 
     logger.info("Loading run analysis artifacts from %s", run_dir)
-    with explanations_path.open("r", encoding="utf-8") as fh:
-        records = json.load(fh)
+    records = list(RunReader.open(run_dir).iter_explanations())
     summary_df = _read_summary_metrics(summary_metrics_path)
     pair_df, record_index = _build_pair_dataframe(records, _summary_index(summary_df))
     pair_lookup = {
-        (str(row["src_iri"]), str(row["tgt_iri"])): row for row in pair_df.to_dict(orient="records")
+        (str(row["src_iri"]), str(row["tgt_iri"])): row
+        for row in pair_df.to_dict(orient="records")
     }
     source_df, ranked_candidates_by_source = _build_source_dataframe(
         ranking_path, pair_lookup, top_k=top_k
@@ -821,7 +926,11 @@ def _eligible_panels(source_df: pd.DataFrame, top_k: int) -> pd.DataFrame:
 def _shortlist_panels(
     eligible_df: pd.DataFrame, shortlist_per_rank: int, per_rank: int
 ) -> pd.DataFrame:
-    shortlist = eligible_df.groupby("gold_rank", group_keys=False).head(shortlist_per_rank).copy()
+    shortlist = (
+        eligible_df.groupby("gold_rank", group_keys=False)
+        .head(shortlist_per_rank)
+        .copy()
+    )
     shortlist["recommended_keep"] = shortlist["auto_rank_within_bucket"] <= per_rank
     return shortlist.reset_index(drop=True)
 
@@ -841,7 +950,9 @@ def _merge_review_sheet(
             if col not in existing.columns:
                 existing[col] = ""
         existing = existing[merge_cols + ["keep", "drop_reason", "review_note"]]
-        review_df = review_df.drop(columns=["keep", "drop_reason", "review_note"]).merge(
+        review_df = review_df.drop(
+            columns=["keep", "drop_reason", "review_note"]
+        ).merge(
             existing,
             on=merge_cols,
             how="left",
@@ -879,6 +990,6 @@ def _final_selection(review_df: pd.DataFrame, per_rank: int) -> pd.DataFrame:
             raise ValueError(
                 f"Selection must contain exactly {per_rank} sources for rank {rank}, found {counts.get(rank, 0)}."
             )
-    return selected.sort_values(by=["gold_rank", "auto_rank_within_bucket", "src_iri"]).reset_index(
-        drop=True
-    )
+    return selected.sort_values(
+        by=["gold_rank", "auto_rank_within_bucket", "src_iri"]
+    ).reset_index(drop=True)

@@ -3,6 +3,7 @@ from pathlib import Path
 import pandas as pd
 
 from exact.analysis.alignment_diagnostics import analyze_alignment_run
+from exact.runs import RunLayout
 
 
 def test_alignment_diagnostics_reports_oracle_and_miss_buckets(tmp_path: Path):
@@ -94,6 +95,32 @@ def test_alignment_diagnostics_reports_oracle_and_miss_buckets(tmp_path: Path):
     assert diagnostics["miss_buckets"]["present_wrong_selected"] == 1
     assert diagnostics["miss_buckets"]["present_abstained"] == 1
     assert diagnostics["llm"]["selected_fp"] == 1
+
+
+def test_alignment_diagnostics_resolves_layout_v2_paths(tmp_path: Path):
+    layout = RunLayout.create(tmp_path / "run-v2")
+    reference_path = tmp_path / "reference.tsv"
+    reference_path.write_text(
+        "SrcEntity\tTgtEntity\tScore\ns1\tt1\t1.0\n", encoding="utf-8"
+    )
+    layout.mapping_path("global").write_text(
+        "SrcEntity\tTgtEntity\tScore\ns1\tt1\t0.9\n", encoding="utf-8"
+    )
+    pd.DataFrame(
+        [
+            {
+                "src_iri": "s1",
+                "tgt_iri": "t1",
+                "saved_alignment_member": True,
+            }
+        ]
+    ).to_csv(layout.summary_metrics_path, sep="\t", index=False)
+
+    diagnostics = analyze_alignment_run(layout.root, reference_path)
+
+    assert diagnostics["counts"]["true_positive_pairs"] == 1
+    assert diagnostics["paths"]["alignment"] == str(layout.mapping_path("global"))
+    assert diagnostics["paths"]["summary"] == str(layout.summary_metrics_path)
 
 
 def test_alignment_diagnostics_applies_train_reference_as_null_mappings(tmp_path: Path):
