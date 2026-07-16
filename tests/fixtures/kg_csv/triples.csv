@@ -1,0 +1,5 @@
+subject,predicate,object
+http://example.org/kg/atrium,subclass_of,http://example.org/kg/heart
+http://example.org/kg/heart,subclass_of,http://example.org/kg/organ
+http://example.org/kg/heart,related_to,http://example.org/kg/blood
+http://example.org/kg/heart,description,muscular pump
