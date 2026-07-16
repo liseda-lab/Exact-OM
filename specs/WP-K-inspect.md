@@ -4,6 +4,7 @@
 PR-D3 (delivery consolidation) on the CLI shim. **Size**: M.
 **Behavior**: the Render-deployed study-visualizer service keeps working (same endpoints, env
 vars honored via shims); local usage gains a simpler entry point.
+**Status**: Done (2026-07-16).
 
 ## Context
 
@@ -108,3 +109,9 @@ capabilities; auth.
    with the new names when updated.
 3. Main `exact` wheel no longer depends on fastapi/uvicorn (dependency tree check in CI).
 4. `git grep study_visualizer_runtime` → only deprecation shims and CHANGELOG/MIGRATION.
+
+## Deviations
+
+The grep allowance also includes package metadata, quality commands, and compatibility tests:
+they are necessary to ship and verify the deprecated package shim. No active implementation
+imports the old runtime.

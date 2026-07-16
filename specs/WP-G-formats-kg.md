@@ -4,6 +4,7 @@
 OWL). Coordinates with WP-F (shared candidate-table schema) and WP-E (`typed-tsv` feeds typed
 eval). **Size**: L. **Behavior**: additive — with OWL inputs and default
 `output_formats: ["tsv-global","tsv-local"]`, outputs are byte-identical to baseline.
+**Status**: Done (2026-07-16).
 
 ## Context
 
@@ -126,3 +127,9 @@ streaming very-large-KG support (document current memory model instead).
 3. All writer/source tests green; conformance suite green for all three sources.
 4. BioKG profile + doc draft committed; submission builder produces a file passing our mirrored
    `verify` checks on the mini fixture.
+
+## Deviations
+
+The relation postprocessor lives at `exact/io/relations.py` and is bound through the core
+alignment-I/O hook, rather than under `exact/impl/models/`; this keeps core independent of I/O
+implementations while preserving the specified pure-function behavior.

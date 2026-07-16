@@ -16,20 +16,25 @@
 
 ## Work packages
 
-| WP | Title | Spec | Depends on | Size |
-|----|-------|------|------------|------|
-| A | Foundations & hygiene | `WP-A-foundations.md` | — | S |
-| B | Java-free ontology backend | `WP-B-ontology-backend.md` | A | XL |
-| C | Timing ledger | `WP-C-timing.md` | A | M |
-| D | Module decomposition & delivery consolidation | `WP-D-decomposition.md` | A, C | L |
-| E | OAEI-Bio-ML-eval integration | `WP-E-evaluation.md` | A (final wiring: B) | M |
-| F | Property & instance matching | `WP-F-entity-kinds.md` | B | L |
-| G | I/O formats & KG sources | `WP-G-formats-kg.md` | B (typed eval: E) | L |
-| H | Documentation | `WP-H-docs.md` | scaffold: A; content: all | M |
-| I | Dataset & track retrieval (HF + classic OAEI) | `WP-I-datasets-tracks.md` | A | M |
-| J | Config schema v2 + migrator | `WP-J-config-v2.md` | A; after B/C/E/I keys land | M |
-| K | `exact-inspect` service repackaging | `WP-K-inspect.md` | B | M |
-| L | Run artifacts & explanation store | `WP-L-run-artifacts.md` | C, D (coordinates K) | M–L |
+| WP | Title | Spec | Depends on | Size | Final status |
+|----|-------|------|------------|------|--------------|
+| A | Foundations & hygiene | `WP-A-foundations.md` | — | S | Done |
+| B | Java-free ontology backend | `WP-B-ontology-backend.md` | A | XL | Done |
+| C | Timing ledger | `WP-C-timing.md` | A | M | Done |
+| D | Module decomposition & delivery consolidation | `WP-D-decomposition.md` | A, C | L | Done |
+| E | OAEI-Bio-ML-eval integration | `WP-E-evaluation.md` | A (final wiring: B) | M | Done |
+| F | Property & instance matching | `WP-F-entity-kinds.md` | B | L | Done |
+| G | I/O formats & KG sources | `WP-G-formats-kg.md` | B (typed eval: E) | L | Done |
+| H | Documentation | `WP-H-docs.md` | scaffold: A; content: all | M | Done |
+| I | Dataset & track retrieval (HF + classic OAEI) | `WP-I-datasets-tracks.md` | A | M | Done |
+| J | Config schema v2 + migrator | `WP-J-config-v2.md` | A; after B/C/E/I keys land | M | Done |
+| K | `exact-inspect` service repackaging | `WP-K-inspect.md` | B | M | Done |
+| L | Run artifacts & explanation store | `WP-L-run-artifacts.md` | C, D (coordinates K) | M–L | Done |
+
+Each work-package file records its implementation deviations. External-data, accelerator, and
+hosted-service checks remain environment-specific verification; they do not reopen completed
+engineering scope. The result-changing plans under `specs/experiments/` were not implemented as
+part of this suite.
 
 Cross-cutting (applies to every WP): `03-performance.md` — benchmark harness, CI perf gates,
 compiled-kernel policy. `04-methodology-audit.md` — methodology sanity-check findings; its

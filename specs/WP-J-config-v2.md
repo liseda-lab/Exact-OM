@@ -5,6 +5,7 @@ their keys under v1 names, so this WP folds them into the v2 shape once. WP-F/WP
 write v2-native keys. **Size**: M.
 **Behavior**: v1 configs keep working for one release via auto-migration; resolved settings are
 identical (exhaustively tested).
+**Status**: Done (2026-07-16).
 
 ## Context
 
@@ -135,3 +136,9 @@ touching the LLM profile schema internals (moved wholesale under `llm.profiles`)
 4. Tuner + job-runner tools work with v2 paths (their tests updated).
 5. WP-F/WP-G land their keys under v2 names without touching the migrator (their keys have no
    v1 ancestry).
+
+## Deviations
+
+Registry-specific `pipeline[].params` remain validated free-form mappings so third-party
+components can accept their own constructor schemas. Built-in defaults are generated centrally,
+but these nested component parameters are not individually typed as `ConfigModel` fields.

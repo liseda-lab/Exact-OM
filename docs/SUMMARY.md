@@ -1,10 +1,33 @@
 # Exact-OM
 
 - [Home](index.md)
-- [User guide](user-guide.md)
+- Getting started
+    - [Installation](getting-started/installation.md)
+    - [Quickstart](getting-started/quickstart.md)
+- Guides
+    - [Datasets and tracks](guides/datasets-tracks.md)
+    - [Ontology matching](guides/ontology-matching.md)
+    - [KG matching](guides/kg-matching.md)
+    - [Property and instance matching](guides/property-instance-matching.md)
+    - [Evaluation](guides/evaluation.md)
+    - [Runs, caching, and resume](guides/runs-caching-resume.md)
+    - [Inspecting alignments](guides/inspecting-alignments.md)
+    - [LLM configuration](guides/llm-configuration.md)
+    - [Tuning and Slurm](guides/tuning-slurm.md)
+    - [User study](guides/user-study.md)
 - Concepts
-    - [Pair-adaptive scoring](pair_adaptive_scoring_slides.md)
-    - [Semantic scorer defaults](semantic_scorer_defaults.md)
+    - [Architecture](concepts/architecture.md)
+    - [Scoring model](concepts/scoring-model.md)
+    - [Extending Exact-OM](concepts/extending.md)
+    - [Detailed scoring notes](pair_adaptive_scoring_slides.md)
 - Reference
     - [Configuration](reference/configuration/)
     - [Command line](reference/cli/)
+    - [Python API](reference/api.md)
+    - [Output files](reference/output-files.md)
+- Project
+    - [Changelog](project/changelog.md)
+    - [Migration from 1.x](project/migration.md)
+    - [Contributing](project/contributing.md)
+    - [Legacy user-guide redirect](user-guide.md)
+    - [Legacy defaults redirect](semantic_scorer_defaults.md)

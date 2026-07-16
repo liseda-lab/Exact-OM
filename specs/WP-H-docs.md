@@ -2,6 +2,7 @@
 
 **Depends on**: scaffold after WP-A (can run in wave 1); content after all WPs land.
 **Size**: M. Two phases: **H-scaffold** (tooling, wave 1) and **H-content** (wave 3).
+**Status**: Done (2026-07-16).
 
 ## Context
 
@@ -102,3 +103,8 @@ Project
 4. MIGRATION.md covers every deprecation shim listed in contracts §11.
 5. `interrogate` report ≥ 80% on the priority packages; no `TODO`/`FIXME` in published pages.
 6. No references to Java/JVM anywhere in docs except the migration page.
+
+## Deviations
+
+The documentation toolchain is a published `docs` wheel extra rather than only a Poetry
+dependency group, satisfying the optional-extra contract for both pip and Poetry installs.

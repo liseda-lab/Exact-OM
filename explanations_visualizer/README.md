@@ -1,10 +1,9 @@
-# Exact Study Visualizer
+# Exact Inspect Frontend
 
-This directory contains the frontend for the Exact study visualizer: a
+This directory contains the frontend for `exact-inspect`: a
 read-only graph application used to inspect user-study cases generated from an
 Exact run. It is designed to be embedded in LimeSurvey through an iframe and is
-served together with a lightweight FastAPI backend via
-`study_visualizer_runtime`.
+served together with the optional `exact_inspect` FastAPI service.
 
 The visualizer is not a standalone file-browser application. It serves one
 fixed study run at a time and loads one source case per request through:
@@ -41,16 +40,17 @@ The frontend expects the backend to expose the study APIs at the same origin:
 
 Those endpoints are implemented in the Python code under:
 
-- [`study_visualizer_runtime/app.py`](../study_visualizer_runtime/app.py)
-- [`study_visualizer_runtime/cli.py`](../study_visualizer_runtime/cli.py)
+- [`exact_inspect/app.py`](../exact_inspect/app.py)
+- [`exact_inspect/cli.py`](../exact_inspect/cli.py)
 
 The frontend therefore assumes it is being served by the visualizer backend,
 not by an isolated static web server.
 
-## Required Run Artifacts
+## Run and bundle inputs
 
-The backend loads its data from an existing Exact run directory. At minimum,
-the run must provide:
+`exact-inspect open` reads a historical or layout-v2 Exact run through `RunReader`; it does not
+require a user-study export or monolithic explanation file. A curated service bundle instead
+uses:
 
 - `analysis/user_study/study_mapping.json`
 - `analysis/user_study/study_selected_records_with_rationales.json`
@@ -97,10 +97,10 @@ npm run build
 From the repository root:
 
 ```bash
-poetry install
-poetry run python -m study_visualizer_runtime.cli \
-  --run-dir exp/test/Full_local_bioml_with_exp/omim-ordo \
-  --analysis-dir exp/test/Full_local_bioml_with_exp/omim-ordo/analysis/user_study \
+poetry install --extras viz
+poetry run exact-inspect serve \
+  --run-dir runs/omim-ordo \
+  --analysis-dir runs/omim-ordo/analysis/user_study \
   --port 8000
 ```
 
@@ -118,7 +118,7 @@ for end-to-end use unless you add your own proxy layer. The normal development
 path is:
 
 1. build the frontend bundle in this directory
-2. serve it through `python -m study_visualizer_runtime.cli`
+2. serve it through `exact-inspect serve`
 
 If you do want to point the frontend at a separately running backend during
 frontend iteration, you can set:
@@ -140,20 +140,24 @@ variables.
 
 Required:
 
-- `EXACT_STUDY_RUN_DIR`
+- `EXACT_INSPECT_RUN_DIR`
 
 Optional:
 
-- `EXACT_STUDY_ANALYSIS_DIR`
-- `EXACT_STUDY_ENABLE_ONTOLOGY_INFO`
-- `EXACT_STUDY_HOST`
-- `EXACT_STUDY_PORT`
-- `EXACT_STUDY_LOG_LEVEL`
+- `EXACT_INSPECT_ANALYSIS_DIR`
+- `EXACT_INSPECT_FRONTEND_DIR`
+- `EXACT_INSPECT_ENABLE_ONTOLOGY_INFO`
+- `EXACT_INSPECT_HOST`
+- `EXACT_INSPECT_PORT`
+- `EXACT_INSPECT_LOG_LEVEL`
+
+The corresponding `EXACT_STUDY_*` names remain accepted temporarily for existing deployments
+and emit a deprecation warning. New names take precedence when both are present.
 
 Equivalent CLI:
 
 ```bash
-poetry run python -m study_visualizer_runtime.cli --help
+poetry run exact-inspect serve --help
 ```
 
 ## Interaction Model
@@ -181,7 +185,7 @@ The intended deployment model is one FastAPI service, suitable for platforms
 such as Render:
 
 1. build the frontend with `npm install && npm run build`
-2. start the Python server with `python -m study_visualizer_runtime.cli`
+2. start the Python server with `exact-inspect serve`
 3. point the service at a fixed run directory through environment variables
 
 One deployment serves one study run. LimeSurvey can then embed specific source

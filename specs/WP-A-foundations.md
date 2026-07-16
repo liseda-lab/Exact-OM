@@ -2,6 +2,7 @@
 
 **Depends on**: nothing. **Blocks**: everything. **Size**: S (1 agent, single PR).
 **Behavior-preserving**: yes — except the named bug fixes, no output may change.
+**Status**: Done (2026-07-16).
 
 ## Context
 
@@ -140,3 +141,8 @@ WP-B owns it.
 4. No collection errors from pytest; every file under `tests/` is either collected or deleted.
 5. `python -W error::DeprecationWarning -c "from exact.delivery.api import EvalutionRunner"`
    raises the deprecation (shim works), and the new names import cleanly.
+
+## Deviations
+
+WP-K superseded the interim visualizer packaging: `exact-study-viz` is now a compatibility
+command behind the `viz` extra, while a core-only wheel fails actionably if that extra is absent.

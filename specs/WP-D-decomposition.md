@@ -5,6 +5,7 @@ WP-B-owned files (`core/contracts/dataset.py`, `core/entities/ontology.py`, `imp
 delivery JVM lines). **Size**: L (1 agent, 3 stacked PRs).
 **Behavior-preserving**: strictly. This WP is pure refactor: same outputs, same file formats,
 same registry names, same config keys. Every commit keeps the test suite green.
+**Status**: Done (2026-07-16).
 
 ## Context
 
@@ -132,3 +133,9 @@ documented duplicate-path unification.
    D1 (fixture-scale artifact committed under `tests/fixtures/checkpoints/`).
 4. No file in `exact/` exceeds ~1500 lines (soft; document any exception).
 5. `lint-imports` green with the full contract set.
+
+## Deviations
+
+`exact/impl/datasets/base.py` is 1,519 lines, marginally above the approximate 1,500-line soft
+ceiling; the WP-D refactor targets are below it, and this WP-B/F-owned dataset keeps its
+kind-aware retrieval and cache lifecycle together.

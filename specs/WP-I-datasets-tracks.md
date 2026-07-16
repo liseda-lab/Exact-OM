@@ -4,6 +4,7 @@
 BioKG/CSV layouts and with WP-J on the `data:` config section. **Size**: M.
 **Behavior**: additive — explicit `-s/-t/-f/-c` paths keep working unchanged; tracks are a
 convenience layer on top.
+**Status**: Done (2026-07-16).
 
 ## Context
 
@@ -126,3 +127,9 @@ not redistribute; a generic "HF datasets-library" loader (we snapshot files, we 
 4. Lockfile survives and correctly reports all four `status` states in hermetic tests.
 5. A new dataset is addable by YAML descriptor alone — prove it in a test that loads a custom
    descriptor from a temp path.
+
+## Deviations
+
+The literal `git grep get_data` gate is scoped to runtime/source references. WP-H is required to
+retain `data/get_data.py` in migration documentation, so those historical references remain;
+the removed downloader has no live callers.

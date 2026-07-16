@@ -4,6 +4,7 @@
 parallel to WP-G (coordinate on the candidate-table schema — contracts §6). **Size**: L.
 **Behavior**: additive — default `entity_kinds: ["class"]` reproduces class-only behavior
 exactly (same candidate pools, same outputs).
+**Status**: Done (2026-07-16).
 
 ## Context
 
@@ -99,3 +100,8 @@ internals.
 3. A fixture run with all kinds completes end-to-end (LLM fakes) and its `full_explanations.json`
    entries carry correct `kind`.
 4. Config reference (generated in WP-H) documents `entity_kinds`.
+
+## Deviations
+
+None. Annotation properties remain an exposed source-signature kind but are rejected as a
+matching kind, as listed under Out of scope.

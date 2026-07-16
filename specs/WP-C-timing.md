@@ -4,6 +4,7 @@
 **Size**: M (1 agent, single PR).
 **Behavior**: output *files* change (new `timings.json`; `times.txt` becomes derived); alignment
 results unchanged.
+**Status**: Done (2026-07-16).
 
 ## Context — how timing lies today
 
@@ -118,3 +119,7 @@ Relocating trainer code (WP-D), evaluator restructuring (WP-E), removing `times.
    sessions; cumulative inference equals run 1; `times.txt` values don't regress to 0.
 3. `AlignmentAction.run` contains no raw `time.time()` stage bookkeeping (grep gate).
 4. `run_stats.json` carries the session/cumulative split; log prints the OAEI-reportable line.
+
+## Deviations
+
+None.

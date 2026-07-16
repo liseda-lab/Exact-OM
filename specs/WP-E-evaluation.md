@@ -4,6 +4,7 @@
 (coherence/ignored-class inputs). **Size**: M (1 agent, single PR + a follow-up when upstream
 publishes its API). **Behavior**: additive — `evaluation.backends: ["builtin"]` default
 reproduces today's outputs exactly.
+**Status**: Done (2026-07-16).
 
 ## Context
 
@@ -110,3 +111,9 @@ upstream package development itself (proposal doc only).
 3. Without the extra installed, selecting `bioml` fails with the actionable install message;
    not selecting it never imports it.
 4. `specs/upstream-bioml-eval-api.md` written and filed upstream as an issue/PR.
+
+## Deviations
+
+The proposal is committed, but filing it in the external upstream tracker remains project
+coordination outside this repository. The pinned upstream distribution currently supports
+Python 3.12; the builtin backend remains available on every supported Exact Python version.

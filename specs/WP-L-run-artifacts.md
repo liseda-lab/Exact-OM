@@ -6,6 +6,7 @@ is the seam this WP replaces), coordinates with WP-K (the viewer reads through t
 **Behavior**: final deliverables (alignment TSVs, eval results) unchanged byte-for-byte; the
 *internal* explanation/audit artifacts are restructured behind a versioned layout with readers
 for both versions.
+**Status**: Done (2026-07-16).
 
 ## Context — what a run directory looks like today, and why it hurts
 
@@ -153,3 +154,7 @@ later if `index.json` shows limits — note in code); retention of dataset cache
    an explicit deliverable).
 5. Grep gates: no `"model/alignment"` string outside `RunLayout`; no module writes into
    `checkpoints/` except `exact/runs` + trainer checkpointing.
+
+## Deviations
+
+None.

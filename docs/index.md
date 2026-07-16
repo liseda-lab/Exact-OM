@@ -25,14 +25,14 @@ breaks the final score into lexical, structural, and LLM contributions.
 
 ## Start here
 
-- The [user guide](user-guide.md) contains the existing installation, alignment, evaluation,
-  analysis, and operations material migrated from the former static site.
+- Run the bundled [CPU quickstart](getting-started/quickstart.md), then choose a focused guide
+  for ontology matching, KG matching, evaluation, or inspection.
 - The [configuration reference](reference/configuration/index.md) is generated from the Pydantic
   schema and `exact/default_config.yaml` on every documentation build.
 - The [command-line reference](reference/cli/index.md) is generated directly from the `argparse`
   definitions under `exact/delivery/cli/`.
-- [Pair-adaptive scoring](pair_adaptive_scoring_slides.md) explains the evidence channels and
-  fusion model in depth.
+- [Pair-adaptive scoring](concepts/scoring-model.md) explains the evidence channels and fusion
+  model, with detailed notes retained in the linked design page.
 
 ## Pipeline
 

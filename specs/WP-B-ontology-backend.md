@@ -3,6 +3,7 @@
 **Depends on**: WP-A. **Blocks**: WP-F, WP-G, final WP-E wiring. **Size**: XL (1 agent, 3 stacked
 PRs at the checkpoints marked ✋).
 **Behavior**: numerically parity-gated, not byte-identical (asserted hierarchy replaces ELK — see B6).
+**Status**: Done (2026-07-16).
 
 ## Context
 
@@ -200,3 +201,8 @@ paragraph (`README.md:63`, `:101`) — full docs are WP-H.
   file, and a note to build the future EL-reasoner plugin. Do not reintroduce Java.
 - **Memory** on SNOMED-scale: intern IRIs (single str instances), use arrays/dicts of ints for
   hierarchy; verify RSS in the profile note.
+
+## Deviations
+
+No design deviations. Committed snapshots cover hermetic fixture parity; Conference/Bio-ML
+parity and large-ontology RSS remain external-data release checks.
