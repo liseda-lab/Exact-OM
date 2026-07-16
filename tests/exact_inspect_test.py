@@ -48,6 +48,27 @@ def _v2_run(root: Path) -> Path:
     return root
 
 
+def _multi_shard_v2_run(root: Path) -> Path:
+    layout = RunLayout.create(root)
+    layout.mapping_path("local").write_text(
+        "SrcEntity\tTgtEntity\tScore\n" "source-a\ttarget-a\t0.91\n" "source-b\ttarget-b\t0.82\n",
+        encoding="utf-8",
+    )
+    store = ExplanationStore(
+        layout.explanations_dir,
+        run_id="inspect-test",
+        shard_mb=0.000001,
+    )
+    first = _record("source-a", "target-a")
+    first["selected_labels"] = {"source": "Source A", "target": "Target A"}
+    second = _record("source-b", "target-b")
+    second["selected_labels"] = {"source": "Source B", "target": "Target B"}
+    store.append([first, second])
+    index = json.loads(layout.explanation_index_path.read_text(encoding="utf-8"))
+    assert len(index["shards"]) == 2
+    return root
+
+
 def test_legacy_settings_warn_and_new_environment_wins(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -97,15 +118,50 @@ def test_open_mode_serves_runreader_artifacts(tmp_path: Path, layout: str) -> No
     assert health.json()["layout_version"] == (1 if layout == "v1" else 2)
 
     sources = client.get("/api/study/sources").json()
-    assert sources == [{"source_id": "source", "source_label": "Source label"}]
+    assert sources == [
+        {
+            "source_id": "source",
+            "source_label": "Source label" if layout == "v1" else "source",
+        }
+    ]
     bundle = client.get("/api/study/source", params={"source": "source"})
     assert bundle.status_code == 200
+    assert bundle.json()["source_label"] == "Source label"
     assert bundle.json()["targets"][0]["target_id"] == "target"
     assert bundle.json()["targets"][0]["score"] == pytest.approx(0.91)
+    assert client.get("/api/study/sources").json()[0]["source_label"] == "Source label"
 
     banner = client.get("/")
     assert banner.status_code == 200
     assert "API-only mode" in banner.text
+
+
+def test_v2_open_reads_at_most_one_shard_per_requested_source(tmp_path: Path) -> None:
+    run_dir = _multi_shard_v2_run(tmp_path / "v2-multi")
+    app = create_app(InspectSettings(run_dir=run_dir, enable_ontology_info=False))
+    service = app.state.study_service
+    client = TestClient(app)
+
+    assert service.reader is not None
+    assert service.reader.explanation_shard_reads == 0
+    assert [row["source_id"] for row in client.get("/api/study/sources").json()] == [
+        "source-a",
+        "source-b",
+    ]
+    assert service.reader.explanation_shard_reads == 0
+
+    first = client.get("/api/study/source", params={"source": "source-a"})
+    assert first.status_code == 200
+    assert first.json()["source_label"] == "Source A"
+    assert service.reader.explanation_shard_reads == 1
+
+    assert client.get("/api/study/source", params={"source": "source-a"}).status_code == 200
+    assert service.reader.explanation_shard_reads == 1
+
+    second = client.get("/api/study/source", params={"source": "source-b"})
+    assert second.status_code == 200
+    assert second.json()["source_label"] == "Source B"
+    assert service.reader.explanation_shard_reads == 2
 
 
 def test_committed_bundle_endpoints_are_unchanged(tmp_path: Path) -> None:

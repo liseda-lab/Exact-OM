@@ -79,8 +79,8 @@ def _normalise_record(record: Mapping[str, Any]) -> Dict[str, Any]:
     return payload
 
 
-def _open_mode_payload(reader: RunReader) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
-    """Build the historical UI payload exclusively through :class:`RunReader`."""
+def _open_mode_mapping_index(reader: RunReader) -> Dict[Tuple[str, str], Dict[str, Any]]:
+    """Index local alignment rows without touching explanation shards."""
 
     mapping_rows = reader.mappings("local").to_dict(orient="records")
     mapping_by_pair: Dict[Tuple[str, str], Dict[str, Any]] = {}
@@ -89,10 +89,18 @@ def _open_mode_payload(reader: RunReader) -> Tuple[Dict[str, Any], List[Dict[str
         tgt = safe_text(_first_value(raw, ("TgtEntity", "Tgt", "tgt_iri", "target")))
         if src and tgt:
             mapping_by_pair[(src, tgt)] = dict(raw)
+    return mapping_by_pair
+
+
+def _open_payload_from_records(
+    mapping_by_pair: Mapping[Tuple[str, str], Mapping[str, Any]],
+    raw_records: Iterable[Mapping[str, Any]],
+) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
+    """Build the UI payload for a materialized set of explanation records."""
 
     records: List[Dict[str, Any]] = []
     indexed_pairs: set[Tuple[str, str]] = set()
-    for raw in reader.iter_explanations():
+    for raw in raw_records:
         record = _normalise_record(raw)
         pair = _record_pair(record)
         if not all(pair):
@@ -142,6 +150,40 @@ def _open_mode_payload(reader: RunReader) -> Tuple[Dict[str, Any], List[Dict[str
             )
         pairs.append({"id": src, "paths": paths})
     return {"pairs": pairs}, records
+
+
+def _open_mode_payload(reader: RunReader) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
+    """Build the complete historical UI payload for exports and v1 runs."""
+
+    return _open_payload_from_records(
+        _open_mode_mapping_index(reader),
+        reader.iter_explanations(),
+    )
+
+
+def _indexed_explanation_sources(reader: RunReader) -> List[str]:
+    """Read source identifiers from a v2 index without opening any shard."""
+
+    path = reader.layout.explanation_index_path
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError(f"Invalid explanation index at {path}: {exc}") from exc
+    sources = payload.get("sources")
+    if not isinstance(sources, dict):
+        raise ValueError(f"Explanation index must contain a source mapping: {path}")
+    return sorted(str(source) for source in sources)
+
+
+def _lazy_open_mode_payload(
+    reader: RunReader,
+) -> Tuple[Dict[str, Any], Dict[Tuple[str, str], Dict[str, Any]]]:
+    """Build source placeholders for v2 without decompressing explanations."""
+
+    mapping_by_pair = _open_mode_mapping_index(reader)
+    sources = set(_indexed_explanation_sources(reader))
+    sources.update(source for source, _ in mapping_by_pair)
+    return {"pairs": [{"id": source, "paths": []} for source in sorted(sources)]}, mapping_by_pair
 
 
 def _hash_id(prefix: str, raw: str) -> str:
@@ -493,6 +535,9 @@ class StudyVisualizerService:
         self.bundle_manifest = self._load_bundle_manifest()
         self.reader: Optional[RunReader] = None
         self.selected_records_path: Optional[Path] = None
+        self._lazy_open = False
+        self._open_mapping_by_pair: Dict[Tuple[str, str], Dict[str, Any]] = {}
+        self._loaded_open_sources: set[str] = set()
         if self.mode == "bundle":
             self.selected_records_path = self._resolve_selected_records_path()
             self.study_mapping = json.loads(self.mapping_path.read_text(encoding="utf-8"))
@@ -501,7 +546,17 @@ class StudyVisualizerService:
             )
         else:
             self.reader = RunReader.open(self.run_dir)
-            self.study_mapping, self.selected_records = _open_mode_payload(self.reader)
+            if (
+                self.reader.layout.version == 2
+                and self.reader.layout.explanation_index_path.is_file()
+            ):
+                self.study_mapping, self._open_mapping_by_pair = _lazy_open_mode_payload(
+                    self.reader
+                )
+                self.selected_records = []
+                self._lazy_open = True
+            else:
+                self.study_mapping, self.selected_records = _open_mode_payload(self.reader)
         self.selected_record_index: Dict[Tuple[str, str], Dict[str, Any]] = {
             _record_pair(record): _normalise_record(record) for record in self.selected_records
         }
@@ -608,6 +663,55 @@ class StudyVisualizerService:
             }
             for source_id in self._selected_sources
         ]
+
+    def _load_open_source(self, source_iri: str) -> None:
+        """Load and index one v2 source while leaving every other shard untouched."""
+
+        if not self._lazy_open or source_iri in self._loaded_open_sources:
+            return
+        if source_iri not in self._selected_sources or self.reader is None:
+            raise KeyError(source_iri)
+
+        source_mappings = {
+            pair: row for pair, row in self._open_mapping_by_pair.items() if pair[0] == source_iri
+        }
+        payload, records = _open_payload_from_records(
+            source_mappings,
+            self.reader.explanations_for(source_iri),
+        )
+        source_payload = next(
+            (
+                dict(pair)
+                for pair in list(payload.get("pairs") or [])
+                if safe_text(pair.get("id")) == source_iri
+            ),
+            {"id": source_iri, "paths": []},
+        )
+        stored_payload = next(
+            (
+                pair
+                for pair in list(self.study_mapping.get("pairs") or [])
+                if safe_text(pair.get("id")) == source_iri
+            ),
+            None,
+        )
+        if stored_payload is None:
+            raise KeyError(source_iri)
+        stored_payload["paths"] = list(source_payload.get("paths") or [])
+
+        for record in records:
+            normalized = _normalise_record(record)
+            self.selected_records.append(normalized)
+            self.selected_record_index[_record_pair(normalized)] = normalized
+        for path in list(stored_payload.get("paths") or []):
+            target = safe_text(path.get("id"))
+            if target:
+                self._pair_mapping_lookup[(source_iri, target)] = dict(path)
+        if records:
+            self._source_label_lookup[source_iri] = (
+                safe_text((records[0].get("selected_labels") or {}).get("source")) or source_iri
+            )
+        self._loaded_open_sources.add(source_iri)
 
     @staticmethod
     def _endpoint_node_id(side: str, entity_iri: str) -> str:
@@ -1086,6 +1190,7 @@ class StudyVisualizerService:
         cached = self._source_cache.get(source_iri)
         if cached is not None:
             return cached
+        self._load_open_source(source_iri)
         pair = next(
             (
                 dict(pair)
