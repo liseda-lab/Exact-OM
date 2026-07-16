@@ -1,3 +1,5 @@
+"""Budgeted graph-path and entity-context search algorithms."""
+
 from collections import defaultdict, deque, namedtuple
 from typing import Callable, Dict, List, Optional, Set, Tuple
 
@@ -93,6 +95,7 @@ def best_path_lagrangian_relaxation(
     cost_fn: Callable[[Tuple[str, str, str]], int],
     iters: int = 8,
 ) -> Tuple[Optional[List[Tuple[str, str, str]]], int]:
+    """Approximate the best budgeted path by searching Lagrange multipliers."""
 
     # 1) Prepare bounds for λ
     all_edges = [e.astuple() for edges in out_edges.values() for e in edges]

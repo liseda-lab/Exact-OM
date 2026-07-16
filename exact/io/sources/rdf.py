@@ -337,17 +337,23 @@ class RdfSource(KnowledgeSource):
         return self._origin
 
     def entities(self, kind: EntityKind = EntityKind.CLASS) -> Sequence[str]:
+        """Return the indexed identifiers for ``kind``."""
+
         try:
             return self._signature[EntityKind(kind)]
         except ValueError as exc:
             raise ValueError(f"Unknown entity kind: {kind!r}") from exc
 
     def labels(self, iri: str) -> list[str]:
+        """Return labels selected by the configured label predicates."""
+
         return list(self._labels.get(str(iri), ()))
 
     def annotations(
         self, iri: str, properties: Sequence[str] | None = None
     ) -> list[AnnotationValue]:
+        """Return literal annotations, optionally filtered by predicate."""
+
         values = self._annotations.get(str(iri), ())
         if properties is None:
             return list(values)
@@ -355,9 +361,13 @@ class RdfSource(KnowledgeSource):
         return [value for value in values if value.property_iri in selected]
 
     def attributes(self, iri: str) -> list[AnnotationValue]:
+        """Return literal annotations that are not labels."""
+
         return list(self._attributes.get(str(iri), ()))
 
     def direct_parents(self, iri: str, kind: EntityKind = EntityKind.CLASS) -> list[str]:
+        """Return direct parents using the kind-appropriate hierarchy."""
+
         normalized_kind = EntityKind(kind)
         if normalized_kind == EntityKind.CLASS:
             return self.hierarchy.direct_parents(str(iri))
@@ -366,6 +376,8 @@ class RdfSource(KnowledgeSource):
         return self._property_hierarchy.direct_parents(str(iri))
 
     def direct_children(self, iri: str, kind: EntityKind = EntityKind.CLASS) -> list[str]:
+        """Return direct children using the kind-appropriate hierarchy."""
+
         normalized_kind = EntityKind(kind)
         if normalized_kind == EntityKind.CLASS:
             return self.hierarchy.direct_children(str(iri))
@@ -376,6 +388,8 @@ class RdfSource(KnowledgeSource):
     def hierarchy_bundle(
         self, iri: str, families: Mapping[str, Sequence[str]]
     ) -> dict[str, list[str]]:
+        """Collect configured hierarchy-predicate targets by family."""
+
         result: dict[str, list[str]] = {}
         for family, predicates in families.items():
             if family == "is_a":
@@ -390,20 +404,30 @@ class RdfSource(KnowledgeSource):
     def projection_edges(
         self, *, method: str = "owl2vecstar", include_literals: bool = False
     ) -> list[Edge]:
+        """Return RDF graph edges, optionally including literal objects."""
+
         del method
         edges = self._iri_edges + (self._literal_edges if include_literals else ())
         return sorted(edges, key=Edge.astuple)
 
     def property_domains(self, prop_iri: str) -> list[str]:
+        """Return named ``rdfs:domain`` targets for a property."""
+
         return list(self._domains.get(str(prop_iri), ()))
 
     def property_ranges(self, prop_iri: str) -> list[str]:
+        """Return named ``rdfs:range`` targets for a property."""
+
         return list(self._ranges.get(str(prop_iri), ()))
 
     def excluded_from_alignment(self) -> frozenset[str]:
+        """Return deprecated or explicitly disabled identifiers."""
+
         return self._excluded
 
     def short_form(self, iri: str) -> str:
+        """Return a compact display form for ``iri``."""
+
         return short_form(iri)
 
     def ancestors(self, iri: str) -> set[str]:

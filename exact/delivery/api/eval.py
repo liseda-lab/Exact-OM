@@ -10,9 +10,7 @@ from exact.delivery.common import (
 
 
 class EvaluationRunner:
-    """
-    Main class to run the evaluation.
-    """
+    """Validate and execute one or more registered evaluation backends."""
 
     def __init__(
         self,
@@ -31,21 +29,23 @@ class EvaluationRunner:
         backends: Optional[list[str]] = None,
         backend_options: Optional[Mapping[str, Mapping[str, Any]]] = None,
     ):
-        """
+        """Create a reusable evaluation runner.
 
         Args:
-            alignment_file (str): Path to the alignment file.
-            output_dir (str): Path to the output directory.
-            error_on_fail (bool, optional): Raise an error if evaluation fails. Defaults to False.
-            K (Optional[list], optional): The number of top-K elements to consider in the evaluation. Defaults to [1, 5, 10].
-            source_ontology_file (Optional[str], optional): Path to the source ontology file. Defaults to None.
-            target_ontology_file (Optional[str], optional): Path to the target ontology file. Defaults to None.
-            train_reference_file (Optional[str], optional): Path to the train reference file. Defaults to None.
-            full_reference_file (Optional[str], optional): Path to the full reference file. Defaults to None.
-            reference_candidates (Optional[str], optional): Path to the reference candidates file. Defaults to None.
-            log_file_path (Optional[str], optional): Path to the log file. Defaults to None.
-            log_level (Optional[str], optional): Log level. Defaults to None.
-            save_logs (Optional[bool], optional): Whether to save logs. Defaults to False.
+            alignment_file: Mapping or ranking file to evaluate.
+            output_dir: Existing directory for evaluation reports.
+            error_on_fail: Raise backend failures instead of reporting them.
+            K: Ranking cutoffs; defaults to 1, 5, and 10.
+            source_ontology_file: Optional source ontology used by a backend.
+            target_ontology_file: Optional target ontology used by a backend.
+            train_reference_file: Optional training mappings excluded from scoring.
+            full_reference_file: Optional complete reference alignment.
+            reference_candidates: Optional candidate-ranking reference.
+            log_level: Optional logging-level override.
+            save_logs: Write the evaluation log under ``output_dir``.
+            jvm_heap_size: Deprecated compatibility argument; ignored.
+            backends: Ordered evaluator registry names.
+            backend_options: Per-backend option mappings.
         """
         self.alignment_file = alignment_file
         self.output_dir = output_dir
@@ -63,9 +63,13 @@ class EvaluationRunner:
         self.backend_options = dict(backend_options or {})
 
     def run_evaluation(self):
+        """Execute evaluation using the prepared request."""
+
         return execute_evaluation(self._prepare(create_output=True))
 
     def _prepare(self, *, create_output: bool) -> EvaluationInvocation:
+        """Resolve paths and options into the shared delivery request."""
+
         return prepare_evaluation(
             alignment_file=self.alignment_file,
             output_dir=self.output_dir,
@@ -86,19 +90,21 @@ class EvaluationRunner:
         )
 
     def validate_files(self) -> None:
+        """Raise when an input or output path is invalid."""
+
         self._prepare(create_output=False)
         warn_ignored_jvm(self.jvm_heap_size, "jvm_heap_size")
 
     def run(self):
-        """
-        Run the evaluation.
-        """
+        """Validate inputs and return the combined evaluation result."""
         self.validate_files()
 
         return self.run_evaluation()
 
 
 def __getattr__(name: str):
+    """Resolve the historical misspelled runner alias with a warning."""
+
     if name == "EvalutionRunner":
         warnings.warn(
             "EvalutionRunner is deprecated; use EvaluationRunner instead",

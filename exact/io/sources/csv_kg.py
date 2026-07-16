@@ -71,6 +71,8 @@ class TripleFileSpec:
 
     @classmethod
     def parse(cls, value: Any, *, location: str) -> "TripleFileSpec":
+        """Parse one compact or mapping-based triples-file declaration."""
+
         if isinstance(value, str):
             path = _safe_relative(value, option=f"{location}.path")
             return cls(path=path, delimiter=_delimiter(path, None, option=location))
@@ -116,6 +118,8 @@ class LabelsFileSpec:
 
     @classmethod
     def parse(cls, value: Any, *, location: str = "labels_file") -> "LabelsFileSpec":
+        """Parse a labels-file declaration and normalize its delimiter."""
+
         if isinstance(value, str):
             path = _safe_relative(value, option=f"{location}.path")
             return cls(path=path, delimiter=_delimiter(path, None, option=location))
@@ -151,6 +155,8 @@ class CsvKgDescriptor:
 
     @classmethod
     def from_mapping(cls, value: Mapping[str, Any]) -> "CsvKgDescriptor":
+        """Validate and normalize a raw descriptor mapping."""
+
         allowed = {
             "attribute_relations",
             "class_relation",
@@ -432,17 +438,23 @@ class CsvKgSource(KnowledgeSource):
         return self._origin
 
     def entities(self, kind: EntityKind = EntityKind.CLASS) -> Sequence[str]:
+        """Return the indexed identifiers for ``kind``."""
+
         try:
             return self._signature[EntityKind(kind)]
         except ValueError as exc:
             raise ValueError(f"Unknown entity kind: {kind!r}") from exc
 
     def labels(self, iri: str) -> list[str]:
+        """Return labels loaded for ``iri`` in stable order."""
+
         return list(self._labels.get(str(iri), ()))
 
     def annotations(
         self, iri: str, properties: Sequence[str] | None = None
     ) -> list[AnnotationValue]:
+        """Return annotations, optionally filtered by relation identifier."""
+
         values = self._annotations.get(str(iri), ())
         if properties is None:
             return list(values)
@@ -450,14 +462,20 @@ class CsvKgSource(KnowledgeSource):
         return [value for value in values if value.property_iri in selected]
 
     def attributes(self, iri: str) -> list[AnnotationValue]:
+        """Return non-label literal values for ``iri``."""
+
         return list(self._attributes.get(str(iri), ()))
 
     def direct_parents(self, iri: str, kind: EntityKind = EntityKind.CLASS) -> list[str]:
+        """Return direct hierarchy parents for class-like entities."""
+
         if EntityKind(kind) in {EntityKind.CLASS, EntityKind.INDIVIDUAL}:
             return self.hierarchy.direct_parents(str(iri))
         return []
 
     def direct_children(self, iri: str, kind: EntityKind = EntityKind.CLASS) -> list[str]:
+        """Return direct hierarchy children for class-like entities."""
+
         if EntityKind(kind) in {EntityKind.CLASS, EntityKind.INDIVIDUAL}:
             return self.hierarchy.direct_children(str(iri))
         return []
@@ -465,6 +483,8 @@ class CsvKgSource(KnowledgeSource):
     def hierarchy_bundle(
         self, iri: str, families: Mapping[str, Sequence[str]]
     ) -> dict[str, list[str]]:
+        """Collect configured hierarchy-relation targets by family."""
+
         result: dict[str, list[str]] = {}
         for family, relations in families.items():
             if family == "is_a":
@@ -479,22 +499,32 @@ class CsvKgSource(KnowledgeSource):
     def projection_edges(
         self, *, method: str = "owl2vecstar", include_literals: bool = False
     ) -> list[Edge]:
+        """Return graph edges, optionally including literal-valued rows."""
+
         del method
         edges = self._iri_edges + (self._literal_edges if include_literals else ())
         return sorted(edges, key=Edge.astuple)
 
     def property_domains(self, prop_iri: str) -> list[str]:
+        """Return no domains because CSV descriptors do not declare them."""
+
         del prop_iri
         return []
 
     def property_ranges(self, prop_iri: str) -> list[str]:
+        """Return no ranges because CSV descriptors do not declare them."""
+
         del prop_iri
         return []
 
     def excluded_from_alignment(self) -> frozenset[str]:
+        """Return identifiers excluded by source metadata, if any."""
+
         return frozenset()
 
     def short_form(self, iri: str) -> str:
+        """Return a compact display form for ``iri``."""
+
         return short_form(iri)
 
     def ancestors(self, iri: str) -> set[str]:

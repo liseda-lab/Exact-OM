@@ -1,3 +1,5 @@
+"""Shared registration and logging bases for runtime components."""
+
 import inspect
 import logging
 import sys
@@ -59,6 +61,8 @@ class LoggingClass:
         self.logger = logger
 
     def log(self, msg: str, level: str = "info", traceback: bool = False):
+        """Emit a message through the bound logger or standard output."""
+
         if self.logger is not None:
             log_method = getattr(self.logger, level, None)
             if callable(log_method):

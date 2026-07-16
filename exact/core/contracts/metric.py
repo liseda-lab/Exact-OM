@@ -1,3 +1,5 @@
+"""Metric component contract used by built-in evaluators."""
+
 from abc import abstractmethod
 from typing import Dict, List
 
@@ -7,6 +9,7 @@ from exact.core.entities.registry import ComponentType
 
 
 class IMetric(SelfRegisteringComponent):
+    """Base contract for one registered evaluation metric."""
 
     component_type = ComponentType.METRIC
     metric_name: MetricNames
