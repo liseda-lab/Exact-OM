@@ -42,7 +42,6 @@ def test_plain_alignment_function_uses_the_functional_session_hook(
     source = _file(tmp_path, "source.owl")
     target = _file(tmp_path, "target.owl")
     captured: list[dict] = []
-    monkeypatch.setattr(alignment_actions, "bootstrap_components", lambda: None)
     monkeypatch.setattr(ConfigModel, "resolve_dependencies", lambda self: None)
 
     def _session(**kwargs):
