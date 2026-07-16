@@ -16,6 +16,7 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Reference/candidate SHA-256 provenance and selector-calibration hash guards.
 - A Java-free OWL parser, indexed knowledge-source backend, asserted reasoner plugin seam,
   parity fixtures, and performance regression harness.
+- A strict MkDocs Material documentation build with generated configuration and CLI references.
 
 ### Changed
 

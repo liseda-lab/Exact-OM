@@ -1,0 +1,81 @@
+site_name: Exact-OM
+site_description: Explainable ontology and knowledge-graph matching
+site_url: https://liseda-lab.github.io/Exact-OM/
+repo_url: https://github.com/liseda-lab/Exact-OM
+repo_name: liseda-lab/Exact-OM
+edit_uri: edit/main/docs/
+docs_dir: docs
+site_dir: site
+
+theme:
+  name: material
+  features:
+    - content.code.copy
+    - navigation.footer
+    - navigation.indexes
+    - navigation.sections
+    - navigation.top
+    - search.highlight
+    - search.suggest
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: teal
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: teal
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+plugins:
+  - search
+  - gen-files:
+      scripts:
+        - docs/_scripts/gen_config_reference.py
+        - docs/_scripts/gen_cli_reference.py
+  - literate-nav:
+      nav_file: SUMMARY.md
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            docstring_style: google
+            heading_level: 2
+            merge_init_into_class: true
+            show_root_heading: true
+            show_signature_annotations: true
+            separate_signature: true
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - tables
+  - toc:
+      permalink: true
+
+exclude_docs: |
+  _scripts/
+  **/SUMMARY.md
+
+validation:
+  omitted_files: warn
+  absolute_links: warn
+  # Literate-nav directory links are expanded by the plugin after MkDocs' own
+  # validator runs, so treating that validator's false positive as a warning
+  # would make a strict build fail.
+  unrecognized_links: info
+
+copyright: Copyright &copy; Exact-OM contributors

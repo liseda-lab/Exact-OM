@@ -56,6 +56,16 @@ black = "^24.4.2"
 import-linter = "^2.1"
 pytest-cov = "^6.0"
 
+[tool.poetry.group.docs]
+optional = true
+
+[tool.poetry.group.docs.dependencies]
+mkdocs-material = "^9.7.6"
+mkdocstrings = {version = "^1.0.4", extras = ["python"]}
+mkdocs-gen-files = "^0.6.1"
+mkdocs-literate-nav = "^0.6.3"
+linkchecker = "^10.6.0"
+
 
 [build-system]
 requires = ["poetry-core"]

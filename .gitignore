@@ -28,3 +28,4 @@
 # Ignore mypy cache
 
 /.mypy_cache/*
+/site/

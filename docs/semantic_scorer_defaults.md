@@ -1,7 +1,7 @@
 # EXACT Default Parameters
 
 This document summarises the defaults in
-[`exact/default_config.yaml`](/home/pgcotovio/Exact-OM/exact/default_config.yaml)
+`exact/default_config.yaml`
 and explains how the main configuration blocks interact.
 
 The filename is historical, but the current default scorer is
@@ -73,8 +73,7 @@ subgraph per entity plus optional per-entity LLM summaries.
 | `num_workers` | `null` | Dataset worker count (`null` = let the runtime decide). |
 | `filter_exact_matches` | `True` | Remove known exact lexical matches before semantic scoring. |
 | `drop_exact_match_sources` | `False` | If `True`, remove every candidate for sources with an exact match. |
-| `reasoner_timeout_secs` | `120` | Timeout for ontology reasoner construction. |
-| `reasoner_force_hermit` | `False` | Force a HermiT retry after lighter reasoners. |
+| `reasoner` | `asserted` | Pure-Python asserted hierarchy reasoner; installed plugins may add alternatives. |
 | `all_labels` | `True` | Use all label variants instead of a single best label. |
 | `delimiter` | `"\n"` | Delimiter used when joining verbalised context triples. |
 | `max_input_tokens_context` | `256` | Shared context-text ceiling. Legacy mode uses it directly; pair-adaptive mode treats it as a global encoder cap above per-channel limits. |
@@ -164,7 +163,7 @@ top-k recall sweeps without invoking the scorer or selector.
 | Parameter | Default | Explanation |
 |-----------|---------|-------------|
 | `batch_size` | `128` | Candidate-pair batch size for the semantic scorer. |
-| `num_workers` | `0` | DataLoader workers during inference. The default avoids fork stalls after JVM and Hugging Face tokenizer initialization. |
+| `num_workers` | `0` | DataLoader workers during inference. Zero is the deterministic default. |
 | `log_every` | `10` | Batch interval for progress logging. |
 | `mixed_precision` | `True` | Use autocast on GPU. |
 | `which` | … | Metrics plotted after inference (see YAML). |
@@ -412,5 +411,5 @@ alignment threshold, `calibration.min_precision`, and the learned accept
 threshold.
 
 Use
-[`exact/default_config.yaml`](/home/pgcotovio/Exact-OM/exact/default_config.yaml)
+`exact/default_config.yaml`
 as the authoritative default whenever you build a custom experiment config.
