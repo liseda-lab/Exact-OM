@@ -20,6 +20,7 @@ from exact.impl.metrics import (  # noqa: F401 - importing registers the metrics
     PrecisionMetric,
     RecallMetric,
 )
+from exact.ontology import load_ontology
 from exact.utils.data import save_dict_to_csv
 from exact.utils.eval import MetricUtils
 
@@ -31,13 +32,19 @@ class BuiltinEvaluator(IEvaluator):
 
     @classmethod
     def run(cls, request: EvaluationRequest) -> BackendEvaluation:
+        source = (
+            load_ontology(request.source) if isinstance(request.source, Path) else request.source
+        )
+        target = (
+            load_ontology(request.target) if isinstance(request.target, Path) else request.target
+        )
         if request.full_reference is not None:
             metrics = cls.global_eval(
                 predictions=cast(Union[List[EntityMapping], Path], request.alignment),
                 test_reference=request.full_reference,
                 train_reference=request.train_reference,
-                source_ontology=request.source,
-                target_ontology=request.target,
+                source_ontology=source,
+                target_ontology=target,
             )
         else:
             metrics = cls.local_eval(

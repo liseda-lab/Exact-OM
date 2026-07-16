@@ -1,7 +1,7 @@
 # Adapted from https://github.com/KRR-Oxford/DeepOnto
 
 from collections import defaultdict
-from heapq import nlargest
+from heapq import nsmallest
 from pathlib import Path
 from typing import TYPE_CHECKING, List, Optional, Set, Tuple, Union
 
@@ -116,10 +116,10 @@ class EntityMapping:
         protected = set(protected_pairs or set())
         filtered_mappings = []
         for head, mappings in all_sources.items():
-            top_n_mappings = nlargest(
+            top_n_mappings = nsmallest(
                 n,
                 mappings,
-                key=lambda x: ((x.head, x.tail) in protected, x.score),
+                key=lambda x: ((x.head, x.tail) not in protected, -x.score, x.tail),
             )
             filtered_mappings.extend(top_n_mappings)
 
@@ -140,10 +140,10 @@ class EntityMapping:
 
         filtered_mappings = []
         for tail, mappings in all_targets.items():
-            top_n_mappings = nlargest(
+            top_n_mappings = nsmallest(
                 n,
                 mappings,
-                key=lambda x: ((x.head, x.tail) in protected, x.score),
+                key=lambda x: ((x.head, x.tail) not in protected, -x.score, x.head),
             )
             filtered_mappings.extend(top_n_mappings)
 

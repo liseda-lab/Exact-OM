@@ -2,18 +2,19 @@
 
 from __future__ import annotations
 
+import functools
 import importlib
 import json
 import logging
 import os
 import time
+import warnings
 from pathlib import Path
-from typing import Any, List, Mapping, Optional, Protocol, Tuple, Union
+from typing import Any, List, Mapping, Optional, Tuple, Union
 
 from exact.core.entities.evaluation import BackendEvaluation, EvaluationRequest
 from exact.core.entities.mappings import EntityMapping, ReferenceMapping
 from exact.core.entities.registry import ComponentRegistry, ComponentType
-from exact.ontology import load_ontology
 from exact.utils.data import save_dict_to_csv
 from exact.utils.logs import configure_exact_logger
 from exact.utils.provenance import file_provenance
@@ -167,129 +168,127 @@ def _save_report(
     return flat
 
 
-class EvaluationAction(Protocol):
-    @staticmethod
-    def run(
-        alignment: Union[
-            List[Tuple[ReferenceMapping, List[EntityMapping]]], List[EntityMapping], Path
-        ],
-        output_dir_path: Path,
-        error_on_fail: bool = False,
-        K: Optional[List[int]] = None,
-        source_file_path: Any = None,
-        target_file_path: Any = None,
-        train_reference_file_path: Optional[Path] = None,
-        full_reference_file_path: Optional[Path] = None,
-        reference_candidates: Optional[Path] = None,
-        log_file_path: Optional[Path] = None,
-        log_level: Optional[str] = None,
-        logger: Optional[logging.Logger] = None,
-        backends: Optional[List[str]] = None,
-        backend_options: Optional[Mapping[str, Mapping[str, Any]]] = None,
-        run_stats_path: Optional[Path] = None,
-        _timing_managed: bool = False,
-    ) -> Optional[dict[str, Optional[float]]]:
-        start_time = time.perf_counter()
-        output_dir_path = Path(output_dir_path)
-        output_dir_path.mkdir(parents=True, exist_ok=True)
-        if logger is None:
-            resolved_log_level = (
-                getattr(logging, str(log_level).upper()) if log_level is not None else logging.INFO
-            )
-            logger = configure_exact_logger(
-                logging.getLogger("exact.eval"),
-                resolved_log_level,
-                log_file_path=log_file_path,
-            )
+def run_evaluation(
+    alignment: Union[List[Tuple[ReferenceMapping, List[EntityMapping]]], List[EntityMapping], Path],
+    output_dir_path: Path,
+    error_on_fail: bool = False,
+    K: Optional[List[int]] = None,
+    source_file_path: Any = None,
+    target_file_path: Any = None,
+    train_reference_file_path: Optional[Path] = None,
+    full_reference_file_path: Optional[Path] = None,
+    reference_candidates: Optional[Path] = None,
+    log_file_path: Optional[Path] = None,
+    log_level: Optional[str] = None,
+    logger: Optional[logging.Logger] = None,
+    backends: Optional[List[str]] = None,
+    backend_options: Optional[Mapping[str, Mapping[str, Any]]] = None,
+    run_stats_path: Optional[Path] = None,
+    _timing_managed: bool = False,
+) -> Optional[dict[str, Optional[float]]]:
+    """Run all selected evaluation backends and persist their reports."""
 
-        backend_names = list(dict.fromkeys(backends or ["builtin"]))
-        if not backend_names:
-            raise ValueError("At least one evaluation backend must be selected.")
-        if current_run_session() is None and not _timing_managed:
-            fingerprint = config_fingerprint(
-                {
-                    "backends": backend_names,
-                    "backend_options": dict(backend_options or {}),
-                    "k": list(K or (1, 5, 10)),
-                    "mode": "global" if full_reference_file_path is not None else "local",
-                },
-                run_dir=output_dir_path,
-            )
-            ledger = TimingLedger.open(output_dir_path)
-            with ledger.session(command="eval", config_fingerprint=fingerprint) as session:
-                with session.stage("Postprocess.Evaluation"):
-                    return EvaluationAction.run(
-                        alignment=alignment,
-                        output_dir_path=output_dir_path,
-                        error_on_fail=error_on_fail,
-                        K=K,
-                        source_file_path=source_file_path,
-                        target_file_path=target_file_path,
-                        train_reference_file_path=train_reference_file_path,
-                        full_reference_file_path=full_reference_file_path,
-                        reference_candidates=reference_candidates,
-                        log_file_path=log_file_path,
-                        log_level=log_level,
-                        logger=logger,
-                        backends=backend_names,
-                        backend_options=backend_options,
-                        run_stats_path=run_stats_path,
-                        _timing_managed=True,
-                    )
-        request_base = {
-            "alignment": alignment,
-            "full_reference": full_reference_file_path,
-            "train_reference": train_reference_file_path,
-            "reference_candidates": reference_candidates,
-            "source": source_file_path,
-            "target": target_file_path,
-            "k": tuple(K or (1, 5, 10)),
-        }
+    start_time = time.perf_counter()
+    output_dir_path = Path(output_dir_path)
+    output_dir_path.mkdir(parents=True, exist_ok=True)
+    if logger is None:
+        resolved_log_level = (
+            getattr(logging, str(log_level).upper()) if log_level is not None else logging.INFO
+        )
+        logger = configure_exact_logger(
+            logging.getLogger("exact.eval"),
+            resolved_log_level,
+            log_file_path=log_file_path,
+        )
 
-        logger.info("Starting evaluation with backends: %s", ", ".join(backend_names))
-        source = (
-            load_ontology(source_file_path)
-            if isinstance(source_file_path, Path)
-            else source_file_path
+    backend_names = list(dict.fromkeys(backends or ["builtin"]))
+    if not backend_names:
+        raise ValueError("At least one evaluation backend must be selected.")
+    if current_run_session() is None and not _timing_managed:
+        fingerprint = config_fingerprint(
+            {
+                "backends": backend_names,
+                "backend_options": dict(backend_options or {}),
+                "k": list(K or (1, 5, 10)),
+                "mode": "global" if full_reference_file_path is not None else "local",
+            },
+            run_dir=output_dir_path,
         )
-        target = (
-            load_ontology(target_file_path)
-            if isinstance(target_file_path, Path)
-            else target_file_path
-        )
-        request_base["source"] = source
-        request_base["target"] = target
-        backend_results: dict[str, BackendEvaluation] = {}
-        for backend in backend_names:
-            evaluator = _load_evaluator(backend)
-            request = EvaluationRequest(
-                **request_base,
-                options=dict((backend_options or {}).get(backend, {})),
-            )
-            try:
-                backend_results[backend] = evaluator.run(request)
-            except ValueError as exc:
-                logger.error("Error during %s evaluation: %s", backend, exc, exc_info=True)
-                if error_on_fail:
-                    raise
-                backend_results[backend] = BackendEvaluation(
-                    metrics={}, skipped={"backend": str(exc)}
+        ledger = TimingLedger.open(output_dir_path)
+        with ledger.session(command="eval", config_fingerprint=fingerprint) as session:
+            with session.stage("Postprocess.Evaluation"):
+                return run_evaluation(
+                    alignment=alignment,
+                    output_dir_path=output_dir_path,
+                    error_on_fail=error_on_fail,
+                    K=K,
+                    source_file_path=source_file_path,
+                    target_file_path=target_file_path,
+                    train_reference_file_path=train_reference_file_path,
+                    full_reference_file_path=full_reference_file_path,
+                    reference_candidates=reference_candidates,
+                    log_file_path=log_file_path,
+                    log_level=log_level,
+                    logger=logger,
+                    backends=backend_names,
+                    backend_options=backend_options,
+                    run_stats_path=run_stats_path,
+                    _timing_managed=True,
                 )
+    request_base = {
+        "alignment": alignment,
+        "full_reference": full_reference_file_path,
+        "train_reference": train_reference_file_path,
+        "reference_candidates": reference_candidates,
+        "source": source_file_path,
+        "target": target_file_path,
+        "k": tuple(K or (1, 5, 10)),
+    }
 
-        request = EvaluationRequest(**request_base)
-        flat = _save_report(
-            output_dir_path,
-            backend_names,
-            backend_results,
-            request,
-            run_stats_path=run_stats_path,
-            logger=logger,
+    logger.info("Starting evaluation with backends: %s", ", ".join(backend_names))
+    backend_results: dict[str, BackendEvaluation] = {}
+    for backend in backend_names:
+        evaluator = _load_evaluator(backend)
+        request = EvaluationRequest(
+            **request_base,
+            options=dict((backend_options or {}).get(backend, {})),
         )
-        elapsed = time.perf_counter() - start_time
-        logger.info("Finished evaluation in %.3f seconds", elapsed)
-        if backend_names == ["builtin"] and not backend_results["builtin"].metrics:
-            return None
-        return flat
+        try:
+            backend_results[backend] = evaluator.run(request)
+        except ValueError as exc:
+            logger.error("Error during %s evaluation: %s", backend, exc, exc_info=True)
+            if error_on_fail:
+                raise
+            backend_results[backend] = BackendEvaluation(metrics={}, skipped={"backend": str(exc)})
+
+    request = EvaluationRequest(**request_base)
+    flat = _save_report(
+        output_dir_path,
+        backend_names,
+        backend_results,
+        request,
+        run_stats_path=run_stats_path,
+        logger=logger,
+    )
+    elapsed = time.perf_counter() - start_time
+    logger.info("Finished evaluation in %.3f seconds", elapsed)
+    if backend_names == ["builtin"] and not backend_results["builtin"].metrics:
+        return None
+    return flat
 
 
-__all__ = ["EvaluationAction"]
+class EvaluationAction:
+    """Deprecated namespace alias for :func:`run_evaluation`."""
+
+    @staticmethod
+    @functools.wraps(run_evaluation)
+    def run(*args, **kwargs):
+        warnings.warn(
+            "EvaluationAction.run is deprecated; use run_evaluation instead",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return run_evaluation(*args, **kwargs)
+
+
+__all__ = ["EvaluationAction", "run_evaluation"]

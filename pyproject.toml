@@ -120,7 +120,7 @@ module = [
     "exact.utils.data",
     "exact.utils.eval",
     "exact.utils.graph_search",
-    "exact.utils.llm_routing",
+    "exact.llm.routing",
     "exact.utils.logs",
     "study_visualizer_runtime.app",
 ]
