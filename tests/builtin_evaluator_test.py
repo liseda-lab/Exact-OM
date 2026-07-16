@@ -5,8 +5,13 @@ import pytest
 
 from exact.core.entities.evaluation import EvaluationRequest
 from exact.core.entities.mappings import EntityMapping, ReferenceMapping
+from exact.impl.evaluators import builtin as builtin_module
 from exact.impl.evaluators.builtin import BuiltinEvaluator
+from exact.io.sources import resolve
 from exact.io.writers import write
+
+RDF_FIXTURE = Path(__file__).parent / "fixtures" / "rdf" / "mini.ttl"
+RDF_HEART = "http://example.org/rdf/Heart"
 
 
 def test_builtin_global_metrics_preserve_historical_names_and_math() -> None:
@@ -30,11 +35,34 @@ def test_builtin_local_metrics_use_requested_cutoffs() -> None:
         EntityMapping("s", "gold", "=", 0.8),
     ]
 
-    result = BuiltinEvaluator.run(
-        EvaluationRequest(alignment=[(reference, candidates)], k=(1, 2))
-    )
+    result = BuiltinEvaluator.run(EvaluationRequest(alignment=[(reference, candidates)], k=(1, 2)))
 
     assert result.metrics == {"Hits@1": 0.0, "Hits@2": 1.0, "MRR": 0.5}
+
+
+def test_builtin_path_sources_use_format_dispatch(monkeypatch: pytest.MonkeyPatch) -> None:
+    source = resolve(RDF_FIXTURE, format="rdf")
+    resolved_paths: list[Path] = []
+
+    def resolve_path(path: Path):
+        resolved_paths.append(path)
+        return source
+
+    monkeypatch.setattr(builtin_module, "resolve_source", resolve_path)
+    mapping = EntityMapping(RDF_HEART, RDF_HEART, "=", 1.0)
+    reference = ReferenceMapping(RDF_HEART, RDF_HEART, "=")
+
+    result = BuiltinEvaluator.run(
+        EvaluationRequest(
+            alignment=[mapping],
+            full_reference=[reference],
+            source=RDF_FIXTURE,
+            target=RDF_FIXTURE,
+        )
+    )
+
+    assert resolved_paths == [RDF_FIXTURE, RDF_FIXTURE]
+    assert result.metrics == {"P": 1.0, "R": 1.0, "F1": 1.0}
 
 
 @pytest.mark.parametrize("output_format", ["typed-tsv", "json", "oaei-rdf"])

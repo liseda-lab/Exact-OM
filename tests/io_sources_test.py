@@ -177,3 +177,19 @@ def test_source_entry_point_contract(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_importing_io_does_not_eagerly_import_rdflib() -> None:
     code = "import sys; import exact.io; assert 'rdflib' not in sys.modules"
     subprocess.run([sys.executable, "-c", code], check=True)
+
+
+def test_importing_ontology_parser_does_not_eagerly_import_rdflib() -> None:
+    code = "import sys; import exact.ontology.parser; assert 'rdflib' not in sys.modules"
+    subprocess.run([sys.executable, "-c", code], check=True)
+
+
+def test_parsing_owl_loads_rdflib_through_the_io_adapter() -> None:
+    code = (
+        "import sys; "
+        "from pathlib import Path; "
+        "from exact.ontology.parser import parse; "
+        f"parse(Path({str(OWL)!r})); "
+        "assert 'rdflib' in sys.modules"
+    )
+    subprocess.run([sys.executable, "-c", code], check=True)

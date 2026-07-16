@@ -28,8 +28,8 @@ from exact.impl.metrics import (  # noqa: F401 - importing registers the metrics
     PrecisionMetric,
     RecallMetric,
 )
+from exact.io.sources import resolve as resolve_source
 from exact.io.writers.oaei_rdf import read_alignment
-from exact.ontology import load_ontology
 from exact.utils.data import save_dict_to_csv
 from exact.utils.eval import MetricUtils
 
@@ -93,14 +93,10 @@ class BuiltinEvaluator(IEvaluator):
         allowed = set(entity_kinds)
         primary = entity_kinds[0]
         source_index = (
-            build_entity_kind_index(source_ontology)
-            if source_ontology is not None
-            else None
+            build_entity_kind_index(source_ontology) if source_ontology is not None else None
         )
         target_index = (
-            build_entity_kind_index(target_ontology)
-            if target_ontology is not None
-            else None
+            build_entity_kind_index(target_ontology) if target_ontology is not None else None
         )
         kept: List[EntityMapping] = []
         removed = 0
@@ -182,9 +178,7 @@ class BuiltinEvaluator(IEvaluator):
                 target = cls._json_mapping_value(
                     record, "Tgt", "TgtEntity", "target", "tgt", "tail"
                 )
-                score = cls._json_mapping_value(
-                    record, "Score", "score", "confidence", "measure"
-                )
+                score = cls._json_mapping_value(record, "Score", "score", "confidence", "measure")
                 src_kind = record.get(
                     "SrcKind", record.get("Kind", record.get("kind", EntityKind.CLASS))
                 )
@@ -234,33 +228,23 @@ class BuiltinEvaluator(IEvaluator):
                         candidate.relation,
                         predicted.score if predicted is not None else 0.0,
                         src_kind=(
-                            predicted.src_kind
-                            if predicted is not None
-                            else reference.src_kind
+                            predicted.src_kind if predicted is not None else reference.src_kind
                         ),
                         tgt_kind=(
-                            predicted.tgt_kind
-                            if predicted is not None
-                            else reference.tgt_kind
+                            predicted.tgt_kind if predicted is not None else reference.tgt_kind
                         ),
                     )
                 )
-            local.append(
-                (reference, EntityMapping.sort_entity_mappings_by_score(filled))
-            )
+            local.append((reference, EntityMapping.sort_entity_mappings_by_score(filled)))
         return local
 
     @classmethod
     def run(cls, request: EvaluationRequest) -> BackendEvaluation:
         source = (
-            load_ontology(request.source)
-            if isinstance(request.source, Path)
-            else request.source
+            resolve_source(request.source) if isinstance(request.source, Path) else request.source
         )
         target = (
-            load_ontology(request.target)
-            if isinstance(request.target, Path)
-            else request.target
+            resolve_source(request.target) if isinstance(request.target, Path) else request.target
         )
         entity_kinds = cls._request_entity_kinds(request.options)
         if request.full_reference is not None:
@@ -306,9 +290,7 @@ class BuiltinEvaluator(IEvaluator):
         entity_kinds: Iterable[EntityKind | str] | EntityKind | str | None = None,
     ) -> Dict[str, float]:
         if (source_ontology is None) != (target_ontology is None):
-            raise ValueError(
-                "Both source_ontology and target_ontology must be provided together."
-            )
+            raise ValueError("Both source_ontology and target_ontology must be provided together.")
 
         prediction_mappings = (
             EntityMapping.read_table_mappings(predictions, threshold=threshold)
@@ -358,9 +340,7 @@ class BuiltinEvaluator(IEvaluator):
         if source_ontology is not None and target_ontology is not None:
             ignored = MetricUtils.get_ignored_class_index(source_ontology)
             ignored.update(MetricUtils.get_ignored_class_index(target_ontology))
-            prediction_mappings = MetricUtils.remove_ignored_mappings(
-                prediction_mappings, ignored
-            )
+            prediction_mappings = MetricUtils.remove_ignored_mappings(prediction_mappings, ignored)
 
         metrics = cls._global_metrics(
             prediction_mappings,
@@ -370,19 +350,13 @@ class BuiltinEvaluator(IEvaluator):
         if len(selected_kinds) > 1:
             for kind in selected_kinds:
                 kind_predictions = [
-                    mapping
-                    for mapping in prediction_mappings
-                    if mapping.src_kind == kind
+                    mapping for mapping in prediction_mappings if mapping.src_kind == kind
                 ]
                 kind_references = [
-                    mapping
-                    for mapping in reference_mappings
-                    if mapping.src_kind == kind
+                    mapping for mapping in reference_mappings if mapping.src_kind == kind
                 ]
                 kind_nulls = [
-                    mapping
-                    for mapping in null_reference_mappings
-                    if mapping.src_kind == kind
+                    mapping for mapping in null_reference_mappings if mapping.src_kind == kind
                 ]
                 for name, value in cls._global_metrics(
                     kind_predictions, kind_references, kind_nulls
@@ -393,9 +367,7 @@ class BuiltinEvaluator(IEvaluator):
     @classmethod
     def local_eval(
         cls,
-        reference_and_candidates: Union[
-            List[Tuple[ReferenceMapping, List[EntityMapping]]], Path
-        ],
+        reference_and_candidates: Union[List[Tuple[ReferenceMapping, List[EntityMapping]]], Path],
         reference_candidates: Optional[Path] = None,
         K: Optional[List[int]] = None,
         source_ontology: Any = None,
@@ -424,9 +396,7 @@ class BuiltinEvaluator(IEvaluator):
                             "supported scored TSV, JSON, or OAEI RDF artifact."
                         ) from scored_error
             else:
-                local_mappings = MetricUtils.read_candidate_mappings(
-                    str(reference_and_candidates)
-                )
+                local_mappings = MetricUtils.read_candidate_mappings(str(reference_and_candidates))
         else:
             local_mappings = reference_and_candidates
         selected_kinds = normalize_entity_kinds(entity_kinds)

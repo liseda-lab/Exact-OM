@@ -61,8 +61,6 @@ source_modules =
     exact
 forbidden_modules =
     rdflib
-# WP-B retains an rdflib parser fallback until WP-G moves RDF dispatch into exact.io.
 ignore_imports =
-    exact.ontology.parser -> rdflib
     exact.io.** -> rdflib
 unmatched_ignore_imports_alerting = none
