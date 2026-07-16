@@ -103,7 +103,10 @@ def _hf_descriptor(*, licensed: bool = False) -> TrackDescriptor:
             "source": {
                 "path": "source.owl",
                 "destination": "licensed/source.owl",
-                "sha256": "0" * 64,
+                "sha256_from": {
+                    "path": "resolved_versions.json",
+                    "key": "ontologies.source.sha256",
+                },
                 "help": "Obtain the licensed source ontology from its publisher.",
             }
         }
@@ -211,6 +214,28 @@ def test_missing_and_mismatched_user_supplied_file_are_actionable(tmp_path: Path
     report = provider.verify("demo", tmp_path)
     assert report.status == "ok"
     assert any("published pin" in message for message in report.warnings)
+
+
+def test_licensed_file_pin_is_resolved_from_snapshot_manifest(tmp_path: Path) -> None:
+    client = FakeHfClient(FIXTURES / "hf_snapshot")
+    provider = HfProvider(_hf_descriptor(licensed=True), client=client)
+    supplied = tmp_path / "user_supplied" / provider.name / "source.owl"
+    supplied.parent.mkdir(parents=True)
+    supplied.write_text("licensed ontology\n", encoding="utf-8")
+
+    layout = provider.materialize("demo", tmp_path)
+    report = provider.verify("demo", tmp_path)
+
+    assert layout.source.read_bytes() == supplied.read_bytes()
+    assert report.status == "ok"
+    assert report.warnings == ()
+    declared = report.lock_entry["declared_hashes"]
+    source_record = next(record for path, record in declared.items() if path.endswith("source.owl"))
+    assert source_record == {
+        "sha256": "3e3d1d0f32ad127387c94be537117fe47f496e1f467bdbf6debddd7551e41156",
+        "enforce": False,
+        "origin": "user-supplied pin source",
+    }
 
 
 def test_http_archive_materialization_and_upstream_movement(tmp_path: Path) -> None:
