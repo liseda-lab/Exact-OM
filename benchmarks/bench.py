@@ -19,6 +19,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if __package__ in {None, ""}:
     sys.path.insert(0, str(ROOT))
 
+from exact.io.sources.csv_kg import CsvKgSource  # noqa: E402
 from exact.ontology import load_ontology  # noqa: E402
 from exact.ontology.parser import parse  # noqa: E402
 from exact.ontology.projection import project  # noqa: E402
@@ -113,6 +114,13 @@ def inference_throughput() -> int:
     return len(examples) + matches
 
 
+def csv_kg_load() -> int:
+    """Load and index the committed mini BioKG-shaped fixture."""
+
+    source = CsvKgSource.from_path(ROOT / "tests" / "fixtures" / "kg_csv")
+    return len(source.projection_edges(include_literals=True))
+
+
 def explanation_store_write() -> int:
     """Write 100k explanation records to bounded compressed shards."""
 
@@ -147,6 +155,7 @@ SCENARIOS: dict[str, Callable[[], int]] = {
     "dataset_build_e2e": dataset_build_e2e,
     "candidate_generation": candidate_generation,
     "inference_throughput": inference_throughput,
+    "csv_kg_load": csv_kg_load,
     "explanation_store_write": explanation_store_write,
     "explanation_store_read": explanation_store_read,
 }

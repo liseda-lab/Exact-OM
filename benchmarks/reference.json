@@ -4,6 +4,7 @@
   "fixture": {
     "build_hierarchy": 0.0180,
     "candidate_generation": 0.0400,
+    "csv_kg_load": 0.0180,
     "dataset_build_e2e": 0.0360,
     "explanation_store_read": 0.2400,
     "explanation_store_write": 3.0000,
