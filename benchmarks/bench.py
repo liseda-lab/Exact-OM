@@ -10,6 +10,7 @@ import json
 import statistics
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 from typing import Callable
@@ -22,6 +23,7 @@ from exact.ontology import load_ontology  # noqa: E402
 from exact.ontology.parser import parse  # noqa: E402
 from exact.ontology.projection import project  # noqa: E402
 from exact.ontology.store import OwlOntologySource  # noqa: E402
+from exact.runs import ExplanationStore, RunLayout  # noqa: E402
 from exact.utils.candidate_generation import (  # noqa: E402
     lexical_candidate_pair_scores,
     make_candidate_labels,
@@ -30,6 +32,26 @@ from exact.utils.candidate_generation import (  # noqa: E402
 FIXTURE_DIR = ROOT / "tests" / "fixtures" / "ontologies"
 SOURCE_PATH = FIXTURE_DIR / "mini_src.owl"
 TARGET_PATH = FIXTURE_DIR / "mini_tgt.owl"
+_EXPLANATION_RECORDS: list[dict] | None = None
+_READ_FIXTURE: tuple[tempfile.TemporaryDirectory[str], Path] | None = None
+
+
+def _explanation_records() -> list[dict]:
+    global _EXPLANATION_RECORDS
+    if _EXPLANATION_RECORDS is None:
+        _EXPLANATION_RECORDS = [
+            {
+                "src_iri": f"https://example.org/source/{index // 100}",
+                "tgt_iri": f"https://example.org/target/{index}",
+                "confidences": {"S_final": (index % 100) / 100.0},
+                "prediction": {"selected": index % 7 == 0},
+                "description": "repeated benchmark explanation payload " * 4,
+                "run_id": "benchmark",
+                "explanation_schema_version": 1,
+            }
+            for index in range(100_000)
+        ]
+    return _EXPLANATION_RECORDS
 
 
 def parse_ontology() -> int:
@@ -91,6 +113,33 @@ def inference_throughput() -> int:
     return len(examples) + matches
 
 
+def explanation_store_write() -> int:
+    """Write 100k explanation records to bounded compressed shards."""
+
+    with tempfile.TemporaryDirectory(prefix="exact-benchmark-write-") as directory:
+        store = ExplanationStore.create(Path(directory), run_id="benchmark")
+        store.append(_explanation_records())
+        return store.record_count
+
+
+def _read_fixture() -> Path:
+    global _READ_FIXTURE
+    if _READ_FIXTURE is None:
+        temporary = tempfile.TemporaryDirectory(prefix="exact-benchmark-read-")
+        run_dir = Path(temporary.name)
+        store = ExplanationStore.create(run_dir, run_id="benchmark")
+        store.append(_explanation_records())
+        _READ_FIXTURE = temporary, run_dir
+    return _READ_FIXTURE[1]
+
+
+def explanation_store_read() -> int:
+    """Cold-open the index and retrieve one source from a 100k-record store."""
+
+    store = ExplanationStore(RunLayout.open(_read_fixture()).explanations_dir)
+    return len(store.get("https://example.org/source/500"))
+
+
 SCENARIOS: dict[str, Callable[[], int]] = {
     "parse_ontology": parse_ontology,
     "build_hierarchy": build_hierarchy,
@@ -98,6 +147,8 @@ SCENARIOS: dict[str, Callable[[], int]] = {
     "dataset_build_e2e": dataset_build_e2e,
     "candidate_generation": candidate_generation,
     "inference_throughput": inference_throughput,
+    "explanation_store_write": explanation_store_write,
+    "explanation_store_read": explanation_store_read,
 }
 
 
