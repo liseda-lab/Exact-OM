@@ -4,6 +4,7 @@ import hashlib  # noqa: F401
 import inspect  # noqa: F401
 import json  # noqa: F401
 import time  # noqa: F401
+import uuid
 from dataclasses import dataclass
 from pathlib import Path  # noqa: F401
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple  # noqa: F401
@@ -16,11 +17,14 @@ from torch.utils.data._utils.collate import default_collate  # noqa: F401
 from exact.core.entities.configs.dataset import DatasetMask  # noqa: F401
 from exact.core.entities.mappings import EntityMapping  # noqa: F401
 from exact.utils.formatting import format_duration as _format_duration  # noqa: F401
+from exact.utils.run_context import current_run_session
 from exact.utils.timing import CacheStatus, StageRecord  # noqa: F401
 
 try:
     import zstandard as zstd  # noqa: F401
-except ImportError:  # pragma: no cover - exercised only when optional dependency is absent
+except (
+    ImportError
+):  # pragma: no cover - exercised only when optional dependency is absent
     zstd = None
 
 from exact.core.contracts.trainer import ITrainer
@@ -70,7 +74,9 @@ class SemanticAlignmentRunner(
         model=None,
         model_params: Optional[Dict[str, Any]] = None,
         models: Optional[List[Tuple[Any, Dict[str, Any]]]] = None,
-        device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+        device: torch.device = torch.device(
+            "cuda" if torch.cuda.is_available() else "cpu"
+        ),
         output_dir: Optional[Path] = None,
         logger: Optional[Any] = None,
         **kwargs,
@@ -142,13 +148,25 @@ class SemanticAlignmentRunner(
         self._cache_persist_policy: str = "finalize"
         self._cache_persist_skip_logged: Set[str] = set()
         self._restored_candidate_rows: List[Dict[str, Any]] = []
+        run_session = current_run_session()
+        self._run_id: str = (
+            str(run_session.run_id)
+            if getattr(run_session, "run_id", None)
+            else str(uuid.uuid4())
+        )
+        self._explanation_store: Optional[Any] = None
+        self._explanation_shard_mb: float = 32.0
 
-    def _finalize_run(self, state: _FinalizationState) -> Tuple[List[EntityMapping], float]:
+    def _finalize_run(
+        self, state: _FinalizationState
+    ) -> Tuple[List[EntityMapping], float]:
         """Apply the shared post-inference path for fresh and completed checkpoints."""
         post_inference_start = time.perf_counter()
         candidate_df = self._build_candidate_dataframe()
         if state.completed_from_checkpoint and candidate_df.empty and self.results_json:
-            candidate_df = self._build_candidate_dataframe_from_records(self.results_json)
+            candidate_df = self._build_candidate_dataframe_from_records(
+                self.results_json
+            )
 
         post_progress_started = False
         if state.run_progress is not None and len(getattr(self, "models", [])) > 1:
@@ -168,7 +186,9 @@ class SemanticAlignmentRunner(
         if state.completed_from_checkpoint:
             if not candidate_df.empty:
                 n_sources = (
-                    int(candidate_df["Src"].nunique()) if "Src" in candidate_df.columns else 0
+                    int(candidate_df["Src"].nunique())
+                    if "Src" in candidate_df.columns
+                    else 0
                 )
                 self.log(
                     (
@@ -178,10 +198,17 @@ class SemanticAlignmentRunner(
                     "debug",
                 )
         else:
-            self.log("Post-inference processing started: assembling candidate dataframe.", "info")
+            self.log(
+                "Post-inference processing started: assembling candidate dataframe.",
+                "info",
+            )
 
         if not candidate_df.empty:
-            n_sources = int(candidate_df["Src"].nunique()) if "Src" in candidate_df.columns else 0
+            n_sources = (
+                int(candidate_df["Src"].nunique())
+                if "Src" in candidate_df.columns
+                else 0
+            )
             if post_progress_started and not state.completed_from_checkpoint:
                 state.run_progress.update(
                     "PostInference",
@@ -227,13 +254,17 @@ class SemanticAlignmentRunner(
             state.all_mappings = list(
                 zip(candidate_df["Src"], candidate_df["Tgt"], candidate_df["S_final"])
             )
-            self._selector_target_conflict_enabled = self._selector_target_conflict_enabled_from_df(
-                candidate_df
+            self._selector_target_conflict_enabled = (
+                self._selector_target_conflict_enabled_from_df(candidate_df)
             )
-            self._last_effective_threshold_origin = self._effective_alignment_threshold_origin(
+            self._last_effective_threshold_origin = (
+                self._effective_alignment_threshold_origin(
+                    candidate_df, state.threshold
+                )
+            )
+            state.threshold = self._effective_alignment_threshold(
                 candidate_df, state.threshold
             )
-            state.threshold = self._effective_alignment_threshold(candidate_df, state.threshold)
             self._last_effective_threshold = state.threshold
 
             if not state.completed_from_checkpoint:
@@ -261,7 +292,9 @@ class SemanticAlignmentRunner(
                 state.threshold,
                 state.local_alignment,
             )
-            compact_rationale_records = self._ensure_compact_rationale_records(candidate_df)
+            compact_rationale_records = self._ensure_compact_rationale_records(
+                candidate_df
+            )
         self._annotate_final_prediction_records(
             predictions,
             threshold=state.threshold,
@@ -314,6 +347,20 @@ class SemanticAlignmentRunner(
                 results_json=self.results_json,
             )
 
+        explanation_store = getattr(self, "_explanation_store", None)
+        if explanation_store is not None and explanation_store.overlay_count:
+            compaction = explanation_store.compact()
+            self._overlay_manifest_path = None
+            self.log(
+                (
+                    "Compacted transient explanation overlays: "
+                    f"records={compaction['records']}, "
+                    f"before={compaction['before_bytes']} bytes, "
+                    f"after={compaction['after_bytes']} bytes."
+                ),
+                "info",
+            )
+
         self._last_stage_timings = [
             StageRecord(
                 stage="Alignment.Inference",
@@ -357,6 +404,7 @@ class SemanticAlignmentRunner(
         audit_shards_enabled: bool = True,
         audit_shard_compression: str = "zstd",
         audit_shard_records: int = 50000,
+        explanation_shard_mb: float = 32.0,
         checkpoint_payload: str = "compact",
         cache_persist_policy: str = "finalize",
         save_json: bool = False,
@@ -410,11 +458,13 @@ class SemanticAlignmentRunner(
         if self._cache_persist_policy not in {"checkpoint", "finalize", "never"}:
             self._cache_persist_policy = "finalize"
         self._cache_persist_skip_logged = set()
+        self._explanation_shard_mb = max(0.001, float(explanation_shard_mb))
         self._prepare_audit_shards(
             None,
-            enabled=False,
+            enabled=True,
             compression=audit_shard_compression,
             records_per_shard=audit_shard_records,
+            append_existing=True,
         )
         self._prepare_candidate_shards(
             None,
@@ -453,12 +503,23 @@ class SemanticAlignmentRunner(
             all_mappings.extend(restored_mappings)
             if restored_json:
                 self.results_json.extend(restored_json)
-            restored_candidate_rows = getattr(self, "_restored_candidate_rows", []) or []
+            restored_candidate_rows = (
+                getattr(self, "_restored_candidate_rows", []) or []
+            )
             if restored_candidate_rows:
                 self._candidate_rows.extend(restored_candidate_rows)
 
         total_examples = len(self.dataset)
         remaining_examples = max(0, total_examples - restored_examples)
+
+        if restored_examples == 0:
+            self._prepare_audit_shards(
+                cp_path,
+                enabled=True,
+                compression=audit_shard_compression,
+                records_per_shard=audit_shard_records,
+                append_existing=False,
+            )
 
         if remaining_examples == 0:
             if checkpoint_enabled and cp_path is not None:
@@ -477,7 +538,10 @@ class SemanticAlignmentRunner(
                     append_existing=True,
                 )
             self.log(
-                ("Checkpoint already contains predictions for all samples. " "Skipping inference."),
+                (
+                    "Checkpoint already contains predictions for all samples. "
+                    "Skipping inference."
+                ),
                 level="info",
             )
             if run_progress is not None:
@@ -535,7 +599,9 @@ class SemanticAlignmentRunner(
 
         dataset_for_dl = self.dataset
         if restored_examples > 0:
-            dataset_for_dl = Subset(self.dataset, range(restored_examples, total_examples))
+            dataset_for_dl = Subset(
+                self.dataset, range(restored_examples, total_examples)
+            )
 
         dl = DataLoader(
             dataset_for_dl,
@@ -724,9 +790,15 @@ class SemanticAlignmentRunner(
                     )
 
             # Accumulate full JSONs
-            if "explanations" in out:
-                explanations = list(out["explanations"])
-                for local_idx, record in enumerate(explanations):
+            explanations = list(out.get("explanations") or [])
+            union_records: List[Dict[str, Any]] = []
+            batch_candidate_rows = self._candidate_rows[candidate_start_idx:]
+            for local_idx, candidate_row in enumerate(batch_candidate_rows):
+                explanation = (
+                    explanations[local_idx] if local_idx < len(explanations) else None
+                )
+                record = self._union_explanation_record(candidate_row, explanation)
+                if explanation is not None:
                     candidate_idx = candidate_start_idx + local_idx
                     if candidate_idx >= len(self._candidate_rows):
                         continue
@@ -735,9 +807,10 @@ class SemanticAlignmentRunner(
                         self._candidate_rows[candidate_idx][
                             "selector_evidence_items"
                         ] = evidence_items
-                self.results_json.extend(explanations)
-                self._append_audit_records(explanations)
-            self._append_candidate_records(self._candidate_rows[candidate_start_idx:])
+                        record["selector_evidence_items"] = evidence_items
+                union_records.append(record)
+            self.results_json.extend(union_records)
+            self._append_audit_records(union_records)
 
             if (
                 checkpoint_enabled
@@ -763,7 +836,9 @@ class SemanticAlignmentRunner(
                 pair_diag = ""
                 if pair_batch_stats:
                     evidence = pair_batch_stats.get("pair_evidence") or {}
-                    pair_total = max(1, int(pair_batch_stats.get("pairs", len(src_iri))))
+                    pair_total = max(
+                        1, int(pair_batch_stats.get("pairs", len(src_iri)))
+                    )
                     pair_diag = (
                         " | pair-adaptive ctx: "
                         f"cache src={pair_batch_stats.get('src_cache_hits', 0)}/{pair_batch_stats.get('unique_src', 0)}, "
@@ -811,7 +886,9 @@ class SemanticAlignmentRunner(
             "info",
         )
         if run_progress is not None:
-            run_progress.finish("Inference", f"processed={processed_examples}/{total_examples}")
+            run_progress.finish(
+                "Inference", f"processed={processed_examples}/{total_examples}"
+            )
         if hasattr(self.model, "llm_summary_stats"):
             self._llm_summary_stats = self.model.llm_summary_stats()
             stats = self._llm_summary_stats or {}
@@ -828,7 +905,9 @@ class SemanticAlignmentRunner(
                     "info",
                 )
             else:
-                self.log("LLM summaries/briefs were not requested for this run.", "debug")
+                self.log(
+                    "LLM summaries/briefs were not requested for this run.", "debug"
+                )
 
         # Normalize LLM importance: if the LLM did not run (p_llm == 0 or no decision),
         # clamp I_llm to 0 so downstream summaries/plots are consistent with behavior.
@@ -844,7 +923,9 @@ class SemanticAlignmentRunner(
                 imps["I_llm"] = 0.0
 
         self._maybe_persist_model_cache(reason="finalize", force=True)
-        inference_status = CacheStatus.RESUMED if restored_examples > 0 else CacheStatus.FRESH
+        inference_status = (
+            CacheStatus.RESUMED if restored_examples > 0 else CacheStatus.FRESH
+        )
         return self._finalize_run(
             _FinalizationState(
                 kind=kind,
@@ -879,7 +960,9 @@ class SemanticAlignmentRunner(
             return threshold
         if "selection_accept_threshold" not in candidate_df.columns:
             return threshold
-        selected = pd.to_numeric(candidate_df["selection_accept_threshold"], errors="coerce")
+        selected = pd.to_numeric(
+            candidate_df["selection_accept_threshold"], errors="coerce"
+        )
         selected = selected[selected.notna() & (selected > 0.0)]
         if selected.empty:
             return threshold
@@ -894,16 +977,25 @@ class SemanticAlignmentRunner(
             return "configured"
         if "selection_accept_threshold" not in candidate_df.columns:
             return "configured"
-        selected = pd.to_numeric(candidate_df["selection_accept_threshold"], errors="coerce")
+        selected = pd.to_numeric(
+            candidate_df["selection_accept_threshold"], errors="coerce"
+        )
         selected = selected[selected.notna() & (selected > 0.0)]
         return "selector-median override" if not selected.empty else "configured"
 
     @staticmethod
-    def _selector_target_conflict_enabled_from_df(candidate_df: pd.DataFrame) -> Optional[bool]:
-        if candidate_df.empty or "selection_target_conflict_enabled" not in candidate_df.columns:
+    def _selector_target_conflict_enabled_from_df(
+        candidate_df: pd.DataFrame,
+    ) -> Optional[bool]:
+        if (
+            candidate_df.empty
+            or "selection_target_conflict_enabled" not in candidate_df.columns
+        ):
             return None
         if "selection_accept_threshold" in candidate_df.columns:
-            thresholds = pd.to_numeric(candidate_df["selection_accept_threshold"], errors="coerce")
+            thresholds = pd.to_numeric(
+                candidate_df["selection_accept_threshold"], errors="coerce"
+            )
             if thresholds[thresholds.notna() & (thresholds > 0.0)].empty:
                 return None
         values = candidate_df["selection_target_conflict_enabled"]
@@ -952,8 +1044,12 @@ class SemanticAlignmentRunner(
                 "Src": src,
                 "Tgt": tgt,
                 "ground_truth": pred.get("ground_truth"),
-                "src_label_text": (record.get("selected_labels") or {}).get("source", ""),
-                "tgt_label_text": (record.get("selected_labels") or {}).get("target", ""),
+                "src_label_text": (record.get("selected_labels") or {}).get(
+                    "source", ""
+                ),
+                "tgt_label_text": (record.get("selected_labels") or {}).get(
+                    "target", ""
+                ),
                 "llm_pair_brief": record.get("llm_pair_brief", ""),
             }
             for payload_name in ["confidences", "qualities", "weights", "importances"]:
@@ -986,13 +1082,16 @@ class SemanticAlignmentRunner(
         extra_cols = [
             col
             for col in dataset_df.columns
-            if col in {"Src", "Tgt"} or any(str(col).startswith(prefix) for prefix in prefixes)
+            if col in {"Src", "Tgt"}
+            or any(str(col).startswith(prefix) for prefix in prefixes)
         ]
         if len(extra_cols) <= 2:
             return df
         extra_df = dataset_df[extra_cols].drop_duplicates(subset=["Src", "Tgt"])
         merge_cols = [
-            col for col in extra_df.columns if col not in df.columns or col in {"Src", "Tgt"}
+            col
+            for col in extra_df.columns
+            if col not in df.columns or col in {"Src", "Tgt"}
         ]
         if len(merge_cols) <= 2:
             return df

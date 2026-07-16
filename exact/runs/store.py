@@ -163,6 +163,12 @@ class ExplanationStore:
     def source_count(self) -> int:
         return len(self._index.get("sources") or {})
 
+    @property
+    def overlay_count(self) -> int:
+        return sum(
+            int(entry.get("records", 0)) for entry in self._index.get("overlays") or []
+        )
+
     def _load_index(self) -> dict[str, Any]:
         try:
             payload = json.loads(self.index_path.read_text(encoding="utf-8"))

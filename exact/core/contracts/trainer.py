@@ -115,19 +115,23 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
 
     @property
     def run_layout(self) -> RunLayout:
-        return self._run_layout
+        layout = getattr(self, "_run_layout", None)
+        if layout is None:
+            layout = RunLayout.create(self._output_dir)
+            self._run_layout = layout
+        return layout
 
     @property
     def plot_dir(self) -> Path:
-        return self._run_layout.plots_dir
+        return self.run_layout.plots_dir
 
     @property
     def alignment_dir(self) -> Path:
-        return self._run_layout.alignment_dir
+        return self.run_layout.alignment_dir
 
     @property
     def checkpoint_dir(self) -> Path:
-        path = self._run_layout.checkpoints_dir
+        path = self.run_layout.checkpoints_dir
         path.mkdir(parents=True, exist_ok=True)
         return path
 
