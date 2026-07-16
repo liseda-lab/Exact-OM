@@ -38,8 +38,41 @@ class PairAdaptiveSemanticScorer(
         max_attr_items: int = 12,
         hierarchical_relation_families: Optional[Dict[str, Dict[str, Any]]] = None,
         attribute_property_weights: Optional[Dict[str, float]] = None,
+        hierarchy_embedding_weight: float = 0.5,
+        hierarchy_support_weight: float = 0.5,
+        similarity_embedding_weight: float = 0.5,
+        similarity_support_weight: float = 0.5,
+        similarity_per_relation_cap: int = 2,
+        difference_per_relation_cap: int = 3,
+        stability_factor: float = 2.0,
+        attribute_information_word_cap: int = 20,
+        attribute_score_floor: float = 0.5,
+        uncertainty_indecision_scale: float = 2.0,
+        uncertainty_disagreement_quality_power: float = 0.5,
         **kwargs: Any,
     ) -> None:
+        self.attribute_property_weights = dict(
+            attribute_property_weights
+            or {
+                "definition": 1.0,
+                "identifier": 0.8,
+                "comment": 0.6,
+                "other": 0.5,
+            }
+        )
+        self.hierarchy_embedding_weight = float(hierarchy_embedding_weight)
+        self.hierarchy_support_weight = float(hierarchy_support_weight)
+        self.similarity_embedding_weight = float(similarity_embedding_weight)
+        self.similarity_support_weight = float(similarity_support_weight)
+        self.similarity_per_relation_cap = int(similarity_per_relation_cap)
+        self.difference_per_relation_cap = int(difference_per_relation_cap)
+        self.stability_factor = float(stability_factor)
+        self.attribute_information_word_cap = int(attribute_information_word_cap)
+        self.attribute_score_floor = float(attribute_score_floor)
+        self.uncertainty_indecision_scale = float(uncertainty_indecision_scale)
+        self.uncertainty_disagreement_quality_power = float(
+            uncertainty_disagreement_quality_power
+        )
         requested_context_cap = int(kwargs.get("max_input_tokens_context", 256))
         kwargs["max_input_tokens_context"] = max(
             requested_context_cap,
@@ -58,10 +91,36 @@ class PairAdaptiveSemanticScorer(
         self.max_diff_triples = int(max_diff_triples)
         self.max_attr_items = int(max_attr_items)
         self.hierarchical_relation_families = dict(hierarchical_relation_families or {})
-        self.attribute_property_weights = dict(attribute_property_weights or {})
         self._attached_dataset = None
 
-    def _brief_prompt(self, src_label: str, tgt_label: str, packet: str) -> Dict[str, str]:
+    def _runtime_fingerprint_payload(
+        self,
+        generate_llm_rationales_override: Optional[bool] = None,
+    ) -> Dict[str, Any]:
+        payload = super()._runtime_fingerprint_payload(
+            generate_llm_rationales_override=generate_llm_rationales_override
+        )
+        payload["pair_adaptive_channels"] = {
+            "hierarchy_embedding_weight": self.hierarchy_embedding_weight,
+            "hierarchy_support_weight": self.hierarchy_support_weight,
+            "similarity_embedding_weight": self.similarity_embedding_weight,
+            "similarity_support_weight": self.similarity_support_weight,
+            "similarity_per_relation_cap": self.similarity_per_relation_cap,
+            "difference_per_relation_cap": self.difference_per_relation_cap,
+            "stability_factor": self.stability_factor,
+            "attribute_property_weights": self.attribute_property_weights,
+            "attribute_information_word_cap": self.attribute_information_word_cap,
+            "attribute_score_floor": self.attribute_score_floor,
+            "uncertainty_indecision_scale": self.uncertainty_indecision_scale,
+            "uncertainty_disagreement_quality_power": (
+                self.uncertainty_disagreement_quality_power
+            ),
+        }
+        return payload
+
+    def _brief_prompt(
+        self, src_label: str, tgt_label: str, packet: str
+    ) -> Dict[str, str]:
         return {
             "system": "You are an ontology alignment analyst that returns strict JSON.",
             "user": (
@@ -87,7 +146,9 @@ class PairAdaptiveSemanticScorer(
         if resolved_backend.backend == "openrouter":
             profile = self._llm_router.profiles.get(resolved_backend.profile_name or "")
             if profile is None:
-                raise RuntimeError("OpenRouter summary profile was resolved but not found.")
+                raise RuntimeError(
+                    "OpenRouter summary profile was resolved but not found."
+                )
             return self._run_hosted_chat_prompts(
                 prompts=prompts,
                 profile=profile,
@@ -174,7 +235,7 @@ class PairAdaptiveSemanticScorer(
         pair_brief = src_summary
         context_block = ""
         if decision_context:
-            context_block = "\nFinal alignment context:\n" f"{decision_context}\n\n"
+            context_block = f"\nFinal alignment context:\n{decision_context}\n\n"
         return {
             "system": "You are an ontology alignment expert.",
             "user": (
@@ -203,7 +264,9 @@ class PairAdaptiveSemanticScorer(
         if not src_labels:
             return []
         summary_backend = self._llm_router.resolve_task("summary")
-        self._last_summary_backend_meta = self._resolved_backend_metadata(summary_backend)
+        self._last_summary_backend_meta = self._resolved_backend_metadata(
+            summary_backend
+        )
         outputs = [""] * len(src_labels)
         pending: Dict[str, Dict[str, Any]] = {}
 
@@ -225,7 +288,12 @@ class PairAdaptiveSemanticScorer(
                 continue
             entry = pending.setdefault(
                 key,
-                {"src_label": src_label, "tgt_label": tgt_label, "packet": packet, "indices": []},
+                {
+                    "src_label": src_label,
+                    "tgt_label": tgt_label,
+                    "packet": packet,
+                    "indices": [],
+                },
             )
             entry["indices"].append(idx)
 
@@ -241,8 +309,12 @@ class PairAdaptiveSemanticScorer(
             ]
             generated = self._generate_briefs_uncached(prompts, summary_backend)
             for key, brief in zip(pending_keys, generated):
-                clean = self._parse_structured_text(brief, "summary", self._clean_summary_text)
-                self._cache_store(self._summary_cache, key, clean, self.max_cached_summaries)
+                clean = self._parse_structured_text(
+                    brief, "summary", self._clean_summary_text
+                )
+                self._cache_store(
+                    self._summary_cache, key, clean, self.max_cached_summaries
+                )
                 for idx in pending[key]["indices"]:
                     outputs[idx] = clean
 
@@ -269,7 +341,9 @@ class PairAdaptiveSemanticScorer(
             tgt_labels.append(str(labels.get("target", "")))
             pair_briefs.append(str(record.get("llm_pair_brief", "")))
             decisions.append(str(prediction.get("rationale_decision_label", "")))
-            decision_contexts.append(self._final_alignment_context_for_rationale(record))
+            decision_contexts.append(
+                self._final_alignment_context_for_rationale(record)
+            )
         return self.generate_rationales_batched(
             src_labels=src_labels,
             tgt_labels=tgt_labels,
@@ -338,7 +412,9 @@ class PairAdaptiveSemanticScorer(
 
         lines.extend(["", "Auxiliary attribute evidence"])
         if attr_payload.get("src_selected") or attr_payload.get("tgt_selected"):
-            lines.append(f"Attribute support score={attr_payload.get('score', self.tau):.3f}")
+            lines.append(
+                f"Attribute support score={attr_payload.get('score', self.tau):.3f}"
+            )
             for item in list(attr_payload.get("src_selected", []))[:4]:
                 lines.append(f"Source attribute: {item.get('text', '')}")
             for item in list(attr_payload.get("tgt_selected", []))[:4]:
@@ -346,6 +422,27 @@ class PairAdaptiveSemanticScorer(
         else:
             lines.append("No attribute evidence selected.")
         return "\n".join(line for line in lines if line is not None).strip()
+
+    def _uncertainty_components(
+        self,
+        S_base: torch.Tensor,
+        s_label: torch.Tensor,
+        S_struct: torch.Tensor,
+        q_label: torch.Tensor,
+        Q_struct: torch.Tensor,
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Compute configurable indecision and cross-channel disagreement."""
+
+        indecision = (
+            self.uncertainty_indecision_scale * (self.tau - (S_base - self.tau).abs())
+        ).clamp(0.0, 1.0)
+        disagreement = (
+            (q_label * Q_struct)
+            .clamp_min(0.0)
+            .pow(self.uncertainty_disagreement_quality_power)
+            * (s_label - S_struct).abs()
+        ).clamp(0.0, 1.0)
+        return indecision, disagreement
 
     @torch.inference_mode()
     def forward(
@@ -367,7 +464,9 @@ class PairAdaptiveSemanticScorer(
         assert len(src_iris) == n_pairs and len(tgt_iris) == n_pairs
         dataset = self._attached_dataset
         if dataset is None:
-            raise RuntimeError("PairAdaptiveSemanticScorer requires an attached dataset.")
+            raise RuntimeError(
+                "PairAdaptiveSemanticScorer requires an attached dataset."
+            )
 
         self._log_once(
             "pair_adaptive_inference_mode",
@@ -382,20 +481,30 @@ class PairAdaptiveSemanticScorer(
         tgt_unique_iris = list(dict.fromkeys(tgt_iris))
         cache_probe = getattr(dataset, "has_entity_features_cached", None)
         src_cache_hits = sum(
-            1 for iri in src_unique_iris if callable(cache_probe) and bool(cache_probe(iri, "src"))
+            1
+            for iri in src_unique_iris
+            if callable(cache_probe) and bool(cache_probe(iri, "src"))
         )
         tgt_cache_hits = sum(
-            1 for iri in tgt_unique_iris if callable(cache_probe) and bool(cache_probe(iri, "tgt"))
+            1
+            for iri in tgt_unique_iris
+            if callable(cache_probe) and bool(cache_probe(iri, "tgt"))
         )
-        src_feature_map = {iri: dataset.get_entity_features(iri, "src") for iri in src_unique_iris}
-        tgt_feature_map = {iri: dataset.get_entity_features(iri, "tgt") for iri in tgt_unique_iris}
+        src_feature_map = {
+            iri: dataset.get_entity_features(iri, "src") for iri in src_unique_iris
+        }
+        tgt_feature_map = {
+            iri: dataset.get_entity_features(iri, "tgt") for iri in tgt_unique_iris
+        }
         self._computed_llm_calibration = None
         self._calibration_messages = []
         self._last_summary_backend_meta = {}
         self._last_decision_backend_meta = {}
         self._last_rationale_backend_meta = {}
 
-        s_label, q_label, best_pairs = self._score_label_channel(src_label_lists, tgt_label_lists)
+        s_label, q_label, best_pairs = self._score_label_channel(
+            src_label_lists, tgt_label_lists
+        )
         s_label_star = s_label
 
         family_names = list(self.hierarchical_relation_families.keys() or [])
@@ -417,9 +526,13 @@ class PairAdaptiveSemanticScorer(
             tgt_feats = tgt_feature_map[tgt_iri]
             src_best_label, tgt_best_label = best_pairs[idx]
             if not src_best_label:
-                src_best_label = src_feats["labels"][0] if src_feats.get("labels") else ""
+                src_best_label = (
+                    src_feats["labels"][0] if src_feats.get("labels") else ""
+                )
             if not tgt_best_label:
-                tgt_best_label = tgt_feats["labels"][0] if tgt_feats.get("labels") else ""
+                tgt_best_label = (
+                    tgt_feats["labels"][0] if tgt_feats.get("labels") else ""
+                )
 
             hierarchy_payloads: Dict[str, Dict[str, Any]] = {}
             for family in family_names:
@@ -429,8 +542,12 @@ class PairAdaptiveSemanticScorer(
                     tgt_feats.get("hierarchy", {}).get(family, []),
                 )
                 hierarchy_payloads[family] = family_payload
-                struct_channel_scores[f"hier__{family}"].append(float(family_payload["score"]))
-                struct_channel_qualities[f"hier__{family}"].append(float(family_payload["quality"]))
+                struct_channel_scores[f"hier__{family}"].append(
+                    float(family_payload["score"])
+                )
+                struct_channel_qualities[f"hier__{family}"].append(
+                    float(family_payload["quality"])
+                )
 
             sim_payload = self._score_similarity_channel(
                 src_feats.get("object_triples", []),
@@ -478,7 +595,9 @@ class PairAdaptiveSemanticScorer(
 
         src_pool_stats = self._batch_pool_stats(src_feature_map, family_names)
         tgt_pool_stats = self._batch_pool_stats(tgt_feature_map, family_names)
-        pair_evidence_stats = self._batch_selected_evidence_stats(pair_payloads, family_names)
+        pair_evidence_stats = self._batch_selected_evidence_stats(
+            pair_payloads, family_names
+        )
 
         channel_score_tensors = {
             key: torch.tensor(values, dtype=torch.float32, device=self.device)
@@ -492,7 +611,9 @@ class PairAdaptiveSemanticScorer(
         sigma_tensors: Dict[str, torch.Tensor] = {}
         for key, score_tensor in channel_score_tensors.items():
             quality_tensor = channel_quality_tensors[key]
-            sigma_tensors[key] = quality_tensor * (score_tensor - self.tau).abs().pow(self.gamma)
+            sigma_tensors[key] = quality_tensor * (score_tensor - self.tau).abs().pow(
+                self.gamma
+            )
 
         sigma_sum = torch.zeros(n_pairs, device=self.device)
         for tensor in sigma_tensors.values():
@@ -509,7 +630,8 @@ class PairAdaptiveSemanticScorer(
         S_struct = torch.full((n_pairs,), float(self.tau), device=self.device)
         if struct_weights:
             structural_terms = [
-                struct_weights[key] * channel_score_tensors[key] for key in struct_weights
+                struct_weights[key] * channel_score_tensors[key]
+                for key in struct_weights
             ]
             structural_sum = torch.stack(structural_terms, dim=0).sum(dim=0)
             S_struct = torch.where(sigma_sum > 1e-8, structural_sum, S_struct)
@@ -517,7 +639,8 @@ class PairAdaptiveSemanticScorer(
         Q_struct = torch.zeros(n_pairs, device=self.device)
         if struct_weights:
             quality_terms = [
-                struct_weights[key] * channel_quality_tensors[key] for key in struct_weights
+                struct_weights[key] * channel_quality_tensors[key]
+                for key in struct_weights
             ]
             Q_struct = torch.where(
                 sigma_sum > 1e-8,
@@ -527,7 +650,8 @@ class PairAdaptiveSemanticScorer(
 
         hier_keys = [f"hier__{family}" for family in family_names]
         hier_sigma = sum(
-            (sigma_tensors[key] for key in hier_keys), torch.zeros(n_pairs, device=self.device)
+            (sigma_tensors[key] for key in hier_keys),
+            torch.zeros(n_pairs, device=self.device),
         )
         s_hier = torch.full((n_pairs,), float(self.tau), device=self.device)
         if hier_keys:
@@ -538,7 +662,9 @@ class PairAdaptiveSemanticScorer(
             active_hier = hier_sigma > 1e-8
             if torch.any(active_hier):
                 s_hier = s_hier.clone()
-                s_hier[active_hier] = hier_weighted[active_hier] / hier_sigma[active_hier]
+                s_hier[active_hier] = (
+                    hier_weighted[active_hier] / hier_sigma[active_hier]
+                )
 
         s_sim = channel_score_tensors["sim_obj"]
         s_diff = channel_score_tensors["diff"]
@@ -546,7 +672,8 @@ class PairAdaptiveSemanticScorer(
         q_hier = torch.zeros(n_pairs, device=self.device)
         if hier_keys:
             active_family_count = sum(
-                (channel_quality_tensors[key] > 0).to(torch.float32) for key in hier_keys
+                (channel_quality_tensors[key] > 0).to(torch.float32)
+                for key in hier_keys
             )
             family_quality_sum = sum(
                 (channel_quality_tensors[key] for key in hier_keys),
@@ -585,13 +712,16 @@ class PairAdaptiveSemanticScorer(
             S_base[only_struct] = S_struct[only_struct]
         if torch.any(both_active):
             S_base = S_base.clone()
-            S_base[both_active] = (1.0 - w_struct[both_active]) * s_label[both_active] + w_struct[
+            S_base[both_active] = (1.0 - w_struct[both_active]) * s_label[
                 both_active
-            ] * S_struct[both_active]
+            ] + w_struct[both_active] * S_struct[both_active]
 
-        U_ind = (2.0 * (self.tau - (S_base - self.tau).abs())).clamp(0.0, 1.0)
-        U_dis = ((q_label * Q_struct).clamp_min(0.0).sqrt() * (s_label - S_struct).abs()).clamp(
-            0.0, 1.0
+        U_ind, U_dis = self._uncertainty_components(
+            S_base,
+            s_label,
+            S_struct,
+            q_label,
+            Q_struct,
         )
         U = torch.maximum(U_ind, U_dis)
         if self.use_llm:
@@ -611,7 +741,11 @@ class PairAdaptiveSemanticScorer(
         brief_idxs: List[int] = []
         if self.use_llm:
             decision_idxs = torch.nonzero(need_llm).flatten().tolist()
-            brief_idxs = list(range(n_pairs)) if self.force_llm_summaries else list(decision_idxs)
+            brief_idxs = (
+                list(range(n_pairs))
+                if self.force_llm_summaries
+                else list(decision_idxs)
+            )
         if self.use_llm and brief_idxs:
             brief_src = [pair_payloads[i]["src_label"] for i in brief_idxs]
             brief_tgt = [pair_payloads[i]["tgt_label"] for i in brief_idxs]
@@ -647,19 +781,25 @@ class PairAdaptiveSemanticScorer(
                     if samples is not None:
                         probs_fit, labels_fit = samples
                         count = int(probs_fit.shape[0])
-                        self._calibration_pending_probs.extend(probs_fit.detach().cpu().tolist())
-                        self._calibration_pending_labels.extend(labels_fit.detach().cpu().tolist())
+                        self._calibration_pending_probs.extend(
+                            probs_fit.detach().cpu().tolist()
+                        )
+                        self._calibration_pending_labels.extend(
+                            labels_fit.detach().cpu().tolist()
+                        )
                         batch_calibration_samples += count
                         self._calibration_messages.append(
                             f"Collected {count} calibration samples this batch (total={len(self._calibration_pending_probs)})."
                         )
             p_llm[decision_idxs] = p_yes_needed
-            decisions_needed = ["Yes" if float(prob) >= 0.5 else "No" for prob in p_yes_needed]
+            decisions_needed = [
+                "Yes" if float(prob) >= 0.5 else "No" for prob in p_yes_needed
+            ]
             for offset, idx in enumerate(decision_idxs):
                 llm_decisions[idx] = decisions_needed[offset]
-            S_final[need_llm] = (1.0 - w_i[need_llm]) * S_base[need_llm] + w_i[need_llm] * p_llm[
+            S_final[need_llm] = (1.0 - w_i[need_llm]) * S_base[need_llm] + w_i[
                 need_llm
-            ]
+            ] * p_llm[need_llm]
 
         llm_used_mask = torch.zeros(n_pairs, dtype=torch.bool, device=self.device)
         if decision_idxs:
@@ -669,7 +809,8 @@ class PairAdaptiveSemanticScorer(
         I_label = (1.0 - w_i_effective) * (1.0 - w_struct)
         I_struct = (1.0 - w_i_effective) * w_struct
         I_hier = I_struct * sum(
-            (struct_weights[key] for key in hier_keys), torch.zeros(n_pairs, device=self.device)
+            (struct_weights[key] for key in hier_keys),
+            torch.zeros(n_pairs, device=self.device),
         )
         I_sim = I_struct * struct_weights["sim_obj"]
         I_diff = I_struct * struct_weights["diff"]
@@ -756,21 +897,25 @@ class PairAdaptiveSemanticScorer(
             explanations = []
             for idx, payload in enumerate(pair_payloads):
                 family_scores = {
-                    family: float(payload["hierarchy"][family]["score"]) for family in family_names
+                    family: float(payload["hierarchy"][family]["score"])
+                    for family in family_names
                 }
                 family_qualities = {
                     family: float(payload["hierarchy"][family]["quality"])
                     for family in family_names
                 }
                 family_weights = {
-                    family: float(struct_weights[f"hier__{family}"][idx]) for family in family_names
+                    family: float(struct_weights[f"hier__{family}"][idx])
+                    for family in family_names
                 }
                 hier_internal_weight = sum(
                     (struct_weights[key][idx] for key in hier_keys),
                     torch.tensor(0.0, device=self.device),
                 )
                 family_importances = {
-                    family: float(I_struct[idx] * struct_weights[f"hier__{family}"][idx])
+                    family: float(
+                        I_struct[idx] * struct_weights[f"hier__{family}"][idx]
+                    )
                     for family in family_names
                 }
                 family_contribs = {
@@ -786,9 +931,22 @@ class PairAdaptiveSemanticScorer(
                         "explanation_schema_version": 3,
                         "src_iri": src_iris[idx],
                         "tgt_iri": tgt_iris[idx],
+                        "kind": dataset.entity_kind_for(
+                            src_iris[idx], "src", warn_unknown=False
+                        ).value,
+                        "src_kind": dataset.entity_kind_for(
+                            src_iris[idx], "src", warn_unknown=False
+                        ).value,
+                        "tgt_kind": dataset.entity_kind_for(
+                            tgt_iris[idx], "tgt", warn_unknown=False
+                        ).value,
                         "models": {
-                            "lexical_model": self.lexical_model_name if self.use_lexical else None,
-                            "context_model": self.context_model_name if self.use_context else None,
+                            "lexical_model": self.lexical_model_name
+                            if self.use_lexical
+                            else None,
+                            "context_model": self.context_model_name
+                            if self.use_context
+                            else None,
                             "llm_model": None,
                             "llm_summary_model": (
                                 self._last_summary_backend_meta.get("model")
@@ -809,7 +967,9 @@ class PairAdaptiveSemanticScorer(
                                 self.llm_model_name if self.use_llm else None
                             ),
                         },
-                        "llm_calibration": self._llm_calibration_payload(batch_samples=0),
+                        "llm_calibration": self._llm_calibration_payload(
+                            batch_samples=0
+                        ),
                         "confidences": {
                             "s_label": float(s_label[idx]),
                             "s_label_star": float(s_label_star[idx]),
@@ -860,9 +1020,17 @@ class PairAdaptiveSemanticScorer(
                         },
                         "contributions": {
                             "C_label": float(I_label[idx] * (s_label[idx] - self.tau)),
-                            "C_struct": float(I_struct[idx] * (S_struct[idx] - self.tau)),
+                            "C_struct": float(
+                                I_struct[idx] * (S_struct[idx] - self.tau)
+                            ),
                             "C_hier": float(
-                                sum((family_contribs[family] for family in family_names), 0.0)
+                                sum(
+                                    (
+                                        family_contribs[family]
+                                        for family in family_names
+                                    ),
+                                    0.0,
+                                )
                             ),
                             "C_sim": float(
                                 I_struct[idx]
@@ -885,7 +1053,9 @@ class PairAdaptiveSemanticScorer(
                         "prediction": {
                             "global_match": bool(S_final[idx] >= self.threshold),
                             "ground_truth": (
-                                label[idx] if label is not None and idx < len(label) else None
+                                label[idx]
+                                if label is not None and idx < len(label)
+                                else None
                             ),
                             "llm_decision": llm_decisions[idx],
                             "llm_rationale": llm_rationales[idx],
@@ -904,44 +1074,68 @@ class PairAdaptiveSemanticScorer(
                         },
                         "context_sentences": {
                             "hierarchy_source": {
-                                family: list(payload["hierarchy"][family].get("src_sentences", []))
+                                family: list(
+                                    payload["hierarchy"][family].get(
+                                        "src_sentences", []
+                                    )
+                                )
                                 for family in family_names
                             },
                             "hierarchy_target": {
-                                family: list(payload["hierarchy"][family].get("tgt_sentences", []))
+                                family: list(
+                                    payload["hierarchy"][family].get(
+                                        "tgt_sentences", []
+                                    )
+                                )
                                 for family in family_names
                             },
-                            "similarity_source": list(payload["sim"].get("src_sentences", [])),
-                            "similarity_target": list(payload["sim"].get("tgt_sentences", [])),
-                            "difference_source": list(payload["diff"].get("src_sentences", [])),
-                            "difference_target": list(payload["diff"].get("tgt_sentences", [])),
+                            "similarity_source": list(
+                                payload["sim"].get("src_sentences", [])
+                            ),
+                            "similarity_target": list(
+                                payload["sim"].get("tgt_sentences", [])
+                            ),
+                            "difference_source": list(
+                                payload["diff"].get("src_sentences", [])
+                            ),
+                            "difference_target": list(
+                                payload["diff"].get("tgt_sentences", [])
+                            ),
                         },
                         "context_triples": {
                             "hierarchy_source": {
                                 family: [
                                     item["triple"]
-                                    for item in payload["hierarchy"][family].get("src_selected", [])
+                                    for item in payload["hierarchy"][family].get(
+                                        "src_selected", []
+                                    )
                                 ]
                                 for family in family_names
                             },
                             "hierarchy_target": {
                                 family: [
                                     item["triple"]
-                                    for item in payload["hierarchy"][family].get("tgt_selected", [])
+                                    for item in payload["hierarchy"][family].get(
+                                        "tgt_selected", []
+                                    )
                                 ]
                                 for family in family_names
                             },
                             "similarity_source": [
-                                item["triple"] for item in payload["sim"].get("src_selected", [])
+                                item["triple"]
+                                for item in payload["sim"].get("src_selected", [])
                             ],
                             "similarity_target": [
-                                item["triple"] for item in payload["sim"].get("tgt_selected", [])
+                                item["triple"]
+                                for item in payload["sim"].get("tgt_selected", [])
                             ],
                             "difference_source": [
-                                item["triple"] for item in payload["diff"].get("src_selected", [])
+                                item["triple"]
+                                for item in payload["diff"].get("src_selected", [])
                             ],
                             "difference_target": [
-                                item["triple"] for item in payload["diff"].get("tgt_selected", [])
+                                item["triple"]
+                                for item in payload["diff"].get("tgt_selected", [])
                             ],
                         },
                         "attributes": {
@@ -965,10 +1159,14 @@ class PairAdaptiveSemanticScorer(
                             "hierarchy": {
                                 family: {
                                     "source": list(
-                                        payload["hierarchy"][family].get("src_selected", [])
+                                        payload["hierarchy"][family].get(
+                                            "src_selected", []
+                                        )
                                     ),
                                     "target": list(
-                                        payload["hierarchy"][family].get("tgt_selected", [])
+                                        payload["hierarchy"][family].get(
+                                            "tgt_selected", []
+                                        )
                                     ),
                                 }
                                 for family in family_names

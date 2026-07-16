@@ -4,6 +4,7 @@ import pprint
 from pathlib import Path
 from typing import TYPE_CHECKING, List, Optional, Union
 
+from exact.core.entities.kinds import EntityKind
 from exact.core.entities.mappings import EntityMapping
 from exact.core.values import DEFAULT_REL
 from exact.utils.data import read_table
@@ -31,7 +32,9 @@ class ReferenceMapping(EntityMapping):
         src_entity_iri: str,
         tgt_entity_iri: str,
         relation: str = DEFAULT_REL,
-        candidate_mappings: Optional[List[EntityMapping]] = [],
+        candidate_mappings: Optional[List[EntityMapping]] = None,
+        src_kind: EntityKind | str = EntityKind.CLASS,
+        tgt_kind: EntityKind | str | None = None,
     ):
         r"""Intialise a reference mapping.
 
@@ -42,9 +45,16 @@ class ReferenceMapping(EntityMapping):
                 Suggested inputs are `"<EquivalentTo>"` and `"<SubsumedBy>"`.
             candidate_mappings (List[EntityMapping], optional): A list of entity mappings that are candidates for this reference mapping. Defaults to `[]`.
         """
-        super().__init__(src_entity_iri, tgt_entity_iri, relation, 1.0)
+        super().__init__(
+            src_entity_iri,
+            tgt_entity_iri,
+            relation,
+            1.0,
+            src_kind=src_kind,
+            tgt_kind=tgt_kind,
+        )
         self.candidates = []
-        for candidate in candidate_mappings:
+        for candidate in candidate_mappings or []:
             self.add_candidate(candidate)
 
     def __repr__(self):
@@ -79,8 +89,30 @@ class ReferenceMapping(EntityMapping):
         if isinstance(table_of_mappings_file, Path):
             table_of_mappings_file = read_table(table_of_mappings_file)
 
-        table_of_mappings_file.columns = ["SrcEntity", "TgtEntity", "Score"]
+        frame = table_of_mappings_file.copy()
+        if {"Src", "Tgt"}.issubset(frame.columns):
+            frame = frame.rename(columns={"Src": "SrcEntity", "Tgt": "TgtEntity"})
+        elif not {"SrcEntity", "TgtEntity"}.issubset(frame.columns):
+            if len(frame.columns) < 2:
+                raise ValueError("Reference table must contain at least two columns")
+            frame = frame.rename(
+                columns={
+                    frame.columns[0]: "SrcEntity",
+                    frame.columns[1]: "TgtEntity",
+                }
+            )
 
         return [
-            cls(dp.SrcEntity, dp.TgtEntity, relation) for dp in table_of_mappings_file.itertuples()
+            cls(
+                str(row.SrcEntity),
+                str(row.TgtEntity),
+                (
+                    str(getattr(row, "Relation"))
+                    if relation == DEFAULT_REL and hasattr(row, "Relation")
+                    else relation
+                ),
+                src_kind=getattr(row, "SrcKind", EntityKind.CLASS),
+                tgt_kind=getattr(row, "TgtKind", getattr(row, "SrcKind", EntityKind.CLASS)),
+            )
+            for row in frame.itertuples(index=False)
         ]

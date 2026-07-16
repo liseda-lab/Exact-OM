@@ -30,6 +30,8 @@ from exact.utils.formatting import (  # noqa: F401
 )
 from exact.utils.provenance import file_provenance  # noqa: F401
 
+from .grouping import count_source_groups, groupby_target, iter_source_groups
+
 
 class FeatureEngineeringMixin:
     def _evidence_support_from_features(self, accept_features: Sequence[float]) -> float:
@@ -286,7 +288,7 @@ class FeatureEngineeringMixin:
             for idx, row in df.iterrows()
         }
         result: Dict[int, float] = {}
-        for _, group in df.groupby("Tgt", sort=False):
+        for _, group in groupby_target(df):
             idxs = list(group.index)
             probs = self._softmax([logits[idx] for idx in idxs], temperature=self.temperature)
             for idx, prob in zip(idxs, probs):
@@ -301,7 +303,7 @@ class FeatureEngineeringMixin:
         log_every: int = 10,
     ) -> Dict[int, float]:
         result: Dict[int, float] = {}
-        n_sources = int(df["Src"].nunique()) if "Src" in df.columns else 0
+        n_sources = count_source_groups(df)
         progress_interval = self._progress_interval(log_every)
         start = time.perf_counter()
         if n_sources:
@@ -310,7 +312,9 @@ class FeatureEngineeringMixin:
                 f"Candidate-set selector distinctive-evidence scan started: sources={n_sources}.",
                 "debug",
             )
-        for group_idx, (_, group) in enumerate(df.groupby("Src", sort=False), start=1):
+        for group_idx, (_, _, _, group) in enumerate(
+            iter_source_groups(df), start=1
+        ):
             idxs = list(group.index)
             item_map: Dict[int, List[Tuple[str, float]]] = {}
             document_frequency: Dict[str, int] = {}

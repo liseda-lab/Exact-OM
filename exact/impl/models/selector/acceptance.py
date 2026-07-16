@@ -30,6 +30,8 @@ from exact.utils.formatting import (  # noqa: F401
 )
 from exact.utils.provenance import file_provenance  # noqa: F401
 
+from .grouping import groupby_source, iter_source_groups, source_group_id
+
 
 class AcceptanceMixin:
     def _validation_llm_mode_candidates(self, primary_model: Optional[IModel]) -> List[str]:
@@ -69,9 +71,11 @@ class AcceptanceMixin:
         original_mode = str(self.llm.get("mode", "veto"))
         self.llm["mode"] = "veto"
         vetoed_sources: set[str] = set()
-        grouped = {str(src): group for src, group in df.groupby("Src", sort=False)}
+        grouped = {
+            source_group_id(key): group for key, group in groupby_source(df)
+        }
         try:
-            for src, decision in decisions.items():
+            for group_id, decision in decisions.items():
                 p_match = float(decision.get("p_match", 0.0))
                 if p_match < float(threshold):
                     continue
@@ -84,9 +88,10 @@ class AcceptanceMixin:
                     evidence_support_floor=0.0,
                 ):
                     continue
-                group = grouped.get(str(src))
+                group = grouped.get(group_id)
                 if group is None:
                     continue
+                src = str(decision.get("source", group.iloc[0]["Src"]))
                 llm_choice = self._llm_direct_choice_group(
                     src=str(src),
                     group=group,
@@ -95,7 +100,7 @@ class AcceptanceMixin:
                     record_lookup=record_lookup,
                 )
                 if llm_choice and llm_choice.get("applied") and bool(llm_choice.get("no_match")):
-                    vetoed_sources.add(str(src))
+                    vetoed_sources.add(group_id)
         finally:
             self.llm["mode"] = original_mode
 
@@ -273,7 +278,7 @@ class AcceptanceMixin:
         reciprocity: Dict[int, float],
     ) -> Dict[int, List[float]]:
         rows: Dict[int, List[float]] = {}
-        for _, group in df.groupby("Src", sort=False):
+        for _, _, _, group in iter_source_groups(df):
             idxs = list(group.index)
             pair_scores = [
                 self._clip01(self._safe_float(group.at[idx, "S_pair_final"], 0.0)) for idx in idxs
@@ -701,7 +706,7 @@ class AcceptanceMixin:
             return 0
         if "Src" not in df.columns:
             return int(df[column].astype(bool).sum())
-        return int(df.groupby("Src", sort=False)[column].any().sum())
+        return int(groupby_source(df)[column].any().sum())
 
     @staticmethod
     def _sha1(value: str) -> str:

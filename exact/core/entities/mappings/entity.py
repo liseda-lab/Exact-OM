@@ -5,6 +5,7 @@ from heapq import nsmallest
 from pathlib import Path
 from typing import TYPE_CHECKING, List, Optional, Set, Tuple, Union
 
+from exact.core.entities.kinds import EntityKind
 from exact.core.values import DEFAULT_REL
 from exact.utils.data import read_table
 
@@ -31,6 +32,8 @@ class EntityMapping:
         tgt_entity_iri: str,
         relation: str = DEFAULT_REL,
         score: float = 0.0,
+        src_kind: EntityKind | str = EntityKind.CLASS,
+        tgt_kind: EntityKind | str | None = None,
     ):
         """Intialise an entity mapping.
 
@@ -45,6 +48,18 @@ class EntityMapping:
         self.tail = tgt_entity_iri
         self.relation = relation
         self.score = score
+        self.src_kind = EntityKind(src_kind)
+        self.tgt_kind = EntityKind(tgt_kind) if tgt_kind is not None else self.src_kind
+
+    @property
+    def kind(self) -> EntityKind:
+        """Return the within-kind mapping kind.
+
+        Cross-kind mappings remain representable for compatibility, but the
+        matching pipeline rejects them before scoring.
+        """
+
+        return self.src_kind
 
     def to_tuple(self, with_score: bool = False):
         """Transform an entity mapping (`self`) to a tuple representation
@@ -109,9 +124,11 @@ class EntityMapping:
             (List[EntityMapping]): A list of filtered entity mappings.
         """
         all_sources = defaultdict(list)
+        kind_aware = len({mapping.src_kind for mapping in preds}) > 1
 
         for ent_map in preds:
-            all_sources[ent_map.head].append(ent_map)
+            key = (ent_map.head, ent_map.src_kind) if kind_aware else ent_map.head
+            all_sources[key].append(ent_map)
 
         protected = set(protected_pairs or set())
         filtered_mappings = []
@@ -133,10 +150,12 @@ class EntityMapping:
     ) -> List["EntityMapping"]:
         r"""Keep the top n source mappings per target."""
         all_targets = defaultdict(list)
+        kind_aware = len({mapping.tgt_kind for mapping in preds}) > 1
         protected = set(protected_pairs or set())
 
         for ent_map in preds:
-            all_targets[ent_map.tail].append(ent_map)
+            key = (ent_map.tail, ent_map.tgt_kind) if kind_aware else ent_map.tail
+            all_targets[key].append(ent_map)
 
         filtered_mappings = []
         for tail, mappings in all_targets.items():
@@ -165,11 +184,41 @@ class EntityMapping:
         if isinstance(table_of_mappings_file, Path):
             table_of_mappings_file = read_table(table_of_mappings_file)
 
-        table_of_mappings_file.columns = ["SrcEntity", "TgtEntity", "Score"]
+        frame = table_of_mappings_file.copy()
+        if {"Src", "Tgt"}.issubset(frame.columns):
+            frame = frame.rename(
+                columns={
+                    "Src": "SrcEntity",
+                    "Tgt": "TgtEntity",
+                    "Scores": "Score",
+                }
+            )
+        elif not {"SrcEntity", "TgtEntity"}.issubset(frame.columns):
+            if len(frame.columns) < 3:
+                raise ValueError("Mapping table must contain at least three columns")
+            rename = {
+                frame.columns[0]: "SrcEntity",
+                frame.columns[1]: "TgtEntity",
+                frame.columns[2]: "Score",
+            }
+            frame = frame.rename(columns=rename)
+        if "Score" not in frame.columns:
+            raise ValueError("Mapping table is missing a Score column")
 
         mappings = [
-            cls(dp.SrcEntity, dp.TgtEntity, relation, dp.Score)
-            for dp in table_of_mappings_file.itertuples()
+            cls(
+                str(row.SrcEntity),
+                str(row.TgtEntity),
+                (
+                    str(getattr(row, "Relation"))
+                    if relation == DEFAULT_REL and hasattr(row, "Relation")
+                    else relation
+                ),
+                float(row.Score),
+                getattr(row, "SrcKind", EntityKind.CLASS),
+                getattr(row, "TgtKind", getattr(row, "SrcKind", EntityKind.CLASS)),
+            )
+            for row in frame.itertuples(index=False)
         ]
 
         if threshold is not None:

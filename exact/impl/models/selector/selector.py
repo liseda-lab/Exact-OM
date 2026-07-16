@@ -33,6 +33,7 @@ from exact.utils.provenance import file_provenance  # noqa: F401
 from .acceptance import AcceptanceMixin
 from .calibration import CalibrationMixin
 from .features import FeatureEngineeringMixin
+from .grouping import count_source_groups, iter_source_groups
 
 
 class CandidateSetSelector(CalibrationMixin, AcceptanceMixin, FeatureEngineeringMixin, IModel):
@@ -404,7 +405,7 @@ class CandidateSetSelector(CalibrationMixin, AcceptanceMixin, FeatureEngineering
             df["S_pair_final"] = df["S_final"]
 
         n_rows = int(len(df))
-        n_sources = int(df["Src"].nunique()) if "Src" in df.columns else 0
+        n_sources = count_source_groups(df)
         self._log(
             logger,
             (
@@ -507,7 +508,7 @@ class CandidateSetSelector(CalibrationMixin, AcceptanceMixin, FeatureEngineering
 
         self._sync_results_json(df, results_json)
         elapsed = time.perf_counter() - start
-        n_sources = int(df["Src"].nunique()) if "Src" in df.columns else 0
+        n_sources = count_source_groups(df)
         n_groups = n_sources
         n_abstained = self._count_source_groups(df, "selection_abstained")
         n_llm = self._count_source_groups(df, "selection_llm_used")
@@ -535,7 +536,7 @@ class CandidateSetSelector(CalibrationMixin, AcceptanceMixin, FeatureEngineering
         checkpoint_every_groups: Optional[int],
         run_progress: Optional[Any],
     ) -> pd.DataFrame:
-        n_sources = int(df["Src"].nunique())
+        n_sources = count_source_groups(df)
         n_groups = 0
         n_abstained = 0
         n_llm = 0
@@ -543,7 +544,7 @@ class CandidateSetSelector(CalibrationMixin, AcceptanceMixin, FeatureEngineering
         checkpoint_interval = self._checkpoint_interval(checkpoint_every_groups)
         progress_start = time.perf_counter()
 
-        for src, group in df.groupby("Src", sort=False):
+        for _, src, _, group in iter_source_groups(df):
             n_groups += 1
             idxs = list(group.index)
             group_result = self._score_group(
@@ -755,7 +756,7 @@ class CandidateSetSelector(CalibrationMixin, AcceptanceMixin, FeatureEngineering
                 ),
                 "warning",
             )
-        n_sources = int(df["Src"].nunique())
+        n_sources = count_source_groups(df)
         n_llm = 0
         n_abstained = 0
         progress_interval = self._progress_interval(log_every)
@@ -767,8 +768,10 @@ class CandidateSetSelector(CalibrationMixin, AcceptanceMixin, FeatureEngineering
             accept_threshold=accept_threshold,
         )
 
-        for n_groups, (src, group) in enumerate(df.groupby("Src", sort=False), start=1):
-            decision = source_decisions.get(str(src))
+        for n_groups, (group_id, src, _, group) in enumerate(
+            iter_source_groups(df), start=1
+        ):
+            decision = source_decisions.get(group_id)
             if decision is None:
                 continue
             p_match = float(decision["p_match"])

@@ -30,6 +30,8 @@ from exact.utils.formatting import (  # noqa: F401
 )
 from exact.utils.provenance import file_provenance  # noqa: F401
 
+from .grouping import iter_source_groups
+
 
 class CalibrationMixin:
     def _load_training_reference_pairs(self, logger: Optional[Any]) -> set[Tuple[str, str]]:
@@ -173,7 +175,7 @@ class CalibrationMixin:
     ) -> Tuple[List[Dict[str, Any]], int]:
         groups: List[Dict[str, Any]] = []
         n_positive_sources = 0
-        for src, group in df.groupby("Src", sort=False):
+        for _, src, _, group in iter_source_groups(df):
             idxs = list(group.index)
             pos = [idx for idx in idxs if (str(src), str(group.at[idx, "Tgt"])) in ref_pairs]
             if not pos:
@@ -932,7 +934,7 @@ class CalibrationMixin:
             self.calibration.get("exact_prefiltered_negative_weight", 1.0)
         )
         decisions: Dict[str, Dict[str, Any]] = {}
-        for src, group in df.groupby("Src", sort=False):
+        for group_id, src_text, src_kind, group in iter_source_groups(df):
             idxs = list(group.index)
             util_values = [utilities[idx] for idx in idxs]
             probs = self._softmax(util_values, temperature=self.temperature)
@@ -962,7 +964,6 @@ class CalibrationMixin:
                 self._safe_float(top_row.get("s_diff"), 0.5),
             ]
             evidence_support = self._evidence_support_from_features(accept_features)
-            src_text = str(src)
             winner_pair = (src_text, str(top_row.get("Tgt")))
             if src_text in exact_sources:
                 label = 0.0
@@ -976,7 +977,9 @@ class CalibrationMixin:
             else:
                 label = 0.0
                 sample_weight = float(self.calibration["background_negative_weight"])
-            decisions[src_text] = {
+            decisions[group_id] = {
+                "source": src_text,
+                "source_kind": src_kind,
                 "indices": idxs,
                 "winner_idx": winner_idx,
                 "winner_pair": winner_pair,

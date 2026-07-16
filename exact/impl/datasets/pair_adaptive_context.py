@@ -9,6 +9,7 @@ import pandas as pd
 import seaborn as sns
 
 from exact.core.entities.ontology import OntologyGraph
+from exact.core.entities.kinds import EntityKind
 from exact.impl.datasets.contextgraph import ContextDataset
 from exact.utils.formatting import safe_mean
 
@@ -41,8 +42,8 @@ class PairAdaptiveContextDataset(ContextDataset):
         self.max_diff_triples = int(max_diff_triples)
         self.max_attr_items = int(max_attr_items)
         self.pair_adaptive_feature_log_every = max(1, int(pair_adaptive_feature_log_every))
-        self._entity_feature_cache: Dict[Tuple[str, str], Dict[str, Any]] = {}
-        self._direct_superclass_cache: Dict[Tuple[str, str], List[str]] = {}
+        self._entity_feature_cache: Dict[Tuple[str, str, str], Dict[str, Any]] = {}
+        self._direct_superclass_cache: Dict[Tuple[str, str, str], List[str]] = {}
         self._hierarchy_axiom_targets_cache: Dict[Tuple[str, str], List[Tuple[str, str]]] = {}
         self._relation_family_cache: Dict[str, Optional[str]] = {}
         self._normalized_relation_families: Dict[str, Dict[str, set[str]]] = {}
@@ -116,13 +117,20 @@ class PairAdaptiveContextDataset(ContextDataset):
         self._relation_family_cache[rel_iri] = None
         return None
 
-    def _direct_superclass_iris(self, iri: str, graph: OntologyGraph, side: str) -> List[str]:
-        cache_key = (side, iri)
+    def _direct_superclass_iris(
+        self,
+        iri: str,
+        graph: OntologyGraph,
+        side: str,
+        kind: EntityKind = EntityKind.CLASS,
+    ) -> List[str]:
+        del graph
+        cache_key = (side, kind.value, iri)
         cached = self._direct_superclass_cache.get(cache_key)
         if cached is not None:
             return list(cached)
         source = self.source if side == "src" else self.target
-        out = source.direct_parents(iri)
+        out = source.direct_parents(iri, kind)
         self._direct_superclass_cache[cache_key] = list(out)
         return out
 
@@ -165,7 +173,7 @@ class PairAdaptiveContextDataset(ContextDataset):
         self._hierarchy_axiom_targets_cache[cache_key] = list(deduped)
         return deduped
 
-    def _hierarchy_bundle(
+    def _class_hierarchy_bundle(
         self, iri: str, graph: OntologyGraph, side: str
     ) -> Dict[str, List[Dict[str, Any]]]:
         out: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
@@ -175,7 +183,9 @@ class PairAdaptiveContextDataset(ContextDataset):
             node, depth = frontier.pop(0)
             if depth >= self.hierarchy_max_depth:
                 continue
-            for sup in self._direct_superclass_iris(node, graph, side):
+            for sup in self._direct_superclass_iris(
+                node, graph, side, EntityKind.CLASS
+            ):
                 if sup in seen:
                     continue
                 seen.add(sup)
@@ -225,6 +235,106 @@ class PairAdaptiveContextDataset(ContextDataset):
             out[family] = triples[: self.max_hierarchy_triples_per_family]
         return dict(out)
 
+    def _property_hierarchy_bundle(
+        self,
+        iri: str,
+        graph: OntologyGraph,
+        side: str,
+        kind: EntityKind,
+    ) -> Dict[str, List[Dict[str, Any]]]:
+        triples: List[Dict[str, Any]] = []
+        frontier = [(iri, 0)]
+        seen = {iri}
+        while frontier:
+            node, depth = frontier.pop(0)
+            if depth >= self.hierarchy_max_depth:
+                continue
+            for parent in self._direct_superclass_iris(node, graph, side, kind):
+                if parent in seen:
+                    continue
+                seen.add(parent)
+                frontier.append((parent, depth + 1))
+                triples.append(
+                    {
+                        "triple": (
+                            graph.get_labels(node)[0],
+                            "subPropertyOf",
+                            graph.get_labels(parent)[0],
+                        ),
+                        "specificity": 1.0 / float(depth + 1),
+                        "subject_iri": node,
+                        "object_iri": parent,
+                    }
+                )
+        triples.sort(key=lambda item: float(item.get("specificity", 0.0)), reverse=True)
+        return {"is_a": triples[: self.max_hierarchy_triples_per_family]}
+
+    def _individual_hierarchy_bundle(
+        self,
+        iri: str,
+        graph: OntologyGraph,
+        side: str,
+    ) -> Dict[str, List[Dict[str, Any]]]:
+        source = self._source_for_side(side)
+        triples: List[Dict[str, Any]] = []
+        seen: set[str] = set()
+        for type_iri in source.direct_parents(iri, EntityKind.INDIVIDUAL):
+            if type_iri in seen:
+                continue
+            seen.add(type_iri)
+            triples.append(
+                {
+                    "triple": (
+                        graph.get_labels(iri)[0],
+                        "rdf:type",
+                        graph.get_labels(type_iri)[0],
+                    ),
+                    "specificity": 1.0,
+                    "subject_iri": iri,
+                    "object_iri": type_iri,
+                    "type_closure": False,
+                }
+            )
+            for parent in source.direct_parents(type_iri, EntityKind.CLASS):
+                if parent in seen:
+                    continue
+                seen.add(parent)
+                triples.append(
+                    {
+                        "triple": (
+                            graph.get_labels(iri)[0],
+                            "rdf:type",
+                            graph.get_labels(parent)[0],
+                        ),
+                        "specificity": 0.5,
+                        "subject_iri": iri,
+                        "object_iri": parent,
+                        "type_closure": True,
+                    }
+                )
+        triples.sort(
+            key=lambda item: (
+                -float(item.get("specificity", 0.0)),
+                str(item.get("object_iri", "")),
+            )
+        )
+        return {"is_a": triples[: self.max_hierarchy_triples_per_family]}
+
+    def _hierarchy_bundle(
+        self,
+        iri: str,
+        graph: OntologyGraph,
+        side: str,
+        kind: EntityKind,
+    ) -> Dict[str, List[Dict[str, Any]]]:
+        if kind == EntityKind.CLASS:
+            return self._class_hierarchy_bundle(iri, graph, side)
+        if kind in {EntityKind.OBJECT_PROPERTY, EntityKind.DATA_PROPERTY}:
+            return self._property_hierarchy_bundle(iri, graph, side, kind)
+        if kind == EntityKind.INDIVIDUAL:
+            return self._individual_hierarchy_bundle(iri, graph, side)
+        return {}
+
     def _hierarchy_family_names(self) -> List[str]:
         family_names = list(self.hierarchical_relation_families.keys() or [])
         if "is_a" not in family_names:
@@ -253,6 +363,53 @@ class PairAdaptiveContextDataset(ContextDataset):
             )
         triples.sort(key=lambda item: item["score"], reverse=True)
         return triples[: self.max_object_triples]
+
+    def _property_object_bundle(
+        self,
+        iri: str,
+        graph: OntologyGraph,
+        side: str,
+    ) -> List[Dict[str, Any]]:
+        """Add property schema evidence to the normal projected neighborhood."""
+
+        source = self._source_for_side(side)
+        triples: List[Dict[str, Any]] = []
+        property_label = graph.get_labels(iri)[0]
+        for relation, targets in (
+            ("domain", source.property_domains(iri)),
+            ("range", source.property_ranges(iri)),
+        ):
+            for target_iri in targets:
+                triples.append(
+                    {
+                        "triple": (
+                            property_label,
+                            relation,
+                            graph.get_labels(target_iri)[0],
+                        ),
+                        "rel_iri": relation,
+                        "score": 1.0,
+                        "subject_iri": iri,
+                        "object_iri": target_iri,
+                        "property_schema": True,
+                    }
+                )
+        triples.extend(self._object_bundle(iri, graph))
+        deduplicated: List[Dict[str, Any]] = []
+        seen: set[Tuple[str, str, str]] = set()
+        for item in triples:
+            key = tuple(str(value) for value in item.get("triple", ()))
+            if len(key) != 3 or key in seen:
+                continue
+            seen.add(key)
+            deduplicated.append(item)
+        deduplicated.sort(
+            key=lambda item: (
+                -float(item.get("score", 0.0)),
+                tuple(str(value) for value in item.get("triple", ())),
+            )
+        )
+        return deduplicated[: self.max_object_triples]
 
     def _annotation_bundle(self, iri: str, graph: OntologyGraph, side: str) -> List[Dict[str, Any]]:
         source = self.source if side == "src" else self.target
@@ -308,23 +465,92 @@ class PairAdaptiveContextDataset(ContextDataset):
         items.sort(key=lambda item: item["weight"], reverse=True)
         return items[: self.max_attr_items]
 
-    def get_entity_features(self, iri: str, side: str) -> Dict[str, Any]:
-        key = (side, iri)
+    def _base_entity_features(
+        self,
+        iri: str,
+        graph: OntologyGraph,
+        side: str,
+        kind: EntityKind,
+    ) -> Dict[str, Any]:
+        labels = graph.get_labels(iri)
+        return {
+            "kind": kind.value,
+            "labels": labels[:] if self.all_labels else [labels[0]],
+            "hierarchy": self._hierarchy_bundle(iri, graph, side, kind),
+            "attributes": self._annotation_bundle(iri, graph, side),
+        }
+
+    def _bundle_for_class(
+        self, iri: str, graph: OntologyGraph, side: str
+    ) -> Dict[str, Any]:
+        features = self._base_entity_features(
+            iri, graph, side, EntityKind.CLASS
+        )
+        features["object_triples"] = self._object_bundle(iri, graph)
+        return features
+
+    def _bundle_for_property(
+        self,
+        iri: str,
+        graph: OntologyGraph,
+        side: str,
+        kind: EntityKind,
+    ) -> Dict[str, Any]:
+        features = self._base_entity_features(iri, graph, side, kind)
+        features["object_triples"] = self._property_object_bundle(iri, graph, side)
+        return features
+
+    def _bundle_for_individual(
+        self, iri: str, graph: OntologyGraph, side: str
+    ) -> Dict[str, Any]:
+        features = self._base_entity_features(
+            iri, graph, side, EntityKind.INDIVIDUAL
+        )
+        features["object_triples"] = self._object_bundle(iri, graph)
+        return features
+
+    def get_entity_features(
+        self,
+        iri: str,
+        side: str,
+        kind: EntityKind | str | None = None,
+    ) -> Dict[str, Any]:
+        resolved_kind = (
+            EntityKind(kind) if kind is not None else self.entity_kind_for(iri, side)
+        )
+        key = (side, resolved_kind.value, iri)
         cached = self._entity_feature_cache.get(key)
         if cached is not None:
             return cached
         graph = self.source_graph if side == "src" else self.target_graph
-        feats = {
-            "labels": graph.get_labels(iri)[:] if self.all_labels else [graph.get_labels(iri)[0]],
-            "hierarchy": self._hierarchy_bundle(iri, graph, side),
-            "object_triples": self._object_bundle(iri, graph),
-            "attributes": self._annotation_bundle(iri, graph, side),
-        }
+        if resolved_kind == EntityKind.CLASS:
+            feats = self._bundle_for_class(iri, graph, side)
+        elif resolved_kind in {
+            EntityKind.OBJECT_PROPERTY,
+            EntityKind.DATA_PROPERTY,
+        }:
+            feats = self._bundle_for_property(
+                iri, graph, side, resolved_kind
+            )
+        elif resolved_kind == EntityKind.INDIVIDUAL:
+            feats = self._bundle_for_individual(iri, graph, side)
+        else:
+            raise ValueError(
+                f"Feature extraction is not implemented for {resolved_kind.value!r}"
+            )
         self._entity_feature_cache[key] = feats
         return feats
 
-    def has_entity_features_cached(self, iri: str, side: str) -> bool:
-        return (side, iri) in self._entity_feature_cache
+    def has_entity_features_cached(
+        self,
+        iri: str,
+        side: str,
+        kind: EntityKind | str | None = None,
+    ) -> bool:
+        resolved_kind = (
+            EntityKind(kind) if kind is not None else self.entity_kind_for(iri, side)
+        )
+        return (side, resolved_kind.value, iri) in self._entity_feature_cache
 
     _safe_mean = staticmethod(safe_mean)
 
@@ -399,23 +625,41 @@ class PairAdaptiveContextDataset(ContextDataset):
         self.log("Generating labels for pair-adaptive dataset…", level="info")
         src_iris: List[str] = df["Src"].tolist()
         tgt_iris: List[str] = df["Tgt"].tolist()
-        usrc = list(dict.fromkeys(src_iris))
-        utgt = list(dict.fromkeys(tgt_iris))
+        src_kinds = [
+            EntityKind(value)
+            for value in df.get(
+                "SrcKind", pd.Series(EntityKind.CLASS.value, index=df.index)
+            ).tolist()
+        ]
+        tgt_kinds = [
+            EntityKind(value)
+            for value in df.get(
+                "TgtKind", pd.Series(EntityKind.CLASS.value, index=df.index)
+            ).tolist()
+        ]
+        src_keys = list(zip(src_iris, src_kinds))
+        tgt_keys = list(zip(tgt_iris, tgt_kinds))
+        usrc = list(dict.fromkeys(src_keys))
+        utgt = list(dict.fromkeys(tgt_keys))
 
         build_started = time.time()
 
-        def _build_feature_map(iris: List[str], side: str) -> Dict[str, Dict[str, Any]]:
-            total = len(iris)
+        def _build_feature_map(
+            entities: List[Tuple[str, EntityKind]], side: str
+        ) -> Dict[Tuple[str, EntityKind], Dict[str, Any]]:
+            total = len(entities)
             progress_every = max(1, int(self.pair_adaptive_feature_log_every))
             label = "source" if side == "src" else "target"
-            feat_map: Dict[str, Dict[str, Any]] = {}
+            feat_map: Dict[Tuple[str, EntityKind], Dict[str, Any]] = {}
             side_started = time.time()
             self.log(
                 f"Pair-adaptive feature build starting for {label}: {total} unique entities",
                 level="info",
             )
-            for idx, iri in enumerate(iris, start=1):
-                feat_map[iri] = self.get_entity_features(iri, side)
+            for idx, (iri, kind) in enumerate(entities, start=1):
+                feat_map[(iri, kind)] = self.get_entity_features(
+                    iri, side, kind
+                )
                 if idx == total or idx % progress_every == 0:
                     elapsed = time.time() - side_started
                     rate = idx / elapsed if elapsed > 1e-8 else 0.0
@@ -430,14 +674,18 @@ class PairAdaptiveContextDataset(ContextDataset):
 
         src_feat_map = _build_feature_map(usrc, "src")
         tgt_feat_map = _build_feature_map(utgt, "tgt")
-        src_lab_map = {iri: src_feat_map[iri]["labels"] for iri in usrc}
-        tgt_lab_map = {iri: tgt_feat_map[iri]["labels"] for iri in utgt}
-        src_pool_metrics_map = {iri: self._entity_pool_metrics(src_feat_map[iri]) for iri in usrc}
-        tgt_pool_metrics_map = {iri: self._entity_pool_metrics(tgt_feat_map[iri]) for iri in utgt}
+        src_lab_map = {key: src_feat_map[key]["labels"] for key in usrc}
+        tgt_lab_map = {key: tgt_feat_map[key]["labels"] for key in utgt}
+        src_pool_metrics_map = {
+            key: self._entity_pool_metrics(src_feat_map[key]) for key in usrc
+        }
+        tgt_pool_metrics_map = {
+            key: self._entity_pool_metrics(tgt_feat_map[key]) for key in utgt
+        }
 
         df = df.copy()
-        df["SrcLabels"] = [src_lab_map[iri] for iri in src_iris]
-        df["TgtLabels"] = [tgt_lab_map[iri] for iri in tgt_iris]
+        df["SrcLabels"] = [src_lab_map[key] for key in src_keys]
+        df["TgtLabels"] = [tgt_lab_map[key] for key in tgt_keys]
         df["SrcCtx"] = [[] for _ in src_iris]
         df["TgtCtx"] = [[] for _ in tgt_iris]
         df["SrcCtxRaw"] = [[] for _ in src_iris]
@@ -450,10 +698,10 @@ class PairAdaptiveContextDataset(ContextDataset):
         ]
 
         src_label_metrics_map = {
-            iri: self._compute_metrics_for_label_list(src_lab_map[iri]) for iri in usrc
+            key: self._compute_metrics_for_label_list(src_lab_map[key]) for key in usrc
         }
         tgt_label_metrics_map = {
-            iri: self._compute_metrics_for_label_list(tgt_lab_map[iri]) for iri in utgt
+            key: self._compute_metrics_for_label_list(tgt_lab_map[key]) for key in utgt
         }
         for key in [
             "n_labels",
@@ -463,17 +711,25 @@ class PairAdaptiveContextDataset(ContextDataset):
             "avg_label_words",
             "is_empty",
         ]:
-            df[f"src_lab_{key}"] = [src_label_metrics_map[iri][key] for iri in src_iris]
-            df[f"tgt_lab_{key}"] = [tgt_label_metrics_map[iri][key] for iri in tgt_iris]
+            df[f"src_lab_{key}"] = [
+                src_label_metrics_map[entity_key][key] for entity_key in src_keys
+            ]
+            df[f"tgt_lab_{key}"] = [
+                tgt_label_metrics_map[entity_key][key] for entity_key in tgt_keys
+            ]
         for key in ["n_triples", "char_len", "word_len", "tok_len"]:
             df[f"src_ctx_{key}"] = 0.0
             df[f"tgt_ctx_{key}"] = 0.0
         df["src_ctx_is_empty"] = 1.0
         df["tgt_ctx_is_empty"] = 1.0
         for key in sorted(src_pool_metrics_map[usrc[0]].keys()) if usrc else []:
-            df[f"src_{key}"] = [src_pool_metrics_map[iri][key] for iri in src_iris]
+            df[f"src_{key}"] = [
+                src_pool_metrics_map[entity_key][key] for entity_key in src_keys
+            ]
         for key in sorted(tgt_pool_metrics_map[utgt[0]].keys()) if utgt else []:
-            df[f"tgt_{key}"] = [tgt_pool_metrics_map[iri][key] for iri in tgt_iris]
+            df[f"tgt_{key}"] = [
+                tgt_pool_metrics_map[entity_key][key] for entity_key in tgt_keys
+            ]
         self.log(
             f"Pair-adaptive feature generation finished in {time.time() - build_started:.2f}s",
             level="info",
