@@ -14,12 +14,11 @@ pytestmark = pytest.mark.requires_data
 def supervised_local_alignment_runner():
     source_ontology_file = str(NCIT_DIR / "ncit.owl")
     target_ontology_file = str(NCIT_DIR / "doid.owl")
-    output_dir = str("tests" / "test_data" / "test_prompt")
-    config_file = str("tests" / "test_data" / "test_prompt" / "config.yaml")
-    reference_file = str("tests" / "test_data" / "train.tsv")
-    candidates_file = str("tests" / "test_data" / "test.cands.tsv")
-    full_reference_file = str("tests" / "test_data" / "test.tsv")
-    memory = "32G"
+    output_dir = str(TEST_DIR / "test_prompt")
+    config_file = str(TEST_DIR / "test_prompt" / "config.yaml")
+    reference_file = str(TEST_DIR / "train.tsv")
+    candidates_file = str(TEST_DIR / "test.cands.tsv")
+    full_reference_file = str(TEST_DIR / "test.tsv")
 
     return AlignmentRunner(
         source_ontology_file=source_ontology_file,
@@ -30,7 +29,6 @@ def supervised_local_alignment_runner():
         candidates_file=candidates_file,
         config_file=config_file,
         save_logs=True,
-        jvm_heap_size=memory,
         run_eval=True,
         device=0,
     )
@@ -40,11 +38,10 @@ def supervised_local_alignment_runner():
 def unsup_local_alignment_runner():
     source_ontology_file = str(NCIT_DIR / "ncit.owl")
     target_ontology_file = str(NCIT_DIR / "doid.owl")
-    output_dir = str("tests" / "test_data" / "test_prompt")
-    config_file = str("tests" / "test_data" / "test_prompt" / "config.yaml")
-    candidates_file = str("tests" / "test_data" / "test.cands.tsv")
-    full_reference_file = str("tests" / "test_data" / "test.tsv")
-    memory = "32G"
+    output_dir = str(TEST_DIR / "test_prompt")
+    config_file = str(TEST_DIR / "test_prompt" / "config.yaml")
+    candidates_file = str(TEST_DIR / "test.cands.tsv")
+    full_reference_file = str(TEST_DIR / "test.tsv")
 
     return AlignmentRunner(
         source_ontology_file=source_ontology_file,
@@ -54,7 +51,6 @@ def unsup_local_alignment_runner():
         candidates_file=candidates_file,
         config_file=config_file,
         save_logs=True,
-        jvm_heap_size=memory,
         run_eval=True,
         device=0,
     )
@@ -64,11 +60,10 @@ def unsup_local_alignment_runner():
 def supervised_global_alignment_runner():
     source_ontology_file = str(NCIT_DIR / "ncit.owl")
     target_ontology_file = str(NCIT_DIR / "doid.owl")
-    output_dir = str("tests" / "test_data" / "test_prompt")
-    config_file = str("tests" / "test_data" / "test_prompt" / "config.yaml")
-    reference_file = str("tests" / "test_data" / "train.tsv")
-    full_reference_file = str("tests" / "test_data" / "test.tsv")
-    memory = "32G"
+    output_dir = str(TEST_DIR / "test_prompt")
+    config_file = str(TEST_DIR / "test_prompt" / "config.yaml")
+    reference_file = str(TEST_DIR / "train.tsv")
+    full_reference_file = str(TEST_DIR / "test.tsv")
 
     return AlignmentRunner(
         source_ontology_file=source_ontology_file,
@@ -78,7 +73,6 @@ def supervised_global_alignment_runner():
         full_reference_file=full_reference_file,
         config_file=config_file,
         save_logs=True,
-        jvm_heap_size=memory,
         run_eval=True,
         device=0,
     )
@@ -88,10 +82,9 @@ def supervised_global_alignment_runner():
 def unsup_global_alignment_runner():
     source_ontology_file = str(NCIT_DIR / "ncit.owl")
     target_ontology_file = str(NCIT_DIR / "doid.owl")
-    output_dir = str("tests" / "test_data" / "test_prompt")
-    config_file = str("tests" / "test_data" / "test_prompt" / "config.yaml")
-    full_reference_file = str("tests" / "test_data" / "test.tsv")
-    memory = "32G"
+    output_dir = str(TEST_DIR / "test_prompt")
+    config_file = str(TEST_DIR / "test_prompt" / "config.yaml")
+    full_reference_file = str(TEST_DIR / "test.tsv")
 
     return AlignmentRunner(
         source_ontology_file=source_ontology_file,
@@ -100,7 +93,6 @@ def unsup_global_alignment_runner():
         full_reference_file=full_reference_file,
         config_file=config_file,
         save_logs=True,
-        jvm_heap_size=memory,
         run_eval=True,
         device=0,
     )

@@ -20,7 +20,6 @@ def eval_runner():
     full_reference_file = NCIT_DIR / "test.tsv"
     candidates_file = str(NCIT_DIR / "test.cands.tsv")
     alignment_file_path = EXP_DIR / "test" / "model" / "alignment" / "src2tgt.maps_local.tsv"
-    memory = "32G"
     k = [1, 5, 10]
     error_on_fail = False
 
@@ -32,7 +31,6 @@ def eval_runner():
         full_reference_file=str(full_reference_file),
         reference_candidates=candidates_file,
         alignment_file=str(alignment_file_path),
-        jvm_heap_size=memory,
         K=k,
         error_on_fail=error_on_fail,
     )
