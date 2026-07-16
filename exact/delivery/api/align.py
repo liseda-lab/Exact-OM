@@ -1,6 +1,11 @@
-import warnings
-from pathlib import Path
 from typing import Optional
+
+from exact.delivery.common import (
+    AlignmentInvocation,
+    execute_alignment,
+    prepare_alignment,
+    warn_ignored_jvm,
+)
 
 
 class AlignmentRunner:
@@ -51,61 +56,27 @@ class AlignmentRunner:
         self.device = device
 
     def run_alignment(self) -> None:
+        execute_alignment(self._prepare())
 
-        from exact.core.actions.alignment import AlignmentAction
-
-        AlignmentAction.run(
-            source_file_path=Path(self.source_ontology_file).resolve(),
-            target_file_path=Path(self.target_ontology_file).resolve(),
-            output_dir_path=Path(self.output_dir).resolve(),
-            configs_file_path=Path(self.config_file).resolve() if self.config_file else None,
-            training_reference_file_path=(
-                Path(self.training_reference_file).resolve()
-                if self.training_reference_file
-                else None
-            ),
-            full_reference_file_path=(
-                Path(self.full_reference_file).resolve() if self.full_reference_file else None
-            ),
-            candidates_file_path=(
-                Path(self.candidates_file).resolve() if self.candidates_file else None
-            ),
-            log_file_path=Path(self.output_dir).resolve() / "exact.log" if self.save_logs else None,
+    def _prepare(self) -> AlignmentInvocation:
+        return prepare_alignment(
+            source_ontology_file=self.source_ontology_file,
+            target_ontology_file=self.target_ontology_file,
+            output_dir=self.output_dir,
+            training_reference_file=self.training_reference_file,
+            full_reference_file=self.full_reference_file,
+            candidates_file=self.candidates_file,
+            config_file=self.config_file,
+            save_logs=self.save_logs,
             run_eval=self.run_eval,
             device=self.device,
+            full_reference_label="Test reference file",
         )
 
     def validate_files(self) -> None:
-
-        if not Path(self.source_ontology_file).exists():
-            raise Exception(f"Source ontology file {self.source_ontology_file} does not exist")
-        if not Path(self.target_ontology_file).exists():
-            raise Exception(f"Target ontology file {self.target_ontology_file} does not exist")
-        if self.training_reference_file and not Path(self.training_reference_file).exists():
-            raise Exception(
-                f"Training reference file {self.training_reference_file} does not exist"
-            )
-        if self.full_reference_file and not Path(self.full_reference_file).exists():
-            raise Exception(f"Test reference file {self.full_reference_file} does not exist")
-        if self.candidates_file and not Path(self.candidates_file).exists():
-            raise Exception(f"Candidates file {self.candidates_file} does not exist")
-        if not Path(self.output_dir).exists():
-            Path(self.output_dir).mkdir(parents=True)
-
-        if self.config_file:
-            config_file = Path(self.config_file)
-            if not config_file.exists():
-                raise Exception(f"Configuration file {self.config_file} does not exist")
+        self._prepare()
 
     def run(self) -> None:
-
+        warn_ignored_jvm(self.jvm_heap_size, "jvm_heap_size")
         self.validate_files()
-
-        if self.jvm_heap_size is not None:
-            warnings.warn(
-                "jvm_heap_size is deprecated and ignored; Exact-OM no longer needs Java.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-
         self.run_alignment()

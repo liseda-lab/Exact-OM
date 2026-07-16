@@ -22,7 +22,7 @@ from exact.core.entities.configs.dataset import (
 from exact.core.entities.ontology import OntologyGraph
 from exact.core.entities.registry import ComponentType
 from exact.impl.datasets.base import BaseAlignmentDataset
-from exact.utils.llm_routing import LLMRouter, extract_chat_text, parse_structured_json
+from exact.llm.routing import LLMRouter, extract_chat_text, parse_structured_json
 
 
 def _prompt_verbalize(head: str, rel: str, tail: str) -> Dict[str, str]:

@@ -1,32 +1,16 @@
 import argparse
-import warnings
-from pathlib import Path
 from typing import Optional, Sequence
 
+from exact.delivery.common import (
+    execute_alignment,
+    prepare_alignment_namespace,
+    warn_ignored_jvm,
+)
 
-def _optional_path(value: Optional[str]) -> Optional[Path]:
-    return Path(value).expanduser().resolve() if value else None
 
-
-def run_alignment(args):
-    from exact.core.actions.alignment import AlignmentAction
-
-    AlignmentAction.run(
-        source_file_path=_optional_path(args.source_ontology_file),
-        target_file_path=_optional_path(args.target_ontology_file),
-        output_dir_path=Path(args.output_dir).resolve(),
-        configs_file_path=Path(args.config_file).resolve() if args.config_file else None,
-        training_reference_file_path=(
-            Path(args.training_reference_file).resolve() if args.training_reference_file else None
-        ),
-        full_reference_file_path=(
-            Path(args.full_reference_file).resolve() if args.full_reference_file else None
-        ),
-        candidates_file_path=Path(args.candidates_file).resolve() if args.candidates_file else None,
-        log_file_path=Path(args.output_dir).resolve() / "exact.log" if args.save_logs else None,
-        run_eval=args.run_eval,
-        device=args.device,
-    )
+def run_alignment(args) -> None:
+    invocation = getattr(args, "_exact_invocation", None) or prepare_alignment_namespace(args)
+    execute_alignment(invocation)
 
 
 def parse_arguments(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
@@ -111,32 +95,8 @@ def parse_arguments(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
 
 def main(argv: Optional[Sequence[str]] = None):
     args = parse_arguments(argv)
-
-    if args.source_ontology_file and not Path(args.source_ontology_file).exists():
-        raise Exception(f"Source ontology file {args.source_ontology_file} does not exist")
-    if args.target_ontology_file and not Path(args.target_ontology_file).exists():
-        raise Exception(f"Target ontology file {args.target_ontology_file} does not exist")
-    if args.training_reference_file and not Path(args.training_reference_file).exists():
-        raise Exception(f"Training reference file {args.training_reference_file} does not exist")
-    if args.full_reference_file and not Path(args.full_reference_file).exists():
-        raise Exception(f"Full reference file {args.full_reference_file} does not exist")
-    if args.candidates_file and not Path(args.candidates_file).exists():
-        raise Exception(f"Candidates file {args.candidates_file} does not exist")
-    if not Path(args.output_dir).exists():
-        Path(args.output_dir).mkdir(parents=True)
-
-    if args.config_file:
-        config_file = Path(args.config_file)
-        if not config_file.exists():
-            raise Exception(f"Configuration file {args.config_file} does not exist")
-
-    if args.jvm_heap_size is not None:
-        warnings.warn(
-            "--jvm_heap_size/-m is deprecated and ignored; Exact-OM no longer needs Java.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-
+    warn_ignored_jvm(args.jvm_heap_size, "--jvm_heap_size/-m")
+    args._exact_invocation = prepare_alignment_namespace(args)
     return run_alignment(args)
 
 

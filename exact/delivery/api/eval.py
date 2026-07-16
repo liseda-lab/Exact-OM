@@ -1,6 +1,12 @@
 import warnings
-from pathlib import Path
 from typing import Any, Mapping, Optional
+
+from exact.delivery.common import (
+    EvaluationInvocation,
+    execute_evaluation,
+    prepare_evaluation,
+    warn_ignored_jvm,
+)
 
 
 class EvaluationRunner:
@@ -57,70 +63,31 @@ class EvaluationRunner:
         self.backend_options = dict(backend_options or {})
 
     def run_evaluation(self):
+        return execute_evaluation(self._prepare(create_output=True))
 
-        from exact.core.actions.evaluation import EvaluationAction
-
-        return EvaluationAction.run(
-            alignment=Path(self.alignment_file).resolve(),
-            output_dir_path=Path(self.output_dir).resolve(),
+    def _prepare(self, *, create_output: bool) -> EvaluationInvocation:
+        return prepare_evaluation(
+            alignment_file=self.alignment_file,
+            output_dir=self.output_dir,
             error_on_fail=self.error_on_fail,
-            K=self.K if self.K else None,
-            source_file_path=(
-                Path(self.source_ontology_file).resolve() if self.source_ontology_file else None
-            ),
-            target_file_path=(
-                Path(self.target_ontology_file).resolve() if self.target_ontology_file else None
-            ),
-            train_reference_file_path=(
-                Path(self.train_reference_file).resolve() if self.train_reference_file else None
-            ),
-            full_reference_file_path=(
-                Path(self.full_reference_file).resolve() if self.full_reference_file else None
-            ),
-            reference_candidates=(
-                Path(self.reference_candidates).resolve() if self.reference_candidates else None
-            ),
-            log_file_path=(
-                Path(self.output_dir).resolve() / "oaei_bio_ml_eval.log" if self.save_logs else None
-            ),
+            k=self.K if self.K else None,
+            source_ontology_file=self.source_ontology_file,
+            target_ontology_file=self.target_ontology_file,
+            train_reference_file=self.train_reference_file,
+            full_reference_file=self.full_reference_file,
+            reference_candidates=self.reference_candidates,
             log_level=self.log_level,
+            save_logs=self.save_logs,
             backends=self.backends,
             backend_options=self.backend_options,
+            create_output=create_output,
+            log_filename="oaei_bio_ml_eval.log",
+            train_reference_label="Train reference file",
         )
 
     def validate_files(self) -> None:
-
-        if not Path(self.alignment_file).exists():
-            raise FileNotFoundError(f"Alignment file {self.alignment_file} does not exist")
-        if not Path(self.output_dir).exists():
-            raise FileNotFoundError(f"Output directory {self.output_dir} does not exist")
-        if self.source_ontology_file and not Path(self.source_ontology_file).exists():
-            raise FileNotFoundError(
-                f"Source ontology file {self.source_ontology_file} does not exist"
-            )
-        if self.target_ontology_file and not Path(self.target_ontology_file).exists():
-            raise FileNotFoundError(
-                f"Target ontology file {self.target_ontology_file} does not exist"
-            )
-        if self.train_reference_file and not Path(self.train_reference_file).exists():
-            raise FileNotFoundError(
-                f"Train reference file {self.train_reference_file} does not exist"
-            )
-        if self.full_reference_file and not Path(self.full_reference_file).exists():
-            raise FileNotFoundError(
-                f"Full reference file {self.full_reference_file} does not exist"
-            )
-        if self.reference_candidates and not Path(self.reference_candidates).exists():
-            raise FileNotFoundError(
-                f"Reference candidates file {self.reference_candidates} does not exist"
-            )
-
-        if self.jvm_heap_size is not None:
-            warnings.warn(
-                "jvm_heap_size is deprecated and ignored; Exact no longer starts a JVM.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
+        self._prepare(create_output=False)
+        warn_ignored_jvm(self.jvm_heap_size, "jvm_heap_size")
 
     def run(self):
         """
