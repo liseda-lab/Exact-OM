@@ -1,0 +1,177 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-07-16",
+  "work_package": "WP-B",
+  "status": "pass",
+  "constraints": {
+    "device": "cpu",
+    "cuda_used": false,
+    "hosted_llm_used": false,
+    "network_used_during_alignment": false
+  },
+  "dataset": {
+    "track": "conference",
+    "task": "cmt-conference",
+    "source": {
+      "bytes": 28548,
+      "sha256": "8bf45a9de7faf24bfee5a9d90cd95f744964f90bb0ad64ad80ec4335f6f5c1db"
+    },
+    "target": {
+      "bytes": 39324,
+      "sha256": "9aa78f9673b776c26f615ec7946182c60a146015038ab9c3c105d903251ff1dd"
+    },
+    "reference": {
+      "bytes": 897,
+      "rows": 15,
+      "sha256": "f5d24bb89aced02245f0268b7b9208072aec3026bbdd69f0616cdece9043faca"
+    }
+  },
+  "implementations": {
+    "historical": {
+      "exact_revision": "330044c942d8876a40205e336ca3ee0aeb70bd55",
+      "backend": "mowl-borg==1.0.1 + ELK",
+      "python": "3.10.11",
+      "java": "15.0.2",
+      "jpype": "1.5.0",
+      "numpy": "1.26.4",
+      "class_resolver": "0.5.4"
+    },
+    "java_free": {
+      "exact_revision": "a089386fa18c19d1e3d599d0381bf0c00378c8ff",
+      "backend": "exact.ontology",
+      "python": "3.12.3",
+      "rdflib": "7.6.0",
+      "parser_path": "rdflib fallback (py-horned-owl has no Intel macOS wheel)"
+    }
+  },
+  "backend_snapshots": {
+    "source": {
+      "historical_sha256": "bfe0574c48c3629bc45b8f3bd8c7aa0965058bd8f1e25998b1b31e3849e54a56",
+      "java_free_sha256": "bfe0574c48c3629bc45b8f3bd8c7aa0965058bd8f1e25998b1b31e3849e54a56",
+      "byte_identical": true,
+      "counts": {
+        "classes": 30,
+        "labels": 30,
+        "annotations": 30,
+        "attributes": 30,
+        "hierarchy_bundles": 30,
+        "excluded": 0,
+        "property_domains": 59,
+        "property_ranges": 59,
+        "taxonomy_edges": 25,
+        "owl2vecstar_edges": 80,
+        "owl2vecstar_literal_edges": 83
+      },
+      "taxonomy_jaccard": 1.0,
+      "owl2vecstar_jaccard": 1.0,
+      "owl2vecstar_literals_jaccard": 1.0,
+      "identical_hierarchy_entities": "30/30"
+    },
+    "target": {
+      "historical_sha256": "2f953ba3bb11710bd23620e51cc0e7ba204f66cd5fd7b0d6593bce75cf2085e6",
+      "java_free_sha256": "2f953ba3bb11710bd23620e51cc0e7ba204f66cd5fd7b0d6593bce75cf2085e6",
+      "byte_identical": true,
+      "counts": {
+        "classes": 60,
+        "labels": 60,
+        "annotations": 60,
+        "attributes": 60,
+        "hierarchy_bundles": 60,
+        "excluded": 0,
+        "property_domains": 64,
+        "property_ranges": 64,
+        "taxonomy_edges": 49,
+        "owl2vecstar_edges": 118,
+        "owl2vecstar_literal_edges": 118
+      },
+      "taxonomy_jaccard": 1.0,
+      "owl2vecstar_jaccard": 1.0,
+      "owl2vecstar_literals_jaccard": 1.0,
+      "identical_hierarchy_entities": "60/60"
+    }
+  },
+  "end_to_end": {
+    "config": {
+      "path": "benchmarks/evidence/wp_b_conference_legacy.yaml",
+      "bytes": 1848,
+      "sha256": "b24155a6642357dbca4a72217c278ceb536c45adf8254ed67568ab906fdbaf33",
+      "seed": 42,
+      "candidate_encoder": "hf-internal-testing/tiny-random-bert",
+      "llm": "disabled"
+    },
+    "global": {
+      "candidate_pairs": 600,
+      "alignment_rows": 30,
+      "alignment_bytes": 2167,
+      "historical_alignment_sha256": "e8611ebb8d433b8c61a960bec0a119cc78a08298b75fb64d570d64f01f9af0eb",
+      "java_free_alignment_sha256": "e8611ebb8d433b8c61a960bec0a119cc78a08298b75fb64d570d64f01f9af0eb",
+      "alignment_byte_identical": true,
+      "historical_metrics": {
+        "P": 0.233,
+        "R": 0.467,
+        "F1": 0.311
+      },
+      "java_free_metrics_with_legacy_denominator": {
+        "P": 0.233,
+        "R": 0.467,
+        "F1": 0.311
+      },
+      "java_free_canonical_metrics": {
+        "P": 0.233,
+        "R": 0.583,
+        "F1": 0.333
+      },
+      "metric_note": "WP-F filters three property references from the default class-only pool. The final alignment and seven true positives are unchanged; evaluating the Java-free alignment against the historical 15-row denominator reproduces all three historical metrics exactly."
+    },
+    "local": {
+      "reference_candidate_rows": 12,
+      "reference_candidate_bytes": 9863,
+      "reference_candidate_sha256": "63fa7f71b715844f208a7001bae0cd1d6662aabb519e4146a0c8cc8da39c9086",
+      "scored_pairs": 240,
+      "alignment_rows": 12,
+      "alignment_bytes": 15051,
+      "historical_alignment_sha256": "9a00fbeabd4e95b101f687561a04e95d85b221d37c619f783ade67414e63a1dc",
+      "java_free_alignment_sha256": "9a00fbeabd4e95b101f687561a04e95d85b221d37c619f783ade67414e63a1dc",
+      "alignment_byte_identical": true,
+      "historical_metrics": {
+        "Hits@1": 0.583,
+        "Hits@5": 0.833,
+        "Hits@10": 0.917,
+        "MRR": 0.701
+      },
+      "java_free_metrics": {
+        "Hits@1": 0.583,
+        "Hits@5": 0.833,
+        "Hits@10": 0.917,
+        "MRR": 0.701
+      },
+      "max_absolute_metric_delta": 0.0
+    }
+  },
+  "performance": {
+    "global_dataset_seconds": {
+      "historical": 10.155,
+      "java_free": 5.792184539954178,
+      "java_free_over_historical": 0.5703776011771717
+    },
+    "global_total_seconds": {
+      "historical": 11.473,
+      "java_free": 7.170456489955541
+    },
+    "local_dataset_seconds": {
+      "historical": 4.418,
+      "java_free": 2.0748218140215613
+    },
+    "note": "Historical seconds are wall-clock differences from exact.log stage markers; Java-free seconds are monotonic timings.json records. Plotting is included in each Dataset stage."
+  },
+  "conditional_external_checks": {
+    "bioml": {
+      "status": "not_run",
+      "reason": "No licensed Bio-ML ontology pair was available locally."
+    },
+    "ncit_or_snomed_rss": {
+      "status": "not_run",
+      "reason": "No NCIT/SNOMED-scale licensed ontology was available locally; this is a soft release gate."
+    }
+  }
+}

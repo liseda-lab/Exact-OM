@@ -204,5 +204,15 @@ paragraph (`README.md:63`, `:101`) — full docs are WP-H.
 
 ## Deviations
 
-No design deviations. Committed snapshots cover hermetic fixture parity; Conference/Bio-ML
-parity and large-ontology RSS remain external-data release checks.
+No design deviations. The fixture snapshots are genuine `mowl-borg==1.0.1` captures. A
+CPU-only `cmt-conference` release check against pre-removal revision `330044c` produced
+byte-identical complete backend snapshots, global alignments, and local ranking alignments;
+local metrics were identical and the legacy-denominator global metrics were identical. The
+canonical 2.0 global recall differs only because WP-F deliberately excludes the three property
+references from a class-only run. Inputs, hashes, metrics, and timings are recorded in
+`benchmarks/evidence/wp_b_conference.json`.
+
+No licensed Bio-ML ontology was available locally, so that conditional release check and the
+NCIT/SNOMED-scale RSS soft gate remain external. The checked-in fixture and unredistributed
+Conference captures exercise the complete parity gate without adding Java to the release
+environment.

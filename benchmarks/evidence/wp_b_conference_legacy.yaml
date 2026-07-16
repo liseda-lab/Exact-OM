@@ -1,0 +1,85 @@
+# Frozen CPU-only parity configuration accepted by Exact 1.x and migrated by 2.x.
+seed: 42
+logging_level: INFO
+use_file_cache: false
+
+alignment_params:
+  threshold: 0.7
+  cardinality: 1
+  target_cardinality: 1
+  save_json: false
+  save_csv: true
+  save_stats_csv: true
+
+dataset_params:
+  num_workers: 0
+  filter_exact_matches: false
+  drop_exact_match_sources: false
+  filter_ignored_alignment_classes: true
+  projection_include_literals: true
+  n_hops: 1
+  all_labels: true
+  only_taxonomy: false
+  pair_adaptive_feature_log_every: 1000
+
+candidates_params:
+  retrieval_strategy: primary_label
+  lexical_encoder_name: hf-internal-testing/tiny-random-bert
+  encode_batch_size: 32
+  search_batch_size: 256
+  top_k: 20
+  use_amp: false
+
+sanity_check_params:
+  sanity_check: false
+  n: 0
+  max_ctx_show: 0
+  max_label_show: 0
+
+plot_params:
+  bins: 10
+  figsize: [7, 5]
+  dpi: 72
+  kde: false
+  alpha: 0.6
+
+inference_params:
+  batch_size: 64
+  num_workers: 0
+  log_every: 10
+  mixed_precision: false
+  which: []
+  checkpoint_every: 100
+  resume_from_checkpoint: false
+  enable_checkpoints: false
+  resume_additional_model_checkpoints: false
+  allow_rationale_toggle_checkpoint_resume: false
+  audit_shards_enabled: false
+  audit_shard_compression: zstd
+  audit_shard_records: 50000
+  checkpoint_payload: compact
+  cache_persist_policy: never
+
+model:
+  name: PairAdaptiveSemanticScorer
+  params:
+    lexical_model_name: hf-internal-testing/tiny-random-bert
+    context_model_name: hf-internal-testing/tiny-random-bert
+    llm_model_name: null
+    fp16_inference: false
+    use_lexical: true
+    use_context: false
+    use_llm: false
+    force_llm_summaries: false
+    return_explanations: false
+    generate_llm_rationales: false
+    persist_cache_to_disk: false
+
+second_model:
+  name: null
+  params: {}
+
+evaluation:
+  backends: [builtin]
+
+k: [1, 5, 10]
