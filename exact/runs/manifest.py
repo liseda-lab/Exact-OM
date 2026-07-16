@@ -289,7 +289,14 @@ def finalize_artifacts(
     compaction: dict[str, int] = {}
     if layout.explanation_index_path.is_file():
         store = ExplanationStore(layout.explanations_dir, run_id=run_id)
-        compaction = store.compact()
+        if store.overlay_count:
+            compaction = store.compact()
+        else:
+            compaction = {
+                "before_bytes": store.stored_bytes,
+                "after_bytes": store.stored_bytes,
+                "records": store.record_count,
+            }
         if save_full_explanations:
             store.export(layout.full_explanations_path, format="json")
     retention = prune_checkpoints(run_dir, policy=checkpoint_retention)  # type: ignore[arg-type]

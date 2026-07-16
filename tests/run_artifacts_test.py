@@ -275,6 +275,28 @@ def test_finalize_compacts_prunes_and_refreshes_manifest(tmp_path: Path) -> None
     assert reader.explanations_for("source-a")[0]["prediction"]["selected"] is False
 
 
+def test_finalize_does_not_rewrite_already_compacted_store(tmp_path: Path) -> None:
+    layout = RunLayout.create(tmp_path / "run")
+    store = ExplanationStore(layout.explanations_dir, run_id="session")
+    store.append(_records())
+    shards_before = sorted(
+        path.name for path in layout.explanation_shards_dir.iterdir()
+    )
+
+    report = finalize_artifacts(
+        layout.root,
+        run_id="session",
+        checkpoint_retention="all",
+    )
+
+    assert report["compaction"]["records"] == len(_records())
+    assert report["compaction"]["before_bytes"] == report["compaction"]["after_bytes"]
+    assert (
+        sorted(path.name for path in layout.explanation_shards_dir.iterdir())
+        == shards_before
+    )
+
+
 def test_manifest_indexes_dynamic_deliverables_and_dataset_cache(
     tmp_path: Path,
 ) -> None:
