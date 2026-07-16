@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Iterable
+from typing import Iterable, Iterator
 
 OWL_THING = "http://www.w3.org/2002/07/owl#Thing"
 OWL_NOTHING = "http://www.w3.org/2002/07/owl#Nothing"
@@ -75,17 +75,18 @@ class HierarchyIndex:
             if visited[root]:
                 continue
             visited[root] = 1
-            stack: list[tuple[int, bool]] = [(root, False)]
+            stack: list[tuple[int, Iterator[int]]] = [(root, iter(sorted(parents[root])))]
             while stack:
-                node, expanded = stack.pop()
-                if expanded:
+                node, adjacent_nodes = stack[-1]
+                try:
+                    adjacent = next(adjacent_nodes)
+                except StopIteration:
                     order.append(node)
+                    stack.pop()
                     continue
-                stack.append((node, True))
-                for adjacent in parents[node]:
-                    if not visited[adjacent]:
-                        visited[adjacent] = 1
-                        stack.append((adjacent, False))
+                if not visited[adjacent]:
+                    visited[adjacent] = 1
+                    stack.append((adjacent, iter(sorted(parents[adjacent]))))
 
         component_for = [-1] * count
         components: list[list[int]] = []
@@ -119,11 +120,37 @@ class HierarchyIndex:
 
     def direct_parents(self, iri: str) -> list[str]:
         component = self._component(iri)
-        return [] if component is None else self._expand_components(self._parents[component])
+        return (
+            []
+            if component is None
+            else self._expand_components(self._direct_parent_components(component))
+        )
 
     def direct_children(self, iri: str) -> list[str]:
         component = self._component(iri)
-        return [] if component is None else self._expand_components(self._children[component])
+        if component is None:
+            return []
+        direct = (
+            child
+            for child in self._children[component]
+            if component in self._direct_parent_components(child)
+        )
+        return self._expand_components(direct)
+
+    @lru_cache(maxsize=None)
+    def _direct_parent_components(self, component: int) -> tuple[int, ...]:
+        """Drop asserted parents reachable through another asserted parent."""
+
+        candidates = self._parents[component]
+        return tuple(
+            parent
+            for parent in candidates
+            if not any(
+                parent in self._component_ancestors(other)
+                for other in candidates
+                if other != parent
+            )
+        )
 
     @lru_cache(maxsize=None)
     def _component_ancestors(self, component: int) -> frozenset[int]:

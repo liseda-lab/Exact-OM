@@ -26,10 +26,48 @@ class ObjectSomeValuesFrom:
 
 
 @dataclass(frozen=True, slots=True)
+class ObjectAllValuesFrom:
+    """An object-property universal restriction."""
+
+    property_iri: str
+    filler: "ClassExpression"
+
+
+@dataclass(frozen=True, slots=True)
+class ObjectCardinalityRestriction:
+    """An unqualified object-cardinality restriction.
+
+    The legacy OWL2Vec* projector represented minimum and maximum object
+    cardinalities as edges to ``owl:Thing``. The numeric cardinality is
+    irrelevant to that projection, but the restriction family is retained so
+    exact-cardinality and data-property restrictions can be ignored just as
+    they were by the historical implementation.
+    """
+
+    property_iri: str
+    cardinality_type: str
+    filler: "ClassExpression | None" = None
+
+
+@dataclass(frozen=True, slots=True)
 class ObjectIntersectionOf:
     """A conjunction of class expressions."""
 
     operands: tuple["ClassExpression", ...]
+
+
+@dataclass(frozen=True, slots=True)
+class ObjectUnionOf:
+    """A disjunction of class expressions."""
+
+    operands: tuple["ClassExpression", ...]
+
+
+@dataclass(frozen=True, slots=True)
+class DataOneOf:
+    """A finite data range retained in stable functional-syntax form."""
+
+    values: tuple[str, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,7 +78,14 @@ class AnonymousClassExpression:
 
 
 ClassExpression = (
-    NamedClass | ObjectSomeValuesFrom | ObjectIntersectionOf | AnonymousClassExpression
+    NamedClass
+    | ObjectSomeValuesFrom
+    | ObjectAllValuesFrom
+    | ObjectCardinalityRestriction
+    | ObjectIntersectionOf
+    | ObjectUnionOf
+    | DataOneOf
+    | AnonymousClassExpression
 )
 
 
@@ -151,13 +196,17 @@ __all__ = [
     "AnonymousClassExpression",
     "ClassAssertion",
     "ClassExpression",
+    "DataOneOf",
     "DataPropertyAssertion",
     "EquivalentClasses",
     "InverseObjectProperties",
     "NamedClass",
+    "ObjectAllValuesFrom",
+    "ObjectCardinalityRestriction",
     "ObjectIntersectionOf",
     "ObjectPropertyAssertion",
     "ObjectSomeValuesFrom",
+    "ObjectUnionOf",
     "ParsedOntology",
     "PropertyDomain",
     "PropertyRange",

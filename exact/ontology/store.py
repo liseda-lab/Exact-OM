@@ -17,9 +17,10 @@ from exact.ontology.expressions import (
     intersection_operands,
     named_class_iri,
     named_class_iris,
+    render_class_expression,
 )
 from exact.ontology.hierarchy import HierarchyIndex
-from exact.ontology.parser import NamedClass, ParsedOntology, parse
+from exact.ontology.parser import NamedClass, ObjectUnionOf, ParsedOntology, parse
 from exact.ontology.projection import project
 
 RDFS_LABEL = "http://www.w3.org/2000/01/rdf-schema#label"
@@ -124,6 +125,14 @@ class OwlOntologySource(KnowledgeSource):
                             class_edges.add((anchor, other.iri))
                         continue
                     restriction_expressions[anchor].append(other)
+                    if isinstance(other, ObjectUnionOf):
+                        # A ≡ (B ⊔ C) entails B ⊑ A and C ⊑ A. ELK exposed
+                        # these as direct parents in the historical baseline.
+                        for operand in other.operands:
+                            child = named_class_iri(operand)
+                            if child is not None:
+                                class_edges.add((child, anchor))
+                        continue
                     for operand in intersection_operands(other):
                         parent = named_class_iri(operand)
                         if parent is not None:
@@ -170,9 +179,15 @@ class OwlOntologySource(KnowledgeSource):
         domains: dict[str, list[str]] = defaultdict(list)
         ranges: dict[str, list[str]] = defaultdict(list)
         for domain_axiom in parsed.property_domains:
-            domains[domain_axiom.property_iri].extend(named_class_iris(domain_axiom.domain))
+            named = named_class_iri(domain_axiom.domain)
+            domains[domain_axiom.property_iri].append(
+                named if named is not None else render_class_expression(domain_axiom.domain)
+            )
         for range_axiom in parsed.property_ranges:
-            ranges[range_axiom.property_iri].extend(named_class_iris(range_axiom.range))
+            named = named_class_iri(range_axiom.range)
+            ranges[range_axiom.property_iri].append(
+                named if named is not None else render_class_expression(range_axiom.range)
+            )
         self._domains = {iri: tuple(sorted(set(values))) for iri, values in domains.items()}
         self._ranges = {iri: tuple(sorted(set(values))) for iri, values in ranges.items()}
 

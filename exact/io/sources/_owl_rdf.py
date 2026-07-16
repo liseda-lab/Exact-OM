@@ -28,13 +28,17 @@ from exact.ontology.records import (
     AnonymousClassExpression,
     ClassAssertion,
     ClassExpression,
+    DataOneOf,
     DataPropertyAssertion,
     EquivalentClasses,
     InverseObjectProperties,
     NamedClass,
+    ObjectAllValuesFrom,
+    ObjectCardinalityRestriction,
     ObjectIntersectionOf,
     ObjectPropertyAssertion,
     ObjectSomeValuesFrom,
+    ObjectUnionOf,
     ParsedOntology,
     PropertyDomain,
     PropertyRange,
@@ -78,11 +82,27 @@ _STRUCTURAL_PREDICATES = {
     RDFS.subClassOf,
     RDFS.subPropertyOf,
     OWL.equivalentClass,
+    OWL.disjointWith,
+    OWL.complementOf,
+    OWL.equivalentProperty,
+    OWL.propertyDisjointWith,
     OWL.imports,
     OWL.intersectionOf,
     OWL.inverseOf,
+    OWL.members,
+    OWL.distinctMembers,
+    OWL.oneOf,
     OWL.onProperty,
+    OWL.onClass,
+    OWL.onDataRange,
     OWL.someValuesFrom,
+    OWL.allValuesFrom,
+    OWL.cardinality,
+    OWL.minCardinality,
+    OWL.maxCardinality,
+    OWL.qualifiedCardinality,
+    OWL.minQualifiedCardinality,
+    OWL.maxQualifiedCardinality,
     OWL.unionOf,
 }
 
@@ -136,10 +156,52 @@ def _expression(graph: Graph, node: Any) -> ClassExpression:
         operands = tuple(_expression(graph, item) for item in _rdf_list(graph, intersection))
         return ObjectIntersectionOf(operands)
 
+    union = graph.value(node, OWL.unionOf)
+    if union is not None:
+        operands = tuple(_expression(graph, item) for item in _rdf_list(graph, union))
+        return ObjectUnionOf(operands)
+
+    one_of = graph.value(node, OWL.oneOf)
+    if one_of is not None:
+        values = tuple(
+            _functional_literal(item)
+            for item in _rdf_list(graph, one_of)
+            if isinstance(item, Literal)
+        )
+        if values:
+            return DataOneOf(values)
+
     prop = graph.value(node, OWL.onProperty)
     filler = graph.value(node, OWL.someValuesFrom)
     if isinstance(prop, URIRef) and filler is not None:
         return ObjectSomeValuesFrom(_iri(prop), _expression(graph, filler))
+
+    filler = graph.value(node, OWL.allValuesFrom)
+    if isinstance(prop, URIRef) and filler is not None:
+        return ObjectAllValuesFrom(_iri(prop), _expression(graph, filler))
+
+    cardinality_type = next(
+        (
+            kind
+            for predicate, kind in (
+                (OWL.minCardinality, "min"),
+                (OWL.minQualifiedCardinality, "min"),
+                (OWL.maxCardinality, "max"),
+                (OWL.maxQualifiedCardinality, "max"),
+                (OWL.cardinality, "exact"),
+                (OWL.qualifiedCardinality, "exact"),
+            )
+            if graph.value(node, predicate) is not None
+        ),
+        None,
+    )
+    if isinstance(prop, URIRef) and cardinality_type is not None:
+        qualified_filler = graph.value(node, OWL.onClass)
+        return ObjectCardinalityRestriction(
+            _iri(prop),
+            cardinality_type,
+            _expression(graph, qualified_filler) if qualified_filler is not None else None,
+        )
 
     return AnonymousClassExpression(_iri(node))
 
@@ -147,18 +209,24 @@ def _expression(graph: Graph, node: Any) -> ClassExpression:
 def _named_iris(expr: ClassExpression) -> Iterable[str]:
     if isinstance(expr, NamedClass):
         yield expr.iri
-    elif isinstance(expr, ObjectSomeValuesFrom):
+    elif isinstance(expr, (ObjectSomeValuesFrom, ObjectAllValuesFrom)):
         yield from _named_iris(expr.filler)
-    elif isinstance(expr, ObjectIntersectionOf):
+    elif isinstance(expr, ObjectCardinalityRestriction) and expr.filler is not None:
+        yield from _named_iris(expr.filler)
+    elif isinstance(expr, (ObjectIntersectionOf, ObjectUnionOf)):
         for operand in expr.operands:
             yield from _named_iris(operand)
 
 
 def _object_property_iris(expr: ClassExpression) -> Iterable[str]:
-    if isinstance(expr, ObjectSomeValuesFrom):
+    if isinstance(expr, (ObjectSomeValuesFrom, ObjectAllValuesFrom)):
         yield expr.property_iri
         yield from _object_property_iris(expr.filler)
-    elif isinstance(expr, ObjectIntersectionOf):
+    elif isinstance(expr, ObjectCardinalityRestriction):
+        yield expr.property_iri
+        if expr.filler is not None:
+            yield from _object_property_iris(expr.filler)
+    elif isinstance(expr, (ObjectIntersectionOf, ObjectUnionOf)):
         for operand in expr.operands:
             yield from _object_property_iris(operand)
 
@@ -172,6 +240,21 @@ def _literal_value(property_iri: str, value: Literal) -> AnnotationValue:
         lang=value.language,
         datatype=datatype,
     )
+
+
+def _functional_literal(value: Literal) -> str:
+    """Render an RDF literal like the OWL API functional-syntax printer."""
+
+    lexical = str(value).replace("\\", "\\\\").replace('"', '\\"')
+    rendered = f'"{lexical}"'
+    if value.language:
+        return f"{rendered}@{value.language}"
+    if value.datatype is None:
+        return rendered
+    datatype = str(value.datatype)
+    xsd = "http://www.w3.org/2001/XMLSchema#"
+    compact = f"xsd:{datatype[len(xsd):]}" if datatype.startswith(xsd) else f"<{datatype}>"
+    return f"{rendered}^^{compact}"
 
 
 def _annotation_value(property_iri: str, value: object) -> AnnotationValue:

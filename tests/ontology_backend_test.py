@@ -78,6 +78,122 @@ def test_parser_infers_undeclared_individual_assertions_deterministically(tmp_pa
     assert any(value.value == "42" for value in source.attributes(base + "bob"))
 
 
+def test_parser_and_projector_preserve_observed_complex_axiom_rules(tmp_path):
+    ontology = tmp_path / "projection-compat.owl"
+    ontology.write_text(
+        """<?xml version="1.0"?>
+<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+         xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
+         xmlns:owl="http://www.w3.org/2002/07/owl#"
+         xmlns:ex="http://example.org/compat#">
+  <owl:Ontology rdf:about="http://example.org/compat"/>
+  <owl:ObjectProperty rdf:about="http://example.org/compat#rel"/>
+  <owl:ObjectProperty rdf:about="http://example.org/compat#parent">
+    <rdfs:domain rdf:resource="http://example.org/compat#Anchor"/>
+    <rdfs:range rdf:resource="http://example.org/compat#A"/>
+  </owl:ObjectProperty>
+  <owl:ObjectProperty rdf:about="http://example.org/compat#childA">
+    <rdfs:subPropertyOf rdf:resource="http://example.org/compat#parent"/>
+  </owl:ObjectProperty>
+  <owl:ObjectProperty rdf:about="http://example.org/compat#childB">
+    <rdfs:subPropertyOf rdf:resource="http://example.org/compat#parent"/>
+  </owl:ObjectProperty>
+  <owl:DatatypeProperty rdf:about="http://example.org/compat#data"/>
+  <owl:Class rdf:about="http://example.org/compat#A"/>
+  <owl:Class rdf:about="http://example.org/compat#B"/>
+  <owl:Class rdf:about="http://example.org/compat#C"/>
+  <owl:Class rdf:about="http://example.org/compat#Root"/>
+  <owl:Class rdf:about="http://example.org/compat#Mid">
+    <rdfs:subClassOf rdf:resource="http://example.org/compat#Root"/>
+  </owl:Class>
+  <owl:Class rdf:about="http://example.org/compat#Leaf">
+    <rdfs:subClassOf rdf:resource="http://example.org/compat#Mid"/>
+    <rdfs:subClassOf rdf:resource="http://example.org/compat#Root"/>
+  </owl:Class>
+  <owl:Class rdf:about="http://example.org/compat#Anchor">
+    <owl:equivalentClass>
+      <owl:Restriction>
+        <owl:onProperty rdf:resource="http://example.org/compat#rel"/>
+        <owl:someValuesFrom rdf:resource="http://example.org/compat#A"/>
+      </owl:Restriction>
+    </owl:equivalentClass>
+    <rdfs:subClassOf>
+      <owl:Restriction>
+        <owl:onProperty rdf:resource="http://example.org/compat#rel"/>
+        <owl:allValuesFrom rdf:resource="http://example.org/compat#B"/>
+      </owl:Restriction>
+    </rdfs:subClassOf>
+  </owl:Class>
+  <owl:Class rdf:about="http://example.org/compat#UnionAnchor">
+    <owl:equivalentClass>
+      <owl:Class><owl:unionOf rdf:parseType="Collection">
+        <rdf:Description rdf:about="http://example.org/compat#A"/>
+        <rdf:Description rdf:about="http://example.org/compat#B"/>
+      </owl:unionOf></owl:Class>
+    </owl:equivalentClass>
+  </owl:Class>
+  <owl:Class rdf:about="http://example.org/compat#NestedAnchor">
+    <owl:equivalentClass>
+      <owl:Class><owl:intersectionOf rdf:parseType="Collection">
+        <rdf:Description rdf:about="http://example.org/compat#C"/>
+        <owl:Class><owl:unionOf rdf:parseType="Collection">
+          <rdf:Description rdf:about="http://example.org/compat#A"/>
+          <rdf:Description rdf:about="http://example.org/compat#B"/>
+        </owl:unionOf></owl:Class>
+        <owl:Restriction>
+          <owl:onProperty rdf:resource="http://example.org/compat#rel"/>
+          <owl:someValuesFrom rdf:resource="http://example.org/compat#C"/>
+        </owl:Restriction>
+      </owl:intersectionOf></owl:Class>
+    </owl:equivalentClass>
+  </owl:Class>
+  <owl:Class rdf:about="http://example.org/compat#MinCardinality">
+    <rdfs:subClassOf><owl:Restriction>
+      <owl:onProperty rdf:resource="http://example.org/compat#rel"/>
+      <owl:minCardinality rdf:datatype="http://www.w3.org/2001/XMLSchema#integer">1</owl:minCardinality>
+    </owl:Restriction></rdfs:subClassOf>
+  </owl:Class>
+  <owl:Class rdf:about="http://example.org/compat#ExactCardinality">
+    <rdfs:subClassOf><owl:Restriction>
+      <owl:onProperty rdf:resource="http://example.org/compat#rel"/>
+      <owl:cardinality rdf:datatype="http://www.w3.org/2001/XMLSchema#integer">1</owl:cardinality>
+    </owl:Restriction></rdfs:subClassOf>
+  </owl:Class>
+  <owl:Class rdf:about="http://example.org/compat#DataCardinality">
+    <rdfs:subClassOf><owl:Restriction>
+      <owl:onProperty rdf:resource="http://example.org/compat#data"/>
+      <owl:minCardinality rdf:datatype="http://www.w3.org/2001/XMLSchema#integer">1</owl:minCardinality>
+    </owl:Restriction></rdfs:subClassOf>
+  </owl:Class>
+</rdf:RDF>
+""",
+        encoding="utf-8",
+    )
+    base = "http://example.org/compat#"
+    source = load_ontology(ontology)
+    edges = {edge.astuple() for edge in source.projection_edges()}
+
+    assert (base + "Anchor", base + "rel", base + "B") in edges
+    assert (base + "Anchor", base + "rel", base + "A") not in edges
+    assert (base + "UnionAnchor", "http://subclassof", base + "A") in edges
+    assert (base + "UnionAnchor", "http://subclassof", base + "B") in edges
+    assert (base + "NestedAnchor", "http://subclassof", base + "C") in edges
+    assert (base + "NestedAnchor", base + "rel", base + "C") in edges
+    assert (base + "NestedAnchor", "http://subclassof", base + "A") not in edges
+    assert (
+        base + "MinCardinality",
+        base + "rel",
+        "http://www.w3.org/2002/07/owl#Thing",
+    ) in edges
+    assert not any(edge[0] == base + "ExactCardinality" for edge in edges)
+    assert not any(edge[0] == base + "DataCardinality" for edge in edges)
+    assert (base + "Anchor", base + "childA", base + "A") in edges
+    assert (base + "Anchor", base + "childB", base + "A") not in edges
+    assert source.direct_parents(base + "A") == [base + "UnionAnchor"]
+    assert source.direct_parents(base + "Leaf") == [base + "Mid"]
+    assert source.direct_children(base + "Root") == [base + "Mid"]
+
+
 def test_annotations_labels_attributes_and_exclusions(source):
     assert source.labels(SRC + "Heart") == ["coração", "heart"]
     assert source.labels(SRC + "UnlabelledClass") == []
