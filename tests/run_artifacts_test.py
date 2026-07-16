@@ -53,7 +53,9 @@ def test_layout_resolves_v1_and_v2_artifacts(tmp_path: Path) -> None:
     mapping.write_text("SrcEntity\tTgtEntity\nsource\ttarget\n", encoding="utf-8")
     explanations = legacy_alignment / "default" / "full_explanations.json"
     explanations.parent.mkdir()
-    explanations.write_text('[{"src_iri":"source","tgt_iri":"target"}]', encoding="utf-8")
+    explanations.write_text(
+        '[{"src_iri":"source","tgt_iri":"target"}]', encoding="utf-8"
+    )
 
     legacy = RunLayout.open(v1)
     assert legacy.version == 1
@@ -66,7 +68,9 @@ def test_layout_resolves_v1_and_v2_artifacts(tmp_path: Path) -> None:
     assert modern.explanation_index_path.parent.is_dir()
 
 
-def test_store_resume_recovers_tail_and_matches_uninterrupted_run(tmp_path: Path) -> None:
+def test_store_resume_recovers_tail_and_matches_uninterrupted_run(
+    tmp_path: Path,
+) -> None:
     records = _records()
     uninterrupted = ExplanationStore.create(tmp_path / "whole", run_id="run-1")
     uninterrupted.append(records)
@@ -84,6 +88,21 @@ def test_store_resume_recovers_tail_and_matches_uninterrupted_run(tmp_path: Path
     assert shard_path.stat().st_size == committed_size
     resumed.append(records[1:])
     assert list(resumed.iter_all()) == list(uninterrupted.iter_all())
+
+
+def test_store_truncates_uncheckpointed_suffix_before_resume(tmp_path: Path) -> None:
+    records = _records()
+    store = ExplanationStore.create(tmp_path / "run", run_id="run-1")
+    store.append(records[:2])
+    checkpoint_count = store.record_count
+    store.append(records[2:])
+
+    report = store.truncate(checkpoint_count)
+
+    assert report["records"] == checkpoint_count
+    assert list(store.iter_all()) == records[:2]
+    store.append(records[2:])
+    assert list(store.iter_all()) == records
 
 
 def test_store_get_reads_one_shard_and_compacts_overlays(tmp_path: Path) -> None:
@@ -187,7 +206,9 @@ def test_clean_is_dry_run_capable_and_preserves_foreign_files(tmp_path: Path) ->
     assert foreign.exists()
 
 
-def test_checkpoint_retention_keeps_latest_valid_manifest_and_sidecars(tmp_path: Path) -> None:
+def test_checkpoint_retention_keeps_latest_valid_manifest_and_sidecars(
+    tmp_path: Path,
+) -> None:
     layout = RunLayout.create(tmp_path / "run")
     old = layout.checkpoints_dir / "inference_old.json"
     new = layout.checkpoints_dir / "inference_new.json"
@@ -198,8 +219,23 @@ def test_checkpoint_retention_keeps_latest_valid_manifest_and_sidecars(tmp_path:
     new_sidecar.parent.mkdir()
     old_sidecar.write_text("{}", encoding="utf-8")
     new_sidecar.write_text("{}", encoding="utf-8")
-    old.write_text(json.dumps({"audit_manifest_path": "inference_old_audit/manifest.json"}))
-    new.write_text(json.dumps({"audit_manifest_path": "inference_new_audit/manifest.json"}))
+    checkpoint_common = {"processed_examples": 1, "checkpoint_fingerprint": "fixture"}
+    old.write_text(
+        json.dumps(
+            {
+                **checkpoint_common,
+                "audit_manifest_path": "inference_old_audit/manifest.json",
+            }
+        )
+    )
+    new.write_text(
+        json.dumps(
+            {
+                **checkpoint_common,
+                "audit_manifest_path": "inference_new_audit/manifest.json",
+            }
+        )
+    )
     corrupt.write_text("{broken", encoding="utf-8")
     os.utime(old, ns=(1, 1))
     os.utime(new, ns=(2, 2))
@@ -219,7 +255,10 @@ def test_finalize_compacts_prunes_and_refreshes_manifest(tmp_path: Path) -> None
         [{"Src": "source-a", "Tgt": "target-2", "prediction": {"selected": False}}]
     )
     checkpoint = layout.checkpoints_dir / "inference_done.json"
-    checkpoint.write_text("{}", encoding="utf-8")
+    checkpoint.write_text(
+        json.dumps({"processed_examples": 1, "checkpoint_fingerprint": "fixture"}),
+        encoding="utf-8",
+    )
 
     report = finalize_artifacts(
         layout.root,
@@ -234,6 +273,26 @@ def test_finalize_compacts_prunes_and_refreshes_manifest(tmp_path: Path) -> None
     assert not checkpoint.exists()
     reader = RunReader.open(layout.root)
     assert reader.explanations_for("source-a")[0]["prediction"]["selected"] is False
+
+
+def test_manifest_indexes_dynamic_deliverables_and_dataset_cache(
+    tmp_path: Path,
+) -> None:
+    layout = RunLayout.create(tmp_path / "run")
+    alignment = layout.alignment_dir / "alignment.rdf"
+    alignment.write_text("<rdf:RDF />\n", encoding="utf-8")
+    evaluation = layout.evaluation_dir / "backend-report.txt"
+    evaluation.write_text("report\n", encoding="utf-8")
+    cache = layout.root / "cache" / "dataset.bin"
+    cache.parent.mkdir()
+    cache.write_bytes(b"cache")
+
+    manifest = refresh_manifest(layout, run_id="session")
+    artifacts = {item["path"]: item for item in manifest.payload["artifacts"]}
+
+    assert len(artifacts["alignment/alignment.rdf"]["sha256"]) == 64
+    assert len(artifacts["evaluation/backend-report.txt"]["sha256"]) == 64
+    assert artifacts["cache/dataset.bin"]["kind"] == "dataset_cache"
 
 
 def test_compressed_store_is_smaller_than_legacy_monolith(tmp_path: Path) -> None:

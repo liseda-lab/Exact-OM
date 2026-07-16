@@ -6,6 +6,7 @@ import copy
 import csv
 import hashlib
 import heapq
+import itertools
 import json
 import os
 import re
@@ -104,7 +105,9 @@ class ExplanationStore:
             self._index = self._load_index()
         else:
             if compression not in {"zstd", "none"}:
-                raise ValueError(f"Unsupported explanation compression: {compression!r}")
+                raise ValueError(
+                    f"Unsupported explanation compression: {compression!r}"
+                )
             self._index = {
                 "schema_version": INDEX_SCHEMA_VERSION,
                 "explanation_schema_version": EXPLANATION_SCHEMA_VERSION,
@@ -134,7 +137,9 @@ class ExplanationStore:
         layout = RunLayout.open(run_dir)
         if layout.version != LAYOUT_VERSION:
             if layout.manifest_path.exists() or Path(run_dir).exists():
-                raise ValueError("ExplanationStore is only available for layout-v2 runs")
+                raise ValueError(
+                    "ExplanationStore is only available for layout-v2 runs"
+                )
             layout = RunLayout.create(run_dir)
         layout.ensure_directories()
         return cls(layout.explanations_dir, run_id=run_id, shard_mb=shard_mb)
@@ -162,7 +167,9 @@ class ExplanationStore:
         try:
             payload = json.loads(self.index_path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
-            raise ValueError(f"Invalid explanation index at {self.index_path}: {exc}") from exc
+            raise ValueError(
+                f"Invalid explanation index at {self.index_path}: {exc}"
+            ) from exc
         if int(payload.get("schema_version", -1)) != INDEX_SCHEMA_VERSION:
             raise ValueError(
                 f"Unsupported explanation index schema: {payload.get('schema_version')!r}"
@@ -183,7 +190,9 @@ class ExplanationStore:
         try:
             path.relative_to(self.directory)
         except ValueError as exc:
-            raise ValueError(f"Explanation index path escapes its store: {relative!r}") from exc
+            raise ValueError(
+                f"Explanation index path escapes its store: {relative!r}"
+            ) from exc
         return path
 
     def _recover_uncommitted_files(self) -> None:
@@ -208,7 +217,11 @@ class ExplanationStore:
                 with path.open("r+b") as stream:
                     stream.truncate(committed_bytes)
         for path in self.shards_dir.iterdir():
-            if path.is_file() and path not in referenced and _STORE_SHARD_PATTERN.match(path.name):
+            if (
+                path.is_file()
+                and path not in referenced
+                and _STORE_SHARD_PATTERN.match(path.name)
+            ):
                 path.unlink()
 
         overlay_paths = {
@@ -217,7 +230,11 @@ class ExplanationStore:
         }
         if self.overlays_dir.is_dir():
             for path in self.overlays_dir.iterdir():
-                if path.is_file() and path not in overlay_paths and _OVERLAY_PATTERN.match(path.name):
+                if (
+                    path.is_file()
+                    and path not in overlay_paths
+                    and _OVERLAY_PATTERN.match(path.name)
+                ):
                     path.unlink()
 
     def _encode_lines(self, records: Iterable[Mapping[str, Any]]) -> bytes:
@@ -248,7 +265,9 @@ class ExplanationStore:
         digest = hashlib.sha256(source.encode("utf-8")).digest()
         return int.from_bytes(digest[:8], "big") % count
 
-    def _new_shard(self, index: dict[str, Any], bucket: int) -> tuple[str, dict[str, Any]]:
+    def _new_shard(
+        self, index: dict[str, Any], bucket: int
+    ) -> tuple[str, dict[str, Any]]:
         number = int(index.get("next_shard", 0))
         shard_id = f"{number:05d}"
         suffix = ".jsonl.zst" if index.get("compression") == "zstd" else ".jsonl"
@@ -273,7 +292,9 @@ class ExplanationStore:
         if source_entry:
             shard_id = str(source_entry["shard"])
             return shard_id, index["shards"][shard_id]
-        bucket = self._bucket(source, int(index.get("hash_buckets", DEFAULT_HASH_BUCKETS)))
+        bucket = self._bucket(
+            source, int(index.get("hash_buckets", DEFAULT_HASH_BUCKETS))
+        )
         bucket_shards = [
             (shard_id, shard)
             for shard_id, shard in index.get("shards", {}).items()
@@ -343,7 +364,9 @@ class ExplanationStore:
                         source_records
                     )
             working["next_sequence"] = next_sequence
-            working["total_records"] = int(working.get("total_records", 0)) + len(materialized)
+            working["total_records"] = int(working.get("total_records", 0)) + len(
+                materialized
+            )
             self._write_index(working)
         except BaseException:
             for path, offset in baselines.items():
@@ -366,7 +389,9 @@ class ExplanationStore:
                 try:
                     payload = json.loads(line)
                 except json.JSONDecodeError as exc:
-                    raise ValueError(f"Corrupt explanation record in {path}: {exc}") from exc
+                    raise ValueError(
+                        f"Corrupt explanation record in {path}: {exc}"
+                    ) from exc
                 if not isinstance(payload, dict):
                     raise ValueError(f"Non-object explanation record in {path}")
                 yield payload
@@ -374,7 +399,9 @@ class ExplanationStore:
     def _iter_overlay_records(self) -> Iterator[dict[str, Any]]:
         for entry in self._index.get("overlays") or []:
             path = self._resolve_store_path(str(entry["path"]))
-            with self._open_text(path, compression=str(entry.get("compression", "zstd"))) as stream:
+            with self._open_text(
+                path, compression=str(entry.get("compression", "zstd"))
+            ) as stream:
                 for line in stream:
                     if line.strip():
                         payload = json.loads(line)
@@ -393,7 +420,9 @@ class ExplanationStore:
         return self._overlay_cache
 
     @staticmethod
-    def _merge_overlay(record: Mapping[str, Any], overlay: Mapping[str, Any]) -> dict[str, Any]:
+    def _merge_overlay(
+        record: Mapping[str, Any], overlay: Mapping[str, Any]
+    ) -> dict[str, Any]:
         merged = dict(record)
         identifier_keys = {"Src", "Tgt", "src_iri", "tgt_iri", "source", "target"}
         for key, value in overlay.items():
@@ -430,9 +459,7 @@ class ExplanationStore:
         """Stream all records in append order using a shard-wise merge."""
 
         overlays = self._overlay_lookup()
-        heap: list[
-            tuple[int, int, dict[str, Any], Iterator[dict[str, Any]]]
-        ] = []
+        heap: list[tuple[int, int, dict[str, Any], Iterator[dict[str, Any]]]] = []
         counter = 0
         for shard_id in sorted(self._index.get("shards") or {}):
             iterator = self._iter_shard_records(self._index["shards"][shard_id])
@@ -503,14 +530,49 @@ class ExplanationStore:
     def compact(self) -> dict[str, int]:
         """Merge overlays into fresh shards and atomically switch the index."""
 
-        before = sum(
+        return self._replace_records(list(self.iter_all()))
+
+    def truncate(self, record_count: int) -> dict[str, int]:
+        """Roll the store back to a checkpoint's committed record boundary.
+
+        The explanation index is committed independently from the checkpoint
+        manifest.  A process can therefore stop after appending a batch but
+        before advancing its checkpoint.  Resume calls this method to discard
+        that uncheckpointed suffix before inference continues.
+        """
+
+        keep = int(record_count)
+        if keep < 0 or keep > self.record_count:
+            raise ValueError(
+                f"Cannot truncate {self.record_count} explanation records to {keep}"
+            )
+        if keep == self.record_count:
+            return {
+                "before_bytes": self._stored_bytes(),
+                "after_bytes": self._stored_bytes(),
+                "records": keep,
+            }
+        records = list(itertools.islice(self.iter_all(), keep))
+        return self._replace_records(records)
+
+    def clear(self) -> dict[str, int]:
+        """Atomically replace all store-owned records with an empty index."""
+
+        return self._replace_records([])
+
+    def _stored_bytes(self) -> int:
+        return sum(
             self._resolve_store_path(str(shard["path"])).stat().st_size
             for shard in (self._index.get("shards") or {}).values()
         ) + sum(
             self._resolve_store_path(str(entry["path"])).stat().st_size
             for entry in self._index.get("overlays") or []
         )
-        records = list(self.iter_all())
+
+    def _replace_records(self, records: list[dict[str, Any]]) -> dict[str, int]:
+        """Atomically install ``records`` as the complete store contents."""
+
+        before = self._stored_bytes()
         token = uuid.uuid4().hex[:12]
         temporary_dir = self.directory / f".compact-{token}"
         temporary_store = ExplanationStore(
@@ -608,7 +670,9 @@ class ExplanationStore:
                     writer.writerow(
                         {
                             key: (
-                                json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+                                json.dumps(
+                                    value, ensure_ascii=False, separators=(",", ":")
+                                )
                                 if isinstance(value, (dict, list))
                                 else value
                             )

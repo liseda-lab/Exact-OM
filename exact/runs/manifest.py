@@ -28,7 +28,8 @@ def _known_checkpoint_artifact(path: Path, checkpoint_dir: Path) -> bool:
                 ("inference_", "train_", "validation_", "test_", "prefiltered_")
             )
             or any(
-                token in relative.name for token in ("_additional_models_", "_rationales_")
+                token in relative.name
+                for token in ("_additional_models_", "_rationales_")
             )
         )
     if not relative.parts[0].endswith(("_audit", "_candidates", "_overlay")):
@@ -97,21 +98,29 @@ class RunManifest:
         try:
             payload = json.loads(layout.manifest_path.read_text(encoding="utf-8"))
         except FileNotFoundError as exc:
-            raise FileNotFoundError(f"Run manifest not found: {layout.manifest_path}") from exc
+            raise FileNotFoundError(
+                f"Run manifest not found: {layout.manifest_path}"
+            ) from exc
         except (OSError, json.JSONDecodeError) as exc:
-            raise ValueError(f"Invalid run manifest at {layout.manifest_path}: {exc}") from exc
+            raise ValueError(
+                f"Invalid run manifest at {layout.manifest_path}: {exc}"
+            ) from exc
         if int(payload.get("schema_version", -1)) != MANIFEST_SCHEMA_VERSION:
             raise ValueError(
                 "Unsupported run manifest schema version: "
                 f"{payload.get('schema_version')!r}"
             )
         if int(payload.get("layout_version", -1)) != layout.version:
-            raise ValueError("Manifest layout version does not match the detected run layout")
+            raise ValueError(
+                "Manifest layout version does not match the detected run layout"
+            )
         artifacts = payload.get("artifacts")
         if not isinstance(artifacts, list):
             raise ValueError("Run manifest 'artifacts' must be a list")
         for artifact in artifacts:
-            if not isinstance(artifact, dict) or not isinstance(artifact.get("path"), str):
+            if not isinstance(artifact, dict) or not isinstance(
+                artifact.get("path"), str
+            ):
                 raise ValueError("Every manifest artifact must have a string path")
             layout.resolve_relative(artifact["path"])
         return cls(layout, payload)
@@ -190,12 +199,15 @@ def refresh_manifest(
     """Register every known v2 artifact currently present in ``layout``."""
 
     current = manifest or (
-        RunManifest.open(layout) if layout.manifest_path.exists() else RunManifest.create(layout)
+        RunManifest.open(layout)
+        if layout.manifest_path.exists()
+        else RunManifest.create(layout)
     )
     if run_id:
         current.add_session(run_id)
 
     candidates: list[tuple[Path, str, Optional[int], Optional[bool]]] = [
+        (layout.config_path, "config", 2, False),
         (layout.timings_path, "timing", 1, False),
         (layout.log_path, "log", None, False),
         (layout.mapping_path("global"), "alignment", None, True),
@@ -219,9 +231,13 @@ def refresh_manifest(
                 checksum=checksum,
             )
     for directory, kind in (
+        (layout.alignment_dir, "alignment"),
+        (layout.evaluation_dir, "evaluation"),
+        (layout.stats_dir, "stats"),
         (layout.explanation_shards_dir, "explanations"),
         (layout.plots_dir, "plot"),
         (layout.checkpoints_dir, "checkpoint"),
+        (layout.root / "cache", "dataset_cache"),
     ):
         if not directory.is_dir():
             continue
@@ -230,7 +246,12 @@ def refresh_manifest(
                 path, layout.checkpoints_dir
             ):
                 continue
-            current.register(path, kind=kind, run_id=run_id, checksum=False)
+            current.register(
+                path,
+                kind=kind,
+                run_id=run_id,
+                checksum=kind in DELIVERABLE_KINDS,
+            )
     current.remove_missing()
     current.write()
     return current
@@ -252,7 +273,9 @@ def finalize_artifacts(
     if layout.version != LAYOUT_VERSION:
         raise ValueError("Only layout-v2 runs can be finalized")
     before = {
-        name: sum(path.stat().st_size for path in directory.rglob("*") if path.is_file())
+        name: sum(
+            path.stat().st_size for path in directory.rglob("*") if path.is_file()
+        )
         for name, directory in (
             ("alignment", layout.alignment_dir),
             ("evaluation", layout.evaluation_dir),
@@ -272,7 +295,9 @@ def finalize_artifacts(
     retention = prune_checkpoints(run_dir, policy=checkpoint_retention)  # type: ignore[arg-type]
     manifest = refresh_manifest(layout, run_id=run_id)
     after = {
-        name: sum(path.stat().st_size for path in directory.rglob("*") if path.is_file())
+        name: sum(
+            path.stat().st_size for path in directory.rglob("*") if path.is_file()
+        )
         for name, directory in (
             ("alignment", layout.alignment_dir),
             ("evaluation", layout.evaluation_dir),

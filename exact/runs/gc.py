@@ -78,7 +78,8 @@ def cleanup_plan(
             selected.update(
                 path
                 for path in layout.checkpoints_dir.rglob("*")
-                if path.is_file() and _known_checkpoint_file(path, layout.checkpoints_dir)
+                if path.is_file()
+                and _known_checkpoint_file(path, layout.checkpoints_dir)
             )
     if include_dataset_cache:
         selected.update(_manifest_paths(layout, {"dataset_cache", "cache"}))
@@ -142,15 +143,22 @@ def _checkpoint_references(path: Path) -> set[Path]:
             resolved = (path.parent / resolved).resolve()
         references.add(resolved)
         if resolved.name == "manifest.json" and resolved.parent.is_dir():
-            references.update(item for item in resolved.parent.rglob("*") if item.is_file())
+            references.update(
+                item for item in resolved.parent.rglob("*") if item.is_file()
+            )
     return references
 
 
 def _valid_checkpoint(path: Path) -> bool:
     try:
-        return isinstance(json.loads(path.read_text(encoding="utf-8")), dict)
+        payload = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return False
+    return (
+        isinstance(payload, dict)
+        and isinstance(payload.get("processed_examples"), int)
+        and bool(payload.get("checkpoint_fingerprint"))
+    )
 
 
 def prune_checkpoints(
@@ -174,7 +182,9 @@ def prune_checkpoints(
             and _valid_checkpoint(path)
         ]
         if manifests:
-            latest = max(manifests, key=lambda path: (path.stat().st_mtime_ns, path.name))
+            latest = max(
+                manifests, key=lambda path: (path.stat().st_mtime_ns, path.name)
+            )
             keep = {latest, *_checkpoint_references(latest)}
             known.difference_update(keep)
     paths = tuple(sorted(path for path in known if path.is_file()))
