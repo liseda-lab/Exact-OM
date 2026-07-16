@@ -186,7 +186,6 @@ def test_track_run_creates_provenance_stats_without_trainer_stats(
 ) -> None:
     provider = FakeProvider(_layout(tmp_path))
     monkeypatch.setattr(alignment_module, "get_track", lambda name: provider)
-    monkeypatch.setattr(alignment_module, "bootstrap_components", lambda: None)
     monkeypatch.setattr(ConfigModel, "resolve_dependencies", lambda self: None)
     stats_path = tmp_path / "run" / "model" / "alignment" / "demo" / "run_stats.json"
     monkeypatch.setattr(

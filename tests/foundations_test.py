@@ -3,6 +3,7 @@ import torch
 
 import exact.impl.metrics  # noqa: F401 - imports register metric implementations
 from exact.core.contracts.evaluator import IEvaluator
+from exact.core.contracts.seed import ISeedSetter
 from exact.core.entities.evaluation import (
     BackendEvaluation,
     EvaluationData,
@@ -10,6 +11,7 @@ from exact.core.entities.evaluation import (
 )
 from exact.core.entities.mappings import EntityMapping, ReferenceMapping
 from exact.core.entities.registry import ComponentRegistry, ComponentType
+from exact.impl import bootstrap_components
 from exact.impl.evaluator import Evaluator
 from exact.impl.models.semantic_scorer import SemanticScorer
 
@@ -42,6 +44,14 @@ def test_evaluator_resolves_every_registered_metric() -> None:
 
     assert [metric.metric_name for metric in evaluator.metrics] == registered_names
     assert MetricNames.PRECISION in registered_names
+
+
+def test_seed_setter_is_resolved_through_the_core_registry() -> None:
+    bootstrap_components()
+
+    seed_setter = ComponentRegistry.get(ComponentType.SEED_SETTER, "SeedSetter")
+
+    assert issubclass(seed_setter, ISeedSetter)
 
 
 def test_evaluation_data_uses_configured_default_k_values() -> None:

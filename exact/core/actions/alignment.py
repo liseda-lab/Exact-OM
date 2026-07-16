@@ -11,8 +11,7 @@ import torch
 
 from exact.core.actions.evaluation import run_evaluation
 from exact.core.entities.configs.config import ConfigModel
-from exact.impl import bootstrap_components
-from exact.impl.seed import SeedSetter
+from exact.core.entities.registry import ComponentRegistry, ComponentType
 from exact.runs import RunLayout, finalize_artifacts
 from exact.tracks import get_track, provider_from_descriptor
 from exact.utils.logs import (
@@ -118,7 +117,6 @@ def run_alignment(
     output_dir_path.mkdir(parents=True, exist_ok=True)
     run_layout = RunLayout.create(output_dir_path)
 
-    bootstrap_components()
     if configs_file_path is None:
         configs = ConfigModel()
     elif isinstance(configs_file_path, ConfigModel):
@@ -437,7 +435,8 @@ def _run_alignment_session(
 
     if configs.seed is not None:
         logger.info(f"Setting seed to {configs.seed}")
-        SeedSetter(configs.seed)
+        seed_setter = ComponentRegistry.get(ComponentType.SEED_SETTER, "SeedSetter")
+        seed_setter(configs.seed)
 
     if device is not None and not torch.cuda.is_available():
         logger.warning("CUDA device specified but not available. Using CPU instead.")

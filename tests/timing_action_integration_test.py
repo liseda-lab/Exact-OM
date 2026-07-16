@@ -6,7 +6,6 @@ from typing import Any
 
 import pytest
 
-import exact.core.actions.alignment as alignment_module
 from exact.core.actions.alignment import AlignmentAction
 from exact.core.entities.configs.config import ConfigModel
 from exact.runs import RunLayout
@@ -39,7 +38,6 @@ def test_alignment_action_twice_preserves_fresh_inference_timing(
             stats_path.write_text("{}\n", encoding="utf-8")
         return None, stats_path
 
-    monkeypatch.setattr(alignment_module, "bootstrap_components", lambda: None)
     monkeypatch.setattr(ConfigModel, "resolve_dependencies", lambda self: None)
     monkeypatch.setattr(
         AlignmentAction,

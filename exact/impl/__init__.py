@@ -11,7 +11,7 @@ import importlib
 from typing import Any
 
 _BOOTSTRAPPED = False
-_SUBMODULES = {"datasets", "evaluators", "metrics", "models", "trainer"}
+_SUBMODULES = {"datasets", "evaluators", "metrics", "models", "seed", "trainer"}
 
 
 def bootstrap_components() -> None:
@@ -20,7 +20,7 @@ def bootstrap_components() -> None:
     global _BOOTSTRAPPED
     if _BOOTSTRAPPED:
         return
-    for name in ("datasets", "metrics", "models", "trainer", "evaluators"):
+    for name in ("datasets", "metrics", "models", "seed", "trainer", "evaluators"):
         importlib.import_module(f"{__name__}.{name}")
 
     from exact.core.entities.registry import ComponentRegistry, ComponentType

@@ -13,9 +13,6 @@ forbidden_modules =
     exact.analysis
     exact.ontology
     exact.io
-ignore_imports =
-    exact.core.actions.alignment -> exact.impl
-    exact.core.actions.alignment -> exact.impl.seed
 
 [importlinter:contract:ontology-boundary]
 name = Ontology does not depend on implementation or delivery

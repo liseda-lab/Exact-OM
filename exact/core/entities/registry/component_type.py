@@ -9,3 +9,4 @@ class ComponentType(Enum):
     TRAINER = "trainer"
     METRIC = "metric"
     EVALUATOR = "evaluator"
+    SEED_SETTER = "seed_setter"
