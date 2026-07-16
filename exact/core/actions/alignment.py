@@ -1,5 +1,5 @@
+import json
 import logging
-import time
 from pathlib import Path
 from typing import Optional, Protocol, Union
 
@@ -7,6 +7,7 @@ import torch
 
 from exact.core.actions.evaluation import EvaluationAction
 from exact.core.entities.configs.config import ConfigModel
+from exact.impl import bootstrap_components
 from exact.impl.seed import SeedSetter
 from exact.utils.logs import (
     ProgressTask,
@@ -15,9 +16,10 @@ from exact.utils.logs import (
     summarize_progress_estimates,
 )
 from exact.utils.timing import (
-    load_recorded_timings,
-    update_recorded_timings,
-    write_recorded_timings,
+    CacheStatus,
+    RunSession,
+    TimingLedger,
+    config_fingerprint,
 )
 
 
@@ -37,20 +39,114 @@ class AlignmentAction(Protocol):
         device: Optional[int] = None,
     ) -> Optional[dict]:
 
-        start_time = time.time()
-        times_file_path = output_dir_path / "times.txt"
-        stage_timings: dict[str, float] = {}
-
-        # Load Configs
-
-        if configs_file_path is not None:
-            if isinstance(configs_file_path, ConfigModel):
-                configs = configs_file_path
-            else:
-                configs = ConfigModel.load_config(configs_file_path)
-
-        else:
+        bootstrap_components()
+        if configs_file_path is None:
             configs = ConfigModel()
+        elif isinstance(configs_file_path, ConfigModel):
+            configs = configs_file_path
+        else:
+            configs = ConfigModel.load_config(configs_file_path)
+        configs.resolve_dependencies()
+
+        fingerprint = config_fingerprint(configs, run_dir=output_dir_path)
+        ledger = TimingLedger.open(output_dir_path)
+        with ledger.session(
+            command="align",
+            config_fingerprint=fingerprint,
+        ) as timing_session:
+            with timing_session.stage("Total") as total_span:
+                results, run_stats_path = AlignmentAction._run_session(
+                    source_file_path=source_file_path,
+                    target_file_path=target_file_path,
+                    output_dir_path=output_dir_path,
+                    configs=configs,
+                    configs_source=configs_file_path,
+                    training_reference_file_path=training_reference_file_path,
+                    full_reference_file_path=full_reference_file_path,
+                    candidates_file_path=candidates_file_path,
+                    log_file_path=log_file_path,
+                    run_eval=run_eval,
+                    task_name=task_name,
+                    device=device,
+                    timing_ledger=ledger,
+                    timing_session=timing_session,
+                )
+
+        totals = ledger.stage_totals(config_fingerprint=fingerprint)
+        timings_result = {
+            stage: (
+                total.compute_seconds if total.compute_seconds > 0.0 else total.overhead_seconds
+            )
+            / 60.0
+            for stage, total in totals.items()
+        }
+        timings_result["Total"] = totals["Total"].compute_seconds / 60.0
+
+        session_record = next(
+            session for session in ledger.sessions() if session.run_id == timing_session.run_id
+        )
+        this_session_seconds: dict[str, float] = {}
+        for stage in session_record.stages:
+            this_session_seconds[stage.stage] = (
+                this_session_seconds.get(stage.stage, 0.0) + stage.seconds
+            )
+        cumulative_compute_seconds = {
+            stage: total.compute_seconds for stage, total in totals.items()
+        }
+        timing_stats = {
+            "run_id": timing_session.run_id,
+            "config_fingerprint": fingerprint,
+            "this_session_seconds": this_session_seconds,
+            "cumulative_compute_seconds": cumulative_compute_seconds,
+            "cumulative_overhead_seconds": {
+                stage: total.overhead_seconds for stage, total in totals.items()
+            },
+        }
+        if run_stats_path is not None and run_stats_path.exists():
+            try:
+                stats = json.loads(run_stats_path.read_text(encoding="utf-8"))
+                stats["timing"] = timing_stats
+                tmp_path = run_stats_path.with_suffix(run_stats_path.suffix + ".tmp")
+                tmp_path.write_text(
+                    json.dumps(stats, indent=2, ensure_ascii=False),
+                    encoding="utf-8",
+                )
+                tmp_path.replace(run_stats_path)
+            except (OSError, json.JSONDecodeError) as exc:
+                logging.getLogger("exact").warning(
+                    "Could not add timing summary to %s: %s",
+                    run_stats_path,
+                    exc,
+                )
+
+        total_stage = totals["Total"]
+        logger = logging.getLogger("exact")
+        logger.info(
+            "Total compute across %d sessions: %.1fm (this session: %.1fm)",
+            total_stage.sessions,
+            total_stage.compute_seconds / 60.0,
+            (total_span.seconds or 0.0) / 60.0,
+        )
+        logger.info("Times updated at %s", ledger.times_path)
+        return results, timings_result
+
+    @staticmethod
+    def _run_session(
+        source_file_path: Path,
+        target_file_path: Path,
+        output_dir_path: Path,
+        configs: ConfigModel,
+        configs_source: Optional[Union[Path, ConfigModel]] = None,
+        training_reference_file_path: Optional[Path] = None,
+        full_reference_file_path: Optional[Path] = None,
+        candidates_file_path: Optional[Path] = None,
+        log_file_path: Optional[Path] = None,
+        run_eval: bool = False,
+        task_name: Optional[str] = None,
+        device: Optional[int] = None,
+        timing_ledger: TimingLedger = None,
+        timing_session: RunSession = None,
+    ):
 
         # Loading logging configuration from configs
 
@@ -64,13 +160,12 @@ class AlignmentAction(Protocol):
 
         # log configs state
 
-        if configs_file_path is not None:
-            logger.info(f"Using configuration from {configs_file_path}")
+        if configs_source is not None:
+            logger.info(f"Using configuration from {configs_source}")
         else:
             logger.info("Using default configuration")
 
         # Resolve dependencies
-        configs.resolve_dependencies()
         model_sequence = configs.get_model_sequence()
         if not model_sequence:
             raise ValueError("No models configured for alignment.")
@@ -104,7 +199,10 @@ class AlignmentAction(Protocol):
         progress = RunProgressLogger(
             logger,
             progress_tasks,
-            estimates_minutes=summarize_progress_estimates(load_recorded_timings(times_file_path)),
+            estimates_minutes=summarize_progress_estimates(
+                ledger=timing_ledger,
+                config_fingerprint=timing_session.config_fingerprint,
+            ),
         )
         progress.start("Setup", "configuration resolved")
         logger.info(
@@ -135,79 +233,88 @@ class AlignmentAction(Protocol):
 
         progress.start("Dataset", "building dataset inputs")
         logger.info("Building Dataset...")
-        dataset_start = time.time()
-        dataset_stage_timings: dict[str, float] = {}
-
-        dataset = configs.dataset(
-            output_path=output_dir_path,
-            logger=logger,
-            cache_ok=configs.use_file_cache,
-            device=device,
-            llm_profiles={k: v.model_dump() for k, v in configs.llm_profiles.items()},
-            llm_routing=configs.llm_routing.model_dump(),
-            request_seed=configs.seed,
-            candidate_generation_params={
-                **configs.candidates_params.model_dump(),
-                "candidates_file_path": str(candidates_file_path) if candidates_file_path else None,
-            },
-            **configs.dataset_params.model_dump(),
-        )
-
-        dataset_step_start = time.time()
-        dataset.load_ontologies(source_file_path, target_file_path)
-        dataset_stage_timings["Dataset.LoadOntologies"] = (time.time() - dataset_step_start) / 60
-        dataset_loaded_from_cache = dataset.has_cache()
-
-        if not dataset_loaded_from_cache:
-            dataset_step_start = time.time()
-
-            if full_reference_file_path is not None:
-                dataset.load_reference(full_reference_file_path)
-
-            dataset.load_candidates(
-                candidates_file_path, device=device, **configs.candidates_params.model_dump()
+        with timing_session.stage("Dataset") as dataset_span:
+            dataset = configs.dataset(
+                output_path=output_dir_path,
+                logger=logger,
+                cache_ok=configs.use_file_cache,
+                device=device,
+                llm_profiles={k: v.model_dump() for k, v in configs.llm_profiles.items()},
+                llm_routing=configs.llm_routing.model_dump(),
+                request_seed=configs.seed,
+                candidate_generation_params={
+                    **configs.candidates_params.model_dump(),
+                    "candidates_file_path": (
+                        str(candidates_file_path) if candidates_file_path else None
+                    ),
+                },
+                **configs.dataset_params.model_dump(),
             )
-            dataset_stage_timings["Dataset.LoadCandidates"] = (
-                time.time() - dataset_step_start
-            ) / 60
 
-        dataset_step_start = time.time()
-        dataset.process()
-        dataset_stage_timings["Dataset.Process"] = (time.time() - dataset_step_start) / 60
+            with timing_session.stage("Dataset.LoadOntologies"):
+                dataset.load_ontologies(source_file_path, target_file_path)
+            dataset_loaded_from_cache = dataset.has_cache()
 
-        if not dataset_loaded_from_cache:
+            if dataset_loaded_from_cache:
+                dataset_span.cache_status = CacheStatus.SKIPPED
+                timing_session.record(
+                    "Dataset.LoadCandidates",
+                    seconds=0.0,
+                    cache_status=CacheStatus.SKIPPED,
+                )
+                with timing_session.stage(
+                    "Dataset.CacheLoad",
+                    cache_status=CacheStatus.CACHE_HIT,
+                ):
+                    dataset.process()
+                timing_session.record(
+                    "Dataset.Process",
+                    seconds=0.0,
+                    cache_status=CacheStatus.SKIPPED,
+                )
+                timing_session.record(
+                    "Dataset.Save",
+                    seconds=0.0,
+                    cache_status=CacheStatus.SKIPPED,
+                )
+                timing_session.record(
+                    "Dataset.Plotting",
+                    seconds=0.0,
+                    cache_status=CacheStatus.SKIPPED,
+                )
+            else:
+                timing_session.record(
+                    "Dataset.CacheLoad",
+                    seconds=0.0,
+                    cache_status=CacheStatus.SKIPPED,
+                )
+                with timing_session.stage("Dataset.LoadCandidates"):
+                    if full_reference_file_path is not None:
+                        dataset.load_reference(full_reference_file_path)
+                    dataset.load_candidates(
+                        candidates_file_path,
+                        device=device,
+                        **configs.candidates_params.model_dump(),
+                    )
+                with timing_session.stage("Dataset.Process"):
+                    dataset.process()
+                with timing_session.stage("Dataset.Save"):
+                    dataset.save()
 
-            dataset_step_start = time.time()
-            dataset.save()
-            dataset_stage_timings["Dataset.Save"] = (time.time() - dataset_step_start) / 60
+                if getattr(dataset, "emit_feature_metrics_on_build", lambda: False)():
+                    dataset.save_feature_metrics()
 
-            if getattr(dataset, "emit_feature_metrics_on_build", lambda: False)():
-                dataset_step_start = time.time()
-                dataset.save_feature_metrics()
-                dataset_stage_timings["Dataset.FeatureMetrics"] = (
-                    time.time() - dataset_step_start
-                ) / 60
+                dataset.log_sanity_examples(**configs.sanity_check_params.model_dump())
+                with timing_session.stage("Dataset.Plotting"):
+                    dataset.plot_feature_distributions(
+                        which=configs.dataset_params.which,
+                        **configs.plot_params.model_dump(),
+                    )
 
-            dataset_step_start = time.time()
-            dataset.log_sanity_examples(**configs.sanity_check_params.model_dump())
-            dataset_stage_timings["Dataset.Sanity"] = (time.time() - dataset_step_start) / 60
+            timing_session.set_dataset_signature(getattr(dataset, "dataset_signature", None))
 
-            dataset_step_start = time.time()
-            dataset.plot_feature_distributions(
-                which=configs.dataset_params.which, **configs.plot_params.model_dump()
-            )
-            dataset_stage_timings["Dataset.Plotting"] = (time.time() - dataset_step_start) / 60
-
-        dataset_end = time.time()
-        dataset_elapsed = (dataset_end - dataset_start) / 60
+        dataset_elapsed = (dataset_span.seconds or 0.0) / 60.0
         logger.info(f"Dataset built in {dataset_elapsed:.1f} minutes")
-        if dataset_loaded_from_cache:
-            stage_timings["Dataset.CacheLoad"] = dataset_elapsed
-        else:
-            stage_timings["Dataset"] = dataset_elapsed
-            stage_timings.update(dataset_stage_timings)
-        update_recorded_timings(times_file_path, stage_timings)
-        logger.debug(f"Persisted dataset timings to {times_file_path}")
         progress.finish("Dataset", f"loaded_from_cache={dataset_loaded_from_cache}")
 
         # Trainer module
@@ -259,105 +366,112 @@ class AlignmentAction(Protocol):
         progress.finish("Trainer", f"models={len(model_specs)}")
 
         logger.info("Computing alignment...")
-
-        alignment_core_minutes = 0.0
-
         inference_kwargs = configs.inference_params.model_dump()
         inference_kwargs["local_alignment"] = candidates_file_path is not None
 
-        predict_start = time.time()
-        progress.start("Inference", f"pairs={len(dataset)}")
-        inference_kwargs["run_progress"] = progress
-        if candidates_file_path is None:
-            inference_kwargs.update(configs.alignment_params.model_dump())
-            alignment, avg_t = trainer.predict(**inference_kwargs)
-        else:
-            alignment, avg_t = trainer.predict(**inference_kwargs)
-        if getattr(progress, "fractions", {}).get("Inference", 0.0) < 1.0:
-            progress.finish("Inference", f"avg={avg_t:.4f}s/example")
-        if (
-            has_post_inference
-            and getattr(progress, "fractions", {}).get("PostInference", 0.0) < 1.0
-        ):
-            progress.finish("PostInference", "post-inference completed")
-        predict_elapsed = (time.time() - predict_start) / 60
-        trainer_stage_timings = getattr(trainer, "last_stage_timings", {}) or {}
-        inference_minutes = trainer_stage_timings.get("Alignment.Inference", predict_elapsed)
-        post_inference_minutes = trainer_stage_timings.get("Alignment.PostInference", 0.0)
-        rationale_minutes = trainer_stage_timings.get("Postprocess.Rationales", 0.0)
-        stage_timings["Alignment.Inference"] = inference_minutes
-        if post_inference_minutes > 0:
-            stage_timings["Alignment.PostInference"] = post_inference_minutes
-        if rationale_minutes > 0:
-            stage_timings["Postprocess.Rationales"] = rationale_minutes
-        alignment_core_minutes += inference_minutes + post_inference_minutes
-
-        logger.info(f"Average inference time per example: {avg_t:.4f} seconds")
-
-        if dataset.filter_exact_matches:
-            progress.start("Prefilter", "applying exact matches")
-            logger.info("Applying Exact Matches to alignment...")
-            prefilter_start = time.time()
-
+        with timing_session.stage("Alignment") as alignment_span:
+            progress.start("Inference", f"pairs={len(dataset)}")
+            inference_kwargs["run_progress"] = progress
             if candidates_file_path is None:
-                alignment = trainer.apply_prefilter(
-                    alignment, **configs.alignment_params.model_dump()
+                inference_kwargs.update(configs.alignment_params.model_dump())
+                alignment, avg_t = trainer.predict(**inference_kwargs)
+            else:
+                alignment, avg_t = trainer.predict(**inference_kwargs)
+            if getattr(progress, "fractions", {}).get("Inference", 0.0) < 1.0:
+                progress.finish("Inference", f"avg={avg_t:.4f}s/example")
+            if (
+                has_post_inference
+                and getattr(progress, "fractions", {}).get("PostInference", 0.0) < 1.0
+            ):
+                progress.finish("PostInference", "post-inference completed")
+
+            trainer_stage_records = list(getattr(trainer, "last_stage_timings", []) or [])
+            for stage_record in trainer_stage_records:
+                timing_session.record(stage_record)
+            inference_record = next(
+                (
+                    record
+                    for record in trainer_stage_records
+                    if record.stage == "Alignment.Inference"
+                ),
+                None,
+            )
+            if inference_record is None:
+                raise RuntimeError("Trainer did not report an Alignment.Inference timing record")
+            if inference_record.cache_status in {
+                CacheStatus.RESUMED,
+                CacheStatus.SKIPPED,
+            }:
+                alignment_span.cache_status = CacheStatus.RESUMED
+
+            effective_threshold = getattr(
+                trainer,
+                "last_effective_threshold",
+                inference_kwargs.get("threshold"),
+            )
+            threshold_origin = getattr(
+                trainer,
+                "last_effective_threshold_origin",
+                "configured",
+            )
+            logger.info(
+                "Effective decision threshold: %s (origin: %s)",
+                "disabled" if effective_threshold is None else f"{effective_threshold:.6g}",
+                threshold_origin,
+            )
+            logger.info(f"Average inference time per example: {avg_t:.4f} seconds")
+
+            if dataset.filter_exact_matches:
+                progress.start("Prefilter", "applying exact matches")
+                logger.info("Applying Exact Matches to alignment...")
+                with timing_session.stage("Alignment.Prefilter"):
+                    if candidates_file_path is None:
+                        alignment = trainer.apply_prefilter(
+                            alignment, **configs.alignment_params.model_dump()
+                        )
+                    else:
+                        alignment = trainer.apply_prefilter(alignment)
+                progress.finish("Prefilter", f"mappings={len(alignment)}")
+            else:
+                timing_session.record(
+                    "Alignment.Prefilter",
+                    seconds=0.0,
+                    cache_status=CacheStatus.SKIPPED,
                 )
 
-            else:
-                alignment = trainer.apply_prefilter(alignment)
-            prefilter_minutes = (time.time() - prefilter_start) / 60
-            stage_timings["Alignment.Prefilter"] = prefilter_minutes
-            alignment_core_minutes += prefilter_minutes
-            progress.finish("Prefilter", f"mappings={len(alignment)}")
-
-        alignment_elapsed = alignment_core_minutes
-        stage_timings["Alignment"] = alignment_elapsed
-        update_recorded_timings(times_file_path, stage_timings)
-        logger.debug(f"Persisted alignment timings to {times_file_path}")
+        alignment_elapsed = (alignment_span.seconds or 0.0) / 60.0
         logger.info(f"Alignment computed in {alignment_elapsed:.1f} minutes")
 
         # Save Alignment
 
         progress.start("Outputs", "writing alignment artifacts")
         logger.info("Writing alignment...")
-        save_results_start = time.time()
-        alignment_file_path = trainer.save_results(
-            alignment,
-            candidates_one2many_path=candidates_file_path,
-            sub_dir=task_name,
-            **configs.alignment_params.model_dump(),
-        )["alignment_tsv"]
-        stage_timings["Postprocess.Outputs"] = (time.time() - save_results_start) / 60
-        stage_timings["Postprocess"] = stage_timings.get(
-            "Postprocess.Rationales", 0.0
-        ) + stage_timings.get("Postprocess.Outputs", 0.0)
-        update_recorded_timings(times_file_path, stage_timings)
-        logger.debug(f"Persisted output timings to {times_file_path}")
+        with timing_session.stage("Postprocess.Outputs") as outputs_span:
+            output_paths = trainer.save_results(
+                alignment,
+                candidates_one2many_path=candidates_file_path,
+                sub_dir=task_name,
+                **configs.alignment_params.model_dump(),
+            )
+        alignment_file_path = output_paths["alignment_tsv"]
+        run_stats_path = output_paths.get("run_stats_json")
 
         logger.info(f"Alignment written to {alignment_file_path}")
         progress.finish("Outputs", str(alignment_file_path))
 
         # Plot Distributions
         progress.start("Plots", "writing plots")
-        plot_start = time.time()
-        trainer.plot_distributions(
-            which=configs.inference_params.which, **configs.plot_params.model_dump()
-        )
-        trainer.plot_scores_vs_labels(
-            which=configs.inference_params.which,
-            figsize=configs.plot_params.figsize,
-            alpha=configs.plot_params.alpha,
-            dpi=configs.plot_params.dpi,
-        )
-        stage_timings["Postprocess.Plotting"] = (time.time() - plot_start) / 60
-        stage_timings["Postprocess"] = (
-            stage_timings.get("Postprocess.Rationales", 0.0)
-            + stage_timings.get("Postprocess.Outputs", 0.0)
-            + stage_timings.get("Postprocess.Plotting", 0.0)
-        )
-        update_recorded_timings(times_file_path, stage_timings)
-        logger.debug(f"Persisted plotting timings to {times_file_path}")
+        with timing_session.stage("Postprocess.Plotting") as plotting_span:
+            trainer.plot_distributions(
+                which=configs.inference_params.which,
+                **configs.plot_params.model_dump(),
+            )
+            trainer.plot_scores_vs_labels(
+                which=configs.inference_params.which,
+                figsize=configs.plot_params.figsize,
+                alpha=configs.plot_params.alpha,
+                dpi=configs.plot_params.dpi,
+            )
         progress.finish("Plots", "plots written")
 
         # Evaluate Alignment
@@ -367,83 +481,47 @@ class AlignmentAction(Protocol):
         if run_eval:
             progress.start("Evaluation", "evaluating alignment")
             logger.info("Evaluating alignment...")
-            eval_start = time.time()
-
-            results = EvaluationAction.run(
-                alignment=Path(alignment_file_path),
-                output_dir_path=(
-                    output_dir_path / task_name if task_name is not None else output_dir_path
-                ),
-                error_on_fail=False,
-                K=configs.k,
-                source_file_path=dataset.source,
-                target_file_path=dataset.target,
-                train_reference_file_path=training_reference_file_path,
-                full_reference_file_path=(
-                    full_reference_file_path if candidates_file_path is None else None
-                ),
-                reference_candidates=candidates_file_path,
-                logger=logger,
-            )
-            stage_timings["Postprocess.Evaluation"] = (time.time() - eval_start) / 60
-            stage_timings["Postprocess"] = (
-                stage_timings.get("Postprocess.Rationales", 0.0)
-                + stage_timings.get("Postprocess.Outputs", 0.0)
-                + stage_timings.get("Postprocess.Plotting", 0.0)
-                + stage_timings.get("Postprocess.Evaluation", 0.0)
-            )
-            update_recorded_timings(times_file_path, stage_timings)
-            logger.debug(f"Persisted evaluation timings to {times_file_path}")
+            with timing_session.stage("Postprocess.Evaluation") as evaluation_span:
+                results = EvaluationAction.run(
+                    alignment=Path(alignment_file_path),
+                    output_dir_path=(
+                        output_dir_path / task_name if task_name is not None else output_dir_path
+                    ),
+                    error_on_fail=False,
+                    K=configs.k,
+                    source_file_path=dataset.source,
+                    target_file_path=dataset.target,
+                    train_reference_file_path=training_reference_file_path,
+                    full_reference_file_path=(
+                        full_reference_file_path if candidates_file_path is None else None
+                    ),
+                    reference_candidates=candidates_file_path,
+                    logger=logger,
+                )
             progress.finish("Evaluation", "evaluation completed")
-
-        end_time = time.time()
-        elapsed_time = (end_time - start_time) / 60
-        logger.info(f"Alignment completed in {elapsed_time:.1f} minutes")
-
-        # Save Times
-        timings = load_recorded_timings(times_file_path)
-        timings["Total"] = elapsed_time
-        timings["Alignment"] = alignment_elapsed
-        if not dataset_loaded_from_cache:
-            timings["Dataset"] = dataset_elapsed
-        if "Postprocess" not in timings:
-            timings["Postprocess"] = (
-                stage_timings.get("Postprocess.Rationales", 0.0)
-                + stage_timings.get("Postprocess.Outputs", 0.0)
-                + stage_timings.get("Postprocess.Plotting", 0.0)
-                + stage_timings.get("Postprocess.Evaluation", 0.0)
+        else:
+            evaluation_span = None
+            timing_session.record(
+                "Postprocess.Evaluation",
+                seconds=0.0,
+                cache_status=CacheStatus.SKIPPED,
             )
 
-        write_recorded_timings(times_file_path, timings)
-        logger.info(f"Times updated at {times_file_path}")
-        progress.complete(f"total={elapsed_time:.1f} minutes")
-
-        timings_result = {
-            "Alignment": alignment_elapsed,
-            "Total": elapsed_time,
-        }
-        if not dataset_loaded_from_cache:
-            timings_result["Dataset"] = dataset_elapsed
-        elif "Dataset" in timings:
-            timings_result["Dataset"] = timings["Dataset"]
-        if "Postprocess" in timings:
-            timings_result["Postprocess"] = timings["Postprocess"]
-        for step in (
-            "Alignment.Inference",
-            "Alignment.PostInference",
-            "Alignment.Prefilter",
-            "Postprocess.Rationales",
-            "Postprocess.Outputs",
-            "Postprocess.Plotting",
-            "Postprocess.Evaluation",
-            "Dataset.LoadOntologies",
-            "Dataset.LoadCandidates",
-            "Dataset.Process",
-            "Dataset.Save",
-            "Dataset.Plotting",
-            "Dataset.CacheLoad",
-        ):
-            if step in timings:
-                timings_result[step] = timings[step]
-
-        return results, timings_result
+        rationale_seconds = sum(
+            record.seconds
+            for record in trainer_stage_records
+            if record.stage == "Postprocess.Rationales"
+        )
+        postprocess_seconds = (
+            rationale_seconds
+            + (outputs_span.seconds or 0.0)
+            + (plotting_span.seconds or 0.0)
+            + ((evaluation_span.seconds or 0.0) if evaluation_span is not None else 0.0)
+        )
+        timing_session.record(
+            "Postprocess",
+            seconds=postprocess_seconds,
+            cache_status=CacheStatus.FRESH,
+        )
+        progress.complete("run stages completed")
+        return results, run_stats_path

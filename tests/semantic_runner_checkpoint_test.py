@@ -82,6 +82,8 @@ def test_compact_checkpoint_restores_from_slim_candidate_sidecar(tmp_path: Path)
     runner._append_audit_records(records)
     candidate_rows = [runner._candidate_row_from_explanation_record(record) for record in records]
     runner._append_candidate_records([row for row in candidate_rows if row is not None])
+    runner._inference_seconds_cumulative = 812.4
+    runner._examples_per_second_ema = 1.48
     runner._write_checkpoint_state(
         checkpoint_path,
         module.DatasetMask.inference,
@@ -97,6 +99,14 @@ def test_compact_checkpoint_restores_from_slim_candidate_sidecar(tmp_path: Path)
     assert "mappings" not in payload
     assert payload["audit_manifest_path"]
     assert payload["candidate_records_manifest_path"]
+    assert payload["timing"] == {
+        "inference_seconds_cumulative": 812.4,
+        "examples_per_second_ema": 1.48,
+    }
+
+    runner._inference_seconds_cumulative = 0.0
+    runner._restored_inference_seconds_cumulative = 0.0
+    runner._examples_per_second_ema = None
 
     mappings, restored_records, processed = runner._load_checkpoint_state(
         checkpoint_path,
@@ -107,6 +117,8 @@ def test_compact_checkpoint_restores_from_slim_candidate_sidecar(tmp_path: Path)
     assert restored_records == records
     assert runner._restored_candidate_rows == candidate_rows
     assert mappings == [("s1", "t1", 0.8), ("s2", "t2", 0.7), ("s3", "t3", 0.6)]
+    assert runner.inference_seconds_cumulative == 812.4
+    assert runner.examples_per_second_ema == 1.48
 
     full_json_path = tmp_path / "full_explanations.json"
     runner.write_full_explanations_json(full_json_path)

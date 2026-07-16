@@ -14,6 +14,7 @@ from exact.core.contracts.trainer import ITrainer
 from exact.core.entities.configs.dataset import DatasetMask
 from exact.core.entities.mappings import EntityMapping
 from exact.utils.formatting import format_duration as _format_duration
+from exact.utils.timing import CacheStatus, StageRecord
 
 try:
     import zstandard as zstd
@@ -111,7 +112,13 @@ class SemanticAlignmentRunner(ITrainer):
             logger=logger,
             **kwargs,
         )
-        self._last_stage_timings: Dict[str, float] = {}
+        self._last_stage_timings: List[StageRecord] = []
+        self._inference_seconds_cumulative: float = 0.0
+        self._restored_inference_seconds_cumulative: float = 0.0
+        self._inference_session_started_at: Optional[float] = None
+        self._examples_per_second_ema: Optional[float] = None
+        self._last_effective_threshold: Optional[float] = None
+        self._last_effective_threshold_origin: str = "configured"
         self._checkpoint_fingerprint_payload: Dict[str, Any] = (
             self._build_checkpoint_fingerprint_payload()
         )
@@ -570,7 +577,35 @@ class SemanticAlignmentRunner(ITrainer):
                 "warning",
             )
             return [], [], 0
+        timing_payload = payload.get("timing") or {}
+        try:
+            restored_seconds = float(timing_payload.get("inference_seconds_cumulative", 0.0) or 0.0)
+        except (TypeError, ValueError):
+            restored_seconds = 0.0
+        if not 0.0 <= restored_seconds < float("inf"):
+            restored_seconds = 0.0
+        try:
+            restored_rate = float(timing_payload.get("examples_per_second_ema"))
+        except (TypeError, ValueError):
+            restored_rate = None
+        if restored_rate is not None and not 0.0 < restored_rate < float("inf"):
+            restored_rate = None
+        self._restored_inference_seconds_cumulative = restored_seconds
+        self._inference_seconds_cumulative = restored_seconds
+        self._examples_per_second_ema = restored_rate
         return mappings, results_json, processed_examples
+
+    def _checkpoint_timing_payload(self) -> Dict[str, Optional[float]]:
+        cumulative_seconds = self._inference_seconds_cumulative
+        if self._inference_session_started_at is not None:
+            cumulative_seconds = self._restored_inference_seconds_cumulative + max(
+                0.0,
+                time.perf_counter() - self._inference_session_started_at,
+            )
+        return {
+            "inference_seconds_cumulative": cumulative_seconds,
+            "examples_per_second_ema": self._examples_per_second_ema,
+        }
 
     def _write_checkpoint_state(
         self,
@@ -600,6 +635,7 @@ class SemanticAlignmentRunner(ITrainer):
             ),
             "total_examples": total_examples,
             "processed_examples": processed_examples,
+            "timing": self._checkpoint_timing_payload(),
             "checkpoint_payload": self._checkpoint_payload_mode,
             "mappings_count": len(mappings),
             "results_json_count": len(results_json),
@@ -2342,7 +2378,13 @@ class SemanticAlignmentRunner(ITrainer):
         self._llm_calibration_messages_logged: Set[str] = set()
         self._llm_calibration_report: Optional[Dict[str, Any]] = None
         self._candidate_rows: List[Dict[str, Any]] = []
-        self._last_stage_timings = {}
+        self._last_stage_timings = []
+        self._inference_seconds_cumulative = 0.0
+        self._restored_inference_seconds_cumulative = 0.0
+        self._inference_session_started_at = None
+        self._examples_per_second_ema = None
+        self._last_effective_threshold = threshold
+        self._last_effective_threshold_origin = "configured"
         self._restored_candidate_rows = []
         self._overlay_manifest_path = None
         if hasattr(self.model, "reset_llm_calibration_tracking"):
@@ -2442,6 +2484,7 @@ class SemanticAlignmentRunner(ITrainer):
             )
             if run_progress is not None:
                 run_progress.finish("Inference", "checkpoint already complete")
+            post_inference_start = time.perf_counter()
             candidate_df = self._build_candidate_dataframe()
             if candidate_df.empty and self.results_json:
                 candidate_df = self._build_candidate_dataframe_from_records(self.results_json)
@@ -2490,7 +2533,11 @@ class SemanticAlignmentRunner(ITrainer):
                 self._selector_target_conflict_enabled = (
                     self._selector_target_conflict_enabled_from_df(candidate_df)
                 )
+                self._last_effective_threshold_origin = self._effective_alignment_threshold_origin(
+                    candidate_df, threshold
+                )
                 threshold = self._effective_alignment_threshold(candidate_df, threshold)
+                self._last_effective_threshold = threshold
             df = pd.DataFrame(all_mappings, columns=["Src", "Tgt", "Scores"])
             preds = EntityMapping.read_table_mappings(
                 df, threshold=threshold, cardinality=cardinality
@@ -2511,6 +2558,10 @@ class SemanticAlignmentRunner(ITrainer):
                 cardinality=cardinality,
             )
             rationale_elapsed = time.perf_counter() - rationale_start
+            post_inference_elapsed = max(
+                0.0,
+                time.perf_counter() - post_inference_start - rationale_elapsed,
+            )
             self.results_df = (
                 self._make_summary_dataframe(self.results_json)
                 if self.results_json and not compact_rationale_records
@@ -2535,11 +2586,26 @@ class SemanticAlignmentRunner(ITrainer):
                     mappings=all_mappings,
                     results_json=self.results_json,
                 )
-            self._last_stage_timings = {
-                "Alignment.Inference": 0.0,
-                "Alignment.PostInference": 0.0,
-                "Postprocess.Rationales": rationale_elapsed / 60.0,
-            }
+            self._last_stage_timings = [
+                StageRecord(
+                    stage="Alignment.Inference",
+                    seconds=0.0,
+                    cache_status=CacheStatus.SKIPPED,
+                    work_done=0,
+                    work_total=total_examples,
+                    unit="examples",
+                ),
+                StageRecord(
+                    stage="Alignment.PostInference",
+                    seconds=post_inference_elapsed,
+                    cache_status=CacheStatus.RESUMED,
+                ),
+                StageRecord(
+                    stage="Postprocess.Rationales",
+                    seconds=rationale_elapsed,
+                    cache_status=CacheStatus.FRESH,
+                ),
+            ]
             return preds, 0.0
 
         if checkpoint_enabled:
@@ -2583,6 +2649,7 @@ class SemanticAlignmentRunner(ITrainer):
 
         total_batches = len(dl)
         start_time = time.perf_counter()
+        self._inference_session_started_at = start_time
         processed_examples = restored_examples
         batches_run = 0
 
@@ -2746,6 +2813,15 @@ class SemanticAlignmentRunner(ITrainer):
 
             processed_examples += len(src_iri)
             batches_run += 1
+            elapsed_for_rate = max(1.0e-9, time.perf_counter() - start_time)
+            current_rate = (processed_examples - restored_examples) / elapsed_for_rate
+            if current_rate > 0.0:
+                if self._examples_per_second_ema is None:
+                    self._examples_per_second_ema = current_rate
+                else:
+                    self._examples_per_second_ema = (
+                        0.2 * current_rate + 0.8 * self._examples_per_second_ema
+                    )
 
             # Accumulate full JSONs
             if "explanations" in out:
@@ -2818,6 +2894,10 @@ class SemanticAlignmentRunner(ITrainer):
         self._finalize_llm_calibration()
 
         inference_elapsed_seconds = time.perf_counter() - start_time
+        self._inference_seconds_cumulative = (
+            self._restored_inference_seconds_cumulative + inference_elapsed_seconds
+        )
+        self._inference_session_started_at = None
         total_time = inference_elapsed_seconds
         duration_str = _format_duration(total_time)
         new_examples = max(0, processed_examples - restored_examples)
@@ -2914,7 +2994,11 @@ class SemanticAlignmentRunner(ITrainer):
             self._selector_target_conflict_enabled = self._selector_target_conflict_enabled_from_df(
                 candidate_df
             )
+            self._last_effective_threshold_origin = self._effective_alignment_threshold_origin(
+                candidate_df, threshold
+            )
             threshold = self._effective_alignment_threshold(candidate_df, threshold)
+            self._last_effective_threshold = threshold
             if self.results_json:
                 # Prefer the richer JSON (includes importances and LLM info) for plotting/summary.
                 # Additional models are expected to sync their public metrics back into records.
@@ -2974,11 +3058,27 @@ class SemanticAlignmentRunner(ITrainer):
                 mappings=all_mappings,
                 results_json=self.results_json,
             )
-        self._last_stage_timings = {
-            "Alignment.Inference": inference_elapsed_seconds / 60.0,
-            "Alignment.PostInference": max(0.0, post_inference_elapsed_seconds) / 60.0,
-            "Postprocess.Rationales": rationale_elapsed_seconds / 60.0,
-        }
+        inference_status = CacheStatus.RESUMED if restored_examples > 0 else CacheStatus.FRESH
+        self._last_stage_timings = [
+            StageRecord(
+                stage="Alignment.Inference",
+                seconds=inference_elapsed_seconds,
+                cache_status=inference_status,
+                work_done=new_examples,
+                work_total=total_examples,
+                unit="examples",
+            ),
+            StageRecord(
+                stage="Alignment.PostInference",
+                seconds=max(0.0, post_inference_elapsed_seconds),
+                cache_status=inference_status,
+            ),
+            StageRecord(
+                stage="Postprocess.Rationales",
+                seconds=rationale_elapsed_seconds,
+                cache_status=CacheStatus.FRESH,
+            ),
+        ]
         return preds, avg_t
 
     @staticmethod
@@ -2997,6 +3097,19 @@ class SemanticAlignmentRunner(ITrainer):
         return float(selected.median())
 
     @staticmethod
+    def _effective_alignment_threshold_origin(
+        candidate_df: pd.DataFrame,
+        threshold: Optional[float],
+    ) -> str:
+        if threshold is None or candidate_df.empty:
+            return "configured"
+        if "selection_accept_threshold" not in candidate_df.columns:
+            return "configured"
+        selected = pd.to_numeric(candidate_df["selection_accept_threshold"], errors="coerce")
+        selected = selected[selected.notna() & (selected > 0.0)]
+        return "selector-median override" if not selected.empty else "configured"
+
+    @staticmethod
     def _selector_target_conflict_enabled_from_df(candidate_df: pd.DataFrame) -> Optional[bool]:
         if candidate_df.empty or "selection_target_conflict_enabled" not in candidate_df.columns:
             return None
@@ -3011,8 +3124,24 @@ class SemanticAlignmentRunner(ITrainer):
         return bool(normalized.any())
 
     @property
-    def last_stage_timings(self) -> Dict[str, float]:
-        return dict(self._last_stage_timings)
+    def last_stage_timings(self) -> List[StageRecord]:
+        return list(self._last_stage_timings)
+
+    @property
+    def inference_seconds_cumulative(self) -> float:
+        return self._inference_seconds_cumulative
+
+    @property
+    def examples_per_second_ema(self) -> Optional[float]:
+        return self._examples_per_second_ema
+
+    @property
+    def last_effective_threshold(self) -> Optional[float]:
+        return self._last_effective_threshold
+
+    @property
+    def last_effective_threshold_origin(self) -> str:
+        return self._last_effective_threshold_origin
 
     def _build_candidate_dataframe(self) -> pd.DataFrame:
         if not self._candidate_rows:

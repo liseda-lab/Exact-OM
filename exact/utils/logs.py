@@ -7,9 +7,12 @@ import time
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Mapping, Optional, Sequence
+from typing import TYPE_CHECKING, Mapping, Optional, Sequence
 
 from exact.utils.formatting import format_duration
+
+if TYPE_CHECKING:
+    from exact.utils.timing import TimingLedger
 
 
 def categorize_log_message(message: str) -> str:
@@ -261,7 +264,24 @@ class RunProgressLogger:
         return "[" + ("#" * filled) + ("-" * (self.bar_width - filled)) + "]"
 
 
-def summarize_progress_estimates(recorded_timings: Mapping[str, float]) -> dict[str, float]:
+def summarize_progress_estimates(
+    recorded_timings: Optional[Mapping[str, float]] = None,
+    *,
+    ledger: Optional["TimingLedger"] = None,
+    config_fingerprint: Optional[str] = None,
+) -> dict[str, float]:
+    """Build minute estimates for :class:`RunProgressLogger`.
+
+    Ledger estimates are stored in seconds and converted here.  The optional
+    mapping remains for callers reading a pre-ledger ``times.txt`` file.
+    """
+
+    if ledger is not None:
+        recorded_timings = {
+            stage: seconds / 60.0
+            for stage, seconds in ledger.estimates(config_fingerprint=config_fingerprint).items()
+        }
+    recorded_timings = recorded_timings or {}
     estimates = {
         "Setup": 0.2,
         "Dataset": 5.0,
