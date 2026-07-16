@@ -1,10 +1,9 @@
 """Crash-safe timing records for alignment and evaluation runs.
 
-``timings.json`` intentionally uses newline-delimited JSON despite its historical
-suffix.  Each line is an immutable event, which means a completed stage is durable
-without rewriting (or risking) timings from an earlier invocation.  The public
-objects below materialize the session-oriented schema described in the project
-contracts.
+``timings.json`` is a locked, atomically replaced JSON document containing an
+append-only list of run sessions.  A session is flushed when it starts, after every
+stage record, and when it finishes, so completed work remains durable across
+interruptions without allowing one invocation to overwrite another.
 
 ``times.txt`` is a deprecated, derived view retained for compatibility.  New code
 should write through :class:`TimingLedger`.
@@ -18,13 +17,13 @@ import os
 import time
 import uuid
 import warnings
-from contextlib import contextmanager
-from dataclasses import asdict, dataclass, field, replace
+from contextlib import AbstractContextManager, contextmanager
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from enum import Enum
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
-from typing import Any, Iterator, Mapping, Optional
+from typing import Any, Callable, Iterator, Mapping, Optional
 
 from exact.core.values import TIMING_STEP_ORDER
 from exact.utils.run_context import activate_run_session
@@ -79,7 +78,7 @@ class StageTotal:
 
 @dataclass(frozen=True)
 class SessionRecord:
-    """Materialized view of the append-only events for a run invocation."""
+    """Materialized view of one append-only run invocation."""
 
     run_id: str
     command: str
@@ -157,7 +156,7 @@ class _ExclusiveFileLock:
 
 
 class TimingLedger:
-    """Append-only timing event ledger rooted in an output directory."""
+    """Append-only session ledger rooted in an output directory."""
 
     def __init__(self, run_dir: Path) -> None:
         self.run_dir = Path(run_dir)
@@ -167,6 +166,8 @@ class TimingLedger:
 
     @classmethod
     def open(cls, run_dir: Path) -> "TimingLedger":
+        """Open or initialize the append-only ledger beneath ``run_dir``."""
+
         ledger = cls(Path(run_dir))
         ledger._initialize()
         return ledger
@@ -179,10 +180,10 @@ class TimingLedger:
         config_fingerprint: str,
         dataset_signature: Optional[str] = None,
     ) -> Iterator["RunSession"]:
-        """Open a session and leave it unfinished when the body raises.
+        """Open a session and leave ``ended_at`` null when the body raises.
 
         Stage records written before an exception remain readable and count toward
-        cumulative compute.  A normal exit appends the end event and refreshes the
+        cumulative compute.  A normal exit closes the session and refreshes the
         deprecated ``times.txt`` projection.
         """
 
@@ -201,7 +202,7 @@ class TimingLedger:
         config_fingerprint: str,
         dataset_signature: Optional[str] = None,
     ) -> "RunSession":
-        """Start a session for call sites that cannot wrap their whole body."""
+        """Start and durably append a session for manually managed call sites."""
 
         run_session = RunSession(
             ledger=self,
@@ -211,82 +212,49 @@ class TimingLedger:
             dataset_signature=dataset_signature,
             started_at=_utc_now(),
         )
-        self._append_event(
-            "session_started",
-            run_id=run_session.run_id,
-            command=run_session.command,
-            started_at=run_session.started_at,
-            config_fingerprint=run_session.config_fingerprint,
-            dataset_signature=run_session.dataset_signature,
-            exact_version=_exact_version(),
-        )
+        session_payload: dict[str, Any] = {
+            "run_id": run_session.run_id,
+            "command": run_session.command,
+            "started_at": run_session.started_at,
+            "ended_at": None,
+            "config_fingerprint": run_session.config_fingerprint,
+            "dataset_signature": run_session.dataset_signature,
+            "exact_version": _exact_version(),
+            "stages": [],
+        }
+
+        def append_session(payload: dict[str, Any]) -> None:
+            payload["sessions"].append(session_payload)
+
+        self._update_payload(append_session)
         return run_session
 
     def sessions(self) -> list[SessionRecord]:
-        """Return the materialized sessions in append order."""
+        """Return immutable session views in append order."""
 
-        events = self._read_events()
-        mutable: dict[str, dict[str, Any]] = {}
-        order: list[str] = []
-        for event in events:
-            event_name = event.get("event")
-            run_id = event.get("run_id")
-            if event_name == "session_started" and run_id:
-                if run_id not in mutable:
-                    order.append(run_id)
-                mutable[run_id] = {
-                    "run_id": run_id,
-                    "command": str(event.get("command", "unknown")),
-                    "started_at": str(event.get("started_at", "")),
-                    "ended_at": None,
-                    "config_fingerprint": str(event.get("config_fingerprint", "legacy")),
-                    "dataset_signature": event.get("dataset_signature"),
-                    "exact_version": str(event.get("exact_version", "unknown")),
-                    "stages": [],
-                    "crashed": False,
-                }
-                continue
-            if not run_id or run_id not in mutable:
-                continue
-            session = mutable[run_id]
-            if event_name == "session_metadata":
-                if "dataset_signature" in event:
-                    session["dataset_signature"] = event.get("dataset_signature")
-            elif event_name in {"stage_recorded", "span_finished"}:
-                try:
-                    session["stages"].append(
-                        StageRecord(
-                            stage=str(event["stage"]),
-                            seconds=float(event.get("seconds", 0.0)),
-                            cache_status=CacheStatus(event.get("cache_status", "fresh")),
-                            work_done=event.get("work_done"),
-                            work_total=event.get("work_total"),
-                            unit=event.get("unit"),
-                            span_id=event.get("span_id"),
-                            parent_span_id=event.get("parent_span_id"),
-                        )
-                    )
-                except (KeyError, TypeError, ValueError):
-                    continue
-            elif event_name == "session_finished":
-                session["ended_at"] = event.get("ended_at")
-            elif event_name == "session_failed":
-                session["crashed"] = True
+        with _ExclusiveFileLock(self.lock_path):
+            payload = self._read_payload_unlocked()
 
         records: list[SessionRecord] = []
-        for run_id in order:
-            item = mutable[run_id]
+        for raw_session in payload["sessions"]:
+            stages: list[StageRecord] = []
+            for raw_stage in raw_session.get("stages", []):
+                try:
+                    stages.append(self._stage_from_payload(raw_stage))
+                except (KeyError, TypeError, ValueError):
+                    continue
+            ended_at = raw_session.get("ended_at")
             records.append(
                 SessionRecord(
-                    run_id=item["run_id"],
-                    command=item["command"],
-                    started_at=item["started_at"],
-                    ended_at=item["ended_at"],
-                    config_fingerprint=item["config_fingerprint"],
-                    dataset_signature=item["dataset_signature"],
-                    exact_version=item["exact_version"],
-                    stages=tuple(item["stages"]),
-                    crashed=bool(item["crashed"] or item["ended_at"] is None),
+                    run_id=str(raw_session.get("run_id", "")),
+                    command=str(raw_session.get("command", "unknown")),
+                    started_at=str(raw_session.get("started_at", "")),
+                    ended_at=str(ended_at) if ended_at is not None else None,
+                    config_fingerprint=str(raw_session.get("config_fingerprint", "legacy")),
+                    dataset_signature=raw_session.get("dataset_signature"),
+                    exact_version=str(raw_session.get("exact_version", "unknown")),
+                    stages=tuple(stages),
+                    crashed=ended_at is None,
                 )
             )
         return records
@@ -401,42 +369,154 @@ class TimingLedger:
     def _initialize(self) -> None:
         self.run_dir.mkdir(parents=True, exist_ok=True)
         with _ExclusiveFileLock(self.lock_path):
-            imported_events: list[dict[str, Any]] = []
             if self.path.exists() and self.path.stat().st_size:
+                raw = self.path.read_text(encoding="utf-8")
                 try:
-                    parsed, monolithic = self._parse_existing_file()
-                except (OSError, ValueError, json.JSONDecodeError) as exc:
-                    backup_path = self._backup_path("corrupt")
-                    os.replace(self.path, backup_path)
-                    warnings.warn(
-                        f"Corrupt timing ledger moved to {backup_path}: {exc}",
-                        RuntimeWarning,
-                        stacklevel=2,
-                    )
-                else:
-                    if not monolithic:
+                    self._parse_payload(raw)
+                except (TypeError, ValueError, json.JSONDecodeError) as object_error:
+                    try:
+                        legacy_events = self._parse_ndjson_events(raw)
+                        payload = self._payload_from_events(legacy_events)
+                    except (TypeError, ValueError, json.JSONDecodeError):
+                        backup_path = self._backup_path("corrupt")
+                        os.replace(self.path, backup_path)
+                        warnings.warn(
+                            f"Corrupt timing ledger moved to {backup_path}: {object_error}",
+                            RuntimeWarning,
+                            stacklevel=2,
+                        )
+                    else:
+                        backup_path = self._backup_path("ndjson")
+                        os.replace(self.path, backup_path)
+                        self._atomic_write_unlocked(payload)
                         return
-                    backup_path = self._backup_path("legacy-json")
-                    os.replace(self.path, backup_path)
-                    imported_events = self._events_from_monolithic(parsed)
+                else:
+                    return
 
-            self._append_lines_unlocked(
-                [self._event("ledger_started", created_at=_utc_now()), *imported_events]
-            )
-            if not imported_events and self.times_path.exists():
+            payload = self._empty_payload()
+            if self.times_path.exists():
                 legacy_timings = load_recorded_timings(self.times_path)
                 if legacy_timings:
-                    self._append_lines_unlocked(self._legacy_events(legacy_timings))
+                    payload["sessions"].append(self._legacy_session(legacy_timings))
+            self._atomic_write_unlocked(payload)
 
-    def _parse_existing_file(self) -> tuple[Any, bool]:
-        raw = self.path.read_text(encoding="utf-8")
+    @staticmethod
+    def _empty_payload() -> dict[str, Any]:
+        return {"schema_version": TIMING_SCHEMA_VERSION, "sessions": []}
+
+    @staticmethod
+    def _parse_payload(raw: str) -> dict[str, Any]:
+        payload = json.loads(raw)
+        if not isinstance(payload, dict):
+            raise ValueError("timing ledger root is not an object")
+        if payload.get("schema_version") != TIMING_SCHEMA_VERSION:
+            raise ValueError(f"unsupported timing schema {payload.get('schema_version')!r}")
+        sessions = payload.get("sessions")
+        if not isinstance(sessions, list):
+            raise ValueError("timing ledger sessions is not an array")
+        if any(not isinstance(session, dict) for session in sessions):
+            raise ValueError("timing ledger contains a non-object session")
+        return payload
+
+    def _read_payload_unlocked(self) -> dict[str, Any]:
+        return self._parse_payload(self.path.read_text(encoding="utf-8"))
+
+    def _update_payload(self, update: Callable[[dict[str, Any]], None]) -> None:
+        with _ExclusiveFileLock(self.lock_path):
+            payload = self._read_payload_unlocked()
+            update(payload)
+            self._atomic_write_unlocked(payload)
+
+    def _update_session(
+        self,
+        run_id: str,
+        update: Callable[[dict[str, Any]], None],
+    ) -> None:
+        def update_matching(payload: dict[str, Any]) -> None:
+            for session in reversed(payload["sessions"]):
+                if session.get("run_id") == run_id:
+                    update(session)
+                    return
+            raise RuntimeError(f"Timing session {run_id} is missing from {self.path}")
+
+        self._update_payload(update_matching)
+
+    def _atomic_write_unlocked(self, payload: Mapping[str, Any]) -> None:
+        temporary_path = self.path.with_name(
+            f".{self.path.name}.{os.getpid()}.{uuid.uuid4().hex}.tmp"
+        )
         try:
-            parsed_whole = json.loads(raw)
-        except json.JSONDecodeError:
-            parsed_whole = None
-        if isinstance(parsed_whole, dict) and "sessions" in parsed_whole:
-            return parsed_whole, True
+            with temporary_path.open("x", encoding="utf-8") as stream:
+                json.dump(payload, stream, indent=2, sort_keys=True)
+                stream.write("\n")
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.replace(temporary_path, self.path)
+            try:
+                directory_descriptor = os.open(self.run_dir, os.O_RDONLY)
+            except OSError:
+                return
+            try:
+                os.fsync(directory_descriptor)
+            finally:
+                os.close(directory_descriptor)
+        finally:
+            temporary_path.unlink(missing_ok=True)
 
+    def _backup_path(self, label: str) -> Path:
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+        return self.path.with_name(f"{self.path.name}.{label}-{stamp}-{uuid.uuid4().hex[:8]}")
+
+    @staticmethod
+    def _stage_to_payload(record: StageRecord) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "stage": record.stage,
+            "seconds": record.seconds,
+            "cache_status": record.cache_status.value,
+        }
+        for name in ("work_done", "work_total", "unit"):
+            value = getattr(record, name)
+            if value is not None:
+                payload[name] = value
+        return payload
+
+    @staticmethod
+    def _stage_from_payload(payload: Mapping[str, Any]) -> StageRecord:
+        return StageRecord(
+            stage=str(payload["stage"]),
+            seconds=float(payload.get("seconds", 0.0)),
+            cache_status=CacheStatus(payload.get("cache_status", CacheStatus.FRESH.value)),
+            work_done=payload.get("work_done"),
+            work_total=payload.get("work_total"),
+            unit=payload.get("unit"),
+            span_id=payload.get("span_id"),
+            parent_span_id=payload.get("parent_span_id"),
+        )
+
+    def _legacy_session(self, timings: Mapping[str, float]) -> dict[str, Any]:
+        now = _utc_now()
+        return {
+            "run_id": str(uuid.uuid4()),
+            "command": "legacy",
+            "started_at": now,
+            "ended_at": now,
+            "config_fingerprint": "legacy",
+            "dataset_signature": None,
+            "exact_version": "unknown",
+            "stages": [
+                self._stage_to_payload(
+                    StageRecord(
+                        stage=stage,
+                        seconds=max(0.0, float(minutes) * 60.0),
+                        cache_status=CacheStatus.FRESH,
+                    )
+                )
+                for stage, minutes in timings.items()
+            ],
+        }
+
+    @staticmethod
+    def _parse_ndjson_events(raw: str) -> list[dict[str, Any]]:
         events: list[dict[str, Any]] = []
         for line_number, line in enumerate(raw.splitlines(), start=1):
             if not line.strip():
@@ -445,114 +525,56 @@ class TimingLedger:
                 event = json.loads(line)
             except json.JSONDecodeError as exc:
                 raise ValueError(f"invalid JSON on line {line_number}") from exc
-            if not isinstance(event, dict):
-                raise ValueError(f"timing event on line {line_number} is not an object")
+            if not isinstance(event, dict) or "event" not in event:
+                raise ValueError(f"timing event on line {line_number} is invalid")
             if event.get("schema_version") != TIMING_SCHEMA_VERSION:
                 raise ValueError(
-                    f"unsupported timing schema {event.get('schema_version')!r} on line {line_number}"
+                    f"unsupported timing schema {event.get('schema_version')!r} "
+                    f"on line {line_number}"
                 )
             events.append(event)
         if not events:
             raise ValueError("timing ledger contains no events")
-        return events, False
+        return events
 
-    def _read_events(self) -> list[dict[str, Any]]:
-        with _ExclusiveFileLock(self.lock_path):
-            parsed, monolithic = self._parse_existing_file()
-            if monolithic:
-                return self._events_from_monolithic(parsed)
-            return parsed
-
-    def _append_event(self, event_name: str, **payload: Any) -> None:
-        with _ExclusiveFileLock(self.lock_path):
-            if not self.path.exists() or not self.path.stat().st_size:
-                self._append_lines_unlocked([self._event("ledger_started", created_at=_utc_now())])
-            self._append_lines_unlocked([self._event(event_name, **payload)])
-
-    def _append_lines_unlocked(self, events: list[dict[str, Any]]) -> None:
-        with self.path.open("a", encoding="utf-8") as stream:
-            for event in events:
-                stream.write(json.dumps(event, sort_keys=True, separators=(",", ":")))
-                stream.write("\n")
-            stream.flush()
-            os.fsync(stream.fileno())
-
-    @staticmethod
-    def _event(event_name: str, **payload: Any) -> dict[str, Any]:
+    def _payload_from_events(self, events: list[dict[str, Any]]) -> dict[str, Any]:
+        sessions: dict[str, dict[str, Any]] = {}
+        order: list[str] = []
+        for event in events:
+            event_name = event.get("event")
+            run_id_value = event.get("run_id")
+            run_id = str(run_id_value) if run_id_value is not None else ""
+            if event_name == "session_started" and run_id:
+                if run_id not in sessions:
+                    order.append(run_id)
+                sessions[run_id] = {
+                    "run_id": run_id,
+                    "command": str(event.get("command", "unknown")),
+                    "started_at": str(event.get("started_at", "")),
+                    "ended_at": None,
+                    "config_fingerprint": str(event.get("config_fingerprint", "legacy")),
+                    "dataset_signature": event.get("dataset_signature"),
+                    "exact_version": str(event.get("exact_version", "unknown")),
+                    "stages": [],
+                }
+                continue
+            if not run_id or run_id not in sessions:
+                continue
+            session = sessions[run_id]
+            if event_name == "session_metadata" and "dataset_signature" in event:
+                session["dataset_signature"] = event.get("dataset_signature")
+            elif event_name in {"stage_recorded", "span_finished"}:
+                try:
+                    record = self._stage_from_payload(event)
+                except (KeyError, TypeError, ValueError):
+                    continue
+                session["stages"].append(self._stage_to_payload(record))
+            elif event_name == "session_finished":
+                session["ended_at"] = event.get("ended_at")
         return {
             "schema_version": TIMING_SCHEMA_VERSION,
-            "event": event_name,
-            **payload,
+            "sessions": [sessions[run_id] for run_id in order],
         }
-
-    def _backup_path(self, label: str) -> Path:
-        stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
-        return self.path.with_name(f"{self.path.name}.{label}-{stamp}-{uuid.uuid4().hex[:8]}")
-
-    def _legacy_events(self, timings: Mapping[str, float]) -> list[dict[str, Any]]:
-        run_id = str(uuid.uuid4())
-        now = _utc_now()
-        events = [
-            self._event(
-                "session_started",
-                run_id=run_id,
-                command="legacy",
-                started_at=now,
-                config_fingerprint="legacy",
-                dataset_signature=None,
-                exact_version="unknown",
-            )
-        ]
-        for stage, minutes in timings.items():
-            events.append(
-                self._event(
-                    "stage_recorded",
-                    run_id=run_id,
-                    stage=stage,
-                    seconds=max(0.0, float(minutes) * 60.0),
-                    cache_status=CacheStatus.FRESH.value,
-                )
-            )
-        events.append(self._event("session_finished", run_id=run_id, ended_at=now))
-        return events
-
-    def _events_from_monolithic(self, payload: Mapping[str, Any]) -> list[dict[str, Any]]:
-        events: list[dict[str, Any]] = []
-        for raw_session in payload.get("sessions", []):
-            run_id = str(raw_session.get("run_id") or uuid.uuid4())
-            events.append(
-                self._event(
-                    "session_started",
-                    run_id=run_id,
-                    command=raw_session.get("command", "unknown"),
-                    started_at=raw_session.get("started_at") or _utc_now(),
-                    config_fingerprint=raw_session.get("config_fingerprint", "legacy"),
-                    dataset_signature=raw_session.get("dataset_signature"),
-                    exact_version=raw_session.get("exact_version", "unknown"),
-                )
-            )
-            for raw_stage in raw_session.get("stages", []):
-                events.append(
-                    self._event(
-                        "stage_recorded",
-                        run_id=run_id,
-                        stage=raw_stage.get("stage", "unknown"),
-                        seconds=max(0.0, float(raw_stage.get("seconds", 0.0))),
-                        cache_status=raw_stage.get("cache_status", "fresh"),
-                        work_done=raw_stage.get("work_done"),
-                        work_total=raw_stage.get("work_total"),
-                        unit=raw_stage.get("unit"),
-                    )
-                )
-            if raw_session.get("ended_at") is not None:
-                events.append(
-                    self._event(
-                        "session_finished",
-                        run_id=run_id,
-                        ended_at=raw_session.get("ended_at"),
-                    )
-                )
-        return events
 
 
 class RunSession:
@@ -576,7 +598,7 @@ class RunSession:
         self.started_at = started_at
         self._closed = False
         self._span_stack: list[str] = []
-        self._activation = None
+        self._activation: AbstractContextManager[Any] | None = None
 
     def __enter__(self) -> "RunSession":
         if self._activation is None:
@@ -603,6 +625,8 @@ class RunSession:
         work_total: Optional[int] = None,
         unit: Optional[str] = None,
     ) -> "StageSpan":
+        """Create a nestable monotonic timing span for one named stage."""
+
         return StageSpan(
             session=self,
             name=name,
@@ -639,41 +663,43 @@ class RunSession:
             )
         if record.parent_span_id is None and self._span_stack:
             record = replace(record, parent_span_id=self._span_stack[-1])
-        payload = asdict(record)
-        payload["cache_status"] = record.cache_status.value
-        self.ledger._append_event("stage_recorded", run_id=self.run_id, **payload)
+
+        def append_stage(session: dict[str, Any]) -> None:
+            session["stages"].append(self.ledger._stage_to_payload(record))
+
+        self.ledger._update_session(self.run_id, append_stage)
         return record
 
     def set_dataset_signature(self, dataset_signature: Optional[str]) -> None:
+        """Attach the resolved dataset fingerprint to this session."""
+
         self._ensure_open()
         self.dataset_signature = dataset_signature
-        self.ledger._append_event(
-            "session_metadata",
-            run_id=self.run_id,
-            dataset_signature=dataset_signature,
+        self.ledger._update_session(
+            self.run_id,
+            lambda session: session.__setitem__("dataset_signature", dataset_signature),
         )
 
     def finish(self) -> None:
+        """Durably close a successful session and refresh the legacy view."""
+
         if self._closed:
             return
-        self.ledger._append_event(
-            "session_finished",
-            run_id=self.run_id,
-            ended_at=_utc_now(),
+        ended_at = _utc_now()
+        self.ledger._update_session(
+            self.run_id,
+            lambda session: session.__setitem__("ended_at", ended_at),
         )
         self._closed = True
         self.ledger.render_legacy_times(config_fingerprint=self.config_fingerprint)
 
     def fail(self, error: Optional[BaseException] = None) -> None:
+        """Close locally while leaving the persisted session marked as crashed."""
+
         if self._closed:
             return
-        payload: dict[str, Any] = {
-            "run_id": self.run_id,
-            "failed_at": _utc_now(),
-        }
-        if error is not None:
-            payload["error_type"] = type(error).__name__
-        self.ledger._append_event("session_failed", **payload)
+        # The contract represents interrupted or failed sessions by leaving
+        # ``ended_at`` null.  Completed stage records were already flushed.
         self._closed = True
 
     def _ensure_open(self) -> None:
@@ -709,17 +735,6 @@ class StageSpan:
         self.parent_span_id = self.session._span_stack[-1] if self.session._span_stack else None
         self.session._span_stack.append(self.span_id)
         self._started = time.perf_counter()
-        self.session.ledger._append_event(
-            "span_started",
-            run_id=self.session.run_id,
-            span_id=self.span_id,
-            parent_span_id=self.parent_span_id,
-            stage=self.name,
-            cache_status=self.cache_status.value,
-            work_total=self.work_total,
-            unit=self.unit,
-            started_at=_utc_now(),
-        )
         return self
 
     def __exit__(self, exc_type, exc, traceback) -> None:
@@ -733,22 +748,22 @@ class StageSpan:
                 self.session._span_stack.remove(self.span_id)
             except ValueError:
                 pass
-        self.session.ledger._append_event(
-            "span_finished",
-            run_id=self.session.run_id,
-            span_id=self.span_id,
-            parent_span_id=self.parent_span_id,
-            stage=self.name,
-            seconds=self.seconds,
-            cache_status=self.cache_status.value,
-            work_done=self.work_done,
-            work_total=self.work_total,
-            unit=self.unit,
-            failed=exc_type is not None,
-            finished_at=_utc_now(),
+        self.session.record(
+            StageRecord(
+                stage=self.name,
+                seconds=self.seconds,
+                cache_status=self.cache_status,
+                work_done=self.work_done,
+                work_total=self.work_total,
+                unit=self.unit,
+                span_id=self.span_id,
+                parent_span_id=self.parent_span_id,
+            )
         )
 
     def set_work_done(self, work_done: int) -> None:
+        """Record completed work units for the span's final event."""
+
         self.work_done = max(0, int(work_done))
 
 
@@ -799,14 +814,14 @@ def _canonicalize_config(value: Any, *, run_dir: Optional[Path], key: Optional[s
                 result[str(child_key)] = canonical
         return result
     if isinstance(value, set):
-        result = [_canonicalize_config(item, run_dir=run_dir, key=None) for item in value]
+        items = [_canonicalize_config(item, run_dir=run_dir, key=None) for item in value]
         return sorted(
-            (item for item in result if item is not _OMIT),
+            (item for item in items if item is not _OMIT),
             key=lambda item: json.dumps(item, sort_keys=True, default=str),
         )
     if isinstance(value, (list, tuple)):
-        result = [_canonicalize_config(item, run_dir=run_dir, key=None) for item in value]
-        return [item for item in result if item is not _OMIT]
+        items = [_canonicalize_config(item, run_dir=run_dir, key=None) for item in value]
+        return [item for item in items if item is not _OMIT]
     if isinstance(value, Path):
         resolved = value.expanduser().resolve()
         if run_dir is None:

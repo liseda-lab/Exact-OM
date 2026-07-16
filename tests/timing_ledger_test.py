@@ -133,18 +133,26 @@ def test_configs_are_separate_and_estimate_falls_back_only_when_needed(tmp_path:
     assert ledger.estimates(config_fingerprint="unknown")["Alignment.Inference"] == 25.0
 
 
-def test_nested_spans_retain_parent_identity(tmp_path: Path):
+def test_nested_spans_record_only_contract_stage_fields(tmp_path: Path):
     ledger = TimingLedger.open(tmp_path)
     with ledger.session(command="align", config_fingerprint="config-a") as session:
-        with session.stage("Dataset") as outer:
+        with session.stage("Dataset"):
             with session.stage("Dataset.Process", work_total=3, unit="examples") as inner:
                 inner.set_work_done(3)
 
     stages = {record.stage: record for record in ledger.sessions()[0].stages}
-    assert stages["Dataset"].span_id == outer.span_id
-    assert stages["Dataset"].parent_span_id is None
-    assert stages["Dataset.Process"].parent_span_id == outer.span_id
     assert stages["Dataset.Process"].work_done == 3
+    payload = json.loads((tmp_path / "timings.json").read_text(encoding="utf-8"))
+    raw_stages = {stage["stage"]: stage for stage in payload["sessions"][0]["stages"]}
+    assert set(raw_stages["Dataset"]) == {"stage", "seconds", "cache_status"}
+    assert set(raw_stages["Dataset.Process"]) == {
+        "stage",
+        "seconds",
+        "cache_status",
+        "work_done",
+        "work_total",
+        "unit",
+    }
 
 
 def test_concurrent_processes_append_without_lost_sessions(tmp_path: Path):
@@ -166,9 +174,10 @@ def test_concurrent_processes_append_without_lost_sessions(tmp_path: Path):
         ledger.stage_totals(config_fingerprint="shared")["Alignment.Inference"].compute_seconds
         == 3.0
     )
-    lines = (tmp_path / "timings.json").read_text(encoding="utf-8").splitlines()
-    assert lines
-    assert all(json.loads(line)["schema_version"] == 1 for line in lines)
+    payload = json.loads((tmp_path / "timings.json").read_text(encoding="utf-8"))
+    assert payload["schema_version"] == 1
+    assert len(payload["sessions"]) == 2
+    assert all(session["ended_at"] is not None for session in payload["sessions"])
 
 
 def test_corrupt_ledger_is_backed_up_and_reinitialized(tmp_path: Path):
@@ -179,11 +188,55 @@ def test_corrupt_ledger_is_backed_up_and_reinitialized(tmp_path: Path):
 
     assert ledger.sessions() == []
     assert len(list(tmp_path.glob("timings.json.corrupt-*"))) == 1
-    first_event = json.loads(
-        (tmp_path / "timings.json").read_text(encoding="utf-8").splitlines()[0]
+    payload = json.loads((tmp_path / "timings.json").read_text(encoding="utf-8"))
+    assert payload == {"schema_version": 1, "sessions": []}
+
+
+def test_ndjson_event_ledger_is_migrated_to_contract_document(tmp_path: Path):
+    events = [
+        {"schema_version": 1, "event": "ledger_started"},
+        {
+            "schema_version": 1,
+            "event": "session_started",
+            "run_id": "old-run",
+            "command": "align",
+            "started_at": "2026-07-15T10:00:00+00:00",
+            "config_fingerprint": "config-a",
+            "dataset_signature": "dataset-a",
+            "exact_version": "2.0.0",
+        },
+        {
+            "schema_version": 1,
+            "event": "stage_recorded",
+            "run_id": "old-run",
+            "stage": "Alignment.Inference",
+            "seconds": 12.5,
+            "cache_status": "fresh",
+        },
+        {
+            "schema_version": 1,
+            "event": "session_finished",
+            "run_id": "old-run",
+            "ended_at": "2026-07-15T10:01:00+00:00",
+        },
+    ]
+    (tmp_path / "timings.json").write_text(
+        "".join(f"{json.dumps(event)}\n" for event in events),
+        encoding="utf-8",
     )
-    assert first_event["schema_version"] == 1
-    assert first_event["event"] == "ledger_started"
+
+    ledger = TimingLedger.open(tmp_path)
+
+    payload = json.loads((tmp_path / "timings.json").read_text(encoding="utf-8"))
+    assert payload["schema_version"] == 1
+    assert payload["sessions"][0]["run_id"] == "old-run"
+    assert payload["sessions"][0]["stages"][0] == {
+        "stage": "Alignment.Inference",
+        "seconds": 12.5,
+        "cache_status": "fresh",
+    }
+    assert ledger.sessions()[0].ended_at == "2026-07-15T10:01:00+00:00"
+    assert len(list(tmp_path.glob("timings.json.ndjson-*"))) == 1
 
 
 def test_legacy_times_file_is_imported_once(tmp_path: Path):
