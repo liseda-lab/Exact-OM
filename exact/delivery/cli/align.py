@@ -1,14 +1,19 @@
 import argparse
 import warnings
 from pathlib import Path
+from typing import Optional, Sequence
+
+
+def _optional_path(value: Optional[str]) -> Optional[Path]:
+    return Path(value).expanduser().resolve() if value else None
 
 
 def run_alignment(args):
     from exact.core.actions.alignment import AlignmentAction
 
     AlignmentAction.run(
-        source_file_path=Path(args.source_ontology_file).resolve(),
-        target_file_path=Path(args.target_ontology_file).resolve(),
+        source_file_path=_optional_path(args.source_ontology_file),
+        target_file_path=_optional_path(args.target_ontology_file),
         output_dir_path=Path(args.output_dir).resolve(),
         configs_file_path=Path(args.config_file).resolve() if args.config_file else None,
         training_reference_file_path=(
@@ -24,21 +29,21 @@ def run_alignment(args):
     )
 
 
-def parse_arguments():
+def parse_arguments(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Compute the alignment between two ontologies")
     parser.add_argument(
         "--source_ontology_file",
         "-s",
         type=str,
-        required=True,
-        help="Please provide the path to the source ontology file",
+        required=False,
+        help="Source ontology path; optional when supplied by the config data block",
     )
     parser.add_argument(
         "--target_ontology_file",
         "-t",
         type=str,
-        required=True,
-        help="Please provide the path to the target ontology file",
+        required=False,
+        help="Target ontology path; optional when supplied by the config data block",
     )
     parser.add_argument(
         "--output_dir",
@@ -101,15 +106,15 @@ def parse_arguments():
         required=False,
         help="GPU device ID to use (leave empty for CPU)",
     )
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
-def main():
-    args = parse_arguments()
+def main(argv: Optional[Sequence[str]] = None):
+    args = parse_arguments(argv)
 
-    if not Path(args.source_ontology_file).exists():
+    if args.source_ontology_file and not Path(args.source_ontology_file).exists():
         raise Exception(f"Source ontology file {args.source_ontology_file} does not exist")
-    if not Path(args.target_ontology_file).exists():
+    if args.target_ontology_file and not Path(args.target_ontology_file).exists():
         raise Exception(f"Target ontology file {args.target_ontology_file} does not exist")
     if args.training_reference_file and not Path(args.training_reference_file).exists():
         raise Exception(f"Training reference file {args.training_reference_file} does not exist")
@@ -132,7 +137,7 @@ def main():
             stacklevel=2,
         )
 
-    run_alignment(args)
+    return run_alignment(args)
 
 
 if __name__ == "__main__":

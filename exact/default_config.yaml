@@ -11,6 +11,24 @@ seed: 42
 # Reuse dataset/model caches when available.
 use_file_cache: True
 
+# Optional dataset-track materialization. Explicit CLI paths always override
+# explicit paths here, which in turn override files supplied by the track.
+data: null
+# Example:
+# data:
+#   track: bioml
+#   task: ncit-doid
+#   root: data
+#   revision: "2026"
+#   descriptor: null
+#   source: null
+#   target: null
+#   refs: {}
+#   candidates: null
+
+# Transitional pre-v2 alias for `data`; remove after the config-v2 migration window.
+dataset_track: null
+
 # Cutoffs reported by the evaluation step.
 k: [1, 5, 10]
 

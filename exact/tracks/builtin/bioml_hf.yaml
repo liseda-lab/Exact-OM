@@ -1,0 +1,74 @@
+descriptor_version: 1
+name: bioml_hf
+aliases: [bioml]
+provider: hf
+provider_version: "1"
+description: Public Bio-ML 2026 task data; ontology files are supplied separately.
+upstream:
+  repo_id: OAEI-ML/bio-ml
+  revision: "2026"
+  checksum_manifest: SHA256SUMS.txt
+user_supplied:
+  ncit:
+    path: NCIT.owl
+    destination: ontologies/NCIT.owl
+    sha256_from: {path: resolved_versions.json, key: NCIT.sha256}
+    help: Obtain the pinned NCIT release described in ontologies.md.
+  doid:
+    path: DOID.owl
+    destination: ontologies/DOID.owl
+    sha256_from: {path: resolved_versions.json, key: DOID.sha256}
+    help: Obtain the pinned DOID release described in ontologies.md.
+  snomed:
+    path: SNOMED.owl
+    destination: ontologies/SNOMED.owl
+    sha256_from: {path: resolved_versions.json, key: SNOMED.sha256}
+    help: Obtain SNOMED CT under a UTS/SNOMED Affiliate licence, then export the pinned OWL release.
+  fma:
+    path: FMA.owl
+    destination: ontologies/FMA.owl
+    sha256_from: {path: resolved_versions.json, key: FMA.sha256}
+    help: Obtain the pinned FMA OWL release described in ontologies.md.
+tasks:
+  ncit-doid:
+    source: ontologies/NCIT.owl
+    target: ontologies/DOID.owl
+    refs:
+      train: NCIT-DOID/refs_equiv/train.tsv
+    candidates: NCIT-DOID/local.test.cands.tsv
+    user_supplied: [ncit, doid]
+    extras:
+      train_candidates: {path: NCIT-DOID/local.train.cands.tsv}
+      valid_candidates: {path: NCIT-DOID/local.valid.cands.tsv}
+      repaired:
+        train_candidates: {path: NCIT-DOID/repaired/local.train.cands.tsv}
+        valid_candidates: {path: NCIT-DOID/repaired/local.valid.cands.tsv}
+        test_candidates: {path: NCIT-DOID/repaired/local.test.cands.tsv}
+  snomed-fma:
+    source: ontologies/SNOMED.owl
+    target: ontologies/FMA.owl
+    refs:
+      train: SNOMED-FMA/refs_equiv/train.tsv
+    candidates: SNOMED-FMA/local.test.cands.tsv
+    user_supplied: [snomed, fma]
+    extras:
+      train_candidates: {path: SNOMED-FMA/local.train.cands.tsv}
+      valid_candidates: {path: SNOMED-FMA/local.valid.cands.tsv}
+      repaired:
+        train_candidates: {path: SNOMED-FMA/repaired/local.train.cands.tsv}
+        valid_candidates: {path: SNOMED-FMA/repaired/local.valid.cands.tsv}
+        test_candidates: {path: SNOMED-FMA/repaired/local.test.cands.tsv}
+  snomed-ncit:
+    source: ontologies/SNOMED.owl
+    target: ontologies/NCIT.owl
+    refs:
+      train: SNOMED-NCIT/refs_equiv/train.tsv
+    candidates: SNOMED-NCIT/local.test.cands.tsv
+    user_supplied: [snomed, ncit]
+    extras:
+      train_candidates: {path: SNOMED-NCIT/local.train.cands.tsv}
+      valid_candidates: {path: SNOMED-NCIT/local.valid.cands.tsv}
+      repaired:
+        train_candidates: {path: SNOMED-NCIT/repaired/local.train.cands.tsv}
+        valid_candidates: {path: SNOMED-NCIT/repaired/local.valid.cands.tsv}
+        test_candidates: {path: SNOMED-NCIT/repaired/local.test.cands.tsv}

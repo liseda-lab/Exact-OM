@@ -33,13 +33,15 @@ fastapi = "^0.116.1"
 uvicorn = {version = "^0.35.0", extras = ["standard"]}
 zstandard = "^0.23.0"
 oaei-bioml-eval = {git = "https://github.com/OAEI-ML/OAEI-Bio-ML-eval.git", rev = "900ba7f242f254d08b0e01e6826975c61d0438b2", optional = true, python = ">=3.12"}
+huggingface-hub = {version = "^0.36.2", optional = true}
 
 [tool.poetry.extras]
 bioml-eval = ["oaei-bioml-eval"]
+hf = ["huggingface-hub"]
 
 
 [tool.poetry.scripts]
-exact = "exact.delivery.cli.align:main"
+exact = "exact.delivery.cli.main:main"
 bioml-eval = "exact.delivery.cli.eval:main"
 exact-eval = "exact.delivery.cli.eval:main"
 exact-llm-debug = "exact.delivery.cli.llm_debug:main"

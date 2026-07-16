@@ -1,0 +1,15 @@
+descriptor_version: 1
+name: biokg
+provider: stub
+provider_version: "1"
+description: BioKG-Align CSV-kit layout stub; activate when the upstream HF repository publishes.
+upstream:
+  repo_id: TBD/BioKG-Align
+  revision: TBD
+tasks:
+  csv-kg:
+    source: source
+    target: target
+    refs: {test: references/test.tsv}
+    candidates: candidates/test.cands.tsv
+    extras: {layout: csv_kg, unpublished: true}

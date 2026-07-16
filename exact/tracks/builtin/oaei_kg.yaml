@@ -1,0 +1,49 @@
+descriptor_version: 1
+name: oaei_kg
+provider: http
+provider_version: "1"
+description: OAEI Knowledge Graph v4 tasks with class, property, and instance references.
+upstream:
+  revision: v4
+  urls:
+    - {url: "https://oaei.webdatacommons.org/tdrs/testdata/persistent/knowledgegraph/v4/suite/starwars-swg/component/source.xml", filename: starwars-swg/source.xml, tasks: [starwars-swg]}
+    - {url: "https://oaei.webdatacommons.org/tdrs/testdata/persistent/knowledgegraph/v4/suite/starwars-swg/component/target.xml", filename: starwars-swg/target.xml, tasks: [starwars-swg]}
+    - {url: "https://oaei.webdatacommons.org/tdrs/testdata/persistent/knowledgegraph/v4/suite/starwars-swg/component/reference.xml", filename: starwars-swg/reference.xml, tasks: [starwars-swg]}
+    - {url: "https://oaei.webdatacommons.org/tdrs/testdata/persistent/knowledgegraph/v4/suite/starwars-swtor/component/source.xml", filename: starwars-swtor/source.xml, tasks: [starwars-swtor]}
+    - {url: "https://oaei.webdatacommons.org/tdrs/testdata/persistent/knowledgegraph/v4/suite/starwars-swtor/component/target.xml", filename: starwars-swtor/target.xml, tasks: [starwars-swtor]}
+    - {url: "https://oaei.webdatacommons.org/tdrs/testdata/persistent/knowledgegraph/v4/suite/starwars-swtor/component/reference.xml", filename: starwars-swtor/reference.xml, tasks: [starwars-swtor]}
+    - {url: "https://oaei.webdatacommons.org/tdrs/testdata/persistent/knowledgegraph/v4/suite/marvelcinematicuniverse-marvel/component/source.xml", filename: marvelcinematicuniverse-marvel/source.xml, tasks: [marvelcinematicuniverse-marvel]}
+    - {url: "https://oaei.webdatacommons.org/tdrs/testdata/persistent/knowledgegraph/v4/suite/marvelcinematicuniverse-marvel/component/target.xml", filename: marvelcinematicuniverse-marvel/target.xml, tasks: [marvelcinematicuniverse-marvel]}
+    - {url: "https://oaei.webdatacommons.org/tdrs/testdata/persistent/knowledgegraph/v4/suite/marvelcinematicuniverse-marvel/component/reference.xml", filename: marvelcinematicuniverse-marvel/reference.xml, tasks: [marvelcinematicuniverse-marvel]}
+    - {url: "https://oaei.webdatacommons.org/tdrs/testdata/persistent/knowledgegraph/v4/suite/memoryalpha-memorybeta/component/source.xml", filename: memoryalpha-memorybeta/source.xml, tasks: [memoryalpha-memorybeta]}
+    - {url: "https://oaei.webdatacommons.org/tdrs/testdata/persistent/knowledgegraph/v4/suite/memoryalpha-memorybeta/component/target.xml", filename: memoryalpha-memorybeta/target.xml, tasks: [memoryalpha-memorybeta]}
+    - {url: "https://oaei.webdatacommons.org/tdrs/testdata/persistent/knowledgegraph/v4/suite/memoryalpha-memorybeta/component/reference.xml", filename: memoryalpha-memorybeta/reference.xml, tasks: [memoryalpha-memorybeta]}
+    - {url: "https://oaei.webdatacommons.org/tdrs/testdata/persistent/knowledgegraph/v4/suite/memoryalpha-stexpanded/component/source.xml", filename: memoryalpha-stexpanded/source.xml, tasks: [memoryalpha-stexpanded]}
+    - {url: "https://oaei.webdatacommons.org/tdrs/testdata/persistent/knowledgegraph/v4/suite/memoryalpha-stexpanded/component/target.xml", filename: memoryalpha-stexpanded/target.xml, tasks: [memoryalpha-stexpanded]}
+    - {url: "https://oaei.webdatacommons.org/tdrs/testdata/persistent/knowledgegraph/v4/suite/memoryalpha-stexpanded/component/reference.xml", filename: memoryalpha-stexpanded/reference.xml, tasks: [memoryalpha-stexpanded]}
+tasks:
+  starwars-swg:
+    source: starwars-swg/source.xml
+    target: starwars-swg/target.xml
+    refs: {test: {path: starwars-swg/reference.xml, transform: alignment_rdf_to_tsv}}
+    extras: &kg_kinds {entity_kinds: [class, property, instance]}
+  starwars-swtor:
+    source: starwars-swtor/source.xml
+    target: starwars-swtor/target.xml
+    refs: {test: {path: starwars-swtor/reference.xml, transform: alignment_rdf_to_tsv}}
+    extras: *kg_kinds
+  marvelcinematicuniverse-marvel:
+    source: marvelcinematicuniverse-marvel/source.xml
+    target: marvelcinematicuniverse-marvel/target.xml
+    refs: {test: {path: marvelcinematicuniverse-marvel/reference.xml, transform: alignment_rdf_to_tsv}}
+    extras: *kg_kinds
+  memoryalpha-memorybeta:
+    source: memoryalpha-memorybeta/source.xml
+    target: memoryalpha-memorybeta/target.xml
+    refs: {test: {path: memoryalpha-memorybeta/reference.xml, transform: alignment_rdf_to_tsv}}
+    extras: *kg_kinds
+  memoryalpha-stexpanded:
+    source: memoryalpha-stexpanded/source.xml
+    target: memoryalpha-stexpanded/target.xml
+    refs: {test: {path: memoryalpha-stexpanded/reference.xml, transform: alignment_rdf_to_tsv}}
+    extras: *kg_kinds

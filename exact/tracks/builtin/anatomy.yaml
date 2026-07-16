@@ -1,0 +1,19 @@
+descriptor_version: 1
+name: anatomy
+provider: http
+provider_version: "1"
+description: Classic OAEI mouse-to-human Anatomy task.
+upstream:
+  revision: "2025"
+  urls:
+    - url: https://oaei.ontologymatching.org/2025/anatomy/anatomy-dataset.zip
+      filename: anatomy-dataset.zip
+      sha256: 0ef7b817c612fb7503a481334b939a3cf6ef2595799810e11799cc04514900b6
+      extract: true
+      destination: anatomy
+tasks:
+  mouse-human:
+    source: {glob: "anatomy/**/mouse.owl"}
+    target: {glob: "anatomy/**/human.owl"}
+    refs:
+      test: {glob: "anatomy/**/reference*.rdf", transform: alignment_rdf_to_tsv}

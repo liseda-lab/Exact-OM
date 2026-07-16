@@ -17,6 +17,8 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - A Java-free OWL parser, indexed knowledge-source backend, asserted reasoner plugin seam,
   parity fixtures, and performance regression harness.
 - A strict MkDocs Material documentation build with generated configuration and CLI references.
+- Declarative HTTP and optional Hugging Face dataset tracks with integrity locks, licensed-input
+  guidance, custom YAML providers, and `exact data pull|verify|status` commands.
 
 ### Changed
 

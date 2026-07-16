@@ -5521,8 +5521,9 @@ cffi = ["cffi (>=1.11)"]
 
 [extras]
 bioml-eval = ["oaei-bioml-eval"]
+hf = ["huggingface-hub"]
 
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.10"
-content-hash = "3575697136357dafd953b0a6032024cd6899d1570e90b07225b17ef0c0a9a1ad"
+content-hash = "0dfd45c91f5ac3cd75cc9213c72e136d61527158dea614bfe8a702e45f322484"

@@ -1,7 +1,8 @@
 import json
 import logging
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Protocol, Union
+from typing import Any, Mapping, Optional, Protocol, Union
 
 import torch
 
@@ -9,6 +10,7 @@ from exact.core.actions.evaluation import EvaluationAction
 from exact.core.entities.configs.config import ConfigModel
 from exact.impl import bootstrap_components
 from exact.impl.seed import SeedSetter
+from exact.tracks import get_track, provider_from_descriptor
 from exact.utils.logs import (
     ProgressTask,
     RunProgressLogger,
@@ -23,12 +25,68 @@ from exact.utils.timing import (
 )
 
 
+@dataclass(frozen=True)
+class ResolvedAlignmentInputs:
+    """Effective alignment inputs after CLI, config, and track precedence."""
+
+    source: Path
+    target: Path
+    training_reference: Optional[Path]
+    full_reference: Optional[Path]
+    candidates: Optional[Path]
+    task_name: Optional[str]
+    track_provenance: Optional[dict[str, Any]]
+
+
+def _resolved_path(path: Optional[Path]) -> Optional[Path]:
+    return Path(path).expanduser().resolve() if path is not None else None
+
+
+def _require_existing(path: Optional[Path], label: str, *, required: bool = False) -> None:
+    if path is None:
+        if required:
+            raise ValueError(
+                f"{label} is required. Pass an explicit path or configure data.track/data.task."
+            )
+        return
+    if not path.exists():
+        raise FileNotFoundError(f"{label} does not exist: {path}")
+
+
+def _merge_run_stats(path: Path, additions: Mapping[str, Any]) -> None:
+    """Atomically merge nested run-stat metadata without discarding trainer output."""
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload: dict[str, Any] = {}
+    if path.exists():
+        try:
+            loaded = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            logging.getLogger("exact").warning(
+                "Replacing unreadable run statistics at %s: %s", path, exc
+            )
+        else:
+            if isinstance(loaded, dict):
+                payload = loaded
+    for key, value in additions.items():
+        if isinstance(value, Mapping) and isinstance(payload.get(key), Mapping):
+            payload[key] = {**dict(payload[key]), **dict(value)}
+        else:
+            payload[key] = value
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary.write_text(
+        json.dumps(payload, indent=2, ensure_ascii=False, default=str),
+        encoding="utf-8",
+    )
+    temporary.replace(path)
+
+
 class AlignmentAction(Protocol):
     @staticmethod
     def run(
-        source_file_path: Path,
-        target_file_path: Path,
-        output_dir_path: Path,
+        source_file_path: Optional[Path] = None,
+        target_file_path: Optional[Path] = None,
+        output_dir_path: Optional[Path] = None,
         configs_file_path: Optional[Union[Path, ConfigModel]] = None,
         training_reference_file_path: Optional[Path] = None,
         full_reference_file_path: Optional[Path] = None,
@@ -39,6 +97,11 @@ class AlignmentAction(Protocol):
         device: Optional[int] = None,
     ) -> Optional[dict]:
 
+        if output_dir_path is None:
+            raise ValueError("output_dir_path is required")
+        output_dir_path = Path(output_dir_path).expanduser().resolve()
+        output_dir_path.mkdir(parents=True, exist_ok=True)
+
         bootstrap_components()
         if configs_file_path is None:
             configs = ConfigModel()
@@ -47,8 +110,34 @@ class AlignmentAction(Protocol):
         else:
             configs = ConfigModel.load_config(configs_file_path)
         configs.resolve_dependencies()
+        configure_exact_logger(
+            logging.getLogger("exact"),
+            configs.logging_level,
+            log_file_path=log_file_path,
+        )
 
-        fingerprint = config_fingerprint(configs, run_dir=output_dir_path)
+        resolved = AlignmentAction.resolve_inputs(
+            configs=configs,
+            source_file_path=source_file_path,
+            target_file_path=target_file_path,
+            training_reference_file_path=training_reference_file_path,
+            full_reference_file_path=full_reference_file_path,
+            candidates_file_path=candidates_file_path,
+            task_name=task_name,
+        )
+
+        fingerprint_source: Any = configs
+        if resolved.track_provenance is not None:
+            fingerprint_provenance = {
+                key: value
+                for key, value in resolved.track_provenance.items()
+                if key != "retrieved_at"
+            }
+            fingerprint_source = {
+                "config": configs.model_dump(mode="python"),
+                "dataset_provenance": fingerprint_provenance,
+            }
+        fingerprint = config_fingerprint(fingerprint_source, run_dir=output_dir_path)
         ledger = TimingLedger.open(output_dir_path)
         with ledger.session(
             command="align",
@@ -56,21 +145,27 @@ class AlignmentAction(Protocol):
         ) as timing_session:
             with timing_session.stage("Total") as total_span:
                 results, run_stats_path = AlignmentAction._run_session(
-                    source_file_path=source_file_path,
-                    target_file_path=target_file_path,
+                    source_file_path=resolved.source,
+                    target_file_path=resolved.target,
                     output_dir_path=output_dir_path,
                     configs=configs,
                     configs_source=configs_file_path,
-                    training_reference_file_path=training_reference_file_path,
-                    full_reference_file_path=full_reference_file_path,
-                    candidates_file_path=candidates_file_path,
+                    training_reference_file_path=resolved.training_reference,
+                    full_reference_file_path=resolved.full_reference,
+                    candidates_file_path=resolved.candidates,
                     log_file_path=log_file_path,
                     run_eval=run_eval,
-                    task_name=task_name,
+                    task_name=resolved.task_name,
                     device=device,
                     timing_ledger=ledger,
                     timing_session=timing_session,
                 )
+
+        if resolved.track_provenance is not None and run_stats_path is not None:
+            _merge_run_stats(
+                run_stats_path,
+                {"provenance": {"dataset": resolved.track_provenance}},
+            )
 
         totals = ledger.stage_totals(config_fingerprint=fingerprint)
         timings_result = {
@@ -104,15 +199,8 @@ class AlignmentAction(Protocol):
         }
         if run_stats_path is not None and run_stats_path.exists():
             try:
-                stats = json.loads(run_stats_path.read_text(encoding="utf-8"))
-                stats["timing"] = timing_stats
-                tmp_path = run_stats_path.with_suffix(run_stats_path.suffix + ".tmp")
-                tmp_path.write_text(
-                    json.dumps(stats, indent=2, ensure_ascii=False),
-                    encoding="utf-8",
-                )
-                tmp_path.replace(run_stats_path)
-            except (OSError, json.JSONDecodeError) as exc:
+                _merge_run_stats(run_stats_path, {"timing": timing_stats})
+            except OSError as exc:
                 logging.getLogger("exact").warning(
                     "Could not add timing summary to %s: %s",
                     run_stats_path,
@@ -129,6 +217,100 @@ class AlignmentAction(Protocol):
         )
         logger.info("Times updated at %s", ledger.times_path)
         return results, timings_result
+
+    @staticmethod
+    def resolve_inputs(
+        *,
+        configs: ConfigModel,
+        source_file_path: Optional[Path] = None,
+        target_file_path: Optional[Path] = None,
+        training_reference_file_path: Optional[Path] = None,
+        full_reference_file_path: Optional[Path] = None,
+        candidates_file_path: Optional[Path] = None,
+        task_name: Optional[str] = None,
+    ) -> ResolvedAlignmentInputs:
+        """Resolve input precedence and lazily materialize a configured track."""
+
+        data = configs.effective_data_config()
+        layout = None
+        track_provenance: Optional[dict[str, Any]] = None
+        if data is not None and (data.track or data.descriptor):
+            if not data.task:
+                raise ValueError("data.task is required when selecting a dataset track")
+            if data.descriptor is not None:
+                descriptor_path = _resolved_path(data.descriptor)
+                _require_existing(descriptor_path, "Track descriptor", required=True)
+                provider = provider_from_descriptor(descriptor_path)
+            else:
+                provider = get_track(str(data.track))
+            root = Path(data.root).expanduser().resolve()
+            logging.getLogger("exact").info(
+                "Materializing dataset track %s/%s under %s",
+                provider.name,
+                data.task,
+                root,
+            )
+            layout = provider.materialize(
+                data.task,
+                root,
+                revision=data.revision,
+                update=False,
+            )
+            track_provenance = {
+                **dict(layout.provenance),
+                "track": provider.name,
+                "task": data.task,
+            }
+
+        configured_refs = {
+            str(split): _resolved_path(path)
+            for split, path in ((data.refs if data is not None else {}) or {}).items()
+        }
+        layout_refs = dict(layout.refs) if layout is not None else {}
+        refs = {**layout_refs, **configured_refs}
+
+        configured_source = _resolved_path(data.source) if data is not None else None
+        configured_target = _resolved_path(data.target) if data is not None else None
+        configured_candidates = _resolved_path(data.candidates) if data is not None else None
+        source = (
+            _resolved_path(source_file_path)
+            or configured_source
+            or (layout.source if layout is not None else None)
+        )
+        target = (
+            _resolved_path(target_file_path)
+            or configured_target
+            or (layout.target if layout is not None else None)
+        )
+        training_reference = _resolved_path(training_reference_file_path) or refs.get("train")
+        full_reference = (
+            _resolved_path(full_reference_file_path)
+            or refs.get("full")
+            or refs.get("test")
+            or refs.get("valid")
+        )
+        candidates = (
+            _resolved_path(candidates_file_path)
+            or configured_candidates
+            or (layout.candidates if layout is not None else None)
+        )
+
+        _require_existing(source, "Source ontology", required=True)
+        _require_existing(target, "Target ontology", required=True)
+        _require_existing(training_reference, "Training reference")
+        _require_existing(full_reference, "Full reference")
+        _require_existing(candidates, "Candidates file")
+        assert source is not None
+        assert target is not None
+        return ResolvedAlignmentInputs(
+            source=source,
+            target=target,
+            training_reference=training_reference,
+            full_reference=full_reference,
+            candidates=candidates,
+            task_name=task_name or (data.task if data is not None else None),
+            track_provenance=track_provenance,
+        )
 
     @staticmethod
     def _run_session(
@@ -454,7 +636,9 @@ class AlignmentAction(Protocol):
                 **configs.alignment_params.model_dump(),
             )
         alignment_file_path = output_paths["alignment_tsv"]
-        run_stats_path = output_paths.get("run_stats_json")
+        run_stats_path = output_paths.get("run_stats_json") or (
+            Path(alignment_file_path).parent / "run_stats.json"
+        )
 
         logger.info(f"Alignment written to {alignment_file_path}")
         progress.finish("Outputs", str(alignment_file_path))

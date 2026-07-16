@@ -252,6 +252,30 @@ class EvaluationConfig(BaseModel):
         return names
 
 
+class DataConfig(BaseModel):
+    """Dataset-track selection and optional explicit input-path overrides."""
+
+    track: Optional[str] = None
+    task: Optional[str] = None
+    root: Path = Path("data")
+    revision: Optional[str] = None
+    descriptor: Optional[Path] = None
+    source: Optional[Path] = None
+    target: Optional[Path] = None
+    refs: Dict[str, Path] = Field(default_factory=dict)
+    candidates: Optional[Path] = None
+
+    @field_validator("track", "task")
+    @classmethod
+    def validate_identifier(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        normalized = value.strip()
+        if not normalized or normalized in {".", ".."} or "/" in normalized or "\\" in normalized:
+            raise ValueError("track and task must be non-empty path-safe identifiers")
+        return normalized
+
+
 class ConfigModel(BaseModel):
 
     seed: int = Field(config["seed"])
@@ -275,6 +299,8 @@ class ConfigModel(BaseModel):
     evaluation: EvaluationConfig = Field(
         default_factory=lambda: EvaluationConfig(**(config.get("evaluation", {}) or {}))
     )
+    data: Optional[DataConfig] = None
+    dataset_track: Optional[DataConfig] = None
     model: ModelParams = ModelParams()
     second_model: Optional[SecondModelParams] = SecondModelParams()
     model_chain: Optional[List[ModelChainEntry]] = None
@@ -359,6 +385,10 @@ class ConfigModel(BaseModel):
                 **(yaml_config.get("evaluation", {}) or {}),
             }
         )
+        data = DataConfig(**yaml_config["data"]) if yaml_config.get("data") else None
+        dataset_track = (
+            DataConfig(**yaml_config["dataset_track"]) if yaml_config.get("dataset_track") else None
+        )
         model_params = ModelParams(
             **cls._merge_registry_entry(
                 yaml_config.get("model", {}) or {}, config.get("model", {}) or {}
@@ -393,6 +423,8 @@ class ConfigModel(BaseModel):
                 "llm_profiles",
                 "llm_routing",
                 "evaluation",
+                "data",
+                "dataset_track",
                 "model",
                 "plot_params",
                 "sanity_check_params",
@@ -411,11 +443,18 @@ class ConfigModel(BaseModel):
             llm_profiles=llm_profiles,
             llm_routing=llm_routing,
             evaluation=evaluation,
+            data=data,
+            dataset_track=dataset_track,
             model=model_params,
             second_model=second_model_params,
             model_chain=model_chain,
             **filtered_config,
         )
+
+    def effective_data_config(self) -> Optional[DataConfig]:
+        """Return v2-style ``data`` settings or the transitional legacy shim."""
+
+        return self.data or self.dataset_track
 
     def get_model_sequence(self) -> List[RegistryParams]:
         """
