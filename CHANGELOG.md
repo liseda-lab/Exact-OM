@@ -12,6 +12,8 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - CPU-compatible packaging and CI quality gates for Python 3.10 and 3.12.
 - The `exact-eval` console-script alias.
 - Packaging for the existing study visualizer runtime.
+- Registered `builtin` and optional `bioml` evaluation backends with canonical JSON reports.
+- Reference/candidate SHA-256 provenance and selector-calibration hash guards.
 
 ### Changed
 
@@ -19,6 +21,7 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `exact.utils.graph_search`, retaining deprecation shims.
 - Consolidated shared formatting and numeric helpers.
 - Restricted learned LLM calibration samples to training-reference sources.
+- Kept historical builtin evaluation CSVs while namespacing multi-backend results.
 
 ### Fixed
 

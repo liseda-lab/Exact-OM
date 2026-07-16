@@ -1,16 +1,28 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
-from mowl.owlapi import OWLOntology
-
-from exact.core.entities.evaluation import EvaluationData, MetricNames
+from exact.core.contracts.base import SelfRegisteringComponent
+from exact.core.entities.evaluation import (
+    BackendEvaluation,
+    EvaluationData,
+    EvaluationRequest,
+    MetricNames,
+)
 from exact.core.entities.mappings import EntityMapping, ReferenceMapping
 from exact.core.entities.registry import ComponentRegistry, ComponentType
 
 
-class IEvaluator(ABC):
+class IEvaluator(SelfRegisteringComponent, ABC):
     """Abstract base class for all evaluators."""
+
+    component_type = ComponentType.EVALUATOR
+
+    @classmethod
+    @abstractmethod
+    def run(cls, request: EvaluationRequest) -> BackendEvaluation:
+        """Evaluate a backend-neutral request without writing output files."""
+        raise NotImplementedError
 
     def __init__(self, metrics: List[MetricNames]):
         """
@@ -60,9 +72,9 @@ class IEvaluator(ABC):
         cls,
         predictions: Union[List[EntityMapping], Path],
         test_reference: Union[List[ReferenceMapping], Path],
-        source_ontology: Optional[OWLOntology] = None,
-        target_ontology: Optional[OWLOntology] = None,
-        train_reference: Optional[List[ReferenceMapping]] = None,
+        source_ontology: Any = None,
+        target_ontology: Any = None,
+        train_reference: Optional[Union[List[ReferenceMapping], Path]] = None,
         threshold: Optional[float] = None,
     ) -> Dict[str, float]:
         """
@@ -86,6 +98,7 @@ class IEvaluator(ABC):
     def local_eval(
         cls,
         reference_and_candidates: Union[List[Tuple[ReferenceMapping, List[EntityMapping]]], Path],
+        reference_candidates: Optional[Path] = None,
         K: Optional[List[int]] = None,
     ) -> Dict[str, float]:
         """

@@ -1,3 +1,4 @@
+import inspect
 import logging
 from abc import ABC
 from typing import TYPE_CHECKING, Optional
@@ -20,7 +21,7 @@ class SelfRegisteringComponent(ABC):
         # methods and are not runnable registry components.  Register only
         # concrete subclasses; otherwise callers must rely on registration
         # order to skip the interface entry.
-        if any(getattr(member, "__isabstractmethod__", False) for member in cls.__dict__.values()):
+        if inspect.isabstract(cls):
             return
 
         # Ensure the subclass defines the component_type
@@ -33,13 +34,14 @@ class SelfRegisteringComponent(ABC):
         # Determine the fully qualified import path of the subclass
         module_name = cls.__module__
         class_name = cls.__name__
+        registry_name = getattr(cls, "registry_name", class_name)
         import_path = f"{module_name}.{class_name}"
 
         # Register the class using the ComponentRegistry
 
         from exact.core.entities.registry import ComponentRegistry
 
-        ComponentRegistry.register(cls.component_type, class_name, import_path)
+        ComponentRegistry.register(cls.component_type, registry_name, import_path)
 
 
 class LoggingClass:

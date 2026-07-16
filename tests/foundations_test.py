@@ -3,7 +3,11 @@ import torch
 
 import exact.impl.metrics  # noqa: F401 - imports register metric implementations
 from exact.core.contracts.evaluator import IEvaluator
-from exact.core.entities.evaluation import EvaluationData, MetricNames
+from exact.core.entities.evaluation import (
+    BackendEvaluation,
+    EvaluationData,
+    MetricNames,
+)
 from exact.core.entities.mappings import EntityMapping, ReferenceMapping
 from exact.core.entities.registry import ComponentRegistry, ComponentType
 from exact.impl.evaluator import Evaluator
@@ -11,6 +15,10 @@ from exact.impl.models.semantic_scorer import SemanticScorer
 
 
 class _TestEvaluator(IEvaluator):
+    @classmethod
+    def run(cls, request):
+        return BackendEvaluation(metrics={})
+
     def evaluate(self, data: EvaluationData):
         return {}
 

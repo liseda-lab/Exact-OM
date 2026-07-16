@@ -45,7 +45,9 @@ def main() -> None:
 
     init_jvm(_normalize_heap_size(args.jvm_heap_size))
 
-    import exact.impl  # noqa: F401
+    from exact.impl import bootstrap_components
+
+    bootstrap_components()
     from exact.core.entities.configs.config import ConfigModel
 
     run_cfg = _load_yaml(args.run_config)

@@ -285,6 +285,18 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
             summary_stats = getattr(self, "_llm_summary_stats", None)
             if summary_stats is not None:
                 stats["llm_summary_stats"] = summary_stats
+            selector_calibration = []
+            for model in self.models:
+                metadata = dict(getattr(model, "_calibration_meta", {}) or {})
+                provenance = getattr(model, "training_reference_provenance", None)
+                if metadata or provenance:
+                    if provenance and "training_reference" not in metadata:
+                        metadata["training_reference"] = provenance
+                        metadata["training_reference_sha256"] = provenance.get("sha256")
+                    metadata["model"] = model.__class__.__name__
+                    selector_calibration.append(metadata)
+            if selector_calibration:
+                stats["selector_calibration"] = selector_calibration
             stats_json_path = out_dir / "run_stats.json"
             with open(stats_json_path, "w", encoding="utf-8") as f:
                 json.dump(stats, f, indent=2, ensure_ascii=False)

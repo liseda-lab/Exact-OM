@@ -14,6 +14,12 @@ use_file_cache: True
 # Cutoffs reported by the evaluation step.
 k: [1, 5, 10]
 
+evaluation:
+  # Evaluators run in order. The built-in backend preserves historical metrics;
+  # `bioml` requires the optional `bioml-eval` extra.
+  backends: [builtin]
+  bioml: {}
+
 alignment_params:
   # Parameters that determine which scored pairs become part of the final
   # global alignment. For local/ranking runs, all candidates stay in the

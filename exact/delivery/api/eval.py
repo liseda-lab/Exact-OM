@@ -1,8 +1,6 @@
 import warnings
 from pathlib import Path
-from typing import Optional
-
-from exact import init_jvm
+from typing import Any, Mapping, Optional
 
 
 class EvaluationRunner:
@@ -23,7 +21,9 @@ class EvaluationRunner:
         reference_candidates: Optional[str] = None,
         log_level: Optional[str] = None,
         save_logs: bool = False,
-        jvm_heap_size: str = "32g",
+        jvm_heap_size: Optional[str] = None,
+        backends: Optional[list[str]] = None,
+        backend_options: Optional[Mapping[str, Mapping[str, Any]]] = None,
     ):
         """
 
@@ -53,12 +53,14 @@ class EvaluationRunner:
         self.log_level = log_level
         self.save_logs = save_logs
         self.jvm_heap_size = jvm_heap_size
+        self.backends = list(backends or ["builtin"])
+        self.backend_options = dict(backend_options or {})
 
-    def run_evaluation(self) -> None:
+    def run_evaluation(self):
 
         from exact.core.actions.evaluation import EvaluationAction
 
-        EvaluationAction.run(
+        return EvaluationAction.run(
             alignment=Path(self.alignment_file).resolve(),
             output_dir_path=Path(self.output_dir).resolve(),
             error_on_fail=self.error_on_fail,
@@ -82,6 +84,8 @@ class EvaluationRunner:
                 Path(self.output_dir).resolve() / "oaei_bio_ml_eval.log" if self.save_logs else None
             ),
             log_level=self.log_level,
+            backends=self.backends,
+            backend_options=self.backend_options,
         )
 
     def validate_files(self) -> None:
@@ -111,22 +115,20 @@ class EvaluationRunner:
                 f"Reference candidates file {self.reference_candidates} does not exist"
             )
 
-        if self.jvm_heap_size.isdigit():
-            self.jvm_heap_size += "G"
-        elif not (self.jvm_heap_size[:-1].isdigit() and self.jvm_heap_size[-1].lower() == "g"):
-            raise Exception(
-                f"JVM heap size {self.jvm_heap_size} is not valid, please provide a valid format"
+        if self.jvm_heap_size is not None:
+            warnings.warn(
+                "jvm_heap_size is deprecated and ignored; Exact no longer starts a JVM.",
+                DeprecationWarning,
+                stacklevel=2,
             )
 
-    def run(self) -> None:
+    def run(self):
         """
         Run the evaluation.
         """
         self.validate_files()
 
-        init_jvm(self.jvm_heap_size)
-
-        self.run_evaluation()
+        return self.run_evaluation()
 
 
 def __getattr__(name: str):

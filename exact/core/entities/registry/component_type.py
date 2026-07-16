@@ -8,3 +8,4 @@ class ComponentType(Enum):
     DATASET = "dataset"
     TRAINER = "trainer"
     METRIC = "metric"
+    EVALUATOR = "evaluator"

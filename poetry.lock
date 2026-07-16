@@ -3325,6 +3325,28 @@ files = [
 ]
 
 [[package]]
+name = "oaei-bioml-eval"
+version = "0.1.0.dev0"
+description = "Common evaluation/scoring logic for the OAEI Bio-ML tracks (public + private)."
+optional = true
+python-versions = ">=3.12"
+groups = ["main"]
+markers = "python_version >= \"3.12\" and extra == \"bioml-eval\""
+files = []
+develop = false
+
+[package.extras]
+deeponto = ["deeponto", "rdflib (>=7.0)"]
+rdf = ["rdflib (>=7.0)"]
+reasoner = ["rdflib (>=7.0)"]
+
+[package.source]
+type = "git"
+url = "https://github.com/OAEI-ML/OAEI-Bio-ML-eval.git"
+reference = "900ba7f242f254d08b0e01e6826975c61d0438b2"
+resolved_reference = "900ba7f242f254d08b0e01e6826975c61d0438b2"
+
+[[package]]
 name = "optuna"
 version = "4.9.0"
 description = "A hyperparameter optimization framework"
@@ -5937,7 +5959,10 @@ cffi = {version = ">=1.11", markers = "platform_python_implementation == \"PyPy\
 [package.extras]
 cffi = ["cffi (>=1.11)"]
 
+[extras]
+bioml-eval = ["oaei-bioml-eval"]
+
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.10"
-content-hash = "056fcfb6ff9e68cbd91452b596a807b1ca32df92f084b002affb614bccea6930"
+content-hash = "13fa1aae0e4e5c8a9cfcfff60b8dfcf9db83f24eb651eba4122f91475a5af69b"

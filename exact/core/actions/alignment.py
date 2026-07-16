@@ -497,6 +497,9 @@ class AlignmentAction(Protocol):
                     ),
                     reference_candidates=candidates_file_path,
                     logger=logger,
+                    backends=configs.evaluation.backends,
+                    backend_options={"bioml": configs.evaluation.bioml},
+                    run_stats_path=run_stats_path,
                 )
             progress.finish("Evaluation", "evaluation completed")
         else:

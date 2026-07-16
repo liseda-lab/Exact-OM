@@ -15,6 +15,7 @@ import torch
 from exact.core.contracts.model import IModel
 from exact.utils.data import read_table
 from exact.utils.formatting import clip01, format_duration, strip_code_fences
+from exact.utils.provenance import file_provenance
 
 
 class CandidateSetSelector(IModel):
@@ -134,6 +135,11 @@ class CandidateSetSelector(IModel):
         self.training_reference_file_path = (
             str(training_reference_file_path) if training_reference_file_path else None
         )
+        self.training_reference_provenance: Optional[Dict[str, Any]] = None
+        if self.training_reference_file_path:
+            reference_path = Path(self.training_reference_file_path).expanduser()
+            if reference_path.is_file():
+                self.training_reference_provenance = file_provenance(reference_path)
         self.request_seed = int(request_seed) if request_seed is not None else 0
         self._llm_prompts_used = 0
         self._llm_warning_logged = False
@@ -156,6 +162,11 @@ class CandidateSetSelector(IModel):
             "score_mode": self.score_mode,
             "calibration": dict(self.calibration),
             "training_reference_file_path": self.training_reference_file_path,
+            "training_reference_sha256": (
+                self.training_reference_provenance.get("sha256")
+                if self.training_reference_provenance
+                else None
+            ),
             "request_seed": self.request_seed,
         }
 
@@ -845,6 +856,12 @@ class CandidateSetSelector(IModel):
         self._calibration_meta = {
             "strategy": self.strategy,
             "training_reference_file_path": self.training_reference_file_path,
+            "training_reference": self.training_reference_provenance,
+            "training_reference_sha256": (
+                self.training_reference_provenance.get("sha256")
+                if self.training_reference_provenance
+                else None
+            ),
             "n_reference_pairs": len(ref_pairs),
             "n_calibration_reference_pairs": len(calibration_ref_pairs),
             "n_calibration_train_reference_pairs": len(train_ref_pairs),

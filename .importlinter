@@ -11,8 +11,8 @@ forbidden_modules =
     exact.delivery
     exact.analysis
 ignore_imports =
+    exact.core.actions.alignment -> exact.impl
     exact.core.actions.alignment -> exact.impl.seed
-    exact.core.actions.evaluation -> exact.impl.evaluator
 
 [importlinter:contract:delivery-boundary]
 name = Library subsystems do not depend on delivery

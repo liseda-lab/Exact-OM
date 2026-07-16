@@ -1,6 +1,7 @@
+import importlib
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Type
+from typing import Any, Dict, List, Optional, Tuple, Type, Union
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -19,30 +20,28 @@ class RegistryParams(BaseModel):
     """Base model for components managed via the ComponentRegistry."""
 
     component_type: ComponentType
-    name: str
+    name: Any
     params: dict
 
     @field_validator("name", mode="before")
-    def validate_and_load(cls, name: str, values) -> Type[Any]:
-        """Validate and load the component from the registry."""
+    def validate_and_load(cls, name: str, values) -> Any:
+        """Normalize a registry name; concrete classes resolve on demand."""
         if name is None:
             return None
-
-        component_type = values.data.get("component_type")
-        if not component_type:
-            raise ValueError("Component type is required for registry-based parameters.")
-        return ComponentRegistry.get(component_type, name)
+        if isinstance(name, type):
+            return name
+        return str(name)
 
 
 class ModelParams(RegistryParams):
     component_type: ComponentType = ComponentType.MODEL
-    name: Type[IModel] = Field(config["model"]["name"], validate_default=True)
+    name: Union[str, Type[IModel]] = Field(config["model"]["name"], validate_default=True)
     params: dict = Field(config["model"]["params"])
 
 
 class SecondModelParams(RegistryParams):
     component_type: ComponentType = ComponentType.MODEL
-    name: Optional[Type[IModel]] = Field(
+    name: Optional[Union[str, Type[IModel]]] = Field(
         config.get("second_model", {}).get("name", None), validate_default=True
     )
     params: dict = Field(config.get("second_model", {}).get("params", {}))
@@ -50,7 +49,7 @@ class SecondModelParams(RegistryParams):
 
 class ModelChainEntry(RegistryParams):
     component_type: ComponentType = ComponentType.MODEL
-    name: Type[IModel]
+    name: Union[str, Type[IModel]]
     params: dict = Field(default_factory=dict)
 
 
@@ -240,6 +239,22 @@ class LLMRoutingConfig(BaseModel):
     decision_fallback_profile: Optional[str] = None
 
 
+class EvaluationConfig(BaseModel):
+    """Ordered evaluator selection and backend-specific options."""
+
+    backends: List[str] = Field(default_factory=lambda: ["builtin"])
+    bioml: Dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("backends", mode="before")
+    @classmethod
+    def validate_backends(cls, value):
+        names = [str(name).strip().lower() for name in (value or ["builtin"])]
+        names = list(dict.fromkeys(name for name in names if name))
+        if not names:
+            raise ValueError("evaluation.backends must contain at least one backend")
+        return names
+
+
 class ConfigModel(BaseModel):
 
     seed: int = Field(config["seed"])
@@ -260,6 +275,9 @@ class ConfigModel(BaseModel):
     llm_routing: LLMRoutingConfig = Field(
         default_factory=lambda: LLMRoutingConfig(**(config.get("llm_routing", {}) or {}))
     )
+    evaluation: EvaluationConfig = Field(
+        default_factory=lambda: EvaluationConfig(**(config.get("evaluation", {}) or {}))
+    )
     model: ModelParams = ModelParams()
     second_model: Optional[SecondModelParams] = SecondModelParams()
     model_chain: Optional[List[ModelChainEntry]] = None
@@ -276,6 +294,11 @@ class ConfigModel(BaseModel):
         return list(set(k))
 
     def resolve_dependencies(self) -> None:
+        importlib.import_module("exact.impl").bootstrap_components()
+        entries = list(self.model_chain or [self.model, self.second_model])
+        for entry in entries:
+            if entry is not None and isinstance(entry.name, str):
+                entry.name = ComponentRegistry.get(entry.component_type, entry.name)
         primary_model = None
         if self.model_chain and len(self.model_chain) > 0:
             primary_model = self.model_chain[0]
@@ -333,6 +356,12 @@ class ConfigModel(BaseModel):
                 **(yaml_config.get("llm_routing", {}) or {}),
             }
         )
+        evaluation = EvaluationConfig(
+            **{
+                **(config.get("evaluation", {}) or {}),
+                **(yaml_config.get("evaluation", {}) or {}),
+            }
+        )
         model_params = ModelParams(
             **cls._merge_registry_entry(
                 yaml_config.get("model", {}) or {}, config.get("model", {}) or {}
@@ -366,6 +395,7 @@ class ConfigModel(BaseModel):
                 "inference_params",
                 "llm_profiles",
                 "llm_routing",
+                "evaluation",
                 "model",
                 "plot_params",
                 "sanity_check_params",
@@ -383,6 +413,7 @@ class ConfigModel(BaseModel):
             inference_params=inference_params,
             llm_profiles=llm_profiles,
             llm_routing=llm_routing,
+            evaluation=evaluation,
             model=model_params,
             second_model=second_model_params,
             model_chain=model_chain,

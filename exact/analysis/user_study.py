@@ -896,7 +896,9 @@ def _load_configs_for_rationale(config_path: Path, jvm_heap_size: str) -> Any:
     from mowl import init_jvm
 
     init_jvm(jvm_heap_size)
-    import exact.impl  # noqa: F401
+    from exact.impl import bootstrap_components
+
+    bootstrap_components()
     from exact.core.entities.configs.config import ConfigModel
 
     configs = ConfigModel.load_config(config_path)
