@@ -1,3 +1,15 @@
-from .app import create_study_visualizer_app
+"""Deprecated package name for :mod:`exact_inspect`."""
 
-__all__ = ["create_study_visualizer_app"]
+from __future__ import annotations
+
+import warnings
+
+warnings.warn(
+    "study_visualizer_runtime was renamed to exact_inspect and will be removed in Exact-OM 2.1.",
+    DeprecationWarning,
+    stacklevel=2,
+)
+
+from exact_inspect.app import create_app, create_study_visualizer_app  # noqa: E402
+
+__all__ = ["create_app", "create_study_visualizer_app"]
