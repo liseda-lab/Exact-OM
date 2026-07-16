@@ -20,7 +20,7 @@ compatibility window.
 | `exact.utils.paths` | `exact.utils.graph_search` (old module warns). |
 | `exact.utils.llm_routing` | `exact.llm.routing` (old module warns). |
 | `bioml-eval` | `exact-eval` (both scripts remain). |
-| `times.txt` | append-only `timings.json`. |
+| `times.txt` | atomic `timings.json` session ledger. |
 | config without `config_version` | config v2; auto-migrated with warning. |
 | `study_visualizer_runtime`, `exact-study-viz`, `EXACT_STUDY_*` | `exact_inspect`, `exact-inspect`, `EXACT_INSPECT_*`. |
 | Viewer bundle scripts and `exact.analysis.study_visualizer` | `exact-inspect bundle` and `exact_inspect` APIs. |

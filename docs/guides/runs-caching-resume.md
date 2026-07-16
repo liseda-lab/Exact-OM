@@ -48,10 +48,11 @@ exact run clean RUN --all       # also manifest-owned dataset cache files
 
 ## Timing semantics
 
-`timings.json` is an append-only event ledger. Each command session has a UUID and a resolved
-configuration fingerprint; explanation records carry the same session ID. Stage records label
-work as fresh, cache-hit, resumed, or skipped. Cumulative compute totals include only real work,
-while the current-session report makes resume overhead visible separately.
+`timings.json` is an atomically rewritten ledger whose command sessions are append-only. Each
+session has a UUID and a resolved configuration fingerprint; explanation records carry the same
+session ID. Stage records label work as fresh, cache-hit, resumed, or skipped. Cumulative compute
+totals include only real work, while the current-session report makes resume overhead visible
+separately.
 
 Dataset and model caches include normalized ontology/source fingerprints, candidate inputs,
 selected entity kinds, and relevant configuration. Changing one of these inputs invalidates the

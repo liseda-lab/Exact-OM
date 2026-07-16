@@ -1,0 +1,43 @@
+config_version: 2
+
+run:
+  logging_level: INFO
+  use_file_cache: false
+
+dataset:
+  filter_exact_matches: false
+  which: []
+  legacy:
+    only_taxonomy: true
+
+pipeline:
+  - name: PairAdaptiveSemanticScorer
+    params:
+      lexical_model_name: hf-internal-testing/tiny-random-bert
+      context_model_name: hf-internal-testing/tiny-random-bert
+      llm_model_name: null
+      fp16_inference: false
+      use_context: false
+      use_llm: false
+      return_explanations: true
+      generate_llm_rationales: false
+
+llm:
+  routing:
+    default_profile: local_llm_default
+    verbaliser_profile: local_verbaliser_default
+    summary_profile: local_llm_default
+    decision_profile: local_llm_default
+    rationale_profile: local_llm_default
+
+inference:
+  batch_size: 4
+  mixed_precision: false
+  which: []
+  enable_checkpoints: false
+
+output:
+  plots:
+    dpi: 72
+  sanity_checks:
+    enabled: false

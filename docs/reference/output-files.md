@@ -7,7 +7,7 @@ file, and consumers should use `RunReader` rather than concatenate paths.
 | --- | --- | --- |
 | `run_manifest.json` | Layout/schema version, sessions, artifact sizes, provenance, deliverable hashes. | Keep. |
 | `config.yaml` | Resolved config-v2 snapshot. | Keep. |
-| `timings.json` | Append-only command sessions and stage records. | Keep. |
+| `timings.json` | Atomically persisted, append-only command sessions and stage records. | Keep. |
 | `times.txt` | Deprecated human-readable rendering of cumulative stage minutes. | Regenerable. |
 | `exact.log` | Optional command log. | Keep as needed. |
 | `alignment/maps_global.tsv` | Filtered global mapping deliverable. | Keep. |

@@ -136,6 +136,5 @@ documented duplicate-path unification.
 
 ## Deviations
 
-`exact/impl/datasets/base.py` is 1,519 lines, marginally above the approximate 1,500-line soft
-ceiling; the WP-D refactor targets are below it, and this WP-B/F-owned dataset keeps its
-kind-aware retrieval and cache lifecycle together.
+No design deviations. `exact/impl/datasets/base.py`, the largest adjacent WP-B/F-owned module,
+is 1,493 lines and therefore also meets the approximate 1,500-line soft ceiling.
