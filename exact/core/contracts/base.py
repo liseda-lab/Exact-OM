@@ -1,5 +1,6 @@
 import inspect
 import logging
+import sys
 from abc import ABC
 from typing import TYPE_CHECKING, Optional
 
@@ -22,6 +23,13 @@ class SelfRegisteringComponent(ABC):
         # concrete subclasses; otherwise callers must rely on registration
         # order to skip the interface entry.
         if inspect.isabstract(cls):
+            return
+
+        # Files executed under a temporary ``module_from_spec`` name may not
+        # be installed in ``sys.modules``. Registering those classes would
+        # leave an unimportable component path and conflict with the canonical
+        # package import. Normal package and plugin imports are present here.
+        if cls.__module__ not in sys.modules:
             return
 
         # Ensure the subclass defines the component_type
