@@ -51,10 +51,13 @@ def apply_transform(name: str, source: Path, destination: Path) -> TransformResu
     return transform(Path(source), Path(destination))
 
 
-def read_alignment(path: Path) -> tuple[str, str, Sequence[tuple[str, str, str]]]:
+def read_alignment(
+    path: Path,
+) -> tuple[str | None, str | None, Sequence[tuple[str, str, str]]]:
     """Parse an OAEI Alignment RDF/XML file.
 
-    The two ontology locations and every complete ``Cell`` are returned. Malformed
+    Optional ontology locations and every complete ``Cell`` are returned. Some
+    official tracks (including Anatomy) omit the location metadata. Malformed
     cells are ignored to preserve the historic retrieval-script behavior.
     """
 
@@ -71,8 +74,6 @@ def read_alignment(path: Path) -> tuple[str, str, Sequence[tuple[str, str, str]]
         for element in root.iter()
         if local_name(element.tag) == "location" and element.text and element.text.strip()
     ]
-    if len(locations) < 2:
-        raise IntegrityError(f"Could not find two ontology locations in {path}")
     cells: list[tuple[str, str, str]] = []
     for cell in (element for element in root.iter() if local_name(element.tag) == "Cell"):
         children = {local_name(child.tag): child for child in cell}
@@ -89,7 +90,9 @@ def read_alignment(path: Path) -> tuple[str, str, Sequence[tuple[str, str, str]]
         )
         if source and target:
             cells.append((source, target, measure.text.strip()))
-    return locations[0], locations[1], cells
+    source_location = locations[0] if locations else None
+    target_location = locations[1] if len(locations) > 1 else None
+    return source_location, target_location, cells
 
 
 def alignment_rdf_to_tsv(source: Path, destination: Path) -> TransformResult:

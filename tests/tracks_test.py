@@ -237,6 +237,29 @@ def test_http_archive_materialization_and_upstream_movement(tmp_path: Path) -> N
     assert any("explicit update repin" in warning for warning in report.warnings)
 
 
+def test_alignment_transform_accepts_anatomy_rdf_without_locations(tmp_path: Path) -> None:
+    source = tmp_path / "reference.rdf"
+    source.write_text(
+        """<?xml version="1.0"?>
+<rdf:RDF xmlns="http://knowledgeweb.semanticweb.org/heterogeneity/alignment"
+ xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+  <Alignment><map><Cell>
+    <entity1 rdf:resource="http://mouse/A"/>
+    <entity2 rdf:resource="http://human/B"/>
+    <measure>1.0</measure><relation>=</relation>
+  </Cell></map></Alignment>
+</rdf:RDF>
+""",
+        encoding="utf-8",
+    )
+
+    result = alignment_rdf_to_tsv(source, tmp_path / "reference.tsv")
+
+    assert result.path.read_text(encoding="utf-8") == (
+        "SrcEntity\tTgtEntity\tScore\nhttp://mouse/A\thttp://human/B\t1.0\n"
+    )
+
+
 def test_custom_yaml_descriptor_materializes_without_provider_code(tmp_path: Path) -> None:
     archive = _archive_bytes()
     value = {

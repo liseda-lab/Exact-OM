@@ -7,7 +7,7 @@ description: Public Bio-ML 2026 task data; ontology files are supplied separatel
 upstream:
   repo_id: OAEI-ML/bio-ml
   revision: "2026"
-  checksum_manifest: SHA256SUMS.txt
+  checksum_manifest: SHA256SUMS
 user_supplied:
   ncit:
     path: NCIT.owl
