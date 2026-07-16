@@ -19,7 +19,6 @@ Options (all may also be provided via env vars):
   --analysis-dir PATH
   --config-path PATH
   --bundle-name NAME
-  --jvm-heap-size SIZE
   --logging-level LEVEL
   --overwrite | --no-overwrite
   --help
@@ -44,7 +43,6 @@ BUNDLE_DIR=${BUNDLE_DIR:-}
 ANALYSIS_DIR=${ANALYSIS_DIR:-}
 CONFIG_PATH=${CONFIG_PATH:-}
 BUNDLE_NAME=${BUNDLE_NAME:-}
-JVM_HEAP_SIZE=${JVM_HEAP_SIZE:-8G}
 LOGGING_LEVEL=${LOGGING_LEVEL:-INFO}
 OVERWRITE=${OVERWRITE:-0}
 
@@ -56,7 +54,6 @@ while [[ $# -gt 0 ]]; do
     --analysis-dir) ANALYSIS_DIR="$2"; shift 2 ;;
     --config-path) CONFIG_PATH="$2"; shift 2 ;;
     --bundle-name) BUNDLE_NAME="$2"; shift 2 ;;
-    --jvm-heap-size) JVM_HEAP_SIZE="$2"; shift 2 ;;
     --logging-level) LOGGING_LEVEL="$2"; shift 2 ;;
     --overwrite) OVERWRITE=1; shift ;;
     --no-overwrite) OVERWRITE=0; shift ;;
@@ -79,9 +76,7 @@ if [[ -n "${SLURM_JOB_ID:-}" && -n "$JOB_NAME" ]]; then
   scontrol update JobId="$SLURM_JOB_ID" JobName="$JOB_NAME" >/dev/null 2>&1 || true
 fi
 
-export EXACT_STUDY_JVM_HEAP_SIZE="$JVM_HEAP_SIZE"
-
-cmd=(poetry run python tools/prepare_study_visualizer_bundle.py --run-dir "$RUN_DIR" --bundle-dir "$BUNDLE_DIR" --jvm-heap-size "$JVM_HEAP_SIZE" --logging-level "$LOGGING_LEVEL")
+cmd=(poetry run python tools/prepare_study_visualizer_bundle.py --run-dir "$RUN_DIR" --bundle-dir "$BUNDLE_DIR" --logging-level "$LOGGING_LEVEL")
 
 if [[ -n "$ANALYSIS_DIR" ]]; then
   cmd+=(--analysis-dir "$ANALYSIS_DIR")

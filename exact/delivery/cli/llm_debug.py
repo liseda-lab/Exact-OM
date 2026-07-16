@@ -2,12 +2,11 @@ import argparse
 import json
 import logging
 import traceback
+import warnings
 from pathlib import Path
 from typing import Any, Dict, List
 
 import torch
-
-from exact import init_jvm
 
 
 def _build_model(configs, device: torch.device):
@@ -46,7 +45,6 @@ def _normalize_decision(value: str) -> str:
 
 
 def run_llm_debug(args) -> None:
-    init_jvm(args.jvm_heap_size)
     from exact.core.entities.configs.config import ConfigModel
 
     configs = (
@@ -181,9 +179,7 @@ def parse_arguments():
     parser.add_argument(
         "--device", "-d", type=int, required=False, help="GPU device ID to use for local fallback."
     )
-    parser.add_argument(
-        "--jvm_heap_size", "-m", type=str, required=False, help="JVM heap size, e.g. 16G or 32G."
-    )
+    parser.add_argument("--jvm_heap_size", "-m", type=str, required=False, help=argparse.SUPPRESS)
     parser.add_argument(
         "--logging_level",
         "-l",
@@ -196,15 +192,12 @@ def parse_arguments():
 
 def main():
     args = parse_arguments()
-    if args.jvm_heap_size:
-        if args.jvm_heap_size.isdigit():
-            args.jvm_heap_size += "G"
-        elif not (args.jvm_heap_size[:-1].isdigit() and args.jvm_heap_size[-1].lower() == "g"):
-            raise Exception(
-                f"JVM heap size {args.jvm_heap_size} is not valid, please provide a valid format"
-            )
-    else:
-        args.jvm_heap_size = "32G"
+    if args.jvm_heap_size is not None:
+        warnings.warn(
+            "--jvm_heap_size/-m is deprecated and ignored; Exact-OM no longer needs Java.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
     try:
         run_llm_debug(args)
     except Exception as exc:  # noqa: BLE001

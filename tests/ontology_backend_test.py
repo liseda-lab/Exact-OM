@@ -1,0 +1,205 @@
+import subprocess
+import sys
+from pathlib import Path
+
+import pytest
+
+from exact.core.entities.graph import AnnotationValue, Edge
+from exact.core.entities.kinds import EntityKind
+from exact.core.entities.ontology import OntologyGraph
+from exact.ontology import load_ontology
+from exact.ontology.expressions import existential_targets, named_class_iri
+from exact.ontology.parser import NamedClass, ObjectSomeValuesFrom, parse
+from exact.ontology.reasoning import AssertedHierarchyReasoner, load_reasoner
+from exact.utils.eval import MetricUtils
+from tests.knowledge_source_conformance import assert_knowledge_source_conformance
+
+FIXTURES = Path(__file__).parent / "fixtures" / "ontologies"
+SRC = "http://example.org/mini/src#"
+TGT = "http://example.org/mini/tgt#"
+PART_OF = "http://purl.obolibrary.org/obo/BFO_0000050"
+
+
+@pytest.fixture(scope="module")
+def source():
+    return load_ontology(FIXTURES / "mini_src.owl")
+
+
+@pytest.fixture(scope="module")
+def target():
+    return load_ontology(FIXTURES / "mini_tgt.owl")
+
+
+def test_fixture_sources_conform(source, target):
+    assert_knowledge_source_conformance(source)
+    assert_knowledge_source_conformance(target)
+
+
+def test_parser_builds_complete_named_signatures(source):
+    assert source.parsed.ontology_iri == "http://example.org/mini/src"
+    assert len(source.entities()) == 32
+    assert len(source.entities(EntityKind.OBJECT_PROPERTY)) == 4
+    assert len(source.entities(EntityKind.DATA_PROPERTY)) == 1
+    assert len(source.entities(EntityKind.INDIVIDUAL)) == 3
+    assert all(not iri.startswith("N") for iri in source.entities())
+    assert "http://www.w3.org/2001/XMLSchema#string" not in source.entities()
+
+
+def test_parser_infers_undeclared_individual_assertions_deterministically(tmp_path):
+    ontology = tmp_path / "undeclared.owl"
+    ontology.write_text(
+        """<?xml version="1.0"?>
+<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+         xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
+         xmlns:owl="http://www.w3.org/2002/07/owl#"
+         xmlns:ex="http://example.org/undeclared#">
+  <owl:Ontology rdf:about="http://example.org/undeclared"/>
+  <owl:Class rdf:about="http://example.org/undeclared#Person"/>
+  <rdf:Description rdf:about="http://example.org/undeclared#knows">
+    <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#TransitiveProperty"/>
+  </rdf:Description>
+  <rdf:Description rdf:about="http://example.org/undeclared#bob">
+    <rdf:type rdf:resource="http://example.org/undeclared#Person"/>
+    <ex:knows rdf:resource="http://example.org/undeclared#alice"/>
+    <ex:code>42</ex:code>
+  </rdf:Description>
+</rdf:RDF>
+""",
+        encoding="utf-8",
+    )
+    source = load_ontology(ontology)
+    base = "http://example.org/undeclared#"
+
+    assert source.entities(EntityKind.INDIVIDUAL) == (base + "alice", base + "bob")
+    assert source.direct_parents(base + "bob", EntityKind.INDIVIDUAL) == [base + "Person"]
+    assert base + "knows" in source.entities(EntityKind.OBJECT_PROPERTY)
+    assert base + "code" in source.entities(EntityKind.DATA_PROPERTY)
+    assert Edge(base + "bob", base + "knows", base + "alice") in source.projection_edges()
+    assert any(value.value == "42" for value in source.attributes(base + "bob"))
+
+
+def test_annotations_labels_attributes_and_exclusions(source):
+    assert source.labels(SRC + "Heart") == ["coração", "heart"]
+    assert source.labels(SRC + "UnlabelledClass") == []
+    assert source.short_form(SRC + "UnlabelledClass") == "UnlabelledClass"
+
+    attributes = source.attributes(SRC + "Heart")
+    assert (
+        AnnotationValue(
+            "http://www.geneontology.org/formats/oboInOwl#hasExactSynonym",
+            "cardiac organ",
+            True,
+        )
+        in attributes
+    )
+    assert any(value.value.startswith("The muscular organ") for value in attributes)
+    assert source.excluded_from_alignment() == frozenset(
+        {SRC + "IgnoredConcept", SRC + "DeprecatedConcept"}
+    )
+
+
+def test_asserted_hierarchy_and_equivalence_normalization(source):
+    assert source.direct_parents(SRC + "Heart") == [
+        SRC + "CardiacStructure",
+        SRC + "Organ",
+    ]
+    assert source.direct_parents(SRC + "Clinician") == [SRC + "Person"]
+    assert source.direct_parents(SRC + "HealthcareProfessional") == [SRC + "Person"]
+    assert set(source.direct_children(SRC + "Person")) >= {
+        SRC + "Clinician",
+        SRC + "HealthcareProfessional",
+        SRC + "Patient",
+    }
+    assert SRC + "Clinician" not in source.direct_parents(SRC + "HealthcareProfessional")
+    assert SRC + "Entity" in source.hierarchy.ancestors(SRC + "Heart")
+
+
+def test_expression_walkers_and_hierarchy_bundle(source):
+    parsed = parse(FIXTURES / "mini_src.owl")
+    chest_axiom = next(
+        axiom
+        for axiom in parsed.subclass_axioms
+        if named_class_iri(axiom.sub) == SRC + "ChestPain"
+        and isinstance(axiom.sup, ObjectSomeValuesFrom)
+    )
+    assert named_class_iri(NamedClass(SRC + "Heart")) == SRC + "Heart"
+    assert existential_targets(chest_axiom.sup, (PART_OF,)) == [SRC + "Heart"]
+    assert source.hierarchy_bundle(
+        SRC + "CardiacStructure", {"is_a": (), "part_of": (PART_OF,)}
+    ) == {"is_a": [SRC + "Structure"], "part_of": [SRC + "Heart"]}
+
+
+def test_property_schema_and_instance_indexes(source):
+    assert source.property_domains(PART_OF) == [SRC + "AnatomicalEntity"]
+    assert source.property_ranges(PART_OF) == [SRC + "AnatomicalEntity"]
+    assert source.direct_parents(SRC + "participatesIn", EntityKind.OBJECT_PROPERTY) == [
+        SRC + "relatedTo"
+    ]
+    assert source.direct_parents(SRC + "alice", EntityKind.INDIVIDUAL) == [SRC + "Patient"]
+    assert any(value.value == "P-001" for value in source.attributes(SRC + "alice"))
+
+
+def test_projection_matches_observed_legacy_fixture_behavior(source):
+    taxonomy = {edge.astuple() for edge in source.projection_edges(method="taxonomy")}
+    owl2vec = {edge.astuple() for edge in source.projection_edges()}
+    with_literals = {edge.astuple() for edge in source.projection_edges(include_literals=True)}
+    assert len(taxonomy) == 28
+    assert len(owl2vec) == 42
+    assert len(with_literals) == 76
+    assert (SRC + "ChestPain", PART_OF, SRC + "Heart") in owl2vec
+    assert (SRC + "Heart", SRC + "hasPart", SRC + "ChestPain") in owl2vec
+    assert (SRC + "alice", "http://type", SRC + "Patient") in owl2vec
+    assert (SRC + "Heart", "rdfs:label", "heart") in with_literals
+
+
+def test_graph_view_consumes_protocol(source):
+    graph = OntologyGraph(source, only_taxonomy=False, include_literals=True)
+    assert graph.get_labels(SRC + "Heart")[0] == "coração"
+    assert graph.get_labels(SRC + "UnlabelledClass") == ["UnlabelledClass"]
+    assert graph.get_all_classes() == list(source.entities())
+    schema = graph.get_property_domains_and_ranges(human_readable=False)
+    assert schema[PART_OF] == {
+        "domain": [SRC + "AnatomicalEntity"],
+        "range": [SRC + "AnatomicalEntity"],
+    }
+
+
+def test_asserted_reasoner_and_unresolved_plugin_error(source):
+    reasoner = load_reasoner("asserted", source)
+    assert isinstance(reasoner, AssertedHierarchyReasoner)
+    assert reasoner.direct_parents(SRC + "Heart") == source.direct_parents(SRC + "Heart")
+    with pytest.raises(ValueError, match="Installed plugins"):
+        load_reasoner("not-installed", source)
+
+
+def test_metric_ignored_index_uses_knowledge_source(source):
+    ignored = MetricUtils.get_ignored_class_index(source)
+    assert ignored[SRC + "IgnoredConcept"]
+    assert ignored[SRC + "DeprecatedConcept"]
+    assert not ignored[SRC + "Heart"]
+
+
+def test_edge_contract_is_hashable_and_tuple_compatible():
+    edge = Edge("a", "r", "b")
+    assert edge.astuple() == ("a", "r", "b")
+    assert {edge} == {Edge("a", "r", "b")}
+
+
+def test_top_level_ontology_import_is_java_free_and_delivery_lazy():
+    code = """
+import sys
+import exact.ontology
+legacy_backend = ''.join(('mo', 'wl'))
+assert not any(name == legacy_backend or name.startswith(legacy_backend + '.') for name in sys.modules)
+assert not any(name.startswith('exact.delivery') for name in sys.modules)
+import exact
+assert 'init_' + 'jvm' not in exact.__all__
+compat_init = getattr(exact, 'init_' + 'jvm')
+try:
+    compat_init('4g')
+except RuntimeError as exc:
+    assert 'no longer needs Java' in str(exc)
+else:
+    raise AssertionError('deprecated stub must reject JVM initialization')
+"""
+    subprocess.run([sys.executable, "-c", code], check=True)

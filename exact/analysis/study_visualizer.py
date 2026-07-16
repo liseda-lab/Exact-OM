@@ -124,10 +124,7 @@ class StudyOntologyLookup:
             raise RuntimeError(
                 "Ontology-backed study expansion is enabled, but no visualizer config file could be resolved."
             )
-        configs = study._load_configs_for_rationale(
-            config_path=self.config_path,
-            jvm_heap_size=os.getenv("EXACT_STUDY_JVM_HEAP_SIZE", "8G"),
-        )
+        configs = study._load_configs_for_rationale(config_path=self.config_path)
         dataset_cls = configs.dataset
         if dataset_cls is None:
             raise RuntimeError(
@@ -169,20 +166,9 @@ class StudyOntologyLookup:
         dataset = self.dataset
         return dataset.source_graph if side == "source" else dataset.target_graph
 
-    def _ontology(self, side: str):
+    def _source(self, side: str):
         dataset = self.dataset
-        return dataset.source.ontology if side == "source" else dataset.target.ontology
-
-    def _reasoner(self, side: str):
-        dataset = self.dataset
-        return dataset.source_reasoner if side == "source" else dataset.target_reasoner
-
-    def _owl_class(self, entity_iri: str, side: str):
-        from org.semanticweb.owlapi.model import IRI
-
-        ontology = self._ontology(side)
-        factory = ontology.getOWLOntologyManager().getOWLDataFactory()
-        return factory.getOWLClass(IRI.create(entity_iri))
+        return dataset.source if side == "source" else dataset.target
 
     def _is_hierarchy_relation(self, side: str, rel_iri: str) -> bool:
         dataset = self.dataset
@@ -202,45 +188,32 @@ class StudyOntologyLookup:
         if cached is not None:
             return dict(cached)
         graph = self._graph(side)
-        ontology = self._ontology(side)
-        owl_class = self._owl_class(entity_iri, side)
+        source = self._source(side)
         labels = list(graph.get_labels(entity_iri) or [])
         definitions: List[str] = []
         synonyms: List[str] = []
         annotations: List[Dict[str, str]] = []
-        try:
-            from org.semanticweb.owlapi.search import EntitySearcher
-
-            anns = EntitySearcher.getAnnotations(owl_class, ontology)
-            iterator = anns.iterator()
-            while iterator.hasNext():
-                ann = iterator.next()
-                value = ann.getValue()
-                if not value.isLiteral():
-                    continue
-                literal = str(value.asLiteral().get().getLiteral()).strip()
-                if not literal:
-                    continue
-                prop_iri = str(ann.getProperty().getIRI().toString())
-                prop_label = graph.get_labels(prop_iri)[0]
-                lowered = study._safe_text(prop_label).lower()
-                annotations.append({"property": prop_label, "value": literal})
-                if "label" in lowered:
-                    continue
-                if any(
-                    token in lowered
-                    for token in ["definition", "comment", "description", "explanation"]
-                ):
-                    definitions.append(literal)
-                elif any(
-                    token in lowered
-                    for token in ["synonym", "altlabel", "exactmatch", "related", "broad", "narrow"]
-                ):
-                    synonyms.append(literal)
-        except Exception as exc:  # noqa: BLE001
-            self.logger.debug(
-                "Ontology annotation lookup failed for %s (%s): %s", entity_iri, side, exc
-            )
+        for value in source.annotations(entity_iri):
+            if not value.is_literal:
+                continue
+            literal = str(value.value).strip()
+            if not literal:
+                continue
+            prop_label = graph.get_labels(value.property_iri)[0]
+            lowered = study._safe_text(prop_label).lower()
+            annotations.append({"property": prop_label, "value": literal})
+            if "label" in lowered:
+                continue
+            if any(
+                token in lowered
+                for token in ["definition", "comment", "description", "explanation"]
+            ):
+                definitions.append(literal)
+            elif any(
+                token in lowered
+                for token in ["synonym", "altlabel", "exactmatch", "related", "broad", "narrow"]
+            ):
+                synonyms.append(literal)
         payload = {
             "labels": labels,
             "definitions": definitions[:5],
@@ -252,19 +225,9 @@ class StudyOntologyLookup:
 
     def direct_parents(self, entity_iri: str, side: str, limit: int = 3) -> List[Dict[str, str]]:
         graph = self._graph(side)
-        dataset = self.dataset
         parent_iris: List[str] = []
         try:
-            if hasattr(dataset, "_direct_superclass_iris"):
-                parent_iris = list(
-                    dataset._direct_superclass_iris(entity_iri, graph, self._side_key(side))
-                )  # noqa: SLF001
-            else:
-                reasoner = self._reasoner(side)
-                owl_class = self._owl_class(entity_iri, side)
-                for parent in reasoner.getSuperClasses(owl_class, True).getFlattened():
-                    if not parent.isOWLThing():
-                        parent_iris.append(str(parent.getIRI().toString()))
+            parent_iris = self._source(side).direct_parents(entity_iri)
         except Exception as exc:  # noqa: BLE001
             self.logger.debug("Parent expansion failed for %s (%s): %s", entity_iri, side, exc)
         deduped = sorted(dict.fromkeys(parent_iris))
@@ -277,13 +240,7 @@ class StudyOntologyLookup:
         graph = self._graph(side)
         child_iris: List[str] = []
         try:
-            reasoner = self._reasoner(side)
-            owl_class = self._owl_class(entity_iri, side)
-            for child in reasoner.getSubClasses(owl_class, True).getFlattened():
-                if not child.isOWLNothing():
-                    child_iri = str(child.getIRI().toString())
-                    if child_iri != entity_iri:
-                        child_iris.append(child_iri)
+            child_iris = self._source(side).direct_children(entity_iri)
         except Exception as exc:  # noqa: BLE001
             self.logger.debug("Child expansion failed for %s (%s): %s", entity_iri, side, exc)
         deduped = sorted(dict.fromkeys(child_iris))

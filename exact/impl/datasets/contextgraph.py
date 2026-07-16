@@ -14,13 +14,14 @@ import seaborn as sns
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-from exact.core.contracts.dataset import DataFrame, IDataset
+from exact.core.contracts.dataset import DataFrame
 from exact.core.entities.configs.dataset import (
     BestPathMethod,
     ContextMethod,
 )
-from exact.core.entities.ontology import Entity, OntologyGraph
+from exact.core.entities.ontology import OntologyGraph
 from exact.core.entities.registry import ComponentType
+from exact.impl.datasets.base import BaseAlignmentDataset
 from exact.utils.llm_routing import LLMRouter, extract_chat_text, parse_structured_json
 
 
@@ -52,7 +53,7 @@ def _prompt_corrective(prev_sentence: str, head: str, rel: str, tail: str) -> Di
     }
 
 
-class ContextDataset(IDataset):
+class ContextDataset(BaseAlignmentDataset):
     """
       • Loads/caches verbalisation templates with an LLM (unless only_taxonomy=True)
       • Extracts per-entity context subgraphs
@@ -117,6 +118,7 @@ class ContextDataset(IDataset):
         self.context_safety = float(context_safety)
         self.max_input_tokens_context = int(max_input_tokens_context)
         self.only_taxonomy = bool(only_taxonomy)
+        self._only_taxonomy_hint = self.only_taxonomy
         self.all_labels = bool(all_labels)
         self.exclude_missing_dr = bool(exclude_missing_dr)
         self.add_connectivity_bridges = bool(add_connectivity_bridges)
@@ -285,9 +287,7 @@ class ContextDataset(IDataset):
                 self.log("Loading source graph (taxonomy only)…", level="info")
             else:
                 self.log("Loading source graph (OWL2Vec*)…", level="info")
-            self._source_graph = OntologyGraph(
-                self.source.ontology, self.source_reasoner, self.only_taxonomy
-            )
+            self._source_graph = OntologyGraph(self.source, only_taxonomy=self.only_taxonomy)
             self.log(f"Source graph edges: {len(self._source_graph)}", level="debug")
         return self._source_graph
 
@@ -298,9 +298,7 @@ class ContextDataset(IDataset):
                 self.log("Loading target graph (taxonomy only)…", level="info")
             else:
                 self.log("Loading target graph (OWL2Vec*)…", level="info")
-            self._target_graph = OntologyGraph(
-                self.target.ontology, self.target_reasoner, self.only_taxonomy
-            )
+            self._target_graph = OntologyGraph(self.target, only_taxonomy=self.only_taxonomy)
             self.log(f"Target graph edges: {len(self._target_graph)}", level="debug")
         return self._target_graph
 
@@ -692,11 +690,7 @@ class ContextDataset(IDataset):
             src_lab_map[iri] = (
                 lbls[:]
                 if self.all_labels
-                else (
-                    [lbls[0]]
-                    if lbls
-                    else [Entity._get_owl_class(iri, self.source.ontology).getIRI().getShortForm()]
-                )
+                else ([lbls[0]] if lbls else [self.source.short_form(iri)])
             )
 
         tgt_lab_map: Dict[str, List[str]] = {}
@@ -705,11 +699,7 @@ class ContextDataset(IDataset):
             tgt_lab_map[iri] = (
                 lbls[:]
                 if self.all_labels
-                else (
-                    [lbls[0]]
-                    if lbls
-                    else [Entity._get_owl_class(iri, self.target.ontology).getIRI().getShortForm()]
-                )
+                else ([lbls[0]] if lbls else [self.target.short_form(iri)])
             )
 
         # Context subgraphs (triples) and verbalisation

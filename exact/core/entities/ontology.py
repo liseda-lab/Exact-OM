@@ -2,19 +2,14 @@ import logging
 import math
 import re
 import sys
-import threading
 import time
 from collections import Counter, defaultdict, deque
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Callable, Dict, List, Optional, Set, Tuple, Union
 
-from mowl.owlapi import OWLOntology
-from mowl.projection import Edge, OWL2VecStarProjector, TaxonomyProjector
-from org.semanticweb.HermiT import Reasoner
-from org.semanticweb.owlapi.model import IRI, OWLClass
-from org.semanticweb.owlapi.search import EntitySearcher
-
+from exact.core.contracts.knowledge import KnowledgeSource
 from exact.core.entities.configs.dataset import BestPathMethod, ContextMethod
+from exact.core.entities.graph import Edge
+from exact.core.entities.kinds import EntityKind
 from exact.utils.graph_search import (
     best_path_dp,
     best_path_lagrangian_relaxation,
@@ -30,11 +25,14 @@ class OntologyGraph:
 
     def __init__(
         self,
-        ontology: OWLOntology,
-        reasoner: Reasoner,
+        ontology: KnowledgeSource,
+        reasoner: object | None = None,
         only_taxonomy: bool = False,
         include_literals: bool = False,
     ) -> None:
+        self.source = ontology
+        # ``ontology`` remains as a compatibility alias for callers that only
+        # passed it through.  It is now a KnowledgeSource, never an OWLAPI object.
         self.ontology = ontology
         self.reasoner = reasoner
         self.only_taxonomy = only_taxonomy
@@ -72,7 +70,7 @@ class OntologyGraph:
 
     def __repr__(self) -> str:
         return (
-            f"OntologyGraph(ontology={self.ontology.getOntologyID().getOntologyIRI()}, "
+            f"OntologyGraph(origin={self.source.origin!s}, "
             f"NumberOfEdges={len(self.edges) if self.edges else 0}, "
             f"NumberOfNodes={len(self.graph) if self.graph else 0})"
         )
@@ -159,30 +157,10 @@ class OntologyGraph:
             level="info",
         )
 
-        if self.only_taxonomy:
-            projector = TaxonomyProjector()
-        else:
-            try:
-                projector = OWL2VecStarProjector(include_literals=self.include_literals)
-            except TypeError:
-                projector = OWL2VecStarProjector()
-
-        stop_evt = threading.Event()
-
-        def _heartbeat():
-            while not stop_evt.wait(60):
-                elapsed = time.time() - start
-                self._log(
-                    f"OntologyGraph: projection still running ({proj_name}) after {elapsed:.1f}s",
-                    level="info",
-                )
-
-        hb_thread = threading.Thread(target=_heartbeat, daemon=True)
-        hb_thread.start()
-
-        self.edges = projector.project(self.ontology)
-        stop_evt.set()
-        hb_thread.join(timeout=1)
+        method = "taxonomy" if self.only_taxonomy else "owl2vecstar"
+        self.edges = self.source.projection_edges(
+            method=method, include_literals=self.include_literals
+        )
         self.out_edges = self._build_out_edges()
         self.graph = self._build_graph(self.edges)
         self._log(
@@ -238,21 +216,12 @@ class OntologyGraph:
         If human_readable=True, keys and all class IRIs become label-lists.
         """
         if self._dr_cache is None:
-            factory = self.ontology.getOWLOntologyManager().getOWLDataFactory()
             dr: Dict[str, Dict[str, List[str]]] = {}
             for rel in self.get_relations(human_readable=False):
-                prop = factory.getOWLObjectProperty(IRI.create(rel))
-                # collect domains
-                doms = []
-                for ax in self.ontology.getObjectPropertyDomainAxioms(prop):
-                    d = ax.getDomain()
-                    doms.append(d.asOWLClass().getIRI().toString() if d.isNamed() else str(d))
-                # collect ranges
-                rngs = []
-                for ax in self.ontology.getObjectPropertyRangeAxioms(prop):
-                    r = ax.getRange()
-                    rngs.append(r.asOWLClass().getIRI().toString() if r.isNamed() else str(r))
-                dr[rel] = {"domain": doms, "range": rngs}
+                dr[rel] = {
+                    "domain": self.source.property_domains(rel),
+                    "range": self.source.property_ranges(rel),
+                }
             self._dr_cache = dr
 
         if not human_readable:
@@ -355,19 +324,8 @@ class OntologyGraph:
             if self._looks_like_literal_or_blank(iri_text):
                 self.label_cache[iri] = [self._normalize_literal_text(iri_text)]
                 return self.label_cache[iri]
-            factory = self.ontology.getOWLOntologyManager().getOWLDataFactory()
-            owl_class = factory.getOWLClass(IRI.create(iri_text))
-            label_property = (
-                self.ontology.getOWLOntologyManager().getOWLDataFactory().getRDFSLabel()
-            )
-            labels = [
-                str(annotation.getValue().asLiteral().get().getLiteral())
-                for annotation in EntitySearcher.getAnnotations(
-                    owl_class, self.ontology, label_property
-                )
-                if annotation.getValue().isLiteral()
-            ]
-            self.label_cache[iri] = labels if labels else [str(owl_class.getIRI().getShortForm())]
+            labels = self.source.labels(iri_text)
+            self.label_cache[iri] = labels if labels else [self.source.short_form(iri_text)]
         return self.label_cache[iri]
 
     @staticmethod
@@ -461,13 +419,8 @@ class OntologyGraph:
             iris.add(edge.dst)
             iris.add(edge.rel)
 
-        # Use ThreadPoolExecutor to extract labels concurrently.
-        with ThreadPoolExecutor() as executor:
-            # Submit a task for each IRI.
-            futures = {executor.submit(self.get_labels, iri): iri for iri in iris}
-            # Wait for all tasks to complete.
-            for future in as_completed(futures):
-                _ = future.result()
+        for iri in iris:
+            self.get_labels(iri)
 
     def get_context_subgraph(
         self,
@@ -756,11 +709,7 @@ class OntologyGraph:
         Return all named class IRIs present in the ontology.
         Uses the OWLAPI signature for robustness.
         """
-        out = []
-        for cls in self.ontology.getClassesInSignature():
-            # Ensure JPype java.lang.String objects are converted to native Python str.
-            out.append(str(cls.getIRI().toString()))
-        return out
+        return list(self.source.entities(EntityKind.CLASS))
 
     def get_labels_map(self) -> Dict[str, List[str]]:
         """
@@ -785,12 +734,13 @@ class Entity:
     def __init__(
         self,
         class_iri: str,
-        ontology: OWLOntology,
-        reasoner: Optional[Reasoner] = None,
+        ontology: KnowledgeSource,
+        reasoner: object | None = None,
         ontology_graph: Optional[OntologyGraph] = None,
     ) -> None:
-        self._owl_class = self._get_owl_class(class_iri, ontology)
-        self.ontology = ontology
+        self._class_iri = str(class_iri)
+        self.source = ontology
+        self.ontology = ontology  # compatibility alias
         self.reasoner = reasoner
         self.ontology_graph = ontology_graph
         self._labels: Optional[List[str]] = None
@@ -806,16 +756,18 @@ class Entity:
         )
 
     @property
-    def owl_class(self) -> OWLClass:
-        return self._owl_class
+    def owl_class(self) -> str:
+        """Compatibility alias; OWLAPI class objects are no longer exposed."""
+
+        return self._class_iri
 
     @property
     def name(self) -> str:
-        return self._owl_class.getIRI().getShortForm()
+        return self.source.short_form(self._class_iri)
 
     @property
     def class_iri(self) -> str:
-        return self._owl_class.getIRI().toString()
+        return self._class_iri
 
     @property
     def labels(self) -> List[str]:
@@ -824,99 +776,65 @@ class Entity:
                 # Use the cached labels from the OntologyGraph.
                 self._labels = self.ontology_graph.get_labels(self.class_iri)
             else:
-                self._labels = self._extract_labels(self.owl_class, self.ontology)
+                self._labels = self.source.labels(self.class_iri) or [self.name]
         return self._labels
 
     @property
     def subclasses(self) -> List[str]:
         if self._subclasses is None:
-            if self.reasoner is None:
-                if not self._reasoner_warned:
-                    print(
-                        "Entity subclasses requested without reasoner; returning empty list.",
-                        file=sys.stderr,
-                    )
-                    self._reasoner_warned = True
-                self._subclasses = []
-            else:
-                self._subclasses = [
-                    self._extract_labels(subcls.getIRI(), self.ontology)[0]
-                    for subcls in self.reasoner.getSubClasses(self.owl_class, True).getFlattened()
-                    if not subcls.isOWLNothing()
-                ]
+            self._subclasses = [
+                (self.source.labels(iri) or [self.source.short_form(iri)])[0]
+                for iri in self.source.direct_children(self.class_iri)
+            ]
         return self._subclasses
 
     @property
     def superclasses(self) -> List[str]:
         if self._superclasses is None:
-            if self.reasoner is None:
-                if not self._reasoner_warned:
-                    print(
-                        "Entity superclasses requested without reasoner; returning empty list.",
-                        file=sys.stderr,
-                    )
-                    self._reasoner_warned = True
-                self._superclasses = []
-            else:
-                self._superclasses = [
-                    self._extract_labels(supercls.getIRI(), self.ontology)[0]
-                    for supercls in self.reasoner.getSuperClasses(
-                        self.owl_class, True
-                    ).getFlattened()
-                    if not supercls.isOWLThing()
-                ]
+            self._superclasses = [
+                (self.source.labels(iri) or [self.source.short_form(iri)])[0]
+                for iri in self.source.direct_parents(self.class_iri)
+            ]
         return self._superclasses
 
     @property
     def top_superclass(self) -> List[str]:
         if self._top_superclass is None:
-            self._top_superclass = self._extract_labels(self._find_top_superclass(), self.ontology)[
-                0
-            ]
+            top_iri = self._find_top_superclass()
+            self._top_superclass = (
+                self.source.labels(top_iri) or [self.source.short_form(top_iri)]
+            )[0]
         return [self._top_superclass]
 
     def _find_top_superclass(self) -> str:
-        if self.reasoner is None:
-            if not self._reasoner_warned:
-                print(
-                    "Entity top_superclass requested without reasoner; returning self.",
-                    file=sys.stderr,
-                )
-                self._reasoner_warned = True
-            return self.owl_class.getIRI()
-        owl_class = self.owl_class
+        current = self.class_iri
+        seen = {current}
         while True:
-            superclasses = self.reasoner.getSuperClasses(owl_class, True).getFlattened()
-            valid_superclasses = [sup for sup in superclasses if not sup.isOWLThing()]
-            if not valid_superclasses:
-                break
-            owl_class = valid_superclasses[0]
-        return owl_class.getIRI()
+            parents = self.source.direct_parents(current)
+            if not parents:
+                return current
+            current = parents[0]
+            if current in seen:
+                return current
+            seen.add(current)
 
     @staticmethod
-    def _get_owl_class(class_iri: Union[IRI, str], ontology: OWLOntology) -> OWLClass:
-        if isinstance(class_iri, str):
-            class_iri = IRI.create(class_iri)
-        factory = ontology.getOWLOntologyManager().getOWLDataFactory()
-        return factory.getOWLClass(class_iri)
+    def _get_owl_class(class_iri: str, ontology: KnowledgeSource) -> str:
+        """Deprecated compatibility helper returning the normalized IRI string."""
+
+        return str(class_iri)
 
     @classmethod
-    def _extract_labels(cls, owl_class: Union[OWLClass, str], ontology: OWLOntology) -> List[str]:
-        if isinstance(owl_class, str):
-            owl_class = cls._get_owl_class(owl_class, ontology)
-        label_property = ontology.getOWLOntologyManager().getOWLDataFactory().getRDFSLabel()
-        return [
-            str(annotation.getValue().asLiteral().get().getLiteral())
-            for annotation in EntitySearcher.getAnnotations(owl_class, ontology, label_property)
-            if annotation.getValue().isLiteral()
-        ]
+    def _extract_labels(cls, owl_class: str, ontology: KnowledgeSource) -> List[str]:
+        iri = str(owl_class)
+        return ontology.labels(iri) or [ontology.short_form(iri)]
 
     @classmethod
     def load_from_list(
         cls,
         class_iris: List[str],
-        ontology: OWLOntology,
-        reasoner: Optional[Reasoner] = None,
+        ontology: KnowledgeSource,
+        reasoner: object | None = None,
         ontology_graph: Optional[OntologyGraph] = None,
         load_onto_graph: bool = False,
     ) -> List["Entity"]:
@@ -946,46 +864,7 @@ class Entity:
             return self.ontology_graph.get_context_subgraph(
                 self.class_iri, n, human_readable, **kwargs
             )
-        else:
-            local_graph = defaultdict(set)
-            current_label = self.labels[0] if self.labels else self.name
-            for sup in self.reasoner.getSuperClasses(self.owl_class, True).getFlattened():
-                if sup.isOWLThing():
-                    continue
-                sup_label = (
-                    self._extract_labels(sup, self.ontology)[0]
-                    if self._extract_labels(sup, self.ontology)
-                    else sup.getIRI().getShortForm()
-                )
-                local_graph[current_label].add(sup_label)
-                local_graph[sup_label].add(current_label)
-            for sub in self.reasoner.getSubClasses(self.owl_class, True).getFlattened():
-                if sub.isOWLNothing():
-                    continue
-                sub_label = (
-                    self._extract_labels(sub, self.ontology)[0]
-                    if self._extract_labels(sub, self.ontology)
-                    else sub.getIRI().getShortForm()
-                )
-                local_graph[current_label].add(sub_label)
-                local_graph[sub_label].add(current_label)
-            visited = {current_label: 0}
-            queue = deque([current_label])
-            while queue:
-                node = queue.popleft()
-                distance = visited[node]
-                if distance < n:
-                    for neighbor in local_graph[node]:
-                        if neighbor not in visited:
-                            visited[neighbor] = distance + 1
-                            queue.append(neighbor)
-            reachable = set(visited.keys())
-            subgraph_edges = []
-            for node in reachable:
-                for neighbor in local_graph[node]:
-                    if (
-                        neighbor in reachable
-                        and (neighbor, node, "subClassOf") not in subgraph_edges
-                    ):
-                        subgraph_edges.append((node, "subClassOf", neighbor))
-            return subgraph_edges
+        local_graph = OntologyGraph(self.source, only_taxonomy=True)
+        return local_graph.get_context_subgraph(
+            self.class_iri, n, human_readable=human_readable, **kwargs
+        )

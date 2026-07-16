@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "max_regression_fraction": 0.25,
+  "fixture": {
+    "build_hierarchy": 0.0180,
+    "candidate_generation": 0.0400,
+    "dataset_build_e2e": 0.0360,
+    "inference_throughput": 0.0450,
+    "parse_ontology": 0.0180,
+    "projection_owl2vecstar": 0.0170
+  }
+}

@@ -71,8 +71,6 @@ def build_bundle_command(cfg: Dict) -> List[str]:
         str(Path(bundle_cfg["run_dir"]).resolve()),
         "--bundle-dir",
         str(Path(bundle_cfg["bundle_dir"]).resolve()),
-        "--jvm-heap-size",
-        str(bundle_cfg.get("jvm_heap_size", "8G")),
         "--logging-level",
         str(job_cfg.get("logging_level", bundle_cfg.get("logging_level", "INFO"))),
     ]
@@ -147,7 +145,6 @@ def main() -> None:
             "ANALYSIS_DIR": _stringify(bundle_cfg.get("analysis_dir")),
             "CONFIG_PATH": _stringify(bundle_cfg.get("config_path")),
             "BUNDLE_NAME": _stringify(bundle_cfg.get("bundle_name")),
-            "JVM_HEAP_SIZE": _stringify(bundle_cfg.get("jvm_heap_size", "8G")),
             "LOGGING_LEVEL": _stringify(
                 job_cfg.get("logging_level", bundle_cfg.get("logging_level", "INFO"))
             ),

@@ -24,7 +24,6 @@ Options (all may also be provided via env vars):
   --generate-rationales | --skip-rationales
   --config-file PATH
   --device ID
-  --jvm-heap-size SIZE
   --logging-level LEVEL
   --help
 EOF
@@ -40,7 +39,6 @@ SEED=${SEED:-0}
 GENERATE_RATIONALES=${GENERATE_RATIONALES:-1}
 CONFIG_FILE=${CONFIG_FILE:-}
 DEVICE=${DEVICE:-}
-JVM_HEAP_SIZE=${JVM_HEAP_SIZE:-32G}
 LOGGING_LEVEL=${LOGGING_LEVEL:-INFO}
 
 while [[ $# -gt 0 ]]; do
@@ -56,7 +54,6 @@ while [[ $# -gt 0 ]]; do
     --skip-rationales) GENERATE_RATIONALES=0; shift ;;
     --config-file) CONFIG_FILE="$2"; shift 2 ;;
     --device) DEVICE="$2"; shift 2 ;;
-    --jvm-heap-size) JVM_HEAP_SIZE="$2"; shift 2 ;;
     --logging-level) LOGGING_LEVEL="$2"; shift 2 ;;
     --help|-h) usage; exit 0 ;;
     *) echo "Unknown option $1" >&2; usage; exit 1 ;;
@@ -70,7 +67,7 @@ fi
 
 mkdir -p "$RUN_DIR"
 
-cmd=(exact-user-study --run-dir "$RUN_DIR" --top-k "$TOP_K" --per-rank "$PER_RANK" --shortlist-per-rank "$SHORTLIST_PER_RANK" --seed "$SEED" --jvm-heap-size "$JVM_HEAP_SIZE" --logging-level "$LOGGING_LEVEL")
+cmd=(exact-user-study --run-dir "$RUN_DIR" --top-k "$TOP_K" --per-rank "$PER_RANK" --shortlist-per-rank "$SHORTLIST_PER_RANK" --seed "$SEED" --logging-level "$LOGGING_LEVEL")
 
 if [[ -n "$OUTPUT_DIR" ]]; then
   cmd+=(--output-dir "$OUTPUT_DIR")

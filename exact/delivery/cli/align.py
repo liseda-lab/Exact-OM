@@ -1,7 +1,6 @@
 import argparse
+import warnings
 from pathlib import Path
-
-from exact import init_jvm
 
 
 def run_alignment(args):
@@ -93,7 +92,7 @@ def parse_arguments():
         "-m",
         type=str,
         required=False,
-        help="JVM heap size",
+        help=argparse.SUPPRESS,
     )
     parser.add_argument(
         "--device",
@@ -126,19 +125,12 @@ def main():
         if not config_file.exists():
             raise Exception(f"Configuration file {args.config_file} does not exist")
 
-    if args.jvm_heap_size:
-        if args.jvm_heap_size.isdigit():
-            args.jvm_heap_size += "G"
-        elif not (args.jvm_heap_size[:-1].isdigit() and args.jvm_heap_size[-1].lower() == "g"):
-            raise Exception(
-                f"JVM heap size {args.jvm_heap_size} is not valid, please provide a valid format"
-            )
-    else:
-        args.jvm_heap_size = "32G"
-
-    print(f"[exact-cli] init_jvm heap={args.jvm_heap_size}", flush=True)
-
-    init_jvm(args.jvm_heap_size)
+    if args.jvm_heap_size is not None:
+        warnings.warn(
+            "--jvm_heap_size/-m is deprecated and ignored; Exact-OM no longer needs Java.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
     run_alignment(args)
 

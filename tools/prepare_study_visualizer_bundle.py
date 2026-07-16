@@ -7,12 +7,12 @@ import logging
 import os
 import shutil
 import sys
+import warnings
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
 import yaml
-from jpype import JVMNotFoundException
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
@@ -60,8 +60,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--jvm-heap-size",
         type=str,
-        default=os.getenv("EXACT_STUDY_JVM_HEAP_SIZE", "8G"),
-        help="JVM heap size used for the one-time ontology cache export.",
+        default=os.getenv("EXACT_STUDY_JVM_HEAP_SIZE"),
+        help=argparse.SUPPRESS,
     )
     parser.add_argument(
         "--overwrite",
@@ -237,7 +237,13 @@ def _bundle_readme(
 def main() -> None:
     args = parse_args()
     logger = _setup_logger(args.logging_level)
-    os.environ["EXACT_STUDY_JVM_HEAP_SIZE"] = str(args.jvm_heap_size)
+    if args.jvm_heap_size is not None:
+        warnings.warn(
+            "--jvm-heap-size and EXACT_STUDY_JVM_HEAP_SIZE are deprecated and ignored; "
+            "Exact-OM no longer needs Java.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
     run_dir = Path(args.run_dir).resolve()
     if not run_dir.exists():
@@ -277,18 +283,12 @@ def main() -> None:
     _copy_file(study_mapping_path, bundle_analysis_dir / "study_mapping.json")
     _copy_file(selected_records_path, bundle_analysis_dir / selected_records_path.name)
 
-    try:
-        ontology_cache = _build_precomputed_ontology_cache(
-            run_dir=run_dir,
-            config_path=config_path,
-            selected_records=selected_records,
-            logger=logger,
-        )
-    except JVMNotFoundException as exc:
-        raise RuntimeError(
-            "Study bundle export needs Java once to precompute ontology_cache.json. "
-            "Run this exporter in a Java-enabled environment, then commit the resulting bundle for Render."
-        ) from exc
+    ontology_cache = _build_precomputed_ontology_cache(
+        run_dir=run_dir,
+        config_path=config_path,
+        selected_records=selected_records,
+        logger=logger,
+    )
     (bundle_analysis_dir / "ontology_cache.json").write_text(
         json.dumps(ontology_cache, indent=2),
         encoding="utf-8",

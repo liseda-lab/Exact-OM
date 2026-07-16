@@ -5,6 +5,7 @@ import copy
 import json
 import logging
 import time
+import warnings
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
@@ -892,10 +893,7 @@ def _bind_model_logger(model: Any, logger: logging.Logger) -> Any:
     return model
 
 
-def _load_configs_for_rationale(config_path: Path, jvm_heap_size: str) -> Any:
-    from mowl import init_jvm
-
-    init_jvm(jvm_heap_size)
+def _load_configs_for_rationale(config_path: Path) -> Any:
     from exact.impl import bootstrap_components
 
     bootstrap_components()
@@ -1128,7 +1126,6 @@ def _backfill_explanation_fields(
     config_path: Optional[Path] = None,
     device: Optional[int] = None,
     backfill_explanations: bool = True,
-    jvm_heap_size: str = "32G",
     log_every: int = 10,
 ) -> List[Dict[str, Any]]:
     hydrated = [copy.deepcopy(record) for record in records]
@@ -1149,7 +1146,7 @@ def _backfill_explanation_fields(
                 "config_path is required to backfill explanation fields when configs is not provided."
             )
         logger.info("Loading configs for explanation backfill from %s", config_path)
-        configs = _load_configs_for_rationale(config_path=config_path, jvm_heap_size=jvm_heap_size)
+        configs = _load_configs_for_rationale(config_path=config_path)
 
     device_obj = (
         torch.device(device)
@@ -1270,7 +1267,6 @@ def _backfill_rationales(
     config_path: Optional[Path] = None,
     device: Optional[int] = None,
     generate_rationales: bool = True,
-    jvm_heap_size: str = "32G",
     log_every: int = 5,
 ) -> List[Dict[str, Any]]:
     hydrated = [copy.deepcopy(record) for record in records]
@@ -1291,7 +1287,7 @@ def _backfill_rationales(
                 "config_path is required to generate rationales when configs is not provided."
             )
         logger.info("Loading configs for rationale backfill from %s", config_path)
-        configs = _load_configs_for_rationale(config_path=config_path, jvm_heap_size=jvm_heap_size)
+        configs = _load_configs_for_rationale(config_path=config_path)
     device_obj = (
         torch.device(device)
         if device is not None and torch.cuda.is_available()
@@ -2847,9 +2843,15 @@ def run_user_study_analysis(
     config_path: Optional[Path] = None,
     device: Optional[int] = None,
     logger: Optional[logging.Logger] = None,
-    jvm_heap_size: str = "32G",
+    jvm_heap_size: Optional[str] = None,
 ) -> Dict[str, Path]:
     del seed
+    if jvm_heap_size is not None:
+        warnings.warn(
+            "jvm_heap_size is deprecated and ignored; Exact-OM no longer needs Java.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
     logger = logger or _setup_logger()
     logger.info(
         "Starting user-study analysis: run_dir=%s, output_dir=%s, top_k=%d, per_rank=%d, shortlist_per_rank=%d, backfill_explanations=%s, generate_rationales=%s",
@@ -2926,7 +2928,6 @@ def run_user_study_analysis(
         config_path=artifacts.config_path,
         device=device,
         backfill_explanations=backfill_explanations,
-        jvm_heap_size=jvm_heap_size,
     )
     selected_records_with_rationales = _backfill_rationales(
         selected_records,
@@ -2936,7 +2937,6 @@ def run_user_study_analysis(
         config_path=artifacts.config_path,
         device=device,
         generate_rationales=generate_rationales,
-        jvm_heap_size=jvm_heap_size,
     )
     selected_records_with_rationales_path = (
         output_dir / "study_selected_records_with_rationales.json"

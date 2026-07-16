@@ -77,8 +77,6 @@ def build_user_study_command(cfg: Dict) -> List[str]:
         str(analysis_cfg.get("seed", 0)),
         "--logging-level",
         str(job_cfg.get("logging_level", analysis_cfg.get("logging_level", "INFO"))),
-        "--jvm-heap-size",
-        str(analysis_cfg.get("jvm_heap_size", "32G")),
     ]
 
     output_dir = analysis_cfg.get("output_dir")
@@ -160,7 +158,6 @@ def main() -> None:
             "GENERATE_RATIONALES": "1" if analysis_cfg.get("generate_rationales", True) else "0",
             "CONFIG_FILE": _stringify(analysis_cfg.get("config_file")),
             "DEVICE": _stringify(analysis_cfg.get("device")),
-            "JVM_HEAP_SIZE": _stringify(analysis_cfg.get("jvm_heap_size", "32G")),
             "LOGGING_LEVEL": _stringify(
                 job_cfg.get("logging_level", analysis_cfg.get("logging_level", "INFO"))
             ),

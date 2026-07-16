@@ -60,7 +60,6 @@ The project is managed with Poetry.
 ### Requirements
 
 - Python 3.10
-- Java available on the system path for JVM-based preprocessing
 - Poetry
 - CUDA-capable GPU if you want GPU execution; CPU-only runs are also supported
 
@@ -106,7 +105,6 @@ Useful optional inputs:
   slices
 - `-e` / `--run_eval`: run evaluation after inference
 - `-d` / `--device`: CUDA device id; omit for CPU
-- `-m` / `--jvm_heap_size`: heap size passed to the JVM, for example `32G`
 - `-l` / `--save_logs`: write `exact.log` inside the output directory
 
 Example:

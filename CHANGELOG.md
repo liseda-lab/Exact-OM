@@ -14,6 +14,8 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Packaging for the existing study visualizer runtime.
 - Registered `builtin` and optional `bioml` evaluation backends with canonical JSON reports.
 - Reference/candidate SHA-256 provenance and selector-calibration hash guards.
+- A Java-free OWL parser, indexed knowledge-source backend, asserted reasoner plugin seam,
+  parity fixtures, and performance regression harness.
 
 ### Changed
 
@@ -22,6 +24,8 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Consolidated shared formatting and numeric helpers.
 - Restricted learned LLM calibration samples to training-reference sources.
 - Kept historical builtin evaluation CSVs while namespacing multi-backend results.
+- Replaced the OWL-API/mOWL runtime with `py-horned-owl` plus an RDFLib parser fallback;
+  legacy heap arguments remain accepted with deprecation warnings and are ignored.
 
 ### Fixed
 

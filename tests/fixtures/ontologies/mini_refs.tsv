@@ -1,0 +1,6 @@
+SrcEntity	TgtEntity	Score
+http://example.org/mini/src#Heart	http://example.org/mini/tgt#CardiacOrgan	1.0
+http://example.org/mini/src#Lung	http://example.org/mini/tgt#PulmonaryOrgan	1.0
+http://example.org/mini/src#Kidney	http://example.org/mini/tgt#RenalOrgan	1.0
+http://example.org/mini/src#Patient	http://example.org/mini/tgt#CareRecipient	1.0
+http://example.org/mini/src#ChestPain	http://example.org/mini/tgt#ThoracicPain	1.0

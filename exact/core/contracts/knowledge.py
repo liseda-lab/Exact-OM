@@ -1,0 +1,43 @@
+from pathlib import Path
+from typing import Mapping, Protocol, Sequence, runtime_checkable
+
+from exact.core.entities.graph import AnnotationValue, Edge
+from exact.core.entities.kinds import EntityKind
+
+
+@runtime_checkable
+class KnowledgeSource(Protocol):
+    """Read-only backend seam consumed by datasets and graph views."""
+
+    @property
+    def origin(self) -> Path | None: ...
+
+    def entities(self, kind: EntityKind = EntityKind.CLASS) -> Sequence[str]: ...
+
+    def labels(self, iri: str) -> list[str]: ...
+
+    def annotations(
+        self, iri: str, properties: Sequence[str] | None = None
+    ) -> list[AnnotationValue]: ...
+
+    def attributes(self, iri: str) -> list[AnnotationValue]: ...
+
+    def direct_parents(self, iri: str, kind: EntityKind = EntityKind.CLASS) -> list[str]: ...
+
+    def direct_children(self, iri: str, kind: EntityKind = EntityKind.CLASS) -> list[str]: ...
+
+    def hierarchy_bundle(
+        self, iri: str, families: Mapping[str, Sequence[str]]
+    ) -> dict[str, list[str]]: ...
+
+    def projection_edges(
+        self, *, method: str = "owl2vecstar", include_literals: bool = False
+    ) -> list[Edge]: ...
+
+    def property_domains(self, prop_iri: str) -> list[str]: ...
+
+    def property_ranges(self, prop_iri: str) -> list[str]: ...
+
+    def excluded_from_alignment(self) -> frozenset[str]: ...
+
+    def short_form(self, iri: str) -> str: ...

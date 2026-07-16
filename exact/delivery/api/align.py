@@ -1,7 +1,6 @@
+import warnings
 from pathlib import Path
 from typing import Optional
-
-from exact import init_jvm
 
 
 class AlignmentRunner:
@@ -19,7 +18,7 @@ class AlignmentRunner:
         candidates_file: Optional[str] = None,
         config_file: Optional[str] = None,
         save_logs: bool = False,
-        jvm_heap_size: str = "32g",
+        jvm_heap_size: Optional[str] = None,
         run_eval: bool = False,
         device: Optional[
             int
@@ -98,18 +97,15 @@ class AlignmentRunner:
             if not config_file.exists():
                 raise Exception(f"Configuration file {self.config_file} does not exist")
 
-        if self.jvm_heap_size.isdigit():
-            self.jvm_heap_size += "G"
-        elif not (self.jvm_heap_size[:-1].isdigit() and self.jvm_heap_size[-1].lower() == "g"):
-            raise Exception(
-                f"JVM heap size {self.jvm_heap_size} is not valid, please provide a valid format"
-            )
-
     def run(self) -> None:
 
         self.validate_files()
 
-        print(f"[exact-api] init_jvm heap={self.jvm_heap_size}", flush=True)
-        init_jvm(self.jvm_heap_size)
+        if self.jvm_heap_size is not None:
+            warnings.warn(
+                "jvm_heap_size is deprecated and ignored; Exact-OM no longer needs Java.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
 
         self.run_alignment()

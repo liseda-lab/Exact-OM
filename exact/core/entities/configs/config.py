@@ -81,10 +81,7 @@ class DatasetParams(BaseModel):
         config["dataset_params"].get("add_connectivity_bridges", True)
     )
     bridge_max_hops: Optional[int] = Field(config["dataset_params"].get("bridge_max_hops", None))
-    reasoner_timeout_secs: float = Field(config["dataset_params"].get("reasoner_timeout_secs", 120))
-    reasoner_force_hermit: bool = Field(
-        config["dataset_params"].get("reasoner_force_hermit", False)
-    )
+    reasoner: str = Field(config["dataset_params"].get("reasoner", "asserted"))
     projection_include_literals: bool = Field(
         config["dataset_params"].get("projection_include_literals", False)
     )

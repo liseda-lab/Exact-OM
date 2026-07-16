@@ -1,5 +1,6 @@
 import argparse
 import logging
+import warnings
 from pathlib import Path
 
 from exact.analysis.user_study import run_user_study_analysis
@@ -74,8 +75,8 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument(
         "--jvm-heap-size",
         type=str,
-        default="32G",
-        help="JVM heap size used only if rationale backfill needs to instantiate the model.",
+        default=None,
+        help=argparse.SUPPRESS,
     )
     parser.add_argument(
         "--logging-level",
@@ -88,6 +89,12 @@ def parse_arguments() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_arguments()
+    if args.jvm_heap_size is not None:
+        warnings.warn(
+            "--jvm-heap-size is deprecated and ignored; Exact-OM no longer needs Java.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
     run_dir = Path(args.run_dir).resolve()
     if not run_dir.exists():
         raise FileNotFoundError(f"Run directory does not exist: {run_dir}")
@@ -130,7 +137,6 @@ def main() -> None:
         config_path=Path(args.config_file).resolve() if args.config_file else None,
         device=args.device,
         logger=logger,
-        jvm_heap_size=args.jvm_heap_size,
     )
 
     print("Wrote user-study analysis artifacts:", flush=True)

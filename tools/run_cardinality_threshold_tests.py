@@ -6,11 +6,10 @@ from __future__ import annotations
 
 import argparse
 import csv
+import warnings
 from itertools import product
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Union
-
-from exact import init_jvm
 
 
 def _as_list(values: Optional[Iterable[Any]], default: Optional[Sequence[Any]]) -> List[Any]:
@@ -136,8 +135,8 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--jvm-heap-size",
-        default="32G",
-        help="Heap size passed to exact.init_jvm (accepts values like 16G or 48G).",
+        default=None,
+        help=argparse.SUPPRESS,
     )
     return parser.parse_args()
 
@@ -167,7 +166,12 @@ def run() -> None:
             "Provide either --full-reference-file for global evaluation or --reference-candidates-file for local evaluation."
         )
 
-    init_jvm(str(args.jvm_heap_size))
+    if args.jvm_heap_size is not None:
+        warnings.warn(
+            "--jvm-heap-size is deprecated and ignored; Exact-OM no longer needs Java.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
     from exact.core.actions.evaluation import EvaluationAction
     from exact.core.entities.mappings import EntityMapping

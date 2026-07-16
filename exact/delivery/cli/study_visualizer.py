@@ -1,11 +1,10 @@
 import argparse
 import logging
 import os
+import warnings
 from pathlib import Path
 
 import uvicorn
-from jpype import JVMNotFoundException
-from mowl import init_jvm
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -44,8 +43,8 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument(
         "--jvm-heap-size",
         type=str,
-        default=os.getenv("EXACT_STUDY_JVM_HEAP_SIZE", "32G"),
-        help="JVM heap size used for ontology-backed study expansion.",
+        default=os.getenv("EXACT_STUDY_JVM_HEAP_SIZE"),
+        help=argparse.SUPPRESS,
     )
     parser.add_argument(
         "--disable-ontology-info",
@@ -71,15 +70,13 @@ def main() -> None:
     if not args.run_dir:
         raise RuntimeError("Study visualizer requires --run-dir or EXACT_STUDY_RUN_DIR.")
 
-    if args.jvm_heap_size:
-        if args.jvm_heap_size.isdigit():
-            args.jvm_heap_size += "G"
-        elif not (args.jvm_heap_size[:-1].isdigit() and args.jvm_heap_size[-1].lower() == "g"):
-            raise Exception(
-                f"JVM heap size {args.jvm_heap_size} is not valid, please provide a valid format"
-            )
-    else:
-        args.jvm_heap_size = "32G"
+    if args.jvm_heap_size is not None:
+        warnings.warn(
+            "--jvm-heap-size and EXACT_STUDY_JVM_HEAP_SIZE are deprecated and ignored; "
+            "Exact-OM no longer needs Java.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
     run_dir = Path(args.run_dir).resolve()
     if not run_dir.exists():
@@ -94,16 +91,6 @@ def main() -> None:
     logger = logging.getLogger("exact.study_visualizer")
     logger.setLevel(level)
     logger.info("Starting study visualizer for run_dir=%s analysis_dir=%s", run_dir, analysis_dir)
-
-    if args.enable_ontology_info:
-        logger.info("Initializing JVM for study visualizer with heap=%s", args.jvm_heap_size)
-        try:
-            init_jvm(args.jvm_heap_size)
-        except JVMNotFoundException as exc:
-            raise RuntimeError(
-                "Study visualizer requires a working Java runtime when ontology info is enabled. "
-                "Install a JDK/JRE and set JAVA_HOME so libjvm.so is available, or rerun with --disable-ontology-info."
-            ) from exc
 
     from study_visualizer_runtime.app import create_study_visualizer_app
 

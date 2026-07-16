@@ -2,13 +2,11 @@ from __future__ import annotations
 
 import time
 from collections import defaultdict
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
-from org.semanticweb.owlapi.model import IRI
-from org.semanticweb.owlapi.search import EntitySearcher
 
 from exact.core.entities.ontology import OntologyGraph
 from exact.impl.datasets.contextgraph import ContextDataset
@@ -85,8 +83,7 @@ class PairAdaptiveContextDataset(ContextDataset):
         if self._source_graph is None:
             self.log("Loading source graph for pair-adaptive dataset…", level="info")
             self._source_graph = OntologyGraph(
-                self.source.ontology,
-                self.source_reasoner,
+                self.source,
                 only_taxonomy=False,
                 include_literals=self.projection_include_literals,
             )
@@ -97,8 +94,7 @@ class PairAdaptiveContextDataset(ContextDataset):
         if self._target_graph is None:
             self.log("Loading target graph for pair-adaptive dataset…", level="info")
             self._target_graph = OntologyGraph(
-                self.target.ontology,
-                self.target_reasoner,
+                self.target,
                 only_taxonomy=False,
                 include_literals=self.projection_include_literals,
             )
@@ -125,114 +121,13 @@ class PairAdaptiveContextDataset(ContextDataset):
         cached = self._direct_superclass_cache.get(cache_key)
         if cached is not None:
             return list(cached)
-        reasoner = self.source_reasoner if side == "src" else self.target_reasoner
-        ontology = self.source.ontology if side == "src" else self.target.ontology
-        factory = ontology.getOWLOntologyManager().getOWLDataFactory()
-        owl_class = factory.getOWLClass(IRI.create(iri))
-        out: List[str] = []
-        try:
-            superset = reasoner.getSuperClasses(owl_class, True).getFlattened()
-            for sup in superset:
-                if not sup.isOWLThing():
-                    out.append(str(sup.getIRI().toString()))
-        except Exception:
-            pass
+        source = self.source if side == "src" else self.target
+        out = source.direct_parents(iri)
         self._direct_superclass_cache[cache_key] = list(out)
         return out
 
-    def _ontology_for_side(self, side: str):
-        return self.source.ontology if side == "src" else self.target.ontology
-
-    @staticmethod
-    def _iter_java_items(value: Any) -> Iterable[Any]:
-        if value is None:
-            return []
-        try:
-            iterator = value.iterator()
-            out: List[Any] = []
-            while iterator.hasNext():
-                out.append(iterator.next())
-            return out
-        except Exception:
-            try:
-                return list(value)
-            except Exception:
-                return []
-
-    @staticmethod
-    def _named_class_iri(expr: Any) -> Optional[str]:
-        if expr is None:
-            return None
-        try:
-            if expr.isOWLClass():
-                return str(expr.asOWLClass().getIRI().toString())
-        except Exception:
-            pass
-        try:
-            owl_class = expr.asOWLClass()
-            return str(owl_class.getIRI().toString())
-        except Exception:
-            return None
-
-    @staticmethod
-    def _property_iri(prop_expr: Any) -> Optional[str]:
-        if prop_expr is None:
-            return None
-        try:
-            named = prop_expr.getNamedProperty()
-            return str(named.getIRI().toString())
-        except Exception:
-            pass
-        try:
-            if not prop_expr.isAnonymous():
-                return str(prop_expr.asOWLObjectProperty().getIRI().toString())
-        except Exception:
-            pass
-        try:
-            return str(prop_expr.toStringID())
-        except Exception:
-            return None
-
-    def _iter_hierarchy_targets(
-        self,
-        expr: Any,
-        graph: OntologyGraph,
-    ) -> List[Tuple[str, str]]:
-        out: List[Tuple[str, str]] = []
-        named_iri = self._named_class_iri(expr)
-        if named_iri:
-            out.append(("is_a", named_iri))
-            return out
-
-        expr_type = ""
-        try:
-            expr_type = str(expr.getClassExpressionType().toString())
-        except Exception:
-            expr_type = ""
-
-        if (
-            "Intersection" in expr_type
-            or hasattr(expr, "getOperandsAsList")
-            or hasattr(expr, "getOperands")
-        ):
-            operands = []
-            try:
-                operands = self._iter_java_items(expr.getOperandsAsList())
-            except Exception:
-                operands = self._iter_java_items(getattr(expr, "getOperands", lambda: [])())
-            for operand in operands:
-                out.extend(self._iter_hierarchy_targets(operand, graph))
-
-        if hasattr(expr, "getProperty") and hasattr(expr, "getFiller"):
-            prop_iri = self._property_iri(expr.getProperty())
-            filler_iri = self._named_class_iri(expr.getFiller())
-            family = self._relation_family(graph, prop_iri or "")
-            if family and filler_iri:
-                out.append((family, filler_iri))
-            else:
-                out.extend(self._iter_hierarchy_targets(expr.getFiller(), graph))
-
-        return out
+    def _source_for_side(self, side: str):
+        return self.source if side == "src" else self.target
 
     def _hierarchy_axiom_targets(
         self,
@@ -244,34 +139,20 @@ class PairAdaptiveContextDataset(ContextDataset):
         cached = self._hierarchy_axiom_targets_cache.get(cache_key)
         if cached is not None:
             return list(cached)
-        ontology = self._ontology_for_side(side)
-        factory = ontology.getOWLOntologyManager().getOWLDataFactory()
-        owl_class = factory.getOWLClass(IRI.create(iri))
-        out: List[Tuple[str, str]] = []
+        source = self._source_for_side(side)
+        family_properties: Dict[str, List[str]] = {"is_a": []}
+        for family, cfg in self.hierarchical_relation_families.items():
+            family_properties[family] = list(cfg.get("iri_aliases") or [])
+        for relation_iri in graph.get_relations(human_readable=False):
+            family = self._relation_family(graph, relation_iri)
+            if family:
+                family_properties.setdefault(family, []).append(relation_iri)
 
-        try:
-            for axiom in self._iter_java_items(ontology.getSubClassAxiomsForSubClass(owl_class)):
-                try:
-                    out.extend(self._iter_hierarchy_targets(axiom.getSuperClass(), graph))
-                except Exception:
-                    continue
-        except Exception:
-            pass
-
-        try:
-            for axiom in self._iter_java_items(ontology.getEquivalentClassesAxioms(owl_class)):
-                expressions = []
-                try:
-                    expressions = self._iter_java_items(axiom.getClassExpressionsAsList())
-                except Exception:
-                    expressions = self._iter_java_items(axiom.getClassExpressions())
-                for expr in expressions:
-                    named = self._named_class_iri(expr)
-                    if named and named == iri:
-                        continue
-                    out.extend(self._iter_hierarchy_targets(expr, graph))
-        except Exception:
-            pass
+        out = [
+            (family, target)
+            for family, targets in source.hierarchy_bundle(iri, family_properties).items()
+            for target in targets
+        ]
 
         deduped: List[Tuple[str, str]] = []
         seen = set()
@@ -374,42 +255,27 @@ class PairAdaptiveContextDataset(ContextDataset):
         return triples[: self.max_object_triples]
 
     def _annotation_bundle(self, iri: str, graph: OntologyGraph, side: str) -> List[Dict[str, Any]]:
-        ontology = self.source.ontology if side == "src" else self.target.ontology
-        factory = ontology.getOWLOntologyManager().getOWLDataFactory()
-        owl_class = factory.getOWLClass(IRI.create(iri))
-        label_prop = str(factory.getRDFSLabel().getIRI().toString())
+        source = self.source if side == "src" else self.target
         items: List[Dict[str, Any]] = []
         seen = set()
-        try:
-            annotations = EntitySearcher.getAnnotations(owl_class, ontology)
-            iterator = annotations.iterator()
-            while iterator.hasNext():
-                ann = iterator.next()
-                prop_iri = str(ann.getProperty().getIRI().toString())
-                if prop_iri == label_prop:
-                    continue
-                value = ann.getValue()
-                if not value.isLiteral():
-                    continue
-                literal = str(value.asLiteral().get().getLiteral()).strip()
-                if not literal:
-                    continue
-                prop_label = graph.get_labels(prop_iri)[0]
-                dedupe_key = (prop_label, literal)
-                if dedupe_key in seen:
-                    continue
-                seen.add(dedupe_key)
-                items.append(
-                    {
-                        "prop": prop_label,
-                        "value": literal,
-                        "text": f"{prop_label}: {literal}",
-                        "weight": min(1.0, max(0.1, len(literal.split()) / 12.0)),
-                        "entity_iri": iri,
-                    }
-                )
-        except Exception:
-            pass
+        for value in source.attributes(iri):
+            literal = value.value.strip()
+            if not value.is_literal or not literal:
+                continue
+            prop_label = graph.get_labels(value.property_iri)[0]
+            dedupe_key = (prop_label, literal)
+            if dedupe_key in seen:
+                continue
+            seen.add(dedupe_key)
+            items.append(
+                {
+                    "prop": prop_label,
+                    "value": literal,
+                    "text": f"{prop_label}: {literal}",
+                    "weight": min(1.0, max(0.1, len(literal.split()) / 12.0)),
+                    "entity_iri": iri,
+                }
+            )
 
         if self.projection_include_literals:
             for src, rel, dst in graph.get_raw_neighborhood(iri, self.n_hops):

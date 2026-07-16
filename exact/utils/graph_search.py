@@ -1,7 +1,7 @@
 from collections import defaultdict, deque, namedtuple
 from typing import Callable, Dict, List, Optional, Set, Tuple
 
-from mowl.projection import Edge
+from exact.core.entities.graph import Edge
 
 
 def best_path_dp(

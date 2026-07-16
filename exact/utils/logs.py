@@ -21,7 +21,7 @@ def categorize_log_message(message: str) -> str:
         return text[1 : text.index("]")].strip() or "runtime"
     category_patterns = (
         ("progress", ("progress:", " eta ", "current=", "missing=")),
-        ("setup", ("configuration", "seed", "jvm", "logging", "device")),
+        ("setup", ("configuration", "seed", "logging", "device")),
         ("dataset", ("dataset", "ontology", "candidate generation", "sanity")),
         ("alignment", ("alignment", "semantic alignment", "inference", "prefilter")),
         ("selector", ("candidate-set selector", "target conflict resolver")),
@@ -339,7 +339,7 @@ def capture_stdout(logger_fn, level="info"):
     """
     Captures:
       1) Python-level writes (print(), tqdm without file=)
-      2) C-level writes to fd 1 & 2 (so Java System.out/err via JPype/JYPe)
+      2) C-level writes to file descriptors 1 and 2
     and redirects them into logger_fn(message, level).
     """
     # --- 1) Set up a pipe for C-level FD redirection

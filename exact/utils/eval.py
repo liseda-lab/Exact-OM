@@ -4,12 +4,8 @@ from ast import literal_eval
 from collections import defaultdict
 from typing import DefaultDict, Dict, List, Optional, Tuple
 
-from mowl.owlapi import OWLOntology
-from org.semanticweb.owlapi.model import (
-    IRI,
-    OWLLiteral,
-)
-
+from exact.core.contracts.knowledge import KnowledgeSource
+from exact.core.entities.kinds import EntityKind
 from exact.core.entities.mappings import EntityMapping, ReferenceMapping
 from exact.core.values import ANNOTATION_IRI
 from exact.utils.data import read_table
@@ -34,7 +30,7 @@ class MetricUtils:
 
     @staticmethod
     def get_ignored_class_index(
-        ontology: OWLOntology, annotation_iri: str = ANNOTATION_IRI
+        ontology: KnowledgeSource, annotation_iri: str = ANNOTATION_IRI
     ) -> DefaultDict[str, bool]:
         """
         Get an index for filtering classes that are marked as not used in alignment.
@@ -42,7 +38,7 @@ class MetricUtils:
         This is indicated by the special class annotation `use_in_alignment` with the provided IRI.
 
         Parameters:
-            ontology (OWLOntology): The ontology object to process.
+            ontology (KnowledgeSource): The indexed source to process.
             annotation_iri (str): The IRI of the annotation indicating usage in alignment. Defaults to
                                 "http://oaei.ontologymatching.org/bio-ml/ann/use_in_alignment".
 
@@ -51,18 +47,17 @@ class MetricUtils:
         """
         ignored_class_index: DefaultDict[str, bool] = defaultdict(lambda: False)
 
-        # Create an OWLAnnotationProperty for the given IRI
-        factory = ontology.getOWLOntologyManager().getOWLDataFactory()
-        annotation_property = factory.getOWLAnnotationProperty(IRI.create(annotation_iri))
+        if annotation_iri == ANNOTATION_IRI:
+            for iri in ontology.excluded_from_alignment():
+                ignored_class_index[iri] = True
+            return ignored_class_index
 
-        # Iterate through all classes in the ontology
-        for owl_class in ontology.getClassesInSignature():
-            # Get annotations for the class
-            for axiom in ontology.getAnnotationAssertionAxioms(owl_class.getIRI()):
-                if axiom.getProperty() == annotation_property:
-                    value = axiom.getValue()
-                    if isinstance(value, OWLLiteral) and str(value.getLiteral()).lower() == "false":
-                        ignored_class_index[owl_class.getIRI().toString()] = True
+        for iri in ontology.entities(EntityKind.CLASS):
+            if any(
+                value.is_literal and value.value.strip().lower() in {"false", "0"}
+                for value in ontology.annotations(iri, (annotation_iri,))
+            ):
+                ignored_class_index[iri] = True
 
         return ignored_class_index
 

@@ -64,8 +64,7 @@ dataset_params:
   filter_exact_matches: True # Remove exact lexical matches before scoring.
   drop_exact_match_sources: False # If True, remove all candidates for sources with an exact exact-match hit.
   filter_ignored_alignment_classes: True # Remove use_in_alignment=false ontology classes before candidate generation and exact matching.
-  reasoner_timeout_secs: 120 # Timeout for ontology reasoner construction, in seconds.
-  reasoner_force_hermit: False # If True, force a HermiT retry after lighter reasoners.
+  reasoner: asserted # Pure-Python asserted hierarchy; plugins may register other reasoners.
   projection_include_literals: True # Pair-adaptive: if True, projected literal/annotation edges can feed attribute/support evidence in addition to ontology-native annotations.
   hierarchy_max_depth: 2 # Pair-adaptive: max ontology-native hierarchy depth collected per configured relation family.
   max_hierarchy_triples_per_family: 6 # Pair-adaptive: max hierarchy triples kept per family and entity before pair-specific selection.
@@ -170,7 +169,7 @@ plot_params:
 inference_params:
   # Inference runner settings.
   batch_size: 512 # Candidate-pair batch size passed to the semantic scorer.
-  num_workers: 0 # DataLoader worker count for inference; 0 avoids fork stalls after JVM/HF tokenizer initialization.
+  num_workers: 0 # DataLoader worker count for inference; 0 is the deterministic default.
   log_every: 10 # Emit inference progress logs every N batches.
   mixed_precision: True # Use torch autocast on GPU where supported.
   which: ["S_final", "S_base", "S_struct", "s_label", "s_hier", "s_sim", "s_diff", "s_attr", "I_label", "I_struct", "I_hier", "I_sim", "I_diff", "I_attr", "I_llm", "w_c", "w_i", "U", "U_ind", "U_dis", "p_llm"]

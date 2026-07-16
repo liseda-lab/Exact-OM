@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import warnings
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -11,7 +12,6 @@ import pandas as pd
 import torch
 import yaml
 
-from exact import init_jvm
 from exact.analysis.candidate_recall import (
     analyze_candidate_recall,
     flatten_candidate_recall,
@@ -31,7 +31,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--output-dir", type=Path, required=True, help="Directory for recall outputs."
     )
-    parser.add_argument("--jvm-heap-size", default="32G", help="Heap size for exact.init_jvm.")
+    parser.add_argument("--jvm-heap-size", default=None, help=argparse.SUPPRESS)
     parser.add_argument(
         "--device", default=None, help="CUDA device id; CPU is used when CUDA is unavailable."
     )
@@ -43,7 +43,12 @@ def main() -> None:
     args.output_dir.mkdir(parents=True, exist_ok=True)
     _setup_logging(args.output_dir)
 
-    init_jvm(_normalize_heap_size(args.jvm_heap_size))
+    if args.jvm_heap_size is not None:
+        warnings.warn(
+            "--jvm-heap-size is deprecated and ignored; Exact-OM no longer needs Java.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
     from exact.impl import bootstrap_components
 
@@ -187,11 +192,6 @@ def _resolve_device(device_arg: Optional[str]) -> torch.device:
     if torch.cuda.is_available():
         return torch.device(f"cuda:{int(device_arg)}")
     return torch.device("cpu")
-
-
-def _normalize_heap_size(value: str) -> str:
-    text = str(value or "32G").strip()
-    return f"{text}G" if text.isdigit() else text
 
 
 def _setup_logging(output_dir: Path) -> None:

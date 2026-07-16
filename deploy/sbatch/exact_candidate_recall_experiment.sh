@@ -17,7 +17,6 @@ Options:
   --run-config PATH
   --output-dir PATH
   --top-k "20 40 60" or --top-k 20 40 60
-  --jvm-heap-size SIZE
   --device ID
   --python-bin PATH
   --help
@@ -27,7 +26,6 @@ EOF
 RUN_CONFIG=${RUN_CONFIG:-exp/test/Full_global/ncit_doid_global.yaml}
 OUTPUT_DIR=${OUTPUT_DIR:-exp/test/candidate_recall}
 TOP_K_VALUES=()
-JVM_HEAP_SIZE=${JVM_HEAP_SIZE:-32G}
 DEVICE=${DEVICE:-}
 PYTHON_BIN=${PYTHON_BIN:-./.venv/bin/python}
 
@@ -42,7 +40,6 @@ while [[ $# -gt 0 ]]; do
         shift
       done
       ;;
-    --jvm-heap-size) JVM_HEAP_SIZE="$2"; shift 2 ;;
     --device) DEVICE="$2"; shift 2 ;;
     --python-bin) PYTHON_BIN="$2"; shift 2 ;;
     --help|-h) usage; exit 0 ;;
@@ -63,8 +60,7 @@ fi
 cmd=("$PYTHON_BIN" tools/run_candidate_recall_experiment.py
   --run-config "$RUN_CONFIG"
   --output-dir "$OUTPUT_DIR"
-  --top-k "${TOP_K_VALUES[@]}"
-  --jvm-heap-size "$JVM_HEAP_SIZE")
+  --top-k "${TOP_K_VALUES[@]}")
 
 if [[ -n "$DEVICE" ]]; then
   cmd+=(--device "$DEVICE")

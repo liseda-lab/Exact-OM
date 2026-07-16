@@ -45,7 +45,6 @@ bundle:
   run_dir: /home/pgcotovio/Exact-OM/exp/test/Full_local_bioml_with_exp/omim-ordo
   bundle_dir: /home/pgcotovio/Exact-OM/deploy/render/study_bundles/omim-ordo
   overwrite: true
-  jvm_heap_size: 8G
 
 job:
   name: prepare_omim_ordo_bundle
@@ -67,9 +66,8 @@ The generated bundle contains:
 - `analysis/user_study/study_selected_records_with_rationales.json` or fallback
 - `analysis/user_study/ontology_cache.json`
 
-`ontology_cache.json` is built offline from the source ontologies. That export
-step still requires a Java-enabled compute environment once, but the deployed
-service does not.
+`ontology_cache.json` is built offline from the source ontologies using Exact's
+pure-Python ontology backend.
 
 ## Image tightening choices
 
@@ -83,7 +81,7 @@ The current Render image is intentionally split into stages:
   - the `deploy/render/` assets
   - the exported frontend under `explanations_visualizer/out`
 
-This avoids shipping Node, npm, Java, the ontology-matching stack, or the full
+This avoids shipping Node, npm, the ontology-matching stack, or the full
 repository into the final running container.
 
 ## Render env vars
