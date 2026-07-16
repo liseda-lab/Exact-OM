@@ -41,7 +41,7 @@ jobs:
             echo "Java runtime reference found outside compatibility shims" >&2
             exit 1
           fi
-      - run: poetry run pytest -m "not requires_data and not slow" --cov=exact
+      - run: poetry run pytest -m "not requires_data and not slow and not requires_cuda and not requires_openrouter" --cov=exact
 
   benchmark:
     runs-on: ubuntu-latest

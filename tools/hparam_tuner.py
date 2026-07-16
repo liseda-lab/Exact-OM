@@ -20,6 +20,9 @@ from typing import Dict, Iterable, List, Sequence, Tuple
 
 import yaml
 
+from exact.core.entities.configs.config import ConfigModel
+from exact.core.entities.configs.migration import V1_TO_V2
+
 
 @dataclass(frozen=True)
 class ParamSpec:
@@ -122,18 +125,55 @@ def set_nested(mapping: dict, dotted_key: str, value) -> None:
     parts = dotted_key.split(".")
     target = mapping
     for part in parts[:-1]:
-        if part not in target:
-            raise KeyError(f"Cannot set '{dotted_key}': missing intermediate key '{part}'.")
-        target = target[part]
-    target[parts[-1]] = value
+        if isinstance(target, list):
+            if not part.isdigit() or int(part) >= len(target):
+                raise KeyError(f"Cannot set '{dotted_key}': invalid list index '{part}'.")
+            target = target[int(part)]
+        else:
+            if part not in target:
+                raise KeyError(f"Cannot set '{dotted_key}': missing intermediate key '{part}'.")
+            target = target[part]
+    leaf = parts[-1]
+    if isinstance(target, list):
+        if not leaf.isdigit() or int(leaf) >= len(target):
+            raise KeyError(f"Cannot set '{dotted_key}': invalid list index '{leaf}'.")
+        target[int(leaf)] = value
+    else:
+        target[leaf] = value
 
 
 def get_nested(mapping: dict, dotted_key: str):
     parts = dotted_key.split(".")
     target = mapping
     for part in parts:
-        target = target[part]
+        target = target[int(part)] if isinstance(target, list) else target[part]
     return target
+
+
+def translate_parameter_path(dotted_key: str) -> str:
+    """Translate one legacy tuner path to its canonical v2 location."""
+
+    dynamic_prefixes = {
+        "model.params.": "pipeline.0.params.",
+        "second_model.params.": "pipeline.1.params.",
+        "llm_profiles.": "llm.profiles.",
+        "llm_routing.": "llm.routing.",
+        "evaluation.bioml.": "evaluation.bioml.",
+        "dataset_params.hierarchical_relation_families.": (
+            "dataset.hierarchical_relation_families."
+        ),
+    }
+    for old_prefix, new_prefix in dynamic_prefixes.items():
+        if dotted_key.startswith(old_prefix):
+            return new_prefix + dotted_key[len(old_prefix) :]
+    target = V1_TO_V2.get(dotted_key)
+    return target if isinstance(target, str) else dotted_key
+
+
+def resolve_base_config(raw: dict) -> dict:
+    """Migrate v1 templates and expand them to a complete canonical v2 dump."""
+
+    return ConfigModel.from_mapping(raw, warn_v1=False).model_dump(mode="json", by_alias=True)
 
 
 def grid_trials(params: Sequence[ParamSpec]) -> List[Dict[str, object]]:
@@ -353,6 +393,7 @@ def create_trial_files(
     config = json.loads(json.dumps(config_template))
     for key, value in param_values.items():
         set_nested(config, key, value)
+    config = resolve_base_config(config)
     ensure_dir(trial_dir)
     config_path = trial_dir / "config.yaml"
     write_yaml(config_path, config)
@@ -417,9 +458,10 @@ def main() -> None:
     config_dir = tuner_config_path.parent
     extra_files = resolve_extra_files(tuner_cfg.get("extra_files"), config_dir)
     base_config_path = Path(tuner_cfg["base_config"]).resolve()
-    base_config = load_yaml(base_config_path)
+    base_config = resolve_base_config(load_yaml(base_config_path))
     params = [
-        ParamSpec.from_mapping(name, spec) for name, spec in tuner_cfg["search_space"].items()
+        ParamSpec.from_mapping(translate_parameter_path(name), spec)
+        for name, spec in tuner_cfg["search_space"].items()
     ]
     experiment_root = Path(tuner_cfg["experiment_root"]).resolve()
     if args.dry_run:
@@ -435,9 +477,13 @@ def main() -> None:
     elif args.strategy == "per_param":
         trial_params = per_param_trials(params)
     else:
-        trial_params = smart_trials(
-            params, tuner_cfg.get("smart", {}), base_config, args.num_samples
-        )
+        smart_cfg = json.loads(json.dumps(tuner_cfg.get("smart", {})))
+        for anchor in smart_cfg.get("anchor_configs", []) or []:
+            anchor["values"] = {
+                translate_parameter_path(name): value
+                for name, value in (anchor.get("values") or {}).items()
+            }
+        trial_params = smart_trials(params, smart_cfg, base_config, args.num_samples)
 
     if not trial_params:
         raise SystemExit("No trials generated.")

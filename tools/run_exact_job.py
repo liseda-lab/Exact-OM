@@ -58,10 +58,14 @@ def _normalize_sbatch_args(value) -> List[str]:
 
 
 def build_exact_command(cfg: Dict) -> List[str]:
-    dataset_cfg = cfg["dataset"]
+    """Build a command from either the legacy ``dataset`` or v2 ``data`` wrapper."""
+
+    dataset_cfg = cfg.get("data") or cfg.get("dataset")
+    if not isinstance(dataset_cfg, dict):
+        raise ValueError("run config must contain a 'data' (v2) or 'dataset' (legacy) mapping")
     job_cfg = cfg["job"]
 
-    data_dir = Path(dataset_cfg["data_dir"]).resolve()
+    data_dir = Path(dataset_cfg.get("root") or dataset_cfg.get("data_dir") or ".").resolve()
 
     def dataset_path(key: str) -> str | None:
         value = dataset_cfg.get(key)
@@ -74,10 +78,6 @@ def build_exact_command(cfg: Dict) -> List[str]:
 
     cmd = [
         "exact",
-        "-s",
-        dataset_path("source"),
-        "-t",
-        dataset_path("target"),
         "-o",
         str(Path(job_cfg["output_dir"]).resolve()),
         "-y",
@@ -86,10 +86,28 @@ def build_exact_command(cfg: Dict) -> List[str]:
         str(job_cfg.get("memory", "60G")),
     ]
 
-    if dataset_cfg.get("train_reference"):
-        cmd.extend(["-r", dataset_path("train_reference")])
-    if dataset_cfg.get("full_reference"):
-        cmd.extend(["-f", dataset_path("full_reference")])
+    source = dataset_path("source")
+    target = dataset_path("target")
+    if source or target:
+        if not source or not target:
+            raise ValueError("data.source and data.target must be supplied together")
+        cmd[1:1] = ["-s", source, "-t", target]
+    elif not dataset_cfg.get("track"):
+        raise ValueError("data must provide source/target paths or a track")
+
+    refs = dataset_cfg.get("refs") or {}
+    train_reference = dataset_cfg.get("train_reference") or refs.get("train") or refs.get("training")
+    full_reference = (
+        dataset_cfg.get("full_reference") or refs.get("full") or refs.get("test")
+    )
+    if train_reference:
+        key = "train_reference" if dataset_cfg.get("train_reference") else None
+        value = dataset_path(key) if key else resolve(str(train_reference), data_dir)
+        cmd.extend(["-r", value])
+    if full_reference:
+        key = "full_reference" if dataset_cfg.get("full_reference") else None
+        value = dataset_path(key) if key else resolve(str(full_reference), data_dir)
+        cmd.extend(["-f", value])
     if dataset_cfg.get("candidates"):
         cmd.extend(["-c", dataset_path("candidates")])
     if job_cfg.get("save_logs", False):
@@ -140,7 +158,7 @@ def main() -> None:
         return
 
     if args.sbatch_script:
-        dataset_cfg = cfg["dataset"]
+        dataset_cfg = cfg.get("data") or cfg["dataset"]
         job_cfg = cfg["job"]
         slurm_cfg = job_cfg.get("slurm", {})
         exp_dir = Path(job_cfg["output_dir"]).resolve()
@@ -157,11 +175,21 @@ def main() -> None:
             "JOB_NAME": job_cfg.get("name", Path(job_cfg["output_dir"]).name),
             "EXP_DIR": str(exp_dir),
             "CONFIG_FILE": str(Path(job_cfg["config_file"]).resolve()),
-            "DATA_DIR": str(Path(dataset_cfg["data_dir"]).resolve()),
-            "SOURCE": dataset_cfg["source"],
-            "TARGET": dataset_cfg["target"],
-            "TRAIN_REFERENCE": env_value(dataset_cfg.get("train_reference")),
-            "FULL_REFERENCE": env_value(dataset_cfg.get("full_reference")),
+            "DATA_DIR": str(
+                Path(dataset_cfg.get("root") or dataset_cfg.get("data_dir") or ".").resolve()
+            ),
+            "SOURCE": env_value(dataset_cfg.get("source")),
+            "TARGET": env_value(dataset_cfg.get("target")),
+            "TRAIN_REFERENCE": env_value(
+                dataset_cfg.get("train_reference")
+                or (dataset_cfg.get("refs") or {}).get("train")
+                or (dataset_cfg.get("refs") or {}).get("training")
+            ),
+            "FULL_REFERENCE": env_value(
+                dataset_cfg.get("full_reference")
+                or (dataset_cfg.get("refs") or {}).get("full")
+                or (dataset_cfg.get("refs") or {}).get("test")
+            ),
             "CANDIDATES": env_value(dataset_cfg.get("candidates")),
             "MEMORY": str(job_cfg.get("memory", "60G")),
             "RUN_EVAL": "1" if job_cfg.get("run_eval") else "0",

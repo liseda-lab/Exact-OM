@@ -1,430 +1,761 @@
-
-# Default runtime configuration for EXACT.
-# For fuller parameter descriptions, see `docs/semantic_scorer_defaults.md`.
-
-# Logging verbosity for the full pipeline.
-logging_level: INFO # One of: DEBUG, INFO, WARNING, ERROR
-
-# Global random seed used where the pipeline exposes deterministic behavior.
-seed: 42
-
-# Reuse dataset/model caches when available.
-use_file_cache: True
-
-# Optional dataset-track materialization. Explicit CLI paths always override
-# explicit paths here, which in turn override files supplied by the track.
-data: null
-# Example:
-# data:
-#   track: bioml
-#   task: ncit-doid
-#   root: data
-#   revision: "2026"
-#   descriptor: null
-#   source: null
-#   target: null
-#   refs: {}
-#   candidates: null
-
-# Transitional pre-v2 alias for `data`; remove after the config-v2 migration window.
-dataset_track: null
-
-# Cutoffs reported by the evaluation step.
-k: [1, 5, 10]
-
-evaluation:
-  # Evaluators run in order. The built-in backend preserves historical metrics;
-  # `bioml` requires the optional `bioml-eval` extra.
-  backends: [builtin]
-  bioml: {}
-
-alignment_params:
-  # Parameters that determine which scored pairs become part of the final
-  # global alignment. For local/ranking runs, all candidates stay in the
-  # output file, but this same threshold is still used to define positive vs
-  # negative rationale polarity.
-
-  # Minimum final score required for a pair to count as a positive alignment.
-  # If null, no score-based filtering is applied to the global alignment.
+# GENERATED — edit the pydantic models, then run `exact config default`.
+# Configuration schema version; currently exactly 2.
+config_version: 2
+# Run-wide process settings.
+run:
+  # Global random seed used by deterministic components.
+  seed: 42
+  # Logging verbosity: DEBUG, INFO, WARNING, ERROR, or CRITICAL.
+  logging_level: INFO
+  # Reuse compatible dataset and model caches when available.
+  use_file_cache: true
+# Input and dataset-track selection.
+data:
+  # Registered dataset-track provider name.
+  track:
+  # Task identifier within the selected track.
+  task:
+  # Local track materialization root.
+  root: data
+  # Optional immutable track revision.
+  revision:
+  # Optional local track descriptor overriding registry discovery.
+  descriptor:
+  # Explicit source knowledge-source path.
+  source:
+  # Explicit target knowledge-source path.
+  target:
+  # Named reference alignments, such as train, test, and full.
+  refs: {}
+  # Optional candidate alignment path.
+  candidates:
+# Input adapters and output formats.
+io:
+  # Input adapter name, or auto to infer it from each input path.
+  input_format: auto
+  # Source-adapter-specific options.
+  source_options: {}
+  # Target-adapter-specific options.
+  target_options: {}
+  # Ordered alignment writer formats produced for each run.
+  output_formats:
+    - tsv-global
+    - tsv-local
+# Alignment extraction and scoring controls.
+matching:
+  # Minimum final score retained in the global alignment.
   threshold: 0.7
-
-  # Maximum number of targets retained per source in the final global alignment.
-  # If null, no cardinality filter is applied.
+  # Maximum targets retained per source; null disables the limit.
   cardinality: 1
-  target_cardinality: 1 # Maximum number of sources retained per target after exact+selector mappings are merged.
-
-  # Output artifacts.
-  save_json: False # Assemble full candidate-level explanations JSON; compressed audit shards remain enabled by default.
-  save_csv: True # Save the flattened summary table as TSV/CSV-style output.
-  save_stats_csv: True # Save one-row run statistics for spreadsheet use.
-  append_stats_to_summary_csv: True # Append human-readable run stats to the summary file.
-
-  # Review band used in reports and plots.
-  review_low: 0.5 # Lower score bound for "needs review".
-  review_high: 0.8 # Upper score bound for "needs review".
-
-dataset_params:
-  # Dataset construction and ontology loading.
-  #
-  # Important mode split:
-  # - The default model (`PairAdaptiveSemanticScorer`) uses
-  #   `PairAdaptiveContextDataset`. It builds ontology-native hierarchy bundles,
-  #   projection-backed non-hierarchical structure, and auxiliary attributes per
-  #   entity, then forms pair-specific evidence inside the scorer.
-  # - The legacy model (`SemanticScorer`) uses `ContextDataset`. It builds one
-  #   cached context subgraph per entity and compares those joined contexts
-  #   directly.
-  #
-  # The block immediately below contains the default pair-adaptive dataset
-  # controls. The later "Legacy single-context extraction" block is kept so you
-  # can still switch back to `SemanticScorer` without rebuilding configs.
-  num_workers: null # Dataset loading worker count. Null means "let the system decide".
-  filter_exact_matches: True # Remove exact lexical matches before scoring.
-  drop_exact_match_sources: False # If True, remove all candidates for sources with an exact exact-match hit.
-  filter_ignored_alignment_classes: True # Remove use_in_alignment=false ontology classes before candidate generation and exact matching.
-  reasoner: asserted # Pure-Python asserted hierarchy; plugins may register other reasoners.
-  projection_include_literals: True # Pair-adaptive: if True, projected literal/annotation edges can feed attribute/support evidence in addition to ontology-native annotations.
-  hierarchy_max_depth: 2 # Pair-adaptive: max ontology-native hierarchy depth collected per configured relation family.
-  max_hierarchy_triples_per_family: 6 # Pair-adaptive: max hierarchy triples kept per family and entity before pair-specific selection.
-  max_object_triples: 48 # Pair-adaptive: max non-hierarchical object-property triples kept per entity for the similarity channel.
-  max_diff_triples: 24 # Pair-adaptive: max distinctive non-hierarchical triples kept per entity before pair-specific reranking for the difference channel.
-  max_attr_items: 12 # Pair-adaptive: max literal/annotation snippets kept per entity for auxiliary attribute evidence.
-  pair_adaptive_feature_log_every: 1000 # Pair-adaptive: emit dataset feature-build progress every N unique entities per side; progress lines are debug-only.
+  # Maximum sources retained per target; null disables the limit.
+  target_cardinality: 1
+  # Lower review-band score bound.
+  review_low: 0.5
+  # Upper review-band score bound.
+  review_high: 0.8
+  # Knowledge-graph entity kinds eligible for alignment.
+  entity_kinds:
+    - class
+  # Relation typing mode: none or hierarchy_heuristic.
+  relation_prediction: none
+  # Pair-adaptive channel constants exposed for reproducible sweeps.
+  channels:
+    # Embedding contribution to each hierarchy-channel score.
+    hierarchy_embedding_weight: 0.5
+    # Cross-side support contribution to each hierarchy-channel score.
+    hierarchy_support_weight: 0.5
+    # Embedding contribution to relational-similarity scoring.
+    similarity_embedding_weight: 0.5
+    # Cross-side support contribution to relational-similarity scoring.
+    similarity_support_weight: 0.5
+    # Maximum selected similarity triples per relation and side.
+    similarity_per_relation_cap: 2
+    # Maximum selected difference triples per relation and side.
+    difference_per_relation_cap: 3
+    # Multiplier applied to support standard deviation in channel quality.
+    stability_factor: 2.0
+    # Fallback weights for definition, identifier, comment, and other attributes.
+    attribute_property_weights:
+      definition: 1.0
+      identifier: 0.8
+      comment: 0.6
+      other: 0.5
+    # Word-count ceiling used to normalize attribute informativeness.
+    attribute_information_word_cap: 20
+    # Minimum support-only attribute-channel score.
+    attribute_score_floor: 0.5
+    # Scale of distance-to-neutral indecision uncertainty.
+    uncertainty_indecision_scale: 2.0
+    # Power applied to lexical/structural quality in disagreement uncertainty.
+    uncertainty_disagreement_quality_power: 0.5
+# Dataset construction and evidence extraction.
+dataset:
+  # Registered hierarchy reasoner name.
+  reasoner: asserted
+  # Dataset loading worker count.
+  num_workers:
+  # Remove exact lexical matches before semantic scoring.
+  filter_exact_matches: true
+  # Remove every candidate for sources with an exact match.
+  drop_exact_match_sources: false
+  # Exclude knowledge-source entities marked use_in_alignment=false.
+  filter_ignored_alignment_classes: true
+  # Include projected literal edges as attribute/support evidence.
+  projection_include_literals: true
+  # Maximum hierarchy depth collected for each configured family.
+  hierarchy_max_depth: 2
+  # Maximum hierarchy triples per family and entity.
+  max_hierarchy_triples_per_family: 6
+  # Maximum non-hierarchical object triples per entity.
+  max_object_triples: 48
+  # Maximum distinctive triples retained before pair reranking.
+  max_diff_triples: 24
+  # Maximum literal or annotation snippets per entity.
+  max_attr_items: 12
+  # Feature-build debug progress interval in unique entities.
+  pair_adaptive_feature_log_every: 1000
+  # Ontology-native hierarchical relation families and aliases.
   hierarchical_relation_families:
-    # Pair-adaptive hierarchy families.
-    # These define what counts as ontology-native hierarchical evidence. `is_a`
-    # is usually enough for standard taxonomies; add domain-specific relations
-    # such as `part_of` when they should contribute to the hierarchy channel.
     is_a:
       iri_aliases:
-        - "http://www.w3.org/2000/01/rdf-schema#subClassOf"
-      label_seeds: ["subclass of", "is a", "type of", "kind of"]
+        - http://www.w3.org/2000/01/rdf-schema#subClassOf
+      label_seeds:
+        - subclass of
+        - is a
+        - type of
+        - kind of
     part_of:
       iri_aliases:
-        - "http://purl.obolibrary.org/obo/BFO_0000050"
-      label_seeds: ["part of", "component of"]
+        - http://purl.obolibrary.org/obo/BFO_0000050
+      label_seeds:
+        - part of
+        - component of
     has_part:
       iri_aliases:
-        - "http://purl.obolibrary.org/obo/BFO_0000051"
-      label_seeds: ["has part"]
-  
-  # Shared graph-exploration and legacy single-context controls.
-  # `n_hops` still matters in the default pair-adaptive mode: it sets the raw
-  # projected neighborhood radius used to collect non-hierarchical object
-  # triples and projected literal edges for the `sim`, `diff`, and literal-side
-  # attribute support channels. The remaining controls below are primarily for
-  # the legacy `SemanticScorer`, which builds one cached context subgraph per
-  # entity. The pair-adaptive scorer does not build one cached joined context
-  # per entity, but the shared lexical and verbalisation code still uses
-  # `all_labels`, `delimiter`, and `max_input_tokens_context` as general utilities.
-  n_hops: 1 # Shared: raw projection neighborhood radius. Pair-adaptive uses it for `sim`/`diff`/projected literals; legacy uses it for single-context extraction.
-  context_method: greedy # Legacy: context extraction strategy for `SemanticScorer` (`bfs` or `greedy`).
-  best_path_method: dp # Legacy: path search strategy inside single-context extraction (`dp`, `greedy`, or `lagrangian`).
-  context_hop_penalty: 0.1 # Legacy: hop penalty used when ranking candidate context paths.
-  context_token_ratio: 1.3 # Legacy: approximate token-per-word multiplier for context budgeting.
-  context_safety: 0.8 # Legacy: safety factor applied before hitting the configured context token budget.
-  max_input_tokens_context: 256 # Shared upper bound for joined context text; legacy uses it directly, pair-adaptive uses it as a global encoder ceiling.
-  only_taxonomy: False # Legacy: if True, use taxonomy-only extraction and fixed subclass templates.
-  all_labels: True # Shared: if True, score all source/target label variants instead of a single best label.
-  add_connectivity_bridges: True # Legacy: add explanation-only bridge triples to keep extracted contexts connected.
-  bridge_max_hops: null # Legacy: optional hard cap on bridge path length. Null means unbounded.
-
-  # Verbaliser generation controls.
-  # `verbaliser_name` is local-only fallback model selection.
-  # `gen_max_new_tokens`, `temperature`, and `top_p` are shared by local and hosted
-  # verbaliser generation. `do_sample` and `top_k` are local-only.
-  # `batch_size_verbaliser` is used as the local batch size and as the hosted
-  # concurrency cap for OpenRouter verbaliser requests.
-  verbaliser_name: Qwen/Qwen2.5-3B-Instruct
-  gen_max_new_tokens: 64 # Shared: max generated tokens for relation-template creation.
-  do_sample: False # Local-only: use sampling instead of greedy decoding for local verbaliser runs.
-  temperature: 0.1 # Shared: generation temperature for verbaliser calls.
-  top_k: null # Local-only: top-k sampling cutoff for local verbaliser runs.
-  top_p: 0.9 # Shared: nucleus sampling cutoff for verbaliser calls.
-  max_verb_gen_retries: 1 # Retry count when a generated template is invalid.
-  exclude_missing_dr: False # Skip relations with missing domain/range examples when building templates.
-  batch_size_verbaliser: 4 # Shared: local batch size and hosted concurrency cap for verbaliser generation.
-  delimiter: "\n" # Delimiter used when joining verbalised context triples into one text block.
-
-  # Dataset-side analysis plots.
-  # The default list below targets the pair-adaptive dataset. If you switch back
-  # to the legacy `ContextDataset`, unsupported metrics are filtered out at
-  # runtime and the dataset falls back to its legacy defaults.
-  which: ["src_hier_total_count","tgt_hier_total_count","src_hier_is_a_count","tgt_hier_is_a_count",
-          "src_hier_part_of_count","tgt_hier_part_of_count","src_hier_has_part_count","tgt_hier_has_part_count",
-          "src_obj_count","tgt_obj_count","src_obj_relation_count","tgt_obj_relation_count",
-          "src_obj_ic_mean","tgt_obj_ic_mean","src_attr_count","tgt_attr_count",
-          "src_attr_weight_mean","tgt_attr_weight_mean",
-          "src_lab_n_labels","tgt_lab_n_labels","src_lab_word_len","tgt_lab_word_len",
-          "src_lab_avg_label_words","tgt_lab_avg_label_words",
-          "cand_sim","cand_sim_src_mean"] # Dataset features to visualize after preprocessing.
-  candidate_share_k: 2 # Number of top lexical candidates to share across candidate generation utilities.
-
-candidates_params:
-  # Candidate generation settings for the lexical prefilter stage.
-  retrieval_strategy: hybrid # hybrid uses labels plus short annotation aliases in lexical retrieval; primary_label keeps the old primary-label embedding search.
-  lexical_encoder_name: sentence-transformers/all-MiniLM-L6-v2 # Encoder used to embed source/target labels.
-  encode_batch_size: 512 # Batch size for lexical embedding generation.
-  search_batch_size: 4096 # Batch size for cosine similarity search.
-  top_k: 20 # Number of candidates retained per source after lexical retrieval.
-  use_amp: True # Use automatic mixed precision during lexical retrieval when supported.
-
-sanity_check_params:
-  # Human-readable dataset debug output.
-  sanity_check: True # Emit sample rows after dataset construction.
-  n: 3 # Number of sample examples to print.
-  max_ctx_show: 3 # Max number of context sentences shown per side in sanity logs.
-  max_label_show: 3 # Max number of label variants shown per side in sanity logs.
-
-plot_params:
-  # Shared plotting defaults for dataset and model reports.
-  bins: 30 # Histogram bin count.
-  figsize: [7, 5] # Figure size in inches.
-  dpi: 300 # Export resolution.
-  kde: False # Overlay KDE on histogram plots.
-  alpha: 0.6 # Default plot transparency.
-
-inference_params:
-  # Inference runner settings.
-  batch_size: 512 # Candidate-pair batch size passed to the semantic scorer.
-  num_workers: 0 # DataLoader worker count for inference; 0 is the deterministic default.
-  log_every: 10 # Emit inference progress logs every N batches.
-  mixed_precision: True # Use torch autocast on GPU where supported.
-  which: ["S_final", "S_base", "S_struct", "s_label", "s_hier", "s_sim", "s_diff", "s_attr", "I_label", "I_struct", "I_hier", "I_sim", "I_diff", "I_attr", "I_llm", "w_c", "w_i", "U", "U_ind", "U_dis", "p_llm"]
-  checkpoint_every: 10 # Write an inference checkpoint every N batches.
-  resume_from_checkpoint: True # Resume from the latest checkpoint when available.
-  enable_checkpoints: True # Enable checkpoint creation during inference.
-  resume_additional_model_checkpoints: True # Reuse post-inference selector/reranker checkpoints when available.
-  allow_rationale_toggle_checkpoint_resume: True # If True, resume a checkpoint when the only model/config difference is `generate_llm_rationales`.
-  audit_shards_enabled: True # Write auditable explanation shards incrementally for compact checkpoint resume.
-  audit_shard_compression: zstd # Compression for audit and post-inference JSONL artifacts; falls back to plain JSONL if unavailable.
-  audit_shard_records: 50000 # Maximum records per audit shard before rotating.
-  checkpoint_payload: compact # compact stores manifests and counts; full retains legacy in-checkpoint mappings/results JSON.
-  cache_persist_policy: finalize # Persist model caches at finalize, checkpoint, or never.
-
-llm_profiles:
-  # Named LLM backend profiles.
-  # `backend: openrouter` profiles call hosted models through OpenRouter.
-  # `backend: local_hf` profiles use local Hugging Face models.
-  # The routing block below decides which profile each task uses.
-  # OpenRouter profiles may also include an optional `provider:` object with
-  # keys such as `require_parameters`, `order`, `only`, `ignore`, or `sort`.
-  # These options are passed through to OpenRouter requests.
-
-  # Default hosted profile used unless a task-specific profile overrides it.
-  openrouter_gpt4o_mini:
-    backend: openrouter
-    model: openai/gpt-4o-mini
-    tokenizer: Xenova/gpt-4o
-    api_base: https://openrouter.ai/api/v1
-    api_key_env: OPENROUTER_API_KEY # First lookup location for the hosted API key.
-    api_key_path: ~/.config/openrouter/api_key # Second lookup location before the interactive prompt.
-    timeout_secs: 60.0 # Per-request timeout in seconds.
-
-  # Hosted generation ablation profiles.
-  # These are good candidates for verbaliser, summary, and rationale generation only.
-  # tokenizer mapping.
-  openrouter_claude_sonnet_46:
-    backend: openrouter
-    model: anthropic/claude-sonnet-4.6
-    api_base: https://openrouter.ai/api/v1
-    api_key_env: OPENROUTER_API_KEY
-    api_key_path: ~/.config/openrouter/api_key
-    timeout_secs: 60.0
-  openrouter_gpt5:
-    backend: openrouter
-    model: openai/gpt-5
-    api_base: https://openrouter.ai/api/v1
-    api_key_env: OPENROUTER_API_KEY
-    api_key_path: ~/.config/openrouter/api_key
-    timeout_secs: 60.0
-  openrouter_gpt_oss_120b:
-    backend: openrouter
-    model: openai/gpt-oss-120b
-    api_base: https://openrouter.ai/api/v1
-    api_key_env: OPENROUTER_API_KEY
-    api_key_path: ~/.config/openrouter/api_key
-    timeout_secs: 60.0
-
-  # Hosted decision ablation profiles for the chat-logprob binary-head path.
-  openrouter_qwen35_122b:
-    backend: openrouter
-    model: qwen/qwen3.5-122b-a10b
-    tokenizer: Qwen/Qwen3.5-122B-A10B
-    api_base: https://openrouter.ai/api/v1
-    api_key_env: OPENROUTER_API_KEY
-    api_key_path: ~/.config/openrouter/api_key
-    timeout_secs: 60.0
-  openrouter_qwen3_235b:
-    backend: openrouter
-    model: qwen/qwen3-235b-a22b-2507
-    tokenizer: Qwen/Qwen3-235B-A22B-2507
-    api_base: https://openrouter.ai/api/v1
-    api_key_env: OPENROUTER_API_KEY
-    api_key_path: ~/.config/openrouter/api_key
-    timeout_secs: 60.0
-  openrouter_llama33_70b:
-    backend: openrouter
-    model: meta-llama/llama-3.3-70b-instruct
-    tokenizer: meta-llama/Llama-3.3-70B-Instruct
-    api_base: https://openrouter.ai/api/v1
-    api_key_env: OPENROUTER_API_KEY
-    api_key_path: ~/.config/openrouter/api_key
-    timeout_secs: 60.0
-  openrouter_deepseek_chat_v31:
-    backend: openrouter
-    model: deepseek/deepseek-chat-v3.1
-    tokenizer: deepseek-ai/DeepSeek-V3.1
-    api_base: https://openrouter.ai/api/v1
-    api_key_env: OPENROUTER_API_KEY
-    api_key_path: ~/.config/openrouter/api_key
-    timeout_secs: 60.0
-
-  # Local fallback profiles.
-  local_verbaliser_default:
-    backend: local_hf
-    model: Qwen/Qwen2.5-3B-Instruct # Default local fallback for template verbalisation.
-  local_llm_default:
-    backend: local_hf
-    model: Qwen/Qwen2.5-7B-Instruct # Default local fallback for summary/decision/rationale.
-
-llm_routing:
-  # Task-to-profile routing.
-  # Each task can use a different hosted or local model.
-  # The task names are stable across scorers, but `summary_profile` means:
-  # - pair brief generation for `PairAdaptiveSemanticScorer`
-  # - per-entity summary generation for legacy `SemanticScorer`
-  # `fallback_*` entries are used when the selected hosted profile is unavailable,
-  # misconfigured, missing credentials, or unsupported for the requested task.
-  default_profile: openrouter_gpt4o_mini
-  verbaliser_profile: openrouter_gpt4o_mini
-  summary_profile: openrouter_gpt4o_mini
-  decision_profile: openrouter_gpt4o_mini # Decision defaults to the shared hosted profile.
-  rationale_profile: openrouter_gpt4o_mini
-  verbaliser_fallback_profile: local_verbaliser_default # Fallback used only for verbaliser calls.
-  fallback_profile: local_llm_default # Shared fallback for the summary task and rationale.
-  decision_fallback_profile: local_llm_default # Fallback used when hosted decision scoring cannot provide logprobs.
-
-model:
-  # Default scorer: pair-adaptive lexical + structural fusion with optional LLM.
-  # Set `name: SemanticScorer` to recover the legacy lexical + single-context
-  # fusion path.
-  name: PairAdaptiveSemanticScorer
-  params:
-    # Core model selection.
-    lexical_model_name: cambridgeltl/SapBERT-from-PubMedBERT-fulltext # Encoder for label similarity.
-    context_model_name: BAAI/bge-large-en-v1.5 # Encoder for structural text blocks: hierarchy, non-hier similarity, difference, and attribute snippets.
-    llm_model_name: Qwen/Qwen2.5-7B-Instruct # Local-only fallback model for pair briefs, decisions, and rationales.
-    max_input_tokens_hier: 128 # Pair-adaptive: max tokens per joined hierarchy-family block.
-    max_input_tokens_sim: 256 # Pair-adaptive: max tokens per joined non-hierarchical similarity block.
-    max_input_tokens_diff: 256 # Pair-adaptive: max tokens per joined distinctive-evidence block.
-    max_input_tokens_attr_item: 96 # Pair-adaptive: max tokens per embedded attribute snippet.
-
-    # Precision and pooling.
-    fp16_inference: True # Use fp16 where supported during model inference.
-    pooling_method: mean # Token pooling for encoder outputs: `mean`, `max`, or `sum`.
-    label_pair_pooling: max # Pooling over label-pair similarity matrix: `mean` or `max`.
-
-    # Input/output length limits.
-    max_input_tokens_lexical: 32 # Max tokens per label passed to the lexical encoder.
-    max_input_tokens_context: 256 # Shared joined-context ceiling. Legacy uses it directly; pair-adaptive uses per-channel caps above plus this global ceiling.
-    max_total_tokens_llm_summary: 768 # Local-only prompt length cap for the "summary" task: pair-brief compression by default, per-entity summaries in legacy mode.
-    max_total_tokens_llm_decision: 640 # Local-only prompt length cap for decision scoring with pair briefs.
-    max_total_tokens_llm_rationale: 896 # Local-only prompt length cap for rationale generation with pair briefs.
-    max_new_tokens_llm: 64 # Shared: max generated tokens for pair briefs and short rationale helpers.
-    max_new_tokens_llm_rationale: 256 # Rationale-only generation cap; lets final explanations be longer than pair briefs.
-
-    # Main feature toggles.
-    use_lexical: True # Enable lexical similarity.
-    use_context: True # Enable context similarity.
-    use_llm: True # Enable LLM pair-brief/decision/rationale components.
-    tau: 0.5 # Neutral midpoint used when estimating confidence and ambiguity.
-
-    # Adaptive weighting and LLM gating.
-    gamma: 2.0 # Controls how sharply lexical/structural confidence changes the fusion weight.
-    beta: 0.8 # Maximum contribution allowed from the LLM branch.
-    tau_LLM: 0.5 # Ambiguity threshold above which the LLM branch is activated.
-    force_llm_summaries: False # If True, always run the "summary" task even when the decision LLM is gated off. In the default scorer this means pair briefs.
-
-    # LLM generation controls.
-    # `llm_temperature`, `llm_top_p`, and `max_new_tokens_llm` are shared by local
-    # and hosted summary/rationale generation.
-    # `llm_do_sample` is local-only.
-    # `llm_summary_batch_size` and `llm_rationale_batch_size` are used as local
-    # batch sizes and as hosted concurrency caps for OpenRouter chat requests.
-    # `llm_decision_batch_size` is used as the local decision batch size and as
-    # the hosted concurrency cap for OpenRouter decision scoring.
-    # Hosted decision scoring ignores stochastic generation knobs and uses fixed
-    # deterministic settings (`temperature=0`, `top_p=1`) while reading first-token
-    # chat logprobs over a constrained binary label head.
-    llm_temperature: 0.1
-    llm_top_p: 0.9
-    llm_do_sample: False
-    llm_summary_batch_size: 8
-    llm_decision_batch_size: 8
-    llm_rationale_batch_size: 8
-    hosted_decision_labels: ["A", "B"] # Hosted-only: first label is positive, second label is negative.
-    hosted_decision_logit_bias: 20.0 # Hosted-only: equal positive bias added to both decision labels.
-    profile_llm: False # Reserved profiling/debug flag; not currently used by the hosted path.
-
-    # Explanation and calibration outputs.
-    return_explanations: True # Include candidate-level explanations in model output.
-    generate_llm_rationales: True # Generate final positive/negative rationales.
-    use_llm_calibration: False # Enable post-hoc calibration on the decision probability.
-    llm_calibration_a: null # Optional preconfigured calibration coefficient.
-    llm_calibration_b: null # Optional preconfigured calibration coefficient.
-    llm_calibration_info: null # Optional human-readable description of the calibration source.
-
-    # On-disk and in-memory caches.
-    cache_dir: null # Cache root. Null uses the default cache directory.
-    cache_namespace: null # Optional namespace to isolate cache files between runs.
-    dataset_signature: null # Optional cache fingerprint override.
-    persist_cache_to_disk: True # Persist summary/rationale/embedding caches between runs.
-    max_cached_labels: null # Optional in-memory cap for lexical embedding cache entries.
-    max_cached_contexts: null # Optional in-memory cap for context embedding cache entries.
-    max_cached_summaries: null # Optional in-memory cap for summary-task cache entries. In the default scorer these entries are pair briefs.
-    max_cached_rationales: null # Optional in-memory cap for rationale cache entries.
-
-# Optional global candidate-set selector.
-second_model:
-  name: CandidateSetSelector
-  params:
-    enabled: True # Enable the selector after the primary semantic scorer.
-    strategy: calibrated_rank_accept # Use supervised rank/accept calibration when -r/--training_reference_file is provided; otherwise fall back.
-    global_only: True # Run only for generated global candidate sets; local candidate-file rankings are left unchanged.
-    replace_final_score: True # Replace S_final with the selector score for global threshold/cardinality.
-    score_mode: p_match # Accepted winners keep raw P_match as final selector score; rejected/non-winners get 0.
-    use_no_match: True # Include an explicit NO_MATCH abstention risk per source group.
-    temperature: 0.75 # Temperature for source-local competition probabilities and gap scaling.
-    eps: 1.0e-6 # Numerical clamp for probabilities and divisions.
-    support_weight: 0.60 # Weight on the original pairwise score; the remaining mass goes to averaged listwise evidence.
-    no_match_threshold: 0.55 # Abstain when the unweighted NO_MATCH risk average is at or above this value.
-    calibration:
-      enabled: auto # Use the CLI training reference (-r) when available; no full/test reference leakage.
-      min_positive_sources: 50 # Minimum train sources with an in-candidate gold target before fitting supervised weights.
-      background_negative_weight: 0.02 # Small weight for non-train source groups as likely global false positives.
-      background_negative_weight_grid: [0.02, 0.05, 0.10, 0.20, 0.40] # Values swept on validation F1.
-      validation_fraction: 0.2 # Enables source-disjoint validation; set 0.0 to tune on all calibration references.
-      validation_folds: 5 # Source-disjoint folds for out-of-fold selector tuning; set 1 to use one held-out split.
-      l2: 0.001 # L2 regularization for rank and acceptance weights.
-      learning_rate: 0.05 # Adam learning rate for the lightweight calibration models.
-      max_epochs: 200 # Maximum training epochs for calibration.
-      threshold_grid_step: 0.005 # Step size used when sweeping P_match thresholds from 0 to 1.
-      # Acceptance-threshold objective for the source-level match/no-match decision:
-      #   f1: maximize held-out validation F1.
-      #   f_beta: maximize F_beta, using f_beta below to weight recall higher when beta > 1.
-      #   recall_at_precision: maximize recall while keeping calibration precision >= min_precision.
-      accept_objective: f1
-      f_beta: 1.5 # Used only when accept_objective=f_beta; values >1 favor recall over precision.
-      min_precision: null # Used only by recall_at_precision as the minimum allowed calibration precision.
-      min_recall: null # Optional extra recall floor for recall_at_precision; null means no recall floor.
-      exact_prefiltered_source_policy: hard_negative # hard_negative keeps exact-solved train sources as accept negatives; exclude gives zero weight; legacy disables exact-aware calibration.
-      exact_prefiltered_negative_weight: 1.0 # Acceptance weight for leftover non-exact candidates from exact-solved train sources.
-    llm:
-      enabled: False
-      mode: off # Selector LLM arbitration is off by default; use veto to only allow near-boundary NO_MATCH vetoes.
-      ambiguity_margin: 0.08 # Trigger arbitration near candidate ties or near the NO_MATCH threshold.
-      max_candidates: 5 # Maximum top candidates shown in each LLM arbitration prompt.
-      trigger_acceptance_margin: 0.025 # Calibrated mode: call LLM when |P_match - accept_threshold| is this small.
-      trigger_rank_margin: 0.03 # Calibrated mode: call LLM when the top two rank probabilities are this close.
-      min_confidence: 0.75 # Ignore low-confidence LLM arbitration responses.
+        - http://purl.obolibrary.org/obo/BFO_0000051
+      label_seeds:
+        - has part
+  # Projected neighborhood radius for structural evidence.
+  n_hops: 1
+  # Shared upper bound for joined context text.
+  max_input_tokens_context: 256
+  # Score all label variants instead of only a primary label.
+  all_labels: true
+  # Delimiter used to join verbalized triples.
+  delimiter: "\n"
+  # Dataset feature names included in preprocessing plots.
+  which:
+    - src_hier_total_count
+    - tgt_hier_total_count
+    - src_hier_is_a_count
+    - tgt_hier_is_a_count
+    - src_hier_part_of_count
+    - tgt_hier_part_of_count
+    - src_hier_has_part_count
+    - tgt_hier_has_part_count
+    - src_obj_count
+    - tgt_obj_count
+    - src_obj_relation_count
+    - tgt_obj_relation_count
+    - src_obj_ic_mean
+    - tgt_obj_ic_mean
+    - src_attr_count
+    - tgt_attr_count
+    - src_attr_weight_mean
+    - tgt_attr_weight_mean
+    - src_lab_n_labels
+    - tgt_lab_n_labels
+    - src_lab_word_len
+    - tgt_lab_word_len
+    - src_lab_avg_label_words
+    - tgt_lab_avg_label_words
+    - cand_sim
+    - cand_sim_src_mean
+  # Top lexical candidates shared by candidate utilities.
+  candidate_share_k: 2
+  # Controls retained only for the legacy single-context dataset.
+  legacy:
+    # Legacy single-context extraction strategy.
+    context_method: greedy
+    # Legacy context path-search strategy.
+    best_path_method: dp
+    # Legacy context-path hop penalty.
+    context_hop_penalty: 0.1
+    # Legacy approximate tokens-per-word budgeting ratio.
+    context_token_ratio: 1.3
+    # Legacy safety factor for context token budgets.
+    context_safety: 0.8
+    # Restrict legacy context extraction to taxonomy edges.
+    only_taxonomy: false
+    # Add explanation-only bridges to legacy extracted contexts.
+    add_connectivity_bridges: true
+    # Optional hard cap on legacy bridge path length.
+    bridge_max_hops:
+# Candidate retrieval controls.
+candidates:
+  # Candidate retrieval strategy: primary_label or hybrid.
+  retrieval_strategy: hybrid
+  # Sentence encoder used for semantic candidate retrieval.
+  lexical_encoder_name: sentence-transformers/all-MiniLM-L6-v2
+  # Candidate-encoder batch size.
+  encode_batch_size: 512
+  # Cosine-search batch size.
+  search_batch_size: 4096
+  # Candidates retained per source entity.
+  top_k: 20
+  # Use automatic mixed precision for candidate retrieval when supported.
+  use_amp: true
+  # Lexical and retrieval-channel fusion constants.
+  fusion:
+    # Weight of lexical token cosine in max fusion.
+    token_weight: 1.0
+    # Weight of character-gram cosine in max fusion.
+    gram_weight: 0.85
+    # Token contribution to the blended lexical retrieval score.
+    blend_token_weight: 0.65
+    # Character-gram contribution to the blended retrieval score.
+    blend_gram_weight: 0.35
+    # Weight applied to semantic retrieval before channel max fusion.
+    semantic_channel_weight: 1.0
+    # Weight applied to lexical retrieval before channel max fusion.
+    lexical_channel_weight: 1.0
+    # Minimum document-frequency ceiling for lexical features.
+    df_ceiling_floor: 10
+    # Target-corpus ratio used for the feature DF ceiling.
+    df_ceiling_ratio: 0.2
+  # Annotation-alias selection caps, priorities, and blocklists.
+  aliases:
+    # Maximum annotation aliases retained per entity.
+    overall_cap: 12
+    # Maximum normalized tokens in an alias literal.
+    max_tokens: 12
+    # Per-property cap for exact synonyms.
+    exact_property_cap: 8
+    # Per-property cap for preferred terms.
+    preferred_property_cap: 2
+    # Per-property cap for related synonyms.
+    related_property_cap: 4
+    # Fallback per-property alias cap.
+    default_property_cap: 4
+    # Property-name tokens accepted as alias signals.
+    accepted_property_terms:
+      - alt
+      - label
+      - name
+      - pref
+      - synonym
+      - term
+      - title
+    # Property-name tokens excluded from candidate aliases.
+    rejected_property_terms:
+      - alternativeid
+      - comment
+      - created
+      - creator
+      - curator
+      - date
+      - definition
+      - deprecated
+      - description
+      - editor
+      - format
+      - id
+      - identifier
+      - namespace
+      - note
+      - provenance
+      - review
+      - reviewer
+      - semantic
+      - slim
+      - source
+      - status
+      - subset
+      - type
+      - version
+      - xref
+    # Compact property identifiers excluded from candidate aliases.
+    rejected_properties:
+      - nhc0
+      - p97
+      - p106
+      - p207
+      - p322
+      - p325
+      - p363
+      - iao0000115
+      - iao0000231
+    # Compact identifiers or names treated as exact-synonym properties.
+    exact_properties:
+      - p90
+      - has exact synonym
+    # Compact identifiers treated as preferred-term properties.
+    preferred_properties:
+      - p107
+      - p108
+    # Property names treated as related-synonym sources.
+    related_properties:
+      - has related synonym
+      - has narrow synonym
+      - has broad synonym
+    # Sort priority for exact aliases.
+    exact_priority: 0.0
+    # Sort priority for preferred aliases.
+    preferred_priority: 0.05
+    # Sort priority for related aliases.
+    related_priority: 0.15
+    # Sort priority for other accepted aliases.
+    default_priority: 0.3
+    # Preferred alias token count for the priority length penalty.
+    priority_length_target: 3
+    # Token-count cap used by the alias priority length penalty.
+    priority_length_cap: 6
+    # Divisor used by the alias priority length penalty.
+    priority_length_divisor: 30.0
+# Ordered primary and post-inference model components.
+pipeline:
+  -
+    # Registered model component name.
+    name: PairAdaptiveSemanticScorer
+    # Component-specific constructor parameters.
+    params:
+      lexical_model_name: cambridgeltl/SapBERT-from-PubMedBERT-fulltext
+      context_model_name: BAAI/bge-large-en-v1.5
+      llm_model_name: Qwen/Qwen2.5-7B-Instruct
+      max_input_tokens_hier: 128
+      max_input_tokens_sim: 256
+      max_input_tokens_diff: 256
+      max_input_tokens_attr_item: 96
+      fp16_inference: true
+      pooling_method: mean
+      label_pair_pooling: max
+      max_input_tokens_lexical: 32
+      max_input_tokens_context: 256
+      max_total_tokens_llm_summary: 768
+      max_total_tokens_llm_decision: 640
+      max_total_tokens_llm_rationale: 896
+      max_new_tokens_llm: 64
+      max_new_tokens_llm_rationale: 256
+      use_lexical: true
+      use_context: true
+      use_llm: true
+      tau: 0.5
+      gamma: 2.0
+      beta: 0.8
+      tau_LLM: 0.5
+      force_llm_summaries: false
+      llm_temperature: 0.1
+      llm_top_p: 0.9
+      llm_do_sample: false
+      llm_summary_batch_size: 8
+      llm_decision_batch_size: 8
+      llm_rationale_batch_size: 8
+      hosted_decision_labels:
+        - A
+        - B
+      hosted_decision_logit_bias: 20.0
+      profile_llm: false
+      return_explanations: true
+      generate_llm_rationales: true
+      use_llm_calibration: false
+      llm_calibration_a:
+      llm_calibration_b:
+      llm_calibration_info:
+      cache_dir:
+      cache_namespace:
+      dataset_signature:
+      persist_cache_to_disk: true
+      max_cached_labels:
+      max_cached_contexts:
+      max_cached_summaries:
+      max_cached_rationales:
+  -
+    # Registered model component name.
+    name: CandidateSetSelector
+    # Component-specific constructor parameters.
+    params:
+      enabled: true
+      strategy: calibrated_rank_accept
+      global_only: true
+      replace_final_score: true
+      score_mode: p_match
+      use_no_match: true
+      temperature: 0.75
+      eps: 1e-06
+      support_weight: 0.6
+      no_match_threshold: 0.55
+      calibration:
+        enabled: auto
+        min_positive_sources: 50
+        background_negative_weight: 0.02
+        background_negative_weight_grid:
+          - 0.02
+          - 0.05
+          - 0.1
+          - 0.2
+          - 0.4
+        validation_fraction: 0.2
+        validation_folds: 5
+        l2: 0.001
+        learning_rate: 0.05
+        max_epochs: 200
+        threshold_grid_step: 0.005
+        accept_objective: f1
+        f_beta: 1.5
+        min_precision:
+        min_recall:
+        exact_prefiltered_source_policy: hard_negative
+        exact_prefiltered_negative_weight: 1.0
+      llm:
+        enabled: false
+        mode: false
+        ambiguity_margin: 0.08
+        max_candidates: 5
+        trigger_acceptance_margin: 0.025
+        trigger_rank_margin: 0.03
+        min_confidence: 0.75
+# Inference, audit, and checkpoint controls.
+inference:
+  # Candidate-pair inference batch size.
+  batch_size: 512
+  # Inference DataLoader worker count.
+  num_workers: 0
+  # Inference progress interval in batches.
+  log_every: 10
+  # Use torch autocast during supported GPU inference.
+  mixed_precision: true
+  # Model output fields included in inference plots.
+  which:
+    - S_final
+    - S_base
+    - S_struct
+    - s_label
+    - s_hier
+    - s_sim
+    - s_diff
+    - s_attr
+    - I_label
+    - I_struct
+    - I_hier
+    - I_sim
+    - I_diff
+    - I_attr
+    - I_llm
+    - w_c
+    - w_i
+    - U
+    - U_ind
+    - U_dis
+    - p_llm
+  # Checkpoint interval in inference batches.
+  checkpoint_every: 10
+  # Resume from the latest compatible inference checkpoint.
+  resume_from_checkpoint: true
+  # Enable inference checkpoint creation.
+  enable_checkpoints: true
+  # Reuse compatible selector or reranker checkpoints.
+  resume_additional_model_checkpoints: true
+  # Allow resume when only rationale generation changed.
+  allow_rationale_toggle_checkpoint_resume: true
+  # Write incremental candidate-level audit shards.
+  audit_shards_enabled: true
+  # Audit shard compression: zstd or none.
+  audit_shard_compression: zstd
+  # Maximum records per audit shard before rotation.
+  audit_shard_records: 50000
+  # Checkpoint payload mode: compact or full.
+  checkpoint_payload: compact
+  # Cache persistence policy: checkpoint, finalize, or never.
+  cache_persist_policy: finalize
+# LLM profiles and generation routing.
+llm:
+  # Named local and hosted backend profiles.
+  profiles:
+    openrouter_gpt4o_mini:
+      # Backend implementation name.
+      backend: openrouter
+      # Backend model identifier.
+      model: openai/gpt-4o-mini
+      # Optional tokenizer identifier override.
+      tokenizer: Xenova/gpt-4o
+      # Hosted backend API base URL.
+      api_base: https://openrouter.ai/api/v1
+      # Environment variable containing the hosted API key.
+      api_key_env: OPENROUTER_API_KEY
+      # Optional file containing the hosted API key.
+      api_key_path: ~/.config/openrouter/api_key
+      # Per-request hosted timeout in seconds.
+      timeout_secs: 60.0
+      # Additional hosted request headers.
+      extra_headers: {}
+      # Provider-routing options forwarded unchanged.
+      provider: {}
+    openrouter_claude_sonnet_46:
+      # Backend implementation name.
+      backend: openrouter
+      # Backend model identifier.
+      model: anthropic/claude-sonnet-4.6
+      # Optional tokenizer identifier override.
+      tokenizer:
+      # Hosted backend API base URL.
+      api_base: https://openrouter.ai/api/v1
+      # Environment variable containing the hosted API key.
+      api_key_env: OPENROUTER_API_KEY
+      # Optional file containing the hosted API key.
+      api_key_path: ~/.config/openrouter/api_key
+      # Per-request hosted timeout in seconds.
+      timeout_secs: 60.0
+      # Additional hosted request headers.
+      extra_headers: {}
+      # Provider-routing options forwarded unchanged.
+      provider: {}
+    openrouter_gpt5:
+      # Backend implementation name.
+      backend: openrouter
+      # Backend model identifier.
+      model: openai/gpt-5
+      # Optional tokenizer identifier override.
+      tokenizer:
+      # Hosted backend API base URL.
+      api_base: https://openrouter.ai/api/v1
+      # Environment variable containing the hosted API key.
+      api_key_env: OPENROUTER_API_KEY
+      # Optional file containing the hosted API key.
+      api_key_path: ~/.config/openrouter/api_key
+      # Per-request hosted timeout in seconds.
+      timeout_secs: 60.0
+      # Additional hosted request headers.
+      extra_headers: {}
+      # Provider-routing options forwarded unchanged.
+      provider: {}
+    openrouter_gpt_oss_120b:
+      # Backend implementation name.
+      backend: openrouter
+      # Backend model identifier.
+      model: openai/gpt-oss-120b
+      # Optional tokenizer identifier override.
+      tokenizer:
+      # Hosted backend API base URL.
+      api_base: https://openrouter.ai/api/v1
+      # Environment variable containing the hosted API key.
+      api_key_env: OPENROUTER_API_KEY
+      # Optional file containing the hosted API key.
+      api_key_path: ~/.config/openrouter/api_key
+      # Per-request hosted timeout in seconds.
+      timeout_secs: 60.0
+      # Additional hosted request headers.
+      extra_headers: {}
+      # Provider-routing options forwarded unchanged.
+      provider: {}
+    openrouter_qwen35_122b:
+      # Backend implementation name.
+      backend: openrouter
+      # Backend model identifier.
+      model: qwen/qwen3.5-122b-a10b
+      # Optional tokenizer identifier override.
+      tokenizer: Qwen/Qwen3.5-122B-A10B
+      # Hosted backend API base URL.
+      api_base: https://openrouter.ai/api/v1
+      # Environment variable containing the hosted API key.
+      api_key_env: OPENROUTER_API_KEY
+      # Optional file containing the hosted API key.
+      api_key_path: ~/.config/openrouter/api_key
+      # Per-request hosted timeout in seconds.
+      timeout_secs: 60.0
+      # Additional hosted request headers.
+      extra_headers: {}
+      # Provider-routing options forwarded unchanged.
+      provider: {}
+    openrouter_qwen3_235b:
+      # Backend implementation name.
+      backend: openrouter
+      # Backend model identifier.
+      model: qwen/qwen3-235b-a22b-2507
+      # Optional tokenizer identifier override.
+      tokenizer: Qwen/Qwen3-235B-A22B-2507
+      # Hosted backend API base URL.
+      api_base: https://openrouter.ai/api/v1
+      # Environment variable containing the hosted API key.
+      api_key_env: OPENROUTER_API_KEY
+      # Optional file containing the hosted API key.
+      api_key_path: ~/.config/openrouter/api_key
+      # Per-request hosted timeout in seconds.
+      timeout_secs: 60.0
+      # Additional hosted request headers.
+      extra_headers: {}
+      # Provider-routing options forwarded unchanged.
+      provider: {}
+    openrouter_llama33_70b:
+      # Backend implementation name.
+      backend: openrouter
+      # Backend model identifier.
+      model: meta-llama/llama-3.3-70b-instruct
+      # Optional tokenizer identifier override.
+      tokenizer: meta-llama/Llama-3.3-70B-Instruct
+      # Hosted backend API base URL.
+      api_base: https://openrouter.ai/api/v1
+      # Environment variable containing the hosted API key.
+      api_key_env: OPENROUTER_API_KEY
+      # Optional file containing the hosted API key.
+      api_key_path: ~/.config/openrouter/api_key
+      # Per-request hosted timeout in seconds.
+      timeout_secs: 60.0
+      # Additional hosted request headers.
+      extra_headers: {}
+      # Provider-routing options forwarded unchanged.
+      provider: {}
+    openrouter_deepseek_chat_v31:
+      # Backend implementation name.
+      backend: openrouter
+      # Backend model identifier.
+      model: deepseek/deepseek-chat-v3.1
+      # Optional tokenizer identifier override.
+      tokenizer: deepseek-ai/DeepSeek-V3.1
+      # Hosted backend API base URL.
+      api_base: https://openrouter.ai/api/v1
+      # Environment variable containing the hosted API key.
+      api_key_env: OPENROUTER_API_KEY
+      # Optional file containing the hosted API key.
+      api_key_path: ~/.config/openrouter/api_key
+      # Per-request hosted timeout in seconds.
+      timeout_secs: 60.0
+      # Additional hosted request headers.
+      extra_headers: {}
+      # Provider-routing options forwarded unchanged.
+      provider: {}
+    local_verbaliser_default:
+      # Backend implementation name.
+      backend: local_hf
+      # Backend model identifier.
+      model: Qwen/Qwen2.5-3B-Instruct
+      # Optional tokenizer identifier override.
+      tokenizer:
+      # Hosted backend API base URL.
+      api_base: https://openrouter.ai/api/v1
+      # Environment variable containing the hosted API key.
+      api_key_env: OPENROUTER_API_KEY
+      # Optional file containing the hosted API key.
+      api_key_path:
+      # Per-request hosted timeout in seconds.
+      timeout_secs: 60.0
+      # Additional hosted request headers.
+      extra_headers: {}
+      # Provider-routing options forwarded unchanged.
+      provider: {}
+    local_llm_default:
+      # Backend implementation name.
+      backend: local_hf
+      # Backend model identifier.
+      model: Qwen/Qwen2.5-7B-Instruct
+      # Optional tokenizer identifier override.
+      tokenizer:
+      # Hosted backend API base URL.
+      api_base: https://openrouter.ai/api/v1
+      # Environment variable containing the hosted API key.
+      api_key_env: OPENROUTER_API_KEY
+      # Optional file containing the hosted API key.
+      api_key_path:
+      # Per-request hosted timeout in seconds.
+      timeout_secs: 60.0
+      # Additional hosted request headers.
+      extra_headers: {}
+      # Provider-routing options forwarded unchanged.
+      provider: {}
+  # Task-to-profile routing and fallbacks.
+  routing:
+    # Default profile for tasks without an override.
+    default_profile: openrouter_gpt4o_mini
+    # Primary verbaliser profile.
+    verbaliser_profile: openrouter_gpt4o_mini
+    # Primary summary or pair-brief profile.
+    summary_profile: openrouter_gpt4o_mini
+    # Primary binary-decision profile.
+    decision_profile: openrouter_gpt4o_mini
+    # Primary rationale profile.
+    rationale_profile: openrouter_gpt4o_mini
+    # Fallback verbaliser profile.
+    verbaliser_fallback_profile: local_verbaliser_default
+    # Optional task-specific summary fallback profile.
+    summary_fallback_profile:
+    # Optional task-specific rationale fallback profile.
+    rationale_fallback_profile:
+    # Shared local fallback profile.
+    fallback_profile: local_llm_default
+    # Fallback binary-decision profile.
+    decision_fallback_profile: local_llm_default
+  # Relation-template generation controls.
+  verbaliser:
+    # Local fallback verbaliser model.
+    model: Qwen/Qwen2.5-3B-Instruct
+    # Maximum tokens generated per relation template.
+    max_new_tokens: 64
+    # Verbaliser generation temperature.
+    temperature: 0.1
+    # Verbaliser nucleus-sampling cutoff.
+    top_p: 0.9
+    # Optional local top-k sampling cutoff.
+    top_k:
+    # Enable local stochastic sampling.
+    do_sample: false
+    # Local batch size or hosted concurrency cap.
+    batch_size: 4
+    # Retries after invalid generated templates.
+    max_retries: 1
+    # Skip relations without domain/range examples.
+    exclude_missing_domain_range: false
+# Evaluation backends and ranking cutoffs.
+evaluation:
+  # Evaluator backends run in order.
+  backends:
+    - builtin
+  # Ranking cutoffs reported by evaluation.
+  k:
+    - 1
+    - 5
+    - 10
+  # Options forwarded to the optional Bio-ML evaluator.
+  bioml: {}
+# Saved artifacts, plots, and diagnostics.
+output:
+  # Alignment save switches.
+  save:
+    # Assemble the optional full candidate-explanations JSON export.
+    json: false
+    # Save the flattened alignment summary table.
+    csv: true
+    # Save one-row run statistics as CSV.
+    stats_csv: true
+    # Append human-readable statistics to the summary table.
+    append_stats_to_summary: true
+  # Shared plot styling.
+  plots:
+    # Histogram bin count.
+    bins: 30
+    # Plot figure size in inches.
+    figsize:
+      - 7
+      - 5
+    # Plot export resolution.
+    dpi: 300
+    # Overlay kernel-density estimates on histograms.
+    kde: false
+    # Default plot transparency.
+    alpha: 0.6
+  # Human-readable dataset diagnostics.
+  sanity_checks:
+    # Emit sample rows after dataset construction.
+    enabled: true
+    # Number of sanity examples emitted.
+    n: 3
+    # Maximum context sentences shown per side.
+    max_ctx_show: 3
+    # Maximum label variants shown per side.
+    max_label_show: 3
+  # Explanation store layout controls.
+  explanations:
+    # Target uncompressed explanation-shard size in MiB.
+    shard_mb: 32
+  # Run-artifact retention policies.
+  retention:
+    # Checkpoint retention policy: all, latest, or none.
+    checkpoints: latest

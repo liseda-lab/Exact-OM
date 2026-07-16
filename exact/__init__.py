@@ -11,12 +11,6 @@ from typing import Any
 EXACT_DIR = Path(__file__).parent
 DEFAULT_CONFIG_PATH = EXACT_DIR / "default_config.yaml"
 
-# Load default configuration file
-
-from .utils.data import read_yaml
-
-config = read_yaml(DEFAULT_CONFIG_PATH)
-
 __all__ = ["AlignmentRunner", "EvaluationRunner"]
 
 

@@ -1,0 +1,28 @@
+# BioKG-Align baseline profile. Pass the task's candidate pool with `-c` and
+# install the optional evaluator with `pip install 'exact-om[bioml-eval]'`.
+config_version: 2
+
+io:
+  input_format: csv-kg
+  source_options:
+    hierarchy_relations: [subclass_of]
+    class_relation: subclass_of
+  target_options:
+    hierarchy_relations: [subclass_of]
+    class_relation: subclass_of
+  output_formats: [typed-tsv]
+
+matching:
+  # Preserve every supplied candidate for a ranked competition submission.
+  threshold: null
+  cardinality: null
+  target_cardinality: null
+  entity_kinds: [class]
+  relation_prediction: hierarchy_heuristic
+
+evaluation:
+  backends: [builtin, bioml]
+
+output:
+  save:
+    full_explanations_json: false
