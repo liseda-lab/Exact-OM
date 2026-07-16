@@ -1,1 +1,3 @@
-from .semantic_runner import SemanticAlignmentRunner
+from .runner import SemanticAlignmentRunner
+
+__all__ = ["SemanticAlignmentRunner"]

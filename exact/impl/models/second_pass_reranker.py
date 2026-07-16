@@ -1,15 +1,5 @@
-from __future__ import annotations
+"""Compatibility module for the folded second-pass reranker alias."""
 
-from .candidate_set_selector import CandidateSetSelector
+from exact.impl.models.selector import SecondPassReranker
 
-
-class SecondPassReranker(CandidateSetSelector):
-    """
-    Backward-compatible alias for the old second-stage model name.
-
-    Legacy configs that still reference ``SecondPassReranker`` now receive the
-    unsupervised candidate-set selector implementation. Unknown legacy
-    parameters are accepted and ignored by ``CandidateSetSelector``.
-    """
-
-    pass
+__all__ = ["SecondPassReranker"]
