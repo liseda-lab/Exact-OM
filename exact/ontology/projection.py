@@ -64,7 +64,7 @@ def _legacy_subproperty_hash(sub_property: str, super_property: str) -> int:
 def _legacy_subroles(parsed: ParsedOntology) -> dict[str, tuple[str, ...]]:
     """Reproduce the historical projector's sub-role overwrite behavior.
 
-    mOWL 1.0.1 iterated the OWLAPI RBox ``HashSet`` and accidentally looked up
+    The historical Java projector iterated the RBox ``HashSet`` and accidentally looked up
     the existing children under the sub-role before assigning them to the
     super-role. Siblings therefore overwrote one another. Keeping this quirk
     isolated here preserves projection parity without leaking Java into the
@@ -197,7 +197,7 @@ def project(
             for expression in equivalent_axiom.expressions:
                 if isinstance(expression, NamedClass) and expression.iri == anchor:
                     continue
-                # mOWL's equivalence walker handled named classes and
+                # The historical equivalence walker handled named classes and
                 # top-level intersections/unions. A direct restriction fell
                 # through without producing an edge.
                 if not isinstance(

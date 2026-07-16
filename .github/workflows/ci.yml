@@ -47,7 +47,9 @@ jobs:
           if git grep -n -iE 'jpype|mowl|org\.semanticweb|init_jvm' -- \
             exact tools tests deploy \
             ':!exact/__init__.py' \
-            ':!tests/ontology_backend_test.py'; then
+            ':!tests/ontology_backend_test.py' \
+            ':!tools/capture_backend_baseline.py' \
+            ':!tests/baselines/**'; then
             echo "Java runtime reference found outside compatibility shims" >&2
             exit 1
           fi

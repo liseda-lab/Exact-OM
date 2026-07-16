@@ -178,7 +178,8 @@ On fixture + conference baselines (and Bio-ML if available locally):
 5. End-to-end conference run (fixed seed, LLM disabled or fixed fakes): global P/R/F1 within
    ±0.001 of the captured baseline; local Hits@k/MRR within ±0.001.
 6. `git grep -iE "jpype|mowl|org\.semanticweb|init_jvm"` over `exact/ tools/ tests/ deploy/`
-   returns nothing (except deprecation shims/docs); add this grep as a CI step.
+   returns nothing except deprecation shims, the isolated baseline-capture mode and its
+   provenance, and docs; add this grep as a CI step.
 7. Dataset build wall-time on conference pair ≤ the mowl path's captured time (JVM startup gone;
    expect a win) and NCIT-class ontology loads without >2× regression (soft gate; profile note
    in PR).
