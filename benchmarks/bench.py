@@ -25,6 +25,8 @@ from exact.ontology.parser import parse  # noqa: E402
 from exact.ontology.projection import project  # noqa: E402
 from exact.ontology.store import OwlOntologySource  # noqa: E402
 from exact.runs import ExplanationStore, RunLayout  # noqa: E402
+from exact.tracks.descriptor import TrackDescriptor  # noqa: E402
+from exact.tracks.hf import HfProvider  # noqa: E402
 from exact.utils.candidate_generation import (  # noqa: E402
     lexical_candidate_pair_scores,
     make_candidate_labels,
@@ -62,6 +64,16 @@ def parse_ontology() -> int:
 def build_hierarchy() -> int:
     source = OwlOntologySource(parse(SOURCE_PATH))
     return sum(len(source.hierarchy.ancestors(iri)) for iri in source.entities())
+
+
+def transitive_closure() -> int:
+    """Materialize all fixture ancestor and descendant closures."""
+
+    source = OwlOntologySource(parse(SOURCE_PATH))
+    return sum(
+        len(source.hierarchy.ancestors(iri)) + len(source.hierarchy.descendants(iri))
+        for iri in source.entities()
+    )
 
 
 def projection_owl2vecstar() -> int:
@@ -121,6 +133,66 @@ def csv_kg_load() -> int:
     return len(source.projection_edges(include_literals=True))
 
 
+class _FixtureHfClient:
+    """Local snapshot client used by the hermetic materialization benchmark."""
+
+    snapshot = ROOT / "tests" / "fixtures" / "tracks" / "hf_snapshot"
+
+    def resolve_revision(self, repo_id: str, revision: str) -> str:
+        return "fixture-commit"
+
+    def snapshot_download(
+        self,
+        repo_id: str,
+        revision: str,
+        destination: Path,
+        **kwargs: object,
+    ) -> Path:
+        return self.snapshot
+
+
+def _fixture_track_descriptor() -> TrackDescriptor:
+    return TrackDescriptor.from_mapping(
+        {
+            "descriptor_version": 1,
+            "name": "benchmark-track",
+            "provider": "hf",
+            "provider_version": "1",
+            "upstream": {
+                "repo_id": "fixture/benchmark",
+                "revision": "fixture",
+                "checksum_manifest": "SHA256SUMS",
+            },
+            "tasks": {
+                "demo": {
+                    "source": "source.owl",
+                    "target": "target.owl",
+                    "refs": {
+                        "test": {
+                            "path": "references/test.rdf",
+                            "transform": "alignment_rdf_to_tsv",
+                        }
+                    },
+                    "candidates": {
+                        "path": "pools/pools.jsonl",
+                        "transform": "pools_jsonl_to_cands_tsv",
+                    },
+                }
+            },
+        }
+    )
+
+
+def track_materialize() -> int:
+    """Materialize and lock a local HF-shaped track fixture."""
+
+    with tempfile.TemporaryDirectory(prefix="exact-benchmark-track-") as directory:
+        provider = HfProvider(_fixture_track_descriptor(), client=_FixtureHfClient())
+        layout = provider.materialize("demo", Path(directory))
+        artifacts = (layout.source, layout.target, *layout.refs.values())
+        return sum(path.is_file() for path in artifacts)
+
+
 def explanation_store_write() -> int:
     """Write 100k explanation records to bounded compressed shards."""
 
@@ -151,11 +223,13 @@ def explanation_store_read() -> int:
 SCENARIOS: dict[str, Callable[[], int]] = {
     "parse_ontology": parse_ontology,
     "build_hierarchy": build_hierarchy,
+    "transitive_closure": transitive_closure,
     "projection_owl2vecstar": projection_owl2vecstar,
     "dataset_build_e2e": dataset_build_e2e,
     "candidate_generation": candidate_generation,
     "inference_throughput": inference_throughput,
     "csv_kg_load": csv_kg_load,
+    "track_materialize": track_materialize,
     "explanation_store_write": explanation_store_write,
     "explanation_store_read": explanation_store_read,
 }

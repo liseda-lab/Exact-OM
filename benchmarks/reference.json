@@ -10,6 +10,8 @@
     "explanation_store_write": 3.0000,
     "inference_throughput": 0.0450,
     "parse_ontology": 0.0180,
-    "projection_owl2vecstar": 0.0170
+    "projection_owl2vecstar": 0.0170,
+    "track_materialize": 0.0800,
+    "transitive_closure": 0.0200
   }
 }
