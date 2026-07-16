@@ -4,12 +4,16 @@ Helper to launch a single Exact run from a YAML description.
 """
 
 import argparse
+import os
 import shlex
 import subprocess
 from pathlib import Path
 from typing import Dict, List
 
 import yaml
+
+from exact.core.entities.configs.config import ConfigModel
+from exact.core.entities.configs.yaml_io import dump_yaml_document
 
 
 def parse_args() -> argparse.Namespace:
@@ -57,6 +61,32 @@ def _normalize_sbatch_args(value) -> List[str]:
     raise TypeError(f"Unsupported sbatch_args value: {type(value)!r}")
 
 
+def _materialize_track_config(dataset_cfg: Dict, job_cfg: Dict) -> Path:
+    """Merge a wrapper-level track selection into a resolved v2 run config."""
+
+    configured_path = Path(job_cfg["config_file"]).expanduser().resolve()
+    if not dataset_cfg.get("track"):
+        return configured_path
+
+    config = ConfigModel.load_config(configured_path)
+    payload = config.model_dump(mode="json", by_alias=True)
+    data = dict(payload.get("data") or {})
+    for key in ("track", "task", "revision"):
+        if dataset_cfg.get(key) is not None:
+            data[key] = dataset_cfg[key]
+    if dataset_cfg.get("root") is not None:
+        data["root"] = str(Path(dataset_cfg["root"]).expanduser().resolve())
+    payload["data"] = data
+
+    output_dir = Path(job_cfg["output_dir"]).expanduser().resolve()
+    output_dir.mkdir(parents=True, exist_ok=True)
+    resolved_path = output_dir / "job-input.config.yaml"
+    temporary = resolved_path.with_name(f".{resolved_path.name}.{os.getpid()}.tmp")
+    temporary.write_text(dump_yaml_document(payload), encoding="utf-8")
+    os.replace(temporary, resolved_path)
+    return resolved_path
+
+
 def build_exact_command(cfg: Dict) -> List[str]:
     """Build a command from either the legacy ``dataset`` or v2 ``data`` wrapper."""
 
@@ -64,6 +94,7 @@ def build_exact_command(cfg: Dict) -> List[str]:
     if not isinstance(dataset_cfg, dict):
         raise ValueError("run config must contain a 'data' (v2) or 'dataset' (legacy) mapping")
     job_cfg = cfg["job"]
+    config_path = _materialize_track_config(dataset_cfg, job_cfg)
 
     data_dir = Path(dataset_cfg.get("root") or dataset_cfg.get("data_dir") or ".").resolve()
 
@@ -81,7 +112,7 @@ def build_exact_command(cfg: Dict) -> List[str]:
         "-o",
         str(Path(job_cfg["output_dir"]).resolve()),
         "-y",
-        str(Path(job_cfg["config_file"]).resolve()),
+        str(config_path),
         "-m",
         str(job_cfg.get("memory", "60G")),
     ]
@@ -174,7 +205,7 @@ def main() -> None:
         env = {
             "JOB_NAME": job_cfg.get("name", Path(job_cfg["output_dir"]).name),
             "EXP_DIR": str(exp_dir),
-            "CONFIG_FILE": str(Path(job_cfg["config_file"]).resolve()),
+            "CONFIG_FILE": cmd[cmd.index("-y") + 1],
             "DATA_DIR": str(
                 Path(dataset_cfg.get("root") or dataset_cfg.get("data_dir") or ".").resolve()
             ),

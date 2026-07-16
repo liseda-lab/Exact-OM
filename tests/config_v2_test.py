@@ -165,16 +165,31 @@ def test_job_runner_supports_v2_data_paths_and_tracks(tmp_path: Path) -> None:
     ]
     assert "-r" in explicit
 
+    track_config = tmp_path / "track.yaml"
+    track_config.write_text(
+        "config_version: 2\nrun:\n  use_file_cache: false\n",
+        encoding="utf-8",
+    )
     tracked = build_exact_command(
         {
-            "data": {"track": "bioml", "task": "ncit-doid"},
+            "data": {
+                "track": "bioml",
+                "task": "ncit-doid",
+                "root": str(tmp_path / "datasets"),
+                "revision": "fixture-revision",
+            },
             "job": {
                 "output_dir": str(tmp_path / "track-run"),
-                "config_file": str(tmp_path / "track.yaml"),
+                "config_file": str(track_config),
             },
         }
     )
     assert "-s" not in tracked and "-t" not in tracked
+    resolved = ConfigModel.load_config(Path(tracked[tracked.index("-y") + 1]))
+    assert resolved.data.track == "bioml"
+    assert resolved.data.task == "ncit-doid"
+    assert resolved.data.root == (tmp_path / "datasets").resolve()
+    assert resolved.data.revision == "fixture-revision"
 
 
 def test_default_yaml_is_valid_yaml_12() -> None:
