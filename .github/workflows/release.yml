@@ -1,0 +1,32 @@
+name: Release distributions
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: explanations_visualizer/package-lock.json
+      - uses: snok/install-poetry@v1
+        with:
+          version: 2.1.4
+          virtualenvs-in-project: true
+      - run: make build-frontend
+      - run: poetry build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: exact-om-${{ github.ref_name }}
+          path: dist/*

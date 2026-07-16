@@ -29,7 +29,7 @@ jobs:
         with:
           path: .venv
           key: docs-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
-      - run: poetry install --with docs
+      - run: poetry install --extras docs
       - run: poetry run mkdocs build --strict
       - name: Check internal links
         run: >-
@@ -58,7 +58,7 @@ jobs:
         with:
           path: .venv
           key: docs-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
-      - run: poetry install --with docs
+      - run: poetry install --extras docs
       - name: Deploy documentation
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

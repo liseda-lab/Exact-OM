@@ -25,12 +25,22 @@ jobs:
         with:
           path: .venv
           key: venv-${{ runner.os }}-${{ matrix.python-version }}-${{ hashFiles('poetry.lock') }}
-      - run: poetry install --with prebuild
-      - run: poetry run black --check exact tests tools study_visualizer_runtime
-      - run: poetry run isort --check-only exact tests tools study_visualizer_runtime
-      - run: poetry run flake8 exact tests tools study_visualizer_runtime
-      - run: poetry run mypy exact
+      - run: poetry install --with prebuild --extras viz
+      - run: poetry run black --check exact exact_inspect tests tools study_visualizer_runtime
+      - run: poetry run isort --check-only exact exact_inspect tests tools study_visualizer_runtime
+      - run: poetry run flake8 exact exact_inspect tests tools study_visualizer_runtime
+      - run: poetry run mypy
       - run: poetry run lint-imports
+      - name: Check priority public API docstrings
+        run: >-
+          poetry run interrogate
+          exact/delivery/api
+          exact/ontology
+          exact/io
+          exact/core/contracts
+          exact/utils/timing.py
+          exact/utils/candidate_generation.py
+          exact/utils/graph_search.py
       - name: Enforce Java-free runtime
         shell: bash
         run: |
@@ -42,6 +52,52 @@ jobs:
             exit 1
           fi
       - run: poetry run pytest -m "not requires_data and not slow and not requires_cuda and not requires_openrouter" --cov=exact
+
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: explanations_visualizer/package-lock.json
+      - uses: snok/install-poetry@v1
+        with:
+          version: 2.1.4
+          virtualenvs-in-project: true
+      - run: poetry install --with prebuild --extras viz
+      - run: make build-frontend
+      - run: poetry build
+      - name: Verify wheel extras and packaged frontend
+        run: |
+          poetry run python - <<'PY'
+          import glob
+          import zipfile
+
+          wheel = glob.glob("dist/*.whl")
+          assert len(wheel) == 1, wheel
+          with zipfile.ZipFile(wheel[0]) as archive:
+              names = archive.namelist()
+              assert "exact_inspect/static/index.html" in names
+              metadata_name = next(name for name in names if name.endswith(".dist-info/METADATA"))
+              metadata = archive.read(metadata_name).decode("utf-8")
+          for dependency in ("fastapi", "uvicorn", "pydantic-settings"):
+              lines = [
+                  line
+                  for line in metadata.splitlines()
+                  if line.lower().startswith(f"requires-dist: {dependency}")
+              ]
+              assert lines and all('extra == "viz"' in line for line in lines), lines
+          PY
+      - run: poetry run exact-inspect --help
+      - uses: actions/upload-artifact@v4
+        with:
+          name: exact-om-distributions
+          path: dist/*
 
   benchmark:
     runs-on: ubuntu-latest

@@ -7,10 +7,12 @@ readme = "README.md"
 repository = "https://github.com/liseda-lab/Exact-OM"
 packages = [
     { include = "exact" },
+    { include = "exact_inspect" },
     { include = "study_visualizer_runtime" },
 ]
 include = [
     { path = "configs/profiles/*.yaml", format = ["sdist", "wheel"] },
+    { path = "exact_inspect/static/**/*", format = ["wheel"] },
 ]
 
 [tool.poetry.dependencies]
@@ -33,15 +35,23 @@ peft = "^0.15.0"
 sentencepiece = "^0.2.0"
 rdflib = "^7.5.0"
 httpx = "^0.28.1"
-fastapi = "^0.116.1"
-uvicorn = {version = "^0.35.0", extras = ["standard"]}
+fastapi = {version = "^0.116.1", optional = true}
+uvicorn = {version = "^0.35.0", extras = ["standard"], optional = true}
+pydantic-settings = {version = "^2.12.0", optional = true}
 zstandard = "^0.23.0"
 oaei-bioml-eval = {git = "https://github.com/OAEI-ML/OAEI-Bio-ML-eval.git", rev = "900ba7f242f254d08b0e01e6826975c61d0438b2", optional = true, python = ">=3.12"}
 huggingface-hub = {version = "^0.36.2", optional = true}
+mkdocs-material = {version = "^9.7.6", optional = true}
+mkdocstrings = {version = "^1.0.4", extras = ["python"], optional = true}
+mkdocs-gen-files = {version = "^0.6.1", optional = true}
+mkdocs-literate-nav = {version = "^0.6.3", optional = true}
+linkchecker = {version = "^10.6.0", optional = true}
 
 [tool.poetry.extras]
 bioml-eval = ["oaei-bioml-eval"]
 hf = ["huggingface-hub"]
+viz = ["fastapi", "uvicorn", "pydantic-settings"]
+docs = ["mkdocs-material", "mkdocstrings", "mkdocs-gen-files", "mkdocs-literate-nav", "linkchecker"]
 
 
 [tool.poetry.scripts]
@@ -51,6 +61,7 @@ exact-eval = "exact.delivery.cli.eval:main"
 exact-llm-debug = "exact.delivery.cli.llm_debug:main"
 exact-user-study = "exact.delivery.cli.user_study:main"
 exact-study-viz = "exact.delivery.cli.study_visualizer:main"
+exact-inspect = "exact_inspect.cli:main"
 
 
 [tool.poetry.group.prebuild.dependencies]
@@ -62,17 +73,6 @@ black = "^24.4.2"
 import-linter = "^2.1"
 pytest-cov = "^6.0"
 interrogate = "^1.7.0"
-
-[tool.poetry.group.docs]
-optional = true
-
-[tool.poetry.group.docs.dependencies]
-mkdocs-material = "^9.7.6"
-mkdocstrings = {version = "^1.0.4", extras = ["python"]}
-mkdocs-gen-files = "^0.6.1"
-mkdocs-literate-nav = "^0.6.3"
-linkchecker = "^10.6.0"
-
 
 [build-system]
 requires = ["poetry-core"]
@@ -92,7 +92,7 @@ line_length = 100
 [tool.mypy]
 warn_return_any = true
 warn_unused_configs = true
-files = ["exact", "study_visualizer_runtime"]
+files = ["exact", "exact_inspect", "study_visualizer_runtime"]
 ignore_missing_imports = true
 check_untyped_defs = false
 
