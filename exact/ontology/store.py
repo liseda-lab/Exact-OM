@@ -576,12 +576,6 @@ class OwlOntologySource(KnowledgeSource):
         return self._origin
 
     @property
-    def parsed(self) -> "OwlOntologySource":
-        """One-minor compatibility shim for callers reading ``parsed.ontology_iri``."""
-
-        return self
-
-    @property
     def projector(self) -> Projector:
         """Expose the projector's identity diagnostic without transferring ownership."""
 

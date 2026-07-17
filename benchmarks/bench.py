@@ -58,7 +58,7 @@ def _explanation_records() -> list[dict]:
 
 
 def parse_ontology() -> int:
-    return len(parse(SOURCE_PATH).signature)
+    return len(parse(SOURCE_PATH).signature(include_builtins=False))
 
 
 def build_hierarchy() -> int:

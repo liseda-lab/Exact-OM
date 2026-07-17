@@ -1,99 +1,77 @@
-"""Walkers over backend-neutral OWL class expressions."""
+"""Deprecated result helpers using public :mod:`pyowl_core` visitors."""
 
 from __future__ import annotations
 
 from collections.abc import Iterable
 
-from exact.ontology.parser import (
-    AnonymousClassExpression,
+import pyowl_core
+from pyowl_core import (
+    Class,
     ClassExpression,
-    DataOneOf,
-    NamedClass,
-    ObjectAllValuesFrom,
-    ObjectCardinalityRestriction,
     ObjectIntersectionOf,
+    ObjectProperty,
     ObjectSomeValuesFrom,
-    ObjectUnionOf,
+    StructuralNode,
+    walk,
 )
 
 
-def named_class_iri(expr: ClassExpression) -> str | None:
-    """Return the IRI when *expr* is a named class, otherwise ``None``."""
+def named_class_iri(expression: ClassExpression) -> str | None:
+    """Return the IRI of a core named class expression."""
 
-    return expr.iri if isinstance(expr, NamedClass) else None
-
-
-def named_class_iris(expr: ClassExpression) -> list[str]:
-    """Return all named class IRIs nested in an expression, in stable order."""
-
-    if isinstance(expr, NamedClass):
-        return [expr.iri]
-    if isinstance(expr, (ObjectSomeValuesFrom, ObjectAllValuesFrom)):
-        return named_class_iris(expr.filler)
-    if isinstance(expr, ObjectCardinalityRestriction):
-        return named_class_iris(expr.filler) if expr.filler is not None else []
-    if isinstance(expr, (ObjectIntersectionOf, ObjectUnionOf)):
-        values: list[str] = []
-        for operand in expr.operands:
-            values.extend(named_class_iris(operand))
-        return list(dict.fromkeys(values))
-    return []
+    return expression.iri.value if isinstance(expression, Class) else None
 
 
-def existential_targets(expr: ClassExpression, property_iris: Iterable[str]) -> list[str]:
-    """Find named fillers of matching ``ObjectSomeValuesFrom`` expressions."""
+def named_class_iris(expression: ClassExpression) -> list[str]:
+    """Return named classes encountered by the core's exhaustive walker."""
 
-    properties = frozenset(property_iris)
+    return list(
+        dict.fromkeys(
+            node.iri.value for node in walk(expression) if isinstance(node, Class)
+        )
+    )
+
+
+def existential_targets(
+    expression: ClassExpression, property_iris: Iterable[str]
+) -> list[str]:
+    """Return named fillers for matching core object-existential occurrences."""
+
+    selected = frozenset(map(str, property_iris))
     targets: list[str] = []
-
-    def visit(current: ClassExpression) -> None:
-        if isinstance(current, ObjectSomeValuesFrom):
-            if current.property_iri in properties:
-                targets.extend(named_class_iris(current.filler))
-            else:
-                visit(current.filler)
-        elif isinstance(current, (ObjectIntersectionOf, ObjectUnionOf)):
-            for operand in current.operands:
-                visit(operand)
-
-    visit(expr)
+    for node in walk(expression):
+        if not isinstance(node, ObjectSomeValuesFrom):
+            continue
+        if isinstance(node.property, ObjectProperty) and node.property.iri.value in selected:
+            targets.extend(named_class_iris(node.filler))
     return list(dict.fromkeys(targets))
 
 
-def intersection_operands(expr: ClassExpression) -> tuple[ClassExpression, ...]:
-    """Return top-level intersection operands, or the expression as one operand."""
+def intersection_operands(
+    expression: ClassExpression,
+) -> tuple[ClassExpression, ...]:
+    """Return top-level core intersection operands or the expression itself."""
 
-    if isinstance(expr, ObjectIntersectionOf):
-        return expr.operands
-    return (expr,)
+    if isinstance(expression, ObjectIntersectionOf):
+        return tuple(expression.operands)
+    return (expression,)
 
 
-def render_class_expression(expr: ClassExpression) -> str:
-    """Render a stable OWL functional-syntax-like class expression."""
+def render_class_expression(expression: StructuralNode) -> str:
+    """Return a stable compatibility display without a local OWL renderer."""
 
-    if isinstance(expr, NamedClass):
-        return f"<{expr.iri}>"
-    if isinstance(expr, ObjectSomeValuesFrom):
-        return (
-            f"ObjectSomeValuesFrom(<{expr.property_iri}> "
-            f"{render_class_expression(expr.filler)})"
-        )
-    if isinstance(expr, ObjectAllValuesFrom):
-        return (
-            f"ObjectAllValuesFrom(<{expr.property_iri}> " f"{render_class_expression(expr.filler)})"
-        )
-    if isinstance(expr, ObjectCardinalityRestriction):
-        filler = f" {render_class_expression(expr.filler)}" if expr.filler is not None else ""
-        family = expr.cardinality_type.capitalize()
-        return f"Object{family}Cardinality(<{expr.property_iri}>{filler})"
-    if isinstance(expr, ObjectIntersectionOf):
-        operands = " ".join(sorted(render_class_expression(item) for item in expr.operands))
-        return f"ObjectIntersectionOf({operands})"
-    if isinstance(expr, ObjectUnionOf):
-        operands = " ".join(sorted(render_class_expression(item) for item in expr.operands))
-        return f"ObjectUnionOf({operands})"
-    if isinstance(expr, DataOneOf):
-        return f"DataOneOf({' '.join(sorted(expr.values))})"
-    if isinstance(expr, AnonymousClassExpression):
-        return expr.identifier
-    raise TypeError(f"Unsupported class expression: {type(expr).__name__}")
+    if isinstance(expression, Class):
+        return f"<{expression.iri.value}>"
+    return (
+        f"{type(expression).__name__}("
+        f"{pyowl_core.structural_hexdigest(expression)})"
+    )
+
+
+__all__ = [
+    "existential_targets",
+    "intersection_operands",
+    "named_class_iri",
+    "named_class_iris",
+    "render_class_expression",
+]

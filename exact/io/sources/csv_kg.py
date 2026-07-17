@@ -20,9 +20,9 @@ from exact.core.contracts.knowledge import KnowledgeSource
 from exact.core.entities.graph import AnnotationValue, Edge
 from exact.core.entities.kinds import EntityKind
 from exact.io._common import short_form
+from exact.io._hierarchy import HierarchyIndex
 from exact.io.sources import SourceOptionsError
 from exact.io.sources.datalog import read_facts
-from exact.ontology.hierarchy import HierarchyIndex
 
 DESCRIPTOR_VERSION = 1
 

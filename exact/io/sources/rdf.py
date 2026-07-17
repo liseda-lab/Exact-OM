@@ -19,8 +19,8 @@ from exact.core.entities.graph import AnnotationValue, Edge
 from exact.core.entities.kinds import EntityKind
 from exact.core.values import ANNOTATION_IRI
 from exact.io._common import short_form
+from exact.io._hierarchy import HierarchyIndex
 from exact.io.sources import SourceOptionsError
-from exact.ontology.hierarchy import HierarchyIndex
 
 RDF_TYPE = str(RDF.type)
 RDFS_LABEL = str(RDFS.label)

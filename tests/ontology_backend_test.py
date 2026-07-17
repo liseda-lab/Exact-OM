@@ -3,13 +3,14 @@ import sys
 from pathlib import Path
 
 import pytest
+from pyowl_core import Class, IRI, ObjectSomeValuesFrom, SubClassOf
 
 from exact.core.entities.graph import AnnotationValue, Edge
 from exact.core.entities.kinds import EntityKind
 from exact.core.entities.ontology import OntologyGraph
 from exact.ontology import load_ontology
 from exact.ontology.expressions import existential_targets, named_class_iri
-from exact.ontology.parser import NamedClass, ObjectSomeValuesFrom, parse
+from exact.ontology.parser import parse
 from exact.ontology.reasoning import AssertedHierarchyReasoner, load_reasoner
 from exact.utils.eval import MetricUtils
 from tests.knowledge_source_conformance import assert_knowledge_source_conformance
@@ -35,8 +36,8 @@ def test_fixture_sources_conform(source, target):
     assert_knowledge_source_conformance(target)
 
 
-def test_parser_builds_complete_named_signatures(source):
-    assert source.parsed.ontology_iri == "http://example.org/mini/src"
+def test_core_snapshot_builds_complete_named_signatures(source):
+    assert source.ontology_iri == "http://example.org/mini/src"
     assert len(source.entities()) == 32
     assert len(source.entities(EntityKind.OBJECT_PROPERTY)) == 4
     assert len(source.entities(EntityKind.DATA_PROPERTY)) == 1
@@ -236,12 +237,12 @@ def test_expression_walkers_and_hierarchy_bundle(source):
     parsed = parse(FIXTURES / "mini_src.owl")
     chest_axiom = next(
         axiom
-        for axiom in parsed.subclass_axioms
-        if named_class_iri(axiom.sub) == SRC + "ChestPain"
-        and isinstance(axiom.sup, ObjectSomeValuesFrom)
+        for axiom in parsed.iter_axioms(SubClassOf)
+        if named_class_iri(axiom.sub_class) == SRC + "ChestPain"
+        and isinstance(axiom.super_class, ObjectSomeValuesFrom)
     )
-    assert named_class_iri(NamedClass(SRC + "Heart")) == SRC + "Heart"
-    assert existential_targets(chest_axiom.sup, (PART_OF,)) == [SRC + "Heart"]
+    assert named_class_iri(Class(IRI(SRC + "Heart"))) == SRC + "Heart"
+    assert existential_targets(chest_axiom.super_class, (PART_OF,)) == [SRC + "Heart"]
     assert source.hierarchy_bundle(
         SRC + "CardiacStructure", {"is_a": (), "part_of": (PART_OF,)}
     ) == {"is_a": [SRC + "Structure"], "part_of": [SRC + "Heart"]}

@@ -1,199 +1,44 @@
-"""Backend-neutral records produced by ontology document parsers."""
+"""Deprecated structural-name imports backed exactly by :mod:`pyowl_core`.
 
-from __future__ import annotations
+Exact 2.1 owns no OWL records.  This module remains for one minor release so
+imports fail gradually; every exported object is the authoritative core type.
+New code must import these names from :mod:`pyowl_core` directly.
+"""
 
-from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Mapping
-
-from exact.core.entities.graph import AnnotationValue
-from exact.core.entities.kinds import EntityKind
-
-
-@dataclass(frozen=True, slots=True)
-class NamedClass:
-    """A named OWL class expression."""
-
-    iri: str
-
-
-@dataclass(frozen=True, slots=True)
-class ObjectSomeValuesFrom:
-    """An object-property existential restriction."""
-
-    property_iri: str
-    filler: "ClassExpression"
-
-
-@dataclass(frozen=True, slots=True)
-class ObjectAllValuesFrom:
-    """An object-property universal restriction."""
-
-    property_iri: str
-    filler: "ClassExpression"
-
-
-@dataclass(frozen=True, slots=True)
-class ObjectCardinalityRestriction:
-    """An unqualified object-cardinality restriction.
-
-    The legacy OWL2Vec* projector represented minimum and maximum object
-    cardinalities as edges to ``owl:Thing``. The numeric cardinality is
-    irrelevant to that projection, but the restriction family is retained so
-    exact-cardinality and data-property restrictions can be ignored just as
-    they were by the historical implementation.
-    """
-
-    property_iri: str
-    cardinality_type: str
-    filler: "ClassExpression | None" = None
-
-
-@dataclass(frozen=True, slots=True)
-class ObjectIntersectionOf:
-    """A conjunction of class expressions."""
-
-    operands: tuple["ClassExpression", ...]
-
-
-@dataclass(frozen=True, slots=True)
-class ObjectUnionOf:
-    """A disjunction of class expressions."""
-
-    operands: tuple["ClassExpression", ...]
-
-
-@dataclass(frozen=True, slots=True)
-class DataOneOf:
-    """A finite data range retained in stable functional-syntax form."""
-
-    values: tuple[str, ...]
-
-
-@dataclass(frozen=True, slots=True)
-class AnonymousClassExpression:
-    """An unsupported expression retained without parser-native objects."""
-
-    identifier: str
-
-
-ClassExpression = (
-    NamedClass
-    | ObjectSomeValuesFrom
-    | ObjectAllValuesFrom
-    | ObjectCardinalityRestriction
-    | ObjectIntersectionOf
-    | ObjectUnionOf
-    | DataOneOf
-    | AnonymousClassExpression
+from pyowl_core import (
+    AnnotationAssertion,
+    Class,
+    ClassAssertion,
+    ClassExpression,
+    DataOneOf,
+    DataPropertyAssertion,
+    EquivalentClasses,
+    InverseObjectProperties,
+    ObjectAllValuesFrom,
+    ObjectExactCardinality,
+    ObjectIntersectionOf,
+    ObjectMaxCardinality,
+    ObjectMinCardinality,
+    ObjectPropertyAssertion,
+    ObjectPropertyDomain,
+    ObjectPropertyRange,
+    ObjectSomeValuesFrom,
+    ObjectUnionOf,
+    OntologySnapshot,
+    SubClassOf,
+    SubObjectPropertyOf,
 )
 
-
-@dataclass(frozen=True, slots=True)
-class SubClassOf:
-    """A normalized subclass axiom."""
-
-    sub: ClassExpression
-    sup: ClassExpression
-
-
-@dataclass(frozen=True, slots=True)
-class EquivalentClasses:
-    """A normalized equivalent-classes axiom."""
-
-    expressions: tuple[ClassExpression, ...]
-
-
-@dataclass(frozen=True, slots=True)
-class AnnotationAssertion:
-    """An annotation assertion on a named entity."""
-
-    subject_iri: str
-    value: AnnotationValue
-
-
-@dataclass(frozen=True, slots=True)
-class PropertyDomain:
-    """A normalized property-domain axiom."""
-
-    property_iri: str
-    domain: ClassExpression
-
-
-@dataclass(frozen=True, slots=True)
-class PropertyRange:
-    """A normalized property-range axiom."""
-
-    property_iri: str
-    range: ClassExpression
-
-
-@dataclass(frozen=True, slots=True)
-class SubPropertyOf:
-    """A normalized subproperty axiom with its entity kind."""
-
-    sub_property_iri: str
-    super_property_iri: str
-    kind: EntityKind
-
-
-@dataclass(frozen=True, slots=True)
-class ClassAssertion:
-    """A normalized class assertion for a named individual."""
-
-    individual_iri: str
-    class_expression: ClassExpression
-
-
-@dataclass(frozen=True, slots=True)
-class ObjectPropertyAssertion:
-    """A normalized object-property assertion."""
-
-    subject_iri: str
-    property_iri: str
-    object_iri: str
-
-
-@dataclass(frozen=True, slots=True)
-class DataPropertyAssertion:
-    """A normalized data-property assertion."""
-
-    subject_iri: str
-    value: AnnotationValue
-
-
-@dataclass(frozen=True, slots=True)
-class InverseObjectProperties:
-    """A normalized inverse-object-properties axiom."""
-
-    first_property_iri: str
-    second_property_iri: str
-
-
-@dataclass(frozen=True, slots=True)
-class ParsedOntology:
-    """Immutable, backend-neutral representation of an ontology document."""
-
-    origin: Path
-    ontology_iri: str | None
-    signature: Mapping[EntityKind, tuple[str, ...]]
-    subclass_axioms: tuple[SubClassOf, ...] = ()
-    equivalent_class_axioms: tuple[EquivalentClasses, ...] = ()
-    annotation_assertions: tuple[AnnotationAssertion, ...] = ()
-    property_domains: tuple[PropertyDomain, ...] = ()
-    property_ranges: tuple[PropertyRange, ...] = ()
-    subproperty_axioms: tuple[SubPropertyOf, ...] = ()
-    class_assertions: tuple[ClassAssertion, ...] = ()
-    object_property_assertions: tuple[ObjectPropertyAssertion, ...] = ()
-    data_property_assertions: tuple[DataPropertyAssertion, ...] = ()
-    inverse_object_properties: tuple[InverseObjectProperties, ...] = ()
-    symmetric_object_properties: frozenset[str] = frozenset()
-    parser_backend: str = field(default="rdflib", compare=False)
-
+# Historical spellings whose authoritative core counterparts are exact.
+NamedClass = Class
+ParsedOntology = OntologySnapshot
+PropertyDomain = ObjectPropertyDomain
+PropertyRange = ObjectPropertyRange
+SubPropertyOf = SubObjectPropertyOf
 
 __all__ = [
     "AnnotationAssertion",
-    "AnonymousClassExpression",
+    "Class",
     "ClassAssertion",
     "ClassExpression",
     "DataOneOf",
@@ -202,14 +47,20 @@ __all__ = [
     "InverseObjectProperties",
     "NamedClass",
     "ObjectAllValuesFrom",
-    "ObjectCardinalityRestriction",
+    "ObjectExactCardinality",
     "ObjectIntersectionOf",
+    "ObjectMaxCardinality",
+    "ObjectMinCardinality",
     "ObjectPropertyAssertion",
+    "ObjectPropertyDomain",
+    "ObjectPropertyRange",
     "ObjectSomeValuesFrom",
     "ObjectUnionOf",
+    "OntologySnapshot",
     "ParsedOntology",
     "PropertyDomain",
     "PropertyRange",
     "SubClassOf",
+    "SubObjectPropertyOf",
     "SubPropertyOf",
 ]
