@@ -102,6 +102,12 @@ dataset:
   filter_ignored_alignment_classes: true
   # Include projected literal edges as attribute/support evidence.
   projection_include_literals: true
+  # Shared OWL projector profile and backend selection.
+  projector:
+    # Projector backend selection with complete Python fallback.
+    backend: auto
+    # Versioned shared-projector compatibility profile.
+    profile: mowl-d993536-v1
   # Maximum hierarchy depth collected for each configured family.
   hierarchy_max_depth: 2
   # Maximum hierarchy triples per family and entity.

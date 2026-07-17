@@ -60,6 +60,7 @@ V1_TO_V2: Dict[str, MigrationTarget] = {
     "dataset_params.drop_exact_match_sources": "dataset.drop_exact_match_sources",
     "dataset_params.filter_ignored_alignment_classes": ("dataset.filter_ignored_alignment_classes"),
     "dataset_params.projection_include_literals": "dataset.projection_include_literals",
+    "dataset_params.projector": "dataset.projector",
     "dataset_params.hierarchy_max_depth": "dataset.hierarchy_max_depth",
     "dataset_params.max_hierarchy_triples_per_family": ("dataset.max_hierarchy_triples_per_family"),
     "dataset_params.max_object_triples": "dataset.max_object_triples",

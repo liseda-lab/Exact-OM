@@ -59,7 +59,8 @@ def test_base_dataset_loads_knowledge_sources_without_runtime_java(tmp_path, mon
     }
     fingerprint = dataset._cache_fingerprint_payload()
     assert fingerprint["reasoner"] == "asserted"
-    assert fingerprint["ontology_backend_version"] == 1
+    assert fingerprint["ontology_backend_version"] == 2
+    assert fingerprint["projector"]["profile"] == "mowl-d993536-v1"
 
     dataset.get_exact_matches()
     exact_pairs = set(dataset.exact_matches[["Src", "Tgt"]].itertuples(index=False, name=None))

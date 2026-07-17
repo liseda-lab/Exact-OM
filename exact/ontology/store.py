@@ -7,8 +7,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from functools import lru_cache
 from os import PathLike
 from pathlib import Path
-from threading import RLock
-from typing import BinaryIO, Literal as TypeLiteral, TypeAlias, cast
+from typing import BinaryIO, TypeAlias
 from urllib.parse import unquote, urlsplit
 
 import pyowl_core
@@ -43,12 +42,13 @@ from pyowl_core import (
 from pyowl_core import EntityKind as CoreEntityKind
 from pyowl_core import RDF_PLAIN_LITERAL_IRI, XSD_STRING_IRI
 from pyowl_core.index import ClassComponent, PropertyComponent
-from pyowl2vec_star_projector import ProjectionOptions, Projector, REFERENCE_PROFILE
+from pyowl2vec_star_projector import Projector, REFERENCE_PROFILE
 
 from exact.core.contracts.knowledge import KnowledgeSource
 from exact.core.entities.graph import AnnotationValue, Edge
 from exact.core.entities.kinds import EntityKind
 from exact.core.values import ANNOTATION_IRI
+from exact.ontology.projection import ProjectorSettings, SharedProjectionAdapter
 
 RDFS_LABEL = "http://www.w3.org/2000/01/rdf-schema#label"
 OWL_DEPRECATED = "http://www.w3.org/2002/07/owl#deprecated"
@@ -65,7 +65,6 @@ _CORE_KINDS = {
 _OWL_BOUNDS = frozenset({OWL_THING, OWL_NOTHING})
 _ClassNode: TypeAlias = Class | ClassComponent
 _PropertyNode: TypeAlias = ObjectProperty | DataProperty | PropertyComponent
-_ProjectorBackend: TypeAlias = TypeLiteral["auto", "native", "python"]
 
 
 def _named_classes(value: object) -> tuple[str, ...]:
@@ -511,13 +510,12 @@ class OwlOntologySource(KnowledgeSource):
 
         self._excluded = self._build_exclusions()
         self._entity_cache: dict[EntityKind, tuple[str, ...]] = {}
-        if projector_backend not in {"auto", "native", "python"}:
-            raise ValueError("projector_backend must be one of: auto, native, python")
-        self._projector_backend = cast(_ProjectorBackend, projector_backend)
-        self._projector_profile = str(projector_profile)
-        self._projector = Projector()
-        self._projection_cache: dict[tuple[str, bool, str, str], tuple[Edge, ...]] = {}
-        self._projection_lock = RLock()
+        self._projection = SharedProjectionAdapter(
+            snapshot,
+            ProjectorSettings.from_value(
+                {"backend": projector_backend, "profile": projector_profile}
+            ),
+        )
 
     @classmethod
     def load(
@@ -587,7 +585,24 @@ class OwlOntologySource(KnowledgeSource):
     def projector(self) -> Projector:
         """Expose the projector's identity diagnostic without transferring ownership."""
 
-        return self._projector
+        return self._projection.projector
+
+    @property
+    def projector_settings(self) -> ProjectorSettings:
+        return self._projection.settings
+
+    def configure_projector(
+        self,
+        *,
+        backend: str = "auto",
+        profile: str = REFERENCE_PROFILE,
+    ) -> None:
+        """Select semantics before use while retaining the exact snapshot identity."""
+
+        self._projection = SharedProjectionAdapter(
+            self.owl_snapshot(),
+            ProjectorSettings.from_value({"backend": backend, "profile": profile}),
+        )
 
     def entities(self, kind: EntityKind = EntityKind.CLASS) -> tuple[str, ...]:
         try:
@@ -712,43 +727,10 @@ class OwlOntologySource(KnowledgeSource):
     def projection_edges(
         self, *, method: str = "owl2vecstar", include_literals: bool = False
     ) -> list[Edge]:
-        normalized = str(method).lower().replace("_", "").replace("-", "")
-        if normalized not in {"taxonomy", "owl2vecstar"}:
-            raise ValueError("method must be one of {'taxonomy', 'owl2vecstar'}")
-        key = (
-            normalized,
-            bool(include_literals),
-            self._projector_backend,
-            self._projector_profile,
+        return self._projection.edges(
+            method=method,
+            include_literals=include_literals,
         )
-        with self._projection_lock:
-            cached = self._projection_cache.get(key)
-            if cached is None:
-                if normalized == "taxonomy":
-                    projected = self._projector.project_taxonomy(
-                        self.owl_snapshot(),
-                        duplicates="unique",
-                        order="canonical",
-                        backend=self._projector_backend,
-                    )
-                else:
-                    options = ProjectionOptions(
-                        profile=self._projector_profile,
-                        include_literals=bool(include_literals),
-                        duplicates="unique",
-                        order="canonical",
-                        compatibility_state="isolated",
-                        backend=self._projector_backend,
-                    )
-                    projected = self._projector.project(
-                        self.owl_snapshot(), options=options
-                    )
-                cached = tuple(
-                    Edge(edge.source, edge.relation, edge.destination)
-                    for edge in projected
-                )
-                self._projection_cache[key] = cached
-        return list(cached)
 
     def _property(self, iri: str) -> ObjectProperty | DataProperty | AnnotationProperty:
         if iri in self.entities(EntityKind.DATA_PROPERTY):

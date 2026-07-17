@@ -29,6 +29,10 @@ from exact.core.entities.kinds import (
 from exact.core.entities.ontology import OntologyGraph
 from exact.impl.datasets.options import candidate_config, mapping_options
 from exact.io.sources import resolve as resolve_source
+from exact.ontology.projection import (
+    ProjectorSettings,
+    projector_cache_identity,
+)
 from exact.runs.layout import RunLayout
 from exact.utils.candidate_generation import (
     candidate_annotation_priority,
@@ -106,6 +110,7 @@ class BaseAlignmentDataset(IDataset):
         self._cache_warning_emitted: bool = False
         self._only_taxonomy_hint: bool = bool(kwargs.get("only_taxonomy", False))
         self._reasoner_name: str = str(kwargs.get("reasoner", "asserted"))
+        self._projector_settings = ProjectorSettings.from_value(kwargs.get("projector"))
         raw_entity_kinds = kwargs.get("entity_kinds")
         if raw_entity_kinds is None:
             matching = kwargs.get("matching")
@@ -552,6 +557,7 @@ class BaseAlignmentDataset(IDataset):
             format=self._input_format,
             options=self._source_options,
         )
+        self._configure_projector(self._source)
         self._source_entity_kind_index = build_entity_kind_index(self._source)
 
         self.log("#Loaded Source...", level="debug")
@@ -561,9 +567,18 @@ class BaseAlignmentDataset(IDataset):
             format=self._input_format,
             options=self._target_options,
         )
+        self._configure_projector(self._target)
         self._target_entity_kind_index = build_entity_kind_index(self._target)
 
         self.log("#Loaded Target...", level="debug")
+
+    def _configure_projector(self, source: KnowledgeSource) -> None:
+        configure = getattr(source, "configure_projector", None)
+        if callable(configure):
+            configure(
+                backend=self._projector_settings.backend,
+                profile=self._projector_settings.profile,
+            )
 
     def _path_fingerprint(self, path: Path) -> str:
         try:
@@ -594,7 +609,8 @@ class BaseAlignmentDataset(IDataset):
             "candidate_generation_version": 5,
             "exact_prefilter_materialization_version": 2,
             "ignored_alignment_filter_version": 1,
-            "ontology_backend_version": 1,
+            "ontology_backend_version": 2,
+            "projector": projector_cache_identity(self._projector_settings),
             "input_format": self._input_format,
             "source_options": self._source_options,
             "target_options": self._target_options,

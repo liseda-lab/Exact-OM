@@ -13,7 +13,7 @@ import importlib
 import json
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, Optional, Tuple, Type
+from typing import Any, Dict, List, Literal, Mapping, Optional, Tuple, Type
 
 from pydantic import (
     BaseModel,
@@ -360,6 +360,20 @@ class DatasetLegacyConfig(StrictConfigModel):
     )
 
 
+class ProjectorConfig(StrictConfigModel):
+    """Shared OWL projector selection; semantics remain versioned upstream."""
+
+    backend: Literal["auto", "native", "python"] = Field(
+        "auto",
+        description="Projector backend selection with complete Python fallback.",
+    )
+    profile: str = Field(
+        "mowl-d993536-v1",
+        min_length=1,
+        description="Versioned shared-projector compatibility profile.",
+    )
+
+
 class DatasetConfig(StrictConfigModel):
     _runtime_component: Optional[Type[IDataset]] = PrivateAttr(default=None)
 
@@ -376,6 +390,10 @@ class DatasetConfig(StrictConfigModel):
     )
     projection_include_literals: bool = Field(
         True, description="Include projected literal edges as attribute/support evidence."
+    )
+    projector: ProjectorConfig = Field(
+        default=ProjectorConfig.model_validate({}),
+        description="Shared OWL projector profile and backend selection.",
     )
     hierarchy_max_depth: int = Field(
         2, description="Maximum hierarchy depth collected for each configured family."
@@ -1330,6 +1348,7 @@ __all__ = [
     "OutputConfig",
     "PipelineEntry",
     "PlotParams",
+    "ProjectorConfig",
     "RegistryParams",
     "RunConfig",
     "SanityCheckParams",

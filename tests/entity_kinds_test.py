@@ -223,6 +223,23 @@ def test_entity_kind_change_invalidates_dataset_cache(
     assert properties._cache_fingerprint_payload()["entity_kinds"] == ["object_property"]
 
 
+def test_projector_config_invalidates_dataset_cache(
+    tmp_path: Path,
+) -> None:
+    automatic = KindDataset(
+        output_path=tmp_path / "projector-auto",
+        projector={"backend": "auto", "profile": "mowl-d993536-v1"},
+    )
+    python = KindDataset(
+        output_path=tmp_path / "projector-python",
+        projector={"backend": "python", "profile": "mowl-d993536-v1"},
+    )
+
+    assert automatic.cache_fingerprint != python.cache_fingerprint
+    assert automatic._cache_fingerprint_payload()["ontology_backend_version"] == 2
+    assert python._cache_fingerprint_payload()["projector"]["backend"] == "python"
+
+
 def test_base_dataset_uses_run_layout_and_source_registry(tmp_path: Path) -> None:
     run_dir = tmp_path / "csv-kg-run"
     dataset = KindDataset(

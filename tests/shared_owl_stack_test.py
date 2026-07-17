@@ -7,6 +7,7 @@ import pyowl_core
 import pytest
 
 from exact.ontology import OwlOntologySource, load_ontology
+from exact.ontology.projection import ProjectorSettings, cache_key
 
 FIXTURE = Path(__file__).parent / "fixtures" / "ontologies" / "mini_src.owl"
 
@@ -59,3 +60,23 @@ def test_existing_snapshot_is_never_reloaded_and_projector_sees_same_object(monk
         snapshot.signature_fingerprint,
         tuple(snapshot.iter_axioms()),
     )
+
+
+def test_projection_cache_key_covers_shared_semantic_versions():
+    source = load_ontology(FIXTURE)
+    source.configure_projector(backend="python", profile="mowl-d993536-v1")
+
+    assert len(source.projection_edges()) == 42
+    assert len(source.projection_edges()) == 42
+    keys = source._projection.cache_keys
+
+    assert len(keys) == 1
+    assert keys[0] == cache_key(
+        source.owl_snapshot(),
+        ProjectorSettings(backend="python"),
+        method="owl2vecstar",
+        include_literals=False,
+    )
+    assert keys[0].core_model_schema_version == pyowl_core.MODEL_SCHEMA_VERSION
+    assert keys[0].core_wire_format_version == pyowl_core.WIRE_FORMAT_VERSION
+    assert keys[0].projector_compiler_cache_schema

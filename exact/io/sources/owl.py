@@ -76,6 +76,9 @@ class _SchemaOnlyOwlSource(KnowledgeSource):
     def short_form(self, iri: str) -> str:
         return self._source.short_form(iri)
 
+    def configure_projector(self, *, backend: str, profile: str) -> None:
+        self._source.configure_projector(backend=backend, profile=profile)
+
 
 def create_source(path: Path, *, options: Mapping[str, Any] | None = None) -> KnowledgeSource:
     """Load an OWL source with optional labels and ABox filtering."""
