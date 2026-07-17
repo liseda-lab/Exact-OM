@@ -516,6 +516,9 @@ class OwlOntologySource(KnowledgeSource):
                 {"backend": projector_backend, "profile": projector_profile}
             ),
         )
+        # The default remains the structural view and therefore imports no optional
+        # reasoner.  Explicit dataset selection installs one narrow adapter lazily.
+        self._reasoner: object | None = None
 
     @classmethod
     def load(
@@ -598,6 +601,35 @@ class OwlOntologySource(KnowledgeSource):
             ProjectorSettings.from_value({"backend": backend, "profile": profile}),
         )
 
+    @property
+    def reasoner(self) -> object:
+        """Return the selected narrow hierarchy adapter, creating asserted lazily."""
+
+        if self._reasoner is None:
+            from exact.ontology.reasoning import AssertedHierarchyReasoner
+
+            self._reasoner = AssertedHierarchyReasoner(self)
+        return self._reasoner
+
+    @property
+    def reasoner_provenance(self) -> dict[str, object]:
+        """Return path-free core/reasoner identity for run-manifest consumers."""
+
+        return dict(getattr(self.reasoner, "provenance"))
+
+    def configure_reasoner(self, name: str = "asserted", **settings: object) -> None:
+        """Select one explicit hierarchy reasoner over this exact snapshot."""
+
+        from exact.ontology.reasoning import load_reasoner
+
+        previous = self._reasoner
+        selected = load_reasoner(name, self, settings=settings or None)
+        self._reasoner = selected
+        if previous is not None and previous is not selected:
+            close = getattr(previous, "close", None)
+            if callable(close):
+                close()
+
     def entities(self, kind: EntityKind = EntityKind.CLASS) -> tuple[str, ...]:
         try:
             normalized_kind = EntityKind(kind)
@@ -679,6 +711,8 @@ class OwlOntologySource(KnowledgeSource):
     def direct_parents(self, iri: str, kind: EntityKind = EntityKind.CLASS) -> list[str]:
         normalized_kind = EntityKind(kind)
         if normalized_kind is EntityKind.CLASS:
+            if self._reasoner is not None:
+                return list(getattr(self._reasoner, "direct_parents")(str(iri)))
             return self.hierarchy.direct_parents(str(iri))
         if normalized_kind is EntityKind.INDIVIDUAL:
             return list(self._individual_parents.get(str(iri), ()))
@@ -689,6 +723,8 @@ class OwlOntologySource(KnowledgeSource):
     def direct_children(self, iri: str, kind: EntityKind = EntityKind.CLASS) -> list[str]:
         normalized_kind = EntityKind(kind)
         if normalized_kind is EntityKind.CLASS:
+            if self._reasoner is not None:
+                return list(getattr(self._reasoner, "direct_children")(str(iri)))
             return self.hierarchy.direct_children(str(iri))
         if normalized_kind is EntityKind.INDIVIDUAL:
             return list(self._class_individuals.get(str(iri), ()))

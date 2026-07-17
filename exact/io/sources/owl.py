@@ -6,6 +6,8 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
+from pyowl_core import OntologySnapshot
+
 from exact.core.contracts.knowledge import KnowledgeSource
 from exact.core.entities.graph import AnnotationValue, Edge
 from exact.core.entities.kinds import EntityKind
@@ -23,6 +25,19 @@ class _SchemaOnlyOwlSource(KnowledgeSource):
     @property
     def origin(self) -> Path | None:
         return self._source.origin
+
+    def owl_snapshot(self) -> OntologySnapshot:
+        """Preserve shared-snapshot identity through the schema-only source view."""
+
+        return self._source.owl_snapshot()
+
+    @property
+    def reasoner(self) -> object:
+        return self._source.reasoner
+
+    @property
+    def reasoner_provenance(self) -> dict[str, object]:
+        return self._source.reasoner_provenance
 
     def entities(self, kind: EntityKind = EntityKind.CLASS) -> Sequence[str]:
         return () if EntityKind(kind) == EntityKind.INDIVIDUAL else self._source.entities(kind)
@@ -78,6 +93,9 @@ class _SchemaOnlyOwlSource(KnowledgeSource):
 
     def configure_projector(self, *, backend: str, profile: str) -> None:
         self._source.configure_projector(backend=backend, profile=profile)
+
+    def configure_reasoner(self, name: str = "asserted", **settings: object) -> None:
+        self._source.configure_reasoner(name, **settings)
 
 
 def create_source(path: Path, *, options: Mapping[str, Any] | None = None) -> KnowledgeSource:

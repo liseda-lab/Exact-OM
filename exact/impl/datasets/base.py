@@ -33,6 +33,7 @@ from exact.ontology.projection import (
     ProjectorSettings,
     projector_cache_identity,
 )
+from exact.ontology.reasoning import reasoner_cache_identity
 from exact.runs.layout import RunLayout
 from exact.utils.candidate_generation import (
     candidate_annotation_priority,
@@ -558,6 +559,7 @@ class BaseAlignmentDataset(IDataset):
             options=self._source_options,
         )
         self._configure_projector(self._source)
+        self._configure_reasoner(self._source)
         self._source_entity_kind_index = build_entity_kind_index(self._source)
 
         self.log("#Loaded Source...", level="debug")
@@ -568,6 +570,7 @@ class BaseAlignmentDataset(IDataset):
             options=self._target_options,
         )
         self._configure_projector(self._target)
+        self._configure_reasoner(self._target)
         self._target_entity_kind_index = build_entity_kind_index(self._target)
 
         self.log("#Loaded Target...", level="debug")
@@ -579,6 +582,11 @@ class BaseAlignmentDataset(IDataset):
                 backend=self._projector_settings.backend,
                 profile=self._projector_settings.profile,
             )
+
+    def _configure_reasoner(self, source: KnowledgeSource) -> None:
+        configure = getattr(source, "configure_reasoner", None)
+        if callable(configure):
+            configure(self._reasoner_name)
 
     def _path_fingerprint(self, path: Path) -> str:
         try:
@@ -619,6 +627,7 @@ class BaseAlignmentDataset(IDataset):
             "candidate_generation_params": self._candidate_generation_params,
             "only_taxonomy_hint": self._only_taxonomy_hint,
             "reasoner": self._reasoner_name,
+            "reasoner_identity": reasoner_cache_identity(self._reasoner_name),
         }
 
     @property
