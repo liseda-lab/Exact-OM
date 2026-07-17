@@ -11,6 +11,9 @@ from tools.capture_backend_baseline import capture
 FIXTURES = Path(__file__).parent / "fixtures" / "ontologies"
 BASELINES = Path(__file__).parent / "baselines"
 PROVENANCE = json.loads((BASELINES / "provenance.json").read_text(encoding="utf-8"))
+SCALE_EVIDENCE = (
+    Path(__file__).parents[1] / "benchmarks" / "evidence" / "wp_m_ncit_doid_baseline.json"
+)
 
 
 def _load_snapshot(path: Path) -> dict[str, Any]:
@@ -22,6 +25,22 @@ def _load_snapshot(path: Path) -> dict[str, Any]:
 
 def _edge_set(payload: dict, name: str) -> set[tuple[str, str, str]]:
     return {tuple(edge) for edge in payload["projection"][name]}
+
+
+def test_wp_m_scale_baseline_is_reviewable_and_content_addressed():
+    evidence = json.loads(SCALE_EVIDENCE.read_text(encoding="utf-8"))
+    assert evidence["schema"] == "exact-ontology-scale-baseline/1"
+    assert evidence["dataset"]["redistributed"] is False
+    for role in ("source", "target"):
+        item = evidence["dataset"][role]
+        result = evidence["results"][role]
+        assert len(item["sha256"]) == 64
+        assert item["file_bytes"] > 0
+        assert item["axiom_records"] > 0
+        assert item["class_and_entity_signature_count"] > 0
+        assert result["parse_internal_seconds"] > 0
+        assert result["projected_edges"] > 0
+        assert result["projection_seconds"] > 0
 
 
 @pytest.mark.parametrize("name", ["mini_src", "mini_tgt"])

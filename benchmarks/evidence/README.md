@@ -36,3 +36,16 @@ Exact wrappers.
 The local-ranking candidate table used for the second end-to-end check was the 20 generated
 targets per class source from the fixed global run, paired with the 12 class reference rows.
 Its hash and row count are in the JSON record, so regeneration drift is visible.
+
+## WP-M NCIT–DOID scale baseline
+
+`wp_m_ncit_doid_baseline.json` freezes the last private-parser/private-projector measurements
+before WP-M moves ontology ownership to `pyowl-core` and projection to the shared projector.
+The legally redistributable Bio-ML files remain below the gitignored `data/` tree; the evidence
+record contains their byte sizes and SHA-256 digests, plus cold parse and projection counts and
+timings. It deliberately contains no machine-local path.
+
+The comparison after M2/M3 must use inputs with those exact digests and report, separately,
+source loading, snapshot construction, time to first projected edge, full projection, peak and
+incremental RSS, native/Python backend, cache state, and output fingerprints. A result with a
+different input digest is a new benchmark, not a replacement for this baseline.

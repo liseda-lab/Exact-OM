@@ -1,0 +1,49 @@
+{
+  "schema": "exact-ontology-scale-baseline/1",
+  "captured_at_utc": "2026-07-17T04:15:40Z",
+  "dataset": {
+    "name": "OAEI Bio-ML NCIT-DOID",
+    "redistributed": false,
+    "source": {
+      "axiom_records": 226954,
+      "class_and_entity_signature_count": 15992,
+      "file_bytes": 57163710,
+      "sha256": "379a37f47c0c8e7c30397769358cca955140d16b2797a1cc75da4b1fc2b354eb"
+    },
+    "target": {
+      "axiom_records": 47148,
+      "class_and_entity_signature_count": 8514,
+      "file_bytes": 6687536,
+      "sha256": "76f41cce3616ad1a9ba6353f469e96bde7addba5d43e541651a3ab703f9ba2bc"
+    }
+  },
+  "environment": {
+    "exact_commit": "064739480d4c337b2a9c3e4c2293ff35eb53741f",
+    "platform": "macOS-26.5.2-x86_64-i386-64bit",
+    "python": "3.12.3"
+  },
+  "method": {
+    "cold_process_per_ontology": true,
+    "parser_backend": "rdflib",
+    "projection": {
+      "include_literals": false,
+      "method": "owl2vecstar"
+    },
+    "rss_available": false,
+    "rss_note": "The host denied the sysctl used by /usr/bin/time, so this capture records wall time and counts only. The post-migration comparison must record RSS on a pinned runner."
+  },
+  "results": {
+    "source": {
+      "parse_internal_seconds": 68.74609404802322,
+      "parse_process_wall_seconds": 69.57,
+      "projected_edges": 41349,
+      "projection_seconds": 0.21777988504618406
+    },
+    "target": {
+      "parse_internal_seconds": 5.440716810000595,
+      "parse_process_wall_seconds": 6.43,
+      "projected_edges": 9388,
+      "projection_seconds": 0.05278209102107212
+    }
+  }
+}
