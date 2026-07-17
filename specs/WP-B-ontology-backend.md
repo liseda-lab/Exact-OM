@@ -5,6 +5,11 @@ PRs at the checkpoints marked ✋).
 **Behavior**: numerically parity-gated, not byte-identical (asserted hierarchy replaces ELK — see B6).
 **Status**: Done (2026-07-16).
 
+> **2.1 supersession:** This file records the completed 2.0 Java-removal implementation and its
+> parity evidence. `WP-M-shared-owl-stack.md` supersedes its ownership of structural OWL records,
+> parsing/normalization, OWL hierarchy storage, and projection rules. The baselines and observed
+> mOWL quirks here remain mandatory migration oracles.
+
 ## Context
 
 `mowl-borg` is the **only** Java-pulling dependency (pyproject line 25; brings OWL-API, ELK,

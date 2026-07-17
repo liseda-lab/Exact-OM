@@ -103,5 +103,14 @@ internals.
 
 ## Deviations
 
-None. Annotation properties remain an exposed source-signature kind but are rejected as a
+Annotation properties remain an exposed source-signature kind but are rejected as a
 matching kind, as listed under Out of scope.
+
+`include_abox` did not land as the `projection_edges` keyword suggested in F2. It shipped
+as an `io.source_options` key on the OWL source (`exact/io/sources/owl.py`, default
+`true`): when `false`, the store is wrapped in a schema-only view that removes individuals
+from signatures/labels/annotations and filters returned projection edges touching an
+individual. Contracts §4's `KnowledgeSource.projection_edges` signature is therefore
+unchanged. This placement is deliberate and survives WP-M unchanged, because the filter
+applies to the shared projector's returned edge list rather than requiring a projector
+option (see `WP-M-shared-owl-stack.md` §5).

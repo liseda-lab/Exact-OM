@@ -4,6 +4,11 @@ These interfaces let WPs proceed in parallel: WP-B implements them for OWL, WP-C
 ledger, WP-D/E/F/G consume them. **Changing a signature here requires updating this file in the
 same PR** and checking the consumers listed next to each contract.
 
+**2.1 ownership note:** WP-M supersedes WP-B wherever this document assigns structural OWL
+records, parsing, projection rules, or OWL hierarchy storage to Exact. Exact keeps its
+`KnowledgeSource` facade, but the authoritative object is the concrete
+`pyowl_core.OntologySnapshot`; projector/reasoners receive that same instance.
+
 Status legend: `[B]` implemented by WP-B, `[C]` by WP-C, `[G]` by WP-G, etc.
 
 ## 1. `EntityKind` `[B, consumed by F/G]`
@@ -18,6 +23,15 @@ class EntityKind(str, Enum):
     ANNOTATION_PROPERTY = "annotation_property"
     INDIVIDUAL = "individual"
 ```
+
+**WP-M mapping to `pyowl_core.EntityKind`** (explicit at the `exact.ontology` boundary;
+never string-compared across packages): `CLASS↔CLASS`, `OBJECT_PROPERTY↔OBJECT_PROPERTY`,
+`DATA_PROPERTY↔DATA_PROPERTY`, `ANNOTATION_PROPERTY↔ANNOTATION_PROPERTY`, and
+`INDIVIDUAL↔NAMED_INDIVIDUAL` (note the differing value strings `"individual"` vs
+`"named_individual"`). Core's `DATATYPE` kind has no Exact counterpart and is never a
+matching kind; the adapter surfaces datatype entities explicitly where a signature needs
+them and must not coerce them to another kind. Anonymous individuals are not named
+entities and appear in neither enum.
 
 ## 2. `Edge` `[B]`
 
@@ -98,15 +112,30 @@ class KnowledgeSource(Protocol):
         """Replaces IRI.getShortForm()."""
 ```
 
+For an OWL source, `OwlOntologySource` additionally implements the shared adapter protocol:
+
+```python
+from pyowl_core import OntologySnapshot
+
+class OwlOntologySource(KnowledgeSource):
+    def owl_snapshot(self) -> OntologySnapshot:
+        """Return the exact snapshot instance owned by this source; never rebuild or reparse."""
+```
+
+`pyowl_core.coerce_snapshot(source)` calls `owl_snapshot()` once and preserves object identity
+and the snapshot's shared lazy-view cache. This method is deliberately OWL-specific and is not
+added to generic RDF/CSV `KnowledgeSource` implementations.
+
 Notes:
-- `OwlOntologySource` (WP-B, `exact/ontology/store.py`) implements this and may expose OWL
-  extras, but **pipeline code must not use anything beyond the protocol**.
+- `OwlOntologySource` (WP-B, migrated by WP-M in `exact/ontology/store.py`) implements this and
+  may expose the snapshot-provider method, but generic pipeline code must not use OWL extras.
 - Expensive results (labels map, hierarchy, projection) are computed once and cached on the
-  instance; all methods are read-only and thread-safe after construction.
+  shared snapshot/lazy views or on the source; all methods are read-only and thread-safe after
+  construction.
 - `KnowledgeSourceConformance` (WP-B delivers, WP-G reuses): a parametrized pytest suite any
   implementation must pass (`tests/knowledge_source_conformance.py`).
 
-## 5. `ReasonerProtocol` + plugin group `[B]`
+## 5. `ReasonerProtocol` + shared reasoner adapters `[B, superseded by M for OWL ownership]`
 
 `exact/ontology/reasoning.py`
 
@@ -118,13 +147,25 @@ class ReasonerProtocol(Protocol):
     def descendants(self, iri: str) -> set[str]: ...
 
 def load_reasoner(name: str, store: "OwlOntologySource") -> ReasonerProtocol:
-    """name "asserted" -> AssertedHierarchyReasoner (built in). Anything else is resolved via
-    the "exact.reasoners" entry-point group -> plugin packages (future EL reasoner with C
-    kernels). Raise a clear error listing installed plugins when unresolved."""
+    """Use store.owl_snapshot() by identity. "asserted" uses core structural views;
+    "elk" and "hermit" adapt optional native packages; other names use entry points."""
 ```
 
-The main library ships only `AssertedHierarchyReasoner`. Config key: `dataset_params.reasoner:
-"asserted"` (default).
+The base installation preserves `"asserted"` as the default and remains independently usable.
+The `reasoning` extra installs pyELK/pyHermiT. Adapters call their snapshot constructors, never
+pass a path, translate into Exact's narrow protocol without copying the ontology, and include
+core/reasoner versions plus structural/logical/signature fingerprints in provenance. Process
+workers exchange only `pyowl_core.encode_snapshot`/`decode_snapshot`/`open_snapshot` artifacts;
+pickle and original-OWL-path handoff are prohibited.
+
+## 5a. Projection delegation `[M]`
+
+`KnowledgeSource.projection_edges(...)` remains source-neutral. The OWL implementation delegates
+to `pyowl2vec_star_projector` with `store.owl_snapshot()` as the strict snapshot argument.
+`owl2vecstar` uses the pinned mOWL compatibility profile and stable unique-edge mode to preserve
+Exact 2.0 behavior; `taxonomy` uses the projector's dedicated asserted-taxonomy API, not mOWL's
+defective `only_taxonomy` flag. A narrow conversion to Exact's public `Edge(src, rel, dst)` is
+allowed; duplicating compiler rules or structural axioms is not.
 
 ## 6. Candidate/feature table schema `[additive changes only]`
 
@@ -224,6 +265,8 @@ v2; wave-2 WPs (F/G) land v2-native names directly (right column).
 | Key (v1 home → v2 home) | Default | WP | Meaning |
 |-----|---------|----|---------|
 | `dataset_params.reasoner` → `dataset.reasoner` | `"asserted"` | B | Reasoner plugin name |
+| `dataset.projector.backend` (v2) | `"auto"` | M | native projector when available, complete Python fallback otherwise |
+| `dataset.projector.profile` (v2) | pinned compatibility profile | M | versioned OWL2Vec* edge semantics |
 | `dataset_track.*` → `data.*` (`track`, `task`, `root`, `revision`) | — | I | Track-provider dataset resolution |
 | `evaluation.backends` (same in v2) | `["builtin"]` | E | Ordered evaluator names (`builtin`, `bioml`) |
 | `evaluation.bioml.*` (same) | — | E | Track/task options passed to OAEI-Bio-ML-eval |
@@ -259,6 +302,7 @@ BioKG-submission-compatible), `json`.
 | `data/get_data.py` | `exact data pull/verify/status` CLI | removed in 2.0 (WP-I) |
 | `full_explanations.json` (written during run) | explanation store + `exact run export` (WP-L); legacy file still emitted when `output.save.full_explanations_json: true` | 2.1 |
 | run layout v1 (`model/alignment/...`) | layout v2 + `run_manifest.json`; v1 dirs stay readable via `RunReader` | read support kept |
+| `exact.ontology` structural record/parser/projector imports | `pyowl_core` and `pyowl2vec_star_projector` public APIs | 2.2 for documented import shims; no duplicate engine |
 
 ## 12. `TrackProvider` protocol `[I]`
 

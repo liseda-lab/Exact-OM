@@ -25,6 +25,11 @@ is ~11× slower but bit-identical — that dual-mode discipline is what we adopt
    re-queried `EntitySearcher` per class — the audit's known sin; WP-B's store indexes on
    construction). Embedding/LLM caches keep their existing policies.
 
+For WP-M, `pyowl-core` owns parsing, structural indexes, IRI interning, and lazy OWL views;
+`pyowl2vec-star-projector` owns its Rust/PyO3 acceleration and complete Python fallback. The
+older Cython rule applies only to measured Exact-owned matcher kernels. Exact must not fork those
+external engines or convert a snapshot into local int/string tables merely to optimize them.
+
 ## Benchmark harness (landed by WP-B, extended by later WPs)
 
 - `benchmarks/bench.py` — a small runner (pytest-benchmark or hand-rolled timer, agent's choice)
@@ -32,6 +37,8 @@ is ~11× slower but bit-identical — that dual-mode discipline is what we adopt
   - `parse_ontology` (fixture / conference / NCIT-scale if available locally)
   - `build_hierarchy` + `transitive_closure`
   - `projection_owl2vecstar`
+  - `shared_snapshot_handoff` (WP-M: one load, object identity preserved across source,
+    projector, and optional reasoner; parser-call count remains one)
   - `dataset_build_e2e` (conference pair, LLM fakes)
   - `candidate_generation` (lexical index + retrieval)
   - `inference_throughput` (fixture, CPU, fake LLM — examples/s)
@@ -44,9 +51,9 @@ is ~11× slower but bit-identical — that dual-mode discipline is what we adopt
 
 | Hot spot | Owner | Plan |
 |---|---|---|
-| Ontology parse + index (was: JVM startup + OWL-API) | WP-B | py-horned-owl (Rust) + single-pass indexing; budget: conference pair < mowl baseline, NCIT-scale load in seconds |
-| Hierarchy transitive closure / `ancestors`/`descendants` | WP-B | int-id adjacency + memoized closure; bitsets or sorted int arrays; Cython kernel **only if** NCIT-scale profiling demands |
-| OWL2Vec*-style projection | WP-B | single pass over indexed axioms; no reasoner |
+| Ontology parse + structural index | WP-M / pyowl-core | one `load_snapshot`, shared lazy views; no Exact structural copy; compare with WP-B baseline |
+| OWL hierarchy closure / classification | WP-M / core or optional pyELK/pyHermiT | consume same snapshot identity; never path-reparse; benchmark separately from load |
+| OWL2Vec*-style projection | WP-M / shared projector | pinned profile; native/Python parity; bounded-memory streaming owned upstream |
 | Lexical candidate index (TF-IDF token/char-grams) | WP-F (touches) | keep sklearn/scipy sparse ops; per-kind indexes avoid inflating the vocab |
 | top-k cosine search | — (already `topk_cosine_search_torch`) | leave; benchmark guards it |
 | Best-path context algorithms (`utils/graph_search.py`) | WP-D (move only) | legacy path; benchmark, don't optimize unless it shows up |
@@ -55,8 +62,9 @@ is ~11× slower but bit-identical — that dual-mode discipline is what we adopt
 
 ## Memory
 
-- IRI interning table shared per `KnowledgeSource` instance; RSS for NCIT-scale load reported in
-  WP-B's PR (soft budget: <4 GB where mowl+JVM needed a 32–60 G heap flag).
+- IRI interning and OWL structural storage are shared by the one `OntologySnapshot`; Exact may
+  add only feature/candidate indexes. WP-M reports incremental RSS for source facade, projector,
+  and reasoner separately and fails if a second ontology-sized representation appears.
 - Streaming writers for anything per-candidate (already the audit-shard pattern); no
   materializing all explanations in memory (preserved from current design).
 

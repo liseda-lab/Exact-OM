@@ -33,13 +33,11 @@ exact/
     entities/              #   configs, mappings, EntityKind, evaluation, registry
     actions/               #   run_alignment(), run_evaluation() as plain functions (not Protocols)
     values.py
-  ontology/                # NEW (WP-B) — the only OWL-aware package
-    parser.py              #   sole importer of py-horned-owl
-    store.py               #   OwlOntologySource: indexed signature, annotations, axioms
-    hierarchy.py           #   asserted class/property hierarchy (direct parents/children, equiv-normalized)
-    expressions.py         #   class-expression walking (named, someValuesFrom, intersections)
-    projection.py          #   owl2vecstar + taxonomy projectors → Edge lists
-    reasoning.py           #   ReasonerProtocol + AssertedHierarchyReasoner + plugin loading
+  ontology/                # WP-M — thin Exact adapter over the shared Java-free OWL stack
+    store.py               #   OwlOntologySource owns one pyowl_core.OntologySnapshot
+    projection.py          #   compatibility shim delegating to pyowl2vec_star_projector
+    reasoning.py           #   asserted core views + optional pyELK/pyHermiT adapters
+    provenance.py          #   shared fingerprints/version/options in Exact run manifests
   io/                      # NEW (WP-G) — sources and writers, format-dispatching
     sources/               #   owl.py (wraps exact.ontology), rdf.py (rdflib), csv_kg.py (BioKG), datalog.py
     writers/               #   tsv.py, oaei_rdf.py, typed_tsv.py, json.py + registry
@@ -68,8 +66,10 @@ exact_inspect/             # alignment-inspection service/CLI (ex study_visualiz
                            #   [extra: viz — fastapi/uvicorn leave the core deps]
 ```
 
-**Core vs plugins.** The core (`exact` matcher + builtin evaluator + OWL backend) installs and
-runs with zero optional deps, no network services, no Java. Everything situational is an
+**Core vs plugins.** The core (`exact` matcher + builtin evaluator + shared OWL core/projector)
+installs and runs with zero optional deps, no network services, no Java, and a complete
+pure-Python projector fallback. Native projection and pyELK/pyHermiT reasoning are optional.
+Everything situational is an
 in-repo plugin behind an extra (contracts §13: `viz`, `hf`, `bioml-eval`, `docs`) with
 import-linter-enforced boundaries, so any of them can graduate to a separate PyPI package later
 without code changes. Config is schema v2 (`config_version: 2`, WP-J) with a migrator for v1
@@ -81,8 +81,9 @@ files.
    never `exact.impl`, `exact.delivery`, `exact.ontology`, `exact.io`.
    (Registry wiring stays lazy/by-import-path, as today.)
 2. `exact.ontology` and `exact.io` import `exact.core` (for contracts/entities) and nothing from
-   `exact.impl`/`exact.delivery`. `exact.ontology` is the **only** package importing `pyhornedowl`;
-   `exact.io` is the only one importing `rdflib`.
+   `exact.impl`/`exact.delivery`. `exact.ontology` imports the public `pyowl_core` and projector
+   APIs only; it owns no structural OWL records or parser. `exact.io` is the only package
+   importing `rdflib` for non-OWL RDF/KG sources.
 3. `exact.impl` may import `core`, `ontology`, `io`, `llm`, `utils`.
 4. `exact.delivery` may import everything; nothing imports `exact.delivery`.
 5. `exact.analysis` may import `core`/`impl`/`utils`; nothing inside `exact` imports `analysis`
@@ -92,11 +93,11 @@ files.
 
 - **ComponentRegistry** (existing): models, datasets, trainers, metrics — extended with
   `EVALUATOR` (WP-E). Registration stays via `SelfRegisteringComponent.__init_subclass__`.
-- **Entry-point plugin groups** (new, WP-B/WP-G/WP-I): `exact.reasoners`, `exact.sources`,
-  `exact.writers`, `exact.tracks`. The main library ships no DL reasoner; a future
-  `exact-reasoner-el` package (Python + C kernels, PyLogMap-style) can register through
-  `exact.reasoners` without any change here. This satisfies "avoid reasoners in the main lib,
-  keep the door open". New datasets are addable via YAML descriptor or an `exact.tracks` plugin.
+- **Entry-point plugin groups** (WP-B/WP-G/WP-I): `exact.reasoners`, `exact.sources`,
+  `exact.writers`, `exact.tracks`. WP-M gives the reasoner seam first-party adapters for optional
+  pyELK and pyHermiT, both consuming `OwlOntologySource.owl_snapshot()` by identity. Third-party
+  reasoners may still register, but path handoff/reparse and private OWL models are forbidden.
+  New datasets remain addable via YAML descriptor or an `exact.tracks` plugin.
 - **Performance**: cross-cutting policy in `03-performance.md` — benchmark harness with CI
   regression gates, and Cython kernels (bit-identical pure-Python fallbacks) for measured hot
   spots only.
@@ -105,6 +106,15 @@ files.
 
 - No changes to the matching algorithms, scoring math, LLM prompting, or calibration logic.
 - No build-system migration (Poetry stays), no rename of the `exact` package or repo.
-- No monorepo split. Candidate future extractions — `exact/ontology` as a standalone package,
-  an EL reasoner plugin — are prepared by the boundaries above but not executed now.
+- No repository merger or dependency cycle. The shared core, projector, and reasoners remain
+  independently versioned packages; Exact consumes them through public contracts (WP-M).
 - No rewrite of `explanations_visualizer` (Next.js app) beyond packaging/docs touch-ups.
+
+## WP-M ownership correction for 2.1
+
+WP-B correctly removed Java for 2.0, but its local `records.py`, parser/normalizer,
+expression walkers, hierarchy indexes, and projector duplicate capabilities are now owned by
+the shared stack. WP-M removes those OWL-specific duplicates. The generic hierarchy utility needed
+by CSV/RDF knowledge sources remains inside Exact under `exact.io`; it must not become an OWL
+model. The exact snapshot instance is the only in-process handoff to projector/reasoners, and
+cross-process work uses the versioned core wire format rather than pickle or source-path reparse.

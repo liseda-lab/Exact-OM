@@ -9,7 +9,9 @@
 1. **Code quality & organization** — remove accumulated iteration cruft, dead code, oversized modules, packaging bugs (WP-A, WP-D).
 2. **Extensive evaluation** — integrate [OAEI-Bio-ML-eval](https://github.com/OAEI-ML/OAEI-Bio-ML-eval) as a dependency next to the built-in evaluator (WP-E).
 3. **Accurate timing** — a run ledger that stays correct when multiple experiments run over each other in the same directory with caches/resumes (WP-C).
-4. **Zero Java** — remove `mowl-borg`/JPype/OWL-API entirely; parse with `py-horned-owl`; reasoning/projection in pure Python (+ optional C-accelerated plugins later), following the [PyLogMap](https://github.com/city-artificial-intelligence/PyLogMap) blueprint (WP-B).
+4. **Zero Java and one OWL model** — keep the WP-B Java removal, then replace Exact's private
+   parser/records/projector with the shared `pyowl-core`, Java-free pyOWL2Vec* projector, and
+   optional native pyELK/pyHermiT packages without reparsing (WP-M).
 5. **Property & instance matching** — extend matching beyond classes (WP-F).
 6. **More formats & pure-KG matching** — OWL/RDF inputs, OAEI-RDF/typed-TSV outputs, CSV+datalog knowledge graphs as in [BioKG-Align-kit](https://github.com/liseda-lab/BioKG-Align-kit) (WP-G).
 7. **Documentation** — vastly improved, generated where possible (WP-H).
@@ -30,11 +32,16 @@
 | J | Config schema v2 + migrator | `WP-J-config-v2.md` | A; after B/C/E/I keys land | M | Done |
 | K | `exact-inspect` service repackaging | `WP-K-inspect.md` | B | M | Done |
 | L | Run artifacts & explanation store | `WP-L-run-artifacts.md` | C, D (coordinates K) | M–L | Done |
+| M | Shared Java-free OWL stack migration (`2.1.0`) | `WP-M-shared-owl-stack.md` | B; external core/projector/reasoner contracts | XL | Planned |
 
 Each work-package file records its implementation deviations. External-data, accelerator, and
 hosted-service checks remain environment-specific verification; they do not reopen completed
 engineering scope. The result-changing plans under `specs/experiments/` were not implemented as
 part of this suite.
+
+WP-M is a post-2.0 ownership migration. Where WP-B says Exact owns structural OWL records,
+parsing, or OWL2Vec* compilation, WP-M supersedes it; the WP-B captures remain required parity
+oracles rather than a mandate to retain duplicate implementations.
 
 Cross-cutting (applies to every WP): `03-performance.md` — benchmark harness, CI perf gates,
 compiled-kernel policy. `04-methodology-audit.md` — methodology sanity-check findings; its
@@ -64,6 +71,8 @@ graph LR
     D --> L
     L -.RunReader.-> K
     B & C & D & E & F & G & I & J & K & L --> Hc[WP-H docs content]
+    B --> M[WP-M shared OWL stack]
+    M -.2.1 release.-> Hc
 ```
 
 ## Execution plan (3 parallel agents + waves)
