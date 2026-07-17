@@ -110,6 +110,9 @@ class RunManifest:
             if not isinstance(artifact, dict) or not isinstance(artifact.get("path"), str):
                 raise ValueError("Every manifest artifact must have a string path")
             layout.resolve_relative(artifact["path"])
+        ontology_stack = payload.get("ontology_stack")
+        if ontology_stack is not None and not isinstance(ontology_stack, dict):
+            raise ValueError("Run manifest 'ontology_stack' must be an object")
         return cls(layout, payload)
 
     def add_session(self, run_id: str) -> None:
@@ -190,6 +193,16 @@ def refresh_manifest(
     )
     if run_id:
         current.add_session(run_id)
+
+    if layout.run_stats_path.is_file():
+        try:
+            run_stats = json.loads(layout.run_stats_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            run_stats = None
+        if isinstance(run_stats, dict):
+            ontology_stack = run_stats.get("ontology_stack")
+            if isinstance(ontology_stack, dict):
+                current.payload["ontology_stack"] = ontology_stack
 
     candidates: list[tuple[Path, str, Optional[int], Optional[bool]]] = [
         (layout.config_path, "config", 2, False),

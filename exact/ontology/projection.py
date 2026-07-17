@@ -10,10 +10,10 @@ from dataclasses import dataclass
 from threading import RLock
 from typing import Literal, Mapping, TypeAlias, cast
 
-import pyowl_core
 import pyowl2vec_star_projector as shared_projector
+import pyowl_core
+from pyowl2vec_star_projector import REFERENCE_PROFILE, ProjectionOptions, Projector
 from pyowl_core import OntologySnapshot
-from pyowl2vec_star_projector import ProjectionOptions, Projector, REFERENCE_PROFILE
 
 from exact.core.entities.graph import Edge
 
@@ -98,9 +98,7 @@ def cache_key(
         raise TypeError("snapshot must be a concrete pyowl_core.OntologySnapshot")
     fingerprint = snapshot.structural_fingerprint
     return ProjectionCacheKey(
-        structural_fingerprint=(
-            f"{fingerprint.algorithm}:{fingerprint.schema}:{fingerprint.hex}"
-        ),
+        structural_fingerprint=(f"{fingerprint.algorithm}:{fingerprint.schema}:{fingerprint.hex}"),
         core_package_version=str(pyowl_core.__version__),
         core_api_version=(pyowl_core.API_VERSION[0], pyowl_core.API_VERSION[1]),
         core_model_schema_version=int(pyowl_core.MODEL_SCHEMA_VERSION),
@@ -160,9 +158,7 @@ class SharedProjectionAdapter:
         with self._lock:
             return tuple(self._cache)
 
-    def edges(
-        self, *, method: str = "owl2vecstar", include_literals: bool = False
-    ) -> list[Edge]:
+    def edges(self, *, method: str = "owl2vecstar", include_literals: bool = False) -> list[Edge]:
         key = cache_key(
             self.snapshot,
             self.settings,
@@ -189,9 +185,7 @@ class SharedProjectionAdapter:
                         backend=self.settings.backend,
                     )
                     rows = self.projector.project(self.snapshot, options=options)
-                cached = tuple(
-                    Edge(row.source, row.relation, row.destination) for row in rows
-                )
+                cached = tuple(Edge(row.source, row.relation, row.destination) for row in rows)
                 self._cache[key] = cached
         return list(cached)
 

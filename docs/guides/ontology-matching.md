@@ -23,6 +23,29 @@ io:
 The ontology backend normalizes equivalence components, hierarchy edges, labels, annotations,
 restrictions, property metadata, and exclusions behind `KnowledgeSource`.
 
+## Shared projector and reasoner
+
+The default base install uses the complete Python projector and asserted hierarchy. Select
+the deterministic Python projector explicitly when warning-free reproducibility is more useful
+than probing an optional accelerator:
+
+```yaml
+dataset:
+  reasoner: asserted
+  projector:
+    backend: python
+    profile: mowl-d993536-v1
+```
+
+For inferred hierarchies, install `exact-om[reasoning]` and set `dataset.reasoner` to `elk` or
+`hermit`. Missing optional packages fail with an installation hint; Exact never silently
+changes requested inferred semantics to asserted semantics. Programmatic integrations can use
+`OwlOntologySource.configure_reasoner(...)` for backend, timeout, fallback, worker, and
+verified-wire options. All modes consume `source.owl_snapshot()` directly.
+
+`run_manifest.json` records the effective core/projector/reasoner selections under
+`ontology_stack` for both sides, including fingerprints and fallback/failure diagnostics.
+
 ## Evaluation backends
 
 The built-in evaluator is deterministic and always available. On Python 3.12, add `bioml` to

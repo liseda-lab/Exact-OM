@@ -1,8 +1,41 @@
-# Migrating from Exact-OM 1.x to 2.0
+# Migrating to Exact-OM 2.1
 
-Exact-OM 2.0 modernizes configuration, ontology loading, dataset acquisition, run artifacts,
-and the alignment viewer. Existing v1 configuration and run directories remain readable for
-the 2.0 compatibility window unless this guide explicitly says otherwise.
+Exact-OM 2.1 completes the shared Java-free OWL stack migration. The 2.0 configuration,
+dataset, artifact, and viewer migrations remain documented below; existing v1 configuration
+and run directories stay readable unless this guide explicitly says otherwise.
+
+## From 2.0 to 2.1: shared OWL snapshots
+
+OWL inputs now load once into an immutable `pyowl-core` snapshot. Exact's source facade,
+structural indexes, projector, and selected hierarchy reasoner all consume that exact object;
+there is no Exact-owned parsed ontology or second projector graph. RDFLib remains confined to
+generic RDF/OAEI input handling and is not an OWL fallback.
+
+The base package requires the compatible `pyowl-core` and `pyowl2vec-star-projector` 0.1
+release lines. Asserted hierarchy queries need no extra. Install the optional Java-free
+reasoners only when selected:
+
+```console
+pip install "exact-om[reasoning]"
+```
+
+`dataset.reasoner` accepts `asserted`, `elk`, or `hermit`; `dataset.projector.backend` accepts
+`auto`, `python`, or `native`. Native accelerators remain optional upstream wheels. The Exact
+wheel itself never invokes Java, Cargo, or a native build.
+
+Pre-2.1 dataset/projection cache metadata is deliberately incompatible. Exact logs an
+actionable warning and rebuilds from the original source bytes; it never unpickles a legacy
+ontology object. Start a fresh cache if disk policy requires explicit cleanup.
+
+New OWL runs add `ontology_stack.source` and `ontology_stack.target` to `run_manifest.json`
+and `stats/run_stats.json`. The records contain core/projector/reasoner versions and backend
+selection, structural/logical/signature fingerprints, import and resolver digests,
+source-document hashes, diagnostics, options/schema identities, and verified-wire state. They
+contain no local source path, temporary path, Python object ID, or credential.
+
+The compatibility names `ParsedOntology`, `ParsedEntity`, and `parse(...)` now only alias or
+delegate to the shared core contracts and are scheduled for removal after 2.1. `init_jvm`
+remains an error-only migration shim; no supported workflow initializes a JVM.
 
 ## Before upgrading
 
@@ -17,7 +50,7 @@ the 2.0 compatibility window unless this guide explicitly says otherwise.
 The Java/mowl runtime was removed. Do not initialize a JVM or pass heap-size settings. The
 `exact.init_jvm` symbol remains temporarily as a stub that raises a migration-focused error,
 and legacy heap flags are accepted but ignored with a deprecation warning. Ontology access now
-goes through `KnowledgeSource`; OWL inputs use the native `py-horned-owl` backend.
+goes through `KnowledgeSource`; in 2.1, OWL inputs use the shared `pyowl-core` snapshot.
 
 Reasoner settings now select an Exact reasoner plugin. The removed
 `reasoner_timeout_secs` and `reasoner_force_hermit` keys are reported and dropped by the
@@ -144,6 +177,7 @@ Cleanup removes only manifest-owned or recognized resume files and preserves for
 | `exact-om[viz]` | `exact-inspect` service and CLI (FastAPI/Uvicorn). |
 | `exact-om[hf]` | Hugging Face dataset-track providers. |
 | `exact-om[bioml-eval]` | Upstream OAEI Bio-ML evaluation backend. |
+| `exact-om[reasoning]` | Optional Java-free pyELK and pyHermiT hierarchy reasoners. |
 | `exact-om[docs]` | Documentation build toolchain. |
 
 Without an optional extra, the corresponding integration fails with an installation hint;

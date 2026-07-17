@@ -575,6 +575,28 @@ class BaseAlignmentDataset(IDataset):
 
         self.log("#Loaded Target...", level="debug")
 
+    def ontology_stack_provenance(self) -> Dict[str, Any]:
+        """Return source/target provenance without retaining another OWL graph."""
+
+        def describe(source: KnowledgeSource | None) -> Dict[str, Any]:
+            provider = getattr(source, "ontology_stack_provenance", None)
+            if callable(provider):
+                value = provider()
+                if not isinstance(value, Mapping):
+                    raise TypeError("ontology stack provenance must be a mapping")
+                return dict(value)
+            return {
+                "schema_version": 1,
+                "kind": "generic",
+                "shared_snapshot": False,
+            }
+
+        return {
+            "schema_version": 1,
+            "source": describe(self._source),
+            "target": describe(self._target),
+        }
+
     def _configure_projector(self, source: KnowledgeSource) -> None:
         configure = getattr(source, "configure_projector", None)
         if callable(configure):
@@ -617,7 +639,7 @@ class BaseAlignmentDataset(IDataset):
             "candidate_generation_version": 5,
             "exact_prefilter_materialization_version": 2,
             "ignored_alignment_filter_version": 1,
-            "ontology_backend_version": 2,
+            "ontology_backend_version": 3,
             "projector": projector_cache_identity(self._projector_settings),
             "input_format": self._input_format,
             "source_options": self._source_options,
@@ -646,6 +668,8 @@ class BaseAlignmentDataset(IDataset):
 
     def _write_cache_metadata(self) -> None:
         payload = {
+            "cache_schema_version": 2,
+            "ontology_backend_version": 3,
             "fingerprint": self.cache_fingerprint,
             "dataset_signature": self.dataset_signature,
             "component": self.__class__.__name__,
@@ -1189,7 +1213,21 @@ class BaseAlignmentDataset(IDataset):
             if meta.get("fingerprint") == self.cache_fingerprint:
                 return True
             if not self._cache_warning_emitted:
+                try:
+                    legacy = (
+                        not meta
+                        or int(meta.get("cache_schema_version", 0)) < 2
+                        or int(meta.get("ontology_backend_version", 0)) < 3
+                    )
+                except (TypeError, ValueError):
+                    legacy = True
                 reason = "missing metadata" if not meta else "fingerprint mismatch"
+                if legacy:
+                    reason = (
+                        "pre-2.1 ParsedOntology/projection metadata is incompatible "
+                        "with the shared pyowl-core snapshot cache; Exact will rebuild "
+                        "from source bytes and never unpickle legacy ontology objects"
+                    )
                 self.log(
                     f"Existing dataset cache at {self._df_save_path} is invalid for the current configuration ({reason}); rebuilding.",
                     level="warning",

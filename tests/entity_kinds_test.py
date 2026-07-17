@@ -236,7 +236,7 @@ def test_projector_config_invalidates_dataset_cache(
     )
 
     assert automatic.cache_fingerprint != python.cache_fingerprint
-    assert automatic._cache_fingerprint_payload()["ontology_backend_version"] == 2
+    assert automatic._cache_fingerprint_payload()["ontology_backend_version"] == 3
     assert python._cache_fingerprint_payload()["projector"]["backend"] == "python"
 
 

@@ -27,8 +27,10 @@ build explicitly:
 poetry run pip install --index-url https://download.pytorch.org/whl/cu128 "torch>=2.7,<3"
 ```
 
-Optional extras enable the viewer (`viz`), Hugging Face track retrieval (`hf`), the upstream
-Bio-ML evaluator (`bioml-eval`), and documentation (`docs`). See the
+Optional extras enable Java-free EL/DL reasoning (`reasoning`), the viewer (`viz`), Hugging
+Face track retrieval (`hf`), the upstream Bio-ML evaluator (`bioml-eval`), and documentation
+(`docs`). The base install includes the shared OWL snapshot and projector, but no reasoner,
+JDK, Cargo toolchain, or native build step. See the
 [installation guide](https://liseda-lab.github.io/Exact-OM/getting-started/installation/).
 
 ## CPU quickstart
@@ -49,7 +51,8 @@ poetry run exact run info runs/quickstart
 
 The run writes `alignment/maps_local.tsv`, evaluation and statistics under their named
 directories, source-indexed explanations, `timings.json`, the resolved `config.yaml`, and
-`run_manifest.json`.
+`run_manifest.json`. OWL runs also record a path-free `ontology_stack` block with core,
+projector, reasoner, import-closure, diagnostic, and semantic-fingerprint provenance.
 
 ## Documentation
 
@@ -58,7 +61,7 @@ directories, source-indexed explanations, `timings.json`, the resolved `config.y
 - [Ontology and KG matching guides](https://liseda-lab.github.io/Exact-OM/guides/ontology-matching/)
 - [Configuration reference](https://liseda-lab.github.io/Exact-OM/reference/configuration/)
 - [CLI reference](https://liseda-lab.github.io/Exact-OM/reference/cli/)
-- [Migration from 1.x](MIGRATION.md) and [contributing](CONTRIBUTING.md)
+- [Migration through 2.1](MIGRATION.md) and [contributing](CONTRIBUTING.md)
 
 For Python integrations, use `exact.delivery.api.AlignmentRunner` and `EvaluationRunner`, or
 the functional `run_alignment(...)` and `run_evaluation(...)` action APIs.

@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import math
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -22,13 +23,21 @@ from threading import RLock
 from typing import Any, Literal, Mapping, Protocol, cast, runtime_checkable
 
 import pyowl_core
-from pyowl_core import Class, IRI, OntologySnapshot, OntologyView
+from pyowl_core import IRI, Class, OntologySnapshot, OntologyView
 
 from exact.ontology.store import OWL_NOTHING, OWL_THING, OwlOntologySource
 
 ReasonerFallback = Literal["error", "asserted"]
 _OWL_BOUNDS = frozenset({OWL_THING, OWL_NOTHING})
 _WORKER_SCHEMA_VERSION = 1
+_PATH_FRAGMENT = re.compile(r"(?<![A-Za-z0-9])(?:[A-Za-z]:[\\/]|/)[^\s\"']+")
+
+
+def _failure_reason(error: Exception) -> str:
+    """Return bounded diagnostics without persisting a machine or wire path."""
+
+    message = _PATH_FRAGMENT.sub("<path>", str(error))
+    return f"{type(error).__name__}: {message[:1000]}"
 
 
 class ReasonerUnavailableError(ImportError):
@@ -177,10 +186,7 @@ class ReasonerProtocol(Protocol):
 
 
 def _fingerprint(value: object) -> str:
-    return (
-        f"{getattr(value, 'algorithm')}:{getattr(value, 'schema')}:"
-        f"{getattr(value, 'hex')}"
-    )
+    return f"{getattr(value, 'algorithm')}:{getattr(value, 'schema')}:" f"{getattr(value, 'hex')}"
 
 
 def _base_provenance(
@@ -363,7 +369,7 @@ class _InferredHierarchyReasoner:
         return isinstance(error, TimeoutError)
 
     def _activate_fallback(self, error: Exception) -> None:
-        reason = f"{type(error).__name__}: {error}"
+        reason = _failure_reason(error)
         self._fallback_active = True
         self._provenance = replace(
             self._provenance,
@@ -383,7 +389,7 @@ class _InferredHierarchyReasoner:
                         raise
                     self._provenance = replace(
                         self._provenance,
-                        failure_reason=f"{type(error).__name__}: {error}",
+                        failure_reason=_failure_reason(error),
                         timed_out=isinstance(error, TimeoutError),
                     )
                     if self.settings.fallback != "asserted":
@@ -469,9 +475,7 @@ class ElkHierarchyReasoner(_InferredHierarchyReasoner):
     def __init__(self, store: OwlOntologySource, settings: ReasonerSettings | None = None) -> None:
         selected = settings or ReasonerSettings()
         super().__init__(store, selected)
-        self._reasoner, self._provenance, self._error_type = _create_elk(
-            self.snapshot, selected
-        )
+        self._reasoner, self._provenance, self._error_type = _create_elk(self.snapshot, selected)
 
     @property
     def shared_reasoner(self) -> object:
@@ -557,9 +561,7 @@ class HermitHierarchyReasoner(_InferredHierarchyReasoner):
     def __init__(self, store: OwlOntologySource, settings: ReasonerSettings | None = None) -> None:
         selected = settings or ReasonerSettings()
         super().__init__(store, selected)
-        self._reasoner, self._provenance, self._error_type = _create_hermit(
-            self.snapshot, selected
-        )
+        self._reasoner, self._provenance, self._error_type = _create_hermit(self.snapshot, selected)
 
     @property
     def shared_reasoner(self) -> object:
@@ -828,7 +830,7 @@ def load_reasoner(
             store,
             _requested_reasoner=normalized,
             _settings=selected,
-            _fallback_reason=f"{type(error).__name__}: {error}",
+            _fallback_reason=_failure_reason(error),
             _timed_out=isinstance(error, TimeoutError),
         )
 

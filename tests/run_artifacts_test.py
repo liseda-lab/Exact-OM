@@ -171,6 +171,24 @@ def test_reader_uses_store_for_v2_and_json_fallback_for_v1(tmp_path: Path) -> No
     assert legacy_reader.manifest()["synthesized"] is True
 
 
+def test_manifest_copies_ontology_stack_from_run_stats(tmp_path: Path) -> None:
+    layout = RunLayout.create(tmp_path / "run")
+    stack = {
+        "schema_version": 1,
+        "source": {"kind": "owl", "core": {"shared_snapshot": True}},
+        "target": {"kind": "generic", "shared_snapshot": False},
+    }
+    layout.run_stats_path.write_text(
+        json.dumps({"ontology_stack": stack}),
+        encoding="utf-8",
+    )
+
+    manifest = refresh_manifest(layout, run_id="run-1")
+
+    assert manifest.payload["ontology_stack"] == stack
+    assert RunManifest.open(layout).payload["ontology_stack"] == stack
+
+
 def test_clean_is_dry_run_capable_and_preserves_foreign_files(tmp_path: Path) -> None:
     layout = RunLayout.create(tmp_path / "run")
     checkpoint = layout.checkpoints_dir / "inference_old.json"

@@ -39,6 +39,9 @@ separate and are not included in these changes.
 - Layout-v2 runs with `RunLayout`, `RunReader`, checksummed `run_manifest.json`, compressed
   source-indexed explanations, crash-safe overlays, checkpoint retention, and
   `exact run info|export|clean` (WP-L).
+- One immutable `pyowl-core` snapshot per OWL source, shared structural views, a delegated
+  OWL2Vec* projector, asserted/pyELK/pyHermiT hierarchy adapters, verified-wire worker
+  isolation, and path-free `ontology_stack` run provenance (WP-M).
 
 ### Changed
 
@@ -52,6 +55,9 @@ separate and are not included in these changes.
   `exact.llm.routing` (WP-D).
 - Replaced the OWL-API/mOWL runtime with `py-horned-owl` plus an RDFLib fallback. Legacy heap
   arguments remain accepted, warn, and are ignored (WP-B).
+- Replaced the transitional `py-horned-owl` parser with the compatible `pyowl-core` and
+  `pyowl2vec-star-projector` 0.1 lines. Optional pyELK/pyHermiT distributions moved behind the
+  independent `reasoning` extra; RDFLib now serves only generic RDF/OAEI formats (WP-M).
 - Moved FastAPI, Uvicorn, and pydantic-settings behind the `viz` extra; Hugging Face tracks,
   upstream Bio-ML evaluation, and documentation tooling remain independent extras (WP-E/I/K).
 - Exposed pair-adaptive channel, retrieval-fusion, alias, and uncertainty constants in the v2
@@ -94,6 +100,8 @@ separate and are not included in these changes.
 
 - Runtime dependencies and imports for mOWL, JPype, OWL-API, Gensim, and process-based
   reasoner management (WP-B).
+- The direct `py-horned-owl` dependency, Exact-owned parsed ontology graph, local projection
+  engine, and path/pickle reasoner handoff (WP-M).
 - The unverified `data/get_data.py` downloader in favor of pinned track providers (WP-I).
 
 [Unreleased]: https://github.com/liseda-lab/Exact-OM/compare/v1.0.0...HEAD

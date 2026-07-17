@@ -57,3 +57,9 @@ separately.
 Dataset and model caches include normalized ontology/source fingerprints, candidate inputs,
 selected entity kinds, and relevant configuration. Changing one of these inputs invalidates the
 cache rather than reusing stale data.
+
+Exact 2.1 increments the ontology cache identity for the shared snapshot/projector stack.
+Pre-2.1 metadata is rejected with a migration-focused warning and rebuilt from source bytes;
+legacy ontology objects are never deserialized. Projector and reasoner cache keys include
+their package/API/schema versions, semantic options, backend choice, and the core structural
+fingerprint.

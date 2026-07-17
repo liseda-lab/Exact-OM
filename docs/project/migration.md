@@ -1,12 +1,25 @@
-# Migrating from 1.x to 2.0
+# Migrating through 2.1
 
 Exact-OM 2.0 changes the runtime backend, configuration shape, data acquisition, viewer name,
 and run layout. Historical configs and run directories remain readable during the documented
 compatibility window.
 
+## 2.0 to 2.1 OWL-stack changes
+
+Exact 2.1 replaces the transitional `py-horned-owl` parser with one immutable
+`pyowl-core` snapshot per OWL source and the released shared OWL2Vec* projector line. The
+source facade, structural views, projector, and selected reasoner consume that exact snapshot;
+RDFLib is restricted to generic RDF/OAEI formats.
+
+The base wheel remains Java- and build-tool-free. Install `exact-om[reasoning]` only for the
+optional pyELK or pyHermiT adapters. Pre-2.1 ontology/projection cache metadata is rejected and
+rebuilt from source bytes without unpickling legacy ontology objects. Each new OWL run records
+path-free core/projector/reasoner versions, fingerprints, closure/document digests,
+diagnostics, options, backend selection, and verified-wire state under `ontology_stack`.
+
 ## Required actions
 
-1. Remove Java/mowl setup and JVM heap flags; OWL parsing is native in 2.0.
+1. Remove Java/mowl setup and JVM heap flags; OWL parsing is Java-free.
 2. Run `exact config migrate old.yaml -o config.yaml` and review the report.
 3. Replace `data/get_data.py` workflows with `exact data pull|verify|status`.
 4. Install `exact-om[viz]` and use `exact-inspect` for the alignment viewer.

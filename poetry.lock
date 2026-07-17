@@ -3618,36 +3618,51 @@ files = [
 ]
 
 [[package]]
-name = "py-horned-owl"
-version = "1.4.0"
-description = ""
+name = "pyelk-reasoner"
+version = "0.1.0"
+description = "Java-free OWL 2 EL reasoning with pure-Python and optional native backends"
+optional = true
+python-versions = ">=3.10"
+groups = ["main"]
+markers = "extra == \"reasoning\""
+files = []
+
+[package.dependencies]
+pyowl-core = ">=0.1,<0.2"
+
+[[package]]
+name = "pyhermit"
+version = "0.1.0"
+description = "Java-free OWL 2 DL reasoning with pure-Python and optional native backends"
+optional = true
+python-versions = ">=3.10"
+groups = ["main"]
+markers = "extra == \"reasoning\""
+files = []
+
+[package.dependencies]
+pyowl-core = ">=0.1,<0.2"
+
+[[package]]
+name = "pyowl-core"
+version = "0.1.0"
+description = "Java-free shared OWL 2 structural parsing and communication kernel"
 optional = false
 python-versions = ">=3.10"
 groups = ["main"]
-files = [
-    {file = "py_horned_owl-1.4.0-cp37-abi3-macosx_11_0_arm64.whl", hash = "sha256:00c2aecc2311f3919e1535801c456294438ae8974c9eadcdddada728b9281684"},
-    {file = "py_horned_owl-1.4.0-cp37-abi3-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:142bfc3264d2f4efdd975b374d367ca9937bff1724d91fc837bf2d91598e419d"},
-    {file = "py_horned_owl-1.4.0-cp37-abi3-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:ef32b4e41145d5171f9005aa64709a0a902e538d771d34ebf7adf126cc85f35c"},
-    {file = "py_horned_owl-1.4.0-cp37-abi3-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:87433e048719bc061ab1bd7a0bae1e91404fe79289ae113801b96a8cecdcce5d"},
-    {file = "py_horned_owl-1.4.0-cp37-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:3e05fc78e3591a5ad28284f525d48d26062d167984cab86cecb9499cf9468c00"},
-    {file = "py_horned_owl-1.4.0-cp37-abi3-manylinux_2_5_i686.manylinux1_i686.whl", hash = "sha256:8edf5f6a2291c45da1ecd662709b970b5a1f32c6ee5682e0bb482ee2cf98cd8b"},
-    {file = "py_horned_owl-1.4.0-cp37-abi3-musllinux_1_2_aarch64.whl", hash = "sha256:eaea0f12522f5876064508727560ab60491aaa5a410e1164680aced20ea57689"},
-    {file = "py_horned_owl-1.4.0-cp37-abi3-musllinux_1_2_armv7l.whl", hash = "sha256:28a6e5c81144e482cbccc673ebeccf73df72d21600f53c5a1a6a572fdb1f2eb9"},
-    {file = "py_horned_owl-1.4.0-cp37-abi3-musllinux_1_2_i686.whl", hash = "sha256:d1ccb9c172a9e72e2f232bf561129f5e0c92ac91fa3257e7e340dde879fcc4f2"},
-    {file = "py_horned_owl-1.4.0-cp37-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:3ea1cd4b51878666912c15dcd5d67d9435e7e22c736536a9238c8c0fbfaacfd0"},
-    {file = "py_horned_owl-1.4.0-cp37-abi3-win32.whl", hash = "sha256:06d5b2c9d9150141653091a5b1168445ad300e593de869dc1661355bd5f4b73a"},
-    {file = "py_horned_owl-1.4.0-cp37-abi3-win_amd64.whl", hash = "sha256:c6ef0cb1bf81c4e3107b3a4101cad6235c38eb702197d03d5c97bc0227799b98"},
-    {file = "py_horned_owl-1.4.0-pp310-pypy310_pp73-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:f55c83b6257b66c057b3b23cc6ad6325a2a38dd248e1098a781e980e10f93a2f"},
-    {file = "py_horned_owl-1.4.0-pp310-pypy310_pp73-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:d1af64567602b357b248609b75cf48eb9f09267d991f5d7623079cffcd0c0720"},
-    {file = "py_horned_owl-1.4.0-pp310-pypy310_pp73-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:d67d526efb7a4f9b6b78ab9f9e519aec31659aa620ad0105b34c35cb47fc086d"},
-    {file = "py_horned_owl-1.4.0-pp39-pypy39_pp73-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:cad3879465fb5c94484b53fc4b185c93e09183555233e9a8430e9f59adb65d7d"},
-    {file = "py_horned_owl-1.4.0-pp39-pypy39_pp73-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:11b914b49d235dadbda5ba042366edf0a4791548aed024654774b2f88fa9c117"},
-    {file = "py_horned_owl-1.4.0-pp39-pypy39_pp73-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:78bfe227f972e38026d6dd90c1d495e06c015e854ef25dababeb3fa5c2a53987"},
-    {file = "py_horned_owl-1.4.0.tar.gz", hash = "sha256:7146d0887c5ec119e423e56c9221cc0ca7da54739be36ce3ed916503348f942d"},
-]
+files = []
+
+[[package]]
+name = "pyowl2vec-star-projector"
+version = "0.1.0"
+description = "Shared-snapshot OWL2Vec* projection for pyowl-core"
+optional = false
+python-versions = ">=3.10"
+groups = ["main"]
+files = []
 
 [package.dependencies]
-jinja2 = ">=3.1.6"
+pyowl-core = ">=0.1,<0.2"
 
 [[package]]
 name = "pyaml"
@@ -5665,9 +5680,10 @@ cffi = ["cffi (>=1.11)"]
 bioml-eval = ["oaei-bioml-eval"]
 docs = ["linkchecker", "mkdocs-gen-files", "mkdocs-literate-nav", "mkdocs-material", "mkdocstrings"]
 hf = ["huggingface-hub"]
+reasoning = ["pyelk-reasoner", "pyhermit"]
 viz = ["fastapi", "pydantic-settings", "uvicorn"]
 
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.10"
-content-hash = "5a57aed758e2b9f99a15f58622a7345083d8f3fb3b6f9ae0d8c726ffaca124f3"
+content-hash = "a06b0c1cd0d43bf00c94322ea0dec03dc57abf3064d4c07a1395a2783b1ea658"

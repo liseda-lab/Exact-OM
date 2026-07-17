@@ -39,6 +39,11 @@ class _SchemaOnlyOwlSource(KnowledgeSource):
     def reasoner_provenance(self) -> dict[str, object]:
         return self._source.reasoner_provenance
 
+    def ontology_stack_provenance(self) -> dict[str, object]:
+        """Delegate provenance without creating a second ontology representation."""
+
+        return self._source.ontology_stack_provenance()
+
     def entities(self, kind: EntityKind = EntityKind.CLASS) -> Sequence[str]:
         return () if EntityKind(kind) == EntityKind.INDIVIDUAL else self._source.entities(kind)
 

@@ -765,6 +765,10 @@ def _run_alignment_session(
         seconds=postprocess_seconds,
         cache_status=CacheStatus.FRESH,
     )
+    _merge_run_stats(
+        run_stats_path,
+        {"ontology_stack": dataset.ontology_stack_provenance()},
+    )
     progress.complete("run stages completed")
     return results, run_stats_path
 

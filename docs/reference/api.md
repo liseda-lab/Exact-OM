@@ -10,6 +10,12 @@ The following pages are rendered from live docstrings.
 
 ::: exact.ontology
 
+::: exact.ontology.projection
+
+::: exact.ontology.reasoning
+
+::: exact.ontology.provenance
+
 ::: exact.core.contracts.knowledge
 
 ## I/O registries

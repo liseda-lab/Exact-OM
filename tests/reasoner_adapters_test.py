@@ -14,7 +14,7 @@ from exact.ontology.reasoning import (
     load_reasoner,
 )
 
-_ONTOLOGY = b'''<?xml version="1.0"?>
+_ONTOLOGY = b"""<?xml version="1.0"?>
 <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
          xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
          xmlns:owl="http://www.w3.org/2002/07/owl#">
@@ -27,7 +27,7 @@ _ONTOLOGY = b'''<?xml version="1.0"?>
   </owl:Class>
   <owl:Class rdf:about="urn:exact:test:C"/>
 </rdf:RDF>
-'''
+"""
 
 
 @pytest.fixture(scope="module")
@@ -146,9 +146,7 @@ def test_source_selection_routes_class_queries_and_records_provenance(reasoning_
         reasoning_source.configure_reasoner("asserted")
 
 
-def test_explicit_timeout_fallback_is_visible_in_provenance(
-    reasoning_source, monkeypatch
-):
+def test_explicit_timeout_fallback_is_visible_in_provenance(reasoning_source, monkeypatch):
     reasoner = load_reasoner(
         "elk",
         reasoning_source,
@@ -156,7 +154,7 @@ def test_explicit_timeout_fallback_is_visible_in_provenance(
     )
 
     def timeout(*_args, **_kwargs):
-        raise TimeoutError("test deadline")
+        raise TimeoutError("/tmp/private/ontology.pyocore test deadline")
 
     monkeypatch.setattr(reasoner, "_query", timeout)
     try:
@@ -166,5 +164,6 @@ def test_explicit_timeout_fallback_is_visible_in_provenance(
         assert provenance["options"]["fallback"] == "asserted"
         assert provenance["timed_out"] is True
         assert "test deadline" in provenance["fallback_reason"]
+        assert "/tmp/private" not in provenance["fallback_reason"]
     finally:
         reasoner.close()

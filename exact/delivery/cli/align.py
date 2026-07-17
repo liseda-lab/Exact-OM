@@ -14,7 +14,12 @@ def run_alignment(args) -> None:
 
 
 def parse_arguments(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Compute the alignment between two ontologies")
+    parser = argparse.ArgumentParser(
+        description=(
+            "Compute an alignment with shared Java-free OWL snapshots; select "
+            "dataset.reasoner/projector in YAML (elk/hermit require exact-om[reasoning])"
+        )
+    )
     parser.add_argument(
         "--source_ontology_file",
         "-s",
@@ -62,7 +67,10 @@ def parse_arguments(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
         "-y",
         type=str,
         required=False,
-        help="Please provide the path to the yaml configuration file",
+        help=(
+            "YAML configuration path, including dataset.reasoner and "
+            "dataset.projector selections"
+        ),
     )
     parser.add_argument(
         "--save_logs",

@@ -10,15 +10,7 @@ from exact.ontology.store import OwlOntologySource
 
 
 def load_ontology(
-    source: (
-        OntologySnapshot
-        | str
-        | PathLike[str]
-        | bytes
-        | bytearray
-        | memoryview
-        | BinaryIO
-    ),
+    source: OntologySnapshot | str | PathLike[str] | bytes | bytearray | memoryview | BinaryIO,
     *,
     label_properties: Sequence[str] | None = None,
     options: pyowl_core.LoadOptions | None = None,

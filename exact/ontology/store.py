@@ -11,7 +11,11 @@ from typing import BinaryIO, TypeAlias
 from urllib.parse import unquote, urlsplit
 
 import pyowl_core
+from pyowl2vec_star_projector import REFERENCE_PROFILE, Projector
 from pyowl_core import (
+    IRI,
+    RDF_PLAIN_LITERAL_IRI,
+    XSD_STRING_IRI,
     AnnotationAssertionIndex,
     AnnotationProperty,
     AssertedClassHierarchyView,
@@ -23,8 +27,10 @@ from pyowl_core import (
     DataPropertyAssertion,
     Datatype,
     Entity,
+)
+from pyowl_core import EntityKind as CoreEntityKind
+from pyowl_core import (
     EquivalentClasses,
-    IRI,
     InvalidIRIError,
     Literal,
     NamedIndividual,
@@ -39,10 +45,7 @@ from pyowl_core import (
     SubClassOf,
     walk,
 )
-from pyowl_core import EntityKind as CoreEntityKind
-from pyowl_core import RDF_PLAIN_LITERAL_IRI, XSD_STRING_IRI
 from pyowl_core.index import ClassComponent, PropertyComponent
-from pyowl2vec_star_projector import Projector, REFERENCE_PROFILE
 
 from exact.core.contracts.knowledge import KnowledgeSource
 from exact.core.entities.graph import AnnotationValue, Edge
@@ -70,9 +73,7 @@ _PropertyNode: TypeAlias = ObjectProperty | DataProperty | PropertyComponent
 def _named_classes(value: object) -> tuple[str, ...]:
     if not isinstance(value, pyowl_core.StructuralNode):
         return ()
-    return tuple(
-        dict.fromkeys(node.iri.value for node in walk(value) if isinstance(node, Class))
-    )
+    return tuple(dict.fromkeys(node.iri.value for node in walk(value) if isinstance(node, Class)))
 
 
 def _object_property_iri(value: object) -> str | None:
@@ -162,9 +163,7 @@ class _ClassHierarchy:
         children.discard(component)
         return children
 
-    def _is_ancestor(
-        self, descendant: tuple[str, ...], ancestor: tuple[str, ...]
-    ) -> bool:
+    def _is_ancestor(self, descendant: tuple[str, ...], ancestor: tuple[str, ...]) -> bool:
         seen: set[tuple[str, ...]] = set()
         stack = list(self._raw_parents(descendant))
         while stack:
@@ -187,8 +186,7 @@ class _ClassHierarchy:
                     parent
                     for parent in candidates
                     if not any(
-                        parent != other and self._is_ancestor(other, parent)
-                        for other in candidates
+                        parent != other and self._is_ancestor(other, parent) for other in candidates
                     )
                 ),
                 key=lambda values: tuple(item.encode("utf-8") for item in values),
@@ -304,9 +302,7 @@ class _PropertyHierarchy:
         children.discard(component)
         return children
 
-    def _is_ancestor(
-        self, descendant: tuple[str, ...], ancestor: tuple[str, ...]
-    ) -> bool:
+    def _is_ancestor(self, descendant: tuple[str, ...], ancestor: tuple[str, ...]) -> bool:
         seen: set[tuple[str, ...]] = set()
         stack = list(self._raw_parents(descendant))
         while stack:
@@ -327,8 +323,7 @@ class _PropertyHierarchy:
                 parent
                 for parent in candidates
                 if not any(
-                    parent != other and self._is_ancestor(other, parent)
-                    for other in candidates
+                    parent != other and self._is_ancestor(other, parent) for other in candidates
                 )
             )
         )
@@ -420,9 +415,7 @@ class OwlOntologySource(KnowledgeSource):
         restrictions: dict[str, list[pyowl_core.StructuralNode]] = defaultdict(list)
         for subclass_axiom in self._axioms.iter(SubClassOf):
             if isinstance(subclass_axiom.sub_class, Class):
-                restrictions[subclass_axiom.sub_class.iri.value].append(
-                    subclass_axiom.super_class
-                )
+                restrictions[subclass_axiom.sub_class.iri.value].append(subclass_axiom.super_class)
         for equivalent_axiom in self._axioms.iter(EquivalentClasses):
             anchors = tuple(
                 expression
@@ -483,14 +476,10 @@ class OwlOntologySource(KnowledgeSource):
         for data_assertion in self._axioms.iter(DataPropertyAssertion):
             if not isinstance(data_assertion.source, NamedIndividual):
                 continue
-            converted = _annotation_value(
-                data_assertion.property.iri.value, data_assertion.value
-            )
+            converted = _annotation_value(data_assertion.property.iri.value, data_assertion.value)
             if converted is not None:
                 data_values[data_assertion.source.iri.value].append(converted)
-        self._data_values = {
-            iri: tuple(values) for iri, values in data_values.items()
-        }
+        self._data_values = {iri: tuple(values) for iri, values in data_values.items()}
 
         self._annotation_property_parents: dict[str, tuple[str, ...]] = {}
         self._annotation_property_children: dict[str, tuple[str, ...]] = {}
@@ -534,9 +523,8 @@ class OwlOntologySource(KnowledgeSource):
     ) -> "OwlOntologySource":
         """Load one closure exactly once and retain the resulting snapshot."""
 
-        if (
-            document_iri is None
-            and not isinstance(source, (str, PathLike, bytes, bytearray, memoryview))
+        if document_iri is None and not isinstance(
+            source, (str, PathLike, bytes, bytearray, memoryview)
         ):
             document_iri = "urn:exact-om:stream-root"
         snapshot = pyowl_core.load_snapshot(
@@ -617,6 +605,18 @@ class OwlOntologySource(KnowledgeSource):
 
         return dict(getattr(self.reasoner, "provenance"))
 
+    def ontology_stack_provenance(self) -> dict[str, object]:
+        """Return path-free provenance for the single shared snapshot and consumers."""
+
+        from exact.ontology.provenance import ontology_stack_provenance
+
+        return ontology_stack_provenance(
+            self.owl_snapshot(),
+            projector_settings=self.projector_settings,
+            projector=self.projector,
+            reasoner=self.reasoner_provenance,
+        )
+
     def configure_reasoner(self, name: str = "asserted", **settings: object) -> None:
         """Select one explicit hierarchy reasoner over this exact snapshot."""
 
@@ -639,9 +639,7 @@ class OwlOntologySource(KnowledgeSource):
         if cached is None:
             core_kind = _CORE_KINDS[normalized_kind]
             cached = tuple(
-                entity.iri.value
-                for entity in self._signature.iter()
-                if entity.kind is core_kind
+                entity.iri.value for entity in self._signature.iter() if entity.kind is core_kind
             )
             self._entity_cache[normalized_kind] = cached
         return cached
@@ -787,10 +785,7 @@ class OwlOntologySource(KnowledgeSource):
         except InvalidIRIError:
             return []
         return sorted(
-            {
-                self._domain_range_value(record.value)
-                for record in self._domain_range.domains(prop)
-            }
+            {self._domain_range_value(record.value) for record in self._domain_range.domains(prop)}
         )
 
     def property_ranges(self, prop_iri: str) -> list[str]:
@@ -799,10 +794,7 @@ class OwlOntologySource(KnowledgeSource):
         except InvalidIRIError:
             return []
         return sorted(
-            {
-                self._domain_range_value(record.value)
-                for record in self._domain_range.ranges(prop)
-            }
+            {self._domain_range_value(record.value) for record in self._domain_range.ranges(prop)}
         )
 
     def _build_exclusions(self) -> frozenset[str]:

@@ -11,7 +11,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10", "3.12"]
+        python-version: ["3.10", "3.11", "3.12"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -25,7 +25,7 @@ jobs:
         with:
           path: .venv
           key: venv-${{ runner.os }}-${{ matrix.python-version }}-${{ hashFiles('poetry.lock') }}
-      - run: poetry install --with prebuild --extras viz
+      - run: poetry install --with prebuild --extras "viz reasoning"
       - run: poetry run black --check exact exact_inspect tests tools study_visualizer_runtime
       - run: poetry run isort --check-only exact exact_inspect tests tools study_visualizer_runtime
       - run: poetry run flake8 exact exact_inspect tests tools study_visualizer_runtime
@@ -44,13 +44,14 @@ jobs:
       - name: Enforce Java-free runtime
         shell: bash
         run: |
-          if git grep -n -iE 'jpype|mowl|org\.semanticweb|init_jvm' -- \
-            exact tools tests deploy \
-            ':!exact/__init__.py' \
-            ':!tests/ontology_backend_test.py' \
-            ':!tools/capture_backend_baseline.py' \
-            ':!tests/baselines/**'; then
-            echo "Java runtime reference found outside compatibility shims" >&2
+          if git grep -n -iE '(^|[[:space:]])(from|import)[[:space:]]+(jpype|mowl|deeponto|pyhornedowl|org\.semanticweb)' -- \
+            exact deploy tools \
+            ':!tools/capture_backend_baseline.py'; then
+            echo "Legacy ontology runtime import found" >&2
+            exit 1
+          fi
+          if git grep -n -E 'pyowl_core\.backends|pyowl2vec_star_projector\.(compiler|native)' -- exact; then
+            echo "Consumer imported a shared-stack implementation module" >&2
             exit 1
           fi
       - run: poetry run pytest -m "not requires_data and not slow and not requires_cuda and not requires_openrouter" --cov=exact
@@ -74,7 +75,7 @@ jobs:
       - run: poetry install --with prebuild --extras viz
       - run: make build-frontend
       - run: poetry build
-      - name: Verify wheel extras and packaged frontend
+      - name: Verify wheel dependencies, extras, and packaged frontend
         run: |
           poetry run python - <<'PY'
           import glob
@@ -87,6 +88,20 @@ jobs:
               assert "exact_inspect/static/index.html" in names
               metadata_name = next(name for name in names if name.endswith(".dist-info/METADATA"))
               metadata = archive.read(metadata_name).decode("utf-8")
+          for dependency in ("pyowl-core", "pyowl2vec-star-projector"):
+              lines = [
+                  line
+                  for line in metadata.splitlines()
+                  if line.lower().startswith(f"requires-dist: {dependency}")
+              ]
+              assert lines and all("extra ==" not in line for line in lines), lines
+          for dependency in ("pyelk-reasoner", "pyhermit"):
+              lines = [
+                  line
+                  for line in metadata.splitlines()
+                  if line.lower().startswith(f"requires-dist: {dependency}")
+              ]
+              assert lines and all('extra == "reasoning"' in line for line in lines), lines
           for dependency in ("fastapi", "uvicorn", "pydantic-settings"):
               lines = [
                   line
@@ -116,10 +131,22 @@ jobs:
             "${smoke_venv}/bin/python" - <<'PY'
           import importlib.util
 
-          for package in ("fastapi", "pydantic_settings", "uvicorn"):
+          for package in ("fastapi", "pydantic_settings", "uvicorn", "pyelk", "pyhermit"):
               assert importlib.util.find_spec(package) is None, package
+          for package in ("pyowl_core", "pyowl2vec_star_projector"):
+              assert importlib.util.find_spec(package) is not None, package
           PY
           )
+          "${smoke_venv}/bin/python" tools/generate_sbom.py --output dist/exact-om.spdx.json
+          "${smoke_venv}/bin/python" - <<'PY'
+          import json
+
+          payload = json.load(open("dist/exact-om.spdx.json", encoding="utf-8"))
+          names = {item["name"].lower() for item in payload["packages"]}
+          assert "pyowl-core" in names
+          assert "pyowl2vec-star-projector" in names
+          assert names.isdisjoint({"py-horned-owl", "pyelk-reasoner", "pyhermit"})
+          PY
           "${smoke_venv}/bin/pip" install "${wheel}[viz]"
           "${smoke_venv}/bin/pip" check
           (
@@ -127,6 +154,34 @@ jobs:
             "${smoke_venv}/bin/exact-inspect" --help
             "${smoke_venv}/bin/exact-study-viz" --help
           )
+          "${smoke_venv}/bin/pip" install "${wheel}[reasoning]"
+          "${smoke_venv}/bin/pip" check
+          "${smoke_venv}/bin/python" - <<'PY'
+          import importlib.util
+          import sys
+
+          from exact.ontology import load_ontology
+
+          for package in ("pyelk", "pyhermit"):
+              assert importlib.util.find_spec(package) is not None, package
+          ontology = b'''<?xml version="1.0"?>
+          <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+                   xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
+                   xmlns:owl="http://www.w3.org/2002/07/owl#">
+            <owl:Ontology rdf:about="urn:exact:wheel-smoke"/>
+            <owl:Class rdf:about="urn:A">
+              <rdfs:subClassOf rdf:resource="urn:B"/>
+            </owl:Class>
+            <owl:Class rdf:about="urn:B"/>
+          </rdf:RDF>'''
+          for name in ("elk", "hermit"):
+              source = load_ontology(ontology)
+              snapshot = source.owl_snapshot()
+              source.configure_reasoner(name, backend="auto")
+              assert source.reasoner.ontology is snapshot
+              assert source.reasoner.ancestors("urn:A") == {"urn:B"}
+          assert "jpype" not in sys.modules and "mowl" not in sys.modules
+          PY
       - uses: actions/upload-artifact@v4
         with:
           name: exact-om-distributions

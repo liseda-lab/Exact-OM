@@ -26,15 +26,11 @@ def named_class_iris(expression: ClassExpression) -> list[str]:
     """Return named classes encountered by the core's exhaustive walker."""
 
     return list(
-        dict.fromkeys(
-            node.iri.value for node in walk(expression) if isinstance(node, Class)
-        )
+        dict.fromkeys(node.iri.value for node in walk(expression) if isinstance(node, Class))
     )
 
 
-def existential_targets(
-    expression: ClassExpression, property_iris: Iterable[str]
-) -> list[str]:
+def existential_targets(expression: ClassExpression, property_iris: Iterable[str]) -> list[str]:
     """Return named fillers for matching core object-existential occurrences."""
 
     selected = frozenset(map(str, property_iris))
@@ -62,10 +58,7 @@ def render_class_expression(expression: StructuralNode) -> str:
 
     if isinstance(expression, Class):
         return f"<{expression.iri.value}>"
-    return (
-        f"{type(expression).__name__}("
-        f"{pyowl_core.structural_hexdigest(expression)})"
-    )
+    return f"{type(expression).__name__}(" f"{pyowl_core.structural_hexdigest(expression)})"
 
 
 __all__ = [

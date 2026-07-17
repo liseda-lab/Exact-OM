@@ -3,7 +3,7 @@ import sys
 from pathlib import Path
 
 import pytest
-from pyowl_core import Class, IRI, ObjectSomeValuesFrom, SubClassOf
+from pyowl_core import IRI, Class, ObjectSomeValuesFrom, SubClassOf
 
 from exact.core.entities.graph import AnnotationValue, Edge
 from exact.core.entities.kinds import EntityKind

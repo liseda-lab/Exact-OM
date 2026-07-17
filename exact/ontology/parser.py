@@ -38,15 +38,7 @@ SubPropertyOf = SubObjectPropertyOf
 
 
 def parse(
-    source: (
-        OntologySnapshot
-        | str
-        | PathLike[str]
-        | bytes
-        | bytearray
-        | memoryview
-        | BinaryIO
-    ),
+    source: OntologySnapshot | str | PathLike[str] | bytes | bytearray | memoryview | BinaryIO,
     *,
     document_iri: pyowl_core.IRI | str | None = None,
     options: pyowl_core.LoadOptions | None = None,
@@ -56,9 +48,8 @@ def parse(
 
     if isinstance(source, OntologySnapshot):
         return source
-    if (
-        document_iri is None
-        and not isinstance(source, (str, PathLike, bytes, bytearray, memoryview))
+    if document_iri is None and not isinstance(
+        source, (str, PathLike, bytes, bytearray, memoryview)
     ):
         document_iri = "urn:exact-om:stream-root"
     snapshot = pyowl_core.load_snapshot(

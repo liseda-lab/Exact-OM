@@ -41,16 +41,6 @@ source_modules =
 forbidden_modules =
     exact.delivery
 
-[importlinter:contract:pyhornedowl-boundary]
-name = pyhornedowl is isolated in the ontology parser
-type = forbidden
-source_modules =
-    exact
-forbidden_modules =
-    pyhornedowl
-ignore_imports =
-    exact.ontology.parser -> pyhornedowl
-
 [importlinter:contract:rdflib-boundary]
 name = rdflib is isolated in IO sources
 type = forbidden
