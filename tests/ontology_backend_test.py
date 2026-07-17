@@ -45,8 +45,8 @@ def test_parser_builds_complete_named_signatures(source):
     assert "http://www.w3.org/2001/XMLSchema#string" not in source.entities()
 
 
-def test_parser_infers_undeclared_individual_assertions_deterministically(tmp_path):
-    ontology = tmp_path / "undeclared.owl"
+def test_core_snapshot_indexes_individual_assertions_deterministically(tmp_path):
+    ontology = tmp_path / "individuals.owl"
     ontology.write_text(
         """<?xml version="1.0"?>
 <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
@@ -55,6 +55,8 @@ def test_parser_infers_undeclared_individual_assertions_deterministically(tmp_pa
          xmlns:ex="http://example.org/undeclared#">
   <owl:Ontology rdf:about="http://example.org/undeclared"/>
   <owl:Class rdf:about="http://example.org/undeclared#Person"/>
+  <owl:ObjectProperty rdf:about="http://example.org/undeclared#knows"/>
+  <owl:DatatypeProperty rdf:about="http://example.org/undeclared#code"/>
   <rdf:Description rdf:about="http://example.org/undeclared#knows">
     <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#TransitiveProperty"/>
   </rdf:Description>
