@@ -38,4 +38,7 @@ def test_eval_cli_accepts_hyphenated_backend_flag() -> None:
     )
 
     assert args.eval_backends == ["builtin", "bioml"]
+    assert args.bioml_coherence_reasoner == "hermit"
+    assert args.bioml_coherence_timeout == 7200.0
+    assert args.bioml_skip_invalid_iris is False
     assert args.K == [1, 5]

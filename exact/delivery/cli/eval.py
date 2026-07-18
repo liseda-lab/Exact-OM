@@ -58,6 +58,24 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--bioml-graded-relevance")
     parser.add_argument("--bioml-hierarchy")
     parser.add_argument("--bioml-candidate-count", type=int)
+    parser.add_argument(
+        "--bioml-coherence-reasoner",
+        choices=("hermit", "elk"),
+        default="hermit",
+        help="Official Bio-ML coherence reasoner (default: hermit)",
+    )
+    parser.add_argument(
+        "--bioml-coherence-timeout",
+        type=float,
+        default=7200.0,
+        metavar="SECONDS",
+        help="HermiT timeout before the labelled ELK fallback (default: 7200)",
+    )
+    parser.add_argument(
+        "--bioml-skip-invalid-iris",
+        action="store_true",
+        help="Drop malformed alignment IRIs during official coherence scoring",
+    )
     parser.add_argument("--save_logs", "--save-logs", "-l", action="store_true")
     parser.add_argument("--log_level", "--log-level", "-v", default="INFO")
     parser.add_argument(

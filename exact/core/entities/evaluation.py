@@ -41,6 +41,7 @@ class BackendEvaluation:
     metrics: Mapping[str, Optional[float]]
     skipped: Mapping[str, str] = field(default_factory=dict)
     version: Optional[str] = None
+    details: Mapping[str, Any] = field(default_factory=dict)
 
 
 class MetricNames(Enum):

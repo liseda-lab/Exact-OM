@@ -26,8 +26,12 @@ class _FakeApi:
     def evaluate_typed(self, request):
         return {}
 
-    def structural_coherence(self, request):
-        return {"structural_coherence_proxy": 0.0}
+    def evaluate_coherence(self, request):
+        return {
+            "global_coherence": 0.0,
+            "reasoner_used": "hermit",
+            "provenance": {"schema": "coherence-provenance/1"},
+        }
 
 
 def test_builtin_only_csv_is_backward_compatible_and_json_is_canonical(tmp_path: Path) -> None:
@@ -75,6 +79,28 @@ def test_multiple_backends_are_namespaced(monkeypatch, tmp_path: Path) -> None:
     csv_text = (tmp_path / "evaluation_results.csv").read_text(encoding="utf-8")
     assert "builtin.F1,1.0" in csv_text
     assert "bioml.equivalence.f1,1.0" in csv_text
+
+
+def test_bioml_coherence_provenance_is_persisted(monkeypatch, tmp_path: Path) -> None:
+    alignment = tmp_path / "alignment.tsv"
+    reference = tmp_path / "reference.tsv"
+    _write_global(alignment, [("s", "t", 0.9)])
+    _write_global(reference, [("s", "t", 1.0)])
+    monkeypatch.setattr(bioml, "_load_bioml_api", lambda: _FakeApi())
+
+    EvaluationAction.run(
+        alignment=alignment,
+        output_dir_path=tmp_path,
+        full_reference_file_path=reference,
+        source_file_path=object(),
+        target_file_path=object(),
+        backends=["bioml"],
+    )
+
+    report = json.loads((tmp_path / "evaluation_results.json").read_text(encoding="utf-8"))
+    coherence = report["meta"]["backend_details"]["bioml"]["coherence"]
+    assert coherence["reasoner_used"] == "hermit"
+    assert coherence["provenance"]["schema"] == "coherence-provenance/1"
 
 
 def test_reference_hash_mismatch_is_recorded(tmp_path: Path) -> None:

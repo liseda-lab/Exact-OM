@@ -3191,25 +3191,18 @@ files = [
 
 [[package]]
 name = "oaei-bioml-eval"
-version = "0.1.0.dev0"
+version = "0.2.0"
 description = "Common evaluation/scoring logic for the OAEI Bio-ML tracks (public + private)."
 optional = true
-python-versions = ">=3.12"
+python-versions = ">=3.10"
 groups = ["main"]
-markers = "python_version >= \"3.12\" and extra == \"bioml-eval\""
+markers = "extra == \"bioml-eval\""
 files = []
-develop = false
 
 [package.extras]
-deeponto = ["deeponto", "rdflib (>=7.0)"]
-rdf = ["rdflib (>=7.0)"]
-reasoner = ["rdflib (>=7.0)"]
-
-[package.source]
-type = "git"
-url = "https://github.com/OAEI-ML/OAEI-Bio-ML-eval.git"
-reference = "900ba7f242f254d08b0e01e6826975c61d0438b2"
-resolved_reference = "900ba7f242f254d08b0e01e6826975c61d0438b2"
+all = ["pyHermiT (>=0.1,<0.2)", "pyelk-reasoner (>=0.1,<0.2)", "pyowl-core (>=0.1,<0.2)", "rdflib (>=7.0,<8)"]
+rdf = ["rdflib (>=7.0,<8)"]
+reasoner = ["pyHermiT (>=0.1,<0.2)", "pyelk-reasoner (>=0.1,<0.2)", "pyowl-core (>=0.1,<0.2)"]
 
 [[package]]
 name = "packaging"
@@ -5686,4 +5679,4 @@ viz = ["fastapi", "pydantic-settings", "uvicorn"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.10"
-content-hash = "a06b0c1cd0d43bf00c94322ea0dec03dc57abf3064d4c07a1395a2783b1ea658"
+content-hash = "2479ca97429101ee57b5a4f96a9a937e4320ba2f68206654eb6313fbc6fe16b7"

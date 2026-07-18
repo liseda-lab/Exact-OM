@@ -37,6 +37,12 @@ The compatibility names `ParsedOntology`, `ParsedEntity`, and `parse(...)` now o
 delegate to the shared core contracts and are scheduled for removal after 2.1. `init_jvm`
 remains an error-only migration shim; no supported workflow initializes a JVM.
 
+The `bioml-eval` extra now targets OAEI-Bio-ML-eval 0.2 on Python 3.10 and newer. When an
+inline run requests the `bioml` backend, official coherence receives the already-loaded Exact
+snapshot providers; it no longer falls back to the old structural-proxy seam or reparses their
+origin paths. Standalone `exact-eval` path inputs are still supported and are loaded once by
+the shared core.
+
 ## Before upgrading
 
 1. Keep a copy of any v1 YAML files and unfinished run directories.
@@ -176,7 +182,7 @@ Cleanup removes only manifest-owned or recognized resume files and preserves for
 | --- | --- |
 | `exact-om[viz]` | `exact-inspect` service and CLI (FastAPI/Uvicorn). |
 | `exact-om[hf]` | Hugging Face dataset-track providers. |
-| `exact-om[bioml-eval]` | Upstream OAEI Bio-ML evaluation backend. |
+| `exact-om[bioml-eval]` | OAEI Bio-ML 0.2 metrics and Java-free official coherence. |
 | `exact-om[reasoning]` | Optional Java-free pyELK and pyHermiT hierarchy reasoners. |
 | `exact-om[docs]` | Documentation build toolchain. |
 

@@ -341,6 +341,9 @@ def prepare_evaluation_namespace(args: Any) -> EvaluationInvocation:
             "graded_relevance_path": optional_path(args.bioml_graded_relevance),
             "hierarchy_path": optional_path(args.bioml_hierarchy),
             "candidate_count": args.bioml_candidate_count,
+            "coherence_reasoner": args.bioml_coherence_reasoner,
+            "coherence_timeout_s": args.bioml_coherence_timeout,
+            "coherence_skip_invalid": args.bioml_skip_invalid_iris,
         }.items()
         if value is not None
     }

@@ -48,10 +48,12 @@ verified-wire options. All modes consume `source.owl_snapshot()` directly.
 
 ## Evaluation backends
 
-The built-in evaluator is deterministic and always available. On Python 3.12, add `bioml` to
-`evaluation.backends` after installing `exact-om[bioml-eval]` to run the pinned upstream
-Bio-ML evaluator as well. Exact writes both results into the canonical `evaluation/` directory
-and records evaluator provenance in run statistics.
+The built-in evaluator is deterministic and always available. On Python 3.10–3.12, add `bioml`
+to `evaluation.backends` after installing `exact-om[bioml-eval]` to run the compatible upstream
+Bio-ML 0.2 evaluator as well. Its official coherence scorer receives the same source/target
+snapshot providers already loaded by Exact, while standalone path inputs are each loaded once.
+Exact writes both results into the canonical `evaluation/` directory and records evaluator
+provenance in run statistics.
 
 Training mappings are treated as null mappings where the track requires it. Local evaluation
 uses the candidate ranking and reports MRR/Hits@K; global evaluation reports precision,

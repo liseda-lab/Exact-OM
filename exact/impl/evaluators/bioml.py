@@ -45,7 +45,7 @@ class BioMLApi(Protocol):
 
     def evaluate_typed(self, request: EvaluationRequest) -> Mapping[str, float]: ...
 
-    def structural_coherence(self, request: EvaluationRequest) -> Mapping[str, float]: ...
+    def evaluate_coherence(self, request: EvaluationRequest) -> Mapping[str, Any]: ...
 
 
 def _optional_symbol(module_name: str, symbol: str) -> Callable[..., Any] | None:
@@ -68,8 +68,11 @@ class _UpstreamBioMLApi:
             "oaei_bioml_eval.equivalence.metrics", "local_ranking_metrics"
         )
         self._score_typed = _optional_symbol("oaei_bioml_eval.typed.report", "score_files")
-        self._score_structural = _optional_symbol(
-            "oaei_bioml_eval.coherence.report", "score_structural_proxy_files"
+        self._score_global_coherence = _optional_symbol(
+            "oaei_bioml_eval.coherence.report", "score_global_coherence_files"
+        )
+        self._score_local_coherence = _optional_symbol(
+            "oaei_bioml_eval.coherence.report", "score_local_coherence_files"
         )
         missing = set()
         if self._score_global is None and self._global_metric is None:
@@ -78,8 +81,8 @@ class _UpstreamBioMLApi:
             missing.add("ranking")
         if self._score_typed is None:
             missing.add("typed")
-        if self._score_structural is None:
-            missing.add("structural")
+        if self._score_global_coherence is None or self._score_local_coherence is None:
+            missing.add("coherence")
         self.missing = frozenset(missing)
 
     def evaluate_equivalence(self, request: EvaluationRequest) -> Mapping[str, float]:
@@ -160,12 +163,51 @@ class _UpstreamBioMLApi:
         kwargs = {key: value for key, value in options.items() if key in allowed}
         return _numeric_mapping(self._score_typed(predictions, answers, **kwargs))
 
-    def structural_coherence(self, request: EvaluationRequest) -> Mapping[str, float]:
-        if self._score_structural is None:
-            raise NotImplementedError("upstream structural proxy is unavailable")
-        source = getattr(request.source, "origin", request.source)
-        target = getattr(request.target, "origin", request.target)
-        return _numeric_mapping(self._score_structural(request.alignment, source, target))
+    def evaluate_coherence(self, request: EvaluationRequest) -> Mapping[str, Any]:
+        """Run official native coherence over the existing Exact snapshot providers.
+
+        The OAEI file wrappers coerce each ontology input once.  Passing Exact's
+        ``OwlOntologySource`` therefore preserves the concrete ``pyowl-core``
+        snapshot identity instead of handing its origin path back for reparsing.
+        """
+
+        if request.source is None or request.target is None:
+            raise ValueError("source and target ontology inputs are required for coherence")
+        if not isinstance(request.alignment, Path):
+            raise TypeError("official Bio-ML coherence currently requires an alignment path")
+        options = dict(request.options)
+        reasoner = str(options.get("coherence_reasoner", options.get("reasoner", "hermit")))
+        timeout = options.get("coherence_timeout_s", options.get("timeout_s", 7200.0))
+        timeout_s = None if timeout is None else float(timeout)
+        skip_invalid = bool(
+            options.get("coherence_skip_invalid", options.get("skip_invalid", False))
+        )
+        kwargs = {
+            "reasoner": reasoner,
+            "timeout_s": timeout_s,
+            "skip_invalid": skip_invalid,
+        }
+        if request.full_reference is not None:
+            if self._score_global_coherence is None:
+                raise NotImplementedError("upstream global coherence scorer is unavailable")
+            result = self._score_global_coherence(
+                request.alignment,
+                request.source,
+                request.target,
+                **kwargs,
+            )
+        else:
+            if self._score_local_coherence is None:
+                raise NotImplementedError("upstream local coherence scorer is unavailable")
+            result = self._score_local_coherence(
+                request.alignment,
+                request.source,
+                request.target,
+                **kwargs,
+            )
+        if not isinstance(result, Mapping):
+            raise TypeError("upstream coherence scorer did not return a report mapping")
+        return {str(name): value for name, value in result.items()}
 
 
 def _load_bioml_api() -> BioMLApi:
@@ -191,7 +233,7 @@ class BioMLEvaluator(IEvaluator):
         "equivalence": ("equivalence.precision", "equivalence.recall", "equivalence.f1"),
         "ranking": ("ranking.mrr",),
         "typed": ("typed.typed_mrr", "typed.hierarchy_aware_ndcg_at_10"),
-        "structural": ("structural.proxy",),
+        "coherence": ("coherence.global_coherence", "coherence.local_coherence"),
     }
 
     @staticmethod
@@ -209,8 +251,9 @@ class BioMLEvaluator(IEvaluator):
         api = _load_bioml_api()
         metrics: dict[str, float | None] = {}
         skipped: dict[str, str] = {}
+        details: dict[str, Any] = {}
 
-        def execute(category: str, callback: Callable[[EvaluationRequest], Mapping[str, float]]):
+        def execute(category: str, callback: Callable[[EvaluationRequest], Mapping[str, Any]]):
             if category in api.missing:
                 reason = f"upstream capability {category!r} is not available"
                 for name in cls._PLACEHOLDERS[category]:
@@ -226,6 +269,12 @@ class BioMLEvaluator(IEvaluator):
                     skipped[name] = reason
                 return
             cls._record(category, values, metrics)
+            if category == "coherence":
+                details[category] = {
+                    str(name): value
+                    for name, value in values.items()
+                    if not (isinstance(value, (int, float)) and not isinstance(value, bool))
+                }
 
         if request.full_reference is not None:
             execute("equivalence", api.evaluate_equivalence)
@@ -238,9 +287,14 @@ class BioMLEvaluator(IEvaluator):
             execute("typed", api.evaluate_typed)
 
         if request.source is not None and request.target is not None:
-            execute("structural", api.structural_coherence)
+            execute("coherence", api.evaluate_coherence)
 
-        return BackendEvaluation(metrics=metrics, skipped=skipped, version=api.version)
+        return BackendEvaluation(
+            metrics=metrics,
+            skipped=skipped,
+            version=api.version,
+            details=details,
+        )
 
     def evaluate(self, data):
         raise NotImplementedError("BioMLEvaluator consumes EvaluationRequest via run()")

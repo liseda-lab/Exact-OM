@@ -42,6 +42,8 @@ separate and are not included in these changes.
 - One immutable `pyowl-core` snapshot per OWL source, shared structural views, a delegated
   OWL2Vec* projector, asserted/pyELK/pyHermiT hierarchy adapters, verified-wire worker
   isolation, and path-free `ontology_stack` run provenance (WP-M).
+- OAEI Bio-ML 0.2 official coherence over Exact's existing snapshot providers, with selectable
+  HermiT/ELK execution and no ontology reparse (WP-E/M).
 
 ### Changed
 
@@ -60,6 +62,8 @@ separate and are not included in these changes.
   independent `reasoning` extra; RDFLib now serves only generic RDF/OAEI formats (WP-M).
 - Moved FastAPI, Uvicorn, and pydantic-settings behind the `viz` extra; Hugging Face tracks,
   upstream Bio-ML evaluation, and documentation tooling remain independent extras (WP-E/I/K).
+- Replaced the pre-release, Python-3.12-only Bio-ML Git pin with the compatible Python-3.10+
+  `0.2` release line and its Java-free reasoner extra (WP-E/M).
 - Exposed pair-adaptive channel, retrieval-fusion, alias, and uncertainty constants in the v2
   configuration with behavior-preserving defaults (WP-J).
 - New runs write resolved configuration, alignments, evaluation, statistics, plots,

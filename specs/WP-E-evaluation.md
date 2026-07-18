@@ -115,5 +115,10 @@ upstream package development itself (proposal doc only).
 ## Deviations
 
 The proposal is committed, but filing it in the external upstream tracker remains project
-coordination outside this repository. The pinned upstream distribution currently supports
-Python 3.12; the builtin backend remains available on every supported Exact Python version.
+coordination outside this repository. The initial implementation pinned the upstream
+`0.1.0.dev0` skeleton and its Python-3.12 floor. The WP-M follow-up now consumes the compatible
+`oaei-bioml-eval[reasoner]>=0.2,<0.3` line on Python 3.10–3.12. Its official global/local
+coherence scorer receives Exact's existing source providers and therefore the same concrete
+`pyowl-core` snapshots; it no longer reparses each provider's origin path or substitutes the
+unfinished structural proxy. HermiT/ELK selection, timeout, and invalid-IRI policy are explicit
+backend/CLI options. Publication remains coordinated with the shared packages' release gates.

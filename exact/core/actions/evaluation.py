@@ -132,6 +132,7 @@ def _save_report(
 
     skipped: dict[str, str] = {}
     versions: dict[str, Optional[str]] = {}
+    backend_details: dict[str, Mapping[str, Any]] = {}
     report: dict[str, Any] = {}
     flat: dict[str, Optional[float]] = {}
     single_builtin = backend_names == ["builtin"]
@@ -139,6 +140,8 @@ def _save_report(
         result = results[backend]
         report[backend] = dict(result.metrics)
         versions[backend] = result.version
+        if result.details:
+            backend_details[backend] = dict(result.details)
         for metric, value in result.metrics.items():
             flat_name = metric if single_builtin else f"{backend}.{metric}"
             flat[flat_name] = value
@@ -148,6 +151,7 @@ def _save_report(
         "refs": provenance,
         "k": list(request.k),
         "versions": versions,
+        "backend_details": backend_details,
         "skipped": skipped,
         "warnings": warnings,
     }

@@ -40,7 +40,7 @@ fastapi = {version = "^0.116.1", optional = true}
 uvicorn = {version = "^0.35.0", extras = ["standard"], optional = true}
 pydantic-settings = {version = "^2.12.0", optional = true}
 zstandard = "^0.23.0"
-oaei-bioml-eval = {git = "https://github.com/OAEI-ML/OAEI-Bio-ML-eval.git", rev = "900ba7f242f254d08b0e01e6826975c61d0438b2", optional = true, python = ">=3.12"}
+oaei-bioml-eval = {version = ">=0.2,<0.3", extras = ["reasoner"], optional = true}
 huggingface-hub = {version = "^0.36.2", optional = true}
 mkdocs-material = {version = "^9.7.6", optional = true}
 mkdocstrings = {version = "^1.0.4", extras = ["python"], optional = true}

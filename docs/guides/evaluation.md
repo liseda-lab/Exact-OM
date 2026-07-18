@@ -13,8 +13,27 @@ exact-eval \
 ```
 
 The builtin backend always runs locally. The optional `bioml` backend requires
-`exact-om[bioml-eval]` and invokes the pinned upstream evaluator through its Python API rather
-than shelling out or mutating `sys.path`.
+`exact-om[bioml-eval]` and invokes the compatible 0.2 evaluator through its Python API rather
+than shelling out or mutating `sys.path`. This extra supports Python 3.10–3.12 and includes
+the Java-free native-reasoner dependencies used for official coherence.
+
+When source and target ontologies are supplied, the Bio-ML backend computes official native
+coherence in addition to equivalence or ranking metrics. An inline Exact run passes its existing
+`OwlOntologySource` providers, so OAEI receives the exact same `pyowl-core` snapshots without a
+second parse. Standalone evaluation loads each path once through the core. Select the backend and
+timeout explicitly when needed:
+
+```console
+exact-eval ... --eval-backends builtin bioml \
+  --bioml-coherence-reasoner hermit \
+  --bioml-coherence-timeout 7200
+```
+
+HermiT is the exact default. Its cooperative timeout alone triggers OAEI's labelled ELK
+lower-bound fallback; other errors remain errors. Use `--bioml-skip-invalid-iris` only when the
+organiser policy explicitly permits malformed correspondence IRIs to be dropped. Exact retains
+the complete `coherence-provenance/1` record and reasoner/lower-bound annotations under
+`evaluation_results.json.meta.backend_details` while keeping the flat CSV numeric-only.
 
 ## Metrics
 

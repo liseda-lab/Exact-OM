@@ -33,13 +33,13 @@ dependencies it does not use.
 | Java-free reasoning | `pip install "exact-om[reasoning]"` | Optional pyELK and pyHermiT hierarchy adapters. |
 | Viewer | `pip install "exact-om[viz]"` | `exact-inspect`, FastAPI, and Uvicorn. |
 | Hugging Face data | `pip install "exact-om[hf]"` | Hugging Face track providers. |
-| Bio-ML evaluator | `pip install "exact-om[bioml-eval]"` | Pinned upstream evaluator backend. |
+| Bio-ML evaluator | `pip install "exact-om[bioml-eval]"` | Compatible 0.2 evaluator plus Java-free official-coherence reasoners. |
 | Documentation | `pip install "exact-om[docs]"` | MkDocs and reference generators. |
 
 An integration selected without its extra exits with an installation hint. Hosted LLM access
 is optional; all core tests and non-LLM matching paths run without OpenRouter credentials.
-The pinned upstream Bio-ML evaluator currently requires Python 3.12; use the always-available
-builtin evaluator on Python 3.10 or 3.11.
+The Bio-ML 0.2 evaluator and its reasoner extra support Python 3.10 and newer. The builtin
+evaluator remains the lighter option when official coherence is not requested.
 
 The base wheel includes the shared `pyowl-core` snapshot API and OWL2Vec* projector. It does
 not require Java, a JDK, Cargo, a compiler, or either optional reasoner. Native accelerators

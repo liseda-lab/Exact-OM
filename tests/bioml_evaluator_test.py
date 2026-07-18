@@ -21,8 +21,13 @@ class FakeBioMLApi:
     def evaluate_typed(self, request):
         return {"typed_mrr": 0.6, "hierarchy_aware_ndcg_at_10": 0.7}
 
-    def structural_coherence(self, request):
-        raise NotImplementedError("structural proxy is still an upstream stub")
+    def evaluate_coherence(self, request):
+        return {
+            "global_coherence": 0.0,
+            "union_class_count": 2,
+            "reasoner_used": "hermit",
+            "provenance": {"schema": "coherence-provenance/1"},
+        }
 
 
 def test_bioml_adapter_uses_available_capabilities(monkeypatch, tmp_path: Path) -> None:
@@ -37,8 +42,10 @@ def test_bioml_adapter_uses_available_capabilities(monkeypatch, tmp_path: Path) 
     result = bioml.BioMLEvaluator.run(request)
 
     assert result.metrics["equivalence.f1"] == pytest.approx(0.615)
-    assert result.metrics["structural.proxy"] is None
-    assert "upstream stub" in result.skipped["structural.proxy"]
+    assert result.metrics["coherence.global_coherence"] == 0.0
+    assert result.metrics["coherence.union_class_count"] == 2.0
+    assert result.details["coherence"]["reasoner_used"] == "hermit"
+    assert result.details["coherence"]["provenance"] == {"schema": "coherence-provenance/1"}
     assert result.version == "fake-1"
 
 
