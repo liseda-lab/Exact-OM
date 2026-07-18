@@ -62,6 +62,33 @@ def test_existing_snapshot_is_never_reloaded_and_projector_sees_same_object(monk
     )
 
 
+def test_projection_only_source_does_not_eagerly_build_exact_feature_indexes():
+    source = load_ontology(FIXTURE)
+    feature_indexes = {
+        "_signature",
+        "_annotations",
+        "_axioms",
+        "_class_view",
+        "_property_view",
+        "_domain_range",
+        "_class_features",
+        "_property_hierarchy",
+        "_individual_features",
+        "_data_values",
+        "_annotation_property_features",
+        "_excluded",
+    }
+
+    assert feature_indexes.isdisjoint(source.__dict__)
+    source.configure_projector(backend="python")
+    assert source.projection_edges()
+    assert feature_indexes.isdisjoint(source.__dict__)
+
+    assert source.entities()
+    assert "_signature" in source.__dict__
+    assert "_class_features" not in source.__dict__
+
+
 def test_projection_cache_key_covers_shared_semantic_versions():
     source = load_ontology(FIXTURE)
     source.configure_projector(backend="python", profile="mowl-d993536-v1")

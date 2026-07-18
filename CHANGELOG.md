@@ -64,6 +64,9 @@ separate and are not included in these changes.
   upstream Bio-ML evaluation, and documentation tooling remain independent extras (WP-E/I/K).
 - Replaced the pre-release, Python-3.12-only Bio-ML Git pin with the compatible Python-3.10+
   `0.2` release line and its Java-free reasoner extra (WP-E/M).
+- Deferred shared-core and Exact feature indexes until their first query, so projection-only and
+  coherence-only consumers do not eagerly construct unrelated hierarchy, annotation, ABox, or
+  domain/range indexes (WP-M).
 - Exposed pair-adaptive channel, retrieval-fusion, alias, and uncertainty constants in the v2
   configuration with behavior-preserving defaults (WP-J).
 - New runs write resolved configuration, alignments, evaluation, statistics, plots,

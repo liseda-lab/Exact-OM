@@ -1,0 +1,163 @@
+{
+  "schema": "exact-ontology-scale-candidate/1",
+  "captured_at_utc": "2026-07-18T09:59:14Z",
+  "status": "blocked",
+  "inputs_match_frozen_baseline": true,
+  "environment": {
+    "platform": "macOS-26.5.2-x86_64-i386-64bit",
+    "python": "3.12.3",
+    "exact_base_commit": "e943881befd7673f42b4b4b0b9230b47364c8f35",
+    "pyowl_core_commit": "fca6a5f346711843eb7f4f830bf88b4154cabd92",
+    "pyowl2vec_star_projector_commit": "1804bdc92ae9cee4afc7b63dd81d5a016128da20",
+    "packages": {
+      "exact-om": "source-checkout",
+      "pyowl-core": "0.1.0.dev0",
+      "pyowl2vec-star-projector": "0.1.0rc1"
+    }
+  },
+  "method": {
+    "load_backend": "python",
+    "load_count_instrumented": true,
+    "projection_backend": "python",
+    "projection_method": "owl2vecstar",
+    "include_literals": false,
+    "duplicates": "unique",
+    "order": "canonical",
+    "compatibility_state": "isolated",
+    "buffer_edges": 250000
+  },
+  "measurements": {
+    "source": {
+      "input": {
+        "name": "source.owl",
+        "bytes": 57163710,
+        "sha256": "379a37f47c0c8e7c30397769358cca955140d16b2797a1cc75da4b1fc2b354eb"
+      },
+      "load_calls": 1,
+      "load_report": {
+        "axioms": 243099,
+        "documents": 1,
+        "source_bytes": 57163710,
+        "acquisition_cache_hits": 0,
+        "document_cache_hits": 0
+      },
+      "load_seconds": 373.54852562298765,
+      "identity": {
+        "source_snapshot": true,
+        "projector_snapshot": true,
+        "reasoner_snapshot": true
+      },
+      "fingerprints": {
+        "structural": "sha256:1:c16d929da9de187fe01a919752c8c5d87559ea782727d18282ecf8525495eed9",
+        "logical": "sha256:1:b24608da18ae1985bacc6169dfb90b4ce91b0733aed3792c75b458c2b03c64f2",
+        "signature": "sha256:1:d6d1e03dba3ed6b13f7b018f204780ab950ffd7221bbe1a7cd1ad6854766dcff"
+      },
+      "projection": {
+        "edges": 42103,
+        "wall_seconds": 8.370085155998822,
+        "time_to_first_edge_seconds": 8.10671658202773,
+        "edges_per_second": 5030.175824414984,
+        "spill": {
+          "runs_created": 1,
+          "merge_passes": 0,
+          "total_spill_bytes": 6700413,
+          "peak_live_bytes": 6700413
+        }
+      },
+      "projection_cache": {
+        "edges": 42103,
+        "fill_seconds": 7.239370800030883,
+        "hit_seconds": 0.0007719270070083439,
+        "hit_faster_than_fill": true
+      },
+      "rss": {
+        "before_bytes": 48697344,
+        "peak_bytes": 1665183744,
+        "incremental_peak_bytes": 1616486400
+      },
+      "second_ontology_representation": false
+    },
+    "target": {
+      "input": {
+        "name": "target.owl",
+        "bytes": 6687536,
+        "sha256": "76f41cce3616ad1a9ba6353f469e96bde7addba5d43e541651a3ab703f9ba2bc"
+      },
+      "load_calls": 1,
+      "load_report": {
+        "axioms": 55687,
+        "documents": 1,
+        "source_bytes": 6687536,
+        "acquisition_cache_hits": 0,
+        "document_cache_hits": 0
+      },
+      "load_seconds": 31.039968733035494,
+      "identity": {
+        "source_snapshot": true,
+        "projector_snapshot": true,
+        "reasoner_snapshot": true
+      },
+      "fingerprints": {
+        "structural": "sha256:1:c8b9f407630b09e811c72f4c832bbc910abd87630e8c0970f68913b12c05c85f",
+        "logical": "sha256:1:29a73cd4f700a45d34fceb789ca387a661190d93f44e18c26ff1b249d5029ef6",
+        "signature": "sha256:1:02e6380f8f7eb796fb88c69c214cba4a636e3ab918a906fe407a28ae451423ad"
+      },
+      "projection": {
+        "edges": 9388,
+        "wall_seconds": 0.8459804599988274,
+        "time_to_first_edge_seconds": 0.7836170429945923,
+        "edges_per_second": 11097.183024786425,
+        "spill": {
+          "runs_created": 1,
+          "merge_passes": 0,
+          "total_spill_bytes": 1037503,
+          "peak_live_bytes": 1037503
+        }
+      },
+      "projection_cache": {
+        "edges": 9388,
+        "fill_seconds": 0.8916042629862204,
+        "hit_seconds": 0.00009687902638688684,
+        "hit_faster_than_fill": true
+      },
+      "rss": {
+        "before_bytes": 1665183744,
+        "peak_bytes": 1665183744,
+        "incremental_peak_bytes": 0
+      },
+      "second_ontology_representation": false
+    }
+  },
+  "comparison_to_wp_m_ncit_doid_baseline": {
+    "source": {
+      "load_wall_ratio": 5.433741811746306,
+      "projection_wall_ratio": 38.433692598486765,
+      "baseline_edges": 41349,
+      "candidate_edges": 42103,
+      "edge_count_delta": 754,
+      "edge_count_delta_fraction": 0.018235023821616
+    },
+    "target": {
+      "load_wall_ratio": 5.705124860750122,
+      "projection_wall_ratio": 16.027793587432672,
+      "baseline_edges": 9388,
+      "candidate_edges": 9388,
+      "edge_count_delta": 0,
+      "edge_count_delta_fraction": 0.0
+    }
+  },
+  "accepted": {
+    "single_load": true,
+    "snapshot_identity": true,
+    "no_second_ontology_representation": true,
+    "cache_hit": true,
+    "performance_gate": false,
+    "projection_parity_gate": false
+  },
+  "blockers": [
+    "Source and target loading exceed the permitted 25 percent wall-time regression.",
+    "Source and target projection exceed the permitted 25 percent wall-time regression.",
+    "The NCIT source projection has 754 additional edges; the semantic difference is not yet classified.",
+    "Peak RSS has no comparable value in the frozen baseline and still requires a pinned-runner acceptance run."
+  ]
+}

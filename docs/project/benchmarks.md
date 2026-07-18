@@ -35,3 +35,10 @@ throughput, peak/incremental RSS, core document-cache hits, Exact projection-cac
 timing, spill counters, fingerprint immutability, and source/projector/reasoner snapshot
 identity. Input bytes are not redistributed, so licensed corpora can contribute release
 evidence without entering the repository.
+
+The current hash-matched NCIT–DOID candidate is committed under
+`benchmarks/evidence/wp_m_ncit_doid_candidate.json`. It passes one-load, shared-identity, and
+no-second-representation checks, but it is not release acceptance: both loading and projection
+exceed the 25% wall-time limit, and the NCIT projection has an unclassified 754-edge delta from
+the frozen private-stack result. WP-M M5 and the Exact 2.1.0 version bump remain blocked until
+those differences are resolved and a comparable pinned-runner RSS result is reviewed.

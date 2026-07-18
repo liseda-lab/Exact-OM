@@ -49,3 +49,18 @@ The comparison after M2/M3 must use inputs with those exact digests and report, 
 source loading, snapshot construction, time to first projected edge, full projection, peak and
 incremental RSS, native/Python backend, cache state, and output fingerprints. A result with a
 different input digest is a new benchmark, not a replacement for this baseline.
+
+`wp_m_ncit_doid_candidate.json` is the first hash-matched post-migration capture. It proves one
+load, shared object identity, no second ontology representation, and a fast projection-cache hit,
+but it is deliberately marked `blocked`: Python loading and projection exceed the 25% wall-time
+gate, and NCIT projection contains 754 more unique edges than the frozen private-stack result.
+That semantic delta must be classified and the performance regressions fixed before M5 or the
+2.1.0 release can be accepted. The raw benchmark remains reproducible with:
+
+```bash
+PYTHONPATH=.:../pyOWLCore/src:../pyOwl2Vec-Star-projector/src \
+  python benchmarks/owl_stack_scale.py \
+  data/bioml_zenodo/ncit-doid/source.owl \
+  data/bioml_zenodo/ncit-doid/target.owl \
+  --output /tmp/exact-wp-m-ncit-doid.json
+```

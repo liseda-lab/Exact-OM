@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from collections.abc import Iterable, Mapping, Sequence
-from functools import lru_cache
+from functools import cached_property, lru_cache
 from os import PathLike
 from pathlib import Path
 from typing import BinaryIO, TypeAlias
@@ -396,108 +396,9 @@ class OwlOntologySource(KnowledgeSource):
         )
         self._label_property_set = frozenset(self.label_properties)
 
-        # These are lazy shared-core indexes; the snapshot cache preserves their identity
-        # for projector and future reasoner consumers.
-        self._signature = snapshot.view(SignatureView, include_builtins=True)
-        self._annotations = snapshot.view(AnnotationAssertionIndex)
-        self._axioms = snapshot.view(AxiomTypeIndex)
-        self._class_view = snapshot.view(AssertedClassHierarchyView)
-        self._property_view = snapshot.view(AssertedPropertyHierarchyView)
-        self._domain_range = snapshot.view(PropertyDomainRangeView)
-
-        class_components = _equivalence_components(
-            record.classes for record in self._class_view.equivalence_sets()
-        )
-        property_components = _equivalence_components(
-            record.properties for record in self._property_view.equivalence_sets()
-        )
-        extra_parents: dict[str, set[str]] = defaultdict(set)
-        restrictions: dict[str, list[pyowl_core.StructuralNode]] = defaultdict(list)
-        for subclass_axiom in self._axioms.iter(SubClassOf):
-            if isinstance(subclass_axiom.sub_class, Class):
-                restrictions[subclass_axiom.sub_class.iri.value].append(subclass_axiom.super_class)
-        for equivalent_axiom in self._axioms.iter(EquivalentClasses):
-            anchors = tuple(
-                expression
-                for expression in equivalent_axiom.expressions
-                if isinstance(expression, Class)
-            )
-            for anchor in anchors:
-                anchor_iri = anchor.iri.value
-                for expression in equivalent_axiom.expressions:
-                    if isinstance(expression, Class):
-                        continue
-                    restrictions[anchor_iri].append(expression)
-                    if isinstance(expression, ObjectUnionOf):
-                        for operand in expression.operands:
-                            if isinstance(operand, Class):
-                                extra_parents[operand.iri.value].add(anchor_iri)
-                    elif isinstance(expression, ObjectIntersectionOf):
-                        for operand in expression.operands:
-                            if isinstance(operand, Class):
-                                extra_parents[anchor_iri].add(operand.iri.value)
-        self._restriction_expressions = {
-            iri: tuple(dict.fromkeys(values)) for iri, values in restrictions.items()
-        }
-        self.hierarchy = _ClassHierarchy(
-            self._class_view,
-            class_components,
-            {iri: tuple(sorted(values)) for iri, values in extra_parents.items()},
-        )
-
-        constructors = {
-            entity.iri.value: (
-                ObjectProperty if entity.kind is CoreEntityKind.OBJECT_PROPERTY else DataProperty
-            )
-            for entity in self._signature.iter()
-            if entity.kind in {CoreEntityKind.OBJECT_PROPERTY, CoreEntityKind.DATA_PROPERTY}
-        }
-        self._property_hierarchy = _PropertyHierarchy(
-            self._property_view, property_components, constructors
-        )
-
-        individual_parents: dict[str, set[str]] = defaultdict(set)
-        class_individuals: dict[str, set[str]] = defaultdict(set)
-        for class_assertion in self._axioms.iter(ClassAssertion):
-            if not isinstance(class_assertion.individual, NamedIndividual):
-                continue
-            individual = class_assertion.individual.iri.value
-            for class_iri in _named_classes(class_assertion.class_expression):
-                individual_parents[individual].add(class_iri)
-                class_individuals[class_iri].add(individual)
-        self._individual_parents = {
-            iri: tuple(sorted(values)) for iri, values in individual_parents.items()
-        }
-        self._class_individuals = {
-            iri: tuple(sorted(values)) for iri, values in class_individuals.items()
-        }
-
-        data_values: dict[str, list[AnnotationValue]] = defaultdict(list)
-        for data_assertion in self._axioms.iter(DataPropertyAssertion):
-            if not isinstance(data_assertion.source, NamedIndividual):
-                continue
-            converted = _annotation_value(data_assertion.property.iri.value, data_assertion.value)
-            if converted is not None:
-                data_values[data_assertion.source.iri.value].append(converted)
-        self._data_values = {iri: tuple(values) for iri, values in data_values.items()}
-
-        self._annotation_property_parents: dict[str, tuple[str, ...]] = {}
-        self._annotation_property_children: dict[str, tuple[str, ...]] = {}
-        annotation_parents: dict[str, set[str]] = defaultdict(set)
-        annotation_children: dict[str, set[str]] = defaultdict(set)
-        for subproperty_axiom in self._axioms.iter(SubAnnotationPropertyOf):
-            child = subproperty_axiom.sub_property.iri.value
-            parent = subproperty_axiom.super_property.iri.value
-            annotation_parents[child].add(parent)
-            annotation_children[parent].add(child)
-        self._annotation_property_parents = {
-            iri: tuple(sorted(values)) for iri, values in annotation_parents.items()
-        }
-        self._annotation_property_children = {
-            iri: tuple(sorted(values)) for iri, values in annotation_children.items()
-        }
-
-        self._excluded = self._build_exclusions()
+        # Shared-core and Exact feature indexes are intentionally lazy. Large projection-only
+        # or coherence runs must not pay for annotations, class/property hierarchy, ABox, and
+        # domain/range indexes merely by constructing the source facade.
         self._entity_cache: dict[EntityKind, tuple[str, ...]] = {}
         self._projection = SharedProjectionAdapter(
             snapshot,
@@ -556,6 +457,161 @@ class OwlOntologySource(KnowledgeSource):
         """Compatibility spelling for :meth:`load`."""
 
         return cls.load(Path(path), label_properties=label_properties)
+
+    @cached_property
+    def _signature(self) -> SignatureView:
+        return self._snapshot.view(SignatureView, include_builtins=True)
+
+    @cached_property
+    def _annotations(self) -> AnnotationAssertionIndex:
+        return self._snapshot.view(AnnotationAssertionIndex)
+
+    @cached_property
+    def _axioms(self) -> AxiomTypeIndex:
+        return self._snapshot.view(AxiomTypeIndex)
+
+    @cached_property
+    def _class_view(self) -> AssertedClassHierarchyView:
+        return self._snapshot.view(AssertedClassHierarchyView)
+
+    @cached_property
+    def _property_view(self) -> AssertedPropertyHierarchyView:
+        return self._snapshot.view(AssertedPropertyHierarchyView)
+
+    @cached_property
+    def _domain_range(self) -> PropertyDomainRangeView:
+        return self._snapshot.view(PropertyDomainRangeView)
+
+    @cached_property
+    def _class_features(
+        self,
+    ) -> tuple[dict[str, tuple[pyowl_core.StructuralNode, ...]], _ClassHierarchy]:
+        class_components = _equivalence_components(
+            record.classes for record in self._class_view.equivalence_sets()
+        )
+        extra_parents: dict[str, set[str]] = defaultdict(set)
+        restrictions: dict[str, list[pyowl_core.StructuralNode]] = defaultdict(list)
+        for subclass_axiom in self._axioms.iter(SubClassOf):
+            if isinstance(subclass_axiom.sub_class, Class):
+                restrictions[subclass_axiom.sub_class.iri.value].append(subclass_axiom.super_class)
+        for equivalent_axiom in self._axioms.iter(EquivalentClasses):
+            anchors = tuple(
+                expression
+                for expression in equivalent_axiom.expressions
+                if isinstance(expression, Class)
+            )
+            for anchor in anchors:
+                anchor_iri = anchor.iri.value
+                for expression in equivalent_axiom.expressions:
+                    if isinstance(expression, Class):
+                        continue
+                    restrictions[anchor_iri].append(expression)
+                    if isinstance(expression, ObjectUnionOf):
+                        for operand in expression.operands:
+                            if isinstance(operand, Class):
+                                extra_parents[operand.iri.value].add(anchor_iri)
+                    elif isinstance(expression, ObjectIntersectionOf):
+                        for operand in expression.operands:
+                            if isinstance(operand, Class):
+                                extra_parents[anchor_iri].add(operand.iri.value)
+        expressions = {iri: tuple(dict.fromkeys(values)) for iri, values in restrictions.items()}
+        hierarchy = _ClassHierarchy(
+            self._class_view,
+            class_components,
+            {iri: tuple(sorted(values)) for iri, values in extra_parents.items()},
+        )
+        return expressions, hierarchy
+
+    @property
+    def _restriction_expressions(
+        self,
+    ) -> dict[str, tuple[pyowl_core.StructuralNode, ...]]:
+        return self._class_features[0]
+
+    @property
+    def hierarchy(self) -> _ClassHierarchy:
+        """Return the lazily constructed asserted class hierarchy adapter."""
+
+        return self._class_features[1]
+
+    @cached_property
+    def _property_hierarchy(self) -> _PropertyHierarchy:
+        components = _equivalence_components(
+            record.properties for record in self._property_view.equivalence_sets()
+        )
+        constructors = {
+            entity.iri.value: (
+                ObjectProperty if entity.kind is CoreEntityKind.OBJECT_PROPERTY else DataProperty
+            )
+            for entity in self._signature.iter()
+            if entity.kind in {CoreEntityKind.OBJECT_PROPERTY, CoreEntityKind.DATA_PROPERTY}
+        }
+        return _PropertyHierarchy(self._property_view, components, constructors)
+
+    @cached_property
+    def _individual_features(
+        self,
+    ) -> tuple[dict[str, tuple[str, ...]], dict[str, tuple[str, ...]]]:
+        individual_parents: dict[str, set[str]] = defaultdict(set)
+        class_individuals: dict[str, set[str]] = defaultdict(set)
+        for class_assertion in self._axioms.iter(ClassAssertion):
+            if not isinstance(class_assertion.individual, NamedIndividual):
+                continue
+            individual = class_assertion.individual.iri.value
+            for class_iri in _named_classes(class_assertion.class_expression):
+                individual_parents[individual].add(class_iri)
+                class_individuals[class_iri].add(individual)
+        return (
+            {iri: tuple(sorted(values)) for iri, values in individual_parents.items()},
+            {iri: tuple(sorted(values)) for iri, values in class_individuals.items()},
+        )
+
+    @property
+    def _individual_parents(self) -> dict[str, tuple[str, ...]]:
+        return self._individual_features[0]
+
+    @property
+    def _class_individuals(self) -> dict[str, tuple[str, ...]]:
+        return self._individual_features[1]
+
+    @cached_property
+    def _data_values(self) -> dict[str, tuple[AnnotationValue, ...]]:
+        data_values: dict[str, list[AnnotationValue]] = defaultdict(list)
+        for data_assertion in self._axioms.iter(DataPropertyAssertion):
+            if not isinstance(data_assertion.source, NamedIndividual):
+                continue
+            converted = _annotation_value(data_assertion.property.iri.value, data_assertion.value)
+            if converted is not None:
+                data_values[data_assertion.source.iri.value].append(converted)
+        return {iri: tuple(values) for iri, values in data_values.items()}
+
+    @cached_property
+    def _annotation_property_features(
+        self,
+    ) -> tuple[dict[str, tuple[str, ...]], dict[str, tuple[str, ...]]]:
+        annotation_parents: dict[str, set[str]] = defaultdict(set)
+        annotation_children: dict[str, set[str]] = defaultdict(set)
+        for subproperty_axiom in self._axioms.iter(SubAnnotationPropertyOf):
+            child = subproperty_axiom.sub_property.iri.value
+            parent = subproperty_axiom.super_property.iri.value
+            annotation_parents[child].add(parent)
+            annotation_children[parent].add(child)
+        return (
+            {iri: tuple(sorted(values)) for iri, values in annotation_parents.items()},
+            {iri: tuple(sorted(values)) for iri, values in annotation_children.items()},
+        )
+
+    @property
+    def _annotation_property_parents(self) -> dict[str, tuple[str, ...]]:
+        return self._annotation_property_features[0]
+
+    @property
+    def _annotation_property_children(self) -> dict[str, tuple[str, ...]]:
+        return self._annotation_property_features[1]
+
+    @cached_property
+    def _excluded(self) -> frozenset[str]:
+        return self._build_exclusions()
 
     def owl_snapshot(self) -> OntologySnapshot:
         """Return the exact shared snapshot instance; never rebuild or reparse."""
@@ -770,9 +826,9 @@ class OwlOntologySource(KnowledgeSource):
     @staticmethod
     def _domain_range_value(value: object) -> str:
         if isinstance(value, IRI):
-            return value.value
+            return str(value.value)
         if isinstance(value, (Class, Datatype)):
-            return value.iri.value
+            return str(value.iri.value)
         # Complex results are rare in Exact's schema channel.  The core value is
         # retained canonically; no local structural model is constructed.
         if isinstance(value, pyowl_core.StructuralNode):

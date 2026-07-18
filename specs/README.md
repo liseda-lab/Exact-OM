@@ -32,7 +32,7 @@
 | J | Config schema v2 + migrator | `WP-J-config-v2.md` | A; after B/C/E/I keys land | M | Done |
 | K | `exact-inspect` service repackaging | `WP-K-inspect.md` | B | M | Done |
 | L | Run artifacts & explanation store | `WP-L-run-artifacts.md` | C, D (coordinates K) | M–L | Done |
-| M | Shared Java-free OWL stack migration (`2.1.0`) | `WP-M-shared-owl-stack.md` | B; external core/projector/reasoner contracts | XL | Planned |
+| M | Shared Java-free OWL stack migration (`2.1.0`) | `WP-M-shared-owl-stack.md` | B; external core/projector/reasoner contracts | XL | M0–M4 implemented; M5 blocked |
 
 Each work-package file records its implementation deviations. External-data, accelerator, and
 hosted-service checks remain environment-specific verification; they do not reopen completed

@@ -14,6 +14,9 @@ PROVENANCE = json.loads((BASELINES / "provenance.json").read_text(encoding="utf-
 SCALE_EVIDENCE = (
     Path(__file__).parents[1] / "benchmarks" / "evidence" / "wp_m_ncit_doid_baseline.json"
 )
+SCALE_CANDIDATE = (
+    Path(__file__).parents[1] / "benchmarks" / "evidence" / "wp_m_ncit_doid_candidate.json"
+)
 
 
 def _load_snapshot(path: Path) -> dict[str, Any]:
@@ -41,6 +44,25 @@ def test_wp_m_scale_baseline_is_reviewable_and_content_addressed():
         assert result["parse_internal_seconds"] > 0
         assert result["projected_edges"] > 0
         assert result["projection_seconds"] > 0
+
+
+def test_wp_m_scale_candidate_records_failed_gates_without_changing_inputs():
+    baseline = json.loads(SCALE_EVIDENCE.read_text(encoding="utf-8"))
+    candidate = json.loads(SCALE_CANDIDATE.read_text(encoding="utf-8"))
+
+    assert candidate["schema"] == "exact-ontology-scale-candidate/1"
+    assert candidate["status"] == "blocked"
+    assert candidate["inputs_match_frozen_baseline"] is True
+    assert candidate["accepted"]["single_load"] is True
+    assert candidate["accepted"]["snapshot_identity"] is True
+    assert candidate["accepted"]["no_second_ontology_representation"] is True
+    assert candidate["accepted"]["performance_gate"] is False
+    assert candidate["accepted"]["projection_parity_gate"] is False
+    for role in ("source", "target"):
+        assert (
+            candidate["measurements"][role]["input"]["sha256"]
+            == baseline["dataset"][role]["sha256"]
+        )
 
 
 @pytest.mark.parametrize("name", ["mini_src", "mini_tgt"])

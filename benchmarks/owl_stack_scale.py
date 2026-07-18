@@ -4,7 +4,10 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
+import importlib.metadata
 import json
+import platform
 import resource
 import sys
 import time
@@ -38,9 +41,27 @@ def _fingerprints(snapshot: pyowl_core.OntologySnapshot) -> dict[str, str]:
     }
 
 
-def measure(path: Path, *, buffer_edges: int) -> dict[str, Any]:
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _package_version(distribution: str, fallback: str) -> str:
+    try:
+        return importlib.metadata.version(distribution)
+    except importlib.metadata.PackageNotFoundError:
+        return fallback
+
+
+def measure(path: Path, *, buffer_edges: int, include_literals: bool) -> dict[str, Any]:
     """Measure one source while asserting single-load and identity invariants."""
 
+    print(f"[owl-stack-scale] hashing {path.name}", file=sys.stderr, flush=True)
+    input_bytes = path.stat().st_size
+    input_sha256 = _sha256_file(path)
     load_calls = 0
     original_load = pyowl_core.load_snapshot
 
@@ -51,6 +72,7 @@ def measure(path: Path, *, buffer_edges: int) -> dict[str, Any]:
         return cast(pyowl_core.OntologySnapshot, loader(*args, **kwargs))
 
     before_rss = _max_rss_bytes()
+    print(f"[owl-stack-scale] loading {path.name}", file=sys.stderr, flush=True)
     started = time.perf_counter()
     pyowl_core.load_snapshot = counted_load  # type: ignore[assignment]
     try:
@@ -71,13 +93,14 @@ def measure(path: Path, *, buffer_edges: int) -> dict[str, Any]:
 
     options = ProjectionOptions(
         profile=source.projector_settings.profile,
-        include_literals=True,
+        include_literals=include_literals,
         duplicates="unique",
         order="canonical",
         compatibility_state="isolated",
         backend="python",
     )
     projection_started = time.perf_counter()
+    print(f"[owl-stack-scale] projecting {path.name}", file=sys.stderr, flush=True)
     iterator = source.projector.iter_edges(
         snapshot,
         options=options,
@@ -95,10 +118,11 @@ def measure(path: Path, *, buffer_edges: int) -> dict[str, Any]:
     spill = asdict(source.projector.last_spill_metrics)
 
     cache_started = time.perf_counter()
-    first_cache_count = len(source.projection_edges(include_literals=True))
+    print(f"[owl-stack-scale] filling cache for {path.name}", file=sys.stderr, flush=True)
+    first_cache_count = len(source.projection_edges(include_literals=include_literals))
     cache_fill_seconds = time.perf_counter() - cache_started
     cache_started = time.perf_counter()
-    second_cache_count = len(source.projection_edges(include_literals=True))
+    second_cache_count = len(source.projection_edges(include_literals=include_literals))
     cache_hit_seconds = time.perf_counter() - cache_started
 
     reasoner = source.reasoner
@@ -118,7 +142,11 @@ def measure(path: Path, *, buffer_edges: int) -> dict[str, Any]:
         raise RuntimeError("projection cache changed its result cardinality")
 
     return {
-        "input_name": path.name,
+        "input": {
+            "name": path.name,
+            "bytes": input_bytes,
+            "sha256": input_sha256,
+        },
         "load_calls": load_calls,
         "load_seconds": load_seconds,
         "load_report": {
@@ -131,6 +159,7 @@ def measure(path: Path, *, buffer_edges: int) -> dict[str, Any]:
         "fingerprints": initial_fingerprints,
         "identity": identity,
         "projection": {
+            "include_literals": include_literals,
             "edges": edge_count,
             "wall_seconds": projection_seconds,
             "time_to_first_edge_seconds": first_edge_seconds,
@@ -158,12 +187,28 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("ontology", type=Path, nargs="+")
     parser.add_argument("--buffer-edges", type=int, default=250_000)
+    parser.add_argument("--include-literals", action="store_true")
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     payload = {
-        "schema_version": 1,
+        "schema_version": 2,
+        "environment": {
+            "python": platform.python_version(),
+            "platform": platform.platform(),
+            "packages": {
+                "exact-om": _package_version("Exact-OM", "source-checkout"),
+                "pyowl-core": _package_version("pyowl-core", str(pyowl_core.__version__)),
+                "pyowl2vec-star-projector": _package_version(
+                    "pyowl2vec-star-projector", "source-checkout"
+                ),
+            },
+        },
         "measurements": [
-            measure(path.expanduser().resolve(), buffer_edges=args.buffer_edges)
+            measure(
+                path.expanduser().resolve(),
+                buffer_edges=args.buffer_edges,
+                include_literals=args.include_literals,
+            )
             for path in args.ontology
         ],
     }
