@@ -2,8 +2,8 @@
 
 **Target release:** Exact-OM `2.1.0`. **Depends on:** completed WP-B plus released compatible
 `pyowl-core`, `pyowl2vec-star-projector`, pyELK, and pyHermiT contracts. **Status:** repository
-implementation M0–M4 complete; M5/release blocked by the scale, parity, and published-dependency
-gates recorded in §12.
+implementation M0–M4 complete; M5/release blocked by the performance, pinned-runner RSS, and
+published-dependency gates recorded in §12.
 
 **Audit baseline:** Exact-OM commit `c51b2b56f42bdd2cf6d27787bd607462d88d222b`
 (version `2.0.0`, 2026-07-16). Re-locate files by symbol if line numbers drift.
@@ -226,7 +226,8 @@ has one shared path.
 
 The repository implementation landed incrementally on `dev`: baseline `4a3cbc5`, source adapter
 `b70cd16`, shared projection `87134b9`, structural views `50719f8`, reasoner adapters `c8d7de3`,
-and release-candidate cleanup `e943881`. Hermetic tests prove one load, exact in-process snapshot
+release-candidate cleanup `e943881`, and lazy-index scale correction `08b859d`. Hermetic tests
+prove one load, exact in-process snapshot
 identity across source/projector/reasoner, immutable shared fingerprints, verified-wire workers,
 fixture semantic parity, Python-only operation, cache versioning, and forbidden-dependency scans.
 Exact's optional OAEI 0.2 coherence adapter also passes these same providers directly rather than
@@ -236,15 +237,21 @@ M5 is not accepted. The content-addressed result in
 `benchmarks/evidence/wp_m_ncit_doid_candidate.json` uses the exact frozen NCIT–DOID inputs and
 proves one load and no second ontology representation, but records:
 
-- NCIT load at 373.55 s versus 68.75 s and projection at 8.37 s versus 0.218 s;
-- DOID load at 31.04 s versus 5.44 s and projection at 0.846 s versus 0.0528 s;
-- 42,103 NCIT edges versus the frozen 41,349, an unclassified 754-edge semantic delta; and
-- 1.665 GB peak process RSS, still lacking the comparable pinned-runner baseline required for an
-  RSS acceptance decision.
+- NCIT load at 301.92 s versus 68.75 s and projection at 7.056 s versus 0.218 s;
+- DOID load at 23.10 s versus 5.44 s and projection at 0.947 s versus 0.0528 s;
+- 1.678 GB NCIT peak process RSS, still lacking the comparable pinned-runner baseline required
+  for an RSS acceptance decision.
 
-These exceed the permitted 25% wall-time regression and fail projection parity. Compatible final
-core/projector/reasoner distributions and hosted Python/native-wheel matrices also remain release
-prerequisites. Exact therefore stays at `2.0.0`; changing metadata to `2.1.0` before these gates
-pass would contradict §9. The eager Exact feature indexes discovered during the capture were
-made lazy, materially reducing the first diagnostic run, but the corrected capture above shows
-that this local fix does not close the shared-core/projector performance gap.
+The 42,103-versus-41,349 NCIT edge difference is now completely classified. Exact set comparison
+records 762 additions from pinned projector rule RB-019 (restriction expansion through historical
+inverse/subrole maps) and eight removals from RB-009 (the old private Exact path incorrectly
+expanded top-level intersection superclass shapes), with zero residual edges. The shared result
+therefore passes pinned mOWL/projector semantic parity even though it does not reproduce the old
+private approximation's count.
+
+The load and projection measurements still exceed the permitted 25% wall-time regression.
+Compatible final core/projector/reasoner distributions and hosted Python/native-wheel matrices
+also remain release prerequisites. Exact therefore stays at `2.0.0`; changing metadata to `2.1.0`
+before these gates pass would contradict §9. Lazy Exact feature indexes and the current shared-core
+optimizations materially improve the first diagnostic run, but do not close the shared-stack
+performance gap.

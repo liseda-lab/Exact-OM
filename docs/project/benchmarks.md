@@ -38,7 +38,9 @@ evidence without entering the repository.
 
 The current hash-matched NCIT–DOID candidate is committed under
 `benchmarks/evidence/wp_m_ncit_doid_candidate.json`. It passes one-load, shared-identity, and
-no-second-representation checks, but it is not release acceptance: both loading and projection
-exceed the 25% wall-time limit, and the NCIT projection has an unclassified 754-edge delta from
-the frozen private-stack result. WP-M M5 and the Exact 2.1.0 version bump remain blocked until
-those differences are resolved and a comparable pinned-runner RSS result is reviewed.
+no-second-representation checks. Its complete NCIT set difference is classified with digests:
+762 RB-019 subrole-expansion edges were correctly added, eight RB-009 top-level-intersection
+edges emitted by old private Exact were correctly removed, and no residual edge remains. Pinned
+projector semantics therefore pass. This is still not release acceptance: both loading and
+projection exceed the 25% wall-time limit, and a comparable pinned-runner RSS result is missing.
+WP-M M5 and the Exact 2.1.0 version bump remain blocked on those performance/evidence gates.

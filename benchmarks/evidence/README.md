@@ -53,9 +53,11 @@ different input digest is a new benchmark, not a replacement for this baseline.
 `wp_m_ncit_doid_candidate.json` is the first hash-matched post-migration capture. It proves one
 load, shared object identity, no second ontology representation, and a fast projection-cache hit,
 but it is deliberately marked `blocked`: Python loading and projection exceed the 25% wall-time
-gate, and NCIT projection contains 754 more unique edges than the frozen private-stack result.
-That semantic delta must be classified and the performance regressions fixed before M5 or the
-2.1.0 release can be accepted. The raw benchmark remains reproducible with:
+gate. The NCIT projection's net 754-edge difference is fully classified and digest-bound: 762
+RB-019 subrole-expansion additions, eight RB-009 removals of edges incorrectly emitted by the old
+private Exact approximation, and zero residuals. Pinned shared-projector semantics pass; the
+performance regressions and comparable pinned-runner RSS evidence must still be resolved before
+M5 or the 2.1.0 release can be accepted. The raw benchmark remains reproducible with:
 
 ```bash
 PYTHONPATH=.:../pyOWLCore/src:../pyOwl2Vec-Star-projector/src \

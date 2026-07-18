@@ -1,14 +1,15 @@
 {
   "schema": "exact-ontology-scale-candidate/1",
-  "captured_at_utc": "2026-07-18T09:59:14Z",
+  "captured_at_utc": "2026-07-18T20:13:45Z",
+  "classified_at_utc": "2026-07-18T21:49:38Z",
   "status": "blocked",
   "inputs_match_frozen_baseline": true,
   "environment": {
     "platform": "macOS-26.5.2-x86_64-i386-64bit",
     "python": "3.12.3",
-    "exact_base_commit": "e943881befd7673f42b4b4b0b9230b47364c8f35",
-    "pyowl_core_commit": "fca6a5f346711843eb7f4f830bf88b4154cabd92",
-    "pyowl2vec_star_projector_commit": "1804bdc92ae9cee4afc7b63dd81d5a016128da20",
+    "exact_base_commit": "08b859d40bb5c98e3dbdd46109bc4f2d5c0ffd3c",
+    "pyowl_core_commit": "354da9a0654b336fd706daa8f19a76decc367795",
+    "pyowl2vec_star_projector_commit": "140e3030c24f3c5d048e5689a85b9d212ec9abdd",
     "packages": {
       "exact-om": "source-checkout",
       "pyowl-core": "0.1.0.dev0",
@@ -16,6 +17,7 @@
     }
   },
   "method": {
+    "cold_process_per_ontology": true,
     "load_backend": "python",
     "load_count_instrumented": true,
     "projection_backend": "python",
@@ -41,7 +43,7 @@
         "acquisition_cache_hits": 0,
         "document_cache_hits": 0
       },
-      "load_seconds": 373.54852562298765,
+      "load_seconds": 301.92239304992836,
       "identity": {
         "source_snapshot": true,
         "projector_snapshot": true,
@@ -54,9 +56,9 @@
       },
       "projection": {
         "edges": 42103,
-        "wall_seconds": 8.370085155998822,
-        "time_to_first_edge_seconds": 8.10671658202773,
-        "edges_per_second": 5030.175824414984,
+        "wall_seconds": 7.056459354003891,
+        "time_to_first_edge_seconds": 6.781491323956288,
+        "edges_per_second": 5966.590025932825,
         "spill": {
           "runs_created": 1,
           "merge_passes": 0,
@@ -66,14 +68,14 @@
       },
       "projection_cache": {
         "edges": 42103,
-        "fill_seconds": 7.239370800030883,
-        "hit_seconds": 0.0007719270070083439,
+        "fill_seconds": 7.065277892048471,
+        "hit_seconds": 0.0007516629993915558,
         "hit_faster_than_fill": true
       },
       "rss": {
-        "before_bytes": 48697344,
-        "peak_bytes": 1665183744,
-        "incremental_peak_bytes": 1616486400
+        "before_bytes": 43679744,
+        "peak_bytes": 1677623296,
+        "incremental_peak_bytes": 1633943552
       },
       "second_ontology_representation": false
     },
@@ -91,7 +93,7 @@
         "acquisition_cache_hits": 0,
         "document_cache_hits": 0
       },
-      "load_seconds": 31.039968733035494,
+      "load_seconds": 23.10163004405331,
       "identity": {
         "source_snapshot": true,
         "projector_snapshot": true,
@@ -104,9 +106,9 @@
       },
       "projection": {
         "edges": 9388,
-        "wall_seconds": 0.8459804599988274,
-        "time_to_first_edge_seconds": 0.7836170429945923,
-        "edges_per_second": 11097.183024786425,
+        "wall_seconds": 0.9467985350638628,
+        "time_to_first_edge_seconds": 0.8865275590214878,
+        "edges_per_second": 9915.520200257562,
         "spill": {
           "runs_created": 1,
           "merge_passes": 0,
@@ -116,34 +118,86 @@
       },
       "projection_cache": {
         "edges": 9388,
-        "fill_seconds": 0.8916042629862204,
-        "hit_seconds": 0.00009687902638688684,
+        "fill_seconds": 0.9511575839715078,
+        "hit_seconds": 0.00014468200970441103,
         "hit_faster_than_fill": true
       },
       "rss": {
-        "before_bytes": 1665183744,
-        "peak_bytes": 1665183744,
-        "incremental_peak_bytes": 0
+        "before_bytes": 37187584,
+        "peak_bytes": 193265664,
+        "incremental_peak_bytes": 156078080
       },
       "second_ontology_representation": false
     }
   },
   "comparison_to_wp_m_ncit_doid_baseline": {
     "source": {
-      "load_wall_ratio": 5.433741811746306,
-      "projection_wall_ratio": 38.433692598486765,
+      "load_wall_ratio": 4.391847962140477,
+      "projection_wall_ratio": 32.40179575128091,
       "baseline_edges": 41349,
       "candidate_edges": 42103,
       "edge_count_delta": 754,
       "edge_count_delta_fraction": 0.018235023821616
     },
     "target": {
-      "load_wall_ratio": 5.705124860750122,
-      "projection_wall_ratio": 16.027793587432672,
+      "load_wall_ratio": 4.246063680724964,
+      "projection_wall_ratio": 17.93787469855777,
       "baseline_edges": 9388,
       "candidate_edges": 9388,
       "edge_count_delta": 0,
       "edge_count_delta_fraction": 0.0
+    }
+  },
+  "source_projection_semantic_classification": {
+    "decision": "accepted-pinned-projector-semantics",
+    "method": "exact sorted set difference over the complete historical and current source projections",
+    "edge_digest_scheme": "sorted-utf8-tsv-lines-sha256-v1",
+    "historical_private_exact": {
+      "exact_commit": "064739480d4c337b2a9c3e4c2293ff35eb53741f",
+      "edges": 41349,
+      "sha256": "364d272a0ea9cbf9e0a67a8aab52ace702731e88aca6fcc97a5ece012dc4c80c"
+    },
+    "current_shared_projector": {
+      "projector_commit": "140e3030c24f3c5d048e5689a85b9d212ec9abdd",
+      "edges": 42103,
+      "sha256": "08509799a537111a2f757af40c255c2dcd08c1c02f84d81e2d0d4cd879eb5b2d"
+    },
+    "difference": {
+      "added": {
+        "edges": 762,
+        "sha256": "8742ea279d31e2e2fcfbf920116c64dbfb4c5a0ca30832276cb9ab451c7d0212",
+        "rule": "RB-019",
+        "rule_claim": "Restriction edges expand through the historical inverse/subrole maps.",
+        "supporting_rule_state": {
+          "RB-015": "The subrole map looks up the prior value under the subproperty key.",
+          "RB-017": "Sibling subroles can overwrite each other according to OWLAPI iteration."
+        },
+        "by_axiom_shape": {
+          "subclass_restriction": 744,
+          "equivalent_restriction": 18
+        },
+        "by_projected_relation": {
+          "R153": 97,
+          "R155": 6,
+          "R158": 659
+        }
+      },
+      "removed": {
+        "edges": 8,
+        "sha256": "18922ce921e3568db25f738c0e24739dc76648abe265867575a7c7d1e73a4c66",
+        "rule": "RB-009",
+        "rule_claim": "Top-level union/intersection subclass shapes are ignored.",
+        "historical_private_behavior": "Exact incorrectly expanded restriction edges from top-level intersection superclasses.",
+        "by_source_class": {
+          "C27558": 6,
+          "C84455": 2
+        }
+      },
+      "net_edges": 754,
+      "residual": {
+        "edges": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
     }
   },
   "accepted": {
@@ -152,12 +206,11 @@
     "no_second_ontology_representation": true,
     "cache_hit": true,
     "performance_gate": false,
-    "projection_parity_gate": false
+    "projection_parity_gate": true
   },
   "blockers": [
     "Source and target loading exceed the permitted 25 percent wall-time regression.",
     "Source and target projection exceed the permitted 25 percent wall-time regression.",
-    "The NCIT source projection has 754 additional edges; the semantic difference is not yet classified.",
     "Peak RSS has no comparable value in the frozen baseline and still requires a pinned-runner acceptance run."
   ]
 }

@@ -67,6 +67,9 @@ separate and are not included in these changes.
 - Deferred shared-core and Exact feature indexes until their first query, so projection-only and
   coherence-only consumers do not eagerly construct unrelated hierarchy, annotation, ABox, or
   domain/range indexes (WP-M).
+- Classified the complete NCIT projection delta against Exact 2.0 as 762 pinned RB-019 additions,
+  eight RB-009 corrections, and zero residuals; semantic parity now passes while the WP-M scale
+  gate remains blocked (WP-M).
 - Exposed pair-adaptive channel, retrieval-fusion, alias, and uncertainty constants in the v2
   configuration with behavior-preserving defaults (WP-J).
 - New runs write resolved configuration, alignments, evaluation, statistics, plots,

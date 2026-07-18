@@ -12,10 +12,16 @@ FIXTURES = Path(__file__).parent / "fixtures" / "ontologies"
 BASELINES = Path(__file__).parent / "baselines"
 PROVENANCE = json.loads((BASELINES / "provenance.json").read_text(encoding="utf-8"))
 SCALE_EVIDENCE = (
-    Path(__file__).parents[1] / "benchmarks" / "evidence" / "wp_m_ncit_doid_baseline.json"
+    Path(__file__).parents[1]
+    / "benchmarks"
+    / "evidence"
+    / "wp_m_ncit_doid_baseline.json"
 )
 SCALE_CANDIDATE = (
-    Path(__file__).parents[1] / "benchmarks" / "evidence" / "wp_m_ncit_doid_candidate.json"
+    Path(__file__).parents[1]
+    / "benchmarks"
+    / "evidence"
+    / "wp_m_ncit_doid_candidate.json"
 )
 
 
@@ -46,7 +52,7 @@ def test_wp_m_scale_baseline_is_reviewable_and_content_addressed():
         assert result["projection_seconds"] > 0
 
 
-def test_wp_m_scale_candidate_records_failed_gates_without_changing_inputs():
+def test_wp_m_scale_candidate_accepts_semantics_but_records_failed_performance():
     baseline = json.loads(SCALE_EVIDENCE.read_text(encoding="utf-8"))
     candidate = json.loads(SCALE_CANDIDATE.read_text(encoding="utf-8"))
 
@@ -57,7 +63,38 @@ def test_wp_m_scale_candidate_records_failed_gates_without_changing_inputs():
     assert candidate["accepted"]["snapshot_identity"] is True
     assert candidate["accepted"]["no_second_ontology_representation"] is True
     assert candidate["accepted"]["performance_gate"] is False
-    assert candidate["accepted"]["projection_parity_gate"] is False
+    assert candidate["accepted"]["projection_parity_gate"] is True
+    classification = candidate["source_projection_semantic_classification"]
+    difference = classification["difference"]
+    assert classification["decision"] == "accepted-pinned-projector-semantics"
+    assert classification["historical_private_exact"]["edges"] == 41349
+    assert (
+        classification["historical_private_exact"]["sha256"]
+        == "364d272a0ea9cbf9e0a67a8aab52ace702731e88aca6fcc97a5ece012dc4c80c"
+    )
+    assert classification["current_shared_projector"]["edges"] == 42103
+    assert (
+        classification["current_shared_projector"]["sha256"]
+        == "08509799a537111a2f757af40c255c2dcd08c1c02f84d81e2d0d4cd879eb5b2d"
+    )
+    assert difference["added"]["edges"] == 762
+    assert (
+        difference["added"]["sha256"]
+        == "8742ea279d31e2e2fcfbf920116c64dbfb4c5a0ca30832276cb9ab451c7d0212"
+    )
+    assert sum(difference["added"]["by_axiom_shape"].values()) == 762
+    assert sum(difference["added"]["by_projected_relation"].values()) == 762
+    assert difference["removed"]["edges"] == 8
+    assert (
+        difference["removed"]["sha256"]
+        == "18922ce921e3568db25f738c0e24739dc76648abe265867575a7c7d1e73a4c66"
+    )
+    assert sum(difference["removed"]["by_source_class"].values()) == 8
+    assert difference["net_edges"] == 754
+    assert difference["residual"] == {
+        "edges": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    }
     for role in ("source", "target"):
         assert (
             candidate["measurements"][role]["input"]["sha256"]
@@ -70,8 +107,13 @@ def test_fixture_snapshot_parity(name):
     ontology = FIXTURES / f"{name}.owl"
     baseline_path = BASELINES / f"{name}.backend.json.zst"
     metadata = PROVENANCE["fixtures"][name]
-    assert hashlib.sha256(ontology.read_bytes()).hexdigest() == metadata["source_sha256"]
-    assert hashlib.sha256(baseline_path.read_bytes()).hexdigest() == metadata["snapshot_sha256"]
+    assert (
+        hashlib.sha256(ontology.read_bytes()).hexdigest() == metadata["source_sha256"]
+    )
+    assert (
+        hashlib.sha256(baseline_path.read_bytes()).hexdigest()
+        == metadata["snapshot_sha256"]
+    )
 
     expected = _load_snapshot(baseline_path)
     actual = json.loads(json.dumps(capture(ontology), sort_keys=True))
