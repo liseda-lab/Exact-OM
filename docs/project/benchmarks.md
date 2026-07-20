@@ -38,8 +38,9 @@ evidence without entering the repository.
 
 WP-N native-consumer evidence additionally records the selected ingestion path, encoded-view
 publication and compiler timing, core wire/parser/scalar-row deltas, copied structural bytes,
-first/complete result time, and compiler/result digests. A warm encoded cache is never compared
-with a cold parse. Native performance remains an unclaimed release gate until the labelled
+first/complete result time, compiler/result digests, and structured fail-closed acceptance checks
+for the complete zero-work counter and released-GIL contract. A warm encoded cache is never
+compared with a cold parse. Native performance remains an unclaimed release gate until the labelled
 NCIT–DOID, GO, and largest licensed workflow runs meet the existing wall-time and RSS criteria.
 
 The current hash-matched NCIT–DOID candidate is committed under

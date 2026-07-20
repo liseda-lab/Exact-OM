@@ -69,11 +69,14 @@ PYTHONPATH=.:../pyOWLCore/src:../pyOwl2Vec-Star-projector/src \
 
 ## WP-N native-consumer handoff
 
-Schema 3 of `benchmarks/owl_stack_scale.py` keeps the WP-M fields and additionally records CPU
+Schema 4 of `benchmarks/owl_stack_scale.py` keeps the WP-M fields and additionally records CPU
 time, canonical projection and hierarchy-result digests, public core operation deltas, exact
 consumer ingestion provenance, encoded compiler counters, copy/materialization coverage, and
-optional reasoner compilation plus first/complete-result timing. It records `null` rather than
-inventing a phase measurement when a consumer does not yet expose publication/compiler timing.
+optional reasoner compilation plus first/complete-result timing. Its structured acceptance block
+checks complete public counter coverage, zero parser/resolver/wire/scalar-materialization/
+base-flattening/structural-copy/per-row-FFI work, zero direct staging copy, released-GIL evidence,
+and the exact allowed core-operation delta. It records `null` rather than inventing a phase
+measurement when a consumer does not yet expose publication/compiler timing.
 
 Capture Python, native in-process, and verified-wire reasoner cases as separate cold processes;
 do not compare a warm encoded publication against a cold parser run. For example:
@@ -89,6 +92,9 @@ PYTHONPATH=.:../pyOWLCore/src:../pyOwl2Vec-Star-projector/src:../pyELK/src:../py
   --output /tmp/exact-wp-n-ncit-doid-native.json
 ```
 
-`--require-encoded-consumers` is deliberately fail-closed: it rejects scalar fallback even when
-the semantic output is correct. Leave it off only for the scalar comparison capture. GO and the
-largest licensed workflow use the same command shape and remain external release evidence.
+`--require-encoded-consumers` is deliberately fail-closed: it rejects scalar fallback, missing or
+nonzero forbidden counters, direct staging copies, absent GIL-release evidence, and unexpected
+core calls even when the semantic output is correct. Verified worker mode permits exactly its one
+parent-side core-wire encoding while still requiring zero OWL parses. Leave the flag off only for
+the scalar comparison capture. GO and the largest licensed workflow use the same command shape and
+remain external release evidence.

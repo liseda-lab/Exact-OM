@@ -1,8 +1,8 @@
 # WP-N encoded native-consumer handoff checkpoint
 
-Date: 2026-07-20. Exact-OM revision: `87fad5a`. Coordinated source candidates:
-pyOWLCore `bdbaac9`, projector `9ee3c52`, pyELK `886f6a3`, pyHermiT `3c56fc2`, and
-OAEI-Bio-ML-eval `fcebff1`.
+Date: 2026-07-20. Exact-OM revision: `680112e`. Coordinated source candidates:
+pyOWLCore `47ec85f`, projector `9ee3c52`, pyELK `886f6a3`, pyHermiT `3c56fc2`, and
+OAEI-Bio-ML-eval `2f91a3a`.
 
 ## Outcome
 
@@ -32,20 +32,21 @@ released dependency ranges, and published compatibility table are still open. No
 - Unknown, malformed, path-bearing, incompatible, or internally inconsistent diagnostics fail
   closed. Scalar paths cannot claim an encoded identity, encoded-view timing, nonzero encoded
   buffers/copies/private IR, or released-GIL evidence.
-- `benchmarks/owl_stack_scale.py` schema 3 records one-load identity, core-operation deltas,
+- `benchmarks/owl_stack_scale.py` schema 4 records one-load identity, core-operation deltas,
   projection and hierarchy result digests, publication/compiler timing, first and complete result
-  timing, CPU/wall/RSS, materialization/copy coverage, cache identity, and verified-worker facts.
-  `--require-encoded-consumers` rejects scalar fallback rather than relabelling it as native
-  evidence.
+  timing, CPU/wall/RSS, materialization/copy coverage, cache identity, verified-worker facts, and
+  structured counter acceptance. `--require-encoded-consumers` rejects scalar fallback, missing
+  counters, forbidden work, direct staging copies, absent GIL release, and unexpected core calls
+  rather than relabelling incomplete evidence as native.
 - Scalar-only core/projector/reasoner combinations remain supported, reasoners stay optional, and
   no Java, OAEI, or private accelerator dependency enters Exact's base installation.
 
 The implementation sequence is recorded by `d12e11d`, `c1a3537`, `3e6687a`, `d7c6b6f`,
-`a5b03e2`, `21d74b3`, `3c3cfce`, `acabe6c`, and `87fad5a`.
+`a5b03e2`, `21d74b3`, `3c3cfce`, `acabe6c`, `87fad5a`, and `680112e`.
 
 ## Local verification at this checkpoint
 
-The latest handoff hardening passed 53 focused provenance, reasoner-adapter, shared-stack, and
+The latest handoff hardening passed 59 focused provenance, reasoner-adapter, shared-stack, and
 scale-benchmark tests. Black, flake8, and isolated strict mypy passed for the changed runtime
 module. Earlier slices also
 proved one worker-wire encoding, verified mmap reopening, zero worker OWL parses, exact snapshot
@@ -62,7 +63,7 @@ This source-tree verification does not replace the final installed distribution 
 | Overlay/composite bases remain retained without Exact flattening | Implemented and focused-tested |
 | Worker handoff uses one verified core wire/mmap artifact with zero OWL parses | Implemented and focused-tested |
 | Versioned cache/provenance compatibility | Implemented for candidate schemas |
-| Public timing and copy/materialization/FFI/wire ledger | Complete projector vocabulary accepted and preserved; reasoner fields remain producer-dependent |
+| Public timing and copy/materialization/FFI/wire ledger | Complete projector vocabulary accepted and preserved; schema-4 release mode enforces complete zero-work, direct-copy, GIL, and core-call evidence for every selected consumer |
 | Scalar-only and optional-reasoner behavior | Preserved in source tests |
 | Python 3.10–3.12 pure/scalar/native installed matrix | Open |
 | Exact NCIT–DOID, GO, and licensed-scale semantic/performance evidence | Open |
