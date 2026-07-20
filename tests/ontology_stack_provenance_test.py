@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from exact.ontology import load_ontology
-from exact.ontology.provenance import ontology_stack_provenance
+from exact.ontology.provenance import _projector_consumer_handoff, ontology_stack_provenance
 
 FIXTURES = Path(__file__).parent / "fixtures" / "ontologies"
 
@@ -84,7 +84,104 @@ def test_consumer_handoff_records_projector_public_ingestion_report() -> None:
 
     assert handoff["projector"]["ingestion_path"] == "scalar-python"
     assert handoff["projector"]["selected_backend"] == "python"
+    assert handoff["projector"]["consumer_compile_seconds"] >= 0.0
+    assert handoff["projector"]["counters"] == {
+        "encoded_buffer_bytes": 0,
+        "encoded_buffer_count": 0,
+        "encoded_compiler_gil_released": False,
+        "encoded_detached_buffer_count": 0,
+        "encoded_indexed_buffer_count": 0,
+        "encoded_posting_bytes": 0,
+        "encoded_referenced_view_count": 0,
+        "encoded_segment_count": 0,
+        "encoded_staging_copy_bytes": 0,
+        "encoded_zero_copy_buffers": 0,
+        "materialized_scalar_rows": 0,
+    }
+    assert "encoded_view_publication_seconds" not in handoff["projector"]
     assert "schema_name" not in handoff["projector"]
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("encoded_view_publication_seconds", float("nan"), "diagnostic is invalid"),
+        ("consumer_compile_seconds", True, "diagnostic is invalid"),
+        ("counters", {"private_arena_id": 1}, "counters are incompatible"),
+        ("counters", {"materialized_scalar_rows": False}, "counters are invalid"),
+    ],
+)
+def test_consumer_handoff_rejects_malformed_projector_diagnostics(
+    field: str, value: object, message: str
+) -> None:
+    ingestion: dict[str, object] = {
+        "path": "scalar-python",
+        "encoded_schema_name": None,
+        "encoded_schema_version": None,
+        "encoded_descriptor_sha256": None,
+        field: value,
+    }
+
+    with pytest.raises((TypeError, ValueError), match=message):
+        _projector_consumer_handoff(
+            {
+                "package_version": "0.1.0",
+                "compiler_cache_schema": "compiler/1",
+                "last_projection": {
+                    "provenance": {
+                        "selected_backend": "python",
+                        "native_implementation_version": None,
+                        "ingestion": ingestion,
+                    }
+                },
+            }
+        )
+
+
+def test_consumer_handoff_records_bounded_encoded_projector_diagnostics() -> None:
+    result = _projector_consumer_handoff(
+        {
+            "package_version": "0.1.0",
+            "compiler_cache_schema": "compiler/1",
+            "last_projection": {
+                "provenance": {
+                    "selected_backend": "native",
+                    "native_implementation_version": "native/1",
+                    "ingestion": {
+                        "path": "encoded-native",
+                        "encoded_schema_name": "pyowl-core/structural-columns",
+                        "encoded_schema_version": 1,
+                        "encoded_descriptor_sha256": "a" * 64,
+                        "encoded_view_publication_seconds": 0.25,
+                        "consumer_compile_seconds": 0.5,
+                        "counters": {
+                            "encoded_buffer_count": 11,
+                            "encoded_staging_copy_bytes": 0,
+                            "materialized_scalar_rows": 0,
+                        },
+                    },
+                }
+            },
+        }
+    )
+
+    assert result == {
+        "package_version": "0.1.0",
+        "compiler_cache_schema": "compiler/1",
+        "selected_backend": "native",
+        "implementation_version": "native/1",
+        "ingestion_path": "encoded-native",
+        "schema_name": "pyowl-core/structural-columns",
+        "schema_version": 1,
+        "descriptor_sha256": "a" * 64,
+        "encoded_view_publication_seconds": 0.25,
+        "consumer_compile_seconds": 0.5,
+        "counters": {
+            "encoded_buffer_count": 11,
+            "encoded_staging_copy_bytes": 0,
+            "materialized_scalar_rows": 0,
+        },
+    }
 
 
 def test_consumer_handoff_rejects_unbounded_reasoner_diagnostics() -> None:

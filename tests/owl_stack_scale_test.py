@@ -51,6 +51,10 @@ def test_scale_measurement_records_path_free_wpn_handoff_evidence() -> None:
     }
     projection = result["projection"]
     assert projection["consumer"]["ingestion_path"] == "scalar-python"
+    assert projection["consumer_compile_seconds"] >= 0.0
+    assert projection["encoded_view_publication_seconds"] is None
+    assert projection["publication_compile_timing_note"] is None
+    assert projection["consumer"]["counters"]["materialized_scalar_rows"] == 0
     assert projection["edges"] > 0
     assert len(projection["result_sha256"]) == 64
     assert projection["result_sha256"] == result["projection_cache"]["result_sha256"]
@@ -58,7 +62,9 @@ def test_scale_measurement_records_path_free_wpn_handoff_evidence() -> None:
     assert reasoner["measured"] is True
     assert reasoner["results"]["entities"] > 0
     assert len(reasoner["results"]["result_sha256"]) == 64
-    assert result["materialization_and_copy"]["complete_public_counter_coverage"] is False
+    materialization = result["materialization_and_copy"]
+    assert materialization["public_counters"]["projector"]["materialized_scalar_rows"] == 0
+    assert materialization["complete_public_counter_coverage"] is False
     assert result["second_ontology_representation"] is False
 
     encoded = json.dumps(result, sort_keys=True)

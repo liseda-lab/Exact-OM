@@ -321,6 +321,9 @@ def measure(
             "implementation_version": (
                 first_projection_report.provenance.native_implementation_version
             ),
+            "encoded_view_publication_seconds": (first_ingestion.encoded_view_publication_seconds),
+            "consumer_compile_seconds": first_ingestion.consumer_compile_seconds,
+            "counters": dict(first_ingestion.counters),
         }
         first_encoded_counters = _dataclass_dict(source.projector.last_encoded_counters)
 
@@ -417,7 +420,7 @@ def measure(
         raise RuntimeError("projection cache changed its result cardinality or digest")
 
     consumer_operations = _counter_delta(all_operations, after_load_operations)
-    projector_public_counters = _public_counters(first_encoded_counters)
+    projector_public_counters = _public_counters(first_projector_handoff)
     reasoner_public_counters = _public_counters(reasoner_handoff)
     public_consumer_counters = {
         **{f"projector.{name}": value for name, value in projector_public_counters.items()},
@@ -430,6 +433,16 @@ def measure(
     copied_structural_bytes = _sum_matching_counters(
         public_consumer_counters,
         fragments=("copy_bytes", "copied_bytes"),
+    )
+    inferred_reasoner_selected = reasoner_name in {"elk", "hermit"}
+    all_measured_consumers_encoded = first_projector_handoff["ingestion_path"] == (
+        "encoded-native"
+    ) and (
+        not inferred_reasoner_selected
+        or (
+            reasoner_handoff is not None
+            and reasoner_handoff.get("ingestion_path") == "encoded-native"
+        )
     )
     return {
         "input": {
@@ -473,7 +486,9 @@ def measure(
             },
             "core_parser_entry_delta": consumer_operations["load_snapshot"],
             "complete_public_counter_coverage": (
-                materialized_scalar_rows is not None and copied_structural_bytes is not None
+                all_measured_consumers_encoded
+                and materialized_scalar_rows is not None
+                and copied_structural_bytes is not None
             ),
         },
         "projection": {
@@ -484,11 +499,17 @@ def measure(
             "wall_seconds": projection_seconds,
             "cpu_seconds": projection_cpu_seconds,
             "time_to_first_edge_seconds": first_edge_seconds,
-            "encoded_view_publication_seconds": None,
-            "consumer_compile_seconds": None,
+            "encoded_view_publication_seconds": (first_ingestion.encoded_view_publication_seconds),
+            "consumer_compile_seconds": first_ingestion.consumer_compile_seconds,
             "publication_compile_timing_note": (
-                "included in time_to_first_edge_seconds until the public consumer report "
-                "exposes phase timings"
+                None
+                if first_ingestion.consumer_compile_seconds is not None
+                and (
+                    first_ingestion.path != "encoded-native"
+                    or first_ingestion.encoded_view_publication_seconds is not None
+                )
+                else "included in time_to_first_edge_seconds because the public consumer "
+                "report omitted a phase timing"
             ),
             "edges_per_second": (
                 edge_count / projection_seconds if projection_seconds > 0.0 else None

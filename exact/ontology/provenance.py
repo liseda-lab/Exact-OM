@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
 from collections import Counter
 from collections.abc import Mapping
@@ -27,6 +28,22 @@ _PATH_FRAGMENT = re.compile(r"(?<![A-Za-z0-9])(?:[A-Za-z]:[\\/]|/)[^\s\"']+")
 _OBJECT_ID = re.compile(r"\b0x[0-9a-fA-F]{6,}\b")
 _REASONER_INGESTION_PATHS = frozenset(
     {"scalar-python", "scalar-native", "scalar-wire", "encoded-native"}
+)
+_PROJECTOR_INGESTION_PATHS = frozenset({"scalar-python", "scalar-native", "encoded-native"})
+_PROJECTOR_HANDOFF_COUNTERS = frozenset(
+    {
+        "encoded_buffer_bytes",
+        "encoded_buffer_count",
+        "encoded_compiler_gil_released",
+        "encoded_detached_buffer_count",
+        "encoded_indexed_buffer_count",
+        "encoded_posting_bytes",
+        "encoded_referenced_view_count",
+        "encoded_segment_count",
+        "encoded_staging_copy_bytes",
+        "encoded_zero_copy_buffers",
+        "materialized_scalar_rows",
+    }
 )
 _REASONER_HANDOFF_COUNTERS = frozenset(
     {
@@ -278,24 +295,76 @@ def _projector_consumer_handoff(projector: Mapping[str, object]) -> dict[str, ob
     provenance = last_projection.get("provenance")
     if not isinstance(provenance, Mapping):
         return result
-    for source, target in (
-        ("selected_backend", "selected_backend"),
-        ("native_implementation_version", "implementation_version"),
-    ):
+    for source, target in (("selected_backend", "selected_backend"),):
         value = provenance.get(source)
         if value is not None:
+            if not isinstance(value, str) or not value:
+                raise TypeError(f"projector {source} diagnostic must be nonempty text")
             result[target] = value
+    implementation = provenance.get("native_implementation_version")
+    if implementation is not None:
+        if not isinstance(implementation, str) or not implementation:
+            raise TypeError("projector implementation diagnostic must be nonempty text")
+        result["implementation_version"] = implementation
     ingestion = provenance.get("ingestion")
     if isinstance(ingestion, Mapping):
-        for source, target in (
-            ("path", "ingestion_path"),
-            ("encoded_schema_name", "schema_name"),
-            ("encoded_schema_version", "schema_version"),
-            ("encoded_descriptor_sha256", "descriptor_sha256"),
-        ):
-            value = ingestion.get(source)
-            if value is not None:
-                result[target] = value
+        path = ingestion.get("path")
+        if path not in _PROJECTOR_INGESTION_PATHS:
+            raise ValueError("projector ingestion path is incompatible")
+        result["ingestion_path"] = path
+        schema_name = ingestion.get("encoded_schema_name")
+        schema_version = ingestion.get("encoded_schema_version")
+        descriptor = ingestion.get("encoded_descriptor_sha256")
+        encoded_identity = (schema_name, schema_version, descriptor)
+        if path == "encoded-native":
+            if (
+                not isinstance(schema_name, str)
+                or not schema_name
+                or isinstance(schema_version, bool)
+                or not isinstance(schema_version, int)
+                or schema_version < 1
+                or not isinstance(descriptor, str)
+                or _SHA256_HEX.fullmatch(descriptor) is None
+            ):
+                raise TypeError("projector encoded ingestion identity is invalid")
+        elif any(value is not None for value in encoded_identity):
+            raise ValueError("scalar projector ingestion claimed an encoded identity")
+        if schema_name is not None:
+            result.update(
+                {
+                    "schema_name": schema_name,
+                    "schema_version": schema_version,
+                    "descriptor_sha256": descriptor,
+                }
+            )
+        for name in ("encoded_view_publication_seconds", "consumer_compile_seconds"):
+            value = ingestion.get(name)
+            if value is None:
+                continue
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, (int, float))
+                or not math.isfinite(value)
+                or value < 0
+            ):
+                raise TypeError(f"projector {name} diagnostic is invalid")
+            result[name] = float(value)
+        counters = ingestion.get("counters")
+        if counters is not None:
+            if not isinstance(counters, Mapping) or any(
+                not isinstance(name, str) or name not in _PROJECTOR_HANDOFF_COUNTERS
+                for name in counters
+            ):
+                raise TypeError("projector ingestion counters are incompatible")
+            bounded: dict[str, int | bool] = {}
+            for name, value in counters.items():
+                if name == "encoded_compiler_gil_released":
+                    if type(value) is not bool:
+                        raise TypeError("projector encoded compiler GIL diagnostic is invalid")
+                elif type(value) is not int or value < 0:
+                    raise TypeError("projector ingestion counters are invalid")
+                bounded[name] = value
+            result["counters"] = dict(sorted(bounded.items()))
     return result
 
 
