@@ -6,6 +6,7 @@ import hashlib
 import json
 import re
 from collections import Counter
+from collections.abc import Mapping
 from typing import Any, cast
 
 import pyowl2vec_star_projector as shared_projector
@@ -16,8 +17,27 @@ from pyowl_core import OntologySnapshot
 from exact.ontology.projection import ProjectorSettings, projector_cache_identity
 
 ONTOLOGY_STACK_PROVENANCE_SCHEMA = 1
+CONSUMER_HANDOFF_PROVENANCE_SCHEMA = 1
 _PATH_FRAGMENT = re.compile(r"(?<![A-Za-z0-9])(?:[A-Za-z]:[\\/]|/)[^\s\"']+")
 _OBJECT_ID = re.compile(r"\b0x[0-9a-fA-F]{6,}\b")
+_REASONER_INGESTION_PATHS = frozenset(
+    {"scalar-python", "scalar-native", "scalar-wire", "encoded-native"}
+)
+_REASONER_HANDOFF_COUNTERS = frozenset(
+    {
+        "encoded_buffer_count",
+        "encoded_buffer_bytes",
+        "encoded_zero_copy_buffers",
+        "encoded_detached_buffer_count",
+        "encoded_indexed_buffer_count",
+        "encoded_staging_copy_bytes",
+        "encoded_private_ir_bytes",
+        "encoded_segment_count",
+        "encoded_referenced_view_count",
+        "encoded_posting_bytes",
+        "encoded_compiler_gil_released",
+    }
+)
 
 
 def _safe_value(value: object) -> object:
@@ -158,6 +178,140 @@ def _projector_provenance(
     }
 
 
+def _encoded_view_schemas(capabilities: object) -> dict[str, int]:
+    raw = getattr(capabilities, "encoded_view_schemas", None)
+    if raw is None:
+        return {}
+    if not isinstance(raw, Mapping):
+        raise TypeError("core encoded_view_schemas must be a mapping")
+    result: dict[str, int] = {}
+    for name, version in raw.items():
+        if not isinstance(name, str) or not name:
+            raise TypeError("core encoded-view schema names must be nonempty text")
+        if isinstance(version, bool) or not isinstance(version, int) or version < 1:
+            raise TypeError("core encoded-view schema versions must be positive integers")
+        result[name] = version
+    return dict(sorted(result.items()))
+
+
+def _core_consumer_handoff(snapshot: OntologySnapshot) -> dict[str, object]:
+    capabilities = snapshot.capabilities
+    features = set(capabilities.features)
+    if "ontology-composite" in features:
+        owner_kind = "composite"
+    elif "ontology-overlay" in features:
+        owner_kind = "overlay"
+    elif "mmap-snapshot" in features:
+        owner_kind = "mmap"
+    elif "wire-verified" in features:
+        owner_kind = "decoded"
+    else:
+        owner_kind = "direct"
+    return {
+        "encoded_view_schemas": _encoded_view_schemas(capabilities),
+        "owner_kind": owner_kind,
+        "storage_backend": capabilities.backend,
+    }
+
+
+def _projector_consumer_handoff(projector: Mapping[str, object]) -> dict[str, object]:
+    result: dict[str, object] = {
+        "package_version": projector["package_version"],
+        "compiler_cache_schema": projector["compiler_cache_schema"],
+    }
+    last_projection = projector.get("last_projection")
+    if not isinstance(last_projection, Mapping):
+        return result
+    provenance = last_projection.get("provenance")
+    if not isinstance(provenance, Mapping):
+        return result
+    for source, target in (
+        ("selected_backend", "selected_backend"),
+        ("native_implementation_version", "implementation_version"),
+    ):
+        value = provenance.get(source)
+        if value is not None:
+            result[target] = value
+    ingestion = provenance.get("ingestion")
+    if isinstance(ingestion, Mapping):
+        for source, target in (
+            ("path", "ingestion_path"),
+            ("encoded_schema_name", "schema_name"),
+            ("encoded_schema_version", "schema_version"),
+            ("encoded_descriptor_sha256", "descriptor_sha256"),
+        ):
+            value = ingestion.get(source)
+            if value is not None:
+                result[target] = value
+    return result
+
+
+def _reasoner_consumer_handoff(reasoner: Mapping[str, object]) -> dict[str, object]:
+    result: dict[str, object] = {}
+    selection = reasoner.get("selection")
+    if isinstance(selection, Mapping):
+        for source, target in (
+            ("effective", "reasoner"),
+            ("package_version", "package_version"),
+        ):
+            value = selection.get(source)
+            if value is not None:
+                result[target] = value
+    backend = reasoner.get("backend")
+    if isinstance(backend, Mapping):
+        for source, target in (
+            ("effective", "selected_backend"),
+            ("implementation_version", "implementation_version"),
+        ):
+            value = backend.get(source)
+            if value is not None:
+                result[target] = value
+    handoff = reasoner.get("consumer_handoff")
+    if isinstance(handoff, Mapping):
+        if set(handoff) != {"ingestion_path", "compiler_digest", "counters"}:
+            raise ValueError("reasoner consumer handoff fields are incompatible")
+        ingestion_path = handoff["ingestion_path"]
+        if ingestion_path not in _REASONER_INGESTION_PATHS:
+            raise ValueError("reasoner consumer handoff ingestion path is incompatible")
+        compiler_digest = handoff["compiler_digest"]
+        if compiler_digest is not None and (
+            not isinstance(compiler_digest, str) or not compiler_digest
+        ):
+            raise TypeError("reasoner consumer handoff compiler digest is invalid")
+        counters = handoff["counters"]
+        if not isinstance(counters, Mapping) or any(
+            not isinstance(name, str) or name not in _REASONER_HANDOFF_COUNTERS for name in counters
+        ):
+            raise TypeError("reasoner consumer handoff counters are incompatible")
+        for name, value in counters.items():
+            if name == "encoded_compiler_gil_released":
+                if not isinstance(value, bool):
+                    raise TypeError("reasoner consumer handoff GIL diagnostic is invalid")
+            elif isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                raise TypeError("reasoner consumer handoff counters are invalid")
+        result.update(
+            {
+                "ingestion_path": ingestion_path,
+                "compiler_digest": compiler_digest,
+                "counters": dict(sorted(counters.items())),
+            }
+        )
+    return result
+
+
+def _consumer_handoff(
+    snapshot: OntologySnapshot,
+    projector: Mapping[str, object],
+    reasoner: Mapping[str, object],
+) -> dict[str, object]:
+    return {
+        "schema_version": CONSUMER_HANDOFF_PROVENANCE_SCHEMA,
+        "core": _core_consumer_handoff(snapshot),
+        "projector": _projector_consumer_handoff(projector),
+        "reasoner": _reasoner_consumer_handoff(reasoner),
+    }
+
+
 def ontology_stack_provenance(
     snapshot: OntologySnapshot,
     *,
@@ -169,14 +323,24 @@ def ontology_stack_provenance(
 
     if not isinstance(snapshot, OntologySnapshot):
         raise TypeError("ontology stack provenance requires an OntologySnapshot")
+    projector_provenance = _projector_provenance(projector_settings, projector)
     payload = {
         "schema_version": ONTOLOGY_STACK_PROVENANCE_SCHEMA,
         "kind": "owl",
         "core": _core_provenance(snapshot),
-        "projector": _projector_provenance(projector_settings, projector),
+        "projector": projector_provenance,
         "reasoner": reasoner,
+        "consumer_handoff": _consumer_handoff(
+            snapshot,
+            projector_provenance,
+            reasoner,
+        ),
     }
     return cast(dict[str, Any], _safe_value(payload))
 
 
-__all__ = ["ONTOLOGY_STACK_PROVENANCE_SCHEMA", "ontology_stack_provenance"]
+__all__ = [
+    "CONSUMER_HANDOFF_PROVENANCE_SCHEMA",
+    "ONTOLOGY_STACK_PROVENANCE_SCHEMA",
+    "ontology_stack_provenance",
+]

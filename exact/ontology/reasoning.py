@@ -31,6 +31,22 @@ ReasonerFallback = Literal["error", "asserted"]
 _OWL_BOUNDS = frozenset({OWL_THING, OWL_NOTHING})
 _WORKER_SCHEMA_VERSION = 1
 _PATH_FRAGMENT = re.compile(r"(?<![A-Za-z0-9])(?:[A-Za-z]:[\\/]|/)[^\s\"']+")
+_INGESTION_PATHS = frozenset({"scalar-python", "scalar-native", "scalar-wire", "encoded-native"})
+_HANDOFF_COUNTERS = frozenset(
+    {
+        "encoded_buffer_count",
+        "encoded_buffer_bytes",
+        "encoded_zero_copy_buffers",
+        "encoded_detached_buffer_count",
+        "encoded_indexed_buffer_count",
+        "encoded_staging_copy_bytes",
+        "encoded_private_ir_bytes",
+        "encoded_segment_count",
+        "encoded_referenced_view_count",
+        "encoded_posting_bytes",
+        "encoded_compiler_gil_released",
+    }
+)
 
 
 def _failure_reason(error: Exception) -> str:
@@ -50,6 +66,41 @@ class ReasonerWorkerError(RuntimeError):
 
 class ReasonerWorkerTimeoutError(ReasonerWorkerError, TimeoutError):
     """A verified-wire reasoner worker exceeded its configured deadline."""
+
+
+@dataclass(frozen=True, slots=True)
+class ConsumerHandoffProvenance:
+    """Bounded public compiler diagnostics without consumer-private state."""
+
+    ingestion_path: str
+    compiler_digest: str | None = None
+    counters: tuple[tuple[str, int | bool], ...] = ()
+
+    def __post_init__(self) -> None:
+        if self.ingestion_path not in _INGESTION_PATHS:
+            raise ValueError("reasoner ingestion path is not recognized")
+        if self.compiler_digest is not None and (
+            not isinstance(self.compiler_digest, str) or not self.compiler_digest
+        ):
+            raise ValueError("reasoner compiler digest must be nonempty text or None")
+        names = tuple(name for name, _value in self.counters)
+        if names != tuple(sorted(set(names))) or any(
+            name not in _HANDOFF_COUNTERS for name in names
+        ):
+            raise ValueError("reasoner handoff counters are not canonical")
+        for name, value in self.counters:
+            if name == "encoded_compiler_gil_released":
+                if not isinstance(value, bool):
+                    raise TypeError("reasoner GIL diagnostic must be boolean")
+            elif isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                raise TypeError("reasoner handoff counters must be nonnegative integers")
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "ingestion_path": self.ingestion_path,
+            "compiler_digest": self.compiler_digest,
+            "counters": dict(self.counters),
+        }
 
 
 @dataclass(frozen=True, slots=True)
@@ -135,9 +186,10 @@ class ReasonerProvenance:
     structural_fingerprint: str
     logical_fingerprint: str
     signature_fingerprint: str
+    consumer_handoff: ConsumerHandoffProvenance | None = None
 
     def as_dict(self) -> dict[str, object]:
-        return {
+        result: dict[str, object] = {
             "selection": {
                 "requested": self.requested_reasoner,
                 "effective": self.effective_reasoner,
@@ -172,6 +224,9 @@ class ReasonerProvenance:
                 "signature": self.signature_fingerprint,
             },
         }
+        if self.consumer_handoff is not None:
+            result["consumer_handoff"] = self.consumer_handoff.as_dict()
+        return result
 
 
 @runtime_checkable
@@ -231,6 +286,58 @@ def _distribution_version(module: object, distribution: str) -> str:
         return version(distribution)
     except PackageNotFoundError:
         return "unknown"
+
+
+def _consumer_handoff_from_record(value: object) -> ConsumerHandoffProvenance | None:
+    if value is None:
+        return None
+    if not isinstance(value, Mapping):
+        raise TypeError("reasoner consumer_handoff must be a mapping")
+    if set(value) != {"ingestion_path", "compiler_digest", "counters"}:
+        raise ValueError("reasoner consumer_handoff fields are incompatible")
+    ingestion_path = value["ingestion_path"]
+    compiler_digest = value["compiler_digest"]
+    raw_counters = value["counters"]
+    if not isinstance(ingestion_path, str):
+        raise TypeError("reasoner ingestion path must be text")
+    if compiler_digest is not None and not isinstance(compiler_digest, str):
+        raise TypeError("reasoner compiler digest must be text or None")
+    if not isinstance(raw_counters, Mapping) or any(
+        not isinstance(name, str) for name in raw_counters
+    ):
+        raise TypeError("reasoner handoff counters must be a string-keyed mapping")
+    return ConsumerHandoffProvenance(
+        ingestion_path=ingestion_path,
+        compiler_digest=compiler_digest,
+        counters=tuple(sorted(cast(Mapping[str, int | bool], raw_counters).items())),
+    )
+
+
+def _consumer_handoff(reasoner: object) -> ConsumerHandoffProvenance | None:
+    diagnostics = getattr(reasoner, "diagnostics", None)
+    if not callable(diagnostics):
+        return None
+    values = diagnostics()
+    if not isinstance(values, Mapping):
+        raise TypeError("reasoner diagnostics must be a mapping")
+    ingestion_path = values.get("ingestion_path")
+    if ingestion_path is None:
+        return None
+    if not isinstance(ingestion_path, str):
+        raise TypeError("reasoner ingestion_path diagnostic must be text")
+    compiler_digest = values.get("compiler_digest")
+    if compiler_digest is not None and not isinstance(compiler_digest, str):
+        raise TypeError("reasoner compiler_digest diagnostic must be text or None")
+    counters = {
+        name: cast(int | bool, values[name]) for name in sorted(_HANDOFF_COUNTERS) if name in values
+    }
+    return _consumer_handoff_from_record(
+        {
+            "ingestion_path": ingestion_path,
+            "compiler_digest": compiler_digest,
+            "counters": counters,
+        }
+    )
 
 
 def reasoner_cache_identity(
@@ -465,6 +572,7 @@ def _create_elk(
         implementation_version=str(backend.implementation_version),
         backend_fallback_reason=backend.fallback_reason,
     )
+    provenance = replace(provenance, consumer_handoff=_consumer_handoff(reasoner))
     error_type = cast(type[Exception], import_module("pyelk.exceptions").PyElkError)
     return reasoner, provenance, error_type
 
@@ -551,6 +659,7 @@ def _create_hermit(
         implementation_version=str(backend.implementation_version),
         backend_fallback_reason=_hermit_fallback_reason(pyhermit, settings, backend),
     )
+    provenance = replace(provenance, consumer_handoff=_consumer_handoff(reasoner))
     error_type = cast(type[Exception], pyhermit.PyHermiTError)
     return reasoner, provenance, error_type
 
@@ -611,15 +720,18 @@ def _worker_payload(
             reasoner.dispose()
     else:  # pragma: no cover - CLI validation guards this branch.
         raise ValueError("wire worker reasoner must be elk or hermit")
+    runtime: dict[str, object] = {
+        "package_version": provenance.reasoner_package_version,
+        "backend": provenance.effective_backend,
+        "implementation_version": provenance.backend_implementation_version,
+        "backend_fallback_reason": provenance.backend_fallback_reason,
+    }
+    if provenance.consumer_handoff is not None:
+        runtime["consumer_handoff"] = provenance.consumer_handoff.as_dict()
     return {
         "schema_version": _WORKER_SCHEMA_VERSION,
         "values": sorted(values),
-        "runtime": {
-            "package_version": provenance.reasoner_package_version,
-            "backend": provenance.effective_backend,
-            "implementation_version": provenance.backend_implementation_version,
-            "backend_fallback_reason": provenance.backend_fallback_reason,
-        },
+        "runtime": runtime,
         "fingerprints": {
             "structural": provenance.structural_fingerprint,
             "logical": provenance.logical_fingerprint,
@@ -752,6 +864,7 @@ class WorkerWireHierarchyReasoner(_InferredHierarchyReasoner):
             effective_backend=str(runtime.get("backend", "unknown")),
             backend_implementation_version=str(runtime.get("implementation_version", "unknown")),
             backend_fallback_reason=cast(str | None, runtime.get("backend_fallback_reason")),
+            consumer_handoff=_consumer_handoff_from_record(runtime.get("consumer_handoff")),
             verified_wire=True,
         )
         return values

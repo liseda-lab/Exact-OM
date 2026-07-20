@@ -68,7 +68,12 @@ def test_elk_adapter_uses_public_facade_and_exact_snapshot(reasoning_source):
     assert reasoner.shared_reasoner.ontology is reasoning_source.owl_snapshot()
     try:
         _assert_chain(reasoner)
-        assert reasoner.provenance["backend"]["effective"] == "python"
+        provenance = reasoner.provenance
+        assert provenance["backend"]["effective"] == "python"
+        handoff = provenance["consumer_handoff"]
+        assert handoff["ingestion_path"] == "scalar-python"
+        assert handoff["compiler_digest"] is None
+        assert handoff["counters"] == {}
     finally:
         reasoner.close()
 
@@ -132,6 +137,7 @@ def test_verified_wire_worker_matches_in_process_without_parser_calls(
         provenance = reasoner.provenance
         assert provenance["verified_wire"] is True
         assert provenance["options"]["worker_wire"] is True
+        assert provenance["consumer_handoff"]["ingestion_path"] == "scalar-python"
         assert encode_calls == 1
     finally:
         reasoner.close()
