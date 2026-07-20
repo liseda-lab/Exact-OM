@@ -36,6 +36,26 @@ LoadBackend = Literal["auto", "python", "native"]
 ProjectorBackend = Literal["auto", "python", "native"]
 ReasonerName = Literal["asserted", "elk", "hermit"]
 
+_REQUIRED_ENCODED_COUNTERS = (
+    "encoded_buffer_bytes",
+    "encoded_buffer_count",
+    "encoded_compiler_gil_released",
+    "encoded_staging_copy_bytes",
+    "encoded_zero_copy_buffers",
+)
+_REQUIRED_ZERO_COUNTERS = (
+    "base_flattening_bytes",
+    "materialized_scalar_rows",
+    "parser_calls",
+    "per_row_ffi_calls",
+    "resolver_calls",
+    "scalar_axiom_materializations",
+    "scalar_term_materializations",
+    "structural_copy_bytes",
+    "wire_decoder_calls",
+    "wire_encoder_calls",
+)
+
 
 def _fingerprints(snapshot: pyowl_core.OntologyView) -> dict[str, str]:
     return {
@@ -204,6 +224,61 @@ def _require_encoded_path(
         raise RuntimeError(
             f"{consumer} did not select required encoded-native ingestion (selected {path!r})"
         )
+
+
+def _is_zero_counter(value: object) -> bool:
+    return value is False or (type(value) is int and value == 0)
+
+
+def _consumer_counter_evidence(
+    *,
+    consumer: str,
+    handoff: Mapping[str, object] | None,
+) -> dict[str, object]:
+    """Evaluate one direct-view consumer's public WP-N handoff evidence."""
+
+    path = None if handoff is None else handoff.get("ingestion_path")
+    raw_counters = None if handoff is None else handoff.get("counters")
+    counters = dict(raw_counters) if isinstance(raw_counters, Mapping) else {}
+    required = (*_REQUIRED_ENCODED_COUNTERS, *_REQUIRED_ZERO_COUNTERS)
+    missing = [name for name in required if name not in counters]
+    forbidden = {
+        name: counters[name]
+        for name in _REQUIRED_ZERO_COUNTERS
+        if name in counters and not _is_zero_counter(counters[name])
+    }
+    staging = counters.get("encoded_staging_copy_bytes")
+    gil_released = counters.get("encoded_compiler_gil_released")
+    ready = (
+        path == "encoded-native"
+        and not missing
+        and not forbidden
+        and _is_zero_counter(staging)
+        and gil_released is True
+    )
+    return {
+        "consumer": consumer,
+        "selected_ingestion_path": path,
+        "complete_public_counter_coverage": path == "encoded-native" and not missing,
+        "missing_public_counters": missing,
+        "nonzero_forbidden_public_counters": forbidden,
+        "direct_staging_copy_bytes": staging,
+        "encoded_compiler_gil_released": gil_released,
+        "acceptance_ready": ready,
+    }
+
+
+def _require_consumer_counter_evidence(evidence: Mapping[str, object]) -> None:
+    if evidence.get("acceptance_ready") is True:
+        return
+    consumer = evidence.get("consumer")
+    raise RuntimeError(
+        f"{consumer} encoded handoff acceptance evidence failed: "
+        f"missing={evidence.get('missing_public_counters')!r}, "
+        f"nonzero={evidence.get('nonzero_forbidden_public_counters')!r}, "
+        f"staging={evidence.get('direct_staging_copy_bytes')!r}, "
+        f"gil_released={evidence.get('encoded_compiler_gil_released')!r}"
+    )
 
 
 def _hierarchy_measurement(source: Any) -> dict[str, object]:
@@ -434,7 +509,19 @@ def measure(
         public_consumer_counters,
         fragments=("copy_bytes", "copied_bytes"),
     )
-    inferred_reasoner_selected = reasoner_name in {"elk", "hermit"}
+    projector_counter_evidence = _consumer_counter_evidence(
+        consumer="projector",
+        handoff=first_projector_handoff,
+    )
+    if reasoner_name in {"elk", "hermit"}:
+        inferred_reasoner_selected = True
+        reasoner_counter_evidence = _consumer_counter_evidence(
+            consumer=reasoner_name,
+            handoff=reasoner_handoff,
+        )
+    else:
+        inferred_reasoner_selected = False
+        reasoner_counter_evidence = None
     all_measured_consumers_encoded = first_projector_handoff["ingestion_path"] == (
         "encoded-native"
     ) and (
@@ -444,6 +531,32 @@ def measure(
             and reasoner_handoff.get("ingestion_path") == "encoded-native"
         )
     )
+    complete_public_counter_coverage = projector_counter_evidence[
+        "complete_public_counter_coverage"
+    ] is True and (
+        reasoner_counter_evidence is None
+        or reasoner_counter_evidence["complete_public_counter_coverage"] is True
+    )
+    all_counter_evidence_ready = projector_counter_evidence["acceptance_ready"] is True and (
+        reasoner_counter_evidence is None or reasoner_counter_evidence["acceptance_ready"] is True
+    )
+    expected_consumer_operations = {name: 0 for name in consumer_operations}
+    if reasoner_worker_wire and inferred_reasoner_selected:
+        expected_consumer_operations["encode_snapshot"] = 1
+    unexpected_core_operations = {
+        name: {"expected": expected_consumer_operations[name], "actual": value}
+        for name, value in consumer_operations.items()
+        if value != expected_consumer_operations[name]
+    }
+    if require_encoded_consumers:
+        _require_consumer_counter_evidence(projector_counter_evidence)
+        if reasoner_counter_evidence is not None:
+            _require_consumer_counter_evidence(reasoner_counter_evidence)
+        if unexpected_core_operations:
+            raise RuntimeError(
+                "encoded consumer handoff performed unexpected core operations: "
+                f"{unexpected_core_operations!r}"
+            )
     return {
         "input": {
             "name": path.name,
@@ -485,11 +598,21 @@ def measure(
                 for name in ("encode_snapshot", "decode_snapshot", "open_snapshot")
             },
             "core_parser_entry_delta": consumer_operations["load_snapshot"],
-            "complete_public_counter_coverage": (
-                all_measured_consumers_encoded
-                and materialized_scalar_rows is not None
-                and copied_structural_bytes is not None
-            ),
+            "complete_public_counter_coverage": complete_public_counter_coverage,
+            "acceptance_evidence": {
+                "all_measured_consumers_encoded": all_measured_consumers_encoded,
+                "all_consumer_counter_evidence_ready": all_counter_evidence_ready,
+                "expected_core_operation_calls": expected_consumer_operations,
+                "unexpected_core_operation_calls": unexpected_core_operations,
+                "projector": projector_counter_evidence,
+                "reasoner": reasoner_counter_evidence,
+                "acceptance_ready": (
+                    all_measured_consumers_encoded
+                    and complete_public_counter_coverage
+                    and all_counter_evidence_ready
+                    and not unexpected_core_operations
+                ),
+            },
         },
         "projection": {
             "requested_backend": projector_backend,
@@ -589,7 +712,7 @@ def main() -> None:
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     payload = {
-        "schema_version": 3,
+        "schema_version": 4,
         "environment": {
             "python": platform.python_version(),
             "platform": platform.platform(),

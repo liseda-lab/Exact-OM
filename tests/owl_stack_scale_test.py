@@ -8,9 +8,37 @@ import pytest
 import pyowl_core
 from pyowl2vec_star_projector import Edge, canonical_edges_sha256
 
-from benchmarks.owl_stack_scale import _edge_record, main, measure
+from benchmarks.owl_stack_scale import (
+    _consumer_counter_evidence,
+    _edge_record,
+    _require_consumer_counter_evidence,
+    main,
+    measure,
+)
 
 FIXTURES = Path(__file__).parent / "fixtures" / "ontologies"
+
+
+def _encoded_handoff(**counter_overrides: int | bool) -> dict[str, object]:
+    counters: dict[str, int | bool] = {
+        "base_flattening_bytes": 0,
+        "encoded_buffer_bytes": 128,
+        "encoded_buffer_count": 11,
+        "encoded_compiler_gil_released": True,
+        "encoded_staging_copy_bytes": 0,
+        "encoded_zero_copy_buffers": 11,
+        "materialized_scalar_rows": 0,
+        "parser_calls": 0,
+        "per_row_ffi_calls": 0,
+        "resolver_calls": 0,
+        "scalar_axiom_materializations": 0,
+        "scalar_term_materializations": 0,
+        "structural_copy_bytes": 0,
+        "wire_decoder_calls": 0,
+        "wire_encoder_calls": 0,
+    }
+    counters.update(counter_overrides)
+    return {"ingestion_path": "encoded-native", "counters": counters}
 
 
 def test_streaming_edge_digest_matches_public_projector_artifact_contract() -> None:
@@ -67,6 +95,10 @@ def test_scale_measurement_records_path_free_wpn_handoff_evidence() -> None:
     materialization = result["materialization_and_copy"]
     assert materialization["public_counters"]["projector"]["materialized_scalar_rows"] == 0
     assert materialization["complete_public_counter_coverage"] is False
+    acceptance = materialization["acceptance_evidence"]
+    assert acceptance["acceptance_ready"] is False
+    assert acceptance["projector"]["selected_ingestion_path"] == "scalar-python"
+    assert acceptance["unexpected_core_operation_calls"] == {}
     assert result["second_ontology_representation"] is False
 
     encoded = json.dumps(result, sort_keys=True)
@@ -89,6 +121,60 @@ def test_required_encoded_mode_rejects_scalar_consumer_selection() -> None:
     assert pyowl_core.load_snapshot is original_load
 
 
+def test_direct_encoded_counter_evidence_requires_complete_zero_copy_gil_record() -> None:
+    evidence = _consumer_counter_evidence(
+        consumer="projector",
+        handoff=_encoded_handoff(),
+    )
+
+    assert evidence["acceptance_ready"] is True
+    assert evidence["complete_public_counter_coverage"] is True
+    assert evidence["missing_public_counters"] == []
+    assert evidence["nonzero_forbidden_public_counters"] == {}
+    _require_consumer_counter_evidence(evidence)
+
+
+@pytest.mark.parametrize(
+    ("overrides", "field"),
+    [
+        ({"parser_calls": 1}, "nonzero_forbidden_public_counters"),
+        ({"structural_copy_bytes": 64}, "nonzero_forbidden_public_counters"),
+        ({"encoded_staging_copy_bytes": 64}, "direct_staging_copy_bytes"),
+        ({"encoded_compiler_gil_released": False}, "encoded_compiler_gil_released"),
+    ],
+)
+def test_direct_encoded_counter_evidence_rejects_ineligible_records(
+    overrides: dict[str, int | bool],
+    field: str,
+) -> None:
+    evidence = _consumer_counter_evidence(
+        consumer="projector",
+        handoff=_encoded_handoff(**overrides),
+    )
+
+    assert evidence["acceptance_ready"] is False
+    if field == "nonzero_forbidden_public_counters":
+        assert evidence[field]
+    elif field == "direct_staging_copy_bytes":
+        assert evidence[field] == overrides["encoded_staging_copy_bytes"]
+    else:
+        assert evidence[field] == overrides["encoded_compiler_gil_released"]
+    with pytest.raises(RuntimeError, match="acceptance evidence failed"):
+        _require_consumer_counter_evidence(evidence)
+
+
+def test_direct_encoded_counter_evidence_rejects_missing_counter() -> None:
+    handoff = _encoded_handoff()
+    counters = handoff["counters"]
+    assert isinstance(counters, dict)
+    counters.pop("wire_encoder_calls")
+
+    evidence = _consumer_counter_evidence(consumer="elk", handoff=handoff)
+
+    assert evidence["acceptance_ready"] is False
+    assert evidence["missing_public_counters"] == ["wire_encoder_calls"]
+
+
 def test_cli_emits_versioned_configuration(monkeypatch, capsys) -> None:
     monkeypatch.setattr(
         "sys.argv",
@@ -103,6 +189,6 @@ def test_cli_emits_versioned_configuration(monkeypatch, capsys) -> None:
     main()
 
     payload = json.loads(capsys.readouterr().out)
-    assert payload["schema_version"] == 3
+    assert payload["schema_version"] == 4
     assert payload["configuration"]["cache_state"] == ("cold-load; projection cache fill then hit")
     assert payload["measurements"][0]["load_calls"] == 1
