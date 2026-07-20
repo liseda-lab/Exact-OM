@@ -1,7 +1,8 @@
 # WP-N — Encoded native-consumer compatibility handoff
 
 **Target release:** Exact-OM `2.1.0` as part of WP-M M5 unless that line has already shipped, in
-which case the next patch release. **Status:** specified, not implemented.
+which case the next patch release. **Status:** implementation checkpoint in progress; release
+acceptance remains open.
 
 **Depends on:** WP-M M0–M4; a released/candidate pyowl-core WP17 encoded-view contract; pyELK
 WP14; pyHermiT WP18; and projector P7. It does not require all three consumers to finish before
