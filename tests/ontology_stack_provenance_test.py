@@ -7,6 +7,7 @@ import pytest
 
 from exact.ontology import load_ontology
 from exact.ontology.provenance import _projector_consumer_handoff, ontology_stack_provenance
+from exact.ontology.reasoning import ConsumerHandoffProvenance
 
 FIXTURES = Path(__file__).parent / "fixtures" / "ontologies"
 
@@ -106,9 +107,16 @@ def test_consumer_handoff_records_projector_public_ingestion_report() -> None:
     ("field", "value", "message"),
     [
         ("encoded_view_publication_seconds", float("nan"), "diagnostic is invalid"),
+        (
+            "encoded_view_publication_seconds",
+            0.25,
+            "claimed encoded-view publication",
+        ),
         ("consumer_compile_seconds", True, "diagnostic is invalid"),
         ("counters", {"private_arena_id": 1}, "counters are incompatible"),
         ("counters", {"materialized_scalar_rows": False}, "counters are invalid"),
+        ("counters", {"encoded_buffer_count": 1}, "nonzero encoded resources"),
+        ("counters", {"encoded_compiler_gil_released": True}, "nonzero encoded resources"),
     ],
 )
 def test_consumer_handoff_rejects_malformed_projector_diagnostics(
@@ -218,6 +226,8 @@ def test_consumer_handoff_rejects_unbounded_reasoner_diagnostics() -> None:
             "claimed encoded-view publication",
         ),
         ("counters", {"materialized_scalar_rows": False}, "counters are invalid"),
+        ("counters", {"encoded_buffer_count": 1}, "nonzero encoded resources"),
+        ("counters", {"encoded_compiler_gil_released": True}, "nonzero encoded resources"),
     ],
 )
 def test_consumer_handoff_rejects_malformed_reasoner_phase_diagnostics(
@@ -280,3 +290,17 @@ def test_consumer_handoff_records_public_reasoner_compiler_contract() -> None:
         "ir_schema_version": 1,
         "consumer_compile_seconds": 0.25,
     }
+
+
+@pytest.mark.parametrize(
+    ("name", "value"),
+    [("encoded_buffer_count", 1), ("encoded_compiler_gil_released", True)],
+)
+def test_reasoner_handoff_value_rejects_scalar_encoded_resource_claims(
+    name: str, value: int | bool
+) -> None:
+    with pytest.raises(ValueError, match="nonzero encoded resources"):
+        ConsumerHandoffProvenance(
+            ingestion_path="scalar-python",
+            counters=((name, value),),
+        )

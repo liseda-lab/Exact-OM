@@ -68,6 +68,19 @@ _HANDOFF_OPTIONAL_FIELDS = frozenset(
         "native_abi_version",
     }
 )
+_ENCODED_ONLY_COUNTER_DEFAULTS: Mapping[str, int | bool] = {
+    "encoded_buffer_count": 0,
+    "encoded_buffer_bytes": 0,
+    "encoded_zero_copy_buffers": 0,
+    "encoded_detached_buffer_count": 0,
+    "encoded_indexed_buffer_count": 0,
+    "encoded_staging_copy_bytes": 0,
+    "encoded_private_ir_bytes": 0,
+    "encoded_segment_count": 0,
+    "encoded_referenced_view_count": 0,
+    "encoded_posting_bytes": 0,
+    "encoded_compiler_gil_released": False,
+}
 _SHA256_HEX = re.compile(r"[0-9a-f]{64}\Z")
 
 
@@ -152,6 +165,12 @@ class ConsumerHandoffProvenance:
                     raise TypeError("reasoner GIL diagnostic must be boolean")
             elif isinstance(value, bool) or not isinstance(value, int) or value < 0:
                 raise TypeError("reasoner handoff counters must be nonnegative integers")
+        counter_values = dict(self.counters)
+        if self.ingestion_path != "encoded-native" and any(
+            name in counter_values and counter_values[name] != expected
+            for name, expected in _ENCODED_ONLY_COUNTER_DEFAULTS.items()
+        ):
+            raise ValueError("scalar reasoner ingestion claimed nonzero encoded resources")
 
     def as_dict(self) -> dict[str, object]:
         result: dict[str, object] = {

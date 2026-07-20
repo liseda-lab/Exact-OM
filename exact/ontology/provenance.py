@@ -80,6 +80,19 @@ _REASONER_HANDOFF_OPTIONAL_FIELDS = frozenset(
         "native_abi_version",
     }
 )
+_ENCODED_ONLY_COUNTER_DEFAULTS: Mapping[str, int | bool] = {
+    "encoded_buffer_count": 0,
+    "encoded_buffer_bytes": 0,
+    "encoded_zero_copy_buffers": 0,
+    "encoded_detached_buffer_count": 0,
+    "encoded_indexed_buffer_count": 0,
+    "encoded_staging_copy_bytes": 0,
+    "encoded_private_ir_bytes": 0,
+    "encoded_segment_count": 0,
+    "encoded_referenced_view_count": 0,
+    "encoded_posting_bytes": 0,
+    "encoded_compiler_gil_released": False,
+}
 _SHA256_HEX = re.compile(r"[0-9a-f]{64}\Z")
 
 
@@ -361,6 +374,8 @@ def _projector_consumer_handoff(projector: Mapping[str, object]) -> dict[str, ob
             ):
                 raise TypeError(f"projector {name} diagnostic is invalid")
             result[name] = float(value)
+        if path != "encoded-native" and "encoded_view_publication_seconds" in result:
+            raise ValueError("scalar projector ingestion claimed encoded-view publication")
         counters = ingestion.get("counters")
         if counters is not None:
             if not isinstance(counters, Mapping) or any(
@@ -376,6 +391,11 @@ def _projector_consumer_handoff(projector: Mapping[str, object]) -> dict[str, ob
                 elif type(value) is not int or value < 0:
                     raise TypeError("projector ingestion counters are invalid")
                 bounded[name] = value
+            if path != "encoded-native" and any(
+                name in bounded and bounded[name] != expected
+                for name, expected in _ENCODED_ONLY_COUNTER_DEFAULTS.items()
+            ):
+                raise ValueError("scalar projector ingestion claimed nonzero encoded resources")
             result["counters"] = dict(sorted(bounded.items()))
     return result
 
@@ -427,6 +447,11 @@ def _reasoner_consumer_handoff(reasoner: Mapping[str, object]) -> dict[str, obje
                     raise TypeError("reasoner consumer handoff GIL diagnostic is invalid")
             elif isinstance(value, bool) or not isinstance(value, int) or value < 0:
                 raise TypeError("reasoner consumer handoff counters are invalid")
+        if ingestion_path != "encoded-native" and any(
+            name in counters and counters[name] != expected
+            for name, expected in _ENCODED_ONLY_COUNTER_DEFAULTS.items()
+        ):
+            raise ValueError("scalar reasoner ingestion claimed nonzero encoded resources")
         result.update(
             {
                 "ingestion_path": ingestion_path,
