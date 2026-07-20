@@ -30,6 +30,13 @@ def test_ontology_stack_provenance_is_complete_and_path_free() -> None:
     handoff = provenance["consumer_handoff"]
     assert handoff["schema_version"] == 1
     assert handoff["core"] == {
+        "encoded_contract": {
+            "schema_name": "pyowl-core/structural-columns",
+            "schema_version": 1,
+            "descriptor_sha256": (
+                "9ad29db6a7e616f65cea2957bc5ba8d1f9b99ef0eb1fe1432c09be25786267b5"
+            ),
+        },
         "encoded_view_schemas": {},
         "owner_kind": "direct",
         "storage_backend": "python",

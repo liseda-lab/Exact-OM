@@ -14,7 +14,11 @@ import pyowl_core
 from pyowl2vec_star_projector import ProjectionOptions, select_backend
 from pyowl_core import OntologySnapshot
 
-from exact.ontology.projection import ProjectorSettings, projector_cache_identity
+from exact.ontology.projection import (
+    ProjectorSettings,
+    encoded_contract_identity,
+    projector_cache_identity,
+)
 
 ONTOLOGY_STACK_PROVENANCE_SCHEMA = 1
 CONSUMER_HANDOFF_PROVENANCE_SCHEMA = 1
@@ -208,6 +212,7 @@ def _core_consumer_handoff(snapshot: OntologySnapshot) -> dict[str, object]:
     else:
         owner_kind = "direct"
     return {
+        "encoded_contract": encoded_contract_identity().as_dict()["core"],
         "encoded_view_schemas": _encoded_view_schemas(capabilities),
         "owner_kind": owner_kind,
         "storage_backend": capabilities.backend,

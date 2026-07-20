@@ -59,7 +59,8 @@ def test_base_dataset_loads_knowledge_sources_without_runtime_java(tmp_path, mon
     }
     fingerprint = dataset._cache_fingerprint_payload()
     assert fingerprint["reasoner"] == "asserted"
-    assert fingerprint["ontology_backend_version"] == 3
+    assert fingerprint["ontology_backend_version"] == 4
+    assert fingerprint["projector"]["encoded_contract"]["core"]["descriptor_sha256"]
     assert fingerprint["projector"]["profile"] == "mowl-d993536-v1"
 
     provenance = dataset.ontology_stack_provenance()

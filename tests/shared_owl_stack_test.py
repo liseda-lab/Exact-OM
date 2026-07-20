@@ -7,7 +7,12 @@ import pyowl_core
 import pytest
 
 from exact.ontology import OwlOntologySource, load_ontology
-from exact.ontology.projection import ProjectorSettings, cache_key
+from exact.ontology.projection import (
+    ProjectorSettings,
+    cache_key,
+    encoded_contract_identity,
+    projector_cache_identity,
+)
 from exact.ontology.reasoning import reasoner_cache_identity
 
 FIXTURE = Path(__file__).parent / "fixtures" / "ontologies" / "mini_src.owl"
@@ -108,6 +113,38 @@ def test_projection_cache_key_covers_shared_semantic_versions():
     assert keys[0].core_model_schema_version == pyowl_core.MODEL_SCHEMA_VERSION
     assert keys[0].core_wire_format_version == pyowl_core.WIRE_FORMAT_VERSION
     assert keys[0].projector_compiler_cache_schema
+    contract = keys[0].encoded_contract
+    assert contract == encoded_contract_identity()
+    assert contract.core_descriptor_sha256 == (
+        pyowl_core.ENCODED_STRUCTURAL_DESCRIPTOR_SHA256_V1.hex()
+    )
+    assert projector_cache_identity(ProjectorSettings())["encoded_contract"] == (contract.as_dict())
+
+
+def test_projection_cache_key_invalidates_on_public_descriptor_change(monkeypatch):
+    source = load_ontology(FIXTURE)
+    settings = ProjectorSettings(backend="python")
+    before = cache_key(
+        source.owl_snapshot(),
+        settings,
+        method="owl2vecstar",
+        include_literals=False,
+    )
+
+    monkeypatch.setattr(
+        pyowl_core,
+        "ENCODED_STRUCTURAL_DESCRIPTOR_SHA256_V1",
+        b"\x00" * 32,
+    )
+    after = cache_key(
+        source.owl_snapshot(),
+        settings,
+        method="owl2vecstar",
+        include_literals=False,
+    )
+
+    assert before != after
+    assert before.structural_fingerprint == after.structural_fingerprint
 
 
 def test_reasoner_cache_identity_versions_the_mmap_worker_contract():

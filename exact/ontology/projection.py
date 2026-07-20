@@ -58,6 +58,70 @@ class ProjectorSettings:
 
 
 @dataclass(frozen=True, slots=True)
+class EncodedContractIdentity:
+    """Import-time public schema identity without requesting an encoded view."""
+
+    core_schema_name: str | None
+    core_schema_version: int | None
+    core_descriptor_sha256: str | None
+    projector_schema_name: str | None
+    projector_schema_version: int | None
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "core": {
+                "schema_name": self.core_schema_name,
+                "schema_version": self.core_schema_version,
+                "descriptor_sha256": self.core_descriptor_sha256,
+            },
+            "projector": {
+                "schema_name": self.projector_schema_name,
+                "schema_version": self.projector_schema_version,
+            },
+        }
+
+
+def _optional_schema(
+    name: object,
+    schema: object,
+    label: str,
+) -> tuple[str | None, int | None]:
+    if name is None and schema is None:
+        return None, None
+    if not isinstance(name, str) or not name:
+        raise TypeError(f"{label} encoded schema name must be nonempty text")
+    if isinstance(schema, bool) or not isinstance(schema, int) or schema < 1:
+        raise TypeError(f"{label} encoded schema version must be a positive integer")
+    return name, schema
+
+
+def encoded_contract_identity() -> EncodedContractIdentity:
+    """Return stable core/projector compiler inputs without capability negotiation."""
+
+    core_view = getattr(pyowl_core, "EncodedStructuralView", object())
+    core_name, core_schema = _optional_schema(
+        getattr(core_view, "SCHEMA_NAME", None),
+        getattr(core_view, "SCHEMA_VERSION", None),
+        "core",
+    )
+    projector_name, projector_schema = _optional_schema(
+        getattr(shared_projector, "ENCODED_SCHEMA_NAME", None),
+        getattr(shared_projector, "ENCODED_SCHEMA_VERSION", None),
+        "projector",
+    )
+    digest = getattr(pyowl_core, "ENCODED_STRUCTURAL_DESCRIPTOR_SHA256_V1", None)
+    if digest is not None and (type(digest) is not bytes or len(digest) != 32):
+        raise TypeError("core encoded descriptor digest must be exact bytes32")
+    return EncodedContractIdentity(
+        core_schema_name=core_name,
+        core_schema_version=core_schema,
+        core_descriptor_sha256=None if digest is None else digest.hex(),
+        projector_schema_name=projector_name,
+        projector_schema_version=projector_schema,
+    )
+
+
+@dataclass(frozen=True, slots=True)
 class ProjectionCacheKey:
     """Complete semantic identity for one in-process projection result."""
 
@@ -69,6 +133,7 @@ class ProjectionCacheKey:
     projector_package_version: str
     projector_api_version: int
     projector_compiler_cache_schema: str
+    encoded_contract: EncodedContractIdentity
     method: ProjectionMethod
     profile: str
     backend: ProjectorBackend
@@ -109,6 +174,7 @@ def cache_key(
         projector_package_version=str(shared_projector.__version__),
         projector_api_version=int(shared_projector.PROJECTOR_API_VERSION),
         projector_compiler_cache_schema=str(shared_projector.COMPILER_CACHE_SCHEMA),
+        encoded_contract=encoded_contract_identity(),
         method=normalize_method(method),
         profile=settings.profile,
         backend=settings.backend,
@@ -123,6 +189,7 @@ def projector_cache_identity(settings: ProjectorSettings) -> dict[str, object]:
         "package_version": str(shared_projector.__version__),
         "api_version": int(shared_projector.PROJECTOR_API_VERSION),
         "compiler_cache_schema": str(shared_projector.COMPILER_CACHE_SCHEMA),
+        "encoded_contract": encoded_contract_identity().as_dict(),
         "profile": settings.profile,
         "backend": settings.backend,
         "duplicates": "unique",
@@ -209,11 +276,13 @@ def project(
 
 
 __all__ = [
+    "EncodedContractIdentity",
     "ProjectionCacheKey",
     "ProjectorBackend",
     "ProjectorSettings",
     "SharedProjectionAdapter",
     "cache_key",
+    "encoded_contract_identity",
     "normalize_method",
     "project",
     "projector_cache_identity",

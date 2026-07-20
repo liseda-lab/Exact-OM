@@ -639,7 +639,7 @@ class BaseAlignmentDataset(IDataset):
             "candidate_generation_version": 5,
             "exact_prefilter_materialization_version": 2,
             "ignored_alignment_filter_version": 1,
-            "ontology_backend_version": 3,
+            "ontology_backend_version": 4,
             "projector": projector_cache_identity(self._projector_settings),
             "input_format": self._input_format,
             "source_options": self._source_options,
@@ -668,8 +668,8 @@ class BaseAlignmentDataset(IDataset):
 
     def _write_cache_metadata(self) -> None:
         payload = {
-            "cache_schema_version": 2,
-            "ontology_backend_version": 3,
+            "cache_schema_version": 3,
+            "ontology_backend_version": 4,
             "fingerprint": self.cache_fingerprint,
             "dataset_signature": self.dataset_signature,
             "component": self.__class__.__name__,
@@ -1216,17 +1216,17 @@ class BaseAlignmentDataset(IDataset):
                 try:
                     legacy = (
                         not meta
-                        or int(meta.get("cache_schema_version", 0)) < 2
-                        or int(meta.get("ontology_backend_version", 0)) < 3
+                        or int(meta.get("cache_schema_version", 0)) < 3
+                        or int(meta.get("ontology_backend_version", 0)) < 4
                     )
                 except (TypeError, ValueError):
                     legacy = True
                 reason = "missing metadata" if not meta else "fingerprint mismatch"
                 if legacy:
                     reason = (
-                        "pre-2.1 ParsedOntology/projection metadata is incompatible "
-                        "with the shared pyowl-core snapshot cache; Exact will rebuild "
-                        "from source bytes and never unpickle legacy ontology objects"
+                        "pre-WP-N ontology/compiler metadata is incompatible with the "
+                        "encoded schema cache contract; Exact will rebuild from source "
+                        "bytes and never reinterpret consumer-local encoded IDs"
                     )
                 self.log(
                     f"Existing dataset cache at {self._df_save_path} is invalid for the current configuration ({reason}); rebuilding.",
