@@ -66,3 +66,29 @@ PYTHONPATH=.:../pyOWLCore/src:../pyOwl2Vec-Star-projector/src \
   data/bioml_zenodo/ncit-doid/target.owl \
   --output /tmp/exact-wp-m-ncit-doid.json
 ```
+
+## WP-N native-consumer handoff
+
+Schema 3 of `benchmarks/owl_stack_scale.py` keeps the WP-M fields and additionally records CPU
+time, canonical projection and hierarchy-result digests, public core operation deltas, exact
+consumer ingestion provenance, encoded compiler counters, copy/materialization coverage, and
+optional reasoner compilation plus first/complete-result timing. It records `null` rather than
+inventing a phase measurement when a consumer does not yet expose publication/compiler timing.
+
+Capture Python, native in-process, and verified-wire reasoner cases as separate cold processes;
+do not compare a warm encoded publication against a cold parser run. For example:
+
+```bash
+PYTHONPATH=.:../pyOWLCore/src:../pyOwl2Vec-Star-projector/src:../pyELK/src:../pyHermiT/src \
+  python benchmarks/owl_stack_scale.py \
+  data/bioml_zenodo/ncit-doid/source.owl \
+  data/bioml_zenodo/ncit-doid/target.owl \
+  --load-backend native --projector-backend native \
+  --reasoner hermit --reasoner-backend native \
+  --require-encoded-consumers \
+  --output /tmp/exact-wp-n-ncit-doid-native.json
+```
+
+`--require-encoded-consumers` is deliberately fail-closed: it rejects scalar fallback even when
+the semantic output is correct. Leave it off only for the scalar comparison capture. GO and the
+largest licensed workflow use the same command shape and remain external release evidence.
