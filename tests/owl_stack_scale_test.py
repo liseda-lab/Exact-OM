@@ -60,6 +60,8 @@ def test_scale_measurement_records_path_free_wpn_handoff_evidence() -> None:
     assert projection["result_sha256"] == result["projection_cache"]["result_sha256"]
     reasoner = result["reasoner"]
     assert reasoner["measured"] is True
+    assert reasoner["consumer_compile_seconds"] is None
+    assert reasoner["encoded_view_publication_seconds"] is None
     assert reasoner["results"]["entities"] > 0
     assert len(reasoner["results"]["result_sha256"]) == 64
     materialization = result["materialization_and_copy"]

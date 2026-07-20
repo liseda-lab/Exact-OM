@@ -203,6 +203,43 @@ def test_consumer_handoff_rejects_unbounded_reasoner_diagnostics() -> None:
         )
 
 
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("consumer_compile_seconds", True, "consumer_compile_seconds is invalid"),
+        (
+            "encoded_view_publication_seconds",
+            float("nan"),
+            "encoded_view_publication_seconds is invalid",
+        ),
+        (
+            "encoded_view_publication_seconds",
+            0.25,
+            "claimed encoded-view publication",
+        ),
+        ("counters", {"materialized_scalar_rows": False}, "counters are invalid"),
+    ],
+)
+def test_consumer_handoff_rejects_malformed_reasoner_phase_diagnostics(
+    field: str, value: object, message: str
+) -> None:
+    source = load_ontology(FIXTURES / "mini_src.owl")
+    handoff: dict[str, object] = {
+        "ingestion_path": "scalar-python",
+        "compiler_digest": "0" * 64,
+        "counters": {},
+        field: value,
+    }
+
+    with pytest.raises((TypeError, ValueError), match=message):
+        ontology_stack_provenance(
+            source.owl_snapshot(),
+            projector_settings=source.projector_settings,
+            projector=source.projector,
+            reasoner={"consumer_handoff": handoff},
+        )
+
+
 def test_consumer_handoff_records_public_reasoner_compiler_contract() -> None:
     source = load_ontology(FIXTURES / "mini_src.owl")
 
@@ -219,7 +256,11 @@ def test_consumer_handoff_records_public_reasoner_compiler_contract() -> None:
                 "compiler_cache_schema_version": 1,
                 "ir_schema_version": 1,
                 "implementation_version": "0.1.0",
-                "counters": {"encoded_buffer_count": 0},
+                "consumer_compile_seconds": 0.25,
+                "counters": {
+                    "encoded_buffer_count": 0,
+                    "materialized_scalar_rows": 7,
+                },
             },
         },
     )
@@ -231,7 +272,11 @@ def test_consumer_handoff_records_public_reasoner_compiler_contract() -> None:
         "implementation_version": "0.1.0",
         "ingestion_path": "scalar-python",
         "compiler_digest": "0" * 64,
-        "counters": {"encoded_buffer_count": 0},
+        "counters": {
+            "encoded_buffer_count": 0,
+            "materialized_scalar_rows": 7,
+        },
         "compiler_cache_schema_version": 1,
         "ir_schema_version": 1,
+        "consumer_compile_seconds": 0.25,
     }

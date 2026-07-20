@@ -74,8 +74,10 @@ def test_elk_adapter_uses_public_facade_and_exact_snapshot(reasoning_source):
         assert provenance["backend"]["effective"] == "python"
         handoff = provenance["consumer_handoff"]
         assert handoff["ingestion_path"] == "scalar-python"
-        assert handoff["compiler_digest"] is None
-        assert handoff["counters"] == {}
+        assert len(handoff["compiler_digest"]) == 64
+        assert handoff["consumer_compile_seconds"] >= 0.0
+        assert handoff["counters"]["materialized_scalar_rows"] > 0
+        assert handoff["counters"]["encoded_staging_copy_bytes"] == 0
     finally:
         reasoner.close()
 
@@ -103,6 +105,8 @@ def test_hermit_adapter_preserves_identity_timeout_and_narrow_results(reasoning_
         assert "native_abi_version" not in handoff
         assert len(handoff["compiler_digest"]) == 64
         assert set(handoff["compiler_digest"]) <= set("0123456789abcdef")
+        assert handoff["consumer_compile_seconds"] >= 0.0
+        assert "encoded_view_publication_seconds" not in handoff
     finally:
         reasoner.close()
 

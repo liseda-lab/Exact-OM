@@ -35,6 +35,7 @@ _PATH_FRAGMENT = re.compile(r"(?<![A-Za-z0-9])(?:[A-Za-z]:[\\/]|/)[^\s\"']+")
 _INGESTION_PATHS = frozenset({"scalar-python", "scalar-native", "scalar-wire", "encoded-native"})
 _HANDOFF_COUNTERS = frozenset(
     {
+        "base_flattening_bytes",
         "encoded_buffer_count",
         "encoded_buffer_bytes",
         "encoded_zero_copy_buffers",
@@ -46,11 +47,22 @@ _HANDOFF_COUNTERS = frozenset(
         "encoded_referenced_view_count",
         "encoded_posting_bytes",
         "encoded_compiler_gil_released",
+        "materialized_scalar_rows",
+        "parser_calls",
+        "per_row_ffi_calls",
+        "resolver_calls",
+        "scalar_axiom_materializations",
+        "scalar_term_materializations",
+        "structural_copy_bytes",
+        "wire_decoder_calls",
+        "wire_encoder_calls",
     }
 )
 _HANDOFF_OPTIONAL_FIELDS = frozenset(
     {
         "compiler_cache_schema_version",
+        "consumer_compile_seconds",
+        "encoded_view_publication_seconds",
         "implementation_version",
         "ir_schema_version",
         "native_abi_version",
@@ -89,6 +101,8 @@ class ConsumerHandoffProvenance:
     ir_schema_version: int | None = None
     native_abi_version: int | str | None = None
     implementation_version: str | None = None
+    consumer_compile_seconds: float | None = None
+    encoded_view_publication_seconds: float | None = None
 
     def __post_init__(self) -> None:
         if self.ingestion_path not in _INGESTION_PATHS:
@@ -116,6 +130,17 @@ class ConsumerHandoffProvenance:
             not isinstance(self.implementation_version, str) or not self.implementation_version
         ):
             raise TypeError("reasoner implementation version must be nonempty text or None")
+        for name in ("consumer_compile_seconds", "encoded_view_publication_seconds"):
+            value = getattr(self, name)
+            if value is not None and (
+                type(value) is not float or not math.isfinite(value) or value < 0.0
+            ):
+                raise TypeError(f"reasoner {name} must be a finite nonnegative float or None")
+        if (
+            self.ingestion_path != "encoded-native"
+            and self.encoded_view_publication_seconds is not None
+        ):
+            raise ValueError("scalar reasoner ingestion claimed encoded-view publication")
         names = tuple(name for name, _value in self.counters)
         if names != tuple(sorted(set(names))) or any(
             name not in _HANDOFF_COUNTERS for name in names
@@ -139,6 +164,8 @@ class ConsumerHandoffProvenance:
             "ir_schema_version",
             "native_abi_version",
             "implementation_version",
+            "consumer_compile_seconds",
+            "encoded_view_publication_seconds",
         ):
             value = getattr(self, name)
             if value is not None:
@@ -363,6 +390,10 @@ def _consumer_handoff_from_record(value: object) -> ConsumerHandoffProvenance | 
         ir_schema_version=cast(int | None, value.get("ir_schema_version")),
         native_abi_version=cast(int | str | None, value.get("native_abi_version")),
         implementation_version=cast(str | None, value.get("implementation_version")),
+        consumer_compile_seconds=cast(float | None, value.get("consumer_compile_seconds")),
+        encoded_view_publication_seconds=cast(
+            float | None, value.get("encoded_view_publication_seconds")
+        ),
     )
 
 

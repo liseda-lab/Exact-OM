@@ -532,6 +532,16 @@ def measure(
             "requested_backend": reasoner_backend if reasoner_name is not None else None,
             "worker_wire": reasoner_worker_wire if reasoner_name is not None else False,
             "configuration": reasoner_configuration,
+            "encoded_view_publication_seconds": (
+                reasoner_handoff.get("encoded_view_publication_seconds")
+                if reasoner_handoff is not None
+                else None
+            ),
+            "consumer_compile_seconds": (
+                reasoner_handoff.get("consumer_compile_seconds")
+                if reasoner_handoff is not None
+                else None
+            ),
             "results": reasoner_results,
             "consumer": reasoner_handoff,
             "provenance": reasoner_provenance,

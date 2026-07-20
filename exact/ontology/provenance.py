@@ -47,6 +47,7 @@ _PROJECTOR_HANDOFF_COUNTERS = frozenset(
 )
 _REASONER_HANDOFF_COUNTERS = frozenset(
     {
+        "base_flattening_bytes",
         "encoded_buffer_count",
         "encoded_buffer_bytes",
         "encoded_zero_copy_buffers",
@@ -58,11 +59,22 @@ _REASONER_HANDOFF_COUNTERS = frozenset(
         "encoded_referenced_view_count",
         "encoded_posting_bytes",
         "encoded_compiler_gil_released",
+        "materialized_scalar_rows",
+        "parser_calls",
+        "per_row_ffi_calls",
+        "resolver_calls",
+        "scalar_axiom_materializations",
+        "scalar_term_materializations",
+        "structural_copy_bytes",
+        "wire_decoder_calls",
+        "wire_encoder_calls",
     }
 )
 _REASONER_HANDOFF_OPTIONAL_FIELDS = frozenset(
     {
         "compiler_cache_schema_version",
+        "consumer_compile_seconds",
+        "encoded_view_publication_seconds",
         "implementation_version",
         "ir_schema_version",
         "native_abi_version",
@@ -447,6 +459,15 @@ def _reasoner_consumer_handoff(reasoner: Mapping[str, object]) -> dict[str, obje
             if selected_implementation is not None and selected_implementation != implementation:
                 raise ValueError("reasoner implementation diagnostics disagree")
             result["implementation_version"] = implementation
+        for name in ("consumer_compile_seconds", "encoded_view_publication_seconds"):
+            value = handoff.get(name)
+            if value is None:
+                continue
+            if type(value) is not float or not math.isfinite(value) or value < 0.0:
+                raise TypeError(f"reasoner consumer handoff {name} is invalid")
+            result[name] = value
+        if ingestion_path != "encoded-native" and "encoded_view_publication_seconds" in result:
+            raise ValueError("scalar reasoner ingestion claimed encoded-view publication")
     for source, target in (
         ("verified_wire", "worker_wire_verified"),
         ("mmap_verified", "worker_mmap_verified"),
