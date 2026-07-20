@@ -37,6 +37,9 @@ def test_ontology_stack_provenance_is_complete_and_path_free() -> None:
     assert handoff["projector"]["compiler_cache_schema"]
     assert "ingestion_path" not in handoff["projector"]
     assert handoff["reasoner"]["reasoner"] == "asserted"
+    assert handoff["reasoner"]["worker_wire_verified"] is False
+    assert handoff["reasoner"]["worker_mmap_verified"] is False
+    assert "worker_owl_parse_count" not in handoff["reasoner"]
 
     encoded = json.dumps(provenance, sort_keys=True)
     assert str(path.resolve()) not in encoded

@@ -29,7 +29,7 @@ from exact.ontology.store import OWL_NOTHING, OWL_THING, OwlOntologySource
 
 ReasonerFallback = Literal["error", "asserted"]
 _OWL_BOUNDS = frozenset({OWL_THING, OWL_NOTHING})
-_WORKER_SCHEMA_VERSION = 1
+_WORKER_SCHEMA_VERSION = 2
 _PATH_FRAGMENT = re.compile(r"(?<![A-Za-z0-9])(?:[A-Za-z]:[\\/]|/)[^\s\"']+")
 _INGESTION_PATHS = frozenset({"scalar-python", "scalar-native", "scalar-wire", "encoded-native"})
 _HANDOFF_COUNTERS = frozenset(
@@ -187,6 +187,8 @@ class ReasonerProvenance:
     logical_fingerprint: str
     signature_fingerprint: str
     consumer_handoff: ConsumerHandoffProvenance | None = None
+    mmap_verified: bool = False
+    owl_parse_count: int | None = None
 
     def as_dict(self) -> dict[str, object]:
         result: dict[str, object] = {
@@ -211,6 +213,8 @@ class ReasonerProvenance:
             "failure_reason": self.failure_reason,
             "timed_out": self.timed_out,
             "verified_wire": self.verified_wire,
+            "mmap_verified": self.mmap_verified,
+            "owl_parse_count": self.owl_parse_count,
             "core": {
                 "package_version": str(pyowl_core.__version__),
                 "api_version": list(pyowl_core.API_VERSION),
@@ -705,6 +709,9 @@ def _worker_payload(
 ) -> dict[str, object]:
     """Run one bounded query over an already-verified worker snapshot."""
 
+    features = snapshot.capabilities.features
+    if not {"wire-verified", "mmap-snapshot"}.issubset(features):
+        raise ReasonerWorkerError("reasoner worker requires a verified mmap snapshot")
     worker_settings = replace(settings, worker_wire=False)
     if reasoner_name == "elk":
         reasoner, provenance, _ = _create_elk(snapshot, worker_settings)
@@ -738,6 +745,8 @@ def _worker_payload(
             "signature": provenance.signature_fingerprint,
         },
         "verified_wire": True,
+        "mmap_verified": True,
+        "owl_parse_count": 0,
     }
 
 
@@ -795,6 +804,10 @@ def _run_wire_worker(
         raise ReasonerWorkerError("reasoner worker schema version is incompatible")
     if payload.get("verified_wire") is not True:
         raise ReasonerWorkerError("reasoner worker did not verify its core wire input")
+    if payload.get("mmap_verified") is not True:
+        raise ReasonerWorkerError("reasoner worker did not retain a mapped core owner")
+    if payload.get("owl_parse_count") != 0:
+        raise ReasonerWorkerError("reasoner worker parsed an OWL document")
     expected = {
         "structural": _fingerprint(snapshot.structural_fingerprint),
         "logical": _fingerprint(snapshot.logical_fingerprint),
@@ -866,6 +879,8 @@ class WorkerWireHierarchyReasoner(_InferredHierarchyReasoner):
             backend_fallback_reason=cast(str | None, runtime.get("backend_fallback_reason")),
             consumer_handoff=_consumer_handoff_from_record(runtime.get("consumer_handoff")),
             verified_wire=True,
+            mmap_verified=True,
+            owl_parse_count=0,
         )
         return values
 

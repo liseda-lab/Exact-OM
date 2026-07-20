@@ -59,6 +59,8 @@ def test_asserted_mode_keeps_exact_snapshot_and_core_provenance(reasoning_source
         reasoning_source.owl_snapshot().structural_fingerprint.hex
     )
     assert provenance["core"]["wire_format_version"] == [1, 1]
+    assert provenance["mmap_verified"] is False
+    assert provenance["owl_parse_count"] is None
 
 
 def test_elk_adapter_uses_public_facade_and_exact_snapshot(reasoning_source):
@@ -132,10 +134,13 @@ def test_verified_wire_worker_matches_in_process_without_parser_calls(
     )
     assert isinstance(reasoner, WorkerWireHierarchyReasoner)
     assert reasoner.provenance["verified_wire"] is False
+    assert reasoner.provenance["mmap_verified"] is False
     try:
         _assert_chain(reasoner)
         provenance = reasoner.provenance
         assert provenance["verified_wire"] is True
+        assert provenance["mmap_verified"] is True
+        assert provenance["owl_parse_count"] == 0
         assert provenance["options"]["worker_wire"] is True
         assert provenance["consumer_handoff"]["ingestion_path"] == "scalar-python"
         assert encode_calls == 1

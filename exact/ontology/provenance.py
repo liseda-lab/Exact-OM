@@ -296,6 +296,25 @@ def _reasoner_consumer_handoff(reasoner: Mapping[str, object]) -> dict[str, obje
                 "counters": dict(sorted(counters.items())),
             }
         )
+    for source, target in (
+        ("verified_wire", "worker_wire_verified"),
+        ("mmap_verified", "worker_mmap_verified"),
+    ):
+        if source not in reasoner:
+            continue
+        value = reasoner[source]
+        if not isinstance(value, bool):
+            raise TypeError(f"reasoner {source} diagnostic is invalid")
+        result[target] = value
+    owl_parse_count = reasoner.get("owl_parse_count")
+    if owl_parse_count is not None:
+        if (
+            isinstance(owl_parse_count, bool)
+            or not isinstance(owl_parse_count, int)
+            or owl_parse_count < 0
+        ):
+            raise TypeError("reasoner worker OWL parse count is invalid")
+        result["worker_owl_parse_count"] = owl_parse_count
     return result
 
 

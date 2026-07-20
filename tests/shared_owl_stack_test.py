@@ -8,6 +8,7 @@ import pytest
 
 from exact.ontology import OwlOntologySource, load_ontology
 from exact.ontology.projection import ProjectorSettings, cache_key
+from exact.ontology.reasoning import reasoner_cache_identity
 
 FIXTURE = Path(__file__).parent / "fixtures" / "ontologies" / "mini_src.owl"
 
@@ -107,3 +108,9 @@ def test_projection_cache_key_covers_shared_semantic_versions():
     assert keys[0].core_model_schema_version == pyowl_core.MODEL_SCHEMA_VERSION
     assert keys[0].core_wire_format_version == pyowl_core.WIRE_FORMAT_VERSION
     assert keys[0].projector_compiler_cache_schema
+
+
+def test_reasoner_cache_identity_versions_the_mmap_worker_contract():
+    identity = reasoner_cache_identity("asserted")
+
+    assert identity["worker_schema_version"] == 2
