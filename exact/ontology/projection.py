@@ -13,9 +13,10 @@ from typing import Literal, Mapping, TypeAlias, cast
 import pyowl2vec_star_projector as shared_projector
 import pyowl_core
 from pyowl2vec_star_projector import REFERENCE_PROFILE, ProjectionOptions, Projector
-from pyowl_core import OntologySnapshot
+from pyowl_core import OntologyView
 
 from exact.core.entities.graph import Edge
+from exact.ontology.view_contract import retain_ontology_view
 
 ProjectorBackend: TypeAlias = Literal["auto", "native", "python"]
 ProjectionMethod: TypeAlias = Literal["owl2vecstar", "taxonomy"]
@@ -151,7 +152,7 @@ def normalize_method(method: str) -> ProjectionMethod:
 
 
 def cache_key(
-    snapshot: OntologySnapshot,
+    snapshot: OntologyView,
     settings: ProjectorSettings,
     *,
     method: str,
@@ -159,8 +160,7 @@ def cache_key(
 ) -> ProjectionCacheKey:
     """Build the versioned semantic key required by the WP-M cache contract."""
 
-    if not isinstance(snapshot, OntologySnapshot):
-        raise TypeError("snapshot must be a concrete pyowl_core.OntologySnapshot")
+    snapshot = retain_ontology_view(snapshot)
     fingerprint = snapshot.structural_fingerprint
     return ProjectionCacheKey(
         structural_fingerprint=(f"{fingerprint.algorithm}:{fingerprint.schema}:{fingerprint.hex}"),
@@ -207,14 +207,12 @@ class SharedProjectionAdapter:
 
     def __init__(
         self,
-        snapshot: OntologySnapshot,
+        snapshot: OntologyView,
         settings: ProjectorSettings | None = None,
         *,
         projector: Projector | None = None,
     ) -> None:
-        if not isinstance(snapshot, OntologySnapshot):
-            raise TypeError("snapshot must be a concrete pyowl_core.OntologySnapshot")
-        self.snapshot = snapshot
+        self.snapshot = retain_ontology_view(snapshot)
         self.settings = settings or ProjectorSettings()
         self.projector = projector or Projector()
         self._cache: dict[ProjectionCacheKey, tuple[Edge, ...]] = {}
@@ -258,7 +256,7 @@ class SharedProjectionAdapter:
 
 
 def project(
-    source: OntologySnapshot | pyowl_core.SnapshotProvider,
+    source: OntologyView | pyowl_core.SnapshotProvider,
     method: str = "owl2vecstar",
     include_literals: bool = False,
     *,
@@ -267,8 +265,6 @@ def project(
     """One-minor compatibility function, without parser/path fallback."""
 
     snapshot = pyowl_core.coerce_snapshot(source)
-    if not isinstance(snapshot, OntologySnapshot):
-        raise TypeError("projection requires a concrete OntologySnapshot")
     return SharedProjectionAdapter(snapshot, settings).edges(
         method=method,
         include_literals=include_literals,

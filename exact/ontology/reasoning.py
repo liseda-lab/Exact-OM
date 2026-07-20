@@ -23,7 +23,7 @@ from threading import RLock
 from typing import Any, Literal, Mapping, Protocol, cast, runtime_checkable
 
 import pyowl_core
-from pyowl_core import IRI, Class, OntologySnapshot, OntologyView
+from pyowl_core import IRI, Class, OntologyView
 
 from exact.ontology.projection import encoded_contract_identity
 from exact.ontology.store import OWL_NOTHING, OWL_THING, OwlOntologySource
@@ -526,7 +526,7 @@ class AssertedHierarchyReasoner:
         )
 
     @property
-    def ontology(self) -> OntologySnapshot:
+    def ontology(self) -> OntologyView:
         return self.snapshot
 
     @property
@@ -562,7 +562,7 @@ class _InferredHierarchyReasoner:
         self._provenance: ReasonerProvenance
 
     @property
-    def ontology(self) -> OntologySnapshot:
+    def ontology(self) -> OntologyView:
         return self.snapshot
 
     @property
@@ -848,7 +848,7 @@ def _worker_payload(
 
 def _run_wire_worker(
     reasoner_name: str,
-    snapshot: OntologySnapshot,
+    snapshot: OntologyView,
     settings: ReasonerSettings,
     *,
     wire_path: Path,

@@ -6,7 +6,7 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
-from pyowl_core import OntologySnapshot
+from pyowl_core import OntologyView
 
 from exact.core.contracts.knowledge import KnowledgeSource
 from exact.core.entities.graph import AnnotationValue, Edge
@@ -26,7 +26,7 @@ class _SchemaOnlyOwlSource(KnowledgeSource):
     def origin(self) -> Path | None:
         return self._source.origin
 
-    def owl_snapshot(self) -> OntologySnapshot:
+    def owl_snapshot(self) -> OntologyView:
         """Preserve shared-snapshot identity through the schema-only source view."""
 
         return self._source.owl_snapshot()

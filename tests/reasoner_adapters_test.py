@@ -107,11 +107,90 @@ def test_hermit_adapter_preserves_identity_timeout_and_narrow_results(reasoning_
         reasoner.close()
 
 
+def test_hermit_compiler_digest_is_backend_independent(reasoning_source):
+    import pyhermit
+
+    if not pyhermit.backend_info().native.available:
+        pytest.skip("pyHermiT native backend is unavailable")
+    diagnostics = {}
+    for backend in ("python", "native", "verify"):
+        reasoner = load_reasoner("hermit", reasoning_source, backend=backend, timeout=30)
+        try:
+            _assert_chain(reasoner)
+            diagnostics[backend] = reasoner.provenance["consumer_handoff"]
+        finally:
+            reasoner.close()
+
+    assert {values["compiler_digest"] for values in diagnostics.values()} == {
+        diagnostics["python"]["compiler_digest"]
+    }
+    assert diagnostics["python"]["ingestion_path"] == "scalar-python"
+    for backend in ("native", "verify"):
+        assert diagnostics[backend]["ingestion_path"] == "scalar-wire"
+        assert diagnostics[backend]["native_abi_version"] == pyhermit.NATIVE_ABI_VERSION
+    assert all(
+        value in {0, False}
+        for diagnostics_by_backend in diagnostics.values()
+        for value in diagnostics_by_backend["counters"].values()
+    )
+
+
 @pytest.mark.parametrize("reasoner_name", ["elk", "hermit"])
+def test_optional_reasoners_retain_overlay_and_composite_views(reasoning_source, reasoner_name):
+    import pyowl_core
+
+    base = reasoning_source.owl_snapshot()
+    overlay = pyowl_core.apply_delta(
+        base,
+        pyowl_core.OntologyDelta(
+            add_axioms={
+                pyowl_core.Declaration(pyowl_core.Class(pyowl_core.IRI("urn:exact:test:Overlay")))
+            }
+        ),
+    )
+    second = pyowl_core.load_snapshot(_ONTOLOGY, document_iri="urn:exact:test:second")
+    composite = pyowl_core.compose_views(overlay, second, roles=("source", "target"))
+
+    for view in (overlay, composite):
+        source = load_ontology(view)
+        reasoner = load_reasoner(reasoner_name, source, backend="python")
+        try:
+            assert reasoner.ontology is view
+            assert reasoner.shared_reasoner.ontology is view
+            _assert_chain(reasoner)
+            assert reasoner.provenance["consumer_handoff"]["ingestion_path"] == "scalar-python"
+        finally:
+            reasoner.close()
+
+
+@pytest.mark.parametrize("reasoner_name", ["elk", "hermit"])
+@pytest.mark.parametrize("view_kind", ["snapshot", "overlay", "composite"])
 def test_verified_wire_worker_matches_in_process_without_parser_calls(
-    reasoning_source, tmp_path, monkeypatch, reasoner_name
+    reasoning_source, tmp_path, monkeypatch, reasoner_name, view_kind
 ):
     import pyowl_core
+
+    source = reasoning_source
+    if view_kind != "snapshot":
+        base = reasoning_source.owl_snapshot()
+        overlay = pyowl_core.apply_delta(
+            base,
+            pyowl_core.OntologyDelta(
+                add_axioms={
+                    pyowl_core.Declaration(
+                        pyowl_core.Class(pyowl_core.IRI("urn:exact:test:WorkerOverlay"))
+                    )
+                }
+            ),
+        )
+        view = overlay
+        if view_kind == "composite":
+            second = pyowl_core.load_snapshot(
+                _ONTOLOGY,
+                document_iri="urn:exact:test:worker-second",
+            )
+            view = pyowl_core.compose_views(overlay, second, roles=("source", "target"))
+        source = load_ontology(view)
 
     encode_snapshot = pyowl_core.encode_snapshot
     encode_calls = 0
@@ -139,10 +218,9 @@ def test_verified_wire_worker_matches_in_process_without_parser_calls(
         "PYTHONPATH",
         os.fspath(tmp_path) if not existing else os.fspath(tmp_path) + os.pathsep + existing,
     )
-    reasoner = load_reasoner(
-        reasoner_name, reasoning_source, backend="python", worker_wire=True, timeout=30
-    )
+    reasoner = load_reasoner(reasoner_name, source, backend="python", worker_wire=True, timeout=30)
     assert isinstance(reasoner, WorkerWireHierarchyReasoner)
+    assert reasoner.ontology is source.owl_snapshot()
     assert reasoner.provenance["verified_wire"] is False
     assert reasoner.provenance["mmap_verified"] is False
     try:

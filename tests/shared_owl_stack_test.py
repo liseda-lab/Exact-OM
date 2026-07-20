@@ -68,6 +68,117 @@ def test_existing_snapshot_is_never_reloaded_and_projector_sees_same_object(monk
     )
 
 
+def test_overlay_and_composite_views_retain_identity_through_exact_consumers():
+    base = pyowl_core.load_snapshot(FIXTURE)
+    target = pyowl_core.load_snapshot(FIXTURE.with_name("mini_tgt.owl"))
+    overlay = pyowl_core.apply_delta(
+        base,
+        pyowl_core.OntologyDelta(
+            add_axioms={
+                pyowl_core.Declaration(pyowl_core.Class(pyowl_core.IRI("urn:exact:overlay")))
+            }
+        ),
+    )
+    composite = pyowl_core.compose_views(overlay, target, roles=("source", "target"))
+
+    for view, owner_kind in ((overlay, "overlay"), (composite, "composite")):
+        source = load_ontology(view)
+        source.configure_projector(backend="python")
+
+        assert source.owl_snapshot() is view
+        assert source.reasoner.ontology is view
+        assert source.projection_edges()
+        assert source.projector.last_view is view
+        provenance = source.ontology_stack_provenance()
+        assert provenance["consumer_handoff"]["core"]["owner_kind"] == owner_kind
+        closure = provenance["core"]["closure"]
+        assert closure["view_kind"] == owner_kind
+        assert closure["complete"] is view.is_complete
+        assert closure["manifest_available"] is (owner_kind == "overlay")
+        provenance_digest = (
+            "overlay_provenance_sha256"
+            if owner_kind == "overlay"
+            else "composition_provenance_sha256"
+        )
+        assert closure[provenance_digest]
+        if owner_kind == "composite":
+            assert set(closure["member_roles"].values()) == {"source", "target"}
+
+
+def test_layered_view_construction_does_not_materialize_lazy_core_state():
+    base = pyowl_core.load_snapshot(FIXTURE)
+    target = pyowl_core.load_snapshot(FIXTURE.with_name("mini_tgt.owl"))
+    overlay = pyowl_core.apply_delta(base, pyowl_core.OntologyDelta())
+    composite = pyowl_core.compose_views(overlay, target, roles=("source", "target"))
+    cache_fields = {
+        overlay: (
+            "_structural_context_cache",
+            "_fingerprint_cache",
+            "_report_cache",
+            "_origin_cache",
+        ),
+        composite: (
+            "_context_cache",
+            "_fingerprint_cache",
+            "_report_cache",
+            "_origin_cache",
+            "_axiom_count_cache",
+        ),
+    }
+
+    for view, fields in cache_fields.items():
+        before = tuple(getattr(view, name) for name in fields)
+        assert load_ontology(view).owl_snapshot() is view
+        after = tuple(getattr(view, name) for name in fields)
+        assert all(current is retained for current, retained in zip(after, before, strict=True))
+
+
+def test_projector_scalar_native_parity_preserves_layered_view_identity():
+    import pyowl2vec_star_projector as projector_package
+
+    try:
+        projector_package.select_backend("native")
+    except projector_package.NativeBackendUnavailableError:
+        pytest.skip("native projector is unavailable")
+    base = pyowl_core.load_snapshot(FIXTURE)
+    target = pyowl_core.load_snapshot(FIXTURE.with_name("mini_tgt.owl"))
+    overlay = pyowl_core.apply_delta(base, pyowl_core.OntologyDelta())
+    composite = pyowl_core.compose_views(overlay, target, roles=("source", "target"))
+
+    for view in (base, overlay, composite):
+        python = load_ontology(view)
+        native = load_ontology(view)
+        python.configure_projector(backend="python")
+        native.configure_projector(backend="native")
+
+        assert native.projection_edges() == python.projection_edges()
+        assert native.projector.last_view is view
+        assert python.projector.last_view is view
+        native_report = native.projector.last_report.to_dict()["provenance"]
+        python_report = python.projector.last_report.to_dict()["provenance"]
+        assert native_report["counts"] == python_report["counts"]
+        assert native_report["diagnostics_digest"] == python_report["diagnostics_digest"]
+        assert native_report["ingestion"]["path"] == "scalar-native"
+        assert python_report["ingestion"]["path"] == "scalar-python"
+
+
+def test_snapshot_provider_is_retained_without_loading(monkeypatch):
+    snapshot = pyowl_core.load_snapshot(FIXTURE)
+
+    class Provider:
+        def owl_snapshot(self):
+            return snapshot
+
+    def unexpected(*args, **kwargs):  # pragma: no cover - assertion helper
+        raise AssertionError("provider input must not be parsed")
+
+    monkeypatch.setattr(pyowl_core, "load_snapshot", unexpected)
+
+    source = load_ontology(Provider())
+
+    assert source.owl_snapshot() is snapshot
+
+
 def test_projection_only_source_does_not_eagerly_build_exact_feature_indexes():
     source = load_ontology(FIXTURE)
     feature_indexes = {

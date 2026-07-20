@@ -39,6 +39,7 @@ from pyowl_core import (
     ObjectSomeValuesFrom,
     ObjectUnionOf,
     OntologySnapshot,
+    OntologyView,
     PropertyDomainRangeView,
     SignatureView,
     SubAnnotationPropertyOf,
@@ -52,6 +53,7 @@ from exact.core.entities.graph import AnnotationValue, Edge
 from exact.core.entities.kinds import EntityKind
 from exact.core.values import ANNOTATION_IRI
 from exact.ontology.projection import ProjectorSettings, SharedProjectionAdapter
+from exact.ontology.view_contract import retain_ontology_view
 
 RDFS_LABEL = "http://www.w3.org/2000/01/rdf-schema#label"
 OWL_DEPRECATED = "http://www.w3.org/2002/07/owl#deprecated"
@@ -373,23 +375,28 @@ def _equivalence_components(
 
 
 class OwlOntologySource(KnowledgeSource):
-    """Read-only Exact facade owning one concrete shared ontology snapshot."""
+    """Read-only Exact facade owning one shared ontology view by identity."""
 
     def __init__(
         self,
-        snapshot: OntologySnapshot,
+        snapshot: OntologyView,
         *,
         label_properties: Sequence[str] | None = None,
         origin: Path | None = None,
         projector_backend: str = "auto",
         projector_profile: str = REFERENCE_PROFILE,
     ) -> None:
-        if not isinstance(snapshot, OntologySnapshot):
-            raise TypeError("snapshot must be a concrete pyowl_core.OntologySnapshot")
+        snapshot = retain_ontology_view(snapshot)
         self._snapshot = snapshot
         self._origin = Path(origin) if origin is not None else None
-        root = snapshot.document(snapshot.root_document_key)
-        ontology_iri = root.ontology_id.ontology_iri
+        root_snapshot: OntologyView = snapshot
+        while isinstance(root_snapshot, pyowl_core.OntologyOverlay):
+            root_snapshot = root_snapshot.base
+        ontology_iri = (
+            root_snapshot.document(root_snapshot.root_document_key).ontology_id.ontology_iri
+            if isinstance(root_snapshot, OntologySnapshot)
+            else None
+        )
         self.ontology_iri = None if ontology_iri is None else ontology_iri.value
         self.label_properties = tuple(
             (RDFS_LABEL,) if label_properties is None else map(str, label_properties)
@@ -613,8 +620,8 @@ class OwlOntologySource(KnowledgeSource):
     def _excluded(self) -> frozenset[str]:
         return self._build_exclusions()
 
-    def owl_snapshot(self) -> OntologySnapshot:
-        """Return the exact shared snapshot instance; never rebuild or reparse."""
+    def owl_snapshot(self) -> OntologyView:
+        """Return the exact shared view instance; never rebuild or reparse."""
 
         return self._snapshot
 

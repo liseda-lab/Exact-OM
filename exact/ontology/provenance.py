@@ -12,13 +12,14 @@ from typing import Any, cast
 import pyowl2vec_star_projector as shared_projector
 import pyowl_core
 from pyowl2vec_star_projector import ProjectionOptions, select_backend
-from pyowl_core import OntologySnapshot
+from pyowl_core import OntologySnapshot, OntologyView
 
 from exact.ontology.projection import (
     ProjectorSettings,
     encoded_contract_identity,
     projector_cache_identity,
 )
+from exact.ontology.view_contract import retain_ontology_view
 
 ONTOLOGY_STACK_PROVENANCE_SCHEMA = 1
 CONSUMER_HANDOFF_PROVENANCE_SCHEMA = 1
@@ -75,7 +76,7 @@ def _sha256(value: bytes) -> str:
     return hashlib.sha256(value).hexdigest()
 
 
-def _diagnostic_summary(snapshot: OntologySnapshot) -> dict[str, object]:
+def _diagnostic_summary(snapshot: OntologyView) -> dict[str, object]:
     diagnostics = tuple(snapshot.report.diagnostics)
     encoded = json.dumps(
         [item.to_dict() for item in diagnostics],
@@ -94,21 +95,68 @@ def _diagnostic_summary(snapshot: OntologySnapshot) -> dict[str, object]:
     }
 
 
-def _core_provenance(snapshot: OntologySnapshot) -> dict[str, object]:
-    manifest = snapshot.import_manifest
-    status_counts = Counter(edge.status.value for edge in manifest.edges)
-    documents = []
-    for record, document in snapshot.iter_documents():
-        documents.append(
+def _closure_provenance(snapshot: OntologyView) -> dict[str, object]:
+    if isinstance(snapshot, pyowl_core.OntologyOverlay):
+        overlay_result = _closure_provenance(snapshot.base)
+        overlay_result.update(
             {
-                "document_key": record.document_key,
-                "source_sha256": record.source_sha256.hex(),
-                "document_fingerprint": _fingerprint(record.document_fingerprint),
-                "format": record.format.value,
-                "status": record.status.value,
-                "source_bytes": document.provenance.byte_length,
+                "view_kind": "overlay",
+                "complete": snapshot.is_complete,
+                "overlay_depth": snapshot.depth,
+                "overlay_provenance_sha256": snapshot.requested_delta.provenance_digest.hex(),
             }
         )
+        return overlay_result
+    if not isinstance(snapshot, OntologySnapshot):
+        features = set(snapshot.capabilities.features)
+        kind = (
+            "composite"
+            if "ontology-composite" in features
+            else "overlay" if "ontology-overlay" in features else "view"
+        )
+        view_result: dict[str, object] = {
+            "view_kind": kind,
+            "complete": snapshot.is_complete,
+            "manifest_available": False,
+        }
+        if isinstance(snapshot, pyowl_core.OntologyComposite):
+            view_result.update(
+                {
+                    "member_count": len(snapshot.members),
+                    "member_roles": dict(sorted(snapshot.member_roles.items())),
+                    "composition_provenance_sha256": (snapshot.composition_provenance_digest.hex()),
+                }
+            )
+        return view_result
+    manifest = snapshot.import_manifest
+    status_counts = Counter(edge.status.value for edge in manifest.edges)
+    documents = [
+        {
+            "document_key": record.document_key,
+            "source_sha256": record.source_sha256.hex(),
+            "document_fingerprint": _fingerprint(record.document_fingerprint),
+            "format": record.format.value,
+            "status": record.status.value,
+            "source_bytes": document.provenance.byte_length,
+        }
+        for record, document in snapshot.iter_documents()
+    ]
+    return {
+        "view_kind": "snapshot",
+        "manifest_available": True,
+        "import_manifest_sha256": _sha256(manifest.canonical_bytes()),
+        "resolver_configuration_sha256": manifest.resolver_configuration_fingerprint.hex(),
+        "policy": manifest.policy.value,
+        "offline": manifest.offline,
+        "complete": manifest.is_complete,
+        "document_count": len(manifest.documents),
+        "import_edge_count": len(manifest.edges),
+        "resolution_status_counts": dict(sorted(status_counts.items())),
+        "source_documents": documents,
+    }
+
+
+def _core_provenance(snapshot: OntologyView) -> dict[str, object]:
     report = snapshot.report
     capabilities = snapshot.capabilities
     return {
@@ -119,23 +167,14 @@ def _core_provenance(snapshot: OntologySnapshot) -> dict[str, object]:
         "adapter_protocol_version": int(pyowl_core.ADAPTER_PROTOCOL_VERSION),
         "backend": report.backend,
         "shared_snapshot": True,
+        "shared_view": True,
         "verified_wire": "wire-verified" in capabilities.features,
         "fingerprints": {
             "structural": _fingerprint(snapshot.structural_fingerprint),
             "logical": _fingerprint(snapshot.logical_fingerprint),
             "signature": _fingerprint(snapshot.signature_fingerprint),
         },
-        "closure": {
-            "import_manifest_sha256": _sha256(manifest.canonical_bytes()),
-            "resolver_configuration_sha256": (manifest.resolver_configuration_fingerprint.hex()),
-            "policy": manifest.policy.value,
-            "offline": manifest.offline,
-            "complete": manifest.is_complete,
-            "document_count": len(manifest.documents),
-            "import_edge_count": len(manifest.edges),
-            "resolution_status_counts": dict(sorted(status_counts.items())),
-            "source_documents": documents,
-        },
+        "closure": _closure_provenance(snapshot),
         "loader": {
             "effective_axiom_count": report.effective_axiom_count,
             "total_source_bytes": report.total_source_bytes,
@@ -207,7 +246,7 @@ def _encoded_view_schemas(capabilities: object) -> dict[str, int]:
     return dict(sorted(result.items()))
 
 
-def _core_consumer_handoff(snapshot: OntologySnapshot) -> dict[str, object]:
+def _core_consumer_handoff(snapshot: OntologyView) -> dict[str, object]:
     capabilities = snapshot.capabilities
     features = set(capabilities.features)
     if "ontology-composite" in features:
@@ -362,7 +401,7 @@ def _reasoner_consumer_handoff(reasoner: Mapping[str, object]) -> dict[str, obje
 
 
 def _consumer_handoff(
-    snapshot: OntologySnapshot,
+    snapshot: OntologyView,
     projector: Mapping[str, object],
     reasoner: Mapping[str, object],
 ) -> dict[str, object]:
@@ -375,7 +414,7 @@ def _consumer_handoff(
 
 
 def ontology_stack_provenance(
-    snapshot: OntologySnapshot,
+    snapshot: OntologyView,
     *,
     projector_settings: ProjectorSettings,
     projector: object,
@@ -383,8 +422,7 @@ def ontology_stack_provenance(
 ) -> dict[str, Any]:
     """Describe one OWL source without paths, object IDs, or reparsing."""
 
-    if not isinstance(snapshot, OntologySnapshot):
-        raise TypeError("ontology stack provenance requires an OntologySnapshot")
+    snapshot = retain_ontology_view(snapshot)
     projector_provenance = _projector_provenance(projector_settings, projector)
     payload = {
         "schema_version": ONTOLOGY_STACK_PROVENANCE_SCHEMA,
