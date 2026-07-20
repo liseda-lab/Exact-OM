@@ -81,6 +81,8 @@ def test_elk_adapter_uses_public_facade_and_exact_snapshot(reasoning_source):
 
 
 def test_hermit_adapter_preserves_identity_timeout_and_narrow_results(reasoning_source):
+    import pyhermit
+
     reasoner = load_reasoner(
         "hermit",
         reasoning_source,
@@ -94,12 +96,20 @@ def test_hermit_adapter_preserves_identity_timeout_and_narrow_results(reasoning_
         provenance = reasoner.provenance
         assert provenance["options"]["timeout_seconds"] == 30.0
         assert provenance["timed_out"] is False
+        handoff = provenance["consumer_handoff"]
+        assert handoff["compiler_cache_schema_version"] == pyhermit.COMPILER_CACHE_SCHEMA_VERSION
+        assert handoff["ir_schema_version"] == pyhermit.COMPILED_IR_SCHEMA_VERSION
+        assert handoff["implementation_version"] == provenance["backend"]["implementation_version"]
+        assert "native_abi_version" not in handoff
+        assert len(handoff["compiler_digest"]) == 64
+        assert set(handoff["compiler_digest"]) <= set("0123456789abcdef")
     finally:
         reasoner.close()
 
 
+@pytest.mark.parametrize("reasoner_name", ["elk", "hermit"])
 def test_verified_wire_worker_matches_in_process_without_parser_calls(
-    reasoning_source, tmp_path, monkeypatch
+    reasoning_source, tmp_path, monkeypatch, reasoner_name
 ):
     import pyowl_core
 
@@ -130,7 +140,7 @@ def test_verified_wire_worker_matches_in_process_without_parser_calls(
         os.fspath(tmp_path) if not existing else os.fspath(tmp_path) + os.pathsep + existing,
     )
     reasoner = load_reasoner(
-        "elk", reasoning_source, backend="python", worker_wire=True, timeout=30
+        reasoner_name, reasoning_source, backend="python", worker_wire=True, timeout=30
     )
     assert isinstance(reasoner, WorkerWireHierarchyReasoner)
     assert reasoner.provenance["verified_wire"] is False
@@ -143,6 +153,9 @@ def test_verified_wire_worker_matches_in_process_without_parser_calls(
         assert provenance["owl_parse_count"] == 0
         assert provenance["options"]["worker_wire"] is True
         assert provenance["consumer_handoff"]["ingestion_path"] == "scalar-python"
+        if reasoner_name == "hermit":
+            assert provenance["consumer_handoff"]["compiler_cache_schema_version"] == 1
+            assert provenance["consumer_handoff"]["ir_schema_version"] == 1
         assert encode_calls == 1
     finally:
         reasoner.close()

@@ -104,3 +104,37 @@ def test_consumer_handoff_rejects_unbounded_reasoner_diagnostics() -> None:
                 }
             },
         )
+
+
+def test_consumer_handoff_records_public_reasoner_compiler_contract() -> None:
+    source = load_ontology(FIXTURES / "mini_src.owl")
+
+    provenance = ontology_stack_provenance(
+        source.owl_snapshot(),
+        projector_settings=source.projector_settings,
+        projector=source.projector,
+        reasoner={
+            "selection": {"effective": "hermit", "package_version": "0.1.0"},
+            "backend": {"effective": "python", "implementation_version": "0.1.0"},
+            "consumer_handoff": {
+                "ingestion_path": "scalar-python",
+                "compiler_digest": "0" * 64,
+                "compiler_cache_schema_version": 1,
+                "ir_schema_version": 1,
+                "implementation_version": "0.1.0",
+                "counters": {"encoded_buffer_count": 0},
+            },
+        },
+    )
+
+    assert provenance["consumer_handoff"]["reasoner"] == {
+        "reasoner": "hermit",
+        "package_version": "0.1.0",
+        "selected_backend": "python",
+        "implementation_version": "0.1.0",
+        "ingestion_path": "scalar-python",
+        "compiler_digest": "0" * 64,
+        "counters": {"encoded_buffer_count": 0},
+        "compiler_cache_schema_version": 1,
+        "ir_schema_version": 1,
+    }

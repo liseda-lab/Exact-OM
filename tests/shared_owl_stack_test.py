@@ -151,3 +151,67 @@ def test_reasoner_cache_identity_versions_the_mmap_worker_contract():
     identity = reasoner_cache_identity("asserted")
 
     assert identity["worker_schema_version"] == 2
+    assert identity["encoded_contract"] == encoded_contract_identity().as_dict()["core"]
+    assert identity["consumer_compiler"] == {
+        "compiler_cache_schema_version": None,
+        "ir_schema_version": None,
+        "native_abi_version": None,
+        "compatibility_id": None,
+    }
+
+
+def test_reasoner_cache_identity_uses_public_consumer_compiler_schemas(monkeypatch):
+    import pyelk.indexing
+    import pyhermit
+
+    elk = reasoner_cache_identity("elk")
+    hermit = reasoner_cache_identity("hermit")
+
+    assert elk["consumer_compiler"] == {
+        "compiler_cache_schema_version": pyelk.indexing.COMPILER_SCHEMA_VERSION,
+        "ir_schema_version": None,
+        "native_abi_version": None,
+        "compatibility_id": pyelk.indexing.ELK_COMPATIBILITY_ID,
+    }
+    assert hermit["consumer_compiler"] == {
+        "compiler_cache_schema_version": pyhermit.COMPILER_CACHE_SCHEMA_VERSION,
+        "ir_schema_version": pyhermit.COMPILED_IR_SCHEMA_VERSION,
+        "native_abi_version": pyhermit.NATIVE_ABI_VERSION,
+        "compatibility_id": None,
+    }
+
+    monkeypatch.setattr(
+        pyhermit,
+        "COMPILER_CACHE_SCHEMA_VERSION",
+        pyhermit.COMPILER_CACHE_SCHEMA_VERSION + 1,
+    )
+    assert reasoner_cache_identity("hermit") != hermit
+
+    monkeypatch.setattr(pyhermit, "NATIVE_ABI_VERSION", True)
+    with pytest.raises(TypeError, match="NATIVE_ABI_VERSION"):
+        reasoner_cache_identity("hermit")
+
+
+def test_reasoner_cache_identity_keeps_missing_extras_import_free(monkeypatch):
+    import importlib.metadata
+
+    import exact.ontology.reasoning as reasoning
+
+    def missing_distribution(_name):
+        raise importlib.metadata.PackageNotFoundError
+
+    def unexpected_import(name):  # pragma: no cover - assertion helper
+        raise AssertionError(f"optional module {name} must not be imported")
+
+    monkeypatch.setattr(reasoning, "version", missing_distribution)
+    monkeypatch.setattr(reasoning, "import_module", unexpected_import)
+
+    identity = reasoning.reasoner_cache_identity("hermit")
+
+    assert identity["package_version"] == "not-installed"
+    assert identity["consumer_compiler"] == {
+        "compiler_cache_schema_version": None,
+        "ir_schema_version": None,
+        "native_abi_version": None,
+        "compatibility_id": None,
+    }

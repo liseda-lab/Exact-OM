@@ -25,6 +25,7 @@ from typing import Any, Literal, Mapping, Protocol, cast, runtime_checkable
 import pyowl_core
 from pyowl_core import IRI, Class, OntologySnapshot, OntologyView
 
+from exact.ontology.projection import encoded_contract_identity
 from exact.ontology.store import OWL_NOTHING, OWL_THING, OwlOntologySource
 
 ReasonerFallback = Literal["error", "asserted"]
@@ -47,6 +48,15 @@ _HANDOFF_COUNTERS = frozenset(
         "encoded_compiler_gil_released",
     }
 )
+_HANDOFF_OPTIONAL_FIELDS = frozenset(
+    {
+        "compiler_cache_schema_version",
+        "implementation_version",
+        "ir_schema_version",
+        "native_abi_version",
+    }
+)
+_SHA256_HEX = re.compile(r"[0-9a-f]{64}\Z")
 
 
 def _failure_reason(error: Exception) -> str:
@@ -75,14 +85,37 @@ class ConsumerHandoffProvenance:
     ingestion_path: str
     compiler_digest: str | None = None
     counters: tuple[tuple[str, int | bool], ...] = ()
+    compiler_cache_schema_version: int | None = None
+    ir_schema_version: int | None = None
+    native_abi_version: int | str | None = None
+    implementation_version: str | None = None
 
     def __post_init__(self) -> None:
         if self.ingestion_path not in _INGESTION_PATHS:
             raise ValueError("reasoner ingestion path is not recognized")
         if self.compiler_digest is not None and (
-            not isinstance(self.compiler_digest, str) or not self.compiler_digest
+            not isinstance(self.compiler_digest, str)
+            or _SHA256_HEX.fullmatch(self.compiler_digest) is None
         ):
-            raise ValueError("reasoner compiler digest must be nonempty text or None")
+            raise ValueError("reasoner compiler digest must be lowercase SHA-256 or None")
+        for name in ("compiler_cache_schema_version", "ir_schema_version"):
+            value = getattr(self, name)
+            if value is not None and (
+                isinstance(value, bool) or not isinstance(value, int) or value < 1
+            ):
+                raise TypeError(f"reasoner {name} must be a positive integer or None")
+        native_abi = self.native_abi_version
+        if native_abi is not None and (
+            isinstance(native_abi, bool)
+            or not isinstance(native_abi, (int, str))
+            or (isinstance(native_abi, int) and native_abi < 1)
+            or (isinstance(native_abi, str) and not native_abi)
+        ):
+            raise TypeError("reasoner native ABI version must be nonempty or None")
+        if self.implementation_version is not None and (
+            not isinstance(self.implementation_version, str) or not self.implementation_version
+        ):
+            raise TypeError("reasoner implementation version must be nonempty text or None")
         names = tuple(name for name, _value in self.counters)
         if names != tuple(sorted(set(names))) or any(
             name not in _HANDOFF_COUNTERS for name in names
@@ -96,11 +129,21 @@ class ConsumerHandoffProvenance:
                 raise TypeError("reasoner handoff counters must be nonnegative integers")
 
     def as_dict(self) -> dict[str, object]:
-        return {
+        result: dict[str, object] = {
             "ingestion_path": self.ingestion_path,
             "compiler_digest": self.compiler_digest,
             "counters": dict(self.counters),
         }
+        for name in (
+            "compiler_cache_schema_version",
+            "ir_schema_version",
+            "native_abi_version",
+            "implementation_version",
+        ):
+            value = getattr(self, name)
+            if value is not None:
+                result[name] = value
+        return result
 
 
 @dataclass(frozen=True, slots=True)
@@ -297,7 +340,9 @@ def _consumer_handoff_from_record(value: object) -> ConsumerHandoffProvenance | 
         return None
     if not isinstance(value, Mapping):
         raise TypeError("reasoner consumer_handoff must be a mapping")
-    if set(value) != {"ingestion_path", "compiler_digest", "counters"}:
+    fields = set(value)
+    required = {"ingestion_path", "compiler_digest", "counters"}
+    if not required.issubset(fields) or not fields.issubset(required | _HANDOFF_OPTIONAL_FIELDS):
         raise ValueError("reasoner consumer_handoff fields are incompatible")
     ingestion_path = value["ingestion_path"]
     compiler_digest = value["compiler_digest"]
@@ -314,6 +359,10 @@ def _consumer_handoff_from_record(value: object) -> ConsumerHandoffProvenance | 
         ingestion_path=ingestion_path,
         compiler_digest=compiler_digest,
         counters=tuple(sorted(cast(Mapping[str, int | bool], raw_counters).items())),
+        compiler_cache_schema_version=cast(int | None, value.get("compiler_cache_schema_version")),
+        ir_schema_version=cast(int | None, value.get("ir_schema_version")),
+        native_abi_version=cast(int | str | None, value.get("native_abi_version")),
+        implementation_version=cast(str | None, value.get("implementation_version")),
     )
 
 
@@ -335,13 +384,58 @@ def _consumer_handoff(reasoner: object) -> ConsumerHandoffProvenance | None:
     counters = {
         name: cast(int | bool, values[name]) for name in sorted(_HANDOFF_COUNTERS) if name in values
     }
-    return _consumer_handoff_from_record(
-        {
-            "ingestion_path": ingestion_path,
-            "compiler_digest": compiler_digest,
-            "counters": counters,
-        }
-    )
+    record: dict[str, object] = {
+        "ingestion_path": ingestion_path,
+        "compiler_digest": compiler_digest,
+        "counters": counters,
+    }
+    for name in sorted(_HANDOFF_OPTIONAL_FIELDS):
+        if name in values:
+            record[name] = values[name]
+    return _consumer_handoff_from_record(record)
+
+
+def _public_positive_int(module: object, name: str) -> int | None:
+    value = getattr(module, name, None)
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        raise TypeError(f"public reasoner {name} must be a positive integer")
+    return value
+
+
+def _public_nonempty_text(module: object, name: str) -> str | None:
+    value = getattr(module, name, None)
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value:
+        raise TypeError(f"public reasoner {name} must be nonempty text")
+    return value
+
+
+def _reasoner_compiler_identity(name: str, package_version: str) -> dict[str, object]:
+    result: dict[str, object] = {
+        "compiler_cache_schema_version": None,
+        "ir_schema_version": None,
+        "native_abi_version": None,
+        "compatibility_id": None,
+    }
+    if package_version == "not-installed":
+        return result
+    if name == "elk":
+        indexing = import_module("pyelk.indexing")
+        result["compiler_cache_schema_version"] = _public_positive_int(
+            indexing, "COMPILER_SCHEMA_VERSION"
+        )
+        result["compatibility_id"] = _public_nonempty_text(indexing, "ELK_COMPATIBILITY_ID")
+    elif name == "hermit":
+        hermit = import_module("pyhermit")
+        result["compiler_cache_schema_version"] = _public_positive_int(
+            hermit, "COMPILER_CACHE_SCHEMA_VERSION"
+        )
+        result["ir_schema_version"] = _public_positive_int(hermit, "COMPILED_IR_SCHEMA_VERSION")
+        result["native_abi_version"] = _public_positive_int(hermit, "NATIVE_ABI_VERSION")
+    return result
 
 
 def reasoner_cache_identity(
@@ -372,6 +466,8 @@ def reasoner_cache_identity(
         "core_model_schema_version": int(pyowl_core.MODEL_SCHEMA_VERSION),
         "core_wire_format_version": list(pyowl_core.WIRE_FORMAT_VERSION),
         "core_adapter_protocol_version": int(pyowl_core.ADAPTER_PROTOCOL_VERSION),
+        "encoded_contract": encoded_contract_identity().as_dict()["core"],
+        "consumer_compiler": _reasoner_compiler_identity(normalized, package_version),
         "worker_schema_version": _WORKER_SCHEMA_VERSION,
     }
 

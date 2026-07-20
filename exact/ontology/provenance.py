@@ -42,6 +42,15 @@ _REASONER_HANDOFF_COUNTERS = frozenset(
         "encoded_compiler_gil_released",
     }
 )
+_REASONER_HANDOFF_OPTIONAL_FIELDS = frozenset(
+    {
+        "compiler_cache_schema_version",
+        "implementation_version",
+        "ir_schema_version",
+        "native_abi_version",
+    }
+)
+_SHA256_HEX = re.compile(r"[0-9a-f]{64}\Z")
 
 
 def _safe_value(value: object) -> object:
@@ -273,14 +282,18 @@ def _reasoner_consumer_handoff(reasoner: Mapping[str, object]) -> dict[str, obje
                 result[target] = value
     handoff = reasoner.get("consumer_handoff")
     if isinstance(handoff, Mapping):
-        if set(handoff) != {"ingestion_path", "compiler_digest", "counters"}:
+        fields = set(handoff)
+        required = {"ingestion_path", "compiler_digest", "counters"}
+        if not required.issubset(fields) or not fields.issubset(
+            required | _REASONER_HANDOFF_OPTIONAL_FIELDS
+        ):
             raise ValueError("reasoner consumer handoff fields are incompatible")
         ingestion_path = handoff["ingestion_path"]
         if ingestion_path not in _REASONER_INGESTION_PATHS:
             raise ValueError("reasoner consumer handoff ingestion path is incompatible")
         compiler_digest = handoff["compiler_digest"]
         if compiler_digest is not None and (
-            not isinstance(compiler_digest, str) or not compiler_digest
+            not isinstance(compiler_digest, str) or _SHA256_HEX.fullmatch(compiler_digest) is None
         ):
             raise TypeError("reasoner consumer handoff compiler digest is invalid")
         counters = handoff["counters"]
@@ -301,6 +314,31 @@ def _reasoner_consumer_handoff(reasoner: Mapping[str, object]) -> dict[str, obje
                 "counters": dict(sorted(counters.items())),
             }
         )
+        for name in ("compiler_cache_schema_version", "ir_schema_version"):
+            value = handoff.get(name)
+            if value is None:
+                continue
+            if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+                raise TypeError(f"reasoner consumer handoff {name} is invalid")
+            result[name] = value
+        native_abi = handoff.get("native_abi_version")
+        if native_abi is not None:
+            if (
+                isinstance(native_abi, bool)
+                or not isinstance(native_abi, (int, str))
+                or (isinstance(native_abi, int) and native_abi < 1)
+                or (isinstance(native_abi, str) and not native_abi)
+            ):
+                raise TypeError("reasoner consumer handoff native ABI version is invalid")
+            result["native_abi_version"] = native_abi
+        implementation = handoff.get("implementation_version")
+        if implementation is not None:
+            if not isinstance(implementation, str) or not implementation:
+                raise TypeError("reasoner consumer handoff implementation version is invalid")
+            selected_implementation = result.get("implementation_version")
+            if selected_implementation is not None and selected_implementation != implementation:
+                raise ValueError("reasoner implementation diagnostics disagree")
+            result["implementation_version"] = implementation
     for source, target in (
         ("verified_wire", "worker_wire_verified"),
         ("mmap_verified", "worker_mmap_verified"),
