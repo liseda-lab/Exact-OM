@@ -1,7 +1,7 @@
 # WP-N encoded native-consumer handoff checkpoint
 
-Date: 2026-07-20. Exact-OM revision: `acabe6c`. Coordinated source candidates:
-pyOWLCore `34b9e84`, projector `46086fb`, pyELK `886f6a3`, pyHermiT `3c56fc2`, and
+Date: 2026-07-20. Exact-OM revision: `87fad5a`. Coordinated source candidates:
+pyOWLCore `bdbaac9`, projector `9ee3c52`, pyELK `886f6a3`, pyHermiT `3c56fc2`, and
 OAEI-Bio-ML-eval `fcebff1`.
 
 ## Outcome
@@ -41,12 +41,13 @@ released dependency ranges, and published compatibility table are still open. No
   no Java, OAEI, or private accelerator dependency enters Exact's base installation.
 
 The implementation sequence is recorded by `d12e11d`, `c1a3537`, `3e6687a`, `d7c6b6f`,
-`a5b03e2`, `21d74b3`, `3c3cfce`, and `acabe6c`.
+`a5b03e2`, `21d74b3`, `3c3cfce`, `acabe6c`, and `87fad5a`.
 
 ## Local verification at this checkpoint
 
-The latest handoff hardening passed 39 focused provenance, reasoner-adapter, and scale-benchmark
-tests. Black, flake8, and strict mypy passed for the changed runtime modules. Earlier slices also
+The latest handoff hardening passed 53 focused provenance, reasoner-adapter, shared-stack, and
+scale-benchmark tests. Black, flake8, and isolated strict mypy passed for the changed runtime
+module. Earlier slices also
 proved one worker-wire encoding, verified mmap reopening, zero worker OWL parses, exact snapshot
 identity, backend-independent compiler digests, projector edge/cache digest stability, and bounded
 path-free provenance.
@@ -61,7 +62,7 @@ This source-tree verification does not replace the final installed distribution 
 | Overlay/composite bases remain retained without Exact flattening | Implemented and focused-tested |
 | Worker handoff uses one verified core wire/mmap artifact with zero OWL parses | Implemented and focused-tested |
 | Versioned cache/provenance compatibility | Implemented for candidate schemas |
-| Public timing and copy/materialization/FFI/wire ledger | Implemented where consumers publish fields; missing fields remain unavailable |
+| Public timing and copy/materialization/FFI/wire ledger | Complete projector vocabulary accepted and preserved; reasoner fields remain producer-dependent |
 | Scalar-only and optional-reasoner behavior | Preserved in source tests |
 | Python 3.10–3.12 pure/scalar/native installed matrix | Open |
 | Exact NCIT–DOID, GO, and licensed-scale semantic/performance evidence | Open |
