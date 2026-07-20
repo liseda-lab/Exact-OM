@@ -15,7 +15,7 @@ microbenchmark noise as a release failure.
 
 For scale evidence, run selected scenarios with `--output result.json` in the target deployment
 and retain the JSON beside the release artifacts. A benchmark implementation must pass the
-same `OntologySnapshot` to `OwlOntologySource`, projector, and reasoner. Adding a parsed graph,
+same `OntologyView` to `OwlOntologySource`, projector, and reasoner. Adding a parsed graph,
 path reparse, or unbounded adapter conversion to make a benchmark faster violates the
 architecture even if wall time improves.
 
@@ -35,6 +35,12 @@ throughput, peak/incremental RSS, core document-cache hits, Exact projection-cac
 timing, spill counters, fingerprint immutability, and source/projector/reasoner snapshot
 identity. Input bytes are not redistributed, so licensed corpora can contribute release
 evidence without entering the repository.
+
+WP-N native-consumer evidence additionally records the selected ingestion path, encoded-view
+publication and compiler timing, core wire/parser/scalar-row deltas, copied structural bytes,
+first/complete result time, and compiler/result digests. A warm encoded cache is never compared
+with a cold parse. Native performance remains an unclaimed release gate until the labelled
+NCIT–DOID, GO, and largest licensed workflow runs meet the existing wall-time and RSS criteria.
 
 The current hash-matched NCIT–DOID candidate is committed under
 `benchmarks/evidence/wp_m_ncit_doid_candidate.json`. It passes one-load, shared-identity, and

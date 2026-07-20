@@ -41,10 +41,18 @@ For inferred hierarchies, install `exact-om[reasoning]` and set `dataset.reasone
 `hermit`. Missing optional packages fail with an installation hint; Exact never silently
 changes requested inferred semantics to asserted semantics. Programmatic integrations can use
 `OwlOntologySource.configure_reasoner(...)` for backend, timeout, fallback, worker, and
-verified-wire options. All modes consume `source.owl_snapshot()` directly.
+verified-wire options. All in-process modes consume `source.owl_snapshot()` directly, including
+public core overlays and composites. Worker mode writes that view once to the stable core wire
+format and opens a verified read-only mmap in the child; it never passes an OWL path.
+
+Consumer provenance reports `scalar-python`, `scalar-native`/`scalar-wire`, or
+`encoded-native`. The last value appears only when core and consumer advertise the compatible
+public encoded schema. Acceleration may change those diagnostics and timing, but not projected
+edges, hierarchy answers, coherence, or alignment output.
 
 `run_manifest.json` records the effective core/projector/reasoner selections under
-`ontology_stack` for both sides, including fingerprints and fallback/failure diagnostics.
+`ontology_stack` for both sides, including fingerprints, encoded/compiler schema identity,
+bounded materialization/copy counters, and fallback/failure diagnostics.
 
 ## Evaluation backends
 

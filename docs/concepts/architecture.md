@@ -39,7 +39,7 @@ backend dependencies localized. `exact_inspect` depends on Exact, never the reve
 
 ```mermaid
 flowchart LR
-    Bytes[OWL bytes / resolver] --> Core[pyowl-core snapshot]
+    Bytes[OWL bytes / resolver] --> Core[pyowl-core ontology view]
     Core --> Facade[OwlOntologySource]
     Core --> Views[Shared structural views]
     Core --> Projector[Shared OWL2Vec* projector]
@@ -50,11 +50,18 @@ flowchart LR
     Facade --> Dataset
 ```
 
-The core snapshot is immutable and owned once by `OwlOntologySource`. All downstream
-consumers retain or query that identity; Exact does not reparse a path or materialize a second
-ontology representation. Optional process isolation encodes the snapshot once with the
-versioned core wire format, and a worker opens and verifies those bytes before reasoning.
-Projection and reasoner adapters convert only bounded returned rows into Exact entities.
+The core view is immutable and owned once by `OwlOntologySource`. A concrete snapshot, overlay,
+composite, or `SnapshotProvider` result is retained by exact object identity. All in-process
+consumers receive that view; Exact does not flatten it, reparse a path, request encoded columns,
+or materialize a consumer-private ontology representation. Optional process isolation encodes
+the view once with the versioned core wire format, and a worker opens it read-only with mmap and
+verification before reasoning. Projection and reasoner adapters convert only bounded returned
+rows into Exact entities.
+
+Native ingestion is capability-negotiated by each upstream consumer. Exact neither infers it
+from package versions nor calls a private extension. A missing encoded capability selects the
+consumer's complete scalar path; an incompatible advertised capability fails before output and
+is not retried from an OWL path after partial work.
 
 ## Reproducibility
 
@@ -64,6 +71,7 @@ and `stats/run_stats.json`. Optional integrations fail explicitly when unavailab
 silently changing the core algorithm.
 
 For OWL sources, `ontology_stack` adds package/API/schema versions, three semantic
-fingerprints, closure/resolution and source-document hashes, projector profile/options/backend,
-reasoner selection, diagnostics, and verified-wire status. The serializer intentionally omits
-machine paths, object IDs, temporary locations, and credentials.
+fingerprints, closure/resolution and source-document hashes, layered-view provenance, encoded
+schema/descriptor identity, projector profile/options/backend, reasoner compiler schemas,
+bounded ingestion/copy counters, and verified-wire/mmap status. The serializer intentionally
+omits machine paths, object IDs, temporary locations, and credentials.

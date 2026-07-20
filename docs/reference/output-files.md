@@ -31,9 +31,10 @@ file, and consumers should use `RunReader` rather than concatenate paths.
 For OWL runs, the manifest and run-stat payloads contain the same top-level
 `ontology_stack` object. Its `source` and `target` records expose the core/projector/reasoner
 versions and effective backends, all three core fingerprints, import/resolver and document
-digests, bounded diagnostics, projector options/schema, and verified-wire state. The block is
-safe to publish with a run: local and temporary paths, object IDs, and credentials are not
-serialized.
+digests, overlay/composite provenance, the core encoded schema/descriptor, projector and reasoner
+compiler schemas, selected ingestion paths, bounded copy/materialization counters, and verified
+wire/mmap state. The block is safe to publish with a run: local and temporary paths, object IDs,
+buffer addresses, dense IDs, and credentials are not serialized.
 
 Explanation overlays may exist during a crashed/in-progress run. Successful finalization merges
 them into the shards and removes them. `output.retention.checkpoints` controls automatic

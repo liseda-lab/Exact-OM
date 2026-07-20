@@ -7,15 +7,18 @@ compatibility window.
 ## 2.0 to 2.1 OWL-stack changes
 
 Exact 2.1 replaces the transitional `py-horned-owl` parser with one immutable
-`pyowl-core` snapshot per OWL source and the released shared OWL2Vec* projector line. The
-source facade, structural views, projector, and selected reasoner consume that exact snapshot;
-RDFLib is restricted to generic RDF/OAEI formats.
+`pyowl-core` view per OWL source and the released shared OWL2Vec* projector line. Concrete
+snapshots, overlays, composites, and provider results are retained by identity; the source
+facade, structural views, projector, and selected reasoner consume that exact object. RDFLib is
+restricted to generic RDF/OAEI formats.
 
 The base wheel remains Java- and build-tool-free. Install `exact-om[reasoning]` only for the
 optional pyELK or pyHermiT adapters. Pre-2.1 ontology/projection cache metadata is rejected and
 rebuilt from source bytes without unpickling legacy ontology objects. Each new OWL run records
 path-free core/projector/reasoner versions, fingerprints, closure/document digests,
-diagnostics, options, backend selection, and verified-wire state under `ontology_stack`.
+encoded/compiler schema identities, bounded ingestion diagnostics, options, backend selection,
+and verified-wire/mmap state under `ontology_stack`. Encoded acceleration is negotiated from
+public capabilities and remains optional throughout the compatible 0.1 package ranges.
 
 ## Required actions
 
