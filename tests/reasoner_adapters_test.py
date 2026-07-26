@@ -6,6 +6,7 @@ from types import SimpleNamespace
 import pytest
 
 import exact.ontology.reasoning as reasoning_module
+import exact.ontology.versions as versions_module
 from exact.ontology import load_ontology
 from exact.ontology.reasoning import (
     AssertedHierarchyReasoner,
@@ -226,7 +227,7 @@ def test_reasoner_module_and_distribution_version_drift_fails_closed(
 
     monkeypatch.setattr(pyhermit.Reasoner, "dispose", tracked_cleanup)
     monkeypatch.setattr(
-        reasoning_module,
+        versions_module,
         "version",
         lambda distribution: "0.1.1" if distribution == "pyHermiT" else "0.1.0.dev0",
     )

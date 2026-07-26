@@ -16,6 +16,7 @@ from pyowl2vec_star_projector import REFERENCE_PROFILE, ProjectionOptions, Proje
 from pyowl_core import OntologyView
 
 from exact.core.entities.graph import Edge
+from exact.ontology.versions import distribution_version
 from exact.ontology.view_contract import retain_ontology_view
 
 ProjectorBackend: TypeAlias = Literal["auto", "native", "python"]
@@ -238,16 +239,21 @@ def cache_key(
 
     snapshot = retain_ontology_view(snapshot)
     fingerprint = snapshot.structural_fingerprint
+    core_package_version = distribution_version(pyowl_core, "pyowl-core")
+    projector_package_version = distribution_version(
+        shared_projector,
+        "pyowl2vec-star-projector",
+    )
     return ProjectionCacheKey(
         structural_fingerprint=(f"{fingerprint.algorithm}:{fingerprint.schema}:{fingerprint.hex}"),
-        core_package_version=str(pyowl_core.__version__),
+        core_package_version=core_package_version,
         core_api_version=(pyowl_core.API_VERSION[0], pyowl_core.API_VERSION[1]),
         core_model_schema_version=int(pyowl_core.MODEL_SCHEMA_VERSION),
         core_wire_format_version=(
             pyowl_core.WIRE_FORMAT_VERSION[0],
             pyowl_core.WIRE_FORMAT_VERSION[1],
         ),
-        projector_package_version=str(shared_projector.__version__),
+        projector_package_version=projector_package_version,
         projector_api_version=int(shared_projector.PROJECTOR_API_VERSION),
         projector_compiler_cache_schema=str(shared_projector.COMPILER_CACHE_SCHEMA),
         encoded_contract=encoded_contract_identity(),
@@ -261,8 +267,13 @@ def cache_key(
 def projector_cache_identity(settings: ProjectorSettings) -> dict[str, object]:
     """Return path-free semantic fields for Exact dataset cache fingerprints."""
 
+    core_package_version = distribution_version(pyowl_core, "pyowl-core")
+    projector_package_version = distribution_version(
+        shared_projector,
+        "pyowl2vec-star-projector",
+    )
     return {
-        "package_version": str(shared_projector.__version__),
+        "package_version": projector_package_version,
         "api_version": int(shared_projector.PROJECTOR_API_VERSION),
         "compiler_cache_schema": str(shared_projector.COMPILER_CACHE_SCHEMA),
         "encoded_contract": encoded_contract_identity().as_dict(),
@@ -271,7 +282,7 @@ def projector_cache_identity(settings: ProjectorSettings) -> dict[str, object]:
         "duplicates": "unique",
         "order": "canonical",
         "compatibility_state": "isolated",
-        "core_package_version": str(pyowl_core.__version__),
+        "core_package_version": core_package_version,
         "core_api_version": list(pyowl_core.API_VERSION),
         "core_model_schema_version": int(pyowl_core.MODEL_SCHEMA_VERSION),
         "core_wire_format_version": list(pyowl_core.WIRE_FORMAT_VERSION),

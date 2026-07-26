@@ -21,6 +21,7 @@ from exact.ontology.projection import (
     encoded_contract_identity,
     projector_cache_identity,
 )
+from exact.ontology.versions import distribution_version
 from exact.ontology.view_contract import retain_ontology_view
 
 ONTOLOGY_STACK_PROVENANCE_SCHEMA = 1
@@ -213,7 +214,7 @@ def _core_provenance(snapshot: OntologyView) -> dict[str, object]:
     report = snapshot.report
     capabilities = snapshot.capabilities
     return {
-        "package_version": str(pyowl_core.__version__),
+        "package_version": distribution_version(pyowl_core, "pyowl-core"),
         "api_version": list(pyowl_core.API_VERSION),
         "model_schema_version": int(pyowl_core.MODEL_SCHEMA_VERSION),
         "wire_format_version": list(pyowl_core.WIRE_FORMAT_VERSION),

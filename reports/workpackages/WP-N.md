@@ -47,7 +47,7 @@ The implementation sequence is recorded by `d12e11d`, `c1a3537`, `3e6687a`, `d7c
 
 ## Local verification at this checkpoint
 
-The latest handoff hardening passed 79 focused provenance, reasoner-adapter, shared-stack, and
+The latest handoff hardening passed 81 focused provenance, reasoner-adapter, shared-stack, and
 scale-benchmark tests. Black, flake8, and isolated strict mypy passed for the changed runtime
 modules. Earlier slices also
 proved one worker-wire encoding, verified mmap reopening, zero worker OWL parses, exact snapshot

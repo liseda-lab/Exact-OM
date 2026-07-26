@@ -3,9 +3,11 @@ from __future__ import annotations
 from io import BytesIO
 from pathlib import Path
 
+import pyowl2vec_star_projector as shared_projector
 import pyowl_core
 import pytest
 
+import exact.ontology.versions as versions_module
 from exact.ontology import OwlOntologySource, load_ontology
 from exact.ontology.projection import (
     ProjectorSettings,
@@ -256,6 +258,28 @@ def test_projection_cache_key_invalidates_on_public_descriptor_change(monkeypatc
 
     assert before != after
     assert before.structural_fingerprint == after.structural_fingerprint
+
+
+@pytest.mark.parametrize(
+    "distribution",
+    ["pyowl-core", "pyowl2vec-star-projector"],
+)
+def test_projection_cache_identity_rejects_module_distribution_version_drift(
+    monkeypatch,
+    distribution,
+):
+    module_versions = {
+        "pyowl-core": pyowl_core.__version__,
+        "pyowl2vec-star-projector": shared_projector.__version__,
+    }
+
+    def installed_version(name):
+        return "0.1.1" if name == distribution else module_versions[name]
+
+    monkeypatch.setattr(versions_module, "version", installed_version)
+
+    with pytest.raises(RuntimeError, match="module/distribution version mismatch"):
+        projector_cache_identity(ProjectorSettings())
 
 
 def test_reasoner_cache_identity_versions_the_mmap_worker_contract():

@@ -30,6 +30,7 @@ from exact.ontology.projection import (
     encoded_contract_identity,
 )
 from exact.ontology.store import OWL_NOTHING, OWL_THING, OwlOntologySource
+from exact.ontology.versions import distribution_version
 
 ReasonerFallback = Literal["error", "asserted"]
 _OWL_BOUNDS = frozenset({OWL_THING, OWL_NOTHING})
@@ -313,6 +314,7 @@ class ReasonerProvenance:
     requested_reasoner: str
     effective_reasoner: str
     reasoner_package_version: str
+    core_package_version: str
     requested_backend: str
     effective_backend: str
     backend_implementation_version: str
@@ -358,7 +360,7 @@ class ReasonerProvenance:
             "mmap_verified": self.mmap_verified,
             "owl_parse_count": self.owl_parse_count,
             "core": {
-                "package_version": str(pyowl_core.__version__),
+                "package_version": self.core_package_version,
                 "api_version": list(pyowl_core.API_VERSION),
                 "model_schema_version": int(pyowl_core.MODEL_SCHEMA_VERSION),
                 "wire_format_version": list(pyowl_core.WIRE_FORMAT_VERSION),
@@ -406,6 +408,7 @@ def _base_provenance(
         requested_reasoner=requested_reasoner,
         effective_reasoner=effective_reasoner,
         reasoner_package_version=package_version,
+        core_package_version=distribution_version(pyowl_core, "pyowl-core"),
         requested_backend=settings.backend,
         effective_backend=effective_backend,
         backend_implementation_version=implementation_version,
@@ -422,26 +425,6 @@ def _base_provenance(
         logical_fingerprint=_fingerprint(snapshot.logical_fingerprint),
         signature_fingerprint=_fingerprint(snapshot.signature_fingerprint),
     )
-
-
-def _distribution_version(module: object, distribution: str) -> str:
-    module_version = getattr(module, "__version__", None)
-    if not isinstance(module_version, str) or not module_version:
-        module_version = None
-    try:
-        distribution_version = version(distribution)
-    except PackageNotFoundError:
-        distribution_version = None
-    if (
-        module_version is not None
-        and distribution_version is not None
-        and module_version != distribution_version
-    ):
-        raise RuntimeError(
-            f"installed {distribution} module/distribution version mismatch: "
-            f"{module_version!r} != {distribution_version!r}"
-        )
-    return module_version or distribution_version or "unknown"
 
 
 def _consumer_handoff_from_record(value: object) -> ConsumerHandoffProvenance | None:
@@ -578,9 +561,10 @@ def reasoner_cache_identity(
 
     normalized = str(name).strip().lower()
     selected = ReasonerSettings.from_value(settings)
+    core_package_version = distribution_version(pyowl_core, "pyowl-core")
     distribution = {"elk": "pyelk-reasoner", "hermit": "pyHermiT"}.get(normalized)
     if distribution is None:
-        package_version = str(pyowl_core.__version__) if normalized == "asserted" else "plugin"
+        package_version = core_package_version if normalized == "asserted" else "plugin"
     else:
         try:
             package_version = version(distribution)
@@ -594,7 +578,7 @@ def reasoner_cache_identity(
         "timeout_seconds": selected.timeout_seconds,
         "fallback": selected.fallback,
         "worker_wire": selected.worker_wire,
-        "core_package_version": str(pyowl_core.__version__),
+        "core_package_version": core_package_version,
         "core_api_version": list(pyowl_core.API_VERSION),
         "core_model_schema_version": int(pyowl_core.MODEL_SCHEMA_VERSION),
         "core_wire_format_version": list(pyowl_core.WIRE_FORMAT_VERSION),
@@ -642,14 +626,15 @@ class AssertedHierarchyReasoner:
         self.store = store
         self.snapshot = store.owl_snapshot()
         settings = _settings or ReasonerSettings()
+        core_package_version = distribution_version(pyowl_core, "pyowl-core")
         provenance = _base_provenance(
             self.snapshot,
             settings,
             requested_reasoner=_requested_reasoner,
             effective_reasoner="asserted",
-            package_version=str(pyowl_core.__version__),
+            package_version=core_package_version,
             effective_backend="structural",
-            implementation_version=str(pyowl_core.__version__),
+            implementation_version=core_package_version,
         )
         self._provenance = replace(
             provenance,
@@ -810,7 +795,7 @@ def _create_elk(
             settings,
             requested_reasoner="elk",
             effective_reasoner="elk",
-            package_version=_distribution_version(pyelk, "pyelk-reasoner"),
+            package_version=distribution_version(pyelk, "pyelk-reasoner"),
             effective_backend=str(backend.name),
             implementation_version=str(backend.implementation_version),
             backend_fallback_reason=backend.fallback_reason,
@@ -900,7 +885,7 @@ def _create_hermit(
             settings,
             requested_reasoner="hermit",
             effective_reasoner="hermit",
-            package_version=_distribution_version(pyhermit, "pyHermiT"),
+            package_version=distribution_version(pyhermit, "pyHermiT"),
             effective_backend=str(backend.name),
             implementation_version=str(backend.implementation_version),
             backend_fallback_reason=_hermit_fallback_reason(pyhermit, settings, backend),
@@ -1091,7 +1076,7 @@ class WorkerWireHierarchyReasoner(_InferredHierarchyReasoner):
             selected,
             requested_reasoner=reasoner_name,
             effective_reasoner=reasoner_name,
-            package_version=_distribution_version(module, distribution),
+            package_version=distribution_version(module, distribution),
             effective_backend="worker-pending",
             implementation_version="worker-pending",
             verified_wire=False,
