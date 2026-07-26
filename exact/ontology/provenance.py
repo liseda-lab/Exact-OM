@@ -17,13 +17,14 @@ from pyowl_core import OntologySnapshot, OntologyView
 
 from exact.ontology.projection import (
     ProjectorSettings,
+    _validate_encoded_compiler_handoff,
     encoded_contract_identity,
     projector_cache_identity,
 )
 from exact.ontology.view_contract import retain_ontology_view
 
 ONTOLOGY_STACK_PROVENANCE_SCHEMA = 1
-CONSUMER_HANDOFF_PROVENANCE_SCHEMA = 1
+CONSUMER_HANDOFF_PROVENANCE_SCHEMA = 2
 _PATH_FRAGMENT = re.compile(r"(?<![A-Za-z0-9])(?:[A-Za-z]:[\\/]|/)[^\s\"']+")
 _OBJECT_ID = re.compile(r"\b0x[0-9a-fA-F]{6,}\b")
 _REASONER_INGESTION_PATHS = frozenset(
@@ -83,6 +84,7 @@ _REASONER_HANDOFF_OPTIONAL_FIELDS = frozenset(
     {
         "compiler_cache_schema_version",
         "consumer_compile_seconds",
+        "encoded_schema",
         "encoded_view_publication_seconds",
         "implementation_version",
         "ir_schema_version",
@@ -361,6 +363,18 @@ def _projector_consumer_handoff(projector: Mapping[str, object]) -> dict[str, ob
                 or _SHA256_HEX.fullmatch(descriptor) is None
             ):
                 raise TypeError("projector encoded ingestion identity is invalid")
+            expected = cast(
+                Mapping[str, object],
+                encoded_contract_identity().as_dict()["core"],
+            )
+            for name, actual in zip(
+                ("schema_name", "schema_version", "descriptor_sha256"),
+                encoded_identity,
+                strict=True,
+            ):
+                expected_value = expected[name]
+                if type(actual) is not type(expected_value) or actual != expected_value:
+                    raise ValueError(f"projector encoded ingestion {name} is incompatible")
         elif any(value is not None for value in encoded_identity):
             raise ValueError("scalar projector ingestion claimed an encoded identity")
         if schema_name is not None:
@@ -461,6 +475,12 @@ def _reasoner_consumer_handoff(reasoner: Mapping[str, object]) -> dict[str, obje
             for name, expected in _ENCODED_ONLY_COUNTER_DEFAULTS.items()
         ):
             raise ValueError("scalar reasoner ingestion claimed nonzero encoded resources")
+        raw_encoded_schema = handoff.get("encoded_schema")
+        if raw_encoded_schema is None:
+            if ingestion_path == "encoded-native":
+                raise ValueError("encoded-native reasoner omitted its public compiler_handoff")
+        else:
+            result["encoded_schema"] = _validate_encoded_compiler_handoff(raw_encoded_schema)
         result.update(
             {
                 "ingestion_path": ingestion_path,

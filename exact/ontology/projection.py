@@ -21,6 +21,29 @@ from exact.ontology.view_contract import retain_ontology_view
 ProjectorBackend: TypeAlias = Literal["auto", "native", "python"]
 ProjectionMethod: TypeAlias = Literal["owl2vecstar", "taxonomy"]
 
+_ENCODED_BUFFER_WIDTHS: Mapping[str, int] = {
+    "field_kinds": 1,
+    "field_lengths": 8,
+    "field_values": 8,
+    "item_kinds": 1,
+    "item_lengths": 8,
+    "item_values": 8,
+    "node_field_offsets": 8,
+    "node_tags": 2,
+    "root_ids": 4,
+    "root_kinds": 1,
+    "scalar_bytes": 1,
+}
+_ENCODED_COMPILER_HANDOFF_FIELDS = frozenset(
+    {
+        "buffer_widths",
+        "descriptor_sha256",
+        "model_schema",
+        "schema_name",
+        "schema_version",
+    }
+)
+
 
 @dataclass(frozen=True, slots=True)
 class ProjectorSettings:
@@ -120,6 +143,59 @@ def encoded_contract_identity() -> EncodedContractIdentity:
         projector_schema_name=projector_name,
         projector_schema_version=projector_schema,
     )
+
+
+def _validate_encoded_compiler_handoff(value: object) -> dict[str, object]:
+    """Validate a consumer's exact public pyowl-core structural schema attestation."""
+
+    if not isinstance(value, Mapping):
+        raise TypeError("consumer compiler_handoff must be a mapping")
+    fields = set(value)
+    if not all(isinstance(name, str) for name in fields):
+        raise TypeError("consumer compiler_handoff keys must be strings")
+    if fields != _ENCODED_COMPILER_HANDOFF_FIELDS:
+        raise ValueError("consumer compiler_handoff fields are incompatible")
+
+    contract = encoded_contract_identity()
+    expected_scalars: tuple[tuple[str, object], ...] = (
+        ("schema_name", contract.core_schema_name),
+        ("schema_version", contract.core_schema_version),
+        ("model_schema", int(pyowl_core.MODEL_SCHEMA_VERSION)),
+        ("descriptor_sha256", contract.core_descriptor_sha256),
+    )
+    if any(expected is None for _name, expected in expected_scalars):
+        raise RuntimeError("core encoded structural contract is unavailable")
+    for name, expected in expected_scalars:
+        actual = value[name]
+        if type(actual) is not type(expected) or actual != expected:
+            raise ValueError(
+                f"consumer compiler_handoff {name} is incompatible; "
+                f"expected {expected!r}, received {actual!r}"
+            )
+
+    widths = value["buffer_widths"]
+    if not isinstance(widths, Mapping):
+        raise TypeError("consumer compiler_handoff buffer_widths must be a mapping")
+    width_names = set(widths)
+    if not all(isinstance(name, str) for name in width_names):
+        raise TypeError("consumer compiler_handoff buffer names must be strings")
+    if width_names != set(_ENCODED_BUFFER_WIDTHS):
+        raise ValueError("consumer compiler_handoff buffer widths are incompatible")
+    for name, expected in _ENCODED_BUFFER_WIDTHS.items():
+        actual = widths[name]
+        if type(actual) is not int or actual != expected:
+            raise ValueError(
+                f"consumer compiler_handoff width for {name!r} is incompatible; "
+                f"expected {expected}, received {actual!r}"
+            )
+
+    return {
+        "buffer_widths": dict(sorted(_ENCODED_BUFFER_WIDTHS.items())),
+        "descriptor_sha256": contract.core_descriptor_sha256,
+        "model_schema": int(pyowl_core.MODEL_SCHEMA_VERSION),
+        "schema_name": contract.core_schema_name,
+        "schema_version": contract.core_schema_version,
+    }
 
 
 @dataclass(frozen=True, slots=True)

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from types import SimpleNamespace
 
 import pytest
 
@@ -29,6 +30,28 @@ _ONTOLOGY = b"""<?xml version="1.0"?>
   <owl:Class rdf:about="urn:exact:test:C"/>
 </rdf:RDF>
 """
+
+
+def _compiler_handoff() -> dict[str, object]:
+    return {
+        "schema_name": "pyowl-core/structural-columns",
+        "schema_version": 1,
+        "model_schema": 1,
+        "descriptor_sha256": ("9ad29db6a7e616f65cea2957bc5ba8d1f9b99ef0eb1fe1432c09be25786267b5"),
+        "buffer_widths": {
+            "field_kinds": 1,
+            "field_lengths": 8,
+            "field_values": 8,
+            "item_kinds": 1,
+            "item_lengths": 8,
+            "item_values": 8,
+            "node_field_offsets": 8,
+            "node_tags": 2,
+            "root_ids": 4,
+            "root_kinds": 1,
+            "scalar_bytes": 1,
+        },
+    }
 
 
 @pytest.fixture(scope="module")
@@ -211,6 +234,54 @@ def test_reasoner_module_and_distribution_version_drift_fails_closed(
     with pytest.raises(RuntimeError, match="module/distribution version mismatch"):
         load_reasoner("hermit", reasoning_source, backend="python")
     assert len(released) == 1
+
+
+def test_encoded_reasoner_handoff_records_exact_public_core_schema() -> None:
+    schema = _compiler_handoff()
+    reasoner = SimpleNamespace(
+        backend=SimpleNamespace(compiler_handoff=schema),
+        diagnostics=lambda: {
+            "ingestion_path": "encoded-native",
+            "compiler_digest": "0" * 64,
+        },
+    )
+
+    handoff = reasoning_module._consumer_handoff(reasoner)
+
+    assert handoff is not None
+    assert handoff.as_dict()["encoded_schema"] == schema
+    assert reasoning_module._consumer_handoff_from_record(handoff.as_dict()) == handoff
+
+
+@pytest.mark.parametrize(
+    "schema",
+    [
+        None,
+        {"schema_name": "pyowl-core/structural-columns"},
+        {**_compiler_handoff(), "schema_version": True},
+        {
+            **_compiler_handoff(),
+            "buffer_widths": {
+                **_compiler_handoff()["buffer_widths"],
+                "root_ids": 8,
+            },
+        },
+    ],
+)
+def test_encoded_reasoner_handoff_rejects_missing_or_incompatible_schema(
+    schema: object,
+) -> None:
+    backend = SimpleNamespace() if schema is None else SimpleNamespace(compiler_handoff=schema)
+    reasoner = SimpleNamespace(
+        backend=backend,
+        diagnostics=lambda: {
+            "ingestion_path": "encoded-native",
+            "compiler_digest": None,
+        },
+    )
+
+    with pytest.raises((TypeError, ValueError), match="compiler_handoff|width|schema_version"):
+        reasoning_module._consumer_handoff(reasoner)
 
 
 @pytest.mark.parametrize("reasoner_name", ["elk", "hermit"])

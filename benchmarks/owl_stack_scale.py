@@ -25,6 +25,10 @@ import pyowl_core  # noqa: E402
 from pyowl2vec_star_projector import ProjectionOptions  # noqa: E402
 
 from exact.ontology import load_ontology  # noqa: E402
+from exact.ontology.projection import (  # noqa: E402
+    _validate_encoded_compiler_handoff,
+    encoded_contract_identity,
+)
 
 
 def _max_rss_bytes() -> int:
@@ -225,6 +229,52 @@ def _require_encoded_path(
         raise RuntimeError(
             f"{consumer} did not select required encoded-native ingestion (selected {path!r})"
         )
+    schema = _encoded_schema_evidence(handoff)
+    if schema["compatible"] is not True:
+        raise RuntimeError(
+            f"{consumer} encoded-native ingestion schema is incompatible: " f"{schema['actual']!r}"
+        )
+
+
+def _encoded_schema_evidence(
+    handoff: Mapping[str, object] | None,
+) -> dict[str, object]:
+    expected = cast(
+        Mapping[str, object],
+        encoded_contract_identity().as_dict()["core"],
+    )
+    actual: dict[str, object] | None = None
+    error: str | None = None
+    if handoff is not None:
+        nested = handoff.get("encoded_schema")
+        if nested is not None:
+            try:
+                canonical = _validate_encoded_compiler_handoff(nested)
+            except (TypeError, ValueError, RuntimeError) as failure:
+                error = str(failure)
+            else:
+                actual = {
+                    name: canonical[name]
+                    for name in ("schema_name", "schema_version", "descriptor_sha256")
+                }
+        elif any(
+            name in handoff for name in ("schema_name", "schema_version", "descriptor_sha256")
+        ):
+            actual = {
+                name: handoff.get(name)
+                for name in ("schema_name", "schema_version", "descriptor_sha256")
+            }
+    identity_fields = ("schema_name", "schema_version", "descriptor_sha256")
+    compatible = actual is not None and all(
+        type(actual[name]) is type(expected[name]) and actual[name] == expected[name]
+        for name in identity_fields
+    )
+    return {
+        "actual": actual,
+        "compatible": compatible,
+        "error": error,
+        "expected": expected,
+    }
 
 
 def _is_zero_counter(value: object) -> bool:
@@ -269,8 +319,10 @@ def _consumer_counter_evidence(
         and type(zero_copy_buffers) is int
         and zero_copy_buffers == buffer_count
     )
+    schema = _encoded_schema_evidence(handoff)
     ready = (
         path == "encoded-native"
+        and schema["compatible"] is True
         and not missing
         and not invalid
         and not forbidden
@@ -290,6 +342,7 @@ def _consumer_counter_evidence(
         "encoded_buffer_count": buffer_count,
         "encoded_zero_copy_buffers": zero_copy_buffers,
         "all_encoded_buffers_zero_copy": all_buffers_zero_copy,
+        "encoded_schema": schema,
         "acceptance_ready": ready,
     }
 
@@ -305,7 +358,8 @@ def _require_consumer_counter_evidence(evidence: Mapping[str, object]) -> None:
         f"nonzero={evidence.get('nonzero_forbidden_public_counters')!r}, "
         f"staging={evidence.get('direct_staging_copy_bytes')!r}, "
         f"gil_released={evidence.get('encoded_compiler_gil_released')!r}, "
-        f"all_buffers_zero_copy={evidence.get('all_encoded_buffers_zero_copy')!r}"
+        f"all_buffers_zero_copy={evidence.get('all_encoded_buffers_zero_copy')!r}, "
+        f"encoded_schema={evidence.get('encoded_schema')!r}"
     )
 
 
@@ -740,7 +794,7 @@ def main() -> None:
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     payload = {
-        "schema_version": 4,
+        "schema_version": 5,
         "environment": {
             "python": platform.python_version(),
             "platform": platform.platform(),

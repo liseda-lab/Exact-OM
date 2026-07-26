@@ -261,7 +261,7 @@ def test_projection_cache_key_invalidates_on_public_descriptor_change(monkeypatc
 def test_reasoner_cache_identity_versions_the_mmap_worker_contract():
     identity = reasoner_cache_identity("asserted")
 
-    assert identity["worker_schema_version"] == 2
+    assert identity["worker_schema_version"] == 3
     assert identity["encoded_contract"] == encoded_contract_identity().as_dict()["core"]
     assert identity["consumer_compiler"] == {
         "compiler_cache_schema_version": None,

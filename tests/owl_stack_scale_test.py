@@ -12,6 +12,7 @@ from benchmarks.owl_stack_scale import (
     _consumer_counter_evidence,
     _edge_record,
     _require_consumer_counter_evidence,
+    _require_encoded_path,
     main,
     measure,
 )
@@ -38,7 +39,13 @@ def _encoded_handoff(**counter_overrides: int | bool) -> dict[str, object]:
         "wire_encoder_calls": 0,
     }
     counters.update(counter_overrides)
-    return {"ingestion_path": "encoded-native", "counters": counters}
+    return {
+        "ingestion_path": "encoded-native",
+        "schema_name": "pyowl-core/structural-columns",
+        "schema_version": 1,
+        "descriptor_sha256": ("9ad29db6a7e616f65cea2957bc5ba8d1f9b99ef0eb1fe1432c09be25786267b5"),
+        "counters": counters,
+    }
 
 
 def test_streaming_edge_digest_matches_public_projector_artifact_contract() -> None:
@@ -135,7 +142,31 @@ def test_direct_encoded_counter_evidence_requires_complete_zero_copy_gil_record(
     assert evidence["encoded_buffer_count"] == 11
     assert evidence["encoded_zero_copy_buffers"] == 11
     assert evidence["all_encoded_buffers_zero_copy"] is True
+    assert evidence["encoded_schema"]["compatible"] is True
     _require_consumer_counter_evidence(evidence)
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("schema_name", "pyowl-core/other"),
+        ("schema_version", True),
+        ("descriptor_sha256", "0" * 64),
+    ],
+)
+def test_direct_encoded_counter_evidence_rejects_incompatible_schema(
+    field: str,
+    value: object,
+) -> None:
+    handoff = _encoded_handoff()
+    handoff[field] = value
+
+    evidence = _consumer_counter_evidence(consumer="projector", handoff=handoff)
+
+    assert evidence["encoded_schema"]["compatible"] is False
+    assert evidence["acceptance_ready"] is False
+    with pytest.raises(RuntimeError, match="ingestion schema is incompatible"):
+        _require_encoded_path(consumer="projector", handoff=handoff)
 
 
 @pytest.mark.parametrize(
@@ -218,6 +249,6 @@ def test_cli_emits_versioned_configuration(monkeypatch, capsys) -> None:
     main()
 
     payload = json.loads(capsys.readouterr().out)
-    assert payload["schema_version"] == 4
+    assert payload["schema_version"] == 5
     assert payload["configuration"]["cache_state"] == ("cold-load; projection cache fill then hit")
     assert payload["measurements"][0]["load_calls"] == 1

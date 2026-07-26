@@ -12,6 +12,28 @@ from exact.ontology.reasoning import ConsumerHandoffProvenance
 FIXTURES = Path(__file__).parent / "fixtures" / "ontologies"
 
 
+def _compiler_handoff() -> dict[str, object]:
+    return {
+        "schema_name": "pyowl-core/structural-columns",
+        "schema_version": 1,
+        "model_schema": 1,
+        "descriptor_sha256": ("9ad29db6a7e616f65cea2957bc5ba8d1f9b99ef0eb1fe1432c09be25786267b5"),
+        "buffer_widths": {
+            "field_kinds": 1,
+            "field_lengths": 8,
+            "field_values": 8,
+            "item_kinds": 1,
+            "item_lengths": 8,
+            "item_values": 8,
+            "node_field_offsets": 8,
+            "node_tags": 2,
+            "root_ids": 4,
+            "root_kinds": 1,
+            "scalar_bytes": 1,
+        },
+    }
+
+
 def test_ontology_stack_provenance_is_complete_and_path_free() -> None:
     path = FIXTURES / "mini_src.owl"
     source = load_ontology(path)
@@ -29,7 +51,8 @@ def test_ontology_stack_provenance_is_complete_and_path_free() -> None:
     assert provenance["projector"]["selection"]["effective"] == "python"
     assert provenance["reasoner"]["selection"]["effective"] == "asserted"
     handoff = provenance["consumer_handoff"]
-    assert handoff["schema_version"] == 1
+    assert handoff["schema_version"] == 2
+    capabilities = source.owl_snapshot().capabilities
     assert handoff["core"] == {
         "encoded_contract": {
             "schema_name": "pyowl-core/structural-columns",
@@ -38,9 +61,9 @@ def test_ontology_stack_provenance_is_complete_and_path_free() -> None:
                 "9ad29db6a7e616f65cea2957bc5ba8d1f9b99ef0eb1fe1432c09be25786267b5"
             ),
         },
-        "encoded_view_schemas": {},
+        "encoded_view_schemas": dict(sorted(capabilities.encoded_view_schemas.items())),
         "owner_kind": "direct",
-        "storage_backend": "python",
+        "storage_backend": capabilities.backend,
     }
     assert handoff["projector"]["compiler_cache_schema"]
     assert "ingestion_path" not in handoff["projector"]
@@ -168,7 +191,9 @@ def test_consumer_handoff_records_bounded_encoded_projector_diagnostics() -> Non
                         "path": "encoded-native",
                         "encoded_schema_name": "pyowl-core/structural-columns",
                         "encoded_schema_version": 1,
-                        "encoded_descriptor_sha256": "a" * 64,
+                        "encoded_descriptor_sha256": (
+                            "9ad29db6a7e616f65cea2957bc5ba8d1f" "9b99ef0eb1fe1432c09be25786267b5"
+                        ),
                         "encoded_view_publication_seconds": 0.25,
                         "consumer_compile_seconds": 0.5,
                         "counters": {
@@ -190,7 +215,7 @@ def test_consumer_handoff_records_bounded_encoded_projector_diagnostics() -> Non
         "ingestion_path": "encoded-native",
         "schema_name": "pyowl-core/structural-columns",
         "schema_version": 1,
-        "descriptor_sha256": "a" * 64,
+        "descriptor_sha256": ("9ad29db6a7e616f65cea2957bc5ba8d1f9b99ef0eb1fe1432c09be25786267b5"),
         "encoded_view_publication_seconds": 0.25,
         "consumer_compile_seconds": 0.5,
         "counters": {
@@ -199,6 +224,26 @@ def test_consumer_handoff_records_bounded_encoded_projector_diagnostics() -> Non
             "materialized_scalar_rows": 0,
         },
     }
+
+
+def test_consumer_handoff_rejects_incompatible_projector_encoded_schema() -> None:
+    with pytest.raises(ValueError, match="descriptor_sha256 is incompatible"):
+        _projector_consumer_handoff(
+            {
+                "package_version": "0.1.0",
+                "compiler_cache_schema": "compiler/1",
+                "last_projection": {
+                    "provenance": {
+                        "ingestion": {
+                            "path": "encoded-native",
+                            "encoded_schema_name": "pyowl-core/structural-columns",
+                            "encoded_schema_version": 1,
+                            "encoded_descriptor_sha256": "0" * 64,
+                        },
+                    }
+                },
+            }
+        )
 
 
 def test_consumer_handoff_rejects_unbounded_reasoner_diagnostics() -> None:
@@ -276,6 +321,7 @@ def test_consumer_handoff_records_public_reasoner_compiler_contract() -> None:
                 "ir_schema_version": 1,
                 "implementation_version": "0.1.0",
                 "consumer_compile_seconds": 0.25,
+                "encoded_schema": _compiler_handoff(),
                 "counters": {
                     "encoded_buffer_count": 0,
                     "materialized_scalar_rows": 7,
@@ -298,7 +344,26 @@ def test_consumer_handoff_records_public_reasoner_compiler_contract() -> None:
         "compiler_cache_schema_version": 1,
         "ir_schema_version": 1,
         "consumer_compile_seconds": 0.25,
+        "encoded_schema": _compiler_handoff(),
     }
+
+
+def test_encoded_reasoner_provenance_requires_exact_public_schema() -> None:
+    source = load_ontology(FIXTURES / "mini_src.owl")
+
+    with pytest.raises(ValueError, match="omitted its public compiler_handoff"):
+        ontology_stack_provenance(
+            source.owl_snapshot(),
+            projector_settings=source.projector_settings,
+            projector=source.projector,
+            reasoner={
+                "consumer_handoff": {
+                    "ingestion_path": "encoded-native",
+                    "compiler_digest": "0" * 64,
+                    "counters": {},
+                },
+            },
+        )
 
 
 @pytest.mark.parametrize(

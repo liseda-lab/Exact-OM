@@ -25,12 +25,15 @@ from typing import Any, Literal, Mapping, Protocol, cast, runtime_checkable
 import pyowl_core
 from pyowl_core import IRI, Class, OntologyView
 
-from exact.ontology.projection import encoded_contract_identity
+from exact.ontology.projection import (
+    _validate_encoded_compiler_handoff,
+    encoded_contract_identity,
+)
 from exact.ontology.store import OWL_NOTHING, OWL_THING, OwlOntologySource
 
 ReasonerFallback = Literal["error", "asserted"]
 _OWL_BOUNDS = frozenset({OWL_THING, OWL_NOTHING})
-_WORKER_SCHEMA_VERSION = 2
+_WORKER_SCHEMA_VERSION = 3
 _PATH_FRAGMENT = re.compile(r"(?<![A-Za-z0-9])(?:[A-Za-z]:[\\/]|/)[^\s\"']+")
 _INGESTION_PATHS = frozenset({"scalar-python", "scalar-native", "scalar-wire", "encoded-native"})
 _HANDOFF_COUNTERS = frozenset(
@@ -62,6 +65,7 @@ _HANDOFF_OPTIONAL_FIELDS = frozenset(
     {
         "compiler_cache_schema_version",
         "consumer_compile_seconds",
+        "encoded_schema",
         "encoded_view_publication_seconds",
         "implementation_version",
         "ir_schema_version",
@@ -82,6 +86,7 @@ _ENCODED_ONLY_COUNTER_DEFAULTS: Mapping[str, int | bool] = {
     "encoded_compiler_gil_released": False,
 }
 _SHA256_HEX = re.compile(r"[0-9a-f]{64}\Z")
+_MISSING = object()
 
 
 def _failure_reason(error: Exception) -> str:
@@ -104,6 +109,45 @@ class ReasonerWorkerTimeoutError(ReasonerWorkerError, TimeoutError):
 
 
 @dataclass(frozen=True, slots=True)
+class EncodedCompilerHandoffProvenance:
+    """Canonical public structural schema accepted from a native consumer."""
+
+    schema_name: str
+    schema_version: int
+    model_schema: int
+    descriptor_sha256: str
+    buffer_widths: tuple[tuple[str, int], ...]
+
+    def __post_init__(self) -> None:
+        if self.buffer_widths != tuple(sorted(dict(self.buffer_widths).items())):
+            raise ValueError("reasoner encoded buffer widths are not canonical")
+        canonical = _validate_encoded_compiler_handoff(self.as_dict())
+        if self.as_dict() != canonical:
+            raise ValueError("reasoner encoded compiler handoff is not canonical")
+
+    @classmethod
+    def from_value(cls, value: object) -> "EncodedCompilerHandoffProvenance":
+        canonical = _validate_encoded_compiler_handoff(value)
+        widths = cast(Mapping[str, int], canonical["buffer_widths"])
+        return cls(
+            schema_name=cast(str, canonical["schema_name"]),
+            schema_version=cast(int, canonical["schema_version"]),
+            model_schema=cast(int, canonical["model_schema"]),
+            descriptor_sha256=cast(str, canonical["descriptor_sha256"]),
+            buffer_widths=tuple(sorted(widths.items())),
+        )
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "buffer_widths": dict(self.buffer_widths),
+            "descriptor_sha256": self.descriptor_sha256,
+            "model_schema": self.model_schema,
+            "schema_name": self.schema_name,
+            "schema_version": self.schema_version,
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class ConsumerHandoffProvenance:
     """Bounded public compiler diagnostics without consumer-private state."""
 
@@ -116,6 +160,7 @@ class ConsumerHandoffProvenance:
     implementation_version: str | None = None
     consumer_compile_seconds: float | None = None
     encoded_view_publication_seconds: float | None = None
+    encoded_schema: EncodedCompilerHandoffProvenance | None = None
 
     def __post_init__(self) -> None:
         if self.ingestion_path not in _INGESTION_PATHS:
@@ -154,6 +199,12 @@ class ConsumerHandoffProvenance:
             and self.encoded_view_publication_seconds is not None
         ):
             raise ValueError("scalar reasoner ingestion claimed encoded-view publication")
+        if self.encoded_schema is not None and not isinstance(
+            self.encoded_schema, EncodedCompilerHandoffProvenance
+        ):
+            raise TypeError("reasoner encoded schema must be public compiler handoff provenance")
+        if self.ingestion_path == "encoded-native" and self.encoded_schema is None:
+            raise ValueError("encoded-native reasoner omitted its public compiler_handoff")
         names = tuple(name for name, _value in self.counters)
         if names != tuple(sorted(set(names))) or any(
             name not in _HANDOFF_COUNTERS for name in names
@@ -189,6 +240,8 @@ class ConsumerHandoffProvenance:
             value = getattr(self, name)
             if value is not None:
                 result[name] = value
+        if self.encoded_schema is not None:
+            result["encoded_schema"] = self.encoded_schema.as_dict()
         return result
 
 
@@ -411,6 +464,12 @@ def _consumer_handoff_from_record(value: object) -> ConsumerHandoffProvenance | 
         not isinstance(name, str) for name in raw_counters
     ):
         raise TypeError("reasoner handoff counters must be a string-keyed mapping")
+    raw_encoded_schema = value.get("encoded_schema")
+    encoded_schema = (
+        None
+        if raw_encoded_schema is None
+        else EncodedCompilerHandoffProvenance.from_value(raw_encoded_schema)
+    )
     return ConsumerHandoffProvenance(
         ingestion_path=ingestion_path,
         compiler_digest=compiler_digest,
@@ -423,10 +482,22 @@ def _consumer_handoff_from_record(value: object) -> ConsumerHandoffProvenance | 
         encoded_view_publication_seconds=cast(
             float | None, value.get("encoded_view_publication_seconds")
         ),
+        encoded_schema=encoded_schema,
     )
 
 
+def _reasoner_encoded_schema(reasoner: object) -> EncodedCompilerHandoffProvenance | None:
+    backend = getattr(reasoner, "backend", _MISSING)
+    if backend is _MISSING:
+        return None
+    value = getattr(backend, "compiler_handoff", _MISSING)
+    if value is _MISSING:
+        return None
+    return EncodedCompilerHandoffProvenance.from_value(value)
+
+
 def _consumer_handoff(reasoner: object) -> ConsumerHandoffProvenance | None:
+    encoded_schema = _reasoner_encoded_schema(reasoner)
     diagnostics = getattr(reasoner, "diagnostics", None)
     if not callable(diagnostics):
         return None
@@ -449,9 +520,11 @@ def _consumer_handoff(reasoner: object) -> ConsumerHandoffProvenance | None:
         "compiler_digest": compiler_digest,
         "counters": counters,
     }
-    for name in sorted(_HANDOFF_OPTIONAL_FIELDS):
+    for name in sorted(_HANDOFF_OPTIONAL_FIELDS - {"encoded_schema"}):
         if name in values:
             record[name] = values[name]
+    if encoded_schema is not None:
+        record["encoded_schema"] = encoded_schema.as_dict()
     return _consumer_handoff_from_record(record)
 
 
