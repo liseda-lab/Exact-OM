@@ -372,13 +372,23 @@ def _base_provenance(
 
 
 def _distribution_version(module: object, distribution: str) -> str:
-    candidate = getattr(module, "__version__", None)
-    if isinstance(candidate, str) and candidate:
-        return candidate
+    module_version = getattr(module, "__version__", None)
+    if not isinstance(module_version, str) or not module_version:
+        module_version = None
     try:
-        return version(distribution)
+        distribution_version = version(distribution)
     except PackageNotFoundError:
-        return "unknown"
+        distribution_version = None
+    if (
+        module_version is not None
+        and distribution_version is not None
+        and module_version != distribution_version
+    ):
+        raise RuntimeError(
+            f"installed {distribution} module/distribution version mismatch: "
+            f"{module_version!r} != {distribution_version!r}"
+        )
+    return module_version or distribution_version or "unknown"
 
 
 def _consumer_handoff_from_record(value: object) -> ConsumerHandoffProvenance | None:

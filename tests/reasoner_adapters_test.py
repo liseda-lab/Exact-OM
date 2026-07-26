@@ -188,6 +188,31 @@ def test_rejected_consumer_handoff_releases_session_and_retry_is_clean(
     assert len(released) == 2
 
 
+def test_reasoner_module_and_distribution_version_drift_fails_closed(
+    reasoning_source,
+    monkeypatch,
+):
+    import pyhermit
+
+    cleanup = pyhermit.Reasoner.dispose
+    released = []
+
+    def tracked_cleanup(reasoner):
+        released.append(reasoner)
+        cleanup(reasoner)
+
+    monkeypatch.setattr(pyhermit.Reasoner, "dispose", tracked_cleanup)
+    monkeypatch.setattr(
+        reasoning_module,
+        "version",
+        lambda distribution: "0.1.1" if distribution == "pyHermiT" else "0.1.0.dev0",
+    )
+
+    with pytest.raises(RuntimeError, match="module/distribution version mismatch"):
+        load_reasoner("hermit", reasoning_source, backend="python")
+    assert len(released) == 1
+
+
 @pytest.mark.parametrize("reasoner_name", ["elk", "hermit"])
 def test_optional_reasoners_retain_overlay_and_composite_views(reasoning_source, reasoner_name):
     import pyowl_core
