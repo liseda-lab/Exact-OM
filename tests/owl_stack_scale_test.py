@@ -130,7 +130,11 @@ def test_direct_encoded_counter_evidence_requires_complete_zero_copy_gil_record(
     assert evidence["acceptance_ready"] is True
     assert evidence["complete_public_counter_coverage"] is True
     assert evidence["missing_public_counters"] == []
+    assert evidence["invalid_public_counters"] == {}
     assert evidence["nonzero_forbidden_public_counters"] == {}
+    assert evidence["encoded_buffer_count"] == 11
+    assert evidence["encoded_zero_copy_buffers"] == 11
+    assert evidence["all_encoded_buffers_zero_copy"] is True
     _require_consumer_counter_evidence(evidence)
 
 
@@ -173,6 +177,31 @@ def test_direct_encoded_counter_evidence_rejects_missing_counter() -> None:
 
     assert evidence["acceptance_ready"] is False
     assert evidence["missing_public_counters"] == ["wire_encoder_calls"]
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"parser_calls": False},
+        {"encoded_buffer_bytes": False},
+        {"encoded_buffer_bytes": -1},
+        {"encoded_staging_copy_bytes": False},
+        {"encoded_buffer_count": 0},
+        {"encoded_zero_copy_buffers": 10},
+        {"encoded_private_ir_bytes": 1},
+    ],
+)
+def test_direct_encoded_counter_evidence_rejects_inexact_zero_copy_records(
+    overrides: dict[str, int | bool],
+) -> None:
+    evidence = _consumer_counter_evidence(
+        consumer="hermit",
+        handoff=_encoded_handoff(**overrides),
+    )
+
+    assert evidence["acceptance_ready"] is False
+    with pytest.raises(RuntimeError, match="acceptance evidence failed"):
+        _require_consumer_counter_evidence(evidence)
 
 
 def test_cli_emits_versioned_configuration(monkeypatch, capsys) -> None:

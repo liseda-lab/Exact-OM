@@ -55,6 +55,7 @@ _REQUIRED_ZERO_COUNTERS = (
     "wire_decoder_calls",
     "wire_encoder_calls",
 )
+_OPTIONAL_ZERO_COUNTERS = ("encoded_private_ir_bytes",)
 
 
 def _fingerprints(snapshot: pyowl_core.OntologyView) -> dict[str, str]:
@@ -227,7 +228,11 @@ def _require_encoded_path(
 
 
 def _is_zero_counter(value: object) -> bool:
-    return value is False or (type(value) is int and value == 0)
+    return type(value) is int and value == 0
+
+
+def _is_nonnegative_counter(value: object) -> bool:
+    return type(value) is int and value >= 0
 
 
 def _consumer_counter_evidence(
@@ -242,28 +247,49 @@ def _consumer_counter_evidence(
     counters = dict(raw_counters) if isinstance(raw_counters, Mapping) else {}
     required = (*_REQUIRED_ENCODED_COUNTERS, *_REQUIRED_ZERO_COUNTERS)
     missing = [name for name in required if name not in counters]
+    invalid = {
+        name: counters[name]
+        for name in (*required, *_OPTIONAL_ZERO_COUNTERS)
+        if name in counters
+        and name != "encoded_compiler_gil_released"
+        and not _is_nonnegative_counter(counters[name])
+    }
     forbidden = {
         name: counters[name]
-        for name in _REQUIRED_ZERO_COUNTERS
+        for name in (*_REQUIRED_ZERO_COUNTERS, *_OPTIONAL_ZERO_COUNTERS)
         if name in counters and not _is_zero_counter(counters[name])
     }
     staging = counters.get("encoded_staging_copy_bytes")
     gil_released = counters.get("encoded_compiler_gil_released")
+    buffer_count = counters.get("encoded_buffer_count")
+    zero_copy_buffers = counters.get("encoded_zero_copy_buffers")
+    all_buffers_zero_copy = (
+        type(buffer_count) is int
+        and buffer_count > 0
+        and type(zero_copy_buffers) is int
+        and zero_copy_buffers == buffer_count
+    )
     ready = (
         path == "encoded-native"
         and not missing
+        and not invalid
         and not forbidden
         and _is_zero_counter(staging)
         and gil_released is True
+        and all_buffers_zero_copy
     )
     return {
         "consumer": consumer,
         "selected_ingestion_path": path,
         "complete_public_counter_coverage": path == "encoded-native" and not missing,
         "missing_public_counters": missing,
+        "invalid_public_counters": invalid,
         "nonzero_forbidden_public_counters": forbidden,
         "direct_staging_copy_bytes": staging,
         "encoded_compiler_gil_released": gil_released,
+        "encoded_buffer_count": buffer_count,
+        "encoded_zero_copy_buffers": zero_copy_buffers,
+        "all_encoded_buffers_zero_copy": all_buffers_zero_copy,
         "acceptance_ready": ready,
     }
 
@@ -275,9 +301,11 @@ def _require_consumer_counter_evidence(evidence: Mapping[str, object]) -> None:
     raise RuntimeError(
         f"{consumer} encoded handoff acceptance evidence failed: "
         f"missing={evidence.get('missing_public_counters')!r}, "
+        f"invalid={evidence.get('invalid_public_counters')!r}, "
         f"nonzero={evidence.get('nonzero_forbidden_public_counters')!r}, "
         f"staging={evidence.get('direct_staging_copy_bytes')!r}, "
-        f"gil_released={evidence.get('encoded_compiler_gil_released')!r}"
+        f"gil_released={evidence.get('encoded_compiler_gil_released')!r}, "
+        f"all_buffers_zero_copy={evidence.get('all_encoded_buffers_zero_copy')!r}"
     )
 
 
