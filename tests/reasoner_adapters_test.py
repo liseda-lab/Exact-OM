@@ -4,6 +4,7 @@ import os
 
 import pytest
 
+import exact.ontology.reasoning as reasoning_module
 from exact.ontology import load_ontology
 from exact.ontology.reasoning import (
     AssertedHierarchyReasoner,
@@ -137,6 +138,54 @@ def test_hermit_compiler_digest_is_backend_independent(reasoning_source):
         for diagnostics_by_backend in diagnostics.values()
         for value in diagnostics_by_backend["counters"].values()
     )
+
+
+@pytest.mark.parametrize(
+    ("reasoner_name", "module_name", "cleanup_name"),
+    [
+        ("elk", "pyelk", "close"),
+        ("hermit", "pyhermit", "dispose"),
+    ],
+)
+def test_rejected_consumer_handoff_releases_session_and_retry_is_clean(
+    reasoning_source,
+    monkeypatch,
+    reasoner_name,
+    module_name,
+    cleanup_name,
+):
+    module = __import__(module_name)
+    cleanup = getattr(module.Reasoner, cleanup_name)
+    released = []
+
+    def tracked_cleanup(reasoner):
+        released.append(reasoner)
+        cleanup(reasoner)
+
+    original_handoff = reasoning_module._consumer_handoff
+    attempts = 0
+
+    def reject_once(reasoner):
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            raise ValueError("incompatible native compiler handoff")
+        return original_handoff(reasoner)
+
+    monkeypatch.setattr(module.Reasoner, cleanup_name, tracked_cleanup)
+    monkeypatch.setattr(reasoning_module, "_consumer_handoff", reject_once)
+
+    with pytest.raises(ValueError, match="incompatible native compiler handoff"):
+        load_reasoner(reasoner_name, reasoning_source, backend="python")
+    assert len(released) == 1
+
+    retry = load_reasoner(reasoner_name, reasoning_source, backend="python")
+    try:
+        _assert_chain(retry)
+    finally:
+        retry.close()
+    assert attempts == 2
+    assert len(released) == 2
 
 
 @pytest.mark.parametrize("reasoner_name", ["elk", "hermit"])

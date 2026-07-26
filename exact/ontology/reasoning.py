@@ -695,6 +695,16 @@ def _elk_query(reasoner: Any, iri: str, *, upward: bool, direct: bool) -> set[st
     }
 
 
+def _release_failed_reasoner(reasoner: object, method_name: str) -> None:
+    """Best-effort cleanup that preserves the primary setup failure."""
+
+    cleanup = getattr(reasoner, method_name)
+    try:
+        cleanup()
+    except Exception:
+        pass
+
+
 def _create_elk(
     snapshot: OntologyView, settings: ReasonerSettings
 ) -> tuple[Any, ReasonerProvenance, type[Exception]]:
@@ -708,23 +718,26 @@ def _create_elk(
         allow_incomplete_imports=False,
     )
     reasoner = pyelk.Reasoner(snapshot, config=config)
-    if reasoner.ontology is not snapshot:
-        reasoner.close()
-        raise RuntimeError("pyELK did not retain Exact's shared snapshot by identity")
-    backend = reasoner.backend
-    provenance = _base_provenance(
-        snapshot,
-        settings,
-        requested_reasoner="elk",
-        effective_reasoner="elk",
-        package_version=_distribution_version(pyelk, "pyelk-reasoner"),
-        effective_backend=str(backend.name),
-        implementation_version=str(backend.implementation_version),
-        backend_fallback_reason=backend.fallback_reason,
-    )
-    provenance = replace(provenance, consumer_handoff=_consumer_handoff(reasoner))
-    error_type = cast(type[Exception], import_module("pyelk.exceptions").PyElkError)
-    return reasoner, provenance, error_type
+    try:
+        if reasoner.ontology is not snapshot:
+            raise RuntimeError("pyELK did not retain Exact's shared snapshot by identity")
+        backend = reasoner.backend
+        provenance = _base_provenance(
+            snapshot,
+            settings,
+            requested_reasoner="elk",
+            effective_reasoner="elk",
+            package_version=_distribution_version(pyelk, "pyelk-reasoner"),
+            effective_backend=str(backend.name),
+            implementation_version=str(backend.implementation_version),
+            backend_fallback_reason=backend.fallback_reason,
+        )
+        provenance = replace(provenance, consumer_handoff=_consumer_handoff(reasoner))
+        error_type = cast(type[Exception], import_module("pyelk.exceptions").PyElkError)
+        return reasoner, provenance, error_type
+    except Exception:
+        _release_failed_reasoner(reasoner, "close")
+        raise
 
 
 class ElkHierarchyReasoner(_InferredHierarchyReasoner):
@@ -795,23 +808,26 @@ def _create_hermit(
         workers=settings.workers,
     )
     reasoner = pyhermit.Reasoner(snapshot, config=config)
-    if reasoner.ontology is not snapshot:
-        reasoner.dispose()
-        raise RuntimeError("pyHermiT did not retain Exact's shared snapshot by identity")
-    backend = reasoner.backend
-    provenance = _base_provenance(
-        snapshot,
-        settings,
-        requested_reasoner="hermit",
-        effective_reasoner="hermit",
-        package_version=_distribution_version(pyhermit, "pyHermiT"),
-        effective_backend=str(backend.name),
-        implementation_version=str(backend.implementation_version),
-        backend_fallback_reason=_hermit_fallback_reason(pyhermit, settings, backend),
-    )
-    provenance = replace(provenance, consumer_handoff=_consumer_handoff(reasoner))
-    error_type = cast(type[Exception], pyhermit.PyHermiTError)
-    return reasoner, provenance, error_type
+    try:
+        if reasoner.ontology is not snapshot:
+            raise RuntimeError("pyHermiT did not retain Exact's shared snapshot by identity")
+        backend = reasoner.backend
+        provenance = _base_provenance(
+            snapshot,
+            settings,
+            requested_reasoner="hermit",
+            effective_reasoner="hermit",
+            package_version=_distribution_version(pyhermit, "pyHermiT"),
+            effective_backend=str(backend.name),
+            implementation_version=str(backend.implementation_version),
+            backend_fallback_reason=_hermit_fallback_reason(pyhermit, settings, backend),
+        )
+        provenance = replace(provenance, consumer_handoff=_consumer_handoff(reasoner))
+        error_type = cast(type[Exception], pyhermit.PyHermiTError)
+        return reasoner, provenance, error_type
+    except Exception:
+        _release_failed_reasoner(reasoner, "dispose")
+        raise
 
 
 class HermitHierarchyReasoner(_InferredHierarchyReasoner):
