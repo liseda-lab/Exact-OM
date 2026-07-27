@@ -154,14 +154,23 @@ def test_hermit_compiler_digest_is_backend_independent(reasoning_source):
         diagnostics["python"]["compiler_digest"]
     }
     assert diagnostics["python"]["ingestion_path"] == "scalar-python"
+    assert all(value in {0, False} for value in diagnostics["python"]["counters"].values())
     for backend in ("native", "verify"):
-        assert diagnostics[backend]["ingestion_path"] == "scalar-wire"
-        assert diagnostics[backend]["native_abi_version"] == pyhermit.NATIVE_ABI_VERSION
-    assert all(
-        value in {0, False}
-        for diagnostics_by_backend in diagnostics.values()
-        for value in diagnostics_by_backend["counters"].values()
-    )
+        handoff = diagnostics[backend]
+        assert handoff["ingestion_path"] == "encoded-native"
+        assert handoff["native_abi_version"] == pyhermit.NATIVE_ABI_VERSION
+        assert handoff["encoded_schema"] == _compiler_handoff()
+        counters = handoff["counters"]
+        assert counters["encoded_buffer_bytes"] > 0
+        assert counters["encoded_buffer_count"] > 0
+        assert counters["encoded_compiler_gil_released"] is True
+        assert (
+            counters["encoded_detached_buffer_count"]
+            == counters["encoded_buffer_count"]
+            == counters["encoded_zero_copy_buffers"]
+        )
+        assert counters["encoded_segment_count"] > 0
+        assert counters["encoded_staging_copy_bytes"] == 0
 
 
 @pytest.mark.parametrize(
