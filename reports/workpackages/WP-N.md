@@ -1,8 +1,12 @@
 # WP-N encoded native-consumer handoff checkpoint
 
-Date: 2026-07-20. Exact-OM revision: `680112e`. Coordinated source candidates:
-pyOWLCore `47ec85f`, projector `9ee3c52`, pyELK `886f6a3`, pyHermiT `3c56fc2`, and
-OAEI-Bio-ML-eval `2f91a3a`.
+Date: 2026-07-27. Exact-OM implementation subject: `d172cfa355a5d2683fc47824a5d8f2ed24cf9125`.
+The committed short compatibility matrix binds pyOWLCore
+`af9bdb0b9178766b5f15806fb6a2f00b05e00e22`, projector
+`53a23e2d385696e2be042568ade0d178580c6de4`, pyELK
+`a909cfcea341834ab6d6598f80445a697b338f13`, pyHermiT
+`04bd8163b532f623044d7391706ff728d1aed4b1`, and OAEI-Bio-ML-eval
+`04573c09dd0e62825c3fa7c5b2490b43d5a22874`.
 
 ## Outcome
 
@@ -12,10 +16,14 @@ reasoners. It records only bounded public compiler diagnostics; it does not deco
 columns, import native extensions, flatten composites, cache dense IDs, or change matching and
 repair semantics.
 
-WP-N is **not accepted for release**. The coordinated encoded capabilities remain unadvertised,
-and the required pure/scalar/native interpreter matrix, accepted scale evidence, artifact audit,
-released dependency ranges, and published compatibility table are still open. No file below
-`specs/exact-repair/` or `specs/experiments/` is part of this implementation checkpoint.
+WP-N is **not accepted for release**. pyOWLCore structural-columns v1 and pyHermiT's
+`encoded-structural-compiler-v1` are now advertised. Exact revision `d172cfa` requires the public
+pyHermiT native and verify handoffs to report `encoded-native`, the exact compiler schema,
+released-GIL evidence, zero staging copy, and retained zero-copy buffers. pyELK and projector
+remain deliberately unadvertised, and the required pure/scalar/native interpreter matrix,
+accepted scale evidence, artifact audit, released dependency ranges, and published compatibility
+table are still open. No file below `specs/exact-repair/` or `specs/experiments/` is part of this
+implementation checkpoint.
 
 ## Implemented repository-owned slice
 
@@ -42,14 +50,18 @@ released dependency ranges, and published compatibility table are still open. No
 - Scalar-only core/projector/reasoner combinations remain supported, reasoners stay optional, and
   no Java, OAEI, or private accelerator dependency enters Exact's base installation.
 
-The implementation sequence is recorded by `d12e11d`, `c1a3537`, `3e6687a`, `d7c6b6f`,
-`a5b03e2`, `21d74b3`, `3c3cfce`, `acabe6c`, `87fad5a`, and `680112e`.
+The original implementation sequence is recorded by `d12e11d`, `c1a3537`, `3e6687a`, `d7c6b6f`,
+`a5b03e2`, `21d74b3`, `3c3cfce`, `acabe6c`, `87fad5a`, and `680112e`. Revisions `3bbde7d`
+through `d172cfa` then tightened zero-copy evidence, exact capability/version negotiation, public
+stack guards, and the advertised pyHermiT handoff without changing matching, repair, or experiment
+semantics.
 
 ## Local verification at this checkpoint
 
-The latest handoff hardening passed 81 focused provenance, reasoner-adapter, shared-stack, and
-scale-benchmark tests. Black, flake8, and isolated strict mypy passed for the changed runtime
-modules. Earlier slices also
+The current committed core compatibility record runs Exact revision `d172cfa` against the exact
+core subject above: 82 focused provenance, reasoner-adapter, shared-stack, scale-benchmark, and
+public-boundary tests pass, with one expected native-fallback warning on the scalar-only path.
+Earlier slices also
 proved one worker-wire encoding, verified mmap reopening, zero worker OWL parses, exact snapshot
 identity, backend-independent compiler digests, projector edge/cache digest stability, and bounded
 path-free provenance.
@@ -66,6 +78,7 @@ This source-tree verification does not replace the final installed distribution 
 | Versioned cache/provenance compatibility | Implemented for candidate schemas |
 | Public timing and copy/materialization/FFI/wire ledger | Complete projector vocabulary accepted and preserved; schema-5 release mode enforces exact encoded-schema, complete zero-work, direct-copy, GIL, and core-call evidence for every selected consumer |
 | Scalar-only and optional-reasoner behavior | Preserved in source tests |
+| Advertised core and pyHermiT public handoff | Implemented and focused-tested at the exact revisions above; pyELK/projector promotion remains external |
 | Python 3.10–3.12 pure/scalar/native installed matrix | Open |
 | Exact NCIT–DOID, GO, and licensed-scale semantic/performance evidence | Open |
 | Maximum 25% wall regression and pinned-runner RSS gates | Open; no speedup claim is made |
