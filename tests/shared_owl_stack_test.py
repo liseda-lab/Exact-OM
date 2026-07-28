@@ -186,6 +186,9 @@ def test_projector_encoded_native_parity_preserves_layered_view_identity():
             "wire_encoder_calls",
         ):
             assert counters[name] == 0
+        projector_handoff = native.ontology_stack_provenance()["consumer_handoff"]["projector"]
+        assert projector_handoff["ingestion_path"] == "encoded-native"
+        assert projector_handoff["counters"] == counters
         assert python_report["ingestion"]["path"] == "scalar-python"
 
 
