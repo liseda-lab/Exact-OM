@@ -12,16 +12,10 @@ FIXTURES = Path(__file__).parent / "fixtures" / "ontologies"
 BASELINES = Path(__file__).parent / "baselines"
 PROVENANCE = json.loads((BASELINES / "provenance.json").read_text(encoding="utf-8"))
 SCALE_EVIDENCE = (
-    Path(__file__).parents[1]
-    / "benchmarks"
-    / "evidence"
-    / "wp_m_ncit_doid_baseline.json"
+    Path(__file__).parents[1] / "benchmarks" / "evidence" / "wp_m_ncit_doid_baseline.json"
 )
 SCALE_CANDIDATE = (
-    Path(__file__).parents[1]
-    / "benchmarks"
-    / "evidence"
-    / "wp_m_ncit_doid_candidate.json"
+    Path(__file__).parents[1] / "benchmarks" / "evidence" / "wp_m_ncit_doid_candidate.json"
 )
 
 
@@ -107,13 +101,8 @@ def test_fixture_snapshot_parity(name):
     ontology = FIXTURES / f"{name}.owl"
     baseline_path = BASELINES / f"{name}.backend.json.zst"
     metadata = PROVENANCE["fixtures"][name]
-    assert (
-        hashlib.sha256(ontology.read_bytes()).hexdigest() == metadata["source_sha256"]
-    )
-    assert (
-        hashlib.sha256(baseline_path.read_bytes()).hexdigest()
-        == metadata["snapshot_sha256"]
-    )
+    assert hashlib.sha256(ontology.read_bytes()).hexdigest() == metadata["source_sha256"]
+    assert hashlib.sha256(baseline_path.read_bytes()).hexdigest() == metadata["snapshot_sha256"]
 
     expected = _load_snapshot(baseline_path)
     actual = json.loads(json.dumps(capture(ontology), sort_keys=True))
