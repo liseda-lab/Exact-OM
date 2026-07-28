@@ -6,7 +6,10 @@ from pathlib import Path
 import pytest
 
 from exact.ontology import load_ontology
-from exact.ontology.provenance import _projector_consumer_handoff, ontology_stack_provenance
+from exact.ontology.provenance import (
+    _projector_consumer_handoff,
+    ontology_stack_provenance,
+)
 from exact.ontology.reasoning import ConsumerHandoffProvenance
 
 FIXTURES = Path(__file__).parent / "fixtures" / "ontologies"

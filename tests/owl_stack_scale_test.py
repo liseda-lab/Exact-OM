@@ -4,8 +4,8 @@ import hashlib
 import json
 from pathlib import Path
 
-import pytest
 import pyowl_core
+import pytest
 from pyowl2vec_star_projector import Edge, canonical_edges_sha256
 
 from benchmarks.owl_stack_scale import (
