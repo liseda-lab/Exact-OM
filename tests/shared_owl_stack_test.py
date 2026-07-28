@@ -135,7 +135,7 @@ def test_layered_view_construction_does_not_materialize_lazy_core_state():
         assert all(current is retained for current, retained in zip(after, before, strict=True))
 
 
-def test_projector_scalar_native_parity_preserves_layered_view_identity():
+def test_projector_encoded_native_parity_preserves_layered_view_identity():
     import pyowl2vec_star_projector as projector_package
 
     try:
@@ -160,7 +160,32 @@ def test_projector_scalar_native_parity_preserves_layered_view_identity():
         python_report = python.projector.last_report.to_dict()["provenance"]
         assert native_report["counts"] == python_report["counts"]
         assert native_report["diagnostics_digest"] == python_report["diagnostics_digest"]
-        assert native_report["ingestion"]["path"] == "scalar-native"
+        ingestion = native_report["ingestion"]
+        assert ingestion["path"] == "encoded-native"
+        assert ingestion["encoded_schema_name"] == "pyowl-core/structural-columns"
+        assert ingestion["encoded_schema_version"] == 1
+        assert ingestion["encoded_descriptor_sha256"] == (
+            pyowl_core.ENCODED_STRUCTURAL_DESCRIPTOR_SHA256_V1.hex()
+        )
+        counters = ingestion["counters"]
+        assert counters["encoded_segment_count"] > 0
+        assert counters["encoded_buffer_count"] > 0
+        assert counters["encoded_compiler_gil_released"] is True
+        assert counters["encoded_zero_copy_buffers"] == counters["encoded_buffer_count"]
+        for name in (
+            "base_flattening_bytes",
+            "encoded_staging_copy_bytes",
+            "materialized_scalar_rows",
+            "parser_calls",
+            "per_row_ffi_calls",
+            "resolver_calls",
+            "scalar_axiom_materializations",
+            "scalar_term_materializations",
+            "structural_copy_bytes",
+            "wire_decoder_calls",
+            "wire_encoder_calls",
+        ):
+            assert counters[name] == 0
         assert python_report["ingestion"]["path"] == "scalar-python"
 
 
