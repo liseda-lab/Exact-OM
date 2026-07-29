@@ -8,6 +8,17 @@ signal, and it becomes *cross-ontology computable* once anchors exist (shared up
 exact-matched ancestors). Siblings are similarly untapped: two candidates whose parents match
 but which have many exactly-matching siblings pointing elsewhere are likely non-matches.
 
+## Research questions
+
+- **RQ09.1**: Does anchor-mapped, IC-weighted ancestor overlap discriminate equivalent pairs
+  better than ancestor-label embeddings alone?
+- **RQ09.2**: Does sibling consistency add independent signal, and is it mainly a precision
+  penalty or a ranking benefit?
+- **RQ09.3**: How do hierarchy depth, anchor coverage, and taxonomy depth affect the gain and
+  graceful fallback behavior?
+- **RQ09.4**: Can the same normalized hierarchy evidence support property equivalence (E11),
+  instance type matching (E12), and later subsumption entailment (E14)?
+
 **Hypothesis**: adding (a) an IC-weighted ancestor-overlap sub-signal (via anchor-mapped
 ancestor sets) and (b) a sibling-consistency penalty improves hierarchy-channel discrimination
 on deep taxonomies (SNOMED pairs, Anatomy) ≥0.5 F1 pts; label-embedding-only hierarchy is
@@ -33,7 +44,9 @@ Anatomy, OAEI-KG; full matrix for guard. 3 seeds. Secondary analysis: hierarchy-
 quality/importance distributions; wins/losses vs baseline where lexical was ambiguous
 (U ≥ τ_LLM slice — does better hierarchy reduce LLM invocations?).
 
-**Promotion**: standard; an LLM-call reduction at neutral F1 also promotes (cost clause).
+**Promotion**: standard; the declared cost arm may promote when LLM calls decrease with a 95%
+CI excluding zero and macro F1 is non-inferior (quality-delta CI lower bound above −0.5
+points). LLM-call count is that arm's pre-registered primary endpoint.
 
 **Effort**: M. **Risks**: anchor sparsity on Conference (few exacts) — coverage term must keep
 it neutral there (guard metric); IC estimates differ per ontology — use per-ontology

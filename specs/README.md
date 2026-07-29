@@ -11,7 +11,8 @@
 3. **Accurate timing** — a run ledger that stays correct when multiple experiments run over each other in the same directory with caches/resumes (WP-C).
 4. **Zero Java and one OWL model** — keep the WP-B Java removal, then replace Exact's private
    parser/records/projector with the shared `pyowl-core`, Java-free pyOWL2Vec* projector, and
-   optional native pyELK/pyHermiT packages without reparsing (WP-M).
+   optional native pyELK/pyHermiT packages without reparsing (WP-M), then adopt their bulk encoded
+   compilers without Exact decoding native structures (WP-N).
 5. **Property & instance matching** — extend matching beyond classes (WP-F).
 6. **More formats & pure-KG matching** — OWL/RDF inputs, OAEI-RDF/typed-TSV outputs, CSV+datalog knowledge graphs as in [BioKG-Align-kit](https://github.com/liseda-lab/BioKG-Align-kit) (WP-G).
 7. **Documentation** — vastly improved, generated where possible (WP-H).
@@ -33,6 +34,7 @@
 | K | `exact-inspect` service repackaging | `WP-K-inspect.md` | B | M | Done |
 | L | Run artifacts & explanation store | `WP-L-run-artifacts.md` | C, D (coordinates K) | M–L | Done |
 | M | Shared Java-free OWL stack migration (`2.1.0`) | `WP-M-shared-owl-stack.md` | B; external core/projector/reasoner contracts | XL | M0–M4 implemented; M5 blocked |
+| N | Encoded native-consumer compatibility handoff | `WP-N-native-view-handoff.md` | M0–M4; core WP17; projector P7; pyELK WP14; pyHermiT WP18 | S–M | Specified |
 
 Each work-package file records its implementation deviations. External-data, accelerator, and
 hosted-service checks remain environment-specific verification; they do not reopen completed
@@ -47,9 +49,14 @@ Cross-cutting (applies to every WP): `03-performance.md` — benchmark harness, 
 compiled-kernel policy. `04-methodology-audit.md` — methodology sanity-check findings; its
 non-result-changing fixes (F1–F7) are assigned to WPs A/C/D/E/H/J and are part of their scope.
 
-**Separate plan**: `specs/experiments/` — result-changing methodology improvements (E00–E10).
+**Separate plan**: `specs/experiments/` — result-changing methodology improvements and
+capability-validation studies (E00–E26).
 Runs strictly AFTER this suite completes; nothing from it may be folded into an engineering WP
 (promotion rules in its README).
+
+**Separate suite**: [`specs/exact-repair/`](exact-repair/) — proposed Exact-Repair post-processor
+(XR-1); it has independent gates and promotion rules, and no work package in this suite depends on
+it.
 
 ```mermaid
 graph LR
@@ -71,8 +78,10 @@ graph LR
     D --> L
     L -.RunReader.-> K
     B & C & D & E & F & G & I & J & K & L --> Hc[WP-H docs content]
-    B --> M[WP-M shared OWL stack]
-    M -.2.1 release.-> Hc
+    B --> M04[WP-M M0-M4 shared OWL stack]
+    M04 --> N[WP-N encoded consumer handoff]
+    N --> M5[WP-M M5 release]
+    M5 -.2.1 release.-> Hc
 ```
 
 ## Execution plan (3 parallel agents + waves)

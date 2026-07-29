@@ -67,11 +67,59 @@ The methodology is sound and internally consistent with the paper:
    explicit NIL option the system cannot emit. → E04.
 10. **Accept model trains on one sample per source** (its winner only); runner-up information
     and pairwise structure are discarded. → E10.
+11. **Property matching is implemented but not empirically validated as its own task**;
+    class-dominated aggregate metrics could hide poor domain/range, sub-property, and usage
+    evidence. → E11.
+12. **Instance matching is implemented but not empirically validated at ABox scale**; ambiguous
+    labels, types, literal values, neighborhoods, hubs, and reference incompleteness create a
+    different regime from TBox class matching. → E12.
+13. **OWL/RDF, CSV, and CSV+Datalog pass source conformance tests but lack representation-level
+    parity and information ablations**; parser fidelity and gains from additional materialized
+    facts are currently indistinguishable. → E13.
+14. **Typed relation output relies on a transparent hierarchy heuristic**; equivalence versus
+    either subsumption direction has not been evaluated separately from entity-pair detection,
+    and semantic entailment has not been compared with learning. → E14.
+15. **The calibrated global accept classifier requires target-pair training mappings**; the
+    current heuristic fallback is not a validated, complete target-label-free method. → E15.
+16. **Cross-pair transfer is unmeasured**; it is unknown whether selector/calibration/relation
+    heads trained on one ontology pair can replace unavailable labels on another. → E16.
+17. **Independent experiment wins do not establish that the promoted stack is beneficial**;
+    retrieval changes candidate pools, channels interact through σ-mixing/selector features,
+    and extraction interacts with calibration, NIL, and label-free acceptance. → E17.
+18. **Supervised ranking exists but has not been experimentally isolated**: selector calibration
+    already groups candidate rows by source and fits a linear listwise-softmax ranker over
+    `RANK_FEATURE_NAMES` (`selector/calibration.py:_rank_training_groups,_fit_rank_model`) before
+    fitting the top-1 acceptance head. Its objective/model family, incomplete-reference behavior,
+    NIL handling, and explanation constraint have not been ablated against pointwise, pairwise,
+    constrained, or more expressive alternatives. Training labels also optionally calibrate LLM
+    probabilities, so “labels reach only acceptance” is not an accurate system description. → E18.
+19. **The σ-mixing form is asserted, not fitted**: `σ_c = q_c·|s_c − τ|^γ`
+    (`pair_adaptive_scorer.py:572`) applies one exponent to every channel, domain, and entity
+    kind. Observation 8 questions the constants; the functional form itself is equally
+    unmeasured, and it also fixes `U` and therefore the LLM gating rate. → E19.
+20. **Retrieval is entirely zero-shot** even where training mappings and in-pool hard negatives
+    are available; since retrieval is the recall ceiling (obs. 3), it is the one stage whose
+    lost recall cannot be recovered downstream. → E20.
+21. **LLM use is zero-shot and gated by a proxy**: prompts show no labelled exemplars, and
+    `U ≥ τ_LLM` (`pair_adaptive_scorer.py:680`) gates on uncertainty rather than on whether a
+    call will change the decision — so confirmatory calls are paid for and buy nothing. → E21.
+22. **Supervision is an all-or-nothing switch**: a training reference either resolves or it does
+    not (`core/actions/alignment.py:323`), and the sole quantity consulted anywhere is
+    `min_positive_sources: 50` (`selector.py:64`). How many labels each component needs, where a
+    fixed budget is best spent, and when a label-free method is simply good enough are all
+    unknown. → E22.
+23. **The evidence model is TBox-shaped and applied uniformly**: the hierarchy channel reads
+    depth-2 ancestors with `1/(d+1)` specificity (obs. 7), so on a source with one shallow type
+    level or no class hierarchy it degenerates toward its `τ` default and the matcher falls back
+    to labels — precisely where labels are weakest. Those inputs are relation-dense rather than
+    structurally poor, and the system has no supervised structural method for them: E02's anchor
+    propagation is its only structural alternative and is unsupervised. → E23.
 
 ## Relationship between the two plans
 
 - The engineering suite (WP-A…WP-L) is **behavior-preserving** and lands first.
-- `specs/experiments/` runs **after** the overhaul (it needs WP-J's exposed constants, WP-C's
-  honest timing, WP-I's pinned datasets, and the WP-B parity baseline as its frozen reference).
+- `specs/experiments/` (E00–E23) runs **after** the overhaul (it needs WP-J's exposed
+  constants, WP-C's honest timing, WP-I's pinned datasets, and the WP-B parity baseline as its
+  frozen reference).
 - Promotion rule: an experiment graduates into the product default only per the criteria in
   `specs/experiments/README.md` — never by folding into an engineering WP.
