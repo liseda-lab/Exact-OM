@@ -13,6 +13,7 @@ packages = [
 include = [
     { path = "configs/profiles/*.yaml", format = ["sdist", "wheel"] },
     { path = "exact_inspect/static/**/*", format = ["wheel"] },
+    { path = "release/core-compatibility.json", format = ["sdist", "wheel"] },
 ]
 
 [tool.poetry.dependencies]

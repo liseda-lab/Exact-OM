@@ -75,19 +75,37 @@ jobs:
       - run: poetry install --with prebuild --extras viz
       - run: make build-frontend
       - run: poetry build
-      - name: Verify wheel dependencies, extras, and packaged frontend
+      - name: Verify wheel dependencies, extras, frontend, and compatibility contract
         run: |
           poetry run python - <<'PY'
           import glob
+          import json
+          import tarfile
           import zipfile
 
           wheel = glob.glob("dist/*.whl")
+          sdist = glob.glob("dist/*.tar.gz")
           assert len(wheel) == 1, wheel
+          assert len(sdist) == 1, sdist
           with zipfile.ZipFile(wheel[0]) as archive:
               names = archive.namelist()
               assert "exact_inspect/static/index.html" in names
+              contract_name = "release/core-compatibility.json"
+              assert contract_name in names
+              wheel_contract = json.loads(archive.read(contract_name))
               metadata_name = next(name for name in names if name.endswith(".dist-info/METADATA"))
               metadata = archive.read(metadata_name).decode("utf-8")
+          with tarfile.open(sdist[0], "r:gz") as archive:
+              contract_member = next(
+                  member
+                  for member in archive.getmembers()
+                  if member.name.endswith("/release/core-compatibility.json")
+              )
+              stream = archive.extractfile(contract_member)
+              assert stream is not None
+              sdist_contract = json.load(stream)
+          assert wheel_contract == sdist_contract
+          assert wheel_contract["schema"] == "exact-om.ontology-stack-compatibility/1"
           for dependency in ("pyowl-core", "pyowl2vec-star-projector"):
               lines = [
                   line
