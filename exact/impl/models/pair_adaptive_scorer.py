@@ -30,8 +30,33 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
         max_attr_items: int = 12,
         hierarchical_relation_families: Optional[Dict[str, Dict[str, Any]]] = None,
         attribute_property_weights: Optional[Dict[str, float]] = None,
+        ablate_channels: Optional[Sequence[str]] = None,
+        uniform_weights: bool = False,
         **kwargs: Any,
     ) -> None:
+        if isinstance(ablate_channels, str):
+            requested_ablations = [ablate_channels]
+        else:
+            requested_ablations = list(ablate_channels or [])
+        normalized_ablations = {
+            str(channel).strip().lower()
+            for channel in requested_ablations
+            if str(channel).strip()
+        }
+        supported_ablations = {"hier", "sim", "diff", "attr"}
+        unsupported_ablations = normalized_ablations - supported_ablations
+        if unsupported_ablations:
+            unsupported = ", ".join(sorted(unsupported_ablations))
+            raise ValueError(
+                f"Unsupported ablate_channels value(s): {unsupported}. "
+                "Expected any of: hier, sim, diff, attr."
+            )
+        self.ablate_channels = tuple(
+            channel
+            for channel in ("hier", "sim", "diff", "attr")
+            if channel in normalized_ablations
+        )
+        self.uniform_weights = bool(uniform_weights)
         requested_context_cap = int(kwargs.get("max_input_tokens_context", 256))
         kwargs["max_input_tokens_context"] = max(
             requested_context_cap,
@@ -52,6 +77,21 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
         self.hierarchical_relation_families = dict(hierarchical_relation_families or {})
         self.attribute_property_weights = dict(attribute_property_weights or {})
         self._attached_dataset = None
+
+    def _runtime_fingerprint_payload(
+        self,
+        generate_llm_rationales_override: Optional[bool] = None,
+    ) -> Dict[str, Any]:
+        payload = super()._runtime_fingerprint_payload(
+            generate_llm_rationales_override=generate_llm_rationales_override
+        )
+        # Preserve legacy default-off fingerprints while ensuring an ablation
+        # arm cannot silently resume a baseline checkpoint.
+        if self.ablate_channels:
+            payload["ablate_channels"] = list(self.ablate_channels)
+        if self.uniform_weights:
+            payload["uniform_weights"] = True
+        return payload
 
     def attach_dataset(self, dataset: Any) -> None:
         self._attached_dataset = dataset
@@ -1751,6 +1791,31 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
             quality_tensor = channel_quality_tensors[key]
             sigma_tensors[key] = quality_tensor * (score_tensor - self.tau).abs().pow(self.gamma)
 
+        # Preserve raw hierarchy evidence for the reported s_hier score;
+        # ablation mutes only the channel's contribution to the mixture.
+        raw_sigma_tensors = dict(sigma_tensors)
+        muted_keys = set()
+        for key in sigma_tensors:
+            channel = (
+                "hier"
+                if key.startswith("hier__")
+                else {"sim_obj": "sim", "diff": "diff", "attr_aux": "attr"}.get(key)
+            )
+            if channel in self.ablate_channels:
+                muted_keys.add(key)
+                sigma_tensors[key] = torch.zeros_like(sigma_tensors[key])
+
+        if self.ablate_channels and self.uniform_weights:
+            self._log_once(
+                "combined_structural_ablation_uniform_weights",
+                (
+                    "Both ablate_channels and uniform_weights are enabled; "
+                    "muted channels remain at zero and uniform weights are "
+                    "assigned over the surviving structural keys."
+                ),
+                "warning",
+            )
+
         sigma_sum = torch.zeros(n_pairs, device=self.device)
         for tensor in sigma_tensors.values():
             sigma_sum = sigma_sum + tensor
@@ -1763,27 +1828,44 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
                 torch.zeros_like(tensor),
             )
 
+        if self.uniform_weights and struct_weights:
+            surviving_keys = [key for key in struct_weights if key not in muted_keys]
+            uniform_weight = 1.0 / len(surviving_keys) if surviving_keys else 0.0
+            for key, tensor in struct_weights.items():
+                struct_weights[key] = (
+                    torch.full_like(tensor, uniform_weight)
+                    if key in surviving_keys
+                    else torch.zeros_like(tensor)
+                )
+
         S_struct = torch.full((n_pairs,), float(self.tau), device=self.device)
         if struct_weights:
             structural_terms = [struct_weights[key] * channel_score_tensors[key] for key in struct_weights]
             structural_sum = torch.stack(structural_terms, dim=0).sum(dim=0)
-            S_struct = torch.where(sigma_sum > 1e-8, structural_sum, S_struct)
+            if self.uniform_weights and any(key not in muted_keys for key in struct_weights):
+                S_struct = structural_sum
+            else:
+                S_struct = torch.where(sigma_sum > 1e-8, structural_sum, S_struct)
 
         Q_struct = torch.zeros(n_pairs, device=self.device)
         if struct_weights:
             quality_terms = [struct_weights[key] * channel_quality_tensors[key] for key in struct_weights]
-            Q_struct = torch.where(
-                sigma_sum > 1e-8,
-                torch.stack(quality_terms, dim=0).sum(dim=0),
-                torch.zeros_like(sigma_sum),
-            )
+            quality_sum = torch.stack(quality_terms, dim=0).sum(dim=0)
+            if self.uniform_weights and any(key not in muted_keys for key in struct_weights):
+                Q_struct = quality_sum
+            else:
+                Q_struct = torch.where(
+                    sigma_sum > 1e-8,
+                    quality_sum,
+                    torch.zeros_like(sigma_sum),
+                )
 
         hier_keys = [f"hier__{family}" for family in family_names]
-        hier_sigma = sum((sigma_tensors[key] for key in hier_keys), torch.zeros(n_pairs, device=self.device))
+        hier_sigma = sum((raw_sigma_tensors[key] for key in hier_keys), torch.zeros(n_pairs, device=self.device))
         s_hier = torch.full((n_pairs,), float(self.tau), device=self.device)
         if hier_keys:
             hier_weighted = sum(
-                (sigma_tensors[key] * channel_score_tensors[key] for key in hier_keys),
+                (raw_sigma_tensors[key] * channel_score_tensors[key] for key in hier_keys),
                 torch.zeros(n_pairs, device=self.device),
             )
             active_hier = hier_sigma > 1e-8
@@ -1818,25 +1900,32 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
         only_struct = active_struct & ~active_lex
 
         w_struct = torch.zeros(n_pairs, device=self.device)
-        if torch.any(both_active):
-            w_struct = w_struct.clone()
-            w_struct[both_active] = sig_struct[both_active] / (
-                sig_lex[both_active] + sig_struct[both_active]
-            ).clamp_min(1e-8)
-        if torch.any(only_struct):
-            w_struct = w_struct.clone()
-            w_struct[only_struct] = 1.0
+        if self.uniform_weights:
+            w_struct = torch.full_like(w_struct, 0.5)
+            S_base = 0.5 * s_label + 0.5 * S_struct
+        else:
+            if torch.any(both_active):
+                w_struct = w_struct.clone()
+                w_struct[both_active] = sig_struct[both_active] / (
+                    sig_lex[both_active] + sig_struct[both_active]
+                ).clamp_min(1e-8)
+            if torch.any(only_struct):
+                w_struct = w_struct.clone()
+                w_struct[only_struct] = 1.0
 
-        S_base = torch.full((n_pairs,), float(self.tau), device=self.device)
-        if torch.any(only_lex):
-            S_base = S_base.clone()
-            S_base[only_lex] = s_label[only_lex]
-        if torch.any(only_struct):
-            S_base = S_base.clone()
-            S_base[only_struct] = S_struct[only_struct]
-        if torch.any(both_active):
-            S_base = S_base.clone()
-            S_base[both_active] = (1.0 - w_struct[both_active]) * s_label[both_active] + w_struct[both_active] * S_struct[both_active]
+            S_base = torch.full((n_pairs,), float(self.tau), device=self.device)
+            if torch.any(only_lex):
+                S_base = S_base.clone()
+                S_base[only_lex] = s_label[only_lex].to(dtype=S_base.dtype)
+            if torch.any(only_struct):
+                S_base = S_base.clone()
+                S_base[only_struct] = S_struct[only_struct].to(dtype=S_base.dtype)
+            if torch.any(both_active):
+                S_base = S_base.clone()
+                S_base[both_active] = (
+                    (1.0 - w_struct[both_active]) * s_label[both_active]
+                    + w_struct[both_active] * S_struct[both_active]
+                )
 
         U_ind = (2.0 * (self.tau - (S_base - self.tau).abs())).clamp(0.0, 1.0)
         U_dis = ((q_label * Q_struct).clamp_min(0.0).sqrt() * (s_label - S_struct).abs()).clamp(0.0, 1.0)
@@ -1919,6 +2008,15 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
         brief_requested_pairs = int(len(brief_idxs))
         decision_requested_pairs = int(len(decision_idxs))
 
+        sigma_hier = sum(
+            (sigma_tensors[key] for key in hier_keys),
+            torch.zeros(n_pairs, device=self.device),
+        )
+        omega_hier = sum(
+            (struct_weights[key] for key in hier_keys),
+            torch.zeros(n_pairs, device=self.device),
+        )
+
         result = {
             "s_label": s_label,
             "s_label_star": s_label_star,
@@ -1932,6 +2030,16 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
             "q_sim": channel_quality_tensors["sim_obj"],
             "q_diff": channel_quality_tensors["diff"],
             "q_attr": channel_quality_tensors["attr_aux"],
+            "sigma_lex": sig_lex,
+            "sigma_hier": sigma_hier,
+            "sigma_sim": sigma_tensors["sim_obj"],
+            "sigma_diff": sigma_tensors["diff"],
+            "sigma_attr": sigma_tensors["attr_aux"],
+            "sigma_struct": sig_struct,
+            "omega_hier": omega_hier,
+            "omega_sim": struct_weights["sim_obj"],
+            "omega_diff": struct_weights["diff"],
+            "omega_attr": struct_weights["attr_aux"],
             "Q_struct": Q_struct,
             "S_base": S_base,
             "S_lctx": S_base,
@@ -1945,6 +2053,8 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
             "U_dis": U_dis,
             "w_i": w_i,
             "need_llm": need_llm,
+            "llm_invoked": llm_used_mask,
+            "llm_gated": need_llm,
             "I_label": I_label,
             "I_struct": I_struct,
             "I_hier": I_hier,

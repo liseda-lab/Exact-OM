@@ -148,6 +148,7 @@ class InferenceParams(BaseModel):
     audit_shard_records: int = Field(config["inference_params"].get("audit_shard_records", 50000))
     checkpoint_payload: str = Field(config["inference_params"].get("checkpoint_payload", "compact"))
     cache_persist_policy: str = Field(config["inference_params"].get("cache_persist_policy", "finalize"))
+    channel_dump: bool = Field(config["inference_params"].get("channel_dump", False))
 
     @field_validator("audit_shard_compression", mode="before")
     def validate_audit_shard_compression(cls, value: str) -> str:

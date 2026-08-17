@@ -178,6 +178,7 @@ inference_params:
   audit_shard_records: 50000 # Maximum records per audit shard before rotating.
   checkpoint_payload: compact # compact stores manifests and counts; full retains legacy in-checkpoint mappings/results JSON.
   cache_persist_policy: finalize # Persist model caches at finalize, checkpoint, or never.
+  channel_dump: false # Write one CSV row per scored candidate pair to <output_dir>/channel_dump.csv.
 
 llm_profiles:
   # Named LLM backend profiles.
@@ -315,6 +316,8 @@ model:
     use_lexical: True # Enable lexical similarity.
     use_context: True # Enable context similarity.
     use_llm: True # Enable LLM pair-brief/decision/rationale components.
+    ablate_channels: [] # Mute structural channels at the mixing stage: any of [hier, sim, diff, attr].
+    uniform_weights: false # Use uniform structural weights and a fixed 0.5 lexical/structural split.
     tau: 0.5 # Neutral midpoint used when estimating confidence and ambiguity.
 
     # Adaptive weighting and LLM gating.

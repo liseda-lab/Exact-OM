@@ -70,6 +70,30 @@ def _json_default(value: Any) -> str:
     return str(value)
 
 
+_CHANNEL_DUMP_ONLY_COLUMNS = frozenset(
+    {
+        "sigma_lex",
+        "sigma_hier",
+        "sigma_sim",
+        "sigma_diff",
+        "sigma_attr",
+        "sigma_struct",
+        "omega_hier",
+        "omega_sim",
+        "omega_diff",
+        "omega_attr",
+        "llm_invoked",
+        "llm_gated",
+    }
+)
+
+
+def _missing_channel_dump_value(value: Any) -> bool:
+    if value is None or not pd.api.types.is_scalar(value):
+        return True
+    return bool(pd.isna(value))
+
+
 class SemanticAlignmentRunner(ITrainer):
     """
     External loop orchestrator for SemanticScorer inference.
@@ -2214,6 +2238,7 @@ class SemanticAlignmentRunner(ITrainer):
         audit_shard_records: int = 50000,
         checkpoint_payload: str = "compact",
         cache_persist_policy: str = "finalize",
+        channel_dump: bool = False,
         save_json: bool = False,
         run_progress: Optional[Any] = None,
         **kwargs,
@@ -2300,9 +2325,45 @@ class SemanticAlignmentRunner(ITrainer):
             all_mappings.extend(restored_mappings)
             if restored_json:
                 self.results_json.extend(restored_json)
-            restored_candidate_rows = getattr(self, "_restored_candidate_rows", []) or []
-            if restored_candidate_rows:
-                self._candidate_rows.extend(restored_candidate_rows)
+            restored_candidate_rows = list(
+                getattr(self, "_restored_candidate_rows", []) or []
+            )
+            if channel_dump and restored_examples > 0:
+                invalid_fields: Set[str] = set()
+                invalid_rows = 0
+                for row in restored_candidate_rows:
+                    row_invalid = {
+                        column
+                        for column in _CHANNEL_DUMP_ONLY_COLUMNS
+                        if not isinstance(row, dict)
+                        or column not in row
+                        or _missing_channel_dump_value(row[column])
+                    }
+                    if row_invalid:
+                        invalid_rows += 1
+                        invalid_fields.update(row_invalid)
+                if (
+                    len(restored_candidate_rows) != restored_examples
+                    or invalid_fields
+                ):
+                    field_text = ", ".join(sorted(invalid_fields)) or "none"
+                    raise RuntimeError(
+                        "Cannot resume channel_dump run from an incompatible checkpoint: "
+                        f"restored_rows={len(restored_candidate_rows)}, "
+                        f"expected_rows={restored_examples}, invalid_rows={invalid_rows}, "
+                        f"invalid_fields={field_text}. Set resume_from_checkpoint=False or "
+                        "use a fresh checkpoint/output directory."
+                    )
+            elif not channel_dump:
+                restored_candidate_rows = [
+                    {
+                        key: value
+                        for key, value in row.items()
+                        if key not in _CHANNEL_DUMP_ONLY_COLUMNS
+                    }
+                    for row in restored_candidate_rows
+                ]
+            self._candidate_rows.extend(restored_candidate_rows)
 
         total_examples = len(self.dataset)
         remaining_examples = max(0, total_examples - restored_examples)
@@ -2335,6 +2396,7 @@ class SemanticAlignmentRunner(ITrainer):
             candidate_df = self._build_candidate_dataframe()
             if candidate_df.empty and self.results_json:
                 candidate_df = self._build_candidate_dataframe_from_records(self.results_json)
+            self._write_channel_dump(candidate_df, enabled=channel_dump)
             if not candidate_df.empty:
                 n_sources = int(candidate_df["Src"].nunique()) if "Src" in candidate_df.columns else 0
                 post_progress_started = False
@@ -2551,6 +2613,19 @@ class SemanticAlignmentRunner(ITrainer):
             q_sim_vals = _tensor_list("q_sim")
             q_diff_vals = _tensor_list("q_diff")
             q_attr_vals = _tensor_list("q_attr")
+            if channel_dump:
+                sigma_lex_vals = _tensor_list("sigma_lex")
+                sigma_hier_vals = _tensor_list("sigma_hier")
+                sigma_sim_vals = _tensor_list("sigma_sim")
+                sigma_diff_vals = _tensor_list("sigma_diff")
+                sigma_attr_vals = _tensor_list("sigma_attr")
+                sigma_struct_vals = _tensor_list("sigma_struct")
+                omega_hier_vals = _tensor_list("omega_hier")
+                omega_sim_vals = _tensor_list("omega_sim")
+                omega_diff_vals = _tensor_list("omega_diff")
+                omega_attr_vals = _tensor_list("omega_attr")
+                llm_invoked_vals = _tensor_list("llm_invoked")
+                llm_gated_vals = _tensor_list("llm_gated")
             s_final = _tensor_list("S_final")
             w_c_vals = _tensor_list("w_c")
             w_struct_vals = _tensor_list("w_struct")
@@ -2573,6 +2648,22 @@ class SemanticAlignmentRunner(ITrainer):
 
             for idx, (s, t, score) in enumerate(zip(src_iri, tgt_iri, s_final)):
                 all_mappings.append((s, t, float(score)))
+                dump_fields = {}
+                if channel_dump:
+                    dump_fields = {
+                        "sigma_lex": float(sigma_lex_vals[idx]),
+                        "sigma_hier": float(sigma_hier_vals[idx]),
+                        "sigma_sim": float(sigma_sim_vals[idx]),
+                        "sigma_diff": float(sigma_diff_vals[idx]),
+                        "sigma_attr": float(sigma_attr_vals[idx]),
+                        "sigma_struct": float(sigma_struct_vals[idx]),
+                        "omega_hier": float(omega_hier_vals[idx]),
+                        "omega_sim": float(omega_sim_vals[idx]),
+                        "omega_diff": float(omega_diff_vals[idx]),
+                        "omega_attr": float(omega_attr_vals[idx]),
+                        "llm_invoked": bool(llm_invoked_vals[idx]),
+                        "llm_gated": bool(llm_gated_vals[idx]),
+                    }
                 self._candidate_rows.append({
                     "Src": s,
                     "Tgt": t,
@@ -2593,6 +2684,7 @@ class SemanticAlignmentRunner(ITrainer):
                     "q_sim": float(q_sim_vals[idx]),
                     "q_diff": float(q_diff_vals[idx]),
                     "q_attr": float(q_attr_vals[idx]),
+                    **dump_fields,
                     "S_final": float(score),
                     "w_c": float(w_c_vals[idx]),
                     "w_struct": float(w_struct_vals[idx]),
@@ -2742,6 +2834,7 @@ class SemanticAlignmentRunner(ITrainer):
             post_progress_started = True
         self.log("Post-inference processing started: assembling candidate dataframe.", "info")
         candidate_df = self._build_candidate_dataframe()
+        self._write_channel_dump(candidate_df, enabled=channel_dump)
         if not candidate_df.empty:
             n_sources = int(candidate_df["Src"].nunique()) if "Src" in candidate_df.columns else 0
             if post_progress_started:
@@ -2879,6 +2972,70 @@ class SemanticAlignmentRunner(ITrainer):
             return pd.DataFrame()
         df = pd.DataFrame(self._candidate_rows)
         return self._merge_dataset_candidate_columns(df)
+
+    def _write_channel_dump(self, candidate_df: pd.DataFrame, enabled: bool) -> None:
+        if not enabled:
+            return
+        source_to_output = {
+            "src": "Src",
+            "tgt": "Tgt",
+            "is_correct": "ground_truth",
+            "s_lex": "s_label",
+            "s_hier": "s_hier",
+            "s_sim": "s_sim",
+            "s_diff": "s_diff",
+            "s_attr": "s_attr",
+            "q_lex": "q_label",
+            "q_hier": "q_hier",
+            "q_sim": "q_sim",
+            "q_diff": "q_diff",
+            "q_attr": "q_attr",
+            "sigma_lex": "sigma_lex",
+            "sigma_hier": "sigma_hier",
+            "sigma_sim": "sigma_sim",
+            "sigma_diff": "sigma_diff",
+            "sigma_attr": "sigma_attr",
+            "sigma_struct": "sigma_struct",
+            "omega_hier": "omega_hier",
+            "omega_sim": "omega_sim",
+            "omega_diff": "omega_diff",
+            "omega_attr": "omega_attr",
+            "w_c": "w_c",
+            "S_struct": "S_struct",
+            "Q_struct": "Q_struct",
+            "S_lctx": "S_lctx",
+            "U": "U",
+            "p_llm": "p_llm",
+            "llm_invoked": "llm_invoked",
+            "llm_gated": "llm_gated",
+            "S_pair": "S_base",
+            "S_final": "S_final",
+            "src_label_text": "src_label_text",
+            "tgt_label_text": "tgt_label_text",
+        }
+        missing = sorted(set(source_to_output.values()) - set(candidate_df.columns))
+        if missing:
+            raise ValueError(f"Cannot write channel dump; missing candidate columns: {missing}")
+        dump = pd.DataFrame(
+            {output: candidate_df[source] for output, source in source_to_output.items()}
+        )
+        correct_numeric = pd.to_numeric(dump["is_correct"], errors="coerce")
+        correct_boolean = (
+            dump["is_correct"].astype(str).str.strip().str.lower().isin({"1", "true", "yes", "y"})
+        )
+        dump["is_correct"] = correct_numeric.where(
+            correct_numeric.notna(), correct_boolean.astype(int)
+        ).fillna(0).astype(int)
+        run_output_dir = self.output_dir.parent if self.output_dir.name == "model" else self.output_dir
+        output_path = run_output_dir / "channel_dump.csv"
+        temporary_path = output_path.with_suffix(".csv.tmp")
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        dump.to_csv(temporary_path, index=False)
+        temporary_path.replace(output_path)
+        self.log(
+            f"Wrote channel dump with {len(dump)} rows to {output_path}.",
+            "info",
+        )
 
     def _build_candidate_dataframe_from_records(self, records: List[Dict[str, Any]]) -> pd.DataFrame:
         rows: List[Dict[str, Any]] = []
