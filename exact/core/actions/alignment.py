@@ -1,3 +1,4 @@
+import csv
 import functools
 import json
 import logging
@@ -14,12 +15,14 @@ from exact.core.entities.configs.config import ConfigModel
 from exact.core.entities.registry import ComponentRegistry, ComponentType
 from exact.runs import RunLayout, finalize_artifacts
 from exact.tracks import get_track, provider_from_descriptor
+from exact.utils.data import read_table
 from exact.utils.logs import (
     ProgressTask,
     RunProgressLogger,
     configure_exact_logger,
     summarize_progress_estimates,
 )
+from exact.utils.provenance import file_provenance
 from exact.utils.timing import CacheStatus, RunSession, TimingLedger, config_fingerprint
 
 
@@ -77,6 +80,56 @@ def _merge_run_stats(path: Path, additions: Mapping[str, Any]) -> None:
         encoding="utf-8",
     )
     temporary.replace(path)
+
+
+def _atomic_table(frame: Any, path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    frame.to_csv(temporary, sep="\t", index=False)
+    os.replace(temporary, path)
+
+
+def _table_columns(path: Path) -> list[str]:
+    delimiter = "\t" if str(path).lower().endswith(".tsv") else ","
+    with Path(path).open("r", encoding="utf-8", newline="") as stream:
+        try:
+            return [str(value) for value in next(csv.reader(stream, delimiter=delimiter))]
+        except StopIteration as exc:
+            raise ValueError(f"reference table is empty: {path}") from exc
+
+
+def _materialize_evaluation_reference(
+    frame: Any,
+    *,
+    parent_path: Path,
+    output_path: Path,
+) -> Path:
+    """Persist the evaluated pair set with explicit relation and entity kinds."""
+
+    materialized = frame.copy()
+    materialized = materialized.rename(columns={"Src": "SrcEntity", "Tgt": "TgtEntity"})
+    source_columns = {column.strip().lower() for column in _table_columns(parent_path)}
+    if "relation" in source_columns:
+        materialized = materialized.rename(columns={"Label": "Relation"})
+    else:
+        # Local candidate splits and two-column reference alignments encode
+        # equivalence by protocol; their third column, when present, is a
+        # candidate list rather than a relation label.
+        materialized["Relation"] = "="
+    required = [
+        "SrcEntity",
+        "TgtEntity",
+        "Relation",
+        "SrcKind",
+        "TgtKind",
+    ]
+    missing = [column for column in required if column not in materialized.columns]
+    if missing:
+        raise ValueError(
+            f"evaluation reference is missing enriched columns {missing}: {parent_path}"
+        )
+    _atomic_table(materialized[required], output_path)
+    return output_path
 
 
 def _write_resolved_config(configs: ConfigModel, layout: RunLayout) -> None:
@@ -316,17 +369,58 @@ def resolve_alignment_inputs(
         or (layout.target if layout is not None else None)
     )
     training_reference = _resolved_path(training_reference_file_path) or refs.get("train")
+    selected_reference = None
+    split_candidates = None
+    if data is not None and data.reference_role:
+        reference_role = str(data.reference_role)
+        selected_reference = refs.get(reference_role)
+        if layout is not None:
+            candidate_value = layout.extras.get(f"{reference_role}_candidates")
+            if candidate_value is None and reference_role in {"test", "full"}:
+                candidate_value = layout.candidates
+            if candidate_value is not None:
+                split_candidates = _resolved_path(Path(candidate_value))
+        # Bio-ML local candidate files carry the gold target in column two and
+        # are therefore also the canonical validation/test reference table.
+        if selected_reference is None:
+            selected_reference = split_candidates
+        if selected_reference is None:
+            available = sorted(
+                set(refs)
+                | {
+                    key[: -len("_candidates")]
+                    for key in (layout.extras if layout is not None else {})
+                    if key.endswith("_candidates")
+                }
+            )
+            raise ValueError(
+                f"Configured data.reference_role {data.reference_role!r} is unavailable; "
+                f"available reference splits: {', '.join(available) or 'none'}"
+            )
     full_reference = (
         _resolved_path(full_reference_file_path)
+        or selected_reference
         or refs.get("full")
         or refs.get("test")
         or refs.get("valid")
     )
-    candidates = (
-        _resolved_path(candidates_file_path)
-        or configured_candidates
-        or (layout.candidates if layout is not None else None)
-    )
+    explicit_candidates = _resolved_path(candidates_file_path) or configured_candidates
+    candidate_source = data.candidate_source if data is not None else "track"
+    if candidate_source == "generated" and configured_candidates is not None:
+        raise ValueError("data.candidate_source=generated conflicts with data.candidates")
+    if explicit_candidates is not None:
+        candidates = explicit_candidates
+    elif candidate_source == "generated":
+        candidates = None
+    elif candidate_source == "reference_split":
+        if split_candidates is None:
+            raise ValueError(
+                "data.candidate_source=reference_split requires a materialized "
+                "split-specific candidate pool"
+            )
+        candidates = split_candidates
+    else:
+        candidates = layout.candidates if layout is not None else None
 
     _require_existing(source, "Source ontology", required=True)
     _require_existing(target, "Target ontology", required=True)
@@ -443,6 +537,16 @@ def _run_alignment_session(
     )
     progress.finish("Setup", f"device={device}")
 
+    sampled_sources: set[str] = set()
+    sampled_source_groups: set[tuple[str, str]] = set()
+    sampled_full_reference_path: Optional[Path] = None
+    sampled_training_reference_path: Optional[Path] = None
+    effective_candidates_file_path = candidates_file_path
+    evaluation_full_reference: Any = full_reference_file_path
+    evaluation_training_reference: Any = training_reference_file_path
+    materialized_full_reference_path: Optional[Path] = None
+    evaluation_alignment_path: Optional[Path] = None
+
     # Create Dataset
 
     progress.start("Dataset", "building dataset inputs")
@@ -533,6 +637,103 @@ def _run_alignment_session(
                     **configs.plot_params.model_dump(),
                 )
 
+        if configs.run.source_cap is not None:
+            sampled_sources = dataset.restrict_sources(
+                cap=configs.run.source_cap,
+                seed=configs.seed,
+            )
+            logger.info(
+                "Development source cap retained %d source groups (cap=%d, seed=%d).",
+                len(sampled_sources),
+                configs.run.source_cap,
+                configs.seed,
+            )
+            sampled_manifest = dataset.candidate_pool_manifest
+            sampled_manifest_path = (
+                Path(dataset.output_path) / "candidate_pool_sample_manifest.json"
+            )
+            temporary_manifest = sampled_manifest_path.with_name(
+                f".{sampled_manifest_path.name}.{os.getpid()}.tmp"
+            )
+            temporary_manifest.write_text(
+                json.dumps(sampled_manifest, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+            os.replace(temporary_manifest, sampled_manifest_path)
+
+            sampled_frame = dataset.dataframe
+            if (
+                sampled_frame is not None
+                and not sampled_frame.empty
+                and {"Src", "SrcKind"}.issubset(sampled_frame.columns)
+            ):
+                sampled_source_groups = {
+                    (str(src), str(kind))
+                    for src, kind in sampled_frame[["Src", "SrcKind"]]
+                    .drop_duplicates()
+                    .itertuples(index=False, name=None)
+                }
+
+            def sampled_mask(frame: Any) -> Any:
+                source_column = (
+                    "Src"
+                    if "Src" in frame.columns
+                    else "SrcEntity" if "SrcEntity" in frame.columns else frame.columns[0]
+                )
+                kind_column = (
+                    "SrcKind"
+                    if "SrcKind" in frame.columns
+                    else "Kind" if "Kind" in frame.columns else None
+                )
+                if kind_column is not None and sampled_source_groups:
+                    return [
+                        (str(src), str(kind)) in sampled_source_groups
+                        for src, kind in frame[[source_column, kind_column]].itertuples(
+                            index=False,
+                            name=None,
+                        )
+                    ]
+                return frame[source_column].astype(str).isin(sampled_sources)
+
+            sampled_inputs_dir = Path(dataset.output_path) / "sampled_inputs"
+            if candidates_file_path is not None:
+                candidate_frame = read_table(candidates_file_path)
+                if candidate_frame.empty:
+                    raise ValueError("cannot source-cap an empty candidate file")
+                candidate_frame = candidate_frame.loc[sampled_mask(candidate_frame)].reset_index(
+                    drop=True
+                )
+                effective_candidates_file_path = sampled_inputs_dir / "reference_candidates.tsv"
+                _atomic_table(candidate_frame, effective_candidates_file_path)
+            if dataset.reference is not None and full_reference_file_path is not None:
+                sampled_full_reference_path = _materialize_evaluation_reference(
+                    dataset.reference,
+                    parent_path=full_reference_file_path,
+                    output_path=sampled_inputs_dir / "full_reference.tsv",
+                )
+                evaluation_full_reference = sampled_full_reference_path
+            if training_reference_file_path is not None:
+                training_frame = read_table(training_reference_file_path)
+                training_frame = training_frame.loc[sampled_mask(training_frame)].reset_index(
+                    drop=True
+                )
+                sampled_training_reference_path = sampled_inputs_dir / "training_reference.tsv"
+                _atomic_table(training_frame, sampled_training_reference_path)
+                evaluation_training_reference = sampled_training_reference_path
+
+        if (
+            run_eval
+            and configs.run.experiment_audit
+            and dataset.reference is not None
+            and full_reference_file_path is not None
+        ):
+            materialized_full_reference_path = _materialize_evaluation_reference(
+                dataset.reference,
+                parent_path=full_reference_file_path,
+                output_path=(Path(output_dir_path) / "evaluation_inputs" / "full_reference.tsv"),
+            )
+            evaluation_full_reference = materialized_full_reference_path
+
         timing_session.set_dataset_signature(getattr(dataset, "dataset_signature", None))
 
     dataset_elapsed = (dataset_span.seconds or 0.0) / 60.0
@@ -545,17 +746,30 @@ def _run_alignment_session(
     progress.start("Trainer", "constructing trainer and model chain")
     logger.info("Building Trainer and Model...")
 
+    training_available = training_reference_file_path is not None
+    llm_supervision, _ = configs.supervision.resolve_component(
+        "llm", training_available=training_available
+    )
+    selector_supervision = {
+        component: configs.supervision.resolve_component(
+            component, training_available=training_available
+        )[0]
+        for component in ("rerank", "accept", "calibration")
+    }
+
     model_specs = []
     primary = model_sequence[0]
     primary_params = {
         **primary.params,
         **configs.matching.channels.model_dump(mode="python"),
+        "fusion_config": configs.matching.fusion.model_dump(mode="python"),
+        "llm_experiment_config": configs.llm.experiment.model_dump(mode="python"),
         "llm_profiles": {k: v.model_dump() for k, v in configs.llm_profiles.items()},
         "llm_routing": configs.llm_routing.model_dump(),
         "request_seed": configs.seed,
         **configs.alignment_params.model_dump(exclude_none=True),
     }
-    if training_reference_file_path is not None:
+    if training_reference_file_path is not None and llm_supervision == "supervised":
         primary_params.setdefault(
             "llm_calibration_reference_file_path",
             str(training_reference_file_path),
@@ -567,16 +781,27 @@ def _run_alignment_session(
         if isinstance(extra.params, dict) and extra.params.get("enabled") is False:
             continue
         extra_params = dict(extra.params or {})
-        if training_reference_file_path is not None and getattr(extra.name, "__name__", "") in {
-            "CandidateSetSelector",
-            "SecondPassReranker",
-        }:
+        model_name = getattr(extra.name, "__name__", "")
+        selector_uses_labels = any(mode == "supervised" for mode in selector_supervision.values())
+        if (
+            training_reference_file_path is not None
+            and selector_uses_labels
+            and model_name in {"CandidateSetSelector", "SecondPassReranker"}
+        ):
             extra_params.setdefault(
                 "training_reference_file_path",
                 str(training_reference_file_path),
             )
-        if getattr(extra.name, "__name__", "") == "CandidateSetSelector":
+        if model_name == "CandidateSetSelector":
+            if configs.selector.runtime_enabled is not None:
+                extra_params["enabled"] = configs.selector.runtime_enabled
             extra_params.setdefault("request_seed", configs.seed)
+            extra_params.setdefault("experiment_config", configs.selector.model_dump(mode="python"))
+            extra_params.setdefault(
+                "matching_calibration",
+                configs.matching.calibration.model_dump(mode="python"),
+            )
+            extra_params.setdefault("nil_config", configs.matching.nil.model_dump(mode="python"))
         model_specs.append((extra.name, extra_params))
 
     trainer_factory = configs.trainer_runtime
@@ -588,18 +813,19 @@ def _run_alignment_session(
         device=device,
         output_dir=output_dir_path,
         logger=logger,
+        extraction_config=configs.matching.extraction.model_dump(mode="python"),
     )
     progress.finish("Trainer", f"models={len(model_specs)}")
 
     logger.info("Computing alignment...")
     inference_kwargs = configs.inference_params.model_dump()
-    inference_kwargs["local_alignment"] = candidates_file_path is not None
+    inference_kwargs["local_alignment"] = effective_candidates_file_path is not None
     inference_kwargs["explanation_shard_mb"] = configs.output.explanations.shard_mb
 
     with timing_session.stage("Alignment") as alignment_span:
         progress.start("Inference", f"pairs={len(dataset)}")
         inference_kwargs["run_progress"] = progress
-        if candidates_file_path is None:
+        if effective_candidates_file_path is None:
             inference_kwargs.update(configs.alignment_params.model_dump())
             alignment, avg_t = trainer.predict(**inference_kwargs)
         else:
@@ -648,7 +874,7 @@ def _run_alignment_session(
             progress.start("Prefilter", "applying exact matches")
             logger.info("Applying Exact Matches to alignment...")
             with timing_session.stage("Alignment.Prefilter"):
-                if candidates_file_path is None:
+                if effective_candidates_file_path is None:
                     alignment = trainer.apply_prefilter(
                         alignment, **configs.alignment_params.model_dump()
                     )
@@ -676,15 +902,17 @@ def _run_alignment_session(
         save_params["save_json"] = False
         output_paths = trainer.save_results(
             alignment,
-            candidates_one2many_path=candidates_file_path,
+            candidates_one2many_path=effective_candidates_file_path,
             sub_dir=task_name,
             output_formats=configs.io.output_formats,
             relation_prediction=configs.matching.relation_prediction,
             source_uri=source_file_path.resolve().as_uri(),
             target_uri=target_file_path.resolve().as_uri(),
+            paper_audit=configs.run.experiment_audit,
             **save_params,
         )
     alignment_file_path = output_paths["alignment_tsv"]
+    evaluation_alignment_path = output_paths.get("alignment_global_audit", alignment_file_path)
     run_stats_path = output_paths.get("run_stats_json") or (
         Path(alignment_file_path).parent / "run_stats.json"
     )
@@ -715,26 +943,75 @@ def _run_alignment_session(
         progress.start("Evaluation", "evaluating alignment")
         logger.info("Evaluating alignment...")
         with timing_session.stage("Postprocess.Evaluation") as evaluation_span:
-            results = run_evaluation(
-                alignment=Path(alignment_file_path),
-                output_dir_path=RunLayout.open(output_dir_path).evaluation_dir,
-                error_on_fail=False,
-                K=configs.k,
-                source_file_path=dataset.source,
-                target_file_path=dataset.target,
-                train_reference_file_path=training_reference_file_path,
-                full_reference_file_path=(
-                    full_reference_file_path if candidates_file_path is None else None
-                ),
-                reference_candidates=candidates_file_path,
-                logger=logger,
-                backends=configs.evaluation.backends,
-                backend_options={
-                    "builtin": {"entity_kinds": configs.matching.entity_kinds},
-                    "bioml": configs.evaluation.bioml,
-                },
-                run_stats_path=run_stats_path,
-            )
+            evaluation_dir = RunLayout.open(output_dir_path).evaluation_dir
+            backend_options = {
+                "builtin": {"entity_kinds": configs.matching.entity_kinds},
+                "bioml": configs.evaluation.bioml,
+            }
+            if (
+                configs.evaluation.dual_global_local
+                and effective_candidates_file_path is not None
+                and evaluation_full_reference is not None
+            ):
+                global_results = run_evaluation(
+                    alignment=Path(evaluation_alignment_path),
+                    output_dir_path=evaluation_dir,
+                    error_on_fail=False,
+                    K=configs.k,
+                    source_file_path=dataset.source,
+                    target_file_path=dataset.target,
+                    train_reference_file_path=evaluation_training_reference,
+                    full_reference_file_path=evaluation_full_reference,
+                    reference_candidates=None,
+                    logger=logger,
+                    backends=configs.evaluation.backends,
+                    backend_options=backend_options,
+                    run_stats_path=run_stats_path,
+                )
+                local_results = run_evaluation(
+                    alignment=Path(alignment_file_path),
+                    output_dir_path=evaluation_dir / "local",
+                    error_on_fail=False,
+                    K=configs.k,
+                    source_file_path=dataset.source,
+                    target_file_path=dataset.target,
+                    train_reference_file_path=None,
+                    full_reference_file_path=None,
+                    reference_candidates=effective_candidates_file_path,
+                    logger=logger,
+                    backends=configs.evaluation.backends,
+                    backend_options=backend_options,
+                    run_stats_path=None,
+                )
+                results = {
+                    **{f"global.{key}": value for key, value in (global_results or {}).items()},
+                    **{f"local.{key}": value for key, value in (local_results or {}).items()},
+                }
+            else:
+                results = run_evaluation(
+                    alignment=Path(
+                        evaluation_alignment_path
+                        if effective_candidates_file_path is None
+                        and evaluation_full_reference is not None
+                        else alignment_file_path
+                    ),
+                    output_dir_path=evaluation_dir,
+                    error_on_fail=False,
+                    K=configs.k,
+                    source_file_path=dataset.source,
+                    target_file_path=dataset.target,
+                    train_reference_file_path=evaluation_training_reference,
+                    full_reference_file_path=(
+                        evaluation_full_reference
+                        if effective_candidates_file_path is None
+                        else None
+                    ),
+                    reference_candidates=effective_candidates_file_path,
+                    logger=logger,
+                    backends=configs.evaluation.backends,
+                    backend_options=backend_options,
+                    run_stats_path=run_stats_path,
+                )
         progress.finish("Evaluation", "evaluation completed")
     else:
         evaluation_span = None
@@ -760,10 +1037,68 @@ def _run_alignment_session(
         seconds=postprocess_seconds,
         cache_status=CacheStatus.FRESH,
     )
-    _merge_run_stats(
-        run_stats_path,
-        {"ontology_stack": dataset.ontology_stack_provenance()},
-    )
+    run_metadata: dict[str, Any] = {"ontology_stack": dataset.ontology_stack_provenance()}
+    if configs.run.experiment_audit and evaluation_alignment_path is not None:
+        run_metadata["evaluation_inputs"] = {
+            "alignment_primary": file_provenance(Path(alignment_file_path)),
+            "alignment_global_audit": file_provenance(Path(evaluation_alignment_path)),
+            "full_reference_parent": (
+                file_provenance(full_reference_file_path)
+                if full_reference_file_path is not None
+                else None
+            ),
+            "full_reference_materialized": (
+                file_provenance(materialized_full_reference_path)
+                if materialized_full_reference_path is not None
+                else None
+            ),
+            "training_reference_parent": (
+                file_provenance(training_reference_file_path)
+                if training_reference_file_path is not None
+                else None
+            ),
+            "training_reference_effective": (
+                file_provenance(Path(evaluation_training_reference))
+                if evaluation_training_reference is not None
+                else None
+            ),
+        }
+    if configs.run.source_cap is not None:
+        sample_config = (dataset.candidate_pool_manifest.get("retrieval_config") or {}).get(
+            "source_sample"
+        ) or {}
+        reference_inputs = {
+            "full_parent": (
+                file_provenance(full_reference_file_path)
+                if full_reference_file_path is not None
+                else None
+            ),
+            "full_sample": (
+                file_provenance(sampled_full_reference_path)
+                if sampled_full_reference_path is not None
+                else None
+            ),
+            "training_parent": (
+                file_provenance(training_reference_file_path)
+                if training_reference_file_path is not None
+                else None
+            ),
+            "training_sample": (
+                file_provenance(sampled_training_reference_path)
+                if sampled_training_reference_path is not None
+                else None
+            ),
+        }
+        run_metadata["source_sampling"] = {
+            "cap": configs.run.source_cap,
+            "seed": configs.seed,
+            "selected_sources": len(sampled_sources),
+            "selected_source_kind_groups": len(sampled_source_groups),
+            "sample_sha256": sample_config.get("sha256"),
+            "candidate_pool_fingerprint": dataset.candidate_pool_fingerprint,
+            "reference_inputs": reference_inputs,
+        }
+    _merge_run_stats(run_stats_path, run_metadata)
     progress.complete("run stages completed")
     return results, run_stats_path
 

@@ -50,6 +50,8 @@ def test_trainer_writes_only_canonical_layout_v2_paths(tmp_path: Path) -> None:
     )
 
     assert paths["alignment_tsv"] == runner.run_layout.mapping_path("global")
+    assert "alignment_global_audit" not in paths
+    assert not (runner.alignment_dir / "paper.maps_global.tsv").exists()
     assert paths["summary_csv"] == runner.run_layout.summary_metrics_path
     assert paths["run_stats_json"] == runner.run_layout.run_stats_path
     assert not (runner.output_dir / "model").exists()
@@ -97,6 +99,7 @@ def test_trainer_dispatches_typed_formats_and_persists_relation_metadata(
         output_formats=["typed-tsv", "json"],
         relation_prediction="hierarchy_heuristic",
         save_json=False,
+        paper_audit=True,
     )
 
     assert paths["alignment_tsv"] == paths["alignment_typed_tsv"]
@@ -107,6 +110,7 @@ def test_trainer_dispatches_typed_formats_and_persists_relation_metadata(
     ]
     assert paths["alignment_json"].is_file()
     assert not runner.run_layout.mapping_path("global").exists()
+    assert paths["alignment_global_audit"].is_file()
     explanation = {item["tgt_iri"]: item for item in store.get(KG_BASE + "atrium")}[
         KG_BASE + "heart"
     ]

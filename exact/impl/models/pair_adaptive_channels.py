@@ -2,10 +2,18 @@ from __future__ import annotations
 
 import hashlib  # noqa: F401
 import json  # noqa: F401
+from collections import deque
 from typing import Any, Dict, List, Optional, Sequence, Tuple  # noqa: F401
 
 import torch  # noqa: F401
 
+from exact.impl.models.pair_adaptive_experiments import (
+    abbreviation_similarity,
+    isub_similarity,
+    jaro_winkler_similarity,
+    token_set_similarity,
+)
+from exact.utils.candidate_generation import normalize_candidate_text
 from exact.utils.formatting import clip01, safe_mean  # noqa: F401
 
 
@@ -14,7 +22,12 @@ class PairAdaptiveChannelsMixin:
         self,
         src_label_lists: List[List[str]],
         tgt_label_lists: List[List[str]],
-    ) -> Tuple[torch.Tensor, torch.Tensor, List[Tuple[str, str]]]:
+    ) -> Tuple[
+        torch.Tensor,
+        torch.Tensor,
+        List[Tuple[str, str]],
+        List[Dict[str, Any]],
+    ]:
         n_pairs = len(src_label_lists)
         if not self.use_lexical:
             best_pairs = [
@@ -26,7 +39,12 @@ class PairAdaptiveChannelsMixin:
             ]
             neutral = torch.full((n_pairs,), self.tau, device=self.device)
             q_label = torch.zeros(n_pairs, device=self.device)
-            return neutral, q_label, best_pairs
+            return (
+                neutral,
+                q_label,
+                best_pairs,
+                [self._empty_label_quality() for _ in range(n_pairs)],
+            )
 
         flat_src = [label for labels in src_label_lists for label in labels]
         flat_tgt = [label for labels in tgt_label_lists for label in labels]
@@ -40,7 +58,12 @@ class PairAdaptiveChannelsMixin:
                 )
                 for src_labels, tgt_labels in zip(src_label_lists, tgt_label_lists)
             ]
-            return neutral, q_label, best_pairs
+            return (
+                neutral,
+                q_label,
+                best_pairs,
+                [self._empty_label_quality() for _ in range(n_pairs)],
+            )
 
         e_src = torch.nn.functional.normalize(self.encode_labels_batch(flat_src), dim=-1)
         e_tgt = torch.nn.functional.normalize(self.encode_labels_batch(flat_tgt), dim=-1)
@@ -61,6 +84,7 @@ class PairAdaptiveChannelsMixin:
         s_vals: List[torch.Tensor] = []
         q_vals: List[float] = []
         best_pairs: List[Tuple[str, str]] = []
+        quality_payloads: List[Dict[str, Any]] = []
         for src_labels, tgt_labels, src_embs, tgt_embs in zip(
             src_label_lists, tgt_label_lists, src_slices, tgt_slices
         ):
@@ -73,18 +97,183 @@ class PairAdaptiveChannelsMixin:
                         (tgt_labels[0] if tgt_labels else ""),
                     )
                 )
+                quality_payloads.append(self._empty_label_quality())
                 continue
             mat = self._sim01(src_embs @ tgt_embs.T)
             score, pair = self._select_label_pair(mat, src_labels, tgt_labels)
             z1, z2 = self._top_two_scores(mat)
-            q_label = 1.0 if mat.numel() <= 1 else self._clip01((z1 - z2) / max(1e-8, (1.0 - z2)))
+            margin = 1.0 if mat.numel() <= 1 else self._clip01((z1 - z2) / max(1e-8, (1.0 - z2)))
+            entropy = self._label_entropy_quality(mat) if self.lex_enabled else 0.0
+            agreement = self._label_encoder_agreement(src_labels, tgt_labels, mat)
+            quality_mode = (
+                self.lex_config.get("quality", "margin") if self.lex_enabled else "margin"
+            )
+            if quality_mode == "margin":
+                q_label = margin
+            elif quality_mode == "entropy":
+                q_label = entropy
+            elif quality_mode == "encoder_agreement":
+                q_label = agreement
+            elif quality_mode == "constant":
+                q_label = 1.0
+            else:
+                raise ValueError(f"unsupported lexical quality mode: {quality_mode!r}")
             s_vals.append(score)
             q_vals.append(q_label)
             best_pairs.append(pair)
+            quality_payloads.append(
+                {
+                    "active": True,
+                    "mode": quality_mode,
+                    "top1": z1,
+                    "top2": z2,
+                    "margin": margin,
+                    "entropy": entropy,
+                    "encoder_agreement": agreement,
+                    "label_pairs": int(mat.numel()),
+                    "selected": q_label,
+                }
+            )
         return (
             torch.stack(s_vals),
             torch.tensor(q_vals, dtype=torch.float32, device=self.device),
             best_pairs,
+            quality_payloads,
+        )
+
+    @staticmethod
+    def _empty_label_quality() -> Dict[str, Any]:
+        return {
+            "active": False,
+            "mode": "margin",
+            "top1": 0.0,
+            "top2": 0.0,
+            "margin": 0.0,
+            "entropy": 0.0,
+            "encoder_agreement": 0.0,
+            "label_pairs": 0,
+            "selected": 0.0,
+        }
+
+    def _label_entropy_quality(self, matrix: torch.Tensor) -> float:
+        if matrix.numel() <= 1:
+            return 1.0
+        top_m = max(2, int(self.lex_config.get("entropy_top_m", 5)))
+        values = torch.topk(matrix.flatten(), k=min(top_m, matrix.numel())).values.float()
+        probabilities = torch.softmax(values, dim=0)
+        entropy = -(probabilities * probabilities.clamp_min(1.0e-12).log()).sum()
+        normalizer = torch.log(torch.tensor(float(values.numel()), device=values.device))
+        return self._clip01(1.0 - float((entropy / normalizer.clamp_min(1.0e-12)).item()))
+
+    def _label_encoder_agreement(
+        self,
+        src_labels: Sequence[str],
+        tgt_labels: Sequence[str],
+        lexical_matrix: torch.Tensor,
+    ) -> float:
+        if not (self.lex_enabled and self.lex_config.get("quality") == "encoder_agreement"):
+            return 0.0
+        if not self.use_context:
+            raise ValueError("lex.quality=encoder_agreement requires the context encoder")
+        src_context = torch.nn.functional.normalize(
+            self.encode_contexts_batch(list(src_labels)), dim=-1
+        )
+        tgt_context = torch.nn.functional.normalize(
+            self.encode_contexts_batch(list(tgt_labels)), dim=-1
+        )
+        context_matrix = self._sim01(src_context @ tgt_context.T)
+        lexical_flat = lexical_matrix.flatten()
+        context_flat = context_matrix.flatten()
+        lexical_best = int(torch.argmax(lexical_flat).item())
+        context_best = int(torch.argmax(context_flat).item())
+        score_agreement = 1.0 - abs(
+            float(lexical_flat[lexical_best].item()) - float(context_flat[context_best].item())
+        )
+        pair_agreement = 1.0 if lexical_best == context_best else 0.0
+        return self._clip01(0.5 * (score_agreement + pair_agreement))
+
+    def _score_string_channel(
+        self,
+        src_label_lists: List[List[str]],
+        tgt_label_lists: List[List[str]],
+    ) -> Tuple[torch.Tensor, torch.Tensor, List[Dict[str, Any]]]:
+        """Score E06's independent, dependency-free lexical string signal."""
+
+        scores: List[float] = []
+        qualities: List[float] = []
+        payloads: List[Dict[str, Any]] = []
+        weights = {
+            "isub": float(self.strsim_config.get("isub_weight", 1.0)),
+            "jaro_winkler": float(self.strsim_config.get("jaro_winkler_weight", 1.0)),
+            "token_set": float(self.strsim_config.get("token_set_weight", 1.0)),
+        }
+        abbreviation_enabled = self.strsim_config.get("abbreviation", "off") == "initialism"
+        for src_labels, tgt_labels in zip(src_label_lists, tgt_label_lists):
+            pair_rows: List[Dict[str, Any]] = []
+            for src_label in src_labels:
+                for tgt_label in tgt_labels:
+                    component_scores = {
+                        "isub": weights["isub"] * isub_similarity(src_label, tgt_label),
+                        "jaro_winkler": weights["jaro_winkler"]
+                        * jaro_winkler_similarity(src_label, tgt_label),
+                        "token_set": weights["token_set"]
+                        * token_set_similarity(src_label, tgt_label),
+                    }
+                    base_name, base_score = max(
+                        component_scores.items(), key=lambda item: (item[1], item[0])
+                    )
+                    abbreviation_score = (
+                        abbreviation_similarity(src_label, tgt_label)
+                        if abbreviation_enabled
+                        else 0.0
+                    )
+                    effective = max(base_score, abbreviation_score)
+                    winner = "abbreviation" if abbreviation_score > base_score else base_name
+                    pair_rows.append(
+                        {
+                            "source": src_label,
+                            "target": tgt_label,
+                            "score": self._clip01(effective),
+                            "winner": winner,
+                            "components": {
+                                **{
+                                    key: self._clip01(value)
+                                    for key, value in component_scores.items()
+                                },
+                                "abbreviation": self._clip01(abbreviation_score),
+                            },
+                        }
+                    )
+            if not pair_rows:
+                scores.append(float(self.tau))
+                qualities.append(0.0)
+                payloads.append({"active": False, "winner": None, "pairs": []})
+                continue
+            ordered = sorted(pair_rows, key=lambda row: float(row["score"]), reverse=True)
+            z1 = float(ordered[0]["score"])
+            z2 = float(ordered[1]["score"]) if len(ordered) > 1 else z1
+            quality = 1.0 if len(ordered) <= 1 else self._clip01((z1 - z2) / max(1.0e-8, 1.0 - z2))
+            scores.append(z1)
+            qualities.append(quality)
+            payloads.append(
+                {
+                    "active": True,
+                    "score": z1,
+                    "quality": quality,
+                    "top1": z1,
+                    "top2": z2,
+                    "winner": ordered[0]["winner"],
+                    "selected_labels": {
+                        "source": ordered[0]["source"],
+                        "target": ordered[0]["target"],
+                    },
+                    "components": ordered[0]["components"],
+                }
+            )
+        return (
+            torch.tensor(scores, dtype=torch.float32, device=self.device),
+            torch.tensor(qualities, dtype=torch.float32, device=self.device),
+            payloads,
         )
 
     def _score_hierarchy_family(
@@ -92,6 +281,8 @@ class PairAdaptiveChannelsMixin:
         family: str,
         src_items: Sequence[Any],
         tgt_items: Sequence[Any],
+        src_iri: Optional[str] = None,
+        tgt_iri: Optional[str] = None,
     ) -> Dict[str, Any]:
         payload = {
             "score": self.tau,
@@ -100,6 +291,11 @@ class PairAdaptiveChannelsMixin:
             "coverage": 0.0,
             "specificity": 0.0,
             "embedding": self.tau,
+            "label_score": self.tau,
+            "ancestor_overlap": 0.0,
+            "anchor_coverage": 0.0,
+            "sibling_conflict": 0.0,
+            "sibling_coverage": 0.0,
             "src_selected": [],
             "tgt_selected": [],
             "src_sentences": [],
@@ -162,10 +358,33 @@ class PairAdaptiveChannelsMixin:
             (len(src_selected) + len(tgt_selected))
             / max(1.0, 2.0 * self.max_hierarchy_triples_per_family)
         )
-        q_f = self._clip01((cov_f + str_f + inf_f) / 3.0)
-        s_f = self._clip01(
+        base_q_f = self._clip01((cov_f + str_f + inf_f) / 3.0)
+        base_s_f = self._clip01(
             self.hierarchy_embedding_weight * emb_f + self.hierarchy_support_weight * str_f
         )
+        s_f = base_s_f
+        q_f = base_q_f
+        overlap = 0.0
+        anchor_coverage = 0.0
+        sibling_conflict = 0.0
+        sibling_coverage = 0.0
+        if (
+            self.hier_enabled
+            and self.hier_config.get("mode") == "labels_overlap"
+            and family == "is_a"
+            and src_iri
+            and tgt_iri
+        ):
+            overlap, anchor_coverage, sibling_conflict, sibling_coverage = (
+                self._hierarchy_anchor_terms(src_iri, tgt_iri)
+            )
+            overlap_weight = float(self.hier_config.get("overlap_weight", 0.5))
+            effective_weight = self._clip01(overlap_weight * anchor_coverage)
+            s_f = (1.0 - effective_weight) * base_s_f + effective_weight * overlap
+            if bool(self.hier_config.get("siblings", False)) and sibling_coverage > 0.0:
+                s_f -= overlap_weight * sibling_coverage * sibling_conflict
+            s_f = self._clip01(s_f)
+            q_f = self._clip01((cov_f + str_f + inf_f + anchor_coverage) / 4.0)
 
         src_imp = [float(value) for value in src_support]
         tgt_imp = [float(value) for value in tgt_support]
@@ -210,6 +429,11 @@ class PairAdaptiveChannelsMixin:
                 "coverage": cov_f,
                 "specificity": inf_f,
                 "embedding": emb_f,
+                "label_score": base_s_f,
+                "ancestor_overlap": overlap,
+                "anchor_coverage": anchor_coverage,
+                "sibling_conflict": sibling_conflict,
+                "sibling_coverage": sibling_coverage,
                 "src_selected": src_selected_rows,
                 "tgt_selected": tgt_selected_rows,
                 "src_sentences": src_sentences,
@@ -220,6 +444,132 @@ class PairAdaptiveChannelsMixin:
             }
         )
         return payload
+
+    def _hierarchy_nodes(
+        self,
+        iri: str,
+        side: str,
+        *,
+        upward: bool,
+        depth: Optional[int],
+    ) -> Dict[str, int]:
+        dataset = self._attached_dataset
+        source = dataset.source if side == "src" else dataset.target
+        kind = dataset.entity_kind_for(iri, side, warn_unknown=False)
+        method = source.direct_parents if upward else source.direct_children
+        distances: Dict[str, int] = {}
+        frontier = deque([(str(iri), 0)])
+        while frontier:
+            node, node_depth = frontier.popleft()
+            if depth is not None and node_depth >= depth:
+                continue
+            for neighbor in method(node, kind):
+                neighbor = str(neighbor)
+                next_depth = node_depth + 1
+                previous = distances.get(neighbor)
+                if previous is not None and previous <= next_depth:
+                    continue
+                distances[neighbor] = next_depth
+                frontier.append((neighbor, next_depth))
+        return distances
+
+    def _hierarchy_ic(self, iri: str, side: str) -> float:
+        cache = getattr(self, "_hierarchy_ic_cache", None)
+        if cache is None:
+            cache = {}
+            self._hierarchy_ic_cache = cache
+        key = (side, str(iri))
+        if key in cache:
+            return float(cache[key])
+        dataset = self._attached_dataset
+        source = dataset.source if side == "src" else dataset.target
+        kind = dataset.entity_kind_for(iri, side, warn_unknown=False)
+        total = max(1, len(source.entities(kind)))
+        descendants = self._hierarchy_nodes(
+            iri,
+            side,
+            upward=False,
+            depth=None,
+        )
+        if total <= 1:
+            value = 1.0
+        else:
+            probability = min(1.0, (len(descendants) + 1.0) / (total + 1.0))
+            value = (
+                -torch.log(torch.tensor(probability)).item()
+                / torch.log(torch.tensor(float(total + 1))).item()
+            )
+        cache[key] = self._clip01(value)
+        return float(cache[key])
+
+    def _hierarchy_anchor_terms(
+        self, src_iri: str, tgt_iri: str
+    ) -> Tuple[float, float, float, float]:
+        depth = self.hier_config.get("depth", 2)
+        depth = None if depth is None else int(depth)
+        src_ancestors = self._hierarchy_nodes(src_iri, "src", upward=True, depth=depth)
+        tgt_ancestors = self._hierarchy_nodes(tgt_iri, "tgt", upward=True, depth=depth)
+        src_to_tgt = getattr(self, "_exact_anchor_src_to_tgt", {})
+        tgt_to_src = getattr(self, "_exact_anchor_tgt_to_src", {})
+
+        mapped_src: Dict[str, float] = {}
+        for src_ancestor in src_ancestors:
+            for mapped_target in src_to_tgt.get(src_ancestor, ()):
+                weight = 0.5 * (
+                    self._hierarchy_ic(src_ancestor, "src")
+                    + self._hierarchy_ic(mapped_target, "tgt")
+                )
+                mapped_src[mapped_target] = max(mapped_src.get(mapped_target, 0.0), weight)
+        anchored_targets = {target for target in tgt_ancestors if target in tgt_to_src}
+        target_weights = {target: self._hierarchy_ic(target, "tgt") for target in anchored_targets}
+        union = set(mapped_src) | anchored_targets
+        intersection = set(mapped_src) & anchored_targets
+        denominator = sum(
+            max(mapped_src.get(target, 0.0), target_weights.get(target, 0.0)) for target in union
+        )
+        numerator = sum(
+            0.5 * (mapped_src[target] + target_weights[target]) for target in intersection
+        )
+        overlap = numerator / denominator if denominator > 0.0 else 0.0
+        src_anchored_count = sum(ancestor in src_to_tgt for ancestor in src_ancestors)
+        tgt_anchored_count = sum(ancestor in tgt_to_src for ancestor in tgt_ancestors)
+        coverage_terms = []
+        if src_ancestors:
+            coverage_terms.append(src_anchored_count / len(src_ancestors))
+        if tgt_ancestors:
+            coverage_terms.append(tgt_anchored_count / len(tgt_ancestors))
+        coverage = self._safe_mean(coverage_terms)
+
+        sibling_conflict = 0.0
+        sibling_coverage = 0.0
+        if bool(self.hier_config.get("siblings", False)):
+            src_parents = self._hierarchy_nodes(src_iri, "src", upward=True, depth=1)
+            tgt_parents = self._hierarchy_nodes(tgt_iri, "tgt", upward=True, depth=1)
+            src_siblings = set()
+            tgt_siblings = set()
+            for parent in src_parents:
+                src_siblings.update(self._hierarchy_nodes(parent, "src", upward=False, depth=1))
+            for parent in tgt_parents:
+                tgt_siblings.update(self._hierarchy_nodes(parent, "tgt", upward=False, depth=1))
+            src_siblings.discard(src_iri)
+            tgt_siblings.discard(tgt_iri)
+            mapped_siblings = [
+                mapped for sibling in src_siblings for mapped in src_to_tgt.get(sibling, ())
+            ]
+            if src_siblings:
+                sibling_coverage = len(
+                    {sibling for sibling in src_siblings if sibling in src_to_tgt}
+                ) / len(src_siblings)
+            if mapped_siblings:
+                sibling_conflict = sum(
+                    mapped not in tgt_siblings for mapped in mapped_siblings
+                ) / len(mapped_siblings)
+        return (
+            self._clip01(overlap),
+            self._clip01(coverage),
+            self._clip01(sibling_conflict),
+            self._clip01(sibling_coverage),
+        )
 
     def _object_support_matrix(
         self,
@@ -386,8 +736,32 @@ class PairAdaptiveChannelsMixin:
             "tgt_sentences": [],
             "source_links": [],
             "target_links": [],
+            "formulation": "normalised",
+            "n_triples_src": len(src_items),
+            "n_triples_tgt": len(tgt_items),
+            "unsupported_mass_src": 0.0,
+            "unsupported_mass_tgt": 0.0,
+            "c_x": 0.0,
+            "c_y": 0.0,
+            "diff_pivot_reason": "explicit_neutral_fallback",
         }
         if not self.use_context:
+            return payload
+
+        formulation = (
+            self.diff_config.get("formulation", "normalised") if self.diff_enabled else "normalised"
+        )
+        payload["formulation"] = formulation
+        if formulation == "off":
+            payload["diff_pivot_reason"] = "channel_off"
+            return payload
+        if self.diff_enabled and (not src_items or not tgt_items):
+            if not src_items and not tgt_items:
+                payload["diff_pivot_reason"] = "empty_both"
+            elif not src_items:
+                payload["diff_pivot_reason"] = "empty_source"
+            else:
+                payload["diff_pivot_reason"] = "empty_target"
             return payload
 
         if support_mat is None:
@@ -447,7 +821,18 @@ class PairAdaptiveChannelsMixin:
         tgt_vals = [tgt_unsupported[i] for i in tgt_idx]
         c_x = _conflict(src_selected, src_vals)
         c_y = _conflict(tgt_selected, tgt_vals)
-        c_diff = self._clip01(0.5 * (c_x + c_y))
+        unsupported_mass_src = sum(src_vals)
+        unsupported_mass_tgt = sum(tgt_vals)
+        if formulation == "absolute":
+            pool_baseline = max(
+                1.0,
+                (max(1, len(src_selected)) * max(1, len(tgt_selected))) ** 0.5,
+            )
+            c_diff = self._clip01((unsupported_mass_src + unsupported_mass_tgt) / pool_baseline)
+        elif formulation == "asymmetric":
+            c_diff = self._clip01(c_y)
+        else:
+            c_diff = self._clip01(0.5 * (c_x + c_y))
         s_diff = self._clip01(1.0 - c_diff)
         cov_diff = self._clip01(
             (len(src_selected) + len(tgt_selected)) / max(1.0, 2.0 * self.max_diff_triples)
@@ -459,6 +844,16 @@ class PairAdaptiveChannelsMixin:
         stab_vals = list(src_vals) + list(tgt_vals)
         stab_diff = self._clip01(1.0 - min(1.0, self.stability_factor * self._safe_std(stab_vals)))
         q_diff = self._clip01((cov_diff + str_diff + stab_diff) / 3.0)
+        pivot_reason = "non_pivot"
+        if abs(s_diff - self.tau) < 1.0e-6:
+            if formulation == "normalised" and abs(c_x + c_y - 1.0) < 1.0e-6:
+                pivot_reason = (
+                    "balanced_unsupported_mass"
+                    if abs(c_x - c_y) < 1.0e-6
+                    else "normalisation_balance"
+                )
+            else:
+                pivot_reason = "genuinely_neutral_mass"
         src_sentences = self._verbalize_object_items(src_selected)
         tgt_sentences = self._verbalize_object_items(tgt_selected)
         total_imp = sum(src_vals) + sum(tgt_vals) or 1.0
@@ -502,6 +897,14 @@ class PairAdaptiveChannelsMixin:
                 "coverage": cov_diff,
                 "strength": str_diff,
                 "stability": stab_diff,
+                "formulation": formulation,
+                "n_triples_src": len(src_items),
+                "n_triples_tgt": len(tgt_items),
+                "unsupported_mass_src": unsupported_mass_src,
+                "unsupported_mass_tgt": unsupported_mass_tgt,
+                "c_x": c_x,
+                "c_y": c_y,
+                "diff_pivot_reason": pivot_reason,
                 "src_selected": src_selected_rows,
                 "tgt_selected": tgt_selected_rows,
                 "src_sentences": src_sentences,
@@ -561,6 +964,55 @@ class PairAdaptiveChannelsMixin:
         )
         return self._clip01(self._attribute_property_weight(prop) * info)
 
+    def _signed_identifier_group(self, item: Dict[str, Any]) -> Optional[str]:
+        prop = normalize_candidate_text(self._normalize_text(item.get("prop")))
+        compact = prop.replace(" ", "")
+        allowlist = [
+            normalize_candidate_text(value).replace(" ", "")
+            for value in self.attr_config.get("signed_property_allowlist", [])
+            if normalize_candidate_text(value)
+        ]
+        if allowlist:
+            matched = next((value for value in allowlist if value in compact), None)
+            if matched is None:
+                return None
+        else:
+            tokens = {"xref", "dbxref", "identifier", "id", "code", "accession"}
+            if not any(token for token in tokens if compact == token or compact.endswith(token)):
+                return None
+        if self._attribute_property_weight(self._normalize_text(item.get("prop"))) < 0.8:
+            return None
+        return "identifier"
+
+    def _signed_identifier_disagreement(
+        self,
+        src_items: Sequence[Dict[str, Any]],
+        tgt_items: Sequence[Dict[str, Any]],
+    ) -> Tuple[float, int, List[str]]:
+        src_groups: Dict[str, set[str]] = {}
+        tgt_groups: Dict[str, set[str]] = {}
+        for item, groups in ((item, src_groups) for item in src_items):
+            group = self._signed_identifier_group(item)
+            value = normalize_candidate_text(self._normalize_text(item.get("value"))).replace(
+                " ", ""
+            )
+            if group and value:
+                groups.setdefault(group, set()).add(value)
+        for item, groups in ((item, tgt_groups) for item in tgt_items):
+            group = self._signed_identifier_group(item)
+            value = normalize_candidate_text(self._normalize_text(item.get("value"))).replace(
+                " ", ""
+            )
+            if group and value:
+                groups.setdefault(group, set()).add(value)
+        comparable = sorted(set(src_groups) & set(tgt_groups))
+        if not comparable:
+            return 0.0, 0, []
+        disagreements = [
+            0.0 if src_groups[group] & tgt_groups[group] else 1.0 for group in comparable
+        ]
+        return self._safe_mean(disagreements), len(comparable), comparable
+
     def _score_attribute_channel(
         self,
         src_attrs: Sequence[Dict[str, Any]],
@@ -580,6 +1032,12 @@ class PairAdaptiveChannelsMixin:
             "tgt_selected": [],
             "source_links": [],
             "target_links": [],
+            "bank": "full",
+            "polarity": "support_only",
+            "identifier_disagreement": 0.0,
+            "identifier_comparable_groups": 0,
+            "identifier_groups": [],
+            "identifier_support": 0.0,
         }
         if not self.use_context:
             return payload
@@ -595,73 +1053,83 @@ class PairAdaptiveChannelsMixin:
         if not src_items and not tgt_items:
             return payload
 
-        tgt_bank = [
-            {
-                "kind": "label",
-                "anchor_ref": "__target__",
-                "text": self._normalize_text(label),
-            }
-            for label in tgt_labels
-            if self._normalize_text(label)
-        ]
-        src_bank = [
-            {
-                "kind": "label",
-                "anchor_ref": "__source__",
-                "text": self._normalize_text(label),
-            }
-            for label in src_labels
-            if self._normalize_text(label)
-        ]
-        for family_payload in hierarchy_payloads.values():
+        bank_mode = self.attr_config.get("bank", "full") if self.attr_enabled else "full"
+        polarity = (
+            self.attr_config.get("polarity", "support_only")
+            if self.attr_enabled
+            else "support_only"
+        )
+        tgt_bank = []
+        src_bank = []
+        if bank_mode in {"full", "attrs_labels"}:
             tgt_bank.extend(
                 {
-                    "kind": "hierarchy",
+                    "kind": "label",
+                    "anchor_ref": "__target__",
+                    "text": self._normalize_text(label),
+                }
+                for label in tgt_labels
+                if self._normalize_text(label)
+            )
+            src_bank.extend(
+                {
+                    "kind": "label",
+                    "anchor_ref": "__source__",
+                    "text": self._normalize_text(label),
+                }
+                for label in src_labels
+                if self._normalize_text(label)
+            )
+        if bank_mode == "full":
+            for family_payload in hierarchy_payloads.values():
+                tgt_bank.extend(
+                    {
+                        "kind": "hierarchy",
+                        "anchor_ref": self._normalize_text(item.get("item_id")),
+                        "text": self._normalize_text(sentence),
+                    }
+                    for item, sentence in zip(
+                        list(family_payload.get("tgt_selected", [])),
+                        list(family_payload.get("tgt_sentences", [])),
+                    )
+                    if self._normalize_text(item.get("item_id")) and self._normalize_text(sentence)
+                )
+                src_bank.extend(
+                    {
+                        "kind": "hierarchy",
+                        "anchor_ref": self._normalize_text(item.get("item_id")),
+                        "text": self._normalize_text(sentence),
+                    }
+                    for item, sentence in zip(
+                        list(family_payload.get("src_selected", [])),
+                        list(family_payload.get("src_sentences", [])),
+                    )
+                    if self._normalize_text(item.get("item_id")) and self._normalize_text(sentence)
+                )
+            tgt_bank.extend(
+                {
+                    "kind": "similarity",
                     "anchor_ref": self._normalize_text(item.get("item_id")),
                     "text": self._normalize_text(sentence),
                 }
                 for item, sentence in zip(
-                    list(family_payload.get("tgt_selected", [])),
-                    list(family_payload.get("tgt_sentences", [])),
+                    list(sim_payload.get("tgt_selected", [])),
+                    list(sim_payload.get("tgt_sentences", [])),
                 )
                 if self._normalize_text(item.get("item_id")) and self._normalize_text(sentence)
             )
             src_bank.extend(
                 {
-                    "kind": "hierarchy",
+                    "kind": "similarity",
                     "anchor_ref": self._normalize_text(item.get("item_id")),
                     "text": self._normalize_text(sentence),
                 }
                 for item, sentence in zip(
-                    list(family_payload.get("src_selected", [])),
-                    list(family_payload.get("src_sentences", [])),
+                    list(sim_payload.get("src_selected", [])),
+                    list(sim_payload.get("src_sentences", [])),
                 )
                 if self._normalize_text(item.get("item_id")) and self._normalize_text(sentence)
             )
-        tgt_bank.extend(
-            {
-                "kind": "similarity",
-                "anchor_ref": self._normalize_text(item.get("item_id")),
-                "text": self._normalize_text(sentence),
-            }
-            for item, sentence in zip(
-                list(sim_payload.get("tgt_selected", [])),
-                list(sim_payload.get("tgt_sentences", [])),
-            )
-            if self._normalize_text(item.get("item_id")) and self._normalize_text(sentence)
-        )
-        src_bank.extend(
-            {
-                "kind": "similarity",
-                "anchor_ref": self._normalize_text(item.get("item_id")),
-                "text": self._normalize_text(sentence),
-            }
-            for item, sentence in zip(
-                list(sim_payload.get("src_selected", [])),
-                list(sim_payload.get("src_sentences", [])),
-            )
-            if self._normalize_text(item.get("item_id")) and self._normalize_text(sentence)
-        )
         tgt_bank.extend(
             {
                 "kind": "attribute",
@@ -750,6 +1218,27 @@ class PairAdaptiveChannelsMixin:
 
         r_attr = self._safe_mean(side_scores)
         s_attr = self._clip01(max(self.attribute_score_floor, r_attr))
+        identifier_disagreement = 0.0
+        identifier_comparable_groups = 0
+        identifier_groups: List[str] = []
+        identifier_support = 0.0
+        if polarity == "signed":
+            (
+                identifier_disagreement,
+                identifier_comparable_groups,
+                identifier_groups,
+            ) = self._signed_identifier_disagreement(src_items, tgt_items)
+            signed_supports = [
+                float(selected.get("support", 0.0))
+                for item, selected in [
+                    *zip(src_items, src_selected),
+                    *zip(tgt_items, tgt_selected),
+                ]
+                if self._signed_identifier_group(item) is not None
+            ]
+            identifier_support = self._safe_mean(signed_supports)
+            if identifier_comparable_groups and identifier_support >= 0.8:
+                s_attr = self._clip01(s_attr - self.tau * identifier_disagreement)
         cov_attr = self._clip01(
             (len(src_items) + len(tgt_items)) / max(1.0, 2.0 * self.max_attr_items)
         )
@@ -778,6 +1267,12 @@ class PairAdaptiveChannelsMixin:
                 "tgt_selected": tgt_selected,
                 "source_links": src_links,
                 "target_links": tgt_links,
+                "bank": bank_mode,
+                "polarity": polarity,
+                "identifier_disagreement": identifier_disagreement,
+                "identifier_comparable_groups": identifier_comparable_groups,
+                "identifier_groups": identifier_groups,
+                "identifier_support": identifier_support,
             }
         )
         return payload

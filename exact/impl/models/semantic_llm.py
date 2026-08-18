@@ -10,6 +10,12 @@ import torch  # noqa: F401
 from torch import nn  # noqa: F401
 from transformers import AutoTokenizer  # noqa: F401
 
+from exact.impl.models.selector.listwise_llm import (
+    build_listwise_decision_prompt,
+    categorical_probabilities_from_logprobs,
+    listwise_labels,
+    transform_listwise_probabilities,
+)
 from exact.llm.routing import extract_chat_text, extract_first_token_top_logprobs
 
 
@@ -1498,3 +1504,12 @@ class SemanticLLMMixin:
             result["explanations"] = explanations
 
         return result
+
+
+__all__ = [
+    "SemanticLLMMixin",
+    "build_listwise_decision_prompt",
+    "categorical_probabilities_from_logprobs",
+    "listwise_labels",
+    "transform_listwise_probabilities",
+]

@@ -94,6 +94,13 @@ class FeatureEngineeringMixin:
             score += float(value) * float(weight)
         return float(score)
 
+    def _score_rank_model(self, row: Sequence[float], model: Mapping[str, Any]) -> float:
+        if str(model.get("model_type", "current_linear")) == "analytic":
+            # RANK_FEATURE_NAMES[0] is logit(S_pair_final); invert it so the
+            # analytic control uses the shipped bounded score itself.
+            return float(self._clip01(self._sigmoid(float(row[0]))))
+        return self._linear_score(row, model)
+
     def _score_group(
         self,
         src: str,
@@ -221,7 +228,8 @@ class FeatureEngineeringMixin:
                 "selection_distinctive": float(distinctive.get(idx, 0.0)),
                 "selection_utility": float(selector_scores[pos]),
                 "P_rank": float(selector_probs[pos]) if pos < len(selector_probs) else 0.0,
-                "P_match": float(1.0 - no_match_prob),
+                "P_match": float(prob if self.emit_candidate_scores else 1.0 - no_match_prob),
+                "selection_source_p_match": float(1.0 - no_match_prob),
                 "selection_winner": bool(winner_pos is not None and pos == winner_pos),
             }
         return {
@@ -486,6 +494,15 @@ class FeatureEngineeringMixin:
             conf["selection_utility"] = float(row.get("selection_utility", 0.0))
             conf["P_rank"] = float(row.get("P_rank", 0.0))
             conf["P_match"] = float(row.get("P_match", 0.0))
+            conf["selection_source_p_match"] = float(
+                row.get("selection_source_p_match", row.get("P_match", 0.0))
+            )
+            conf["selection_reciprocal"] = bool(row.get("selection_reciprocal", False))
+            conf["selection_channel_agreement"] = int(
+                row.get("selection_channel_agreement", 0) or 0
+            )
+            conf["selection_margin_cutoff"] = float(row.get("selection_margin_cutoff", 0.0))
+            conf["selection_threshold_mode"] = str(row.get("selection_threshold_mode", "fixed"))
             conf["selection_accept_threshold"] = float(row.get("selection_accept_threshold", 0.0))
             conf["selection_target_conflict_enabled"] = bool(
                 row.get("selection_target_conflict_enabled", False)

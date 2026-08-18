@@ -388,7 +388,8 @@ class CalibrationMixin:
                     )
                     break
                 utilities = {
-                    idx: self._linear_score(rank_features[idx], rank_model) for idx in rank_features
+                    idx: self._score_rank_model(rank_features[idx], rank_model)
+                    for idx in rank_features
                 }
 
                 decision_start = time.perf_counter()
@@ -560,7 +561,7 @@ class CalibrationMixin:
             self.llm["mode"] = original_llm_mode
             return None
         utilities = {
-            idx: self._linear_score(rank_features[idx], rank_model) for idx in rank_features
+            idx: self._score_rank_model(rank_features[idx], rank_model) for idx in rank_features
         }
         source_decisions = self._source_decisions(
             df,
@@ -838,6 +839,8 @@ class CalibrationMixin:
         logger: Optional[Any] = None,
         label: str = "rank",
     ) -> Optional[Dict[str, Any]]:
+        if self.experiments_enabled and self.rerank_config["mode"] == "analytic":
+            return {"model_type": "analytic"}
         train_indices = sorted({idx for group in groups for idx in group["indices"]})
         if not train_indices:
             return None
@@ -1108,6 +1111,7 @@ class CalibrationMixin:
                 "TP": 0.0,
                 "FP": 0.0,
                 "FN": 0.0,
+                "count_reference_miss_as": self.count_reference_miss_as,
                 "accept_objective": str(self.calibration["accept_objective"]),
                 "fallback_to_f1": False,
                 "selected_metrics": {},
@@ -1133,7 +1137,7 @@ class CalibrationMixin:
                     tp += weight
                 elif pred and not label:
                     fp += weight
-                    if has_reference:
+                    if has_reference and self.count_reference_miss_as == "fp_fn":
                         fn += weight
                 elif (not pred) and label:
                     fn += weight
@@ -1159,6 +1163,7 @@ class CalibrationMixin:
                     "TP": tp,
                     "FP": fp,
                     "FN": fn,
+                    "count_reference_miss_as": self.count_reference_miss_as,
                 }
             )
 

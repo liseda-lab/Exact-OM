@@ -155,7 +155,7 @@ class AcceptanceMixin:
                 tp += weight
             elif pred and not label:
                 fp += weight
-                if has_reference:
+                if has_reference and self.count_reference_miss_as == "fp_fn":
                     fn += weight
             elif (not pred) and label:
                 fn += weight
@@ -182,6 +182,7 @@ class AcceptanceMixin:
             "TP": tp,
             "FP": fp,
             "FN": fn,
+            "count_reference_miss_as": self.count_reference_miss_as,
             "target_conflict_removed_predictions": int(
                 sum(
                     1
@@ -227,7 +228,7 @@ class AcceptanceMixin:
                 tp += weight
             elif pred and not label:
                 fp += weight
-                if has_reference:
+                if has_reference and self.count_reference_miss_as == "fp_fn":
                     fn += weight
             elif (not pred) and label:
                 fn += weight
@@ -253,6 +254,7 @@ class AcceptanceMixin:
             "TP": tp,
             "FP": fp,
             "FN": fn,
+            "count_reference_miss_as": self.count_reference_miss_as,
         }
         selected.update(
             {

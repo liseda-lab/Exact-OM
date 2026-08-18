@@ -8,6 +8,10 @@ import torch  # noqa: F401
 
 from exact.impl.models.pair_adaptive_channels import PairAdaptiveChannelsMixin
 from exact.impl.models.pair_adaptive_evidence import PairAdaptiveEvidenceMixin
+from exact.impl.models.pair_adaptive_experiments import (
+    JsonExperimentArtifact,
+    config_dict,
+)
 from exact.impl.models.semantic_scorer import SemanticScorer
 from exact.utils.formatting import clip01, safe_mean  # noqa: F401
 
@@ -49,8 +53,151 @@ class PairAdaptiveSemanticScorer(
         attribute_score_floor: float = 0.5,
         uncertainty_indecision_scale: float = 2.0,
         uncertainty_disagreement_quality_power: float = 0.5,
+        strsim: Optional[Dict[str, Any]] = None,
+        attr: Optional[Dict[str, Any]] = None,
+        hier: Optional[Dict[str, Any]] = None,
+        diff: Optional[Dict[str, Any]] = None,
+        lex: Optional[Dict[str, Any]] = None,
+        property: Optional[Dict[str, Any]] = None,
+        instance: Optional[Dict[str, Any]] = None,
+        graph: Optional[Dict[str, Any]] = None,
+        fusion_config: Optional[Dict[str, Any]] = None,
+        llm_experiment_config: Optional[Dict[str, Any]] = None,
         **kwargs: Any,
     ) -> None:
+        self.strsim_config = self._experiment_config(
+            strsim,
+            enabled=False,
+            placement="channel",
+            abbreviation="off",
+            isub_weight=1.0,
+            jaro_winkler_weight=1.0,
+            token_set_weight=1.0,
+        )
+        self.attr_config = self._experiment_config(
+            attr,
+            enabled=False,
+            polarity="support_only",
+            bank="full",
+            signed_property_allowlist=[],
+        )
+        self.hier_config = self._experiment_config(
+            hier,
+            enabled=False,
+            mode="labels",
+            siblings=False,
+            depth=2,
+            overlap_weight=0.5,
+        )
+        self.diff_config = self._experiment_config(
+            diff,
+            enabled=False,
+            formulation="normalised",
+            dump_components=False,
+        )
+        self.lex_config = self._experiment_config(
+            lex,
+            enabled=False,
+            quality="margin",
+            entropy_top_m=5,
+        )
+        self.property_config = self._experiment_config(property, enabled=False)
+        self.instance_config = self._experiment_config(instance, enabled=False)
+        self.graph_config = self._experiment_config(
+            graph,
+            mode="off",
+            artifact=None,
+            dump_profile=False,
+        )
+        self.fusion_config = self._experiment_config(
+            fusion_config,
+            enabled=False,
+            mode="analytic_shipped",
+            scope="global",
+            sigma_mode="full",
+            tau=0.5,
+            gamma=2.0,
+            beta=0.8,
+            artifact=None,
+        )
+        raw_llm_config = self._experiment_config(
+            llm_experiment_config,
+            enabled=False,
+            decision={},
+            gate={},
+            fusion_weight="beta_u",
+            fusion_artifact=None,
+        )
+        raw_llm_config["decision"] = self._experiment_config(
+            raw_llm_config.get("decision"),
+            mode="binary",
+            probability="raw_joint",
+            listwise_max_candidates=5,
+            order_averages=1,
+        )
+        raw_llm_config["gate"] = self._experiment_config(
+            raw_llm_config.get("gate"),
+            mode="analytic",
+            threshold=0.5,
+            quantile_fraction=0.05,
+            forced_sample_size=0,
+            artifact=None,
+        )
+        self.llm_experiment_config = raw_llm_config
+
+        self.strsim_enabled = bool(self.strsim_config["enabled"])
+        self.attr_enabled = bool(self.attr_config["enabled"])
+        self.hier_enabled = bool(self.hier_config["enabled"])
+        self.diff_enabled = bool(self.diff_config["enabled"])
+        self.lex_enabled = bool(self.lex_config["enabled"])
+        self.fusion_enabled = bool(self.fusion_config["enabled"])
+        self.llm_experiment_enabled = bool(self.llm_experiment_config["enabled"])
+        self._fusion_artifact: Optional[JsonExperimentArtifact] = None
+        self._gate_artifact: Optional[JsonExperimentArtifact] = None
+        self._validate_experiment_configs()
+
+        if self.fusion_enabled:
+            kwargs["tau"] = float(self.fusion_config["tau"])
+            kwargs["gamma"] = float(self.fusion_config["gamma"])
+            kwargs["beta"] = float(self.fusion_config["beta"])
+            fusion_mode = str(self.fusion_config["mode"])
+            if fusion_mode != "analytic_shipped":
+                if fusion_mode == "learned_adaptive":
+                    raise NotImplementedError(
+                        "learned_adaptive fusion requires a fitted gating-network runtime"
+                    )
+                if self.fusion_config["scope"] != "global":
+                    raise NotImplementedError(
+                        "artifact-backed analytic_fitted/learned_global currently supports "
+                        "only fusion scope='global'"
+                    )
+                self._fusion_artifact = JsonExperimentArtifact.load(
+                    self.fusion_config.get("artifact"),
+                    expected_mode=fusion_mode,
+                    kind="fusion",
+                )
+                if fusion_mode == "analytic_fitted":
+                    parameters = self._fusion_artifact.scoped_payload(
+                        "parameters", scope_key="global"
+                    )
+                    for name in ("tau", "gamma", "beta"):
+                        if name in parameters:
+                            kwargs[name] = float(parameters[name])
+
+        gate_mode = str(self.llm_experiment_config["gate"]["mode"])
+        gate_artifact = self.llm_experiment_config["gate"].get("artifact")
+        if self.llm_experiment_enabled and gate_mode in {"router", "forced_sample"}:
+            if not gate_artifact:
+                raise ValueError(
+                    f"LLM gate mode {gate_mode!r} requires an immutable selection/model artifact"
+                )
+        if self.llm_experiment_enabled and gate_artifact:
+            self._gate_artifact = JsonExperimentArtifact.load(
+                gate_artifact,
+                expected_mode=gate_mode,
+                kind="LLM gate",
+            )
+
         self.attribute_property_weights = dict(
             attribute_property_weights
             or {
@@ -90,6 +237,252 @@ class PairAdaptiveSemanticScorer(
         self.max_attr_items = int(max_attr_items)
         self.hierarchical_relation_families = dict(hierarchical_relation_families or {})
         self._attached_dataset = None
+        self._exact_anchor_src_to_tgt: Dict[str, set[str]] = {}
+        self._exact_anchor_tgt_to_src: Dict[str, set[str]] = {}
+        self._hierarchy_ic_cache: Dict[Tuple[str, str], float] = {}
+
+    @staticmethod
+    def _experiment_config(value: Any, **defaults: Any) -> Dict[str, Any]:
+        merged = dict(defaults)
+        merged.update(config_dict(value))
+        return merged
+
+    def _validate_experiment_configs(self) -> None:
+        if self.strsim_config["placement"] not in {"channel", "folded_into_lexical"}:
+            raise ValueError(f"unsupported strsim placement: {self.strsim_config['placement']!r}")
+        if self.strsim_config["abbreviation"] not in {"off", "initialism"}:
+            raise ValueError(
+                f"unsupported strsim abbreviation mode: {self.strsim_config['abbreviation']!r}"
+            )
+        for key in ("isub_weight", "jaro_winkler_weight", "token_set_weight"):
+            if float(self.strsim_config[key]) < 0.0:
+                raise ValueError(f"strsim {key} must be non-negative")
+        if self.attr_config["polarity"] not in {"support_only", "signed"}:
+            raise ValueError(f"unsupported attr polarity: {self.attr_config['polarity']!r}")
+        if self.attr_config["bank"] not in {"full", "attrs_labels", "attrs_only"}:
+            raise ValueError(f"unsupported attr bank: {self.attr_config['bank']!r}")
+        if self.hier_config["mode"] not in {"labels", "labels_overlap"}:
+            raise ValueError(f"unsupported hierarchy mode: {self.hier_config['mode']!r}")
+        if self.diff_config["formulation"] not in {
+            "normalised",
+            "absolute",
+            "asymmetric",
+            "off",
+        }:
+            raise ValueError(
+                f"unsupported difference formulation: {self.diff_config['formulation']!r}"
+            )
+        if self.lex_config["quality"] not in {
+            "margin",
+            "entropy",
+            "encoder_agreement",
+            "constant",
+        }:
+            raise ValueError(f"unsupported lexical quality: {self.lex_config['quality']!r}")
+        if self.fusion_config["sigma_mode"] not in {
+            "full",
+            "constant_q",
+            "no_sharpening",
+            "suppression_only",
+            "uniform",
+        }:
+            raise ValueError(f"unsupported fusion sigma mode: {self.fusion_config['sigma_mode']!r}")
+        graph_mode = self.graph_config["mode"]
+        if graph_mode not in {"off", "inductive", "transductive", "graph_only"}:
+            raise ValueError(f"unsupported graph channel mode: {graph_mode!r}")
+        if graph_mode != "off":
+            raise NotImplementedError(
+                "E23 graph scoring needs a normalized graph-feature/artifact contract; "
+                "refusing to execute this arm as the graph-off baseline"
+            )
+        if bool(self.property_config.get("enabled")) or bool(self.instance_config.get("enabled")):
+            raise NotImplementedError(
+                "property/instance evidence-group switches are not implemented in this scorer"
+            )
+        if self.llm_experiment_enabled and self.llm_experiment_config["fusion_weight"] != "beta_u":
+            raise NotImplementedError(
+                "learned LLM mixing requires an immutable fitted fusion artifact runtime"
+            )
+
+    def attach_dataset(self, dataset: Any) -> None:
+        super().attach_dataset(dataset)
+        self._hierarchy_ic_cache = {}
+        self._exact_anchor_src_to_tgt = {}
+        self._exact_anchor_tgt_to_src = {}
+        exact_matches = getattr(dataset, "exact_matches", None)
+        if exact_matches is not None and hasattr(exact_matches, "columns"):
+            if {"Src", "Tgt"}.issubset(exact_matches.columns):
+                rows = exact_matches[["Src", "Tgt"]].dropna().itertuples(index=False, name=None)
+                for src_iri, tgt_iri in rows:
+                    src_key = str(src_iri)
+                    tgt_key = str(tgt_iri)
+                    self._exact_anchor_src_to_tgt.setdefault(src_key, set()).add(tgt_key)
+                    self._exact_anchor_tgt_to_src.setdefault(tgt_key, set()).add(src_key)
+        dataset_signature = getattr(dataset, "dataset_signature", None)
+        if self._fusion_artifact is not None:
+            self._fusion_artifact.validate_dataset(dataset_signature, required=True)
+        if self._gate_artifact is not None:
+            self._gate_artifact.validate_dataset(dataset_signature, required=True)
+
+    def _fusion_multiplier(self, channel: str) -> float:
+        if self._fusion_artifact is None:
+            return 1.0
+        mode = str(self.fusion_config["mode"])
+        field = "parameters" if mode == "analytic_fitted" else "weights"
+        payload = self._fusion_artifact.scoped_payload(field, scope_key="global")
+        values = payload.get("multipliers", payload) if field == "parameters" else payload
+        if not isinstance(values, dict):
+            raise ValueError(
+                f"fusion artifact {self._fusion_artifact.path} has invalid {field!r} payload"
+            )
+        fallback = 1.0 if mode == "analytic_fitted" else 0.0
+        value = float(values.get(channel, values.get("default", fallback)))
+        if value < 0.0:
+            raise ValueError(f"fusion weight for {channel!r} must be non-negative")
+        return value
+
+    def _sigma_authority(
+        self,
+        score: torch.Tensor,
+        quality: torch.Tensor,
+        active: torch.Tensor,
+        *,
+        channel: str,
+    ) -> torch.Tensor:
+        """Return channel authority for E19/E26 while preserving the shipped default."""
+
+        active_float = active.to(dtype=score.dtype)
+        fusion_mode = str(self.fusion_config["mode"]) if self.fusion_enabled else "analytic_shipped"
+        if fusion_mode == "learned_global":
+            return active_float * quality * self._fusion_multiplier(channel)
+
+        sigma_mode = str(self.fusion_config["sigma_mode"]) if self.fusion_enabled else "full"
+        margin = (score - self.tau).abs()
+        if sigma_mode == "full":
+            authority = quality * margin.pow(self.gamma)
+        elif sigma_mode == "constant_q":
+            authority = active_float * margin.pow(self.gamma)
+        elif sigma_mode == "no_sharpening":
+            authority = active_float * quality
+        elif sigma_mode == "suppression_only":
+            authority = active_float
+        elif sigma_mode == "uniform":
+            authority = torch.ones_like(score)
+        else:  # guarded in _validate_experiment_configs
+            raise ValueError(f"unsupported fusion sigma mode: {sigma_mode!r}")
+        return authority * self._fusion_multiplier(channel)
+
+    def _llm_gate_mask(
+        self,
+        *,
+        U_ind: torch.Tensor,
+        U_dis: torch.Tensor,
+        U: torch.Tensor,
+        S_base: torch.Tensor,
+        q_label: torch.Tensor,
+        Q_struct: torch.Tensor,
+        src_iris: Sequence[str],
+        tgt_iris: Sequence[str],
+        label: Optional[Sequence[float]],
+    ) -> Tuple[torch.Tensor, List[Dict[str, Any]]]:
+        """Compute a frozen, per-pair gate and an auditable diagnostic row."""
+
+        if not self.llm_experiment_enabled:
+            mask = U >= self.tau_LLM
+            return mask, []
+
+        gate = self.llm_experiment_config["gate"]
+        mode = str(gate["mode"])
+        statistic_name = "U"
+        statistic = U
+        threshold = float(gate["threshold"])
+        extra: Dict[str, Any] = {}
+        if mode == "analytic":
+            pass
+        elif mode == "quantile":
+            # The threshold is frozen in config or an artifact; it is never derived
+            # from the current inference batch, which would make routing batch-local.
+            if self._gate_artifact is not None:
+                threshold = float(self._gate_artifact.payload.get("threshold", threshold))
+            extra["target_fraction"] = float(gate["quantile_fraction"])
+            extra["threshold_source"] = (
+                "artifact" if self._gate_artifact is not None else "config_frozen"
+            )
+        elif mode == "forced_sample":
+            assert self._gate_artifact is not None
+            pairs = self._gate_artifact.payload.get("pairs")
+            if not isinstance(pairs, list):
+                raise ValueError("forced_sample artifact must contain a 'pairs' array")
+            selected = {
+                (str(pair[0]), str(pair[1]))
+                for pair in pairs
+                if isinstance(pair, list) and len(pair) == 2
+            }
+            expected_size = int(gate["forced_sample_size"])
+            if expected_size and len(selected) != expected_size:
+                raise ValueError(
+                    "forced_sample artifact pair count does not match configured sample size"
+                )
+            statistic_name = "frozen_sample_membership"
+            statistic = torch.tensor(
+                [float((str(src), str(tgt)) in selected) for src, tgt in zip(src_iris, tgt_iris)],
+                dtype=torch.float32,
+                device=self.device,
+            )
+            threshold = 0.5
+            extra["sample_size"] = len(selected)
+        elif mode == "oracle":
+            if label is None or len(label) != len(src_iris):
+                raise ValueError("oracle LLM gate requires one reference label per scored pair")
+            truth = torch.tensor(label, dtype=torch.float32, device=self.device) >= 0.5
+            predicted = S_base >= self.threshold
+            statistic_name = "baseline_error"
+            statistic = (truth != predicted).to(torch.float32)
+            threshold = 0.5
+            extra["oracle_diagnostic"] = True
+        elif mode == "router":
+            assert self._gate_artifact is not None
+            payload = self._gate_artifact.payload
+            weights = payload.get("weights")
+            if not isinstance(weights, dict):
+                raise ValueError("router artifact must contain a 'weights' object")
+            features = {
+                "U_ind": U_ind,
+                "U_dis": U_dis,
+                "U": U,
+                "S_base": S_base,
+                "q_label": q_label,
+                "Q_struct": Q_struct,
+            }
+            linear = torch.full_like(U, float(payload.get("bias", 0.0)))
+            for name, weight in weights.items():
+                if name not in features:
+                    raise ValueError(f"router artifact references unknown feature {name!r}")
+                linear = linear + float(weight) * features[name]
+            statistic_name = "router_probability"
+            statistic = torch.sigmoid(linear)
+            threshold = float(payload.get("threshold", threshold))
+            extra["artifact"] = dict(self._gate_artifact.provenance)
+        else:
+            raise ValueError(f"unsupported LLM gate mode: {mode!r}")
+
+        mask = statistic >= threshold
+        rows = []
+        for idx in range(len(src_iris)):
+            rows.append(
+                {
+                    "mode": mode,
+                    "statistic_name": statistic_name,
+                    "statistic": float(statistic[idx]),
+                    "threshold": threshold,
+                    "U_ind": float(U_ind[idx]),
+                    "U_dis": float(U_dis[idx]),
+                    "U": float(U[idx]),
+                    "would_route": bool(mask[idx]),
+                    **extra,
+                }
+            )
+        return mask, rows
 
     def _runtime_fingerprint_payload(
         self,
@@ -111,6 +504,33 @@ class PairAdaptiveSemanticScorer(
             "attribute_score_floor": self.attribute_score_floor,
             "uncertainty_indecision_scale": self.uncertainty_indecision_scale,
             "uncertainty_disagreement_quality_power": (self.uncertainty_disagreement_quality_power),
+            "experiments": {
+                "strsim": self.strsim_config,
+                "attr": self.attr_config,
+                "hier": self.hier_config,
+                "diff": self.diff_config,
+                "lex": self.lex_config,
+                "property": self.property_config,
+                "instance": self.instance_config,
+                "graph": self.graph_config,
+                "fusion": self.fusion_config,
+                "fusion_effective": {
+                    "tau": self.tau,
+                    "gamma": self.gamma,
+                    "beta": self.beta,
+                },
+                "llm": self.llm_experiment_config,
+                "fusion_artifact": (
+                    dict(self._fusion_artifact.provenance)
+                    if self._fusion_artifact is not None
+                    else None
+                ),
+                "gate_artifact": (
+                    dict(self._gate_artifact.provenance)
+                    if self._gate_artifact is not None
+                    else None
+                ),
+            },
         }
         return payload
 
@@ -424,6 +844,105 @@ class PairAdaptiveSemanticScorer(
         ).clamp(0.0, 1.0)
         return indecision, disagreement
 
+    def _experiment_diagnostics_for_pair(
+        self,
+        payload: Dict[str, Any],
+        *,
+        gate_diagnostic: Optional[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        diagnostics: Dict[str, Any] = {}
+        if self.strsim_enabled:
+            diagnostics["string_similarity"] = dict(payload["strsim"])
+        if self.attr_enabled:
+            diagnostics["attribute"] = {
+                key: payload["attr"].get(key)
+                for key in (
+                    "bank",
+                    "polarity",
+                    "identifier_disagreement",
+                    "identifier_comparable_groups",
+                    "identifier_groups",
+                    "identifier_support",
+                )
+            }
+        if self.hier_enabled:
+            diagnostics["hierarchy"] = {
+                family: {
+                    key: family_payload.get(key)
+                    for key in (
+                        "label_score",
+                        "ancestor_overlap",
+                        "anchor_coverage",
+                        "sibling_conflict",
+                        "sibling_coverage",
+                    )
+                }
+                for family, family_payload in payload["hierarchy"].items()
+            }
+        if self.diff_enabled and bool(self.diff_config.get("dump_components")):
+            diagnostics["difference"] = {
+                key: payload["diff"].get(key)
+                for key in (
+                    "formulation",
+                    "n_triples_src",
+                    "n_triples_tgt",
+                    "unsupported_mass_src",
+                    "unsupported_mass_tgt",
+                    "c_x",
+                    "c_y",
+                    "diff_pivot_reason",
+                )
+            }
+        if self.lex_enabled or self.fusion_enabled:
+            diagnostics["quality_components"] = {
+                "label": dict(payload["label_quality"]),
+                "hierarchy": {
+                    family: {
+                        key: family_payload.get(key)
+                        for key in (
+                            "coverage",
+                            "strength",
+                            "specificity",
+                            "embedding",
+                            "anchor_coverage",
+                        )
+                    }
+                    for family, family_payload in payload["hierarchy"].items()
+                },
+                "similarity": {
+                    key: payload["sim"].get(key)
+                    for key in ("coverage", "strength", "stability", "embedding")
+                },
+                "difference": {
+                    key: payload["diff"].get(key)
+                    for key in ("coverage", "strength", "stability", "conflict")
+                },
+                "attribute": {
+                    key: payload["attr"].get(key)
+                    for key in ("coverage", "informativeness", "stability")
+                },
+                "sigma_mode": (self.fusion_config["sigma_mode"] if self.fusion_enabled else "full"),
+            }
+        if gate_diagnostic is not None:
+            diagnostics["llm_gate"] = dict(gate_diagnostic)
+        if self.fusion_enabled:
+            diagnostics["fusion"] = {
+                "mode": self.fusion_config["mode"],
+                "scope": self.fusion_config["scope"],
+                "sigma_mode": self.fusion_config["sigma_mode"],
+                "effective_parameters": {
+                    "tau": self.tau,
+                    "gamma": self.gamma,
+                    "beta": self.beta,
+                },
+                "artifact": (
+                    dict(self._fusion_artifact.provenance)
+                    if self._fusion_artifact is not None
+                    else None
+                ),
+            }
+        return diagnostics
+
     @torch.inference_mode()
     def forward(
         self,
@@ -472,8 +991,82 @@ class PairAdaptiveSemanticScorer(
         self._last_decision_backend_meta = {}
         self._last_rationale_backend_meta = {}
 
-        s_label, q_label, best_pairs = self._score_label_channel(src_label_lists, tgt_label_lists)
-        s_label_star = s_label
+        s_label, q_label, best_pairs, label_quality_payloads = self._score_label_channel(
+            src_label_lists, tgt_label_lists
+        )
+        label_active = torch.tensor(
+            [
+                bool(self.use_lexical and src_labels and tgt_labels)
+                for src_labels, tgt_labels in zip(src_label_lists, tgt_label_lists)
+            ],
+            dtype=torch.bool,
+            device=self.device,
+        )
+        s_strsim = torch.full((n_pairs,), float(self.tau), device=self.device)
+        q_strsim = torch.zeros(n_pairs, device=self.device)
+        strsim_payloads = [
+            {"active": False, "winner": None, "components": {}} for _ in range(n_pairs)
+        ]
+        strsim_active = torch.zeros(n_pairs, dtype=torch.bool, device=self.device)
+        if self.strsim_enabled:
+            s_strsim, q_strsim, strsim_payloads = self._score_string_channel(
+                src_label_lists, tgt_label_lists
+            )
+            strsim_active = torch.tensor(
+                [bool(payload.get("active")) for payload in strsim_payloads],
+                dtype=torch.bool,
+                device=self.device,
+            )
+
+        needs_inner_lexical_fusion = self.strsim_enabled or (
+            self.fusion_enabled
+            and self.fusion_config["mode"] in {"analytic_fitted", "learned_global"}
+        )
+        sig_label_inner = (
+            self._sigma_authority(s_label, q_label, label_active, channel="label")
+            if needs_inner_lexical_fusion
+            else torch.zeros(n_pairs, device=self.device)
+        )
+        sig_strsim_inner = torch.zeros(n_pairs, device=self.device)
+        lex_label_weight = torch.ones(n_pairs, device=self.device)
+        lex_strsim_weight = torch.zeros(n_pairs, device=self.device)
+        S_lex = s_label
+        Q_lex = q_label
+        lex_active = label_active
+        if self.strsim_enabled and self.strsim_config["placement"] == "folded_into_lexical":
+            strsim_wins = strsim_active & (~label_active | (s_strsim > s_label))
+            S_lex = torch.where(strsim_wins, s_strsim, s_label)
+            Q_lex = torch.where(strsim_wins, q_strsim, q_label)
+            lex_active = label_active | strsim_active
+            lex_label_weight = (~strsim_wins).to(torch.float32)
+            lex_strsim_weight = strsim_wins.to(torch.float32)
+        elif self.strsim_enabled:
+            sig_strsim_inner = self._sigma_authority(
+                s_strsim, q_strsim, strsim_active, channel="strsim"
+            )
+            lex_sigma_sum = sig_label_inner + sig_strsim_inner
+            lex_label_weight = torch.where(
+                lex_sigma_sum > 1.0e-8,
+                sig_label_inner / lex_sigma_sum.clamp_min(1.0e-8),
+                (~(~label_active & strsim_active)).to(torch.float32),
+            )
+            lex_strsim_weight = torch.where(
+                lex_sigma_sum > 1.0e-8,
+                sig_strsim_inner / lex_sigma_sum.clamp_min(1.0e-8),
+                (~label_active & strsim_active).to(torch.float32),
+            )
+            S_lex = torch.where(
+                lex_sigma_sum > 1.0e-8,
+                lex_label_weight * s_label + lex_strsim_weight * s_strsim,
+                torch.full_like(s_label, float(self.tau)),
+            )
+            Q_lex = torch.where(
+                lex_sigma_sum > 1.0e-8,
+                lex_label_weight * q_label + lex_strsim_weight * q_strsim,
+                torch.zeros_like(q_label),
+            )
+            lex_active = label_active | strsim_active
+        s_label_star = S_lex
 
         family_names = list(self.hierarchical_relation_families.keys() or [])
         if "is_a" not in family_names:
@@ -482,12 +1075,15 @@ class PairAdaptiveSemanticScorer(
         pair_payloads: List[Dict[str, Any]] = []
         struct_channel_scores: Dict[str, List[float]] = {}
         struct_channel_qualities: Dict[str, List[float]] = {}
+        struct_channel_active: Dict[str, List[bool]] = {}
         for family in family_names:
             struct_channel_scores[f"hier__{family}"] = []
             struct_channel_qualities[f"hier__{family}"] = []
+            struct_channel_active[f"hier__{family}"] = []
         for key in ["sim_obj", "diff", "attr_aux"]:
             struct_channel_scores[key] = []
             struct_channel_qualities[key] = []
+            struct_channel_active[key] = []
 
         for idx, (src_iri, tgt_iri) in enumerate(zip(src_iris, tgt_iris)):
             src_feats = src_feature_map[src_iri]
@@ -504,10 +1100,15 @@ class PairAdaptiveSemanticScorer(
                     family,
                     src_feats.get("hierarchy", {}).get(family, []),
                     tgt_feats.get("hierarchy", {}).get(family, []),
+                    src_iri=src_iri,
+                    tgt_iri=tgt_iri,
                 )
                 hierarchy_payloads[family] = family_payload
                 struct_channel_scores[f"hier__{family}"].append(float(family_payload["score"]))
                 struct_channel_qualities[f"hier__{family}"].append(float(family_payload["quality"]))
+                struct_channel_active[f"hier__{family}"].append(
+                    bool(family_payload.get("src_selected") or family_payload.get("tgt_selected"))
+                )
 
             sim_payload = self._score_similarity_channel(
                 src_feats.get("object_triples", []),
@@ -532,6 +1133,15 @@ class PairAdaptiveSemanticScorer(
             struct_channel_qualities["diff"].append(float(diff_payload["quality"]))
             struct_channel_scores["attr_aux"].append(float(attr_payload["score"]))
             struct_channel_qualities["attr_aux"].append(float(attr_payload["quality"]))
+            struct_channel_active["sim_obj"].append(
+                bool(sim_payload.get("src_selected") or sim_payload.get("tgt_selected"))
+            )
+            struct_channel_active["diff"].append(
+                bool(diff_payload.get("src_selected") or diff_payload.get("tgt_selected"))
+            )
+            struct_channel_active["attr_aux"].append(
+                bool(attr_payload.get("src_selected") or attr_payload.get("tgt_selected"))
+            )
 
             packet = self._build_evidence_packet(
                 src_best_label,
@@ -549,6 +1159,8 @@ class PairAdaptiveSemanticScorer(
                     "sim": sim_payload,
                     "diff": diff_payload,
                     "attr": attr_payload,
+                    "label_quality": label_quality_payloads[idx],
+                    "strsim": strsim_payloads[idx],
                     "packet": packet,
                 }
             )
@@ -565,11 +1177,20 @@ class PairAdaptiveSemanticScorer(
             key: torch.tensor(values, dtype=torch.float32, device=self.device)
             for key, values in struct_channel_qualities.items()
         }
+        channel_active_tensors = {
+            key: torch.tensor(values, dtype=torch.bool, device=self.device)
+            for key, values in struct_channel_active.items()
+        }
 
         sigma_tensors: Dict[str, torch.Tensor] = {}
         for key, score_tensor in channel_score_tensors.items():
             quality_tensor = channel_quality_tensors[key]
-            sigma_tensors[key] = quality_tensor * (score_tensor - self.tau).abs().pow(self.gamma)
+            sigma_tensors[key] = self._sigma_authority(
+                score_tensor,
+                quality_tensor,
+                channel_active_tensors[key],
+                channel=key,
+            )
 
         sigma_sum = torch.zeros(n_pairs, device=self.device)
         for tensor in sigma_tensors.values():
@@ -636,13 +1257,26 @@ class PairAdaptiveSemanticScorer(
                 torch.zeros_like(family_quality_sum),
             )
 
-        sig_lex = q_label * (s_label - self.tau).abs().pow(self.gamma)
-        sig_struct = Q_struct * (S_struct - self.tau).abs().pow(self.gamma)
-        active_lex = sig_lex > 1e-8
-        active_struct = sig_struct > 1e-8
-        both_active = active_lex & active_struct
-        only_lex = active_lex & ~active_struct
-        only_struct = active_struct & ~active_lex
+        fusion_mode = str(self.fusion_config["mode"]) if self.fusion_enabled else "analytic_shipped"
+        if fusion_mode in {"analytic_fitted", "learned_global"}:
+            if self.strsim_enabled and self.strsim_config["placement"] == "channel":
+                sig_lex = sig_label_inner + sig_strsim_inner
+            else:
+                sig_lex = self._sigma_authority(S_lex, Q_lex, lex_active, channel="label")
+            sig_struct = sigma_sum
+        else:
+            sig_lex = self._sigma_authority(S_lex, Q_lex, lex_active, channel="lex")
+            sig_struct = self._sigma_authority(
+                S_struct,
+                Q_struct,
+                torch.stack(list(channel_active_tensors.values()), dim=0).any(dim=0),
+                channel="struct",
+            )
+        authority_active_lex = sig_lex > 1e-8
+        authority_active_struct = sig_struct > 1e-8
+        both_active = authority_active_lex & authority_active_struct
+        only_lex = authority_active_lex & ~authority_active_struct
+        only_struct = authority_active_struct & ~authority_active_lex
 
         w_struct = torch.zeros(n_pairs, device=self.device)
         if torch.any(both_active):
@@ -657,27 +1291,38 @@ class PairAdaptiveSemanticScorer(
         S_base = torch.full((n_pairs,), float(self.tau), device=self.device)
         if torch.any(only_lex):
             S_base = S_base.clone()
-            S_base[only_lex] = s_label[only_lex]
+            S_base[only_lex] = S_lex[only_lex]
         if torch.any(only_struct):
             S_base = S_base.clone()
             S_base[only_struct] = S_struct[only_struct]
         if torch.any(both_active):
             S_base = S_base.clone()
-            S_base[both_active] = (1.0 - w_struct[both_active]) * s_label[both_active] + w_struct[
+            S_base[both_active] = (1.0 - w_struct[both_active]) * S_lex[both_active] + w_struct[
                 both_active
             ] * S_struct[both_active]
 
         U_ind, U_dis = self._uncertainty_components(
             S_base,
-            s_label,
+            S_lex,
             S_struct,
-            q_label,
+            Q_lex,
             Q_struct,
         )
         U = torch.maximum(U_ind, U_dis)
+        would_route, gate_diagnostics = self._llm_gate_mask(
+            U_ind=U_ind,
+            U_dis=U_dis,
+            U=U,
+            S_base=S_base,
+            q_label=Q_lex,
+            Q_struct=Q_struct,
+            src_iris=src_iris,
+            tgt_iris=tgt_iris,
+            label=label,
+        )
         if self.use_llm:
             w_i = (self.beta * U).clamp(0.0, 1.0)
-            need_llm = U >= self.tau_LLM
+            need_llm = would_route
         else:
             w_i = torch.zeros_like(U)
             need_llm = torch.zeros_like(U, dtype=torch.bool)
@@ -747,7 +1392,9 @@ class PairAdaptiveSemanticScorer(
             llm_used_mask[decision_idxs] = True
         w_i_effective = w_i * llm_used_mask.to(w_i.dtype)
 
-        I_label = (1.0 - w_i_effective) * (1.0 - w_struct)
+        I_lex = (1.0 - w_i_effective) * (1.0 - w_struct)
+        I_label = I_lex * lex_label_weight
+        I_strsim = I_lex * lex_strsim_weight
         I_struct = (1.0 - w_i_effective) * w_struct
         I_hier = I_struct * sum(
             (struct_weights[key] for key in hier_keys),
@@ -758,6 +1405,16 @@ class PairAdaptiveSemanticScorer(
         I_attr = I_struct * struct_weights["attr_aux"]
         I_ctx = I_struct
         I_llm = w_i_effective
+        for idx, diagnostic in enumerate(gate_diagnostics):
+            diagnostic.update(
+                {
+                    "invoked": bool(llm_used_mask[idx]),
+                    "mix_weight": float(w_i_effective[idx]),
+                    "llm_probability": (float(p_llm[idx]) if bool(llm_used_mask[idx]) else None),
+                    "score_before": float(S_base[idx]),
+                    "score_after": float(S_final[idx]),
+                }
+            )
         w_c = w_struct
         struct_active_pairs = int((sigma_sum > 1e-8).sum().item())
         llm_gated_pairs = int(need_llm.to(torch.int32).sum().item())
@@ -767,12 +1424,15 @@ class PairAdaptiveSemanticScorer(
         result = {
             "s_label": s_label,
             "s_label_star": s_label_star,
+            "s_strsim": s_strsim,
             "s_ctx": S_struct,
             "s_hier": s_hier,
             "s_sim": s_sim,
             "s_diff": s_diff,
             "s_attr": s_attr,
             "q_label": q_label,
+            "q_lex": Q_lex,
+            "q_strsim": q_strsim,
             "q_hier": q_hier,
             "q_sim": channel_quality_tensors["sim_obj"],
             "q_diff": channel_quality_tensors["diff"],
@@ -791,6 +1451,8 @@ class PairAdaptiveSemanticScorer(
             "w_i": w_i,
             "need_llm": need_llm,
             "I_label": I_label,
+            "I_lex": I_lex,
+            "I_strsim": I_strsim,
             "I_struct": I_struct,
             "I_hier": I_hier,
             "I_sim": I_sim,
@@ -833,6 +1495,8 @@ class PairAdaptiveSemanticScorer(
                 "decision_requested_pairs": int(decision_requested_pairs),
             },
         }
+        if self.llm_experiment_enabled:
+            result["llm_gate_diagnostics"] = gate_diagnostics
 
         if self.return_explanations:
             explanations = []
@@ -863,9 +1527,20 @@ class PairAdaptiveSemanticScorer(
                     )
                     for family in family_names
                 }
+                experiment_diagnostics = self._experiment_diagnostics_for_pair(
+                    payload,
+                    gate_diagnostic=(
+                        gate_diagnostics[idx] if self.llm_experiment_enabled else None
+                    ),
+                )
                 explanations.append(
                     {
                         "explanation_schema_version": 3,
+                        **(
+                            {"experiment_diagnostics": experiment_diagnostics}
+                            if experiment_diagnostics
+                            else {}
+                        ),
                         "src_iri": src_iris[idx],
                         "tgt_iri": tgt_iris[idx],
                         "kind": dataset.entity_kind_for(
@@ -904,6 +1579,7 @@ class PairAdaptiveSemanticScorer(
                         "confidences": {
                             "s_label": float(s_label[idx]),
                             "s_label_star": float(s_label_star[idx]),
+                            "s_strsim": float(s_strsim[idx]),
                             "s_hier": float(s_hier[idx]),
                             "s_sim": float(s_sim[idx]),
                             "s_diff": float(s_diff[idx]),
@@ -918,6 +1594,8 @@ class PairAdaptiveSemanticScorer(
                         },
                         "qualities": {
                             "q_label": float(q_label[idx]),
+                            "q_lex": float(Q_lex[idx]),
+                            "q_strsim": float(q_strsim[idx]),
                             "q_hier": float(q_hier[idx]),
                             "q_sim": float(channel_quality_tensors["sim_obj"][idx]),
                             "q_diff": float(channel_quality_tensors["diff"][idx]),
@@ -925,7 +1603,12 @@ class PairAdaptiveSemanticScorer(
                             "family_qualities": family_qualities,
                         },
                         "weights": {
-                            "w_label": float((1.0 - w_struct[idx]).item()),
+                            "w_label": float(
+                                ((1.0 - w_struct[idx]) * lex_label_weight[idx]).item()
+                            ),
+                            "w_strsim": float(
+                                ((1.0 - w_struct[idx]) * lex_strsim_weight[idx]).item()
+                            ),
                             "w_struct": float(w_struct[idx]),
                             "w_hier": float(hier_internal_weight.item()),
                             "w_sim": float(struct_weights["sim_obj"][idx]),
@@ -940,6 +1623,8 @@ class PairAdaptiveSemanticScorer(
                         },
                         "importances": {
                             "I_label": float(I_label[idx]),
+                            "I_lex": float(I_lex[idx]),
+                            "I_strsim": float(I_strsim[idx]),
                             "I_struct": float(I_struct[idx]),
                             "I_hier": float(I_hier[idx]),
                             "I_sim": float(I_sim[idx]),
@@ -951,6 +1636,7 @@ class PairAdaptiveSemanticScorer(
                         },
                         "contributions": {
                             "C_label": float(I_label[idx] * (s_label[idx] - self.tau)),
+                            "C_strsim": float(I_strsim[idx] * (s_strsim[idx] - self.tau)),
                             "C_struct": float(I_struct[idx] * (S_struct[idx] - self.tau)),
                             "C_hier": float(
                                 sum(
@@ -1043,7 +1729,7 @@ class PairAdaptiveSemanticScorer(
                             "target": list(payload["attr"].get("tgt_selected", [])),
                         },
                         "cross_side_provenance": self._build_cross_side_provenance(
-                            float(s_label[idx]),
+                            float(S_lex[idx]),
                             payload["hierarchy"],
                             payload["sim"],
                             payload["diff"],

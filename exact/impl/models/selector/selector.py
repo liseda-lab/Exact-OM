@@ -34,9 +34,16 @@ from .acceptance import AcceptanceMixin
 from .calibration import CalibrationMixin
 from .features import FeatureEngineeringMixin
 from .grouping import count_source_groups, iter_source_groups
+from .label_free import LabelFreeSelectorMixin
 
 
-class CandidateSetSelector(CalibrationMixin, AcceptanceMixin, FeatureEngineeringMixin, IModel):
+class CandidateSetSelector(
+    CalibrationMixin,
+    AcceptanceMixin,
+    FeatureEngineeringMixin,
+    LabelFreeSelectorMixin,
+    IModel,
+):
     """
     Unsupervised listwise second-stage selector for global alignment.
 
@@ -76,6 +83,20 @@ class CandidateSetSelector(CalibrationMixin, AcceptanceMixin, FeatureEngineering
         "min_recall": None,
         "exact_prefiltered_source_policy": "hard_negative",
         "exact_prefiltered_negative_weight": 1.0,
+    }
+    DEFAULT_EXPERIMENT_CONFIG = {
+        "enabled": False,
+        "emit_candidate_scores": False,
+        "accept_model": "logistic",
+        "accept_training": "winner_only",
+        "label_free_mode": "current_fallback",
+        "tuning": {"count_reference_miss_as": "fp_fn"},
+        "rerank": {
+            "mode": "current",
+            "model": "current_linear",
+            "features": "current",
+            "artifact": None,
+        },
     }
     RANK_FEATURE_NAMES = [
         "logit_pair",
@@ -128,6 +149,9 @@ class CandidateSetSelector(CalibrationMixin, AcceptanceMixin, FeatureEngineering
         strategy: str = "heuristic",
         score_mode: str = "p_match",
         calibration: Optional[Dict[str, Any]] = None,
+        experiment_config: Optional[Dict[str, Any]] = None,
+        matching_calibration: Optional[Dict[str, Any]] = None,
+        nil_config: Optional[Dict[str, Any]] = None,
         training_reference_file_path: Optional[Any] = None,
         request_seed: Optional[int] = None,
         **kwargs: Any,
@@ -153,6 +177,35 @@ class CandidateSetSelector(CalibrationMixin, AcceptanceMixin, FeatureEngineering
         self.strategy = str(strategy or "heuristic")
         self.score_mode = self._normalize_score_mode(score_mode)
         self.calibration = self._normalize_calibration(calibration or {})
+        self.experiment_config = self._normalize_experiment_config(experiment_config or {})
+        self.experiments_enabled = bool(self.experiment_config["enabled"])
+        self.emit_candidate_scores = bool(
+            self.experiments_enabled and self.experiment_config["emit_candidate_scores"]
+        )
+        self.label_free_mode = str(self.experiment_config["label_free_mode"])
+        self.count_reference_miss_as = str(
+            self.experiment_config["tuning"]["count_reference_miss_as"]
+        )
+        self.rerank_config = dict(self.experiment_config["rerank"])
+        self.matching_calibration = {
+            "mode": "none",
+            "threshold_mode": "fixed",
+            "artifact": None,
+            **dict(matching_calibration or {}),
+        }
+        self.matching_calibration["mode"] = (
+            str(self.matching_calibration["mode"] or "none").strip().lower()
+        )
+        self.matching_calibration["threshold_mode"] = (
+            str(self.matching_calibration["threshold_mode"] or "fixed").strip().lower()
+        )
+        self.nil_config = {
+            "mode": "off",
+            "ranking_scale": "joint_accept_probability",
+            **dict(nil_config or {}),
+        }
+        self.nil_config["mode"] = str(self.nil_config["mode"] or "off").strip().lower()
+        self._validate_experiment_modes()
         self.training_reference_file_path = (
             str(training_reference_file_path) if training_reference_file_path else None
         )
@@ -182,6 +235,9 @@ class CandidateSetSelector(CalibrationMixin, AcceptanceMixin, FeatureEngineering
             "strategy": self.strategy,
             "score_mode": self.score_mode,
             "calibration": dict(self.calibration),
+            "experiment_config": dict(self.experiment_config),
+            "matching_calibration": dict(self.matching_calibration),
+            "nil_config": dict(self.nil_config),
             "training_reference_file_path": self.training_reference_file_path,
             "training_reference_sha256": (
                 self.training_reference_provenance.get("sha256")
@@ -258,6 +314,74 @@ class CandidateSetSelector(CalibrationMixin, AcceptanceMixin, FeatureEngineering
         if "prior" in no_match:
             return self._clip01(1.0 - float(no_match["prior"]))
         return self.DEFAULT_NO_MATCH_THRESHOLD
+
+    def _normalize_experiment_config(self, raw: Dict[str, Any]) -> Dict[str, Any]:
+        normalized = dict(self.DEFAULT_EXPERIMENT_CONFIG)
+        normalized["tuning"] = dict(self.DEFAULT_EXPERIMENT_CONFIG["tuning"])
+        normalized["rerank"] = dict(self.DEFAULT_EXPERIMENT_CONFIG["rerank"])
+        for key in [
+            "enabled",
+            "emit_candidate_scores",
+            "accept_model",
+            "accept_training",
+            "label_free_mode",
+        ]:
+            if key in raw:
+                normalized[key] = raw[key]
+        if isinstance(raw.get("tuning"), Mapping):
+            normalized["tuning"].update(dict(raw["tuning"]))
+        if isinstance(raw.get("rerank"), Mapping):
+            normalized["rerank"].update(dict(raw["rerank"]))
+        normalized["enabled"] = bool(normalized["enabled"])
+        normalized["emit_candidate_scores"] = bool(normalized["emit_candidate_scores"])
+        for key in ["accept_model", "accept_training", "label_free_mode"]:
+            normalized[key] = str(normalized[key]).strip().lower()
+        normalized["tuning"]["count_reference_miss_as"] = (
+            str(normalized["tuning"]["count_reference_miss_as"]).strip().lower()
+        )
+        for key in ["mode", "model", "features"]:
+            normalized["rerank"][key] = str(normalized["rerank"][key]).strip().lower()
+        artifact = normalized["rerank"].get("artifact")
+        normalized["rerank"]["artifact"] = str(artifact) if artifact is not None else None
+        return normalized
+
+    def _validate_experiment_modes(self) -> None:
+        if not self.experiments_enabled:
+            return
+        if self.count_reference_miss_as not in {"fp_fn", "fp"}:
+            raise ValueError("count_reference_miss_as must be 'fp_fn' or 'fp'")
+        if self.label_free_mode not in {
+            "current_fallback",
+            "score_partition",
+            "reciprocal_consensus",
+            "pseudo_label_accept",
+        }:
+            raise ValueError(f"Unknown selector label-free mode: {self.label_free_mode!r}")
+        if self.label_free_mode == "pseudo_label_accept":
+            raise NotImplementedError(
+                "pseudo_label_accept needs experiment-harness pseudo-label provenance and is "
+                "not available in the inference-only selector"
+            )
+        if self.experiment_config["accept_model"] != "logistic":
+            raise NotImplementedError("Only the shipped logistic accept model is implemented")
+        if self.experiment_config["accept_training"] != "winner_only":
+            raise NotImplementedError("winner_plus_runnerup acceptance training is not implemented")
+        if self.rerank_config["mode"] not in {"current", "current_listwise", "analytic"}:
+            raise NotImplementedError(
+                f"Rerank objective {self.rerank_config['mode']!r} is not implemented"
+            )
+        if self.rerank_config["model"] != "current_linear":
+            raise NotImplementedError(
+                f"Rerank model {self.rerank_config['model']!r} is not implemented"
+            )
+        if self.rerank_config["features"] != "current":
+            raise NotImplementedError("Extended rerank features are not implemented")
+        if self.matching_calibration["mode"] not in {"none", "platt", "isotonic"}:
+            raise ValueError("matching calibration mode must be none, platt, or isotonic")
+        if self.matching_calibration["threshold_mode"] not in {"fixed", "otsu", "knee"}:
+            raise ValueError("matching threshold mode must be fixed, otsu, or knee")
+        if self.nil_config["mode"] not in {"off", "accept_model", "heuristic"}:
+            raise ValueError("NIL mode must be off, accept_model, or heuristic")
 
     def _normalize_llm(self, llm: Dict[str, Any]) -> Dict[str, Any]:
         normalized = dict(self.DEFAULT_LLM)
@@ -449,16 +573,25 @@ class CandidateSetSelector(CalibrationMixin, AcceptanceMixin, FeatureEngineering
             "selection_utility": 0.0,
             "P_rank": 0.0,
             "P_match": 0.0,
+            "selection_source_p_match": 0.0,
             "selection_winner": False,
             "selection_accept_threshold": 0.0,
             "selection_target_conflict_enabled": False,
             "selection_target_cardinality": 0,
+            "selection_reciprocal": False,
+            "selection_channel_agreement": 0,
+            "selection_margin_cutoff": 0.0,
+            "selection_threshold_mode": "fixed",
         }
         for col, value in defaults.items():
             if col not in df.columns:
                 df[col] = value
 
-        if self.strategy == "calibrated_rank_accept":
+        if self.experiments_enabled and self.label_free_mode == "score_partition":
+            df = self._run_score_partition_selector(df=df, threshold=threshold)
+        elif self.experiments_enabled and self.label_free_mode == "reciprocal_consensus":
+            df = self._run_reciprocal_consensus_selector(df=df, threshold=threshold)
+        elif self.strategy == "calibrated_rank_accept":
             calibrated_df = self._run_calibrated_selector(
                 df=df,
                 distinctive=distinctive,
@@ -708,7 +841,7 @@ class CandidateSetSelector(CalibrationMixin, AcceptanceMixin, FeatureEngineering
                 )
                 return None
             utilities = {
-                idx: self._linear_score(rank_features[idx], rank_model) for idx in rank_features
+                idx: self._score_rank_model(rank_features[idx], rank_model) for idx in rank_features
             }
 
             calibration_choice = self._select_accept_model_by_validation(
@@ -815,14 +948,29 @@ class CandidateSetSelector(CalibrationMixin, AcceptanceMixin, FeatureEngineering
                 final_score = 0.0
                 n_abstained += 1
 
+            winner_rank_probability = float(decision["rank_probs"].get(winner_idx, 0.0))
             for row_idx in list(group.index):
                 row_rank_prob = float(decision["rank_probs"].get(row_idx, 0.0))
                 is_winner = row_idx == winner_idx
-                row_score = final_score if is_winner and accepted else 0.0
+                candidate_p_match = p_match
+                if self.emit_candidate_scores and not is_winner:
+                    candidate_p_match = self._clip01(
+                        p_match * row_rank_prob / max(winner_rank_probability, self.eps)
+                    )
+                    candidate_p_match = min(candidate_p_match, max(0.0, p_match - self.eps))
+                if accepted and self.emit_candidate_scores:
+                    row_score = self._final_selector_score(
+                        p_match=candidate_p_match,
+                        accept_threshold=accept_threshold,
+                        score_threshold=score_threshold,
+                    )
+                else:
+                    row_score = final_score if is_winner and accepted else 0.0
                 df.at[row_idx, "S_select"] = row_score
                 df.at[row_idx, "P_select"] = row_score
                 df.at[row_idx, "P_rank"] = row_rank_prob
-                df.at[row_idx, "P_match"] = float(p_match)
+                df.at[row_idx, "P_match"] = float(candidate_p_match)
+                df.at[row_idx, "selection_source_p_match"] = float(p_match)
                 df.at[row_idx, "selection_winner"] = bool(is_winner and accepted)
                 df.at[row_idx, "selection_accept_threshold"] = float(accept_threshold)
                 df.at[row_idx, "selection_target_conflict_enabled"] = bool(target_conflict_enabled)
@@ -901,6 +1049,9 @@ class CandidateSetSelector(CalibrationMixin, AcceptanceMixin, FeatureEngineering
             "selected_target_conflict_enabled": target_conflict_enabled,
             "selected_target_cardinality": target_cardinality,
             "score_mode": self.score_mode,
+            "emit_candidate_scores": self.emit_candidate_scores,
+            "count_reference_miss_as": self.count_reference_miss_as,
+            "rerank": dict(self.rerank_config),
             "n_positive_sources": n_positive_sources,
             "rank_feature_names": list(self.RANK_FEATURE_NAMES),
             "accept_feature_names": list(self.ACCEPT_FEATURE_NAMES),

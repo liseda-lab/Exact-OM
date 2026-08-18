@@ -3,11 +3,15 @@ from __future__ import annotations
 import hashlib  # noqa: F401
 import inspect  # noqa: F401
 import json  # noqa: F401
+import math
+import re
 import time  # noqa: F401
 import uuid
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path  # noqa: F401
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple  # noqa: F401
+from urllib.parse import urlsplit, urlunsplit
 
 import pandas as pd  # noqa: F401
 import torch  # noqa: F401
@@ -16,6 +20,7 @@ from torch.utils.data._utils.collate import default_collate  # noqa: F401
 
 from exact.core.entities.configs.dataset import DatasetMask  # noqa: F401
 from exact.core.entities.mappings import EntityMapping  # noqa: F401
+from exact.impl.extraction import extract_global_alignment
 from exact.io.relations import predict_relations
 from exact.io.writers import write as write_alignment_format
 from exact.runs.layout import RunLayout
@@ -84,8 +89,26 @@ class SemanticAlignmentRunner(
         device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
         output_dir: Optional[Path] = None,
         logger: Optional[Any] = None,
+        extraction_config: Optional[Dict[str, Any]] = None,
         **kwargs,
     ):
+        self._extraction_config = {
+            "mode": "greedy",
+            "assignment_component_cap": 500,
+            **dict(extraction_config or {}),
+        }
+        extraction_mode = str(self._extraction_config["mode"]).strip().lower()
+        if extraction_mode not in {
+            "greedy",
+            "mutual_best",
+            "assignment",
+            "stable_marriage",
+        }:
+            raise ValueError(f"Unknown global extraction mode: {extraction_mode!r}")
+        self._extraction_config["mode"] = extraction_mode
+        self._extraction_includes_prefilter = False
+        self._extraction_diagnostics: Dict[str, Any] = {}
+
         params = dict(model_params or {})
         cache_dir = params.get("cache_dir")
         if cache_dir is None and output_dir is not None:
@@ -126,6 +149,7 @@ class SemanticAlignmentRunner(
         self._examples_per_second_ema: Optional[float] = None
         self._last_effective_threshold: Optional[float] = None
         self._last_effective_threshold_origin: str = "configured"
+        self._llm_backend_observations: List[Dict[str, Any]] = []
         self._checkpoint_fingerprint_payload: Dict[str, Any] = (
             self._build_checkpoint_fingerprint_payload()
         )
@@ -159,6 +183,446 @@ class SemanticAlignmentRunner(
         )
         self._explanation_store: Optional[Any] = None
         self._explanation_shard_mb: float = 32.0
+
+    @staticmethod
+    def _json_safe_value(value: Any) -> Any:
+        """Normalize nested diagnostics into deterministic strict-JSON values."""
+
+        if isinstance(value, torch.Tensor):
+            return SemanticAlignmentRunner._json_safe_value(value.detach().cpu().tolist())
+        if value is None or isinstance(value, (str, bool, int)):
+            return value
+        if isinstance(value, float):
+            return value if math.isfinite(value) else None
+        if isinstance(value, Mapping):
+            return {
+                str(key): SemanticAlignmentRunner._json_safe_value(item)
+                for key, item in sorted(value.items(), key=lambda pair: str(pair[0]))
+            }
+        if isinstance(value, (list, tuple)):
+            return [SemanticAlignmentRunner._json_safe_value(item) for item in value]
+        if isinstance(value, (set, frozenset)):
+            normalized = [SemanticAlignmentRunner._json_safe_value(item) for item in value]
+            return sorted(
+                normalized,
+                key=lambda item: json.dumps(
+                    item,
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ),
+            )
+        item_method = getattr(value, "item", None)
+        if callable(item_method):
+            try:
+                return SemanticAlignmentRunner._json_safe_value(item_method())
+            except (TypeError, ValueError):
+                pass
+        return str(value)
+
+    @classmethod
+    def _gate_candidate_fields(cls, diagnostic: Any) -> Dict[str, Any]:
+        if not isinstance(diagnostic, Mapping):
+            return {}
+        safe = cls._json_safe_value(diagnostic)
+        if not isinstance(safe, dict):
+            return {}
+        fields: Dict[str, Any] = {
+            "llm_gate_diagnostics": json.dumps(
+                safe,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+                allow_nan=False,
+            )
+        }
+        scalar_fields = {
+            "mode": "llm_gate_mode",
+            "statistic_name": "llm_gate_statistic_name",
+            "statistic": "llm_gate_statistic",
+            "threshold": "llm_gate_threshold",
+            "would_route": "llm_gate_would_route",
+            "invoked": "llm_gate_invoked",
+            "outcome": "llm_gate_outcome",
+        }
+        for source, target in scalar_fields.items():
+            if source in safe and not isinstance(safe[source], (dict, list)):
+                fields[target] = safe[source]
+        if "llm_gate_outcome" not in fields and ("would_route" in safe or "invoked" in safe):
+            would_route = bool(safe.get("would_route", False))
+            invoked = bool(safe.get("invoked", False))
+            fields["llm_gate_outcome"] = (
+                "invoked" if invoked else "routed_not_invoked" if would_route else "not_routed"
+            )
+        return fields
+
+    @staticmethod
+    def _safe_llm_identity_text(value: Any, *, limit: int = 512) -> Optional[str]:
+        if value is None or isinstance(value, (Mapping, list, tuple, set, frozenset)):
+            return None
+        text = str(value).strip()
+        if not text or len(text) > limit or any(ord(char) < 32 for char in text):
+            return None
+        return text
+
+    @classmethod
+    def _safe_llm_endpoint(cls, value: Any) -> Optional[str]:
+        text = cls._safe_llm_identity_text(value, limit=2048)
+        if text is None:
+            return None
+        try:
+            parsed = urlsplit(text)
+        except ValueError:
+            return None
+        if parsed.scheme or parsed.netloc:
+            if parsed.scheme.lower() not in {"http", "https"} or not parsed.hostname:
+                return None
+            hostname = parsed.hostname
+            safe_host = f"[{hostname}]" if ":" in hostname else hostname
+            try:
+                port = parsed.port
+            except ValueError:
+                return None
+            netloc = f"{safe_host}:{port}" if port is not None else safe_host
+            return urlunsplit((parsed.scheme.lower(), netloc, parsed.path, "", ""))
+        relative = text.split("?", 1)[0].split("#", 1)[0].strip()
+        if not relative or "@" in relative:
+            return None
+        return relative
+
+    @classmethod
+    def _safe_llm_provider(cls, value: Any) -> Optional[str]:
+        if isinstance(value, Mapping):
+            for key in ("name", "id", "provider"):
+                candidate = cls._safe_llm_identity_text(value.get(key))
+                if candidate is not None:
+                    return candidate
+            return None
+        return cls._safe_llm_identity_text(value)
+
+    @staticmethod
+    def _safe_llm_hash(value: Any) -> Optional[str]:
+        if not isinstance(value, str):
+            return None
+        candidate = value.strip()
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9:_-]{7,199}", candidate):
+            return None
+        return candidate
+
+    @staticmethod
+    def _llm_profile_matches(profile: Any, backend: Any, model: Any) -> bool:
+        if profile is None:
+            return False
+        if backend is not None and str(getattr(profile, "backend", "")) != str(backend):
+            return False
+        profile_model = getattr(profile, "model", None)
+        return model is None or profile_model is None or str(profile_model) == str(model)
+
+    def _llm_decoding_defaults(self, task: str, backend: Optional[str]) -> Dict[str, Any]:
+        model = self.model
+        decoding: Dict[str, Any] = {}
+        if task == "summary":
+            decoding["max_input_tokens"] = getattr(model, "max_total_tokens_llm_summary", None)
+            token_field = "max_tokens" if backend == "openrouter" else "max_new_tokens"
+            decoding[token_field] = getattr(model, "max_new_tokens_llm", None)
+        elif task == "rationale":
+            decoding["max_input_tokens"] = getattr(model, "max_total_tokens_llm_rationale", None)
+            token_field = "max_tokens" if backend == "openrouter" else "max_new_tokens"
+            decoding[token_field] = getattr(model, "max_new_tokens_llm_rationale", None)
+        elif task == "decision":
+            decoding["max_input_tokens"] = getattr(model, "max_total_tokens_llm_decision", None)
+            if backend == "openrouter":
+                decoding.update(
+                    {
+                        "max_tokens": 1,
+                        "temperature": 0.0,
+                        "top_p": 1.0,
+                        "logprobs": True,
+                        "top_logprobs": 20,
+                        "logit_bias_magnitude": getattr(model, "hosted_decision_logit_bias", None),
+                        "scoring_mode": "chat_logprobs_binary_head",
+                    }
+                )
+            else:
+                decoding["scoring_mode"] = "local_next_token_logits"
+
+        if task in {"summary", "rationale"}:
+            decoding["temperature"] = getattr(model, "llm_temperature", None)
+            decoding["top_p"] = getattr(model, "llm_top_p", None)
+            if backend != "openrouter":
+                decoding["do_sample"] = getattr(model, "llm_do_sample", None)
+        return {key: value for key, value in decoding.items() if value is not None}
+
+    def _enrich_llm_backend_metadata(
+        self, task: str, metadata: Mapping[str, Any]
+    ) -> Dict[str, Any]:
+        enriched = dict(metadata)
+        backend = enriched.get("backend")
+        effective_model = enriched.get("effective_model")
+        if effective_model is None:
+            effective_model = enriched.get("model")
+        if effective_model is not None:
+            enriched["effective_model"] = effective_model
+
+        router = getattr(self.model, "_llm_router", None)
+        profiles = getattr(router, "profiles", {}) if router is not None else {}
+        routing = getattr(router, "routing", None) if router is not None else None
+
+        requested_profile = enriched.get("requested_profile")
+        profile_for_task = getattr(routing, "profile_for_task", None)
+        if requested_profile is None and callable(profile_for_task):
+            requested_profile = profile_for_task(task)
+        if requested_profile is not None:
+            enriched["requested_profile"] = requested_profile
+        requested_profile_obj = (
+            profiles.get(str(requested_profile))
+            if isinstance(profiles, Mapping) and requested_profile is not None
+            else None
+        )
+        if enriched.get("requested_model") is None and requested_profile_obj is not None:
+            enriched["requested_model"] = getattr(requested_profile_obj, "model", None)
+        if enriched.get("requested_model") is None and not bool(
+            enriched.get("fallback_triggered", False)
+        ):
+            enriched["requested_model"] = effective_model
+
+        effective_profile = enriched.get("effective_profile") or enriched.get("profile")
+        effective_profile_obj = (
+            profiles.get(str(effective_profile))
+            if isinstance(profiles, Mapping) and effective_profile is not None
+            else None
+        )
+        if not self._llm_profile_matches(effective_profile_obj, backend, effective_model):
+            candidate_names: List[str] = []
+            fallback_for_task = getattr(routing, "fallback_for_task", None)
+            if callable(fallback_for_task):
+                fallback_name = fallback_for_task(task)
+                if fallback_name:
+                    candidate_names.append(str(fallback_name))
+            local_name = getattr(self.model, "_local_llm_profile_name", None)
+            if local_name:
+                candidate_names.append(str(local_name))
+            if isinstance(profiles, Mapping):
+                candidate_names.extend(sorted(str(name) for name in profiles))
+            for candidate_name in dict.fromkeys(candidate_names):
+                candidate_profile = profiles.get(candidate_name)
+                if self._llm_profile_matches(candidate_profile, backend, effective_model):
+                    effective_profile = candidate_name
+                    effective_profile_obj = candidate_profile
+                    break
+        if effective_profile is not None:
+            enriched["profile"] = effective_profile
+
+        if enriched.get("tokenizer") is None and effective_profile_obj is not None:
+            enriched["tokenizer"] = getattr(effective_profile_obj, "tokenizer", None)
+        if enriched.get("tokenizer") is None and backend == "local_hf":
+            enriched["tokenizer"] = effective_model
+
+        endpoint = enriched.get("endpoint")
+        if backend == "openrouter" and effective_profile_obj is not None:
+            base = self._safe_llm_endpoint(getattr(effective_profile_obj, "api_base", None))
+            relative = self._safe_llm_endpoint(endpoint or "chat/completions")
+            if relative and base and not urlsplit(relative).scheme:
+                endpoint = f"{base.rstrip('/')}/{relative.lstrip('/')}"
+            elif relative:
+                endpoint = relative
+        elif backend != "openrouter":
+            endpoint = None
+        enriched["endpoint"] = endpoint
+
+        if enriched.get("request_seed") is None:
+            enriched["request_seed"] = getattr(self.model, "request_seed", None)
+        decoding = self._llm_decoding_defaults(task, str(backend) if backend is not None else None)
+        supplied_decoding = enriched.get("decoding") or enriched.get("decoding_settings")
+        if isinstance(supplied_decoding, Mapping):
+            decoding.update(supplied_decoding)
+        scoring_mode = enriched.get("decision_scoring_mode")
+        if scoring_mode is not None:
+            decoding["scoring_mode"] = scoring_mode
+        if (
+            task == "decision"
+            and backend != "openrouter"
+            and bool(enriched.get("fallback_triggered", False))
+        ):
+            decoding["scoring_mode"] = "local_next_token_logits"
+        if decoding:
+            enriched["decoding"] = decoding
+        return enriched
+
+    @classmethod
+    def _sanitize_llm_backend_identity(
+        cls, metadata: Mapping[str, Any]
+    ) -> Optional[Dict[str, Any]]:
+        identity: Dict[str, Any] = {}
+        for field in (
+            "backend",
+            "profile",
+            "requested_profile",
+            "requested_model",
+            "effective_model",
+            "tokenizer",
+        ):
+            value = cls._safe_llm_identity_text(metadata.get(field))
+            if value is not None and "://" in value:
+                value = cls._safe_llm_endpoint(value)
+            if value is not None:
+                identity[field] = value
+
+        provider = cls._safe_llm_provider(metadata.get("provider"))
+        if provider is not None and "://" in provider:
+            provider = cls._safe_llm_endpoint(provider)
+        if provider is not None:
+            identity["provider"] = provider
+        endpoint = cls._safe_llm_endpoint(metadata.get("endpoint"))
+        if endpoint is not None:
+            identity["endpoint"] = endpoint
+
+        request_seed = metadata.get("request_seed", metadata.get("seed"))
+        if isinstance(request_seed, torch.Tensor) and request_seed.numel() == 1:
+            request_seed = request_seed.item()
+        if isinstance(request_seed, int) and not isinstance(request_seed, bool):
+            identity["request_seed"] = int(request_seed)
+        if isinstance(metadata.get("fallback_triggered"), bool):
+            identity["fallback_triggered"] = metadata["fallback_triggered"]
+
+        decoding_source = metadata.get("decoding") or metadata.get("decoding_settings")
+        decoding: Dict[str, Any] = {}
+        if isinstance(decoding_source, Mapping):
+            float_fields = {"temperature", "top_p", "logit_bias_magnitude"}
+            int_fields = {
+                "max_tokens",
+                "max_new_tokens",
+                "max_input_tokens",
+                "top_logprobs",
+            }
+            bool_fields = {"do_sample", "logprobs"}
+            for field in sorted(float_fields | int_fields | bool_fields | {"scoring_mode"}):
+                value = decoding_source.get(field)
+                if isinstance(value, torch.Tensor) and value.numel() == 1:
+                    value = value.item()
+                if (
+                    field in float_fields
+                    and isinstance(value, (int, float))
+                    and not isinstance(value, bool)
+                ):
+                    number = float(value)
+                    if math.isfinite(number):
+                        decoding[field] = number
+                elif field in int_fields and isinstance(value, int) and not isinstance(value, bool):
+                    decoding[field] = int(value)
+                elif field in bool_fields and isinstance(value, bool):
+                    decoding[field] = value
+                elif field == "scoring_mode":
+                    text = cls._safe_llm_identity_text(value)
+                    if text is not None:
+                        decoding[field] = text
+        if decoding:
+            identity["decoding"] = decoding
+
+        prompt_hashes: Set[str] = set()
+        cache_hashes: Set[str] = set()
+
+        def _collect_hashes(target: Set[str], value: Any) -> None:
+            values = value if isinstance(value, (list, tuple, set, frozenset)) else [value]
+            for item in values:
+                safe_hash = cls._safe_llm_hash(item)
+                if safe_hash is not None:
+                    target.add(safe_hash)
+
+        for field in ("prompt_hash", "prompt_sha1", "prompt_sha256", "prompt_hashes"):
+            _collect_hashes(prompt_hashes, metadata.get(field))
+        for field in ("cache_hash", "cache_key_hash", "cache_hashes"):
+            _collect_hashes(cache_hashes, metadata.get(field))
+        request_debug = metadata.get("request_debug")
+        if isinstance(request_debug, Mapping):
+            for field in ("prompt_hash", "prompt_sha1", "prompt_sha256"):
+                _collect_hashes(prompt_hashes, request_debug.get(field))
+        if prompt_hashes:
+            identity["prompt_hashes"] = sorted(prompt_hashes)
+        if cache_hashes:
+            identity["cache_hashes"] = sorted(cache_hashes)
+
+        backend = identity.get("backend")
+        has_runtime_identity = any(
+            identity.get(field)
+            for field in (
+                "profile",
+                "requested_model",
+                "effective_model",
+                "provider",
+                "endpoint",
+                "tokenizer",
+            )
+        )
+        if backend in {None, "none"} or not has_runtime_identity:
+            return None
+        return identity
+
+    def _record_llm_backend_usage(self, backend_usage: Any) -> None:
+        if not isinstance(backend_usage, Mapping):
+            return
+        for task in ("summary", "decision", "rationale"):
+            metadata = backend_usage.get(task)
+            if not isinstance(metadata, Mapping) or not metadata:
+                continue
+            enriched = self._enrich_llm_backend_metadata(task, metadata)
+            identity = self._sanitize_llm_backend_identity(enriched)
+            if identity is not None:
+                self._llm_backend_observations.append({"task": task, **identity})
+
+    def _llm_backend_usage_stats(self) -> Optional[Dict[str, Any]]:
+        task_buckets: Dict[str, Dict[str, Dict[str, Any]]] = {
+            "summary": {},
+            "decision": {},
+            "rationale": {},
+        }
+        for observation in self._llm_backend_observations:
+            task = observation.get("task")
+            if task not in task_buckets:
+                continue
+            core = {
+                key: value
+                for key, value in observation.items()
+                if key not in {"task", "prompt_hashes", "cache_hashes"}
+            }
+            canonical = json.dumps(
+                core,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+                allow_nan=False,
+            )
+            record = task_buckets[task].setdefault(canonical, dict(core))
+            for hash_field in ("prompt_hashes", "cache_hashes"):
+                hashes = observation.get(hash_field) or []
+                if hashes:
+                    record[hash_field] = sorted(set(record.get(hash_field, [])) | set(hashes))
+
+        identities = {
+            task: [bucket[key] for key in sorted(bucket)]
+            for task, bucket in task_buckets.items()
+            if bucket
+        }
+        return {"backend_identities": identities} if identities else None
+
+    def _compute_run_stats(
+        self,
+        df: pd.DataFrame,
+        review_low: Optional[float] = None,
+        review_high: Optional[float] = None,
+    ) -> Dict[str, Any]:
+        for record in self.results_json or []:
+            if isinstance(record, Mapping):
+                self._record_llm_backend_usage(record.get("backend_usage"))
+        stats = super()._compute_run_stats(
+            df,
+            review_low=review_low,
+            review_high=review_high,
+        )
+        llm_usage = self._llm_backend_usage_stats()
+        if llm_usage is not None:
+            stats["llm_usage"] = llm_usage
+        return stats
 
     def _finalize_run(self, state: _FinalizationState) -> Tuple[List[EntityMapping], float]:
         """Apply the shared post-inference path for fresh and completed checkpoints."""
@@ -278,11 +742,69 @@ class SemanticAlignmentRunner(
             score_frame = candidate_df[["Src", "Tgt", "S_final", *kind_columns]].rename(
                 columns={"S_final": "Scores"}
             )
-        predictions = EntityMapping.read_table_mappings(
-            score_frame,
-            threshold=state.threshold,
-            cardinality=state.cardinality,
-        )
+        extraction_mode = str(self._extraction_config.get("mode", "greedy"))
+        if extraction_mode == "greedy":
+            # Preserve the shipped threshold-then-source-greedy path byte for byte.
+            predictions = EntityMapping.read_table_mappings(
+                score_frame,
+                threshold=state.threshold,
+                cardinality=state.cardinality,
+            )
+        else:
+            if state.local_alignment:
+                raise ValueError(
+                    "non-greedy global extraction cannot be used for local candidate ranking"
+                )
+            if state.cardinality not in {None, 1} or state.target_cardinality not in {None, 1}:
+                raise ValueError(
+                    f"matching.extraction.mode={extraction_mode!r} requires one-to-one "
+                    "source and target cardinality"
+                )
+            scored_mappings = EntityMapping.read_table_mappings(score_frame)
+            prefilter_frame = self.dataset.dataframe
+            prefiltered_mappings: List[EntityMapping] = []
+            if (
+                prefilter_frame is not None
+                and not prefilter_frame.empty
+                and DatasetMask.prefiltered in prefilter_frame.columns
+            ):
+                exact_frame = prefilter_frame[prefilter_frame[DatasetMask.prefiltered]].copy()
+                score_column = next(
+                    (name for name in ("Scores", "Score") if name in exact_frame.columns),
+                    None,
+                )
+                if score_column is not None and not exact_frame.empty:
+                    columns = ["Src", "Tgt", score_column]
+                    for kind_column in ("SrcKind", "TgtKind"):
+                        if kind_column in exact_frame.columns:
+                            columns.append(kind_column)
+                    exact_frame = exact_frame[columns].rename(columns={score_column: "Score"})
+                    prefiltered_mappings = EntityMapping.read_table_mappings(exact_frame)
+            protected_pairs = {
+                (str(mapping.head), str(mapping.tail)) for mapping in prefiltered_mappings
+            }
+            extraction = extract_global_alignment(
+                [*prefiltered_mappings, *scored_mappings],
+                mode=extraction_mode,
+                threshold=state.threshold,
+                protected_pairs=protected_pairs,
+                source_cardinality=state.cardinality,
+                target_cardinality=state.target_cardinality,
+                assignment_component_cap=int(
+                    self._extraction_config.get("assignment_component_cap", 500)
+                ),
+            )
+            predictions = extraction.mappings
+            self._extraction_diagnostics = dict(extraction.diagnostics)
+            self._extraction_includes_prefilter = bool(prefiltered_mappings)
+            if not candidate_df.empty:
+                selected_pairs = {(str(mapping.head), str(mapping.tail)) for mapping in predictions}
+                candidate_df["extraction_selected"] = [
+                    (str(source), str(target)) in selected_pairs
+                    for source, target in candidate_df[["Src", "Tgt"]].itertuples(
+                        index=False, name=None
+                    )
+                ]
         compact_rationale_records = False
         if not candidate_df.empty:
             self._annotate_candidate_dataframe(
@@ -298,6 +820,7 @@ class SemanticAlignmentRunner(
             local_alignment=state.local_alignment,
         )
 
+        rationale_enabled = self._should_generate_final_rationales()
         rationale_start = time.perf_counter()
         self._generate_final_rationales(
             log_every=state.log_every,
@@ -306,6 +829,9 @@ class SemanticAlignmentRunner(
             threshold=state.threshold,
             cardinality=state.cardinality,
         )
+        rationale_meta = getattr(self.model, "_last_rationale_backend_meta", {}) or {}
+        if rationale_enabled and isinstance(rationale_meta, Mapping) and rationale_meta:
+            self._record_llm_backend_usage({"rationale": rationale_meta})
         rationale_elapsed = time.perf_counter() - rationale_start
         post_inference_elapsed = max(
             0.0,
@@ -418,6 +944,7 @@ class SemanticAlignmentRunner(
         self.results_json.clear()
         self.results_df = None
         self._llm_summary_stats: Optional[Dict[str, Any]] = None
+        self._llm_backend_observations = []
         self._llm_calibration_messages_logged: Set[str] = set()
         self._llm_calibration_report: Optional[Dict[str, Any]] = None
         self._candidate_rows: List[Dict[str, Any]] = []
@@ -648,6 +1175,7 @@ class SemanticAlignmentRunner(
                     tgt_ctx_bridges=tgt_ctx_bridges,
                     label=labels,
                 )
+            self._record_llm_backend_usage(out.get("backend_usage"))
             self._record_llm_calibration(out.get("llm_calibration"))
             pair_batch_stats = out.get("batch_pair_adaptive_stats") or {}
             if step == 1 and pair_batch_stats:
@@ -714,62 +1242,89 @@ class SemanticAlignmentRunner(
             i_diff_vals = _tensor_list("I_diff")
             i_attr_vals = _tensor_list("I_attr")
             i_llm_vals = _tensor_list("I_llm")
+            optional_experiment_values: Dict[str, List[Any]] = {}
+            for output_name in ("s_strsim", "q_lex", "q_strsim", "I_lex", "I_strsim"):
+                if output_name not in out:
+                    continue
+                output_value = out[output_name]
+                if isinstance(output_value, torch.Tensor):
+                    values = output_value.detach().cpu().tolist()
+                elif isinstance(output_value, (list, tuple)):
+                    values = list(output_value)
+                else:
+                    raise TypeError(f"Scorer output {output_name!r} must be a tensor or sequence")
+                if len(values) != len(src_iri):
+                    raise ValueError(
+                        f"Scorer output {output_name!r} has {len(values)} values for "
+                        f"{len(src_iri)} pairs"
+                    )
+                optional_experiment_values[output_name] = values
+
+            raw_gate_diagnostics = out.get("llm_gate_diagnostics")
+            gate_diagnostics: Optional[List[Any]] = None
+            if raw_gate_diagnostics is not None:
+                if not isinstance(raw_gate_diagnostics, (list, tuple)):
+                    raise TypeError("llm_gate_diagnostics must be a per-pair sequence")
+                gate_diagnostics = list(raw_gate_diagnostics)
+                if len(gate_diagnostics) != len(src_iri):
+                    raise ValueError(
+                        "llm_gate_diagnostics count does not match the scored pair count"
+                    )
             llm_pair_briefs = list(out.get("llm_pair_briefs") or [""] * len(src_iri))
             ground_truth = labels or [None] * len(src_iri)
             candidate_start_idx = len(self._candidate_rows)
 
             for idx, (s, t, score) in enumerate(zip(src_iri, tgt_iri, s_final)):
                 all_mappings.append((s, t, float(score)))
-                self._candidate_rows.append(
-                    {
-                        "Src": s,
-                        "Tgt": t,
-                        "SrcKind": str(src_kinds[idx]),
-                        "TgtKind": str(tgt_kinds[idx]),
-                        "ground_truth": ground_truth[idx],
-                        "s_label": float(s_label_vals[idx]),
-                        "s_label_star": float(s_label_star_vals[idx]),
-                        "s_ctx": float(s_ctx_vals[idx]),
-                        "S_lctx": float(s_lctx_vals[idx]),
-                        "S_base": float(s_base_vals[idx]),
-                        "S_struct": float(s_struct_vals[idx]),
-                        "s_hier": float(s_hier_vals[idx]),
-                        "s_sim": float(s_sim_vals[idx]),
-                        "s_diff": float(s_diff_vals[idx]),
-                        "s_attr": float(s_attr_vals[idx]),
-                        "q_label": float(q_label_vals[idx]),
-                        "Q_struct": float(q_struct_vals[idx]),
-                        "q_hier": float(q_hier_vals[idx]),
-                        "q_sim": float(q_sim_vals[idx]),
-                        "q_diff": float(q_diff_vals[idx]),
-                        "q_attr": float(q_attr_vals[idx]),
-                        "S_final": float(score),
-                        "w_c": float(w_c_vals[idx]),
-                        "w_struct": float(w_struct_vals[idx]),
-                        "w_i": float(w_i_vals[idx]),
-                        "U": float(u_vals[idx]),
-                        "U_ind": float(u_ind_vals[idx]),
-                        "U_dis": float(u_dis_vals[idx]),
-                        "p_llm": float(p_llm_vals[idx]),
-                        "I_label": float(i_label_vals[idx]),
-                        "I_struct": float(i_struct_vals[idx]),
-                        "I_ctx": float(i_ctx_vals[idx]),
-                        "I_hier": float(i_hier_vals[idx]),
-                        "I_sim": float(i_sim_vals[idx]),
-                        "I_diff": float(i_diff_vals[idx]),
-                        "I_attr": float(i_attr_vals[idx]),
-                        "I_llm": float(i_llm_vals[idx]),
-                        "llm_pair_brief": llm_pair_briefs[idx],
-                        "src_label_text": self._summarize_label(src_labels[idx]),
-                        "tgt_label_text": self._summarize_label(tgt_labels[idx]),
-                        "src_context_text": self._summarize_context(
-                            src_ctxs[idx] if src_ctxs else []
-                        ),
-                        "tgt_context_text": self._summarize_context(
-                            tgt_ctxs[idx] if tgt_ctxs else []
-                        ),
-                    }
-                )
+                candidate_row = {
+                    "Src": s,
+                    "Tgt": t,
+                    "SrcKind": str(src_kinds[idx]),
+                    "TgtKind": str(tgt_kinds[idx]),
+                    "ground_truth": ground_truth[idx],
+                    "s_label": float(s_label_vals[idx]),
+                    "s_label_star": float(s_label_star_vals[idx]),
+                    "s_ctx": float(s_ctx_vals[idx]),
+                    "S_lctx": float(s_lctx_vals[idx]),
+                    "S_base": float(s_base_vals[idx]),
+                    "S_struct": float(s_struct_vals[idx]),
+                    "s_hier": float(s_hier_vals[idx]),
+                    "s_sim": float(s_sim_vals[idx]),
+                    "s_diff": float(s_diff_vals[idx]),
+                    "s_attr": float(s_attr_vals[idx]),
+                    "q_label": float(q_label_vals[idx]),
+                    "Q_struct": float(q_struct_vals[idx]),
+                    "q_hier": float(q_hier_vals[idx]),
+                    "q_sim": float(q_sim_vals[idx]),
+                    "q_diff": float(q_diff_vals[idx]),
+                    "q_attr": float(q_attr_vals[idx]),
+                    "S_final": float(score),
+                    "w_c": float(w_c_vals[idx]),
+                    "w_struct": float(w_struct_vals[idx]),
+                    "w_i": float(w_i_vals[idx]),
+                    "U": float(u_vals[idx]),
+                    "U_ind": float(u_ind_vals[idx]),
+                    "U_dis": float(u_dis_vals[idx]),
+                    "p_llm": float(p_llm_vals[idx]),
+                    "I_label": float(i_label_vals[idx]),
+                    "I_struct": float(i_struct_vals[idx]),
+                    "I_ctx": float(i_ctx_vals[idx]),
+                    "I_hier": float(i_hier_vals[idx]),
+                    "I_sim": float(i_sim_vals[idx]),
+                    "I_diff": float(i_diff_vals[idx]),
+                    "I_attr": float(i_attr_vals[idx]),
+                    "I_llm": float(i_llm_vals[idx]),
+                    "llm_pair_brief": llm_pair_briefs[idx],
+                    "src_label_text": self._summarize_label(src_labels[idx]),
+                    "tgt_label_text": self._summarize_label(tgt_labels[idx]),
+                    "src_context_text": self._summarize_context(src_ctxs[idx] if src_ctxs else []),
+                    "tgt_context_text": self._summarize_context(tgt_ctxs[idx] if tgt_ctxs else []),
+                }
+                for output_name, values in optional_experiment_values.items():
+                    candidate_row[output_name] = float(values[idx])
+                if gate_diagnostics is not None:
+                    candidate_row.update(self._gate_candidate_fields(gate_diagnostics[idx]))
+                self._candidate_rows.append(candidate_row)
 
             processed_examples += len(src_iri)
             batches_run += 1

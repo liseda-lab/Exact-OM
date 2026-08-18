@@ -76,11 +76,23 @@ class CheckpointingMixin:
             if fingerprint_payload is not None:
                 model_entry["payload"] = fingerprint_payload
             model_payloads.append(model_entry)
-        return {
+        payload: Dict[str, Any] = {
             "dataset_signature": dataset_signature,
             "dataset_fingerprint": dataset_fingerprint,
             "models": model_payloads,
         }
+        extraction = dict(
+            getattr(
+                self,
+                "_extraction_config",
+                {"mode": "greedy", "assignment_component_cap": 500},
+            )
+        )
+        # Preserve legacy/default checkpoint identity byte-for-byte. Only an
+        # experimental non-greedy extractor changes reusable inference output.
+        if extraction != {"mode": "greedy", "assignment_component_cap": 500}:
+            payload["trainer"] = {"extraction": extraction}
+        return payload
 
     def _build_checkpoint_fingerprint(
         self,

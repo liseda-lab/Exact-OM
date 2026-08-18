@@ -176,6 +176,11 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
         """
         Apply prefiltering to the dataset based on the features.
         """
+        if getattr(self, "_extraction_includes_prefilter", False):
+            # Non-greedy E01 extraction already preassigned exact mappings and
+            # enforced both cardinalities over the combined graph.
+            return alignment
+
         selector_target_conflict_enabled = getattr(self, "_selector_target_conflict_enabled", None)
         if selector_target_conflict_enabled is False:
             target_cardinality = None
@@ -260,6 +265,7 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
         relation_prediction: str = "none",
         source_uri: Optional[str] = None,
         target_uri: Optional[str] = None,
+        paper_audit: bool = False,
         **kwargs,
     ) -> Dict[str, Path]:
         """
@@ -276,6 +282,7 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
             relation_prediction=relation_prediction,
             source_uri=source_uri,
             target_uri=target_uri,
+            paper_audit=paper_audit,
         )
         output_paths.update(alignment_paths)
 
@@ -332,6 +339,9 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
                     selector_calibration.append(metadata)
             if selector_calibration:
                 stats["selector_calibration"] = selector_calibration
+            extraction = dict(getattr(self, "_extraction_diagnostics", {}) or {})
+            if extraction:
+                stats["extraction"] = extraction
             stats_json_path = self._run_layout.run_stats_path
             with open(stats_json_path, "w", encoding="utf-8") as f:
                 json.dump(stats, f, indent=2, ensure_ascii=False)
@@ -501,6 +511,7 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
         relation_prediction: str,
         source_uri: Optional[str],
         target_uri: Optional[str],
+        paper_audit: bool,
     ) -> Dict[str, Path]:
         """Write the configured alignment formats and select the primary artifact."""
 
@@ -518,7 +529,23 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
                 columns=["SrcEntity", "TgtEntity", "TgtCandidates"],
             )
 
+        # Preserve a lossless, selected-pair audit artifact even when the
+        # compatibility output is a local ranking table. Global evaluation
+        # must never treat ``TgtCandidates`` as model decisions.
         paths: Dict[str, Path] = {}
+        if paper_audit:
+            global_audit_path = self.alignment_dir / "paper.maps_global.tsv"
+            scored[
+                [
+                    "SrcEntity",
+                    "TgtEntity",
+                    "Score",
+                    "Relation",
+                    "SrcKind",
+                    "TgtKind",
+                ]
+            ].to_csv(global_audit_path, sep="\t", index=False)
+            paths["alignment_global_audit"] = global_audit_path
         primary: Optional[Path] = None
         for format_name in formats:
             normalized = str(format_name).strip().lower()
