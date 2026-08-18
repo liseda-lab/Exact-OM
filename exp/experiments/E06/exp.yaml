@@ -1,0 +1,38 @@
+schema_version: 1
+experiment_id: E06
+title: Scoring-time string-similarity channel
+implementation: {status: deferred, reason: "The confirmation matrix omits the full eligible OAEI and non-biomedical task coverage and the required reporting slices."}
+base_config: ../../../exact/default_config.yaml
+baseline_id: R_n
+depends_on: [E00]
+resource: {kind: gpu, device: "0", concurrency: 1}
+screen:
+  tasks:
+    - {id: bioml-ncit-doid-valid, split_role: development, track: bioml_hf, task: ncit-doid, reference_role: valid, overlay: {data: {candidate_source: reference_split}, evaluation: {dual_global_local: true}}, reference_completeness: complete, capabilities: [train_reference]}
+  seeds: [17]
+  source_cap: 300
+confirm:
+  tasks:
+    - {id: bioml-ncit-doid-test, split_role: reporting, track: bioml_hf, task: ncit-doid, reference_role: test, overlay: {data: {candidate_source: reference_split}, evaluation: {dual_global_local: true}}, reference_completeness: complete, capabilities: [train_reference]}
+    - {id: anatomy-mouse-human-test, split_role: reporting, track: anatomy, task: mouse-human, reference_role: test, overlay: {data: {candidate_source: generated}, evaluation: {dual_global_local: true}}, reference_completeness: unknown, capabilities: []}
+    - {id: conference-cmt-conference-test, split_role: reporting, track: conference, task: cmt-conference, reference_role: test, overlay: {data: {candidate_source: generated}, evaluation: {dual_global_local: true}}, reference_completeness: unknown, capabilities: []}
+  seeds: [17, 29, 43]
+arms:
+  - {id: strsim_off, role: baseline, overlay: {matching: {channels: {strsim: {enabled: false}}}, supervision: {mode: label_free}}, supervision_label: target_label_free}
+  - {id: strsim_channel, role: candidate, overlay: {matching: {channels: {strsim: {enabled: true, placement: channel, abbreviation: off}}}, supervision: {mode: label_free}}, supervision_label: target_label_free}
+  - {id: strsim_abbreviation_channel, role: candidate, overlay: {matching: {channels: {strsim: {enabled: true, placement: channel, abbreviation: initialism}}}, supervision: {mode: label_free}}, supervision_label: target_label_free}
+  - {id: strsim_folded, role: candidate, overlay: {matching: {channels: {strsim: {enabled: true, placement: folded_into_lexical, abbreviation: off}}}, supervision: {mode: label_free}}, supervision_label: target_label_free}
+selection:
+  decisions:
+    - {id: string_channel, baseline: strsim_off, candidates: [strsim_channel, strsim_abbreviation_channel, strsim_folded], metric: F1, min_delta: 0.001}
+design:
+  primary_comparison: frozen_string_channel_vs_off
+  primary_endpoint: macro_F1
+  independent_unit: source_entity
+  power_status: underpowered
+  assumptions: ["Abbreviation slices are derived from label forms without mapping correctness."]
+  required_slices: [domain, label_length, abbreviation, entity_kind]
+  regression_bound: 0.005
+  cost_bound: 1.2
+  multiplicity: none
+negative_label_policy: not_applicable

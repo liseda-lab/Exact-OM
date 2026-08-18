@@ -1,0 +1,41 @@
+schema_version: 1
+experiment_id: E09
+title: IC-weighted hierarchy overlap and sibling consistency
+implementation: {status: deferred, reason: "The confirmation matrix omits eligible OAEI tasks and the required hierarchy cost endpoint."}
+base_config: ../../../exact/default_config.yaml
+baseline_id: R_n
+depends_on: [E00]
+resource: {kind: gpu, device: "0", concurrency: 1}
+screen:
+  tasks:
+    - {id: bioml-snomed-fma-valid, split_role: development, track: bioml_hf, task: snomed-fma, reference_role: valid, overlay: {data: {candidate_source: reference_split}, evaluation: {dual_global_local: true}}, reference_completeness: complete, capabilities: [train_reference]}
+  seeds: [17]
+  source_cap: 300
+confirm:
+  tasks:
+    - {id: bioml-snomed-fma-test, split_role: reporting, track: bioml_hf, task: snomed-fma, reference_role: test, overlay: {data: {candidate_source: reference_split}, evaluation: {dual_global_local: true}}, reference_completeness: complete, capabilities: [train_reference]}
+    - {id: bioml-snomed-ncit-test, split_role: reporting, track: bioml_hf, task: snomed-ncit, reference_role: test, overlay: {data: {candidate_source: reference_split}, evaluation: {dual_global_local: true}}, reference_completeness: complete, capabilities: [train_reference]}
+    - {id: anatomy-mouse-human-test, split_role: reporting, track: anatomy, task: mouse-human, reference_role: test, overlay: {data: {candidate_source: generated}, evaluation: {dual_global_local: true}}, reference_completeness: unknown, capabilities: []}
+  seeds: [17, 29, 43]
+arms:
+  - {id: labels_depth2, role: baseline, overlay: {matching: {channels: {hier: {enabled: true, mode: labels, siblings: false, depth: 2}}}, supervision: {mode: label_free}}, supervision_label: target_label_free}
+  - {id: labels_full, role: control, overlay: {matching: {channels: {hier: {enabled: true, mode: labels, siblings: false, depth: null}}}, supervision: {mode: label_free}}, supervision_label: target_label_free}
+  - {id: overlap_depth2, role: candidate, overlay: {matching: {channels: {hier: {enabled: true, mode: labels_overlap, siblings: false, depth: 2}}}, supervision: {mode: label_free}}, supervision_label: target_label_free}
+  - {id: overlap_full, role: candidate, overlay: {matching: {channels: {hier: {enabled: true, mode: labels_overlap, siblings: false, depth: null}}}, supervision: {mode: label_free}}, supervision_label: target_label_free}
+  - {id: overlap_siblings_depth2, role: candidate, overlay: {matching: {channels: {hier: {enabled: true, mode: labels_overlap, siblings: true, depth: 2}}}, supervision: {mode: label_free}}, supervision_label: target_label_free}
+  - {id: overlap_siblings_full, role: candidate, overlay: {matching: {channels: {hier: {enabled: true, mode: labels_overlap, siblings: true, depth: null}}}, supervision: {mode: label_free}}, supervision_label: target_label_free}
+selection:
+  decisions:
+    - {id: hierarchy_semantics, baseline: labels_depth2, candidates: [overlap_depth2, overlap_full, overlap_siblings_depth2, overlap_siblings_full], metric: F1, min_delta: 0.001, required_controls: [labels_full]}
+design:
+  primary_comparison: frozen_hierarchy_semantics_vs_labels
+  primary_endpoint: macro_F1
+  independent_unit: source_entity
+  power_status: underpowered
+  assumptions: ["Exact anchors only are used to map ancestor sets."]
+  required_slices: [anchor_coverage, hierarchy_depth, task]
+  regression_bound: 0.005
+  non_inferiority_margin: -0.005
+  cost_bound: 1.2
+  multiplicity: none
+negative_label_policy: not_applicable

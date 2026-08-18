@@ -1,0 +1,40 @@
+schema_version: 1
+experiment_id: E10
+title: Fusion constants and selector-head ablations
+implementation: {status: deferred, reason: "The shipped analytic fusion arm is preserved, but monotonic GBDT, winner-plus-runner-up training, and the two-phase sweep/interaction orchestration are not implemented."}
+base_config: ../../../exact/default_config.yaml
+baseline_id: R_n
+depends_on: [E00]
+resource: {kind: gpu, device: "0", concurrency: 1}
+screen:
+  tasks:
+    - {id: bioml-ncit-doid-valid, split_role: development, track: bioml_hf, task: ncit-doid, reference_role: valid, overlay: {data: {candidate_source: reference_split}}, reference_completeness: complete, capabilities: [train_reference]}
+    - {id: bioml-snomed-fma-valid, split_role: development, track: bioml_hf, task: snomed-fma, reference_role: valid, overlay: {data: {candidate_source: reference_split}}, reference_completeness: complete, capabilities: [train_reference]}
+  seeds: [17]
+  source_cap: 300
+confirm:
+  tasks:
+    - {id: bioml-ncit-doid-test, split_role: reporting, track: bioml_hf, task: ncit-doid, reference_role: test, overlay: {data: {candidate_source: reference_split}}, reference_completeness: complete, capabilities: [train_reference]}
+  seeds: [17, 29, 43]
+arms:
+  - {id: shipped_logistic_winner, role: baseline, overlay: {matching: {fusion: {enabled: true, mode: analytic_shipped, tau: 0.5, gamma: 2.0, beta: 0.8}}, selector: {enabled: true, accept_model: logistic, accept_training: winner_only}}}
+  - {id: fusion_low_gamma, role: candidate, overlay: {matching: {fusion: {enabled: true, mode: analytic_shipped, tau: 0.5, gamma: 1.0, beta: 0.8}}}}
+  - {id: fusion_high_gamma, role: candidate, overlay: {matching: {fusion: {enabled: true, mode: analytic_shipped, tau: 0.5, gamma: 3.0, beta: 0.8}}}}
+  - {id: fusion_low_beta, role: candidate, overlay: {matching: {fusion: {enabled: true, mode: analytic_shipped, tau: 0.5, gamma: 2.0, beta: 0.4}}}}
+  - {id: logistic_runnerup, role: candidate, overlay: {selector: {enabled: true, accept_model: logistic, accept_training: winner_plus_runnerup}}}
+  - {id: gbdt_winner, role: candidate, overlay: {selector: {enabled: true, accept_model: gbdt_monotonic, accept_training: winner_only}}}
+  - {id: gbdt_runnerup, role: candidate, overlay: {selector: {enabled: true, accept_model: gbdt_monotonic, accept_training: winner_plus_runnerup}}}
+selection:
+  decisions:
+    - {id: fusion_selector, baseline: shipped_logistic_winner, candidates: [fusion_low_gamma, fusion_high_gamma, fusion_low_beta, logistic_runnerup, gbdt_winner, gbdt_runnerup], metric: F1, min_delta: 0.001}
+design:
+  primary_comparison: frozen_fusion_or_accept_head_vs_shipped
+  primary_endpoint: macro_F1_and_local_MRR
+  independent_unit: source_entity
+  power_status: underpowered
+  assumptions: ["Fusion and acceptance candidates are selected independently before any 2x2 confirmation."]
+  required_slices: [task, entity_kind, llm_invocation]
+  regression_bound: 0.005
+  cost_bound: 1.2
+  multiplicity: holm
+negative_label_policy: complete_reference_or_confirmed_negative

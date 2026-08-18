@@ -1,0 +1,39 @@
+schema_version: 1
+experiment_id: E08
+title: Attribute polarity and evidence-bank ablation
+implementation: {status: deferred, reason: "The manifest encodes one joint selection instead of separate polarity and attribute-bank decisions with the required conditional 2x2 interaction."}
+base_config: ../../../exact/default_config.yaml
+baseline_id: R_n
+depends_on: [E00]
+resource: {kind: gpu, device: "0", concurrency: 1}
+screen:
+  tasks:
+    - {id: bioml-ncit-doid-valid, split_role: development, track: bioml_hf, task: ncit-doid, reference_role: valid, overlay: {data: {candidate_source: reference_split}, evaluation: {dual_global_local: true}}, reference_completeness: complete, capabilities: [train_reference]}
+  seeds: [17]
+  source_cap: 300
+confirm:
+  tasks:
+    - {id: bioml-ncit-doid-test, split_role: reporting, track: bioml_hf, task: ncit-doid, reference_role: test, overlay: {data: {candidate_source: reference_split}, evaluation: {dual_global_local: true}}, reference_completeness: complete, capabilities: [train_reference]}
+    - {id: bioml-snomed-fma-test, split_role: reporting, track: bioml_hf, task: snomed-fma, reference_role: test, overlay: {data: {candidate_source: reference_split}, evaluation: {dual_global_local: true}}, reference_completeness: complete, capabilities: [train_reference]}
+  seeds: [17, 29, 43]
+arms:
+  - {id: support_full, role: baseline, overlay: {matching: {channels: {attr: {enabled: true, polarity: support_only, bank: full}}}, supervision: {mode: label_free}}, supervision_label: target_label_free}
+  - {id: support_attrs_labels, role: candidate, overlay: {matching: {channels: {attr: {enabled: true, polarity: support_only, bank: attrs_labels}}}, supervision: {mode: label_free}}, supervision_label: target_label_free}
+  - {id: support_attrs_only, role: candidate, overlay: {matching: {channels: {attr: {enabled: true, polarity: support_only, bank: attrs_only}}}, supervision: {mode: label_free}}, supervision_label: target_label_free}
+  - {id: signed_full, role: candidate, overlay: {matching: {channels: {attr: {enabled: true, polarity: signed, bank: full}}}, supervision: {mode: label_free}}, supervision_label: target_label_free}
+  - {id: signed_attrs_labels, role: candidate, overlay: {matching: {channels: {attr: {enabled: true, polarity: signed, bank: attrs_labels}}}, supervision: {mode: label_free}}, supervision_label: target_label_free}
+  - {id: signed_attrs_only, role: candidate, overlay: {matching: {channels: {attr: {enabled: true, polarity: signed, bank: attrs_only}}}, supervision: {mode: label_free}}, supervision_label: target_label_free}
+selection:
+  decisions:
+    - {id: attribute_factorial, baseline: support_full, candidates: [support_attrs_labels, support_attrs_only, signed_full, signed_attrs_labels, signed_attrs_only], metric: F1, min_delta: 0.001}
+design:
+  primary_comparison: frozen_attribute_configuration_vs_support_full
+  primary_endpoint: macro_F1
+  independent_unit: source_entity
+  power_status: underpowered
+  assumptions: ["Signed identifier evidence is limited to declared identifier properties."]
+  required_slices: [task, entity_kind, attribute_coverage]
+  regression_bound: 0.005
+  non_inferiority_margin: -0.005
+  multiplicity: none
+negative_label_policy: not_applicable

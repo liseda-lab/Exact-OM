@@ -1,0 +1,37 @@
+schema_version: 1
+experiment_id: E14
+title: Typed relation prediction
+implementation: {status: deferred, reason: "The canonical relation modes are declared, but semantic anchor entailment extensions, learned three-way artifacts, typed evaluator, and coherence audit are incomplete."}
+base_config: ../../../exact/default_config.yaml
+baseline_id: R_n
+depends_on: [E00, E13]
+resource: {kind: gpu, device: "0", concurrency: 1}
+screen:
+  tasks:
+    - {id: biokg-csv-kg-diagnostic, split_role: diagnostic, track: biokg, task: csv-kg, reference_role: valid, overlay: {data: {candidate_source: generated}}, reference_completeness: unknown, capabilities: [typed_relations]}
+  seeds: [17]
+  source_cap: 300
+confirm:
+  tasks:
+    - {id: biokg-csv-kg-test, split_role: reporting, track: biokg, task: csv-kg, reference_role: test, overlay: {data: {candidate_source: generated}}, reference_completeness: unknown, capabilities: [typed_relations]}
+  seeds: [17, 29, 43]
+arms:
+  - {id: all_equivalent, role: baseline, overlay: {matching: {relation_prediction: none}}}
+  - {id: hierarchy_heuristic, role: control, overlay: {matching: {relation_prediction: hierarchy_heuristic}}, required_control: true}
+  - {id: semantic_graph_closure, role: candidate, overlay: {matching: {relation_prediction: semantic_entailment, relation_semantic_backend: graph_closure}}, supervision_label: target_label_free}
+  - {id: semantic_bridge_reasoner, role: candidate, overlay: {matching: {relation_prediction: semantic_entailment, relation_semantic_backend: bridge_reasoner}}, supervision_label: target_label_free}
+  - {id: learned_three_way, role: candidate, overlay: {matching: {relation_prediction: learned_three_way}, supervision: {components: {relation: supervised}}}, supervision_label: in_pair_supervised}
+  - {id: semantic_then_learned, role: candidate, overlay: {matching: {relation_prediction: semantic_then_learned}, supervision: {components: {relation: supervised}}}, supervision_label: in_pair_supervised}
+selection:
+  decisions:
+    - {id: relation_typer, baseline: hierarchy_heuristic, candidates: [semantic_graph_closure, semantic_bridge_reasoner, learned_three_way, semantic_then_learned], metric: relation_macro_F1, min_delta: 0.001, required_controls: [all_equivalent]}
+design:
+  primary_comparison: frozen_relation_typer_vs_hierarchy_heuristic
+  primary_endpoint: relation_macro_F1
+  independent_unit: accepted_source_target_pair
+  power_status: underpowered
+  assumptions: ["Pair detection and relation typing are evaluated separately."]
+  required_slices: [relation, entity_kind, format]
+  regression_bound: 0.01
+  multiplicity: holm
+negative_label_policy: relation_balanced_complete_or_explicit

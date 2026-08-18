@@ -1,0 +1,43 @@
+schema_version: 1
+experiment_id: E01
+title: Deterministic global extraction
+implementation: {status: deferred, reason: "The confirmation matrix omits Anatomy, the required selector-sensitive 2x2 control is absent, and incomplete-reference adjudication is not configured."}
+base_config: ../../../exact/default_config.yaml
+baseline_id: R_n
+depends_on: [E00]
+resource: {kind: gpu, device: "0", concurrency: 1}
+screen:
+  tasks:
+    - {id: bioml-ncit-doid-valid, split_role: development, track: bioml_hf, task: ncit-doid, reference_role: valid, overlay: {data: {candidate_source: reference_split}, evaluation: {dual_global_local: true}}, reference_completeness: complete, capabilities: [train_reference]}
+  seeds: [17]
+  source_cap: 300
+confirm:
+  tasks:
+    - {id: bioml-ncit-doid-test, split_role: reporting, track: bioml_hf, task: ncit-doid, reference_role: test, overlay: {data: {candidate_source: reference_split}, evaluation: {dual_global_local: true}}, reference_completeness: complete, capabilities: [train_reference]}
+    - {id: bioml-snomed-fma-test, split_role: reporting, track: bioml_hf, task: snomed-fma, reference_role: test, overlay: {data: {candidate_source: reference_split}, evaluation: {dual_global_local: true}}, reference_completeness: complete, capabilities: [train_reference]}
+    - {id: bioml-snomed-ncit-test, split_role: reporting, track: bioml_hf, task: snomed-ncit, reference_role: test, overlay: {data: {candidate_source: reference_split}, evaluation: {dual_global_local: true}}, reference_completeness: complete, capabilities: [train_reference]}
+  seeds: [17, 29, 43]
+arms:
+  - {id: greedy_on, role: baseline, overlay: {matching: {extraction: {mode: greedy}}, selector: {runtime_enabled: true}, supervision: {mode: label_free}}, supervision_label: target_label_free}
+  - {id: mutual_best_on, role: candidate, overlay: {matching: {extraction: {mode: mutual_best}}, selector: {runtime_enabled: true}, supervision: {mode: label_free}}, supervision_label: target_label_free}
+  - {id: assignment_on, role: candidate, overlay: {matching: {extraction: {mode: assignment, assignment_component_cap: 500}}, selector: {runtime_enabled: true}, supervision: {mode: label_free}}, supervision_label: target_label_free}
+  - {id: stable_marriage_on, role: candidate, overlay: {matching: {extraction: {mode: stable_marriage}}, selector: {runtime_enabled: true}, supervision: {mode: label_free}}, supervision_label: target_label_free}
+  - {id: greedy_off, role: control, overlay: {matching: {extraction: {mode: greedy}}, selector: {runtime_enabled: false}, supervision: {mode: label_free}}, required_control: true, supervision_label: target_label_free}
+  - {id: mutual_best_off, role: diagnostic, stages: [screen], overlay: {matching: {extraction: {mode: mutual_best}}, selector: {runtime_enabled: false}, supervision: {mode: label_free}}, supervision_label: target_label_free}
+  - {id: assignment_off, role: diagnostic, stages: [screen], overlay: {matching: {extraction: {mode: assignment, assignment_component_cap: 500}}, selector: {runtime_enabled: false}, supervision: {mode: label_free}}, supervision_label: target_label_free}
+  - {id: stable_marriage_off, role: diagnostic, stages: [screen], overlay: {matching: {extraction: {mode: stable_marriage}}, selector: {runtime_enabled: false}, supervision: {mode: label_free}}, supervision_label: target_label_free}
+selection:
+  decisions:
+    - {id: extraction_mode, baseline: greedy_on, candidates: [mutual_best_on, assignment_on, stable_marriage_on], metric: F1, direction: max, min_delta: 0.001, required_controls: [greedy_off], allow_screened_out: true}
+design:
+  primary_comparison: frozen_extractor_vs_greedy
+  primary_endpoint: macro_F1
+  independent_unit: source_entity
+  power_status: underpowered
+  assumptions: ["Exact matches are preassigned.", "Assignment falls back to mutual-best above the frozen component cap."]
+  required_slices: [task, entity_kind, target_collision]
+  regression_bound: 0.005
+  cost_bound: 1.2
+  multiplicity: none
+  reporting_exclusions: [reference_incomplete_cardinality_mode_selection]
+negative_label_policy: not_applicable

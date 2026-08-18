@@ -1,0 +1,42 @@
+schema_version: 1
+experiment_id: E07
+title: Listwise LLM arbitration
+implementation: {status: deferred, reason: "Deterministic listwise prompts and categorical probability transforms exist, but hosted/local listwise calls, self-consistency, order averaging, and identity-bound runtime orchestration are not wired."}
+base_config: ../../../exact/default_config.yaml
+baseline_id: R_n
+depends_on: [E00, E25]
+resource: {kind: llm, profile: openrouter_gpt4o_mini, concurrency: 1}
+screen:
+  tasks:
+    - {id: bioml-ncit-doid-valid, split_role: development, track: bioml_hf, task: ncit-doid, reference_role: valid, overlay: {data: {candidate_source: reference_split}}, reference_completeness: complete, capabilities: [train_reference, llm_logprobs]}
+  seeds: [17]
+  source_cap: 300
+confirm:
+  tasks:
+    - {id: bioml-ncit-doid-test, split_role: reporting, track: bioml_hf, task: ncit-doid, reference_role: test, overlay: {data: {candidate_source: reference_split}}, reference_completeness: complete, capabilities: [train_reference, llm_logprobs]}
+  seeds: [17, 29, 43]
+arms:
+  - {id: binary_operational, role: baseline, overlay: {llm: {experiment: {enabled: true, decision: {mode: binary, probability: raw_joint}}}}, supervision_label: target_label_free}
+  - {id: binary_same_five, role: control, overlay: {llm: {experiment: {enabled: true, decision: {mode: binary, probability: raw_joint, listwise_max_candidates: 5}}}}, required_control: true, supervision_label: target_label_free}
+  - {id: listwise_raw_joint, role: candidate, overlay: {llm: {experiment: {enabled: true, decision: {mode: listwise, probability: raw_joint, listwise_max_candidates: 5}}}}, supervision_label: target_label_free}
+  - {id: listwise_conditional_real, role: candidate, overlay: {llm: {experiment: {enabled: true, decision: {mode: listwise, probability: conditional_real, listwise_max_candidates: 5}}}}, supervision_label: target_label_free}
+  - {id: listwise_pairwise_none, role: candidate, overlay: {llm: {experiment: {enabled: true, decision: {mode: listwise, probability: pairwise_vs_none, listwise_max_candidates: 5}}}}, supervision_label: target_label_free}
+  - {id: listwise_max_normalized, role: diagnostic, overlay: {llm: {experiment: {enabled: true, decision: {mode: listwise, probability: max_normalized, listwise_max_candidates: 5}}}}, deployable: false, supervision_label: target_label_free}
+  - {id: listwise_sc_raw_joint, role: candidate, overlay: {llm: {experiment: {enabled: true, decision: {mode: listwise_sc, probability: raw_joint, listwise_max_candidates: 5, order_averages: 3}}}}, supervision_label: target_label_free}
+  - {id: listwise_sc_conditional_real, role: candidate, overlay: {llm: {experiment: {enabled: true, decision: {mode: listwise_sc, probability: conditional_real, listwise_max_candidates: 5, order_averages: 3}}}}, supervision_label: target_label_free}
+  - {id: listwise_sc_pairwise_none, role: candidate, overlay: {llm: {experiment: {enabled: true, decision: {mode: listwise_sc, probability: pairwise_vs_none, listwise_max_candidates: 5, order_averages: 3}}}}, supervision_label: target_label_free}
+selection:
+  decisions:
+    - {id: listwise_decision, baseline: binary_same_five, candidates: [listwise_raw_joint, listwise_conditional_real, listwise_pairwise_none, listwise_sc_raw_joint, listwise_sc_conditional_real, listwise_sc_pairwise_none], metric: F1, min_delta: 0.001, required_controls: [binary_operational, binary_same_five]}
+design:
+  primary_comparison: frozen_listwise_vs_binary_same_five
+  primary_endpoint: macro_F1_and_token_cost
+  independent_unit: source_entity
+  power_status: underpowered
+  assumptions: ["All paired calls pin provider and resolved model identity."]
+  required_slices: [list_length, overflow, sibling_confusion]
+  regression_bound: 0.005
+  non_inferiority_margin: -0.005
+  cost_bound: 0.6
+  multiplicity: none
+negative_label_policy: not_applicable

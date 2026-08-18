@@ -1,0 +1,37 @@
+schema_version: 1
+experiment_id: E19
+title: Supervised evidence fusion
+implementation: {status: deferred, reason: "Strict global artifact-backed analytic-fitted and learned-global inference exists, but artifact fitting, per-kind scope, learned-adaptive gating, and source-disjoint training are absent."}
+base_config: ../../../exact/default_config.yaml
+baseline_id: R_n
+depends_on: [E00, E20, E26]
+resource: {kind: gpu, device: "0", concurrency: 1}
+screen:
+  tasks:
+    - {id: bioml-ncit-doid-valid, split_role: development, track: bioml_hf, task: ncit-doid, reference_role: valid, overlay: {data: {candidate_source: reference_split}}, reference_completeness: complete, capabilities: [train_reference]}
+  seeds: [17]
+  source_cap: 300
+confirm:
+  tasks:
+    - {id: bioml-ncit-doid-test, split_role: reporting, track: bioml_hf, task: ncit-doid, reference_role: test, overlay: {data: {candidate_source: reference_split}}, reference_completeness: complete, capabilities: [train_reference]}
+  seeds: [17, 29, 43]
+arms:
+  - {id: analytic_shipped, role: baseline, overlay: {matching: {fusion: {enabled: true, mode: analytic_shipped, scope: global}}, supervision: {components: {fusion: label_free}}}, supervision_label: target_label_free}
+  - {id: analytic_fitted_global, role: candidate, overlay: {matching: {fusion: {enabled: true, mode: analytic_fitted, scope: global}}, supervision: {components: {fusion: supervised}}}, supervision_label: in_pair_supervised}
+  - {id: analytic_fitted_per_kind, role: candidate, overlay: {matching: {fusion: {enabled: true, mode: analytic_fitted, scope: per_kind}}, supervision: {components: {fusion: supervised}}}, supervision_label: in_pair_supervised}
+  - {id: learned_global, role: candidate, overlay: {matching: {fusion: {enabled: true, mode: learned_global, scope: global}}, supervision: {components: {fusion: supervised}}}, supervision_label: in_pair_supervised}
+  - {id: learned_global_per_kind, role: candidate, overlay: {matching: {fusion: {enabled: true, mode: learned_global, scope: per_kind}}, supervision: {components: {fusion: supervised}}}, supervision_label: in_pair_supervised}
+  - {id: learned_adaptive, role: candidate, overlay: {matching: {fusion: {enabled: true, mode: learned_adaptive, scope: global}}, supervision: {components: {fusion: supervised}}}, supervision_label: in_pair_supervised}
+selection:
+  decisions:
+    - {id: fusion_provider, baseline: analytic_shipped, candidates: [analytic_fitted_global, analytic_fitted_per_kind, learned_global, learned_global_per_kind, learned_adaptive], metric: F1, min_delta: 0.001}
+design:
+  primary_comparison: frozen_supervised_fusion_vs_analytic_shipped
+  primary_endpoint: macro_F1_and_llm_cost
+  independent_unit: source_entity
+  power_status: underpowered
+  assumptions: ["Every fitted artifact is bound to pool, dataset lock, schema, and seed."]
+  required_slices: [task, entity_kind, channel_weight_entropy]
+  regression_bound: 0.005
+  multiplicity: none
+negative_label_policy: complete_reference_or_positive_unlabelled

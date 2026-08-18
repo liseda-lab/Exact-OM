@@ -1,0 +1,37 @@
+schema_version: 1
+experiment_id: E22
+title: Label efficiency and automatic supervision resolution
+implementation: {status: deferred, reason: "Explicit auto/supervised/label-free resolution is wired, but budget subsampling, effective-unit accounting, active selection, crossover fitting, and profile-rule artifacts are not implemented."}
+base_config: ../../../exact/default_config.yaml
+baseline_id: R_n
+depends_on: [E15, E18, E19, E20, E21, E23]
+resource: {kind: gpu, device: "0", concurrency: 1}
+screen:
+  tasks:
+    - {id: bioml-ncit-doid-valid, split_role: development, track: bioml_hf, task: ncit-doid, reference_role: valid, overlay: {data: {candidate_source: reference_split}}, reference_completeness: complete, capabilities: [train_reference]}
+  seeds: [17]
+  source_cap: 300
+confirm:
+  tasks:
+    - {id: bioml-ncit-doid-test, split_role: reporting, track: bioml_hf, task: ncit-doid, reference_role: test, overlay: {data: {candidate_source: reference_split}}, reference_completeness: complete, capabilities: [train_reference]}
+  seeds: [17, 29, 43]
+arms:
+  - {id: current_auto, role: baseline, overlay: {supervision: {mode: auto, auto_policy: {kind: current}}}}
+  - {id: all_label_free, role: control, overlay: {supervision: {mode: label_free}}, supervision_label: target_label_free}
+  - {id: all_supervised, role: control, overlay: {supervision: {mode: supervised}}, supervision_label: in_pair_supervised}
+  - {id: threshold_auto, role: candidate, overlay: {supervision: {mode: auto, auto_policy: {kind: threshold}, min_effective_training_units: {accept: {unit: source_groups, minimum: 100}, calibration: {unit: source_groups, minimum: 100}, rerank: {unit: candidate_rows, minimum: 1000}}}}}
+  - {id: profile_rule_auto, role: candidate, overlay: {supervision: {mode: auto, auto_policy: {kind: profile_rule}}}}
+  - {id: oracle_component_mode, role: oracle, overlay: {supervision: {mode: supervised}}, deployable: false, supervision_label: oracle_diagnostic}
+selection:
+  decisions:
+    - {id: automatic_mode_rule, baseline: current_auto, candidates: [threshold_auto, profile_rule_auto], metric: F1, min_delta: 0.001, required_controls: [all_label_free, all_supervised]}
+design:
+  primary_comparison: fitted_auto_rule_vs_current_auto
+  primary_endpoint: macro_F1_or_label_cost
+  independent_unit: source_entity
+  power_status: underpowered
+  assumptions: ["One labelled source can supervise every compatible component without duplicate annotation cost."]
+  required_slices: [component, label_budget, entity_kind, structural_profile]
+  regression_bound: 0.005
+  multiplicity: holm
+negative_label_policy: component_specific

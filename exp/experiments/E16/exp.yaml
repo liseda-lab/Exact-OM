@@ -1,0 +1,37 @@
+schema_version: 1
+experiment_id: E16
+title: Cross-pair supervised-head transfer
+implementation: {status: deferred, reason: "Strict artifact consumers exist in parts of the pipeline, but source-pair training, pooled leave-one-pair-out artifacts, target-unsupervised adaptation, and transfer-matrix orchestration are absent."}
+base_config: ../../../exact/default_config.yaml
+baseline_id: R_n
+depends_on: [E00, E11, E12, E14, E15]
+resource: {kind: gpu, device: "0", concurrency: 1}
+screen:
+  tasks:
+    - {id: bioml-ncit-doid-valid, split_role: development, track: bioml_hf, task: ncit-doid, reference_role: valid, overlay: {data: {candidate_source: reference_split}}, reference_completeness: complete, capabilities: [train_reference]}
+  seeds: [17]
+  source_cap: 300
+confirm:
+  tasks:
+    - {id: bioml-snomed-fma-test, split_role: reporting, track: bioml_hf, task: snomed-fma, reference_role: test, overlay: {data: {candidate_source: reference_split}}, reference_completeness: complete, capabilities: [train_reference]}
+  seeds: [17, 29, 43]
+arms:
+  - {id: label_free, role: baseline, overlay: {supervision: {mode: label_free}}, supervision_label: target_label_free}
+  - {id: source_only, role: candidate, overlay: {supervision: {mode: supervised}}, supervision_label: cross_pair_transfer}
+  - {id: source_model_target_unsup_cal, role: candidate, overlay: {supervision: {mode: supervised}, matching: {calibration: {threshold_mode: otsu}}}, supervision_label: cross_pair_transfer}
+  - {id: pooled_lopo, role: candidate, overlay: {supervision: {mode: supervised}}, supervision_label: cross_pair_transfer}
+  - {id: in_pair_supervised, role: control, overlay: {supervision: {mode: supervised}}, required_control: true, supervision_label: in_pair_supervised}
+  - {id: oracle_target, role: oracle, overlay: {supervision: {mode: supervised}}, deployable: false, supervision_label: oracle_diagnostic}
+selection:
+  decisions:
+    - {id: transfer_strategy, baseline: label_free, candidates: [source_only, source_model_target_unsup_cal, pooled_lopo], metric: F1, min_delta: 0.001, required_controls: [in_pair_supervised]}
+design:
+  primary_comparison: frozen_transfer_head_vs_label_free
+  primary_endpoint: target_task_kind_macro_F1
+  independent_unit: source_entity
+  power_status: underpowered
+  assumptions: ["Target reporting labels never select source pairs or adaptation methods."]
+  required_slices: [source_target_pair, domain, entity_kind]
+  regression_bound: 0.01
+  multiplicity: holm
+negative_label_policy: artifact_declared_complete_or_positive_unlabelled

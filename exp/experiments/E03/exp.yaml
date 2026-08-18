@@ -1,0 +1,40 @@
+schema_version: 1
+experiment_id: E03
+title: Calibration and transferable thresholds
+implementation: {status: deferred, reason: "Calibration primitives exist, but fitted artifact application and donor-to-recipient OOF orchestration are not yet wired into runtime."}
+base_config: ../../../exact/default_config.yaml
+baseline_id: R_n
+depends_on: [E00]
+resource: {kind: gpu, device: "0", concurrency: 1}
+screen:
+  tasks:
+    - {id: bioml-ncit-doid-valid, split_role: development, track: bioml_hf, task: ncit-doid, reference_role: valid, overlay: {data: {candidate_source: reference_split}}, reference_completeness: complete, capabilities: [train_reference]}
+  seeds: [17]
+  source_cap: 300
+confirm:
+  tasks:
+    - {id: bioml-ncit-doid-test, split_role: reporting, track: bioml_hf, task: ncit-doid, reference_role: test, overlay: {data: {candidate_source: reference_split}}, reference_completeness: complete, capabilities: [train_reference]}
+  seeds: [17, 29, 43]
+arms:
+  - {id: none_fpfn, role: baseline, overlay: {matching: {calibration: {mode: none, threshold_mode: fixed}}, selector: {tuning: {count_reference_miss_as: fp_fn}}}}
+  - {id: none_fp, role: control, overlay: {matching: {calibration: {mode: none, threshold_mode: fixed}}, selector: {tuning: {count_reference_miss_as: fp}}}}
+  - {id: platt_fpfn, role: candidate, overlay: {matching: {calibration: {mode: platt}}, selector: {tuning: {count_reference_miss_as: fp_fn}}}, supervision_label: in_pair_supervised}
+  - {id: platt_fp, role: candidate, overlay: {matching: {calibration: {mode: platt}}, selector: {tuning: {count_reference_miss_as: fp}}}, supervision_label: in_pair_supervised}
+  - {id: isotonic_fpfn, role: candidate, overlay: {matching: {calibration: {mode: isotonic}}, selector: {tuning: {count_reference_miss_as: fp_fn}}}, supervision_label: in_pair_supervised}
+  - {id: isotonic_fp, role: candidate, overlay: {matching: {calibration: {mode: isotonic}}, selector: {tuning: {count_reference_miss_as: fp}}}, supervision_label: in_pair_supervised}
+  - {id: otsu, role: candidate, overlay: {matching: {calibration: {mode: none, threshold_mode: otsu}}, supervision: {mode: label_free}}, supervision_label: target_label_free}
+  - {id: knee, role: candidate, overlay: {matching: {calibration: {mode: none, threshold_mode: knee}}, supervision: {mode: label_free}}, supervision_label: target_label_free}
+selection:
+  decisions:
+    - {id: calibration_threshold, baseline: none_fpfn, candidates: [platt_fpfn, platt_fp, isotonic_fpfn, isotonic_fp, otsu, knee], metric: F1, min_delta: 0.001, required_controls: [none_fp]}
+design:
+  primary_comparison: frozen_calibrator_vs_none
+  primary_endpoint: macro_F1
+  independent_unit: source_entity
+  power_status: underpowered
+  assumptions: ["Donor thresholds are fixed before recipient reporting references are opened."]
+  required_slices: [donor, recipient, domain]
+  regression_bound: 0.005
+  non_inferiority_margin: -0.005
+  multiplicity: holm
+negative_label_policy: complete_reference_or_confirmed_negative

@@ -1,0 +1,39 @@
+schema_version: 1
+experiment_id: E13
+title: Representation parity and materialized-fact robustness
+implementation: {status: deferred, reason: "Source adapters exist, but paired lossless snapshot generation, evidence parity comparison, and independently materialized closure controls are not implemented in the harness."}
+base_config: ../../../exact/default_config.yaml
+baseline_id: R_n
+depends_on: [E00]
+resource: {kind: cpu, concurrency: 1}
+screen:
+  tasks:
+    - {id: controlled-parity-valid, split_role: diagnostic, reference_role: valid, overlay: {data: {source: tests/fixtures/ontologies/mini_src.owl, target: tests/fixtures/ontologies/mini_tgt.owl, refs: {valid: tests/fixtures/ontologies/mini_refs.tsv}, candidate_source: generated}}, reference_completeness: complete, capabilities: [owl, rdf, csv_kg, materialized_facts]}
+  seeds: [17]
+  source_cap: 300
+confirm:
+  tasks:
+    - {id: controlled-parity-test, split_role: reporting, reference_role: test, overlay: {data: {source: tests/fixtures/ontologies/mini_src.owl, target: tests/fixtures/ontologies/mini_tgt.owl, refs: {test: tests/fixtures/ontologies/mini_refs.tsv}, candidate_source: generated}}, reference_completeness: complete, capabilities: [owl, rdf, csv_kg, materialized_facts]}
+  seeds: [17, 29, 43]
+arms:
+  - {id: owl_asserted, role: baseline, overlay: {io: {input_format: owl}}}
+  - {id: rdf_asserted, role: candidate, overlay: {io: {input_format: rdf}}}
+  - {id: csv_asserted, role: candidate, overlay: {io: {input_format: csv-kg}}}
+  - {id: csv_hierarchy_closure, role: candidate, overlay: {io: {input_format: csv-kg}, dataset: {reasoner: asserted}}}
+  - {id: csv_type_domain_range_closure, role: candidate, overlay: {io: {input_format: csv-kg}, dataset: {reasoner: asserted}}}
+  - {id: csv_all_materialized, role: candidate, overlay: {io: {input_format: csv-kg}, dataset: {reasoner: asserted}}}
+  - {id: irrelevant_facts, role: control, overlay: {io: {input_format: csv-kg}}, required_control: true}
+selection:
+  decisions:
+    - {id: representation_information, baseline: owl_asserted, candidates: [rdf_asserted, csv_asserted, csv_hierarchy_closure, csv_type_domain_range_closure, csv_all_materialized], metric: F1, min_delta: 0.0, required_controls: [irrelevant_facts]}
+design:
+  primary_comparison: representation_parity_and_materialized_information
+  primary_endpoint: exact_mapping_parity_and_macro_F1
+  independent_unit: source_entity
+  power_status: descriptive
+  assumptions: ["Materialization uses each KG independently and never consumes mappings."]
+  required_slices: [format, predicate_family, entity_kind]
+  regression_bound: 0.000001
+  cost_bound: 1.5
+  multiplicity: none
+negative_label_policy: not_applicable

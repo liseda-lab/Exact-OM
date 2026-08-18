@@ -1,0 +1,39 @@
+schema_version: 1
+experiment_id: E24
+title: Contrastive-channel degeneracy and corrective maps
+implementation: {status: deferred, reason: "The confirmation matrix omits the required all-five-BioML coverage, including OMIM-ORDO."}
+base_config: ../../../exact/default_config.yaml
+baseline_id: R_n
+depends_on: [E00]
+resource: {kind: gpu, device: "0", concurrency: 1}
+screen:
+  tasks:
+    - {id: bioml-ncit-doid-valid, split_role: development, track: bioml_hf, task: ncit-doid, reference_role: valid, overlay: {data: {candidate_source: reference_split}, evaluation: {dual_global_local: true}}, reference_completeness: complete, capabilities: [train_reference]}
+    - {id: bioml-snomed-fma-valid, split_role: development, track: bioml_hf, task: snomed-fma, reference_role: valid, overlay: {data: {candidate_source: reference_split}, evaluation: {dual_global_local: true}}, reference_completeness: complete, capabilities: [train_reference]}
+  seeds: [17]
+  source_cap: 300
+confirm:
+  tasks:
+    - {id: bioml-ncit-doid-test, split_role: reporting, track: bioml_hf, task: ncit-doid, reference_role: test, overlay: {data: {candidate_source: reference_split}, evaluation: {dual_global_local: true}}, reference_completeness: complete, capabilities: [train_reference]}
+    - {id: bioml-snomed-fma-test, split_role: reporting, track: bioml_hf, task: snomed-fma, reference_role: test, overlay: {data: {candidate_source: reference_split}, evaluation: {dual_global_local: true}}, reference_completeness: complete, capabilities: [train_reference]}
+    - {id: anatomy-mouse-human-test, split_role: reporting, track: anatomy, task: mouse-human, reference_role: test, overlay: {data: {candidate_source: generated}, evaluation: {dual_global_local: true}}, reference_completeness: unknown, capabilities: []}
+  seeds: [17, 29, 43]
+arms:
+  - {id: R_n, role: baseline, overlay: {matching: {channels: {diff: {enabled: false}}}, supervision: {mode: label_free}}, supervision_label: target_label_free}
+  - {id: normalised_diagnostic, role: control, stages: [screen], overlay: {matching: {channels: {diff: {enabled: true, formulation: normalised, dump_components: true}}}, supervision: {mode: label_free}}, supervision_label: target_label_free}
+  - {id: diff_off, role: candidate, overlay: {matching: {channels: {diff: {enabled: true, formulation: off, dump_components: true}}}, supervision: {mode: label_free}}, required_control: true, supervision_label: target_label_free}
+  - {id: diff_absolute, role: candidate, overlay: {matching: {channels: {diff: {enabled: true, formulation: absolute, dump_components: true}}}, supervision: {mode: label_free}}, supervision_label: target_label_free}
+  - {id: diff_asymmetric, role: candidate, overlay: {matching: {channels: {diff: {enabled: true, formulation: asymmetric, dump_components: true}}}, supervision: {mode: label_free}}, supervision_label: target_label_free}
+selection:
+  decisions:
+    - {id: contrastive_formulation, baseline: R_n, candidates: [diff_off, diff_absolute, diff_asymmetric], metric: F1, min_delta: 0.001, required_controls: [diff_off]}
+design:
+  primary_comparison: frozen_contrastive_map_vs_R_n
+  primary_endpoint: macro_F1
+  independent_unit: source_entity
+  power_status: underpowered
+  assumptions: ["The same-family confounder slice is frozen before correctness is joined."]
+  required_slices: [confounder, channel_active, pivot_reason, task]
+  regression_bound: 0.003
+  multiplicity: none
+negative_label_policy: not_applicable

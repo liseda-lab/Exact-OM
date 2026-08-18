@@ -1,0 +1,37 @@
+schema_version: 1
+experiment_id: E21
+title: Supervised LLM exemplars gating and distillation
+implementation: {status: deferred, reason: "Canonical controls exist, but training-only exemplar retrieval, counterfactual gate labels, student training, learned fusion fitting, and identity-bound immutable artifacts are not implemented end to end."}
+base_config: ../../../exact/default_config.yaml
+baseline_id: R_n
+depends_on: [E07, E25]
+resource: {kind: llm, profile: openrouter_gpt4o_mini, concurrency: 1}
+screen:
+  tasks:
+    - {id: bioml-ncit-doid-valid, split_role: development, track: bioml_hf, task: ncit-doid, reference_role: valid, overlay: {data: {candidate_source: reference_split}}, reference_completeness: complete, capabilities: [train_reference, llm_logprobs]}
+  seeds: [17]
+  source_cap: 300
+confirm:
+  tasks:
+    - {id: bioml-ncit-doid-test, split_role: reporting, track: bioml_hf, task: ncit-doid, reference_role: test, overlay: {data: {candidate_source: reference_split}}, reference_completeness: complete, capabilities: [train_reference, llm_logprobs]}
+  seeds: [17, 29, 43]
+arms:
+  - {id: frozen_e07, role: baseline, overlay: {llm: {experiment: {enabled: true, exemplars: off, distill: off, fusion_weight: beta_u}}, supervision: {components: {llm: label_free}}}, supervision_label: target_label_free}
+  - {id: knn_exemplars, role: candidate, overlay: {llm: {experiment: {enabled: true, exemplars: knn, exemplar_count: 4}}, supervision: {components: {llm: supervised}}}, supervision_label: in_pair_supervised}
+  - {id: learned_gate, role: candidate, overlay: {llm: {experiment: {enabled: true, gate: {mode: router}}}, supervision: {components: {llm: supervised}}}, supervision_label: in_pair_supervised}
+  - {id: distilled_student, role: candidate, overlay: {llm: {experiment: {enabled: true, distill: student}}, supervision: {components: {llm: supervised}}}, supervision_label: in_pair_supervised}
+  - {id: learned_fusion, role: candidate, overlay: {llm: {experiment: {enabled: true, fusion_weight: learned}}, supervision: {components: {llm: supervised}}}, supervision_label: in_pair_supervised}
+selection:
+  decisions:
+    - {id: supervised_llm_configuration, baseline: frozen_e07, candidates: [knn_exemplars, learned_gate, distilled_student, learned_fusion], metric: F1, min_delta: 0.001}
+design:
+  primary_comparison: frozen_supervised_llm_vs_e07
+  primary_endpoint: macro_F1_and_llm_cost
+  independent_unit: source_entity
+  power_status: underpowered
+  assumptions: ["Every fitted object is bound to a resolved immutable LLM identity."]
+  required_slices: [task, decision_flip, exemplar_distance]
+  regression_bound: 0.005
+  non_inferiority_margin: -0.005
+  multiplicity: holm
+negative_label_policy: complete_reference_or_adjudicated_counterfactual

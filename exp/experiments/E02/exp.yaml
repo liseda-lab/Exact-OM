@@ -1,0 +1,39 @@
+schema_version: 1
+experiment_id: E02
+title: Anchor-guided structural rescoring
+implementation: {status: deferred, reason: "The anchor channel and bounded second scorer pass are not integrated; running these overlays would not produce anchor-rescored scores."}
+base_config: ../../../exact/default_config.yaml
+baseline_id: R_n
+depends_on: [E00]
+resource: {kind: gpu, device: "0", concurrency: 1}
+screen:
+  tasks:
+    - {id: bioml-snomed-fma-valid, split_role: development, track: bioml_hf, task: snomed-fma, reference_role: valid, overlay: {data: {candidate_source: reference_split}}, reference_completeness: complete, capabilities: [train_reference]}
+  seeds: [17]
+  source_cap: 300
+confirm:
+  tasks:
+    - {id: bioml-snomed-fma-test, split_role: reporting, track: bioml_hf, task: snomed-fma, reference_role: test, overlay: {data: {candidate_source: reference_split}, evaluation: {dual_global_local: true}}, reference_completeness: complete, capabilities: [train_reference]}
+  seeds: [17, 29, 43]
+arms:
+  - {id: off, role: baseline, overlay: {matching: {anchor_rescoring: {mode: off}}, supervision: {mode: label_free}}, supervision_label: target_label_free}
+  - {id: one_pass_t090, role: candidate, overlay: {matching: {anchor_rescoring: {mode: one_pass, threshold: 0.9}}}}
+  - {id: one_pass_t095, role: candidate, overlay: {matching: {anchor_rescoring: {mode: one_pass, threshold: 0.95}}}}
+  - {id: one_pass_exact, role: candidate, overlay: {matching: {anchor_rescoring: {mode: one_pass, exact_only: true}}}}
+  - {id: iterate_t090, role: candidate, overlay: {matching: {anchor_rescoring: {mode: iterate, threshold: 0.9, max_passes: 2}}}}
+  - {id: iterate_t095, role: candidate, overlay: {matching: {anchor_rescoring: {mode: iterate, threshold: 0.95, max_passes: 2}}}}
+  - {id: iterate_exact, role: candidate, overlay: {matching: {anchor_rescoring: {mode: iterate, exact_only: true, max_passes: 2}}}}
+selection:
+  decisions:
+    - {id: anchor_mode, baseline: off, candidates: [one_pass_t090, one_pass_t095, one_pass_exact, iterate_t090, iterate_t095, iterate_exact], metric: F1, min_delta: 0.001}
+design:
+  primary_comparison: frozen_anchor_rescorer_vs_off
+  primary_endpoint: macro_F1
+  independent_unit: source_entity
+  power_status: underpowered
+  assumptions: ["Gold is joined only after all anchor passes finish."]
+  required_slices: [task, anchor_source, anchor_coverage]
+  regression_bound: 0.005
+  cost_bound: 1.2
+  multiplicity: none
+negative_label_policy: not_applicable

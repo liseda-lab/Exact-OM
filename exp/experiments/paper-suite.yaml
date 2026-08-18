@@ -1,0 +1,33 @@
+schema_version: 1
+suite_id: exact-om-paper-v1
+baseline_id: R_n
+baseline_manifest: baselines/R_n.yaml
+dataset_lock: datasets.lock.yaml
+experiments:
+  - {id: E00, config: E00/exp.yaml, depends_on: []}
+  - {id: E01, config: E01/exp.yaml, depends_on: [E00]}
+  - {id: E02, config: E02/exp.yaml, depends_on: [E00]}
+  - {id: E03, config: E03/exp.yaml, depends_on: [E00]}
+  - {id: E04, config: E04/exp.yaml, depends_on: [E00]}
+  - {id: E05, config: E05/exp.yaml, depends_on: [E00]}
+  - {id: E06, config: E06/exp.yaml, depends_on: [E00]}
+  - {id: E07, config: E07/exp.yaml, depends_on: [E00, E25]}
+  - {id: E08, config: E08/exp.yaml, depends_on: [E00]}
+  - {id: E09, config: E09/exp.yaml, depends_on: [E00]}
+  - {id: E10, config: E10/exp.yaml, depends_on: [E00]}
+  - {id: E11, config: E11/exp.yaml, depends_on: [E00]}
+  - {id: E12, config: E12/exp.yaml, depends_on: [E00]}
+  - {id: E13, config: E13/exp.yaml, depends_on: [E00]}
+  - {id: E14, config: E14/exp.yaml, depends_on: [E00, E13]}
+  - {id: E15, config: E15/exp.yaml, depends_on: [E00, E03]}
+  - {id: E16, config: E16/exp.yaml, depends_on: [E00, E11, E12, E14, E15]}
+  - {id: E17, config: E17/exp.yaml, depends_on: [E00, E01, E02, E03, E04, E05, E06, E07, E08, E09, E10, E11, E12, E13, E14, E15, E16, E18, E19, E20, E21, E22, E23, E24, E25, E26]}
+  - {id: E18, config: E18/exp.yaml, depends_on: [E00, E20]}
+  - {id: E19, config: E19/exp.yaml, depends_on: [E00, E20, E26]}
+  - {id: E20, config: E20/exp.yaml, depends_on: [E05]}
+  - {id: E21, config: E21/exp.yaml, depends_on: [E07, E25]}
+  - {id: E22, config: E22/exp.yaml, depends_on: [E15, E18, E19, E20, E21, E23]}
+  - {id: E23, config: E23/exp.yaml, depends_on: [E02, E12, E13, E18, E19]}
+  - {id: E24, config: E24/exp.yaml, depends_on: [E00]}
+  - {id: E25, config: E25/exp.yaml, depends_on: [E00]}
+  - {id: E26, config: E26/exp.yaml, depends_on: [E00]}

@@ -1,0 +1,38 @@
+schema_version: 1
+experiment_id: E11
+title: Property-equivalence evidence groups
+implementation: {status: deferred, reason: "Canonical property switches exist, but dataset bundle extraction and scorer consumption for property evidence groups are intentionally fail-closed."}
+base_config: ../../../exact/default_config.yaml
+baseline_id: R_n
+depends_on: [E00]
+resource: {kind: gpu, device: "0", concurrency: 1}
+screen:
+  tasks:
+    - {id: oaei-kg-starwars-swg-diagnostic, split_role: diagnostic, track: oaei_kg, task: starwars-swg, reference_role: valid, overlay: {data: {candidate_source: generated}, matching: {entity_kinds: [object_property, data_property]}}, reference_completeness: unknown, capabilities: [property_reference]}
+  seeds: [17]
+  source_cap: 300
+confirm:
+  tasks:
+    - {id: oaei-kg-starwars-swg-test, split_role: reporting, track: oaei_kg, task: starwars-swg, reference_role: test, overlay: {data: {candidate_source: generated}, matching: {entity_kinds: [object_property, data_property]}}, reference_completeness: unknown, capabilities: [property_reference]}
+  seeds: [17, 29, 43]
+arms:
+  - {id: lexical_only, role: baseline, overlay: {matching: {channels: {property: {enabled: true, labels: true, annotations: false, signature: false, hierarchy: false, characteristics: false, usage: false}}}}}
+  - {id: lexical_annotations, role: candidate, overlay: {matching: {channels: {property: {enabled: true, labels: true, annotations: true, signature: false, hierarchy: false, characteristics: false, usage: false}}}}}
+  - {id: full_bundle, role: candidate, overlay: {matching: {channels: {property: {enabled: true}}}}}
+  - {id: minus_signature, role: candidate, overlay: {matching: {channels: {property: {enabled: true, signature: false}}}}}
+  - {id: minus_hierarchy, role: candidate, overlay: {matching: {channels: {property: {enabled: true, hierarchy: false}}}}}
+  - {id: minus_characteristics, role: candidate, overlay: {matching: {channels: {property: {enabled: true, characteristics: false}}}}}
+  - {id: minus_usage, role: candidate, overlay: {matching: {channels: {property: {enabled: true, usage: false}}}}}
+selection:
+  decisions:
+    - {id: property_bundle, baseline: lexical_only, candidates: [lexical_annotations, full_bundle, minus_signature, minus_hierarchy, minus_characteristics, minus_usage], metric: F1, min_delta: 0.001}
+design:
+  primary_comparison: frozen_property_bundle_vs_lexical_only
+  primary_endpoint: property_kind_macro_F1
+  independent_unit: source_property
+  power_status: underpowered
+  assumptions: ["Object and data properties are reported separately."]
+  required_slices: [object_property, data_property, exact_label]
+  regression_bound: 0.01
+  multiplicity: none
+negative_label_policy: reference_completeness_dependent

@@ -1,0 +1,34 @@
+schema_version: 1
+experiment_id: E04
+title: Explicit NIL and abstention
+implementation: {status: deferred, reason: "Candidate and abstention probabilities exist, but common-scale NIL calibration, synthetic NIL rows, and ranking-writer integration are incomplete."}
+base_config: ../../../exact/default_config.yaml
+baseline_id: R_n
+depends_on: [E00]
+resource: {kind: gpu, device: "0", concurrency: 1}
+screen:
+  tasks:
+    - {id: bioml-ncit-doid-valid, split_role: development, track: bioml_hf, task: ncit-doid, reference_role: valid, overlay: {data: {candidate_source: reference_split}}, reference_completeness: complete, capabilities: [train_reference, nil_reference]}
+  seeds: [17]
+  source_cap: 300
+confirm:
+  tasks:
+    - {id: bioml-ncit-doid-test, split_role: reporting, track: bioml_hf, task: ncit-doid, reference_role: test, overlay: {data: {candidate_source: reference_split}}, reference_completeness: complete, capabilities: [train_reference, nil_reference]}
+  seeds: [17, 29, 43]
+arms:
+  - {id: nil_off, role: baseline, overlay: {matching: {nil: {mode: off}}}}
+  - {id: nil_heuristic, role: candidate, overlay: {matching: {nil: {mode: heuristic, ranking_scale: joint_accept_probability}}, supervision: {mode: label_free}}, supervision_label: target_label_free}
+  - {id: nil_accept_model, role: candidate, overlay: {matching: {nil: {mode: accept_model, ranking_scale: joint_accept_probability}}, supervision: {components: {accept: supervised, calibration: supervised}}}, supervision_label: in_pair_supervised}
+selection:
+  decisions:
+    - {id: nil_mode, baseline: nil_off, candidates: [nil_heuristic, nil_accept_model], metric: F1, min_delta: 0.001}
+design:
+  primary_comparison: frozen_nil_mode_vs_off
+  primary_endpoint: nil_aware_macro_F1
+  independent_unit: source_entity
+  power_status: underpowered
+  assumptions: ["Pool-ablation NIL examples are built from training or validation pools only."]
+  required_slices: [natural_nil, pool_ablation_nil, non_nil]
+  regression_bound: 0.005
+  multiplicity: none
+negative_label_policy: complete_reference_or_pool_ablation

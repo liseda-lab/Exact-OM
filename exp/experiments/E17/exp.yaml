@@ -1,0 +1,62 @@
+schema_version: 1
+experiment_id: E17
+title: Frozen promoted-stack integration
+implementation:
+  status: deferred
+  reason: "The bounded composition engine is implemented, but E17 must consume an immutable confirmed-components record; the current two-stage suite exposes only development-screen selections."
+base_config: ../../../exact/default_config.yaml
+baseline_id: R_n
+depends_on: [E00, E01, E02, E03, E04, E05, E06, E07, E08, E09, E10, E11, E12, E13, E14, E15, E16, E18, E19, E20, E21, E22, E23, E24, E25, E26]
+resource: {kind: gpu, device: "0", concurrency: 1}
+screen:
+  tasks:
+    - {id: bioml-ncit-doid-valid, split_role: development, track: bioml_hf, task: ncit-doid, reference_role: valid, overlay: {data: {candidate_source: reference_split}, evaluation: {dual_global_local: true}}, reference_completeness: complete, capabilities: [train_reference]}
+    - {id: bioml-snomed-fma-valid, split_role: development, track: bioml_hf, task: snomed-fma, reference_role: valid, overlay: {data: {candidate_source: reference_split}, evaluation: {dual_global_local: true}}, reference_completeness: complete, capabilities: [train_reference]}
+  seeds: [17]
+  source_cap: 300
+confirm:
+  tasks:
+    - {id: bioml-ncit-doid-test, split_role: reporting, track: bioml_hf, task: ncit-doid, reference_role: test, overlay: {data: {candidate_source: reference_split}, evaluation: {dual_global_local: true}}, reference_completeness: complete, capabilities: [train_reference]}
+    - {id: bioml-snomed-fma-test, split_role: reporting, track: bioml_hf, task: snomed-fma, reference_role: test, overlay: {data: {candidate_source: reference_split}, evaluation: {dual_global_local: true}}, reference_completeness: complete, capabilities: [train_reference]}
+    - {id: bioml-snomed-ncit-test, split_role: reporting, track: bioml_hf, task: snomed-ncit, reference_role: test, overlay: {data: {candidate_source: reference_split}, evaluation: {dual_global_local: true}}, reference_completeness: complete, capabilities: [train_reference]}
+  seeds: [17, 29, 43]
+arms:
+  - {id: rolling, role: baseline, overlay: {}}
+  - {id: stack_all, role: candidate, overlay: {}}
+selection:
+  decisions:
+    - id: frozen_stack
+      baseline: rolling
+      candidates: [stack_all]
+      metric: F1
+      direction: max
+      min_delta: 0.001
+      required_controls: [stack_minus_extraction, stack_minus_retrieval, stack_minus_strsim, stack_minus_attribute, stack_minus_hierarchy, stack_minus_selector, stack_minus_contrastive, stack_minus_quality, interaction_retrieval_selector_00, interaction_retrieval_selector_10, interaction_retrieval_selector_01, interaction_retrieval_selector_11, interaction_contrastive_quality_00, interaction_contrastive_quality_10, interaction_contrastive_quality_01, interaction_contrastive_quality_11]
+      allow_screened_out: true
+composition:
+  rolling_overlay: {}
+  components:
+    - {id: extraction, source_experiment: E01, overlay: {}, claim: true}
+    - {id: retrieval, source_experiment: E05, overlay: {data: {candidate_source: generated}}, claim: true}
+    - {id: strsim, source_experiment: E06, overlay: {}, claim: true}
+    - {id: attribute, source_experiment: E08, overlay: {}, claim: true}
+    - {id: hierarchy, source_experiment: E09, overlay: {}, claim: true}
+    - {id: selector, source_experiment: E15, overlay: {}, claim: true}
+    - {id: contrastive, source_experiment: E24, overlay: {}, claim: true}
+    - {id: quality, source_experiment: E26, overlay: {}, claim: true}
+  interactions:
+    - {id: retrieval_selector, left: retrieval, right: selector, justification: "Retrieval changes the pool on which the selector acts.", confirm: true}
+    - {id: contrastive_quality, left: contrastive, right: quality, justification: "Contrastive activity and quality authority share the fusion boundary.", confirm: true}
+design:
+  primary_comparison: stack_all_vs_rolling
+  primary_endpoint: macro_F1
+  independent_unit: source_entity
+  power_status: underpowered
+  assumptions: ["Only frozen dependency overlays enter the stack.", "The matrix is rolling, stack, eight leave-one-out arms, and two declared 2x2 interactions; no factorial expansion is permitted."]
+  required_slices: [task, entity_kind, candidate_recall, abstention, explanation_reconstruction]
+  regression_bound: 0.005
+  non_inferiority_margin: -0.005
+  cost_bound: 1.2
+  multiplicity: holm
+  reporting_exclusions: [screened_out_components, exploratory_only_components]
+negative_label_policy: inherited_per_component

@@ -1,0 +1,36 @@
+schema_version: 1
+experiment_id: E20
+title: Supervised retrieval encoder and cross-encoder
+implementation: {status: deferred, reason: "Strict runtime artifact loaders and bounded cross-reranking exist, but training, hard-negative mining, immutable artifact production, and transfer orchestration are intentionally outside runtime and not yet supplied."}
+base_config: ../../../exact/default_config.yaml
+baseline_id: R_n
+depends_on: [E05]
+resource: {kind: gpu, device: "0", concurrency: 1}
+screen:
+  tasks:
+    - {id: bioml-ncit-doid-valid, split_role: development, track: bioml_hf, task: ncit-doid, reference_role: valid, overlay: {data: {candidate_source: generated}}, reference_completeness: complete, capabilities: [train_reference]}
+  seeds: [17]
+  source_cap: 300
+confirm:
+  tasks:
+    - {id: bioml-ncit-doid-test, split_role: reporting, track: bioml_hf, task: ncit-doid, reference_role: test, overlay: {data: {candidate_source: generated}}, reference_completeness: complete, capabilities: [train_reference]}
+  seeds: [17, 29, 43]
+arms:
+  - {id: zero_shot_e05, role: baseline, overlay: {candidates: {encoder_finetune: {mode: off}, cross_encoder: {mode: off}}, supervision: {components: {retrieval: label_free}}}, supervision_label: target_label_free}
+  - {id: finetuned, role: candidate, overlay: {candidates: {encoder_finetune: {mode: contrastive, negative_policy: complete_reference}, cross_encoder: {mode: off}}, supervision: {components: {retrieval: supervised}}}, supervision_label: in_pair_supervised}
+  - {id: zero_shot_cross, role: candidate, overlay: {candidates: {encoder_finetune: {mode: off}, cross_encoder: {mode: on, top_k: 20}}, supervision: {components: {retrieval: supervised}}}, supervision_label: in_pair_supervised}
+  - {id: finetuned_cross, role: candidate, overlay: {candidates: {encoder_finetune: {mode: contrastive, negative_policy: complete_reference}, cross_encoder: {mode: on, top_k: 20}}, supervision: {components: {retrieval: supervised}}}, supervision_label: in_pair_supervised}
+selection:
+  decisions:
+    - {id: supervised_retrieval, baseline: zero_shot_e05, candidates: [finetuned, zero_shot_cross, finetuned_cross], metric: F1, min_delta: 0.001}
+design:
+  primary_comparison: frozen_supervised_retrieval_vs_zero_shot_e05
+  primary_endpoint: macro_F1_and_test_candidate_recall
+  independent_unit: source_entity
+  power_status: underpowered
+  assumptions: ["Training and validation references are disjoint from reporting sources."]
+  required_slices: [shared_ontology_transfer, disjoint_ontology_transfer, entity_kind]
+  regression_bound: 0.005
+  cost_bound: 2.0
+  multiplicity: none
+negative_label_policy: complete_reference_or_positive_unlabelled

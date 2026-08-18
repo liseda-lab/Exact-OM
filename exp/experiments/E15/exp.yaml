@@ -1,0 +1,37 @@
+schema_version: 1
+experiment_id: E15
+title: Deployable target-label-free selection
+implementation: {status: deferred, reason: "The supervised control is invalid on mixed-capability tasks without usable training references, and the declared reporting scope is incomplete."}
+base_config: ../../../exact/default_config.yaml
+baseline_id: R_n
+depends_on: [E00, E03]
+resource: {kind: gpu, device: "0", concurrency: 1}
+screen:
+  tasks:
+    - {id: bioml-ncit-doid-valid-hidden-train, split_role: development, track: bioml_hf, task: ncit-doid, reference_role: valid, overlay: {data: {candidate_source: reference_split}, evaluation: {dual_global_local: true}}, reference_completeness: complete, capabilities: [train_reference]}
+  seeds: [17]
+  source_cap: 300
+confirm:
+  tasks:
+    - {id: bioml-ncit-doid-test, split_role: reporting, track: bioml_hf, task: ncit-doid, reference_role: test, overlay: {data: {candidate_source: reference_split}, evaluation: {dual_global_local: true}}, reference_completeness: complete, capabilities: [train_reference]}
+    - {id: anatomy-mouse-human-test, split_role: reporting, track: anatomy, task: mouse-human, reference_role: test, overlay: {data: {candidate_source: generated}, evaluation: {dual_global_local: true}}, reference_completeness: unknown, capabilities: []}
+    - {id: conference-cmt-conference-test, split_role: reporting, track: conference, task: cmt-conference, reference_role: test, overlay: {data: {candidate_source: generated}, evaluation: {dual_global_local: true}}, reference_completeness: unknown, capabilities: []}
+  seeds: [17, 29, 43]
+arms:
+  - {id: current_fallback, role: baseline, overlay: {selector: {enabled: true, runtime_enabled: true, emit_candidate_scores: true, label_free_mode: current_fallback}, supervision: {mode: label_free}}, supervision_label: target_label_free}
+  - {id: score_partition, role: candidate, overlay: {selector: {enabled: true, runtime_enabled: true, emit_candidate_scores: true, label_free_mode: score_partition}, supervision: {mode: label_free}}, supervision_label: target_label_free}
+  - {id: reciprocal_consensus, role: candidate, overlay: {selector: {enabled: true, runtime_enabled: true, emit_candidate_scores: true, label_free_mode: reciprocal_consensus}, supervision: {mode: label_free}}, supervision_label: target_label_free}
+  - {id: in_pair_supervised, role: control, overlay: {selector: {enabled: true, runtime_enabled: true, emit_candidate_scores: true, label_free_mode: current_fallback}, supervision: {mode: supervised}}, required_control: true, supervision_label: in_pair_supervised}
+selection:
+  decisions:
+    - {id: label_free_selector, baseline: current_fallback, candidates: [score_partition, reciprocal_consensus], metric: F1, min_delta: 0.001, required_controls: [in_pair_supervised]}
+design:
+  primary_comparison: frozen_label_free_selector_vs_current_fallback
+  primary_endpoint: task_kind_macro_F1
+  independent_unit: source_entity
+  power_status: underpowered
+  assumptions: ["Target-pair train references are ignored by every promotion candidate.", "Pseudo-label training and beta-mixture arms remain outside this runnable subset until completed."]
+  required_slices: [task, entity_kind, score_separation]
+  regression_bound: 0.01
+  multiplicity: none
+negative_label_policy: not_applicable_for_label_free_candidates

@@ -1,0 +1,42 @@
+schema_version: 1
+experiment_id: E26
+title: Quality-proxy validity and sigma decomposition
+implementation: {status: deferred, reason: "The current selection and reporting configuration does not guarantee the mandatory no-promotion macro-MRR decomposition."}
+base_config: ../../../exact/default_config.yaml
+baseline_id: R_n
+depends_on: [E00]
+resource: {kind: gpu, device: "0", concurrency: 1}
+screen:
+  tasks:
+    - {id: bioml-ncit-doid-valid, split_role: development, track: bioml_hf, task: ncit-doid, reference_role: valid, overlay: {data: {candidate_source: reference_split}, evaluation: {dual_global_local: true}}, reference_completeness: complete, capabilities: [train_reference]}
+    - {id: bioml-snomed-fma-valid, split_role: development, track: bioml_hf, task: snomed-fma, reference_role: valid, overlay: {data: {candidate_source: reference_split}, evaluation: {dual_global_local: true}}, reference_completeness: complete, capabilities: [train_reference]}
+  seeds: [17]
+  source_cap: 300
+confirm:
+  tasks:
+    - {id: bioml-ncit-doid-test, split_role: reporting, track: bioml_hf, task: ncit-doid, reference_role: test, overlay: {data: {candidate_source: reference_split}, evaluation: {dual_global_local: true}}, reference_completeness: complete, capabilities: [train_reference]}
+    - {id: anatomy-mouse-human-test, split_role: reporting, track: anatomy, task: mouse-human, reference_role: test, overlay: {data: {candidate_source: generated}, evaluation: {dual_global_local: true}}, reference_completeness: unknown, capabilities: []}
+    - {id: conference-cmt-conference-test, split_role: reporting, track: conference, task: cmt-conference, reference_role: test, overlay: {data: {candidate_source: generated}, evaluation: {dual_global_local: true}}, reference_completeness: unknown, capabilities: []}
+  seeds: [17, 29, 43]
+arms:
+  - {id: full, role: baseline, overlay: {matching: {fusion: {enabled: true, mode: analytic_shipped, sigma_mode: full}, channels: {lex: {enabled: true, quality: margin}, diff: {enabled: true, dump_components: true}}}, supervision: {mode: label_free}}, supervision_label: target_label_free}
+  - {id: constant_q, role: control, overlay: {matching: {fusion: {enabled: true, mode: analytic_shipped, sigma_mode: constant_q}, channels: {lex: {enabled: true, quality: margin}}}, supervision: {mode: label_free}}, required_control: true, supervision_label: target_label_free}
+  - {id: no_sharpening, role: control, overlay: {matching: {fusion: {enabled: true, mode: analytic_shipped, sigma_mode: no_sharpening}, channels: {lex: {enabled: true, quality: margin}}}, supervision: {mode: label_free}}, required_control: true, supervision_label: target_label_free}
+  - {id: suppression_only, role: control, overlay: {matching: {fusion: {enabled: true, mode: analytic_shipped, sigma_mode: suppression_only}, channels: {lex: {enabled: true, quality: margin}}}, supervision: {mode: label_free}}, required_control: true, supervision_label: target_label_free}
+  - {id: uniform, role: control, overlay: {matching: {fusion: {enabled: true, mode: analytic_shipped, sigma_mode: uniform}, channels: {lex: {enabled: true, quality: margin}}}, supervision: {mode: label_free}}, required_control: true, supervision_label: target_label_free}
+  - {id: lex_entropy, role: candidate, overlay: {matching: {fusion: {enabled: true, mode: analytic_shipped, sigma_mode: full}, channels: {lex: {enabled: true, quality: entropy, entropy_top_m: 5}}}, supervision: {mode: label_free}}, supervision_label: target_label_free}
+  - {id: lex_encoder_agreement, role: candidate, overlay: {matching: {fusion: {enabled: true, mode: analytic_shipped, sigma_mode: full}, channels: {lex: {enabled: true, quality: encoder_agreement}}}, supervision: {mode: label_free}}, supervision_label: target_label_free}
+  - {id: lex_constant, role: candidate, overlay: {matching: {fusion: {enabled: true, mode: analytic_shipped, sigma_mode: full}, channels: {lex: {enabled: true, quality: constant}}}, supervision: {mode: label_free}}, supervision_label: target_label_free}
+selection:
+  decisions:
+    - {id: lexical_quality, baseline: full, candidates: [lex_entropy, lex_encoder_agreement, lex_constant], metric: F1, min_delta: 0.001, required_controls: [constant_q, no_sharpening, suppression_only, uniform]}
+design:
+  primary_comparison: frozen_lexical_quality_vs_full
+  primary_endpoint: macro_F1
+  independent_unit: source_entity
+  power_status: underpowered
+  assumptions: ["The sigma mechanism decomposition is reported regardless of lexical-quality promotion."]
+  required_slices: [task, channel, quality_component, entity_kind]
+  regression_bound: 0.005
+  multiplicity: holm
+negative_label_policy: supervised_reliability_head_deferred

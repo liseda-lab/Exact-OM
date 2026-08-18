@@ -1,0 +1,40 @@
+schema_version: 1
+experiment_id: E12
+title: Instance-equivalence evidence and multi-view retrieval
+implementation: {status: deferred, reason: "Individual-only multi-view retrieval is implemented, but kind-scoped instance evidence bundles, degree-preserving relation shuffle, and anchor cross are not integrated."}
+base_config: ../../../exact/default_config.yaml
+baseline_id: R_n
+depends_on: [E00]
+resource: {kind: gpu, device: "0", concurrency: 1}
+screen:
+  tasks:
+    - {id: oaei-kg-starwars-swg-diagnostic, split_role: diagnostic, track: oaei_kg, task: starwars-swg, reference_role: valid, overlay: {data: {candidate_source: generated}, matching: {entity_kinds: [individual]}}, reference_completeness: unknown, capabilities: [instance_reference]}
+  seeds: [17]
+  source_cap: 300
+confirm:
+  tasks:
+    - {id: oaei-kg-starwars-swg-test, split_role: reporting, track: oaei_kg, task: starwars-swg, reference_role: test, overlay: {data: {candidate_source: generated}, matching: {entity_kinds: [individual]}}, reference_completeness: unknown, capabilities: [instance_reference]}
+  seeds: [17, 29, 43]
+arms:
+  - {id: label_only, role: baseline, overlay: {matching: {channels: {instance: {enabled: true, labels: true, types: false, relations: false, literals: false}}}, candidates: {multi_view: {mode: labels}}}}
+  - {id: plus_types, role: candidate, overlay: {matching: {channels: {instance: {enabled: true, types: true, relations: false, literals: false}}}}}
+  - {id: plus_relations, role: candidate, overlay: {matching: {channels: {instance: {enabled: true, types: false, relations: true, literals: false}}}}}
+  - {id: plus_literals, role: candidate, overlay: {matching: {channels: {instance: {enabled: true, types: false, relations: false, literals: true}}}}}
+  - {id: full_bundle, role: candidate, overlay: {matching: {channels: {instance: {enabled: true, types: true, relations: true, literals: true}}}}}
+  - {id: relations_shuffled, role: control, overlay: {matching: {channels: {instance: {enabled: true, relations_shuffled: true}}}}, required_control: true}
+  - {id: retrieval_labels_types, role: candidate, overlay: {candidates: {multi_view: {mode: labels_types}}}}
+  - {id: retrieval_labels_relations, role: candidate, overlay: {candidates: {multi_view: {mode: labels_relations}}}}
+selection:
+  decisions:
+    - {id: instance_bundle, baseline: label_only, candidates: [plus_types, plus_relations, plus_literals, full_bundle, retrieval_labels_types, retrieval_labels_relations], metric: F1, min_delta: 0.001, required_controls: [relations_shuffled]}
+design:
+  primary_comparison: frozen_instance_configuration_vs_label_only
+  primary_endpoint: instance_macro_F1
+  independent_unit: source_individual
+  power_status: underpowered
+  assumptions: ["Neighborhood construction never reads reference mappings."]
+  required_slices: [degree_quartile, type_availability, label_equality]
+  regression_bound: 0.01
+  cost_bound: 1.5
+  multiplicity: none
+negative_label_policy: positive_unlabelled_when_incomplete
