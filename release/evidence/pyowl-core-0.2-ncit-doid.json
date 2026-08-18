@@ -1,0 +1,989 @@
+{
+  "configuration": {
+    "buffer_edges": 250000,
+    "cache_state": "cold-load; projection cache fill then hit",
+    "include_literals": false,
+    "load_backend": "native",
+    "projector_backend": "native",
+    "reasoner": null,
+    "reasoner_backend": null,
+    "reasoner_timeout_seconds": null,
+    "reasoner_worker_wire": false,
+    "reasoner_workers": null,
+    "require_encoded_consumers": true
+  },
+  "environment": {
+    "packages": {
+      "exact-om": "2.1.0",
+      "pyelk-reasoner": "0.2.0",
+      "pyhermit": "0.2.0",
+      "pyowl-core": "0.2.0",
+      "pyowl2vec-star-projector": "0.2.0"
+    },
+    "platform": "Linux-6.8.0-60-generic-x86_64-with-glibc2.39",
+    "python": "3.12.3"
+  },
+  "measurements": [
+    {
+      "consumer_handoff": {
+        "core": {
+          "encoded_contract": {
+            "descriptor_sha256": "c51d0eb7ecf6f29ad3495fe7c40a2ea6741cf03a7cf194d51417bb810df90f51",
+            "schema_name": "pyowl-core/structural-columns",
+            "schema_version": 2
+          },
+          "encoded_view_schemas": {
+            "pyowl-core/structural-columns": 2
+          },
+          "owner_kind": "direct",
+          "storage_backend": "native"
+        },
+        "projector": {
+          "compiler_cache_schema": "pyowl-projector.compiler-cache/1",
+          "consumer_compile_seconds": 0.32713274378329515,
+          "counters": {
+            "base_flattening_bytes": 0,
+            "encoded_buffer_bytes": 37186759,
+            "encoded_buffer_count": 11,
+            "encoded_compiler_gil_released": true,
+            "encoded_detached_buffer_count": 11,
+            "encoded_indexed_buffer_count": 0,
+            "encoded_posting_bytes": 0,
+            "encoded_referenced_view_count": 0,
+            "encoded_segment_count": 1,
+            "encoded_staging_copy_bytes": 0,
+            "encoded_zero_copy_buffers": 11,
+            "materialized_scalar_rows": 0,
+            "native_batch_edges": 250000,
+            "native_boundary_calls": 2,
+            "native_compiled_edges": 42103,
+            "native_edge_batches": 1,
+            "native_output_vector_edges": 0,
+            "native_peak_buffered_edges": 42103,
+            "native_retained_inverse_properties": 0,
+            "native_retained_subrole_properties": 0,
+            "parser_calls": 0,
+            "per_row_ffi_calls": 0,
+            "resolver_calls": 0,
+            "scalar_axiom_materializations": 0,
+            "scalar_term_materializations": 0,
+            "structural_copy_bytes": 0,
+            "wire_decoder_calls": 0,
+            "wire_encoder_calls": 0
+          },
+          "descriptor_sha256": "c51d0eb7ecf6f29ad3495fe7c40a2ea6741cf03a7cf194d51417bb810df90f51",
+          "encoded_view_publication_seconds": 3.823685792274773,
+          "implementation_version": "0.2.0",
+          "ingestion_path": "encoded-native",
+          "package_version": "0.2.0",
+          "schema_name": "pyowl-core/structural-columns",
+          "schema_version": 2,
+          "selected_backend": "native"
+        },
+        "reasoner": {
+          "implementation_version": "0.2.0",
+          "package_version": "0.2.0",
+          "reasoner": "asserted",
+          "selected_backend": "structural",
+          "worker_mmap_verified": false,
+          "worker_wire_verified": false
+        },
+        "schema_version": 2
+      },
+      "core_operations": {
+        "consumer_delta": {
+          "decode_snapshot": 0,
+          "encode_snapshot": 0,
+          "load_snapshot": 0,
+          "open_snapshot": 0
+        },
+        "projection_cache_delta": {
+          "decode_snapshot": 0,
+          "encode_snapshot": 0,
+          "load_snapshot": 0,
+          "open_snapshot": 0
+        },
+        "projection_delta": {
+          "decode_snapshot": 0,
+          "encode_snapshot": 0,
+          "load_snapshot": 0,
+          "open_snapshot": 0
+        },
+        "reasoner_delta": {
+          "decode_snapshot": 0,
+          "encode_snapshot": 0,
+          "load_snapshot": 0,
+          "open_snapshot": 0
+        },
+        "total": {
+          "decode_snapshot": 0,
+          "encode_snapshot": 0,
+          "load_snapshot": 1,
+          "open_snapshot": 0
+        }
+      },
+      "cpu_seconds": 47.148914,
+      "fingerprints": {
+        "logical": "sha256:2:24707a0a59eeb8535d9d676523c737ec2296b71fd7d7f65201e5f4ed6fd88c77",
+        "signature": "sha256:2:424f051d9a8a4aac55c231860e9d5bf979533c2bfc7e26e1db1899d2110f53a5",
+        "structural": "sha256:2:27431caf5acb6d4fc23652abc1b5218119dd746c7394de845e5e48209d36ce96"
+      },
+      "identity": {
+        "projector_snapshot": true,
+        "reasoner_snapshot": true,
+        "source_snapshot": true
+      },
+      "input": {
+        "bytes": 57163710,
+        "name": "source.owl",
+        "sha256": "379a37f47c0c8e7c30397769358cca955140d16b2797a1cc75da4b1fc2b354eb"
+      },
+      "load_backend": "native",
+      "load_calls": 1,
+      "load_cpu_seconds": 16.423817,
+      "load_report": {
+        "acquisition_cache_hits": 0,
+        "axioms": 243099,
+        "document_cache_hits": 0,
+        "documents": 1,
+        "resolution_attempts": 0,
+        "source_bytes": 57163710,
+        "timings": {
+          "load_seconds": 16.166031753644347,
+          "native_anonymous_accounted_bytes": 0.0,
+          "native_anonymous_component_count": 0.0,
+          "native_anonymous_largest_component_arcs": 0.0,
+          "native_anonymous_largest_component_labels": 0.0,
+          "native_anonymous_largest_component_roots": 0.0,
+          "native_anonymous_largest_component_work": 0.0,
+          "native_anonymous_maximum_open_root_intervals": 0.0,
+          "native_anonymous_maximum_refinement_rounds": 0.0,
+          "native_anonymous_maximum_root_interval_span": 0.0,
+          "native_anonymous_total_arcs": 0.0,
+          "native_anonymous_total_candidate_order_work": 0.0,
+          "native_anonymous_total_canonical_work": 0.0,
+          "native_anonymous_total_labels": 0.0,
+          "native_anonymous_total_permutations_examined": 0.0,
+          "native_anonymous_total_refinement_work": 0.0,
+          "native_anonymous_total_setup_work": 0.0,
+          "native_arena_construction_seconds": 1.469353424,
+          "native_freeze_seconds": 2.053716012,
+          "native_publication_prepare_seconds": 2.167203376,
+          "native_rdf_mapping_seconds": 2.602356006,
+          "native_rdfxml_syntax_parse_seconds": 2.900268845,
+          "native_result_encode_seconds": 0.867691046,
+          "root_parse_seconds": 16.166030294261873
+        }
+      },
+      "load_seconds": 16.435613945126534,
+      "materialization_and_copy": {
+        "acceptance_evidence": {
+          "acceptance_ready": true,
+          "all_consumer_counter_evidence_ready": true,
+          "all_measured_consumers_encoded": true,
+          "expected_core_operation_calls": {
+            "decode_snapshot": 0,
+            "encode_snapshot": 0,
+            "load_snapshot": 0,
+            "open_snapshot": 0
+          },
+          "projector": {
+            "acceptance_ready": true,
+            "all_encoded_buffers_zero_copy": true,
+            "complete_public_counter_coverage": true,
+            "consumer": "projector",
+            "direct_staging_copy_bytes": 0,
+            "encoded_buffer_count": 11,
+            "encoded_compiler_gil_released": true,
+            "encoded_schema": {
+              "actual": {
+                "descriptor_sha256": "c51d0eb7ecf6f29ad3495fe7c40a2ea6741cf03a7cf194d51417bb810df90f51",
+                "schema_name": "pyowl-core/structural-columns",
+                "schema_version": 2
+              },
+              "compatible": true,
+              "error": null,
+              "expected": {
+                "descriptor_sha256": "c51d0eb7ecf6f29ad3495fe7c40a2ea6741cf03a7cf194d51417bb810df90f51",
+                "schema_name": "pyowl-core/structural-columns",
+                "schema_version": 2
+              }
+            },
+            "encoded_zero_copy_buffers": 11,
+            "invalid_public_counters": {},
+            "missing_public_counters": [],
+            "nonzero_forbidden_public_counters": {},
+            "selected_ingestion_path": "encoded-native"
+          },
+          "reasoner": null,
+          "unexpected_core_operation_calls": {}
+        },
+        "complete_public_counter_coverage": true,
+        "copied_structural_bytes": 0,
+        "core_parser_entry_delta": 0,
+        "core_wire_delta": {
+          "decode_snapshot": 0,
+          "encode_snapshot": 0,
+          "open_snapshot": 0
+        },
+        "materialized_scalar_rows": 0,
+        "public_counters": {
+          "projector": {
+            "base_flattening_bytes": 0,
+            "encoded_buffer_bytes": 37186759,
+            "encoded_buffer_count": 11,
+            "encoded_compiler_gil_released": true,
+            "encoded_detached_buffer_count": 11,
+            "encoded_indexed_buffer_count": 0,
+            "encoded_posting_bytes": 0,
+            "encoded_referenced_view_count": 0,
+            "encoded_segment_count": 1,
+            "encoded_staging_copy_bytes": 0,
+            "encoded_zero_copy_buffers": 11,
+            "materialized_scalar_rows": 0,
+            "native_batch_edges": 250000,
+            "native_boundary_calls": 2,
+            "native_compiled_edges": 42103,
+            "native_edge_batches": 1,
+            "native_output_vector_edges": 0,
+            "native_peak_buffered_edges": 42103,
+            "native_retained_inverse_properties": 0,
+            "native_retained_subrole_properties": 0,
+            "parser_calls": 0,
+            "per_row_ffi_calls": 0,
+            "resolver_calls": 0,
+            "scalar_axiom_materializations": 0,
+            "scalar_term_materializations": 0,
+            "structural_copy_bytes": 0,
+            "wire_decoder_calls": 0,
+            "wire_encoder_calls": 0
+          },
+          "reasoner": {}
+        }
+      },
+      "projection": {
+        "consumer": {
+          "compiler_cache_schema": "pyowl-projector.compiler-cache/1",
+          "compiler_digest": null,
+          "consumer_compile_seconds": 0.3291577324271202,
+          "counters": {
+            "base_flattening_bytes": 0,
+            "encoded_buffer_bytes": 37186759,
+            "encoded_buffer_count": 11,
+            "encoded_compiler_gil_released": true,
+            "encoded_detached_buffer_count": 11,
+            "encoded_indexed_buffer_count": 0,
+            "encoded_posting_bytes": 0,
+            "encoded_referenced_view_count": 0,
+            "encoded_segment_count": 1,
+            "encoded_staging_copy_bytes": 0,
+            "encoded_zero_copy_buffers": 11,
+            "materialized_scalar_rows": 0,
+            "native_batch_edges": 250000,
+            "native_boundary_calls": 2,
+            "native_compiled_edges": 42103,
+            "native_edge_batches": 1,
+            "native_output_vector_edges": 0,
+            "native_peak_buffered_edges": 42103,
+            "native_retained_inverse_properties": 0,
+            "native_retained_subrole_properties": 0,
+            "parser_calls": 0,
+            "per_row_ffi_calls": 0,
+            "resolver_calls": 0,
+            "scalar_axiom_materializations": 0,
+            "scalar_term_materializations": 0,
+            "structural_copy_bytes": 0,
+            "wire_decoder_calls": 0,
+            "wire_encoder_calls": 0
+          },
+          "descriptor_sha256": "c51d0eb7ecf6f29ad3495fe7c40a2ea6741cf03a7cf194d51417bb810df90f51",
+          "encoded_view_publication_seconds": 23.51729396916926,
+          "implementation_version": "0.2.0",
+          "ingestion_path": "encoded-native",
+          "schema_name": "pyowl-core/structural-columns",
+          "schema_version": 2
+        },
+        "consumer_compile_seconds": 0.3291577324271202,
+        "cpu_seconds": 25.125481999999995,
+        "edges": 42103,
+        "edges_per_second": 1674.5544661366068,
+        "encoded_counters": null,
+        "encoded_view_publication_seconds": 23.51729396916926,
+        "include_literals": false,
+        "profile": "mowl-d993536-v1",
+        "provenance": {
+          "call_history_digest": "cd55259a040d2a12ba0744b9a339e88b072c240ee60f535709595c3c6351a614",
+          "compiler_cache_schema": "pyowl-projector.compiler-cache/1",
+          "core": {
+            "adapter_protocol_version": 1,
+            "api_version": [
+              0,
+              2
+            ],
+            "closure_document_identities": [
+              "d2:d1fe917975eb9b0d6a82e295822822784ca3c3706ef0c8884c5ead63635f1abc"
+            ],
+            "import_manifest_digest": "56aa9816d34c1fafcc5532edc4cf084166f2dffbd5edeec24a8eedbc5daebf5a",
+            "loader_diagnostics_digest": "a482c59f2a1fd341e816dce3da50b1e4f696d39c12348e12cdcdb05a7e2d0555",
+            "logical_fingerprint": "24707a0a59eeb8535d9d676523c737ec2296b71fd7d7f65201e5f4ed6fd88c77",
+            "model_schema_version": 2,
+            "package_version": "0.2.0",
+            "signature_fingerprint": "424f051d9a8a4aac55c231860e9d5bf979533c2bfc7e26e1db1899d2110f53a5",
+            "structural_fingerprint": "27431caf5acb6d4fc23652abc1b5218119dd746c7394de845e5e48209d36ce96",
+            "wire_format_version": [
+              1,
+              2
+            ]
+          },
+          "counts": {
+            "duplicates": 0,
+            "edges": 42103,
+            "ignored_shapes": 23,
+            "skipped_axioms": 274,
+            "warnings": 0
+          },
+          "diagnostics_digest": "b4ceb96971bebdd49f2bc1c4f9a33504da3ec6dda0c9c03aef0c8e7e5e4f46d7",
+          "edge_artifact_schema": "pyowl-projector.edge-list/1",
+          "ingestion": {
+            "consumer_compile_seconds": 0.3291577324271202,
+            "counters": {
+              "base_flattening_bytes": 0,
+              "encoded_buffer_bytes": 37186759,
+              "encoded_buffer_count": 11,
+              "encoded_compiler_gil_released": true,
+              "encoded_detached_buffer_count": 11,
+              "encoded_indexed_buffer_count": 0,
+              "encoded_posting_bytes": 0,
+              "encoded_referenced_view_count": 0,
+              "encoded_segment_count": 1,
+              "encoded_staging_copy_bytes": 0,
+              "encoded_zero_copy_buffers": 11,
+              "materialized_scalar_rows": 0,
+              "native_batch_edges": 250000,
+              "native_boundary_calls": 2,
+              "native_compiled_edges": 42103,
+              "native_edge_batches": 1,
+              "native_output_vector_edges": 0,
+              "native_peak_buffered_edges": 42103,
+              "native_retained_inverse_properties": 0,
+              "native_retained_subrole_properties": 0,
+              "parser_calls": 0,
+              "per_row_ffi_calls": 0,
+              "resolver_calls": 0,
+              "scalar_axiom_materializations": 0,
+              "scalar_term_materializations": 0,
+              "structural_copy_bytes": 0,
+              "wire_decoder_calls": 0,
+              "wire_encoder_calls": 0
+            },
+            "encoded_descriptor_sha256": "c51d0eb7ecf6f29ad3495fe7c40a2ea6741cf03a7cf194d51417bb810df90f51",
+            "encoded_schema_name": "pyowl-core/structural-columns",
+            "encoded_schema_version": 2,
+            "encoded_view_publication_seconds": 23.51729396916926,
+            "path": "encoded-native",
+            "reason": null,
+            "schema": "pyowl-projector.ingestion/1"
+          },
+          "invocation_count": 1,
+          "native_implementation_version": "0.2.0",
+          "options": {
+            "backend": "native",
+            "bidirectional_taxonomy": false,
+            "compatibility_state": "isolated",
+            "duplicates": "unique",
+            "include_literals": false,
+            "only_taxonomy": false,
+            "order": "canonical",
+            "profile": "mowl-d993536-v1"
+          },
+          "profile": "mowl-d993536-v1",
+          "projector_api_version": 1,
+          "projector_version": "0.2.0",
+          "selected_backend": "native",
+          "source_kind": "direct"
+        },
+        "publication_compile_timing_note": null,
+        "requested_backend": "native",
+        "result_sha256": "b0c1186bd4004bc2a288593c1b5783d568e44f58723fedd7ba6d9c1eb6a20914",
+        "spill": {
+          "merge_passes": 0,
+          "peak_live_bytes": 6700413,
+          "runs_created": 1,
+          "total_spill_bytes": 6700413
+        },
+        "time_to_first_edge_seconds": 24.77798572089523,
+        "wall_seconds": 25.142807147465646
+      },
+      "projection_cache": {
+        "edges": 42103,
+        "fill_seconds": 5.264196335338056,
+        "hit_faster_than_fill": true,
+        "hit_seconds": 0.0015884917229413986,
+        "result_sha256": "b0c1186bd4004bc2a288593c1b5783d568e44f58723fedd7ba6d9c1eb6a20914"
+      },
+      "reasoner": {
+        "configuration": null,
+        "consumer": null,
+        "consumer_compile_seconds": null,
+        "encoded_view_publication_seconds": null,
+        "measured": false,
+        "provenance": {
+          "backend": {
+            "effective": "structural",
+            "fallback_reason": null,
+            "implementation_version": "0.2.0",
+            "requested": "auto"
+          },
+          "core": {
+            "adapter_protocol_version": 1,
+            "api_version": [
+              0,
+              2
+            ],
+            "encoded_contract": {
+              "descriptor_sha256": "c51d0eb7ecf6f29ad3495fe7c40a2ea6741cf03a7cf194d51417bb810df90f51",
+              "schema_name": "pyowl-core/structural-columns",
+              "schema_version": 2
+            },
+            "model_schema_version": 2,
+            "package_version": "0.2.0",
+            "wire_format_version": [
+              1,
+              2
+            ]
+          },
+          "failure_reason": null,
+          "fallback_reason": null,
+          "fingerprints": {
+            "logical": "sha256:2:24707a0a59eeb8535d9d676523c737ec2296b71fd7d7f65201e5f4ed6fd88c77",
+            "signature": "sha256:2:424f051d9a8a4aac55c231860e9d5bf979533c2bfc7e26e1db1899d2110f53a5",
+            "structural": "sha256:2:27431caf5acb6d4fc23652abc1b5218119dd746c7394de845e5e48209d36ce96"
+          },
+          "mmap_verified": false,
+          "options": {
+            "fallback": "error",
+            "timeout_seconds": null,
+            "worker_wire": false,
+            "workers": 0
+          },
+          "owl_parse_count": null,
+          "selection": {
+            "effective": "asserted",
+            "package_version": "0.2.0",
+            "requested": "asserted"
+          },
+          "timed_out": false,
+          "verified_wire": false
+        },
+        "requested": null,
+        "requested_backend": null,
+        "results": null,
+        "worker_wire": false
+      },
+      "rss": {
+        "before_bytes": 100278272,
+        "incremental_peak_bytes": 791130112,
+        "peak_bytes": 891408384
+      },
+      "second_ontology_representation": false,
+      "wall_seconds": 47.1904273359105
+    },
+    {
+      "consumer_handoff": {
+        "core": {
+          "encoded_contract": {
+            "descriptor_sha256": "c51d0eb7ecf6f29ad3495fe7c40a2ea6741cf03a7cf194d51417bb810df90f51",
+            "schema_name": "pyowl-core/structural-columns",
+            "schema_version": 2
+          },
+          "encoded_view_schemas": {
+            "pyowl-core/structural-columns": 2
+          },
+          "owner_kind": "direct",
+          "storage_backend": "native"
+        },
+        "projector": {
+          "compiler_cache_schema": "pyowl-projector.compiler-cache/1",
+          "consumer_compile_seconds": 0.03532680682837963,
+          "counters": {
+            "base_flattening_bytes": 0,
+            "encoded_buffer_bytes": 7292832,
+            "encoded_buffer_count": 11,
+            "encoded_compiler_gil_released": true,
+            "encoded_detached_buffer_count": 11,
+            "encoded_indexed_buffer_count": 0,
+            "encoded_posting_bytes": 0,
+            "encoded_referenced_view_count": 0,
+            "encoded_segment_count": 1,
+            "encoded_staging_copy_bytes": 0,
+            "encoded_zero_copy_buffers": 11,
+            "materialized_scalar_rows": 0,
+            "native_batch_edges": 250000,
+            "native_boundary_calls": 2,
+            "native_compiled_edges": 9388,
+            "native_edge_batches": 1,
+            "native_output_vector_edges": 0,
+            "native_peak_buffered_edges": 9388,
+            "native_retained_inverse_properties": 0,
+            "native_retained_subrole_properties": 0,
+            "parser_calls": 0,
+            "per_row_ffi_calls": 0,
+            "resolver_calls": 0,
+            "scalar_axiom_materializations": 0,
+            "scalar_term_materializations": 0,
+            "structural_copy_bytes": 0,
+            "wire_decoder_calls": 0,
+            "wire_encoder_calls": 0
+          },
+          "descriptor_sha256": "c51d0eb7ecf6f29ad3495fe7c40a2ea6741cf03a7cf194d51417bb810df90f51",
+          "encoded_view_publication_seconds": 0.7730022091418505,
+          "implementation_version": "0.2.0",
+          "ingestion_path": "encoded-native",
+          "package_version": "0.2.0",
+          "schema_name": "pyowl-core/structural-columns",
+          "schema_version": 2,
+          "selected_backend": "native"
+        },
+        "reasoner": {
+          "implementation_version": "0.2.0",
+          "package_version": "0.2.0",
+          "reasoner": "asserted",
+          "selected_backend": "structural",
+          "worker_mmap_verified": false,
+          "worker_wire_verified": false
+        },
+        "schema_version": 2
+      },
+      "core_operations": {
+        "consumer_delta": {
+          "decode_snapshot": 0,
+          "encode_snapshot": 0,
+          "load_snapshot": 0,
+          "open_snapshot": 0
+        },
+        "projection_cache_delta": {
+          "decode_snapshot": 0,
+          "encode_snapshot": 0,
+          "load_snapshot": 0,
+          "open_snapshot": 0
+        },
+        "projection_delta": {
+          "decode_snapshot": 0,
+          "encode_snapshot": 0,
+          "load_snapshot": 0,
+          "open_snapshot": 0
+        },
+        "reasoner_delta": {
+          "decode_snapshot": 0,
+          "encode_snapshot": 0,
+          "load_snapshot": 0,
+          "open_snapshot": 0
+        },
+        "total": {
+          "decode_snapshot": 0,
+          "encode_snapshot": 0,
+          "load_snapshot": 1,
+          "open_snapshot": 0
+        }
+      },
+      "cpu_seconds": 8.040420000000005,
+      "fingerprints": {
+        "logical": "sha256:2:dfd4cc74f0cdf1370ca247c8ef7932139274fca6d3c4680a6d10cea6b8ad1556",
+        "signature": "sha256:2:f62578ab4bb8597f177bd0d20257ecd85bdf4a7df1cae838cc1fc747b4fc5134",
+        "structural": "sha256:2:7a11d07b9450f083ecd3de1f94d94ad7c75cb7470e52565ada4debecb457b7c4"
+      },
+      "identity": {
+        "projector_snapshot": true,
+        "reasoner_snapshot": true,
+        "source_snapshot": true
+      },
+      "input": {
+        "bytes": 6687536,
+        "name": "target.owl",
+        "sha256": "76f41cce3616ad1a9ba6353f469e96bde7addba5d43e541651a3ab703f9ba2bc"
+      },
+      "load_backend": "native",
+      "load_calls": 1,
+      "load_cpu_seconds": 2.3777840000000054,
+      "load_report": {
+        "acquisition_cache_hits": 0,
+        "axioms": 55687,
+        "document_cache_hits": 0,
+        "documents": 1,
+        "resolution_attempts": 0,
+        "source_bytes": 6687536,
+        "timings": {
+          "load_seconds": 2.323939469642937,
+          "native_anonymous_accounted_bytes": 0.0,
+          "native_anonymous_component_count": 0.0,
+          "native_anonymous_largest_component_arcs": 0.0,
+          "native_anonymous_largest_component_labels": 0.0,
+          "native_anonymous_largest_component_roots": 0.0,
+          "native_anonymous_largest_component_work": 0.0,
+          "native_anonymous_maximum_open_root_intervals": 0.0,
+          "native_anonymous_maximum_refinement_rounds": 0.0,
+          "native_anonymous_maximum_root_interval_span": 0.0,
+          "native_anonymous_total_arcs": 0.0,
+          "native_anonymous_total_candidate_order_work": 0.0,
+          "native_anonymous_total_canonical_work": 0.0,
+          "native_anonymous_total_labels": 0.0,
+          "native_anonymous_total_permutations_examined": 0.0,
+          "native_anonymous_total_refinement_work": 0.0,
+          "native_anonymous_total_setup_work": 0.0,
+          "native_arena_construction_seconds": 0.235044532,
+          "native_freeze_seconds": 0.413848628,
+          "native_publication_prepare_seconds": 0.342892566,
+          "native_rdf_mapping_seconds": 0.27410585,
+          "native_rdfxml_syntax_parse_seconds": 0.299815118,
+          "native_result_encode_seconds": 0.105702293,
+          "root_parse_seconds": 2.3239384200423956
+        }
+      },
+      "load_seconds": 2.377938712015748,
+      "materialization_and_copy": {
+        "acceptance_evidence": {
+          "acceptance_ready": true,
+          "all_consumer_counter_evidence_ready": true,
+          "all_measured_consumers_encoded": true,
+          "expected_core_operation_calls": {
+            "decode_snapshot": 0,
+            "encode_snapshot": 0,
+            "load_snapshot": 0,
+            "open_snapshot": 0
+          },
+          "projector": {
+            "acceptance_ready": true,
+            "all_encoded_buffers_zero_copy": true,
+            "complete_public_counter_coverage": true,
+            "consumer": "projector",
+            "direct_staging_copy_bytes": 0,
+            "encoded_buffer_count": 11,
+            "encoded_compiler_gil_released": true,
+            "encoded_schema": {
+              "actual": {
+                "descriptor_sha256": "c51d0eb7ecf6f29ad3495fe7c40a2ea6741cf03a7cf194d51417bb810df90f51",
+                "schema_name": "pyowl-core/structural-columns",
+                "schema_version": 2
+              },
+              "compatible": true,
+              "error": null,
+              "expected": {
+                "descriptor_sha256": "c51d0eb7ecf6f29ad3495fe7c40a2ea6741cf03a7cf194d51417bb810df90f51",
+                "schema_name": "pyowl-core/structural-columns",
+                "schema_version": 2
+              }
+            },
+            "encoded_zero_copy_buffers": 11,
+            "invalid_public_counters": {},
+            "missing_public_counters": [],
+            "nonzero_forbidden_public_counters": {},
+            "selected_ingestion_path": "encoded-native"
+          },
+          "reasoner": null,
+          "unexpected_core_operation_calls": {}
+        },
+        "complete_public_counter_coverage": true,
+        "copied_structural_bytes": 0,
+        "core_parser_entry_delta": 0,
+        "core_wire_delta": {
+          "decode_snapshot": 0,
+          "encode_snapshot": 0,
+          "open_snapshot": 0
+        },
+        "materialized_scalar_rows": 0,
+        "public_counters": {
+          "projector": {
+            "base_flattening_bytes": 0,
+            "encoded_buffer_bytes": 7292832,
+            "encoded_buffer_count": 11,
+            "encoded_compiler_gil_released": true,
+            "encoded_detached_buffer_count": 11,
+            "encoded_indexed_buffer_count": 0,
+            "encoded_posting_bytes": 0,
+            "encoded_referenced_view_count": 0,
+            "encoded_segment_count": 1,
+            "encoded_staging_copy_bytes": 0,
+            "encoded_zero_copy_buffers": 11,
+            "materialized_scalar_rows": 0,
+            "native_batch_edges": 250000,
+            "native_boundary_calls": 2,
+            "native_compiled_edges": 9388,
+            "native_edge_batches": 1,
+            "native_output_vector_edges": 0,
+            "native_peak_buffered_edges": 9388,
+            "native_retained_inverse_properties": 0,
+            "native_retained_subrole_properties": 0,
+            "parser_calls": 0,
+            "per_row_ffi_calls": 0,
+            "resolver_calls": 0,
+            "scalar_axiom_materializations": 0,
+            "scalar_term_materializations": 0,
+            "structural_copy_bytes": 0,
+            "wire_decoder_calls": 0,
+            "wire_encoder_calls": 0
+          },
+          "reasoner": {}
+        }
+      },
+      "projection": {
+        "consumer": {
+          "compiler_cache_schema": "pyowl-projector.compiler-cache/1",
+          "compiler_digest": null,
+          "consumer_compile_seconds": 0.03554837219417095,
+          "counters": {
+            "base_flattening_bytes": 0,
+            "encoded_buffer_bytes": 7292832,
+            "encoded_buffer_count": 11,
+            "encoded_compiler_gil_released": true,
+            "encoded_detached_buffer_count": 11,
+            "encoded_indexed_buffer_count": 0,
+            "encoded_posting_bytes": 0,
+            "encoded_referenced_view_count": 0,
+            "encoded_segment_count": 1,
+            "encoded_staging_copy_bytes": 0,
+            "encoded_zero_copy_buffers": 11,
+            "materialized_scalar_rows": 0,
+            "native_batch_edges": 250000,
+            "native_boundary_calls": 2,
+            "native_compiled_edges": 9388,
+            "native_edge_batches": 1,
+            "native_output_vector_edges": 0,
+            "native_peak_buffered_edges": 9388,
+            "native_retained_inverse_properties": 0,
+            "native_retained_subrole_properties": 0,
+            "parser_calls": 0,
+            "per_row_ffi_calls": 0,
+            "resolver_calls": 0,
+            "scalar_axiom_materializations": 0,
+            "scalar_term_materializations": 0,
+            "structural_copy_bytes": 0,
+            "wire_decoder_calls": 0,
+            "wire_encoder_calls": 0
+          },
+          "descriptor_sha256": "c51d0eb7ecf6f29ad3495fe7c40a2ea6741cf03a7cf194d51417bb810df90f51",
+          "encoded_view_publication_seconds": 4.520241275429726,
+          "implementation_version": "0.2.0",
+          "ingestion_path": "encoded-native",
+          "schema_name": "pyowl-core/structural-columns",
+          "schema_version": 2
+        },
+        "consumer_compile_seconds": 0.03554837219417095,
+        "cpu_seconds": 4.685767999999996,
+        "edges": 9388,
+        "edges_per_second": 2003.3358239905945,
+        "encoded_counters": null,
+        "encoded_view_publication_seconds": 4.520241275429726,
+        "include_literals": false,
+        "profile": "mowl-d993536-v1",
+        "provenance": {
+          "call_history_digest": "cd9dd44361233623afaf0a259a5b2808025ba70f41598e6868ce044e20d61416",
+          "compiler_cache_schema": "pyowl-projector.compiler-cache/1",
+          "core": {
+            "adapter_protocol_version": 1,
+            "api_version": [
+              0,
+              2
+            ],
+            "closure_document_identities": [
+              "d2:c4add243b31f4dd78f4b6218ba9cf6784431bc32607d23bd5729da50904d9935"
+            ],
+            "import_manifest_digest": "6a6c5dd746e676e099f55d9e852ec3cc9965b7b2ca590299ccaaf445dbd05965",
+            "loader_diagnostics_digest": "a482c59f2a1fd341e816dce3da50b1e4f696d39c12348e12cdcdb05a7e2d0555",
+            "logical_fingerprint": "dfd4cc74f0cdf1370ca247c8ef7932139274fca6d3c4680a6d10cea6b8ad1556",
+            "model_schema_version": 2,
+            "package_version": "0.2.0",
+            "signature_fingerprint": "f62578ab4bb8597f177bd0d20257ecd85bdf4a7df1cae838cc1fc747b4fc5134",
+            "structural_fingerprint": "7a11d07b9450f083ecd3de1f94d94ad7c75cb7470e52565ada4debecb457b7c4",
+            "wire_format_version": [
+              1,
+              2
+            ]
+          },
+          "counts": {
+            "duplicates": 0,
+            "edges": 9388,
+            "ignored_shapes": 0,
+            "skipped_axioms": 37,
+            "warnings": 0
+          },
+          "diagnostics_digest": "0641ad055ff8547737fccc49b16f2ccfdb8eba7a89be710d58caceaf82d0a3f8",
+          "edge_artifact_schema": "pyowl-projector.edge-list/1",
+          "ingestion": {
+            "consumer_compile_seconds": 0.03554837219417095,
+            "counters": {
+              "base_flattening_bytes": 0,
+              "encoded_buffer_bytes": 7292832,
+              "encoded_buffer_count": 11,
+              "encoded_compiler_gil_released": true,
+              "encoded_detached_buffer_count": 11,
+              "encoded_indexed_buffer_count": 0,
+              "encoded_posting_bytes": 0,
+              "encoded_referenced_view_count": 0,
+              "encoded_segment_count": 1,
+              "encoded_staging_copy_bytes": 0,
+              "encoded_zero_copy_buffers": 11,
+              "materialized_scalar_rows": 0,
+              "native_batch_edges": 250000,
+              "native_boundary_calls": 2,
+              "native_compiled_edges": 9388,
+              "native_edge_batches": 1,
+              "native_output_vector_edges": 0,
+              "native_peak_buffered_edges": 9388,
+              "native_retained_inverse_properties": 0,
+              "native_retained_subrole_properties": 0,
+              "parser_calls": 0,
+              "per_row_ffi_calls": 0,
+              "resolver_calls": 0,
+              "scalar_axiom_materializations": 0,
+              "scalar_term_materializations": 0,
+              "structural_copy_bytes": 0,
+              "wire_decoder_calls": 0,
+              "wire_encoder_calls": 0
+            },
+            "encoded_descriptor_sha256": "c51d0eb7ecf6f29ad3495fe7c40a2ea6741cf03a7cf194d51417bb810df90f51",
+            "encoded_schema_name": "pyowl-core/structural-columns",
+            "encoded_schema_version": 2,
+            "encoded_view_publication_seconds": 4.520241275429726,
+            "path": "encoded-native",
+            "reason": null,
+            "schema": "pyowl-projector.ingestion/1"
+          },
+          "invocation_count": 1,
+          "native_implementation_version": "0.2.0",
+          "options": {
+            "backend": "native",
+            "bidirectional_taxonomy": false,
+            "compatibility_state": "isolated",
+            "duplicates": "unique",
+            "include_literals": false,
+            "only_taxonomy": false,
+            "order": "canonical",
+            "profile": "mowl-d993536-v1"
+          },
+          "profile": "mowl-d993536-v1",
+          "projector_api_version": 1,
+          "projector_version": "0.2.0",
+          "selected_backend": "native",
+          "source_kind": "direct"
+        },
+        "publication_compile_timing_note": null,
+        "requested_backend": "native",
+        "result_sha256": "0440e1c8a27f67692350837bca320d31a6e17ad9142aaad7bca502b903089bf5",
+        "spill": {
+          "merge_passes": 0,
+          "peak_live_bytes": 1037503,
+          "runs_created": 1,
+          "total_spill_bytes": 1037503
+        },
+        "time_to_first_edge_seconds": 4.609368339180946,
+        "wall_seconds": 4.686183857731521
+      },
+      "projection_cache": {
+        "edges": 9388,
+        "fill_seconds": 0.9045767122879624,
+        "hit_faster_than_fill": true,
+        "hit_seconds": 0.001256858929991722,
+        "result_sha256": "0440e1c8a27f67692350837bca320d31a6e17ad9142aaad7bca502b903089bf5"
+      },
+      "reasoner": {
+        "configuration": null,
+        "consumer": null,
+        "consumer_compile_seconds": null,
+        "encoded_view_publication_seconds": null,
+        "measured": false,
+        "provenance": {
+          "backend": {
+            "effective": "structural",
+            "fallback_reason": null,
+            "implementation_version": "0.2.0",
+            "requested": "auto"
+          },
+          "core": {
+            "adapter_protocol_version": 1,
+            "api_version": [
+              0,
+              2
+            ],
+            "encoded_contract": {
+              "descriptor_sha256": "c51d0eb7ecf6f29ad3495fe7c40a2ea6741cf03a7cf194d51417bb810df90f51",
+              "schema_name": "pyowl-core/structural-columns",
+              "schema_version": 2
+            },
+            "model_schema_version": 2,
+            "package_version": "0.2.0",
+            "wire_format_version": [
+              1,
+              2
+            ]
+          },
+          "failure_reason": null,
+          "fallback_reason": null,
+          "fingerprints": {
+            "logical": "sha256:2:dfd4cc74f0cdf1370ca247c8ef7932139274fca6d3c4680a6d10cea6b8ad1556",
+            "signature": "sha256:2:f62578ab4bb8597f177bd0d20257ecd85bdf4a7df1cae838cc1fc747b4fc5134",
+            "structural": "sha256:2:7a11d07b9450f083ecd3de1f94d94ad7c75cb7470e52565ada4debecb457b7c4"
+          },
+          "mmap_verified": false,
+          "options": {
+            "fallback": "error",
+            "timeout_seconds": null,
+            "worker_wire": false,
+            "workers": 0
+          },
+          "owl_parse_count": null,
+          "selection": {
+            "effective": "asserted",
+            "package_version": "0.2.0",
+            "requested": "asserted"
+          },
+          "timed_out": false,
+          "verified_wire": false
+        },
+        "requested": null,
+        "requested_backend": null,
+        "results": null,
+        "worker_wire": false
+      },
+      "rss": {
+        "before_bytes": 891408384,
+        "incremental_peak_bytes": 0,
+        "peak_bytes": 891408384
+      },
+      "second_ontology_representation": false,
+      "wall_seconds": 8.04142093192786
+    }
+  ],
+  "ncit_doid_acceptance": {
+    "expected_projection_edges": {
+      "source": 42103,
+      "target": 9388
+    },
+    "historical_ncit_delta": {
+      "added": {
+        "edges": 762,
+        "rule": "RB-019"
+      },
+      "classification_evidence": "benchmarks/evidence/wp_m_ncit_doid_candidate.json",
+      "removed": {
+        "edges": 8,
+        "rule": "RB-009"
+      },
+      "residual": {
+        "edges": 0
+      }
+    },
+    "inputs_match_frozen_baseline": true,
+    "invariants": {
+      "cache_semantics_identical": true,
+      "encoded_native_consumers": true,
+      "fingerprints_and_axioms_unchanged": true,
+      "no_second_ontology_representation": true,
+      "single_load_and_owner": true,
+      "zero_forbidden_consumer_work": true
+    },
+    "performance_claim": false,
+    "profile": "mowl-d993536-v1",
+    "status": "passed"
+  },
+  "schema_version": 5
+}

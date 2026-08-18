@@ -1,110 +1,168 @@
 {
   "schema": "exact-om.legacy-compliance-closure/1",
-  "status": "pending",
+  "status": "passed",
   "exact": {
-    "commit": null,
+    "commit": "c694419932ff1df76b7614df4881cf17aef2838a",
     "commit_role": "implementation-candidate",
     "version": "2.1.0"
   },
   "candidate": {
-    "implementation_commit": null,
-    "source_date_epoch": null
+    "implementation_commit": "c694419932ff1df76b7614df4881cf17aef2838a",
+    "source_date_epoch": 1787046681
   },
-  "tested_python_versions": [],
+  "tested_python_versions": [
+    "3.10",
+    "3.11",
+    "3.12"
+  ],
   "artifacts": {
-    "lock_sha256": null,
-    "ncit_doid_evidence_sha256": null,
+    "lock_sha256": "8e2e7b64d6604bbbb6c42932a5c7df1ea88f34e31660d72ef67919244f5bd703",
+    "ncit_doid_evidence_sha256": "7ef83ffd00eaf7bdc645a57ae0c7f21c1ab57cf66f91ba056140b0364cdccf18",
     "sdist": {
-      "filename": null,
-      "sha256": null
+      "filename": "exact_om-2.1.0.tar.gz",
+      "sha256": "cab89c93adf41029341e2947bd4a3de801c8f3ba050b29f7ff24eacef5543ad9"
     },
     "wheel": {
-      "filename": null,
-      "sha256": null
+      "filename": "exact_om-2.1.0-py3-none-any.whl",
+      "sha256": "e8e905f4a0c502329949e26c67d15b448a8f9ca5d115508740def96a53df0a32"
     }
   },
   "preserved_feature_matrix": {
     "foundations_and_packaging": {
-      "status": "pending",
-      "evidence": []
+      "status": "passed",
+      "evidence": [
+        "quality:python-3.10-3.12",
+        "artifact:wheel-sdist-smoke-matrix"
+      ]
     },
     "java_free_ontology_backend": {
-      "status": "pending",
-      "evidence": []
+      "status": "passed",
+      "evidence": [
+        "quality:java-private-boundary",
+        "artifact:base-native-reasoning-smoke"
+      ]
     },
     "timing_ledger": {
-      "status": "pending",
-      "evidence": []
+      "status": "passed",
+      "evidence": [
+        "pytest:tests/timing_ledger_test.py",
+        "pytest:tests/timing_action_integration_test.py"
+      ]
     },
     "module_and_import_architecture": {
-      "status": "pending",
-      "evidence": []
+      "status": "passed",
+      "evidence": [
+        "quality:lint-imports",
+        "quality:java-private-boundary"
+      ]
     },
     "evaluation": {
-      "status": "pending",
-      "evidence": []
+      "status": "passed",
+      "evidence": [
+        "pytest:tests/bioml_evaluator_test.py",
+        "artifact:bioml-eval-smoke"
+      ]
     },
     "entity_kinds": {
-      "status": "pending",
-      "evidence": []
+      "status": "passed",
+      "evidence": [
+        "pytest:tests/entity_kinds_test.py",
+        "pytest:tests/entity_kinds_pipeline_test.py"
+      ]
     },
     "formats_and_kg_sources": {
-      "status": "pending",
-      "evidence": []
+      "status": "passed",
+      "evidence": [
+        "pytest:tests/io_sources_test.py",
+        "pytest:tests/io_writers_test.py"
+      ]
     },
     "documentation": {
-      "status": "pending",
-      "evidence": []
+      "status": "passed",
+      "evidence": [
+        "docs:python-3.10-3.12-strict-linkcheck"
+      ]
     },
     "dataset_and_track_retrieval": {
-      "status": "pending",
-      "evidence": []
+      "status": "passed",
+      "evidence": [
+        "pytest:tests/tracks_test.py",
+        "pytest:tests/tracks_integration_test.py"
+      ]
     },
     "config_schema_v2": {
-      "status": "pending",
-      "evidence": []
+      "status": "passed",
+      "evidence": [
+        "pytest:tests/config_v2_test.py",
+        "pytest:tests/config_loading_test.py"
+      ]
     },
     "exact_inspect": {
-      "status": "pending",
-      "evidence": []
+      "status": "passed",
+      "evidence": [
+        "pytest:tests/exact_inspect_test.py",
+        "artifact:viz-smoke"
+      ]
     },
     "run_artifacts": {
-      "status": "pending",
-      "evidence": []
+      "status": "passed",
+      "evidence": [
+        "pytest:tests/run_artifacts_test.py",
+        "pytest:tests/run_artifacts_acceptance_test.py"
+      ]
     },
     "shared_owl_consumers": {
-      "status": "pending",
-      "evidence": []
+      "status": "passed",
+      "evidence": [
+        "pytest:tests/shared_owl_stack_test.py",
+        "pytest:tests/ontology_compatibility_test.py",
+        "acceptance:ncit-doid"
+      ]
     }
   },
   "audit_defects": {
     "formatting": {
-      "status": "pending",
-      "evidence": []
+      "status": "passed",
+      "evidence": [
+        "quality:black-isort-python-3.10-3.12"
+      ]
     },
     "typing": {
-      "status": "pending",
-      "evidence": []
+      "status": "passed",
+      "evidence": [
+        "quality:mypy-python-3.10-3.12"
+      ]
     },
     "pytest_collection": {
-      "status": "pending",
-      "evidence": []
+      "status": "passed",
+      "evidence": [
+        "pytest:hermetic-python-3.10-3.12"
+      ]
     },
     "exact_inspect_test_isolation": {
-      "status": "pending",
-      "evidence": []
+      "status": "passed",
+      "evidence": [
+        "pytest:tests/exact_inspect_test.py"
+      ]
     },
     "reasoner_cleanup_test": {
-      "status": "pending",
-      "evidence": []
+      "status": "passed",
+      "evidence": [
+        "pytest:tests/reasoner_adapters_test.py"
+      ]
     },
     "distribution_coverage": {
-      "status": "pending",
-      "evidence": []
+      "status": "passed",
+      "evidence": [
+        "artifact:wheel-sdist-smoke-matrix"
+      ]
     },
     "core_0_2_migration": {
-      "status": "pending",
-      "evidence": []
+      "status": "passed",
+      "evidence": [
+        "pytest:ontology-schema-2-compatibility",
+        "acceptance:ncit-doid"
+      ]
     }
   },
   "superseded_requirements": [
