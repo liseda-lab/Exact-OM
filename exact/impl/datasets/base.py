@@ -7,7 +7,9 @@ import os
 import warnings
 from abc import abstractmethod
 from ast import literal_eval
+from collections import defaultdict
 from contextlib import nullcontext
+from copy import deepcopy
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple
 
@@ -17,10 +19,16 @@ import torch
 from sentence_transformers import SentenceTransformer
 from torch import Tensor
 
+try:
+    from sentence_transformers import CrossEncoder
+except ImportError:  # Compatibility with minimal/runtime-specific installations.
+    CrossEncoder = None  # type: ignore[misc, assignment]
+
 from exact.core.contracts.dataset import IDataset
 from exact.core.contracts.knowledge import KnowledgeSource
 from exact.core.entities.configs.dataset import DatasetMask
 from exact.core.entities.kinds import (
+    MATCHABLE_ENTITY_KINDS,
     EntityKind,
     build_entity_kind_index,
     infer_entity_kind,
@@ -28,19 +36,26 @@ from exact.core.entities.kinds import (
 )
 from exact.core.entities.ontology import OntologyGraph
 from exact.impl.datasets.options import candidate_config, mapping_options
+from exact.impl.retrieval import (
+    LocalRetrievalArtifact,
+    resolve_local_retrieval_artifact,
+)
 from exact.io.sources import resolve as resolve_source
 from exact.ontology.projection import ProjectorSettings, projector_cache_identity
 from exact.ontology.reasoning import reasoner_cache_identity
 from exact.runs.layout import RunLayout
 from exact.utils.candidate_generation import (
+    adaptive_candidate_count,
     candidate_annotation_priority,
     candidate_token_key,
     lexical_candidate_pair_scores,
     make_candidate_labels,
+    normalize_candidate_text,
     rank_channel_scores,
     select_candidate_annotation_literals,
 )
 from exact.utils.data import read_table
+from exact.utils.provenance import file_provenance
 
 DataFrame = pd.DataFrame
 _DATASET_CACHE_SCHEMA_VERSION = 4
@@ -124,6 +139,11 @@ class BaseAlignmentDataset(IDataset):
         self._target_entity_kind_index: Dict[str, EntityKind] = {}
         self._unknown_kind_warnings: set[Tuple[str, str]] = set()
         self._candidate_pool_sizes: Dict[str, Dict[str, int]] = {}
+        self._candidate_pool_manifest: Dict[str, Any] = {}
+        self._candidate_pool_manifest_path = self.output_path / "candidate_pool_manifest.json"
+        self._active_candidate_config: Dict[str, Any] = {}
+        self._retrieval_artifacts: Dict[str, LocalRetrievalArtifact] = {}
+        self._source_restriction_active = False
 
         super().__init__(logger=kwargs.get("logger"))
 
@@ -231,6 +251,37 @@ class BaseAlignmentDataset(IDataset):
         """Return defensive per-kind retrieval pool statistics."""
 
         return {kind: dict(values) for kind, values in self._candidate_pool_sizes.items()}
+
+    @property
+    def candidate_pool_manifest(self) -> Dict[str, Any]:
+        """Return the gold-free candidate-pool manifest, loading it after cache hits."""
+
+        if not self._candidate_pool_manifest and self._candidate_pool_manifest_path.is_file():
+            try:
+                value = json.loads(self._candidate_pool_manifest_path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                value = {}
+            if isinstance(value, dict):
+                self._candidate_pool_manifest = value
+        return deepcopy(self._candidate_pool_manifest)
+
+    @property
+    def candidate_pool_fingerprint(self) -> Optional[str]:
+        """Return the actual ranked-pool fingerprint used by downstream artifacts."""
+
+        value = self.candidate_pool_manifest.get("fingerprint")
+        return str(value) if isinstance(value, str) and value else None
+
+    def _persisted_candidate_pool_fingerprint(self) -> Optional[str]:
+        if not self._candidate_pool_manifest_path.is_file():
+            return None
+        try:
+            value = json.loads(self._candidate_pool_manifest_path.read_text(encoding="utf-8")).get(
+                "fingerprint"
+            )
+        except (OSError, json.JSONDecodeError, AttributeError):
+            return None
+        return str(value) if isinstance(value, str) and value else None
 
     @property
     def reference(self) -> DataFrame:
@@ -641,7 +692,7 @@ class BaseAlignmentDataset(IDataset):
             "filter_ignored_alignment_classes": self.filter_ignored_alignment_classes,
             "cardinality": self._cardinality,
             "candidate_share_k": self._candidate_share_k,
-            "candidate_generation_version": 5,
+            "candidate_generation_version": 6,
             "exact_prefilter_materialization_version": 2,
             "ignored_alignment_filter_version": 1,
             "ontology_backend_version": _ONTOLOGY_BACKEND_VERSION,
@@ -652,10 +703,45 @@ class BaseAlignmentDataset(IDataset):
             "entity_kinds": [kind.value for kind in self.entity_kinds],
             "entity_kind_schema_version": 1,
             "candidate_generation_params": self._candidate_generation_params,
+            "retrieval_artifacts": {
+                name: {
+                    "kind": artifact.kind,
+                    "sha256": artifact.sha256,
+                }
+                for name, artifact in self._configured_retrieval_artifacts().items()
+            },
             "only_taxonomy_hint": self._only_taxonomy_hint,
             "reasoner": self._reasoner_name,
             "reasoner_identity": reasoner_cache_identity(self._reasoner_name),
         }
+
+    def _configured_retrieval_artifacts(self) -> Dict[str, LocalRetrievalArtifact]:
+        """Resolve enabled fitted models locally and bind cache identity to their bytes."""
+
+        if self._retrieval_artifacts:
+            return dict(self._retrieval_artifacts)
+
+        finetune = mapping_options(
+            self._candidate_generation_params.get("encoder_finetune"),
+            "candidate encoder_finetune",
+        )
+        if str(finetune.get("mode", "off")).lower() == "contrastive":
+            self._retrieval_artifacts["encoder"] = resolve_local_retrieval_artifact(
+                finetune.get("artifact"),
+                expected_kind="contrastive_encoder",
+                negative_policy=str(finetune.get("negative_policy", "complete_reference")),
+            )
+
+        cross_encoder = mapping_options(
+            self._candidate_generation_params.get("cross_encoder"),
+            "candidate cross_encoder",
+        )
+        if str(cross_encoder.get("mode", "off")).lower() == "on":
+            self._retrieval_artifacts["cross_encoder"] = resolve_local_retrieval_artifact(
+                cross_encoder.get("artifact"),
+                expected_kind="cross_encoder",
+            )
+        return dict(self._retrieval_artifacts)
 
     @property
     def cache_fingerprint(self) -> Optional[str]:
@@ -677,6 +763,7 @@ class BaseAlignmentDataset(IDataset):
             "cache_schema_version": _DATASET_CACHE_SCHEMA_VERSION,
             "ontology_backend_version": _ONTOLOGY_BACKEND_VERSION,
             "fingerprint": self.cache_fingerprint,
+            "candidate_pool_fingerprint": self.candidate_pool_fingerprint,
             "dataset_signature": self.dataset_signature,
             "component": self.__class__.__name__,
         }
@@ -694,10 +781,39 @@ class BaseAlignmentDataset(IDataset):
         retrieval_strategy: str = "hybrid",
         fusion: Optional[Mapping[str, Any]] = None,
         aliases: Optional[Mapping[str, Any]] = None,
+        adaptive_k: Optional[Mapping[str, Any]] = None,
+        encoder_finetune: Optional[Mapping[str, Any]] = None,
+        cross_encoder: Optional[Mapping[str, Any]] = None,
+        multi_view: Optional[Mapping[str, Any]] = None,
         device: Optional[torch.device] = None,
     ) -> None:
 
         if file_path is not None:
+            fusion_config = candidate_config(self._candidate_generation_params, "fusion", fusion)
+            adaptive_config = candidate_config(
+                self._candidate_generation_params, "adaptive_k", adaptive_k
+            )
+            finetune_config = candidate_config(
+                self._candidate_generation_params, "encoder_finetune", encoder_finetune
+            )
+            cross_encoder_config = candidate_config(
+                self._candidate_generation_params, "cross_encoder", cross_encoder
+            )
+            multi_view_config = candidate_config(
+                self._candidate_generation_params, "multi_view", multi_view
+            )
+            active_transform = (
+                str(fusion_config.get("mode", "max")).lower() != "max"
+                or bool(adaptive_config.get("enabled", False))
+                or str(finetune_config.get("mode", "off")).lower() != "off"
+                or str(cross_encoder_config.get("mode", "off")).lower() != "off"
+                or str(multi_view_config.get("mode", "labels")).lower() != "labels"
+            )
+            if active_transform:
+                raise ValueError(
+                    "Retrieval experiment controls require generated candidates; "
+                    "they cannot be applied to an opaque provided pool"
+                )
             if not file_path.exists():
                 self.log(f"Candidates file not found at {file_path}", level="error")
                 raise FileNotFoundError(f"Candidates file not found at {file_path}")
@@ -726,6 +842,19 @@ class BaseAlignmentDataset(IDataset):
             )
             self._candidates = self._filter_candidates_ignored_classes(self._candidates)
             self._annotate_candidate_similarity_stats()
+            self._active_candidate_config = {
+                "origin": "provided",
+                "path": str(file_path.resolve()),
+                "fusion": fusion_config,
+                "adaptive_k": adaptive_config,
+                "encoder_finetune": finetune_config,
+                "cross_encoder": cross_encoder_config,
+                "multi_view": multi_view_config,
+            }
+            self._refresh_candidate_pool_manifest(
+                origin="provided",
+                candidate_file=file_path,
+            )
             self.log("#Loaded Candidates...", level="info")
 
             if self.filter_exact_matches:
@@ -748,6 +877,10 @@ class BaseAlignmentDataset(IDataset):
                 retrieval_strategy=retrieval_strategy,
                 fusion=fusion,
                 aliases=aliases,
+                adaptive_k=adaptive_k,
+                encoder_finetune=encoder_finetune,
+                cross_encoder=cross_encoder,
+                multi_view=multi_view,
                 device=device,
             )
 
@@ -761,6 +894,10 @@ class BaseAlignmentDataset(IDataset):
         retrieval_strategy: str = "hybrid",
         fusion: Optional[Mapping[str, Any]] = None,
         aliases: Optional[Mapping[str, Any]] = None,
+        adaptive_k: Optional[Mapping[str, Any]] = None,
+        encoder_finetune: Optional[Mapping[str, Any]] = None,
+        cross_encoder: Optional[Mapping[str, Any]] = None,
+        multi_view: Optional[Mapping[str, Any]] = None,
         device: Optional[torch.device] = None,
     ) -> None:
         """
@@ -779,13 +916,86 @@ class BaseAlignmentDataset(IDataset):
 
         fusion_config = candidate_config(self._candidate_generation_params, "fusion", fusion)
         alias_config = candidate_config(self._candidate_generation_params, "aliases", aliases)
+        adaptive_config = candidate_config(
+            self._candidate_generation_params, "adaptive_k", adaptive_k
+        )
+        finetune_config = candidate_config(
+            self._candidate_generation_params, "encoder_finetune", encoder_finetune
+        )
+        cross_encoder_config = candidate_config(
+            self._candidate_generation_params, "cross_encoder", cross_encoder
+        )
+        multi_view_config = candidate_config(
+            self._candidate_generation_params, "multi_view", multi_view
+        )
+        self._candidate_generation_params.update(
+            {
+                "retrieval_strategy": strategy,
+                "lexical_encoder_name": lexical_encoder_name,
+                "encode_batch_size": int(encode_batch_size),
+                "search_batch_size": int(search_batch_size),
+                "top_k": int(top_k),
+                "use_amp": bool(use_amp),
+            }
+        )
+        self._active_candidate_config = {
+            key: self._candidate_generation_params.get(key)
+            for key in (
+                "retrieval_strategy",
+                "lexical_encoder_name",
+                "encode_batch_size",
+                "search_batch_size",
+                "top_k",
+                "use_amp",
+                "fusion",
+                "aliases",
+                "adaptive_k",
+                "encoder_finetune",
+                "cross_encoder",
+                "multi_view",
+            )
+        }
+        self._retrieval_artifacts = {}
+        artifacts = self._configured_retrieval_artifacts()
+
+        adaptive_enabled = bool(adaptive_config.get("enabled", False))
+        final_pool_cap = (
+            int(adaptive_config.get("k_max", top_k)) if adaptive_enabled else int(top_k)
+        )
+        final_pool_min = (
+            int(adaptive_config.get("k_min", top_k)) if adaptive_enabled else int(top_k)
+        )
+        if adaptive_enabled and (final_pool_min < 1 or final_pool_cap < final_pool_min):
+            raise ValueError("adaptive_k requires 1 <= k_min <= k_max")
+
+        finetune_mode = str(finetune_config.get("mode", "off")).lower()
+        if finetune_mode not in {"off", "contrastive"}:
+            raise ValueError(f"Unsupported encoder_finetune mode: {finetune_mode!r}")
+        encoder_name = lexical_encoder_name
+        if finetune_mode == "contrastive":
+            encoder_name = str(artifacts["encoder"].model_path)
+        if encoder_name is None or not str(encoder_name).strip():
+            raise ValueError("Candidate retrieval requires a configured encoder")
+
+        cross_encoder_mode = str(cross_encoder_config.get("mode", "off")).lower()
+        if cross_encoder_mode not in {"off", "on"}:
+            raise ValueError(f"Unsupported candidate cross_encoder mode: {cross_encoder_mode!r}")
+        cross_encoder_top_k = int(cross_encoder_config.get("top_k", top_k))
+        if cross_encoder_mode == "on" and cross_encoder_top_k < final_pool_cap:
+            raise ValueError(
+                "cross_encoder.top_k must be at least the fixed/adaptive candidate-pool cap"
+            )
+
+        multi_view_mode = str(multi_view_config.get("mode", "labels")).lower()
+        if multi_view_mode not in {"labels", "labels_types", "labels_relations"}:
+            raise ValueError(f"Unsupported candidate multi_view mode: {multi_view_mode!r}")
 
         dev = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.log(
             f"#Candidate generation strategy={strategy} via torch top-k cosine…",
             level="info",
         )
-        self.log(f"  Encoder: {lexical_encoder_name}", level="debug")
+        self.log(f"  Encoder: {encoder_name}", level="debug")
         self.log(f"  Device:  {dev}", level="debug")
 
         pools: List[Tuple[EntityKind, List[str], List[str]]] = []
@@ -854,9 +1064,20 @@ class BaseAlignmentDataset(IDataset):
                 ]
             )
             self._candidates_generated = True
+            self._refresh_candidate_pool_manifest(origin="generated")
             return
 
-        st = SentenceTransformer(lexical_encoder_name, device=str(dev))
+        st = SentenceTransformer(str(encoder_name), device=str(dev))
+        cross_encoder_model = None
+        if cross_encoder_mode == "on":
+            if CrossEncoder is None:
+                raise ImportError(
+                    "cross-encoder reranking requires sentence_transformers.CrossEncoder"
+                )
+            cross_encoder_model = CrossEncoder(
+                str(artifacts["cross_encoder"].model_path),
+                device=str(dev),
+            )
         all_rows: List[Dict[str, object]] = []
         for kind, src_iris, tgt_iris in pools:
             if not src_iris or not tgt_iris:
@@ -875,31 +1096,43 @@ class BaseAlignmentDataset(IDataset):
                     device=dev,
                     fusion_config=fusion_config,
                     alias_config=alias_config,
+                    adaptive_config=adaptive_config,
+                    cross_encoder_config=cross_encoder_config,
+                    cross_encoder_model=cross_encoder_model,
+                    multi_view_mode=multi_view_mode,
                 )
             )
 
         self.log("  Assembling candidate DataFrame…", level="debug")
+        candidate_columns = [
+            "Src",
+            "Tgt",
+            "Label",
+            "cand_sim",
+            "cand_sim_semantic",
+            "cand_sim_lexical",
+            "cand_channels",
+        ]
+        if cross_encoder_mode == "on":
+            candidate_columns.extend(
+                [
+                    "cand_sim_retrieval",
+                    "cand_sim_cross_encoder",
+                ]
+            )
+        candidate_columns.extend(["SrcKind", "TgtKind"])
         cand_df = pd.DataFrame(
             all_rows,
-            columns=[
-                "Src",
-                "Tgt",
-                "Label",
-                "cand_sim",
-                "cand_sim_semantic",
-                "cand_sim_lexical",
-                "cand_channels",
-                "SrcKind",
-                "TgtKind",
-            ],
+            columns=candidate_columns,
         )
 
         self._candidates = self._filter_candidates_ignored_classes(cand_df)
         self._annotate_candidate_similarity_stats()
         self._candidates_generated = True
+        self._refresh_candidate_pool_manifest(origin="generated")
         self.log(
             f"#Candidate generation complete: {len(self._candidates)} rows "
-            f"(Top-{top_k} per source and kind).",
+            f"(pool cap {final_pool_cap} per source and kind).",
             level="debug",
         )
 
@@ -918,9 +1151,23 @@ class BaseAlignmentDataset(IDataset):
         device: torch.device,
         fusion_config: Mapping[str, Any],
         alias_config: Mapping[str, Any],
+        adaptive_config: Mapping[str, Any],
+        cross_encoder_config: Mapping[str, Any],
+        cross_encoder_model: Any,
+        multi_view_mode: str,
     ) -> List[Dict[str, object]]:
         """Build one isolated semantic/lexical retrieval index for a kind."""
 
+        adaptive_enabled = bool(adaptive_config.get("enabled", False))
+        final_pool_cap = (
+            int(adaptive_config.get("k_max", top_k)) if adaptive_enabled else int(top_k)
+        )
+        cross_encoder_enabled = str(cross_encoder_config.get("mode", "off")).lower() == "on"
+        initial_pool_k = (
+            int(cross_encoder_config.get("top_k", final_pool_cap))
+            if cross_encoder_enabled
+            else final_pool_cap
+        )
         label_scope = "primary labels" if strategy == "primary_label" else "all labels"
         self.log(f"  Extracting {label_scope} for {kind.value} entities…", level="debug")
         if strategy == "primary_label":
@@ -932,7 +1179,7 @@ class BaseAlignmentDataset(IDataset):
             }
             src_lexical_texts_by_iri = src_labels_by_iri
             tgt_lexical_texts_by_iri = tgt_labels_by_iri
-            channel_k = int(top_k)
+            channel_k = initial_pool_k
         else:
             src_labels_by_iri = {iri: self.source_graph.get_labels(iri) for iri in src_iris}
             tgt_labels_by_iri = {iri: self.target_graph.get_labels(iri) for iri in tgt_iris}
@@ -944,7 +1191,27 @@ class BaseAlignmentDataset(IDataset):
                 iri: self._candidate_texts_for_iri(self.target_graph, iri, "tgt", alias_config)
                 for iri in tgt_iris
             }
-            channel_k = max(int(top_k) * 3, 30)
+            channel_k = max(initial_pool_k * 3, 30)
+
+        if kind == EntityKind.INDIVIDUAL and multi_view_mode != "labels":
+            src_views = self._candidate_multiview_texts_by_iri(
+                src_iris,
+                side="src",
+                mode=multi_view_mode,
+            )
+            tgt_views = self._candidate_multiview_texts_by_iri(
+                tgt_iris,
+                side="tgt",
+                mode=multi_view_mode,
+            )
+            src_lexical_texts_by_iri = {
+                iri: list(src_lexical_texts_by_iri.get(iri, ())) + src_views.get(iri, [])
+                for iri in src_iris
+            }
+            tgt_lexical_texts_by_iri = {
+                iri: list(tgt_lexical_texts_by_iri.get(iri, ())) + tgt_views.get(iri, [])
+                for iri in tgt_iris
+            }
 
         src_records = make_candidate_labels(src_iris, src_labels_by_iri, kind=kind)
         tgt_records = make_candidate_labels(tgt_iris, tgt_labels_by_iri, kind=kind)
@@ -987,13 +1254,421 @@ class BaseAlignmentDataset(IDataset):
             sources=[str(iri) for iri in src_iris],
             semantic_scores=semantic_scores,
             lexical_scores=lexical_scores,
-            top_k=int(top_k),
+            top_k=initial_pool_k if cross_encoder_enabled else int(top_k),
             fusion_config=fusion_config,
+            adaptive_config=None if cross_encoder_enabled else adaptive_config,
         )
+        if cross_encoder_enabled:
+            rows = self._rerank_with_cross_encoder(
+                rows,
+                sources=[str(iri) for iri in src_iris],
+                model=cross_encoder_model,
+                top_k=int(top_k),
+                adaptive_config=adaptive_config,
+                encode_batch_size=encode_batch_size,
+            )
         for row in rows:
             row["SrcKind"] = kind.value
             row["TgtKind"] = kind.value
+        self._candidate_pool_sizes[kind.value].update(
+            {
+                "candidate_rows": len(rows),
+                "covered_sources": len({str(row["Src"]) for row in rows}),
+            }
+        )
         return rows
+
+    def _candidate_multiview_texts_by_iri(
+        self,
+        iris: Sequence[str],
+        *,
+        side: str,
+        mode: str,
+    ) -> Dict[str, List[str]]:
+        """Build reference-free retrieval views for individual entities only."""
+
+        source = self.source if side == "src" else self.target
+        if mode == "labels":
+            return {str(iri): [] for iri in iris}
+
+        if mode == "labels_types":
+            result: Dict[str, List[str]] = {}
+            for iri in iris:
+                type_iris: set[str] = set()
+                for type_iri in source.direct_parents(str(iri), EntityKind.INDIVIDUAL):
+                    type_iris.add(str(type_iri))
+                    type_iris.update(
+                        str(parent)
+                        for parent in source.direct_parents(str(type_iri), EntityKind.CLASS)
+                    )
+                result[str(iri)] = [
+                    f"type {label}"
+                    for type_iri in sorted(type_iris)
+                    for label in source.labels(type_iri)
+                    if str(label).strip()
+                ]
+            return result
+
+        if mode != "labels_relations":
+            raise ValueError(f"Unsupported candidate multi_view mode: {mode!r}")
+
+        requested = {str(iri) for iri in iris}
+        kind_index = (
+            self._source_entity_kind_index if side == "src" else self._target_entity_kind_index
+        )
+        texts: Dict[str, set[str]] = {iri: set() for iri in requested}
+        for edge in source.projection_edges(method="owl2vecstar", include_literals=False):
+            src = str(edge.src)
+            dst = str(edge.dst)
+            if (
+                kind_index.get(src) != EntityKind.INDIVIDUAL
+                or kind_index.get(dst) != EntityKind.INDIVIDUAL
+            ):
+                continue
+            relation_labels = source.labels(str(edge.rel))
+            if src in requested:
+                for relation_label in relation_labels:
+                    for neighbor_label in source.labels(dst):
+                        texts[src].add(f"out {relation_label} {neighbor_label}")
+            if dst in requested:
+                for relation_label in relation_labels:
+                    for neighbor_label in source.labels(src):
+                        texts[dst].add(f"in {relation_label} {neighbor_label}")
+
+        cap = max(1, int(getattr(self, "max_object_triples", 48)))
+        return {
+            iri: sorted(values, key=lambda value: (normalize_candidate_text(value), value))[:cap]
+            for iri, values in texts.items()
+        }
+
+    def _rerank_with_cross_encoder(
+        self,
+        rows: Sequence[Mapping[str, object]],
+        *,
+        sources: Sequence[str],
+        model: Any,
+        top_k: int,
+        adaptive_config: Mapping[str, Any],
+        encode_batch_size: int,
+    ) -> List[Dict[str, object]]:
+        """Rerank a bounded fused pool with a validated local cross-encoder."""
+
+        if not rows:
+            return []
+        if model is None:
+            raise RuntimeError("cross_encoder mode is on but no local model was loaded")
+
+        pairs = [
+            (
+                self.source_graph.get_primary_label(str(row["Src"])),
+                self.target_graph.get_primary_label(str(row["Tgt"])),
+            )
+            for row in rows
+        ]
+        predictions = np.asarray(
+            model.predict(
+                pairs,
+                batch_size=int(encode_batch_size),
+                show_progress_bar=False,
+                convert_to_numpy=True,
+            )
+        )
+        if predictions.ndim == 2 and predictions.shape[1] == 1:
+            predictions = predictions[:, 0]
+        if predictions.ndim != 1 or predictions.shape[0] != len(rows):
+            raise ValueError(
+                "Cross-encoder artifact must emit exactly one scalar score per candidate pair"
+            )
+        if not np.isfinite(predictions).all():
+            raise ValueError("Cross-encoder artifact emitted a non-finite candidate score")
+
+        by_source: Dict[str, List[Dict[str, object]]] = defaultdict(list)
+        for raw_row, prediction in zip(rows, predictions):
+            row = dict(raw_row)
+            row["cand_sim_retrieval"] = float(row["cand_sim"])
+            row["cand_sim_cross_encoder"] = float(prediction)
+            row["cand_sim"] = float(prediction)
+            channels = str(row.get("cand_channels", "") or "")
+            row["cand_channels"] = f"{channels}|cross_encoder" if channels else "cross_encoder"
+            by_source[str(row["Src"])].append(row)
+
+        reranked: List[Dict[str, object]] = []
+        for src in sources:
+            candidates = by_source.get(str(src), [])
+            candidates.sort(
+                key=lambda row: (
+                    -float(row["cand_sim_cross_encoder"]),
+                    -float(row["cand_sim_retrieval"]),
+                    str(row["Tgt"]),
+                )
+            )
+            limit = adaptive_candidate_count(
+                [float(row["cand_sim_cross_encoder"]) for row in candidates],
+                top_k=top_k,
+                adaptive_config=adaptive_config,
+            )
+            reranked.extend(candidates[:limit])
+        return reranked
+
+    def _refresh_candidate_pool_manifest(
+        self,
+        *,
+        origin: str,
+        candidate_file: Optional[Path] = None,
+        frame: Optional[DataFrame] = None,
+        persist: bool = True,
+    ) -> None:
+        """Build and atomically persist a gold-free ranked-pool manifest."""
+
+        candidate_frame = self._candidates if frame is None else frame
+        if candidate_frame is None:
+            return
+
+        frame = candidate_frame
+        kind_names = list(dict.fromkeys(kind.value for kind in self.entity_kinds))
+        if "SrcKind" in frame.columns:
+            for value in frame["SrcKind"].dropna().astype(str):
+                if value not in kind_names:
+                    kind_names.append(value)
+
+        per_kind: Dict[str, Dict[str, Any]] = {}
+        all_counts: List[int] = []
+        for kind_name in kind_names:
+            if "SrcKind" in frame.columns:
+                kind_frame = frame[frame["SrcKind"].astype(str) == kind_name]
+            else:
+                kind_frame = frame
+            pool_meta = self._candidate_pool_sizes.get(kind_name, {})
+            try:
+                kind = EntityKind(kind_name)
+            except ValueError:
+                kind = None
+            expected_sources = int(pool_meta.get("source_entities", 0))
+            if expected_sources <= 0 and kind is not None and self.source is not None:
+                expected_sources = len(self.source.entities(kind))
+            kind_payload, counts = self._candidate_kind_manifest(
+                kind_frame,
+                expected_sources=expected_sources,
+            )
+            per_kind[kind_name] = kind_payload
+            all_counts.extend(counts)
+
+        artifacts = self._configured_retrieval_artifacts()
+        encoder_identifier = self._active_candidate_config.get("lexical_encoder_name")
+        encoder_record: Dict[str, Any] = {
+            "identifier": str(encoder_identifier) if encoder_identifier is not None else None,
+            "identifier_sha256": (
+                hashlib.sha256(str(encoder_identifier).encode("utf-8")).hexdigest()
+                if encoder_identifier is not None
+                else None
+            ),
+        }
+        if "encoder" in artifacts:
+            encoder_record["artifact"] = artifacts["encoder"].provenance()
+
+        inputs: Dict[str, Any] = {
+            "source": self._candidate_input_provenance(self._source_path),
+            "target": self._candidate_input_provenance(self._target_path),
+            "data_lock": None,
+        }
+        if candidate_file is not None:
+            inputs["candidate_file"] = self._candidate_input_provenance(candidate_file)
+
+        ontology_inventory = {
+            "per_kind": {
+                kind.value: {
+                    "source_entities": len(self.source.entities(kind)),
+                    "target_entities": len(self.target.entities(kind)),
+                }
+                for kind in MATCHABLE_ENTITY_KINDS
+            }
+        }
+
+        summary = self._candidate_count_summary(all_counts)
+        payload: Dict[str, Any] = {
+            "schema_version": 1,
+            "origin": str(origin),
+            "retrieval_config": self._json_safe(self._active_candidate_config),
+            "models": {
+                "encoder": encoder_record,
+                "cross_encoder": (
+                    artifacts["cross_encoder"].provenance()
+                    if "cross_encoder" in artifacts
+                    else None
+                ),
+            },
+            "inputs": inputs,
+            "ontology_inventory": ontology_inventory,
+            "per_kind": per_kind,
+            "gold_free_summary": {
+                **summary,
+                "candidate_pairs": int(len(frame)),
+                "covered_sources": (
+                    int(frame["Src"].astype(str).nunique()) if "Src" in frame.columns else 0
+                ),
+            },
+        }
+        fingerprint_config = deepcopy(self._active_candidate_config)
+        fingerprint_config.pop("path", None)
+        for config_name, artifact_name in (
+            ("encoder_finetune", "encoder"),
+            ("cross_encoder", "cross_encoder"),
+        ):
+            config_value = fingerprint_config.get(config_name)
+            if isinstance(config_value, Mapping) and artifact_name in artifacts:
+                fingerprint_config[config_name] = {
+                    **dict(config_value),
+                    "artifact": artifacts[artifact_name].sha256,
+                }
+        fingerprint_basis = {
+            "schema_version": payload["schema_version"],
+            "origin": payload["origin"],
+            "retrieval_config": self._json_safe(fingerprint_config),
+            "model_hashes": {name: artifact.sha256 for name, artifact in artifacts.items()},
+            "input_hashes": {
+                name: value.get("sha256")
+                for name, value in inputs.items()
+                if isinstance(value, Mapping)
+            },
+            "per_kind": per_kind,
+        }
+        canonical = json.dumps(
+            self._json_safe(fingerprint_basis),
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=True,
+            allow_nan=False,
+        )
+        payload["fingerprint"] = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+        self._candidate_pool_manifest = self._json_safe(payload)
+        if not persist:
+            return
+        temporary = self._candidate_pool_manifest_path.with_suffix(".json.tmp")
+        temporary.write_text(
+            json.dumps(self._candidate_pool_manifest, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        os.replace(temporary, self._candidate_pool_manifest_path)
+
+    def _candidate_kind_manifest(
+        self,
+        frame: DataFrame,
+        *,
+        expected_sources: int,
+    ) -> Tuple[Dict[str, Any], List[int]]:
+        source_groups = (
+            {
+                str(src): source_rows
+                for src, source_rows in frame.groupby(
+                    frame["Src"].astype(str),
+                    sort=False,
+                )
+            }
+            if "Src" in frame.columns and not frame.empty
+            else {}
+        )
+        grouped_counts = {src: len(source_rows) for src, source_rows in source_groups.items()}
+        counts = [int(value) for value in grouped_counts.values()]
+        counts.extend([0] * max(0, int(expected_sources) - len(counts)))
+
+        digest = hashlib.sha256()
+        score_columns = [
+            column
+            for column in (
+                "cand_sim",
+                "cand_sim_semantic",
+                "cand_sim_lexical",
+                "cand_sim_retrieval",
+                "cand_sim_cross_encoder",
+                "cand_channels",
+            )
+            if column in frame.columns
+        ]
+        if source_groups:
+            for src in sorted(source_groups):
+                source_rows = source_groups[src]
+                for rank, (_, row) in enumerate(source_rows.iterrows(), start=1):
+                    record: Dict[str, Any] = {
+                        "src": src,
+                        "tgt": str(row["Tgt"]),
+                        "rank": rank,
+                    }
+                    for column in score_columns:
+                        value = row[column]
+                        if pd.isna(value):
+                            record[column] = None
+                        elif isinstance(value, (float, np.floating)):
+                            record[column] = float(value).hex()
+                        else:
+                            record[column] = str(value)
+                    digest.update(
+                        json.dumps(
+                            record,
+                            sort_keys=True,
+                            separators=(",", ":"),
+                            ensure_ascii=True,
+                        ).encode("utf-8")
+                    )
+                    digest.update(b"\n")
+
+        return (
+            {
+                **self._candidate_count_summary(counts),
+                "candidate_pairs": int(len(frame)),
+                "covered_sources": len(grouped_counts),
+                "pool_sha256": digest.hexdigest(),
+            },
+            counts,
+        )
+
+    @staticmethod
+    def _candidate_count_summary(counts: Sequence[int]) -> Dict[str, Any]:
+        if not counts:
+            return {
+                "source_entities": 0,
+                "mean_pool_size": 0.0,
+                "pool_size_q50": 0.0,
+                "pool_size_q90": 0.0,
+                "pool_size_q95": 0.0,
+                "pool_size_max": 0,
+            }
+        values = np.asarray(counts, dtype=np.float64)
+        return {
+            "source_entities": int(len(counts)),
+            "mean_pool_size": float(values.mean()),
+            "pool_size_q50": float(np.quantile(values, 0.50)),
+            "pool_size_q90": float(np.quantile(values, 0.90)),
+            "pool_size_q95": float(np.quantile(values, 0.95)),
+            "pool_size_max": int(values.max()),
+        }
+
+    @staticmethod
+    def _candidate_input_provenance(path: Optional[Path]) -> Optional[Dict[str, Any]]:
+        if path is None:
+            return None
+        resolved = Path(path).expanduser().resolve()
+        if resolved.is_file():
+            return file_provenance(resolved)
+        return {
+            "path": str(resolved),
+            "sha256": None,
+            "bytes": None,
+            "rows": None,
+        }
+
+    @classmethod
+    def _json_safe(cls, value: Any) -> Any:
+        if isinstance(value, Mapping):
+            return {str(key): cls._json_safe(item) for key, item in value.items()}
+        if isinstance(value, (list, tuple, set)):
+            return [cls._json_safe(item) for item in value]
+        if isinstance(value, Path):
+            return str(value)
+        if isinstance(value, np.generic):
+            return value.item()
+        if isinstance(value, float) and not math.isfinite(value):
+            return None
+        return value
 
     def _candidate_texts_for_iri(
         self,
@@ -1190,6 +1865,16 @@ class BaseAlignmentDataset(IDataset):
         if self.dataframe is None:
             self.log("Dataset is empty.", level="error")
             raise ValueError("Dataset is empty.")
+        if self._source_restriction_active:
+            if self._df_save_path.exists():
+                self.log(
+                    "#Source-restricted in-memory view; preserving full dataset cache.",
+                    level="debug",
+                )
+                return self._df_save_path
+            raise RuntimeError(
+                "A source-restricted view cannot be persisted as the full dataset cache"
+            )
 
         if self.has_cache():
             self.log("#Dataset already saved; skipping...", level="debug")
@@ -1225,12 +1910,24 @@ class BaseAlignmentDataset(IDataset):
                 and type(ontology_backend) is int
                 and ontology_backend == _ONTOLOGY_BACKEND_VERSION
             )
-            if versions_current and meta.get("fingerprint") == self.cache_fingerprint:
+            pool_fingerprint = self._persisted_candidate_pool_fingerprint()
+            pool_manifest_current = (
+                isinstance(pool_fingerprint, str)
+                and len(pool_fingerprint) == 64
+                and meta.get("candidate_pool_fingerprint") == pool_fingerprint
+            )
+            if (
+                versions_current
+                and meta.get("fingerprint") == self.cache_fingerprint
+                and pool_manifest_current
+            ):
                 self._cache_state = "hit"
                 return True
             self._cache_state = "invalidated"
             if not self._cache_warning_emitted:
                 reason = "missing metadata" if not meta else "fingerprint mismatch"
+                if versions_current and not pool_manifest_current:
+                    reason = "candidate-pool manifest missing or incompatible"
                 if not versions_current:
                     reason = (
                         "ontology-derived cache schema is incompatible with pyowl-core model "
@@ -1426,6 +2123,112 @@ class BaseAlignmentDataset(IDataset):
         self.log("#Processing Done", level="debug")
 
         return self
+
+    def restrict_sources(self, cap: int, seed: int) -> set[str]:
+        """Restrict processed in-memory frames to deterministic source-kind groups.
+
+        Selection is gold-free: only source groups present in the processed
+        dataframe (or candidate pool) enter the hash ranking. The reusable
+        full-dataset cache and its persisted pool manifest are never rewritten.
+        """
+
+        if int(cap) < 1:
+            raise ValueError("source cap must be at least one")
+        universe = self._df if self._df is not None else self._candidates
+        if universe is None:
+            raise RuntimeError("Dataset not processed. Call process() first.")
+        if "Src" not in universe.columns:
+            raise ValueError("Dataset source capping requires a Src column")
+
+        def source_groups(frame: DataFrame) -> set[Tuple[str, str]]:
+            if frame.empty:
+                return set()
+            if "SrcKind" in frame.columns:
+                return {
+                    (str(src), str(kind))
+                    for src, kind in frame[["Src", "SrcKind"]]
+                    .dropna(subset=["Src"])
+                    .itertuples(index=False, name=None)
+                }
+            return {
+                (str(src), self.primary_entity_kind.value)
+                for src in frame["Src"].dropna().astype(str)
+            }
+
+        groups = source_groups(universe)
+        ranked_groups = sorted(
+            groups,
+            key=lambda item: (
+                hashlib.sha256(f"{int(seed)}\x1f{item[0]}\x1f{item[1]}".encode("utf-8")).digest(),
+                item[0],
+                item[1],
+            ),
+        )
+        selected_groups = set(ranked_groups[: min(int(cap), len(ranked_groups))])
+        selected_sources = {src for src, _ in selected_groups}
+
+        def restrict(frame: Optional[DataFrame]) -> Optional[DataFrame]:
+            if frame is None or "Src" not in frame.columns:
+                return frame
+            if "SrcKind" in frame.columns:
+                mask = pd.Series(
+                    [
+                        (str(src), str(kind)) in selected_groups
+                        for src, kind in frame[["Src", "SrcKind"]].itertuples(
+                            index=False,
+                            name=None,
+                        )
+                    ],
+                    index=frame.index,
+                )
+            else:
+                mask = frame["Src"].astype(str).isin(selected_sources)
+            return frame.loc[mask].reset_index(drop=True).copy()
+
+        self._df = restrict(self._df)
+        self._candidates = restrict(self._candidates)
+        self._reference = restrict(self._reference)
+        self._exact_matches = restrict(self._exact_matches)
+        self._source_restriction_active = True
+        self._invalidate_active_dataframe_cache()
+
+        selected_by_kind: Dict[str, int] = defaultdict(int)
+        for _, kind in selected_groups:
+            selected_by_kind[kind] += 1
+        for kind, count in selected_by_kind.items():
+            self._candidate_pool_sizes.setdefault(kind, {})["source_entities"] = int(count)
+        for kind, values in self._candidate_pool_sizes.items():
+            values["source_entities"] = int(selected_by_kind.get(kind, 0))
+        if self._candidates is not None:
+            for kind, values in self._candidate_pool_sizes.items():
+                kind_frame = (
+                    self._candidates[self._candidates["SrcKind"].astype(str) == kind]
+                    if "SrcKind" in self._candidates.columns
+                    else self._candidates
+                )
+                values["candidate_rows"] = int(len(kind_frame))
+                values["covered_sources"] = int(kind_frame["Src"].astype(str).nunique())
+
+        sample_payload = "\n".join(f"{src}\t{kind}" for src, kind in sorted(selected_groups))
+        self._active_candidate_config = {
+            **self._active_candidate_config,
+            "source_sample": {
+                "cap": int(cap),
+                "seed": int(seed),
+                "selected_groups": len(selected_groups),
+                "sha256": hashlib.sha256(sample_payload.encode("utf-8")).hexdigest(),
+            },
+        }
+        pool_frame = self._candidates
+        if pool_frame is None and self._df is not None and "cand_sim" in self._df.columns:
+            pool_frame = self._df[self._df["cand_sim"].notna()].reset_index(drop=True)
+        if pool_frame is not None:
+            self._refresh_candidate_pool_manifest(
+                origin="sampled",
+                frame=pool_frame,
+                persist=False,
+            )
+        return selected_sources
 
     def _exact_mapping_pairs(self) -> set[Tuple[str, str]]:
         if not self.filter_exact_matches:

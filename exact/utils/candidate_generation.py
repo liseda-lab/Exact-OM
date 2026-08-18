@@ -403,8 +403,9 @@ def rank_channel_scores(
     lexical_scores: Mapping[Tuple[str, str], float],
     top_k: int,
     fusion_config: Optional[Mapping[str, Any]] = None,
+    adaptive_config: Optional[Mapping[str, Any]] = None,
 ) -> List[Dict[str, object]]:
-    """Fuse semantic and lexical retrieval channels into deterministic top-k rows."""
+    """Fuse retrieval channels and apply a deterministic per-source pool limit."""
 
     rows: List[Dict[str, object]] = []
     by_source: Dict[str, Dict[str, Dict[str, float]]] = defaultdict(dict)
@@ -413,14 +414,42 @@ def rank_channel_scores(
     for (src, tgt), score in lexical_scores.items():
         by_source[str(src)].setdefault(str(tgt), {})["lexical"] = float(score)
 
+    mode = str(_option(fusion_config, "mode", "max") or "max").lower()
+    if mode not in {"max", "rrf", "weighted"}:
+        raise ValueError(f"Unsupported candidate fusion mode: {mode!r}")
+    semantic_ranks = _channel_ranks(semantic_scores) if mode == "rrf" else {}
+    lexical_ranks = _channel_ranks(lexical_scores) if mode == "rrf" else {}
+
     for src in sources:
         entries = []
         for tgt, channel_scores in by_source.get(str(src), {}).items():
             semantic = float(channel_scores.get("semantic", 0.0))
             lexical = float(channel_scores.get("lexical", 0.0))
-            semantic_weight = float(_option(fusion_config, "semantic_channel_weight", 1.0))
-            lexical_weight = float(_option(fusion_config, "lexical_channel_weight", 1.0))
-            score = max(semantic_weight * semantic, lexical_weight * lexical)
+            if mode == "max":
+                semantic_weight = float(_option(fusion_config, "semantic_channel_weight", 1.0))
+                lexical_weight = float(_option(fusion_config, "lexical_channel_weight", 1.0))
+                score = max(semantic_weight * semantic, lexical_weight * lexical)
+            elif mode == "weighted":
+                semantic_weight = float(_option(fusion_config, "weighted_semantic", 0.5))
+                lexical_weight = float(_option(fusion_config, "weighted_lexical", 0.5))
+                weight_total = semantic_weight + lexical_weight
+                if semantic_weight < 0.0 or lexical_weight < 0.0 or weight_total <= 0.0:
+                    raise ValueError(
+                        "weighted candidate fusion requires non-negative shares "
+                        "with a positive total"
+                    )
+                score = ((semantic_weight * semantic) + (lexical_weight * lexical)) / weight_total
+            else:
+                rrf_constant = float(_option(fusion_config, "rrf_constant", 60.0))
+                if rrf_constant <= 0.0:
+                    raise ValueError("candidate fusion rrf_constant must be greater than zero")
+                score = 0.0
+                semantic_rank = semantic_ranks.get((str(src), str(tgt)))
+                lexical_rank = lexical_ranks.get((str(src), str(tgt)))
+                if semantic_rank is not None:
+                    score += 1.0 / (rrf_constant + semantic_rank)
+                if lexical_rank is not None:
+                    score += 1.0 / (rrf_constant + lexical_rank)
             channels = [
                 name
                 for name, value in (("semantic", semantic), ("lexical", lexical))
@@ -428,7 +457,12 @@ def rank_channel_scores(
             ]
             entries.append((tgt, score, semantic, lexical, "|".join(channels)))
         entries.sort(key=lambda item: (-item[1], -item[2], -item[3], item[0]))
-        for tgt, score, semantic, lexical, channels in entries[: max(0, int(top_k))]:
+        limit = adaptive_candidate_count(
+            [float(item[1]) for item in entries],
+            top_k=top_k,
+            adaptive_config=adaptive_config,
+        )
+        for tgt, score, semantic, lexical, channels in entries[:limit]:
             rows.append(
                 {
                     "Src": str(src),
@@ -441,6 +475,86 @@ def rank_channel_scores(
                 }
             )
     return rows
+
+
+def adaptive_candidate_count(
+    ranked_scores: Sequence[float],
+    *,
+    top_k: int,
+    adaptive_config: Optional[Mapping[str, Any]] = None,
+) -> int:
+    """Return the number of ranked candidates retained for one source.
+
+    Gap mode grows from ``k_min`` until the first sufficiently separated rank
+    boundary. Entropy mode grows while the retained score distribution remains
+    diffuse; concentrated prefixes stop at the minimum. Both modes are bounded
+    by ``k_max`` and contain no reference/gold information.
+    """
+
+    available = len(ranked_scores)
+    if not bool(_option(adaptive_config, "enabled", False)):
+        return min(available, max(0, int(top_k)))
+    if available == 0:
+        return 0
+
+    k_min = int(_option(adaptive_config, "k_min", top_k))
+    k_max = int(_option(adaptive_config, "k_max", top_k))
+    if k_min < 1 or k_max < 1 or k_min > k_max:
+        raise ValueError("adaptive_k requires 1 <= k_min <= k_max")
+    count = min(available, k_min)
+    cap = min(available, k_max)
+    if count >= cap:
+        return count
+
+    criterion = str(_option(adaptive_config, "criterion", "gap") or "gap").lower()
+    if criterion == "gap":
+        threshold = float(_option(adaptive_config, "gap", 0.05))
+        if not 0.0 <= threshold <= 1.0:
+            raise ValueError("adaptive_k.gap must be between zero and one")
+        while count < cap:
+            boundary_gap = float(ranked_scores[count - 1]) - float(ranked_scores[count])
+            if boundary_gap >= threshold:
+                break
+            count += 1
+        return count
+    if criterion == "entropy":
+        threshold = float(_option(adaptive_config, "entropy", 0.75))
+        if not 0.0 <= threshold <= 1.0:
+            raise ValueError("adaptive_k.entropy must be between zero and one")
+        while count < cap:
+            if normalized_score_entropy(ranked_scores[:count]) <= threshold:
+                break
+            count += 1
+        return count
+    raise ValueError(f"Unsupported adaptive_k criterion: {criterion!r}")
+
+
+def normalized_score_entropy(scores: Sequence[float]) -> float:
+    """Return Shannon entropy in ``[0, 1]`` for non-negative score mass."""
+
+    if len(scores) <= 1:
+        return 0.0
+    mass = [max(0.0, float(score)) for score in scores]
+    total = sum(mass)
+    if total <= 0.0:
+        return 1.0
+    probabilities = [value / total for value in mass if value > 0.0]
+    entropy = -sum(probability * math.log(probability) for probability in probabilities)
+    return max(0.0, min(1.0, entropy / math.log(len(scores))))
+
+
+def _channel_ranks(
+    scores: Mapping[Tuple[str, str], float],
+) -> Dict[Tuple[str, str], int]:
+    by_source: Dict[str, List[Tuple[str, float]]] = defaultdict(list)
+    for (src, tgt), score in scores.items():
+        by_source[str(src)].append((str(tgt), float(score)))
+    ranks: Dict[Tuple[str, str], int] = {}
+    for src, values in by_source.items():
+        values.sort(key=lambda item: (-item[1], item[0]))
+        for rank, (tgt, _) in enumerate(values, start=1):
+            ranks[(src, tgt)] = rank
+    return ranks
 
 
 def _build_inverted_index(
