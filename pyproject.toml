@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "Exact-OM"
-version = "2.0.0"
+version = "2.1.0"
 description = "Exact is a deep learning framework for explainable ontology matching."
 authors = ["Pedro Cotovio <pgcotovio@gmail.com>"]
 readme = "README.md"
