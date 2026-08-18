@@ -25,9 +25,10 @@ restrictions, property metadata, and exclusions behind `KnowledgeSource`.
 
 ## Shared projector and reasoner
 
-The default base install uses the complete Python projector and asserted hierarchy. Select
-the deterministic Python projector explicitly when warning-free reproducibility is more useful
-than probing an optional accelerator:
+The base install uses `pyowl-core>=0.2,<0.3` and
+`pyowl2vec-star-projector>=0.2,<0.3`, with a complete Python projector and asserted
+hierarchy. Select the deterministic Python projector explicitly when warning-free portability
+is more useful than selecting a published native wheel:
 
 ```yaml
 dataset:
@@ -37,28 +38,31 @@ dataset:
     profile: mowl-d993536-v1
 ```
 
-For inferred hierarchies, install `exact-om[reasoning]` and set `dataset.reasoner` to `elk` or
-`hermit`. Missing optional packages fail with an installation hint; Exact never silently
+For inferred hierarchies, install `exact-om[reasoning]` and set `dataset.reasoner` to `elk`
+or `hermit`. Missing optional packages fail with an installation hint; Exact never silently
 changes requested inferred semantics to asserted semantics. Programmatic integrations can use
 `OwlOntologySource.configure_reasoner(...)` for backend, timeout, fallback, worker, and
-verified-wire options. All in-process modes consume `source.owl_snapshot()` directly, including
-public core overlays and composites. Worker mode writes that view once to the stable core wire
-format and opens a verified read-only mmap in the child; it never passes an OWL path.
+verified-wire options.
+
+All in-process modes consume `source.owl_snapshot()` directly, including public core
+overlays and composites. Worker mode writes that view once with the current public core wire
+writer and opens a verified read-only mmap in the child; it never passes an OWL path.
 
 Consumer provenance reports `scalar-python`, `scalar-native`/`scalar-wire`, or
-`encoded-native`. The last value appears only when core and consumer advertise the compatible
-public encoded schema. Acceleration may change those diagnostics and timing, but not projected
-edges, hierarchy answers, coherence, or alignment output.
+`encoded-native`. Encoded-native selection requires the public schema-2 capability and
+`pyowl_core.EncodedStructuralView.DESCRIPTOR_SHA256`; Exact never requests or decodes the
+buffers. Acceleration may change diagnostics and timing, but not projected edges, hierarchy
+answers, coherence, or alignment output.
 
-`run_manifest.json` records the effective core/projector/reasoner selections under
+`run_manifest.json` records effective public core/projector/reasoner selections under
 `ontology_stack` for both sides, including fingerprints, encoded/compiler schema identity,
-bounded materialization/copy counters, and fallback/failure diagnostics.
+bounded materialization/copy counters, cache state, and fallback/failure diagnostics.
 
 ## Evaluation backends
 
-The built-in evaluator is deterministic and always available. On Python 3.10–3.12, add `bioml`
-to `evaluation.backends` after installing `exact-om[bioml-eval]` to run the compatible upstream
-Bio-ML 0.2 evaluator as well. Its official coherence scorer receives the same source/target
+The built-in evaluator is deterministic and always available. On Python 3.10–3.12, add
+`bioml` to `evaluation.backends` after installing `exact-om[bioml-eval]` to run
+`oaei-bioml-eval>=0.2.1,<0.3`. Its official coherence scorer receives the same source/target
 snapshot providers already loaded by Exact, while standalone path inputs are each loaded once.
 Exact writes both results into the canonical `evaluation/` directory and records evaluator
 provenance in run statistics.

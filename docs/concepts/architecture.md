@@ -26,8 +26,8 @@ flowchart LR
 - Component registries resolve datasets, models, trainers, and evaluators by stable names.
 - Source/writer/track/reasoner entry points allow external plugins without importing them at
   core startup.
-- `RunLayout`, `ExplanationStore`, and `RunReader` isolate artifact versions from producers and
-  consumers.
+- `RunLayout`, `ExplanationStore`, and `RunReader` isolate artifact versions from producers
+  and consumers.
 - Plain `run_alignment` and `run_evaluation` functions are the action boundary used by CLI and
   Python wrappers.
 
@@ -39,29 +39,34 @@ backend dependencies localized. `exact_inspect` depends on Exact, never the reve
 
 ```mermaid
 flowchart LR
-    Bytes[OWL bytes / resolver] --> Core[pyowl-core ontology view]
+    Input[OWL path / bytes / stream] --> Core[pyowl-core 0.2 OntologyView]
     Core --> Facade[OwlOntologySource]
     Core --> Views[Shared structural views]
-    Core --> Projector[Shared OWL2Vec* projector]
-    Core --> Reasoner[Asserted / optional reasoner adapter]
+    Core --> Projector[Public OWL2Vec* projector API]
+    Core --> Reasoner[Asserted / public optional reasoner API]
     Views --> Dataset[Alignment dataset]
     Projector --> Dataset
     Reasoner --> Dataset
     Facade --> Dataset
 ```
 
-The core view is immutable and owned once by `OwlOntologySource`. A concrete snapshot, overlay,
-composite, or `SnapshotProvider` result is retained by exact object identity. All in-process
-consumers receive that view; Exact does not flatten it, reparse a path, request encoded columns,
-or materialize a consumer-private ontology representation. Optional process isolation encodes
-the view once with the versioned core wire format, and a worker opens it read-only with mmap and
-verification before reasoning. Projection and reasoner adapters convert only bounded returned
-rows into Exact entities.
+Core 0.2 owns OWL parsing, model-schema-2 identities, immutable views, and wire/mmap
+serialization. Exact owns only its source facade and bounded result conversion; it does not
+carry a parser, decode encoded structural buffers, or implement an OWL projector.
 
-Native ingestion is capability-negotiated by each upstream consumer. Exact neither infers it
-from package versions nor calls a private extension. A missing encoded capability selects the
-consumer's complete scalar path; an incompatible advertised capability fails before output and
-is not retried from an OWL path after partial work.
+Each OWL input is loaded exactly once. A concrete snapshot, overlay, composite, or
+`SnapshotProvider` result is retained by exact object identity, and all in-process consumers
+receive that owner. Exact does not flatten it, reparse a path, request encoded columns, or
+materialize a second ontology-sized representation. Optional process isolation writes the
+owner once with the current public core wire writer, then a worker verifies and opens it
+read-only with mmap. The worker never receives the original OWL path.
+
+Native ingestion is capability-negotiated through public core and consumer attributes,
+including the encoded schema and
+`pyowl_core.EncodedStructuralView.DESCRIPTOR_SHA256`. Exact neither infers support from a
+distribution version nor calls a private extension. A missing encoded capability selects the
+consumer's complete scalar path; an incompatible advertised capability fails before output
+and is not retried from an OWL path.
 
 ## Reproducibility
 
@@ -70,8 +75,9 @@ timing sessions, evaluator provenance, and deliverable checksums meet in `run_ma
 and `stats/run_stats.json`. Optional integrations fail explicitly when unavailable rather than
 silently changing the core algorithm.
 
-For OWL sources, `ontology_stack` adds package/API/schema versions, three semantic
+For OWL sources, `ontology_stack` adds public distribution/API/schema values, three semantic
 fingerprints, closure/resolution and source-document hashes, layered-view provenance, encoded
 schema/descriptor identity, projector profile/options/backend, reasoner compiler schemas,
-bounded ingestion/copy counters, and verified-wire/mmap status. The serializer intentionally
-omits machine paths, object IDs, temporary locations, and credentials.
+bounded ingestion/copy counters, selected owner/ingestion kinds, cache state, and
+verified-wire/mmap status. The serializer omits machine paths, object IDs, pointers, temporary
+locations, and credentials.

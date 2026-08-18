@@ -10,6 +10,23 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 This release completes engineering work packages A–L. Methodology experiments remain
 separate and are not included in these changes.
 
+### Exact-OM 2.1.0 pyOWL compatibility
+
+- Migrated the public ontology contract to released `pyowl-core==0.2.0` and compatible 0.2
+  projector/reasoner packages while retaining minor-line dependency ranges.
+- Bound ontology provenance and cache identities to core API 0.2, model schema 2, the current
+  public wire writer, encoded structural schema 2, and
+  `EncodedStructuralView.DESCRIPTOR_SHA256`.
+- Invalidated ontology-derived schema-1 caches before unpickling or interpreting identities.
+  Exact rebuilds from source and never converts or reinterprets these caches; completed
+  immutable run artifacts remain readable.
+- Expanded one-built-artifact wheel/sdist clean-install coverage across Python 3.10–3.12 for
+  base, visualization, Java-free ELK/HermiT, pure-Python projection, and a supported published
+  native projection path.
+- Made fixture timings diagnostic and replaced historical comparative performance gates with
+  one content-addressed NCIT–DOID correctness acceptance. Exact-OM 2.1.0 keeps
+  `performance_claim: false`.
+
 ### Added
 
 - Python 3.10–3.12 CPU packaging, hermetic test markers, import-boundary checks, docstring
@@ -58,18 +75,18 @@ separate and are not included in these changes.
 - Replaced the OWL-API/mOWL runtime with `py-horned-owl` plus an RDFLib fallback. Legacy heap
   arguments remain accepted, warn, and are ignored (WP-B).
 - Replaced the transitional `py-horned-owl` parser with the compatible `pyowl-core` and
-  `pyowl2vec-star-projector` 0.1 lines. Optional pyELK/pyHermiT distributions moved behind the
-  independent `reasoning` extra; RDFLib now serves only generic RDF/OAEI formats (WP-M).
+  `pyowl2vec-star-projector` 0.2 lines. Optional pyELK/pyHermiT distributions remain behind
+  the independent `reasoning` extra; RDFLib serves only generic RDF/OAEI formats (WP-M).
 - Moved FastAPI, Uvicorn, and pydantic-settings behind the `viz` extra; Hugging Face tracks,
   upstream Bio-ML evaluation, and documentation tooling remain independent extras (WP-E/I/K).
 - Replaced the pre-release, Python-3.12-only Bio-ML Git pin with the compatible Python-3.10+
-  `0.2` release line and its Java-free reasoner extra (WP-E/M).
+  `>=0.2.1,<0.3` release line and its Java-free reasoner extra (WP-E/M).
 - Deferred shared-core and Exact feature indexes until their first query, so projection-only and
   coherence-only consumers do not eagerly construct unrelated hierarchy, annotation, ABox, or
   domain/range indexes (WP-M).
 - Classified the complete NCIT projection delta against Exact 2.0 as 762 pinned RB-019 additions,
-  eight RB-009 corrections, and zero residuals; semantic parity now passes while the WP-M scale
-  gate remains blocked (WP-M).
+  eight RB-009 corrections, and zero residuals; the frozen NCIT–DOID run is now a correctness
+  gate rather than a comparative timing gate (WP-M).
 - Exposed pair-adaptive channel, retrieval-fusion, alias, and uncertainty constants in the v2
   configuration with behavior-preserving defaults (WP-J).
 - New runs write resolved configuration, alignments, evaluation, statistics, plots,

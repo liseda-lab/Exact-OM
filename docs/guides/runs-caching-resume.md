@@ -58,10 +58,20 @@ Dataset and model caches include normalized ontology/source fingerprints, candid
 selected entity kinds, and relevant configuration. Changing one of these inputs invalidates the
 cache rather than reusing stale data.
 
-Exact 2.1 increments the ontology cache identity for the shared snapshot/projector stack.
-Pre-2.1 metadata is rejected with a migration-focused warning and rebuilt from source bytes;
-legacy ontology objects are never deserialized. Projector and reasoner cache keys include
-their package/API/compiler-schema versions, semantic options, backend choice, the core structural
-fingerprint, and the public encoded-view schema/descriptor digest. The keys never contain dense
-encoded IDs. Merely switching between scalar and accelerated compilation does not change
-matching/result semantics; an incompatible old cache is rebuilt instead of reinterpreted.
+## pyOWL 0.2 cache boundary
+
+Exact 2.1 increments its ontology backend and ontology-derived cache identities for core model
+schema 2. Cache keys include the public core API/model/wire/encoded contract, projector
+distribution/profile/options/compiler schema, selected reasoner distribution and public
+compiler/native schema, source/closure fingerprints, and backend selection. They never contain
+dense encoded IDs, Python object IDs, pointers, or temporary paths.
+
+Every schema-1 parsed-ontology, projection, compiler, dataset, or resumable-workflow cache is
+rejected before unsafe unpickling or identity interpretation. Exact rebuilds it from the
+original source through core 0.2. It never converts or reinterprets the cache, even if the
+source path, mtime, or digest is unchanged.
+
+Completed immutable historical run artifacts remain readable. They cannot be resumed through
+schema-1 ontology cache state. Scalar and accelerated consumers preserve the same matching
+semantics; a public contract mismatch causes a rebuild or actionable error rather than an OWL
+path retry.

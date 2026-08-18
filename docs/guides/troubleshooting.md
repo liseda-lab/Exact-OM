@@ -1,11 +1,20 @@
 # Troubleshooting
 
-## Shared OWL packages are missing
+## Shared OWL packages are missing or incompatible
 
-The base distribution requires compatible `pyowl-core` and
-`pyowl2vec-star-projector` 0.1 releases. If importing Exact reports either package as missing,
-confirm that the package installer used the same Python 3.10–3.12 environment as `exact` and
-run `python -m pip check`. Do not install `py-horned-owl`, mOWL, JPype, or a JDK as a fallback.
+The base distribution requires `pyowl-core>=0.2,<0.3` and
+`pyowl2vec-star-projector>=0.2,<0.3`; released `pyowl-core==0.2.0` is supported. If importing
+Exact reports either package as missing or incompatible, confirm that the installer used the
+same Python 3.10–3.12 environment as `exact`, then run:
+
+```console
+python -m pip check
+python -m pip show exact-om pyowl-core pyowl2vec-star-projector
+```
+
+Do not install `py-horned-owl`, mOWL, JPype, DeepOnto, or a JDK as a fallback. The exact
+published package set used for a release is recorded in
+`release/core-compatibility.json`.
 
 ## An optional reasoner is unavailable
 
@@ -15,30 +24,40 @@ run `python -m pip check`. Do not install `py-horned-owl`, mOWL, JPype, or a JDK
 python -m pip install "exact-om[reasoning]"
 ```
 
-Selecting an unavailable reasoner is an error by default. Programmatic callers may explicitly
-choose an asserted fallback policy; the requested/effective reasoner and reason are then
-recorded in `ontology_stack`.
+This selects compatible `pyelk-reasoner>=0.2,<0.3` and `pyhermit>=0.2,<0.3` releases.
+Selecting an unavailable or incompatible reasoner is an error by default. Programmatic callers
+may explicitly choose an asserted fallback policy; the requested/effective reasoner and reason
+are then recorded in `ontology_stack`.
 
 ## A native backend was not selected
 
-Both the core parser and projector have complete Python implementations. `backend: auto` may
-report that an optional native accelerator is unavailable or not yet preferred. Use
-`backend: python` for an explicit portable choice. Use `native` only when a compatible
-upstream wheel is installed; Exact never runs Cargo during installation.
+The core and projector expose complete Python paths. `backend: auto` may report that a
+platform-native wheel is unavailable. Use `backend: python` for an explicit portable choice.
+Use `native` only when compatible published upstream wheels are installed; Exact never runs
+Cargo during installation.
 
-## A dataset cache is rebuilt after upgrade
+Exact negotiates encoded ingestion from public capabilities, not package-version guesses. An
+advertised schema or descriptor mismatch is a hard compatibility error. Do not work around it
+by retrying with an OWL path or importing a private native module.
 
-This is expected for pre-2.1 ontology caches. Their metadata cannot prove shared-snapshot,
-projector, or reasoner compatibility. Exact rebuilds from the input bytes and never unpickles
-a legacy ontology graph. Delete `dataset/dataset.csv` and `dataset/dataset.meta.json` only if
-you want to reclaim the stale files before rerunning.
+## An ontology cache is rebuilt after upgrading
+
+This is required for ontology-derived schema-1 caches. Core model schema 2 changes structural
+identities, including anonymous-individual/component scoping, so Exact rejects the old metadata
+before unpickling or interpreting IDs and rebuilds from the original OWL source. A matching
+path, timestamp, or source digest does not make the old cache reusable.
+
+There is no cache converter. Completed immutable run outputs remain readable, but a resumable
+workflow cannot continue through schema-1 ontology cache state. Delete stale files only to
+reclaim disk space; do not rename them to bypass the compatibility check.
 
 ## Provenance appears incomplete
 
 Check `stats/run_stats.json` and `run_manifest.json` after successful finalization. Generic
-RDF/CSV sources have `kind: generic`; OWL sources have `kind: owl` plus core, projector, and
-reasoner records. A killed run may have run statistics but no refreshed manifest; rerun or
-finalize the run rather than copying private paths into provenance manually.
+RDF/CSV sources have `kind: generic`; OWL sources have `kind: owl` plus public core,
+projector, reasoner, cache, and handoff records. A killed run may have run statistics but no
+refreshed manifest; rerun or finalize it rather than copying private paths into provenance
+manually.
 
 ## Legacy JVM flags still appear in a script
 

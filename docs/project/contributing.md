@@ -15,14 +15,25 @@ poetry run lint-imports
 poetry run pytest \
   -m "not requires_data and not slow and not requires_cuda and not requires_openrouter"
 poetry run mkdocs build --strict
-poetry run python benchmarks/bench.py --repeat 7 --check-reference
 ```
 
+Fixture timings are optional diagnostics:
+
+```console
+poetry run python benchmarks/bench.py \
+  --repeat 7 \
+  --output benchmark-results/fixture.json
+```
+
+Do not use `--check-reference` as an Exact 2.1 release gate. The frozen NCIT–DOID correctness
+run is performed once by the release owner against content-addressed external inputs; normal
+contributions do not download or execute it.
+
 Defaults and descriptions live in the Pydantic config models; regenerate the committed default
-YAML instead of editing two sources. Public APIs use Google-style docstrings. Add small reviewable
-fixtures, mark external-data/accelerator/hosted tests accurately, and keep commits scoped by
-component.
+YAML instead of editing two sources. Public APIs use Google-style docstrings. Add small
+reviewable fixtures, mark external-data/accelerator/hosted tests accurately, and keep commits
+scoped by component.
 
 See the complete
 [CONTRIBUTING.md](https://github.com/liseda-lab/Exact-OM/blob/main/CONTRIBUTING.md)
-for registry/plugin patterns, markers, performance gates, and commit guidance.
+for registry/plugin patterns, markers, and commit guidance.

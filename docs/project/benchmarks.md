@@ -1,53 +1,59 @@
-# Benchmarks
+# Correctness and diagnostic measurements
 
-`benchmarks/bench.py` measures the committed, license-safe ontology fixtures and checks median
-runtime against `benchmarks/reference.json`:
+Exact-OM 2.1 makes no performance claim. Fixture and scale timings may be collected for
+diagnosis, but timing comparisons are not release gates.
 
-```console
-poetry run python benchmarks/bench.py --repeat 7 --check-reference
-```
+## Fixture diagnostics
 
-The OWL acceptance scenarios cover one-shot snapshot loading, shared hierarchy views,
-transitive queries, delegated OWL2Vec* projection, end-to-end dataset evidence, and candidate
-generation. Additional scenarios cover CSV-KG loading, track materialization, inference, and
-the explanation store. The 25% fixture tolerance catches coarse regressions without treating
-microbenchmark noise as a release failure.
-
-For scale evidence, run selected scenarios with `--output result.json` in the target deployment
-and retain the JSON beside the release artifacts. A benchmark implementation must pass the
-same `OntologyView` to `OwlOntologySource`, projector, and reasoner. Adding a parsed graph,
-path reparse, or unbounded adapter conversion to make a benchmark faster violates the
-architecture even if wall time improves.
-
-Peak-memory and throughput claims for optional native upstream engines belong to those
-projects' release evidence. Exact's base acceptance proves that no JDK, Cargo invocation,
-reasoner distribution, or second ontology representation is needed.
-
-For legally available conference/Bio-ML/GO/NCIT inputs, capture the full WP-M scale record:
+`benchmarks/bench.py` measures committed, license-safe fixtures. CI runs it without the
+historical reference threshold and uploads the JSON:
 
 ```console
-poetry run python benchmarks/owl_stack_scale.py source.owl target.owl \
-  --output owl-stack-scale.json
+poetry run python benchmarks/bench.py \
+  --repeat 7 \
+  --output benchmark-results/fixture.json
 ```
 
-The record includes exact load count, load wall time, time to first projected edge, projection
-throughput, peak/incremental RSS, core document-cache hits, Exact projection-cache fill/hit
-timing, spill counters, fingerprint immutability, and source/projector/reasoner snapshot
-identity. Input bytes are not redistributed, so licensed corpora can contribute release
-evidence without entering the repository.
+The scenarios cover one-shot snapshot loading, hierarchy views, transitive queries, delegated
+OWL2Vec* projection, dataset evidence, candidate generation, CSV-KG loading, track
+materialization, inference, and the explanation store. A functional failure still needs
+investigation; a slower median alone does not block Exact 2.1.
 
-WP-N native-consumer evidence additionally records the selected ingestion path, encoded-view
-publication and compiler timing, core wire/parser/scalar-row deltas, copied structural bytes,
-first/complete result time, compiler/result digests, and structured fail-closed acceptance checks
-for the complete zero-work counter and released-GIL contract. A warm encoded cache is never
-compared with a cold parse. Native performance remains an unclaimed release gate until the labelled
-NCIT–DOID, GO, and largest licensed workflow runs meet the existing wall-time and RSS criteria.
+The legacy `--check-reference` mode and `benchmarks/reference.json` remain available for
+experiments. Their 25% comparison is not normal CI or release acceptance.
 
-The current hash-matched NCIT–DOID candidate is committed under
-`benchmarks/evidence/wp_m_ncit_doid_candidate.json`. It passes one-load, shared-identity, and
-no-second-representation checks. Its complete NCIT set difference is classified with digests:
-762 RB-019 subrole-expansion edges were correctly added, eight RB-009 top-level-intersection
-edges emitted by old private Exact were correctly removed, and no residual edge remains. Pinned
-projector semantics therefore pass. This is still not release acceptance: both loading and
-projection exceed the 25% wall-time limit, and a comparable pinned-runner RSS result is missing.
-WP-M M5 and the Exact 2.1.0 version bump remain blocked on those performance/evidence gates.
+## Exact 2.1 external-data acceptance
+
+The only external-data gate is the frozen NCIT–DOID correctness run. The inputs must match:
+
+| Side | Bytes | SHA-256 |
+| --- | ---: | --- |
+| NCIT source | 57,163,710 | `379a37f47c0c8e7c30397769358cca955140d16b2797a1cc75da4b1fc2b354eb` |
+| DOID target | 6,687,536 | `76f41cce3616ad1a9ba6353f469e96bde7addba5d43e541651a3ab703f9ba2bc` |
+
+Run the released native core/projector path in one cold process:
+
+```console
+poetry run python benchmarks/owl_stack_scale.py \
+  data/bioml_zenodo/ncit-doid/source.owl \
+  data/bioml_zenodo/ncit-doid/target.owl \
+  --load-backend native \
+  --projector-backend native \
+  --require-encoded-consumers \
+  --output release/evidence/pyowl-core-0.2-ncit-doid.json
+```
+
+Acceptance requires one load per ontology, retained owner identity, encoded-native ingestion,
+zero forbidden parse/wire/scalar/copy work, unchanged fingerprints and axiom counts, no second
+ontology-sized representation, and identical cache-fill/cache-hit projection digests. The
+classified projection result remains 42,103 NCIT edges and 9,388 DOID edges. The historical
+NCIT delta is exactly 762 RB-019 additions and eight RB-009 removals, with no unexplained
+residual edge.
+
+The command records wall time, CPU time, throughput, cache timing, and RSS as diagnostic
+fields. Those values are not compared with Exact 2.0 and do not affect acceptance unless the
+ordinary release-job timeout or runner resources are exhausted.
+
+Conference, GO, additional Bio-ML pairs, licensed workflows, CUDA, hosted LLMs, native
+reasoner scale, pinned-runner RSS comparisons, Exact Repair, and experiments are outside the
+2.1 release gate.

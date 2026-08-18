@@ -1,66 +1,90 @@
 # Migrating to Exact-OM 2.1
 
-Exact-OM 2.1 completes the shared Java-free OWL stack migration. The 2.0 configuration,
-dataset, artifact, and viewer migrations remain documented below; existing v1 configuration
-and run directories stay readable unless this guide explicitly says otherwise.
+Exact-OM 2.1 completes the shared Java-free OWL stack migration on the released pyOWL 0.2
+package family. The 2.0 configuration, dataset, artifact, and viewer migrations remain
+documented below; existing v1 configuration and completed run directories stay readable unless
+this guide explicitly says otherwise.
 
-## From 2.0 to 2.1: shared OWL snapshots
+## From 2.0 to 2.1: pyOWL 0.2 shared views
 
-OWL inputs now load once into an immutable `pyowl-core` snapshot. Exact's source facade,
-structural indexes, projector, and selected hierarchy reasoner all consume that exact object;
-there is no Exact-owned parsed ontology or second projector graph. RDFLib remains confined to
-generic RDF/OAEI input handling and is not an OWL fallback.
+The base package requires `pyowl-core>=0.2,<0.3` and
+`pyowl2vec-star-projector>=0.2,<0.3`, including released
+`pyowl-core==0.2.0`. Asserted hierarchy queries need no extra. Optional integrations use:
 
-The base package requires the compatible `pyowl-core` and `pyowl2vec-star-projector` 0.1
-release lines. Asserted hierarchy queries need no extra. Install the optional Java-free
-reasoners only when selected:
+```text
+pyelk-reasoner>=0.2,<0.3
+pyhermit>=0.2,<0.3
+oaei-bioml-eval>=0.2.1,<0.3
+```
+
+Install the Java-free reasoners only when selected:
 
 ```console
 pip install "exact-om[reasoning]"
 ```
 
-`dataset.reasoner` accepts `asserted`, `elk`, or `hermit`; `dataset.projector.backend` accepts
-`auto`, `python`, or `native`. Native accelerators remain optional upstream wheels. The Exact
-wheel itself never invokes Java, Cargo, or a native build.
+OWL inputs load once into an immutable public core view. Exact's source facade, structural
+indexes, projector, and selected hierarchy reasoner all consume that exact owner; there is no
+Exact-owned parsed ontology or second projector graph. RDFLib remains confined to generic
+RDF/OAEI input handling and is not an OWL fallback.
 
-Pre-2.1 dataset/projection cache metadata is deliberately incompatible. Exact logs an
-actionable warning and rebuilds from the original source bytes; it never unpickles a legacy
-ontology object. Start a fresh cache if disk policy requires explicit cleanup.
+Core 0.2 uses model schema 2, including corrected anonymous-individual and repeated
+isomorphic-component scoping. Exact negotiates the current wire writer, encoded schema 2, and
+`pyowl_core.EncodedStructuralView.DESCRIPTOR_SHA256` through public attributes. It does not
+request or decode encoded buffers, import implementation modules, or retry a failed consumer
+from an OWL path.
 
-New OWL runs add `ontology_stack.source` and `ontology_stack.target` to `run_manifest.json`
-and `stats/run_stats.json`. The records contain core/projector/reasoner versions and backend
-selection, structural/logical/signature fingerprints, import and resolver digests,
-source-document hashes, diagnostics, options/schema identities, and verified-wire state. They
-contain no local source path, temporary path, Python object ID, or credential.
+`dataset.reasoner` accepts `asserted`, `elk`, or `hermit`;
+`dataset.projector.backend` accepts `auto`, `python`, or `native`. Native accelerators
+remain optional published upstream wheels. The Exact wheel itself never invokes Java, Cargo,
+or a native build.
 
-The compatibility names `ParsedOntology`, `ParsedEntity`, and `parse(...)` now only alias or
-delegate to the shared core contracts and are scheduled for removal after 2.1. `init_jvm`
-remains an error-only migration shim; no supported workflow initializes a JVM.
+### Required cache rebuild
 
-The `bioml-eval` extra now targets OAEI-Bio-ML-eval 0.2 on Python 3.10 and newer. When an
-inline run requests the `bioml` backend, official coherence receives the already-loaded Exact
-snapshot providers; it no longer falls back to the old structural-proxy seam or reparses their
-origin paths. Standalone `exact-eval` path inputs are still supported and are loaded once by
-the shared core.
+Every schema-1 ontology-derived cache is incompatible. Exact rejects parsed-ontology,
+projection, compiler, dataset, and resumable-workflow cache metadata before unsafe unpickling
+or identity interpretation, then rebuilds it from the original source through core 0.2. A
+matching path, mtime, or source digest does not make the cache reusable.
+
+Never convert or reinterpret schema-1 caches. Completed immutable run results remain readable,
+but an unfinished run cannot resume through schema-1 ontology cache state.
+
+New OWL runs add `ontology_stack.source` and `ontology_stack.target` to
+`run_manifest.json` and `stats/run_stats.json`. The records contain public
+core/projector/reasoner distribution and schema values, structural/logical/signature
+fingerprints, import and resolver digests, source-document hashes, options, cache state,
+bounded handoff diagnostics, and verified-wire state. They contain no local source path,
+temporary path, Python object ID, pointer, or credential.
+
+The compatibility names `ParsedOntology`, `ParsedEntity`, and `parse(...)` only alias or
+delegate to public core contracts and are scheduled for removal after 2.1. `init_jvm` remains
+an error-only migration shim; no supported workflow initializes a JVM.
+
+The `bioml-eval` extra targets OAEI-Bio-ML-eval 0.2.1 or newer in the 0.2 line on Python
+3.10 and newer. Inline official coherence receives the already-loaded Exact snapshot
+providers; it does not reparse origin paths. Standalone `exact-eval` path inputs remain
+supported and are each loaded once by core.
 
 ## Before upgrading
 
-1. Keep a copy of any v1 YAML files and unfinished run directories.
+1. Keep a copy of v1 YAML files, unfinished run directories, and their original ontology
+   sources.
 2. Upgrade Exact-OM and install the extras used by your workflow.
-3. Migrate configuration files with `exact config migrate`.
-4. Start a new output directory for the first 2.0 run; use `exact run info` to inspect old
+3. Let Exact rebuild ontology-derived caches; do not copy or convert schema-1 cache state.
+4. Migrate configuration files with `exact config migrate`.
+5. Start a new output directory for the first 2.1 run; use `exact run info` to inspect old
    and new runs.
 
 ## Runtime and ontology backend
 
-The Java/mowl runtime was removed. Do not initialize a JVM or pass heap-size settings. The
+The Java/mOWL runtime was removed. Do not initialize a JVM or pass heap-size settings. The
 `exact.init_jvm` symbol remains temporarily as a stub that raises a migration-focused error,
 and legacy heap flags are accepted but ignored with a deprecation warning. Ontology access now
-goes through `KnowledgeSource`; in 2.1, OWL inputs use the shared `pyowl-core` snapshot.
+goes through `KnowledgeSource`; in 2.1, OWL inputs use one retained public
+`pyowl-core` 0.2 view.
 
-Reasoner settings now select an Exact reasoner plugin. The removed
-`reasoner_timeout_secs` and `reasoner_force_hermit` keys are reported and dropped by the
-config migrator.
+Reasoner settings select an Exact reasoner plugin. The removed `reasoner_timeout_secs` and
+`reasoner_force_hermit` keys are reported and dropped by the config migrator.
 
 ## Configuration schema v2
 
@@ -105,7 +129,7 @@ migration table as the main command.
 
 ## Commands and Python imports
 
-| 1.x | 2.0 | Compatibility |
+| 1.x | 2.0+ | Compatibility |
 | --- | --- | --- |
 | `bioml-eval` | `exact-eval` | Both console scripts remain installed. |
 | `EvalutionRunner` | `EvaluationRunner` | Misspelled alias warns and remains through 2.0. |
@@ -161,10 +185,11 @@ file. It is deprecated and scheduled for removal in 2.1.
 compatibility window, Exact can still read historical files and render a derived `times.txt`;
 new timing state is recorded in `timings.json`.
 
-Checkpoint schema v2 and full-payload checkpoints remain readable. New checkpoints point at
-the explanation store, discard an uncheckpointed shard suffix safely on resume, and are pruned
-at successful finalization according to `output.retention.checkpoints`. Layout-v1 run folders
-are never rewritten merely by opening them.
+Checkpoint schema v2 and full-payload checkpoints remain readable when independent of an
+incompatible ontology cache. New checkpoints point at the explanation store, discard an
+uncheckpointed shard suffix safely on resume, and are pruned at successful finalization
+according to `output.retention.checkpoints`. Layout-v1 run folders are never rewritten merely
+by opening them.
 
 Useful maintenance commands are:
 
@@ -182,8 +207,8 @@ Cleanup removes only manifest-owned or recognized resume files and preserves for
 | --- | --- |
 | `exact-om[viz]` | `exact-inspect` service and CLI (FastAPI/Uvicorn). |
 | `exact-om[hf]` | Hugging Face dataset-track providers. |
-| `exact-om[bioml-eval]` | OAEI Bio-ML 0.2 metrics and Java-free official coherence. |
-| `exact-om[reasoning]` | Optional Java-free pyELK and pyHermiT hierarchy reasoners. |
+| `exact-om[bioml-eval]` | OAEI Bio-ML >=0.2.1,<0.3 metrics and Java-free official coherence. |
+| `exact-om[reasoning]` | Optional Java-free pyELK and pyHermiT >=0.2,<0.3 hierarchy reasoners. |
 | `exact-om[docs]` | Documentation build toolchain. |
 
 Without an optional extra, the corresponding integration fails with an installation hint;

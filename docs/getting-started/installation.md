@@ -1,6 +1,6 @@
 # Installation
 
-Exact-OM supports Python 3.10–3.12. A CPU is sufficient for development and small
+Exact-OM 2.1 supports Python 3.10–3.12. A CPU is sufficient for development and small
 fixtures; a CUDA-enabled PyTorch installation substantially accelerates embedding and scoring
 on large tracks.
 
@@ -23,6 +23,19 @@ poetry run pip install --index-url https://download.pytorch.org/whl/cu128 "torch
 
 Do not request a CUDA device on a CPU-only host; omitting `--device` selects CPU.
 
+## Shared ontology package contract
+
+The base distribution installs the released Java-free shared stack:
+
+- `pyowl-core>=0.2,<0.3` (including `pyowl-core==0.2.0`);
+- `pyowl2vec-star-projector>=0.2,<0.3`;
+- `pyelk-reasoner>=0.2,<0.3` and `pyhermit>=0.2,<0.3` only with `reasoning`; and
+- `oaei-bioml-eval>=0.2.1,<0.3` only with `bioml-eval`.
+
+Release artifacts are tested against one exact published set recorded in
+`release/core-compatibility.json`. Editable installs, source checkouts, development builds,
+and release candidates are not release evidence.
+
 ## Optional features
 
 Release wheels expose independent extras so the matcher does not import service or dataset
@@ -38,20 +51,21 @@ dependencies it does not use.
 
 An integration selected without its extra exits with an installation hint. Hosted LLM access
 is optional; all core tests and non-LLM matching paths run without OpenRouter credentials.
-The Bio-ML 0.2 evaluator and its reasoner extra support Python 3.10 and newer. The builtin
-evaluator remains the lighter option when official coherence is not requested.
+The built-in evaluator remains the lighter option when official Bio-ML coherence is not
+requested.
 
 The base wheel includes the shared `pyowl-core` snapshot API and OWL2Vec* projector. It does
-not require Java, a JDK, Cargo, a compiler, or either optional reasoner. Native accelerators
-are selected only when a compatible upstream wheel is already installed; the complete Python
-backend remains available on Python 3.10–3.12.
+not require Java, a JDK, Cargo, a compiler, visualization services, or either optional
+reasoner. Native accelerators are selected only from compatible published upstream wheels;
+the complete Python projection path remains available on Python 3.10–3.12.
 
 ## Verify the installation
 
 ```console
-poetry run exact data list
-poetry run exact config default --format yaml > /tmp/exact-default.yaml
-poetry run exact run --help
+python -m pip check
+exact data list
+exact config default --format yaml > /tmp/exact-default.yaml
+exact run --help
 ```
 
 For a source checkout, the standard CPU-only check is:
