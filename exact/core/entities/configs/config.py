@@ -7,7 +7,6 @@ from these models; importing :mod:`exact` never reads that file.
 
 from __future__ import annotations
 
-import difflib
 import hashlib
 import importlib
 import json
@@ -27,43 +26,32 @@ from pydantic import (
 from exact.core.contracts.dataset import IDataset
 from exact.core.contracts.trainer import ITrainer
 from exact.core.entities.configs.dataset import BestPathMethod, ContextMethod
+from exact.core.entities.configs.experimental import (
+    AdaptiveKConfig,
+    AnchorRescoringConfig,
+    AttributeChannelExperimentConfig,
+    CandidateMultiViewConfig,
+    CrossEncoderConfig,
+    DifferenceChannelExperimentConfig,
+    EncoderFinetuneConfig,
+    EvidenceGroupConfig,
+    ExtractionConfig,
+    FusionExperimentConfig,
+    GraphChannelExperimentConfig,
+    HierarchyChannelExperimentConfig,
+    LexicalChannelExperimentConfig,
+    LLMExperimentConfig,
+    NilConfig,
+    ScoreCalibrationConfig,
+    SelectorExperimentConfig,
+    StringSimilarityChannelConfig,
+    SupervisionConfig,
+)
+from exact.core.entities.configs.strict import StrictConfigModel
 from exact.core.entities.registry import ComponentRegistry, ComponentType
 
 DEFAULT_CONFIG_PATH = Path(__file__).resolve().parents[3] / "default_config.yaml"
 CONFIG_VERSION = 2
-
-
-class StrictConfigModel(BaseModel):
-    """Base class that rejects misspelled configuration keys with a hint."""
-
-    model_config = ConfigDict(
-        extra="forbid",
-        populate_by_name=True,
-        validate_default=True,
-        use_enum_values=False,
-    )
-
-    @model_validator(mode="before")
-    @classmethod
-    def reject_unknown_keys(cls, value: Any) -> Any:
-        if not isinstance(value, Mapping):
-            return value
-        accepted: set[str] = set(cls.model_fields)
-        aliases: dict[str, str] = {}
-        for name, info in cls.model_fields.items():
-            alias = info.alias
-            if isinstance(alias, str):
-                accepted.add(alias)
-                aliases[alias] = name
-        unknown = [str(key) for key in value if str(key) not in accepted]
-        if not unknown:
-            return value
-        messages: list[str] = []
-        for key in sorted(unknown):
-            suggestion = difflib.get_close_matches(key, sorted(accepted), n=1, cutoff=0.55)
-            hint = f" Did you mean '{suggestion[0]}'?" if suggestion else ""
-            messages.append(f"Unknown configuration key '{key}'.{hint}")
-        raise ValueError(" ".join(messages))
 
 
 class CompatibilityParams(BaseModel):
@@ -128,6 +116,13 @@ class RunConfig(StrictConfigModel):
     use_file_cache: bool = Field(
         True, description="Reuse compatible dataset and model caches when available."
     )
+    source_cap: Optional[int] = Field(
+        None, ge=1, description="Deterministic source-group cap for development screening."
+    )
+    experiment_audit: bool = Field(
+        False,
+        description="Persist paper-only lossless evaluation artifacts and provenance.",
+    )
 
     @field_validator("logging_level", mode="before")
     @classmethod
@@ -157,6 +152,14 @@ class DataConfig(StrictConfigModel):
         description="Named reference alignments, such as train, test, and full.",
     )
     candidates: Optional[Path] = Field(None, description="Optional candidate alignment path.")
+    reference_role: Optional[str] = Field(
+        None,
+        description="Explicit evaluation reference split (for example valid or test).",
+    )
+    candidate_source: Literal["track", "reference_split", "generated"] = Field(
+        "track",
+        description="Use the track pool, the selected split's pool, or generate candidates.",
+    )
 
     @field_validator("track", "task")
     @classmethod
@@ -245,6 +248,38 @@ class MatchingChannelsConfig(StrictConfigModel):
     uncertainty_disagreement_quality_power: float = Field(
         0.5, description="Power applied to lexical/structural quality in disagreement uncertainty."
     )
+    strsim: StringSimilarityChannelConfig = Field(
+        default=StringSimilarityChannelConfig.model_validate({}),
+        description="E06 string-similarity channel controls.",
+    )
+    attr: AttributeChannelExperimentConfig = Field(
+        default=AttributeChannelExperimentConfig.model_validate({}),
+        description="E08 attribute polarity and evidence-bank controls.",
+    )
+    hier: HierarchyChannelExperimentConfig = Field(
+        default=HierarchyChannelExperimentConfig.model_validate({}),
+        description="E09 hierarchy-overlap and sibling controls.",
+    )
+    diff: DifferenceChannelExperimentConfig = Field(
+        default=DifferenceChannelExperimentConfig.model_validate({}),
+        description="E24 contrastive-channel formulation and diagnostics.",
+    )
+    lex: LexicalChannelExperimentConfig = Field(
+        default=LexicalChannelExperimentConfig.model_validate({}),
+        description="E26 lexical-quality controls.",
+    )
+    property: EvidenceGroupConfig = Field(
+        default=EvidenceGroupConfig.model_validate({}),
+        description="E11 property evidence groups.",
+    )
+    instance: EvidenceGroupConfig = Field(
+        default=EvidenceGroupConfig.model_validate({}),
+        description="E12 instance evidence groups.",
+    )
+    graph: GraphChannelExperimentConfig = Field(
+        default=GraphChannelExperimentConfig.model_validate({}),
+        description="E23 supervised graph-channel controls.",
+    )
 
 
 class MatchingConfig(StrictConfigModel):
@@ -264,7 +299,30 @@ class MatchingConfig(StrictConfigModel):
         description="Knowledge-graph entity kinds eligible for alignment.",
     )
     relation_prediction: str = Field(
-        "none", description="Relation typing mode: none or hierarchy_heuristic."
+        "none", description="Relation typing mode; none preserves shipped all-equivalent output."
+    )
+    relation_semantic_backend: Literal["graph_closure", "bridge_reasoner"] = Field(
+        "graph_closure", description="E14 semantic relation-typing backend."
+    )
+    relation_equivalence_anchor_threshold: float = Field(0.95, ge=0.0, le=1.0)
+    relation_confidence_threshold: float = Field(0.5, ge=0.0, le=1.0)
+    extraction: ExtractionConfig = Field(
+        default=ExtractionConfig.model_validate({}), description="E01 global extraction controls."
+    )
+    anchor_rescoring: AnchorRescoringConfig = Field(
+        default=AnchorRescoringConfig.model_validate({}),
+        description="E02 anchor-guided structural rescoring controls.",
+    )
+    calibration: ScoreCalibrationConfig = Field(
+        default=ScoreCalibrationConfig.model_validate({}),
+        description="E03 score calibration and threshold controls.",
+    )
+    nil: NilConfig = Field(
+        default=NilConfig.model_validate({}), description="E04 NIL/abstention controls."
+    )
+    fusion: FusionExperimentConfig = Field(
+        default=FusionExperimentConfig.model_validate({}),
+        description="E10/E19/E24/E26 evidence-fusion controls.",
     )
     channels: MatchingChannelsConfig = Field(
         default=MatchingChannelsConfig.model_validate({}),
@@ -282,8 +340,17 @@ class MatchingConfig(StrictConfigModel):
     @classmethod
     def validate_relation_prediction(cls, value: Any) -> str:
         mode = str(value or "none").strip().lower()
-        if mode not in {"none", "hierarchy_heuristic"}:
-            raise ValueError("relation_prediction must be none or hierarchy_heuristic")
+        if mode not in {
+            "none",
+            "hierarchy_heuristic",
+            "semantic_entailment",
+            "learned_three_way",
+            "semantic_then_learned",
+        }:
+            raise ValueError(
+                "relation_prediction must be none, hierarchy_heuristic, semantic_entailment, "
+                "learned_three_way, or semantic_then_learned"
+            )
         return mode
 
 
@@ -451,6 +518,12 @@ class DatasetConfig(StrictConfigModel):
 
 
 class CandidateFusionConfig(StrictConfigModel):
+    mode: Literal["max", "rrf", "weighted"] = Field(
+        "max", description="Semantic/lexical retrieval-channel fusion."
+    )
+    rrf_constant: float = Field(60.0, gt=0.0, description="Rank offset used by RRF.")
+    weighted_semantic: float = Field(0.5, ge=0.0, description="Weighted-fusion semantic share.")
+    weighted_lexical: float = Field(0.5, ge=0.0, description="Weighted-fusion lexical share.")
     token_weight: float = Field(1.0, description="Weight of lexical token cosine in max fusion.")
     gram_weight: float = Field(0.85, description="Weight of character-gram cosine in max fusion.")
     blend_token_weight: float = Field(
@@ -570,6 +643,7 @@ class CandidatesConfig(StrictConfigModel):
     )
     lexical_encoder_name: Optional[str] = Field(
         "sentence-transformers/all-MiniLM-L6-v2",
+        alias="encoder",
         description="Sentence encoder used for semantic candidate retrieval.",
     )
     encode_batch_size: int = Field(512, description="Candidate-encoder batch size.")
@@ -585,6 +659,21 @@ class CandidatesConfig(StrictConfigModel):
     aliases: CandidateAliasConfig = Field(
         default=CandidateAliasConfig.model_validate({}),
         description="Annotation-alias selection caps, priorities, and blocklists.",
+    )
+    adaptive_k: AdaptiveKConfig = Field(
+        default=AdaptiveKConfig.model_validate({}), description="E05 adaptive pool sizing."
+    )
+    encoder_finetune: EncoderFinetuneConfig = Field(
+        default=EncoderFinetuneConfig.model_validate({}),
+        description="E20 fitted retrieval-encoder controls.",
+    )
+    cross_encoder: CrossEncoderConfig = Field(
+        default=CrossEncoderConfig.model_validate({}),
+        description="E20 supervised pool reranker controls.",
+    )
+    multi_view: CandidateMultiViewConfig = Field(
+        default=CandidateMultiViewConfig.model_validate({}),
+        description="E12 kind-scoped multi-view retrieval controls.",
     )
 
     @field_validator("retrieval_strategy", mode="before")
@@ -821,6 +910,10 @@ class LLMConfig(StrictConfigModel):
         default=LLMVerbaliserConfig.model_validate({}),
         description="Relation-template generation controls.",
     )
+    experiment: LLMExperimentConfig = Field(
+        default=LLMExperimentConfig.model_validate({}),
+        description="E07/E21/E25 LLM decision, gate, and supervision controls.",
+    )
 
     @model_validator(mode="before")
     @classmethod
@@ -852,6 +945,10 @@ class EvaluationConfig(StrictConfigModel):
     )
     bioml: Dict[str, Any] = Field(
         default_factory=dict, description="Options forwarded to the optional Bio-ML evaluator."
+    )
+    dual_global_local: bool = Field(
+        False,
+        description="Evaluate accepted mappings globally and the fixed pool locally.",
     )
 
     @field_validator("backends", mode="before")
@@ -1082,6 +1179,14 @@ class ConfigModel(StrictConfigModel):
     )
     llm: LLMConfig = Field(
         default=LLMConfig.model_validate({}), description="LLM profiles and generation routing."
+    )
+    selector: SelectorExperimentConfig = Field(
+        default=SelectorExperimentConfig.model_validate({}),
+        description="Canonical selector experiment controls.",
+    )
+    supervision: SupervisionConfig = Field(
+        default=SupervisionConfig.model_validate({}),
+        description="Per-component supervision-mode resolution.",
     )
     evaluation: EvaluationConfig = Field(
         default=EvaluationConfig.model_validate({}),

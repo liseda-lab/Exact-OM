@@ -9,6 +9,10 @@ run:
   logging_level: INFO
   # Reuse compatible dataset and model caches when available.
   use_file_cache: true
+  # Deterministic source-group cap for development screening.
+  source_cap:
+  # Persist paper-only lossless evaluation artifacts and provenance.
+  experiment_audit: false
 # Input and dataset-track selection.
 data:
   # Registered dataset-track provider name.
@@ -29,6 +33,10 @@ data:
   refs: {}
   # Optional candidate alignment path.
   candidates:
+  # Explicit evaluation reference split (for example valid or test).
+  reference_role:
+  # Use the track pool, the selected split's pool, or generate candidates.
+  candidate_source: track
 # Input adapters and output formats.
 io:
   # Input adapter name, or auto to infer it from each input path.
@@ -56,8 +64,60 @@ matching:
   # Knowledge-graph entity kinds eligible for alignment.
   entity_kinds:
     - class
-  # Relation typing mode: none or hierarchy_heuristic.
+  # Relation typing mode; none preserves shipped all-equivalent output.
   relation_prediction: none
+  # E14 semantic relation-typing backend.
+  relation_semantic_backend: graph_closure
+  relation_equivalence_anchor_threshold: 0.95
+  relation_confidence_threshold: 0.5
+  # E01 global extraction controls.
+  extraction:
+    # Global extraction strategy; greedy preserves shipped behavior.
+    mode: greedy
+    # Connected-component size above which assignment falls back to mutual-best.
+    assignment_component_cap: 500
+  # E02 anchor-guided structural rescoring controls.
+  anchor_rescoring:
+    # Anchor-rescoring mode; off preserves shipped behavior.
+    mode: off
+    # Base-score threshold for predicted anchors.
+    threshold: 0.95
+    # Restrict the anchor set to exact matches.
+    exact_only: false
+    # Maximum bounded anchor-rescoring passes.
+    max_passes: 2
+  # E03 score calibration and threshold controls.
+  calibration:
+    # Calibration applied to final pair scores.
+    mode: none
+    # Acceptance-threshold source.
+    threshold_mode: fixed
+    # Optional immutable fitted calibrator artifact.
+    artifact:
+  # E04 NIL/abstention controls.
+  nil:
+    # NIL scoring mode; off preserves non-NIL behavior.
+    mode: off
+    # Common scale for real candidates and NIL.
+    ranking_scale: joint_accept_probability
+  # E10/E19/E24/E26 evidence-fusion controls.
+  fusion:
+    # Enable experiment-side fusion controls.
+    enabled: false
+    # Evidence-fusion weight provider.
+    mode: analytic_shipped
+    # Scope of fitted fusion parameters.
+    scope: global
+    # E26 decomposition of quality, sharpening, and suppression.
+    sigma_mode: full
+    # Neutral score pivot when enabled.
+    tau: 0.5
+    # Informative-deviation exponent when enabled.
+    gamma: 2.0
+    # LLM contribution scale when enabled.
+    beta: 0.8
+    # Optional immutable fitted fusion artifact.
+    artifact:
   # Pair-adaptive channel constants exposed for reproducible sweeps.
   channels:
     # Embedding contribution to each hierarchy-channel score.
@@ -88,6 +148,81 @@ matching:
     uncertainty_indecision_scale: 2.0
     # Power applied to lexical/structural quality in disagreement uncertainty.
     uncertainty_disagreement_quality_power: 0.5
+    # E06 string-similarity channel controls.
+    strsim:
+      # Enable the E06 scoring-time string channel.
+      enabled: false
+      # Treat the signal independently or fold it into lexical evidence.
+      placement: channel
+      # Optional conservative abbreviation sub-signal.
+      abbreviation: off
+      isub_weight: 1.0
+      jaro_winkler_weight: 1.0
+      token_set_weight: 1.0
+    # E08 attribute polarity and evidence-bank controls.
+    attr:
+      # Enable E08 attribute-channel variants.
+      enabled: false
+      polarity: support_only
+      bank: full
+      signed_property_allowlist: []
+    # E09 hierarchy-overlap and sibling controls.
+    hier:
+      # Enable E09 hierarchy-semantic variants.
+      enabled: false
+      mode: labels
+      siblings: false
+      # Ancestor depth; null requests full closure.
+      depth: 2
+      overlap_weight: 0.5
+    # E24 contrastive-channel formulation and diagnostics.
+    diff:
+      # Enable E24 contrastive-channel diagnostics/variants.
+      enabled: false
+      formulation: normalised
+      # Persist pivot-reason diagnostics.
+      dump_components: false
+    # E26 lexical-quality controls.
+    lex:
+      # Enable E26 lexical-quality variants.
+      enabled: false
+      quality: margin
+      entropy_top_m: 5
+    # E11 property evidence groups.
+    property:
+      # Enable kind-specific experiment evidence switches.
+      enabled: false
+      labels: true
+      annotations: true
+      signature: true
+      hierarchy: true
+      characteristics: true
+      usage: true
+      types: true
+      relations: true
+      literals: true
+      anchors: false
+      relations_shuffled: false
+    # E12 instance evidence groups.
+    instance:
+      # Enable kind-specific experiment evidence switches.
+      enabled: false
+      labels: true
+      annotations: true
+      signature: true
+      hierarchy: true
+      characteristics: true
+      usage: true
+      types: true
+      relations: true
+      literals: true
+      anchors: false
+      relations_shuffled: false
+    # E23 supervised graph-channel controls.
+    graph:
+      mode: off
+      artifact:
+      dump_profile: false
 # Dataset construction and evidence extraction.
 dataset:
   # Registered hierarchy reasoner name.
@@ -202,7 +337,7 @@ candidates:
   # Candidate retrieval strategy: primary_label or hybrid.
   retrieval_strategy: hybrid
   # Sentence encoder used for semantic candidate retrieval.
-  lexical_encoder_name: sentence-transformers/all-MiniLM-L6-v2
+  encoder: sentence-transformers/all-MiniLM-L6-v2
   # Candidate-encoder batch size.
   encode_batch_size: 512
   # Cosine-search batch size.
@@ -213,6 +348,14 @@ candidates:
   use_amp: true
   # Lexical and retrieval-channel fusion constants.
   fusion:
+    # Semantic/lexical retrieval-channel fusion.
+    mode: max
+    # Rank offset used by RRF.
+    rrf_constant: 60.0
+    # Weighted-fusion semantic share.
+    weighted_semantic: 0.5
+    # Weighted-fusion lexical share.
+    weighted_lexical: 0.5
     # Weight of lexical token cosine in max fusion.
     token_weight: 1.0
     # Weight of character-gram cosine in max fusion.
@@ -318,6 +461,27 @@ candidates:
     priority_length_cap: 6
     # Divisor used by the alias priority length penalty.
     priority_length_divisor: 30.0
+  # E05 adaptive pool sizing.
+  adaptive_k:
+    enabled: false
+    criterion: gap
+    gap: 0.05
+    entropy: 0.75
+    k_min: 20
+    k_max: 20
+  # E20 fitted retrieval-encoder controls.
+  encoder_finetune:
+    mode: off
+    artifact:
+    negative_policy: complete_reference
+  # E20 supervised pool reranker controls.
+  cross_encoder:
+    mode: off
+    artifact:
+    top_k: 20
+  # E12 kind-scoped multi-view retrieval controls.
+  multi_view:
+    mode: labels
 # Ordered primary and post-inference model components.
 pipeline:
   -
@@ -709,6 +873,54 @@ llm:
     max_retries: 1
     # Skip relations without domain/range examples.
     exclude_missing_domain_range: false
+  # E07/E21/E25 LLM decision, gate, and supervision controls.
+  experiment:
+    # Enable experiment-side LLM controls.
+    enabled: false
+    decision:
+      mode: binary
+      probability: raw_joint
+      listwise_max_candidates: 5
+      order_averages: 1
+    gate:
+      mode: analytic
+      threshold: 0.5
+      quantile_fraction: 0.05
+      forced_sample_size: 0
+      artifact:
+    exemplars: off
+    exemplar_count: 0
+    distill: off
+    distill_artifact:
+    fusion_weight: beta_u
+    fusion_artifact:
+# Canonical selector experiment controls.
+selector:
+  # Enable experiment-side selector controls.
+  enabled: false
+  # Optional experiment override for the CandidateSetSelector stage.
+  runtime_enabled:
+  emit_candidate_scores: false
+  accept_model: logistic
+  accept_training: winner_only
+  label_free_mode: current_fallback
+  tuning:
+    count_reference_miss_as: fp_fn
+  rerank:
+    mode: current
+    model: current_linear
+    features: current
+    artifact:
+# Per-component supervision-mode resolution.
+supervision:
+  mode: auto
+  components: {}
+  auto_policy:
+    kind: current
+    artifact:
+    fallback: label_free
+  min_effective_training_units: {}
+  artifacts: {}
 # Evaluation backends and ranking cutoffs.
 evaluation:
   # Evaluator backends run in order.
@@ -721,6 +933,8 @@ evaluation:
     - 10
   # Options forwarded to the optional Bio-ML evaluator.
   bioml: {}
+  # Evaluate accepted mappings globally and the fixed pool locally.
+  dual_global_local: false
 # Saved artifacts, plots, and diagnostics.
 output:
   # Alignment save switches.
