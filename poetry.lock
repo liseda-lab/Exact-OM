@@ -3191,18 +3191,26 @@ files = [
 
 [[package]]
 name = "oaei-bioml-eval"
-version = "0.2.0"
+version = "0.2.1"
 description = "Common evaluation/scoring logic for the OAEI Bio-ML tracks (public + private)."
 optional = true
 python-versions = ">=3.10"
 groups = ["main"]
 markers = "extra == \"bioml-eval\""
-files = []
+files = [
+    {file = "oaei_bioml_eval-0.2.1-py3-none-any.whl", hash = "sha256:26f0b480dd072a33c382a8010ca1137b0c73b873d4c9df417b4578f31d272b16"},
+    {file = "oaei_bioml_eval-0.2.1.tar.gz", hash = "sha256:4b765f9e40003a71e0925a6841fbaba2340704d6e4ea04fc61bca67687a75682"},
+]
+
+[package.dependencies]
+pyelk-reasoner = {version = ">=0.2,<0.3", optional = true, markers = "extra == \"reasoner\""}
+pyhermit = {version = ">=0.2,<0.3", optional = true, markers = "extra == \"reasoner\""}
+pyowl-core = {version = ">=0.2,<0.3", optional = true, markers = "extra == \"reasoner\""}
 
 [package.extras]
-all = ["pyHermiT (>=0.1,<0.2)", "pyelk-reasoner (>=0.1,<0.2)", "pyowl-core (>=0.1,<0.2)", "rdflib (>=7.0,<8)"]
+all = ["pyelk-reasoner (>=0.2,<0.3)", "pyhermit (>=0.2,<0.3)", "pyowl-core (>=0.2,<0.3)", "rdflib (>=7.0,<8)"]
 rdf = ["rdflib (>=7.0,<8)"]
-reasoner = ["pyHermiT (>=0.1,<0.2)", "pyelk-reasoner (>=0.1,<0.2)", "pyowl-core (>=0.1,<0.2)"]
+reasoner = ["pyelk-reasoner (>=0.2,<0.3)", "pyhermit (>=0.2,<0.3)", "pyowl-core (>=0.2,<0.3)"]
 
 [[package]]
 name = "packaging"
@@ -3611,53 +3619,6 @@ files = [
 ]
 
 [[package]]
-name = "pyelk-reasoner"
-version = "0.1.0"
-description = "Java-free OWL 2 EL reasoning with pure-Python and optional native backends"
-optional = true
-python-versions = ">=3.10"
-groups = ["main"]
-markers = "extra == \"reasoning\""
-files = []
-
-[package.dependencies]
-pyowl-core = ">=0.1,<0.2"
-
-[[package]]
-name = "pyhermit"
-version = "0.1.0"
-description = "Java-free OWL 2 DL reasoning with pure-Python and optional native backends"
-optional = true
-python-versions = ">=3.10"
-groups = ["main"]
-markers = "extra == \"reasoning\""
-files = []
-
-[package.dependencies]
-pyowl-core = ">=0.1,<0.2"
-
-[[package]]
-name = "pyowl-core"
-version = "0.1.0"
-description = "Java-free shared OWL 2 structural parsing and communication kernel"
-optional = false
-python-versions = ">=3.10"
-groups = ["main"]
-files = []
-
-[[package]]
-name = "pyowl2vec-star-projector"
-version = "0.1.0"
-description = "Shared-snapshot OWL2Vec* projection for pyowl-core"
-optional = false
-python-versions = ">=3.10"
-groups = ["main"]
-files = []
-
-[package.dependencies]
-pyowl-core = ">=0.1,<0.2"
-
-[[package]]
 name = "pyaml"
 version = "25.7.0"
 description = "PyYAML-based module to produce a bit more pretty and readable YAML-serialized data"
@@ -3881,6 +3842,32 @@ toml = ["tomli (>=2.0.1)"]
 yaml = ["pyyaml (>=6.0.1)"]
 
 [[package]]
+name = "pyelk-reasoner"
+version = "0.2.0"
+description = "ELK-compatible OWL 2 EL reasoning in pure Python with optional Rust acceleration"
+optional = true
+python-versions = ">=3.10"
+groups = ["main"]
+markers = "extra == \"bioml-eval\" or extra == \"reasoning\""
+files = [
+    {file = "pyelk_reasoner-0.2.0-cp310-abi3-macosx_10_12_x86_64.whl", hash = "sha256:261735da52cf0ca1f827178fc3186dc94fea12ae4d9910db18957e17eb2a6636"},
+    {file = "pyelk_reasoner-0.2.0-cp310-abi3-macosx_11_0_arm64.whl", hash = "sha256:e9519bd02480df6c63284eb46a5e046bbb857782568b12ea44d2575c068e63d5"},
+    {file = "pyelk_reasoner-0.2.0-cp310-abi3-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:c2ff9e6f5909a20bd8e594688e16d03a7d3be261b97660e07c84895ae38f7f92"},
+    {file = "pyelk_reasoner-0.2.0-cp310-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:584940db4f1a75637eb618ac41d6fb6f724a6cf90324d67b53756dbeb89af2af"},
+    {file = "pyelk_reasoner-0.2.0-cp310-abi3-musllinux_1_2_aarch64.whl", hash = "sha256:7d1e1ea970b8eefb528fe2c0b0e26d758bd68d81378c50994ca3466209217758"},
+    {file = "pyelk_reasoner-0.2.0-cp310-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:8be1e4c3f242572199f98f3fd72f524f443527144a34e2f6473f6a8087cd9b8b"},
+    {file = "pyelk_reasoner-0.2.0-cp310-abi3-win_amd64.whl", hash = "sha256:e8b808d5e60dad577510a17271f09843674cf996340ec665ad66cf06f32793d8"},
+    {file = "pyelk_reasoner-0.2.0-py3-none-any.whl", hash = "sha256:019193f4be2ac423bdb5b4f6e299762530397d4bf897f5b833c84ed8d087e20e"},
+    {file = "pyelk_reasoner-0.2.0.tar.gz", hash = "sha256:74dca1f7ef94f05999cdaf8328642f94ceb449f0d49247c048e26d39fba3fb68"},
+]
+
+[package.dependencies]
+pyowl-core = ">=0.2,<0.3"
+
+[package.extras]
+dev = ["build (>=1.2,<2)", "hypothesis (>=6.100,<7)", "import-linter (>=2.1,<3)", "mypy (>=1.10,<3)", "packaging (>=24,<27)", "pytest (>=8.2,<10)", "pytest-cov (>=5,<8)", "ruff (>=0.5,<1)"]
+
+[[package]]
 name = "pyflakes"
 version = "3.4.0"
 description = "passive checker of Python programs"
@@ -3909,6 +3896,33 @@ markers = {main = "extra == \"docs\""}
 windows-terminal = ["colorama (>=0.4.6)"]
 
 [[package]]
+name = "pyhermit"
+version = "0.2.0"
+description = "Java-free OWL 2 DL reasoning with pure-Python and optional Rust backends"
+optional = true
+python-versions = ">=3.10"
+groups = ["main"]
+markers = "extra == \"bioml-eval\" or extra == \"reasoning\""
+files = [
+    {file = "pyhermit-0.2.0-cp310-abi3-macosx_10_12_x86_64.whl", hash = "sha256:d5d0d4cc725f428f8703511530f4cd01d27cb78eac1a12c2f8a8356705ca5e92"},
+    {file = "pyhermit-0.2.0-cp310-abi3-macosx_11_0_arm64.whl", hash = "sha256:049c446a27628ade9027aa673b36b5edfc0868167de317c7bc9e2c82b3d60ae8"},
+    {file = "pyhermit-0.2.0-cp310-abi3-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:e63bb66f449a6f7ba98d2c1ab657091b4ef85ccecc2e1a06251e706a7375a5d4"},
+    {file = "pyhermit-0.2.0-cp310-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:63917514ac974ddc1bb3d83f40db86d50ab1e6863e9fb5d1a6c92fd96608f3af"},
+    {file = "pyhermit-0.2.0-cp310-abi3-musllinux_1_2_aarch64.whl", hash = "sha256:2432b10de153d3f019d7fe1c2adf7c9ccf257da252099604a40caa088c00b382"},
+    {file = "pyhermit-0.2.0-cp310-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:fcfc95a0ab1cf3d229f8c23de797b82eb371a36370bc4837f132ffd26893b71b"},
+    {file = "pyhermit-0.2.0-cp310-abi3-win_amd64.whl", hash = "sha256:abf527d5e0e1b21fb5be4ede3002806b1e5d6cc70b2b2ae000eac37a02c4d1ff"},
+    {file = "pyhermit-0.2.0-cp310-abi3-win_arm64.whl", hash = "sha256:8ae4a0018420d262d5eea737af47926e9e8e41accee878df5634efd23d744d2e"},
+    {file = "pyhermit-0.2.0-py3-none-any.whl", hash = "sha256:b20ad14156740709bdb749e9771ced38a792c1536b482ec96e30f965b57f99e0"},
+    {file = "pyhermit-0.2.0.tar.gz", hash = "sha256:bac356cf74b8a9342fb9678fb9f2cfe393f79fb04bc1102901de51bc1ce0d966"},
+]
+
+[package.dependencies]
+pyowl-core = ">=0.2,<0.3"
+
+[package.extras]
+dev = ["build (>=1.2,<2)", "hypothesis (>=6.100,<7)", "import-linter (>=2.1,<3)", "mypy (>=1.10,<3)", "packaging (>=24,<27)", "pytest (>=8.2,<10)", "pytest-cov (>=5,<8)", "ruff (==0.15.22)", "tomli (>=2.0,<3) ; python_version < \"3.11\""]
+
+[[package]]
 name = "pymdown-extensions"
 version = "11.0.1"
 description = "Extension pack for Python Markdown."
@@ -3927,6 +3941,70 @@ pyyaml = "*"
 
 [package.extras]
 extra = ["pygments (>=2.19.1)"]
+
+[[package]]
+name = "pyowl-core"
+version = "0.2.0"
+description = "Java-free shared OWL 2 structural parsing and communication kernel"
+optional = false
+python-versions = ">=3.10"
+groups = ["main"]
+files = [
+    {file = "pyowl_core-0.2.0-cp310-cp310-macosx_13_0_arm64.whl", hash = "sha256:ea961d43ee3a069f4b7a3dc6728593ae2887836047898de3ad0334272047ca42"},
+    {file = "pyowl_core-0.2.0-cp310-cp310-macosx_13_0_x86_64.whl", hash = "sha256:e26d7c848baf72032e5755fbe9fb7dbbbb4f879e5deb83463994cb27eedd9dc7"},
+    {file = "pyowl_core-0.2.0-cp310-cp310-manylinux_2_28_aarch64.whl", hash = "sha256:5b6bfaad1f0dc3316631ba3879ee05dd2603b95329918a78bcad4772781d3b7d"},
+    {file = "pyowl_core-0.2.0-cp310-cp310-manylinux_2_28_x86_64.whl", hash = "sha256:0ccdf4ddf0b5a62142c250f30398be97271ee1b629632e6aa83e95140c9d5495"},
+    {file = "pyowl_core-0.2.0-cp310-cp310-win_amd64.whl", hash = "sha256:e20147fae4738369cb486704449f1675895090f86c7a866b14ac523801578f36"},
+    {file = "pyowl_core-0.2.0-cp311-cp311-macosx_13_0_arm64.whl", hash = "sha256:7c39768f9d43ece68bca7b8cb55f84b44b273245889f3091c159188f2e6e89a4"},
+    {file = "pyowl_core-0.2.0-cp311-cp311-macosx_13_0_x86_64.whl", hash = "sha256:b5ca6ccc7124f56182117ae926f5c9dafdae0ffb631757a8bde982939f2390ba"},
+    {file = "pyowl_core-0.2.0-cp311-cp311-manylinux_2_28_aarch64.whl", hash = "sha256:0f2aa524d14f6ff802ffd4a3a9dd36b2bbd1c1f705afaf3848ee7825d70dce4c"},
+    {file = "pyowl_core-0.2.0-cp311-cp311-manylinux_2_28_x86_64.whl", hash = "sha256:b79de77254457c7d0ec2e69ebc480eade8b1e2f7831f7aa16554b0efb82c1b67"},
+    {file = "pyowl_core-0.2.0-cp311-cp311-win_amd64.whl", hash = "sha256:e3c25506ecbe168a19a718015dcae6220a7100882b094b39e0d8ef5788a4b4f0"},
+    {file = "pyowl_core-0.2.0-cp312-cp312-macosx_13_0_arm64.whl", hash = "sha256:30102af8a8212964172dd326a662cfdee2f5e54edfa4a5a7ea7f581b6e206745"},
+    {file = "pyowl_core-0.2.0-cp312-cp312-macosx_13_0_x86_64.whl", hash = "sha256:9849337d04d972162f4a738550aa18ef163d6700cec202e8d4eed48b615c3177"},
+    {file = "pyowl_core-0.2.0-cp312-cp312-manylinux_2_28_aarch64.whl", hash = "sha256:b74038011d6036ed2d00f46efcff99c8f3622d781c48ff79281839675e1939a1"},
+    {file = "pyowl_core-0.2.0-cp312-cp312-manylinux_2_28_x86_64.whl", hash = "sha256:c4298d856f89629285871813194bd0fb3abb8a35ec9c9d2ceb0178c42faa86d5"},
+    {file = "pyowl_core-0.2.0-cp312-cp312-win_amd64.whl", hash = "sha256:c616fc8ce99c0988ecf43f20e482ffb9350b49ac9017abde4e9bd7790e260165"},
+    {file = "pyowl_core-0.2.0-cp313-cp313-macosx_13_0_arm64.whl", hash = "sha256:f5c9879873600caa6a1b807676997575dd8cd4f68a6f4a622af4836428ae19b0"},
+    {file = "pyowl_core-0.2.0-cp313-cp313-macosx_13_0_x86_64.whl", hash = "sha256:f8afc0c05b18251a31a72e8bc3c1b370a2d06f8df72501c79793e66099bf2018"},
+    {file = "pyowl_core-0.2.0-cp313-cp313-manylinux_2_28_aarch64.whl", hash = "sha256:5fd992f97d66847335980487d806a000f6d56aaee34531f901a640fd51f33b6b"},
+    {file = "pyowl_core-0.2.0-cp313-cp313-manylinux_2_28_x86_64.whl", hash = "sha256:b3852590b029af720f9a8209b0666f8faf8b83f2324e85389fe18a6b7bea5e7b"},
+    {file = "pyowl_core-0.2.0-cp313-cp313-win_amd64.whl", hash = "sha256:8977d84b69bf0ee6c0437c7bea39f32bf6b6359a4e843e589666621fd513cefe"},
+    {file = "pyowl_core-0.2.0-cp314-cp314-macosx_13_0_arm64.whl", hash = "sha256:fd6acdce38740a2f3da5b298b7feb179be90c9d38b3d7b8b5919ba4904c52f0f"},
+    {file = "pyowl_core-0.2.0-cp314-cp314-macosx_13_0_x86_64.whl", hash = "sha256:05bdefce26cdc206410284df1df46491c077658a041b8ca65a974656e8615a6b"},
+    {file = "pyowl_core-0.2.0-cp314-cp314-manylinux_2_28_aarch64.whl", hash = "sha256:f233bd2ce7a9aa9415cc3bbd37afa5d3e6cbe28dbd4f1cf776e2dde58d23a702"},
+    {file = "pyowl_core-0.2.0-cp314-cp314-manylinux_2_28_x86_64.whl", hash = "sha256:a4bda35b2335158de97cdc22382ee1ff90508f4ff08b024a97176ddbb7897110"},
+    {file = "pyowl_core-0.2.0-cp314-cp314-win_amd64.whl", hash = "sha256:3225b23d23d00a27d243616ff6dd6ef6707b634085e420babae8b33604a8fbd2"},
+    {file = "pyowl_core-0.2.0-py3-none-any.whl", hash = "sha256:2e6f7bf4f853943451626561ffde965b7507ae38aa0a8640ce357f2e5a623272"},
+    {file = "pyowl_core-0.2.0.tar.gz", hash = "sha256:19d387d32adaa907271a1551e424c8f20d001371ca0041e09c6dc8cc360f3728"},
+]
+
+[package.extras]
+dev = ["build (>=1.2)", "hypothesis (>=6.100)", "mypy (>=1.10)", "pytest (>=8)", "pytest-benchmark (>=4)", "ruff (>=0.5)", "tomli (>=2) ; python_version < \"3.11\"", "twine (>=5)"]
+
+[[package]]
+name = "pyowl2vec-star-projector"
+version = "0.2.0"
+description = "Java-free OWL2Vec* projection over shared pyowl-core ontology views"
+optional = false
+python-versions = ">=3.10"
+groups = ["main"]
+files = [
+    {file = "pyowl2vec_star_projector-0.2.0-cp310-abi3-macosx_10_12_x86_64.whl", hash = "sha256:3d05a5a53c9b4849fda4362ef6ff89ece33b86bd1e5f3de0c45825db3fa0611c"},
+    {file = "pyowl2vec_star_projector-0.2.0-cp310-abi3-macosx_11_0_arm64.whl", hash = "sha256:e0093df5e3953e26104f4bbbe1c6dad9c289f33f29cf5a0a66926d101f1a6767"},
+    {file = "pyowl2vec_star_projector-0.2.0-cp310-abi3-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:1e47997b8f725d5079db533067fd1a3a29cec68d749acef0ee88a8a8c9048bc8"},
+    {file = "pyowl2vec_star_projector-0.2.0-cp310-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:d9ef0c381c94b871831967d2e24ab0b0d1e69a62c976b81b85c199d3149dbcf2"},
+    {file = "pyowl2vec_star_projector-0.2.0-cp310-abi3-win_amd64.whl", hash = "sha256:6b0fc457d5cf56bbd456f65fa2785cf71ebcaef22871b0a89232dcb84a72ad88"},
+    {file = "pyowl2vec_star_projector-0.2.0-py3-none-any.whl", hash = "sha256:a2cc37916b1eabf4e3d4e6d6fd9ef4f52db98dcf0f6976b15025545208636df6"},
+    {file = "pyowl2vec_star_projector-0.2.0.tar.gz", hash = "sha256:7322f2ee19f87e315d67b2df335d8e9dbb155f46bb3f400f011729c68f1ff202"},
+]
+
+[package.dependencies]
+pyowl-core = ">=0.2,<0.3"
+
+[package.extras]
+dev = ["build (>=1.2)", "mypy (>=1.10)", "pytest (>=8)", "ruff (>=0.5)", "tomli (>=2) ; python_version < \"3.11\"", "twine (>=5)"]
+native-build = ["setuptools-rust (==1.13.0)"]
 
 [[package]]
 name = "pyparsing"
@@ -5104,6 +5182,18 @@ tests = ["autopep8", "isort", "llnl-hatchet", "numpy", "pytest", "pytest-forked"
 tutorials = ["matplotlib", "pandas", "tabulate"]
 
 [[package]]
+name = "types-pyyaml"
+version = "6.0.12.20260815"
+description = "Typing stubs for PyYAML"
+optional = false
+python-versions = ">=3.10"
+groups = ["prebuild"]
+files = [
+    {file = "types_pyyaml-6.0.12.20260815-py3-none-any.whl", hash = "sha256:6f332212b7e191f3afd5016a713c510b6340593b7ebec573c7d5d20aa5386d3b"},
+    {file = "types_pyyaml-6.0.12.20260815.tar.gz", hash = "sha256:28764110c9cf35846e733da32d8d734df7473c5dde9ef67c3b7332ec0e819858"},
+]
+
+[[package]]
 name = "typing-extensions"
 version = "4.16.0"
 description = "Backported and Experimental Type Hints for Python 3.9+"
@@ -5679,4 +5769,4 @@ viz = ["fastapi", "pydantic-settings", "uvicorn"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.10"
-content-hash = "2479ca97429101ee57b5a4f96a9a937e4320ba2f68206654eb6313fbc6fe16b7"
+content-hash = "44b5f1127a45270e4cf5ef4f6f237ef4f43413f24350d41af0bfb13301ff37b0"

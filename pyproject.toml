@@ -15,6 +15,7 @@ include = [
     { path = "exact_inspect/static/**/*", format = ["wheel"] },
     { path = "release/core-compatibility.json", format = ["sdist", "wheel"] },
 ]
+exclude = ["release/evidence/**"]
 
 [tool.poetry.dependencies]
 python = "^3.10"
@@ -27,8 +28,8 @@ sentence-transformers = "^2.7.0"
 cython = "^3.0.11"
 typing-extensions = "^4.12.2"
 pydantic = "^2.10.6"
-pyowl-core = ">=0.1,<0.2"
-pyowl2vec-star-projector = ">=0.1,<0.2"
+pyowl-core = ">=0.2,<0.3"
+pyowl2vec-star-projector = ">=0.2,<0.3"
 matplotlib = "^3.10.0"
 seaborn = "^0.13.2"
 pyaml = "^25.1.0"
@@ -41,15 +42,15 @@ fastapi = {version = "^0.116.1", optional = true}
 uvicorn = {version = "^0.35.0", extras = ["standard"], optional = true}
 pydantic-settings = {version = "^2.12.0", optional = true}
 zstandard = "^0.23.0"
-oaei-bioml-eval = {version = ">=0.2,<0.3", extras = ["reasoner"], optional = true}
+oaei-bioml-eval = {version = ">=0.2.1,<0.3", extras = ["reasoner"], optional = true}
 huggingface-hub = {version = "^0.36.2", optional = true}
 mkdocs-material = {version = "^9.7.6", optional = true}
 mkdocstrings = {version = "^1.0.4", extras = ["python"], optional = true}
 mkdocs-gen-files = {version = "^0.6.1", optional = true}
 mkdocs-literate-nav = {version = "^0.6.3", optional = true}
 linkchecker = {version = "^10.6.0", optional = true}
-pyelk-reasoner = {version = ">=0.1,<0.2", optional = true}
-pyhermit = {version = ">=0.1,<0.2", optional = true}
+pyelk-reasoner = {version = ">=0.2,<0.3", optional = true}
+pyhermit = {version = ">=0.2,<0.3", optional = true}
 
 [tool.poetry.extras]
 bioml-eval = ["oaei-bioml-eval"]
@@ -78,6 +79,7 @@ black = "^24.4.2"
 import-linter = "^2.1"
 pytest-cov = "^6.0"
 interrogate = "^1.7.0"
+types-PyYAML = "*"
 
 [build-system]
 requires = ["poetry-core"]

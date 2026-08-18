@@ -20,12 +20,7 @@ from exact.utils.logs import (
     configure_exact_logger,
     summarize_progress_estimates,
 )
-from exact.utils.timing import (
-    CacheStatus,
-    RunSession,
-    TimingLedger,
-    config_fingerprint,
-)
+from exact.utils.timing import CacheStatus, RunSession, TimingLedger, config_fingerprint
 
 
 @dataclass(frozen=True)

@@ -8,6 +8,7 @@ import math
 import re
 from collections import Counter
 from collections.abc import Mapping
+from importlib.metadata import PackageNotFoundError, version
 from typing import Any, cast
 
 import pyowl2vec_star_projector as shared_projector
@@ -227,6 +228,7 @@ def _core_provenance(snapshot: OntologyView) -> dict[str, object]:
         "model_schema_version": int(pyowl_core.MODEL_SCHEMA_VERSION),
         "wire_format_version": list(pyowl_core.WIRE_FORMAT_VERSION),
         "adapter_protocol_version": int(pyowl_core.ADAPTER_PROTOCOL_VERSION),
+        "encoded_contract": encoded_contract_identity().as_dict()["core"],
         "backend": report.backend,
         "shared_snapshot": True,
         "shared_view": True,
@@ -566,6 +568,13 @@ def _consumer_handoff(
     }
 
 
+def _exact_package_version() -> str:
+    try:
+        return version("exact-om")
+    except PackageNotFoundError:
+        return "unknown"
+
+
 def ontology_stack_provenance(
     snapshot: OntologyView,
     *,
@@ -579,6 +588,9 @@ def ontology_stack_provenance(
     projector_provenance = _projector_provenance(projector_settings, projector)
     payload = {
         "schema_version": ONTOLOGY_STACK_PROVENANCE_SCHEMA,
+        "exact": {
+            "package_version": _exact_package_version(),
+        },
         "kind": "owl",
         "core": _core_provenance(snapshot),
         "projector": projector_provenance,

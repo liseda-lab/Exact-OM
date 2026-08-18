@@ -365,6 +365,7 @@ class ReasonerProvenance:
                 "model_schema_version": int(pyowl_core.MODEL_SCHEMA_VERSION),
                 "wire_format_version": list(pyowl_core.WIRE_FORMAT_VERSION),
                 "adapter_protocol_version": int(pyowl_core.ADAPTER_PROTOCOL_VERSION),
+                "encoded_contract": encoded_contract_identity().as_dict()["core"],
             },
             "fingerprints": {
                 "structural": self.structural_fingerprint,
@@ -517,7 +518,7 @@ def _public_positive_int(module: object, name: str) -> int | None:
         return None
     if isinstance(value, bool) or not isinstance(value, int) or value < 1:
         raise TypeError(f"public reasoner {name} must be a positive integer")
-    return value
+    return cast(int, value)
 
 
 def _public_nonempty_text(module: object, name: str) -> str | None:

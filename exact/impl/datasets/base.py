@@ -29,10 +29,7 @@ from exact.core.entities.kinds import (
 from exact.core.entities.ontology import OntologyGraph
 from exact.impl.datasets.options import candidate_config, mapping_options
 from exact.io.sources import resolve as resolve_source
-from exact.ontology.projection import (
-    ProjectorSettings,
-    projector_cache_identity,
-)
+from exact.ontology.projection import ProjectorSettings, projector_cache_identity
 from exact.ontology.reasoning import reasoner_cache_identity
 from exact.runs.layout import RunLayout
 from exact.utils.candidate_generation import (
@@ -46,6 +43,8 @@ from exact.utils.candidate_generation import (
 from exact.utils.data import read_table
 
 DataFrame = pd.DataFrame
+_DATASET_CACHE_SCHEMA_VERSION = 4
+_ONTOLOGY_BACKEND_VERSION = 5
 
 
 class BaseAlignmentDataset(IDataset):
@@ -109,6 +108,7 @@ class BaseAlignmentDataset(IDataset):
         self._target_path: Optional[Path] = None
         self._dataset_signature: Optional[str] = None
         self._cache_warning_emitted: bool = False
+        self._cache_state: str = "cold"
         self._only_taxonomy_hint: bool = bool(kwargs.get("only_taxonomy", False))
         self._reasoner_name: str = str(kwargs.get("reasoner", "asserted"))
         self._projector_settings = ProjectorSettings.from_value(kwargs.get("projector"))
@@ -593,6 +593,11 @@ class BaseAlignmentDataset(IDataset):
 
         return {
             "schema_version": 1,
+            "cache": {
+                "schema_version": _DATASET_CACHE_SCHEMA_VERSION,
+                "ontology_backend_version": _ONTOLOGY_BACKEND_VERSION,
+                "state": self._cache_state,
+            },
             "source": describe(self._source),
             "target": describe(self._target),
         }
@@ -639,7 +644,7 @@ class BaseAlignmentDataset(IDataset):
             "candidate_generation_version": 5,
             "exact_prefilter_materialization_version": 2,
             "ignored_alignment_filter_version": 1,
-            "ontology_backend_version": 4,
+            "ontology_backend_version": _ONTOLOGY_BACKEND_VERSION,
             "projector": projector_cache_identity(self._projector_settings),
             "input_format": self._input_format,
             "source_options": self._source_options,
@@ -662,19 +667,21 @@ class BaseAlignmentDataset(IDataset):
         if not self._cache_meta_path.exists():
             return {}
         try:
-            return json.loads(self._cache_meta_path.read_text(encoding="utf-8"))
+            value = json.loads(self._cache_meta_path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             return {}
+        return value if isinstance(value, dict) else {}
 
     def _write_cache_metadata(self) -> None:
         payload = {
-            "cache_schema_version": 3,
-            "ontology_backend_version": 4,
+            "cache_schema_version": _DATASET_CACHE_SCHEMA_VERSION,
+            "ontology_backend_version": _ONTOLOGY_BACKEND_VERSION,
             "fingerprint": self.cache_fingerprint,
             "dataset_signature": self.dataset_signature,
             "component": self.__class__.__name__,
         }
         self._cache_meta_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        self._cache_state = "cold"
 
     def load_candidates(
         self,
@@ -1210,23 +1217,26 @@ class BaseAlignmentDataset(IDataset):
     def has_cache(self) -> bool:
         if self._cache_ok and self._df_save_path.exists():
             meta = self._load_cache_metadata()
-            if meta.get("fingerprint") == self.cache_fingerprint:
+            cache_schema = meta.get("cache_schema_version")
+            ontology_backend = meta.get("ontology_backend_version")
+            versions_current = (
+                type(cache_schema) is int
+                and cache_schema == _DATASET_CACHE_SCHEMA_VERSION
+                and type(ontology_backend) is int
+                and ontology_backend == _ONTOLOGY_BACKEND_VERSION
+            )
+            if versions_current and meta.get("fingerprint") == self.cache_fingerprint:
+                self._cache_state = "hit"
                 return True
+            self._cache_state = "invalidated"
             if not self._cache_warning_emitted:
-                try:
-                    legacy = (
-                        not meta
-                        or int(meta.get("cache_schema_version", 0)) < 3
-                        or int(meta.get("ontology_backend_version", 0)) < 4
-                    )
-                except (TypeError, ValueError):
-                    legacy = True
                 reason = "missing metadata" if not meta else "fingerprint mismatch"
-                if legacy:
+                if not versions_current:
                     reason = (
-                        "pre-WP-N ontology/compiler metadata is incompatible with the "
-                        "encoded schema cache contract; Exact will rebuild from source "
-                        "bytes and never reinterpret consumer-local encoded IDs"
+                        "ontology-derived cache schema is incompatible with pyowl-core model "
+                        "schema 2; rebuild required from the original source bytes. Exact "
+                        "will never convert or reinterpret schema-1 structural identities "
+                        "or consumer-local dense IDs"
                     )
                 self.log(
                     f"Existing dataset cache at {self._df_save_path} is invalid for the current configuration ({reason}); rebuilding.",

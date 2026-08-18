@@ -123,7 +123,28 @@ def _optional_schema(
 def encoded_contract_identity() -> EncodedContractIdentity:
     """Return stable core/projector compiler inputs without capability negotiation."""
 
-    core_view = getattr(pyowl_core, "EncodedStructuralView", object())
+    api_version = pyowl_core.API_VERSION
+    model_schema = pyowl_core.MODEL_SCHEMA_VERSION
+    wire_version = pyowl_core.WIRE_FORMAT_VERSION
+    adapter_protocol = pyowl_core.ADAPTER_PROTOCOL_VERSION
+    if type(api_version) is not tuple or api_version != (0, 2):
+        raise RuntimeError("pyowl-core API version is incompatible; Exact requires API (0, 2)")
+    if type(model_schema) is not int or model_schema != 2:
+        raise RuntimeError("pyowl-core model schema is incompatible; Exact requires schema 2")
+    if (
+        type(wire_version) is not tuple
+        or len(wire_version) != 2
+        or any(type(item) is not int for item in wire_version)
+        or wire_version[0] != 1
+        or wire_version[1] < 2
+    ):
+        raise RuntimeError(
+            "pyowl-core wire contract is incompatible; readable version 2 is required"
+        )
+    if type(adapter_protocol) is not int or adapter_protocol < 1:
+        raise RuntimeError("pyowl-core adapter protocol is incompatible")
+
+    core_view = pyowl_core.EncodedStructuralView
     core_name, core_schema = _optional_schema(
         getattr(core_view, "SCHEMA_NAME", None),
         getattr(core_view, "SCHEMA_VERSION", None),
@@ -134,13 +155,39 @@ def encoded_contract_identity() -> EncodedContractIdentity:
         getattr(shared_projector, "ENCODED_SCHEMA_VERSION", None),
         "projector",
     )
-    digest = getattr(pyowl_core, "ENCODED_STRUCTURAL_DESCRIPTOR_SHA256_V1", None)
-    if digest is not None and (type(digest) is not bytes or len(digest) != 32):
+    if core_name is None or core_schema is None:
+        raise RuntimeError("pyowl-core encoded structural contract is unavailable")
+    if core_schema != 2:
+        raise RuntimeError(
+            "pyowl-core encoded structural schema is incompatible; schema 2 required"
+        )
+    core_encoded_model = getattr(core_view, "MODEL_SCHEMA", None)
+    if type(core_encoded_model) is not int or core_encoded_model != model_schema:
+        raise RuntimeError("pyowl-core encoded structural model schema is incompatible")
+    if (projector_name, projector_schema) != (core_name, core_schema):
+        raise RuntimeError("projector encoded structural schema is incompatible with pyowl-core")
+
+    projector_contract = {
+        "CORE_API_VERSION": api_version,
+        "CORE_ADAPTER_PROTOCOL_VERSION": adapter_protocol,
+        "CORE_MODEL_SCHEMA_VERSION": model_schema,
+        "CORE_WIRE_FORMAT_VERSION": wire_version,
+    }
+    for name, expected in projector_contract.items():
+        actual = getattr(shared_projector, name, None)
+        if type(actual) is not type(expected) or actual != expected:
+            raise RuntimeError(
+                f"projector {name} is incompatible with pyowl-core; "
+                f"expected {expected!r}, received {actual!r}"
+            )
+
+    digest = pyowl_core.EncodedStructuralView.DESCRIPTOR_SHA256
+    if type(digest) is not bytes or len(digest) != 32:
         raise TypeError("core encoded descriptor digest must be exact bytes32")
     return EncodedContractIdentity(
         core_schema_name=core_name,
         core_schema_version=core_schema,
-        core_descriptor_sha256=None if digest is None else digest.hex(),
+        core_descriptor_sha256=digest.hex(),
         projector_schema_name=projector_name,
         projector_schema_version=projector_schema,
     )
@@ -208,6 +255,7 @@ class ProjectionCacheKey:
     core_api_version: tuple[int, int]
     core_model_schema_version: int
     core_wire_format_version: tuple[int, int]
+    core_adapter_protocol_version: int
     projector_package_version: str
     projector_api_version: int
     projector_compiler_cache_schema: str
@@ -253,6 +301,7 @@ def cache_key(
             pyowl_core.WIRE_FORMAT_VERSION[0],
             pyowl_core.WIRE_FORMAT_VERSION[1],
         ),
+        core_adapter_protocol_version=int(pyowl_core.ADAPTER_PROTOCOL_VERSION),
         projector_package_version=projector_package_version,
         projector_api_version=int(shared_projector.PROJECTOR_API_VERSION),
         projector_compiler_cache_schema=str(shared_projector.COMPILER_CACHE_SCHEMA),
@@ -286,6 +335,7 @@ def projector_cache_identity(settings: ProjectorSettings) -> dict[str, object]:
         "core_api_version": list(pyowl_core.API_VERSION),
         "core_model_schema_version": int(pyowl_core.MODEL_SCHEMA_VERSION),
         "core_wire_format_version": list(pyowl_core.WIRE_FORMAT_VERSION),
+        "core_adapter_protocol_version": int(pyowl_core.ADAPTER_PROTOCOL_VERSION),
     }
 
 

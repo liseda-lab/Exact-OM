@@ -15,10 +15,7 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from exact.core.contracts.dataset import DataFrame
-from exact.core.entities.configs.dataset import (
-    BestPathMethod,
-    ContextMethod,
-)
+from exact.core.entities.configs.dataset import BestPathMethod, ContextMethod
 from exact.core.entities.ontology import OntologyGraph
 from exact.core.entities.registry import ComponentType
 from exact.impl.datasets.base import BaseAlignmentDataset
