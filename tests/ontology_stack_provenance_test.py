@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+from importlib.metadata import version
 from pathlib import Path
 
+import pyowl_core
 import pytest
 
 from exact.ontology import load_ontology
@@ -13,14 +15,16 @@ from exact.ontology.provenance import (
 from exact.ontology.reasoning import ConsumerHandoffProvenance
 
 FIXTURES = Path(__file__).parent / "fixtures" / "ontologies"
+_SCHEMA_1_DESCRIPTOR_SHA256 = "9ad29db6a7e616f65cea2957bc5ba8d1f9b99ef0eb1fe1432c09be25786267b5"
 
 
 def _compiler_handoff() -> dict[str, object]:
+    encoded_view = pyowl_core.EncodedStructuralView
     return {
-        "schema_name": "pyowl-core/structural-columns",
-        "schema_version": 1,
-        "model_schema": 1,
-        "descriptor_sha256": ("9ad29db6a7e616f65cea2957bc5ba8d1f9b99ef0eb1fe1432c09be25786267b5"),
+        "schema_name": encoded_view.SCHEMA_NAME,
+        "schema_version": encoded_view.SCHEMA_VERSION,
+        "model_schema": pyowl_core.MODEL_SCHEMA_VERSION,
+        "descriptor_sha256": encoded_view.DESCRIPTOR_SHA256.hex(),
         "buffer_widths": {
             "field_kinds": 1,
             "field_lengths": 8,
@@ -44,6 +48,7 @@ def test_ontology_stack_provenance_is_complete_and_path_free() -> None:
     provenance = source.ontology_stack_provenance()
 
     assert provenance["kind"] == "owl"
+    assert provenance["exact"] == {"package_version": version("exact-om")}
     core = provenance["core"]
     assert core["shared_snapshot"] is True
     assert set(core["fingerprints"]) == {"structural", "logical", "signature"}
@@ -58,11 +63,9 @@ def test_ontology_stack_provenance_is_complete_and_path_free() -> None:
     capabilities = source.owl_snapshot().capabilities
     assert handoff["core"] == {
         "encoded_contract": {
-            "schema_name": "pyowl-core/structural-columns",
-            "schema_version": 1,
-            "descriptor_sha256": (
-                "9ad29db6a7e616f65cea2957bc5ba8d1f9b99ef0eb1fe1432c09be25786267b5"
-            ),
+            "schema_name": pyowl_core.EncodedStructuralView.SCHEMA_NAME,
+            "schema_version": pyowl_core.EncodedStructuralView.SCHEMA_VERSION,
+            "descriptor_sha256": pyowl_core.EncodedStructuralView.DESCRIPTOR_SHA256.hex(),
         },
         "encoded_view_schemas": dict(sorted(capabilities.encoded_view_schemas.items())),
         "owner_kind": "direct",
@@ -168,7 +171,7 @@ def test_consumer_handoff_rejects_malformed_projector_diagnostics(
     with pytest.raises((TypeError, ValueError), match=message):
         _projector_consumer_handoff(
             {
-                "package_version": "0.1.0",
+                "package_version": "0.2.0",
                 "compiler_cache_schema": "compiler/1",
                 "last_projection": {
                     "provenance": {
@@ -184,7 +187,7 @@ def test_consumer_handoff_rejects_malformed_projector_diagnostics(
 def test_consumer_handoff_records_bounded_encoded_projector_diagnostics() -> None:
     result = _projector_consumer_handoff(
         {
-            "package_version": "0.1.0",
+            "package_version": "0.2.0",
             "compiler_cache_schema": "compiler/1",
             "last_projection": {
                 "provenance": {
@@ -192,10 +195,10 @@ def test_consumer_handoff_records_bounded_encoded_projector_diagnostics() -> Non
                     "native_implementation_version": "native/1",
                     "ingestion": {
                         "path": "encoded-native",
-                        "encoded_schema_name": "pyowl-core/structural-columns",
-                        "encoded_schema_version": 1,
+                        "encoded_schema_name": pyowl_core.EncodedStructuralView.SCHEMA_NAME,
+                        "encoded_schema_version": pyowl_core.EncodedStructuralView.SCHEMA_VERSION,
                         "encoded_descriptor_sha256": (
-                            "9ad29db6a7e616f65cea2957bc5ba8d1f" "9b99ef0eb1fe1432c09be25786267b5"
+                            pyowl_core.EncodedStructuralView.DESCRIPTOR_SHA256.hex()
                         ),
                         "encoded_view_publication_seconds": 0.25,
                         "consumer_compile_seconds": 0.5,
@@ -211,14 +214,14 @@ def test_consumer_handoff_records_bounded_encoded_projector_diagnostics() -> Non
     )
 
     assert result == {
-        "package_version": "0.1.0",
+        "package_version": "0.2.0",
         "compiler_cache_schema": "compiler/1",
         "selected_backend": "native",
         "implementation_version": "native/1",
         "ingestion_path": "encoded-native",
-        "schema_name": "pyowl-core/structural-columns",
-        "schema_version": 1,
-        "descriptor_sha256": ("9ad29db6a7e616f65cea2957bc5ba8d1f9b99ef0eb1fe1432c09be25786267b5"),
+        "schema_name": pyowl_core.EncodedStructuralView.SCHEMA_NAME,
+        "schema_version": pyowl_core.EncodedStructuralView.SCHEMA_VERSION,
+        "descriptor_sha256": pyowl_core.EncodedStructuralView.DESCRIPTOR_SHA256.hex(),
         "encoded_view_publication_seconds": 0.25,
         "consumer_compile_seconds": 0.5,
         "counters": {
@@ -229,19 +232,22 @@ def test_consumer_handoff_records_bounded_encoded_projector_diagnostics() -> Non
     }
 
 
-def test_consumer_handoff_rejects_incompatible_projector_encoded_schema() -> None:
+def test_consumer_handoff_rejects_schema_2_with_schema_1_descriptor() -> None:
+    assert _SCHEMA_1_DESCRIPTOR_SHA256 != pyowl_core.EncodedStructuralView.DESCRIPTOR_SHA256.hex()
     with pytest.raises(ValueError, match="descriptor_sha256 is incompatible"):
         _projector_consumer_handoff(
             {
-                "package_version": "0.1.0",
+                "package_version": "0.2.0",
                 "compiler_cache_schema": "compiler/1",
                 "last_projection": {
                     "provenance": {
                         "ingestion": {
                             "path": "encoded-native",
-                            "encoded_schema_name": "pyowl-core/structural-columns",
-                            "encoded_schema_version": 1,
-                            "encoded_descriptor_sha256": "0" * 64,
+                            "encoded_schema_name": pyowl_core.EncodedStructuralView.SCHEMA_NAME,
+                            "encoded_schema_version": (
+                                pyowl_core.EncodedStructuralView.SCHEMA_VERSION
+                            ),
+                            "encoded_descriptor_sha256": _SCHEMA_1_DESCRIPTOR_SHA256,
                         },
                     }
                 },
@@ -308,6 +314,8 @@ def test_consumer_handoff_rejects_malformed_reasoner_phase_diagnostics(
 
 
 def test_consumer_handoff_records_public_reasoner_compiler_contract() -> None:
+    import pyhermit
+
     source = load_ontology(FIXTURES / "mini_src.owl")
 
     provenance = ontology_stack_provenance(
@@ -315,14 +323,14 @@ def test_consumer_handoff_records_public_reasoner_compiler_contract() -> None:
         projector_settings=source.projector_settings,
         projector=source.projector,
         reasoner={
-            "selection": {"effective": "hermit", "package_version": "0.1.0"},
-            "backend": {"effective": "python", "implementation_version": "0.1.0"},
+            "selection": {"effective": "hermit", "package_version": "0.2.0"},
+            "backend": {"effective": "python", "implementation_version": "0.2.0"},
             "consumer_handoff": {
                 "ingestion_path": "scalar-python",
                 "compiler_digest": "0" * 64,
-                "compiler_cache_schema_version": 1,
-                "ir_schema_version": 1,
-                "implementation_version": "0.1.0",
+                "compiler_cache_schema_version": pyhermit.COMPILER_CACHE_SCHEMA_VERSION,
+                "ir_schema_version": pyhermit.COMPILED_IR_SCHEMA_VERSION,
+                "implementation_version": "0.2.0",
                 "consumer_compile_seconds": 0.25,
                 "encoded_schema": _compiler_handoff(),
                 "counters": {
@@ -335,17 +343,17 @@ def test_consumer_handoff_records_public_reasoner_compiler_contract() -> None:
 
     assert provenance["consumer_handoff"]["reasoner"] == {
         "reasoner": "hermit",
-        "package_version": "0.1.0",
+        "package_version": "0.2.0",
         "selected_backend": "python",
-        "implementation_version": "0.1.0",
+        "implementation_version": "0.2.0",
         "ingestion_path": "scalar-python",
         "compiler_digest": "0" * 64,
         "counters": {
             "encoded_buffer_count": 0,
             "materialized_scalar_rows": 7,
         },
-        "compiler_cache_schema_version": 1,
-        "ir_schema_version": 1,
+        "compiler_cache_schema_version": pyhermit.COMPILER_CACHE_SCHEMA_VERSION,
+        "ir_schema_version": pyhermit.COMPILED_IR_SCHEMA_VERSION,
         "consumer_compile_seconds": 0.25,
         "encoded_schema": _compiler_handoff(),
     }

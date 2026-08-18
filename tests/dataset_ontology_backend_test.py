@@ -1,4 +1,5 @@
 import importlib.util
+import json
 import sys
 import types
 from pathlib import Path
@@ -59,13 +60,18 @@ def test_base_dataset_loads_knowledge_sources_without_runtime_java(tmp_path, mon
     }
     fingerprint = dataset._cache_fingerprint_payload()
     assert fingerprint["reasoner"] == "asserted"
-    assert fingerprint["ontology_backend_version"] == 4
+    assert fingerprint["ontology_backend_version"] == 5
     assert fingerprint["projector"]["encoded_contract"]["core"]["descriptor_sha256"]
     assert fingerprint["projector"]["profile"] == "mowl-d993536-v1"
 
     provenance = dataset.ontology_stack_provenance()
     assert provenance["source"]["kind"] == "owl"
     assert provenance["target"]["kind"] == "owl"
+    assert provenance["cache"] == {
+        "schema_version": 4,
+        "ontology_backend_version": 5,
+        "state": "cold",
+    }
     assert provenance["source"]["core"]["shared_snapshot"] is True
     assert provenance["source"]["reasoner"]["selection"]["effective"] == "asserted"
 
@@ -75,3 +81,56 @@ def test_base_dataset_loads_knowledge_sources_without_runtime_java(tmp_path, mon
         "http://example.org/mini/src#Heart",
         "http://example.org/mini/tgt#CardiacOrgan",
     ) in exact_pairs
+
+
+def test_schema_1_dataset_cache_is_rejected_before_payload_interpretation(
+    tmp_path,
+    monkeypatch,
+    capsys,
+):
+    module = _load_base_module(monkeypatch)
+
+    class CacheBoundaryDataset(module.BaseAlignmentDataset):
+        def __getitem__(self, idx):
+            raise IndexError(idx)
+
+        def __len__(self):
+            return 0
+
+        def get_features(self, df):
+            return df
+
+        def plot_feature_distributions(self, *args, **kwargs):
+            return None
+
+        def log_sanity_examples(self, *args, **kwargs):
+            return None
+
+    dataset = CacheBoundaryDataset(output_path=tmp_path, cache_ok=True)
+    dataset._df_save_path.write_bytes(b"schema-1 dense-id payload must not be interpreted")
+    dataset._cache_meta_path.write_text(
+        json.dumps(
+            {
+                "cache_schema_version": 1,
+                "ontology_backend_version": 1,
+                "fingerprint": dataset.cache_fingerprint,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    def unexpected_read(*_args, **_kwargs):
+        raise AssertionError("schema-1 cache payload must not be interpreted")
+
+    monkeypatch.setattr(module.pd, "read_csv", unexpected_read)
+
+    assert dataset.has_cache() is False
+    assert dataset.dataframe is None
+    assert dataset.ontology_stack_provenance()["cache"] == {
+        "schema_version": 4,
+        "ontology_backend_version": 5,
+        "state": "invalidated",
+    }
+    warning = capsys.readouterr().out.lower()
+    assert "schema" in warning
+    assert "rebuild" in warning

@@ -8,10 +8,11 @@ import hashlib
 import importlib.metadata
 import json
 import platform
+import re
 import resource
 import sys
 import time
-from collections.abc import Callable, Iterator, Mapping
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass, is_dataclass
 from pathlib import Path
@@ -60,6 +61,29 @@ _REQUIRED_ZERO_COUNTERS = (
     "wire_encoder_calls",
 )
 _OPTIONAL_ZERO_COUNTERS = ("encoded_private_ir_bytes",)
+
+_NCIT_DOID_ACCEPTANCE = (
+    {
+        "role": "source",
+        "name": "source.owl",
+        "bytes": 57_163_710,
+        "sha256": "379a37f47c0c8e7c30397769358cca955140d16b2797a1cc75da4b1fc2b354eb",
+        "edges": 42_103,
+    },
+    {
+        "role": "target",
+        "name": "target.owl",
+        "bytes": 6_687_536,
+        "sha256": "76f41cce3616ad1a9ba6353f469e96bde7addba5d43e541651a3ab703f9ba2bc",
+        "edges": 9_388,
+    },
+)
+
+_NCIT_HISTORICAL_DELTA = {
+    "added": {"edges": 762, "rule": "RB-019"},
+    "removed": {"edges": 8, "rule": "RB-009"},
+    "residual": {"edges": 0},
+}
 
 
 def _fingerprints(snapshot: pyowl_core.OntologyView) -> dict[str, str]:
@@ -361,6 +385,126 @@ def _require_consumer_counter_evidence(evidence: Mapping[str, object]) -> None:
         f"all_buffers_zero_copy={evidence.get('all_encoded_buffers_zero_copy')!r}, "
         f"encoded_schema={evidence.get('encoded_schema')!r}"
     )
+
+
+def _is_ncit_doid_request(paths: Sequence[Path]) -> bool:
+    return (
+        len(paths) == 2
+        and tuple(path.name for path in paths) == ("source.owl", "target.owl")
+        and paths[0].parent == paths[1].parent
+        and paths[0].parent.name == "ncit-doid"
+    )
+
+
+def _validate_ncit_doid_acceptance(
+    environment: Mapping[str, object],
+    measurements: Sequence[Mapping[str, object]],
+) -> dict[str, object]:
+    """Fail closed over the frozen pyOWL 0.2 NCIT–DOID release record."""
+
+    failures: list[str] = []
+    raw_packages = environment.get("packages")
+    packages = raw_packages if isinstance(raw_packages, Mapping) else {}
+    exact_version = packages.get("exact-om")
+    core_version = packages.get("pyowl-core")
+    projector_version = packages.get("pyowl2vec-star-projector")
+    if exact_version != "2.1.0":
+        failures.append(f"Exact-OM version is {exact_version!r}, expected '2.1.0'")
+    if core_version != "0.2.0":
+        failures.append(f"pyowl-core version is {core_version!r}, expected '0.2.0'")
+    if (
+        not isinstance(projector_version, str)
+        or re.fullmatch(r"0\.2\.\d+", projector_version) is None
+    ):
+        failures.append(
+            "pyowl2vec-star-projector is not a final 0.2 release: " f"{projector_version!r}"
+        )
+
+    if len(measurements) != len(_NCIT_DOID_ACCEPTANCE):
+        failures.append(f"expected two NCIT–DOID measurements, found {len(measurements)}")
+    for index, expected in enumerate(_NCIT_DOID_ACCEPTANCE):
+        if index >= len(measurements):
+            break
+        measurement = measurements[index]
+        raw_input = measurement.get("input")
+        input_record = raw_input if isinstance(raw_input, Mapping) else {}
+        for field in ("name", "bytes", "sha256"):
+            if input_record.get(field) != expected[field]:
+                failures.append(
+                    f"{expected['role']} input {field} is {input_record.get(field)!r}, "
+                    f"expected {expected[field]!r}"
+                )
+
+        if measurement.get("load_calls") != 1:
+            failures.append(
+                f"{expected['role']} load count is {measurement.get('load_calls')!r}, expected 1"
+            )
+        if measurement.get("load_backend") != "native":
+            failures.append(
+                f"{expected['role']} load backend is {measurement.get('load_backend')!r}, expected 'native'"
+            )
+        raw_identity = measurement.get("identity")
+        identity = raw_identity if isinstance(raw_identity, Mapping) else {}
+        if not identity or any(value is not True for value in identity.values()):
+            failures.append(f"{expected['role']} did not retain one shared owner")
+        if measurement.get("second_ontology_representation") is not False:
+            failures.append(f"{expected['role']} reported a second ontology representation")
+
+        raw_projection = measurement.get("projection")
+        projection = raw_projection if isinstance(raw_projection, Mapping) else {}
+        if projection.get("profile") != "mowl-d993536-v1":
+            failures.append(
+                f"{expected['role']} projection profile is {projection.get('profile')!r}"
+            )
+        if projection.get("requested_backend") != "native":
+            failures.append(
+                f"{expected['role']} projector backend is "
+                f"{projection.get('requested_backend')!r}, expected 'native'"
+            )
+        if projection.get("edges") != expected["edges"]:
+            failures.append(
+                f"{expected['role']} projected {projection.get('edges')!r} edges, "
+                f"expected {expected['edges']}"
+            )
+
+        raw_cache = measurement.get("projection_cache")
+        cache = raw_cache if isinstance(raw_cache, Mapping) else {}
+        if cache.get("edges") != projection.get("edges") or cache.get(
+            "result_sha256"
+        ) != projection.get("result_sha256"):
+            failures.append(f"{expected['role']} cold/cache-hit projection digests differ")
+
+        raw_materialization = measurement.get("materialization_and_copy")
+        materialization = raw_materialization if isinstance(raw_materialization, Mapping) else {}
+        raw_evidence = materialization.get("acceptance_evidence")
+        evidence = raw_evidence if isinstance(raw_evidence, Mapping) else {}
+        if evidence.get("acceptance_ready") is not True:
+            failures.append(f"{expected['role']} encoded-consumer evidence did not pass")
+
+    if failures:
+        raise RuntimeError("NCIT–DOID acceptance failed: " + "; ".join(failures))
+
+    return {
+        "status": "passed",
+        "performance_claim": False,
+        "profile": "mowl-d993536-v1",
+        "inputs_match_frozen_baseline": True,
+        "expected_projection_edges": {
+            str(item["role"]): item["edges"] for item in _NCIT_DOID_ACCEPTANCE
+        },
+        "historical_ncit_delta": {
+            **_NCIT_HISTORICAL_DELTA,
+            "classification_evidence": ("benchmarks/evidence/wp_m_ncit_doid_candidate.json"),
+        },
+        "invariants": {
+            "single_load_and_owner": True,
+            "encoded_native_consumers": True,
+            "zero_forbidden_consumer_work": True,
+            "fingerprints_and_axioms_unchanged": True,
+            "no_second_ontology_representation": True,
+            "cache_semantics_identical": True,
+        },
+    }
 
 
 def _hierarchy_measurement(source: Any) -> dict[str, object]:
@@ -698,6 +842,7 @@ def measure(
         },
         "projection": {
             "requested_backend": projector_backend,
+            "profile": source.projector_settings.profile,
             "include_literals": include_literals,
             "edges": edge_count,
             "result_sha256": result_sha256,
@@ -793,6 +938,23 @@ def main() -> None:
     )
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
+    paths = [path.expanduser().resolve() for path in args.ontology]
+    measurements = [
+        measure(
+            path,
+            buffer_edges=args.buffer_edges,
+            include_literals=args.include_literals,
+            load_backend=cast(LoadBackend, args.load_backend),
+            projector_backend=cast(ProjectorBackend, args.projector_backend),
+            reasoner_name=cast(ReasonerName | None, args.reasoner),
+            reasoner_backend=args.reasoner_backend,
+            reasoner_workers=args.reasoner_workers,
+            reasoner_timeout_seconds=args.reasoner_timeout_seconds,
+            reasoner_worker_wire=args.reasoner_worker_wire,
+            require_encoded_consumers=args.require_encoded_consumers,
+        )
+        for path in paths
+    ]
     payload = {
         "schema_version": 5,
         "environment": {
@@ -825,23 +987,12 @@ def main() -> None:
             "require_encoded_consumers": args.require_encoded_consumers,
             "cache_state": "cold-load; projection cache fill then hit",
         },
-        "measurements": [
-            measure(
-                path.expanduser().resolve(),
-                buffer_edges=args.buffer_edges,
-                include_literals=args.include_literals,
-                load_backend=cast(LoadBackend, args.load_backend),
-                projector_backend=cast(ProjectorBackend, args.projector_backend),
-                reasoner_name=cast(ReasonerName | None, args.reasoner),
-                reasoner_backend=args.reasoner_backend,
-                reasoner_workers=args.reasoner_workers,
-                reasoner_timeout_seconds=args.reasoner_timeout_seconds,
-                reasoner_worker_wire=args.reasoner_worker_wire,
-                require_encoded_consumers=args.require_encoded_consumers,
-            )
-            for path in args.ontology
-        ],
+        "measurements": measurements,
     }
+    if _is_ncit_doid_request(paths):
+        payload["ncit_doid_acceptance"] = _validate_ncit_doid_acceptance(
+            payload["environment"], measurements
+        )
     rendered = json.dumps(payload, indent=2, sort_keys=True)
     print(rendered)
     if args.output is not None:

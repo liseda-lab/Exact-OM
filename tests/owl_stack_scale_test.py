@@ -11,8 +11,10 @@ from pyowl2vec_star_projector import Edge, canonical_edges_sha256
 from benchmarks.owl_stack_scale import (
     _consumer_counter_evidence,
     _edge_record,
+    _is_ncit_doid_request,
     _require_consumer_counter_evidence,
     _require_encoded_path,
+    _validate_ncit_doid_acceptance,
     main,
     measure,
 )
@@ -39,13 +41,122 @@ def _encoded_handoff(**counter_overrides: int | bool) -> dict[str, object]:
         "wire_encoder_calls": 0,
     }
     counters.update(counter_overrides)
+    encoded_view = pyowl_core.EncodedStructuralView
     return {
         "ingestion_path": "encoded-native",
-        "schema_name": "pyowl-core/structural-columns",
-        "schema_version": 1,
-        "descriptor_sha256": ("9ad29db6a7e616f65cea2957bc5ba8d1f9b99ef0eb1fe1432c09be25786267b5"),
+        "schema_name": encoded_view.SCHEMA_NAME,
+        "schema_version": encoded_view.SCHEMA_VERSION,
+        "descriptor_sha256": encoded_view.DESCRIPTOR_SHA256.hex(),
         "counters": counters,
     }
+
+
+def _ncit_doid_acceptance_fixture() -> tuple[dict[str, object], list[dict[str, object]]]:
+    environment: dict[str, object] = {
+        "packages": {
+            "exact-om": "2.1.0",
+            "pyowl-core": "0.2.0",
+            "pyowl2vec-star-projector": "0.2.0",
+        }
+    }
+    measurements = []
+    for name, size, sha256, edges, digest in (
+        (
+            "source.owl",
+            57_163_710,
+            "379a37f47c0c8e7c30397769358cca955140d16b2797a1cc75da4b1fc2b354eb",
+            42_103,
+            "a" * 64,
+        ),
+        (
+            "target.owl",
+            6_687_536,
+            "76f41cce3616ad1a9ba6353f469e96bde7addba5d43e541651a3ab703f9ba2bc",
+            9_388,
+            "b" * 64,
+        ),
+    ):
+        measurements.append(
+            {
+                "input": {"name": name, "bytes": size, "sha256": sha256},
+                "load_calls": 1,
+                "load_backend": "native",
+                "identity": {
+                    "source_snapshot": True,
+                    "projector_snapshot": True,
+                    "reasoner_snapshot": True,
+                },
+                "second_ontology_representation": False,
+                "projection": {
+                    "profile": "mowl-d993536-v1",
+                    "requested_backend": "native",
+                    "edges": edges,
+                    "result_sha256": digest,
+                },
+                "projection_cache": {"edges": edges, "result_sha256": digest},
+                "materialization_and_copy": {"acceptance_evidence": {"acceptance_ready": True}},
+            }
+        )
+    return environment, measurements
+
+
+def test_ncit_doid_acceptance_validator_accepts_frozen_correctness_record() -> None:
+    environment, measurements = _ncit_doid_acceptance_fixture()
+
+    acceptance = _validate_ncit_doid_acceptance(environment, measurements)
+
+    assert acceptance["status"] == "passed"
+    assert acceptance["performance_claim"] is False
+    assert acceptance["inputs_match_frozen_baseline"] is True
+    assert acceptance["expected_projection_edges"] == {
+        "source": 42_103,
+        "target": 9_388,
+    }
+    assert acceptance["historical_ncit_delta"]["residual"] == {"edges": 0}
+
+
+def test_ncit_doid_acceptance_auto_selects_only_the_frozen_pair_path() -> None:
+    pair = Path("data/bioml_zenodo/ncit-doid")
+
+    assert _is_ncit_doid_request((pair / "source.owl", pair / "target.owl")) is True
+    assert _is_ncit_doid_request((pair / "target.owl", pair / "source.owl")) is False
+    assert _is_ncit_doid_request((Path("other/source.owl"), Path("other/target.owl"))) is False
+
+
+@pytest.mark.parametrize(
+    ("mismatch", "message"),
+    [
+        ("version", "pyowl-core version"),
+        ("hash", "source input sha256"),
+        ("count", "source projected"),
+        ("backend", "source projector backend"),
+    ],
+)
+def test_ncit_doid_acceptance_validator_rejects_frozen_contract_mismatch(
+    mismatch: str,
+    message: str,
+) -> None:
+    environment, measurements = _ncit_doid_acceptance_fixture()
+    packages = environment["packages"]
+    assert isinstance(packages, dict)
+
+    if mismatch == "version":
+        packages["pyowl-core"] = "0.2.0rc1"
+    elif mismatch == "hash":
+        input_record = measurements[0]["input"]
+        assert isinstance(input_record, dict)
+        input_record["sha256"] = "0" * 64
+    elif mismatch == "count":
+        projection = measurements[0]["projection"]
+        assert isinstance(projection, dict)
+        projection["edges"] = 42_102
+    else:
+        projection = measurements[0]["projection"]
+        assert isinstance(projection, dict)
+        projection["requested_backend"] = "python"
+
+    with pytest.raises(RuntimeError, match=message):
+        _validate_ncit_doid_acceptance(environment, measurements)
 
 
 def test_streaming_edge_digest_matches_public_projector_artifact_contract() -> None:

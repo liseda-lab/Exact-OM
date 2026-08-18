@@ -18,6 +18,87 @@ from exact.ontology.projection import (
 from exact.ontology.reasoning import reasoner_cache_identity
 
 FIXTURE = Path(__file__).parent / "fixtures" / "ontologies" / "mini_src.owl"
+_UNMAPPABLE_RDF = b"""<?xml version="1.0"?>
+<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+         xmlns:unsupported="urn:exact:test:unsupported:">
+  <rdf:Description rdf:about="urn:exact:test:subject">
+    <unsupported:predicate rdf:resource="urn:exact:test:object"/>
+  </rdf:Description>
+</rdf:RDF>
+"""
+
+
+def _blank_component_ontology(
+    labels: tuple[str, ...],
+    *,
+    declaration_first: bool,
+) -> bytes:
+    declaration = '<owl:Class rdf:about="urn:exact:test:BlankClass"/>'
+    components = "".join(
+        (
+            f'<rdf:Description rdf:nodeID="{label}">'
+            '<rdf:type rdf:resource="urn:exact:test:BlankClass"/>'
+            "</rdf:Description>"
+        )
+        for label in labels
+    )
+    body = declaration + components if declaration_first else components + declaration
+    return (
+        '<?xml version="1.0"?>'
+        '<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" '
+        'xmlns:owl="http://www.w3.org/2002/07/owl#">'
+        '<owl:Ontology rdf:about="urn:exact:test:blank-components"/>'
+        f"{body}</rdf:RDF>"
+    ).encode()
+
+
+def _anonymous_assertion_individuals(
+    snapshot: pyowl_core.OntologyView,
+) -> tuple[pyowl_core.AnonymousIndividual, ...]:
+    individuals = (
+        axiom.individual
+        for axiom in snapshot.iter_axioms(pyowl_core.ClassAssertion)
+        if isinstance(axiom.individual, pyowl_core.AnonymousIndividual)
+    )
+    return tuple(sorted(individuals, key=lambda individual: individual.canonical_bytes()))
+
+
+def test_released_core_0_2_public_contract_is_active():
+    encoded_view = pyowl_core.EncodedStructuralView
+
+    assert pyowl_core.API_VERSION == (0, 2)
+    assert pyowl_core.MODEL_SCHEMA_VERSION == 2
+    assert pyowl_core.WIRE_FORMAT_VERSION == (1, 2)
+    assert encoded_view.SCHEMA_VERSION == 2
+    assert type(encoded_view.DESCRIPTOR_SHA256) is bytes
+    assert len(encoded_view.DESCRIPTOR_SHA256) == 32
+    assert shared_projector.ENCODED_SCHEMA_NAME == encoded_view.SCHEMA_NAME
+    assert shared_projector.ENCODED_SCHEMA_VERSION == encoded_view.SCHEMA_VERSION
+
+
+def test_schema_2_repeated_isomorphic_blank_components_keep_distinct_identities():
+    repeated = pyowl_core.load_snapshot(
+        _blank_component_ontology(("component-a", "component-b"), declaration_first=True)
+    )
+    renamed_and_reordered = pyowl_core.load_snapshot(
+        _blank_component_ontology(("renamed-z", "renamed-a"), declaration_first=False)
+    )
+    single = pyowl_core.load_snapshot(
+        _blank_component_ontology(("only-component",), declaration_first=True)
+    )
+
+    repeated_individuals = _anonymous_assertion_individuals(repeated)
+    reordered_individuals = _anonymous_assertion_individuals(renamed_and_reordered)
+    single_individuals = _anonymous_assertion_individuals(single)
+
+    assert len(repeated_individuals) == len(reordered_individuals) == 2
+    assert len(single_individuals) == 1
+    assert len({individual.document_scope for individual in repeated_individuals}) == 1
+    assert len({individual.local_key for individual in repeated_individuals}) == 2
+    assert repeated_individuals == reordered_individuals
+    assert repeated.structural_fingerprint == renamed_and_reordered.structural_fingerprint
+    assert repeated_individuals[0].document_scope != single_individuals[0].document_scope
+    assert repeated.structural_fingerprint != single.structural_fingerprint
 
 
 @pytest.mark.parametrize(
@@ -42,6 +123,23 @@ def test_acquisition_loads_one_snapshot_and_preserves_provider_identity(monkeypa
 
     assert calls == 1
     assert source.owl_snapshot() is pyowl_core.coerce_snapshot(source)
+
+
+def test_strict_rdf_mapping_failure_never_constructs_an_exact_source(monkeypatch):
+    constructed = False
+
+    def reject_partial_source(*_args, **_kwargs):
+        nonlocal constructed
+        constructed = True
+        raise AssertionError("a partial RDF document reached Exact ontology consumers")
+
+    monkeypatch.setattr(OwlOntologySource, "__init__", reject_partial_source)
+
+    with pytest.raises(pyowl_core.UnsupportedSyntaxError) as caught:
+        load_ontology(_UNMAPPABLE_RDF)
+
+    assert caught.value.code == "RDF_MAPPING_INCOMPLETE"
+    assert constructed is False
 
 
 def test_existing_snapshot_is_never_reloaded_and_projector_sees_same_object(monkeypatch):
@@ -161,12 +259,11 @@ def test_projector_encoded_native_parity_preserves_layered_view_identity():
         assert native_report["counts"] == python_report["counts"]
         assert native_report["diagnostics_digest"] == python_report["diagnostics_digest"]
         ingestion = native_report["ingestion"]
+        encoded_view = pyowl_core.EncodedStructuralView
         assert ingestion["path"] == "encoded-native"
-        assert ingestion["encoded_schema_name"] == "pyowl-core/structural-columns"
-        assert ingestion["encoded_schema_version"] == 1
-        assert ingestion["encoded_descriptor_sha256"] == (
-            pyowl_core.ENCODED_STRUCTURAL_DESCRIPTOR_SHA256_V1.hex()
-        )
+        assert ingestion["encoded_schema_name"] == encoded_view.SCHEMA_NAME
+        assert ingestion["encoded_schema_version"] == encoded_view.SCHEMA_VERSION
+        assert ingestion["encoded_descriptor_sha256"] == encoded_view.DESCRIPTOR_SHA256.hex()
         counters = ingestion["counters"]
         assert counters["encoded_segment_count"] > 0
         assert counters["encoded_buffer_count"] > 0
@@ -257,7 +354,7 @@ def test_projection_cache_key_covers_shared_semantic_versions():
     contract = keys[0].encoded_contract
     assert contract == encoded_contract_identity()
     assert contract.core_descriptor_sha256 == (
-        pyowl_core.ENCODED_STRUCTURAL_DESCRIPTOR_SHA256_V1.hex()
+        pyowl_core.EncodedStructuralView.DESCRIPTOR_SHA256.hex()
     )
     assert projector_cache_identity(ProjectorSettings())["encoded_contract"] == (contract.as_dict())
 
@@ -273,8 +370,8 @@ def test_projection_cache_key_invalidates_on_public_descriptor_change(monkeypatc
     )
 
     monkeypatch.setattr(
-        pyowl_core,
-        "ENCODED_STRUCTURAL_DESCRIPTOR_SHA256_V1",
+        pyowl_core.EncodedStructuralView,
+        "DESCRIPTOR_SHA256",
         b"\x00" * 32,
     )
     after = cache_key(

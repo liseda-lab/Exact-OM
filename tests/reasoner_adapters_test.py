@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 from types import SimpleNamespace
 
+import pyowl_core
 import pytest
 
 import exact.ontology.reasoning as reasoning_module
@@ -13,6 +14,7 @@ from exact.ontology.reasoning import (
     ElkHierarchyReasoner,
     HermitHierarchyReasoner,
     ReasonerSettings,
+    ReasonerUnavailableError,
     WorkerWireHierarchyReasoner,
     load_reasoner,
 )
@@ -34,11 +36,12 @@ _ONTOLOGY = b"""<?xml version="1.0"?>
 
 
 def _compiler_handoff() -> dict[str, object]:
+    encoded_view = pyowl_core.EncodedStructuralView
     return {
-        "schema_name": "pyowl-core/structural-columns",
-        "schema_version": 1,
-        "model_schema": 1,
-        "descriptor_sha256": ("9ad29db6a7e616f65cea2957bc5ba8d1f9b99ef0eb1fe1432c09be25786267b5"),
+        "schema_name": encoded_view.SCHEMA_NAME,
+        "schema_version": encoded_view.SCHEMA_VERSION,
+        "model_schema": pyowl_core.MODEL_SCHEMA_VERSION,
+        "descriptor_sha256": encoded_view.DESCRIPTOR_SHA256.hex(),
         "buffer_widths": {
             "field_kinds": 1,
             "field_lengths": 8,
@@ -83,9 +86,40 @@ def test_asserted_mode_keeps_exact_snapshot_and_core_provenance(reasoning_source
     assert provenance["fingerprints"]["structural"].endswith(
         reasoning_source.owl_snapshot().structural_fingerprint.hex
     )
-    assert provenance["core"]["wire_format_version"] == [1, 1]
+    assert provenance["core"]["wire_format_version"] == list(pyowl_core.WIRE_FORMAT_VERSION)
     assert provenance["mmap_verified"] is False
     assert provenance["owl_parse_count"] is None
+
+
+def test_asserted_mode_never_imports_optional_reasoner_distributions(
+    reasoning_source,
+    monkeypatch,
+):
+    def unexpected_import(name):
+        raise AssertionError(f"asserted mode imported optional module {name}")
+
+    monkeypatch.setattr(reasoning_module, "import_module", unexpected_import)
+
+    reasoner = load_reasoner("asserted", reasoning_source)
+
+    assert isinstance(reasoner, AssertedHierarchyReasoner)
+    assert reasoner.ontology is reasoning_source.owl_snapshot()
+    _assert_chain(reasoner)
+
+
+@pytest.mark.parametrize("reasoner_name", ["elk", "hermit"])
+def test_missing_optional_reasoner_distribution_fails_actionably(
+    reasoning_source,
+    monkeypatch,
+    reasoner_name,
+):
+    def missing_module(name):
+        raise ModuleNotFoundError(f"No module named {name!r}", name=name)
+
+    monkeypatch.setattr(reasoning_module, "import_module", missing_module)
+
+    with pytest.raises(ReasonerUnavailableError, match="reasoning.*extra"):
+        load_reasoner(reasoner_name, reasoning_source, backend="python")
 
 
 def test_elk_adapter_uses_public_facade_and_exact_snapshot(reasoning_source):
@@ -234,11 +268,14 @@ def test_reasoner_module_and_distribution_version_drift_fails_closed(
         released.append(reasoner)
         cleanup(reasoner)
 
+    installed_version = versions_module.version
     monkeypatch.setattr(pyhermit.Reasoner, "dispose", tracked_cleanup)
     monkeypatch.setattr(
         versions_module,
         "version",
-        lambda distribution: "0.1.1" if distribution == "pyHermiT" else "0.1.0.dev0",
+        lambda distribution: (
+            "0.1.1" if distribution == "pyHermiT" else installed_version(distribution)
+        ),
     )
 
     with pytest.raises(RuntimeError, match="module/distribution version mismatch"):
@@ -391,8 +428,14 @@ def test_verified_wire_worker_matches_in_process_without_parser_calls(
         assert provenance["options"]["worker_wire"] is True
         assert provenance["consumer_handoff"]["ingestion_path"] == "scalar-python"
         if reasoner_name == "hermit":
-            assert provenance["consumer_handoff"]["compiler_cache_schema_version"] == 1
-            assert provenance["consumer_handoff"]["ir_schema_version"] == 1
+            import pyhermit
+
+            assert provenance["consumer_handoff"]["compiler_cache_schema_version"] == (
+                pyhermit.COMPILER_CACHE_SCHEMA_VERSION
+            )
+            assert provenance["consumer_handoff"]["ir_schema_version"] == (
+                pyhermit.COMPILED_IR_SCHEMA_VERSION
+            )
         assert encode_calls == 1
     finally:
         reasoner.close()
