@@ -1,4 +1,4 @@
-name: Release distributions
+name: Release tested distributions
 
 on:
   push:
@@ -8,8 +8,65 @@ permissions:
   contents: read
 
 jobs:
-  build:
+  resolve_candidate:
     runs-on: ubuntu-latest
+    outputs:
+      implementation_commit: ${{ steps.evidence.outputs.implementation_commit }}
+      source_date_epoch: ${{ steps.evidence.outputs.source_date_epoch }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+      - name: Resolve the verified implementation candidate
+        id: evidence
+        shell: bash
+        run: |
+          test "${GITHUB_REF_NAME}" = "v2.1.0"
+          python - <<'PY'
+          import json
+          import os
+          import re
+          from pathlib import Path
+
+          closure = json.loads(
+              Path("release/evidence/legacy-compliance-closure.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+          candidate = closure.get("candidate")
+          exact = closure.get("exact")
+          if closure.get("status") != "passed" or not isinstance(candidate, dict):
+              raise SystemExit("release closure is not finalized")
+          commit = candidate.get("implementation_commit")
+          epoch = candidate.get("source_date_epoch")
+          if not isinstance(commit, str) or re.fullmatch(r"[0-9a-f]{40}", commit) is None:
+              raise SystemExit("candidate implementation commit is invalid")
+          if not isinstance(exact, dict) or exact.get("commit") != commit:
+              raise SystemExit("closure exact.commit is not the implementation candidate")
+          if not isinstance(epoch, int) or epoch <= 0:
+              raise SystemExit("candidate SOURCE_DATE_EPOCH is invalid")
+          output = Path(os.environ["GITHUB_OUTPUT"])
+          with output.open("a", encoding="utf-8") as handle:
+              handle.write(f"implementation_commit={commit}\n")
+              handle.write(f"source_date_epoch={epoch}\n")
+          PY
+      - name: Confirm the evidence-only commit boundary
+        env:
+          IMPLEMENTATION_COMMIT: ${{ steps.evidence.outputs.implementation_commit }}
+          SOURCE_DATE_EPOCH: ${{ steps.evidence.outputs.source_date_epoch }}
+        shell: bash
+        run: |
+          git merge-base --is-ancestor "${IMPLEMENTATION_COMMIT}" "${GITHUB_SHA}"
+          test "$(git show -s --format=%ct "${IMPLEMENTATION_COMMIT}")" = \
+            "${SOURCE_DATE_EPOCH}"
+          git diff --quiet "${IMPLEMENTATION_COMMIT}" "${GITHUB_SHA}" -- \
+            . ':(exclude)release/evidence/**'
+
+  package_build:
+    needs: resolve_candidate
+    runs-on: ubuntu-latest
+    env:
+      SOURCE_DATE_EPOCH: ${{ needs.resolve_candidate.outputs.source_date_epoch }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.4.0
@@ -24,9 +81,192 @@ jobs:
         with:
           version: 2.1.4
           virtualenvs-in-project: true
+      - run: poetry install --with prebuild --extras viz
       - run: make build-frontend
       - run: poetry build
+      - name: Verify reproducible artifacts and final evidence
+        env:
+          IMPLEMENTATION_COMMIT: ${{ needs.resolve_candidate.outputs.implementation_commit }}
+        run: |
+          poetry run python tools/verify_distribution_artifacts.py \
+            --dist-dir dist \
+            --write-support-files
+          poetry run python tools/verify_release_evidence.py \
+            --dist-dir dist \
+            --revision "${IMPLEMENTATION_COMMIT}"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
+          name: exact-om-tag-candidate-${{ github.sha }}
+          if-no-files-found: error
+          retention-days: 7
+          path: |
+            dist/*.whl
+            dist/*.tar.gz
+            dist/artifact-sha256.json
+            dist/stack-constraints.txt
+
+  package_smoke:
+    name: Release smoke (${{ matrix.python-version }}, ${{ matrix.artifact }})
+    needs: package_build
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - python-version: "3.10"
+            artifact: wheel
+            extra: viz
+            native: false
+            sbom: false
+          - python-version: "3.10"
+            artifact: sdist
+            extra: reasoning
+            native: false
+            sbom: false
+          - python-version: "3.11"
+            artifact: wheel
+            extra: reasoning
+            native: false
+            sbom: false
+          - python-version: "3.11"
+            artifact: sdist
+            extra: viz
+            native: false
+            sbom: false
+          - python-version: "3.12"
+            artifact: wheel
+            extra: viz-reasoning-bioml
+            native: true
+            sbom: true
+          - python-version: "3.12"
+            artifact: sdist
+            extra: none
+            native: false
+            sbom: false
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.4.0
+        with:
+          python-version: ${{ matrix.python-version }}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: exact-om-tag-candidate-${{ github.sha }}
+          path: dist
+      - name: Verify downloaded candidate
+        run: |
+          python -m pip install "packaging>=24,<26"
+          python tools/verify_distribution_artifacts.py --dist-dir dist
+      - name: Select candidate artifact
+        shell: bash
+        run: |
+          if [[ "${{ matrix.artifact }}" == "wheel" ]]; then
+            artifacts=(dist/*.whl)
+          else
+            artifacts=(dist/*.tar.gz)
+          fi
+          test "${#artifacts[@]}" -eq 1
+          echo "EXACT_ARTIFACT=$(realpath "${artifacts[0]}")" >> "$GITHUB_ENV"
+          echo "EXACT_CONSTRAINTS=$(realpath dist/stack-constraints.txt)" >> "$GITHUB_ENV"
+      - name: Clean-install and smoke release candidate
+        shell: bash
+        env:
+          CARGO: /__exact_forbidden__/cargo
+          RUSTC: /__exact_forbidden__/rustc
+          JAVA_HOME: ""
+        run: |
+          smoke_venv="${RUNNER_TEMP}/exact-release-${{ matrix.python-version }}-${{ matrix.artifact }}"
+          python -m venv "${smoke_venv}"
+          "${smoke_venv}/bin/python" -m pip install --upgrade pip
+          "${smoke_venv}/bin/python" -m pip install "packaging>=24,<26"
+          "${smoke_venv}/bin/python" -m pip install \
+            --only-binary=pyowl-core,pyowl2vec-star-projector,pyelk-reasoner,pyhermit \
+            -c "${EXACT_CONSTRAINTS}" "${EXACT_ARTIFACT}"
+          "${smoke_venv}/bin/python" -m pip check
+          smoke_args=(base)
+          if [[ "${{ matrix.sbom }}" == "true" ]]; then
+            smoke_args+=(--sbom-output "${RUNNER_TEMP}/exact-om.spdx.json")
+          fi
+          (
+            cd "${RUNNER_TEMP}"
+            "${smoke_venv}/bin/python" \
+              "${GITHUB_WORKSPACE}/tools/smoke_distribution.py" "${smoke_args[@]}"
+          )
+          if [[ "${{ matrix.native }}" == "true" ]]; then
+            (
+              cd "${RUNNER_TEMP}"
+              "${smoke_venv}/bin/python" \
+                "${GITHUB_WORKSPACE}/tools/smoke_distribution.py" native
+            )
+          fi
+          case "${{ matrix.extra }}" in
+            viz)
+              extras=(viz)
+              ;;
+            reasoning)
+              extras=(reasoning)
+              ;;
+            viz-reasoning-bioml)
+              extras=(viz reasoning bioml-eval)
+              ;;
+            none)
+              extras=()
+              ;;
+          esac
+          for extra in "${extras[@]}"; do
+            "${smoke_venv}/bin/python" -m pip install \
+              --only-binary=pyowl-core,pyowl2vec-star-projector,pyelk-reasoner,pyhermit \
+              -c "${EXACT_CONSTRAINTS}" "${EXACT_ARTIFACT}[${extra}]"
+            "${smoke_venv}/bin/python" -m pip check
+            (
+              cd "${RUNNER_TEMP}"
+              "${smoke_venv}/bin/python" \
+                "${GITHUB_WORKSPACE}/tools/smoke_distribution.py" "${extra}"
+            )
+          done
+      - name: Upload base SBOM
+        if: matrix.sbom
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: exact-om-tag-sbom-${{ github.sha }}
+          if-no-files-found: error
+          path: ${{ runner.temp }}/exact-om.spdx.json
+
+  publish_tested_artifacts:
+    needs: [resolve_candidate, package_build, package_smoke]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.4.0
+        with:
+          python-version: "3.12"
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: exact-om-tag-candidate-${{ github.sha }}
+          path: dist
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: exact-om-tag-sbom-${{ github.sha }}
+          path: dist
+      - name: Reconfirm tested artifact and evidence identity
+        env:
+          IMPLEMENTATION_COMMIT: ${{ needs.resolve_candidate.outputs.implementation_commit }}
+        run: |
+          python -m pip install "packaging>=24,<26"
+          python tools/verify_distribution_artifacts.py --dist-dir dist
+          python tools/verify_release_evidence.py \
+            --dist-dir dist \
+            --revision "${IMPLEMENTATION_COMMIT}"
+      - name: Upload the already-tested distributions and evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
           name: exact-om-${{ github.ref_name }}
-          path: dist/*
+          if-no-files-found: error
+          path: |
+            dist/*.whl
+            dist/*.tar.gz
+            dist/artifact-sha256.json
+            dist/stack-constraints.txt
+            dist/exact-om.spdx.json
+            release/core-compatibility.json
+            release/evidence/legacy-compliance-closure.json
+            release/evidence/pyowl-core-0.2-ncit-doid.json

@@ -1,0 +1,127 @@
+{
+  "schema": "exact-om.legacy-compliance-closure/1",
+  "status": "pending",
+  "exact": {
+    "commit": null,
+    "commit_role": "implementation-candidate",
+    "version": "2.1.0"
+  },
+  "candidate": {
+    "implementation_commit": null,
+    "source_date_epoch": null
+  },
+  "tested_python_versions": [],
+  "artifacts": {
+    "lock_sha256": null,
+    "ncit_doid_evidence_sha256": null,
+    "sdist": {
+      "filename": null,
+      "sha256": null
+    },
+    "wheel": {
+      "filename": null,
+      "sha256": null
+    }
+  },
+  "preserved_feature_matrix": {
+    "foundations_and_packaging": {
+      "status": "pending",
+      "evidence": []
+    },
+    "java_free_ontology_backend": {
+      "status": "pending",
+      "evidence": []
+    },
+    "timing_ledger": {
+      "status": "pending",
+      "evidence": []
+    },
+    "module_and_import_architecture": {
+      "status": "pending",
+      "evidence": []
+    },
+    "evaluation": {
+      "status": "pending",
+      "evidence": []
+    },
+    "entity_kinds": {
+      "status": "pending",
+      "evidence": []
+    },
+    "formats_and_kg_sources": {
+      "status": "pending",
+      "evidence": []
+    },
+    "documentation": {
+      "status": "pending",
+      "evidence": []
+    },
+    "dataset_and_track_retrieval": {
+      "status": "pending",
+      "evidence": []
+    },
+    "config_schema_v2": {
+      "status": "pending",
+      "evidence": []
+    },
+    "exact_inspect": {
+      "status": "pending",
+      "evidence": []
+    },
+    "run_artifacts": {
+      "status": "pending",
+      "evidence": []
+    },
+    "shared_owl_consumers": {
+      "status": "pending",
+      "evidence": []
+    }
+  },
+  "audit_defects": {
+    "formatting": {
+      "status": "pending",
+      "evidence": []
+    },
+    "typing": {
+      "status": "pending",
+      "evidence": []
+    },
+    "pytest_collection": {
+      "status": "pending",
+      "evidence": []
+    },
+    "exact_inspect_test_isolation": {
+      "status": "pending",
+      "evidence": []
+    },
+    "reasoner_cleanup_test": {
+      "status": "pending",
+      "evidence": []
+    },
+    "distribution_coverage": {
+      "status": "pending",
+      "evidence": []
+    },
+    "core_0_2_migration": {
+      "status": "pending",
+      "evidence": []
+    }
+  },
+  "superseded_requirements": [
+    "fixture benchmark 25% timing comparison",
+    "Exact 2.0 versus shared-stack 25% wall-time comparison",
+    "pinned-runner comparative RSS baseline",
+    "Conference, GO, multiple Bio-ML pairs, and largest licensed workflow",
+    "exhaustive native-consumer performance cross-product"
+  ],
+  "core_contract": {
+    "api_version": [
+      0,
+      2
+    ],
+    "model_schema": 2
+  },
+  "experiments_in_scope": false,
+  "exact_repair_in_scope": false,
+  "performance_claim": false
+}

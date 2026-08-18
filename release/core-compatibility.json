@@ -1,68 +1,70 @@
 {
   "schema": "exact-om.ontology-stack-compatibility/1",
+  "status": "verified",
+  "performance_claim": false,
   "exact": {
     "repository": "https://github.com/liseda-lab/Exact-OM",
-    "version": "2.0.0",
-    "compatibility_parent_commit": "abba717bd5b3f186678bd6f3e88bf73066c2ae49",
-    "compatibility_parent_tree": "a0a7c9e3ddf3a9ad1ae8da307654eeafdd2d3b59",
-    "final_revision_binding": "external-pyowl-core-consumer-compatibility-matrix",
-    "runtime_baseline_commit": "ab4b76644f6ed58894d0920e47de713ba1ffb358",
-    "runtime_baseline_tree": "dc353f2b4e2eb2f987ae4d7552cdb51bf9480226"
+    "version": "2.1.0"
   },
   "tested_stack": {
     "pyowl-core": {
       "repository": "https://github.com/OAEI-ML/pyOWLCore",
-      "commit": "005c3ccad129757b3a9be125dc064b812b607ef5",
-      "tree": "d4f3f29f6594b59f3d45a4811c38fb761a7028b9",
-      "version": "0.1.0.dev0"
+      "version": "0.2.0"
     },
     "pyowl2vec-star-projector": {
       "repository": "https://github.com/OAEI-ML/pyOwl2Vec-Star-projector",
-      "commit": "9f19db3de54b7bdffe45498479edadd72af37218",
-      "tree": "71280102561265fb015d9bf9d02c57448c0490a4",
-      "version": "0.1.0rc1"
+      "version": "0.2.0"
     },
     "pyelk-reasoner": {
       "repository": "https://github.com/OAEI-ML/pyELK",
-      "commit": "70302fcd6abc27d703eeb8f59027fc1392f4709b",
-      "tree": "ad28753b4cb0efed5e4ca442575a63ef4d7bd0c8",
-      "version": "0.1.0.dev0"
+      "version": "0.2.0"
     },
-    "pyHermiT": {
+    "pyhermit": {
       "repository": "https://github.com/OAEI-ML/pyHermiT",
-      "commit": "af8f7fc669b28dfc15728c84c78f9094787d288b",
-      "tree": "e7523959d80b116520f9387463d2ae82ba22c5f8",
-      "version": "0.1.0.dev0"
-    }
-  },
-  "companion_evidence": {
+      "version": "0.2.0"
+    },
     "oaei-bioml-eval": {
       "repository": "https://github.com/OAEI-ML/OAEI-Bio-ML-eval",
-      "role": "companion-evaluation-evidence",
-      "ontology_runtime_dependency": false,
-      "final_commit": "94713d5068ce78d90f42e7fb100c7631b6490924",
-      "source_commit": "1e8a55f27cc5e6de0dad7f149408a8d85a294be6",
-      "tree": "10a9fa27852cc02210a494f7daebfe418be17238"
+      "version": "0.2.1"
     }
   },
   "dependency_constraints": {
     "base": {
-      "pyowl-core": ">=0.1,<0.2",
-      "pyowl2vec-star-projector": ">=0.1,<0.2"
+      "pyowl-core": ">=0.2,<0.3",
+      "pyowl2vec-star-projector": ">=0.2,<0.3"
     },
     "reasoning_extra": {
-      "pyelk-reasoner": ">=0.1,<0.2",
-      "pyhermit": ">=0.1,<0.2"
+      "pyelk-reasoner": ">=0.2,<0.3",
+      "pyhermit": ">=0.2,<0.3"
     },
     "evaluation_extra": {
-      "oaei-bioml-eval": ">=0.2,<0.3"
+      "oaei-bioml-eval": ">=0.2.1,<0.3"
     }
+  },
+  "core_contract": {
+    "distribution": "pyowl-core",
+    "version": "0.2.0",
+    "api_version": [
+      0,
+      2
+    ],
+    "model_schema": 2,
+    "wire_writer": [
+      1,
+      2
+    ],
+    "wire_readable_through": [
+      1,
+      2
+    ],
+    "adapter_protocol": 1
   },
   "encoded_contract": {
     "schema_name": "pyowl-core/structural-columns",
-    "schema_version": 1,
-    "model_schema": 1,
-    "descriptor_sha256": "9ad29db6a7e616f65cea2957bc5ba8d1f9b99ef0eb1fe1432c09be25786267b5",
+    "schema_version": 2,
+    "model_schema": 2,
+    "descriptor_source": "pyowl_core.EncodedStructuralView.DESCRIPTOR_SHA256",
+    "descriptor_sha256": "c51d0eb7ecf6f29ad3495fe7c40a2ea6741cf03a7cf194d51417bb810df90f51",
     "owner_matrix": [
       "direct",
       "decoded",
@@ -73,6 +75,29 @@
     "in_process_transport": "identity",
     "worker_transport": "one-core-wire-verified-mmap",
     "performance_claim": false
+  },
+  "projector_contract": {
+    "distribution": "pyowl2vec-star-projector",
+    "version": "0.2.0",
+    "api_version": 1,
+    "core_api_version": [
+      0,
+      2
+    ],
+    "core_model_schema": 2,
+    "core_wire_version": [
+      1,
+      2
+    ],
+    "adapter_protocol": 1,
+    "compiler_cache_schema": "pyowl-projector.compiler-cache/1",
+    "edge_schema": "pyowl-projector.edge-list/1",
+    "profile": "mowl-d993536-v1",
+    "supported_ingestion_paths": [
+      "scalar-python",
+      "scalar-native",
+      "encoded-native"
+    ]
   },
   "projector_handoff": {
     "advertised_ingestion_path": "encoded-native",
@@ -152,6 +177,24 @@
       "wire_encoder_calls"
     ]
   },
+  "reasoner_contract": {
+    "asserted": {
+      "distribution": null,
+      "included_in_base": true
+    },
+    "elk": {
+      "distribution": "pyelk-reasoner",
+      "version": "0.2.0",
+      "compiler_schema": 1
+    },
+    "hermit": {
+      "distribution": "pyhermit",
+      "version": "0.2.0",
+      "compiler_cache_schema": 1,
+      "ir_schema": 1,
+      "native_abi_schema": 1
+    }
+  },
   "reasoner_handoff": {
     "advertised_ingestion_path": "encoded-native",
     "scalar_paths": [
@@ -195,10 +238,19 @@
       "wire_encoder_calls"
     ]
   },
+  "cache_policy": {
+    "core_model_schema": 2,
+    "schema_1_ontology_caches": "reject-before-interpretation-and-rebuild",
+    "conversion_supported": false,
+    "completed_run_artifacts_readable": true,
+    "schema_1_resume_supported": false
+  },
   "public_boundary": {
     "exact_requests_encoded_buffers": false,
     "exact_decodes_encoded_buffers": false,
     "exact_flattens_layered_views": false,
+    "consumer_path_retry": false,
+    "java_runtime": false,
     "oaei_is_ontology_runtime_dependency": false
   }
 }

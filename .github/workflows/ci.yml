@@ -25,7 +25,7 @@ jobs:
         with:
           path: .venv
           key: venv-${{ runner.os }}-${{ matrix.python-version }}-${{ hashFiles('poetry.lock') }}
-      - run: poetry install --with prebuild --extras "viz reasoning"
+      - run: poetry install --with prebuild --extras "viz reasoning bioml-eval"
       - run: poetry run black --check exact exact_inspect tests tools study_visualizer_runtime
       - run: poetry run isort --check-only exact exact_inspect tests tools study_visualizer_runtime
       - run: poetry run flake8 exact exact_inspect tests tools study_visualizer_runtime
@@ -56,8 +56,10 @@ jobs:
           fi
       - run: poetry run pytest -m "not requires_data and not slow and not requires_cuda and not requires_openrouter" --cov=exact
 
-  package:
+  package-build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.4.0
@@ -75,137 +77,149 @@ jobs:
       - run: poetry install --with prebuild --extras viz
       - run: make build-frontend
       - run: poetry build
-      - name: Verify wheel dependencies, extras, frontend, and compatibility contract
-        run: |
-          poetry run python - <<'PY'
-          import glob
-          import json
-          import tarfile
-          import zipfile
-
-          wheel = glob.glob("dist/*.whl")
-          sdist = glob.glob("dist/*.tar.gz")
-          assert len(wheel) == 1, wheel
-          assert len(sdist) == 1, sdist
-          with zipfile.ZipFile(wheel[0]) as archive:
-              names = archive.namelist()
-              assert "exact_inspect/static/index.html" in names
-              contract_name = "release/core-compatibility.json"
-              assert contract_name in names
-              wheel_contract = json.loads(archive.read(contract_name))
-              metadata_name = next(name for name in names if name.endswith(".dist-info/METADATA"))
-              metadata = archive.read(metadata_name).decode("utf-8")
-          with tarfile.open(sdist[0], "r:gz") as archive:
-              contract_member = next(
-                  member
-                  for member in archive.getmembers()
-                  if member.name.endswith("/release/core-compatibility.json")
-              )
-              stream = archive.extractfile(contract_member)
-              assert stream is not None
-              sdist_contract = json.load(stream)
-          assert wheel_contract == sdist_contract
-          assert wheel_contract["schema"] == "exact-om.ontology-stack-compatibility/1"
-          for dependency in ("pyowl-core", "pyowl2vec-star-projector"):
-              lines = [
-                  line
-                  for line in metadata.splitlines()
-                  if line.lower().startswith(f"requires-dist: {dependency}")
-              ]
-              assert lines and all("extra ==" not in line for line in lines), lines
-          for dependency in ("pyelk-reasoner", "pyhermit"):
-              lines = [
-                  line
-                  for line in metadata.splitlines()
-                  if line.lower().startswith(f"requires-dist: {dependency}")
-              ]
-              assert lines and all('extra == "reasoning"' in line for line in lines), lines
-          for dependency in ("fastapi", "uvicorn", "pydantic-settings"):
-              lines = [
-                  line
-                  for line in metadata.splitlines()
-                  if line.lower().startswith(f"requires-dist: {dependency}")
-              ]
-              assert lines and all('extra == "viz"' in line for line in lines), lines
-          PY
-      - name: Smoke-test the built wheel in a clean environment
-        shell: bash
-        run: |
-          wheels=(dist/*.whl)
-          test "${#wheels[@]}" -eq 1
-          wheel="$(realpath "${wheels[0]}")"
-          smoke_venv="${RUNNER_TEMP}/exact-wheel-smoke"
-          smoke_cwd="${RUNNER_TEMP}/exact-wheel-cwd"
-          python -m venv "${smoke_venv}"
-          "${smoke_venv}/bin/python" -m pip install --upgrade pip
-          "${smoke_venv}/bin/pip" install "${wheel}"
-          "${smoke_venv}/bin/pip" check
-          mkdir -p "${smoke_cwd}"
-          (
-            cd "${smoke_cwd}"
-            "${smoke_venv}/bin/exact" --help
-            "${smoke_venv}/bin/exact-eval" --help
-            "${smoke_venv}/bin/bioml-eval" --help
-            "${smoke_venv}/bin/python" - <<'PY'
-          import importlib.util
-
-          for package in ("fastapi", "pydantic_settings", "uvicorn", "pyelk", "pyhermit"):
-              assert importlib.util.find_spec(package) is None, package
-          for package in ("pyowl_core", "pyowl2vec_star_projector"):
-              assert importlib.util.find_spec(package) is not None, package
-          PY
-          )
-          "${smoke_venv}/bin/python" tools/generate_sbom.py --output dist/exact-om.spdx.json
-          "${smoke_venv}/bin/python" - <<'PY'
-          import json
-
-          payload = json.load(open("dist/exact-om.spdx.json", encoding="utf-8"))
-          names = {item["name"].lower() for item in payload["packages"]}
-          assert "pyowl-core" in names
-          assert "pyowl2vec-star-projector" in names
-          assert names.isdisjoint({"py-horned-owl", "pyelk-reasoner", "pyhermit"})
-          PY
-          "${smoke_venv}/bin/pip" install "${wheel}[viz]"
-          "${smoke_venv}/bin/pip" check
-          (
-            cd "${smoke_cwd}"
-            "${smoke_venv}/bin/exact-inspect" --help
-            "${smoke_venv}/bin/exact-study-viz" --help
-          )
-          "${smoke_venv}/bin/pip" install "${wheel}[reasoning]"
-          "${smoke_venv}/bin/pip" check
-          "${smoke_venv}/bin/python" - <<'PY'
-          import importlib.util
-          import sys
-
-          from exact.ontology import load_ontology
-
-          for package in ("pyelk", "pyhermit"):
-              assert importlib.util.find_spec(package) is not None, package
-          ontology = b'''<?xml version="1.0"?>
-          <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
-                   xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
-                   xmlns:owl="http://www.w3.org/2002/07/owl#">
-            <owl:Ontology rdf:about="urn:exact:wheel-smoke"/>
-            <owl:Class rdf:about="urn:A">
-              <rdfs:subClassOf rdf:resource="urn:B"/>
-            </owl:Class>
-            <owl:Class rdf:about="urn:B"/>
-          </rdf:RDF>'''
-          for name in ("elk", "hermit"):
-              source = load_ontology(ontology)
-              snapshot = source.owl_snapshot()
-              source.configure_reasoner(name, backend="auto")
-              assert source.reasoner.ontology is snapshot
-              assert source.reasoner.ancestors("urn:A") == {"urn:B"}
-          assert "jpype" not in sys.modules and "mowl" not in sys.modules
-          PY
+      - name: Verify distribution contents and freeze candidate identity
+        run: >-
+          poetry run python tools/verify_distribution_artifacts.py
+          --dist-dir dist
+          --write-support-files
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: exact-om-distributions
-          path: dist/*
+          name: exact-om-candidate-${{ github.sha }}
+          if-no-files-found: error
+          retention-days: 7
+          path: |
+            dist/*.whl
+            dist/*.tar.gz
+            dist/artifact-sha256.json
+            dist/stack-constraints.txt
 
-  benchmark:
+  package-smoke:
+    name: Package smoke (${{ matrix.python-version }}, ${{ matrix.artifact }})
+    needs: package-build
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - python-version: "3.10"
+            artifact: wheel
+            extra: viz
+            native: false
+            sbom: false
+          - python-version: "3.10"
+            artifact: sdist
+            extra: reasoning
+            native: false
+            sbom: false
+          - python-version: "3.11"
+            artifact: wheel
+            extra: reasoning
+            native: false
+            sbom: false
+          - python-version: "3.11"
+            artifact: sdist
+            extra: viz
+            native: false
+            sbom: false
+          - python-version: "3.12"
+            artifact: wheel
+            extra: viz-reasoning-bioml
+            native: true
+            sbom: true
+          - python-version: "3.12"
+            artifact: sdist
+            extra: none
+            native: false
+            sbom: false
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.4.0
+        with:
+          python-version: ${{ matrix.python-version }}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: exact-om-candidate-${{ github.sha }}
+          path: dist
+      - name: Verify downloaded candidate
+        run: |
+          python -m pip install "packaging>=24,<26"
+          python tools/verify_distribution_artifacts.py --dist-dir dist
+      - name: Select candidate artifact
+        shell: bash
+        run: |
+          if [[ "${{ matrix.artifact }}" == "wheel" ]]; then
+            artifacts=(dist/*.whl)
+          else
+            artifacts=(dist/*.tar.gz)
+          fi
+          test "${#artifacts[@]}" -eq 1
+          echo "EXACT_ARTIFACT=$(realpath "${artifacts[0]}")" >> "$GITHUB_ENV"
+          echo "EXACT_CONSTRAINTS=$(realpath dist/stack-constraints.txt)" >> "$GITHUB_ENV"
+      - name: Clean-install and smoke base distribution
+        shell: bash
+        env:
+          CARGO: /__exact_forbidden__/cargo
+          RUSTC: /__exact_forbidden__/rustc
+          JAVA_HOME: ""
+        run: |
+          smoke_venv="${RUNNER_TEMP}/exact-${{ matrix.python-version }}-${{ matrix.artifact }}"
+          python -m venv "${smoke_venv}"
+          "${smoke_venv}/bin/python" -m pip install --upgrade pip
+          "${smoke_venv}/bin/python" -m pip install "packaging>=24,<26"
+          "${smoke_venv}/bin/python" -m pip install \
+            --only-binary=pyowl-core,pyowl2vec-star-projector,pyelk-reasoner,pyhermit \
+            -c "${EXACT_CONSTRAINTS}" "${EXACT_ARTIFACT}"
+          "${smoke_venv}/bin/python" -m pip check
+          smoke_args=(base)
+          if [[ "${{ matrix.sbom }}" == "true" ]]; then
+            smoke_args+=(--sbom-output "${RUNNER_TEMP}/exact-om.spdx.json")
+          fi
+          (
+            cd "${RUNNER_TEMP}"
+            "${smoke_venv}/bin/python" \
+              "${GITHUB_WORKSPACE}/tools/smoke_distribution.py" "${smoke_args[@]}"
+          )
+          if [[ "${{ matrix.native }}" == "true" ]]; then
+            (
+              cd "${RUNNER_TEMP}"
+              "${smoke_venv}/bin/python" \
+                "${GITHUB_WORKSPACE}/tools/smoke_distribution.py" native
+            )
+          fi
+          case "${{ matrix.extra }}" in
+            viz)
+              extras=(viz)
+              ;;
+            reasoning)
+              extras=(reasoning)
+              ;;
+            viz-reasoning-bioml)
+              extras=(viz reasoning bioml-eval)
+              ;;
+            none)
+              extras=()
+              ;;
+          esac
+          for extra in "${extras[@]}"; do
+            "${smoke_venv}/bin/python" -m pip install \
+              --only-binary=pyowl-core,pyowl2vec-star-projector,pyelk-reasoner,pyhermit \
+              -c "${EXACT_CONSTRAINTS}" "${EXACT_ARTIFACT}[${extra}]"
+            "${smoke_venv}/bin/python" -m pip check
+            (
+              cd "${RUNNER_TEMP}"
+              "${smoke_venv}/bin/python" \
+                "${GITHUB_WORKSPACE}/tools/smoke_distribution.py" "${extra}"
+            )
+          done
+      - name: Upload base SBOM
+        if: matrix.sbom
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: exact-om-base-sbom-${{ github.sha }}
+          if-no-files-found: error
+          path: ${{ runner.temp }}/exact-om.spdx.json
+
+  benchmark-diagnostics:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -221,4 +235,15 @@ jobs:
           path: .venv
           key: benchmark-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
       - run: poetry install --with prebuild
-      - run: poetry run python benchmarks/bench.py --repeat 7 --check-reference
+      - name: Capture informational fixture timings
+        run: >-
+          poetry run python benchmarks/bench.py
+          --repeat 7
+          --output benchmark-results/fixture.json
+      - name: Upload informational timings
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: fixture-timings-${{ github.sha }}
+          if-no-files-found: warn
+          path: benchmark-results/fixture.json
