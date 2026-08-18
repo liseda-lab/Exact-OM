@@ -301,12 +301,16 @@ def _encoded_view_schemas(capabilities: object) -> dict[str, int]:
     if not isinstance(raw, Mapping):
         raise TypeError("core encoded_view_schemas must be a mapping")
     result: dict[str, int] = {}
-    for name, version in raw.items():
+    for name, schema_version in raw.items():
         if not isinstance(name, str) or not name:
             raise TypeError("core encoded-view schema names must be nonempty text")
-        if isinstance(version, bool) or not isinstance(version, int) or version < 1:
+        if (
+            isinstance(schema_version, bool)
+            or not isinstance(schema_version, int)
+            or schema_version < 1
+        ):
             raise TypeError("core encoded-view schema versions must be positive integers")
-        result[name] = version
+        result[name] = schema_version
     return dict(sorted(result.items()))
 
 
