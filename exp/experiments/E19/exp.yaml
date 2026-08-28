@@ -1,10 +1,10 @@
 schema_version: 1
 experiment_id: E19
 title: Supervised evidence fusion
-implementation: {status: deferred, reason: "Strict global artifact-backed analytic-fitted and learned-global inference exists, but artifact fitting, per-kind scope, learned-adaptive gating, and source-disjoint training are absent."}
+implementation: {status: deferred, reason_code: fitting_pipeline_unavailable, reason: "Strict artifact-backed inference exists, but artifact fitting, per-kind scope, learned-adaptive gating, and source-disjoint training are not supplied."}
 base_config: ../../../exact/default_config.yaml
-baseline_id: R_n
-depends_on: [E00, E20, E26]
+baseline_id: R_0
+depends_on: [E00, E10, E20, E26]
 resource: {kind: gpu, device: "0", concurrency: 1}
 screen:
   tasks:
@@ -25,12 +25,16 @@ arms:
 selection:
   decisions:
     - {id: fusion_provider, baseline: analytic_shipped, candidates: [analytic_fitted_global, analytic_fitted_per_kind, learned_global, learned_global_per_kind, learned_adaptive], metric: F1, min_delta: 0.001}
+frozen_constants:
+  beta: {source: E10_confirmed_selection, fitted_in_E19: false, status: required_before_activation}
+  analytic_fitted_parameters: [tau, gamma, normalized_channel_multipliers]
+  artifact_binding: [candidate_pool_fingerprint, dataset_lock_hash, feature_schema_hash, seed]
 design:
   primary_comparison: frozen_supervised_fusion_vs_analytic_shipped
-  primary_endpoint: macro_F1_and_llm_cost
+  primary_endpoint: macro_F1
   independent_unit: source_entity
   power_status: underpowered
-  assumptions: ["Every fitted artifact is bound to pool, dataset lock, schema, and seed."]
+  assumptions: ["Every fitted artifact is bound to pool, dataset lock, schema, and seed.", "LLM gating rate and token spend are mandatory cost guards rather than additional promotion endpoints."]
   required_slices: [task, entity_kind, channel_weight_entropy]
   regression_bound: 0.005
   multiplicity: none

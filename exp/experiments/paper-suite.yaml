@@ -1,8 +1,14 @@
 schema_version: 1
 suite_id: exact-om-paper-v1
-baseline_id: R_n
-baseline_manifest: baselines/R_n.yaml
+baseline_id: R_0
+baseline_manifest: baselines/R_0.yaml
+specification:
+  path: ../../specs/experiments
+  sha256: 58c95fe891eaa7f6040d81dd6efe1f3dc3ab021d7600310647b8abfcedd5836e
+  files: 29
+  algorithm: sha256-length-prefixed-v1
 dataset_lock: datasets.lock.yaml
+model_lock: models.lock.yaml
 experiments:
   - {id: E00, config: E00/exp.yaml, depends_on: []}
   - {id: E01, config: E01/exp.yaml, depends_on: [E00]}
@@ -22,8 +28,8 @@ experiments:
   - {id: E15, config: E15/exp.yaml, depends_on: [E00, E03]}
   - {id: E16, config: E16/exp.yaml, depends_on: [E00, E11, E12, E14, E15]}
   - {id: E17, config: E17/exp.yaml, depends_on: [E00, E01, E02, E03, E04, E05, E06, E07, E08, E09, E10, E11, E12, E13, E14, E15, E16, E18, E19, E20, E21, E22, E23, E24, E25, E26]}
-  - {id: E18, config: E18/exp.yaml, depends_on: [E00, E20]}
-  - {id: E19, config: E19/exp.yaml, depends_on: [E00, E20, E26]}
+  - {id: E18, config: E18/exp.yaml, depends_on: [E00, E15, E20]}
+  - {id: E19, config: E19/exp.yaml, depends_on: [E00, E10, E20, E26]}
   - {id: E20, config: E20/exp.yaml, depends_on: [E05]}
   - {id: E21, config: E21/exp.yaml, depends_on: [E07, E25]}
   - {id: E22, config: E22/exp.yaml, depends_on: [E15, E18, E19, E20, E21, E23]}

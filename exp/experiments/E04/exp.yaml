@@ -1,9 +1,9 @@
 schema_version: 1
 experiment_id: E04
 title: Explicit NIL and abstention
-implementation: {status: deferred, reason: "Candidate and abstention probabilities exist, but common-scale NIL calibration, synthetic NIL rows, and ranking-writer integration are incomplete."}
+implementation: {status: deferred, reason_code: nil_writer_incomplete, reason: "Joint candidate/NIL probabilities are implemented, but fitted NIL calibration and synthetic NIL-row writer/evaluator integration are incomplete."}
 base_config: ../../../exact/default_config.yaml
-baseline_id: R_n
+baseline_id: R_0
 depends_on: [E00]
 resource: {kind: gpu, device: "0", concurrency: 1}
 screen:

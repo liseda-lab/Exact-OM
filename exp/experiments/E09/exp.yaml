@@ -1,9 +1,9 @@
 schema_version: 1
 experiment_id: E09
 title: IC-weighted hierarchy overlap and sibling consistency
-implementation: {status: deferred, reason: "The confirmation matrix omits eligible OAEI tasks and the required hierarchy cost endpoint."}
+implementation: {status: deferred_unavailable, reason_code: hierarchy_reporting_tracks_not_materialized, missing_capability: anatomy_and_kg_hierarchy_reporting_bundles, expected_dataset: OAEI-Anatomy-2025+OAEI-KG-v4, reason: "IC-weighted hierarchy overlap and sibling evidence are implemented, but the pinned Anatomy and OAEI-KG reporting bundles required by the frozen hierarchy matrix are not materialized."}
 base_config: ../../../exact/default_config.yaml
-baseline_id: R_n
+baseline_id: R_0
 depends_on: [E00]
 resource: {kind: gpu, device: "0", concurrency: 1}
 screen:
@@ -15,7 +15,7 @@ confirm:
   tasks:
     - {id: bioml-snomed-fma-test, split_role: reporting, track: bioml_hf, task: snomed-fma, reference_role: test, overlay: {data: {candidate_source: reference_split}, evaluation: {dual_global_local: true}}, reference_completeness: complete, capabilities: [train_reference]}
     - {id: bioml-snomed-ncit-test, split_role: reporting, track: bioml_hf, task: snomed-ncit, reference_role: test, overlay: {data: {candidate_source: reference_split}, evaluation: {dual_global_local: true}}, reference_completeness: complete, capabilities: [train_reference]}
-    - {id: anatomy-mouse-human-test, split_role: reporting, track: anatomy, task: mouse-human, reference_role: test, overlay: {data: {candidate_source: generated}, evaluation: {dual_global_local: true}}, reference_completeness: unknown, capabilities: []}
+    - {id: anatomy-mouse-human-test, split_role: reporting, track: anatomy, task: mouse-human, reference_role: test, overlay: {data: {candidate_source: generated}, evaluation: {dual_global_local: true}}, reference_completeness: unknown, capabilities: [], availability: {status: deferred_unavailable, reason_code: anatomy_2025_not_materialized, missing_capability: ontology_pair_and_reference, expected_dataset: OAEI-Anatomy-2025/mouse-human, reason: "Pinned Anatomy ontologies and reporting reference are not materialized locally; implementation must not download them."}}
   seeds: [17, 29, 43]
 arms:
   - {id: labels_depth2, role: baseline, overlay: {matching: {channels: {hier: {enabled: true, mode: labels, siblings: false, depth: 2}}}, supervision: {mode: label_free}}, supervision_label: target_label_free}

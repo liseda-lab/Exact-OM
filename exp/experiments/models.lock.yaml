@@ -1,0 +1,54 @@
+schema_version: 1
+status: incomplete
+note: "Screening may resolve configured models, but confirmation remains blocked until the user records immutable local revisions or artifact hashes without credentials."
+models:
+  candidate_encoder:
+    requested_id: sentence-transformers/all-MiniLM-L6-v2
+    resolved_revision:
+    artifact_sha256:
+    reason: "No immutable locally resolved revision has been materialized and approved."
+  lexical_encoder:
+    requested_id: cambridgeltl/SapBERT-from-PubMedBERT-fulltext
+    resolved_revision:
+    artifact_sha256:
+    reason: "The E26 SapBERT identity is declared, but no immutable locally resolved commit has been materialized and approved."
+  context_encoder:
+    requested_id: BAAI/bge-large-en-v1.5
+    resolved_revision:
+    artifact_sha256:
+    reason: "The E26 BGE identity is declared, but no immutable locally resolved commit has been materialized and approved."
+  local_verbaliser_default:
+    requested_id: Qwen/Qwen2.5-3B-Instruct
+    resolved_revision:
+    artifact_sha256:
+    reason: "No immutable local verbaliser model/tokenizer revision has been materialized and approved."
+  local_llm_default:
+    requested_id: Qwen/Qwen2.5-7B-Instruct
+    resolved_revision:
+    artifact_sha256:
+    reason: "No immutable local model/tokenizer revision has been materialized and approved."
+  openrouter_gpt4o_mini_tokenizer:
+    requested_id: Xenova/gpt-4o
+    resolved_revision:
+    artifact_sha256:
+    reason: "The hosted decision tokenizer is configured, but no immutable tokenizer commit has been materialized and approved."
+  openrouter_qwen35_122b_tokenizer:
+    requested_id: Qwen/Qwen3.5-122B-A10B
+    resolved_revision:
+    artifact_sha256:
+    reason: "The hosted decision tokenizer is configured, but no immutable tokenizer commit has been materialized and approved."
+  openrouter_qwen3_235b_tokenizer:
+    requested_id: Qwen/Qwen3-235B-A22B-2507
+    resolved_revision:
+    artifact_sha256:
+    reason: "The hosted decision tokenizer is configured, but no immutable tokenizer commit has been materialized and approved."
+  openrouter_llama33_70b_tokenizer:
+    requested_id: meta-llama/Llama-3.3-70B-Instruct
+    resolved_revision:
+    artifact_sha256:
+    reason: "The hosted decision tokenizer is configured, but no immutable tokenizer commit has been materialized and approved."
+  openrouter_deepseek_chat_v31_tokenizer:
+    requested_id: deepseek-ai/DeepSeek-V3.1
+    resolved_revision:
+    artifact_sha256:
+    reason: "The hosted decision tokenizer is configured, but no immutable tokenizer commit has been materialized and approved."

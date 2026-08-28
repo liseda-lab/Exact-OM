@@ -1,0 +1,13 @@
+schema_version: 1
+baseline_id: R_0
+parent: B0
+exact_om_version: 2.1.0
+pyowlcore_version: 0.2.0
+source_commit: ba9b88240e70ccc7bf13ec67224ba840e9fe1680
+source_tree_sha256: a92db6ef98d178eff98d4c30abe298fa2b61e3174ce1d9c0ae11126e92887197
+source_tree_files: 199
+config: ../../../exact/default_config.yaml
+config_sha256: f3fa8639f1604fc195bdf79bae65e72b68cf5a6a3b0f6934faef8d667e2a19d1
+status: frozen_configuration
+experiment_flags: disabled
+note: "Frozen Exact-OM 2.1.0 / pyowl-core 0.2.0 production configuration with every experimental switch disabled; E00 verifies exact decisions and tolerance-bounded score/metric replay before paper comparisons."

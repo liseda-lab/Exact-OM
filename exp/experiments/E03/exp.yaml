@@ -1,9 +1,9 @@
 schema_version: 1
 experiment_id: E03
 title: Calibration and transferable thresholds
-implementation: {status: deferred, reason: "Calibration primitives exist, but fitted artifact application and donor-to-recipient OOF orchestration are not yet wired into runtime."}
+implementation: {status: deferred, reason_code: cross_pair_artifacts_unavailable, reason: "Calibration application is implemented, but donor-to-recipient out-of-fold artifact production and transfer orchestration are not supplied."}
 base_config: ../../../exact/default_config.yaml
-baseline_id: R_n
+baseline_id: R_0
 depends_on: [E00]
 resource: {kind: gpu, device: "0", concurrency: 1}
 screen:

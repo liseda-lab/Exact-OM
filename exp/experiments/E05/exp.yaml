@@ -1,9 +1,9 @@
 schema_version: 1
 experiment_id: E05
 title: Zero-shot candidate retrieval upgrades
-implementation: {status: deferred, reason: "Development selection still uses end-to-end F1 instead of the required retrieval-only candidate-recall and gold-rank endpoint."}
+implementation: {status: deferred, reason_code: retrieval_matrix_and_progressive_assembly_unavailable, reason: "The bounded retrieval arms, realized-pool diagnostics, and matched-pool multi-criterion selector are implemented, but the full eligible reporting matrix and development-only progressive-winner assembly are not supplied; the suite must not narrow or preselect that paper comparison."}
 base_config: ../../../exact/default_config.yaml
-baseline_id: R_n
+baseline_id: R_0
 depends_on: [E00]
 resource: {kind: gpu, device: "0", concurrency: 1}
 screen:
@@ -16,7 +16,7 @@ confirm:
   tasks:
     - {id: bioml-ncit-doid-test, split_role: reporting, track: bioml_hf, task: ncit-doid, reference_role: test, overlay: {data: {candidate_source: generated}, evaluation: {dual_global_local: true}}, reference_completeness: complete, capabilities: [train_reference]}
     - {id: bioml-snomed-fma-test, split_role: reporting, track: bioml_hf, task: snomed-fma, reference_role: test, overlay: {data: {candidate_source: generated}, evaluation: {dual_global_local: true}}, reference_completeness: complete, capabilities: [train_reference]}
-    - {id: anatomy-mouse-human-test, split_role: reporting, track: anatomy, task: mouse-human, reference_role: test, overlay: {data: {candidate_source: generated}, evaluation: {dual_global_local: true}}, reference_completeness: unknown, capabilities: []}
+    - {id: anatomy-mouse-human-test, split_role: reporting, track: anatomy, task: mouse-human, reference_role: test, overlay: {data: {candidate_source: generated}, evaluation: {dual_global_local: true}}, reference_completeness: unknown, capabilities: [], availability: {status: deferred_unavailable, reason_code: anatomy_2025_not_materialized, missing_capability: ontology_pair_and_reference, expected_dataset: OAEI-Anatomy-2025/mouse-human, reason: "Pinned Anatomy ontologies and reporting reference are not materialized locally; implementation must not download them."}}
   seeds: [17, 29, 43]
 arms:
   - {id: minilm_max_k20, role: baseline, overlay: {candidates: {encoder: sentence-transformers/all-MiniLM-L6-v2, top_k: 20, fusion: {mode: max}, adaptive_k: {enabled: false}}, supervision: {mode: label_free}}, supervision_label: target_label_free}
@@ -24,19 +24,34 @@ arms:
   - {id: minilm_rrf_k20, role: candidate, overlay: {candidates: {encoder: sentence-transformers/all-MiniLM-L6-v2, top_k: 20, fusion: {mode: rrf, rrf_constant: 60.0}, adaptive_k: {enabled: false}}, supervision: {mode: label_free}}, supervision_label: target_label_free}
   - {id: minilm_weighted_k20, role: candidate, overlay: {candidates: {encoder: sentence-transformers/all-MiniLM-L6-v2, top_k: 20, fusion: {mode: weighted, weighted_semantic: 0.5, weighted_lexical: 0.5}, adaptive_k: {enabled: false}}, supervision: {mode: label_free}}, supervision_label: target_label_free}
   - {id: minilm_gap_adaptive, role: candidate, overlay: {candidates: {encoder: sentence-transformers/all-MiniLM-L6-v2, top_k: 20, fusion: {mode: max}, adaptive_k: {enabled: true, criterion: gap, gap: 0.05, k_min: 10, k_max: 40}}, supervision: {mode: label_free}}, supervision_label: target_label_free}
-  - {id: minilm_entropy_adaptive, role: candidate, overlay: {candidates: {encoder: sentence-transformers/all-MiniLM-L6-v2, top_k: 20, fusion: {mode: max}, adaptive_k: {enabled: true, criterion: entropy, entropy: 0.75, k_min: 10, k_max: 40}}, supervision: {mode: label_free}}, supervision_label: target_label_free}
   - {id: sapbert_rrf_gap_adaptive, role: candidate, overlay: {candidates: {encoder: cambridgeltl/SapBERT-from-PubMedBERT-fulltext, top_k: 20, fusion: {mode: rrf, rrf_constant: 60.0}, adaptive_k: {enabled: true, criterion: gap, gap: 0.05, k_min: 10, k_max: 40}}, supervision: {mode: label_free}}, supervision_label: target_label_free}
 selection:
   decisions:
-    - {id: retrieval_configuration, baseline: minilm_max_k20, candidates: [sapbert_max_k20, minilm_rrf_k20, minilm_weighted_k20, minilm_gap_adaptive, minilm_entropy_adaptive, sapbert_rrf_gap_adaptive], metric: F1, direction: max, min_delta: 0.001, allow_screened_out: true}
+    - id: retrieval_configuration
+      baseline: minilm_max_k20
+      candidates: [sapbert_max_k20, minilm_rrf_k20, minilm_weighted_k20, minilm_gap_adaptive, sapbert_rrf_gap_adaptive]
+      metric: candidate_recall
+      direction: max
+      min_delta: 0.005
+      guards:
+        - {id: matched_mean_pool_size, metric: mean_pool_size, comparison: matched, scope: aggregate, match_tolerance: {absolute: 1.0, relative: 0.02, combine: max}}
+        - {id: per_task_candidate_recall, metric: candidate_recall, direction: max, scope: each_task, min_delta: -0.005}
+        - {id: local_ranking_noninferiority, metric: local.MRR, direction: max, scope: each_task, min_delta: -0.005}
+        - {id: end_to_end_runtime, metric: wall_seconds, direction: min, scope: aggregate, min_relative_delta: -0.20}
+      tie_breaks:
+        - {kind: metric, metric: gold_rank_p90, direction: min}
+        - {kind: metric, metric: gold_rank_median, direction: min}
+        - {kind: metric, metric: wall_seconds, direction: min}
+        - {kind: arm_order, direction: min, order: [sapbert_max_k20, minilm_rrf_k20, minilm_weighted_k20, minilm_gap_adaptive, sapbert_rrf_gap_adaptive]}
+      allow_screened_out: true
 design:
   primary_comparison: frozen_retrieval_vs_minilm_max_k20
   primary_endpoint: macro_F1
   independent_unit: source_entity
   power_status: underpowered
-  assumptions: ["Retrieval screening is deterministic for a fixed source set and encoder artifact.", "Reporting recall never selects an arm."]
+  assumptions: ["Retrieval screening is deterministic for a fixed source set and encoder artifact.", "Development arms are compared at matched mean pool size within max(1 candidate, 2%).", "Eligibility requires at least +0.005 macro candidate recall and no task below -0.005 candidate recall; ties rank by lower gold-rank p90, lower median, runtime, then simplicity.", "Reporting recall never selects an arm; local MRR is a mandatory end-to-end guard.", "End-to-end runtime is bounded at 1.2x; only SapBERT dataset construction may use the preregistered 1.5x override and both bounds are reported."]
   required_slices: [task, entity_kind, domain]
   regression_bound: 0.005
-  cost_bound: 1.5
+  cost_bound: 1.2
   multiplicity: none
 negative_label_policy: not_applicable

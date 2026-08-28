@@ -1,9 +1,9 @@
 schema_version: 1
 experiment_id: E14
 title: Typed relation prediction
-implementation: {status: deferred, reason: "The canonical relation modes are declared, but semantic anchor entailment extensions, learned three-way artifacts, typed evaluator, and coherence audit are incomplete."}
+implementation: {status: deferred_unavailable, reason_code: biokg_not_published, missing_capability: typed_relation_dataset, expected_dataset: BioKG-Align/csv-kg-published-revision, reason: "The BioKG-Align typed-relation dataset is an unpublished stub and is not materialized; learned relation artifacts and the coherence audit also remain unavailable."}
 base_config: ../../../exact/default_config.yaml
-baseline_id: R_n
+baseline_id: R_0
 depends_on: [E00, E13]
 resource: {kind: gpu, device: "0", concurrency: 1}
 screen:
@@ -18,13 +18,15 @@ confirm:
 arms:
   - {id: all_equivalent, role: baseline, overlay: {matching: {relation_prediction: none}}}
   - {id: hierarchy_heuristic, role: control, overlay: {matching: {relation_prediction: hierarchy_heuristic}}, required_control: true}
-  - {id: semantic_graph_closure, role: candidate, overlay: {matching: {relation_prediction: semantic_entailment, relation_semantic_backend: graph_closure}}, supervision_label: target_label_free}
-  - {id: semantic_bridge_reasoner, role: candidate, overlay: {matching: {relation_prediction: semantic_entailment, relation_semantic_backend: bridge_reasoner}}, supervision_label: target_label_free}
+  - {id: semantic_graph_closure, role: candidate, overlay: {matching: {relation_prediction: semantic_entailment, relation_semantic_backend: graph_closure, relation_equivalence_anchor_margin: 0.10, relation_reasoning_timeout_seconds: 60.0}}, supervision_label: target_label_free}
+  - {id: semantic_bridge_reasoner, role: candidate, overlay: {matching: {relation_prediction: semantic_entailment, relation_semantic_backend: bridge_reasoner, relation_equivalence_anchor_margin: 0.10, relation_reasoning_timeout_seconds: 60.0}}, supervision_label: target_label_free}
   - {id: learned_three_way, role: candidate, overlay: {matching: {relation_prediction: learned_three_way}, supervision: {components: {relation: supervised}}}, supervision_label: in_pair_supervised}
-  - {id: semantic_then_learned, role: candidate, overlay: {matching: {relation_prediction: semantic_then_learned}, supervision: {components: {relation: supervised}}}, supervision_label: in_pair_supervised}
+  - {id: semantic_then_learned, role: candidate, overlay: {matching: {relation_prediction: semantic_then_learned, relation_equivalence_anchor_margin: 0.10, relation_reasoning_timeout_seconds: 60.0}, supervision: {components: {relation: supervised}}}, supervision_label: in_pair_supervised}
 selection:
   decisions:
     - {id: relation_typer, baseline: hierarchy_heuristic, candidates: [semantic_graph_closure, semantic_bridge_reasoner, learned_three_way, semantic_then_learned], metric: relation_macro_F1, min_delta: 0.001, required_controls: [all_equivalent]}
+frozen_constants:
+  semantic_entailment: {reciprocal_anchor_margin: 0.10, reasoning_timeout_seconds: 60.0}
 design:
   primary_comparison: frozen_relation_typer_vs_hierarchy_heuristic
   primary_endpoint: relation_macro_F1

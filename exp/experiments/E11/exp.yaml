@@ -1,9 +1,9 @@
 schema_version: 1
 experiment_id: E11
 title: Property-equivalence evidence groups
-implementation: {status: deferred, reason: "Canonical property switches exist, but dataset bundle extraction and scorer consumption for property evidence groups are intentionally fail-closed."}
+implementation: {status: deferred_unavailable, reason_code: oaei_kg_v4_not_materialized, missing_capability: property_reference_bundle, expected_dataset: OAEI-KG-v4/starwars-swg, reason: "The required OAEI-KG v4 property task is not materialized locally; property evidence bundles also remain fail-closed."}
 base_config: ../../../exact/default_config.yaml
-baseline_id: R_n
+baseline_id: R_0
 depends_on: [E00]
 resource: {kind: gpu, device: "0", concurrency: 1}
 screen:

@@ -7,21 +7,8 @@ tracks:
     descriptor_sha256: cd89ce8f3418f81158a3fb69c7045198f8954391091d9ecfa214ad1466fddb8d
     revision: "2026"
     roles: [train, valid, test]
-  anatomy:
-    descriptor: ../../exact/tracks/builtin/anatomy.yaml
-    descriptor_sha256: 8a4a5080617be6ac697a7d8559c9c8be6d65ac7d937f520f86f7da9ee2022801
-    revision: "2025"
-    roles: [test]
   conference:
     descriptor: ../../exact/tracks/builtin/conference.yaml
     descriptor_sha256: db2daec1789276377b9a2f78542f02b0c32e2f92caaf020530ac079471428c9e
     revision: "2025"
     roles: [test]
-  oaei_kg:
-    descriptor: ../../exact/tracks/builtin/oaei_kg.yaml
-    descriptor_sha256: 89bc1c754c02e77c375d3cd8ea9cbd8921560ae5d8a23eee54902cb2e27eb41a
-    roles: [valid, test]
-  biokg:
-    descriptor: ../../exact/tracks/builtin/biokg.yaml
-    descriptor_sha256: 625f9e4a23d15e6bd4af2fac169c6a91a65de43e45608316789fc45bb8508d05
-    roles: [valid, test]

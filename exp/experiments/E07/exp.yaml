@@ -1,9 +1,9 @@
 schema_version: 1
 experiment_id: E07
 title: Listwise LLM arbitration
-implementation: {status: deferred, reason: "Deterministic listwise prompts and categorical probability transforms exist, but hosted/local listwise calls, self-consistency, order averaging, and identity-bound runtime orchestration are not wired."}
+implementation: {status: deferred, reason_code: llm_backend_orchestration_unavailable, reason: "Deterministic listwise call plans and aggregation exist, but an immutable local/provider backend and identity-bound scorer orchestration are not supplied."}
 base_config: ../../../exact/default_config.yaml
-baseline_id: R_n
+baseline_id: R_0
 depends_on: [E00, E25]
 resource: {kind: llm, profile: openrouter_gpt4o_mini, concurrency: 1}
 screen:
@@ -22,18 +22,23 @@ arms:
   - {id: listwise_conditional_real, role: candidate, overlay: {llm: {experiment: {enabled: true, decision: {mode: listwise, probability: conditional_real, listwise_max_candidates: 5}}}}, supervision_label: target_label_free}
   - {id: listwise_pairwise_none, role: candidate, overlay: {llm: {experiment: {enabled: true, decision: {mode: listwise, probability: pairwise_vs_none, listwise_max_candidates: 5}}}}, supervision_label: target_label_free}
   - {id: listwise_max_normalized, role: diagnostic, overlay: {llm: {experiment: {enabled: true, decision: {mode: listwise, probability: max_normalized, listwise_max_candidates: 5}}}}, deployable: false, supervision_label: target_label_free}
-  - {id: listwise_sc_raw_joint, role: candidate, overlay: {llm: {experiment: {enabled: true, decision: {mode: listwise_sc, probability: raw_joint, listwise_max_candidates: 5, order_averages: 3}}}}, supervision_label: target_label_free}
-  - {id: listwise_sc_conditional_real, role: candidate, overlay: {llm: {experiment: {enabled: true, decision: {mode: listwise_sc, probability: conditional_real, listwise_max_candidates: 5, order_averages: 3}}}}, supervision_label: target_label_free}
-  - {id: listwise_sc_pairwise_none, role: candidate, overlay: {llm: {experiment: {enabled: true, decision: {mode: listwise_sc, probability: pairwise_vs_none, listwise_max_candidates: 5, order_averages: 3}}}}, supervision_label: target_label_free}
+  - {id: listwise_sc_raw_joint, role: candidate, overlay: {llm: {experiment: {enabled: true, decision: {mode: listwise_sc, probability: raw_joint, listwise_max_candidates: 5, permutations: 2, samples_per_permutation: 3}}}}, supervision_label: target_label_free}
+  - {id: listwise_sc_conditional_real, role: candidate, overlay: {llm: {experiment: {enabled: true, decision: {mode: listwise_sc, probability: conditional_real, listwise_max_candidates: 5, permutations: 2, samples_per_permutation: 3}}}}, supervision_label: target_label_free}
+  - {id: listwise_sc_pairwise_none, role: candidate, overlay: {llm: {experiment: {enabled: true, decision: {mode: listwise_sc, probability: pairwise_vs_none, listwise_max_candidates: 5, permutations: 2, samples_per_permutation: 3}}}}, supervision_label: target_label_free}
 selection:
   decisions:
     - {id: listwise_decision, baseline: binary_same_five, candidates: [listwise_raw_joint, listwise_conditional_real, listwise_pairwise_none, listwise_sc_raw_joint, listwise_sc_conditional_real, listwise_sc_pairwise_none], metric: F1, min_delta: 0.001, required_controls: [binary_operational, binary_same_five]}
+frozen_constants:
+  call_plan: {permutations: 2, samples_per_permutation: 3, stochastic_temperature: 0.7, candidate_cap: 5}
+  aggregation: {categorical_probability_weight: 0.5, vote_distribution_weight: 0.5, normalize_after_mix: true}
+  tie_rule: [probability_desc, target_iri_asc]
+  seed_rule: stable_source_and_run_seed_hash
 design:
   primary_comparison: frozen_listwise_vs_binary_same_five
-  primary_endpoint: macro_F1_and_token_cost
+  primary_endpoint: macro_F1
   independent_unit: source_entity
   power_status: underpowered
-  assumptions: ["All paired calls pin provider and resolved model identity."]
+  assumptions: ["All paired calls pin provider and resolved model identity.", "LLM token spend is a mandatory cost constraint, not a second promotion endpoint."]
   required_slices: [list_length, overflow, sibling_confusion]
   regression_bound: 0.005
   non_inferiority_margin: -0.005

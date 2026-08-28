@@ -1,9 +1,9 @@
 schema_version: 1
 experiment_id: E01
 title: Deterministic global extraction
-implementation: {status: deferred, reason: "The confirmation matrix omits Anatomy, the required selector-sensitive 2x2 control is absent, and incomplete-reference adjudication is not configured."}
+implementation: {status: deferred_unavailable, reason_code: anatomy_reporting_bundle_not_materialized, missing_capability: ontology_pair_reference_and_blinded_adjudication, expected_dataset: OAEI-Anatomy-2025/mouse-human, reason: "The global extraction primitive and selector-on/off screen controls are implemented, but the pinned Anatomy reporting bundle required by this paper design is not materialized; no substitute task is allowed."}
 base_config: ../../../exact/default_config.yaml
-baseline_id: R_n
+baseline_id: R_0
 depends_on: [E00]
 resource: {kind: gpu, device: "0", concurrency: 1}
 screen:

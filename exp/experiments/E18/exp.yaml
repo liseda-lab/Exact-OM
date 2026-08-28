@@ -1,10 +1,10 @@
 schema_version: 1
 experiment_id: E18
 title: Supervised reranking objectives and model families
-implementation: {status: deferred, reason: "The analytic/current dispatch is present, but pointwise, pairwise, NIL-listwise, channel-gating, additive GAM, GBDT, extended features, and immutable OOF artifact orchestration are not implemented."}
+implementation: {status: deferred, reason_code: reranker_training_artifacts_unavailable, reason: "The analytic/current controls are available, but channel-gating and diagnostic objective/model trainers do not yet produce immutable out-of-fold artifacts with the required split, pool, negative-policy, and explanation-schema bindings."}
 base_config: ../../../exact/default_config.yaml
-baseline_id: R_n
-depends_on: [E00, E20]
+baseline_id: R_0
+depends_on: [E00, E15, E20]
 resource: {kind: gpu, device: "0", concurrency: 1}
 screen:
   tasks:
@@ -18,21 +18,29 @@ confirm:
 arms:
   - {id: current_listwise, role: baseline, overlay: {selector: {enabled: true, rerank: {mode: current_listwise, model: current_linear, features: current}}, supervision: {components: {rerank: supervised}}}, supervision_label: in_pair_supervised}
   - {id: analytic, role: control, overlay: {selector: {enabled: true, rerank: {mode: analytic, model: current_linear, features: current}}, supervision: {components: {rerank: label_free}}}, required_control: true, supervision_label: target_label_free}
-  - {id: pointwise_linear, role: candidate, overlay: {selector: {enabled: true, rerank: {mode: pointwise, model: current_linear, features: current}}, supervision: {components: {rerank: supervised}}}, supervision_label: in_pair_supervised}
-  - {id: pairwise_linear, role: candidate, overlay: {selector: {enabled: true, rerank: {mode: pairwise, model: current_linear, features: current}}, supervision: {components: {rerank: supervised}}}, supervision_label: in_pair_supervised}
-  - {id: listwise_nil_linear, role: candidate, overlay: {selector: {enabled: true, rerank: {mode: listwise_nil, model: current_linear, features: current}}, supervision: {components: {rerank: supervised}}}, supervision_label: in_pair_supervised}
+  - {id: pointwise_linear, role: diagnostic, stages: [screen], overlay: {selector: {enabled: true, rerank: {mode: pointwise, model: current_linear, features: current}}, supervision: {components: {rerank: supervised}}}, deployable: false, supervision_label: in_pair_supervised}
+  - {id: pairwise_linear, role: diagnostic, stages: [screen], overlay: {selector: {enabled: true, rerank: {mode: pairwise, model: current_linear, features: current}}, supervision: {components: {rerank: supervised}}}, deployable: false, supervision_label: in_pair_supervised}
+  - {id: listwise_nil_linear, role: diagnostic, stages: [screen], overlay: {selector: {enabled: true, rerank: {mode: listwise_nil, model: current_linear, features: current}}, supervision: {components: {rerank: supervised}}}, deployable: false, supervision_label: in_pair_supervised}
   - {id: channel_gating, role: candidate, overlay: {selector: {enabled: true, rerank: {mode: current_listwise, model: channel_gating, features: current}}, supervision: {components: {rerank: supervised}}}, supervision_label: in_pair_supervised}
-  - {id: additive_gam_extended, role: diagnostic, overlay: {selector: {enabled: true, rerank: {mode: current_listwise, model: additive_gam, features: extended}}, supervision: {components: {rerank: supervised}}}, deployable: false, supervision_label: in_pair_supervised}
-  - {id: gbdt_extended, role: diagnostic, overlay: {selector: {enabled: true, rerank: {mode: current_listwise, model: gbdt_monotonic, features: extended}}, supervision: {components: {rerank: supervised}}}, deployable: false, supervision_label: in_pair_supervised}
+  - {id: additive_gam_extended, role: diagnostic, stages: [screen], overlay: {selector: {enabled: true, rerank: {mode: current_listwise, model: additive_gam, features: extended}}, supervision: {components: {rerank: supervised}}}, deployable: false, supervision_label: in_pair_supervised}
+  - {id: gbdt_extended, role: diagnostic, stages: [screen], overlay: {selector: {enabled: true, rerank: {mode: current_listwise, model: gbdt_monotonic, features: extended}}, supervision: {components: {rerank: supervised}}}, deployable: false, supervision_label: in_pair_supervised}
 selection:
   decisions:
-    - {id: reranking_head, baseline: current_listwise, candidates: [pointwise_linear, pairwise_linear, listwise_nil_linear, channel_gating], metric: F1, min_delta: 0.001, required_controls: [analytic]}
+    - id: reranking_head
+      baseline: current_listwise
+      candidates: [channel_gating]
+      metric: F1
+      min_delta: 0.001
+      guards:
+        - {id: local_mrr_noninferiority, metric: local.MRR, direction: max, scope: each_task, min_delta: -0.005}
+        - {id: exact_explanation_reconstruction, metric: explanation_reconstruction.max_abs_error, comparison: absolute_threshold, direction: min, scope: each_cell, threshold: 0.000001}
+      required_controls: [analytic]
 design:
   primary_comparison: frozen_decomposition_preserving_reranker_vs_current_listwise
-  primary_endpoint: macro_F1_and_local_MRR
+  primary_endpoint: macro_F1
   independent_unit: source_entity
   power_status: underpowered
-  assumptions: ["Source groups never cross folds."]
+  assumptions: ["Source groups never cross folds.", "Local MRR is reported separately and may regress by at most 0.005.", "Promotion requires exact explanation reconstruction; pointwise, pairwise, NIL-listwise, additive GAM, and GBDT arms are scientific diagnostics under the current explanation contract."]
   required_slices: [task, entity_kind, pool_density, lexical_strength]
   regression_bound: 0.005
   multiplicity: none

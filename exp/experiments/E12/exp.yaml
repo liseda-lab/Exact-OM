@@ -1,9 +1,9 @@
 schema_version: 1
 experiment_id: E12
 title: Instance-equivalence evidence and multi-view retrieval
-implementation: {status: deferred, reason: "Individual-only multi-view retrieval is implemented, but kind-scoped instance evidence bundles, degree-preserving relation shuffle, and anchor cross are not integrated."}
+implementation: {status: deferred_unavailable, reason_code: oaei_kg_v4_not_materialized, missing_capability: instance_reference_bundle, expected_dataset: OAEI-KG-v4/starwars-swg, reason: "The required OAEI-KG v4 instance task is not materialized locally; evidence bundles, relation shuffle, and anchor cross remain incomplete."}
 base_config: ../../../exact/default_config.yaml
-baseline_id: R_n
+baseline_id: R_0
 depends_on: [E00]
 resource: {kind: gpu, device: "0", concurrency: 1}
 screen:

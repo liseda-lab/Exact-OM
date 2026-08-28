@@ -1,9 +1,9 @@
 schema_version: 1
 experiment_id: E16
 title: Cross-pair supervised-head transfer
-implementation: {status: deferred, reason: "Strict artifact consumers exist in parts of the pipeline, but source-pair training, pooled leave-one-pair-out artifacts, target-unsupervised adaptation, and transfer-matrix orchestration are absent."}
+implementation: {status: deferred, reason_code: transfer_artifacts_unavailable, reason: "Strict artifact consumers exist, but source-pair training, pooled leave-one-pair-out artifacts, target-unsupervised adaptation, and transfer-matrix orchestration are not supplied."}
 base_config: ../../../exact/default_config.yaml
-baseline_id: R_n
+baseline_id: R_0
 depends_on: [E00, E11, E12, E14, E15]
 resource: {kind: gpu, device: "0", concurrency: 1}
 screen:

@@ -1,9 +1,9 @@
 schema_version: 1
 experiment_id: E00
 title: Lean paper runner and frozen production baseline
-implementation: {status: deferred, reason: "The authoritative E00 spec names Exact-OM 0.2.1 while the runtime and frozen baseline use 2.1.0, and baseline replay does not yet assert exact decision equality."}
+implementation: {status: ready}
 base_config: ../../../exact/default_config.yaml
-baseline_id: R_n
+baseline_id: R_0
 depends_on: []
 resource: {kind: gpu, device: "0", concurrency: 1}
 screen:
@@ -25,17 +25,28 @@ confirm:
     - {id: bioml-snomed-ncit-test, split_role: reporting, track: bioml_hf, task: snomed-ncit, reference_role: test, overlay: {data: {candidate_source: reference_split}, evaluation: {dual_global_local: true}}, reference_completeness: complete, capabilities: [train_reference]}
   seeds: [17, 29, 43]
 arms:
-  - {id: R_n, role: baseline, overlay: {}}
+  - {id: R_0, role: baseline, overlay: {}}
   - {id: baseline_replay, role: candidate, overlay: {}}
 selection:
   decisions:
-    - {id: reproduce_frozen_default, baseline: R_n, candidates: [baseline_replay], metric: F1, direction: max, min_delta: 0.0, required_controls: [], allow_screened_out: false}
+    - {id: reproduce_frozen_default, baseline: R_0, candidates: [baseline_replay], metric: F1, direction: max, min_delta: -0.0001, required_controls: [], allow_screened_out: false}
+frozen_constants:
+  replay:
+    exact_fields: [canonical_source_id, canonical_target_id, selected_mapping, relation]
+    cpu_score_tolerance: 0.000001
+    gpu_score_tolerance: 0.00001
+    aggregate_metric_tolerance: 0.0001
+    canonical_order: [source_id, target_id, relation]
 design:
-  primary_comparison: baseline_replay_vs_R_n
+  primary_comparison: baseline_replay_vs_R_0
   primary_endpoint: macro_F1
   independent_unit: source_entity
   power_status: descriptive
   assumptions: ["This is a same-path reproducibility control, not a result-changing arm.", "Reporting seeds are paired across identical tasks and pools."]
+  power_slices:
+    - {id: bioml-ncit-doid-class-equivalence, task: bioml-ncit-doid-test, entity_kind: class, relation: equivalence, status: descriptive, hypothesized_effect: 0.0, assumptions: ["Same-path replay expects zero semantic effect."]}
+    - {id: bioml-snomed-fma-class-equivalence, task: bioml-snomed-fma-test, entity_kind: class, relation: equivalence, status: descriptive, hypothesized_effect: 0.0, assumptions: ["Same-path replay expects zero semantic effect."]}
+    - {id: bioml-snomed-ncit-class-equivalence, task: bioml-snomed-ncit-test, entity_kind: class, relation: equivalence, status: descriptive, hypothesized_effect: 0.0, assumptions: ["Same-path replay expects zero semantic effect."]}
   required_slices: [task, entity_kind, relation]
   regression_bound: 0.0
   cost_bound: 1.2

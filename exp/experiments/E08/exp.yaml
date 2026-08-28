@@ -1,9 +1,9 @@
 schema_version: 1
 experiment_id: E08
 title: Attribute polarity and evidence-bank ablation
-implementation: {status: deferred, reason: "The manifest encodes one joint selection instead of separate polarity and attribute-bank decisions with the required conditional 2x2 interaction."}
+implementation: {status: deferred, reason_code: descriptor_identifier_semantics_unavailable, reason: "The bank arm is runnable, but signed polarity remains unavailable until revision-pinned dataset descriptors provide property-IRI allowlists, polarity semantics, identifier namespaces, and normalization rules; the manifest schema also cannot schedule a conditional post-selection 2x2 interaction."}
 base_config: ../../../exact/default_config.yaml
-baseline_id: R_n
+baseline_id: R_0
 depends_on: [E00]
 resource: {kind: gpu, device: "0", concurrency: 1}
 screen:
@@ -21,19 +21,32 @@ arms:
   - {id: support_attrs_labels, role: candidate, overlay: {matching: {channels: {attr: {enabled: true, polarity: support_only, bank: attrs_labels}}}, supervision: {mode: label_free}}, supervision_label: target_label_free}
   - {id: support_attrs_only, role: candidate, overlay: {matching: {channels: {attr: {enabled: true, polarity: support_only, bank: attrs_only}}}, supervision: {mode: label_free}}, supervision_label: target_label_free}
   - {id: signed_full, role: candidate, overlay: {matching: {channels: {attr: {enabled: true, polarity: signed, bank: full}}}, supervision: {mode: label_free}}, supervision_label: target_label_free}
-  - {id: signed_attrs_labels, role: candidate, overlay: {matching: {channels: {attr: {enabled: true, polarity: signed, bank: attrs_labels}}}, supervision: {mode: label_free}}, supervision_label: target_label_free}
-  - {id: signed_attrs_only, role: candidate, overlay: {matching: {channels: {attr: {enabled: true, polarity: signed, bank: attrs_only}}}, supervision: {mode: label_free}}, supervision_label: target_label_free}
+  - {id: signed_attrs_labels, role: diagnostic, stages: [screen], overlay: {matching: {channels: {attr: {enabled: true, polarity: signed, bank: attrs_labels}}}, supervision: {mode: label_free}}, deployable: false, supervision_label: target_label_free}
+  - {id: signed_attrs_only, role: diagnostic, stages: [screen], overlay: {matching: {channels: {attr: {enabled: true, polarity: signed, bank: attrs_only}}}, supervision: {mode: label_free}}, deployable: false, supervision_label: target_label_free}
 selection:
   decisions:
-    - {id: attribute_factorial, baseline: support_full, candidates: [support_attrs_labels, support_attrs_only, signed_full, signed_attrs_labels, signed_attrs_only], metric: F1, min_delta: 0.001}
+    - {id: attribute_polarity, baseline: support_full, candidates: [signed_full], metric: F1, min_delta: 0.001}
+    - id: attribute_bank
+      baseline: support_full
+      candidates: [support_attrs_labels, support_attrs_only]
+      metric: attribute_channel_correlation
+      direction: min
+      min_delta: 0.0
+      evidence: paired_ci_lower
+      strict: true
+      guards:
+        - {id: macro_f1_noninferiority, metric: F1, direction: max, min_delta: -0.005, evidence: paired_ci_lower, strict: true}
+      tie_breaks:
+        - {kind: metric, metric: F1, direction: max}
+        - {kind: arm_order, direction: min, order: [support_attrs_labels, support_attrs_only]}
 design:
-  primary_comparison: frozen_attribute_configuration_vs_support_full
+  primary_comparison: independent_polarity_and_attribute_bank_decisions
   primary_endpoint: macro_F1
   independent_unit: source_entity
   power_status: underpowered
-  assumptions: ["Signed identifier evidence is limited to declared identifier properties."]
+  assumptions: ["Signed identifier evidence is limited to revision-pinned descriptor property IRIs and fails closed when descriptor semantics are absent.", "Bank promotion requires a 95% CI for correlation reduction excluding zero and macro F1 non-inferiority above -0.005.", "If both independent decisions survive, signed_full and the frozen bank restriction form a conditional 2x2 interaction before confirmation."]
   required_slices: [task, entity_kind, attribute_coverage]
   regression_bound: 0.005
   non_inferiority_margin: -0.005
-  multiplicity: none
+  multiplicity: holm
 negative_label_policy: not_applicable

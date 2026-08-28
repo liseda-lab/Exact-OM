@@ -1,9 +1,9 @@
 schema_version: 1
 experiment_id: E23
 title: Supervised graph-structure channel
-implementation: {status: deferred, reason: "The graph config and artifact fingerprint are declared, but graph feature construction, inductive/transductive training, channel scoring, shuffle control reuse, and scorer registration are fail-closed."}
+implementation: {status: deferred_unavailable, reason_code: graph_benchmark_and_training_unavailable, missing_capability: graph_structure_reference_bundle_and_fitted_heads, expected_dataset: OAEI-KG-v4/starwars-swg plus a pinned controlled-TBox-ablation bundle, reason: "The required OAEI-KG v4 graph task and controlled TBox-ablation inputs are not materialized locally, and inductive/transductive fitted graph-head production remains fail-closed."}
 base_config: ../../../exact/default_config.yaml
-baseline_id: R_n
+baseline_id: R_0
 depends_on: [E02, E12, E13, E18, E19]
 resource: {kind: gpu, device: "0", concurrency: 1}
 screen:
@@ -21,16 +21,16 @@ arms:
   - {id: graph_inductive, role: candidate, overlay: {matching: {channels: {graph: {mode: inductive}}}, supervision: {components: {structure: supervised}}}, supervision_label: in_pair_supervised}
   - {id: graph_transductive, role: candidate, overlay: {matching: {channels: {graph: {mode: transductive}}}, supervision: {components: {structure: supervised}}}, supervision_label: in_pair_supervised}
   - {id: graph_only, role: diagnostic, overlay: {matching: {channels: {graph: {mode: graph_only}}}, supervision: {components: {structure: supervised}}}, deployable: false, supervision_label: in_pair_supervised}
-  - {id: relations_shuffled, role: control, overlay: {matching: {channels: {instance: {enabled: true, relations_shuffled: true}, graph: {mode: inductive}}}}, required_control: true, supervision_label: in_pair_supervised}
+  - {id: relations_shuffled, role: control, overlay: {matching: {channels: {instance: {enabled: true, relations_shuffled: true}, graph: {mode: inductive}}}}, required_control: true, deployable: false, supervision_label: in_pair_supervised}
 selection:
   decisions:
     - {id: graph_channel, baseline: evidence_baseline, candidates: [graph_inductive, graph_transductive], metric: F1, min_delta: 0.001, required_controls: [anchor_label_free, relations_shuffled]}
 design:
   primary_comparison: frozen_graph_channel_vs_evidence_baseline
-  primary_endpoint: tbox_poor_macro_F1
+  primary_endpoint: macro_F1
   independent_unit: source_entity
   power_status: underpowered
-  assumptions: ["Seed mappings never enter the reporting reference or candidate construction."]
+  assumptions: ["Seed mappings never enter the reporting reference or candidate construction.", "Inductive is L2 logistic regression over frozen graph features; transductive is two-layer mean GraphSAGE with 64-dimensional embeddings and a normalized-dot-product decoder.", "TBox retention is exactly {100%,50%,0%}, with the 50% level selected by deterministic hash; seed-count grid is {0,25,50,100,250,500,1000,all}.", "tbox_density=named_subclass_edges/max(1,named_classes) and relation_density=non_type_object_edges/max(1,individuals).", "Any incompatible E19-style fusion is refitted as a namespaced E23 interaction artifact with its own pool and feature hash.", "graph_only is never promotable; graph gains must survive the degree-preserving relation-shuffle control and preserve exact score decomposition."]
   required_slices: [tbox_depth, degree_quartile, non_exact_label]
   regression_bound: 0.005
   cost_bound: 1.2

@@ -1,9 +1,9 @@
 schema_version: 1
 experiment_id: E24
 title: Contrastive-channel degeneracy and corrective maps
-implementation: {status: deferred, reason: "The confirmation matrix omits the required all-five-BioML coverage, including OMIM-ORDO."}
+implementation: {status: deferred, reason_code: reporting_matrix_and_relation_gate_incomplete, reason: "The clarified absolute map is implemented, but the confirmation matrix omits required all-five-BioML coverage including OMIM-ORDO, and asymmetric promotion awaits frozen E14 relation typing; the undefined sim_fix arm is intentionally omitted."}
 base_config: ../../../exact/default_config.yaml
-baseline_id: R_n
+baseline_id: R_0
 depends_on: [E00]
 resource: {kind: gpu, device: "0", concurrency: 1}
 screen:
@@ -16,24 +16,24 @@ confirm:
   tasks:
     - {id: bioml-ncit-doid-test, split_role: reporting, track: bioml_hf, task: ncit-doid, reference_role: test, overlay: {data: {candidate_source: reference_split}, evaluation: {dual_global_local: true}}, reference_completeness: complete, capabilities: [train_reference]}
     - {id: bioml-snomed-fma-test, split_role: reporting, track: bioml_hf, task: snomed-fma, reference_role: test, overlay: {data: {candidate_source: reference_split}, evaluation: {dual_global_local: true}}, reference_completeness: complete, capabilities: [train_reference]}
-    - {id: anatomy-mouse-human-test, split_role: reporting, track: anatomy, task: mouse-human, reference_role: test, overlay: {data: {candidate_source: generated}, evaluation: {dual_global_local: true}}, reference_completeness: unknown, capabilities: []}
+    - {id: anatomy-mouse-human-test, split_role: reporting, track: anatomy, task: mouse-human, reference_role: test, overlay: {data: {candidate_source: generated}, evaluation: {dual_global_local: true}}, reference_completeness: unknown, capabilities: [], availability: {status: deferred_unavailable, reason_code: anatomy_2025_not_materialized, missing_capability: ontology_pair_and_reference, expected_dataset: OAEI-Anatomy-2025/mouse-human, reason: "Pinned Anatomy ontologies and reporting reference are not materialized locally; implementation must not download them."}}
   seeds: [17, 29, 43]
 arms:
-  - {id: R_n, role: baseline, overlay: {matching: {channels: {diff: {enabled: false}}}, supervision: {mode: label_free}}, supervision_label: target_label_free}
-  - {id: normalised_diagnostic, role: control, stages: [screen], overlay: {matching: {channels: {diff: {enabled: true, formulation: normalised, dump_components: true}}}, supervision: {mode: label_free}}, supervision_label: target_label_free}
+  - {id: R_0, role: baseline, overlay: {matching: {channels: {diff: {enabled: true, formulation: normalised, dump_components: true}}}, supervision: {mode: label_free}}, supervision_label: target_label_free}
   - {id: diff_off, role: candidate, overlay: {matching: {channels: {diff: {enabled: true, formulation: off, dump_components: true}}}, supervision: {mode: label_free}}, required_control: true, supervision_label: target_label_free}
   - {id: diff_absolute, role: candidate, overlay: {matching: {channels: {diff: {enabled: true, formulation: absolute, dump_components: true}}}, supervision: {mode: label_free}}, supervision_label: target_label_free}
-  - {id: diff_asymmetric, role: candidate, overlay: {matching: {channels: {diff: {enabled: true, formulation: asymmetric, dump_components: true}}}, supervision: {mode: label_free}}, supervision_label: target_label_free}
+  - {id: diff_asymmetric, role: diagnostic, stages: [screen], overlay: {matching: {channels: {diff: {enabled: true, formulation: asymmetric, dump_components: true}}}, supervision: {mode: label_free}}, deployable: false, supervision_label: target_label_free}
 selection:
   decisions:
-    - {id: contrastive_formulation, baseline: R_n, candidates: [diff_off, diff_absolute, diff_asymmetric], metric: F1, min_delta: 0.001, required_controls: [diff_off]}
+    - {id: contrastive_formulation, baseline: R_0, candidates: [diff_absolute, diff_off], metric: F1, min_delta: 0.0, required_controls: [diff_off]}
 design:
-  primary_comparison: frozen_contrastive_map_vs_R_n
+  primary_comparison: frozen_contrastive_map_vs_R_0
   primary_endpoint: macro_F1
   independent_unit: source_entity
   power_status: underpowered
-  assumptions: ["The same-family confounder slice is frozen before correctness is joined."]
+  assumptions: ["The same-family confounder slice is frozen before correctness is joined.", "Absolute uses diff_absolute=clip(0.5*(mean_src_unsupported+mean_tgt_unsupported),0,1), s_diff=1-diff_absolute, and is inactive only when both relation pools are empty.", "sim_fix is undefined and omitted; asymmetric is a screen-only diagnostic until E14 relation typing is frozen.", "Removal through diff_off is an eligible simplification when every corrective arm is null."]
   required_slices: [confounder, channel_active, pivot_reason, task]
   regression_bound: 0.003
+  non_inferiority_margin: -0.003
   multiplicity: none
 negative_label_policy: not_applicable

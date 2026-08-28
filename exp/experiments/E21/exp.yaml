@@ -1,9 +1,9 @@
 schema_version: 1
 experiment_id: E21
 title: Supervised LLM exemplars gating and distillation
-implementation: {status: deferred, reason: "Canonical controls exist, but training-only exemplar retrieval, counterfactual gate labels, student training, learned fusion fitting, and identity-bound immutable artifacts are not implemented end to end."}
+implementation: {status: deferred, reason_code: supervised_llm_artifacts_unavailable, reason: "Canonical controls exist, but training-only exemplars, counterfactual learned-gate labels, student training, learned fusion fitting, immutable LLM-identity-bound artifacts, and conditional survivor-combination orchestration are not supplied."}
 base_config: ../../../exact/default_config.yaml
-baseline_id: R_n
+baseline_id: R_0
 depends_on: [E07, E25]
 resource: {kind: llm, profile: openrouter_gpt4o_mini, concurrency: 1}
 screen:
@@ -18,18 +18,39 @@ confirm:
 arms:
   - {id: frozen_e07, role: baseline, overlay: {llm: {experiment: {enabled: true, exemplars: off, distill: off, fusion_weight: beta_u}}, supervision: {components: {llm: label_free}}}, supervision_label: target_label_free}
   - {id: knn_exemplars, role: candidate, overlay: {llm: {experiment: {enabled: true, exemplars: knn, exemplar_count: 4}}, supervision: {components: {llm: supervised}}}, supervision_label: in_pair_supervised}
-  - {id: learned_gate, role: candidate, overlay: {llm: {experiment: {enabled: true, gate: {mode: router}}}, supervision: {components: {llm: supervised}}}, supervision_label: in_pair_supervised}
+  - {id: learned_gate, role: candidate, overlay: {llm: {experiment: {enabled: true, gate: {mode: learned}}}, supervision: {components: {llm: supervised}}}, supervision_label: in_pair_supervised}
   - {id: distilled_student, role: candidate, overlay: {llm: {experiment: {enabled: true, distill: student}}, supervision: {components: {llm: supervised}}}, supervision_label: in_pair_supervised}
   - {id: learned_fusion, role: candidate, overlay: {llm: {experiment: {enabled: true, fusion_weight: learned}}, supervision: {components: {llm: supervised}}}, supervision_label: in_pair_supervised}
 selection:
   decisions:
-    - {id: supervised_llm_configuration, baseline: frozen_e07, candidates: [knn_exemplars, learned_gate, distilled_student, learned_fusion], metric: F1, min_delta: 0.001}
+    - {id: exemplar_prompting, baseline: frozen_e07, candidates: [knn_exemplars], metric: F1, min_delta: 0.001}
+    - id: learned_gate
+      baseline: frozen_e07
+      candidates: [learned_gate]
+      metric: llm.calls
+      direction: min
+      min_delta: 0.0
+      evidence: paired_ci_lower
+      strict: true
+      guards:
+        - {id: macro_f1_noninferiority, metric: F1, direction: max, min_delta: -0.005, evidence: paired_ci_lower, strict: true}
+    - id: distilled_student
+      baseline: frozen_e07
+      candidates: [distilled_student]
+      metric: llm.calls
+      direction: min
+      min_delta: 0.0
+      evidence: paired_ci_lower
+      strict: true
+      guards:
+        - {id: macro_f1_noninferiority, metric: F1, direction: max, min_delta: -0.005, evidence: paired_ci_lower, strict: true}
+    - {id: learned_fusion_weight, baseline: frozen_e07, candidates: [learned_fusion], metric: F1, min_delta: 0.001}
 design:
   primary_comparison: frozen_supervised_llm_vs_e07
-  primary_endpoint: macro_F1_and_llm_cost
+  primary_endpoint: macro_F1
   independent_unit: source_entity
   power_status: underpowered
-  assumptions: ["Every fitted object is bound to a resolved immutable LLM identity."]
+  assumptions: ["Every fitted object is bound to a resolved immutable LLM identity.", "The learned gate is trained only from complete-reference or adjudicated counterfactual call outcomes and is owned by E21, not E25.", "Gate and distillation promotion require macro-F1 non-inferiority above -0.005 and a call-reduction CI excluding zero; exemplar and fusion-weight decisions use quality gates.", "When multiple independent levers survive, only their frozen combined configuration and necessary single-lever controls proceed to confirmation."]
   required_slices: [task, decision_flip, exemplar_distance]
   regression_bound: 0.005
   non_inferiority_margin: -0.005
