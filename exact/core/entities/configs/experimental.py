@@ -75,6 +75,12 @@ class FusionExperimentConfig(StrictConfigModel):
         Field("full", description="E26 decomposition of quality, sharpening, and suppression.")
     )
     tau: float = Field(0.5, ge=0.0, le=1.0, description="Neutral score pivot when enabled.")
+    llm_pivot: float = Field(
+        0.5,
+        ge=0.0,
+        le=1.0,
+        description="Canonical E10 mapping to PairAdaptiveSemanticScorer.params.tau_LLM.",
+    )
     gamma: float = Field(2.0, ge=0.0, description="Informative-deviation exponent when enabled.")
     beta: float = Field(0.8, ge=0.0, description="LLM contribution scale when enabled.")
     artifact: Optional[Path] = Field(None, description="Optional immutable fitted fusion artifact.")
@@ -179,11 +185,14 @@ class LLMDecisionExperimentConfig(StrictConfigModel):
         Field("raw_joint")
     )
     listwise_max_candidates: int = Field(5, ge=2, le=26)
-    order_averages: int = Field(1, ge=1, le=3)
+    permutations: Literal[2] = 2
+    samples_per_permutation: Literal[3] = 3
 
 
 class LLMGateExperimentConfig(StrictConfigModel):
-    mode: Literal["analytic", "quantile", "forced_sample", "oracle", "router"] = Field("analytic")
+    mode: Literal["off", "analytic", "quantile", "forced_sample", "oracle", "learned"] = Field(
+        "analytic"
+    )
     threshold: float = Field(0.5, ge=0.0, le=1.0)
     quantile_fraction: float = Field(0.05, gt=0.0, le=1.0)
     forced_sample_size: int = Field(0, ge=0)

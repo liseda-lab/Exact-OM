@@ -95,6 +95,7 @@ V1_TO_V2: Dict[str, MigrationTarget] = {
     "dataset_params.reasoner_force_hermit": Drop(_REASONER_REMOVED),
     "candidates_params.retrieval_strategy": "candidates.retrieval_strategy",
     "candidates_params.lexical_encoder_name": "candidates.lexical_encoder_name",
+    "candidates_params.encoder_revision": "candidates.encoder_revision",
     "candidates_params.encode_batch_size": "candidates.encode_batch_size",
     "candidates_params.search_batch_size": "candidates.search_batch_size",
     "candidates_params.top_k": "candidates.top_k",

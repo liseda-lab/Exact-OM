@@ -291,6 +291,22 @@ class SemanticAlignmentRunner(
         return relative
 
     @classmethod
+    def _safe_llm_endpoint_identity(cls, value: Any) -> Optional[str]:
+        text = cls._safe_llm_identity_text(value, limit=2048)
+        if text is None:
+            return None
+        if "://" in text:
+            return cls._safe_llm_endpoint(text)
+        identity = text.split("?", 1)[0].split("#", 1)[0].strip()
+        if (
+            not identity
+            or "@" in identity
+            or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:/-]*", identity)
+        ):
+            return None
+        return identity
+
+    @classmethod
     def _safe_llm_provider(cls, value: Any) -> Optional[str]:
         if isinstance(value, Mapping):
             for key in ("name", "id", "provider"):
@@ -308,6 +324,58 @@ class SemanticAlignmentRunner(
         if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9:_-]{7,199}", candidate):
             return None
         return candidate
+
+    @staticmethod
+    def _safe_llm_usage_counter(value: Any) -> Optional[int]:
+        if isinstance(value, torch.Tensor):
+            if value.numel() != 1:
+                return None
+            value = value.item()
+        if isinstance(value, bool):
+            return None
+        if isinstance(value, int):
+            return int(value) if value >= 0 else None
+        if isinstance(value, float) and math.isfinite(value) and value >= 0 and value.is_integer():
+            return int(value)
+        return None
+
+    @classmethod
+    def _llm_usage_counters(cls, metadata: Mapping[str, Any]) -> Dict[str, int]:
+        sources: List[Mapping[str, Any]] = []
+        for field in ("usage", "token_usage", "response_usage"):
+            nested = metadata.get(field)
+            if isinstance(nested, Mapping):
+                sources.append(nested)
+        sources.append(metadata)
+        aliases = {
+            "calls": ("calls", "call_count", "request_count", "requests", "n_calls"),
+            "input_tokens": ("input_tokens", "prompt_tokens"),
+            "output_tokens": ("output_tokens", "completion_tokens"),
+            "total_tokens": ("total_tokens",),
+        }
+        counters: Dict[str, int] = {}
+        for target, names in aliases.items():
+            for source in sources:
+                found = False
+                for name in names:
+                    if name not in source:
+                        continue
+                    found = True
+                    value = cls._safe_llm_usage_counter(source.get(name))
+                    if value is not None:
+                        counters[target] = value
+                    break
+                if target in counters or found:
+                    break
+        return counters
+
+    @classmethod
+    def _llm_model_revision(cls, value: Any) -> Optional[str]:
+        model = cls._safe_llm_identity_text(value)
+        if model is None:
+            return None
+        _, separator, revision = model.rpartition("@")
+        return cls._safe_llm_identity_text(revision) if separator else None
 
     @staticmethod
     def _llm_profile_matches(profile: Any, backend: Any, model: Any) -> bool:
@@ -359,6 +427,8 @@ class SemanticAlignmentRunner(
         enriched = dict(metadata)
         backend = enriched.get("backend")
         effective_model = enriched.get("effective_model")
+        if effective_model is None:
+            effective_model = enriched.get("resolved_model")
         if effective_model is None:
             effective_model = enriched.get("model")
         if effective_model is not None:
@@ -413,10 +483,74 @@ class SemanticAlignmentRunner(
         if effective_profile is not None:
             enriched["profile"] = effective_profile
 
+        aliases = {
+            "requested_revision": ("requested_model_revision", "request_revision"),
+            "resolved_revision": (
+                "effective_revision",
+                "resolved_model_revision",
+                "model_revision",
+                "revision",
+            ),
+            "endpoint_identity": ("runtime_endpoint_identity", "endpoint_id"),
+            "request_time": ("requested_at", "request_timestamp", "timestamp"),
+        }
+        for target, candidates in aliases.items():
+            if enriched.get(target) is not None:
+                continue
+            for candidate in candidates:
+                if enriched.get(candidate) is not None:
+                    enriched[target] = enriched[candidate]
+                    break
+
+        if enriched.get("requested_revision") is None and requested_profile_obj is not None:
+            enriched["requested_revision"] = getattr(
+                requested_profile_obj,
+                "requested_revision",
+                getattr(
+                    requested_profile_obj,
+                    "model_revision",
+                    getattr(requested_profile_obj, "revision", None),
+                ),
+            )
+        if enriched.get("requested_revision") is None:
+            enriched["requested_revision"] = self._llm_model_revision(
+                enriched.get("requested_model")
+            )
+        if (
+            enriched.get("resolved_revision") is None
+            and backend != "openrouter"
+            and effective_profile_obj is not None
+        ):
+            enriched["resolved_revision"] = getattr(
+                effective_profile_obj,
+                "resolved_revision",
+                getattr(
+                    effective_profile_obj,
+                    "model_revision",
+                    getattr(effective_profile_obj, "revision", None),
+                ),
+            )
+        if enriched.get("resolved_revision") is None and backend != "openrouter":
+            enriched["resolved_revision"] = self._llm_model_revision(effective_model)
+        if enriched.get("endpoint_identity") is None and effective_profile_obj is not None:
+            enriched["endpoint_identity"] = getattr(
+                effective_profile_obj, "endpoint_identity", None
+            )
+
         if enriched.get("tokenizer") is None and effective_profile_obj is not None:
             enriched["tokenizer"] = getattr(effective_profile_obj, "tokenizer", None)
         if enriched.get("tokenizer") is None and backend == "local_hf":
             enriched["tokenizer"] = effective_model
+        if enriched.get("tokenizer_revision") is None and effective_profile_obj is not None:
+            enriched["tokenizer_revision"] = getattr(
+                effective_profile_obj, "tokenizer_revision", None
+            )
+        if (
+            enriched.get("tokenizer_revision") is None
+            and backend == "local_hf"
+            and enriched.get("tokenizer") == effective_model
+        ):
+            enriched["tokenizer_revision"] = enriched.get("resolved_revision")
 
         endpoint = enriched.get("endpoint")
         if backend == "openrouter" and effective_profile_obj is not None:
@@ -459,8 +593,12 @@ class SemanticAlignmentRunner(
             "profile",
             "requested_profile",
             "requested_model",
+            "requested_revision",
             "effective_model",
+            "resolved_revision",
             "tokenizer",
+            "tokenizer_revision",
+            "request_time",
         ):
             value = cls._safe_llm_identity_text(metadata.get(field))
             if value is not None and "://" in value:
@@ -476,6 +614,9 @@ class SemanticAlignmentRunner(
         endpoint = cls._safe_llm_endpoint(metadata.get("endpoint"))
         if endpoint is not None:
             identity["endpoint"] = endpoint
+        endpoint_identity = cls._safe_llm_endpoint_identity(metadata.get("endpoint_identity"))
+        if endpoint_identity is not None:
+            identity["endpoint_identity"] = endpoint_identity
 
         request_seed = metadata.get("request_seed", metadata.get("seed"))
         if isinstance(request_seed, torch.Tensor) and request_seed.numel() == 1:
@@ -531,7 +672,7 @@ class SemanticAlignmentRunner(
 
         for field in ("prompt_hash", "prompt_sha1", "prompt_sha256", "prompt_hashes"):
             _collect_hashes(prompt_hashes, metadata.get(field))
-        for field in ("cache_hash", "cache_key_hash", "cache_hashes"):
+        for field in ("cache_hash", "cache_key_hash", "cache_hashes", "cache_identity"):
             _collect_hashes(cache_hashes, metadata.get(field))
         request_debug = metadata.get("request_debug")
         if isinstance(request_debug, Mapping):
@@ -551,6 +692,7 @@ class SemanticAlignmentRunner(
                 "effective_model",
                 "provider",
                 "endpoint",
+                "endpoint_identity",
                 "tokenizer",
             )
         )
@@ -558,7 +700,9 @@ class SemanticAlignmentRunner(
             return None
         return identity
 
-    def _record_llm_backend_usage(self, backend_usage: Any) -> None:
+    def _record_llm_backend_usage(
+        self, backend_usage: Any, *, runtime_observation: bool = True
+    ) -> None:
         if not isinstance(backend_usage, Mapping):
             return
         for task in ("summary", "decision", "rationale"):
@@ -568,7 +712,26 @@ class SemanticAlignmentRunner(
             enriched = self._enrich_llm_backend_metadata(task, metadata)
             identity = self._sanitize_llm_backend_identity(enriched)
             if identity is not None:
-                self._llm_backend_observations.append({"task": task, **identity})
+                observation: Dict[str, Any] = {"task": task, **identity}
+                if runtime_observation:
+                    observation["_runtime_observation"] = True
+                    observation["_usage_counters"] = self._llm_usage_counters(enriched)
+                self._llm_backend_observations.append(observation)
+
+    @staticmethod
+    def _llm_counter_summary(observations: List[Mapping[str, int]], field: str) -> Dict[str, Any]:
+        values = [int(observation[field]) for observation in observations if field in observation]
+        complete = bool(observations) and len(values) == len(observations)
+        summary: Dict[str, Any] = {
+            "status": "available" if complete else "unavailable",
+            "observation_count": len(observations),
+            "reported_observations": len(values),
+        }
+        if complete:
+            summary["value"] = sum(values)
+        elif values:
+            summary["reported_value"] = sum(values)
+        return summary
 
     def _llm_backend_usage_stats(self) -> Optional[Dict[str, Any]]:
         task_buckets: Dict[str, Dict[str, Dict[str, Any]]] = {
@@ -576,14 +739,29 @@ class SemanticAlignmentRunner(
             "decision": {},
             "rationale": {},
         }
+        runtime_counters: Dict[str, List[Mapping[str, int]]] = {
+            "summary": [],
+            "decision": [],
+            "rationale": [],
+        }
         for observation in self._llm_backend_observations:
             task = observation.get("task")
             if task not in task_buckets:
                 continue
+            if observation.get("_runtime_observation") is True:
+                counters = observation.get("_usage_counters")
+                runtime_counters[task].append(counters if isinstance(counters, Mapping) else {})
             core = {
                 key: value
                 for key, value in observation.items()
-                if key not in {"task", "prompt_hashes", "cache_hashes"}
+                if key
+                not in {
+                    "task",
+                    "prompt_hashes",
+                    "cache_hashes",
+                    "_runtime_observation",
+                    "_usage_counters",
+                }
             }
             canonical = json.dumps(
                 core,
@@ -603,7 +781,42 @@ class SemanticAlignmentRunner(
             for task, bucket in task_buckets.items()
             if bucket
         }
-        return {"backend_identities": identities} if identities else None
+        if not identities:
+            return None
+
+        counter_fields = ("calls", "input_tokens", "output_tokens", "total_tokens")
+        by_task: Dict[str, Dict[str, Any]] = {}
+        for task in identities:
+            observations = runtime_counters[task]
+            availability = {
+                field: self._llm_counter_summary(observations, field) for field in counter_fields
+            }
+            task_usage: Dict[str, Any] = {
+                "observation_count": len(observations),
+                "counter_availability": availability,
+            }
+            for field, report in availability.items():
+                if report["status"] == "available":
+                    task_usage[field] = report["value"]
+            by_task[task] = task_usage
+
+        all_runtime = [
+            observation
+            for task in ("summary", "decision", "rationale")
+            for observation in runtime_counters[task]
+        ]
+        availability = {
+            field: self._llm_counter_summary(all_runtime, field) for field in counter_fields
+        }
+        usage: Dict[str, Any] = {
+            "backend_identities": identities,
+            "by_task": by_task,
+            "counter_availability": availability,
+        }
+        for field, report in availability.items():
+            if report["status"] == "available":
+                usage[field] = report["value"]
+        return usage
 
     def _compute_run_stats(
         self,
@@ -613,7 +826,9 @@ class SemanticAlignmentRunner(
     ) -> Dict[str, Any]:
         for record in self.results_json or []:
             if isinstance(record, Mapping):
-                self._record_llm_backend_usage(record.get("backend_usage"))
+                self._record_llm_backend_usage(
+                    record.get("backend_usage"), runtime_observation=False
+                )
         stats = super()._compute_run_stats(
             df,
             review_low=review_low,
@@ -622,6 +837,104 @@ class SemanticAlignmentRunner(
         llm_usage = self._llm_backend_usage_stats()
         if llm_usage is not None:
             stats["llm_usage"] = llm_usage
+        reconstruction_rows = 0
+        reconstruction_errors: List[float] = []
+        for record in self.results_json or []:
+            if not isinstance(record, Mapping):
+                continue
+            contributions = record.get("contributions")
+            confidences = record.get("confidences")
+            if not isinstance(contributions, Mapping) or not isinstance(confidences, Mapping):
+                continue
+            score = confidences.get("S_final")
+            if score is None:
+                continue
+            names = ("C_label", "C_strsim", "C_struct", "C_llm", "C_oracle")
+            if any(name not in contributions for name in names[:-1]):
+                continue
+            reconstructed = sum(float(contributions.get(name, 0.0)) for name in names)
+            tau = float(getattr(self.model, "tau", 0.5))
+            error = abs(reconstructed - (float(score) - tau))
+            if not math.isfinite(error):
+                raise ValueError("explanation reconstruction produced a non-finite error")
+            reconstruction_rows += 1
+            reconstruction_errors.append(error)
+        result_count = len(self.results_json or [])
+        stats["explanation_reconstruction"] = {
+            "status": (
+                "complete"
+                if result_count > 0 and reconstruction_rows == result_count
+                else "unavailable" if reconstruction_rows == 0 else "partial"
+            ),
+            "result_rows": result_count,
+            "reconstructed_rows": reconstruction_rows,
+            "max_abs_error": max(reconstruction_errors) if reconstruction_errors else None,
+        }
+        source_column = next(
+            (column for column in ("src_iri", "Src") if column in df.columns),
+            None,
+        )
+        if source_column is not None and "saved_alignment_member" in df.columns:
+            kind_column = next(
+                (column for column in ("src_kind", "SrcKind") if column in df.columns),
+                None,
+            )
+            identity_columns = [source_column]
+            if kind_column is not None:
+                identity_columns.append(kind_column)
+            observed_groups = df[identity_columns].dropna(subset=[source_column]).copy()
+            observed_groups[source_column] = observed_groups[source_column].astype(str)
+            if kind_column is not None:
+                observed_groups[kind_column] = observed_groups[kind_column].astype(str)
+            observed_count = int(observed_groups.drop_duplicates().shape[0])
+            accepted = df["saved_alignment_member"].fillna(False).astype(bool)
+            accepted_groups = (
+                df.loc[accepted, identity_columns].dropna(subset=[source_column]).copy()
+            )
+            accepted_groups[source_column] = accepted_groups[source_column].astype(str)
+            if kind_column is not None:
+                accepted_groups[kind_column] = accepted_groups[kind_column].astype(str)
+            accepted_count = int(accepted_groups.drop_duplicates().shape[0])
+
+            pool_manifest = getattr(self.dataset, "candidate_pool_manifest", None)
+            pool_summary = (
+                pool_manifest.get("gold_free_summary")
+                if isinstance(pool_manifest, Mapping)
+                else None
+            )
+            declared_count: Optional[int] = None
+            if (
+                isinstance(pool_summary, Mapping)
+                and pool_summary.get("source_entities") is not None
+            ):
+                declared_count = int(pool_summary["source_entities"])
+                if declared_count < 0:
+                    raise ValueError("candidate-pool source_entities cannot be negative")
+            source_count = max(observed_count, declared_count or 0)
+            if source_count > 0:
+                stats["coverage"] = accepted_count / source_count
+                stats["abstention_rate"] = 1.0 - stats["coverage"]
+                stats["decision_source_counts"] = {
+                    "declared": declared_count,
+                    "observed": observed_count,
+                    "accepted": accepted_count,
+                    "unscored": max(0, source_count - observed_count),
+                }
+                applicability = dict(stats.get("metric_applicability") or {})
+                applicability["coverage"] = declared_count is not None
+                applicability["abstention_rate"] = declared_count is not None
+                stats["metric_applicability"] = applicability
+        observed_device = self.device
+        observed_execution: Dict[str, Any] = {
+            "device_type": observed_device.type,
+            "device": str(observed_device),
+        }
+        if observed_device.type == "cuda":
+            try:
+                observed_execution["device_name"] = torch.cuda.get_device_name(observed_device)
+            except (AssertionError, RuntimeError, ValueError):
+                pass
+        stats["observed_execution"] = observed_execution
         return stats
 
     def _finalize_run(self, state: _FinalizationState) -> Tuple[List[EntityMapping], float]:

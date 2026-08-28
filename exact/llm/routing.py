@@ -145,7 +145,9 @@ class LLMProfile:
     name: str
     backend: str = "local_hf"
     model: Optional[str] = None
+    revision: Optional[str] = None
     tokenizer: Optional[str] = None
+    tokenizer_revision: Optional[str] = None
     api_base: str = DEFAULT_OPENROUTER_BASE_URL
     api_key_env: str = "OPENROUTER_API_KEY"
     api_key_path: Optional[str] = None
@@ -161,7 +163,9 @@ class LLMProfile:
             name=name,
             backend=str(raw.get("backend", "local_hf")).strip() or "local_hf",
             model=raw.get("model"),
+            revision=raw.get("revision"),
             tokenizer=raw.get("tokenizer"),
+            tokenizer_revision=raw.get("tokenizer_revision"),
             api_base=str(raw.get("api_base", DEFAULT_OPENROUTER_BASE_URL)).rstrip("/"),
             api_key_env=str(raw.get("api_key_env", "OPENROUTER_API_KEY")).strip()
             or "OPENROUTER_API_KEY",
@@ -231,6 +235,7 @@ class ResolvedLLMTask:
     fallback_triggered: bool
     fallback_reason: Optional[str]
     api_key: Optional[str] = None
+    revision: Optional[str] = None
 
 
 class OpenRouterClient:
@@ -545,7 +550,9 @@ class LLMRouter:
                 name: {
                     "backend": profile.backend,
                     "model": profile.model,
+                    "revision": profile.revision,
                     "tokenizer": profile.tokenizer,
+                    "tokenizer_revision": profile.tokenizer_revision,
                     "api_base": profile.api_base,
                     "api_key_env": profile.api_key_env,
                     "timeout_secs": profile.timeout_secs,
@@ -592,6 +599,7 @@ class LLMRouter:
                 not require_logprobs,
                 True,
                 "missing_primary_profile",
+                revision=fallback.revision,
             )
 
         if primary.backend != "openrouter":
@@ -603,6 +611,7 @@ class LLMRouter:
                 not require_logprobs,
                 False,
                 None,
+                revision=primary.revision,
             )
 
         api_key = self.hosted.resolve_api_key(primary)
@@ -623,9 +632,17 @@ class LLMRouter:
                     False,
                     True,
                     "missing_api_key",
+                    revision=fallback.revision,
                 )
             return ResolvedLLMTask(
-                task, "openrouter", primary.name, primary.model, False, False, "missing_api_key"
+                task,
+                "openrouter",
+                primary.name,
+                primary.model,
+                False,
+                False,
+                "missing_api_key",
+                revision=primary.revision,
             )
 
         if require_logprobs and not self.hosted.supports_parameter(primary, "logprobs"):
@@ -645,6 +662,7 @@ class LLMRouter:
                     False,
                     True,
                     "logprobs_unsupported",
+                    revision=fallback.revision,
                 )
             return ResolvedLLMTask(
                 task,
@@ -655,10 +673,19 @@ class LLMRouter:
                 False,
                 "logprobs_unsupported",
                 api_key=api_key,
+                revision=primary.revision,
             )
 
         return ResolvedLLMTask(
-            task, "openrouter", primary.name, primary.model, True, False, None, api_key=api_key
+            task,
+            "openrouter",
+            primary.name,
+            primary.model,
+            True,
+            False,
+            None,
+            api_key=api_key,
+            revision=primary.revision,
         )
 
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import re
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional
@@ -42,14 +43,57 @@ def _reference_role(value: str) -> str:
 
 
 class ImplementationConfig(StrictConfigModel):
-    status: Literal["ready", "deferred", "blocked"] = "ready"
+    status: Literal["ready", "deferred", "deferred_unavailable", "blocked"] = "ready"
     reason: Optional[str] = None
+    reason_code: Optional[str] = None
+    missing_capability: Optional[str] = None
+    expected_dataset: Optional[str] = None
 
     @model_validator(mode="after")
     def require_reason(self) -> "ImplementationConfig":
         if self.status != "ready" and not str(self.reason or "").strip():
             raise ValueError(f"implementation status {self.status!r} requires a reason")
+        if self.status != "ready" and not str(self.reason_code or "").strip():
+            raise ValueError(f"implementation status {self.status!r} requires a reason_code")
+        if self.status != "ready":
+            self.reason_code = _identifier(str(self.reason_code), "implementation reason code")
+        if self.status == "deferred_unavailable":
+            if not str(self.missing_capability or "").strip():
+                raise ValueError("deferred_unavailable requires missing_capability")
+            if not str(self.expected_dataset or "").strip():
+                raise ValueError("deferred_unavailable requires expected_dataset")
+        elif self.missing_capability is not None or self.expected_dataset is not None:
+            raise ValueError(
+                "missing_capability and expected_dataset are reserved for deferred_unavailable"
+            )
+        if self.status == "ready" and any(
+            value is not None
+            for value in (
+                self.reason,
+                self.reason_code,
+                self.missing_capability,
+                self.expected_dataset,
+            )
+        ):
+            raise ValueError("ready implementations cannot declare a deferral reason")
         return self
+
+
+class SpecificationConfig(StrictConfigModel):
+    """Pinned identity of the authoritative experiment specification tree."""
+
+    path: Path
+    sha256: str
+    files: int = Field(ge=1)
+    algorithm: Literal["sha256-length-prefixed-v1"] = "sha256-length-prefixed-v1"
+
+    @field_validator("sha256")
+    @classmethod
+    def validate_sha256(cls, value: str) -> str:
+        normalized = str(value).strip().lower()
+        if not _SHA256_RE.fullmatch(normalized):
+            raise ValueError("specification SHA-256 must contain 64 lowercase hex characters")
+        return normalized
 
 
 class BaselineManifest(StrictConfigModel):
@@ -112,6 +156,34 @@ class ResourceConfig(StrictConfigModel):
         return f"{self.kind}:{identity or 'default'}"
 
 
+class TaskAvailabilityConfig(StrictConfigModel):
+    status: Literal["ready", "deferred_unavailable"] = "ready"
+    reason_code: Optional[str] = None
+    missing_capability: Optional[str] = None
+    expected_dataset: Optional[str] = None
+    reason: Optional[str] = None
+
+    @model_validator(mode="after")
+    def validate_availability(self) -> "TaskAvailabilityConfig":
+        fields = (
+            self.reason_code,
+            self.missing_capability,
+            self.expected_dataset,
+            self.reason,
+        )
+        if self.status == "ready":
+            if any(value is not None for value in fields):
+                raise ValueError("ready task availability cannot declare deferral metadata")
+            return self
+        if not all(str(value or "").strip() for value in fields):
+            raise ValueError(
+                "deferred_unavailable task availability requires reason_code, "
+                "missing_capability, expected_dataset, and reason"
+            )
+        self.reason_code = _identifier(str(self.reason_code), "task reason code")
+        return self
+
+
 class TaskConfig(StrictConfigModel):
     id: str
     split_role: Literal["development", "diagnostic", "reporting"]
@@ -122,6 +194,7 @@ class TaskConfig(StrictConfigModel):
     source_cap: Optional[int] = Field(None, ge=1)
     reference_completeness: Literal["complete", "known_incomplete", "unknown"] = "unknown"
     capabilities: List[str] = Field(default_factory=list)
+    availability: TaskAvailabilityConfig = Field(default_factory=TaskAvailabilityConfig)
 
     @field_validator("id")
     @classmethod
@@ -198,6 +271,168 @@ class ArmConfig(StrictConfigModel):
         return self
 
 
+class SelectionMatchToleranceConfig(StrictConfigModel):
+    absolute: float = Field(ge=0.0)
+    relative: float = Field(ge=0.0)
+    combine: Literal["max", "min"] = "max"
+
+    @model_validator(mode="after")
+    def finite_values(self) -> "SelectionMatchToleranceConfig":
+        if not all(math.isfinite(value) for value in (self.absolute, self.relative)):
+            raise ValueError("selection match tolerances must be finite")
+        return self
+
+
+class SelectionGuardConfig(StrictConfigModel):
+    id: str
+    metric: str
+    comparison: Literal["baseline_delta", "absolute_threshold", "matched"] = "baseline_delta"
+    baseline: Optional[str] = None
+    direction: Literal["max", "min"] = "max"
+    scope: Literal["aggregate", "each_task", "each_cell"] = "aggregate"
+    evidence: Literal["point", "paired_ci_lower"] = "point"
+    min_delta: Optional[float] = None
+    min_relative_delta: Optional[float] = None
+    threshold: Optional[float] = None
+    match_tolerance: Optional[SelectionMatchToleranceConfig] = None
+    strict: bool = False
+
+    @field_validator("id")
+    @classmethod
+    def validate_id(cls, value: str) -> str:
+        return _identifier(value, "selection guard id")
+
+    @field_validator("baseline")
+    @classmethod
+    def validate_baseline(cls, value: Optional[str]) -> Optional[str]:
+        return None if value is None else _identifier(value, "selection guard baseline id")
+
+    @field_validator("metric")
+    @classmethod
+    def validate_metric(cls, value: str) -> str:
+        normalized = str(value).strip()
+        if not normalized:
+            raise ValueError("selection guard metric must be non-empty")
+        return normalized
+
+    @model_validator(mode="after")
+    def validate_contract(self) -> "SelectionGuardConfig":
+        numeric = (self.min_delta, self.min_relative_delta, self.threshold)
+        if any(value is not None and not math.isfinite(value) for value in numeric):
+            raise ValueError("selection guard thresholds must be finite")
+        if self.evidence == "paired_ci_lower" and self.scope != "aggregate":
+            raise ValueError("paired-CI selection guards must use aggregate scope")
+        if self.comparison == "baseline_delta":
+            if self.min_delta is None and self.min_relative_delta is None:
+                raise ValueError(
+                    "baseline-delta selection guards require min_delta or " "min_relative_delta"
+                )
+            if self.threshold is not None or self.match_tolerance is not None:
+                raise ValueError(
+                    "baseline-delta selection guards cannot declare an absolute threshold "
+                    "or match tolerance"
+                )
+        elif self.comparison == "absolute_threshold":
+            if self.threshold is None:
+                raise ValueError("absolute selection guards require threshold")
+            if (
+                self.baseline is not None
+                or self.min_delta is not None
+                or self.min_relative_delta is not None
+                or self.match_tolerance is not None
+            ):
+                raise ValueError(
+                    "absolute selection guards cannot declare a baseline, delta, or match "
+                    "tolerance"
+                )
+            if self.evidence != "point":
+                raise ValueError("absolute selection guards currently require point evidence")
+        else:
+            if self.match_tolerance is None:
+                raise ValueError("matched selection guards require match_tolerance")
+            if (
+                self.baseline is not None
+                or self.min_delta is not None
+                or self.min_relative_delta is not None
+                or self.threshold is not None
+                or self.strict
+            ):
+                raise ValueError(
+                    "matched selection guards cannot declare a baseline, threshold, delta, "
+                    "or strict comparison"
+                )
+            if self.evidence != "point":
+                raise ValueError("matched selection guards currently require point evidence")
+        return self
+
+
+class SelectionTieBreakConfig(StrictConfigModel):
+    kind: Literal["metric", "arm_order", "numeric_overlay_l1"] = "metric"
+    metric: Optional[str] = None
+    direction: Literal["max", "min"] = "max"
+    tolerance: float = Field(default=0.0, ge=0.0)
+    order: List[str] = Field(default_factory=list)
+    paths: List[str] = Field(default_factory=list)
+
+    @field_validator("metric")
+    @classmethod
+    def validate_metric(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        normalized = str(value).strip()
+        if not normalized:
+            raise ValueError("selection tie-break metric must be non-empty")
+        return normalized
+
+    @field_validator("order")
+    @classmethod
+    def validate_order(cls, values: List[str]) -> List[str]:
+        return [_identifier(value, "selection tie-break arm id") for value in values]
+
+    @field_validator("paths")
+    @classmethod
+    def validate_paths(cls, values: List[str]) -> List[str]:
+        normalized: List[str] = []
+        for value in values:
+            path = str(value).strip()
+            if not path or any(not _IDENTIFIER_RE.fullmatch(part) for part in path.split(".")):
+                raise ValueError(
+                    "numeric overlay distance paths must be non-empty dotted identifiers"
+                )
+            normalized.append(path)
+        return normalized
+
+    @model_validator(mode="after")
+    def validate_contract(self) -> "SelectionTieBreakConfig":
+        if not math.isfinite(self.tolerance):
+            raise ValueError("selection tie-break tolerance must be finite")
+        if self.kind == "metric":
+            if self.metric is None or self.order or self.paths:
+                raise ValueError(
+                    "metric tie breaks require metric and cannot declare arm order or paths"
+                )
+        elif self.kind == "arm_order":
+            if not self.order or self.metric is not None or self.paths:
+                raise ValueError(
+                    "arm-order tie breaks require order and cannot declare metric or paths"
+                )
+            if len(set(self.order)) != len(self.order):
+                raise ValueError("selection tie-break arm order must be unique")
+            if self.direction != "min" or self.tolerance != 0.0:
+                raise ValueError("arm-order tie breaks must use direction=min and zero tolerance")
+        else:
+            if not self.paths or self.metric is not None or self.order:
+                raise ValueError(
+                    "numeric-overlay-L1 tie breaks require paths and cannot declare metric "
+                    "or arm order"
+                )
+            if len(set(self.paths)) != len(self.paths):
+                raise ValueError("numeric overlay distance paths must be unique")
+            if self.direction != "min":
+                raise ValueError("numeric overlay distance must use direction=min")
+        return self
+
+
 class SelectionDecisionConfig(StrictConfigModel):
     id: str
     baseline: str
@@ -205,6 +440,12 @@ class SelectionDecisionConfig(StrictConfigModel):
     metric: str
     direction: Literal["max", "min"] = "max"
     min_delta: float = 0.0
+    min_relative_delta: Optional[float] = None
+    evidence: Literal["point", "paired_ci_lower"] = "point"
+    strict: bool = False
+    tie_tolerance: float = Field(default=0.0, ge=0.0)
+    tie_breaks: List[SelectionTieBreakConfig] = Field(default_factory=list)
+    guards: List[SelectionGuardConfig] = Field(default_factory=list)
     required_controls: List[str] = Field(default_factory=list)
     allow_screened_out: bool = True
 
@@ -233,6 +474,12 @@ class SelectionDecisionConfig(StrictConfigModel):
 
     @model_validator(mode="after")
     def nonempty_candidates(self) -> "SelectionDecisionConfig":
+        if not math.isfinite(self.min_delta):
+            raise ValueError("selection minimum delta must be finite")
+        if self.min_relative_delta is not None and not math.isfinite(self.min_relative_delta):
+            raise ValueError("selection minimum relative delta must be finite")
+        if not math.isfinite(self.tie_tolerance):
+            raise ValueError("selection tie tolerance must be finite")
         if not self.candidates:
             raise ValueError(f"selection decision {self.id!r} has no candidates")
         if len(set(self.candidates)) != len(self.candidates):
@@ -241,6 +488,15 @@ class SelectionDecisionConfig(StrictConfigModel):
             raise ValueError(f"selection decision {self.id!r} required controls must be unique")
         if self.baseline in self.candidates:
             raise ValueError("a selection baseline cannot also be a candidate")
+        guard_ids = [guard.id for guard in self.guards]
+        if len(set(guard_ids)) != len(guard_ids):
+            raise ValueError(f"selection decision {self.id!r} guard identifiers must be unique")
+        for tie_break in self.tie_breaks:
+            if tie_break.kind == "arm_order" and set(tie_break.order) != set(self.candidates):
+                raise ValueError(
+                    f"selection decision {self.id!r} arm-order tie break must list every "
+                    "candidate exactly once"
+                )
         return self
 
 
@@ -257,12 +513,61 @@ class SelectionConfig(StrictConfigModel):
         return self
 
 
+class PowerSliceConfig(StrictConfigModel):
+    id: str
+    task: str
+    entity_kind: str
+    relation: str
+    status: Literal["powered", "underpowered", "descriptive", "deferred_unavailable"]
+    hypothesized_effect: float
+    assumptions: List[str]
+    reason_code: Optional[str] = None
+    missing_capability: Optional[str] = None
+    expected_dataset: Optional[str] = None
+
+    @field_validator("id", "task")
+    @classmethod
+    def validate_ids(cls, value: str) -> str:
+        return _identifier(value, "power slice identifier")
+
+    @field_validator("entity_kind", "relation")
+    @classmethod
+    def validate_dimensions(cls, value: str) -> str:
+        normalized = str(value).strip()
+        if not normalized:
+            raise ValueError("power slice dimensions must be non-empty")
+        return normalized
+
+    @field_validator("assumptions")
+    @classmethod
+    def validate_slice_assumptions(cls, values: List[str]) -> List[str]:
+        normalized = [str(value).strip() for value in values]
+        if not normalized or any(not value for value in normalized):
+            raise ValueError("power slice assumptions must be non-empty")
+        return normalized
+
+    @model_validator(mode="after")
+    def validate_slice_availability(self) -> "PowerSliceConfig":
+        fields = (self.reason_code, self.missing_capability, self.expected_dataset)
+        if self.status == "deferred_unavailable":
+            if not all(str(value or "").strip() for value in fields):
+                raise ValueError(
+                    "deferred_unavailable power slices require reason_code, "
+                    "missing_capability, and expected_dataset"
+                )
+            self.reason_code = _identifier(str(self.reason_code), "power-slice reason code")
+        elif any(value is not None for value in fields):
+            raise ValueError("power-slice deferral metadata is reserved for deferred_unavailable")
+        return self
+
+
 class DesignConfig(StrictConfigModel):
     primary_comparison: str
     primary_endpoint: str
     independent_unit: str
     power_status: Literal["powered", "underpowered", "descriptive"]
     assumptions: List[str]
+    power_slices: List[PowerSliceConfig] = Field(default_factory=list)
     required_slices: List[str] = Field(default_factory=list)
     regression_bound: Optional[float] = None
     non_inferiority_margin: Optional[float] = None
@@ -393,6 +698,7 @@ class ExperimentConfig(StrictConfigModel):
     selection: SelectionConfig
     design: DesignConfig
     composition: Optional[CompositionConfig] = None
+    frozen_constants: Dict[str, Any] = Field(default_factory=dict)
     negative_label_policy: str = "not_applicable"
 
     @field_validator("experiment_id")
@@ -416,6 +722,7 @@ class ExperimentConfig(StrictConfigModel):
         if len(arm_ids) != len(set(arm_ids)):
             raise ValueError(f"{self.experiment_id}: arm identifiers must be unique")
         known = set(arm_ids)
+        arms_by_id = {arm.id: arm for arm in self.arms}
         if self.experiment_id == "E17" and self.composition is not None:
             component_ids = [component.id for component in self.composition.components]
             for component in self.composition.components:
@@ -434,11 +741,26 @@ class ExperimentConfig(StrictConfigModel):
                     f"interaction_{interaction.id}_{cell}" for cell in ("00", "10", "01", "11")
                 )
         for decision in self.selection.decisions:
-            referenced = {decision.baseline, *decision.candidates, *decision.required_controls}
+            referenced = {
+                decision.baseline,
+                *decision.candidates,
+                *decision.required_controls,
+                *(guard.baseline for guard in decision.guards if guard.baseline is not None),
+            }
             missing = sorted(referenced.difference(known))
             if missing:
                 raise ValueError(
                     f"{self.experiment_id}: selection {decision.id!r} references unknown arms {missing}"
+                )
+            nondeployable = sorted(
+                arm_id
+                for arm_id in decision.candidates
+                if arm_id in arms_by_id and not arms_by_id[arm_id].deployable
+            )
+            if nondeployable:
+                raise ValueError(
+                    f"{self.experiment_id}: selection {decision.id!r} cannot promote "
+                    f"non-deployable arms {nondeployable}"
                 )
         bad_screen = [
             task.id
@@ -530,6 +852,38 @@ class ExperimentConfig(StrictConfigModel):
                         raise ValueError(
                             f"E17 exploratory interaction arm {arm_id!r} cannot " "include confirm"
                         )
+        if self.implementation.status == "ready":
+            if not self.design.power_slices:
+                raise ValueError(
+                    f"{self.experiment_id}: ready experiments require task/kind/relation "
+                    "power_slices"
+                )
+            declared_tasks = {item.task for item in self.design.power_slices}
+            expected_tasks = {task.id for task in self.confirm.tasks}
+            if declared_tasks != expected_tasks:
+                raise ValueError(
+                    f"{self.experiment_id}: power_slices tasks {sorted(declared_tasks)} "
+                    f"do not match confirm tasks {sorted(expected_tasks)}"
+                )
+            slice_ids = [item.id for item in self.design.power_slices]
+            if len(slice_ids) != len(set(slice_ids)):
+                raise ValueError(f"{self.experiment_id}: power slice identifiers must be unique")
+            slice_keys = [
+                (item.task, item.entity_kind.lower(), item.relation.lower())
+                for item in self.design.power_slices
+            ]
+            if len(slice_keys) != len(set(slice_keys)):
+                raise ValueError(
+                    f"{self.experiment_id}: power task/kind/relation slices must be unique"
+                )
+            task_availability = {task.id: task.availability for task in self.confirm.tasks}
+            for item in self.design.power_slices:
+                unavailable = task_availability[item.task].status == "deferred_unavailable"
+                if unavailable != (item.status == "deferred_unavailable"):
+                    raise ValueError(
+                        f"{self.experiment_id}: power slice {item.id!r} availability must "
+                        f"match confirm task {item.task!r}"
+                    )
         # One selection decision freezes one surviving candidate regardless of
         # how many development candidates or diagnostic controls it names.
         confirmatory_comparisons = len(self.selection.decisions)
@@ -572,7 +926,9 @@ class SuiteConfig(StrictConfigModel):
     suite_id: str
     baseline_id: str
     baseline_manifest: Path
+    specification: SpecificationConfig
     dataset_lock: Optional[Path] = None
+    model_lock: Path
     experiments: List[SuiteEntry]
 
     @field_validator("suite_id")
@@ -638,11 +994,14 @@ __all__ = [
     "CompositionConfig",
     "DesignConfig",
     "ExperimentConfig",
+    "PowerSliceConfig",
     "ResourceConfig",
     "SelectionDecisionConfig",
+    "SpecificationConfig",
     "StageConfig",
     "SuiteConfig",
     "TaskConfig",
+    "TaskAvailabilityConfig",
     "load_baseline",
     "load_experiment",
     "load_suite",

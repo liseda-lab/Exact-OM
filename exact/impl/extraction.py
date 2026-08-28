@@ -88,6 +88,54 @@ def _preassign_exact(
     return protected, residual
 
 
+def _validate_protected_exact_constraints(
+    mappings: Sequence[EntityMapping],
+    protected_pairs: Set[Pair],
+) -> None:
+    """Reject contradictory exact-match hard constraints before extraction.
+
+    E01 treats protected exact matches as pre-assigned one-to-one edges. Letting
+    two protected edges occupy the same typed source or target would make the
+    optimization infeasible and used to leak a non-one-to-one result out of
+    every global extraction mode. Only protected pairs present in the input
+    graph participate: a protected pair may have been consumed by an earlier
+    exact-match stage and therefore need not be present here.
+    """
+
+    present = _deduplicate(
+        mapping for mapping in mappings if (str(mapping.head), str(mapping.tail)) in protected_pairs
+    )
+    targets_by_source: Dict[Node, Set[Node]] = defaultdict(set)
+    sources_by_target: Dict[Node, Set[Node]] = defaultdict(set)
+    for mapping in present:
+        source = _source_node(mapping)
+        target = _target_node(mapping)
+        targets_by_source[source].add(target)
+        sources_by_target[target].add(source)
+
+    source_conflicts = {
+        source: tuple(sorted(targets))
+        for source, targets in targets_by_source.items()
+        if len(targets) > 1
+    }
+    target_conflicts = {
+        target: tuple(sorted(sources))
+        for target, sources in sources_by_target.items()
+        if len(sources) > 1
+    }
+    if not source_conflicts and not target_conflicts:
+        return
+
+    details: List[str] = []
+    for source, targets in sorted(source_conflicts.items()):
+        details.append(f"source {source!r} -> {list(targets)!r}")
+    for target, sources in sorted(target_conflicts.items()):
+        details.append(f"target {target!r} <- {list(sources)!r}")
+    raise ValueError(
+        "Conflicting protected exact matches violate one-to-one extraction: " + "; ".join(details)
+    )
+
+
 def _threshold_selected(
     selected: Sequence[EntityMapping],
     protected_pairs: Set[Pair],
@@ -310,6 +358,7 @@ def extract_global_alignment(
         raise ValueError("assignment_component_cap must be at least one")
 
     protected_set = {(str(source), str(target)) for source, target in (protected_pairs or set())}
+    _validate_protected_exact_constraints(mappings, protected_set)
     protected, residual = _preassign_exact(list(mappings), protected_set)
     threshold_removed = 0
     component_count = 0

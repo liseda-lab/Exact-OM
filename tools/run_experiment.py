@@ -42,6 +42,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="Frozen screen/selection.json (required for confirm; invalid for screen).",
     )
     parser.add_argument(
+        "--confirmed-components-record",
+        type=Path,
+        help=(
+            "Immutable confirmed component record required when E17 is runnable; "
+            "accepted for both public stages."
+        ),
+    )
+    parser.add_argument(
         "--output-root",
         type=Path,
         default=_REPOSITORY_ROOT / "exp" / "results",
@@ -84,6 +92,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             resume=args.resume,
             workdir=_REPOSITORY_ROOT,
             selection_record_path=args.selection_record,
+            confirmed_components_record_path=args.confirmed_components_record,
             dry_run=args.dry_run,
         )
     except (OSError, TypeError, ValueError) as exc:

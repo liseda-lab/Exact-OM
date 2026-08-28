@@ -10,7 +10,7 @@ from __future__ import annotations
 import bisect
 import math
 from dataclasses import dataclass
-from typing import Iterable, List, Mapping, Optional, Sequence, Tuple, Union
+from typing import Any, Iterable, List, Mapping, Optional, Sequence, Tuple, Union
 
 
 def _sigmoid(value: float) -> float:
@@ -99,6 +99,61 @@ class IsotonicCalibrator:
 
 
 ScoreCalibrator = Union[PlattCalibrator, IsotonicCalibrator]
+
+
+def score_calibrator_from_dict(
+    payload: Mapping[str, Any],
+    *,
+    expected_mode: Optional[str] = None,
+) -> ScoreCalibrator:
+    """Reconstruct and validate an immutable fitted score calibrator.
+
+    Fitting and split enforcement belong to the experiment harness. This
+    runtime helper is deliberately data-only: it refuses malformed or
+    mode-mismatched artifacts instead of accepting a configured calibration
+    arm that behaves like ``none``.
+    """
+
+    if not isinstance(payload, Mapping):
+        raise ValueError("score calibrator payload must be an object")
+    mode = str(payload.get("mode") or "").strip().lower()
+    if expected_mode is not None and mode != str(expected_mode).strip().lower():
+        raise ValueError(
+            f"score calibrator mode mismatch: expected {expected_mode!r}, found {mode!r}"
+        )
+    if mode == "platt":
+        try:
+            slope = float(payload["slope"])
+            intercept = float(payload["intercept"])
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ValueError("Platt calibrator requires numeric slope and intercept") from exc
+        if not math.isfinite(slope) or not math.isfinite(intercept):
+            raise ValueError("Platt calibrator parameters must be finite")
+        return PlattCalibrator(slope=slope, intercept=intercept)
+    if mode == "isotonic":
+        raw_bounds = payload.get("upper_bounds")
+        raw_probabilities = payload.get("probabilities")
+        if not isinstance(raw_bounds, (list, tuple)) or not isinstance(
+            raw_probabilities, (list, tuple)
+        ):
+            raise ValueError("isotonic calibrator requires upper_bounds and probabilities arrays")
+        try:
+            bounds = tuple(float(value) for value in raw_bounds)
+            probabilities = tuple(float(value) for value in raw_probabilities)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("isotonic calibrator arrays must be numeric") from exc
+        if not bounds or len(bounds) != len(probabilities):
+            raise ValueError("isotonic calibrator arrays must be equally sized and non-empty")
+        if any(not math.isfinite(value) for value in (*bounds, *probabilities)):
+            raise ValueError("isotonic calibrator values must be finite")
+        if any(left >= right for left, right in zip(bounds, bounds[1:])):
+            raise ValueError("isotonic upper_bounds must be strictly increasing")
+        if any(value < 0.0 or value > 1.0 for value in probabilities):
+            raise ValueError("isotonic probabilities must be between zero and one")
+        if any(left > right for left, right in zip(probabilities, probabilities[1:])):
+            raise ValueError("isotonic probabilities must be non-decreasing")
+        return IsotonicCalibrator(upper_bounds=bounds, probabilities=probabilities)
+    raise ValueError("score calibrator mode must be 'platt' or 'isotonic'")
 
 
 def _logistic_loss(
@@ -376,5 +431,6 @@ __all__ = [
     "fit_score_calibrator",
     "knee_threshold",
     "otsu_threshold",
+    "score_calibrator_from_dict",
     "select_distribution_threshold",
 ]

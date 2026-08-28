@@ -103,7 +103,9 @@ class PairAdaptiveChannelsMixin:
             score, pair = self._select_label_pair(mat, src_labels, tgt_labels)
             z1, z2 = self._top_two_scores(mat)
             margin = 1.0 if mat.numel() <= 1 else self._clip01((z1 - z2) / max(1e-8, (1.0 - z2)))
-            entropy = self._label_entropy_quality(mat) if self.lex_enabled else 0.0
+            entropy_raw, entropy, entropy_quality_defined = (
+                self._label_entropy_components(mat) if self.lex_enabled else (0.0, 0.0, False)
+            )
             agreement = self._label_encoder_agreement(src_labels, tgt_labels, mat)
             quality_mode = (
                 self.lex_config.get("quality", "margin") if self.lex_enabled else "margin"
@@ -128,7 +130,9 @@ class PairAdaptiveChannelsMixin:
                     "top1": z1,
                     "top2": z2,
                     "margin": margin,
+                    "entropy_raw": entropy_raw,
                     "entropy": entropy,
+                    "entropy_quality_defined": entropy_quality_defined,
                     "encoder_agreement": agreement,
                     "label_pairs": int(mat.numel()),
                     "selected": q_label,
@@ -149,21 +153,35 @@ class PairAdaptiveChannelsMixin:
             "top1": 0.0,
             "top2": 0.0,
             "margin": 0.0,
+            "entropy_raw": 0.0,
             "entropy": 0.0,
+            "entropy_quality_defined": False,
             "encoder_agreement": 0.0,
             "label_pairs": 0,
             "selected": 0.0,
         }
 
     def _label_entropy_quality(self, matrix: torch.Tensor) -> float:
+        return self._label_entropy_components(matrix)[1]
+
+    def _label_entropy_components(self, matrix: torch.Tensor) -> Tuple[float, float, bool]:
+        """Return raw entropy, normalized quality, and whether entropy is defined.
+
+        E26 treats a single observed label-pair score as missing distributional
+        evidence, not as perfect certainty. Keeping the boolean explicit also
+        prevents downstream calibration code from silently binning that case as
+        maximally reliable.
+        """
+
         if matrix.numel() <= 1:
-            return 1.0
+            return 0.0, 0.0, False
         top_m = max(2, int(self.lex_config.get("entropy_top_m", 5)))
         values = torch.topk(matrix.flatten(), k=min(top_m, matrix.numel())).values.float()
         probabilities = torch.softmax(values, dim=0)
         entropy = -(probabilities * probabilities.clamp_min(1.0e-12).log()).sum()
         normalizer = torch.log(torch.tensor(float(values.numel()), device=values.device))
-        return self._clip01(1.0 - float((entropy / normalizer.clamp_min(1.0e-12)).item()))
+        quality = self._clip01(1.0 - float((entropy / normalizer.clamp_min(1.0e-12)).item()))
+        return float(entropy.item()), quality, True
 
     def _label_encoder_agreement(
         self,
@@ -184,13 +202,9 @@ class PairAdaptiveChannelsMixin:
         context_matrix = self._sim01(src_context @ tgt_context.T)
         lexical_flat = lexical_matrix.flatten()
         context_flat = context_matrix.flatten()
-        lexical_best = int(torch.argmax(lexical_flat).item())
-        context_best = int(torch.argmax(context_flat).item())
-        score_agreement = 1.0 - abs(
-            float(lexical_flat[lexical_best].item()) - float(context_flat[context_best].item())
-        )
-        pair_agreement = 1.0 if lexical_best == context_best else 0.0
-        return self._clip01(0.5 * (score_agreement + pair_agreement))
+        lexical_best = float(torch.max(lexical_flat).item())
+        context_best = float(torch.max(context_flat).item())
+        return self._clip01(1.0 - abs(lexical_best - context_best))
 
     def _score_string_channel(
         self,
@@ -520,16 +534,20 @@ class PairAdaptiveChannelsMixin:
                     + self._hierarchy_ic(mapped_target, "tgt")
                 )
                 mapped_src[mapped_target] = max(mapped_src.get(mapped_target, 0.0), weight)
-        anchored_targets = {target for target in tgt_ancestors if target in tgt_to_src}
-        target_weights = {target: self._hierarchy_ic(target, "tgt") for target in anchored_targets}
+        target_weights: Dict[str, float] = {}
+        for target in tgt_ancestors:
+            for mapped_source in tgt_to_src.get(target, ()):
+                weight = 0.5 * (
+                    self._hierarchy_ic(mapped_source, "src") + self._hierarchy_ic(target, "tgt")
+                )
+                target_weights[target] = max(target_weights.get(target, 0.0), weight)
+        anchored_targets = set(target_weights)
         union = set(mapped_src) | anchored_targets
         intersection = set(mapped_src) & anchored_targets
         denominator = sum(
             max(mapped_src.get(target, 0.0), target_weights.get(target, 0.0)) for target in union
         )
-        numerator = sum(
-            0.5 * (mapped_src[target] + target_weights[target]) for target in intersection
-        )
+        numerator = sum(min(mapped_src[target], target_weights[target]) for target in intersection)
         overlap = numerator / denominator if denominator > 0.0 else 0.0
         src_anchored_count = sum(ancestor in src_to_tgt for ancestor in src_ancestors)
         tgt_anchored_count = sum(ancestor in tgt_to_src for ancestor in tgt_ancestors)
@@ -742,6 +760,9 @@ class PairAdaptiveChannelsMixin:
             "unsupported_mass_src": 0.0,
             "unsupported_mass_tgt": 0.0,
             "c_x": 0.0,
+            "unsupported_mean_src": 0.0,
+            "unsupported_mean_tgt": 0.0,
+            "diff_absolute": 0.0,
             "c_y": 0.0,
             "diff_pivot_reason": "explicit_neutral_fallback",
         }
@@ -755,13 +776,8 @@ class PairAdaptiveChannelsMixin:
         if formulation == "off":
             payload["diff_pivot_reason"] = "channel_off"
             return payload
-        if self.diff_enabled and (not src_items or not tgt_items):
-            if not src_items and not tgt_items:
-                payload["diff_pivot_reason"] = "empty_both"
-            elif not src_items:
-                payload["diff_pivot_reason"] = "empty_source"
-            else:
-                payload["diff_pivot_reason"] = "empty_target"
+        if self.diff_enabled and not src_items and not tgt_items:
+            payload["diff_pivot_reason"] = "empty_both"
             return payload
 
         if support_mat is None:
@@ -821,14 +837,13 @@ class PairAdaptiveChannelsMixin:
         tgt_vals = [tgt_unsupported[i] for i in tgt_idx]
         c_x = _conflict(src_selected, src_vals)
         c_y = _conflict(tgt_selected, tgt_vals)
-        unsupported_mass_src = sum(src_vals)
-        unsupported_mass_tgt = sum(tgt_vals)
+        unsupported_mass_src = sum(src_unsupported)
+        unsupported_mass_tgt = sum(tgt_unsupported)
+        unsupported_mean_src = self._safe_mean(src_unsupported)
+        unsupported_mean_tgt = self._safe_mean(tgt_unsupported)
+        diff_absolute = self._clip01(0.5 * (unsupported_mean_src + unsupported_mean_tgt))
         if formulation == "absolute":
-            pool_baseline = max(
-                1.0,
-                (max(1, len(src_selected)) * max(1, len(tgt_selected))) ** 0.5,
-            )
-            c_diff = self._clip01((unsupported_mass_src + unsupported_mass_tgt) / pool_baseline)
+            c_diff = diff_absolute
         elif formulation == "asymmetric":
             c_diff = self._clip01(c_y)
         else:
@@ -844,16 +859,20 @@ class PairAdaptiveChannelsMixin:
         stab_vals = list(src_vals) + list(tgt_vals)
         stab_diff = self._clip01(1.0 - min(1.0, self.stability_factor * self._safe_std(stab_vals)))
         q_diff = self._clip01((cov_diff + str_diff + stab_diff) / 3.0)
-        pivot_reason = "non_pivot"
-        if abs(s_diff - self.tau) < 1.0e-6:
+        if not src_items:
+            pivot_reason = "empty_source"
+        elif not tgt_items:
+            pivot_reason = "empty_target"
+        elif abs(s_diff - self.tau) < 1.0e-6:
+            pivot_reason = "genuinely_neutral_mass"
             if formulation == "normalised" and abs(c_x + c_y - 1.0) < 1.0e-6:
                 pivot_reason = (
                     "balanced_unsupported_mass"
                     if abs(c_x - c_y) < 1.0e-6
                     else "normalisation_balance"
                 )
-            else:
-                pivot_reason = "genuinely_neutral_mass"
+        else:
+            pivot_reason = "non_pivot"
         src_sentences = self._verbalize_object_items(src_selected)
         tgt_sentences = self._verbalize_object_items(tgt_selected)
         total_imp = sum(src_vals) + sum(tgt_vals) or 1.0
@@ -902,6 +921,9 @@ class PairAdaptiveChannelsMixin:
                 "n_triples_tgt": len(tgt_items),
                 "unsupported_mass_src": unsupported_mass_src,
                 "unsupported_mass_tgt": unsupported_mass_tgt,
+                "unsupported_mean_src": unsupported_mean_src,
+                "unsupported_mean_tgt": unsupported_mean_tgt,
+                "diff_absolute": diff_absolute,
                 "c_x": c_x,
                 "c_y": c_y,
                 "diff_pivot_reason": pivot_reason,
@@ -965,24 +987,20 @@ class PairAdaptiveChannelsMixin:
         return self._clip01(self._attribute_property_weight(prop) * info)
 
     def _signed_identifier_group(self, item: Dict[str, Any]) -> Optional[str]:
-        prop = normalize_candidate_text(self._normalize_text(item.get("prop")))
-        compact = prop.replace(" ", "")
-        allowlist = [
-            normalize_candidate_text(value).replace(" ", "")
+        prop_iri = self._normalize_text(item.get("prop_iri"))
+        allowlist = {
+            self._normalize_text(value)
             for value in self.attr_config.get("signed_property_allowlist", [])
-            if normalize_candidate_text(value)
-        ]
-        if allowlist:
-            matched = next((value for value in allowlist if value in compact), None)
-            if matched is None:
-                return None
-        else:
-            tokens = {"xref", "dbxref", "identifier", "id", "code", "accession"}
-            if not any(token for token in tokens if compact == token or compact.endswith(token)):
-                return None
-        if self._attribute_property_weight(self._normalize_text(item.get("prop"))) < 0.8:
+            if self._normalize_text(value)
+        }
+        if not prop_iri or prop_iri not in allowlist:
             return None
-        return "identifier"
+        namespace = self._normalize_text(item.get("identifier_namespace"))
+        if not namespace:
+            raise ValueError(
+                f"signed identifier property {prop_iri!r} lacks descriptor namespace semantics"
+            )
+        return namespace
 
     def _signed_identifier_disagreement(
         self,
@@ -993,16 +1011,16 @@ class PairAdaptiveChannelsMixin:
         tgt_groups: Dict[str, set[str]] = {}
         for item, groups in ((item, src_groups) for item in src_items):
             group = self._signed_identifier_group(item)
-            value = normalize_candidate_text(self._normalize_text(item.get("value"))).replace(
-                " ", ""
-            )
+            value = self._normalize_text(item.get("identifier_normalized"))
+            if group and not value:
+                raise ValueError("signed identifier evidence lacks descriptor-normalized value")
             if group and value:
                 groups.setdefault(group, set()).add(value)
         for item, groups in ((item, tgt_groups) for item in tgt_items):
             group = self._signed_identifier_group(item)
-            value = normalize_candidate_text(self._normalize_text(item.get("value"))).replace(
-                " ", ""
-            )
+            value = self._normalize_text(item.get("identifier_normalized"))
+            if group and not value:
+                raise ValueError("signed identifier evidence lacks descriptor-normalized value")
             if group and value:
                 groups.setdefault(group, set()).add(value)
         comparable = sorted(set(src_groups) & set(tgt_groups))
@@ -1180,6 +1198,13 @@ class PairAdaptiveChannelsMixin:
                     {
                         "item_id": self._normalize_text(item.get("item_id")),
                         "property": self._normalize_text(item.get("prop")),
+                        "property_iri": self._normalize_text(item.get("prop_iri")),
+                        "identifier_namespace": self._normalize_text(
+                            item.get("identifier_namespace")
+                        ),
+                        "identifier_normalized": self._normalize_text(
+                            item.get("identifier_normalized")
+                        ),
                         "value": self._normalize_text(item.get("value")),
                         "text": self._normalize_text(item.get("text")),
                         "entity_iri": self._normalize_text(item.get("entity_iri")),

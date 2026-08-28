@@ -305,7 +305,19 @@ class MatchingConfig(StrictConfigModel):
         "graph_closure", description="E14 semantic relation-typing backend."
     )
     relation_equivalence_anchor_threshold: float = Field(0.95, ge=0.0, le=1.0)
+    relation_equivalence_anchor_margin: float = Field(
+        0.10,
+        ge=0.0,
+        le=1.0,
+        description="E14 reciprocal-top-1 equivalence-anchor score margin.",
+    )
     relation_confidence_threshold: float = Field(0.5, ge=0.0, le=1.0)
+    relation_reasoning_timeout_seconds: float = Field(
+        60.0,
+        gt=0.0,
+        le=3600.0,
+        description="E14 per-task semantic relation-reasoning timeout in seconds.",
+    )
     extraction: ExtractionConfig = Field(
         default=ExtractionConfig.model_validate({}), description="E01 global extraction controls."
     )
@@ -646,6 +658,10 @@ class CandidatesConfig(StrictConfigModel):
         alias="encoder",
         description="Sentence encoder used for semantic candidate retrieval.",
     )
+    encoder_revision: Optional[str] = Field(
+        None,
+        description="Optional immutable candidate-encoder revision.",
+    )
     encode_batch_size: int = Field(512, description="Candidate-encoder batch size.")
     search_batch_size: int = Field(4096, description="Cosine-search batch size.")
     top_k: int = Field(20, description="Candidates retained per source entity.")
@@ -777,7 +793,12 @@ class InferenceConfig(StrictConfigModel):
 class LLMProfileConfig(StrictConfigModel):
     backend: str = Field("local_hf", description="Backend implementation name.")
     model: Optional[str] = Field(None, description="Backend model identifier.")
+    revision: Optional[str] = Field(None, description="Optional immutable local-model revision.")
     tokenizer: Optional[str] = Field(None, description="Optional tokenizer identifier override.")
+    tokenizer_revision: Optional[str] = Field(
+        None,
+        description="Optional immutable tokenizer revision.",
+    )
     api_base: str = Field(
         "https://openrouter.ai/api/v1", description="Hosted backend API base URL."
     )
@@ -1026,8 +1047,11 @@ class OutputConfig(StrictConfigModel):
 def _default_primary_params() -> Dict[str, Any]:
     return {
         "lexical_model_name": "cambridgeltl/SapBERT-from-PubMedBERT-fulltext",
+        "lexical_model_revision": None,
         "context_model_name": "BAAI/bge-large-en-v1.5",
+        "context_model_revision": None,
         "llm_model_name": "Qwen/Qwen2.5-7B-Instruct",
+        "llm_model_revision": None,
         "max_input_tokens_hier": 128,
         "max_input_tokens_sim": 256,
         "max_input_tokens_diff": 256,

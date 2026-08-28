@@ -35,6 +35,12 @@ def type_alignment_relations(
     target: Any,
     *,
     mode: str,
+    anchors: Any | None = None,
+    semantic_backend: str = "graph_closure",
+    equivalence_anchor_threshold: float = 0.95,
+    equivalence_anchor_margin: float = 0.10,
+    relation_confidence_threshold: float = 0.5,
+    timeout_seconds: float = 60.0,
 ) -> Any:
     """Run the configured relation typer over a canonical mapping table."""
 
@@ -43,7 +49,18 @@ def type_alignment_relations(
             "Alignment I/O is not initialized; import the built-in trainer or call "
             "exact.impl.bootstrap_components() first."
         )
-    return _relation_typer(candidates, source, target, mode=mode)
+    return _relation_typer(
+        candidates,
+        source,
+        target,
+        mode=mode,
+        anchors=anchors,
+        semantic_backend=semantic_backend,
+        equivalence_anchor_threshold=equivalence_anchor_threshold,
+        equivalence_anchor_margin=equivalence_anchor_margin,
+        relation_confidence_threshold=relation_confidence_threshold,
+        timeout_seconds=timeout_seconds,
+    )
 
 
 def write_alignment_format(

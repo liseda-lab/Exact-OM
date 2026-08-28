@@ -57,6 +57,16 @@ class LocalRetrievalArtifact:
             "metadata": dict(self.metadata),
         }
 
+    def assert_unchanged(self) -> None:
+        """Fail if artifact bytes changed after validation."""
+
+        current = _artifact_sha256(self.manifest_path, self.model_path)
+        if current != self.sha256:
+            raise ValueError(
+                "Retrieval artifact changed after validation: "
+                f"{self.manifest_path} ({self.sha256} != {current})"
+            )
+
 
 def resolve_local_retrieval_artifact(
     value: str | Path | None,
@@ -78,6 +88,8 @@ def resolve_local_retrieval_artifact(
     supplied = Path(value).expanduser()
     if not supplied.exists():
         raise FileNotFoundError(f"Local {expected_kind} artifact does not exist: {supplied}")
+    if supplied.is_symlink():
+        raise ValueError(f"Retrieval artifact roots may not be symbolic links: {supplied}")
     supplied = supplied.resolve()
     manifest_path = _resolve_manifest_path(supplied)
     payload = _read_manifest(manifest_path)
@@ -93,8 +105,7 @@ def resolve_local_retrieval_artifact(
     missing = sorted((_COMMON_METADATA | _KIND_METADATA[expected_kind]) - set(payload))
     if missing:
         raise ValueError(f"{manifest_path} is missing required metadata: {', '.join(missing)}")
-    if not isinstance(payload["training_pairs"], list):
-        raise ValueError(f"{manifest_path} training_pairs must be a list")
+    _validate_artifact_metadata(payload, manifest_path, expected_kind)
     if payload["reference_completeness"] not in _REFERENCE_COMPLETENESS:
         raise ValueError(
             f"{manifest_path} reference_completeness must be complete, "
@@ -138,6 +149,114 @@ def resolve_local_retrieval_artifact(
     )
 
 
+def retrieval_artifact_requirement(
+    value: str | Path | None,
+    *,
+    expected_kind: ArtifactKind,
+    negative_policy: str | None = None,
+    expected_dataset_lock: str | Mapping[str, Any] | None = None,
+    expected_candidate_pool_fingerprint: str | None = None,
+    expected_dataset_identity: str | None = None,
+) -> dict[str, Any]:
+    """Return a machine-readable preflight result for an E20 artifact.
+
+    An absent local artifact is an unavailable capability and may keep an arm
+    explicitly deferred. A present but malformed or incompatibly bound
+    artifact is invalid and must fail closed.
+    """
+
+    try:
+        artifact = resolve_local_retrieval_artifact(
+            value,
+            expected_kind=expected_kind,
+            negative_policy=negative_policy,
+        )
+    except FileNotFoundError as exc:
+        return _artifact_requirement_result(
+            status="deferred_unavailable",
+            code="missing_fitted_retrieval_artifact",
+            expected_kind=expected_kind,
+            expected_dataset_identity=expected_dataset_identity,
+            detail=str(exc),
+        )
+    except ValueError as exc:
+        if value is None or not str(value).strip():
+            return _artifact_requirement_result(
+                status="deferred_unavailable",
+                code="missing_fitted_retrieval_artifact",
+                expected_kind=expected_kind,
+                expected_dataset_identity=expected_dataset_identity,
+                detail=str(exc),
+            )
+        return _artifact_requirement_result(
+            status="invalid",
+            code="invalid_fitted_retrieval_artifact",
+            expected_kind=expected_kind,
+            expected_dataset_identity=expected_dataset_identity,
+            detail=str(exc),
+        )
+
+    if expected_dataset_lock is not None:
+        expected_lock = _immutable_binding_digest(expected_dataset_lock, "expected_dataset_lock")
+        artifact_lock = _immutable_binding_digest(
+            artifact.metadata.get("dataset_lock"),
+            f"{artifact.manifest_path} dataset_lock",
+        )
+        if artifact_lock != expected_lock:
+            return _artifact_requirement_result(
+                status="invalid",
+                code="dataset_lock_mismatch",
+                expected_kind=expected_kind,
+                expected_dataset_identity=expected_dataset_identity,
+                detail=f"artifact={artifact_lock}; expected={expected_lock}",
+            )
+
+    expected_pool = None
+    if expected_candidate_pool_fingerprint is not None:
+        expected_pool = _sha256_hex(
+            expected_candidate_pool_fingerprint,
+            "expected_candidate_pool_fingerprint",
+        )
+        declared_pool = artifact.metadata.get("candidate_pool_fingerprint")
+        mining = artifact.metadata.get("mining")
+        if declared_pool is None and isinstance(mining, Mapping):
+            declared_pool = mining.get("candidate_pool_fingerprint")
+        if declared_pool is None:
+            return _artifact_requirement_result(
+                status="invalid",
+                code="missing_candidate_pool_binding",
+                expected_kind=expected_kind,
+                expected_dataset_identity=expected_dataset_identity,
+                detail=f"artifact must bind candidate pool {expected_pool}",
+            )
+        actual_pool = _sha256_hex(
+            declared_pool,
+            f"{artifact.manifest_path} candidate_pool_fingerprint",
+        )
+        if actual_pool != expected_pool:
+            return _artifact_requirement_result(
+                status="invalid",
+                code="candidate_pool_mismatch",
+                expected_kind=expected_kind,
+                expected_dataset_identity=expected_dataset_identity,
+                detail=f"artifact={actual_pool}; expected={expected_pool}",
+            )
+
+    return {
+        "schema_version": 1,
+        "status": "ready",
+        "code": "retrieval_artifact_ready",
+        "capability": expected_kind,
+        "expected_dataset_identity": expected_dataset_identity,
+        "artifact_sha256": artifact.sha256,
+        "dataset_lock_sha256": _immutable_binding_digest(
+            artifact.metadata.get("dataset_lock"),
+            f"{artifact.manifest_path} dataset_lock",
+        ),
+        "candidate_pool_fingerprint": expected_pool,
+    }
+
+
 def _resolve_manifest_path(supplied: Path) -> Path:
     if supplied.is_file():
         if supplied.suffix.lower() != ".json":
@@ -152,6 +271,8 @@ def _resolve_manifest_path(supplied: Path) -> Path:
         raise ValueError(f"Retrieval artifact directory must contain {names}: {supplied}")
     if len(manifests) > 1:
         raise ValueError(f"Retrieval artifact directory contains ambiguous manifests: {supplied}")
+    if manifests[0].is_symlink():
+        raise ValueError(f"Retrieval artifact manifests may not be symbolic links: {manifests[0]}")
     return manifests[0]
 
 
@@ -192,3 +313,105 @@ def _artifact_sha256(manifest_path: Path, model_path: Path) -> str:
                 digest.update(chunk)
         digest.update(b"\0")
     return digest.hexdigest()
+
+
+def _validate_artifact_metadata(
+    payload: Mapping[str, Any],
+    manifest_path: Path,
+    expected_kind: ArtifactKind,
+) -> None:
+    base_model = payload.get("base_model")
+    if isinstance(base_model, str):
+        if not base_model.strip():
+            raise ValueError(f"{manifest_path} base_model must be non-empty")
+    elif isinstance(base_model, Mapping):
+        identifier = base_model.get("identifier", base_model.get("model_id"))
+        revision = base_model.get("revision")
+        if not str(identifier or "").strip() or not str(revision or "").strip():
+            raise ValueError(
+                f"{manifest_path} base_model mappings require identifier/model_id and revision"
+            )
+    else:
+        raise ValueError(f"{manifest_path} base_model must be a string or mapping")
+
+    training_pairs = payload.get("training_pairs")
+    if not isinstance(training_pairs, list) or not training_pairs:
+        raise ValueError(f"{manifest_path} training_pairs must be a non-empty list")
+    for index, item in enumerate(training_pairs):
+        if isinstance(item, str):
+            if not item.strip():
+                raise ValueError(f"{manifest_path} training_pairs[{index}] must be non-empty")
+            continue
+        if not isinstance(item, Mapping):
+            raise ValueError(f"{manifest_path} training_pairs[{index}] must be a string or mapping")
+        split_role = str(item.get("split_role", item.get("reference_role", "train"))).lower()
+        if split_role in {"test", "reporting", "confirm"}:
+            raise ValueError(
+                f"{manifest_path} training_pairs[{index}] declares forbidden split role "
+                f"{split_role!r}"
+            )
+
+    _immutable_binding_digest(payload.get("dataset_lock"), f"{manifest_path} dataset_lock")
+    epochs = payload.get("epochs")
+    if isinstance(epochs, bool) or not isinstance(epochs, int) or epochs < 1:
+        raise ValueError(f"{manifest_path} epochs must be a positive integer")
+    seed = payload.get("seed")
+    if isinstance(seed, bool) or not isinstance(seed, int):
+        raise ValueError(f"{manifest_path} seed must be an integer")
+    if expected_kind == "contrastive_encoder":
+        mining = payload.get("mining")
+        if not isinstance(mining, Mapping) or not mining:
+            raise ValueError(f"{manifest_path} mining must be a non-empty mapping")
+        required_mining = {
+            "candidate_pool_fingerprint",
+            "top_k",
+            "max_negatives_per_source",
+            "max_training_pairs",
+            "exclude_known_positives",
+        }
+        missing_mining = sorted(required_mining - set(mining))
+        if missing_mining:
+            raise ValueError(
+                f"{manifest_path} mining is missing required metadata: " + ", ".join(missing_mining)
+            )
+        _sha256_hex(
+            mining.get("candidate_pool_fingerprint"),
+            f"{manifest_path} mining.candidate_pool_fingerprint",
+        )
+        for name in ("top_k", "max_negatives_per_source", "max_training_pairs"):
+            number = mining.get(name)
+            if isinstance(number, bool) or not isinstance(number, int) or number < 1:
+                raise ValueError(f"{manifest_path} mining.{name} must be a positive integer")
+        if mining.get("exclude_known_positives") is not True:
+            raise ValueError(f"{manifest_path} mining.exclude_known_positives must be true")
+
+
+def _artifact_requirement_result(
+    *,
+    status: str,
+    code: str,
+    expected_kind: ArtifactKind,
+    expected_dataset_identity: str | None,
+    detail: str,
+) -> dict[str, Any]:
+    return {
+        "schema_version": 1,
+        "status": status,
+        "code": code,
+        "capability": expected_kind,
+        "expected_dataset_identity": expected_dataset_identity,
+        "detail": detail,
+    }
+
+
+def _immutable_binding_digest(value: Any, label: str) -> str:
+    if isinstance(value, Mapping):
+        value = value.get("sha256", value.get("fingerprint"))
+    return _sha256_hex(value, label)
+
+
+def _sha256_hex(value: Any, label: str) -> str:
+    text = str(value or "").strip().lower()
+    if len(text) != 64 or any(char not in "0123456789abcdef" for char in text):
+        raise ValueError(f"{label} must contain an immutable SHA-256 digest")
+    return text

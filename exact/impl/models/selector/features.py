@@ -228,7 +228,11 @@ class FeatureEngineeringMixin:
                 "selection_distinctive": float(distinctive.get(idx, 0.0)),
                 "selection_utility": float(selector_scores[pos]),
                 "P_rank": float(selector_probs[pos]) if pos < len(selector_probs) else 0.0,
-                "P_match": float(prob if self.emit_candidate_scores else 1.0 - no_match_prob),
+                "P_match": float(
+                    selector_scores[pos]
+                    if self.nil_config["mode"] != "off"
+                    else (prob if self.emit_candidate_scores else 1.0 - no_match_prob)
+                ),
                 "selection_source_p_match": float(1.0 - no_match_prob),
                 "selection_winner": bool(winner_pos is not None and pos == winner_pos),
             }
@@ -510,6 +514,21 @@ class FeatureEngineeringMixin:
             conf["selection_target_cardinality"] = int(
                 row.get("selection_target_cardinality", 0) or 0
             )
+            for key in [
+                "P_rank_without_nil",
+                "P_match_pre_nil",
+                "P_nil",
+                "Q_match",
+                "Q_nil",
+            ]:
+                if key in row:
+                    conf[key] = float(row.get(key, 0.0))
+            for key in ["nil_rank", "candidate_joint_rank"]:
+                if key in row:
+                    conf[key] = int(row.get(key, 0) or 0)
+            if "nil_mode" in row:
+                conf["nil_mode"] = str(row.get("nil_mode"))
+                conf["nil_ranking_scale"] = str(row.get("nil_ranking_scale"))
             if self.replace_final_score:
                 conf["S_final"] = float(row.get("S_select", 0.0))
             record["confidences"] = conf
@@ -519,6 +538,8 @@ class FeatureEngineeringMixin:
             pred["selector_llm_used"] = bool(row.get("selection_llm_used", False))
             pred["selector_reason"] = str(row.get("selection_reason", ""))
             pred["selector_winner"] = bool(row.get("selection_winner", False))
+            if "selection_nil_winner" in row:
+                pred["selector_nil_winner"] = bool(row.get("selection_nil_winner", False))
             pred["selector_strategy"] = self.strategy
             record["prediction"] = pred
 

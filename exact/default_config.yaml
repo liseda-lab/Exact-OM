@@ -69,7 +69,11 @@ matching:
   # E14 semantic relation-typing backend.
   relation_semantic_backend: graph_closure
   relation_equivalence_anchor_threshold: 0.95
+  # E14 reciprocal-top-1 equivalence-anchor score margin.
+  relation_equivalence_anchor_margin: 0.1
   relation_confidence_threshold: 0.5
+  # E14 per-task semantic relation-reasoning timeout in seconds.
+  relation_reasoning_timeout_seconds: 60.0
   # E01 global extraction controls.
   extraction:
     # Global extraction strategy; greedy preserves shipped behavior.
@@ -112,6 +116,8 @@ matching:
     sigma_mode: full
     # Neutral score pivot when enabled.
     tau: 0.5
+    # Canonical E10 mapping to PairAdaptiveSemanticScorer.params.tau_LLM.
+    llm_pivot: 0.5
     # Informative-deviation exponent when enabled.
     gamma: 2.0
     # LLM contribution scale when enabled.
@@ -338,6 +344,8 @@ candidates:
   retrieval_strategy: hybrid
   # Sentence encoder used for semantic candidate retrieval.
   encoder: sentence-transformers/all-MiniLM-L6-v2
+  # Optional immutable candidate-encoder revision.
+  encoder_revision:
   # Candidate-encoder batch size.
   encode_batch_size: 512
   # Cosine-search batch size.
@@ -490,8 +498,11 @@ pipeline:
     # Component-specific constructor parameters.
     params:
       lexical_model_name: cambridgeltl/SapBERT-from-PubMedBERT-fulltext
+      lexical_model_revision:
       context_model_name: BAAI/bge-large-en-v1.5
+      context_model_revision:
       llm_model_name: Qwen/Qwen2.5-7B-Instruct
+      llm_model_revision:
       max_input_tokens_hier: 128
       max_input_tokens_sim: 256
       max_input_tokens_diff: 256
@@ -646,8 +657,12 @@ llm:
       backend: openrouter
       # Backend model identifier.
       model: openai/gpt-4o-mini
+      # Optional immutable local-model revision.
+      revision:
       # Optional tokenizer identifier override.
       tokenizer: Xenova/gpt-4o
+      # Optional immutable tokenizer revision.
+      tokenizer_revision:
       # Hosted backend API base URL.
       api_base: https://openrouter.ai/api/v1
       # Environment variable containing the hosted API key.
@@ -665,8 +680,12 @@ llm:
       backend: openrouter
       # Backend model identifier.
       model: anthropic/claude-sonnet-4.6
+      # Optional immutable local-model revision.
+      revision:
       # Optional tokenizer identifier override.
       tokenizer:
+      # Optional immutable tokenizer revision.
+      tokenizer_revision:
       # Hosted backend API base URL.
       api_base: https://openrouter.ai/api/v1
       # Environment variable containing the hosted API key.
@@ -684,8 +703,12 @@ llm:
       backend: openrouter
       # Backend model identifier.
       model: openai/gpt-5
+      # Optional immutable local-model revision.
+      revision:
       # Optional tokenizer identifier override.
       tokenizer:
+      # Optional immutable tokenizer revision.
+      tokenizer_revision:
       # Hosted backend API base URL.
       api_base: https://openrouter.ai/api/v1
       # Environment variable containing the hosted API key.
@@ -703,8 +726,12 @@ llm:
       backend: openrouter
       # Backend model identifier.
       model: openai/gpt-oss-120b
+      # Optional immutable local-model revision.
+      revision:
       # Optional tokenizer identifier override.
       tokenizer:
+      # Optional immutable tokenizer revision.
+      tokenizer_revision:
       # Hosted backend API base URL.
       api_base: https://openrouter.ai/api/v1
       # Environment variable containing the hosted API key.
@@ -722,8 +749,12 @@ llm:
       backend: openrouter
       # Backend model identifier.
       model: qwen/qwen3.5-122b-a10b
+      # Optional immutable local-model revision.
+      revision:
       # Optional tokenizer identifier override.
       tokenizer: Qwen/Qwen3.5-122B-A10B
+      # Optional immutable tokenizer revision.
+      tokenizer_revision:
       # Hosted backend API base URL.
       api_base: https://openrouter.ai/api/v1
       # Environment variable containing the hosted API key.
@@ -741,8 +772,12 @@ llm:
       backend: openrouter
       # Backend model identifier.
       model: qwen/qwen3-235b-a22b-2507
+      # Optional immutable local-model revision.
+      revision:
       # Optional tokenizer identifier override.
       tokenizer: Qwen/Qwen3-235B-A22B-2507
+      # Optional immutable tokenizer revision.
+      tokenizer_revision:
       # Hosted backend API base URL.
       api_base: https://openrouter.ai/api/v1
       # Environment variable containing the hosted API key.
@@ -760,8 +795,12 @@ llm:
       backend: openrouter
       # Backend model identifier.
       model: meta-llama/llama-3.3-70b-instruct
+      # Optional immutable local-model revision.
+      revision:
       # Optional tokenizer identifier override.
       tokenizer: meta-llama/Llama-3.3-70B-Instruct
+      # Optional immutable tokenizer revision.
+      tokenizer_revision:
       # Hosted backend API base URL.
       api_base: https://openrouter.ai/api/v1
       # Environment variable containing the hosted API key.
@@ -779,8 +818,12 @@ llm:
       backend: openrouter
       # Backend model identifier.
       model: deepseek/deepseek-chat-v3.1
+      # Optional immutable local-model revision.
+      revision:
       # Optional tokenizer identifier override.
       tokenizer: deepseek-ai/DeepSeek-V3.1
+      # Optional immutable tokenizer revision.
+      tokenizer_revision:
       # Hosted backend API base URL.
       api_base: https://openrouter.ai/api/v1
       # Environment variable containing the hosted API key.
@@ -798,8 +841,12 @@ llm:
       backend: local_hf
       # Backend model identifier.
       model: Qwen/Qwen2.5-3B-Instruct
+      # Optional immutable local-model revision.
+      revision:
       # Optional tokenizer identifier override.
       tokenizer:
+      # Optional immutable tokenizer revision.
+      tokenizer_revision:
       # Hosted backend API base URL.
       api_base: https://openrouter.ai/api/v1
       # Environment variable containing the hosted API key.
@@ -817,8 +864,12 @@ llm:
       backend: local_hf
       # Backend model identifier.
       model: Qwen/Qwen2.5-7B-Instruct
+      # Optional immutable local-model revision.
+      revision:
       # Optional tokenizer identifier override.
       tokenizer:
+      # Optional immutable tokenizer revision.
+      tokenizer_revision:
       # Hosted backend API base URL.
       api_base: https://openrouter.ai/api/v1
       # Environment variable containing the hosted API key.
@@ -881,7 +932,8 @@ llm:
       mode: binary
       probability: raw_joint
       listwise_max_candidates: 5
-      order_averages: 1
+      permutations: 2
+      samples_per_permutation: 3
     gate:
       mode: analytic
       threshold: 0.5

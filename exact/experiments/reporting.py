@@ -34,6 +34,25 @@ _RELATION_NAMES = {
     "source_subsumes_target": "source_subsumes_target",
 }
 _NIL_VALUES = {"nil", "no_match", "nomatch", "unmatched"}
+_MANDATORY_REPORTING_ENDPOINTS = (
+    ("candidate_recall", "candidate_recall", "proportion"),
+    ("coverage", "coverage", "proportion"),
+    ("abstention", "abstention_rate", "proportion"),
+    ("ranking", "MRR", "proportion"),
+    ("ranking", "Hits@1", "proportion"),
+    ("wall_time", "wall_seconds", "seconds"),
+    ("peak_memory", "peak_memory_kb", "KiB"),
+    ("llm_usage", "llm.calls", "calls"),
+    ("llm_usage", "llm.input_tokens", "tokens"),
+    ("llm_usage", "llm.output_tokens", "tokens"),
+    ("llm_usage", "llm.total_tokens", "tokens"),
+)
+_LLM_COUNTER_ALIASES = {
+    "llm.calls": ("calls",),
+    "llm.input_tokens": ("input_tokens", "prompt_tokens"),
+    "llm.output_tokens": ("output_tokens", "completion_tokens"),
+    "llm.total_tokens": ("total_tokens",),
+}
 
 
 def _jsonable(value: Any) -> Any:
@@ -275,52 +294,334 @@ def enrich_inventory_from_manifests(
     return enriched
 
 
-def _metric_dimensions(metric_key: str) -> tuple[str, str]:
-    # Evaluator metric strings are endpoint identifiers, not a typed reporting
-    # schema.  In particular BioML keys such as ``equivalence.f1`` do not prove
-    # that a kind×relation confusion slice was evaluated.  Verified slice rows
-    # are emitted separately from explicit mapping/reference dimensions.
-    _ = metric_key
-    return "all", "all"
+def _metric_family_endpoint(metric_key: str) -> tuple[str, str]:
+    """Classify an explicit metric key without treating global recall as retrieval recall."""
+
+    key = str(metric_key).strip()
+    lowered = key.lower().replace("-", "_")
+    leaf = lowered.replace("/", ".").rsplit(".", 1)[-1]
+    if "candidate_recall" in lowered:
+        return "candidate_recall", "candidate_recall"
+    if leaf == "coverage":
+        return "coverage", "coverage"
+    if "abstention" in leaf:
+        return "abstention", "abstention_rate"
+    if leaf == "mrr":
+        return "ranking", "MRR"
+    if leaf == "hits@1" or leaf == "hits_1":
+        return "ranking", "Hits@1"
+    if leaf.startswith("hits@") or leaf.startswith("hits_"):
+        return "ranking", key
+    if leaf in {"p", "precision", "r", "recall", "f1"}:
+        return "quality", key
+    if leaf in {"ece", "brier", "brier_score"}:
+        return "calibration", key
+    return "other", key
+
+
+def _finite_metric_value(value: Any, *, label: str, non_negative: bool = False) -> float:
+    if isinstance(value, bool):
+        raise ValueError(f"{label} must be numeric, not boolean")
+    try:
+        result = float(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{label} must be numeric") from exc
+    if not math.isfinite(result):
+        raise ValueError(f"{label} must be finite")
+    if non_negative and result < 0.0:
+        raise ValueError(f"{label} must be non-negative")
+    return result
+
+
+def _proportion_metric_value(value: Any, *, label: str) -> float:
+    result = _finite_metric_value(value, label=label)
+    if not 0.0 <= result <= 1.0:
+        raise ValueError(f"{label} must be between zero and one")
+    return result
+
+
+def _metric_applicability(
+    record: Mapping[str, Any],
+    *,
+    family: str,
+    endpoint: str,
+) -> tuple[str, str]:
+    declared = record.get("metric_applicability")
+    if declared is not None and not isinstance(declared, Mapping):
+        raise ValueError("metric_applicability must be a mapping when provided")
+    value = None
+    if isinstance(declared, Mapping):
+        if endpoint in declared:
+            value = declared[endpoint]
+        elif family in declared:
+            value = declared[family]
+    if value is False or value == "not_applicable":
+        return "not_applicable", "declared_not_applicable"
+    if value not in (None, True, "applicable", "required"):
+        raise ValueError(
+            f"metric_applicability[{endpoint!r}] must be boolean or an applicability label"
+        )
+    if family == "llm_usage" and value is None and record.get("llm_required") is False:
+        return "not_applicable", "llm_not_used"
+    if record.get("status") != "complete":
+        return "unavailable", "cell_not_complete"
+    return "unavailable", "not_recorded"
+
+
+def _llm_usage_root(value: Any) -> Mapping[str, Any] | None:
+    if value is None:
+        return None
+    if not isinstance(value, Mapping):
+        raise ValueError("llm_usage must be a mapping when provided")
+    summary = value.get("summary")
+    if isinstance(summary, Mapping):
+        has_top_level_counter = any(
+            alias in value for aliases in _LLM_COUNTER_ALIASES.values() for alias in aliases
+        )
+        if not has_top_level_counter:
+            return summary
+    return value
+
+
+def _llm_counter(
+    usage: Mapping[str, Any] | None,
+    endpoint: str,
+) -> tuple[float | None, str | None, Any]:
+    if usage is None:
+        return None, None, None
+    aliases = _LLM_COUNTER_ALIASES[endpoint]
+    availability = usage.get("counter_availability")
+    availability = availability if isinstance(availability, Mapping) else {}
+    reported: list[tuple[str, float]] = []
+    for alias in aliases:
+        if usage.get(alias) is not None:
+            value = _finite_metric_value(
+                usage[alias],
+                label=f"llm_usage.{alias}",
+                non_negative=True,
+            )
+            if not value.is_integer():
+                raise ValueError(f"llm_usage.{alias} must be an integer counter")
+            reported.append((alias, value))
+    if reported and len({value for _alias, value in reported}) != 1:
+        raise ValueError(f"LLM counter aliases disagree for {endpoint}: {reported}")
+    if reported:
+        alias, value = reported[0]
+        for counter_alias in aliases:
+            detail = availability.get(counter_alias)
+            if not isinstance(detail, Mapping):
+                continue
+            if detail.get("status") == "unavailable":
+                raise ValueError(f"llm_usage.{counter_alias} is reported but marked unavailable")
+            if detail.get("value") is not None and float(detail["value"]) != value:
+                raise ValueError(f"llm_usage.{counter_alias} disagrees with counter availability")
+        return value, alias, None
+    for alias in aliases:
+        if alias in availability:
+            detail = availability[alias]
+            if isinstance(detail, Mapping) and detail.get("status") == "available":
+                raise ValueError(
+                    f"llm_usage.{alias} is marked available but has no reported counter"
+                )
+            return None, None, _jsonable(detail)
+    return None, None, None
+
+
+def cell_metric_rows(record: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """Represent raw, runtime, and explicitly unavailable mandatory cell metrics."""
+
+    experiment = str(record.get("experiment_id"))
+    arm = str(record.get("arm_id"))
+    task = str(record.get("task_id"))
+    seed = int(record.get("seed") or 0)
+    identity = {
+        "experiment_id": experiment,
+        "arm_id": arm,
+        "task_id": task,
+        "seed": seed,
+        "entity_kind": "all",
+        "relation": "all",
+    }
+    raw_metrics = record.get("metrics") or {}
+    if not isinstance(raw_metrics, Mapping):
+        raise ValueError(f"metrics must be a mapping for {experiment}/{arm}/{task}/seed-{seed}")
+    rows: list[dict[str, Any]] = []
+    represented: set[tuple[str, str]] = set()
+
+    def add_available(
+        metric: str,
+        raw_value: Any,
+        *,
+        family: str,
+        endpoint: str,
+        unit: str,
+        source: str,
+        source_metric: str | None = None,
+    ) -> None:
+        value = _finite_metric_value(
+            raw_value,
+            label=metric,
+            non_negative=unit in {"seconds", "KiB", "calls", "tokens"},
+        )
+        if unit == "proportion" or family in {
+            "candidate_recall",
+            "coverage",
+            "abstention",
+            "ranking",
+        }:
+            value = _proportion_metric_value(raw_value, label=metric)
+        row = {
+            **identity,
+            "metric": metric,
+            "metric_family": family,
+            "metric_endpoint": endpoint,
+            "value": value,
+            "unit": unit,
+            "availability": "available",
+            "availability_reason": None,
+            "source": source,
+        }
+        if source_metric is not None:
+            row["source_metric"] = source_metric
+        rows.append(row)
+        represented.add((family, endpoint))
+
+    for raw_key, raw_value in raw_metrics.items():
+        metric = str(raw_key)
+        family, endpoint = _metric_family_endpoint(metric)
+        unit = (
+            "proportion"
+            if family
+            in {
+                "candidate_recall",
+                "coverage",
+                "abstention",
+                "ranking",
+                "quality",
+                "calibration",
+            }
+            else "value"
+        )
+        add_available(
+            metric,
+            raw_value,
+            family=family,
+            endpoint=endpoint,
+            unit=unit,
+            source="authoritative_evaluator",
+        )
+
+    supplemental = (
+        ("candidate_recall", "candidate_recall", "candidate_recall", "proportion"),
+        ("coverage", "coverage", "coverage", "proportion"),
+        ("abstention_rate", "abstention", "abstention_rate", "proportion"),
+        ("abstention", "abstention", "abstention_rate", "proportion"),
+        ("wall_seconds", "wall_time", "wall_seconds", "seconds"),
+        ("peak_memory_kb", "peak_memory", "peak_memory_kb", "KiB"),
+    )
+    for field, family, endpoint, unit in supplemental:
+        if (family, endpoint) in represented or record.get(field) is None:
+            continue
+        add_available(
+            endpoint,
+            record[field],
+            family=family,
+            endpoint=endpoint,
+            unit=unit,
+            source="run_manifest",
+            source_metric=field,
+        )
+
+    usage = _llm_usage_root(record.get("llm_usage"))
+    llm_availability_details: dict[str, Any] = {}
+    for endpoint in _LLM_COUNTER_ALIASES:
+        value, source_metric, detail = _llm_counter(usage, endpoint)
+        if detail is not None:
+            llm_availability_details[endpoint] = detail
+        if value is not None:
+            add_available(
+                endpoint,
+                value,
+                family="llm_usage",
+                endpoint=endpoint,
+                unit="calls" if endpoint == "llm.calls" else "tokens",
+                source="run_manifest",
+                source_metric=f"llm_usage.{source_metric}",
+            )
+
+    for family, endpoint, unit in _MANDATORY_REPORTING_ENDPOINTS:
+        if (family, endpoint) in represented:
+            continue
+        availability, reason = _metric_applicability(
+            record,
+            family=family,
+            endpoint=endpoint,
+        )
+        row = {
+            **identity,
+            "metric": endpoint,
+            "metric_family": family,
+            "metric_endpoint": endpoint,
+            "value": None,
+            "unit": unit,
+            "availability": availability,
+            "availability_reason": reason,
+            "source": "availability_declaration",
+        }
+        if endpoint in llm_availability_details:
+            row["availability_detail"] = llm_availability_details[endpoint]
+            row["availability_reason"] = "runtime_counter_unavailable"
+        rows.append(row)
+    rows.sort(
+        key=lambda row: (
+            str(row["metric_family"]),
+            str(row["metric_endpoint"]),
+            str(row["metric"]),
+        )
+    )
+    return rows
 
 
 def metric_reports(
     records: Sequence[Mapping[str, Any]],
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    """Return finite long-form cell metrics and completeness-aware task macros."""
+    """Return availability-aware cell metrics and completeness-aware task macros."""
 
     long_rows: list[dict[str, Any]] = []
     expected_cells: dict[tuple[str, str], set[tuple[str, int]]] = defaultdict(set)
-    observed: dict[tuple[str, str, str, str, str], dict[tuple[str, int], float]] = defaultdict(dict)
+    observed: dict[
+        tuple[str, str, str, str, str, str, str, str],
+        dict[tuple[str, int], float],
+    ] = defaultdict(dict)
     for record in records:
         experiment = str(record.get("experiment_id"))
         arm = str(record.get("arm_id"))
         task = str(record.get("task_id"))
         seed = int(record.get("seed") or 0)
         expected_cells[(experiment, arm)].add((task, seed))
-        for metric_key, raw_value in (record.get("metrics") or {}).items():
-            value = float(raw_value)
-            if not math.isfinite(value):
-                raise ValueError(
-                    f"non-finite metric {metric_key!r} for {experiment}/{arm}/{task}/seed-{seed}"
-                )
-            kind, relation = _metric_dimensions(str(metric_key))
-            row = {
-                "experiment_id": experiment,
-                "arm_id": arm,
-                "task_id": task,
-                "seed": seed,
-                "entity_kind": kind,
-                "relation": relation,
-                "metric": str(metric_key),
-                "value": value,
-            }
+        for row in cell_metric_rows(record):
             long_rows.append(row)
-            observed[(experiment, arm, str(metric_key), kind, relation)][(task, seed)] = value
+            if row["availability"] != "available":
+                continue
+            metric_key = str(row["metric"])
+            kind = str(row["entity_kind"])
+            relation = str(row["relation"])
+            observed[
+                (
+                    experiment,
+                    arm,
+                    metric_key,
+                    str(row["metric_family"]),
+                    str(row["metric_endpoint"]),
+                    str(row["unit"]),
+                    kind,
+                    relation,
+                )
+            ][(task, seed)] = float(row["value"])
 
     macros: list[dict[str, Any]] = []
     for key, values in sorted(observed.items()):
-        experiment, arm, metric_key, kind, relation = key
+        experiment, arm, metric_key, family, endpoint, unit, kind, relation = key
         expected = expected_cells[(experiment, arm)]
         missing = sorted(expected.difference(values))
         by_task: dict[str, list[float]] = defaultdict(list)
@@ -335,6 +636,9 @@ def metric_reports(
                 "entity_kind": kind,
                 "relation": relation,
                 "metric": metric_key,
+                "metric_family": family,
+                "metric_endpoint": endpoint,
+                "unit": unit,
                 "macro_over_tasks": (
                     fmean(task_means.values()) if complete and task_means else None
                 ),
@@ -349,6 +653,7 @@ def metric_reports(
             row["arm_id"],
             row["task_id"],
             row["seed"],
+            row["metric_family"],
             row["metric"],
         )
     )
@@ -377,11 +682,7 @@ def _evaluation_reference_paths(output_dir: Path) -> tuple[Path, Optional[Path],
         if train.get("sha256"):
             train_sha256 = str(train["sha256"])
     if train_path is not None:
-        if (
-            not train_path.is_file()
-            or not train_sha256
-            or sha256_file(train_path) != train_sha256
-        ):
+        if not train_path.is_file() or not train_sha256 or sha256_file(train_path) != train_sha256:
             raise ValueError(
                 f"evaluation training reference changed after evaluation: {train_path}"
             )
@@ -675,6 +976,7 @@ def stable_bootstrap_seed(suite_id: str, stage: str) -> int:
 
 
 __all__ = [
+    "cell_metric_rows",
     "e17_interaction_bootstrap_reports",
     "enrich_inventory_from_manifests",
     "inspect_dataset_task",

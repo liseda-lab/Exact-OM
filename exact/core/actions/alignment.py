@@ -10,6 +10,7 @@ from typing import Any, Mapping, Optional, Union
 
 import torch
 
+from exact.analysis.candidate_recall import analyze_candidate_recall
 from exact.core.actions.evaluation import run_evaluation
 from exact.core.entities.configs.config import ConfigModel
 from exact.core.entities.registry import ComponentRegistry, ComponentType
@@ -87,6 +88,128 @@ def _atomic_table(frame: Any, path: Path) -> None:
     temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
     frame.to_csv(temporary, sep="\t", index=False)
     os.replace(temporary, path)
+
+
+def _candidate_recall_run_stats(
+    dataset: Any,
+    *,
+    training_reference_path: Optional[Path],
+) -> dict[str, Any]:
+    """Summarize the materialized ranked pool against this stage's reference.
+
+    This is called only for explicitly audited experiment runs. It keeps gold
+    information out of the candidate-pool manifest while making the declared
+    candidate-recall endpoint available to screen/confirm reporting.
+    """
+
+    def pair_columns(frame: Any, label: str) -> tuple[str, str]:
+        columns = {str(column).strip().lower(): str(column) for column in frame.columns}
+        source = next(
+            (
+                columns[name]
+                for name in ("src", "srcentity", "source", "source_id")
+                if name in columns
+            ),
+            None,
+        )
+        target = next(
+            (
+                columns[name]
+                for name in ("tgt", "tgtentity", "target", "target_id")
+                if name in columns
+            ),
+            None,
+        )
+        if source is None or target is None:
+            raise ValueError(f"{label} has no unambiguous source/target columns")
+        return source, target
+
+    def pairs(frame: Any, label: str) -> list[tuple[str, str]]:
+        if frame is None or frame.empty:
+            return []
+        source, target = pair_columns(frame, label)
+        return [
+            (str(src), str(tgt))
+            for src, tgt in frame[[source, target]].itertuples(index=False, name=None)
+        ]
+
+    reference = getattr(dataset, "reference", None)
+    candidates = getattr(dataset, "candidates", None)
+    if reference is None or reference.empty:
+        return {
+            "metric_applicability": {"candidate_recall": False},
+            "candidate_recall_diagnostics": {
+                "status": "not_applicable",
+                "reason": "stage reference is absent or empty",
+            },
+        }
+
+    candidate_input: Any = []
+    if candidates is not None and not candidates.empty:
+        source, target = pair_columns(candidates, "candidate pool")
+        score = next(
+            (
+                str(column)
+                for column in candidates.columns
+                if str(column).strip().lower() in {"cand_sim", "score", "scores", "similarity"}
+            ),
+            None,
+        )
+        candidate_input = candidates[[source, target]].rename(
+            columns={source: "Src", target: "Tgt"}
+        )
+        candidate_input["cand_sim"] = (
+            candidates[score].to_numpy(copy=True) if score is not None else 0.0
+        )
+
+    training_pairs: list[tuple[str, str]] = []
+    if training_reference_path is not None:
+        training_frame = read_table(Path(training_reference_path))
+        training_pairs = pairs(training_frame, "training reference")
+    analysis = analyze_candidate_recall(
+        candidate_input,
+        pairs(reference, "stage reference"),
+        train_pairs=training_pairs,
+        exact_pairs=pairs(getattr(dataset, "exact_matches", None), "exact prefilter"),
+    )
+    counts = dict(analysis["counts"])
+    metrics = dict(analysis["metrics"])
+    gold_rank = dict(analysis["gold_rank"])
+    pool_manifest = getattr(dataset, "candidate_pool_manifest", None)
+    pool_summary = (
+        pool_manifest.get("gold_free_summary") if isinstance(pool_manifest, Mapping) else None
+    )
+    mean_pool_size: Optional[float] = None
+    if isinstance(pool_summary, Mapping) and pool_summary.get("mean_pool_size") is not None:
+        mean_pool_size = float(pool_summary["mean_pool_size"])
+    elif candidates is not None and not candidates.empty:
+        source, _target = pair_columns(candidates, "candidate pool")
+        mean_pool_size = float(candidates.groupby(source, sort=False).size().mean())
+    if int(counts.get("reference_pairs") or 0) == 0:
+        return {
+            "metric_applicability": {"candidate_recall": False},
+            "candidate_recall_diagnostics": {
+                "status": "not_applicable",
+                "reason": "no evaluation reference pairs remain after training-pair exclusion",
+                "counts": counts,
+                "metrics": metrics,
+                "gold_rank": gold_rank,
+            },
+        }
+    return {
+        "metric_applicability": {"candidate_recall": True},
+        "candidate_recall": float(metrics["generated_candidate_recall"]),
+        "candidate_recall_after_exact": float(metrics["exact_prefilter_oracle_recall"]),
+        "mean_pool_size": mean_pool_size,
+        "gold_rank_p90": gold_rank.get("rank_p90"),
+        "gold_rank_median": gold_rank.get("rank_median"),
+        "candidate_recall_diagnostics": {
+            "status": "available",
+            "counts": counts,
+            "metrics": metrics,
+            "gold_rank": gold_rank,
+        },
+    }
 
 
 def _table_columns(path: Path) -> list[str]:
@@ -906,6 +1029,17 @@ def _run_alignment_session(
             sub_dir=task_name,
             output_formats=configs.io.output_formats,
             relation_prediction=configs.matching.relation_prediction,
+            relation_semantic_backend=configs.matching.relation_semantic_backend,
+            relation_equivalence_anchor_threshold=(
+                configs.matching.relation_equivalence_anchor_threshold
+            ),
+            relation_equivalence_anchor_margin=(
+                configs.matching.relation_equivalence_anchor_margin
+            ),
+            relation_confidence_threshold=configs.matching.relation_confidence_threshold,
+            relation_reasoning_timeout_seconds=(
+                configs.matching.relation_reasoning_timeout_seconds
+            ),
             source_uri=source_file_path.resolve().as_uri(),
             target_uri=target_file_path.resolve().as_uri(),
             paper_audit=configs.run.experiment_audit,
@@ -1039,6 +1173,16 @@ def _run_alignment_session(
     )
     run_metadata: dict[str, Any] = {"ontology_stack": dataset.ontology_stack_provenance()}
     if configs.run.experiment_audit and evaluation_alignment_path is not None:
+        run_metadata.update(
+            _candidate_recall_run_stats(
+                dataset,
+                training_reference_path=(
+                    Path(evaluation_training_reference)
+                    if evaluation_training_reference is not None
+                    else None
+                ),
+            )
+        )
         run_metadata["evaluation_inputs"] = {
             "alignment_primary": file_provenance(Path(alignment_file_path)),
             "alignment_global_audit": file_provenance(Path(evaluation_alignment_path)),

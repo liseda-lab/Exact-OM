@@ -44,9 +44,13 @@ class ScorerCommonMixin:
         if not self.llm_model_name:
             raise ValueError("Local LLM fallback requested but llm_model_name is not configured.")
         self.log("Loading local LLM fallback...", "info")
-        self.llm_tok = AutoTokenizer.from_pretrained(self.llm_model_name)
+        llm_model_revision = getattr(self, "llm_model_revision", None)
+        revision_kwargs = {"revision": llm_model_revision} if llm_model_revision is not None else {}
+        self.llm_tok = AutoTokenizer.from_pretrained(self.llm_model_name, **revision_kwargs)
         self.llm = AutoModelForCausalLM.from_pretrained(
-            self.llm_model_name, torch_dtype=torch.float16 if self.fp16 else torch.float32
+            self.llm_model_name,
+            torch_dtype=torch.float16 if self.fp16 else torch.float32,
+            **revision_kwargs,
         ).to(self.device)
         self.yes_token_ids = self._candidate_token_ids([" Yes", "Yes", "yes"])
         self.no_token_ids = self._candidate_token_ids([" No", "No", "no"])
@@ -128,8 +132,17 @@ class ScorerCommonMixin:
         )
         return {
             "lexical_model": self.lexical_model_name if self.use_lexical else None,
+            "lexical_model_revision": (
+                getattr(self, "lexical_model_revision", None) if self.use_lexical else None
+            ),
             "context_model": self.context_model_name if self.use_context else None,
+            "context_model_revision": (
+                getattr(self, "context_model_revision", None) if self.use_context else None
+            ),
             "llm_model": self.llm_model_name if self.use_llm else None,
+            "llm_model_revision": (
+                getattr(self, "llm_model_revision", None) if self.use_llm else None
+            ),
             "llm_router": self._llm_router.fingerprint_payload() if self.use_llm else None,
             "max_input_tokens_lexical": self.max_input_tokens_lexical,
             "max_input_tokens_context": self.max_input_tokens_context,
@@ -635,6 +648,7 @@ class ScorerCommonMixin:
             "backend": resolved.backend,
             "profile": resolved.profile_name,
             "model": resolved.model,
+            "revision": getattr(resolved, "revision", None),
             "decision_capable": bool(resolved.decision_capable),
             "fallback_triggered": bool(resolved.fallback_triggered),
             "fallback_reason": resolved.fallback_reason,

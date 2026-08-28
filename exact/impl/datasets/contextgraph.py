@@ -184,8 +184,23 @@ class ContextDataset(BaseAlignmentDataset):
 
         self.context_cost_fn = _triple_token_cost
 
+    def _verbaliser_identity_payload(self) -> Dict[str, Any]:
+        requested_profile_name = self._llm_router.routing.profile_for_task("verbaliser")
+        requested_profile = self._llm_router.profiles.get(requested_profile_name or "")
+        return {
+            "requested_profile": requested_profile_name,
+            "requested_model": (requested_profile.model if requested_profile is not None else None),
+            "requested_revision": (
+                requested_profile.revision if requested_profile is not None else None
+            ),
+            "resolved_profile": self._verbaliser_backend.profile_name,
+            "resolved_model": self._verbaliser_backend.model,
+            "resolved_revision": self._verbaliser_backend.revision,
+        }
+
     def _cache_fingerprint_payload(self) -> Dict[str, Any]:
         payload = super()._cache_fingerprint_payload()
+        verbaliser_identity = self._verbaliser_identity_payload()
         payload.update(
             {
                 "n_hops": self.n_hops,
@@ -203,6 +218,7 @@ class ContextDataset(BaseAlignmentDataset):
                 "verbaliser_backend": self._verbaliser_backend.backend,
                 "verbaliser_profile": self._verbaliser_backend.profile_name,
                 "verbaliser_model": self._verbaliser_backend.model,
+                **{f"verbaliser_{key}": value for key, value in verbaliser_identity.items()},
                 "gen_max_new_tokens": self.gen_max_new_tokens,
                 "do_sample": self.do_sample,
                 "temperature": self.temperature,
@@ -219,6 +235,7 @@ class ContextDataset(BaseAlignmentDataset):
 
     @property
     def verbalizer_template_fingerprint(self) -> str:
+        verbaliser_identity = self._verbaliser_identity_payload()
         payload = {
             "dataset_signature": self.dataset_signature,
             "only_taxonomy": self.only_taxonomy,
@@ -226,6 +243,7 @@ class ContextDataset(BaseAlignmentDataset):
             "verbaliser_backend": self._verbaliser_backend.backend,
             "verbaliser_profile": self._verbaliser_backend.profile_name,
             "verbaliser_model": self._verbaliser_backend.model,
+            **{f"verbaliser_{key}": value for key, value in verbaliser_identity.items()},
             "gen_max_new_tokens": self.gen_max_new_tokens,
             "do_sample": self.do_sample,
             "temperature": self.temperature,
@@ -265,12 +283,14 @@ class ContextDataset(BaseAlignmentDataset):
         return True
 
     def _write_template_cache_metadata(self) -> None:
+        verbaliser_identity = self._verbaliser_identity_payload()
         payload = {
             "fingerprint": self.verbalizer_template_fingerprint,
             "dataset_signature": self.dataset_signature,
             "backend": self._verbaliser_backend.backend,
             "profile": self._verbaliser_backend.profile_name,
             "model": self._verbaliser_backend.model,
+            **verbaliser_identity,
         }
         self._verb_temp_meta_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
@@ -308,17 +328,25 @@ class ContextDataset(BaseAlignmentDataset):
         if self._verbaliser_backend.backend == "openrouter":
             return
         if self._verbaliser is None or self._verbaliser_tok is None:
-            if self.verbaliser_name is None:
+            resolved_model = self._verbaliser_backend.model
+            if resolved_model is None:
                 self.log(
-                    "verbaliser_name is None but only_taxonomy=False; cannot generate templates.",
+                    "The resolved local verbaliser profile has no model; cannot generate templates.",
                     level="error",
                 )
-                raise ValueError("Set verbaliser_name or only_taxonomy=True.")
-            self.log(f"Loading verbaliser LLM: {self.verbaliser_name}", level="info")
-            self._verbaliser_tok = AutoTokenizer.from_pretrained(self.verbaliser_name)
-            self._verbaliser = AutoModelForCausalLM.from_pretrained(self.verbaliser_name).to(
-                self.device
+                raise ValueError(
+                    "Configure a model on the resolved local_hf verbaliser profile or set only_taxonomy=True."
+                )
+            revision_kwargs = (
+                {"revision": self._verbaliser_backend.revision}
+                if self._verbaliser_backend.revision is not None
+                else {}
             )
+            self.log(f"Loading verbaliser LLM: {resolved_model}", level="info")
+            self._verbaliser_tok = AutoTokenizer.from_pretrained(resolved_model, **revision_kwargs)
+            self._verbaliser = AutoModelForCausalLM.from_pretrained(
+                resolved_model, **revision_kwargs
+            ).to(self.device)
 
     # ------------------------------------------------------------------
     # Templates (LLM-generated except taxonomy-only)

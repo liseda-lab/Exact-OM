@@ -35,6 +35,8 @@ from .calibration import CalibrationMixin
 from .features import FeatureEngineeringMixin
 from .grouping import count_source_groups, iter_source_groups
 from .label_free import LabelFreeSelectorMixin
+from .nil_ranking import NilRankingMixin
+from .score_calibration import ScoreCalibrationMixin
 
 
 class CandidateSetSelector(
@@ -42,6 +44,8 @@ class CandidateSetSelector(
     AcceptanceMixin,
     FeatureEngineeringMixin,
     LabelFreeSelectorMixin,
+    NilRankingMixin,
+    ScoreCalibrationMixin,
     IModel,
 ):
     """
@@ -218,6 +222,8 @@ class CandidateSetSelector(
         self._llm_prompts_used = 0
         self._llm_warning_logged = False
         self._calibration_meta: Dict[str, Any] = {}
+        self._score_calibration_meta: Dict[str, Any] = {}
+        self._nil_meta: Dict[str, Any] = {}
         self._ignored_legacy_kwargs = dict(kwargs or {})
 
     def runtime_fingerprint_payload(self, **_: Any) -> Dict[str, Any]:
@@ -346,6 +352,24 @@ class CandidateSetSelector(
         return normalized
 
     def _validate_experiment_modes(self) -> None:
+        if self.matching_calibration["mode"] not in {"none", "platt", "isotonic"}:
+            raise ValueError("matching calibration mode must be none, platt, or isotonic")
+        if self.matching_calibration["threshold_mode"] not in {"fixed", "otsu", "knee"}:
+            raise ValueError("matching threshold mode must be fixed, otsu, or knee")
+        calibration_artifact = self.matching_calibration.get("artifact")
+        if self.matching_calibration["mode"] == "none" and calibration_artifact:
+            raise ValueError("matching calibration artifact requires platt or isotonic mode")
+        if self.matching_calibration["mode"] != "none" and not calibration_artifact:
+            raise ValueError(
+                f"matching calibration mode {self.matching_calibration['mode']!r} requires "
+                "an immutable fitted artifact"
+            )
+        if self.nil_config["mode"] not in {"off", "accept_model", "heuristic"}:
+            raise ValueError("NIL mode must be off, accept_model, or heuristic")
+        if str(self.nil_config.get("ranking_scale")) != "joint_accept_probability":
+            raise ValueError("NIL ranking scale must be joint_accept_probability")
+        if self.nil_config["mode"] != "off" and not self.use_no_match:
+            raise ValueError("NIL mode requires use_no_match=true")
         if not self.experiments_enabled:
             return
         if self.count_reference_miss_as not in {"fp_fn", "fp"}:
@@ -376,12 +400,6 @@ class CandidateSetSelector(
             )
         if self.rerank_config["features"] != "current":
             raise NotImplementedError("Extended rerank features are not implemented")
-        if self.matching_calibration["mode"] not in {"none", "platt", "isotonic"}:
-            raise ValueError("matching calibration mode must be none, platt, or isotonic")
-        if self.matching_calibration["threshold_mode"] not in {"fixed", "otsu", "knee"}:
-            raise ValueError("matching threshold mode must be fixed, otsu, or knee")
-        if self.nil_config["mode"] not in {"off", "accept_model", "heuristic"}:
-            raise ValueError("NIL mode must be off, accept_model, or heuristic")
 
     def _normalize_llm(self, llm: Dict[str, Any]) -> Dict[str, Any]:
         normalized = dict(self.DEFAULT_LLM)
@@ -527,6 +545,7 @@ class CandidateSetSelector(
         df = candidate_df.copy()
         if "S_pair_final" not in df.columns:
             df["S_pair_final"] = df["S_final"]
+        df = self._apply_matching_score_calibration(df)
 
         n_rows = int(len(df))
         n_sources = count_source_groups(df)
@@ -636,6 +655,9 @@ class CandidateSetSelector(
                 run_progress=run_progress,
             )
 
+        df = self._apply_joint_nil_ranking(df)
+        self._calibration_meta["score_calibration"] = dict(self._score_calibration_meta)
+        self._calibration_meta["nil"] = dict(self._nil_meta)
         if self.replace_final_score:
             df["S_final"] = df["S_select"]
 
@@ -953,7 +975,9 @@ class CandidateSetSelector(
                 row_rank_prob = float(decision["rank_probs"].get(row_idx, 0.0))
                 is_winner = row_idx == winner_idx
                 candidate_p_match = p_match
-                if self.emit_candidate_scores and not is_winner:
+                if (
+                    self.emit_candidate_scores or self.nil_config["mode"] != "off"
+                ) and not is_winner:
                     candidate_p_match = self._clip01(
                         p_match * row_rank_prob / max(winner_rank_probability, self.eps)
                     )

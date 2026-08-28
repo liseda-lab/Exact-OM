@@ -44,8 +44,11 @@ class SemanticScorer(SemanticLLMMixin, ScorerCommonMixin, IModel):
         self,
         # ---- Models ----
         lexical_model_name: str = "cambridgeltl/SapBERT-from-PubMedBERT-fulltext",
+        lexical_model_revision: Optional[str] = None,
         context_model_name: str = "BAAI/bge-large-en-v1.5",
+        context_model_revision: Optional[str] = None,
         llm_model_name: Optional[str] = "Qwen/Qwen2.5-7B-Instruct",
+        llm_model_revision: Optional[str] = None,
         # ---- Precision / device ----
         fp16_inference: bool = True,
         device: Optional[str] = None,
@@ -242,15 +245,22 @@ class SemanticScorer(SemanticLLMMixin, ScorerCommonMixin, IModel):
 
         # store model names (for explanations)
         self.lexical_model_name = lexical_model_name
+        self.lexical_model_revision = lexical_model_revision
         self.context_model_name = context_model_name
+        self.context_model_revision = context_model_revision
         self.llm_model_name = llm_model_name
+        self.llm_model_revision = llm_model_revision
         self._llm_router = LLMRouter(
             llm_profiles=llm_profiles, llm_routing=llm_routing, log=self.log
         )
         self._local_llm_profile_name = "__semantic_local_llm__"
         self._llm_router.ensure_profile(
             self._local_llm_profile_name,
-            {"backend": "local_hf", "model": self.llm_model_name},
+            {
+                "backend": "local_hf",
+                "model": self.llm_model_name,
+                "revision": self.llm_model_revision,
+            },
         )
         if self._llm_router.routing.default_profile is None:
             self._llm_router.routing.default_profile = self._local_llm_profile_name
@@ -265,19 +275,37 @@ class SemanticScorer(SemanticLLMMixin, ScorerCommonMixin, IModel):
         self._last_summary_backend_meta: Dict[str, Any] = {}
         self._last_decision_backend_meta: Dict[str, Any] = {}
         self._last_rationale_backend_meta: Dict[str, Any] = {}
-        self._hosted_decision_tokenizers: Dict[str, Any] = {}
+        self._hosted_decision_tokenizers: Dict[Tuple[str, Optional[str]], Any] = {}
         self._cache_fingerprint = self._build_cache_fingerprint()
 
         # ---- Load models ----
         if self.use_lexical:
             self.log("Loading lexical encoder...", "info")
-            self.lex_tok = AutoTokenizer.from_pretrained(lexical_model_name)
-            self.lex_model = AutoModel.from_pretrained(lexical_model_name).to(self.device)
+            lexical_revision_kwargs = (
+                {"revision": self.lexical_model_revision}
+                if self.lexical_model_revision is not None
+                else {}
+            )
+            self.lex_tok = AutoTokenizer.from_pretrained(
+                lexical_model_name, **lexical_revision_kwargs
+            )
+            self.lex_model = AutoModel.from_pretrained(
+                lexical_model_name, **lexical_revision_kwargs
+            ).to(self.device)
 
         if self.use_context:
             self.log("Loading context encoder...", "info")
-            self.ctx_tok = AutoTokenizer.from_pretrained(context_model_name)
-            self.ctx_model = AutoModel.from_pretrained(context_model_name).to(self.device)
+            context_revision_kwargs = (
+                {"revision": self.context_model_revision}
+                if self.context_model_revision is not None
+                else {}
+            )
+            self.ctx_tok = AutoTokenizer.from_pretrained(
+                context_model_name, **context_revision_kwargs
+            )
+            self.ctx_model = AutoModel.from_pretrained(
+                context_model_name, **context_revision_kwargs
+            ).to(self.device)
 
         if self.use_llm:
             self.llm_temperature = llm_temperature

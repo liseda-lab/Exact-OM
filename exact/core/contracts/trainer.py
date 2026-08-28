@@ -3,6 +3,7 @@
 import json
 import logging
 from abc import abstractmethod
+from collections.abc import Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type
 
@@ -263,6 +264,12 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
         review_high: Optional[float] = None,
         output_formats: Optional[List[str]] = None,
         relation_prediction: str = "none",
+        relation_anchors: Any = None,
+        relation_semantic_backend: str = "graph_closure",
+        relation_equivalence_anchor_threshold: float = 0.95,
+        relation_equivalence_anchor_margin: float = 0.10,
+        relation_confidence_threshold: float = 0.5,
+        relation_reasoning_timeout_seconds: float = 60.0,
         source_uri: Optional[str] = None,
         target_uri: Optional[str] = None,
         paper_audit: bool = False,
@@ -280,6 +287,12 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
             candidates_one2many_path=candidates_one2many_path,
             output_formats=output_formats,
             relation_prediction=relation_prediction,
+            relation_anchors=relation_anchors,
+            relation_semantic_backend=relation_semantic_backend,
+            relation_equivalence_anchor_threshold=relation_equivalence_anchor_threshold,
+            relation_equivalence_anchor_margin=relation_equivalence_anchor_margin,
+            relation_confidence_threshold=relation_confidence_threshold,
+            relation_reasoning_timeout_seconds=relation_reasoning_timeout_seconds,
             source_uri=source_uri,
             target_uri=target_uri,
             paper_audit=paper_audit,
@@ -403,6 +416,12 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
         preds: List[EntityMapping],
         *,
         relation_prediction: str,
+        relation_anchors: Any,
+        relation_semantic_backend: str,
+        relation_equivalence_anchor_threshold: float,
+        relation_equivalence_anchor_margin: float,
+        relation_confidence_threshold: float,
+        relation_reasoning_timeout_seconds: float,
     ) -> pd.DataFrame:
         """Build the canonical scored frame and apply optional relation typing."""
 
@@ -434,72 +453,245 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
             getattr(self.dataset, "source", None),
             getattr(self.dataset, "target", None),
             mode=relation_prediction,
+            anchors=relation_anchors,
+            semantic_backend=relation_semantic_backend,
+            equivalence_anchor_threshold=relation_equivalence_anchor_threshold,
+            equivalence_anchor_margin=relation_equivalence_anchor_margin,
+            relation_confidence_threshold=relation_confidence_threshold,
+            timeout_seconds=relation_reasoning_timeout_seconds,
         )
         # ``none`` is the compatibility mode: relations remain equality and
         # historical explanation payloads must stay byte-identical.  Only an
         # enabled typer contributes new relation metadata and overlays.
         if str(relation_prediction).strip().lower() != "none":
-            self._apply_relation_metadata(preds, typed)
+            self._apply_relation_metadata(
+                preds,
+                typed,
+                relation_prediction=relation_prediction,
+                relation_semantic_backend=relation_semantic_backend,
+            )
         return typed
 
     def _apply_relation_metadata(
         self,
         preds: List[EntityMapping],
         frame: pd.DataFrame,
+        *,
+        relation_prediction: str,
+        relation_semantic_backend: str,
     ) -> None:
-        """Synchronize typed relations into mappings, summaries, and explanations."""
+        """Synchronize relation acceptances and abstentions across every output surface."""
 
-        metadata = {
-            (str(row.SrcEntity), str(row.TgtEntity)): (
-                str(row.Relation),
-                float(row.relation_confidence),
-            )
-            for row in frame.itertuples(index=False)
+        def plain(value: Any) -> Any:
+            if isinstance(value, np.generic):
+                return value.item()
+            if isinstance(value, Mapping):
+                return {
+                    str(key): plain(item)
+                    for key, item in sorted(value.items(), key=lambda pair: str(pair[0]))
+                }
+            if isinstance(value, (list, tuple)):
+                return [plain(item) for item in value]
+            return value
+
+        def optional(row: Mapping[str, Any], name: str) -> Any:
+            if name not in row:
+                return None
+            value = plain(row[name])
+            if value is None:
+                return None
+            try:
+                missing = pd.isna(value)
+                if isinstance(missing, (bool, np.bool_)) and bool(missing):
+                    return None
+            except (TypeError, ValueError):
+                pass
+            return value
+
+        original_keys = {(str(mapping.head), str(mapping.tail)) for mapping in preds}
+        semantic_mode = str(relation_prediction).strip().lower() in {
+            "semantic_entailment",
+            "semantic_then_learned",
         }
+        configured_backend = str(relation_semantic_backend) if semantic_mode else None
+        metadata: Dict[Tuple[str, str], Dict[str, Any]] = {}
+        for row in frame.to_dict(orient="records"):
+            key = (str(row.get("SrcEntity")), str(row.get("TgtEntity")))
+            relation = optional(row, "Relation")
+            confidence = optional(row, "relation_confidence")
+            if relation is None or confidence is None:
+                raise ValueError(f"Relation typer returned incomplete metadata for pair {key!r}")
+            item: Dict[str, Any] = {
+                "relation": str(relation),
+                "relation_confidence": float(confidence),
+            }
+            backend = optional(row, "relation_semantic_backend") or configured_backend
+            evidence = optional(row, "relation_evidence")
+            if backend is not None:
+                item["relation_semantic_backend"] = str(backend)
+            if evidence is not None:
+                item["relation_evidence"] = evidence
+            metadata[key] = item
+
+        unknown_typed = sorted(set(metadata).difference(original_keys))
+        if unknown_typed:
+            raise ValueError(
+                f"Relation typer returned pairs absent from the accepted input: {unknown_typed}"
+            )
+
+        abstentions: Dict[Tuple[str, str], Dict[str, Any]] = {}
+        raw_abstentions = frame.attrs.get("relation_abstentions") or []
+        if not isinstance(raw_abstentions, (list, tuple)):
+            raise ValueError("relation_abstentions must be a sequence of pair records")
+        normalized_abstentions = [
+            plain(entry) for entry in raw_abstentions if isinstance(entry, Mapping)
+        ]
+        normalized_abstentions.sort(
+            key=lambda entry: (
+                str(entry.get("source", "")),
+                str(entry.get("target", "")),
+                json.dumps(entry, sort_keys=True, separators=(",", ":"), default=str),
+            )
+        )
+        for entry in normalized_abstentions:
+            source = entry.get("source")
+            target = entry.get("target")
+            if source is None or target is None:
+                continue
+            key = (str(source), str(target))
+            if key in abstentions:
+                raise ValueError(
+                    f"Relation typer returned duplicate abstention metadata for {key!r}"
+                )
+            abstentions[key] = {
+                str(name): value
+                for name, value in entry.items()
+                if name not in {"source", "target"}
+            }
+
+        conflicting = sorted(set(metadata).intersection(abstentions))
+        if conflicting:
+            raise ValueError(f"Relation typer both accepted and abstained pairs: {conflicting}")
+
+        updates: Dict[Tuple[str, str], Dict[str, Any]] = {}
+        for key in sorted(original_keys):
+            accepted = metadata.get(key)
+            if accepted is not None:
+                prediction = {
+                    "relation": accepted["relation"],
+                    "relation_abstained": False,
+                    "saved_alignment_member": True,
+                }
+                updates[key] = {
+                    **accepted,
+                    "relation_abstained": False,
+                    "confidences": {"relation_confidence": accepted["relation_confidence"]},
+                    "prediction": prediction,
+                }
+                continue
+
+            payload = dict(abstentions.get(key) or {})
+            reason = str(payload.get("reason") or "relation_typer_abstained")
+            payload["reason"] = reason
+            backend = (
+                payload.get("relation_semantic_backend")
+                or payload.get("backend")
+                or configured_backend
+            )
+            evidence = payload.get("relation_evidence", payload.get("evidence"))
+            update: Dict[str, Any] = {
+                "relation": None,
+                "relation_confidence": None,
+                "relation_abstained": True,
+                "relation_abstention": payload,
+                "relation_abstention_reason": reason,
+                "confidences": {"relation_confidence": None},
+                "prediction": {
+                    "relation": None,
+                    "relation_abstained": True,
+                    "saved_alignment_member": False,
+                    "rationale_positive": False,
+                    "rationale_decision_label": "No match",
+                },
+            }
+            if backend is not None:
+                update["relation_semantic_backend"] = str(backend)
+            if evidence is not None:
+                update["relation_evidence"] = evidence
+            updates[key] = update
+
+        kept: List[EntityMapping] = []
         for mapping in preds:
-            relation = metadata.get((mapping.head, mapping.tail))
-            if relation is not None:
-                mapping.relation = relation[0]
+            key = (str(mapping.head), str(mapping.tail))
+            accepted = metadata.get(key)
+            if accepted is None:
+                continue
+            mapping.relation = str(accepted["relation"])
+            kept.append(mapping)
+        preds[:] = kept
 
         for record in self.results_json:
             key = (str(record.get("src_iri")), str(record.get("tgt_iri")))
-            relation = metadata.get(key)
-            if relation is None:
+            update = updates.get(key)
+            if update is None:
                 continue
-            symbol, confidence = relation
-            record["relation"] = symbol
-            record["relation_confidence"] = confidence
-            confidences = dict(record.get("confidences") or {})
-            confidences["relation_confidence"] = confidence
-            record["confidences"] = confidences
-            prediction = dict(record.get("prediction") or {})
-            prediction["relation"] = symbol
-            record["prediction"] = prediction
+            for name, value in update.items():
+                if name in {"confidences", "prediction"}:
+                    section = dict(record.get(name) or {})
+                    section.update(value)
+                    record[name] = section
+                else:
+                    record[name] = value
 
         results_df = self.results_df
         if results_df is not None and not results_df.empty:
             source_column = "src_iri" if "src_iri" in results_df.columns else "Src"
             target_column = "tgt_iri" if "tgt_iri" in results_df.columns else "Tgt"
             if source_column in results_df.columns and target_column in results_df.columns:
-                values = [
-                    metadata.get((str(src), str(tgt)), (None, None))
-                    for src, tgt in zip(results_df[source_column], results_df[target_column])
-                ]
-                results_df["Relation"] = [value[0] for value in values]
-                results_df["relation_confidence"] = [value[1] for value in values]
+                if "saved_alignment_member" not in results_df.columns:
+                    results_df["saved_alignment_member"] = False
+                if "relation_abstained" not in results_df.columns:
+                    results_df["relation_abstained"] = False
+                for index, row in results_df.iterrows():
+                    key = (str(row[source_column]), str(row[target_column]))
+                    update = updates.get(key)
+                    if update is None:
+                        continue
+                    prediction = update["prediction"]
+                    flat = {
+                        "Relation": update.get("relation"),
+                        "relation_confidence": update.get("relation_confidence"),
+                        "relation_semantic_backend": update.get("relation_semantic_backend"),
+                        "relation_evidence": update.get("relation_evidence"),
+                        "relation_abstained": update["relation_abstained"],
+                        "relation_abstention_reason": update.get("relation_abstention_reason"),
+                        "relation_abstention": (
+                            json.dumps(
+                                update["relation_abstention"],
+                                sort_keys=True,
+                                separators=(",", ":"),
+                                default=str,
+                            )
+                            if "relation_abstention" in update
+                            else None
+                        ),
+                        "saved_alignment_member": prediction["saved_alignment_member"],
+                    }
+                    if "rationale_positive" in prediction:
+                        flat["rationale_positive"] = prediction["rationale_positive"]
+                        flat["rationale_decision_label"] = prediction["rationale_decision_label"]
+                    for name, value in flat.items():
+                        results_df.at[index, name] = value
 
         store = getattr(self, "_explanation_store", None)
-        if store is not None and metadata:
+        if store is not None and updates:
             store.append_overlay(
                 {
                     "Src": source,
                     "Tgt": target,
-                    "relation": relation,
-                    "relation_confidence": confidence,
-                    "confidences": {"relation_confidence": confidence},
-                    "prediction": {"relation": relation},
+                    **update,
                 }
-                for (source, target), (relation, confidence) in metadata.items()
+                for (source, target), update in sorted(updates.items())
             )
 
     def _save_alignment_formats(
@@ -509,6 +701,12 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
         candidates_one2many_path: Optional[Path],
         output_formats: Optional[List[str]],
         relation_prediction: str,
+        relation_anchors: Any,
+        relation_semantic_backend: str,
+        relation_equivalence_anchor_threshold: float,
+        relation_equivalence_anchor_margin: float,
+        relation_confidence_threshold: float,
+        relation_reasoning_timeout_seconds: float,
         source_uri: Optional[str],
         target_uri: Optional[str],
         paper_audit: bool,
@@ -518,7 +716,16 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
         formats = ["tsv-global", "tsv-local"] if output_formats is None else list(output_formats)
         if not formats:
             raise ValueError("At least one alignment output format must be configured")
-        scored = self._scored_alignment_frame(preds, relation_prediction=relation_prediction)
+        scored = self._scored_alignment_frame(
+            preds,
+            relation_prediction=relation_prediction,
+            relation_anchors=relation_anchors,
+            relation_semantic_backend=relation_semantic_backend,
+            relation_equivalence_anchor_threshold=relation_equivalence_anchor_threshold,
+            relation_equivalence_anchor_margin=relation_equivalence_anchor_margin,
+            relation_confidence_threshold=relation_confidence_threshold,
+            relation_reasoning_timeout_seconds=relation_reasoning_timeout_seconds,
+        )
         local_frame: Optional[pd.DataFrame] = None
         is_local = candidates_one2many_path is not None
         if candidates_one2many_path is not None:
@@ -660,6 +867,12 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
                 "src_iri": rec.get("src_iri"),
                 "tgt_iri": rec.get("tgt_iri"),
             }
+            src_kind = rec.get("src_kind", rec.get("kind"))
+            tgt_kind = rec.get("tgt_kind", src_kind)
+            if src_kind is not None:
+                base["src_kind"] = self._entity_kind_value(src_kind)
+            if tgt_kind is not None:
+                base["tgt_kind"] = self._entity_kind_value(tgt_kind)
             pred = rec.get("prediction") or {}
             if "ground_truth" in pred:
                 base["ground_truth"] = pred.get("ground_truth")

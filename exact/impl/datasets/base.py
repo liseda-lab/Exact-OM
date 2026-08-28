@@ -62,6 +62,43 @@ _DATASET_CACHE_SCHEMA_VERSION = 4
 _ONTOLOGY_BACKEND_VERSION = 5
 
 
+def _sentence_transformer_resolved_revision(
+    model: Any, requested_revision: Optional[str]
+) -> Optional[str]:
+    """Return the concrete HF revision exposed by a loaded sentence encoder."""
+
+    candidates: List[Any] = [model]
+    first_module = getattr(model, "_first_module", None)
+    if callable(first_module):
+        try:
+            candidates.append(first_module())
+        except (AttributeError, KeyError, TypeError):
+            pass
+    index = 0
+    seen: set[int] = set()
+    while index < len(candidates):
+        component = candidates[index]
+        index += 1
+        if component is None or id(component) in seen:
+            continue
+        seen.add(id(component))
+        auto_model = getattr(component, "auto_model", None)
+        if auto_model is not None:
+            candidates.append(auto_model)
+        config = getattr(component, "config", None)
+        if config is not None:
+            candidates.append(config)
+
+    for component in candidates:
+        if component is None:
+            continue
+        for field in ("resolved_revision", "_commit_hash", "revision"):
+            value = getattr(component, field, None)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+    return requested_revision
+
+
 class BaseAlignmentDataset(IDataset):
     def __init__(
         self,
@@ -143,6 +180,21 @@ class BaseAlignmentDataset(IDataset):
         self._candidate_pool_manifest_path = self.output_path / "candidate_pool_manifest.json"
         self._active_candidate_config: Dict[str, Any] = {}
         self._retrieval_artifacts: Dict[str, LocalRetrievalArtifact] = {}
+        self._candidate_data_lock_binding = self._candidate_provenance_binding(
+            kwargs.get("candidate_data_lock"),
+            label="candidate_data_lock",
+            require_sha256=True,
+        )
+        self._candidate_spec_lock_binding = self._candidate_provenance_binding(
+            kwargs.get("candidate_spec_lock"),
+            label="candidate_spec_lock",
+            require_sha256=True,
+        )
+        self._candidate_model_lock_binding = self._candidate_provenance_binding(
+            kwargs.get("candidate_model_lock"),
+            label="candidate_model_lock",
+            require_sha256=False,
+        )
         self._source_restriction_active = False
 
         super().__init__(logger=kwargs.get("logger"))
@@ -271,6 +323,36 @@ class BaseAlignmentDataset(IDataset):
 
         value = self.candidate_pool_manifest.get("fingerprint")
         return str(value) if isinstance(value, str) and value else None
+
+    def bind_candidate_provenance(
+        self,
+        *,
+        data_lock: Any = None,
+        spec_lock: Any = None,
+        model_lock: Any = None,
+    ) -> None:
+        """Bind immutable data/model identities before candidates are loaded."""
+
+        if self._candidates_generated or self._candidates is not None:
+            raise RuntimeError("candidate provenance must be bound before candidates are loaded")
+        if data_lock is not None:
+            self._candidate_data_lock_binding = self._candidate_provenance_binding(
+                data_lock,
+                label="candidate_data_lock",
+                require_sha256=True,
+            )
+        if spec_lock is not None:
+            self._candidate_spec_lock_binding = self._candidate_provenance_binding(
+                spec_lock,
+                label="candidate_spec_lock",
+                require_sha256=True,
+            )
+        if model_lock is not None:
+            self._candidate_model_lock_binding = self._candidate_provenance_binding(
+                model_lock,
+                label="candidate_model_lock",
+                require_sha256=False,
+            )
 
     def _persisted_candidate_pool_fingerprint(self) -> Optional[str]:
         if not self._candidate_pool_manifest_path.is_file():
@@ -684,7 +766,7 @@ class BaseAlignmentDataset(IDataset):
         return self._dataset_signature
 
     def _cache_fingerprint_payload(self) -> Dict[str, Any]:
-        return {
+        payload = {
             "component": self.__class__.__name__,
             "dataset_signature": self.dataset_signature,
             "filter_exact_matches": self.filter_exact_matches,
@@ -714,11 +796,20 @@ class BaseAlignmentDataset(IDataset):
             "reasoner": self._reasoner_name,
             "reasoner_identity": reasoner_cache_identity(self._reasoner_name),
         }
+        if self._candidate_data_lock_binding is not None:
+            payload["candidate_data_lock"] = self._candidate_data_lock_binding
+        if self._candidate_spec_lock_binding is not None:
+            payload["candidate_spec_lock"] = self._candidate_spec_lock_binding
+        if self._candidate_model_lock_binding is not None:
+            payload["candidate_model_lock"] = self._candidate_model_lock_binding
+        return payload
 
     def _configured_retrieval_artifacts(self) -> Dict[str, LocalRetrievalArtifact]:
         """Resolve enabled fitted models locally and bind cache identity to their bytes."""
 
         if self._retrieval_artifacts:
+            for artifact in self._retrieval_artifacts.values():
+                artifact.assert_unchanged()
             return dict(self._retrieval_artifacts)
 
         finetune = mapping_options(
@@ -741,6 +832,8 @@ class BaseAlignmentDataset(IDataset):
                 cross_encoder.get("artifact"),
                 expected_kind="cross_encoder",
             )
+        for artifact in self._retrieval_artifacts.values():
+            artifact.assert_unchanged()
         return dict(self._retrieval_artifacts)
 
     @property
@@ -766,6 +859,11 @@ class BaseAlignmentDataset(IDataset):
             "candidate_pool_fingerprint": self.candidate_pool_fingerprint,
             "dataset_signature": self.dataset_signature,
             "component": self.__class__.__name__,
+            "candidate_encoder": {
+                "identifier": self._active_candidate_config.get("lexical_encoder_name"),
+                "requested_revision": self._active_candidate_config.get("encoder_revision"),
+                "resolved_revision": self._active_candidate_config.get("encoder_resolved_revision"),
+            },
         }
         self._cache_meta_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
         self._cache_state = "cold"
@@ -775,6 +873,7 @@ class BaseAlignmentDataset(IDataset):
         file_path: Optional[Path] = None,
         top_k: Optional[int] = 100,
         lexical_encoder_name: Optional[str] = "sentence-transformers/all-MiniLM-L6-v2",
+        encoder_revision: Optional[str] = None,
         encode_batch_size: Optional[int] = 512,
         search_batch_size: Optional[int] = 4096,
         use_amp: Optional[bool] = True,
@@ -871,6 +970,7 @@ class BaseAlignmentDataset(IDataset):
             self.generate_candidates(
                 top_k=top_k,
                 lexical_encoder_name=lexical_encoder_name,
+                encoder_revision=encoder_revision,
                 encode_batch_size=encode_batch_size,
                 search_batch_size=search_batch_size,
                 use_amp=use_amp,
@@ -888,6 +988,7 @@ class BaseAlignmentDataset(IDataset):
         self,
         top_k: int = 100,
         lexical_encoder_name: str = "sentence-transformers/all-MiniLM-L6-v2",
+        encoder_revision: Optional[str] = None,
         encode_batch_size: int = 512,
         search_batch_size: int = 4096,
         use_amp: bool = True,
@@ -932,6 +1033,7 @@ class BaseAlignmentDataset(IDataset):
             {
                 "retrieval_strategy": strategy,
                 "lexical_encoder_name": lexical_encoder_name,
+                "encoder_revision": encoder_revision,
                 "encode_batch_size": int(encode_batch_size),
                 "search_batch_size": int(search_batch_size),
                 "top_k": int(top_k),
@@ -943,6 +1045,7 @@ class BaseAlignmentDataset(IDataset):
             for key in (
                 "retrieval_strategy",
                 "lexical_encoder_name",
+                "encoder_revision",
                 "encode_batch_size",
                 "search_batch_size",
                 "top_k",
@@ -1067,7 +1170,12 @@ class BaseAlignmentDataset(IDataset):
             self._refresh_candidate_pool_manifest(origin="generated")
             return
 
-        st = SentenceTransformer(str(encoder_name), device=str(dev))
+        encoder_revision_kwargs = (
+            {"revision": encoder_revision} if encoder_revision is not None else {}
+        )
+        st = SentenceTransformer(str(encoder_name), device=str(dev), **encoder_revision_kwargs)
+        resolved_encoder_revision = _sentence_transformer_resolved_revision(st, encoder_revision)
+        self._active_candidate_config["encoder_resolved_revision"] = resolved_encoder_revision
         cross_encoder_model = None
         if cross_encoder_mode == "on":
             if CrossEncoder is None:
@@ -1457,6 +1565,8 @@ class BaseAlignmentDataset(IDataset):
         encoder_identifier = self._active_candidate_config.get("lexical_encoder_name")
         encoder_record: Dict[str, Any] = {
             "identifier": str(encoder_identifier) if encoder_identifier is not None else None,
+            "requested_revision": self._active_candidate_config.get("encoder_revision"),
+            "resolved_revision": self._active_candidate_config.get("encoder_resolved_revision"),
             "identifier_sha256": (
                 hashlib.sha256(str(encoder_identifier).encode("utf-8")).hexdigest()
                 if encoder_identifier is not None
@@ -1465,12 +1575,16 @@ class BaseAlignmentDataset(IDataset):
         }
         if "encoder" in artifacts:
             encoder_record["artifact"] = artifacts["encoder"].provenance()
+        if self._candidate_model_lock_binding is not None:
+            encoder_record["model_lock"] = deepcopy(self._candidate_model_lock_binding)
 
         inputs: Dict[str, Any] = {
             "source": self._candidate_input_provenance(self._source_path),
             "target": self._candidate_input_provenance(self._target_path),
-            "data_lock": None,
+            "data_lock": deepcopy(self._candidate_data_lock_binding),
         }
+        if self._candidate_spec_lock_binding is not None:
+            inputs["spec_lock"] = deepcopy(self._candidate_spec_lock_binding)
         if candidate_file is not None:
             inputs["candidate_file"] = self._candidate_input_provenance(candidate_file)
 
@@ -1532,6 +1646,8 @@ class BaseAlignmentDataset(IDataset):
             },
             "per_kind": per_kind,
         }
+        if self._candidate_model_lock_binding is not None:
+            fingerprint_basis["model_lock"] = self._candidate_model_lock_binding
         canonical = json.dumps(
             self._json_safe(fingerprint_basis),
             sort_keys=True,
@@ -1655,6 +1771,50 @@ class BaseAlignmentDataset(IDataset):
             "bytes": None,
             "rows": None,
         }
+
+    @classmethod
+    def _candidate_provenance_binding(
+        cls,
+        value: Any,
+        *,
+        label: str,
+        require_sha256: bool,
+    ) -> Optional[Dict[str, Any]]:
+        if value is None:
+            return None
+        if isinstance(value, (str, Path)):
+            text = str(value).strip()
+            if not text:
+                return None
+            if len(text) == 64 and all(char in "0123456789abcdefABCDEF" for char in text):
+                return {"sha256": text.lower()}
+            path = Path(text).expanduser()
+            if path.is_file():
+                return file_provenance(path.resolve())
+            raise ValueError(
+                f"{label} must be an existing lock file, SHA-256 digest, or immutable mapping"
+            )
+        if not isinstance(value, Mapping):
+            raise TypeError(f"{label} must be a path, SHA-256 digest, or mapping")
+
+        binding = cls._json_safe(dict(value))
+        sha = str(binding.get("sha256", binding.get("fingerprint", "")) or "").lower()
+        valid_sha = len(sha) == 64 and all(char in "0123456789abcdef" for char in sha)
+        if require_sha256:
+            if not valid_sha:
+                raise ValueError(f"{label} must declare an immutable SHA-256 digest")
+            return binding
+
+        revision = str(binding.get("revision", "") or "").lower()
+        identifier = str(binding.get("identifier", binding.get("model_id", "")) or "").strip()
+        immutable_revision = len(revision) in {40, 64} and all(
+            char in "0123456789abcdef" for char in revision
+        )
+        if not valid_sha and not (identifier and immutable_revision):
+            raise ValueError(
+                f"{label} must declare sha256 or identifier/model_id plus an immutable commit"
+            )
+        return binding
 
     @classmethod
     def _json_safe(cls, value: Any) -> Any:

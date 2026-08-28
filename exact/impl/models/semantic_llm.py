@@ -11,6 +11,11 @@ from torch import nn  # noqa: F401
 from transformers import AutoTokenizer  # noqa: F401
 
 from exact.impl.models.selector.listwise_llm import (
+    LISTWISE_NONE_KEY,
+    ListwiseAggregate,
+    ListwiseCallPlan,
+    aggregate_listwise_call_probabilities,
+    build_listwise_call_plan,
     build_listwise_decision_prompt,
     categorical_probabilities_from_logprobs,
     listwise_labels,
@@ -59,16 +64,24 @@ class SemanticLLMMixin:
             raise ValueError(
                 f"OpenRouter decision profile '{profile.name}' must define a tokenizer for hosted decision biasing."
             )
-        cached = self._hosted_decision_tokenizers.get(tokenizer_name)
+        tokenizer_revision = getattr(profile, "tokenizer_revision", None)
+        cache_key = (tokenizer_name, tokenizer_revision)
+        cached = self._hosted_decision_tokenizers.get(cache_key)
         if cached is not None:
             return cached
+        tokenizer_identity = (
+            f"{tokenizer_name}@{tokenizer_revision}"
+            if tokenizer_revision is not None
+            else tokenizer_name
+        )
         self._log_once(
-            f"hosted_decision_tokenizer_load:{tokenizer_name}",
-            f"Loading hosted decision tokenizer '{tokenizer_name}' for profile '{profile.name}'.",
+            f"hosted_decision_tokenizer_load:{tokenizer_identity}",
+            f"Loading hosted decision tokenizer '{tokenizer_identity}' for profile '{profile.name}'.",
             "debug",
         )
-        tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
-        self._hosted_decision_tokenizers[tokenizer_name] = tokenizer
+        revision_kwargs = {"revision": tokenizer_revision} if tokenizer_revision is not None else {}
+        tokenizer = AutoTokenizer.from_pretrained(tokenizer_name, **revision_kwargs)
+        self._hosted_decision_tokenizers[cache_key] = tokenizer
         return tokenizer
 
     def _hosted_decision_label_ids(self, profile) -> Dict[str, List[int]]:
@@ -1507,7 +1520,12 @@ class SemanticLLMMixin:
 
 
 __all__ = [
+    "LISTWISE_NONE_KEY",
+    "ListwiseAggregate",
+    "ListwiseCallPlan",
     "SemanticLLMMixin",
+    "aggregate_listwise_call_probabilities",
+    "build_listwise_call_plan",
     "build_listwise_decision_prompt",
     "categorical_probabilities_from_logprobs",
     "listwise_labels",

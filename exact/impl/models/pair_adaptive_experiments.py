@@ -240,7 +240,17 @@ class JsonExperimentArtifact:
                 f"expected {expected!r}, got {dataset_signature!r}"
             )
 
+    def require_fields(self, *names: str, kind: str = "artifact") -> None:
+        """Fail closed when scientific artifact provenance is incomplete."""
+
+        missing = [name for name in names if self.payload.get(name) in (None, "", [], {})]
+        if missing:
+            raise ValueError(
+                f"{kind} artifact {self.path} is missing required field(s): {', '.join(missing)}"
+            )
+
     def scoped_payload(self, field: str, *, scope_key: str) -> Mapping[str, Any]:
+
         value = self.payload.get(field)
         if not isinstance(value, Mapping):
             raise ValueError(f"artifact {self.path} must contain object field {field!r}")
