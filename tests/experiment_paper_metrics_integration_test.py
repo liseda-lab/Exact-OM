@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 import json
 from pathlib import Path
 from typing import Any
@@ -91,6 +92,18 @@ def _mapping(*, typed: bool = False, holm: bool = False) -> dict[str, Any]:
             "independent_unit": "source_entity",
             "power_status": "descriptive",
             "assumptions": ["synthetic"],
+            "power_slices": [
+                {
+                    "id": f"{task}-class-equivalence",
+                    "task": task,
+                    "entity_kind": "class",
+                    "relation": "equivalence",
+                    "status": "descriptive",
+                    "hypothesized_effect": 0.0,
+                    "assumptions": ["synthetic fixture"],
+                }
+                for task in ("task-1", "task-2")
+            ],
             "required_slices": (["task", "entity_kind", "relation"] if typed else ["task"]),
             "multiplicity": "holm" if holm else "none",
         },
@@ -109,6 +122,12 @@ def _suite(tmp_path: Path, *, typed: bool = False, holm: bool = False) -> Loaded
         suite_hash="suite-sha",
         dataset_lock=None,
         dataset_lock_hash=None,
+        specification={
+            "path": str((tmp_path / "specs" / "experiments").resolve()),
+            "sha256": "a" * 64,
+            "files": 1,
+            "algorithm": "sha256-length-prefixed-v1",
+        },
     )
 
 
@@ -291,6 +310,71 @@ def test_e05_pool_treatments_may_differ_but_each_arm_is_seed_stable() -> None:
     assert error is not None
 
 
+def test_fixed_retrieval_compares_arms_within_each_task_seed() -> None:
+    cells = {
+        "baseline": {
+            ("task", 1): {"candidate_pool_fingerprint": "seed-1"},
+            ("task", 2): {"candidate_pool_fingerprint": "seed-2"},
+        },
+        "candidate": {
+            ("task", 1): {"candidate_pool_fingerprint": "seed-1"},
+            ("task", 2): {"candidate_pool_fingerprint": "seed-2"},
+        },
+    }
+
+    status, _fingerprints, error = _candidate_pool_guard("E18", cells)
+    assert status == "matched_fixed_retrieval"
+    assert error is None
+
+    cells["candidate"][("task", 2)] = {"candidate_pool_fingerprint": "wrong"}
+    status, _fingerprints, error = _candidate_pool_guard("E18", cells)
+    assert status == "candidate_pool_mismatch"
+    assert "seed-2" in str(error)
+
+
+def test_e20_allows_seed_specific_retrieval_treatment_pools() -> None:
+    cells = {
+        "zero_shot": {
+            ("task", 1): {"candidate_pool_fingerprint": "zero-1"},
+            ("task", 2): {"candidate_pool_fingerprint": "zero-2"},
+        },
+        "finetuned": {
+            ("task", 1): {"candidate_pool_fingerprint": "trained-1"},
+            ("task", 2): {"candidate_pool_fingerprint": "trained-2"},
+        },
+    }
+
+    status, _fingerprints, error = _candidate_pool_guard("E20", cells)
+    assert status == "allowed_retrieval_treatment"
+    assert error is None
+
+
+def test_e17_retrieval_treatment_requires_distinct_design_provenance() -> None:
+    cells = {
+        "rolling": {
+            ("task", 1): {
+                "candidate_pool_fingerprint": "rolling-pool",
+                "candidate_pool_design_hash": "rolling-design",
+            }
+        },
+        "stack_all": {
+            ("task", 1): {
+                "candidate_pool_fingerprint": "stack-pool",
+                "candidate_pool_design_hash": "stack-design",
+            }
+        },
+    }
+
+    status, _fingerprints, error = _candidate_pool_guard("E17", cells)
+    assert status == "allowed_retrieval_treatment"
+    assert error is None
+
+    cells["stack_all"][("task", 1)]["candidate_pool_design_hash"] = "rolling-design"
+    status, _fingerprints, error = _candidate_pool_guard("E17", cells)
+    assert status == "unbound_retrieval_treatment_change"
+    assert error is not None
+
+
 def test_explicit_enriched_artifacts_emit_typed_rows_and_legacy_records_unavailability(
     tmp_path: Path,
 ) -> None:
@@ -298,22 +382,25 @@ def test_explicit_enriched_artifacts_emit_typed_rows_and_legacy_records_unavaila
     typed_records, _references = _records(tmp_path / "typed", typed=True)
     typed_rows = _paired_bootstrap_rows(suite, typed_records, stage="confirm", resamples=50, seed=4)
 
-    assert len(typed_rows) == 2
-    typed = next(row for row in typed_rows if row["endpoint_scope"] == "typed_kind_relation")
-    assert typed["status"] == "complete"
-    assert typed["entity_kind"] == "class"
-    assert typed["relation"] == "equivalence"
-    assert typed["delta"] == pytest.approx(1.0)
+    assert len(typed_rows) == 3
+    typed = [row for row in typed_rows if row["endpoint_scope"] == "typed_kind_relation"]
+    assert {row["task_id"] for row in typed} == {"task-1", "task-2"}
+    assert all(row["status"] == "complete" for row in typed)
+    assert all(row["entity_kind"] == "class" for row in typed)
+    assert all(row["relation"] == "equivalence" for row in typed)
+    assert all(row["delta"] == pytest.approx(1.0) for row in typed)
+    assert all(row["power_slice_id"].endswith("-class-equivalence") for row in typed)
 
     legacy_records, _references = _records(tmp_path / "legacy", typed=False)
     legacy_rows = _paired_bootstrap_rows(
         suite, legacy_records, stage="confirm", resamples=10, seed=4
     )
-    typed_unavailable = next(
+    typed_unavailable = [
         row for row in legacy_rows if row["endpoint_scope"] == "typed_kind_relation"
-    )
-    assert typed_unavailable["status"] == "unavailable"
-    assert typed_unavailable["reason_code"] == "typed_artifact_unavailable"
+    ]
+    assert len(typed_unavailable) == 2
+    assert all(row["status"] == "unavailable" for row in typed_unavailable)
+    assert all(row["reason_code"] == "typed_artifact_unavailable" for row in typed_unavailable)
 
 
 def test_holm_is_applied_to_complete_confirmatory_rows_by_experiment(tmp_path: Path) -> None:
@@ -344,7 +431,23 @@ def test_aggregate_persists_metric_error_before_success_validation_fails(
         "seed": 1,
         "stage": "confirm",
         "status": "complete",
-        "fingerprint_payload": {"output_dir": str(run)},
+        "fingerprint_payload": {"output_dir": str(run), "llm_required": False},
+        "candidate_recall": 0.9,
+        "candidate_recall_after_exact": 0.95,
+        "candidate_recall_diagnostics": {"status": "available", "counts": {"hits": 9}},
+        "mean_pool_size": 20.0,
+        "gold_rank_p90": 3.0,
+        "gold_rank_median": 2.0,
+        "coverage": 0.8,
+        "abstention_rate": 0.2,
+        "metric_applicability": {"ranking": True},
+        "explanation_reconstruction": {
+            "status": "complete",
+            "result_rows": 2,
+            "reconstructed_rows": 2,
+            "max_abs_error": 0.0,
+        },
+        "selection_evidence": {"schema_version": 1, "comparisons": []},
     }
 
     rows = aggregate_stage(
@@ -360,6 +463,21 @@ def test_aggregate_persists_metric_error_before_success_validation_fails(
     aggregate = tmp_path / "results" / suite.suite_id / "confirm" / "metrics.json"
     persisted = json.loads(aggregate.read_text(encoding="utf-8"))["rows"][0]
     assert persisted["metric_error"]["type"] == "ValueError"
+    csv_path = tmp_path / "results" / suite.suite_id / "confirm" / "metrics.csv"
+    with csv_path.open(encoding="utf-8", newline="") as stream:
+        csv_row = next(csv.DictReader(stream))
+    assert csv_row["llm_required"] == "False"
+    assert csv_row["candidate_recall"] == "0.9"
+    assert csv_row["candidate_recall_after_exact"] == "0.95"
+    assert json.loads(csv_row["candidate_recall_diagnostics"])["status"] == "available"
+    assert csv_row["mean_pool_size"] == "20.0"
+    assert csv_row["gold_rank_p90"] == "3.0"
+    assert csv_row["gold_rank_median"] == "2.0"
+    assert csv_row["coverage"] == "0.8"
+    assert csv_row["abstention_rate"] == "0.2"
+    assert json.loads(csv_row["metric_applicability"]) == {"ranking": True}
+    assert json.loads(csv_row["explanation_reconstruction"])["status"] == "complete"
+    assert json.loads(csv_row["selection_evidence"])["schema_version"] == 1
     with pytest.raises(ValueError, match="metric extraction errors"):
         _require_successful_cells([manifest], stage="confirm")
 

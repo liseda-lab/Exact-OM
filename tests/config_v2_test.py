@@ -109,6 +109,28 @@ def test_matching_entity_kinds_are_validated_and_deduplicated() -> None:
         )
 
 
+def test_relation_reasoning_timeout_is_positive_and_bounded() -> None:
+    config = ConfigModel.model_validate({"matching": {"relation_reasoning_timeout_seconds": 60.0}})
+    assert config.matching.relation_reasoning_timeout_seconds == 60.0
+
+    for invalid in (0.0, -1.0, 3600.01, float("inf")):
+        with pytest.raises(ValueError, match="relation_reasoning_timeout_seconds"):
+            ConfigModel.model_validate(
+                {"matching": {"relation_reasoning_timeout_seconds": invalid}}
+            )
+
+
+def test_relation_equivalence_anchor_margin_is_bounded() -> None:
+    config = ConfigModel.model_validate({"matching": {"relation_equivalence_anchor_margin": 0.10}})
+    assert config.matching.relation_equivalence_anchor_margin == 0.10
+
+    for invalid in (-0.01, 1.01, float("inf")):
+        with pytest.raises(ValueError, match="relation_equivalence_anchor_margin"):
+            ConfigModel.model_validate(
+                {"matching": {"relation_equivalence_anchor_margin": invalid}}
+            )
+
+
 def test_second_pass_and_removed_reasoner_controls_are_reported() -> None:
     migrated, report = migrate_v1_mapping(
         {

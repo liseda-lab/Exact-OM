@@ -11,7 +11,10 @@ import torch
 from exact.core.entities.kinds import EntityKind
 from exact.impl.datasets import base as base_module
 from exact.impl.datasets.base import BaseAlignmentDataset
-from exact.impl.retrieval import resolve_local_retrieval_artifact
+from exact.impl.retrieval import (
+    resolve_local_retrieval_artifact,
+    retrieval_artifact_requirement,
+)
 from exact.utils.candidate_generation import (
     adaptive_candidate_count,
     rank_channel_scores,
@@ -90,7 +93,13 @@ def _artifact(
         "seed": 7,
     }
     if kind == "contrastive_encoder":
-        payload["mining"] = {"kind": "fixture"}
+        payload["mining"] = {
+            "candidate_pool_fingerprint": "b" * 64,
+            "top_k": 50,
+            "max_negatives_per_source": 5,
+            "max_training_pairs": 100_000,
+            "exclude_known_positives": True,
+        }
     (root / "retrieval_artifact.json").write_text(
         json.dumps(payload),
         encoding="utf-8",
@@ -245,6 +254,63 @@ def test_fitted_retrieval_artifacts_are_local_self_describing_and_hashed(
         )
 
 
+def test_retrieval_artifact_preflight_distinguishes_absent_and_invalid_bindings(
+    tmp_path: Path,
+) -> None:
+    missing = retrieval_artifact_requirement(
+        None,
+        expected_kind="contrastive_encoder",
+        expected_dataset_identity="bioml/ncit-doid",
+    )
+    assert missing["status"] == "deferred_unavailable"
+    assert missing["code"] == "missing_fitted_retrieval_artifact"
+
+    root = _artifact(tmp_path / "encoder-bound", kind="contrastive_encoder")
+    manifest = root / "retrieval_artifact.json"
+    payload = json.loads(manifest.read_text(encoding="utf-8"))
+    payload["mining"]["candidate_pool_fingerprint"] = "b" * 64
+    manifest.write_text(json.dumps(payload), encoding="utf-8")
+
+    ready = retrieval_artifact_requirement(
+        root,
+        expected_kind="contrastive_encoder",
+        negative_policy="complete_reference",
+        expected_dataset_lock="a" * 64,
+        expected_candidate_pool_fingerprint="b" * 64,
+        expected_dataset_identity="bioml/ncit-doid",
+    )
+    assert ready["status"] == "ready"
+    assert ready["dataset_lock_sha256"] == "a" * 64
+    assert ready["candidate_pool_fingerprint"] == "b" * 64
+
+    mismatch = retrieval_artifact_requirement(
+        root,
+        expected_kind="contrastive_encoder",
+        expected_candidate_pool_fingerprint="c" * 64,
+    )
+    assert mismatch["status"] == "invalid"
+    assert mismatch["code"] == "candidate_pool_mismatch"
+
+
+def test_retrieval_artifact_rejects_reporting_training_rows_and_mutation(
+    tmp_path: Path,
+) -> None:
+    root = _artifact(tmp_path / "encoder-guarded", kind="contrastive_encoder")
+    manifest = root / "retrieval_artifact.json"
+    payload = json.loads(manifest.read_text(encoding="utf-8"))
+    payload["training_pairs"] = [{"task": "fixture", "split_role": "reporting"}]
+    manifest.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(ValueError, match="forbidden split role"):
+        resolve_local_retrieval_artifact(root, expected_kind="contrastive_encoder")
+
+    payload["training_pairs"] = [{"task": "fixture", "split_role": "development"}]
+    manifest.write_text(json.dumps(payload), encoding="utf-8")
+    artifact = resolve_local_retrieval_artifact(root, expected_kind="contrastive_encoder")
+    (root / "model" / "weights.bin").write_bytes(b"mutation after validation")
+    with pytest.raises(ValueError, match="changed after validation"):
+        artifact.assert_unchanged()
+
+
 def test_individual_multiview_uses_types_and_directional_relation_labels_only(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -307,6 +373,38 @@ def test_non_individual_multiview_does_not_change_pool_and_manifest_is_bound(
     assert inventory["target_entities"] == len(labels.target.entities(EntityKind.CLASS))
     assert manifest["gold_free_summary"]["candidate_pairs"] == len(labels.candidates)
     assert (labels.output_path / "candidate_pool_manifest.json").is_file()
+
+
+def test_candidate_pool_manifest_binds_data_and_model_locks(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    dataset = _dataset(tmp_path, monkeypatch, name="bound-pool")
+    dataset.bind_candidate_provenance(
+        data_lock="d" * 64,
+        spec_lock="c" * 64,
+        model_lock={
+            "identifier": "fixture/encoder",
+            "revision": "e" * 40,
+        },
+    )
+    dataset.generate_candidates(
+        top_k=2,
+        lexical_encoder_name="fixture/encoder",
+        retrieval_strategy="hybrid",
+        device=torch.device("cpu"),
+        use_amp=False,
+    )
+
+    manifest = dataset.candidate_pool_manifest
+    assert manifest["inputs"]["data_lock"]["sha256"] == "d" * 64
+    assert manifest["inputs"]["spec_lock"]["sha256"] == "c" * 64
+    assert manifest["models"]["encoder"]["model_lock"] == {
+        "identifier": "fixture/encoder",
+        "revision": "e" * 40,
+    }
+    with pytest.raises(RuntimeError, match="before candidates are loaded"):
+        dataset.bind_candidate_provenance(data_lock="f" * 64)
 
 
 def test_runtime_loads_fitted_encoder_and_cross_encoder_only_from_artifacts(

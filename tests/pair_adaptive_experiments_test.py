@@ -110,6 +110,12 @@ def test_lexical_quality_variants_are_explicit_and_non_degenerate(
     assert 0.0 < entropy_quality.item() < 1.0
     assert payloads[0]["mode"] == "entropy"
     assert payloads[0]["margin"] > payloads[0]["entropy"]
+    _, singleton_quality, _, singleton_payloads = entropy._score_label_channel(
+        [["exact"]], [["target"]]
+    )
+    assert singleton_quality.item() == pytest.approx(0.0)
+    assert singleton_payloads[0]["entropy_raw"] == pytest.approx(0.0)
+    assert singleton_payloads[0]["entropy_quality_defined"] is False
 
     constant = _scorer(lex={"enabled": True, "quality": "constant"})
     constant.use_lexical = True
@@ -176,6 +182,17 @@ def test_sigma_decomposition_modes_retain_inactivity_suppression(
         assert inactive.item() == pytest.approx(0.0)
 
 
+def test_fusion_llm_pivot_maps_to_scorer_tau_llm() -> None:
+    scorer = _scorer(
+        fusion_config={
+            "enabled": True,
+            "mode": "analytic_shipped",
+            "llm_pivot": 0.35,
+        }
+    )
+    assert scorer.tau_LLM == pytest.approx(0.35)
+
+
 def test_difference_formulations_and_empty_pool_diagnostics() -> None:
     src = [
         {"triple": ("s", "r1", "a"), "score": 1.0},
@@ -195,17 +212,20 @@ def test_difference_formulations_and_empty_pool_diagnostics() -> None:
 
     absolute = _scorer(diff={"enabled": True, "formulation": "absolute"})
     absolute.use_context = True
-    assert absolute._score_difference_channel(src, tgt, support)["score"] == pytest.approx(
-        1.0 - 1.0 / 2.0**0.5
-    )
+    absolute_payload = absolute._score_difference_channel(src, tgt, support)
+    assert absolute_payload["diff_absolute"] == pytest.approx(0.25)
+    assert absolute_payload["score"] == pytest.approx(0.75)
 
     asymmetric = _scorer(diff={"enabled": True, "formulation": "asymmetric"})
     asymmetric.use_context = True
     assert asymmetric._score_difference_channel(src, tgt, support)["score"] == pytest.approx(1.0)
 
     empty = absolute._score_difference_channel([], tgt, torch.zeros((0, 1)))
-    assert empty["quality"] == 0.0
+    assert empty["score"] == pytest.approx(0.5)
     assert empty["diff_pivot_reason"] == "empty_source"
+    both_empty = absolute._score_difference_channel([], [], torch.zeros((0, 0)))
+    assert both_empty["quality"] == 0.0
+    assert both_empty["diff_pivot_reason"] == "empty_both"
 
     off = _scorer(diff={"enabled": True, "formulation": "off"})
     off.use_context = True
@@ -215,7 +235,14 @@ def test_difference_formulations_and_empty_pool_diagnostics() -> None:
 def test_signed_identifier_attributes_can_contribute_below_pivot(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    scorer = _scorer(attr={"enabled": True, "polarity": "signed", "bank": "attrs_only"})
+    scorer = _scorer(
+        attr={
+            "enabled": True,
+            "polarity": "signed",
+            "bank": "attrs_only",
+            "signed_property_allowlist": ["urn:test:identifier"],
+        }
+    )
     scorer.use_context = True
     monkeypatch.setattr(
         scorer,
@@ -223,8 +250,26 @@ def test_signed_identifier_attributes_can_contribute_below_pivot(
         lambda left, right: torch.full((len(left), len(right)), 0.9),
     )
     payload = scorer._score_attribute_channel(
-        [{"prop": "identifier", "value": "A-1", "text": "identifier A-1"}],
-        [{"prop": "code", "value": "B-9", "text": "code B-9"}],
+        [
+            {
+                "prop": "identifier",
+                "prop_iri": "urn:test:identifier",
+                "identifier_namespace": "test",
+                "identifier_normalized": "A1",
+                "value": "A-1",
+                "text": "identifier A-1",
+            }
+        ],
+        [
+            {
+                "prop": "code",
+                "prop_iri": "urn:test:identifier",
+                "identifier_namespace": "test",
+                "identifier_normalized": "B9",
+                "value": "B-9",
+                "text": "code B-9",
+            }
+        ],
         ["source"],
         ["target"],
         {},
@@ -254,17 +299,45 @@ def test_hierarchy_overlap_uses_exact_anchors_and_reports_sibling_conflict() -> 
     assert sibling_conflict == pytest.approx(0.0)
 
 
-def test_gate_instrumentation_uses_frozen_threshold_without_batch_quantiles() -> None:
+def test_gate_instrumentation_uses_exact_fitted_quantile_pairs(tmp_path) -> None:
+    path = tmp_path / "quantile-gate.json"
+    path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "mode": "quantile",
+                "dataset_signature": "tiny-signature",
+                "task_id": "tiny-task",
+                "entity_kind": "class",
+                "fraction": 0.5,
+                "row_count": 2,
+                "selected_count": 1,
+                "threshold": 0.8,
+                "pairs": [["s2", "t2"]],
+                "boundary_ids": {
+                    "selected_last": ["s2", "t2"],
+                    "excluded_first": ["s1", "t1"],
+                },
+                "tie_rule": "(-U, source_iri, target_iri)",
+            }
+        ),
+        encoding="utf-8",
+    )
     scorer = _scorer(
         llm_experiment_config={
             "enabled": True,
-            "gate": {"mode": "quantile", "threshold": 0.7, "quantile_fraction": 0.05},
+            "gate": {
+                "mode": "quantile",
+                "threshold": 0.7,
+                "quantile_fraction": 0.5,
+                "artifact": path,
+            },
         }
     )
     mask, rows = scorer._llm_gate_mask(
-        U_ind=torch.tensor([0.2, 0.8]),
-        U_dis=torch.tensor([0.1, 0.3]),
-        U=torch.tensor([0.2, 0.8]),
+        U_ind=torch.tensor([0.9, 0.1]),
+        U_dis=torch.tensor([0.1, 0.0]),
+        U=torch.tensor([0.9, 0.1]),
         S_base=torch.tensor([0.9, 0.5]),
         q_label=torch.tensor([1.0, 0.5]),
         Q_struct=torch.tensor([0.2, 0.5]),
@@ -273,9 +346,103 @@ def test_gate_instrumentation_uses_frozen_threshold_without_batch_quantiles() ->
         label=None,
     )
     assert mask.tolist() == [False, True]
-    assert rows[0]["threshold_source"] == "config_frozen"
+    assert rows[0]["threshold_source"] == "artifact_exact_pairs"
     assert rows[1]["would_route"] is True
-    assert rows[1]["U_ind"] == pytest.approx(0.8)
+    assert rows[1]["U_ind"] == pytest.approx(0.1)
+    assert rows[1]["fitted_cutoff"] == pytest.approx(0.8)
+
+
+@pytest.mark.parametrize(
+    ("config", "message"),
+    [
+        ({"decision": {"mode": "listwise"}}, "candidate-group backend runtime"),
+        ({"exemplars": "knn", "exemplar_count": 2}, "training-only retrieval artifact"),
+        ({"distill": "student", "distill_artifact": "student.json"}, "fitted student"),
+        ({"gate": {"mode": "router"}}, "legacy 'router' linear head"),
+    ],
+)
+def test_unavailable_llm_arms_fail_closed(config: dict, message: str) -> None:
+    with pytest.raises(NotImplementedError, match=message):
+        _scorer(llm_experiment_config={"enabled": True, **config})
+
+
+def test_quantile_gate_requires_fitted_selection_artifact() -> None:
+    with pytest.raises(ValueError, match="requires an immutable selection artifact"):
+        _scorer(
+            llm_experiment_config={
+                "enabled": True,
+                "gate": {"mode": "quantile", "quantile_fraction": 0.05},
+            }
+        )
+
+
+def test_off_gate_routes_no_pairs() -> None:
+    scorer = _scorer(llm_experiment_config={"enabled": True, "gate": {"mode": "off"}})
+    mask, rows = scorer._llm_gate_mask(
+        U_ind=torch.tensor([1.0, 0.0]),
+        U_dis=torch.tensor([0.0, 1.0]),
+        U=torch.tensor([1.0, 1.0]),
+        S_base=torch.tensor([0.9, 0.1]),
+        q_label=torch.tensor([1.0, 0.0]),
+        Q_struct=torch.tensor([0.0, 1.0]),
+        src_iris=["s1", "s2"],
+        tgt_iris=["t1", "t2"],
+        label=None,
+    )
+    assert mask.tolist() == [False, False]
+    assert all(row["mode"] == "off" and row["llm_disabled"] for row in rows)
+
+
+def test_oracle_is_analytical_non_deployable_and_never_calls_llm(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    scorer = PairAdaptiveSemanticScorer(
+        use_lexical=False,
+        use_context=False,
+        use_llm=True,
+        llm_model_name="fixture-llm",
+        force_llm_summaries=True,
+        persist_cache_to_disk=False,
+        device="cpu",
+        return_explanations=True,
+        strsim={"enabled": True, "placement": "channel", "abbreviation": "initialism"},
+        llm_experiment_config={"enabled": True, "gate": {"mode": "oracle"}},
+    )
+
+    def unexpected_call(*args, **kwargs):
+        raise AssertionError("oracle must not invoke any LLM backend")
+
+    monkeypatch.setattr(scorer, "generate_pair_briefs_batched", unexpected_call)
+    monkeypatch.setattr(scorer, "llm_yesno_probs_batched", unexpected_call)
+    scorer.attach_dataset(_TinyDataset())
+    result = scorer(
+        src_iris=["s"],
+        tgt_iris=["t"],
+        src_label_lists=[["chronic obstructive pulmonary disease"]],
+        tgt_label_lists=[["COPD"]],
+        label=[0.0],
+    )
+    assert result["S_base"].item() == pytest.approx(1.0)
+    assert result["S_final"].item() == pytest.approx(0.0)
+    assert result["need_llm"].tolist() == [False]
+    assert result["batch_pair_adaptive_stats"]["llm_gated_pairs"] == 1
+    assert result["batch_pair_adaptive_stats"]["decision_requested_pairs"] == 0
+    assert result["oracle_diagnostic"] == {
+        "oracle_only": True,
+        "deployable": False,
+        "llm_invocations": 0,
+        "routed": [True],
+        "baseline_predictions": [True],
+        "labels": [False],
+    }
+    assert result["llm_gate_diagnostics"][0]["invoked"] is False
+    assert result["llm_gate_diagnostics"][0]["oracle_adjustment"] == pytest.approx(-1.0)
+    contributions = result["explanations"][0]["contributions"]
+    assert contributions["C_oracle"] == pytest.approx(-1.0)
+    reconstructed = sum(
+        contributions[name] for name in ("C_label", "C_strsim", "C_struct", "C_llm", "C_oracle")
+    )
+    assert reconstructed == pytest.approx(result["S_final"].item() - scorer.tau)
 
 
 def test_unimplemented_graph_arm_fails_closed_instead_of_running_baseline() -> None:
@@ -311,11 +478,15 @@ def test_analytic_fitted_artifact_applies_constants_and_channel_multipliers(tmp_
                 "schema_version": 1,
                 "mode": "analytic_fitted",
                 "dataset_signature": "tiny-signature",
+                "candidate_pool_fingerprint": "tiny-pool",
+                "dataset_lock_sha256": "tiny-lock",
+                "seed": 7,
+                "feature_schema": ["score", "quality", "active"],
+                "negative_label_policy": "complete_reference",
                 "parameters": {
                     "tau": 0.4,
                     "gamma": 1.0,
-                    "beta": 0.25,
-                    "multipliers": {"label": 2.0, "default": 0.5},
+                    "multipliers": {"label": 1.5, "diff": 0.5, "default": 0.5},
                 },
             }
         ),
@@ -330,14 +501,14 @@ def test_analytic_fitted_artifact_applies_constants_and_channel_multipliers(tmp_
         }
     )
     scorer.attach_dataset(_TinyDataset())
-    assert (scorer.tau, scorer.gamma, scorer.beta) == pytest.approx((0.4, 1.0, 0.25))
+    assert (scorer.tau, scorer.gamma, scorer.beta) == pytest.approx((0.4, 1.0, 0.8))
     authority = scorer._sigma_authority(
         torch.tensor([0.8]),
         torch.tensor([0.5]),
         torch.tensor([True]),
         channel="label",
     )
-    assert authority.item() == pytest.approx(0.4)
+    assert authority.item() == pytest.approx(0.3)
 
 
 def test_end_to_end_string_channel_reconstructs_explanation_contributions() -> None:

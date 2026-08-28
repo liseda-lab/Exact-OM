@@ -1,4 +1,5 @@
 from pathlib import Path
+from types import SimpleNamespace
 
 import pandas as pd
 
@@ -8,6 +9,7 @@ from exact.analysis.candidate_recall import (
     flatten_candidate_recall,
     write_absent_gold_tsv,
 )
+from exact.core.actions.alignment import _candidate_recall_run_stats
 
 
 def test_candidate_recall_excludes_train_and_counts_exact_oracle():
@@ -71,3 +73,66 @@ def test_candidate_recall_writes_absent_gold_and_flattens(tmp_path: Path):
     assert flat["top_k"] == 40
     assert flat["reference_pairs"] == 2
     assert flat["generated_candidate_recall"] == 0.5
+
+
+def test_candidate_recall_run_stats_uses_materialized_pool_and_exact_prefilter(
+    tmp_path: Path,
+):
+    training = tmp_path / "train.tsv"
+    pd.DataFrame([{"SrcEntity": "s_train", "TgtEntity": "t_train"}]).to_csv(
+        training, sep="\t", index=False
+    )
+    dataset = SimpleNamespace(
+        reference=pd.DataFrame(
+            [
+                {"Src": "s1", "Tgt": "t1"},
+                {"Src": "s2", "Tgt": "t2"},
+                {"Src": "s_train", "Tgt": "t_train"},
+            ]
+        ),
+        candidates=pd.DataFrame(
+            [
+                {"Src": "s1", "Tgt": "t1", "cand_sim": 0.9},
+                {"Src": "s2", "Tgt": "t_wrong", "cand_sim": 0.8},
+                {"Src": "s_train", "Tgt": "t_train", "cand_sim": 1.0},
+            ]
+        ),
+        exact_matches=pd.DataFrame([{"Src": "s2", "Tgt": "t2"}]),
+        candidate_pool_manifest={"gold_free_summary": {"mean_pool_size": 7.5}},
+    )
+
+    stats = _candidate_recall_run_stats(
+        dataset,
+        training_reference_path=training,
+    )
+
+    assert stats["metric_applicability"]["candidate_recall"] is True
+    assert stats["candidate_recall"] == 0.5
+    assert stats["candidate_recall_after_exact"] == 1.0
+    assert stats["mean_pool_size"] == 7.5
+    assert stats["gold_rank_p90"] == 1.0
+    assert stats["gold_rank_median"] == 1.0
+    diagnostics = stats["candidate_recall_diagnostics"]
+    assert diagnostics["status"] == "available"
+    assert diagnostics["counts"]["reference_pairs"] == 2
+    assert diagnostics["counts"]["generated_hits"] == 1
+    assert diagnostics["counts"]["oracle_hits"] == 2
+    assert diagnostics["gold_rank"]["present_pairs"] == 1
+    assert diagnostics["gold_rank"]["rank_median"] == 1.0
+
+
+def test_candidate_recall_run_stats_marks_empty_reference_not_applicable():
+    dataset = SimpleNamespace(
+        reference=pd.DataFrame(columns=["Src", "Tgt"]),
+        candidates=pd.DataFrame(columns=["Src", "Tgt", "cand_sim"]),
+        exact_matches=pd.DataFrame(columns=["Src", "Tgt"]),
+        candidate_pool_manifest={"gold_free_summary": {"mean_pool_size": 0.0}},
+    )
+
+    stats = _candidate_recall_run_stats(dataset, training_reference_path=None)
+
+    assert stats["metric_applicability"]["candidate_recall"] is False
+    assert stats["candidate_recall_diagnostics"] == {
+        "status": "not_applicable",
+        "reason": "stage reference is absent or empty",
+    }

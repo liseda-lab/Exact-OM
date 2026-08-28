@@ -110,14 +110,17 @@ class _BackendUsageModel(_FixtureModel):
                 "hosted-profile": SimpleNamespace(
                     backend="openrouter",
                     model="vendor/requested-model@v1",
+                    revision="1" * 40,
                     tokenizer="vendor/tokenizer@r3",
                     api_base="https://api-user:api-password@api.example.test/v1?secret=yes",
                 ),
                 "local-profile": SimpleNamespace(
                     backend="local_hf",
                     model="vendor/local-model@r4",
+                    revision="3" * 40,
                     tokenizer="vendor/local-tokenizer@r4",
                     api_base=None,
+                    endpoint_identity="local:cpu",
                 ),
             },
         )
@@ -130,14 +133,18 @@ class _BackendUsageModel(_FixtureModel):
             "profile": "hosted-profile",
             "requested_profile": "hosted-profile",
             "requested_model": "vendor/requested-model@v1",
+            "requested_revision": "1" * 40,
             "effective_model": "vendor/effective-model@r2",
+            "resolved_revision": "2" * 40,
             "tokenizer": "vendor/tokenizer@r3",
             "provider": {"name": "safe-provider", "api_key": "provider-secret"},
             "endpoint": (
                 "https://api-user:api-password@api.example.test/v1/chat/completions"
                 "?api_key=query-secret#debug"
             ),
+            "endpoint_identity": "openrouter:api.example.test/v1/chat/completions",
             "request_seed": 17,
+            "request_time": "2026-08-28T12:00:00+00:00",
             "decoding": {
                 "temperature": 0.2,
                 "top_p": 0.8,
@@ -146,6 +153,12 @@ class _BackendUsageModel(_FixtureModel):
             },
             "prompt_hash": "a" * 40,
             "cache_key_hash": "b" * 64,
+            "usage": {
+                "calls": 1,
+                "prompt_tokens": 10,
+                "completion_tokens": 2,
+                "total_tokens": 12,
+            },
             "request_debug": {
                 "prompt_sha1": prompt_sha1,
                 "prompt": "never persist this debug prompt",
@@ -164,7 +177,18 @@ class _BackendUsageModel(_FixtureModel):
                     "backend": "local_hf",
                     "profile": "hosted-profile",
                     "model": "vendor/local-model@r4",
+                    "provider": {"name": "huggingface", "api_key": "local-secret"},
+                    "runtime_endpoint_identity": "local:cpu",
                     "request_seed": 17,
+                    "request_timestamp": "2026-08-28T12:00:00+00:00",
+                    "prompt_sha256": "d" * 64,
+                    "cache_identity": "e" * 64,
+                    "usage": {
+                        "call_count": 1,
+                        "input_tokens": 4,
+                        "output_tokens": 1,
+                        "total_tokens": 5,
+                    },
                     "fallback_triggered": True,
                     "decision_scoring_mode": "chat_logprobs_binary_head",
                 },
@@ -175,9 +199,25 @@ class _BackendUsageModel(_FixtureModel):
                         "top_p": 0.8,
                         "max_tokens": 48,
                     },
+                    "usage": {
+                        "request_count": 1,
+                        "prompt_tokens": 6,
+                        "completion_tokens": 3,
+                        "total_tokens": 9,
+                    },
                 },
             },
         }
+
+
+class _BackendUsageWithoutTotalsModel(_BackendUsageModel):
+    def forward(self, *, src_iris: list[str], **kwargs: Any) -> dict[str, Any]:
+        output = super().forward(src_iris=src_iris, **kwargs)
+        for metadata in output["backend_usage"].values():
+            usage = dict(metadata["usage"])
+            usage.pop("total_tokens")
+            metadata["usage"] = usage
+        return output
 
 
 def _run(tmp_path: Path, *, emit: bool) -> SemanticAlignmentRunner:
@@ -265,7 +305,8 @@ def test_runner_persists_deduplicated_sanitized_llm_backend_provenance(
     )
     paths = runner.save_results(predictions, save_json=False, save_stats_csv=False)
     stats = json.loads(paths["run_stats_json"].read_text(encoding="utf-8"))
-    identities = stats["llm_usage"]["backend_identities"]
+    usage = stats["llm_usage"]
+    identities = usage["backend_identities"]
 
     assert list(identities) == ["summary", "decision", "rationale"]
     assert all(len(identities[task]) == 1 for task in identities)
@@ -275,11 +316,15 @@ def test_runner_persists_deduplicated_sanitized_llm_backend_provenance(
         "profile": "hosted-profile",
         "requested_profile": "hosted-profile",
         "requested_model": "vendor/requested-model@v1",
+        "requested_revision": "1" * 40,
         "effective_model": "vendor/effective-model@r2",
+        "resolved_revision": "2" * 40,
         "provider": "safe-provider",
         "endpoint": "https://api.example.test/v1/chat/completions",
+        "endpoint_identity": "openrouter:api.example.test/v1/chat/completions",
         "tokenizer": "vendor/tokenizer@r3",
         "request_seed": 17,
+        "request_time": "2026-08-28T12:00:00+00:00",
         "decoding": {
             "max_input_tokens": 256,
             "max_tokens": 32,
@@ -293,14 +338,54 @@ def test_runner_persists_deduplicated_sanitized_llm_backend_provenance(
     assert decision["profile"] == "local-profile"
     assert decision["requested_profile"] == "hosted-profile"
     assert decision["requested_model"] == "vendor/requested-model@v1"
+    assert decision["requested_revision"] == "1" * 40
     assert decision["effective_model"] == "vendor/local-model@r4"
+    assert decision["resolved_revision"] == "3" * 40
+    assert decision["provider"] == "huggingface"
+    assert decision["endpoint_identity"] == "local:cpu"
     assert decision["tokenizer"] == "vendor/local-tokenizer@r4"
+    assert decision["prompt_hashes"] == ["d" * 64]
+    assert decision["cache_hashes"] == ["e" * 64]
+    assert decision["request_time"] == "2026-08-28T12:00:00+00:00"
     assert decision["decoding"]["scoring_mode"] == "local_next_token_logits"
+
+    expected_by_task = {
+        "summary": {"calls": 2, "input_tokens": 20, "output_tokens": 4, "total_tokens": 24},
+        "decision": {"calls": 2, "input_tokens": 8, "output_tokens": 2, "total_tokens": 10},
+        "rationale": {"calls": 2, "input_tokens": 12, "output_tokens": 6, "total_tokens": 18},
+    }
+    for task, expected in expected_by_task.items():
+        task_usage = usage["by_task"][task]
+        assert task_usage["observation_count"] == 2
+        assert {field: task_usage[field] for field in expected} == expected
+        for field, value in expected.items():
+            assert task_usage["counter_availability"][field] == {
+                "status": "available",
+                "observation_count": 2,
+                "reported_observations": 2,
+                "value": value,
+            }
+
+    expected_totals = {
+        "calls": 6,
+        "input_tokens": 40,
+        "output_tokens": 12,
+        "total_tokens": 52,
+    }
+    assert {field: usage[field] for field in expected_totals} == expected_totals
+    for field, value in expected_totals.items():
+        assert usage["counter_availability"][field] == {
+            "status": "available",
+            "observation_count": 6,
+            "reported_observations": 6,
+            "value": value,
+        }
 
     serialized = json.dumps(stats["llm_usage"], sort_keys=True)
     for forbidden in (
         "never persist",
         "provider-secret",
+        "local-secret",
         "api-password",
         "query-secret",
         "debug-secret",
@@ -315,3 +400,84 @@ def test_runner_persists_deduplicated_sanitized_llm_backend_provenance(
     baseline = _run(tmp_path / "baseline-stats", emit=False)
     baseline_stats = baseline._compute_run_stats(baseline.results_df)
     assert "llm_usage" not in baseline_stats
+    assert baseline_stats["observed_execution"] == {
+        "device_type": "cpu",
+        "device": "cpu",
+    }
+    assert baseline_stats["coverage"] == pytest.approx(1.0)
+    assert baseline_stats["abstention_rate"] == pytest.approx(0.0)
+    assert baseline_stats["decision_source_counts"] == {
+        "declared": None,
+        "observed": 2,
+        "accepted": 2,
+        "unscored": 0,
+    }
+
+
+def test_runner_does_not_infer_hosted_resolved_revision_from_requested_profile(
+    tmp_path: Path,
+) -> None:
+    runner = SemanticAlignmentRunner(
+        dataset=_FixtureDataset(),
+        model=_BackendUsageModel,
+        device=torch.device("cpu"),
+        output_dir=tmp_path / "unresolved-hosted-revision",
+    )
+    enriched = runner._enrich_llm_backend_metadata(
+        "summary",
+        {
+            "backend": "openrouter",
+            "profile": "hosted-profile",
+            "model": "vendor/requested-model@v1",
+            "provider": "safe-provider",
+            "endpoint": "chat/completions",
+        },
+    )
+    identity = runner._sanitize_llm_backend_identity(enriched)
+
+    assert identity is not None
+    assert identity["requested_revision"] == "1" * 40
+    assert "resolved_revision" not in identity
+
+
+def test_runner_marks_missing_llm_token_totals_unavailable_without_inferring_them(
+    tmp_path: Path,
+) -> None:
+    runner = SemanticAlignmentRunner(
+        dataset=_FixtureDataset(),
+        model=_BackendUsageWithoutTotalsModel,
+        device=torch.device("cpu"),
+        output_dir=tmp_path / "llm-provenance-no-totals",
+    )
+    predictions, _ = runner.predict(
+        threshold=0.0,
+        local_alignment=True,
+        batch_size=1,
+        num_workers=0,
+        mixed_precision=False,
+        enable_checkpoints=False,
+        audit_shards_enabled=False,
+        audit_shard_compression="none",
+        cache_persist_policy="never",
+        log_every=100,
+    )
+    paths = runner.save_results(predictions, save_json=False, save_stats_csv=False)
+    usage = json.loads(paths["run_stats_json"].read_text(encoding="utf-8"))["llm_usage"]
+
+    assert usage["calls"] == 6
+    assert usage["input_tokens"] == 40
+    assert usage["output_tokens"] == 12
+    assert "total_tokens" not in usage
+    assert usage["counter_availability"]["total_tokens"] == {
+        "status": "unavailable",
+        "observation_count": 6,
+        "reported_observations": 0,
+    }
+    for task in ("summary", "decision", "rationale"):
+        task_usage = usage["by_task"][task]
+        assert "total_tokens" not in task_usage
+        assert task_usage["counter_availability"]["total_tokens"] == {
+            "status": "unavailable",
+            "observation_count": 2,
+            "reported_observations": 0,
+        }

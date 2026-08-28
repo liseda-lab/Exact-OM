@@ -1,4 +1,5 @@
 import builtins
+import json
 import math
 
 import pandas as pd
@@ -14,8 +15,18 @@ from exact.impl.models.selector.calibration_helpers import (
     fit_platt_calibrator,
     knee_threshold,
     otsu_threshold,
+    score_calibrator_from_dict,
 )
+from exact.impl.models.selector.llm_gate import (
+    analytical_oracle_ceiling,
+    fit_forced_sample_artifact,
+    fit_quantile_gate_artifact,
+)
+from exact.impl.models.selector.nil_ranking import joint_nil_distribution
 from exact.impl.models.semantic_llm import (
+    LISTWISE_NONE_KEY,
+    aggregate_listwise_call_probabilities,
+    build_listwise_call_plan,
     build_listwise_decision_prompt,
     categorical_probabilities_from_logprobs,
     transform_listwise_probabilities,
@@ -71,6 +82,22 @@ def test_extraction_preassigns_exact_and_caps_assignment_components():
     assert capped.diagnostics["assignment_fallback_components"] == 1
 
 
+@pytest.mark.parametrize(
+    "protected_pairs",
+    [
+        {("s1", "t1"), ("s1", "t2")},
+        {("s1", "t1"), ("s2", "t1")},
+    ],
+)
+def test_extraction_rejects_conflicting_protected_exact_matches(protected_pairs):
+    with pytest.raises(ValueError, match="Conflicting protected exact matches"):
+        extract_global_alignment(
+            _collision_graph(),
+            mode="assignment",
+            protected_pairs=protected_pairs,
+        )
+
+
 def test_assignment_reports_missing_scipy_but_cap_fallback_does_not_import_it(monkeypatch):
     real_import = builtins.__import__
 
@@ -105,6 +132,41 @@ def test_calibration_and_distribution_threshold_primitives():
     assert knee_threshold(scores) == pytest.approx(0.475)
     assert brier_score([0.1, 0.9], [0, 1]) == pytest.approx(0.01)
     assert expected_calibration_error([0.1, 0.9], [0, 1], bins=2) == pytest.approx(0.1)
+    restored = score_calibrator_from_dict(platt.to_dict(), expected_mode="platt")
+    assert restored.predict_one(0.9) == pytest.approx(platt.predict_one(0.9))
+
+
+def test_score_calibration_artifact_is_applied_and_missing_artifact_fails_closed(tmp_path):
+    artifact = tmp_path / "platt.json"
+    artifact.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "kind": "score_calibrator",
+                "calibrator": {"mode": "platt", "slope": 10.0, "intercept": -5.0},
+                "fit_provenance": {"split_role": "training_oof"},
+            }
+        ),
+        encoding="utf-8",
+    )
+    selector = CandidateSetSelector(
+        enabled=True,
+        experiment_config=_experiment_config(label_free_mode="score_partition"),
+        matching_calibration={
+            "mode": "platt",
+            "threshold_mode": "fixed",
+            "artifact": artifact,
+        },
+    )
+    result = selector.forward(_label_free_frame(), threshold=0.5)["candidate_df"]
+
+    assert result["S_pair_pre_calibration"].tolist() == pytest.approx(
+        _label_free_frame()["S_final"].tolist()
+    )
+    assert result.iloc[0]["S_pair_final"] > result.iloc[0]["S_pair_pre_calibration"]
+    assert selector._calibration_meta["score_calibration"]["artifact"]["sha256"]
+    with pytest.raises(ValueError, match="requires an immutable fitted artifact"):
+        CandidateSetSelector(matching_calibration={"mode": "isotonic"})
 
 
 def _experiment_config(**overrides):
@@ -174,6 +236,25 @@ def test_reciprocal_consensus_requires_margin_channels_and_reciprocity():
     assert bool(winners.iloc[0]["selection_reciprocal"])
     assert int(winners.iloc[0]["selection_channel_agreement"]) == 3
     assert selector._calibration_meta["target_labels_used"] is False
+
+
+def test_nil_joint_scale_uses_probabilities_and_is_attached_to_every_candidate():
+    distribution = joint_nil_distribution([0.8, 0.2], 0.4)
+    assert sum(distribution.real_q) + distribution.nil_q == pytest.approx(1.0)
+    assert distribution.real_q[0] > distribution.nil_q > distribution.real_q[1]
+
+    selector = CandidateSetSelector(
+        enabled=True,
+        use_no_match=True,
+        nil_config={"mode": "heuristic", "ranking_scale": "joint_accept_probability"},
+    )
+    frame = _label_free_frame().query("Src == 's1'").reset_index(drop=True)
+    result = selector.forward(frame)["candidate_df"]
+    assert result["P_match"].nunique() == 2
+    assert result["P_nil"].nunique() == 1
+    assert result["Q_match"].sum() + result.iloc[0]["Q_nil"] == pytest.approx(1.0)
+    assert result["P_rank"].tolist() == pytest.approx(result["Q_match"].tolist())
+    assert selector._calibration_meta["nil"]["applied"] is True
 
 
 def test_reference_miss_count_mode_and_analytic_rerank_dispatch():
@@ -249,3 +330,90 @@ def test_listwise_prompt_and_probability_transforms_are_pure_and_complete():
     assert transform_listwise_probabilities(categorical, 2, "max_normalized")["A"] == pytest.approx(
         1.0
     )
+
+
+def test_listwise_sc_plan_is_six_calls_and_aggregation_is_order_invariant():
+    candidates = [
+        {"target_iri": f"t{index}", "score": 1.0 - (index / 10), "brief": f"brief {index}"}
+        for index in range(1, 7)
+    ]
+    plan = build_listwise_call_plan(
+        source_iri="s1",
+        source_label="source",
+        source_summary="summary",
+        candidates=candidates,
+        mode="listwise_sc",
+        request_seed=17,
+    )
+    replay = build_listwise_call_plan(
+        source_iri="s1",
+        source_label="source",
+        source_summary="summary",
+        candidates=list(reversed(candidates)),
+        mode="listwise_sc",
+        request_seed=17,
+    )
+    assert plan == replay
+    assert len(plan.calls) == 6
+    assert {call.temperature for call in plan.calls} == {0.7}
+    assert len({call.seed for call in plan.calls}) == 6
+    assert plan.overflow_candidate_ids == ("t6",)
+    assert plan.calls[3].candidate_ids == tuple(reversed(plan.calls[0].candidate_ids))
+
+    call_probabilities = []
+    for call in plan.calls:
+        labels = [chr(ord("A") + index) for index in range(len(call.candidate_ids))]
+        probabilities = {
+            label: (0.7 if target == "t2" else 0.2 / (len(labels) - 1))
+            for label, target in zip(labels, call.candidate_ids)
+        }
+        probabilities["Z"] = 0.1
+        call_probabilities.append(probabilities)
+    aggregate = aggregate_listwise_call_probabilities(
+        plan,
+        call_probabilities,
+        probability_mode="raw_joint",
+    )
+    assert aggregate.call_count == 6
+    assert aggregate.categorical["t2"] == pytest.approx(0.85)
+    assert aggregate.categorical[LISTWISE_NONE_KEY] == pytest.approx(0.05)
+    assert aggregate.pair_probabilities["t2"] == pytest.approx(0.85)
+
+
+def test_quantile_forced_and_oracle_gate_helpers_are_exact_and_no_call():
+    rows = [
+        {"U": 0.8, "source_iri": "s2", "target_iri": "t"},
+        {"U": 0.8, "source_iri": "s1", "target_iri": "t"},
+        {"U": 0.1, "source_iri": "s3", "target_iri": "t"},
+    ]
+    quantile = fit_quantile_gate_artifact(
+        rows,
+        fraction=1.0 / 3.0,
+        task_id="task",
+        entity_kind="class",
+    )
+    assert quantile["selected_count"] == 1
+    assert quantile["pairs"] == [["s1", "t"]]
+    assert quantile["boundary_ids"]["excluded_first"] == ["s2", "t"]
+
+    forced = fit_forced_sample_artifact(
+        rows,
+        sample_size=2,
+        seed=9,
+        task_id="task",
+        entity_kind="class",
+    )
+    assert forced == fit_forced_sample_artifact(
+        list(reversed(rows)),
+        sample_size=2,
+        seed=9,
+        task_id="task",
+        entity_kind="class",
+    )
+    assert len(forced["pairs"]) == 2
+
+    oracle = analytical_oracle_ceiling([0.9, 0.8, 0.2], [1, 0, 1], threshold=0.5)
+    assert oracle.routed == (False, True, True)
+    assert oracle.corrected_scores == pytest.approx((0.9, 0.0, 1.0))
+    assert oracle.llm_invocations == 0
+    assert oracle.deployable is False
