@@ -64,7 +64,7 @@ by construction — `matching.channels.graph: off|inductive|transductive`:
 - `graph_only`: a standalone arm scoring on the graph channel alone. Diagnostic ceiling for
   RQ23.6; it bypasses the evidence model and cannot promote.
 
-**Structural profile** (added to E00's `dataset_inventory.parquet`, and a deliverable regardless
+**Structural profile** (added to E00's dataset inventory, and a deliverable regardless
 of promotion): per task and per kind, hierarchy depth distribution, ancestor coverage, class-to-
 instance ratio, axiom density, triples per entity, distinct predicates, and relational entropy,
 reduced to a pre-registered `tbox_richness` and `relational_density` pair. The reduction is fixed

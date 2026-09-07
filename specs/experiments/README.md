@@ -1,5 +1,9 @@
 # Exact-OM Methodology Experiments Plan
 
+Implementation ambiguities raised during the first runner pass are resolved in
+[`IMPLEMENTATION-CLARIFICATIONS.md`](IMPLEMENTATION-CLARIFICATIONS.md). That file is authoritative
+for the narrow questions it answers and includes the implementation-agent handoff prompt.
+
 **This plan is deliberately separate from the engineering overhaul (`specs/WP-*`).** Everything
 here **changes results** and therefore requires empirical validation before it can touch the
 product defaults. It runs **after** the overhaul completes, because it depends on: WP-J
@@ -40,8 +44,10 @@ Axis 5 also crosses axes 2 and 3 rather than running parallel to them. E23 is th
 which supervised method is appropriate depends on how much TBox structure the input actually has,
 so its result is a threshold on a measured structural profile rather than a single winner.
 
-E17 is the cross-cutting integration gate: it tests the promoted configuration across these
-axes and does not assume that independently positive changes are additive.
+E17 is the cross-cutting integration experiment: it tests the final paper configuration across
+these axes and does not assume that independently positive changes are additive. It is mandatory
+when the paper claims a combined Exact-OM system, and it is also the release gate when more than
+one result-changing default is proposed.
 
 An experiment changes one of these axes and holds the others fixed unless it explicitly
 declares a factorial interaction. In particular, entity discovery, pair detection, relation
@@ -64,11 +70,46 @@ produce their scientific artifact regardless of whether any flag flips. And the 
 label-free paths are both first-class outputs — the interesting claim is not that supervision
 wins, but where in the pipeline it wins, by how much, and how many labels it takes.
 
+## One staged paper suite
+
+There is one experiment runner, one configuration format, and one results schema. The suite has
+two execution stages so that compute is spent on credible hypotheses without weakening the final
+paper evidence:
+
+1. **Screen** — run the declared arm sweep on development data or a spec-named frozen diagnostic
+   subset. One seed is sufficient unless the method is visibly stochastic. Bounded source samples
+   are allowed. Screening may reject arms, debug instrumentation, and select at most one frozen
+   candidate per explicit paper/default decision using a rule written in the experiment config
+   before the screen runs.
+2. **Confirm** — run only the frozen candidate, its current-baseline control, and any
+   scientifically necessary diagnostic control on untouched reporting data. Use the full eligible
+   reporting tasks declared for the paper and at least three paired seeds. The confirmatory matrix,
+   primary endpoint, slices, and non-inferiority/cost bounds are frozen before any reporting result
+   is opened.
+
+These are stages of the same suite, not separate pilot and confirmatory implementations. They use
+the same code paths and artifacts; the manifest records `stage: screen|confirm` and the selection
+record that links a confirmatory arm to its development evidence. Reporting/test references are
+never used to choose an arm, threshold, fallback, feature set, task subset, or stopping rule.
+
+If no arm meets its predeclared development selection rule, the experiment stops after screening
+and is recorded as `screened_out`; it makes no confirmatory or product claim. A null screen is still
+useful engineering evidence but is not presented as a reporting-set result. Diagnostic/removal
+experiments such as E24–E26 may freeze a simplification or removal candidate rather than an
+improvement candidate. A diagnostic contrast that supports a central paper claim must itself be
+named in the frozen confirmatory matrix; it is not exempt merely because it cannot become a
+product default.
+
+The global staged rule supersedes any experiment wording that appears to send a complete arm sweep
+directly to reporting data. Full sweeps belong to `screen`; `confirm` contains only the frozen
+candidate and required controls. This rule reduces compute and multiplicity while preserving a
+clean held-out test.
+
 ## Experiments
 
 | ID | Title | Finding | Cost | Expected value | Priority |
 |----|-------|---------|------|----------------|----------|
-| E00 | Experiment harness & baseline lineage | — | M | enables everything | **first, mandatory** |
+| E00 | Lean paper experiment runner & frozen baseline | — | S–M | enables reproducible screening and confirmation | **first, mandatory** |
 | E05 | Candidate retrieval upgrades (encoder, fusion, adaptive k) | 3 | M | recall ceiling ↑ | **1**, before pool consumers |
 | E01 | Global alignment extraction (mutual-best / assignment) | 1 | S | P↑ on 1-1 tracks, cheap | **1** |
 | E03 | Score calibration, threshold transfer & tuning-objective ablation | 8 | S–M | robustness across tasks | **1** |
@@ -94,13 +135,12 @@ wins, but where in the pipeline it wins, by how much, and how many labels it tak
 | E24 | Contrastive-channel degeneracy (why the only penalising signal never fires) | RR-1 | M | restores precision mechanism, or removes a dead channel | **1** |
 | E25 | LLM gate viability (does the branch fire, does it help) | RR-2 | M | removes a dependency or makes gating measurable | **1**, before E07/E21 |
 | E26 | Quality-proxy validity ($q_k$ vs correctness; σ decomposition) | RR-3 | M | explains what the core mechanism actually does | **2** |
-| E17 | Promoted-stack integration audit | 17 | M | validates interactions and release candidate | **final release gate** |
+| E17 | Frozen-stack integration experiment | 17 | M | validates the combined paper system and release candidate | **final paper/release gate** |
 
-Priorities 1 → 3 = run order. E00 blocks all. E05 runs next through its end-to-end promotion
-decision; candidate-consuming experiments freeze their pools only afterward. If E05 promotes,
-append a rolling snapshot and regenerate candidate-pool fingerprints, capability baselines, and
-power estimates before downstream experiments lock. E03's distribution-threshold stage
-precedes E15.
+Priorities 1 → 3 = run order. E00 blocks all. E05 screens and, if selected, confirms before
+candidate-consuming experiments freeze their pools. If E05 survives confirmation, freeze the new
+candidate-pool fingerprint and refresh the affected baseline slices before downstream experiments
+lock. E03's distribution-threshold screen precedes E15.
 The evidence-only stages of E11/E12 can run in parallel with class-only E15; freeze both sides
 before the pre-registered property/instance selector cross. E16 consumes the strongest E15
 method and frozen E11/E12 evidence bundles; its typed-head arm consumes E14. E13's
@@ -134,16 +174,18 @@ and E25 both change $U$, so their reporting runs must not be in flight against d
 arms, and E26's Stage 2 decomposition should precede E19, which otherwise fits weights over a
 quality term whose contribution is unquantified.
 
-E17 runs after a batch of promotion-eligible arms has been selected and before a release flips
-multiple defaults. A retrieval promotion after any downstream experiment was frozen marks that
-experiment's product-promotion evidence stale: its candidate-pool fingerprint must be
-reconfirmed under E17 (or the experiment rerun) before its flag can ship.
+E17 runs after the individual confirmatory survivors have been selected. It is required before the
+paper reports a combined-system result and before a release flips multiple defaults. A retrieval
+promotion after any downstream experiment was frozen marks that experiment's product-promotion
+evidence stale: its candidate-pool fingerprint must be reconfirmed under E17 (or the experiment
+rerun) before its flag can ship.
 
 ## Validation protocol (binding for every experiment)
 
-**Dataset capability inventory (stage 0, before any run)**:
+**Dataset capability inventory (before screening)**:
 
-- Generate `dataset_inventory.parquet` from the pinned track layouts: task/pair, source format,
+- Generate a CSV or JSON inventory for the tasks declared by the paper matrix: task/pair,
+  source format,
   entity counts by kind, reference counts by kind and relation, train/validation/test
   availability, candidate-pool coverage, NIL count, hierarchy predicates, and Datalog fact
   count, plus declared reference completeness (`complete|known_incomplete|unknown`). A track is
@@ -219,10 +261,10 @@ effective-unit definition/count, and resolution reason. A results row whose supe
 disagrees with its resolved config is a harness error, not a reporting detail.
 
 **Runs & statistics**:
-- ≥3 seeds per confirmatory/reporting configuration (baseline and variant), same seeds across
-  arms. A deterministic retrieval/parity stage or development-only screening/pruning stage may
-  use one seed only when it makes no reporting-set or promotion claim; every surviving arm is
-  rerun with ≥3 seeds before confirmation.
+- Screening uses one seed by default and development data or a spec-named frozen diagnostic
+  subset. Confirmatory/reporting configurations use ≥3 seeds for baseline and variant, with the
+  same seeds across arms. Every surviving stochastic arm is rerun with ≥3 seeds before a paper or
+  promotion claim.
 - Report candidate recall before end-to-end results so retrieval misses are visible.
 - Report per-task × entity-kind P/R/F1 (global) and MRR/Hits@1 (local), plus macro averages
   over tasks. Do not micro-average classes, properties, and instances into a number dominated
@@ -239,15 +281,13 @@ disagrees with its resolved config is a harness error, not a reporting detail.
   A quality win that doubles cost is a finding, not a win.
 - Report coverage and abstention rate next to accuracy. A method must not improve F1 merely by
   silently dropping a hard entity kind or a rare relation.
-- Join E00's power table before freezing an experiment matrix. For every task×kind×relation
-  primary slice, record the hypothesized effect, MDE at 80% power, and
-  `powered|underpowered|descriptive`. This declaration is made before result inspection.
-  Underpowered cells remain visible but yield `inconclusive`, not a post-hoc merged endpoint;
-  any composite slice must be defined from development data before reporting runs.
-- Before an experiment's first execution, append a generated **Pre-run power declaration**
-  table to its spec (task, kind, relation, independent units, hypothesized delta, MDE80, status,
-  and any pre-defined composite) and commit it with the experiment YAML. The harness refuses to
-  generate or change this section after a reporting result exists.
+- Before confirmatory execution, record in the frozen experiment config or design manifest the
+  independent units, hypothesized effect or non-inferiority margin, and
+  `powered|underpowered|descriptive` status for each primary task×kind×relation slice. A scripted
+  power simulation is optional; the declaration and its assumptions are not. Underpowered cells
+  remain visible but yield `inconclusive`, not a post-hoc merged endpoint. Any composite slice is
+  defined from development data before reporting runs. The harness hashes this declaration and
+  refuses to change it after a confirmatory result exists; it never edits a spec file at run time.
 
 **Known-incomplete reference protocol** (mandatory for precision-led claims):
 
@@ -258,8 +298,9 @@ disagrees with its resolved config is a harness error, not a reporting detail.
 - Hide arm identity, score, and hypothesis from at least two domain-competent annotators; a
   third adjudicates disagreements. Render identical evidence packets, record
   correct/incorrect/uncertain, and report inter-annotator agreement.
-- Choose the sample size before opening predictions using E00's binomial-precision calculation
-  (target CI width recorded; minimum 50 when available). Report inverse-probability-weighted
+- Choose the sample size before opening predictions using a simple binomial-precision
+  calculation recorded in the frozen design manifest (target CI width recorded; minimum 50 when
+  available). Report inverse-probability-weighted
   adjusted precision with a bootstrap CI beside raw precision. Adjudication is a sensitivity
   analysis, cannot tune the arm, and uncertain cases are reported rather than forced.
 
@@ -267,12 +308,14 @@ disagrees with its resolved config is a harness error, not a reporting detail.
 - One change per causal experiment arm; if two mechanisms interact (e.g. E01×E03), run the
   2×2. E17 is the explicit exception: its purpose is to combine already-eligible changes, with
   leave-one-out and dependency-derived factorial controls.
-- Each spec pre-registers numbered research questions. Every results note answers each one with
+- Each spec pre-registers numbered research questions. Every final results record answers each
+  one with
   `supported`, `not supported`, or `inconclusive`, cites the relevant table/CI, and records the
   important failure slices. A result can be useful without promoting its arm.
 - Every experiment lands as: config-flagged code (default = current behavior), a runner config
-  under `exp/experiments/EXX/`, and a results note appended to the experiment's spec file
-  (tables + decision). No experiment code merges without its flag defaulting off.
+  under `exp/experiments/EXX/`, and a machine-readable result/decision record outside `specs/`.
+  Experiment execution never modifies specification files. No experiment code merges without its
+  flag defaulting off.
 - `B0` is the immutable post-overhaul/WP-B historical baseline. `R_n` is the immutable rolling
   snapshot of current product defaults after promotion batch `n`. Each experiment locks an
   `R_n` ID, config/commit hash, dataset lock, and candidate-pool fingerprint before running;
@@ -313,8 +356,9 @@ delivery criteria cannot be relaxed.
 4. Explanations remain exact: the importance decomposition must still reconstruct the final
    score algebraically (this is a product invariant, not a metric).
 5. The flag flip + updated generated config/docs land as their own PR citing the results note.
-6. When more than one result-changing flag would ship since the last release baseline, E17's
-   combined-stack gate passes. Sequentially flipping flags does not waive this requirement.
+6. When the paper claims a combined system, or when more than one result-changing flag would ship
+   since the last release baseline, E17's combined-stack gate passes. Sequentially flipping flags
+   does not waive this requirement.
 
 For a new entity kind, input representation, or relation type, criterion 2 is applied within
 that slice as well as globally. A class-equivalence gain cannot compensate for a property,
@@ -334,9 +378,10 @@ supervised component winning its own experiment does not by itself make supervis
 
 `EXX-title.md`: Motivation (audit finding or capability gap) · **Numbered research questions** ·
 Hypotheses (falsifiable, with expected direction and rough magnitude) · Change (implementation
-sketch, config flags, touched modules) · Arms & sweep · Validation (eligible tasks, splits,
+sketch, config flags, touched modules) · Arms & screening sweep · Frozen confirmatory candidate
+and selection rule · Validation (eligible tasks, splits,
 entity kinds, relations, supervision label, metrics, seeds, cost) · Promotion decision rule
 (one primary comparison + endpoint per explicit default decision, non-inferiority margin where
 needed, and any justified pre-registered bound override) · Effort & risks · Results note
-(appended after running and answering every research question, power declaration, rolling/B0
-comparison, and both default/override gates).
+(stored outside `specs/` after running and answering every research question, design/power
+declaration, rolling/B0 comparison where relevant, and both default/override gates).

@@ -37,13 +37,16 @@ already flows correctly through σ-weighting).
 
 ## Arms & validation
 
-2×3 factorial (polarity × bank), full matrix, 3 seeds. Primary: macro F1; secondary: per-track
-P/R, channel-correlation matrix (Pearson over per-pair channel scores — report shrinkage),
-and count of pairs where signed attributes flipped the decision. On incomplete/unknown
-references, feed the union of baseline/variant disagreement mappings into the shared blinded
-adjudication protocol (power-derived sample, identical evidence packets, arm identity hidden)
-and report adjusted precision plus veto correctness. A separate qualitative table may explain
-30 adjudicated flips, but it does not replace the weighted precision estimate.
+Screen the 2×3 polarity×bank factorial on development data with one seed. Freeze at most one
+signed-polarity candidate and one bank-restriction candidate because they are separate paper/default
+decisions. If both survive, pre-register their 2×2 interaction. Confirm only the baseline, frozen
+candidate(s), and that interaction on the reporting tasks with three paired seeds. Primary: macro
+F1; secondary: per-track P/R, channel-correlation matrix (Pearson over per-pair channel scores —
+report shrinkage), and count of pairs where signed attributes flipped the decision. On
+incomplete/unknown references, feed the union of confirmatory-arm disagreement mappings into the
+shared blinded adjudication protocol (power-derived sample, identical evidence packets, arm
+identity hidden) and report adjusted precision plus veto correctness. A separate qualitative
+table may explain 30 adjudicated flips, but it does not replace the weighted precision estimate.
 
 **Promotion**: standard; the bank-restriction explanation arm may promote when cross-channel
 correlation decreases with a 95% CI excluding zero and macro F1 is non-inferior (quality-delta

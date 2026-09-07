@@ -1,111 +1,118 @@
-# E00 — Experiment Harness & Baseline Lineage
+# E00 — Lean Paper Experiment Runner & Frozen Baseline
 
-**Blocks all other experiments. No result-changing intent** — this is the instrument that makes
-the others measurable. Size: M.
+**Blocks all other experiments. No result-changing intent.** This is a small, paper-grade
+execution and measurement layer, not a general workflow platform. Size: S–M.
 
 ## Research questions
 
-- **RQ00.1**: Can repeated runs reproduce decisions and metrics closely enough that the effect
-  sizes targeted by E01–E23 are distinguishable from execution noise?
-- **RQ00.2**: Does the harness prevent reference leakage and preserve enough dataset/model/config
-  provenance to audit every supervision claim?
-- **RQ00.3**: Can one results schema compare quality, coverage, significance, runtime, memory,
-  and LLM cost across entity kinds, relation types, formats, and supervision regimes?
-- **RQ00.4**: Does the frozen post-overhaul class baseline reproduce WP-B parity, and are the
-  shipped property, instance, pure-KG, relation-typing, and no-label capability baselines
-  reproducible on every eligible reporting slice?
-- **RQ00.5**: What effect size is detectable for every task×kind×relation slice under the
-  planned bootstrap, seed count, and multiplicity policy?
-- **RQ00.6**: Can rolling baseline and hosted-model provenance detect a candidate-pool, default,
-  fitted-artifact, or provider-model change before it confounds an experiment?
+- **RQ00.1**: Can the same runner screen many arms cheaply and then confirm a frozen survivor
+  without changing code paths, metrics, or data semantics?
+- **RQ00.2**: Does every result carry enough split, supervision, configuration, model, dataset,
+  candidate-pool, and source-code provenance to audit leakage and reproduce the comparison?
+- **RQ00.3**: Can paired arms produce per-source evidence and paper-ready quality, coverage, and
+  cost summaries with deterministic aggregation?
+- **RQ00.4**: Does the frozen post-migration baseline reproduce current production behavior, and
+  do disabled experiment flags leave its decisions unchanged?
+- **RQ00.5**: Can independent runs execute concurrently, resume safely, and reuse only artifacts
+  whose fingerprints match?
 
-These are measurement-system questions, not hypotheses about a better matcher. Acceptance
-below answers each with a pass/fail result; any failure blocks downstream claims.
+These are measurement-system questions. E00 does not test a better matcher and does not need a
+complete benchmark or product-release service before screening can begin.
 
-## Deliverables
+## Single-suite execution model
 
-1. **`tools/run_experiment.py`**: takes an experiment YAML (`exp/experiments/EXX/exp.yaml`)
-   declaring arms (config overlays over a shared base), tasks, seeds; executes the full matrix
-   (locally or emitting sbatch, reusing `tools/run_exact_job.py`); collects per-run
-   `evaluation_results.json`, ledger timing, LLM usage counters into one
-   `results.parquet` + `results.md` summary table per experiment.
-2. **Paired bootstrap** module (`exact/analysis/significance.py`): resamples per-source
-   decision outcomes (global task) / per-anchor ranks (local task) 10k×; reports Δ, 95% CI,
-   p-value for any two arms. Unit-tested against known synthetic cases.
-3. **Immutable baseline lineage**: run the post-overhaul system (3 seeds) and commit
-   `exp/experiments/baselines/B0/{results.parquet,results.md,baseline_manifest.json}`; it
-   contains (a) the default class-equivalence baseline on Bio-ML, Anatomy, Conference, and
-   DISO ranking; and (b) current
-   shipped capability baselines for every eligible property/instance/OAEI-KG slice, each input
-   representation, `hierarchy_heuristic` relation typing, and the no-training fallback. The
-   class subset must match WP-B parity (sanity: the overhaul did not drift); additive
-   capability subsets establish their own pre-experiment reference rather than borrowing class
-   numbers. A not-yet-published task is recorded as unavailable, never replaced by a mini
-   fixture performance number. Each baseline manifest stores baseline ID/parent, commit and
-   resolved-config hashes, dataset locks, candidate-pool hashes, enabled flags, fitted-artifact
-   hashes, and results hashes. The harness can append (never overwrite) a rolling `R_n` snapshot
-   after an E17/single-promotion gate under `baselines/R_n/` and can reconstruct its complete
-   ancestry to `B0`.
-4. **Determinism guard**: the deterministic tie-break from audit F6 must be merged first
-   (WP-D); the harness runs a same-seed repeat on one task and asserts metric deltas < 1e-4 on
-   CPU (GPU jitter documented, not asserted).
-5. **Leakage guards active**: audit F1/F2 fixes asserted at harness startup — the harness
-   refuses to run an arm whose selector calibration or LLM calibration would see
-   full-reference labels, and stamps reference-file hashes into every results row.
-6. **Cost columns**: wall-time (ledger `cumulative compute`), LLM calls, LLM tokens
-   (from the existing model-usage counters), per arm×task×seed.
-7. **Capability inventory**: materialize the `dataset_inventory.parquet` required by the plan,
-   plus per-run columns for entity kind, relation vocabulary, input representation, and
-   supervision label. Add peak-memory and load/index-time fields for E12/E13 and the descriptor's
-   reference-completeness declaration. Add E23's **structural profile** columns — hierarchy depth
-   distribution, ancestor coverage, class-to-instance ratio, axiom density, triples per entity,
-   distinct predicates, relational entropy — so the TBox-richness axis is measurable from the
-   inventory before any experiment reads a result. Record the **resolved supervision mode per
-   component** (README §"Supervision as a configured mode"), auto-policy artifact hash, observed
-   policy features, effective-unit definition/count, and resolution reason in the run manifest and
-   results schema. Fail the run when a row's supervision label disagrees with its resolved config
-   — the E18–E23 arms are distinguished by that resolution, so it cannot be reconstructed later.
-8. **Power and adjudication planning**: write `power_analysis.parquet` per
-   task×kind×relation×metric with independent-unit count, match prevalence, smallest attainable
-   metric step, baseline seed/cluster-bootstrap variance, and MDE at 80%/90% power. Estimate MDE
-   by injecting controlled paired decision improvements into baseline per-source outcomes and
-   rerunning the exact planned bootstrap/multiplicity test; use connected-component clusters for
-   the E12 sensitivity calculation. Also emit the sample size required for the shared
-   adjusted-precision adjudication protocol at declared CI widths. The calculation uses no
-   experiment-arm result.
-9. **LLM identity/drift stamps**: for every request record provider, requested and response
-   model IDs, immutable revision/deployment/API version when available, endpoint identity
-   (without secrets), router route, tokenizer, prompt/template hash, decoding/logprob parameters,
-   seed, cache key, and request time. Paired arms must resolve to the same model fingerprint;
-   an alias/version change mid-matrix aborts rather than mixing responses. A provider that
-   exposes only a mutable alias and no controlled deployment/revision is exploratory-only for
-   confirmatory LLM comparisons; use an immutable hosted deployment or self-hosted snapshot for
-   a promotion claim.
+`tools/run_experiment.py` implements one suite with `screen` and `confirm` stages:
+
+- `screen` runs the full development arm sweep, normally with one seed and an optional
+  deterministic source cap. It may use only development labels or a spec-named frozen diagnostic
+  subset. The experiment config declares the selection rule before execution.
+- `confirm` accepts a frozen selection record from `screen` and runs only the selected candidate,
+  the current baseline, and required controls on untouched reporting data with at least three
+  paired seeds. It refuses to run if the selection record, design declaration, base configuration,
+  or reporting matrix has changed.
+
+There is no separate pilot runner. Both stages resolve the same base config plus arm overlay, use
+the same metrics, and write the same schema. If no candidate passes the development selection
+rule, the experiment ends as `screened_out` without opening reporting data.
+
+## Required deliverables
+
+1. **Lean runner**: read one experiment YAML under `exp/experiments/EXX/`, resolve its base config,
+   arms, tasks, stage, seeds, and optional source cap, then execute locally by reusing
+   `tools/run_exact_job.py`. Support `--dry-run`, `--resume`, and bounded `--jobs`. CPU-independent
+   runs may run concurrently; GPU and LLM runs are serialized per device/profile unless an
+   explicit safe concurrency limit is configured.
+2. **Isolated artifacts**: one directory per experiment×stage×arm×task×seed. A completed run is
+   reused only when its manifest fingerprint matches; partial or failed runs retain a reason and
+   can resume without being mistaken for results.
+3. **Run manifest**: record stage, experiment/arm, seed, commit, Exact-OM version, pyowlcore
+   version, resolved-config hash, dataset and reference hashes, split role, supervision label,
+   candidate-pool fingerprint, fitted-artifact hashes, model revisions, selection-record hash,
+   design-declaration hash, start/end time, and status. Do not record secrets.
+4. **Frozen paper baseline**: after the Exact-OM 2.1.0 / pyowlcore 0.2.0 migration and production
+   tests pass, freeze the current default as the paper's `R_n` baseline manifest. Preserve
+   historical `B0` as an optional longitudinal comparator; E00 does not need a complete rolling
+   lineage service. A retrieval change creates a new candidate-pool fingerprint before any
+   downstream confirmation.
+5. **Results**: retain per-source decisions/ranks and aggregate per task×entity kind×relation.
+   Emit machine-readable CSV or JSON for P/R/F1, MRR/Hits@1, candidate recall, coverage,
+   abstention, wall time, peak memory when relevant, and LLM calls/tokens when used. Also report
+   macro summaries; never silently pool entity kinds or relation types.
+6. **Statistics**: provide a small paired-bootstrap utility over per-source decisions or ranks,
+   with 10,000 resamples by default, delta and 95% CI. Cluster instance sensitivity analyses by
+   connected component only where the experiment requires it. Unit-test the utility on synthetic
+   identical, positive-effect, and deterministic cases.
+7. **Dataset inventory**: emit CSV or JSON only for tasks declared in the paper matrix, including
+   split availability, entity/reference counts, candidate coverage, representation, relation and
+   entity-kind support, reference completeness, and any experiment-specific capability field.
+   Building an inventory for unused tracks is not an E00 prerequisite.
+8. **Leakage and supervision guards**: reporting references cannot be used by screening,
+   calibration, training, threshold selection, routing, early stopping, or fallback selection.
+   `label_free` ignores available training labels; `supervised` fails when usable training data is
+   absent. Every result's declared supervision must equal its resolved runtime mode.
+9. **LLM provenance**: when an LLM arm is confirmed, record provider, requested and resolved model
+   IDs/revisions, endpoint identity without credentials, tokenizer, prompt hash, decoding
+   parameters, seed, cache key, and request time. A model-identity change within paired arms aborts
+   the comparison. Mutable hosted aliases are exploratory-only.
+
+## Frozen design declaration
+
+Before `confirm`, write and hash a design record alongside the experiment config containing:
+
+- selected arm and development selection rule/result;
+- reporting tasks and exclusions;
+- primary comparison and endpoint;
+- required slices and controls;
+- paired seeds;
+- independent-unit definition;
+- hypothesized effect or non-inferiority margin;
+- `powered|underpowered|descriptive` status and its assumptions;
+- multiplicity rule when more than one confirmatory comparison remains.
+
+This record is immutable once any reporting result exists. A full automated power simulator is
+optional; an explicit design declaration is mandatory. The runner never writes into `specs/`.
 
 ## Acceptance
 
-- Rerunning `B0` from scratch reproduces the committed parquet within seed
-  noise (documented tolerance).
-- Appending a synthetic `R_1` leaves `B0` byte-identical, records `B0` as parent, and detects a
-  changed config, candidate pool, or fitted artifact in a lineage comparison.
-- `results.md` for the baseline renders per-task and macro tables with CIs.
-- `power_analysis.parquet` covers every eligible inventory slice and the experiment dry-run
-  refuses a confirmatory cell with no pre-registered power status.
-- The run manifest stamps the spec's pre-run power-declaration hash and rejects a changed
-  declaration once a reporting result exists.
-- A dry-run mode prints the full run matrix (arms × tasks × seeds) without executing.
-- A deliberately mislabelled target-supervised arm is rejected, and result aggregation refuses
-  to silently pool entity kinds or relation types when their per-slice rows are absent.
-- A run configured `supervision.mode: label_free` with a training reference on disk resolves
-  every component label-free and records that resolution; a run configured `supervised` with no
-  resolvable training reference fails loudly rather than falling back silently.
-- A fake `profile_rule` fixture resolves differently across an effective-unit/structural-profile
-  boundary, records the policy hash and reason, and never reads a test reference. With no training
-  reference it produces the same resolved label-free config and decisions as the explicit
-  `label_free` arm.
-- A fitted head or policy (selector, reranker, fusion weights, encoder, LLM gate, structural
-  head, or auto-resolution policy) whose recorded feature/policy schema, candidate-pool
-  fingerprint, graph hash, or resolved LLM identity does not match the current run is refused
-  rather than loaded.
-- A fake hosted-model response whose resolved identity changes between paired arms triggers the
-  LLM drift guard.
+- A dry run prints the exact stage×arm×task×seed matrix and resolved output paths.
+- A one-seed development screen produces a selection record without reading reporting references.
+- Confirmation rejects an unfrozen, missing, or mismatched selection/design record.
+- Repeating a deterministic same-seed run reproduces decisions and metrics within a documented
+  CPU tolerance; GPU nondeterminism is measured and recorded.
+- With every experiment flag disabled, runner output matches the frozen production baseline.
+- A changed config, dataset, candidate pool, fitted artifact, split, or model identity prevents
+  unsafe resume/reuse.
+- A deliberately mislabelled supervised or label-free run fails before inference.
+- Two independent CPU runs can execute concurrently without sharing mutable output files; device
+  limits prevent GPU/LLM oversubscription.
+- Aggregation reports missing/failed cells rather than silently dropping them and emits the
+  per-source data required for paired inference.
+
+## Explicit non-goals
+
+E00 does not require Parquet, automatic sbatch generation, a dashboard, a workflow database,
+automatic prose/table insertion into specs, a complete B0/R_n ancestry manager, a full inventory
+of every available benchmark, automated expert adjudication, or exhaustive power simulation.
+Those may be added only when a selected experiment or the paper submission actually requires
+them. Simplifying orchestration never relaxes split isolation, provenance, paired statistics, or
+the frozen confirmatory design.

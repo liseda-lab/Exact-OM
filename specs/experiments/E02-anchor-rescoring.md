@@ -40,10 +40,11 @@ features gain `s_anchor` when active.
 
 ## Arms & validation
 
-off (baseline) / one_pass / iterate; anchor threshold a ∈ {0.9, 0.95, exact-only}. Tasks: full
-matrix with emphasis on DISO + SNOMED pairs; both global and local metrics (channel helps
-ranking too). 3 seeds. Report channel-importance distributions (how often anchor channel
-dominates) for the explanation story.
+Screen off (baseline) / one_pass / iterate × anchor threshold {0.9, 0.95, exact-only} on
+development data with one seed, emphasizing DISO and SNOMED pairs. Freeze exactly one candidate.
+Confirm it against off on the eligible reporting tasks with three paired seeds and both global and
+local metrics. Report channel-importance distributions (how often the anchor channel dominates)
+for the explanation story.
 
 For each pass, persist the exact/predicted anchor set, how many anchors were added/removed,
 their source (exact, base score, or LLM-influenced score), coverage/degree distribution, and

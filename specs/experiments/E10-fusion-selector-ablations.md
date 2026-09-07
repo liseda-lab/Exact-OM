@@ -33,19 +33,22 @@ All config-only or selector-internal, gated:
 2. `selector.accept_model: logistic|gbdt_monotonic` (lightgbm with monotone constraints on
    evidence features; keep the linear model's feature set identical).
 3. `selector.accept_training: winner_only|winner_plus_runnerup`.
-4. Deliverable regardless of promotion: a committed **constants provenance table** — final
-   swept values + dev-set evidence — replacing folklore defaults (closes finding F3's origin
-   problem for good).
+4. Deliverable regardless of promotion: a versioned **constants provenance table** stored
+   with the experiment results — final swept values plus development evidence — replacing
+   folklore defaults (closes finding F3's origin problem for good).
 
 ## Arms & validation
 
-Stage 1 (development-only screening carve-out): γ/τ_LLM/β sweep on two dev tasks, 1 seed,
-prune to top-3 configs; it makes no reporting-set or promotion claim.
-Stage 2: pruned fusion configs × {logistic, gbdt} × {winner_only, +runnerup}, full matrix,
-3 seeds. Primary: macro F1 + local MRR; secondary: p_match AUROC, LLM invocation rate (τ_LLM
-moves it directly — cost column mandatory), explanation-impact note (GBDT loses exact linear
-attributions for the *accept* step; the pairwise-score decomposition is untouched, but the
-promotion decision must weigh this explicitly against the paper's interpretability claims).
+Screen phase A: sweep γ/τ_LLM/β on two development tasks with one seed and prune to the
+top three configurations using the predeclared rule. Screen phase B: cross those survivors with
+{logistic, gbdt} × {winner_only, winner_plus_runnerup}, still on development data and one seed.
+Freeze at most one fusion candidate and one accept-model/training candidate because they are
+separate paper/default decisions; if both survive, freeze their 2×2 interaction. Confirmation runs
+only those candidates, their shipped controls, and the required 2×2 on reporting data with three
+paired seeds. Primary: macro F1 plus local MRR; secondary: p_match AUROC, LLM invocation rate
+(tau_LLM moves it directly, so cost is mandatory), and an explanation-impact note. GBDT loses
+exact linear attributions for the accept step; the pairwise-score decomposition is untouched, but
+the paper and promotion decision must state that trade-off explicitly.
 
 **Promotion**: standard criteria; GBDT additionally requires the interpretability trade-off to
 be explicitly accepted by the owner (it changes the "fully inspectable decision process"

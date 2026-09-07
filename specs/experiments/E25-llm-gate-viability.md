@@ -74,9 +74,15 @@ cost unless (d) is large.
 
 ## Validation
 
-Eligible tasks: all five Bio-ML pairs, plus at least one identifier-poor track (Anatomy or
-Conference) where lexical evidence is weaker and the gate has more reason to fire. Classes.
-Primary metric macro F1 (global) and macro MRR (local).
+Screen analytic/off, the quantile sweep, and a bounded forced sample on development data with one
+seed. Run the oracle only as a development diagnostic. Freeze one quantile candidate only if the
+LLM and quality/cost selection rule passes; the router remains deferred to E21 machinery. If no
+candidate passes, freeze the explicit removal recommendation and do not spend reporting LLM calls.
+
+Confirm the frozen candidate or removal claim against the analytic/off controls on all five
+eligible Bio-ML reporting pairs plus at least one identifier-poor track (Anatomy or Conference),
+with three paired seeds where an LLM candidate survives. Classes. Primary metric macro F1 (global)
+and macro MRR (local).
 
 **Cost reporting is a first-class endpoint here, not a footnote**: call count, token count, and
 wall time per arm, since the design's stated justification is selective use. An arm that improves
@@ -115,5 +121,5 @@ in flight against different fusion arms.
 
 ## Results note
 
-*(appended after running; must answer RQ25.1–RQ25.5 and state explicitly whether the branch is
+*(stored outside `specs/` after running; must answer RQ25.1–RQ25.5 and state explicitly whether the branch is
 retained, re-gated, or removed)*

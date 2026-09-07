@@ -39,9 +39,12 @@ Touched: `impl/models/selector/acceptance.py` (score emission mode),
 
 ## Arms & validation
 
-Arms: greedy (baseline) / mutual_best / assignment / stable_marriage; ×{selector on, selector
-off} on one task to check interaction. Tasks: full reporting matrix (global metric only).
-3 seeds. Primary metric: macro F1; secondary: per-task P/R, count of sources changed.
+Screen greedy (baseline) / mutual_best / assignment / stable_marriage on development data
+with one seed; cross selector {on, off} on one development task to check the interaction. Freeze one
+extraction candidate per explicit cardinality regime. Confirm each frozen candidate against greedy
+on the eligible reporting tasks with three paired seeds; carry the selector 2×2 into confirmation
+only if it is named in the frozen design record. Primary: macro F1; secondary: per-task P/R and
+count of sources changed.
 
 For RQ01.4, compute only reference-free task statistics: source/target signature-size ratio,
 candidate-graph component density, target-collision rate among source top-1s, reciprocal-top-1

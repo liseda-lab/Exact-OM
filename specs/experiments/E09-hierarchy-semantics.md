@@ -39,10 +39,11 @@ Inside `_score_hierarchy_family` (flag `matching.channels.hier.mode: labels|labe
 
 ## Arms & validation
 
-labels (baseline) / +overlap / +overlap+siblings; depth ∈ {2, full}. Emphasis tracks: SNOMED-*,
-Anatomy, OAEI-KG; full matrix for guard. 3 seeds. Secondary analysis: hierarchy-channel
-quality/importance distributions; wins/losses vs baseline where lexical was ambiguous
-(U ≥ τ_LLM slice — does better hierarchy reduce LLM invocations?).
+Screen labels (baseline) / +overlap / +overlap+siblings × depth {2, full} on development
+data with one seed. Freeze exactly one hierarchy candidate. Confirm that candidate against labels
+on SNOMED-*, Anatomy, and eligible OAEI-KG reporting tasks with three paired seeds. Secondary
+analysis: hierarchy-channel quality/importance distributions; wins/losses versus baseline where
+lexical evidence was ambiguous (U ≥ τ_LLM slice — does better hierarchy reduce LLM invocations?).
 
 **Promotion**: standard; the declared cost arm may promote when LLM calls decrease with a 95%
 CI excluding zero and macro F1 is non-inferior (quality-delta CI lower bound above −0.5

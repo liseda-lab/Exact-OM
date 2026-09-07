@@ -78,15 +78,16 @@ tool, not runtime code; the runtime only loads a fitted artifact.
 Following E05's two-stage shape, because retrieval screening is cheap and end-to-end runs are
 not:
 
-Stage 1 (development retrieval screening, 1 seed under the deterministic-screening carve-out):
-{best zero-shot E05 arm, contrastive fine-tuned} × pool sizes, measured by candidate recall and
-gold-rank median/p90 on development tasks. Freeze survivors here.
+Screen on development data with one seed: {best zero-shot E05 arm, contrastive fine-tuned}
+× pool sizes × {cross_encoder off, on}, first by candidate recall and gold-rank median/p90 and then
+by a bounded end-to-end check. Freeze exactly one combined supervised-retrieval candidate using
+the predeclared rule.
 
-Stage 2 (reporting, 3 seeds end-to-end): frozen survivors × {cross_encoder off, on}, on Bio-ML
-test and every eligible track with a training split and a declared negative-label policy. Report
-the label-free comparator (the promoted zero-shot E05 configuration) in the same table, plus
-`cross_pair_transfer` for the
-fine-tuned encoder — separated into shared-ontology and disjoint-ontology slices, per RQ20.4.
+Confirm the frozen candidate against the promoted zero-shot E05 label-free comparator with three
+paired end-to-end seeds on Bio-ML test and every eligible track with a training split and declared
+negative-label policy. Report `cross_pair_transfer` for that same frozen encoder separately for
+shared-ontology and disjoint-ontology slices, per RQ20.4; it is a distinct supervision regime, not
+another arm selected from reporting data.
 
 Primary: end-to-end macro F1. Co-primary declared in advance: test-split candidate recall at
 fixed mean pool size, since a retrieval experiment whose recall claim is only secondary cannot

@@ -113,5 +113,5 @@ since quality terms depending on coverage move with pool size.
 
 ## Results note
 
-*(appended after running; must answer RQ26.1–RQ26.5, and must report the Stage 2 decomposition
+*(stored outside `specs/` after running; must answer RQ26.1–RQ26.5, and must report the Stage 2 decomposition
 table whether or not any arm is promoted)*

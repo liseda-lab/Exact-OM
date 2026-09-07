@@ -69,13 +69,15 @@ existing gating and decision points in `pair_adaptive_scorer.py`. The router is 
 
 ## Arms & validation
 
-Development: exemplar count sweep and gate/student model selection on Bio-ML train/validation,
-1 seed, pruned to one frozen configuration per lever.
+Screen the exemplar count, gate, student, and supported combinations on Bio-ML
+train/validation with one seed and the fixed collection budget. Apply a predeclared selection rule
+per explicit lever and retain only candidates that clear their quality/cost guard; freeze one
+combined configuration when more than one lever survives.
 
-Reporting (3 seeds): {zero-shot E07 winner, +exemplars} × {uncertainty gate, learned gate}, plus
-the distilled student as its own arm, on eligible tracks with training splits and a declared
-counterfactual-label/completeness policy. The label-free
-comparator column is the promoted E07 configuration with its uncertainty gate.
+Confirm only the frozen candidate(s), the necessary single-lever controls, and the promoted E07
+label-free comparator on eligible reporting tracks with three paired seeds and a declared
+counterfactual-label/completeness policy. Do not send the complete development factorial to
+reporting data.
 
 Primary: macro F1. **Co-primary, declared before results open**: LLM calls and tokens. For the
 gate and distillation arms the cost endpoint is primary and quality is held to a non-inferiority

@@ -1,115 +1,118 @@
-# E17 — Promoted-Stack Integration Audit
+# E17 — Frozen-Stack Integration Experiment
 
-**Motivation** (audit obs. 17): individual experiments isolate causal changes, but the product
-ships their defaults together. Retrieval changes candidate pools; new channels compete through
-σ-mixing and alter selector features; extraction interacts with thresholds, NIL, and label-free
-acceptance. Independent improvements therefore do not imply that the combined matcher is
-better, calibrated, coherent, or affordable.
+**Motivation** (audit obs. 17): individual experiments isolate causal changes, but the paper and
+product present those changes as one matcher. Retrieval changes candidate pools; channels compete
+through fusion; selection, calibration, NIL behavior, and LLM gating share scores. Independent
+improvements therefore do not establish that their combination is better, coherent, or affordable.
 
-E17 is a release gate, not a mechanism for rescuing an experiment that failed its own test.
+E17 is mandatory when the paper claims a final combined Exact-OM system and when a release proposes
+more than one result-changing default. It is not a mechanism for rescuing an arm that failed its
+own confirmation.
 
 ## Research questions
 
-- **RQ17.1**: Does the complete proposed default stack improve on the current rolling baseline
-  `R_n`, and what is its cumulative change relative to historical `B0`?
-- **RQ17.2**: Are the observed combined gains consistent with additivity, or do promoted changes
-  exhibit diminishing, synergistic, or sign-reversing interactions?
-- **RQ17.3**: Does each promoted flag retain a beneficial or non-inferior marginal contribution
-  when removed from the otherwise complete stack?
-- **RQ17.4**: Do the known high-risk boundaries—retrieval×downstream matching,
-  channels×fusion/selector, extraction×calibration/NIL/label-free selection,
-  listwise×NIL, and the supervised boundaries below—remain valid in combination?
-- **RQ17.5**: Does the proposed stack preserve calibration, abstention/coverage, typed alignment
-  coherence, explanation reconstruction, runtime/memory, and LLM cost?
-- **RQ17.6**: Does the stack behave correctly under every supervision resolution — do the
-  label-free resolutions still compose into a working matcher when no training reference is
-  supplied, and do supervised components resolve correctly around E22's effective-training-unit
-  and profile-policy boundaries?
-
-## Hypotheses
-
-The frozen proposed stack should improve its macro quality metric over `R_n` with the standard
-CI gate and preserve every task×kind×relation guard. A batch containing only declared
-cost/robustness promotions instead uses its pre-registered aggregate objective with the README's
-quality non-inferiority guard. Some sub-additivity is expected because channels share evidence,
-but no promotion should reverse its declared objective or become harmful beyond the slice MDE
-when embedded in the stack.
+- **RQ17.1**: Does the frozen combined stack improve on the paper's current `R_n` baseline?
+- **RQ17.2**: Does every claimed component retain a beneficial or non-inferior marginal
+  contribution inside the combined stack?
+- **RQ17.3**: Do the small number of predeclared high-risk component pairs show synergy,
+  cancellation, or sign reversal?
+- **RQ17.4**: Does the stack preserve candidate recall, calibration, coverage/abstention, typed
+  coherence, exact explanation reconstruction, runtime/memory, and LLM cost?
+- **RQ17.5**: Does the combined matcher run correctly in each supervision regime claimed by the
+  paper, including label-free execution when training references happen to be present?
 
 ## Inputs and freeze
 
-The harness reads promotion-eligibility manifests produced since `R_n`. Each manifest names the
-experiment arm, locked baseline, config overlay, fitted-artifact hashes, candidate-pool
-fingerprint, power declaration, and promotion decision. Before reporting data is opened:
+E17 consumes only candidates that survived their experiment's development screen and confirmatory
+comparison. A component with only exploratory evidence may appear in a separately labelled
+diagnostic stack but not in the primary paper stack. Before E17 reporting data is opened:
 
-1. Apply all eligible overlays to `R_n` in dependency order, regenerate config and candidate
-   caches, and refit any selector/calibrator/relation head on permitted training splits. Reusing
-   a fitted artifact from an incompatible feature or pool fingerprint is an error.
-2. Run the arms below on development tasks. Remove or revise a flag only here, then freeze the
-   release-candidate stack and all interaction contrasts.
-3. Produce one E17 reporting matrix. Reporting leave-one-out results diagnose interactions but
-   cannot be used to prune and rerun a more favorable stack on the same test data; a failure
-   blocks release and requires a separately pre-registered integration revision.
+1. Apply surviving overlays to the same frozen `R_n` baseline in dependency order. Retrieval
+   changes run first; regenerate candidate pools and refit downstream artifacts whose pool or
+   feature fingerprint changed.
+2. On development data, execute the E17 screening matrix below, resolve integration defects, and
+   freeze the final stack, leave-one-out arms, required interaction contrasts, reporting tasks,
+   seeds, endpoints, and cost/non-inferiority bounds.
+3. Write one immutable E17 selection/design record. Reporting results may diagnose a failed stack
+   but may not be used to prune it and rerun a more favorable combination on the same test data.
 
-## Arms
+## Screening matrix
 
-- `rolling`: exact current defaults from `R_n` (**primary baseline**).
-- `historical`: immutable `B0` (**longitudinal diagnostic**, never the primary promotion
-  comparator).
-- `stack_all`: every frozen proposed promotion applied and all derived artifacts refit.
-- `stack_minus_EXX`: one arm per promoted result, removing only that result from `stack_all`.
+Run on development data, normally with one seed:
 
-On development data, also run `R_n + EXX` single-change arms and mandatory 2×2 factorials for
-every pair that shares a candidate pool, score mixture, selector feature/threshold, extraction,
-NIL, or relation-typing boundary. Among supervised promotions the mandatory pairs are
-E20×{E18, E19} (a fitted head over a changed pool), E19×{E18, E10} (fused score versus ranking
-and acceptance heads competing for the same headroom), E19×{E04, E07, E21} (learned fusion moves
-`U`, which moves LLM gating and NIL together), and E23×{E02, E13, E18, E19} (learned graph
-evidence versus anchor propagation/materialized closure, plus the ranking and learned-fusion
-heads that consume its changed feature schema). An E23×E19 arm always refits E19 with the graph
-channel present; loading a pre-E23 artifact is an error. Every supervised promotion is additionally
-run in both of its resolutions, since a stack is only shippable if it composes under
-`label_free` as well as `supervised`. Report the interaction residual
-`Δ(A+B) − Δ(A) − Δ(B)`. Any pair whose development interaction changes sign or exceeds the
-relevant MDE is pre-registered as a confirmatory reporting contrast; Holm-adjust those
-contrasts. LLM arms use E00's model fingerprint/drift guard.
+- `rolling`: exact current defaults from the frozen `R_n` baseline.
+- `stack_all`: every individually confirmed paper component, with compatible artifacts refit.
+- `stack_minus_EXX`: remove one claimed component at a time from `stack_all`.
+- `rolling_plus_EXX`: optional single-addition controls when the individual result used a
+  different baseline or candidate pool and cannot support an interaction calculation directly.
+- targeted 2×2 contrasts only for component pairs that share a causal boundary.
 
-## Validation
+The default high-risk boundaries are retrieval×selector/reranker, fusion×acceptance, fusion or
+uncertainty×LLM gating, contrastive evidence×quality/fusion, extraction×NIL, and representation or
+graph structure×a fitted downstream head. Instantiate a contrast only when both components are in
+`stack_all`. The E17 config names and justifies every included pair before screening. Do not run a
+complete factorial.
 
-Run the full eligible reporting matrix, three paired seeds, with the exact source/entity-kind,
-relation, supervision, candidate-recall, cost, and incomplete-reference protocols from the
-programme README. Primary comparison: `stack_all` versus `rolling`. Report `stack_all` versus
-`historical` separately and never attribute that cumulative delta to the newest batch alone.
+Use the screening results to repair implementation incompatibilities, not to manufacture a better
+test result. Once stable, freeze `stack_all`. A component that becomes harmful on development may
+be removed before the freeze, with the removal and reason recorded; it remains part of the
+individual experiment record.
 
-For every leave-one-out arm report marginal ΔP/R/F1 or MRR, coverage/abstention, ECE/Brier,
-typed-relation macro F1 and cross-hierarchy cycle/coherence counts, channel importance, exact
-explanation reconstruction, wall time, peak memory, and LLM tokens/calls. Compare observed
-marginals with the individual experiment's effect and MDE, noting baseline or pool changes.
+## Confirmatory matrix
 
-## Release decision and baseline stamp
+Run on untouched reporting data with at least three paired seeds:
 
-The proposed defaults may ship only if:
+- `rolling` (**primary baseline**);
+- frozen `stack_all` (**primary candidate**);
+- one `stack_minus_EXX` arm for every component whose contribution is claimed in the paper;
+- only those 2×2 interaction contrasts named as central or high-risk in the frozen design record;
+- historical `B0` optionally, as a longitudinal diagnostic and never the primary comparator.
 
-1. `stack_all` passes the standard promotion criteria against `rolling`, including powered
-   per-slice guards and any already-approved capability-specific overrides.
-2. No reporting leave-one-out result shows that removing a flag improves the primary endpoint
-   by more than that slice's MDE, reverses that flag's declared cost/robustness objective, or
-   repairs a guard failure. Such a result blocks the batch; it is not permission to tune on
-   reporting data.
-3. All pre-registered high-risk interaction contrasts avoid sign reversal and their costs and
-   calibration shifts are within their declared gates.
-4. Candidate-pool/artifact compatibility, explanation reconstruction, NIL scale, LLM identity,
-   and typed-hierarchy coherence checks pass.
-5. The stack runs end to end under `supervision.mode: label_free` on a track with training
-   labels present, producing a valid alignment with the expected supervision labels — a release
-   may not depend on labels being available.
+This bounded matrix replaces an exhaustive factorial. Leave-one-out measures marginal contribution
+near the final system; the selected 2×2 contrasts test the most plausible shared boundaries.
 
-On success, append `R_{n+1}` to E00's lineage with parent `R_n`, the complete resolved config,
-promotion manifests, fitted artifacts, candidate pools, and E17 result hashes. `B0` and all
-earlier `R_*` entries remain immutable. Multiple sequential flag-flip PRs for the same release
-all cite this one integration stamp; splitting the PRs does not split the statistical gate.
+## Validation and reporting
 
-**Effort**: M, mostly compute. **Risks**: combinatorial interactions cannot all be exhaustively
-tested; LOO measures marginal contribution near the full stack rather than every higher-order
-interaction; repeated integration attempts can leak reporting results. The dependency-derived
-factorials cover the most plausible boundaries, and a failed reporting gate requires a new
-pre-registration rather than iterative test-set pruning.
+Use the full eligible reporting tasks declared for the paper, the same candidate pools and paired
+seeds where retrieval is held fixed, and all applicable supervision/incomplete-reference rules
+from the programme README. The primary comparison is `stack_all` versus `rolling` on the frozen
+macro quality endpoint. Report cumulative change versus `B0` separately when available and never
+attribute it solely to the newest stack.
+
+For `stack_all`, baseline, and every leave-one-out arm, report:
+
+- candidate recall before end-to-end quality;
+- per-task and macro P/R/F1 or MRR/Hits@1;
+- coverage/abstention and ECE/Brier where applicable;
+- entity-kind and typed-relation slices claimed by the paper;
+- exact explanation reconstruction;
+- wall time, peak memory when material, and LLM calls/tokens;
+- the marginal delta from removing each component.
+
+For each retained 2×2, report the interaction residual
+`delta(A+B) - delta(A) - delta(B)` with its paired interval. Apply the frozen multiplicity rule when
+more than one interaction is confirmatory.
+
+## Paper and release decision
+
+The combined-system claim passes only if:
+
+1. `stack_all` improves the frozen primary endpoint over `rolling`, or meets a predeclared
+   quality non-inferiority bound for a cost/robustness claim, with the required paired interval.
+2. No reporting task or claimed entity-kind/relation slice breaches its frozen regression bound.
+3. No leave-one-out result shows that removing a claimed component materially improves the
+   primary endpoint or repairs a guard failure. Such a result makes the combined claim
+   `inconclusive` or failed; it is not permission to retune on reporting data.
+4. Predeclared high-risk interactions avoid an unexplained sign reversal and stay within frozen
+   calibration and cost bounds.
+5. Candidate-pool/artifact compatibility, supervision resolution, explanation reconstruction,
+   NIL scale, LLM identity, and typed-coherence checks pass where applicable.
+
+For a paper-only result, the immutable E17 manifest and result hashes are sufficient. If the same
+stack will become product defaults, append `R_{n+1}` with parent `R_n`, resolved configuration,
+artifacts, candidate-pool fingerprint, and E17 result hashes; earlier baselines remain immutable.
+
+**Effort**: M, primarily compute. **Risks**: leave-one-out does not identify every higher-order
+interaction, while an exhaustive factorial is impractical. The bounded matrix answers the combined
+system question and tests the few causal boundaries most likely to invalidate it without turning
+E17 into a second full experiment programme.

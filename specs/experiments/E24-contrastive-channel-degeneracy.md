@@ -72,8 +72,11 @@ own fix.
 | `diff_asymmetric` | secondary corrective arm |
 | `diff_absolute` × `sim_fix` | factorial with RQ24.5's relational fix, only if both are individually non-null |
 
-Diagnostic stage runs on the frozen 300-source OMIM–ORDO and SNOMED–FMA subsets. Confirmatory
-stage runs the full eligible task set with ≥3 seeds.
+Screen the diagnostic and corrective arms on the frozen 300-source OMIM–ORDO and SNOMED–FMA
+subsets with one seed. Freeze at most one corrective or removal candidate; include `diff_off` as a
+required control when the paper claims the shipped channel is inert. Confirm only the baseline,
+frozen candidate, and required control on the full eligible task set with at least three paired
+seeds.
 
 ## Validation
 
@@ -116,5 +119,5 @@ firing changes $U$, so any E04/E07/E21/E25 comparison running alongside must pin
 
 ## Results note
 
-*(appended after running; must answer RQ24.1–RQ24.5 with `supported`, `not supported`, or
+*(stored outside `specs/` after running; must answer RQ24.1–RQ24.5 with `supported`, `not supported`, or
 `inconclusive`, and include the power declaration and both gate outcomes)*

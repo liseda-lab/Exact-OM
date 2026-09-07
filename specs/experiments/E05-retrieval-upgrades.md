@@ -39,9 +39,11 @@ pool summary. Downstream experiment manifests bind to this fingerprint.
 Two-stage evaluation, cheap first:
 1. **Development retrieval screening** (no full runs): candidate recall + gold-rank median/p90
    via the existing recall tool, all arms × development tasks, 1 seed under the deterministic-
-   screening carve-out (retrieval is deterministic on CPU). Freeze the surviving arm(s) here.
+   screening carve-out (retrieval is deterministic on CPU). Freeze exactly one candidate using
+   the predeclared rule, or stop as `screened_out`.
 2. **Reporting confirmation**: evaluate retrieval diagnostics and end-to-end results for the
-   frozen arms on the reporting matrix in the same final pass, with 3 end-to-end seeds. No arm
+   frozen candidate and current baseline on the reporting matrix in the same final pass, with 3
+   paired end-to-end seeds. No arm
    is killed or selected from reporting candidate recall. Recall gains must survive the selector
    because additional candidates can add downstream noise; measure precision explicitly.
 
@@ -51,10 +53,11 @@ dataset-build wall time (ledger).
 **Promotion**: standard criteria; encoder swap additionally requires dataset-build time within
 1.5× (SapBERT is heavier — batch-encode once, embeddings are already cached across runs).
 
-E05's promotion decision precedes all downstream candidate-consuming experiments. If an E05 arm
-promotes, append the new rolling baseline and regenerate E00 capability/power artifacts before
-those experiments freeze. A later retrieval change makes downstream product-promotion evidence
-stale until E17 reconfirms it on the new pool.
+E05's confirmation decision precedes all downstream candidate-consuming experiments. If the
+frozen E05 candidate confirms, record its candidate-pool fingerprint as the retrieval baseline and
+refresh affected inventory rows and downstream design declarations before those experiments freeze.
+A later retrieval change makes downstream product-promotion evidence stale until E17 reconfirms it
+on the new pool.
 
 **Pre-registered criterion-3 override**: the encoder-swap arm may use 1.5× dataset-build time
 because SapBERT is inherently heavier and the embedding cache amortizes this cost across runs.

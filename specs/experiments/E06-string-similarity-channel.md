@@ -48,10 +48,11 @@ Touched: one new channel module, scorer channel registry, config.
 
 ## Arms & validation
 
-off (baseline) / strsim-as-channel / strsim+abbreviation-as-channel /
-strsim-folded-into-lex (replace `s_label` with `max(s_label, s_strsim)` — the blunt variant, to
-test whether channel-level treatment matters). Full matrix, 3 seeds, global + local metrics.
-Report per-track channel-importance shift and cases where strsim vetoes/rescues the encoder.
+Screen off (baseline) / strsim-as-channel / strsim+abbreviation-as-channel /
+strsim-folded-into-lex on development data with one seed; the folded arm tests whether explicit
+channel treatment matters. Freeze exactly one candidate. Confirm it against off on the eligible
+reporting tasks with three paired seeds and global plus local metrics. Report per-track
+channel-importance shift and cases where string similarity vetoes or rescues the encoder.
 For RQ06.4, pre-register abbreviation pairs from label forms without using mapping correctness;
 report the base ensemble and abbreviation sub-signal separately on that slice.
 

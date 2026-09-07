@@ -60,9 +60,11 @@ Touched: decision path in the scorer + prompt builders; router unchanged.
 
 ## Arms & validation
 
-Development: binary controls plus listwise × all probability modes; freeze one promotable
-probability mode, then run listwise/listwise_sc on the full reporting matrix with 3 seeds.
-Primary: macro F1 + local MRR **and** LLM cost (calls, tokens — this experiment's promotion
+Screen the binary controls plus {listwise, listwise_sc} × all probability modes on
+development data with one seed and a fixed LLM budget. Freeze exactly one combined decision and
+probability configuration. Confirm it against the required binary controls on the eligible
+reporting tasks with three paired seeds. Primary: macro F1 plus local MRR **and** LLM cost (calls,
+tokens — this experiment's promotion
 explicitly trades both). Report categorical NLL/Brier/top-choice ECE for `P(A..E,Z)`, pairwise
 ECE/Brier after fusion/calibration, and reliability sliced by list length. Also analyze gated,
 overflow/non-overflow, and sibling-confusion sources.

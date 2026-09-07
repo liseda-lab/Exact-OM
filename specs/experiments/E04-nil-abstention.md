@@ -46,10 +46,11 @@ consumed instead of dropped.
 
 ## Arms & validation
 
-off / heuristic / accept_model on DISO (primary; NIL-aware metrics per the track's eval —
-via the OAEI-Bio-ML-eval backend when it lands, else the kit's own scorer) + Bio-ML local
-(guard: MRR/Hits unchanged within CI). Pool-ablation stress test: remove gold from x% of val
-pools, measure NIL detection AUROC. 3 seeds.
+Screen off / heuristic / accept_model on DISO development data plus Bio-ML validation with
+one seed. Use the pool-ablation stress test only on validation pools and freeze one NIL candidate
+using the predeclared NIL quality and non-NIL ranking guard. Confirm that candidate against off on
+untouched DISO/Bio-ML reporting data with three paired seeds. Use the pinned NIL-aware evaluator;
+report NIL detection AUROC and guard that non-NIL MRR/Hits remain within the frozen bound.
 
 Report categorical NLL/Brier/ECE for the joint distribution, NIL ECE, and rank changes caused
 by replacing raw `S_final` order with calibrated `p_match`/`q`. Non-NIL MRR guards whether the
