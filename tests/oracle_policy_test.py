@@ -276,6 +276,40 @@ def test_followup_binds_completed_recipe_and_refuses_population_or_role_changes(
     )
     with pytest.raises(ValueError, match="frozen source_universe"):
         materialize_followup(modified, suite, [item], {})
+    # A consumer may relocate identical reference bytes, but cannot change the
+    # effective role or reference labels before the adapter opens either table.
+    relocated = tmp_path / "relocated-valid.tsv"
+    relocated.write_bytes(reference.read_bytes())
+
+    def with_reference(path, role="valid"):
+        task = source.config.screen.tasks[0].model_copy(
+            update={
+                "reference_role": role,
+                "overlay": harness.deep_merge(overlay, {"data": {"refs": {role: str(path)}}}),
+            }
+        )
+        return replace(
+            source,
+            config=source.config.model_copy(
+                update={"screen": source.config.screen.model_copy(update={"tasks": [task]})}
+            ),
+        )
+
+    replay = materialize_followup(with_reference(relocated), suite, [item], {})
+    assert (
+        replay.config.frozen_constants["resolved_oracle_policy"]["manifest_sha256"]
+        == metadata["manifest_sha256"]
+    )
+    relocated.write_text("SrcEntity\tTgtEntity\ngood\ta\n")
+    with monkeypatch.context() as guard:
+        guard.setattr(
+            "exact.utils.data.read_table",
+            lambda *args: pytest.fail("opened changed reference labels"),
+        )
+        with pytest.raises(ValueError, match="reference bytes"):
+            materialize_followup(with_reference(relocated), suite, [item], {})
+        with pytest.raises(ValueError, match="effective reference role"):
+            materialize_followup(with_reference(reference, "development"), suite, [item], {})
     producer["data"]["reference_role"] = "test"
     config_path.write_text(dump_yaml_document(producer))
     item["resolved_config_hash"] = harness.hash_payload(producer)

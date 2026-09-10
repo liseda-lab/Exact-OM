@@ -342,6 +342,18 @@ def materialize_followup(source, suite, manifests, selections):
     )
     from exact.utils.provenance import sha256_path
 
+    if consumer["data"].get("reference_role") != role:
+        raise ValueError("Cached E25 changed its effective reference role")
+    reference_paths = []
+    for config in (producer, consumer):
+        data = config["data"]
+        reference_name = data.get("refs", {}).get(role)
+        if not reference_name:
+            raise ValueError("Cached E25 requires the same bound development reference")
+        reference_paths.append(Path(data.get("root") or ".") / reference_name)
+    if sha256_file(reference_paths[0]) != sha256_file(reference_paths[1]):
+        raise ValueError("Cached E25 changed its frozen development reference bytes")
+
     for key in ("source", "target", "source_universe", "candidates"):
         values = []
         for config in (producer, consumer):
@@ -414,6 +426,8 @@ def materialize_followup(source, suite, manifests, selections):
         "no_new_hosted_requests": True,
     }
     resolved = ExperimentConfig.model_validate(declaration)
-    path = destination / "resolved-experiment.json"
+    path = destination / (
+        "resolved-experiment." + hash_payload(resolved.model_dump(mode="json"))[:20] + ".json"
+    )
     freeze_json(path, resolved.model_dump(mode="json"))
     return ExperimentSource(config=resolved, path=path)
