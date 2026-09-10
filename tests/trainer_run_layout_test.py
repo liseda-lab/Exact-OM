@@ -143,6 +143,7 @@ def test_semantic_abstention_rejects_mapping_across_all_output_surfaces(
     )
     accepted_key = (KG_BASE + "organ", KG_BASE + "organ")
     abstained_key = (KG_BASE + "blood", KG_BASE + "missing")
+    dataset.eligible_source_iris = [accepted_key[0], abstained_key[0], KG_BASE + "unscored"]
     pairs = [
         EntityMapping(*accepted_key, score=0.99),
         EntityMapping(*abstained_key, score=0.88),
@@ -264,6 +265,14 @@ def test_semantic_abstention_rejects_mapping_across_all_output_surfaces(
         "unscored": 1,
     }
     assert stats["metric_applicability"]["coverage"] is True
+    source_trace = json.loads(paths["source_decisions_json"].read_text())
+    sources = {row["Src"]: row for row in source_trace["records"]}
+    assert len(sources) == 3
+    assert sources[accepted_key[0]]["emitted_targets"] == [accepted_key[1]]
+    assert sources[abstained_key[0]]["emitted_targets"] == []
+    rejected = sources[abstained_key[0]]["candidates"][0]
+    assert rejected["reason"] == "relation_abstention"
+    assert rejected["relation_abstention"]["reason"] == "not_entailed"
 
 
 def test_trainer_forwards_semantic_relation_configuration_and_anchors(

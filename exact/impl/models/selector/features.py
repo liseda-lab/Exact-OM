@@ -498,8 +498,19 @@ class FeatureEngineeringMixin:
             ]:
                 if key in row:
                     conf[key] = float(row.get(key, 0.0))
-            if "S_pair_final" not in conf:
-                conf["S_pair_final"] = float(row.get("S_pair_final", conf.get("S_final", 0.0)))
+            conf["S_pair_final"] = float(row.get("S_pair_final", conf.get("S_final", 0.0)))
+            if "S_pair_pre_calibration" in row:
+                conf["S_pair_pre_calibration"] = float(row["S_pair_pre_calibration"])
+            serialized = row.get("selector_explanation")
+            if isinstance(serialized, str) and serialized:
+                record["selector_explanation"] = json.loads(serialized)
+            calibration = getattr(self, "_score_calibration_meta", {})
+            if calibration.get("applied"):
+                record["score_calibration"] = {
+                    **{key: calibration[key] for key in ("mode", "parameters", "artifact")},
+                    "input": float(row["S_pair_pre_calibration"]),
+                    "output": float(row["S_pair_final"]),
+                }
             conf["S_select"] = float(row.get("S_select", 0.0))
             conf["P_select"] = float(row.get("P_select", 0.0))
             conf["selection_margin"] = float(row.get("selection_margin", 0.0))
@@ -532,6 +543,7 @@ class FeatureEngineeringMixin:
                 "P_nil",
                 "Q_match",
                 "Q_nil",
+                "Q_pool_miss",
             ]:
                 if key in row:
                     conf[key] = float(row.get(key, 0.0))

@@ -325,36 +325,112 @@ class FittedSelectorMixin:
                 df.at[index, "selection_accept_threshold"] = threshold
                 df.at[index, "selection_utility"] = utilities[index]
                 rank_model = payload["rank_model"]
-                if rank_model.get("model_type") != "analytic":
-                    basis = self._rank_basis(
-                        features[index], rank_model.get("model_type", "current_linear")
-                    )
-                    contributions = [
+                model_type = rank_model.get("model_type", "current_linear")
+                if model_type == "analytic":
+                    contributions = {"bounded_pair_score": utilities[index]}
+                    rank_bias = 0.0
+                    basis = list(features[index])
+                else:
+                    basis = list(self._rank_basis(features[index], model_type))
+                    values = [
                         value * weight
                         for value, weight in zip(
                             self._standardize(basis, rank_model["mean"], rank_model["scale"]),
                             rank_model["weights"],
                         )
                     ]
-                    if rank_model.get("model_type") == "additive_gam":
-                        contributions = [
-                            sum(contributions[i : i + 2]) for i in range(0, len(contributions), 2)
-                        ]
+                    if model_type == "additive_gam":
+                        values = [sum(values[i : i + 2]) for i in range(0, len(values), 2)]
                     names = (
                         [self.RANK_FEATURE_NAMES[i] for i in (1, 3, 4, 5, 6)]
-                        if rank_model.get("model_type") == "channel_gating"
+                        if model_type == "channel_gating"
                         else self.RANK_FEATURE_NAMES
                     )
-                    explanation = {
-                        "schema": payload["explanation_schema"],
-                        "bias": rank_model["bias"],
-                        "contributions": dict(zip(names, contributions)),
-                        "logit": utilities[index],
-                        "accept_logit": self._linear_score(
-                            decision["accept_features"], payload["accept_model"]
+                    contributions = dict(zip(names, values))
+                    rank_bias = rank_model["bias"]
+                explanation = {
+                    "schema_version": 2,
+                    "schema": payload["explanation_schema"],
+                    "stage": "fitted_selector_before_nil_and_extraction",
+                    "fit_identity": payload["fit_identity"],
+                    "rank": {
+                        "feature_names": self.RANK_FEATURE_NAMES,
+                        "features": dict(zip(self.RANK_FEATURE_NAMES, features[index])),
+                        "basis": basis,
+                        "model": rank_model,
+                    },
+                    "bias": rank_bias,
+                    "contributions": contributions,
+                    "logit": utilities[index],
+                    "accept_logit": self._linear_score(
+                        decision["accept_features"], payload["accept_model"]
+                    ),
+                    "source_decision_target": str(df.at[winner, "Tgt"]),
+                    "output": {
+                        "is_winner": is_winner,
+                        "accepted": bool(accepted),
+                        "P_match": candidate_probability,
+                        "P_rank": decision["rank_probs"][index],
+                        "S_select": float(df.at[index, "S_select"]),
+                    },
+                }
+                if is_winner:
+                    accept_model = payload["accept_model"]
+                    accept_values = self._standardize(
+                        decision["accept_features"], accept_model["mean"], accept_model["scale"]
+                    )
+                    explanation["source_decision"] = {
+                        "source": decision["source"],
+                        "source_kind": decision["source_kind"],
+                        "winner": str(df.at[winner, "Tgt"]),
+                        "candidates": [
+                            {
+                                "target": str(df.at[item, "Tgt"]),
+                                "target_kind": (
+                                    str(df.at[item, "TgtKind"]) if "TgtKind" in df else "class"
+                                ),
+                                "utility": utilities[item],
+                                "rank_probability": decision["rank_probs"][item],
+                            }
+                            for item in decision["indices"]
+                        ],
+                        "rank_temperature": self.temperature,
+                        "tie_break": "stable_input_order",
+                        "llm_source_choice": (
+                            str(df.at[winner, "llm_source_choice"])
+                            if "llm_source_choice" in df
+                            else ""
                         ),
+                        "displayed_none": bool(decision.get("displayed_none", False)),
+                        "accept": {
+                            "feature_names": self.ACCEPT_FEATURE_NAMES,
+                            "features": dict(
+                                zip(self.ACCEPT_FEATURE_NAMES, decision["accept_features"])
+                            ),
+                            "model": accept_model,
+                            "contributions": dict(
+                                zip(
+                                    self.ACCEPT_FEATURE_NAMES,
+                                    [
+                                        value * weight
+                                        for value, weight in zip(
+                                            accept_values, accept_model["weights"]
+                                        )
+                                    ],
+                                )
+                            ),
+                            "logit": explanation["accept_logit"],
+                            "probability": probability,
+                        },
+                        "accept_threshold": threshold,
+                        "score_threshold": (
+                            float(score_threshold) if score_threshold is not None else threshold
+                        ),
+                        "score_mode": self.score_mode,
+                        "emit_candidate_scores": self.emit_candidate_scores,
+                        "eps": self.eps,
                     }
-                    df.at[index, "selector_explanation"] = json.dumps(explanation, sort_keys=True)
+                df.at[index, "selector_explanation"] = json.dumps(explanation, sort_keys=True)
                 df.at[index, "selection_entropy"] = decision["rank_entropy"]
                 df.at[index, "selection_margin"] = decision["utility_margin"]
                 df.at[index, "selection_no_match_prob"] = 1.0 - probability

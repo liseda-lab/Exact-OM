@@ -2161,7 +2161,8 @@ class PairAdaptiveSemanticScorer(
             llm_used_mask[decision_idxs] = True
         w_i_effective = w_i * llm_used_mask.to(w_i.dtype)
 
-        I_lex = (1.0 - w_i_effective) * (1.0 - w_struct)
+        base_lex_weight = (1.0 - w_struct) * authority_active_lex.to(w_struct.dtype)
+        I_lex = (1.0 - w_i_effective) * base_lex_weight
         I_label = I_lex * lex_label_weight
         I_strsim = I_lex * lex_strsim_weight
         I_struct = (1.0 - w_i_effective) * w_struct
@@ -2383,7 +2384,20 @@ class PairAdaptiveSemanticScorer(
                     }
                 explanations.append(
                     {
-                        "explanation_schema_version": 3,
+                        "explanation_schema_version": 4,
+                        "reconstruction": {
+                            "score_stage": "pair_pre_selector",
+                            "baseline": float(self.tau),
+                            "score": float(S_final[idx]),
+                            "component_names": [
+                                "C_label",
+                                "C_strsim",
+                                "C_struct",
+                                "C_llm",
+                                "C_oracle",
+                            ],
+                            "llm_score_delta": float(S_final[idx] - S_base[idx]),
+                        },
                         **(
                             {"experiment_diagnostics": experiment_diagnostics}
                             if experiment_diagnostics
@@ -2451,11 +2465,12 @@ class PairAdaptiveSemanticScorer(
                             "family_qualities": family_qualities,
                         },
                         "weights": {
-                            "w_label": float(
-                                ((1.0 - w_struct[idx]) * lex_label_weight[idx]).item()
-                            ),
+                            "w_lex": float(base_lex_weight[idx]),
+                            "lex_authority": float(sig_lex[idx]),
+                            "struct_authority": float(sig_struct[idx]),
+                            "w_label": float((base_lex_weight[idx] * lex_label_weight[idx]).item()),
                             "w_strsim": float(
-                                ((1.0 - w_struct[idx]) * lex_strsim_weight[idx]).item()
+                                (base_lex_weight[idx] * lex_strsim_weight[idx]).item()
                             ),
                             "w_struct": float(w_struct[idx]),
                             "w_hier": float(hier_internal_weight.item()),
@@ -2516,7 +2531,7 @@ class PairAdaptiveSemanticScorer(
                                 if "graph" in struct_weights
                                 else 0.0
                             ),
-                            "C_llm": float(I_llm[idx] * (p_llm[idx] - S_base[idx])),
+                            "C_llm": float(I_llm[idx] * (p_llm[idx] - self.tau)),
                             "C_oracle": (float(S_final[idx] - S_base[idx]) if oracle_mode else 0.0),
                             "family_contributions": family_contribs,
                         },

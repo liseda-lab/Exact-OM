@@ -874,14 +874,15 @@ class SemanticAlignmentRunner(
             confidences = record.get("confidences")
             if not isinstance(contributions, Mapping) or not isinstance(confidences, Mapping):
                 continue
-            score = confidences.get("S_final")
+            replay = record.get("reconstruction") or {}
+            score = replay.get("score", confidences.get("S_final"))
             if score is None:
                 continue
             names = ("C_label", "C_strsim", "C_struct", "C_llm", "C_oracle")
             if any(name not in contributions for name in names[:-1]):
                 continue
             reconstructed = sum(float(contributions.get(name, 0.0)) for name in names)
-            tau = float(getattr(self.model, "tau", 0.5))
+            tau = float(replay.get("baseline", getattr(self.model, "tau", 0.5)))
             error = abs(reconstructed - (float(score) - tau))
             if not math.isfinite(error):
                 raise ValueError("explanation reconstruction produced a non-finite error")
@@ -896,6 +897,9 @@ class SemanticAlignmentRunner(
             ),
             "result_rows": result_count,
             "reconstructed_rows": reconstruction_rows,
+            "score_stage": "pair_pre_selector",
+            "tolerance": 1e-6,
+            "failed_rows": sum(error > 1e-6 for error in reconstruction_errors),
             "max_abs_error": max(reconstruction_errors) if reconstruction_errors else None,
         }
         source_column = next(
@@ -1099,6 +1103,18 @@ class SemanticAlignmentRunner(
             score_frame = candidate_df[["Src", "Tgt", "S_final", *kind_columns]].rename(
                 columns={"S_final": "Scores"}
             )
+        self._decision_policy = {
+            "threshold": state.threshold,
+            "threshold_origin": getattr(self, "_last_effective_threshold_origin", "configured"),
+            "source_cardinality": state.cardinality,
+            "target_cardinality": (
+                None
+                if getattr(self, "_selector_target_conflict_enabled", None) is False
+                else state.target_cardinality
+            ),
+            "local_alignment": state.local_alignment,
+            "extraction": dict(self._extraction_config),
+        }
         extraction_mode = str(self._extraction_config.get("mode", "greedy"))
         if extraction_mode == "greedy":
             # Preserve the shipped threshold-then-source-greedy path byte for byte.
@@ -1162,6 +1178,7 @@ class SemanticAlignmentRunner(
                         index=False, name=None
                     )
                 ]
+        self._final_candidate_frame = candidate_df.copy()
         nil_models = [
             model
             for model in self.models[1:]
@@ -1288,6 +1305,11 @@ class SemanticAlignmentRunner(
 
         self._last_stage_timings = [
             StageRecord(
+                stage="Alignment.Fitting",
+                seconds=getattr(self, "_fitting_seconds", 0.0),
+                cache_status=CacheStatus.FRESH,
+            ),
+            StageRecord(
                 stage="Alignment.Inference",
                 seconds=state.inference_seconds,
                 cache_status=state.inference_status,
@@ -1346,7 +1368,9 @@ class SemanticAlignmentRunner(
         if stop_path is not None:
             signal.signal(signal.SIGTERM, lambda *_: stop_path.touch())
         self.dataset.default_kind = kind
+        fitting_started = time.perf_counter()
         self.fit_training_pool(batch_size=batch_size)
+        self._fitting_seconds = time.perf_counter() - fitting_started
         grouped_decisions = bool(getattr(self.model, "llm_experiment_enabled", False)) and (
             getattr(self.model, "llm_experiment_config", {})
             .get("decision", {})

@@ -48,6 +48,7 @@ class ScoreCalibrationMixin:
         metadata: Dict[str, Any] = {
             "mode": mode,
             "artifact": provenance,
+            "parameters": dict(calibrator_payload),
             "fit_provenance": dict(payload.get("fit_provenance") or {}),
         }
         return calibrator, metadata

@@ -66,6 +66,184 @@ def _json_default(value: Any) -> str:
 
 
 class AuditIOMixin:
+    def _write_source_decisions(self, predictions, typed: pd.DataFrame) -> Path:
+        """Save final decisions and their complete frozen competitors without consulting gold."""
+        frame = getattr(self, "_final_candidate_frame", None)
+        if frame is None:
+            frame = self.results_df
+        if frame is None:
+            frame = pd.DataFrame(
+                [
+                    {
+                        "Src": row.get("src_iri"),
+                        "Tgt": row.get("tgt_iri"),
+                        **row.get("confidences", {}),
+                    }
+                    for row in self.results_json or []
+                ]
+            )
+        frame = frame.rename(columns={"src_iri": "Src", "tgt_iri": "Tgt"}).copy()
+        if "Src" not in frame or "Tgt" not in frame:
+            frame = pd.DataFrame(columns=["Src", "Tgt", "S_final"])
+        dataset_frame = getattr(self.dataset, "dataframe", None)
+        protected = set()
+        if dataset_frame is not None and DatasetMask.prefiltered in dataset_frame:
+            exact = dataset_frame[dataset_frame[DatasetMask.prefiltered].fillna(False)].copy()
+            protected = set(exact[["Src", "Tgt"]].itertuples(index=False, name=None))
+            present = set(frame[["Src", "Tgt"]].itertuples(index=False, name=None))
+            absent = [tuple(row) not in present for row in exact[["Src", "Tgt"]].values]
+            exact = exact.loc[absent].rename(columns={"Scores": "S_final", "Score": "S_final"})
+            frame = pd.concat([frame, exact], ignore_index=True)
+        before_typing = {
+            (str(item.head), str(item.tail)): float(item.score) for item in predictions
+        }
+        emitted = {
+            (str(row["SrcEntity"]), str(row["TgtEntity"])): row for row in typed.to_dict("records")
+        }
+        present = set(frame[["Src", "Tgt"]].itertuples(index=False, name=None))
+        extra = [
+            {"Src": source, "Tgt": target, "S_final": score}
+            for (source, target), score in before_typing.items()
+            if (source, target) not in present
+        ]
+        if extra:
+            frame = (
+                pd.DataFrame(extra)
+                if frame.empty
+                else pd.concat([frame, pd.DataFrame(extra)], ignore_index=True)
+            )
+        explanations = {
+            (str(row.get("src_iri")), str(row.get("tgt_iri"))): row
+            for row in self.results_json or []
+        }
+        policy = dict(getattr(self, "_decision_policy", {}))
+        threshold = policy.get("threshold", getattr(self, "_last_effective_threshold", None))
+        policy.setdefault("threshold", threshold)
+        policy["extraction_diagnostics"] = dict(getattr(self, "_extraction_diagnostics", {}))
+        policy["anchor_inventory"] = getattr(self.model, "_anchor_manifest", None)
+        fields = (
+            "S_base",
+            "S_pair_final",
+            "S_pair_pre_calibration",
+            "S_select",
+            "P_select",
+            "P_rank",
+            "P_match",
+            "S_final",
+            "S_before_source_choice",
+            "Q_pool_miss",
+            "selection_accept_threshold",
+            "selection_margin",
+            "selection_entropy",
+            "selection_no_match_prob",
+            "selection_evidence_support",
+            "selection_distinctive",
+            "selection_utility",
+            "selection_target_conflict_enabled",
+            "selection_target_cardinality",
+            "llm_source_choice",
+            "source_choice_reason",
+            "selector_explanation",
+            "calibration_explanation",
+            "SrcKind",
+            "TgtKind",
+        )
+        groups = {}
+        competitors = {}
+        for raw in frame.to_dict("records"):
+            source, target = str(raw["Src"]), str(raw["Tgt"])
+            pair = (source, target)
+            explanation = explanations.get(pair, {})
+            confidence = explanation.get("confidences", {})
+            score = raw.get("S_final", confidence.get("S_final"))
+            accepted = threshold is None or (score is not None and float(score) >= threshold)
+            entry = {
+                "target": target,
+                **{
+                    key: raw.get(key, confidence.get(key))
+                    for key in fields
+                    if key in raw or key in confidence
+                },
+            }
+            entry.update(
+                protected_exact=pair in protected,
+                threshold_positive=bool(accepted),
+                pre_typing_selected=pair in before_typing,
+                emitted=pair in emitted,
+            )
+            for key in ("selector_explanation", "calibration_explanation", "reconstruction"):
+                if key in explanation:
+                    entry[key] = explanation[key]
+            if pair in emitted:
+                row = emitted[pair]
+                entry["reason"] = "emitted"
+                entry["relation"] = row.get("Relation", "=")
+                entry["relation_confidence"] = row.get("relation_confidence")
+                entry["relation_evidence"] = row.get("relation_evidence")
+            elif pair in before_typing:
+                entry["reason"] = "relation_abstention"
+                entry["relation_abstention"] = explanation.get("relation_abstention")
+            elif not accepted:
+                entry["reason"] = (
+                    "comparative_rejection"
+                    if raw.get("source_choice_reason") in {"displayed_none", "comparative_choice"}
+                    else "below_threshold"
+                )
+            else:
+                entry["reason"] = "cardinality_or_extraction"
+            groups.setdefault(source, []).append(entry)
+            competitors.setdefault(target, set()).add(source)
+        universe = sorted(
+            set(map(str, getattr(self.dataset, "eligible_source_iris", ()) or ())) | set(groups)
+        )
+        destination = self.output_dir / "source_decisions.json"
+        previous = json.loads(destination.read_text()) if destination.exists() else {}
+        previous_records = {str(row["Src"]): row for row in previous.get("records", [])}
+        records = []
+        for source in universe:
+            candidates = sorted(groups.get(source, []), key=lambda row: row["target"])
+            targets = sorted(target for src, target in emitted if src == source)
+            record = dict(previous_records.get(source, {}))
+            record.update(
+                Src=source,
+                candidates=candidates,
+                candidate_count=len(candidates),
+                emitted_targets=targets,
+                action="emit" if targets else "abstain",
+                empty_candidate_pool=not candidates,
+                pre_typing_targets=sorted(target for src, target in before_typing if src == source),
+                competing_sources_by_target={
+                    row["target"]: sorted(competitors[row["target"]] - {source})
+                    for row in candidates
+                },
+            )
+            records.append(record)
+        payload = self._json_safe_value(
+            {
+                "schema_version": 2,
+                "mode": previous.get("mode", "pipeline"),
+                "stage": "after_cardinality_and_relation_typing",
+                "dataset_signature": getattr(self.dataset, "dataset_signature", None),
+                "source_universe": universe,
+                "source_universe_status": (
+                    "declared"
+                    if getattr(self.dataset, "eligible_source_iris", None)
+                    else "observed_only"
+                ),
+                "policy": policy,
+                "reference_labels_used": False,
+                "records": records,
+            }
+        )
+        temporary = destination.with_suffix(".json.partial")
+        with temporary.open("w") as stream:
+            json.dump(payload, stream, sort_keys=True, allow_nan=False)
+            stream.write("\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+        temporary.replace(destination)
+        return destination
+
     @staticmethod
     def _jsonl_suffix(compression: str) -> str:
         return ".jsonl.zst" if compression == "zstd" else ".jsonl"

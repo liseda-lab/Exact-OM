@@ -732,6 +732,7 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
         formats = ["tsv-global", "tsv-local"] if output_formats is None else list(output_formats)
         if not formats:
             raise ValueError("At least one alignment output format must be configured")
+        decision_inputs = list(preds)
         scored = self._scored_alignment_frame(
             preds,
             relation_prediction=relation_prediction,
@@ -807,6 +808,9 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
                 "Configured output formats did not produce an artifact for this alignment mode"
             )
         paths["alignment_tsv"] = primary
+        source_writer = getattr(self, "_write_source_decisions", None)
+        if callable(source_writer):
+            paths["source_decisions_json"] = source_writer(decision_inputs, scored)
         return paths
 
     def save_alignment(
