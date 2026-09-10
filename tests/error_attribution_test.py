@@ -1,6 +1,9 @@
 import pytest
 
-from exact.experiments.error_attribution import attribute_source_errors, _cardinality_ceiling
+from exact.experiments.error_attribution import (
+    _cardinality_ceiling,
+    attribute_source_errors,
+)
 
 
 def candidate(target, score=0.9, **kwargs):
