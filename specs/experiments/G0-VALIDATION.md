@@ -6,7 +6,7 @@ The detached job uses only NCIT–DOID train/development inputs; no private test
 
 ## Work and limits
 
-The launcher measures full original ontology loading/projection and cold/warm 64-source
+The launcher measures full ontology-closure loading/projection and cold/warm 64-source
 scoring with the pinned SapBERT/BGE encoders, followed by at most 20 hosted source groups and
 one 64-training-source selector fit. The local resource probe explicitly disables generation;
 the hosted probe and later production-method replay retain the frozen hosted settings.
@@ -17,17 +17,17 @@ The fit population is explicitly bounded for validation, so this is not a full-t
 result or a component-selection experiment. A failed or unaffordable phase stops the job.
 
 One GPU worker, two numerical CPU threads, at most 56 GiB process RAM, 2,000 hosted requests and
-3.2 million hosted tokens are permitted. The relaunch is limited to 11h45 with a 30-minute
-checkpoint margin, retaining headroom for the earlier failed startup within the 12-hour
+3.2 million hosted tokens are permitted. The relaunch is limited to 11h30 with a 30-minute
+checkpoint margin, retaining headroom for earlier failed attempts and bounded loader diagnostics within the 12-hour
 foundation envelope. Unknown hosted deliveries are not automatically retried.
 
 ## Monitor and stop
 
-Current output: `data/experiments-v2/g0-validation-02/`.
+Current output: `data/experiments-v2/g0-validation-03/`.
 
 ```console
-tmux attach -t exact-g0-02
-.venv/bin/python data/experiments-v2/g0-validation-02/monitor.py
+tmux attach -t exact-g0-03
+.venv/bin/python data/experiments-v2/g0-validation-03/monitor.py
 ```
 
 Detach from tmux with Ctrl-b, then d. `status.json` reports the current phase, process and
@@ -38,7 +38,7 @@ can remain open after completion, so session existence alone does not mean work 
 Request a cooperative stop:
 
 ```console
-touch data/experiments-v2/g0-validation-02/STOP
+touch data/experiments-v2/g0-validation-03/STOP
 ```
 
 The parent forwards STOP to the active worker, including during ontology loading. Completed
@@ -61,3 +61,18 @@ worker environment; no credential value is written into configs, logs or commits
 Attempt `g0-validation-01` failed before model work because CUDA telemetry was reset before
 CUDA initialization. Its logs/report remain intact. The startup ordering was fixed before
 launching the new attempt; do not interpret the failed attempt as a resource measurement.
+
+Attempt `g0-validation-02` stopped during DOID loading, before scoring or hosted requests.
+The original root omits two annotation declarations; its `ext.owl` import relies on three
+annotation declarations in sibling documents. The strict parser requires them locally.
+`tools/prepare_doid_annotations.py` produces separate, byte-preserving derivatives with explicit
+provenance. Original files remain untouched; no asserted annotation or logical axiom is deleted.
+The three import declarations already occur in the same pinned closure.
+
+Revision 06 binds all 15 imports from the original DOID `v2026-05-30` release, commit
+`3a4023833a9d7048c7ad110b061b851344957fc6`, using local files with verified checksums.
+The full closure passes strict native loading: 16 documents, 199,429 effective axioms,
+305,921/305,921 root RDF triples consumed, no dropped triples or diagnostics, in 15.43 seconds.
+Evidence: `data/experiments-v2/ontology-normalization/doid-611355c44553/strict-load-report.json`.
+The runtime uses `import-map.normalized.json`; the unnormalized import map is diagnostic history.
+This successful loader check is not yet the full G0 throughput/recovery result.

@@ -5,7 +5,7 @@ scope: Implementation and preparation only; no real screen admitted and no match
   claimed.
 common_remaining:
   - Measured full-input G0 memory/throughput and cold/warm cost forecast.
-  - Prescribed 300-source vertical acceptance and successful hosted capability/cache probe.
+  - Prescribed 300-source vertical acceptance; bounded hosted capability/cache probe now passes.
 unsupported_optional:
   - E14 bridge_reasoner execution is not implemented; its arm remains planned, outside implemented
     core typing controls.
@@ -40,15 +40,22 @@ families:
     required_inputs:
       - Safe source-disjoint training reference/pool; D0/D1 training inputs are bound.
   E04:
+    inspected_commit: f31e117
     implemented_paths:
+      - exact/experiments/biollm_inputs.py
+      - exact/utils/artifact_transfer.py
       - exact/impl/models/selector/nil_head.py
       - exact/experiments/nil_evaluation.py
     tests:
+      - tests/biollm_nil_inputs_test.py
+      - tests/benchmark_nil_test.py
+      - tests/nil_transfer_test.py
       - tests/natural_nil_test.py
       - tests/nil_evaluation_test.py
     required_inputs:
-      - Explicit natural-NIL training statuses and separately bound evaluation source labels; N0/N1
-        truth unresolved.
+      - N0 benchmark-pool training/evaluation labels are bound with original legacy ontologies.
+      - N1 FMA strict loading remains unresolved; selected frozen donor artifact and explicit reporting declaration await development freeze.
+      - No verified ontology-wide NIL claim is supported by these historical benchmark labels.
   E05:
     implemented_paths:
       - exact/utils/candidate_generation.py
@@ -71,8 +78,7 @@ families:
       - tests/selector_experiment_primitives_test.py
       - tests/grouped_fitting_test.py
     required_inputs:
-      - Working pinned hosted credential and categorical-probability capability; operational request
-        returned HTTP 401.
+      - Bounded hosted capability/cache probe passes with repository api_key; actual production decisions remain subject to strict probability checks.
   E08:
     implemented_paths:
       - exact/impl/models/pair_adaptive_channels.py
@@ -127,8 +133,7 @@ families:
       - tests/relation_head_test.py
       - tests/relation_typer_test.py
     required_inputs:
-      - Private BioKG release, typed relation labels, and declared bridge/entailment provenance
-        remain unresolved.
+      - Active local BioKG v0.2.0 public typed train/valid labels are bound; declared consequence materialization remains unresolved.
       - Optional bridge execution remains unimplemented; graph/learned typing does not establish
         logical satisfiability.
   E15:

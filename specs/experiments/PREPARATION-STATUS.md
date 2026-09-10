@@ -17,10 +17,12 @@ All generated files below are intentionally outside Git, relative to the reposit
 
 | Input | Prepared location / status |
 | --- | --- |
+| Verified DOID import closure | `data/experiments-v2/ontology-normalization/doid-611355c44553/`; original v2026-05-30 plus 15 pinned imports; explicit declaration derivatives, strict complete closure passes |
 | Public Bio-ML ontologies, split pools and references | `data/experiments-v2/bioml-primary/`; immutable upstream revision `c454644a334ab43754bc1070c0fb7fdd56a90a1d` |
 | Locally converted SNOMED | `/home/pgcotovio/OAEI-Bio-ML-SNOMED-CT/ontologies/`; converted file bytes separately hashed |
 | Confirmed training labels | Task-specific `prepared/train.confirmed.candidates.tsv`; [documented safe-label contract](BIOML-TRAINING-LABELS.md) |
-| DISO natural-NIL candidate cases | `data/experiments-v2/diso/`; ontology/pool data bound, expert NIL truth still unresolved |
+| Bio-LLM 2024 benchmark NIL | `data/experiments-v2/biollm-nil/`; N0 source-stratified 60/20/20 research split, N1 separate reporting population; original ontology/pool hashes pinned |
+| DISO submission inputs | `data/experiments-v2/diso/`; public ontology/pool data retained; no public answer labels |
 | OAEI-KG | `data/experiments-v2/oaei_kg/`; Starwars–SWG development and Starwars–SWTOR heldout inputs materialized; byte identities pinned |
 | Conference property case | `data/experiments-v2/property-case/case-lock.json`; P0 CMT–confOf, prospective P1 Conference–edas |
 | Matched OWL/CSV representation views | P0 `source-matched-csv` and `target-matched-csv`; normalized evidence parity verified |
@@ -36,6 +38,16 @@ K0 uses a source-grouped 60/20/20 development split of 1,096 reference-bearing i
 sources (657 train, 219 valid, 220 internal check). This scope does not establish full-KG
 precision or natural-NIL performance. K0 and K1 share the Starwars source ontology; that
 exposure is recorded. K1 gold values have not been opened.
+
+E04 uses explicit historical benchmark NIL, not verified ontology-wide absence. N0's 60/20/20
+source split is balanced by mapped/unmatched status. Its original NCIT and DOID inputs pass
+strict loading. N1 retains all 100 SNOMED–FMA sources for reporting; FMA's native loader fails
+on OWL axiom reification, and a 90-second strict Python check timed out without a result.
+N1 remains unadmitted until loader compatibility is resolved. Frozen NIL transfer is implemented
+through the existing immutable donor manifest, with no recipient fitting; actual reporting also
+requires a selected N0 artifact and an explicit reporting declaration. `heldout_case` metadata
+does not itself schedule a reporting run. These small public research splits do not support
+blind official-test or nonbiomedical-generalization claims.
 
 E16 initially binds the compatible D1 recipient. The prepared legacy OMIM–ORDO D2 case
 remains unadmitted until a safe training-negative pool is available; the two-recipient
@@ -75,11 +87,17 @@ retained attempt history. Its `status.json`/`report.json` are authoritative for 
 Focused regression suites cover numerical controls, grouped fitting, safe training labels,
 source populations, explanation reconstruction, budget admission, stage recovery, representation
 parity, and published-output evaluation. The strict documentation build and all five import
-boundary contracts pass. The complete tracked offline regression suite passes: **779 tests,
-9 deselected**. The final recipe change also passes its focused eight-test preparation suite. Black, isort and flake8
+boundary contracts pass. The preparation baseline passed the complete tracked offline regression suite: **779 tests,
+9 deselected**; subsequent changes use focused regression checks. The final recipe change also passes its focused eight-test preparation suite. Black, isort and flake8
 pass for all 347 tracked Python files in the quality directories; mypy passes 218 source files.
 Priority public API docstrings pass at 83.5%, and both runtime import guards pass. Unrelated
 pre-existing untracked user scripts were excluded from these checks.
+
+The Bio-LLM converter passes six focused tests; benchmark NIL integration passes 46, and
+strict NIL transfer passes 13. Blueprint preparation passes seven tests, and the offline import
+adapter plus existing IO sources pass 20. The declaration-repair helper passes seven tests.
+These overlapping focused suites are not a new full-suite test count. Current scoped static
+checks, strict documentation build and five import boundary contracts pass.
 
 The seven-repeat fixture benchmark check fails six historical timing thresholds. Repeating the
 same command at unchanged pre-implementation revision
@@ -91,8 +109,8 @@ relaxed. Full-ontology resource estimates must use this node's measured backend 
 
 Before admitting real screens, complete G0's prescribed full-input memory/throughput probe,
 300-source vertical acceptance and cost forecast, validate the hosted credential/profile,
-and resolve each feature case's actual labels/artifacts. Natural-NIL cases need expert source
-status labels; K0 graph fitting needs confirmed negatives. BioKG typed positives are now bound;
+and validate each feature case's actual labels/artifacts. E04 now uses explicitly scoped
+Bio-LLM benchmark NIL; verified ontology-wide NIL remains unavailable. K0 graph fitting needs confirmed negatives. BioKG typed positives are now bound;
 Datalog consequence materialization and family-specific artifacts still need validation. The optional E14 bridge-reasoner executor remains unimplemented and explicitly
 planned; it is outside the implemented graph/learned typing controls. E24's asymmetric arm
 needs a directional typed diagnostic input, which D1 equivalence labels do not provide.
@@ -100,11 +118,12 @@ The planner keeps these separate from fixture readiness. See [NODE-SETUP.md](NOD
 limits. Final request/token and node-hour reserves are protected by runtime admission.
 
 The final local declaration snapshot is
-`data/experiments-v2/prepared-campaign-05/campaign.lock.yaml`, with stage declarations under
+`data/experiments-v2/prepared-campaign-06/campaign.lock.yaml`, with stage declarations under
 `runtime/declarations/screen/` and the read-only inventory in `readiness-plan.json`.
 All 27 families are represented by 37 steps: 35 screen declarations and two final declarations.
 The input-hash-verified screen plan has 142 arm rows, all awaiting admission; its missing
-forecasts are not zero-cost estimates. Earlier preparation revisions remain immutable.
+forecasts are not zero-cost estimates. Earlier preparation revisions remain unchanged. Revision 06 also snapshots its blueprint bytes,
+so subsequent workspace design edits cannot alter it.
 E20 uses one pinned MiniLM contrastive recipe
 and one pinned BGE-reranker-large pair scorer (at most three epochs/1,000 steps, batch 4 ×
 accumulation 8); actual fitting and resource admission remain pending. Conditional E05/E20
