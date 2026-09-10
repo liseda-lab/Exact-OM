@@ -152,6 +152,7 @@ class CsvKgDescriptor:
     attribute_relations: tuple[str, ...] = ()
     datalog_files: tuple[str, ...] = ()
     class_relation: str | None = None
+    evidence_file: str | None = None
 
     @classmethod
     def from_mapping(cls, value: Mapping[str, Any]) -> "CsvKgDescriptor":
@@ -159,6 +160,7 @@ class CsvKgDescriptor:
 
         allowed = {
             "attribute_relations",
+            "evidence_file",
             "class_relation",
             "datalog_files",
             "description",
@@ -205,6 +207,11 @@ class CsvKgDescriptor:
                 for item in _sequence(value.get("datalog_files"), option="datalog_files")
             ),
             class_relation=str(class_relation) if class_relation is not None else None,
+            evidence_file=(
+                _safe_relative(value["evidence_file"], option="evidence_file")
+                if value.get("evidence_file")
+                else None
+            ),
         )
 
 
@@ -411,6 +418,89 @@ class CsvKgSource(KnowledgeSource):
         }
         self._iri_edges = tuple(sorted(iri_edges, key=Edge.astuple))
         self._literal_edges = tuple(sorted(literal_edges, key=Edge.astuple))
+        self._normalized_hierarchy = None
+        self._domains, self._ranges, self._excluded = {}, {}, frozenset()
+        if descriptor.evidence_file:
+            self._load_normalized_evidence(
+                _resolve(self._origin, descriptor.evidence_file, option="evidence_file")
+            )
+
+    def _load_normalized_evidence(self, path: Path) -> None:
+        """Restore typed metadata explicitly retained by the matched-information export."""
+        import json
+
+        facts = defaultdict(list)
+        with path.open(encoding="utf-8", newline="") as stream:
+            reader = csv.DictReader(stream)
+            if reader.fieldnames != ["section", "record"]:
+                raise SourceOptionsError("Normalized evidence CSV requires section,record columns")
+            for row in reader:
+                facts[row["section"]].append(json.loads(row["record"]))
+        expected = {
+            "entities",
+            "labels",
+            "annotations",
+            "attributes",
+            "hierarchy",
+            "domains",
+            "ranges",
+            "excluded",
+            "property_axioms",
+            "projected_iri_edges",
+            "projected_edges",
+        }
+        if set(facts) - expected:
+            raise SourceOptionsError("Unknown normalized evidence section")
+
+        def grouped(rows):
+            result = defaultdict(list)
+            for entity, value in rows:
+                result[entity].append(value)
+            return {key: tuple(values) for key, values in result.items()}
+
+        self._signature = {
+            kind: tuple(iri for entity_kind, iri in facts["entities"] if entity_kind == kind.value)
+            for kind in EntityKind
+        }
+        self._labels = grouped(facts["labels"])
+        for field in ("annotations", "attributes"):
+            values = []
+            for raw in facts[field]:
+                value = json.loads(raw)
+                entity = value.pop("entity")
+                values.append((entity, AnnotationValue(**value)))
+            setattr(self, "_" + field, grouped(values))
+        self._normalized_hierarchy = {
+            kind: HierarchyIndex(
+                self._signature[kind],
+                [
+                    (iri, parent)
+                    for entity_kind, iri, parent in facts["hierarchy"]
+                    if entity_kind == kind.value
+                ],
+                filter_owl_bounds=False,
+            )
+            for kind in EntityKind
+        }
+        self.hierarchy = self._normalized_hierarchy[EntityKind.CLASS]
+        self._domains, self._ranges = grouped(facts["domains"]), grouped(facts["ranges"])
+        self._excluded = frozenset(facts["excluded"])
+        self.normalized_property_axioms = facts["property_axioms"]
+        iri_edges = {Edge(*row) for row in facts["projected_iri_edges"]}
+        all_edges = {Edge(*row) for row in facts["projected_edges"]}
+        if not iri_edges <= all_edges:
+            raise SourceOptionsError(
+                "Normalized nonliteral projection must be a subset of all projected edges"
+            )
+        self._iri_edges = tuple(sorted(iri_edges, key=Edge.astuple))
+        self._literal_edges = tuple(sorted(all_edges - iri_edges, key=Edge.astuple))
+        targets = defaultdict(lambda: defaultdict(set))
+        for edge in self._iri_edges:
+            targets[edge.rel][edge.src].add(edge.dst)
+        self._relation_targets = {
+            relation: {src: tuple(sorted(dsts)) for src, dsts in by_src.items()}
+            for relation, by_src in targets.items()
+        }
 
     @classmethod
     def from_path(cls, path: Path, *, options: Mapping[str, Any] | None = None) -> "CsvKgSource":
@@ -469,6 +559,8 @@ class CsvKgSource(KnowledgeSource):
     def direct_parents(self, iri: str, kind: EntityKind = EntityKind.CLASS) -> list[str]:
         """Return direct hierarchy parents for class-like entities."""
 
+        if self._normalized_hierarchy is not None:
+            return self._normalized_hierarchy[EntityKind(kind)].direct_parents(str(iri))
         if EntityKind(kind) in {EntityKind.CLASS, EntityKind.INDIVIDUAL}:
             return self.hierarchy.direct_parents(str(iri))
         return []
@@ -476,6 +568,8 @@ class CsvKgSource(KnowledgeSource):
     def direct_children(self, iri: str, kind: EntityKind = EntityKind.CLASS) -> list[str]:
         """Return direct hierarchy children for class-like entities."""
 
+        if self._normalized_hierarchy is not None:
+            return self._normalized_hierarchy[EntityKind(kind)].direct_children(str(iri))
         if EntityKind(kind) in {EntityKind.CLASS, EntityKind.INDIVIDUAL}:
             return self.hierarchy.direct_children(str(iri))
         return []
@@ -508,19 +602,17 @@ class CsvKgSource(KnowledgeSource):
     def property_domains(self, prop_iri: str) -> list[str]:
         """Return no domains because CSV descriptors do not declare them."""
 
-        del prop_iri
-        return []
+        return list(self._domains.get(str(prop_iri), ()))
 
     def property_ranges(self, prop_iri: str) -> list[str]:
         """Return no ranges because CSV descriptors do not declare them."""
 
-        del prop_iri
-        return []
+        return list(self._ranges.get(str(prop_iri), ()))
 
     def excluded_from_alignment(self) -> frozenset[str]:
         """Return identifiers excluded by source metadata, if any."""
 
-        return frozenset()
+        return self._excluded
 
     def short_form(self, iri: str) -> str:
         """Return a compact display form for ``iri``."""
