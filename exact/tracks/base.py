@@ -697,6 +697,12 @@ class UnavailableDescriptorProvider:
     ) -> TaskLayout:
         """Fail actionably until the descriptor receives a real upstream."""
 
+        if self.descriptor.upstream.get("availability") == "awaiting_local_release":
+            raise UserSuppliedFilesError(
+                f"Track {self.name!r} awaits its local release under "
+                f"{self.descriptor.upstream['local_release_subdirectory']}. "
+                + str(self.descriptor.upstream["binding_help"])
+            )
         raise TrackUnavailableError(
             f"Track {self.name!r} has not been published yet. Update its YAML descriptor "
             "with the repository id and revision once the upstream becomes available."

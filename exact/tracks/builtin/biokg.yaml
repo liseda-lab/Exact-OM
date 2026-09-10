@@ -2,10 +2,11 @@ descriptor_version: 1
 name: biokg
 provider: stub
 provider_version: "1"
-description: BioKG-Align CSV-kit layout stub; activate when the upstream HF repository publishes.
+description: Private BioKG-Align release binding; awaiting the user-confirmed local build/release package.
 upstream:
-  repo_id: TBD/BioKG-Align
-  revision: TBD
+  local_release_subdirectory: BioKG-Align/build/release
+  availability: awaiting_local_release
+  binding_help: Bind the completed local release after the user announces it; no public download is assumed.
 tasks:
   csv-kg:
     source: source
