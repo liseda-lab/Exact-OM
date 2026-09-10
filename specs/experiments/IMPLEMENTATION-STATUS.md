@@ -1,4 +1,7 @@
-# Implementation inventory and ordered work
+# Historical implementation inventory and ordered work
+
+This is the pre-implementation audit. See [PREPARATION-STATUS.md](PREPARATION-STATUS.md)
+for current implementation and readiness evidence.
 
 **Snapshot: 655f599e714e13d592f702f326ca5a36f6b50b2f, inspected 2026-09-07 and rechecked 2026-09-09.**
 The code revision is unchanged at this specification update. No v2 runtime implementation has

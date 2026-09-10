@@ -1,16 +1,18 @@
 # Exact-OM experiment programme v2
 
-**Design revision: 2026-09-09. Status: specification; implementation and real runs pending.**
+**Design revision: 2026-09-09. Implementation validation: 2026-09-10; long campaign not started.**
+See [PREPARATION-STATUS.md](PREPARATION-STATUS.md) for current code, input and operational evidence.
 This revision implements the accepted 2026-09-07 review and the user's single-node, 2–3 week
 execution constraint. It supersedes the v1 exhaustive matrices, per-component reporting
 requirements, whole-run invalidation rules, and implementation-only handoff. No v2 empirical
-result or new runtime capability is implied by these documents.
+result is implied by the design specifications.
 
 Read in order:
 
 1. [RUN-PLAN.md](RUN-PLAN.md): scope, task roles, budgets, gates, selection, and final study.
-2. [IMPLEMENTATION-STATUS.md](IMPLEMENTATION-STATUS.md): inspected primitives, defects, missing
-   integration, external inputs, and ordered implementation work.
+2. [PREPARATION-STATUS.md](PREPARATION-STATUS.md): current implementation, validation, local
+   inputs and remaining execution prerequisites. [IMPLEMENTATION-STATUS.md](IMPLEMENTATION-STATUS.md)
+   preserves the historical pre-implementation audit.
 3. [CHECKPOINT-RECOVERY.md](CHECKPOINT-RECOVERY.md): interruption, relocation, bug fixes,
    artifact compatibility, and statistical validity.
 4. [IMPLEMENTATION-CLARIFICATIONS.md](IMPLEMENTATION-CLARIFICATIONS.md): precise method contracts.
@@ -18,8 +20,8 @@ Read in order:
 6. [AGENT-HANDOFF.md](AGENT-HANDOFF.md): implement, validate, then execute the campaign.
 
 [campaign-v2.yaml](campaign-v2.yaml) is the machine-readable **design blueprint**, not an
-executable configuration for the current schema-v1 runner. E00 must implement its contract and
-materialize strict executable run declarations. Existing exp/experiments/E*/exp.yaml matrices
+executable run declaration. `tools/prepare_experiment_campaign.py` binds it to inspected
+readiness and materialized inputs, then the shared runner materializes strict run declarations. Existing exp/experiments/E*/exp.yaml matrices
 are explicitly blocked legacy scaffolds pending that migration. The previous production
 baseline R_0 remains historical evidence; never rewrite its source/configuration hashes.
 
@@ -64,8 +66,8 @@ confirmation after each of 26 component screens.
 
 Every applicable E00–E26 family receives a small focused screen. E11/E12/E23 use real
 property/instance/KG tasks; E14 uses typed BioKG-Align data; E04 uses a natural-NIL case.
-The user confirms the OAEI and BioKG data are available. Resolve paths and capability metadata
-before assigning cases. Every family gets a status and reason; a genuine capability or budget
+Public missing data can be downloaded from official OAEI/subtrack sites. The private BioKG-Align
+release remains pending user notice. Resolve paths and capability metadata before assigning cases. Every family gets a status and reason; a genuine capability or budget
 limit is explicit, and is not a negative empirical result.
 
 The normal execution budget is 336 node-hours; a predeclared expanded profile permits 504.

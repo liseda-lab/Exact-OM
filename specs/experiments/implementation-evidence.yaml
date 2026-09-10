@@ -1,0 +1,242 @@
+schema_version: 1
+inspected_commit: 4dddefeddd434fc2be1ddd282097d0e6bba28421
+status: fixture_evidence
+scope: Implementation and preparation only; no real screen admitted and no matching-quality result
+  claimed.
+common_remaining:
+  - Measured full-input G0 memory/throughput and cold/warm cost forecast.
+  - Prescribed 300-source vertical acceptance and successful hosted capability/cache probe.
+unsupported_optional:
+  - E14 bridge_reasoner execution is not implemented; its arm remains planned, outside implemented
+    core typing controls.
+families:
+  E00:
+    implemented_paths:
+      - exact/experiments/campaign.py
+      - exact/experiments/runtime.py
+      - exact/experiments/error_attribution.py
+    tests:
+      - tests/campaign_v2_test.py
+      - tests/experiment_recovery_test.py
+      - tests/error_attribution_test.py
+  E01:
+    implemented_paths:
+      - exact/impl/extraction.py
+    tests:
+      - tests/experiment_numerical_controls_test.py
+      - tests/explicit_execution_mode_test.py
+  E02:
+    implemented_paths:
+      - exact/impl/trainer/anchors.py
+    tests:
+      - tests/anchor_controls_test.py
+  E03:
+    implemented_paths:
+      - exact/impl/models/selector/fitting.py
+      - exact/impl/models/selector/score_calibration.py
+    tests:
+      - tests/grouped_fitting_test.py
+      - tests/selector_trace_replay_test.py
+    required_inputs:
+      - Safe source-disjoint training reference/pool; D0/D1 training inputs are bound.
+  E04:
+    implemented_paths:
+      - exact/impl/models/selector/nil_head.py
+      - exact/experiments/nil_evaluation.py
+    tests:
+      - tests/natural_nil_test.py
+      - tests/nil_evaluation_test.py
+    required_inputs:
+      - Explicit natural-NIL training statuses and separately bound evaluation source labels; N0/N1
+        truth unresolved.
+  E05:
+    implemented_paths:
+      - exact/utils/candidate_generation.py
+      - exact/experiments/preparation.py
+    tests:
+      - tests/retrieval_experiments_test.py
+      - tests/campaign_preparation_test.py
+  E06:
+    implemented_paths:
+      - exact/impl/models/pair_adaptive_channels.py
+    tests:
+      - tests/experiment_numerical_controls_test.py
+      - tests/pair_adaptive_experiments_test.py
+  E07:
+    implemented_paths:
+      - exact/impl/models/semantic_llm.py
+      - exact/impl/models/selector/listwise_llm.py
+      - exact/impl/models/selector/evidence_acquisition.py
+    tests:
+      - tests/selector_experiment_primitives_test.py
+      - tests/grouped_fitting_test.py
+    required_inputs:
+      - Working pinned hosted credential and categorical-probability capability; operational request
+        returned HTTP 401.
+  E08:
+    implemented_paths:
+      - exact/impl/models/pair_adaptive_channels.py
+    tests:
+      - tests/experiment_numerical_controls_test.py
+      - tests/pair_adaptive_experiments_test.py
+  E09:
+    implemented_paths:
+      - exact/impl/models/pair_adaptive_scorer.py
+    tests:
+      - tests/experiment_numerical_controls_test.py
+      - tests/explanation_replay_test.py
+  E10:
+    implemented_paths:
+      - exact/experiments/fitting_recipes.py
+      - exact/impl/models/selector/fitting.py
+    tests:
+      - tests/fitting_recipes_test.py
+      - tests/grouped_fitting_test.py
+    required_inputs:
+      - Safe source-disjoint training reference/pool; D0/D1 training inputs are bound.
+  E11:
+    implemented_paths:
+      - exact/impl/datasets/pair_adaptive_context.py
+    tests:
+      - tests/kind_evidence_controls_test.py
+    required_inputs:
+      - P0 has six property positives; label-free small-case evidence only.
+  E12:
+    implemented_paths:
+      - exact/impl/datasets/pair_adaptive_context.py
+      - exact/impl/graph_controls.py
+    tests:
+      - tests/kind_evidence_controls_test.py
+    required_inputs:
+      - K0 uses reference-bearing development sources; K1 shares its source ontology. Actual
+        full-input resource probe remains pending.
+  E13:
+    implemented_paths:
+      - exact/io/sources/csv_kg.py
+      - exact/experiments/evidence_inventory.py
+    tests:
+      - tests/representation_parity_test.py
+    required_inputs:
+      - P0 matched OWL/CSV parity is bound; materialized enrichment requires an explicit
+        provenance-bound external profile.
+  E14:
+    implemented_paths:
+      - exact/io/relation_head.py
+      - exact/io/relations.py
+    tests:
+      - tests/relation_head_test.py
+      - tests/relation_typer_test.py
+    required_inputs:
+      - Private BioKG release, typed relation labels, and declared bridge/entailment provenance
+        remain unresolved.
+      - Optional bridge execution remains unimplemented; graph/learned typing does not establish
+        logical satisfiability.
+  E15:
+    implemented_paths:
+      - exact/impl/models/selector/fitting.py
+      - exact/experiments/core_recipes.py
+      - exact/impl/models/selector/selector.py
+    tests:
+      - tests/grouped_fitting_test.py
+      - tests/core_recipes_test.py
+      - tests/selector_experiment_primitives_test.py
+  E16:
+    implemented_paths:
+      - exact/utils/artifact_transfer.py
+      - exact/experiments/core_recipes.py
+      - exact/experiments/transfer.py
+    tests:
+      - tests/artifact_transfer_test.py
+    required_inputs:
+      - Completed selected E18 donor artifact; D1 is the initial recipient. D2 is unadmitted until
+        safe train negatives are bound.
+  E17:
+    implemented_paths:
+      - exact/experiments/campaign.py
+      - exact/experiments/paper_metrics.py
+      - exact/experiments/published_matcher.py
+    tests:
+      - tests/campaign_v2_test.py
+      - tests/paper_metrics_test.py
+      - tests/published_matcher_test.py
+      - tests/campaign_inference_test.py
+  E18:
+    implemented_paths:
+      - exact/impl/models/selector/fitting.py
+    tests:
+      - tests/grouped_fitting_test.py
+      - tests/selector_trace_replay_test.py
+    required_inputs:
+      - Safe source-disjoint training reference/pool; D0/D1 training inputs are bound.
+  E19:
+    implemented_paths:
+      - exact/impl/models/selector/fitting.py
+      - exact/impl/models/selector/fusion_fitting.py
+    tests:
+      - tests/grouped_fitting_test.py
+      - tests/explanation_replay_test.py
+    required_inputs:
+      - Safe source-disjoint training reference/pool; D0/D1 training inputs are bound.
+  E20:
+    implemented_paths:
+      - exact/impl/retrieval/training.py
+    tests:
+      - tests/retrieval_training_test.py
+    required_inputs:
+      - Selected E05 pool; safe D0 train labels. Local pinned MiniLM and BGE-reranker recipes are
+        bound; fitting and resource forecast remain unexecuted. Combined treatment requires a later
+        supported declaration.
+  E21:
+    implemented_paths:
+      - exact/impl/models/selector/llm_learning.py
+      - exact/impl/models/semantic_llm.py
+    tests:
+      - tests/grouped_fitting_test.py
+    required_inputs:
+      - Selected E07 and immutable teacher cache; router requires fully confirmed source pools.
+        Generated-brief benefit routing is unsupported.
+  E22:
+    implemented_paths:
+      - exact/experiments/label_policy.py
+      - exact/impl/models/selector/label_budget.py
+    tests:
+      - tests/label_policy_test.py
+      - tests/grouped_fitting_test.py
+    required_inputs:
+      - Completed passive 25/100/400 plus label-free curves and independent D1 effective training
+        counts.
+  E23:
+    implemented_paths:
+      - exact/impl/models/graph_head.py
+      - exact/impl/graph_controls.py
+    tests:
+      - tests/graph_head_test.py
+    required_inputs:
+      - K0 labels are positive-unlabelled; supervised graph heads require safely confirmed
+        negatives.
+  E24:
+    implemented_paths:
+      - exact/impl/models/pair_adaptive_channels.py
+    tests:
+      - tests/pair_adaptive_experiments_test.py
+    required_inputs:
+      - Asymmetric treatment is a directional typed diagnostic; D1 equivalence labels do not
+        establish that interpretation.
+  E25:
+    implemented_paths:
+      - exact/impl/models/selector/llm_gate.py
+      - exact/impl/models/selector/oracle_replay.py
+      - exact/experiments/oracle_policy.py
+    tests:
+      - tests/forced_source_gate_test.py
+      - tests/oracle_replay_runtime_test.py
+      - tests/oracle_policy_test.py
+    required_inputs:
+      - Completed forced judgments; observed outcome oracle requires complete or explicit confirmed
+        outcomes. Binary judgments cannot supply comparative source-trust choice.
+  E26:
+    implemented_paths:
+      - exact/impl/models/pair_adaptive_scorer.py
+    tests:
+      - tests/candidate_quality_test.py
+      - tests/explanation_replay_test.py
