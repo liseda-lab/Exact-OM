@@ -121,7 +121,46 @@ class AuditIOMixin:
         policy.setdefault("threshold", threshold)
         policy["extraction_diagnostics"] = dict(getattr(self, "_extraction_diagnostics", {}))
         policy["anchor_inventory"] = getattr(self.model, "_anchor_manifest", None)
+        llm_config = getattr(self.model, "llm_experiment_config", {})
+        if llm_config:
+            artifact = getattr(self.model, "_gate_artifact", None)
+            policy["llm"] = {
+                "gate": llm_config.get("gate"),
+                "decision": llm_config.get("decision"),
+                "fusion_weight": llm_config.get("fusion_weight"),
+                "constant_weight": llm_config.get("constant_weight"),
+                "beta": getattr(self.model, "beta", None),
+                "pair_threshold": getattr(self.model, "threshold", None),
+                "gate_artifact": getattr(artifact, "provenance", None),
+                "forced_sample": (
+                    {
+                        key: artifact.payload.get(key)
+                        for key in (
+                            "selected_sources",
+                            "source_count",
+                            "sample_size",
+                            "sample_unit",
+                            "seed",
+                            "source_strata",
+                            "strata_provenance",
+                            "stratum_sampling",
+                            "selected_source_weights",
+                            "population_estimation_supported",
+                            "population_fingerprint",
+                        )
+                    }
+                    if artifact and artifact.payload.get("mode") == "forced_sample"
+                    else None
+                ),
+            }
         fields = (
+            "U",
+            "U_ind",
+            "U_dis",
+            "p_llm",
+            "llm_gate_invoked",
+            "llm_gate_diagnostics",
+            "llm_grouped_decision",
             "S_base",
             "S_pair_final",
             "S_pair_pre_calibration",

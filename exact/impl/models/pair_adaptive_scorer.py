@@ -607,7 +607,12 @@ class PairAdaptiveSemanticScorer(
                 or set(payload["decision_probs"]) != selected
             ):
                 raise ValueError("Oracle replay intervention source inventory is invalid")
-            if payload["negative_label_policy"] not in {
+            label_independent_trust = (
+                mode == "oracle_replay"
+                and payload.get("protocol") == "forced_cached_trust"
+                and payload.get("label_independent_selection") is True
+            )
+            if not label_independent_trust and payload["negative_label_policy"] not in {
                 "complete_reference",
                 "confirmed_negatives",
             }:

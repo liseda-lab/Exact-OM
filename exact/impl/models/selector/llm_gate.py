@@ -207,6 +207,15 @@ def fit_forced_sample_artifact(
             if buckets[stratum] and len(selected) < count:
                 selected.append(buckets[stratum].pop(0))
     selected_set = set(selected)
+    sampling = {}
+    for stratum in sorted(set(strata.values())):
+        population_count = sum(value == stratum for value in strata.values())
+        sample_count = sum(strata[source] == stratum for source in selected)
+        sampling[stratum] = {
+            "population_sources": population_count,
+            "sampled_sources": sample_count,
+            "inclusion_fraction": sample_count / population_count,
+        }
     pairs = sorted((source, target) for _, source, target in clean if source in selected_set)
     population = sorted((source, target) for _, source, target in clean)
     return {
@@ -227,6 +236,15 @@ def fit_forced_sample_artifact(
         "population_pairs": [list(pair) for pair in population],
         "source_strata": strata,
         "strata_provenance": dict(strata_provenance),
+        "stratum_sampling": sampling,
+        "inclusion_design": "uniform_hash_order_within_fixed_stratum_under_seed_randomization",
+        "selected_source_weights": {
+            source: 1.0 / sampling[strata[source]]["inclusion_fraction"]
+            for source in sorted(selected)
+        },
+        "population_estimation_supported": all(
+            row["sampled_sources"] > 0 for row in sampling.values()
+        ),
         "selection_rule": "stratified_round_robin_sha256(seed, source_iri)",
         "population_fingerprint": hashlib.sha256(
             json.dumps({"pairs": population, "strata": strata}, sort_keys=True).encode()

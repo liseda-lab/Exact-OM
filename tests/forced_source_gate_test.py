@@ -22,6 +22,10 @@ def test_forced_sample_keeps_whole_source_groups_and_replays_any_batch(tmp_path)
         dataset_signature="tiny-signature",
     )
     assert state["sample_size"] == 2 and len(state["pairs"]) == 14
+    assert state["population_estimation_supported"] is True
+    assert set(state["selected_source_weights"].values()) == {2.0}
+    assert sum(state["selected_source_weights"].values()) == state["source_count"]
+    assert all(row["inclusion_fraction"] == 0.5 for row in state["stratum_sampling"].values())
     assert state == fit_forced_sample_artifact(
         list(reversed(rows)),
         sample_size=2,

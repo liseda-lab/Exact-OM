@@ -9,7 +9,7 @@ from .fitting import fingerprint, safe_training_labels
 NONE = "__NONE__"
 
 
-def _inventory(population, reference_pairs, negative_label_policy):
+def _inventory(population, reference_pairs, negative_label_policy, nil_sources=()):
     if not {"Src", "Tgt", "S_base", "U"}.issubset(population):
         raise ValueError("Oracle replay requires frozen Src/Tgt/S_base/U evidence")
     if any(
@@ -20,8 +20,18 @@ def _inventory(population, reference_pairs, negative_label_policy):
         raise ValueError("Oracle population scores/uncertainties must be finite")
     if population.duplicated(["Src", "Tgt"]).any():
         raise ValueError("Oracle population contains duplicate candidate pairs")
+    reference_pairs = {(str(source), str(target)) for source, target in reference_pairs}
+    nil_sources = set(map(str, nil_sources))
+    if nil_sources & {source for source, _ in reference_pairs}:
+        raise ValueError("Explicit NIL sources conflict with positive references")
+    population = population.copy()
+    if negative_label_policy == "confirmed_negatives" and nil_sources:
+        population.loc[population.Src.astype(str).isin(nil_sources), "confirmed_label"] = 0
+    # Reserved NONE is a source label, never a displayed candidate or synthesized answer.
     labeled, reference = safe_training_labels(
-        population, reference_pairs, {"negative_label_policy": negative_label_policy}
+        population,
+        reference_pairs | {(source, NONE) for source in nil_sources},
+        {"negative_label_policy": negative_label_policy},
     )
     known_pairs = set(zip(labeled.Src.astype(str), labeled.Tgt.astype(str)))
     groups, excluded = {}, []
@@ -66,8 +76,8 @@ def _outcome(
                 )
                 mixed[target] = (1 - weight) * baseline[target] + weight * probabilities[target]
         after = _winner(mixed, threshold)
-    before_correct = (source, before) in reference
-    after_correct = (source, after) in reference
+    before_correct = (source, before if before is not None else NONE) in reference
+    after_correct = (source, after if after is not None else NONE) in reference
     return {
         "source": source,
         "baseline_choice": before,
@@ -150,6 +160,7 @@ def observed_response_oracle(
     fusion_weight="beta_u",
     constant_weight=0.5,
     teacher_binding=None,
+    nil_sources=(),
 ):
     """Select at most budget cached interventions by observed correction minus harm.
 
@@ -158,7 +169,9 @@ def observed_response_oracle(
     """
     if not 0 <= budget <= 200:
         raise ValueError("Oracle intervention budget must be between zero and 200 sources")
-    groups, reference, excluded = _inventory(population, reference_pairs, negative_label_policy)
+    groups, reference, excluded = _inventory(
+        population, reference_pairs, negative_label_policy, nil_sources
+    )
     records = {}
     for record in observed_records:
         source = str(record["source"])
@@ -229,9 +242,12 @@ def perfect_intervention(
     fusion_weight="beta_u",
     constant_weight=0.5,
     teacher_binding=None,
+    nil_sources=(),
 ):
     """Perfect probabilities on exactly the observed oracle's selected sources/support."""
-    groups, reference, excluded = _inventory(population, reference_pairs, negative_label_policy)
+    groups, reference, excluded = _inventory(
+        population, reference_pairs, negative_label_policy, nil_sources
+    )
     selected = list(selected_sources)
     if (
         len(selected) > 200
