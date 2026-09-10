@@ -202,10 +202,11 @@ def worker(config_path, output, evaluate):
 
     ScorerCommonMixin._encode_texts = encode
     OpenRouterClient.__init__ = client_init
-    torch.cuda.reset_peak_memory_stats(0)
     started = time.monotonic()
     code = 0
     try:
+        torch.cuda.init()
+        torch.cuda.reset_peak_memory_stats(0)
         run_alignment(
             output_dir_path=output, configs_file_path=config_path, run_eval=evaluate, device=0
         )
@@ -224,8 +225,12 @@ def worker(config_path, output, evaluate):
                 "return_code": code,
                 "wall_seconds": time.monotonic() - started,
                 "peak_rss_bytes": resource.getrusage(resource.RUSAGE_SELF).ru_maxrss * 1024,
-                "peak_cuda_allocated_bytes": torch.cuda.max_memory_allocated(0),
-                "peak_cuda_reserved_bytes": torch.cuda.max_memory_reserved(0),
+                "peak_cuda_allocated_bytes": (
+                    torch.cuda.max_memory_allocated(0) if torch.cuda.is_initialized() else None
+                ),
+                "peak_cuda_reserved_bytes": (
+                    torch.cuda.max_memory_reserved(0) if torch.cuda.is_initialized() else None
+                ),
             },
         )
     return code
