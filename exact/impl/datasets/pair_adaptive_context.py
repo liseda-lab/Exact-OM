@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import time
-from copy import copy
 from collections import defaultdict
+from copy import copy
 from typing import Any, Dict, List, Optional, Tuple
 
 import matplotlib.pyplot as plt

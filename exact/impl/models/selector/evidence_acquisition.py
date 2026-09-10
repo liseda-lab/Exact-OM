@@ -1,10 +1,11 @@
 """Bounded ontology-only evidence acquisition for a frozen comparative pool."""
 
-from dataclasses import replace
 import hashlib
 import json
+from dataclasses import replace
 
 from exact.llm.routing import extract_chat_text
+
 from .listwise_llm import listwise_labels
 
 

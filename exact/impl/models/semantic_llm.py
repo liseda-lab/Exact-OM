@@ -52,7 +52,9 @@ class SemanticLLMMixin:
                 plan, exemplar_sources = exemplar_prompt(self, plan)
             acquisition = None
             if config.get("max_evidence_packets", 0):
-                from exact.impl.models.selector.evidence_acquisition import acquire_plan_evidence
+                from exact.impl.models.selector.evidence_acquisition import (
+                    acquire_plan_evidence,
+                )
 
                 plan, acquisition = acquire_plan_evidence(self, plan, profile)
             probabilities, observations, hard_choices = [], [], []

@@ -1,7 +1,7 @@
 from exact.core.entities.kinds import EntityKind
-from exact.experiments.evidence_inventory import export_matched_csv, evidence_inventory
-from exact.io.sources.csv_kg import CsvKgSource
+from exact.experiments.evidence_inventory import evidence_inventory, export_matched_csv
 from exact.impl.datasets.pair_adaptive_context import PairAdaptiveContextDataset
+from exact.io.sources.csv_kg import CsvKgSource
 from tests import kind_evidence_controls_test
 
 dataset = kind_evidence_controls_test.dataset
@@ -43,6 +43,7 @@ def test_real_owl_to_csv_preserves_typed_evidence_and_literal_identity(dataset, 
 
 def test_public_biokg_table_shape_preserves_candidate_node_ids_and_drops_anchors(tmp_path):
     import csv
+
     from exact.experiments.evidence_inventory import import_biokg_public_graph
 
     package = tmp_path / "public"

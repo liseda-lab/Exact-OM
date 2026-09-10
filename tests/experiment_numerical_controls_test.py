@@ -9,7 +9,7 @@ import torch
 from exact.core.entities.mappings.entity import EntityMapping
 from exact.impl.extraction import extract_global_alignment
 from exact.impl.models.selector.llm_gate import select_inference_gate_artifact
-from tests.pair_adaptive_experiments_test import _TinyDataset, _scorer
+from tests.pair_adaptive_experiments_test import _scorer, _TinyDataset
 
 
 def test_accepted_assignment_retains_strong_edge_hidden_by_legacy_objective():

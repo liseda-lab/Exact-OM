@@ -108,7 +108,10 @@ def test_official_four_column_reference_survives_dataset_and_action_materializat
 
 
 def test_stripped_local_pool_gets_reporting_gold_only_after_scoring(tmp_path):
-    from exact.core.actions.evaluation import materialize_local_ranking_inputs, run_evaluation
+    from exact.core.actions.evaluation import (
+        materialize_local_ranking_inputs,
+        run_evaluation,
+    )
 
     pool = tmp_path / "unlabelled.tsv"
     original = (
@@ -135,7 +138,11 @@ def test_stripped_local_pool_gets_reporting_gold_only_after_scoring(tmp_path):
 
 def test_local_reporting_join_keeps_all_positives_and_empty_candidate_groups(tmp_path):
     import ast
-    from exact.core.actions.evaluation import materialize_local_ranking_inputs, run_evaluation
+
+    from exact.core.actions.evaluation import (
+        materialize_local_ranking_inputs,
+        run_evaluation,
+    )
 
     pool = tmp_path / "pool.tsv"
     pool.write_text("SrcEntity\tTgtEntity\tTgtCandidates\ns\t\t['a', 'b']\nempty\t\t[]\n")

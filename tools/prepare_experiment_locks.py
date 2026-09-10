@@ -16,7 +16,10 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from exact.core.entities.configs.yaml_io import dump_yaml_document, load_yaml_mapping  # noqa: E402
+from exact.core.entities.configs.yaml_io import (  # noqa: E402
+    dump_yaml_document,
+    load_yaml_mapping,
+)
 from exact.experiments.campaign import digest, openrouter_only  # noqa: E402
 from exact.experiments.harness import (  # noqa: E402
     _assert_experiment_flags_disabled,

@@ -8,9 +8,9 @@ strategy-appropriate point and keep exact matches protected.
 
 from __future__ import annotations
 
+import math
 from collections import defaultdict, deque
 from dataclasses import dataclass
-import math
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Set, Tuple
 
 from exact.core.entities.mappings.entity import EntityMapping

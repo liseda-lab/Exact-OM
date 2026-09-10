@@ -182,7 +182,9 @@ def materialize_local_ranking_inputs(
     remain explicit rows. Gold targets are never appended to candidate lists.
     """
     from ast import literal_eval
+
     import pandas as pd
+
     from exact.utils.data import read_table
 
     pool = read_table(candidates)

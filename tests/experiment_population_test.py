@@ -125,8 +125,9 @@ def test_budget_keeps_retry_spend_reserve_and_overlapping_node_time(tmp_path):
 
 
 def test_public_final_pool_without_gold_column_preserves_empty_source(tmp_path):
-    from exact.experiments.inputs import prepare_pool
     import pandas as pd
+
+    from exact.experiments.inputs import prepare_pool
 
     pool = tmp_path / "public.tsv"
     pool.write_text("SrcEntity\tTgtCandidates\ns1\t['t1']\ns2\t[]\n")

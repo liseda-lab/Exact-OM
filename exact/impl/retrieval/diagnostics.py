@@ -13,7 +13,6 @@ import math
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-
 _SHA256_HEX_LENGTH = 64
 
 

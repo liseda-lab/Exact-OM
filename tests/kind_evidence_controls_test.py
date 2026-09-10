@@ -106,9 +106,10 @@ def test_shuffle_preserves_predicate_node_degrees_and_removal_is_nested():
 
 def test_representation_inventory_detects_literal_metadata_loss(dataset):
     from dataclasses import replace
+
     from exact.experiments.evidence_inventory import (
-        evidence_inventory,
         compare_evidence_inventories,
+        evidence_inventory,
     )
 
     class LostLanguage:

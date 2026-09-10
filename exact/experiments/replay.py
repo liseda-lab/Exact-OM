@@ -222,7 +222,7 @@ def normalize_execution_device(value: Any, *, label: str = "execution device") -
                 candidate = indexed_device
         except ReplayValidationError:
             raise
-        except (TypeError, ValueError) as exc:
+        except (TypeError, ValueError):
             _fail(
                 "invalid_execution_device_index",
                 f"{label} has invalid GPU device/index metadata",
@@ -397,7 +397,7 @@ def validate_e00_replay(
             _fail("invalid_replay_manifest", "completed E00 replay manifest has no task_id")
         try:
             seed = int(str(manifest.get("seed")))
-        except (TypeError, ValueError) as exc:
+        except (TypeError, ValueError):
             _fail(
                 "invalid_replay_manifest",
                 f"completed E00 replay manifest has invalid seed {manifest.get('seed')!r}",

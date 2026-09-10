@@ -2,18 +2,25 @@
 
 from __future__ import annotations
 
+import json
+import random
 from collections import Counter, defaultdict
 from pathlib import Path
-
-import random
-import json
 
 import numpy as np
 from scipy.optimize import minimize
 from scipy.special import expit
 
-from exact.impl.graph_controls import graph_fingerprint, remove_hierarchy, shuffle_relations
-from exact.impl.models.selector.fitting import fingerprint, freeze_json, safe_training_labels
+from exact.impl.graph_controls import (
+    graph_fingerprint,
+    remove_hierarchy,
+    shuffle_relations,
+)
+from exact.impl.models.selector.fitting import (
+    fingerprint,
+    freeze_json,
+    safe_training_labels,
+)
 
 FEATURE_SCHEMA = [
     "in_degree_agreement",

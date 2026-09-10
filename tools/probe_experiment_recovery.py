@@ -13,10 +13,10 @@ import hashlib
 import json
 import os
 import resource
-from pathlib import Path
 import shutil
 import sys
 import time
+from pathlib import Path
 
 
 def digest(path):
@@ -178,7 +178,10 @@ def main():
         TOKENIZERS_PARALLELISM="false",
         OMP_NUM_THREADS="4",
     )
+    from dataclasses import replace
+
     import torch
+
     from exact.core.actions.alignment import run_alignment
     from exact.core.entities.configs.config import ConfigModel
     from exact.experiments import harness
@@ -186,7 +189,6 @@ def main():
     from exact.experiments.schema import ResourceConfig
     from exact.impl.models.scorer_common import ScorerCommonMixin
     from exact.llm.routing import OpenRouterClient
-    from dataclasses import replace
 
     inputs = output / "inputs"
     revision = "1110a243fdf4706b3f48f1d95db1a4f5529b4d41"
