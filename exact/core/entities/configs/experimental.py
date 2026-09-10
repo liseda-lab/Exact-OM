@@ -446,10 +446,22 @@ class SupervisionConfig(StrictConfigModel):
             threshold = self.min_effective_training_units.get(component)
             if threshold is None:
                 return "label_free", "auto_threshold_missing_definition"
-            return (
-                "label_free",
-                f"auto_threshold_requires_{threshold.minimum}_{threshold.unit}",
-            )
+            units_path = self.artifacts.get("training_units")
+            if units_path is None:
+                return "label_free", f"auto_threshold_requires_{threshold.minimum}_{threshold.unit}"
+            units = json.loads(units_path.read_text())
+            if not profile_binding:
+                return "label_free", "auto_threshold_missing_runtime_binding"
+            if any(
+                units.get("binding", {}).get(key) != value for key, value in profile_binding.items()
+            ):
+                raise ValueError("Fixed supervision policy runtime binding mismatch")
+            count = int(units.get("component_units", {}).get(component, 0))
+            definition = units.get("component_definitions", {}).get(component)
+            if definition != threshold.unit or count < threshold.minimum:
+                return "label_free", "auto_threshold_label_free_fallback"
+            return "supervised", "auto_threshold_effective_units"
+
         if self.auto_policy.artifact is None:
             raise ValueError("profile_rule auto policy requires an immutable artifact")
         payload = json.loads(self.auto_policy.artifact.read_text())
@@ -469,7 +481,11 @@ class SupervisionConfig(StrictConfigModel):
         minimum = rule.get("minimum_groups")
         count = int(units.get("component_units", {}).get(component, 0))
         definition = units.get("component_definitions", {}).get(component)
-        if minimum is None or definition != payload.get("count_definition") or count < int(minimum):
+        if (
+            minimum is None
+            or definition != rule.get("count_definition", payload.get("count_definition"))
+            or count < int(minimum)
+        ):
             return "label_free", "auto_profile_label_free_fallback"
         return "supervised", "auto_profile_frozen_count_crossover"
 

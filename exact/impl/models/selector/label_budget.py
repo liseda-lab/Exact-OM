@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import random
+
 from .fitting import fingerprint, freeze_json
 
 
@@ -99,4 +100,4 @@ def fit_count_policy(records, path, *, component, binding, practical_effect=0.0)
         "comparisons": records,
         "practical_effect": practical_effect,
     }
-    return freeze_json(path, payload)
+    return freeze_json(path, payload) if path is not None else payload

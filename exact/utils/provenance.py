@@ -9,6 +9,21 @@ from pathlib import Path
 from typing import Any, Optional
 
 
+def dataset_signature_for_paths(source: Path, target: Path) -> str:
+    """Match the dataset's legacy identity without loading ontologies or models."""
+
+    def path_fingerprint(path):
+        path = Path(path).expanduser().resolve()
+        try:
+            stat = path.stat()
+            return f"{path.as_posix()}::{int(stat.st_mtime)}::{stat.st_size}"
+        except OSError:
+            return path.as_posix()
+
+    blob = f"{path_fingerprint(source)}||{path_fingerprint(target)}"
+    return hashlib.sha1(blob.encode("utf-8")).hexdigest()
+
+
 def sha256_file(path: Path, *, chunk_size: int = 1024 * 1024) -> str:
     """Return the SHA-256 digest of *path* without loading it into memory."""
 

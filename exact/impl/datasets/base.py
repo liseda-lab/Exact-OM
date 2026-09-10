@@ -55,7 +55,7 @@ from exact.utils.candidate_generation import (
     select_candidate_annotation_literals,
 )
 from exact.utils.data import read_table
-from exact.utils.provenance import file_provenance
+from exact.utils.provenance import dataset_signature_for_paths, file_provenance
 
 DataFrame = pd.DataFrame
 _DATASET_CACHE_SCHEMA_VERSION = 4
@@ -760,21 +760,13 @@ class BaseAlignmentDataset(IDataset):
         if callable(configure):
             configure(self._reasoner_name)
 
-    def _path_fingerprint(self, path: Path) -> str:
-        try:
-            stat = path.stat()
-            return f"{path.as_posix()}::{int(stat.st_mtime)}::{stat.st_size}"
-        except OSError:
-            return path.as_posix()
-
     @property
     def dataset_signature(self) -> Optional[str]:
         if self._dataset_signature is not None:
             return self._dataset_signature
         if self._source_path is None or self._target_path is None:
             return None
-        blob = f"{self._path_fingerprint(self._source_path)}||{self._path_fingerprint(self._target_path)}"
-        self._dataset_signature = hashlib.sha1(blob.encode("utf-8")).hexdigest()
+        self._dataset_signature = dataset_signature_for_paths(self._source_path, self._target_path)
         return self._dataset_signature
 
     def _cache_fingerprint_payload(self) -> Dict[str, Any]:
