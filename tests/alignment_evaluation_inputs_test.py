@@ -105,3 +105,54 @@ def test_official_four_column_reference_survives_dataset_and_action_materializat
         mappings, tmp_path / "evaluation", full_reference_file_path=output, error_on_fail=True
     )
     assert output.read_text().splitlines()[1] == "s\tt\t=\tclass\tclass"
+
+
+def test_stripped_local_pool_gets_reporting_gold_only_after_scoring(tmp_path):
+    from exact.core.actions.evaluation import materialize_local_ranking_inputs, run_evaluation
+
+    pool = tmp_path / "unlabelled.tsv"
+    original = (
+        "SrcEntity\tTgtEntity\tTgtCandidates\ns1\t\t['wrong', 'right']\ns2\t\t['other', 'gold']\n"
+    )
+    pool.write_text(original)
+    scores = tmp_path / "scores.tsv"
+    scores.write_text(
+        "SrcEntity\tTgtEntity\tTgtCandidates\ns1\t\t[('wrong', 0.1), ('right', 0.9)]\ns2\t\t[('other', 0.2), ('gold', 0.8)]\n"
+    )
+    reference = tmp_path / "valid.tsv"
+    reference.write_text("SrcEntity\tTgtEntity\tRelation\tScore\ns1\tright\t=\t1\ns2\tgold\t=\t1\n")
+    annotated, queries = materialize_local_ranking_inputs(
+        scores, pool, reference, tmp_path / "evaluation/inputs"
+    )
+    metrics = run_evaluation(
+        annotated, tmp_path / "evaluation", reference_candidates=queries, error_on_fail=True
+    )
+    assert metrics["MRR"] == 1.0
+    assert metrics["Hits@1"] == 1.0
+    assert pool.read_text() == original
+    assert scores.read_text().splitlines()[1].startswith("s1\t\t")
+
+
+def test_local_reporting_join_keeps_all_positives_and_empty_candidate_groups(tmp_path):
+    import ast
+    from exact.core.actions.evaluation import materialize_local_ranking_inputs, run_evaluation
+
+    pool = tmp_path / "pool.tsv"
+    pool.write_text("SrcEntity\tTgtEntity\tTgtCandidates\ns\t\t['a', 'b']\nempty\t\t[]\n")
+    scores = tmp_path / "scores.tsv"
+    scores.write_text("SrcEntity\tTgtEntity\tTgtCandidates\ns\t\t[('a', 0.9), ('b', 0.8)]\n")
+    reference = tmp_path / "valid.tsv"
+    reference.write_text(
+        "SrcEntity\tTgtEntity\tRelation\tScore\ns\ta\t=\t1\ns\tb\t=\t1\nempty\tmissing\t=\t1\noutside\tx\t=\t1\n"
+    )
+    annotated, queries = materialize_local_ranking_inputs(
+        scores, pool, reference, tmp_path / "evaluation/inputs"
+    )
+    rows = pd.read_csv(queries, sep="\t")
+    assert len(rows) == 3
+    assert set(rows.loc[rows.SrcEntity == "s", "TgtEntity"]) == {"a", "b"}
+    assert ast.literal_eval(rows.loc[rows.SrcEntity == "empty", "TgtCandidates"].iloc[0]) == []
+    metrics = run_evaluation(
+        annotated, tmp_path / "evaluation", reference_candidates=queries, error_on_fail=True
+    )
+    assert metrics["MRR"] == 0.5  # (1 + 1/2 + empty-pool zero) / three official queries

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import csv
 import hashlib
+import json
 from pathlib import Path
 from typing import Any, Optional
 
@@ -16,6 +17,23 @@ def sha256_file(path: Path, *, chunk_size: int = 1024 * 1024) -> str:
         for chunk in iter(lambda: stream.read(chunk_size), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def sha256_path(path: Path) -> str:
+    """Hash file bytes or a directory's relative filenames and file-byte identities."""
+    path = Path(path)
+    if not path.is_dir():
+        return sha256_file(path)
+    files = {
+        item.relative_to(path).as_posix(): sha256_file(item)
+        for item in sorted(path.rglob("*"))
+        if item.is_file()
+    }
+    if not files:
+        raise ValueError(f"Input directory contains no files: {path}")
+    return hashlib.sha256(
+        json.dumps(files, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
 
 
 def tabular_row_count(path: Path) -> Optional[int]:
@@ -50,6 +68,19 @@ def file_provenance(path: Path) -> dict[str, Any]:
     """Describe an input file using its resolved path, digest, size, and row count."""
 
     resolved = Path(path).expanduser().resolve()
+    if resolved.is_dir():
+        files = {
+            item.relative_to(resolved).as_posix(): sha256_file(item)
+            for item in sorted(resolved.rglob("*"))
+            if item.is_file()
+        }
+        return {
+            "path": str(resolved),
+            "sha256": sha256_path(resolved),
+            "files": files,
+            "bytes": sum((resolved / name).stat().st_size for name in files),
+            "rows": None,
+        }
     return {
         "path": str(resolved),
         "sha256": sha256_file(resolved),

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 from typing import Optional, Sequence
@@ -29,6 +30,28 @@ def build_parser() -> argparse.ArgumentParser:
         "--suite",
         type=Path,
         help="A dependency-aware experiment suite manifest.",
+    )
+    source.add_argument("--campaign", type=Path, help="A strict v2 campaign lock.")
+    parser.add_argument(
+        "--materialize-only",
+        action="store_true",
+        help="Write strict run declarations without executing them.",
+    )
+    parser.add_argument(
+        "--resume-from",
+        type=Path,
+        help="Import verified stage artifacts from an earlier campaign directory.",
+    )
+    parser.add_argument(
+        "--repair-record", type=Path, help="Dependency-scoped implementation repair record."
+    )
+    parser.add_argument(
+        "--reuse-plan-only",
+        action="store_true",
+        help="Write the repair/reuse plan without executing work.",
+    )
+    parser.add_argument(
+        "--stop-after-checkpoint", action="store_true", help="Stop at the next durable checkpoint."
     )
     parser.add_argument(
         "--stage",
@@ -80,6 +103,49 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     if args.jobs < 1:
         parser.error("--jobs must be positive")
     try:
+        if args.campaign:
+            from exact.experiments.campaign import (
+                campaign_plan,
+                execute_campaign,
+                materialize_campaign,
+            )
+
+            if args.dry_run:
+                plan = campaign_plan(args.campaign, stage=args.stage)
+                print(json.dumps(plan, indent=2, sort_keys=True))
+                return (
+                    2 if plan["budget_errors"] or any(row["issues"] for row in plan["rows"]) else 0
+                )
+            if args.materialize_only:
+                suite = materialize_campaign(
+                    args.campaign, args.output_root / "declarations" / args.stage, stage=args.stage
+                )
+                print(
+                    f"Materialized {len(suite.sources)} strict declarations in {args.output_root / 'declarations' / args.stage}"
+                )
+                return 0
+            return execute_campaign(
+                args.campaign,
+                stage=args.stage,
+                output_root=args.output_root,
+                workdir=_REPOSITORY_ROOT,
+                jobs=args.jobs,
+                resume=args.resume,
+                resume_from=args.resume_from,
+                repair_record=args.repair_record,
+                reuse_plan_only=args.reuse_plan_only,
+                stop_after_checkpoint=args.stop_after_checkpoint,
+            )
+        if any(
+            (
+                args.materialize_only,
+                args.resume_from,
+                args.repair_record,
+                args.reuse_plan_only,
+                args.stop_after_checkpoint,
+            )
+        ):
+            raise ValueError("v2 preparation/recovery flags require --campaign")
         suite = load_suite_or_experiment(
             suite_path=args.suite,
             experiment_path=args.config,

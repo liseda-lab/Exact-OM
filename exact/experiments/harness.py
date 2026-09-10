@@ -17,7 +17,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Iterable, Literal, Mapping, Optional, Sequence
+from typing import Any, Iterable, Literal, Mapping, Optional, Sequence, cast
 from urllib.parse import urlsplit, urlunsplit
 
 from exact.core.entities.configs.config import ConfigModel
@@ -240,6 +240,7 @@ class LoadedSuite:
     baseline_manifest: Optional[Path] = None
     baseline_manifest_hash: Optional[str] = None
     baseline: Optional[BaselineManifest] = None
+    campaign: Optional[dict[str, Any]] = None
 
     @property
     def by_id(self) -> dict[str, ExperimentSource]:
@@ -269,6 +270,7 @@ class RunCell:
     supervision_label: str
     resolved_supervision: dict[str, Any]
     negative_label_policy: str
+    recovery: Optional[dict[str, Any]] = None
 
     @property
     def manifest_path(self) -> Path:
@@ -547,7 +549,7 @@ def _validate_model_lock(path: Path) -> dict[str, Any]:
     return payload
 
 
-def _configured_model_ids(mapping: Mapping[str, Any]) -> set[str]:
+def _configured_model_ids(mapping: Mapping[str, Any], *, hosted_only: bool = False) -> set[str]:
     """Return local/Hugging Face model IDs which must be revision locked."""
 
     required: set[str] = set()
@@ -556,6 +558,11 @@ def _configured_model_ids(mapping: Mapping[str, Any]) -> set[str]:
         encoder = candidates.get("encoder") or candidates.get("lexical_encoder_name")
         if encoder:
             required.add(str(encoder))
+        for name in ("encoder_finetune", "cross_encoder"):
+            treatment = candidates.get(name) or {}
+            training = treatment.get("training") or {}
+            if treatment.get("mode") not in {None, "off"} and training.get("base_model"):
+                required.add(str(training["base_model"]))
     for entry in mapping.get("pipeline") or ():
         if not isinstance(entry, Mapping):
             continue
@@ -563,13 +570,19 @@ def _configured_model_ids(mapping: Mapping[str, Any]) -> set[str]:
         if not isinstance(params, Mapping):
             continue
         for field in ("lexical_model_name", "context_model_name", "llm_model_name"):
+            if hosted_only and field == "llm_model_name":
+                continue
             value = params.get(field)
             if value:
                 required.add(str(value))
     llm = mapping.get("llm")
     profiles = llm.get("profiles") if isinstance(llm, Mapping) else None
     if isinstance(profiles, Mapping):
-        for profile in profiles.values():
+        routing = (llm.get("routing") or {}) if isinstance(llm, Mapping) else {}
+        active = {value for key, value in routing.items() if value and "fallback" not in key}
+        for name, profile in profiles.items():
+            if hosted_only and name not in active:
+                continue
             if not isinstance(profile, Mapping):
                 continue
             if str(profile.get("backend") or "").strip().lower() == "local_hf" and profile.get(
@@ -613,7 +626,9 @@ def _validate_model_lock_bindings(
             validated = ConfigModel.from_mapping(mapping, warn_v1=False).model_dump(
                 mode="json", by_alias=True
             )
-            required.update(_configured_model_ids(validated))
+            required.update(
+                _configured_model_ids(validated, hosted_only=source.config.schema_version == 2)
+            )
     models = lock.get("models")
     declared = {
         str(raw.get("requested_id"))
@@ -627,12 +642,14 @@ def _validate_model_lock_bindings(
 
 def _bind_model_lock_revisions(
     mapping: Mapping[str, Any],
-    lock: Mapping[str, Any],
+    lock: Optional[Mapping[str, Any]],
     *,
     require_complete: bool,
+    hosted_only: bool = False,
 ) -> dict[str, Any]:
     """Inject immutable revisions into every local/HF loader configuration."""
 
+    lock = lock or {}
     status = str(lock.get("status") or "")
     if status != "complete":
         if require_complete:
@@ -692,6 +709,18 @@ def _bind_model_lock_revisions(
             revision_field="encoder_revision",
             context="candidate encoder",
         )
+        for name in ("encoder_finetune", "cross_encoder"):
+            treatment = dict(candidates.get(name) or {})
+            training = dict(treatment.get("training") or {})
+            if treatment.get("mode") not in {None, "off"} and training.get("base_model"):
+                bind_field(
+                    training,
+                    model_field="base_model",
+                    revision_field="revision",
+                    context=f"{name} training encoder",
+                )
+                treatment["training"] = training
+                candidates[name] = treatment
         bound["candidates"] = candidates
 
     pipeline: list[Any] = []
@@ -708,6 +737,8 @@ def _bind_model_lock_revisions(
                 ("context_model_name", "context_model_revision", "context encoder"),
                 ("llm_model_name", "llm_model_revision", "pipeline local LLM"),
             ):
+                if hosted_only and model_field == "llm_model_name":
+                    continue
                 bind_field(
                     params,
                     model_field=model_field,
@@ -724,7 +755,11 @@ def _bind_model_lock_revisions(
         profiles_value = llm.get("profiles")
         if isinstance(profiles_value, Mapping):
             profiles: dict[str, Any] = {}
+            active = set((llm.get("routing") or {}).values())
             for name, profile_value in profiles_value.items():
+                if hosted_only and name not in active:
+                    profiles[str(name)] = profile_value
+                    continue
                 if not isinstance(profile_value, Mapping):
                     profiles[str(name)] = profile_value
                     continue
@@ -1191,7 +1226,7 @@ def _component_arms(
     *,
     promoted_overlays: Optional[Mapping[str, Mapping[str, Any]]] = None,
 ) -> list[ArmConfig]:
-    if config.experiment_id != "E17":
+    if config.experiment_id != "E17" or (config.schema_version == 2 and config.composition is None):
         return list(config.arms)
     assert config.composition is not None
     composition = config.composition
@@ -1425,6 +1460,11 @@ def _selected_arm_ids(
     experiment = (selection_record.get("experiments") or {}).get(source.config.experiment_id)
     if not isinstance(experiment, Mapping):
         raise ValueError(f"selection record has no entry for {source.config.experiment_id}")
+    if (
+        source.config.schema_version == 2
+        and selection_record.get("kind") == "exact_om_final_selection"
+    ):
+        return set(experiment["arms"])
     status = experiment.get("status")
     if status == "screened_out":
         return set()
@@ -1514,6 +1554,7 @@ def build_cells(
                     resolved,
                     suite.model_lock_payload,
                     require_complete=stage == "confirm",
+                    hosted_only=config.schema_version == 2,
                 )
                 validated = ConfigModel.from_mapping(resolved, warn_v1=False)
                 resolved = validated.model_dump(mode="json", by_alias=True)
@@ -1552,6 +1593,7 @@ def build_cells(
                         supervision_label=label,
                         resolved_supervision=supervision,
                         negative_label_policy=config.negative_label_policy,
+                        recovery=suite.campaign,
                     )
                 )
     return cells
@@ -1732,12 +1774,12 @@ def _path_provenance(mapping: Mapping[str, Any]) -> dict[str, Any]:
         if not path.is_absolute():
             path = (root / path) if relative_to_root else path.resolve()
         path = path.resolve()
-        if not path.is_file():
+        if not path.is_file() and not (label in {"data.source", "data.target"} and path.is_dir()):
             raise FileNotFoundError(f"configured {label} does not exist: {path}")
         return path
 
     result: dict[str, Any] = {}
-    for key in ("source", "target", "candidates"):
+    for key in ("source", "target", "candidates", "source_universe", "train_candidates"):
         value = data.get(key)
         if value:
             result[key] = file_provenance(
@@ -1849,6 +1891,15 @@ def _model_identities(mapping: Mapping[str, Any]) -> dict[str, Any]:
         "candidate_retrieval": {
             "encoder": candidates.get("encoder") or candidates.get("lexical_encoder_name"),
             "revision": candidates.get("encoder_revision"),
+        },
+        "retrieval_training": {
+            name: {
+                key: (candidates[name].get("training") or {}).get(key)
+                for key in ("base_model", "revision")
+            }
+            for name in ("encoder_finetune", "cross_encoder")
+            if isinstance(candidates.get(name), Mapping)
+            and candidates[name].get("mode") not in {None, "off"}
         },
         "llm_profiles": safe_profiles,
     }
@@ -2039,12 +2090,13 @@ def _prepare_cell(
     *,
     workdir: Path,
     resume: bool,
+    recovery: Any = None,
 ) -> tuple[dict[str, Any], bool]:
     provenance = _provenance_payload(cell, suite, workdir=workdir)
     if cell.manifest_path.is_file():
         existing = _load_json(cell.manifest_path)
         old_fingerprint = existing.get("fingerprint")
-        if old_fingerprint != provenance["fingerprint"]:
+        if old_fingerprint != provenance["fingerprint"] and recovery is None:
             raise ValueError(
                 f"resume fingerprint mismatch for {cell.cell_id}: "
                 f"{old_fingerprint} != {provenance['fingerprint']}"
@@ -2054,13 +2106,16 @@ def _prepare_cell(
                 raise FileExistsError(
                     f"completed output already exists for {cell.cell_id}; pass --resume to reuse"
                 )
-            _validate_reused_candidate_pool(cell, existing)
-            return existing, True
+            if recovery is None:
+                _validate_reused_candidate_pool(cell, existing)
+                return existing, True
         if not resume:
             raise FileExistsError(
                 f"partial output exists for {cell.cell_id}; pass --resume to continue"
             )
-    elif cell.output_dir.exists() and any(cell.output_dir.iterdir()):
+    elif cell.output_dir.exists() and any(
+        path.name != "reuse-plan.json" or recovery is None for path in cell.output_dir.iterdir()
+    ):
         raise FileExistsError(
             f"non-empty output exists without a provenance manifest: {cell.output_dir}"
         )
@@ -2129,6 +2184,7 @@ def _run_subprocess(
     cwd: Path,
     stdout_path: Path,
     stderr_path: Path,
+    env: Optional[Mapping[str, str]] = None,
 ) -> tuple[int, float, Optional[int]]:
     started = time.monotonic()
     peak_kb: Optional[int] = None
@@ -2141,6 +2197,8 @@ def _run_subprocess(
             stdout=stdout,
             stderr=stderr,
             text=True,
+            env={**os.environ, **dict(env or {})},
+            start_new_session=bool(env and env.get("EXACT_EXPERIMENT_MODE") == "1"),
         )
         status_path = Path("/proc") / str(process.pid) / "status"
         while process.poll() is None:
@@ -2429,9 +2487,26 @@ def execute_cell(
     workdir: Path,
     resume: bool,
 ) -> dict[str, Any]:
-    manifest, reused = _prepare_cell(cell, suite, workdir=workdir, resume=resume)
+    recovery = None
+    if cell.recovery:
+        from exact.experiments.runtime import CellRecovery
+
+        recovery = CellRecovery(cell, _provenance_payload(cell, suite, workdir=workdir), workdir)
+        if cell.recovery.get("reuse_plan_only"):
+            return {
+                "experiment_id": cell.experiment_id,
+                "stage": cell.stage,
+                "arm_id": cell.arm_id,
+                "task_id": cell.task_id,
+                "seed": cell.seed,
+                "status": "planned",
+                "reuse_plan": recovery.plan,
+            }
+    manifest, reused = _prepare_cell(cell, suite, workdir=workdir, resume=resume, recovery=recovery)
     if reused:
         return manifest
+    if recovery is not None:
+        recovery.prepare()
     _, wrapper_path = _write_cell_inputs(cell)
     manifest["status"] = "running"
     manifest["started_at"] = _utc_now()
@@ -2446,12 +2521,22 @@ def execute_cell(
     stdout_path = cell.output_dir / "experiment.stdout.log"
     stderr_path = cell.output_dir / "experiment.stderr.log"
     try:
-        return_code, elapsed, peak_kb = _run_subprocess(
-            command,
-            cwd=workdir,
-            stdout_path=stdout_path,
-            stderr_path=stderr_path,
-        )
+        if recovery is not None and "extraction" in recovery.reuse:
+            started = time.monotonic()
+            if "evaluation" not in recovery.reuse:
+                recovery.evaluate()
+            return_code, elapsed, peak_kb = 0, time.monotonic() - started, None
+        else:
+            runtime_options: dict[str, Any] = (
+                {"env": recovery.environment()} if recovery is not None else {}
+            )
+            return_code, elapsed, peak_kb = _run_subprocess(
+                command,
+                cwd=workdir,
+                stdout_path=stdout_path,
+                stderr_path=stderr_path,
+                **runtime_options,
+            )
     except Exception as exc:
         manifest.update(
             {
@@ -2460,6 +2545,8 @@ def execute_cell(
                 "failure": {"type": type(exc).__name__, "message": str(exc)},
             }
         )
+        if recovery is not None:
+            manifest["recovery"] = recovery.finish(manifest)
         _atomic_json(cell.manifest_path, manifest)
         return manifest
 
@@ -2489,6 +2576,10 @@ def execute_cell(
             "message": f"run_exact_job exited with status {return_code}",
             "stderr": str(stderr_path),
         }
+    if recovery is not None:
+        if (cell.output_dir / "interrupted.json").is_file() and return_code != 0:
+            manifest["status"] = "interrupted"
+        manifest["recovery"] = recovery.finish(manifest)
     _atomic_json(cell.manifest_path, manifest)
     return manifest
 
@@ -2513,6 +2604,20 @@ def run_cells(
             locks[key] = threading.BoundedSemaphore(cell.resource.concurrency)
 
     def run_one(cell: RunCell) -> dict[str, Any]:
+        if cell.recovery and (Path(cell.recovery["root"]) / "STOP").exists():
+            return {
+                "suite_id": cell.suite_id,
+                "experiment_id": cell.experiment_id,
+                "stage": cell.stage,
+                "arm_id": cell.arm_id,
+                "task_id": cell.task_id,
+                "seed": cell.seed,
+                "status": "interrupted",
+                "failure": {
+                    "type": "StopRequested",
+                    "message": "Campaign STOP prevents scheduling this cell",
+                },
+            }
         lock = locks.get(cell.resource.serialization_key())
         if lock is None:
             return execute_cell(cell, suite, workdir=workdir, resume=resume)
@@ -2868,17 +2973,17 @@ def _candidate_pool_guard(
                     )
         return "allowed_retrieval_treatment", fingerprints, None
     if experiment_id == "E20":
-        missing = [
+        missing_e20 = [
             f"{arm}/{task}/seed-{seed}"
             for arm, cells in sorted(cells_by_arm.items())
             for (task, seed), record in sorted(cells.items())
             if not record.get("candidate_pool_fingerprint")
         ]
-        if missing:
+        if missing_e20:
             return (
                 "missing_retrieval_treatment_fingerprint",
                 fingerprints,
-                f"E20 retrieval treatments have missing fingerprints: {missing}",
+                f"E20 retrieval treatments have missing fingerprints: {missing_e20}",
             )
         return "allowed_retrieval_treatment", fingerprints, None
 
@@ -2902,13 +3007,13 @@ def _candidate_pool_guard(
             )
             for seed in seeds:
                 records = {arm: cells[(task, seed)] for arm, cells in cells_by_arm.items()}
-                values = {
+                pool_values = {
                     arm: record.get("candidate_pool_fingerprint") for arm, record in records.items()
                 }
-                if any(not value for value in values.values()):
+                if any(not value for value in pool_values.values()):
                     missing.append(f"{task}/seed-{seed}")
                     continue
-                if len(set(values.values())) > 1:
+                if len(set(pool_values.values())) > 1:
                     design_hashes = {
                         record.get("candidate_pool_design_hash") for record in records.values()
                     }
@@ -3698,6 +3803,7 @@ def aggregate_stage(
     output_root: Path,
     manifests: Optional[Iterable[Mapping[str, Any]]] = None,
     finalize_reports: bool = True,
+    expected_cells: Optional[Sequence[RunCell]] = None,
 ) -> list[dict[str, Any]]:
     stage_root = Path(output_root).expanduser().resolve() / suite.suite_id / stage
     artifact_root = _stage_artifact_root(
@@ -3712,6 +3818,40 @@ def aggregate_stage(
     else:
         loaded = manifests
     manifest_list = list(loaded)
+    if suite.campaign and finalize_reports:
+        from exact.experiments.runtime import validate_campaign_results
+
+        selection = None
+        if stage == "confirm":
+            selection_path = Path(
+                suite.campaign.get("selection_record")
+                or Path(output_root) / suite.suite_id / "screen/selection.json"
+            )
+            selection = load_and_validate_selection(selection_path, suite)
+        expected = (
+            list(expected_cells)
+            if expected_cells is not None
+            else [
+                cell
+                for source in suite.sources
+                for cell in build_cells(
+                    suite,
+                    source,
+                    stage=stage,
+                    output_root=output_root,
+                    selection_record=selection,
+                    promoted_component_overlays=(
+                        suite.confirmed_component_overlays
+                        if source.config.experiment_id == "E17"
+                        else None
+                    ),
+                )
+            ]
+        )
+        current = validate_campaign_results(
+            manifest_list, expected, root=Path(suite.campaign["root"])
+        )
+        _atomic_json(artifact_root / "current-result-set.json", current)
     for manifest in manifest_list:
         output_dir_value = manifest.get("fingerprint_payload", {}).get("output_dir")
         if output_dir_value:
@@ -3921,11 +4061,12 @@ _SELECTION_ENDPOINT_PATHS = {
 
 
 def _selection_metric_value(record: Mapping[str, Any], requested: str) -> Optional[float]:
+    value: Any
     metrics = record.get("metrics")
     if isinstance(metrics, Mapping):
-        value = _metric_value(metrics, requested)
-        if value is not None:
-            return value
+        metric_value = _metric_value(metrics, requested)
+        if metric_value is not None:
+            return metric_value
     if requested in record:
         value = record[requested]
     else:
@@ -3966,7 +4107,7 @@ def _metric_cells_by_arm(
             continue
         task = str(record.get("task_id"))
         try:
-            seed = int(record.get("seed"))
+            seed = int(cast(Any, record.get("seed")))
         except (TypeError, ValueError) as exc:
             raise ValueError(
                 f"{experiment_id}: selection record for {arm}/{task} has an invalid seed"
@@ -4060,7 +4201,7 @@ def _selection_ci_evidence(
             }:
                 raise ValueError(f"{experiment_id}: incomplete selection evidence identity")
             try:
-                estimate = float(raw.get("estimate"))
+                estimate = float(cast(Any, raw.get("estimate")))
             except (TypeError, ValueError) as exc:
                 raise ValueError(
                     f"{experiment_id}: selection evidence estimate is invalid"
@@ -4071,9 +4212,9 @@ def _selection_ci_evidence(
                     f"{experiment_id}: selection evidence requires confidence_interval"
                 )
             try:
-                confidence = float(interval.get("confidence"))
-                lower = float(interval.get("lower"))
-                upper = float(interval.get("upper"))
+                confidence = float(cast(Any, interval.get("confidence")))
+                lower = float(cast(Any, interval.get("lower")))
+                upper = float(cast(Any, interval.get("upper")))
             except (TypeError, ValueError) as exc:
                 raise ValueError(
                     f"{experiment_id}: selection evidence confidence interval is invalid"
@@ -4443,6 +4584,24 @@ def _lexicographic_candidate_ranking(
     return ranking
 
 
+def _project_policy(mapping: Mapping[str, Any], paths: Sequence[str]) -> dict[str, Any]:
+    """Export only the component settings declared before comparison outcomes."""
+    result: dict[str, Any] = {}
+    for path in paths:
+        parts = path.split(".")
+        value: Any = mapping
+        for part in parts:
+            if not isinstance(value, Mapping) or part not in value:
+                break
+            value = value[part]
+        else:
+            branch: Any = value
+            for part in reversed(parts):
+                branch = {part: branch}
+            result = deep_merge(result, branch)
+    return result
+
+
 def _mapping_delta(baseline: Mapping[str, Any], candidate: Mapping[str, Any]) -> dict[str, Any]:
     delta: dict[str, Any] = {}
     for key, candidate_value in candidate.items():
@@ -4583,7 +4742,7 @@ def _e17_component_removal_guard(
         failures: list[dict[str, Any]] = []
         for record in arm_records:
             try:
-                cost = float(record.get(cost_metric))
+                cost = float(cast(Any, record.get(cost_metric)))
             except (TypeError, ValueError) as exc:
                 raise ValueError(
                     f"E17 component-removal arm {arm!r} has no numeric {cost_metric}"
@@ -4597,9 +4756,9 @@ def _e17_component_removal_guard(
             passed = False
             if isinstance(audit, Mapping):
                 try:
-                    result_rows = int(audit.get("result_rows"))
-                    reconstructed_rows = int(audit.get("reconstructed_rows"))
-                    max_abs_error = float(audit.get("max_abs_error"))
+                    result_rows = int(cast(Any, audit.get("result_rows")))
+                    reconstructed_rows = int(cast(Any, audit.get("reconstructed_rows")))
+                    max_abs_error = float(cast(Any, audit.get("max_abs_error")))
                 except (TypeError, ValueError):
                     pass
                 else:
@@ -4730,8 +4889,18 @@ def select_experiment(
             f"{config.experiment_id}: selection evidence contains undeclared comparisons "
             f"{undeclared_ci}"
         )
+    diagnostic = config.schema_version == 2 and not config.selection.decisions
+    if diagnostic:
+        _scores_by_arm(
+            records,
+            experiment_id=config.experiment_id,
+            metric=config.design.primary_endpoint,
+            arms=set(arms),
+        )
     decisions: list[dict[str, Any]] = []
     combined_selected_overlay: dict[str, Any] = {}
+    published_policy: dict[str, Any] = {}
+    policy_paths = config.frozen_constants.get("campaign_v2", {}).get("policy_paths", [])
     any_selected = False
     all_selected = True
     for rule in config.selection.decisions:
@@ -4825,7 +4994,14 @@ def select_experiment(
         if selected_arm is not None:
             baseline_mapping = deep_merge(base, arms[rule.baseline].overlay)
             candidate_mapping = deep_merge(base, arms[selected_arm].overlay)
-            selected_overlay = _mapping_delta(baseline_mapping, candidate_mapping)
+            selected_overlay = (
+                _project_policy(
+                    deep_merge(arms[rule.baseline].overlay, arms[selected_arm].overlay),
+                    policy_paths,
+                )
+                if policy_paths
+                else _mapping_delta(baseline_mapping, candidate_mapping)
+            )
             combined_selected_overlay = _strict_overlay_merge(
                 combined_selected_overlay,
                 selected_overlay,
@@ -4833,6 +5009,14 @@ def select_experiment(
             selected_signed_delta = float(
                 candidate_evaluations[selected_arm]["primary"]["evaluations"][0]["signed_delta"]
             )
+        if policy_paths:
+            policy = _project_policy(
+                deep_merge(
+                    arms[rule.baseline].overlay, arms[selected_arm or rule.baseline].overlay
+                ),
+                policy_paths,
+            )
+            published_policy = _strict_overlay_merge(published_policy, policy)
         decisions.append(
             {
                 "id": rule.id,
@@ -4880,10 +5064,13 @@ def select_experiment(
             baseline_manifest_hash=baseline_manifest_hash,
         ),
         "candidate_pool_design_hash": _candidate_design_hash(base),
-        "status": "selected" if any_selected else "screened_out",
-        "decision_mode": "independent",
+        "status": "complete" if diagnostic else "selected" if any_selected else "screened_out",
+        "decision_mode": "diagnostic" if diagnostic else "independent",
         "all_decisions_selected": all_selected,
-        "combined_selected_overlay": combined_selected_overlay if any_selected else None,
+        "combined_selected_overlay": (
+            combined_selected_overlay if any_selected or diagnostic else None
+        ),
+        "published_policy_overlay": published_policy if policy_paths else None,
         "selection_evidence_hash": (
             hash_payload([ci_index[key] for key in sorted(ci_index)]) if ci_index else None
         ),
@@ -4900,7 +5087,17 @@ def selected_experiment_overlays(
     experiments = selection_record.get("experiments") or {}
     for dependency in dependencies:
         record = experiments.get(dependency)
-        if not isinstance(record, Mapping) or record.get("status") != "selected":
+        if not isinstance(record, Mapping) or record.get("status") not in {
+            "selected",
+            "screened_out",
+            "complete",
+        }:
+            continue
+        published = record.get("published_policy_overlay")
+        if isinstance(published, Mapping):
+            selected[dependency] = dict(published)
+            continue
+        if record.get("status") != "selected":
             continue
         combined = record.get("combined_selected_overlay")
         if isinstance(combined, Mapping):
@@ -5064,7 +5261,11 @@ def _validate_component_confirmation_evidence(
     observed_cells: dict[tuple[str, str, int], Mapping[str, Any]] = {}
     for row in source_rows:
         try:
-            cell = (str(row.get("arm_id")), str(row.get("task_id")), int(row.get("seed")))
+            cell = (
+                str(row.get("arm_id")),
+                str(row.get("task_id")),
+                int(cast(Any, row.get("seed"))),
+            )
         except (TypeError, ValueError) as exc:
             raise ValueError(
                 f"E17 component {source_id!r} confirmation has an invalid cell identity"
@@ -5194,6 +5395,7 @@ def load_and_bind_confirmed_components(path: Path, suite: LoadedSuite) -> Loaded
     if len(e17_sources) != 1 or e17_sources[0].config.composition is None:
         raise ValueError("confirmed-components record requires exactly one E17 composition")
     e17 = e17_sources[0]
+    assert e17.config.composition is not None
     required = {
         component.source_experiment: component
         for component in e17.config.composition.components
@@ -5553,6 +5755,10 @@ def load_and_validate_selection(
 ) -> dict[str, Any]:
     record_path = Path(path).expanduser().resolve()
     record = _load_json(record_path)
+    if suite.campaign and record.get("kind") == "exact_om_final_selection":
+        from exact.experiments.campaign import validate_final_selection
+
+        return validate_final_selection(record, suite)
     embedded_hash = record.pop("selection_hash", None)
     computed_hash = hash_payload(record)
     record["selection_hash"] = embedded_hash
@@ -5662,7 +5868,11 @@ def print_dry_run(
                 f"{detail}"
             )
             continue
-        if config.experiment_id == "E17" and suite.confirmed_component_overlays is None:
+        if (
+            config.schema_version == 1
+            and config.experiment_id == "E17"
+            and suite.confirmed_component_overlays is None
+        ):
             print(
                 "DEFERRED_RUNTIME\tE17\tconfirmed_components_record_required: "
                 "supply --confirmed-components-record after component confirmations"
@@ -5776,6 +5986,16 @@ def run_stage(
         )
         return None
 
+    campaign_lock = None
+    plan_only = bool(suite.campaign and suite.campaign.get("reuse_plan_only"))
+    previous_selections: dict[str, Any] = {}
+    if suite.campaign:
+        from exact.experiments.campaign import load_campaign, load_progress, write_progress
+
+        campaign_lock, _ = load_campaign(Path(suite.campaign["lock_path"]))
+        if stage == "screen" and (resume or plan_only):
+            previous_selections = load_progress(suite, stage)
+
     downstream_parent: Optional[dict[str, Any]] = None
     e17_only = False
     if suite.confirmed_components_hash is not None:
@@ -5821,23 +6041,30 @@ def run_stage(
         if len(e17_sources) != 1:
             raise ValueError("downstream component-confirmation phase requires exactly one E17")
         inventory_suite = replace(suite, sources=e17_sources)
-    build_dataset_inventory(
-        inventory_suite,
-        stage=stage,
-        output_root=output_root,
-        selection_record=selection,
-    )
+    if not plan_only:
+        build_dataset_inventory(
+            inventory_suite,
+            stage=stage,
+            output_root=output_root,
+            selection_record=selection,
+        )
 
     all_manifests: list[dict[str, Any]] = []
+    all_cells: list[RunCell] = []
     selections: dict[str, Any] = (
         dict(_jsonable(downstream_parent.get("experiments") or {}))
         if downstream_parent is not None
-        else {}
+        else previous_selections
     )
     incremental_selection: dict[str, Any] = {
         "experiments": selections,
         "selection_hash": None,
     }
+
+    def persist(status: str = "partial") -> None:
+        if suite.campaign and not plan_only:
+            write_progress(suite, stage, selections, all_manifests, status=status)
+
     for source in suite.sources:
         config = source.config
         if e17_only and config.experiment_id != "E17":
@@ -5867,8 +6094,24 @@ def run_stage(
                     "expected_dataset": config.implementation.expected_dataset,
                     "decisions": [],
                 }
+            if suite.campaign and stage == "screen":
+                states = set(
+                    config.frozen_constants.get("campaign_v2", {}).get("readiness", {}).values()
+                )
+                terminal = {"inapplicable", "deferred_budget", "blocked_input_resolution"}
+                if states and states <= terminal:
+                    selections[config.experiment_id]["status"] = next(
+                        value
+                        for value in ("deferred_budget", "blocked_input_resolution", "inapplicable")
+                        if value in states
+                    )
+            persist()
             continue
-        if config.experiment_id == "E17" and suite.confirmed_component_overlays is None:
+        if (
+            config.schema_version == 1
+            and config.experiment_id == "E17"
+            and suite.confirmed_component_overlays is None
+        ):
             if stage == "screen":
                 selections[config.experiment_id] = _runtime_deferred_selection(
                     source,
@@ -5882,6 +6125,47 @@ def run_stage(
                     ),
                 )
             continue
+        if suite.campaign and config.experiment_id not in suite.campaign.get(
+            "allowed_steps", [config.experiment_id]
+        ):
+            if stage == "confirm":
+                raise ValueError(
+                    f"frozen final comparison was not admitted: {config.experiment_id}"
+                )
+            selections[config.experiment_id] = _runtime_deferred_selection(
+                source,
+                suite,
+                reason_code="not_admitted",
+                reason="Comparison is not admitted by the campaign readiness plan",
+            )
+            persist()
+            continue
+        if suite.campaign and stage == "screen":
+            from exact.experiments.campaign import dependency_blockers
+
+            blockers = dependency_blockers(source, selections)
+            if blockers:
+                selections[config.experiment_id] = _runtime_deferred_selection(
+                    source,
+                    suite,
+                    reason_code="dependency_pending",
+                    reason="Waiting for completed dependency policies: " + ", ".join(blockers),
+                )
+                persist()
+                continue
+        if suite.campaign and stage == "screen":
+            from exact.experiments.campaign import compose_development
+
+            assert campaign_lock is not None
+            source = compose_development(source, campaign_lock, selections)
+            config = source.config
+            suite = replace(
+                suite,
+                sources=tuple(
+                    source if item.config.experiment_id == config.experiment_id else item
+                    for item in suite.sources
+                ),
+            )
         source_selection = selection if stage == "confirm" else incremental_selection
         assert source_selection is not None
         promoted_components = (
@@ -5901,16 +6185,48 @@ def run_stage(
             inherited_overlay=inherited,
             promoted_component_overlays=promoted_components,
         )
-        manifests = run_cells(
-            cells,
-            suite,
-            workdir=workdir,
-            jobs=jobs,
-            resume=resume,
-        )
-        if stage == "confirm":
+        all_cells.extend(cells)
+        if suite.campaign:
+            from exact.experiments.campaign import run_comparison
+
+            try:
+                manifests = run_comparison(
+                    cells, suite, source, workdir=workdir, jobs=jobs, resume=resume
+                )
+            except ValueError as exc:
+                if stage != "screen" or not str(exc).startswith("deferred_budget:"):
+                    raise
+                all_cells = [
+                    cell for cell in all_cells if cell.experiment_id != config.experiment_id
+                ]
+                selections[config.experiment_id] = {
+                    **_runtime_deferred_selection(
+                        source, suite, reason_code="deferred_budget", reason=str(exc)
+                    ),
+                    "status": "deferred_budget",
+                }
+                persist()
+                continue
+        else:
+            manifests = run_cells(cells, suite, workdir=workdir, jobs=jobs, resume=resume)
+        if stage == "confirm" and not plan_only:
             _validate_paired_llm_identities(manifests)
         all_manifests.extend(manifests)
+        if plan_only:
+            continue
+        if suite.campaign:
+            if any(item.get("status") != "complete" for item in manifests):
+                selections[config.experiment_id] = _runtime_deferred_selection(
+                    source,
+                    suite,
+                    reason_code="interrupted_comparison",
+                    reason="Comparison retains incomplete cells; resume the declared cells before selection",
+                )
+                persist("interrupted")
+                _require_successful_cells(manifests, stage=stage)
+            from exact.experiments.runtime import validate_campaign_results
+
+            validate_campaign_results(manifests, cells, root=Path(suite.campaign["root"]))
         records = aggregate_stage(
             suite,
             stage=stage,
@@ -5942,14 +6258,19 @@ def run_stage(
                 promoted_component_overlays=promoted_components,
                 baseline_manifest_hash=suite.baseline_manifest_hash,
             )
+        persist()
 
+    if plan_only:
+        return None
     aggregate_stage(
         suite,
         stage=stage,
         output_root=output_root,
         manifests=all_manifests,
         finalize_reports=True,
+        expected_cells=all_cells if suite.campaign else None,
     )
+    persist("complete")
     if stage == "screen":
         return write_selection_record(suite, selections, output_root=output_root)
     return None

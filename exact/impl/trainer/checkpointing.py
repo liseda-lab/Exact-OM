@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib  # noqa: F401
 import inspect  # noqa: F401
 import json  # noqa: F401
+import os
 import time  # noqa: F401
 from pathlib import Path  # noqa: F401
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple  # noqa: F401
@@ -656,7 +657,13 @@ class CheckpointingMixin:
         try:
             with open(tmp_path, "w", encoding="utf-8") as f:
                 json.dump(payload, f, indent=2, ensure_ascii=False, default=_json_default)
+                f.flush()
+                os.fsync(f.fileno())
             tmp_path.replace(checkpoint_path)
+            if os.getenv("EXACT_EXPERIMENT_RUNTIME"):
+                from exact.experiments.runtime import runtime_checkpoint
+
+                runtime_checkpoint(self, checkpoint_path, processed_examples)
             self.log(
                 (
                     f"Wrote checkpoint ({processed_examples}/{total_examples} examples) "
@@ -666,6 +673,8 @@ class CheckpointingMixin:
             )
         except OSError as exc:
             self.log(f"Failed to write checkpoint {checkpoint_path}: {exc}", "warning")
+            if os.getenv("EXACT_EXPERIMENT_RUNTIME"):
+                raise
 
     def _model_fingerprint_entry(self, model: Any) -> Dict[str, Any]:
         fingerprint_payload: Optional[Dict[str, Any]] = None

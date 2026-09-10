@@ -1215,7 +1215,7 @@ def _run_alignment_session(
                     run_stats_path=run_stats_path,
                 )
                 local_results = run_evaluation(
-                    alignment=Path(alignment_file_path),
+                    alignment=local_alignment_path,
                     output_dir_path=evaluation_dir / "local",
                     error_on_fail=False,
                     K=configs.k,
@@ -1223,9 +1223,7 @@ def _run_alignment_session(
                     target_file_path=dataset.target,
                     train_reference_file_path=None,
                     full_reference_file_path=None,
-                    reference_candidates=(
-                        effective_candidates_file_path if local_ranking else None
-                    ),
+                    reference_candidates=(local_reference_candidates if local_ranking else None),
                     logger=logger,
                     backends=configs.evaluation.backends,
                     backend_options=backend_options,
@@ -1240,8 +1238,25 @@ def _run_alignment_session(
                     alignment=Path(
                         evaluation_alignment_path
                         if not local_ranking and evaluation_full_reference is not None
-                        else alignment_file_path
+                        else local_alignment_path
                     ),
+            local_alignment_path = Path(alignment_file_path)
+            local_reference_candidates = effective_candidates_file_path
+            if (
+                local_ranking
+                and evaluation_full_reference is not None
+                and effective_candidates_file_path is not None
+            ):
+                from exact.core.actions.evaluation import (
+                    materialize_local_ranking_inputs,
+                )
+
+                local_alignment_path, local_reference_candidates = materialize_local_ranking_inputs(
+                    local_alignment_path,
+                    Path(effective_candidates_file_path),
+                    Path(evaluation_full_reference),
+                    evaluation_dir / "inputs",
+                )
                     output_dir_path=evaluation_dir,
                     error_on_fail=False,
                     K=configs.k,
@@ -1251,9 +1266,7 @@ def _run_alignment_session(
                     full_reference_file_path=(
                         evaluation_full_reference if not local_ranking else None
                     ),
-                    reference_candidates=(
-                        effective_candidates_file_path if local_ranking else None
-                    ),
+                    reference_candidates=(local_reference_candidates if local_ranking else None),
                     logger=logger,
                     backends=configs.evaluation.backends,
                     backend_options=backend_options,

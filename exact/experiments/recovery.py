@@ -420,8 +420,6 @@ def build_reuse_plan(
         action = "reuse"
         if stage in affected:
             action, reason = "recompute", "declared repair or invalidated semantic descendant"
-        elif previous.get(stage) != artifact_id:
-            action, reason = "recompute", "missing artifact or changed numerical identity"
         else:
             try:
                 store.verify(artifact_id)

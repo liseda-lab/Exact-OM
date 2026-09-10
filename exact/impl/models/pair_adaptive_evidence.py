@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib  # noqa: F401
 import json  # noqa: F401
+import os
 from typing import Any, Dict, List, Optional, Sequence, Tuple  # noqa: F401
 
 import torch  # noqa: F401
@@ -596,7 +597,8 @@ class PairAdaptiveEvidenceMixin:
             try:
                 return list(dataset._verbalize_triples(triples))
             except Exception:
-                pass
+                if os.environ.get("EXACT_EXPERIMENT_MODE") == "1":
+                    raise
         out: List[str] = []
         for head, rel, tail in triples:
             out.append(f"{head} {rel} {tail}.")

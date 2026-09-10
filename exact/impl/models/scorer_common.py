@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib  # noqa: F401
 import json  # noqa: F401
+import os
 import re  # noqa: F401
 import time  # noqa: F401
 from collections import OrderedDict  # noqa: F401
@@ -39,6 +40,8 @@ class ScorerCommonMixin:
     def _ensure_local_llm(self) -> None:
         if not self.use_llm:
             return
+        if os.getenv("EXACT_EXPERIMENT_MODE") == "1":
+            raise RuntimeError("Local generative models are disabled in experiment mode")
         if self.llm is not None and self.llm_tok is not None:
             return
         if not self.llm_model_name:
@@ -249,7 +252,19 @@ class ScorerCommonMixin:
                 outputs[idx] = cached
 
         if missing_keys:
-            encodings = self._encode_texts(tokenizer, model, missing_keys, max_len)
+            if os.getenv("EXACT_EMBEDDING_CACHE_DIR"):
+                from exact.experiments.runtime import cached_encoder_rows
+
+                encodings = cached_encoder_rows(
+                    self,
+                    tokenizer,
+                    model,
+                    missing_keys,
+                    max_len,
+                    lambda rows: self._encode_texts(tokenizer, model, rows, max_len),
+                )
+            else:
+                encodings = self._encode_texts(tokenizer, model, missing_keys, max_len)
             encodings = encodings.detach().to("cpu").to(self._cache_tensor_dtype)
             for key, tensor in zip(missing_keys, encodings):
                 self._cache_store(cache, key, tensor, limit)

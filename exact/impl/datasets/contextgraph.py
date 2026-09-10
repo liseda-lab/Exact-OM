@@ -89,6 +89,7 @@ class ContextDataset(BaseAlignmentDataset):
         # Verbalisation LLM
         device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
         verbaliser_name: Optional[str] = "Qwen/Qwen2.5-3B-Instruct",
+        verbalization_mode: str = "llm",
         gen_max_new_tokens: int = 64,
         do_sample: bool = False,
         temperature: float = 0.1,
@@ -124,6 +125,9 @@ class ContextDataset(BaseAlignmentDataset):
         # Verbaliser LLM
         self.device = device
         self.verbaliser_name = verbaliser_name
+        if verbalization_mode not in {"llm", "deterministic"}:
+            raise ValueError(f"Unknown verbalization mode: {verbalization_mode}")
+        self.verbalization_mode = verbalization_mode
         self.gen_max_new_tokens = int(gen_max_new_tokens)
         self.do_sample = bool(do_sample)
         self.temperature = float(temperature)
@@ -214,6 +218,7 @@ class ContextDataset(BaseAlignmentDataset):
                 "all_labels": self.all_labels,
                 "add_connectivity_bridges": self.add_connectivity_bridges,
                 "bridge_max_hops": self.bridge_max_hops,
+                "verbalization_mode": self.verbalization_mode,
                 "verbaliser_name": self.verbaliser_name,
                 "verbaliser_backend": self._verbaliser_backend.backend,
                 "verbaliser_profile": self._verbaliser_backend.profile_name,
@@ -239,6 +244,7 @@ class ContextDataset(BaseAlignmentDataset):
         payload = {
             "dataset_signature": self.dataset_signature,
             "only_taxonomy": self.only_taxonomy,
+            "verbalization_mode": self.verbalization_mode,
             "verbaliser_name": self.verbaliser_name,
             "verbaliser_backend": self._verbaliser_backend.backend,
             "verbaliser_profile": self._verbaliser_backend.profile_name,
@@ -353,6 +359,10 @@ class ContextDataset(BaseAlignmentDataset):
     # ------------------------------------------------------------------
     @property
     def verbalization_templates(self) -> Dict[str, str]:
+
+        if self.verbalization_mode == "deterministic":
+            # The renderer below uses the exact relation label for every triple.
+            return {}
 
         if self.only_taxonomy:
             if not self._taxonomy_template_log_emitted:

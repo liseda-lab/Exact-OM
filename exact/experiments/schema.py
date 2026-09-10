@@ -505,8 +505,6 @@ class SelectionConfig(StrictConfigModel):
 
     @model_validator(mode="after")
     def validate_decisions(self) -> "SelectionConfig":
-        if not self.decisions:
-            raise ValueError("selection must declare at least one decision")
         decision_ids = [decision.id for decision in self.decisions]
         if len(set(decision_ids)) != len(decision_ids):
             raise ValueError("selection decision identifiers must be unique")
@@ -684,7 +682,7 @@ class CompositionConfig(StrictConfigModel):
 
 
 class ExperimentConfig(StrictConfigModel):
-    schema_version: Literal[1] = 1
+    schema_version: Literal[1, 2] = 1
     experiment_id: str
     title: str
     implementation: ImplementationConfig = Field(default=ImplementationConfig.model_validate({}))
@@ -716,6 +714,8 @@ class ExperimentConfig(StrictConfigModel):
 
     @model_validator(mode="after")
     def validate_matrix(self) -> "ExperimentConfig":
+        if self.schema_version == 1 and not self.selection.decisions:
+            raise ValueError("selection must declare at least one decision")
         if not self.arms:
             raise ValueError(f"{self.experiment_id}: must declare at least one arm")
         arm_ids = [arm.id for arm in self.arms]
@@ -787,7 +787,7 @@ class ExperimentConfig(StrictConfigModel):
             task.source_cap is not None for task in self.confirm.tasks
         ):
             raise ValueError(f"{self.experiment_id}: confirm cannot cap reporting sources")
-        if self.experiment_id == "E17" and self.composition is None:
+        if self.schema_version == 1 and self.experiment_id == "E17" and self.composition is None:
             raise ValueError("E17 requires a bounded composition declaration")
         if self.experiment_id == "E17" and self.composition is not None:
             if not any(
@@ -852,7 +852,7 @@ class ExperimentConfig(StrictConfigModel):
                         raise ValueError(
                             f"E17 exploratory interaction arm {arm_id!r} cannot " "include confirm"
                         )
-        if self.implementation.status == "ready":
+        if self.implementation.status == "ready" and self.schema_version == 1:
             if not self.design.power_slices:
                 raise ValueError(
                     f"{self.experiment_id}: ready experiments require task/kind/relation "

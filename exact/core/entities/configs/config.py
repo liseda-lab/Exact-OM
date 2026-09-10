@@ -472,6 +472,8 @@ class DatasetConfig(StrictConfigModel):
         True, description="Remove exact lexical matches before semantic scoring."
     )
     drop_exact_match_sources: bool = Field(
+    verbalization_mode: Literal["llm", "deterministic"] = "llm"
+
         False, description="Remove every candidate for sources with an exact match."
     )
     filter_ignored_alignment_classes: bool = Field(

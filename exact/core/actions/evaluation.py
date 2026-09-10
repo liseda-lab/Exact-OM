@@ -172,6 +172,83 @@ def _save_report(
     return flat
 
 
+def materialize_local_ranking_inputs(
+    alignment: Path, candidates: Path, reference: Path, output_dir: Path
+) -> tuple[Path, Path]:
+    """Join reporting labels to frozen pools after scoring, retaining missed positives.
+
+    Source groups and candidate membership come only from the frozen pool. Each
+    positive retains its own benchmark query; empty pools and unlabelled groups
+    remain explicit rows. Gold targets are never appended to candidate lists.
+    """
+    from ast import literal_eval
+    import pandas as pd
+    from exact.utils.data import read_table
+
+    pool = read_table(candidates)
+    scored = read_table(alignment)
+    refs = read_table(reference)
+    if len(pool.columns) < 2 or len(scored.columns) < 2 or len(refs.columns) < 2:
+        raise ValueError("Local evaluation requires source and target columns")
+    pools: dict[str, set[str]] = {}
+    list_column = next(
+        (c for c in ("TgtCandidates", "Candidates", "candidates") if c in pool), None
+    )
+    for row in pool.itertuples(index=False, name=None):
+        source = str(row[0])
+        targets = pools.setdefault(source, set())
+        values = literal_eval(row[pool.columns.get_loc(list_column)]) if list_column else [row[1]]
+        targets.update(str(target) for target in values if str(target))
+    scores: dict[tuple[str, str], float] = {}
+    scored_list = next(
+        (c for c in ("TgtCandidates", "Candidates", "candidates") if c in scored), None
+    )
+    for row in scored.itertuples(index=False, name=None):
+        source = str(row[0])
+        if scored_list:
+            values = literal_eval(row[scored.columns.get_loc(scored_list)])
+            for rank, value in enumerate(values):
+                target, score = (value, len(values) - rank) if isinstance(value, str) else value[:2]
+                scores[(source, str(target))] = float(score)
+        else:
+            scores[(source, str(row[1]))] = float(row[2])
+    positives: dict[str, set[str]] = {}
+    relation = next((c for c in ("Relation", "relation") if c in refs), None)
+    for row in refs.itertuples(index=False, name=None):
+        if relation and row[refs.columns.get_loc(relation)] != "=":
+            continue
+        if str(row[0]) in pools and pd.notna(row[1]) and str(row[1]):
+            positives.setdefault(str(row[0]), set()).add(str(row[1]))
+    ranked_rows, reference_rows = [], []
+    for source, targets in sorted(pools.items()):
+        ranked = sorted(
+            ((target, scores.get((source, target), 0.0)) for target in targets),
+            key=lambda item: (-item[1], item[0]),
+        )
+        for positive in sorted(positives.get(source) or {""}):
+            ranked_rows.append((source, positive, repr(ranked)))
+            reference_rows.append((source, positive, repr(sorted(targets))))
+    output_dir.mkdir(parents=True, exist_ok=True)
+    paths = (output_dir / "ranked.tsv", output_dir / "reference_candidates.tsv")
+    for path, rows in zip(paths, (ranked_rows, reference_rows)):
+        temporary = path.with_suffix(".tmp")
+        pd.DataFrame(rows, columns=["SrcEntity", "TgtEntity", "TgtCandidates"]).to_csv(
+            temporary, sep="\t", index=False
+        )
+        os.replace(temporary, path)
+    _atomic_json(
+        output_dir / "provenance.json",
+        {
+            "alignment": file_provenance(alignment),
+            "candidates": file_provenance(candidates),
+            "reporting_reference": file_provenance(reference),
+            "sources": len(pools),
+            "queries": len(reference_rows),
+        },
+    )
+    return paths
+
+
 def run_evaluation(
     alignment: Union[List[Tuple[ReferenceMapping, List[EntityMapping]]], List[EntityMapping], Path],
     output_dir_path: Path,
