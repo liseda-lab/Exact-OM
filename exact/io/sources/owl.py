@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
-from pyowl_core import OntologyView
+from pyowl_core import IRI, MappingResolver, OntologyView
 
 from exact.core.contracts.knowledge import KnowledgeSource
 from exact.core.entities.graph import AnnotationValue, Edge
@@ -103,11 +104,33 @@ class _SchemaOnlyOwlSource(KnowledgeSource):
         self._source.configure_reasoner(name, **settings)
 
 
+def _import_resolver(bindings: Any, base: Path) -> MappingResolver | None:
+    """Bind exact import IRIs to verified local bytes, with no network fallback."""
+    if not isinstance(bindings, Mapping):
+        raise SourceOptionsError("imports must map ontology IRIs to path/sha256 bindings")
+    documents: dict[IRI | str, bytes] = {}
+    for iri, binding in bindings.items():
+        if (
+            not isinstance(iri, str)
+            or not isinstance(binding, Mapping)
+            or set(binding) != {"path", "sha256"}
+            or not isinstance(binding["path"], str)
+            or not isinstance(binding["sha256"], str)
+        ):
+            raise SourceOptionsError("Each import requires an IRI, local path and SHA256")
+        path = Path(binding["path"]).expanduser()
+        content = (path if path.is_absolute() else base / path).read_bytes()
+        if hashlib.sha256(content).hexdigest() != binding["sha256"]:
+            raise SourceOptionsError(f"OWL import checksum mismatch: {iri}")
+        documents[iri] = content
+    return MappingResolver(documents) if documents else None
+
+
 def create_source(path: Path, *, options: Mapping[str, Any] | None = None) -> KnowledgeSource:
     """Load an OWL source with optional labels and ABox filtering."""
 
     normalized = dict(options or {})
-    unknown = sorted(set(normalized) - {"include_abox", "label_properties"})
+    unknown = sorted(set(normalized) - {"include_abox", "label_properties", "imports"})
     if unknown:
         raise SourceOptionsError(f"Unknown OWL source option(s): {', '.join(unknown)}")
     label_properties = normalized.get("label_properties")
@@ -120,7 +143,11 @@ def create_source(path: Path, *, options: Mapping[str, Any] | None = None) -> Kn
     include_abox = normalized.get("include_abox", True)
     if not isinstance(include_abox, bool):
         raise SourceOptionsError("include_abox must be a boolean")
-    source = load_ontology(Path(path), label_properties=label_properties)
+    source = load_ontology(
+        Path(path),
+        label_properties=label_properties,
+        resolver=_import_resolver(normalized.get("imports", {}), Path(path).parent),
+    )
     return source if include_abox else _SchemaOnlyOwlSource(source)
 
 

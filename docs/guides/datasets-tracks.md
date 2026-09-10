@@ -48,3 +48,23 @@ with `entity,kind` columns to preserve isolated classes without introducing grap
 Third-party Python providers implement `TrackProvider` and register in the `exact.tracks`
 entry-point group. They must expose deterministic task names, verification, status, pinned
 revisions, and a `TaskLayout` with provenance.
+
+## Offline OWL imports
+
+OWL inputs use strict parsing and local import resolution. Bind each declared import, including
+transitive imports, through `io.source_options.imports` or `io.target_options.imports`:
+
+```yaml
+io:
+  target_options:
+    imports:
+      "http://example.org/imported.owl":
+        path: imports/imported.owl
+        sha256: "<SHA256 of the pinned file>"
+```
+
+Relative paths resolve against the importing root ontology's directory. Each binding is read
+and checksum-verified before the public `pyowl_core.MappingResolver` receives its bytes.
+Changed, unresolved, or malformed imports fail loading; the adapter does not fetch network
+resources or enable partial RDF mapping. Use files from the declared ontology release, and
+record that release's provenance alongside the bindings.
