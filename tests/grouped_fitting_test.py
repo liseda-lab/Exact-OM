@@ -759,3 +759,54 @@ def test_runnerup_acceptance_never_makes_alternative_positive_negative():
     assert all("runnerup_negative" not in decision for decision in decisions.values())
     decisions = fitted._source_decisions(frame, utilities, features, {}, {("s0", "t0-0")})
     assert next(iter(decisions.values()))["runnerup_negative"]["label"] == 0
+
+
+def test_benefit_router_confirmed_pool_labels_fail_before_calls_when_incomplete(tmp_path):
+    from exact.impl.models.selector.llm_learning import fit_llm_artifacts
+
+    reference = {(f"s{i}", f"t{i}-0") for i in range(9)}
+    frame = learning_frame()
+    frame["confirmed_label"] = [int((row.Src, row.Tgt) in reference) for row in frame.itertuples()]
+    application = {
+        "dataset_signature": "report",
+        "source_ids": ["report-source"],
+        "negative_label_policy": "confirmed_negatives",
+    }
+    model = LearningFixture(gate="learned")
+    result = fit_llm_artifacts(
+        model,
+        frame,
+        reference,
+        tmp_path / "complete",
+        config=model.llm_experiment_config,
+        application=application,
+    )
+    assert len(model.calls) == 9
+    assert result["router"]["outcome_scope"] == "frozen_fully_labeled_candidate_pool"
+    model = LearningFixture(gate="learned")
+    partial = frame.copy()
+    partial.loc[1, "confirmed_label"] = float("nan")
+    with pytest.raises(ValueError, match="every candidate"):
+        fit_llm_artifacts(
+            model,
+            partial,
+            reference,
+            tmp_path / "partial",
+            config=model.llm_experiment_config,
+            application=application,
+        )
+    assert not model.calls
+    # A prior shared fit pass may already have dropped unknown rows; its proof
+    # must still prevent a partial original population from appearing complete.
+    filtered = partial.drop(index=1)
+    coverage = {**application, "fully_labeled_training_sources": [f"s{i}" for i in range(1, 9)]}
+    with pytest.raises(ValueError, match="every candidate"):
+        fit_llm_artifacts(
+            model,
+            filtered,
+            reference,
+            tmp_path / "filtered",
+            config=model.llm_experiment_config,
+            application=coverage,
+        )
+    assert not model.calls

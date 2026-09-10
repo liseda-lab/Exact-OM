@@ -197,17 +197,32 @@ def validate_learning_binding(payload, model, source_ids):
 
 def fit_llm_artifacts(model, frame, reference_pairs, directory, *, config, application):
     """Teacher requests are executed only when this explicit runtime fit is called."""
+    original_counts = frame.groupby("Src").size()
     frame, reference = safe_training_labels(frame, reference_pairs, application)
     if config.get("distill") == "student" and config.get("fusion_weight") == "source_first":
         raise ValueError("The pair student requires beta_u or constant integration")
     if config["gate"]["mode"] == "learned" and (
-        application["negative_label_policy"] != "complete_reference"
-        or config.get("fusion_weight") != "source_first"
+        config.get("fusion_weight") != "source_first"
         or config.get("decision", {}).get("evidence", "structured_packet") == "generated_brief"
     ):
         raise ValueError(
-            "Benefit router requires complete source references, scored or structured packets, and frozen source_first integration"
+            "Benefit router requires scored or structured packets and frozen source_first integration"
         )
+    if (
+        config["gate"]["mode"] == "learned"
+        and application["negative_label_policy"] == "confirmed_negatives"
+    ):
+        labeled_counts = frame.groupby("Src").size()
+        complete = {
+            str(source)
+            for source, count in original_counts.items()
+            if int(labeled_counts.get(source, 0)) == int(count)
+        }
+        complete &= set(application.get("fully_labeled_training_sources", complete))
+        if set(original_counts.index.astype(str)) - complete:
+            raise ValueError(
+                "Benefit router requires every candidate of each training source to have an explicit confirmed label"
+            )
     sources = sorted(set(frame.Src.astype(str)))
     binding = teacher_identity(model)
     recipe = {
@@ -387,6 +402,7 @@ def fit_llm_artifacts(model, frame, reference_pairs, directory, *, config, appli
             "threshold": 0.0,
             "target": "correction_minus_harm_per_1000_tokens",
             "outcome_policy": config["outcome_policy"],
+            "outcome_scope": "frozen_fully_labeled_candidate_pool",
             "counterfactuals": examples,
         }
         result["router"] = freeze_json(directory / "router.json", payload)

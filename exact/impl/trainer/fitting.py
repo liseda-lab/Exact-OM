@@ -170,8 +170,20 @@ class TrainingPoolMixin:
             reference = consumers[0]._load_training_reference_pairs(getattr(self, "logger", None))
         else:
             raise ValueError("Train-only fitting requires an explicit training reference")
+        router_requested = (getattr(self, "fitting_llm_config", None) or {}).get("gate", {}).get(
+            "mode"
+        ) == "learned"
+        original_counts = raw.groupby("Src").size() if router_requested else None
         if not nil_consumers:
             raw, reference = safe_training_labels(raw, reference, application)
+        if router_requested:
+            labeled = safe_training_labels(raw, reference, application)[0] if nil_consumers else raw
+            labeled_counts = labeled.groupby("Src").size()
+            application["fully_labeled_training_sources"] = sorted(
+                str(source)
+                for source, count in original_counts.items()
+                if int(labeled_counts.get(source, 0)) == int(count)
+            )
         identity = fingerprint(
             self._json_safe_value(
                 {
