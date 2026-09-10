@@ -193,3 +193,28 @@ def test_parsing_owl_never_loads_rdflib() -> None:
         "assert 'rdflib' not in sys.modules"
     )
     subprocess.run([sys.executable, "-c", code], check=True)
+
+
+def test_csv_explicit_inventory_preserves_isolated_classes_without_synthetic_edges(tmp_path):
+    (tmp_path / "triples.csv").write_text("src,rel,dst\nA,part_of,B\n")
+    (tmp_path / "entities.csv").write_text("entity,kind\nA,class\nB,class\nC,class\n")
+    (tmp_path / "kg.yaml").write_text("triples_files: [triples.csv]\nentities_file: entities.csv\n")
+    source = CsvKgSource.from_path(tmp_path)
+    assert source.entities(EntityKind.CLASS) == ("A", "B", "C")
+    assert source.entities(EntityKind.INDIVIDUAL) == ()
+    assert source.entities(EntityKind.OBJECT_PROPERTY) == ("part_of",)
+    assert source.projection_edges() == [Edge("A", "part_of", "B")]
+    assert source.direct_parents("C") == []
+
+
+@pytest.mark.parametrize(
+    "content",
+    ["entity,kind\nA,invalid\n", "entity,kind\n,class\n", "entity,type\nA,class\n"],
+)
+def test_csv_explicit_inventory_rejects_invalid_declarations(tmp_path, content):
+    (tmp_path / "triples.csv").write_text("src,rel,dst\n")
+    (tmp_path / "entities.csv").write_text(content)
+    with pytest.raises(SourceOptionsError):
+        CsvKgSource.from_path(
+            tmp_path, options={"triples_files": ["triples.csv"], "entities_file": "entities.csv"}
+        )

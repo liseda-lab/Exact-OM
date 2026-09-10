@@ -153,6 +153,7 @@ class CsvKgDescriptor:
     datalog_files: tuple[str, ...] = ()
     class_relation: str | None = None
     evidence_file: str | None = None
+    entities_file: str | None = None
 
     @classmethod
     def from_mapping(cls, value: Mapping[str, Any]) -> "CsvKgDescriptor":
@@ -161,6 +162,7 @@ class CsvKgDescriptor:
         allowed = {
             "attribute_relations",
             "evidence_file",
+            "entities_file",
             "class_relation",
             "datalog_files",
             "description",
@@ -207,6 +209,11 @@ class CsvKgDescriptor:
                 for item in _sequence(value.get("datalog_files"), option="datalog_files")
             ),
             class_relation=str(class_relation) if class_relation is not None else None,
+            entities_file=(
+                _safe_relative(value["entities_file"], option="entities_file")
+                if value.get("entities_file")
+                else None
+            ),
             evidence_file=(
                 _safe_relative(value["evidence_file"], option="evidence_file")
                 if value.get("evidence_file")
@@ -388,6 +395,27 @@ class CsvKgSource(KnowledgeSource):
             ),
             EntityKind.INDIVIDUAL: tuple(sorted(entities - class_entities)),
         }
+        if descriptor.entities_file:
+            declared: dict[EntityKind, set[str]] = defaultdict(set)
+            path = _resolve(self._origin, descriptor.entities_file, option="entities_file")
+            with path.open(encoding="utf-8", newline="") as stream:
+                reader = csv.DictReader(stream)
+                if reader.fieldnames != ["entity", "kind"]:
+                    raise SourceOptionsError("Entity inventory requires entity,kind columns")
+                for row in reader:
+                    iri = row["entity"].strip()
+                    if not iri:
+                        raise SourceOptionsError("Entity inventory contains an empty identifier")
+                    try:
+                        declared[EntityKind(row["kind"])].add(iri)
+                    except ValueError as exc:
+                        raise SourceOptionsError("Unknown entity inventory kind") from exc
+                    entities.add(iri)
+            for kind in EntityKind:
+                members = set(self._signature[kind]) | declared[kind]
+                if kind == EntityKind.INDIVIDUAL:
+                    members -= declared[EntityKind.CLASS] - declared[EntityKind.INDIVIDUAL]
+                self._signature[kind] = tuple(sorted(members))
         self.hierarchy = HierarchyIndex(entities, hierarchy_edges, filter_owl_bounds=False)
         self._labels = {iri: tuple(sorted(values)) for iri, values in labels.items()}
         self._annotations = {

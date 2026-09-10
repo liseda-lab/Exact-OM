@@ -39,8 +39,11 @@ exact data pull my-track/my-task --descriptor track.yaml --root data
 
 Archive extraction rejects absolute paths, parent traversal, and escaping links. Licensed
 providers describe expected local files but never download material that requires acceptance.
-The BioKG provider is intentionally unavailable until its upstream repository is published;
-its descriptor already records the expected CSV-KG layout.
+BioKG supports version-pinned local CSV inputs through explicit, hashed experiment
+`CaseBinding` paths and `io.input_format: csv-kg`. Its automatic built-in provider remains
+unimplemented. Bind only the selected release's public train/validation labels; keep final
+submission inputs reference-free. A CSV graph descriptor may set `entities_file: entities.csv`
+with `entity,kind` columns to preserve isolated classes without introducing graph edges.
 
 Third-party Python providers implement `TrackProvider` and register in the `exact.tracks`
 entry-point group. They must expose deterministic task names, verification, status, pinned

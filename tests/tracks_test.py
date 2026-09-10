@@ -427,3 +427,13 @@ def test_validation_sampling_moved_from_legacy_script(tmp_path: Path) -> None:
 
     assert outputs == [dataset / "test.cands.val.tsv"]
     assert len(outputs[0].read_text(encoding="utf-8").splitlines()) == 2
+
+
+def test_biokg_provider_explains_available_explicit_bindings(tmp_path):
+    from exact.tracks.provider import TrackUnavailableError
+
+    provider = TrackRegistry(discover_plugins=False).get("biokg")
+    with pytest.raises(
+        TrackUnavailableError, match="automatic materialization.*hashed CaseBindings"
+    ):
+        provider.materialize("csv-kg", tmp_path)

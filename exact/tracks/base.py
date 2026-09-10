@@ -697,6 +697,11 @@ class UnavailableDescriptorProvider:
     ) -> TaskLayout:
         """Fail actionably until the descriptor receives a real upstream."""
 
+        if self.descriptor.upstream.get("availability") == "explicit_local_bindings":
+            raise TrackUnavailableError(
+                f"Track {self.name!r} automatic materialization is not implemented. "
+                + str(self.descriptor.upstream["binding_help"])
+            )
         if self.descriptor.upstream.get("availability") == "awaiting_local_release":
             raise UserSuppliedFilesError(
                 f"Track {self.name!r} awaits its local release under "
