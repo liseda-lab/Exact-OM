@@ -220,7 +220,10 @@ def test_primary_listwise_single_call_and_singleton():
 
 
 def test_fusion_fit_neutral_identity_and_grouped_export(tmp_path):
-    from exact.impl.models.selector.fusion_fitting import fit_fusion_artifact, fusion_scores
+    from exact.impl.models.selector.fusion_fitting import (
+        fit_fusion_artifact,
+        fusion_scores,
+    )
 
     frame = training_rows()
     channels = []
@@ -466,8 +469,8 @@ def test_nested_label_budgets_and_reference_safe_active_selection():
 
 
 def test_frozen_count_policy_requires_supported_development_crossover(tmp_path):
-    from exact.impl.models.selector.label_budget import fit_count_policy
     from exact.core.entities.configs.experimental import SupervisionConfig
+    from exact.impl.models.selector.label_budget import fit_count_policy
 
     binding = {"dataset_signature": "fixture-v1"}
     policy = tmp_path / "policy.json"
@@ -614,7 +617,10 @@ def learning_frame():
 
 
 def test_gold_and_distilled_students_share_architecture_and_grouped_folds(tmp_path):
-    from exact.impl.models.selector.llm_learning import fit_llm_artifacts, validate_learning_binding
+    from exact.impl.models.selector.llm_learning import (
+        fit_llm_artifacts,
+        validate_learning_binding,
+    )
 
     frame = learning_frame()
     reference = {(f"s{i}", f"t{i}-0") for i in range(9)}
@@ -669,7 +675,10 @@ def test_gold_and_distilled_students_share_architecture_and_grouped_folds(tmp_pa
 
 
 def test_exemplars_are_train_only_bounded_and_bound_to_teacher(tmp_path):
-    from exact.impl.models.selector.llm_learning import exemplar_prompt, fit_llm_artifacts
+    from exact.impl.models.selector.llm_learning import (
+        exemplar_prompt,
+        fit_llm_artifacts,
+    )
 
     model = LearningFixture(exemplars="knn")
     result = fit_llm_artifacts(
@@ -736,3 +745,17 @@ def test_benefit_router_requires_complete_outcomes_and_actual_call_cost(tmp_path
         for row in examples
     )
     assert result["router"]["target"] == "correction_minus_harm_per_1000_tokens"
+
+
+def test_runnerup_acceptance_never_makes_alternative_positive_negative():
+    fitted = selector()
+    frame = training_rows().iloc[:2].copy()
+    frame["S_pair_final"] = frame.S_final
+    features = fitted._rank_feature_rows(frame, {}, {})
+    utilities = {0: 0.8, 1: 0.7}
+    decisions = fitted._source_decisions(
+        frame, utilities, features, {}, {("s0", "t0-0"), ("s0", "t0-1")}
+    )
+    assert all("runnerup_negative" not in decision for decision in decisions.values())
+    decisions = fitted._source_decisions(frame, utilities, features, {}, {("s0", "t0-0")})
+    assert next(iter(decisions.values()))["runnerup_negative"]["label"] == 0

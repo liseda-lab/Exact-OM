@@ -418,8 +418,10 @@ class CsvKgSource(KnowledgeSource):
         }
         self._iri_edges = tuple(sorted(iri_edges, key=Edge.astuple))
         self._literal_edges = tuple(sorted(literal_edges, key=Edge.astuple))
-        self._normalized_hierarchy = None
-        self._domains, self._ranges, self._excluded = {}, {}, frozenset()
+        self._normalized_hierarchy: dict[EntityKind, HierarchyIndex] | None = None
+        self._domains: dict[str, tuple[str, ...]] = {}
+        self._ranges: dict[str, tuple[str, ...]] = {}
+        self._excluded: frozenset[str] = frozenset()
         if descriptor.evidence_file:
             self._load_normalized_evidence(
                 _resolve(self._origin, descriptor.evidence_file, option="evidence_file")
@@ -494,7 +496,7 @@ class CsvKgSource(KnowledgeSource):
             )
         self._iri_edges = tuple(sorted(iri_edges, key=Edge.astuple))
         self._literal_edges = tuple(sorted(all_edges - iri_edges, key=Edge.astuple))
-        targets = defaultdict(lambda: defaultdict(set))
+        targets: dict[str, dict[str, set[str]]] = defaultdict(lambda: defaultdict(set))
         for edge in self._iri_edges:
             targets[edge.rel][edge.src].add(edge.dst)
         self._relation_targets = {

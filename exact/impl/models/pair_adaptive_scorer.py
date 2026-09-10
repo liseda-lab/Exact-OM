@@ -155,6 +155,7 @@ class PairAdaptiveSemanticScorer(
             evidence="generated_brief",
             permutations=1,
             output="categorical",
+            brief_max_tokens=64,
             samples_per_permutation=3,
         )
         raw_llm_config["gate"] = self._experiment_config(
@@ -230,6 +231,8 @@ class PairAdaptiveSemanticScorer(
             "source_top_fraction",
             "pair_top_fraction",
             "forced_sample",
+            "oracle_perfect",
+            "oracle_replay",
             "learned",
         }:
             if not gate_artifact:
@@ -248,6 +251,8 @@ class PairAdaptiveSemanticScorer(
                 "source_top_fraction",
                 "pair_top_fraction",
                 "forced_sample",
+                "oracle_perfect",
+                "oracle_replay",
             }:
                 self._validate_gate_artifact_contract(gate_mode)
 
@@ -318,7 +323,7 @@ class PairAdaptiveSemanticScorer(
             "signed_property_allowlist"
         ):
             raise ValueError("signed attribute polarity requires a descriptor property allowlist")
-        if self.hier_config["mode"] not in {"labels", "labels_overlap"}:
+        if self.hier_config["mode"] not in {"labels", "labels_overlap", "off"}:
             raise ValueError(f"unsupported hierarchy mode: {self.hier_config['mode']!r}")
         if self.diff_config["formulation"] not in {
             "normalised",
@@ -331,6 +336,7 @@ class PairAdaptiveSemanticScorer(
                 f"unsupported difference formulation: {self.diff_config['formulation']!r}"
             )
         if self.lex_config["quality"] not in {
+            "candidate_margin",
             "margin",
             "entropy",
             "encoder_agreement",
@@ -388,6 +394,8 @@ class PairAdaptiveSemanticScorer(
                 "pair_top_fraction",
                 "forced_sample",
                 "oracle",
+                "oracle_perfect",
+                "oracle_replay",
                 "learned",
             }:
                 raise ValueError(f"unsupported LLM gate mode: {gate_mode!r}")
@@ -487,9 +495,28 @@ class PairAdaptiveSemanticScorer(
         if self._graph_artifact is not None:
             self._graph_artifact.validate_dataset(dataset_signature, required=True)
         if self._fusion_artifact is not None:
-            self._fusion_artifact.validate_dataset(dataset_signature, required=True)
+            from exact.utils.artifact_transfer import validate_transferred_artifact
+
+            families = set(self.hierarchical_relation_families) | {"is_a"}
+            features = sorted(
+                ["label", "strsim", "sim_obj", "diff", "attr_aux"]
+                + [f"hier__{family}" for family in families]
+                + (
+                    ["graph"]
+                    if self.graph_config.get("mode") in {"inductive", "graph_only"}
+                    else []
+                )
+            ) + ["lex", "struct"]
+            if not validate_transferred_artifact(
+                dataset, self._fusion_artifact.path, kind="fusion", features=features
+            ):
+                self._fusion_artifact.validate_dataset(dataset_signature, required=True)
         if self._gate_artifact is not None:
-            self._gate_artifact.validate_dataset(dataset_signature, required=True)
+            self._gate_artifact.validate_dataset(
+                dataset_signature,
+                required=self.llm_experiment_config["gate"]["mode"]
+                not in {"oracle_perfect", "oracle_replay"},
+            )
 
     def _validate_fusion_artifact_contract(self, mode: str) -> None:
         artifact = self._fusion_artifact
@@ -556,6 +583,37 @@ class PairAdaptiveSemanticScorer(
         if artifact is None:
             raise RuntimeError("gate artifact validation requires a loaded artifact")
         payload = artifact.payload
+        if mode in {"oracle_perfect", "oracle_replay"}:
+            artifact.require_fields(
+                "selected_sources",
+                "decision_probs",
+                "population_rows",
+                "fixed_fusion",
+                "negative_label_policy",
+                kind="oracle replay",
+            )
+            if (
+                payload.get("kind") != "llm_oracle_replay"
+                or not payload.get("no_llm_invocations")
+                or payload.get("deployable") is not False
+            ):
+                raise ValueError(
+                    "Oracle replay artifact must explicitly prohibit live calls and deployment"
+                )
+            selected = set(payload["selected_sources"])
+            if (
+                len(selected) != len(payload["selected_sources"])
+                or len(selected) > 200
+                or set(payload["decision_probs"]) != selected
+            ):
+                raise ValueError("Oracle replay intervention source inventory is invalid")
+            if payload["negative_label_policy"] not in {
+                "complete_reference",
+                "confirmed_negatives",
+            }:
+                raise ValueError("Oracle replay requires safe development outcome labels")
+            return
+
         if mode in {"source_top_fraction", "pair_top_fraction"}:
             artifact.require_fields(
                 "dataset_signature",
@@ -609,21 +667,38 @@ class PairAdaptiveSemanticScorer(
         if len(selected) != len(set(selected)):
             raise ValueError("LLM gate artifact pairs must be unique")
         if mode == "forced_sample":
-            artifact.require_fields("sample_size", "seed", "selection_rule", kind="LLM gate")
+            artifact.require_fields(
+                "sample_size",
+                "sample_unit",
+                "source_count",
+                "selected_sources",
+                "population_pairs",
+                "seed",
+                "selection_rule",
+                kind="LLM gate",
+            )
             sample_size = int(payload["sample_size"])
-            if sample_size != len(selected):
-                raise ValueError("forced_sample artifact sample_size must equal its pair count")
-            try:
-                int(payload["seed"])
-            except (TypeError, ValueError) as exc:
-                raise ValueError("forced_sample artifact seed must be an integer") from exc
-            if payload["selection_rule"] != "sha256(seed, source_iri, target_iri)":
-                raise ValueError("forced_sample artifact has an unsupported selection rule")
-
-            configured_size = int(self.llm_experiment_config["gate"].get("forced_sample_size", 0))
-            if configured_size and configured_size != sample_size:
+            sources = set(map(str, payload["selected_sources"]))
+            if (
+                payload["sample_unit"] != "source"
+                or sample_size != len(sources)
+                or not 1 <= sample_size <= 200
+            ):
+                raise ValueError("forced_sample must contain at most 200 whole source groups")
+            population = {tuple(map(str, pair)) for pair in payload["population_pairs"]}
+            if set(selected) != {pair for pair in population if pair[0] in sources}:
                 raise ValueError(
-                    "forced_sample artifact pair count does not match configured sample size"
+                    "forced_sample must retain every candidate of each selected source"
+                )
+            if payload["selection_rule"] != "stratified_round_robin_sha256(seed, source_iri)":
+                raise ValueError("forced_sample artifact has an unsupported selection rule")
+            configured_size = int(self.llm_experiment_config["gate"].get("forced_sample_size", 0))
+            if (
+                configured_size
+                and min(configured_size, int(payload["source_count"])) != sample_size
+            ):
+                raise ValueError(
+                    "forced_sample source count differs from the configured source budget"
                 )
             return
 
@@ -772,6 +847,10 @@ class PairAdaptiveSemanticScorer(
             )
         elif mode == "forced_sample":
             assert self._gate_artifact is not None
+            payload = self._gate_artifact.payload
+            population = {tuple(pair) for pair in payload["population_pairs"]}
+            if not set(zip(map(str, src_iris), map(str, tgt_iris))) <= population:
+                raise ValueError("Forced judgment candidates differ from the frozen population")
             pairs = self._gate_artifact.payload.get("pairs")
             if not isinstance(pairs, list):
                 raise ValueError("forced_sample artifact must contain a 'pairs' array")
@@ -781,9 +860,10 @@ class PairAdaptiveSemanticScorer(
                 if isinstance(pair, list) and len(pair) == 2
             }
             expected_size = int(gate["forced_sample_size"])
-            if expected_size and len(selected) != expected_size:
+            source_count = len({source for source, _ in selected})
+            if expected_size and source_count != min(expected_size, int(payload["source_count"])):
                 raise ValueError(
-                    "forced_sample artifact pair count does not match configured sample size"
+                    "forced_sample artifact source count does not match configured sample size"
                 )
             statistic_name = "frozen_sample_membership"
             statistic = torch.tensor(
@@ -792,7 +872,45 @@ class PairAdaptiveSemanticScorer(
                 device=self.device,
             )
             threshold = 0.5
-            extra["sample_size"] = len(selected)
+            extra["sample_size"] = source_count
+            extra["sample_unit"] = "source"
+        elif mode in {"oracle_perfect", "oracle_replay"}:
+            assert self._gate_artifact is not None
+            payload = self._gate_artifact.payload
+            population = {
+                (str(row["Src"]), str(row["Tgt"])): row for row in payload["population_rows"]
+            }
+            for index, pair in enumerate(zip(map(str, src_iris), map(str, tgt_iris))):
+                frozen = population.get(pair)
+                if (
+                    frozen is None
+                    or abs(float(frozen["S_base"]) - float(S_base[index])) > 1e-6
+                    or abs(float(frozen["U"]) - float(U[index])) > 1e-6
+                ):
+                    raise ValueError(
+                        "Oracle replay base scores/population differ from the frozen response artifact"
+                    )
+            fixed = payload["fixed_fusion"]
+            if (
+                fixed["fusion_weight"] != self.llm_experiment_config["fusion_weight"]
+                or abs(float(fixed["beta"]) - self.beta) > 1e-6
+                or abs(
+                    float(fixed["constant_weight"])
+                    - float(self.llm_experiment_config["constant_weight"])
+                )
+                > 1e-6
+            ):
+                raise ValueError(
+                    "Oracle replay integration differs from the frozen counterfactual rule"
+                )
+            statistic_name = "frozen_oracle_source_intervention"
+            statistic = torch.tensor(
+                [float(str(source) in payload["selected_sources"]) for source in src_iris],
+                device=self.device,
+            )
+            threshold = 0.5
+            extra["oracle_diagnostic"] = True
+            extra["protocol"] = payload["protocol"]
         elif mode == "oracle":
             if label is None or len(label) != len(src_iris):
                 raise ValueError("oracle LLM gate requires one reference label per scored pair")
@@ -879,6 +997,7 @@ class PairAdaptiveSemanticScorer(
                 "property": self.property_config,
                 "instance": self.instance_config,
                 "graph": self.graph_config,
+                "anchor_inventory": getattr(self, "_anchor_manifest", None),
                 "fusion": self.fusion_config,
                 "fusion_effective": {
                     "tau": self.tau,
@@ -930,7 +1049,11 @@ class PairAdaptiveSemanticScorer(
             return self._run_hosted_chat_prompts(
                 prompts=prompts,
                 profile=profile,
-                max_tokens=self.max_new_tokens_llm,
+                max_tokens=(
+                    self.llm_experiment_config["decision"]["brief_max_tokens"]
+                    if self.llm_experiment_enabled
+                    else self.max_new_tokens_llm
+                ),
                 temperature=self.llm_temperature,
                 top_p=self.llm_top_p,
                 concurrency=self.llm_summary_batch_size,
@@ -1054,7 +1177,7 @@ class PairAdaptiveSemanticScorer(
             if not packet:
                 outputs[idx] = ""
                 continue
-            if len(packet.split()) <= short_threshold:
+            if not self.llm_experiment_enabled and len(packet.split()) <= short_threshold:
                 outputs[idx] = packet
                 continue
             key = self._brief_key(src_label, tgt_label, packet)
@@ -1101,7 +1224,8 @@ class PairAdaptiveSemanticScorer(
     ) -> List[str]:
         if (
             not (self.use_llm and self.generate_llm_rationales)
-            or self.llm_experiment_config["gate"]["mode"] == "off"
+            or self.llm_experiment_config["gate"]["mode"]
+            in {"off", "oracle", "oracle_perfect", "oracle_replay"}
             or self.llm_experiment_config.get("distill") == "student"
         ):
             return ["" for _ in records]
@@ -1444,6 +1568,18 @@ class PairAdaptiveSemanticScorer(
         s_label, q_label, best_pairs, label_quality_payloads = self._score_label_channel(
             src_label_lists, tgt_label_lists
         )
+        if self.lex_enabled and self.lex_config["quality"] in {
+            "candidate_margin",
+            "encoder_agreement",
+        }:
+            q_label = self._candidate_quality(
+                src_iris,
+                tgt_iris,
+                src_label_lists,
+                tgt_label_lists,
+                s_label,
+                label_quality_payloads,
+            )
         label_active = torch.tensor(
             [
                 bool(self.use_lexical and src_labels and tgt_labels)
@@ -1557,7 +1693,10 @@ class PairAdaptiveSemanticScorer(
                 struct_channel_scores[f"hier__{family}"].append(float(family_payload["score"]))
                 struct_channel_qualities[f"hier__{family}"].append(float(family_payload["quality"]))
                 struct_channel_active[f"hier__{family}"].append(
-                    bool(family_payload.get("src_selected") or family_payload.get("tgt_selected"))
+                    bool(family_payload.get("active", True))
+                    and bool(
+                        family_payload.get("src_selected") or family_payload.get("tgt_selected")
+                    )
                 )
 
             sim_payload = self._score_similarity_channel(
@@ -1809,10 +1948,9 @@ class PairAdaptiveSemanticScorer(
             tgt_iris=tgt_iris,
             label=label,
         )
-        oracle_mode = (
-            self.llm_experiment_enabled
-            and str(self.llm_experiment_config["gate"]["mode"]) == "oracle"
-        )
+        oracle_mode = self.llm_experiment_enabled and str(
+            self.llm_experiment_config["gate"]["mode"]
+        ) in {"oracle", "oracle_perfect", "oracle_replay"}
         decision_enabled = (
             self.use_llm and not oracle_mode and self.llm_experiment_config["gate"]["mode"] != "off"
         )
@@ -1862,7 +2000,7 @@ class PairAdaptiveSemanticScorer(
         if (
             decision_enabled
             and brief_idxs
-            and self.llm_experiment_config["decision"]["evidence"] != "structured_packet"
+            and self.llm_experiment_config["decision"]["evidence"] == "generated_brief"
         ):
             brief_src = [pair_payloads[i]["src_label"] for i in brief_idxs]
             brief_tgt = [pair_payloads[i]["tgt_label"] for i in brief_idxs]
@@ -1876,7 +2014,7 @@ class PairAdaptiveSemanticScorer(
         p_llm = torch.zeros(n_pairs, device=self.device)
         S_final = S_base.clone()
         oracle_result = None
-        if oracle_mode:
+        if oracle_mode and self.llm_experiment_config["gate"]["mode"] == "oracle":
             assert label is not None
             oracle_result = analytical_oracle_ceiling(
                 S_base.detach().cpu().tolist(),
@@ -1894,6 +2032,37 @@ class PairAdaptiveSemanticScorer(
                 device=self.device,
             )
         grouped_records = []
+        if oracle_mode and self.llm_experiment_config["gate"]["mode"] in {
+            "oracle_perfect",
+            "oracle_replay",
+        }:
+            payload = self._gate_artifact.payload
+            for index, (source, target) in enumerate(zip(map(str, src_iris), map(str, tgt_iris))):
+                probability = payload["decision_probs"].get(source, {}).get(target)
+                if probability is None:
+                    continue
+                if not math.isfinite(float(probability)) or not 0.0 <= float(probability) <= 1.0:
+                    raise ValueError("Oracle artifact has invalid cached probabilities")
+                p_llm[index] = float(probability)
+                if payload["fixed_fusion"]["fusion_weight"] != "source_first":
+                    weight = (
+                        float(payload["fixed_fusion"]["constant_weight"])
+                        if payload["fixed_fusion"]["fusion_weight"] == "constant"
+                        else min(1.0, max(0.0, self.beta * float(U[index])))
+                    )
+                    S_final[index] = (1.0 - weight) * S_base[index] + weight * p_llm[index]
+            if payload["fixed_fusion"]["fusion_weight"] == "source_first":
+                grouped_records = [
+                    {
+                        "source": source,
+                        "choice": payload["source_choices"][source],
+                        "valid": True,
+                        "integration": "source_first",
+                        "probabilities": payload["decision_probs"][source],
+                        "oracle_cached_replay": True,
+                    }
+                    for source in sorted(set(map(str, src_iris)) & set(payload["selected_sources"]))
+                ]
         if (
             decision_enabled
             and decision_idxs
@@ -2013,6 +2182,13 @@ class PairAdaptiveSemanticScorer(
                     "llm_probability": (float(p_llm[idx]) if bool(llm_used_mask[idx]) else None),
                     "score_before": float(S_base[idx]),
                     "score_after": float(S_final[idx]),
+                    "replayed": bool(
+                        oracle_mode
+                        and oracle_result is None
+                        and str(src_iris[idx]) in self._gate_artifact.payload["decision_probs"]
+                        and str(tgt_iris[idx])
+                        in self._gate_artifact.payload["decision_probs"][str(src_iris[idx])]
+                    ),
                     "oracle_adjustment": (
                         float(S_final[idx] - S_base[idx]) if oracle_mode else 0.0
                     ),
@@ -2130,8 +2306,7 @@ class PairAdaptiveSemanticScorer(
         }
         if self.llm_experiment_enabled:
             result["llm_gate_diagnostics"] = gate_diagnostics
-        if oracle_mode:
-            assert oracle_result is not None
+        if oracle_mode and oracle_result is not None:
             result["oracle_diagnostic"] = {
                 "oracle_only": True,
                 "deployable": False,
@@ -2139,6 +2314,16 @@ class PairAdaptiveSemanticScorer(
                 "routed": list(oracle_result.routed),
                 "baseline_predictions": list(oracle_result.baseline_predictions),
                 "labels": list(oracle_result.labels),
+            }
+
+        if oracle_mode and oracle_result is None:
+            result["oracle_diagnostic"] = {
+                "oracle_only": True,
+                "deployable": False,
+                "llm_invocations": 0,
+                "protocol": self._gate_artifact.payload["protocol"],
+                "selected_sources": self._gate_artifact.payload["selected_sources"],
+                "interpretation": self._gate_artifact.payload["interpretation"],
             }
 
         if self.return_explanations:
@@ -2178,6 +2363,16 @@ class PairAdaptiveSemanticScorer(
                 )
                 kind_source = src_feature_map[src_iris[idx]].get("experiment_evidence")
                 kind_target = tgt_feature_map[tgt_iris[idx]].get("experiment_evidence")
+                if getattr(self, "_anchor_manifest", None):
+                    experiment_diagnostics["anchors"] = {
+                        key: self._anchor_manifest[key]
+                        for key in (
+                            "inventory_sha256",
+                            "origin",
+                            "diagnostic",
+                            "query_self_support",
+                        )
+                    }
                 if graph_diagnostics:
                     experiment_diagnostics["graph_head"] = graph_diagnostics[idx]
                 if kind_source or kind_target:

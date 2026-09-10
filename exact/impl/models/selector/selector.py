@@ -370,8 +370,8 @@ class CandidateSetSelector(
                 f"matching calibration mode {self.matching_calibration['mode']!r} requires "
                 "an immutable fitted artifact"
             )
-        if self.nil_config["mode"] not in {"off", "accept_model", "heuristic"}:
-            raise ValueError("NIL mode must be off, accept_model, or heuristic")
+        if self.nil_config["mode"] not in {"off", "accept_model", "heuristic", "fitted"}:
+            raise ValueError("NIL mode must be off, accept_model, heuristic, or fitted")
         if str(self.nil_config.get("ranking_scale")) != "joint_accept_probability":
             raise ValueError("NIL ranking scale must be joint_accept_probability")
         if self.nil_config["mode"] != "off" and not self.use_no_match:
@@ -394,8 +394,6 @@ class CandidateSetSelector(
             )
         if self.experiment_config["accept_model"] != "logistic":
             raise NotImplementedError("Only the shipped logistic accept model is implemented")
-        if self.experiment_config["accept_training"] != "winner_only":
-            raise NotImplementedError("winner_plus_runnerup acceptance training is not implemented")
         if self.rerank_config["mode"] not in {
             "current",
             "current_listwise",
@@ -556,6 +554,21 @@ class CandidateSetSelector(
         df = candidate_df.copy()
         if "S_pair_final" not in df.columns:
             df["S_pair_final"] = df["S_final"]
+        if getattr(dataset, "transfer_artifact", None) is not None:
+            from exact.utils.artifact_transfer import validate_transferred_artifact
+
+            if self.training_reference_file_path:
+                raise ValueError("Transferred selector cannot consume recipient training labels")
+            if self.matching_calibration["threshold_mode"] != "fixed":
+                raise ValueError("Transferred selector cannot adapt the donor threshold")
+            if self.matching_calibration.get("artifact"):
+                validate_transferred_artifact(
+                    dataset,
+                    self.matching_calibration["artifact"],
+                    kind="calibration",
+                    features=["S_pair_final"],
+                    score_threshold=threshold,
+                )
         df = self._apply_matching_score_calibration(df)
 
         n_rows = int(len(df))
@@ -668,7 +681,7 @@ class CandidateSetSelector(
                 run_progress=run_progress,
             )
 
-        df = self._apply_joint_nil_ranking(df)
+        df = self._apply_joint_nil_ranking(df, dataset=dataset)
         self._calibration_meta["score_calibration"] = dict(self._score_calibration_meta)
         self._calibration_meta["nil"] = dict(self._nil_meta)
         if self.replace_final_score:

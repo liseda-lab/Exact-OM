@@ -63,10 +63,54 @@ def joint_nil_distribution(
 class NilRankingMixin:
     """Attach a joint real/NIL distribution without changing global acceptance."""
 
-    def _apply_joint_nil_ranking(self, df: pd.DataFrame) -> pd.DataFrame:
+    def _apply_joint_nil_ranking(self, df: pd.DataFrame, dataset=None) -> pd.DataFrame:
         mode = str(self.nil_config.get("mode", "off")).strip().lower()
         if mode == "off":
             self._nil_meta = {"mode": "off", "applied": False}
+            return df
+        if mode == "fitted":
+            import json
+            from pathlib import Path
+
+            from .nil_head import source_decision_records
+
+            path = self.nil_config.get("artifact")
+            if not path or not Path(path).is_file():
+                raise ValueError("Fitted natural NIL requires a training-source artifact")
+            artifact = json.loads(Path(path).read_text())
+            if artifact["application"].get("dataset_signature") != getattr(
+                dataset, "dataset_signature", None
+            ):
+                raise ValueError("NIL artifact application dataset mismatch")
+            records = source_decision_records(df, df.Src.astype(str).unique(), artifact=artifact)
+            for record in records:
+                indices = df.index[df.Src.astype(str) == record["Src"]]
+                probabilities = df.loc[indices, "P_rank"].astype(float).clip(lower=0)
+                conditional = (
+                    probabilities / float(probabilities.sum())
+                    if float(probabilities.sum()) > self.eps
+                    else pd.Series(1.0 / len(indices), index=indices)
+                )
+                for index, value in conditional.items():
+                    df.at[index, "Q_match"] = record["in_pool_probability"] * value
+                    df.at[index, "Q_nil"] = record["ontology_nil_probability"]
+                    df.at[index, "Q_pool_miss"] = record["pool_miss_probability"]
+                    df.at[index, "P_rank"] = record["in_pool_probability"] * value
+                    df.at[index, "nil_absence_semantics"] = record["absence_semantics"]
+                    df.at[index, "nil_ranking_scale"] = artifact["probability_scale"]
+                    df.at[index, "selection_nil_winner"] = (
+                        record["absence_semantics"] == "ontology_nil"
+                    )
+                    if record["action"] == "abstain":
+                        df.at[index, "S_select"] = 0.0
+                        df.at[index, "selection_abstained"] = True
+            self._nil_meta = {
+                "mode": mode,
+                "applied": True,
+                "artifact": str(path),
+                "source_groups": len(records),
+                "probability_scale": artifact["probability_scale"],
+            }
             return df
         ranking_scale = (
             str(self.nil_config.get("ranking_scale", "joint_accept_probability")).strip().lower()

@@ -153,32 +153,84 @@ def fit_forced_sample_artifact(
     seed: int,
     task_id: str,
     entity_kind: str,
+    dataset_signature: str | None = None,
+    source_strata: Mapping[str, str] | None = None,
+    strata_provenance: Mapping[str, Any] | None = None,
 ) -> Dict[str, Any]:
-    """Freeze a bounded deterministic hash sample without consulting labels."""
-
+    """Freeze up to 200 whole source groups; source strata never alter pair membership."""
     clean = _gate_rows(rows)
-    count = int(sample_size)
-    if count < 1 or count > len(clean):
-        raise ValueError("forced sample_size must be between one and the row count")
+    requested = int(sample_size)
+    if not 1 <= requested <= 200:
+        raise ValueError("forced sample_size must be between one and 200 source groups")
+    grouped = {}
+    for uncertainty, source, target in clean:
+        grouped.setdefault(source, []).append((uncertainty, target))
+    if not grouped:
+        raise ValueError("forced source sampling requires nonempty candidate groups")
+    if source_strata is not None:
+        if set(source_strata) != set(grouped):
+            raise ValueError("Forced strata must describe exactly the eligible source groups")
+        if (strata_provenance or {}).get("label_scope") not in {
+            "target_label_free",
+            "permitted_development",
+        }:
+            raise ValueError(
+                "Labeled diagnostic strata require explicit permitted-development provenance"
+            )
+        strata = {source: str(source_strata[source]) for source in grouped}
+    else:
+        strata = {
+            source: (
+                "singleton"
+                if len(values) == 1
+                else "high_uncertainty" if max(value for value, _ in values) >= 0.5 else "clear"
+            )
+            for source, values in grouped.items()
+        }
+        strata_provenance = {
+            "label_scope": "target_label_free",
+            "features": ["candidate_count", "pre_llm_uncertainty"],
+        }
+    buckets = {}
 
-    def _key(row: Tuple[float, str, str]) -> Tuple[bytes, str, str]:
-        _, source, target = row
-        digest = hashlib.sha256(f"{int(seed)}\x00{source}\x00{target}".encode("utf-8")).digest()
-        return digest, source, target
+    def key(source):
+        return hashlib.sha256(f"{int(seed)}\x00{source}".encode()).digest(), source
 
-    selected = sorted(clean, key=_key)[:count]
-    pairs = sorted((source, target) for _, source, target in selected)
+    for source, stratum in strata.items():
+        buckets.setdefault(stratum, []).append(source)
+    for bucket in buckets.values():
+        bucket.sort(key=key)
+    count = min(requested, len(grouped))
+    selected = []
+    while len(selected) < count:
+        for stratum in sorted(buckets):
+            if buckets[stratum] and len(selected) < count:
+                selected.append(buckets[stratum].pop(0))
+    selected_set = set(selected)
+    pairs = sorted((source, target) for _, source, target in clean if source in selected_set)
+    population = sorted((source, target) for _, source, target in clean)
     return {
         "schema_version": 1,
         "kind": "llm_gate",
         "mode": "forced_sample",
         "task_id": str(task_id),
         "entity_kind": str(entity_kind),
+        "dataset_signature": dataset_signature,
         "seed": int(seed),
         "row_count": len(clean),
+        "source_count": len(grouped),
         "sample_size": count,
-        "pairs": [[source, target] for source, target in pairs],
-        "selection_rule": "sha256(seed, source_iri, target_iri)",
+        "requested_sample_size": requested,
+        "sample_unit": "source",
+        "selected_sources": sorted(selected),
+        "pairs": [list(pair) for pair in pairs],
+        "population_pairs": [list(pair) for pair in population],
+        "source_strata": strata,
+        "strata_provenance": dict(strata_provenance),
+        "selection_rule": "stratified_round_robin_sha256(seed, source_iri)",
+        "population_fingerprint": hashlib.sha256(
+            json.dumps({"pairs": population, "strata": strata}, sort_keys=True).encode()
+        ).hexdigest(),
     }
 
 

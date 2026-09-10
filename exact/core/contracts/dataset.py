@@ -30,6 +30,18 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
         for index in range(len(self)):
             yield self[index]
 
+    def prepare_retrieval_training(self, configs, **kwargs) -> None:
+        """Fit explicitly requested retrieval models before candidate cache lookup."""
+        if any(
+            getattr(getattr(configs.candidates, name), "training", None) is not None
+            for name in ("encoder_finetune", "cross_encoder")
+        ):
+            raise NotImplementedError("This dataset does not support retrieval training")
+
+    def prepare_pool_miss_diagnostic(self, reference_path, **kwargs) -> None:
+        """Apply a named development-only candidate intervention."""
+        raise NotImplementedError("This dataset does not support pool-miss diagnostics")
+
     @abstractmethod
     def __getitem__(self, idx: int) -> Tuple[Tensor, Tensor]: ...
 

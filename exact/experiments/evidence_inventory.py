@@ -21,7 +21,7 @@ def evidence_inventory(
         (EntityKind(kind).value, str(iri)) for kind in kinds for iri in source.entities(kind)
     )
     iris = sorted({iri for _, iri in entities})
-    facts = {
+    facts: dict[str, list[Any]] = {
         "entities": entities,
         "labels": sorted((iri, label) for iri in iris for label in set(source.labels(iri))),
         "annotations": sorted(
@@ -124,7 +124,9 @@ def export_matched_csv(source: KnowledgeSource, destination) -> dict[str, Any]:
     """
     import csv
     from pathlib import Path
+
     import yaml
+
     from exact.io.sources.csv_kg import CsvKgSource
 
     destination = Path(destination)
@@ -174,9 +176,11 @@ def import_biokg_public_graph(package, destination, *, ontology: str) -> dict[st
     """Normalize one ontology from the public table package; never import alignment links."""
     import csv
     from pathlib import Path
+
+    import yaml
+
     from exact.core.entities.graph import AnnotationValue, Edge
     from exact.io.sources.csv_kg import CsvKgSource
-    import yaml
 
     package, destination = Path(package), Path(destination)
     destination.mkdir(parents=True, exist_ok=True)
@@ -232,7 +236,7 @@ def import_biokg_public_graph(package, destination, *, ontology: str) -> dict[st
                 )
                 if not relation.endswith("IAO_0000115"):
                     labels.append((iri, value))
-    facts = {
+    facts: dict[str, list[Any]] = {
         "entities": sorted((kinds.get(iri, "class"), iri) for iri in entities),
         "labels": sorted(set(labels)),
         "annotations": sorted(set(annotations)),

@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 from typing import List, Literal, Optional
 
-from pydantic import Field, model_validator
+from pydantic import Field, field_validator, model_validator
 
 from exact.core.entities.configs.strict import StrictConfigModel
 
@@ -40,6 +40,27 @@ class AnchorRescoringConfig(StrictConfigModel):
     threshold: float = Field(
         0.95, ge=0.0, le=1.0, description="Base-score threshold for predicted anchors."
     )
+    exact_policy: Optional[Literal["hard", "soft"]] = None
+    source: Literal["exact", "trusted", "predicted"] = "predicted"
+    trusted_file: Optional[Path] = None
+    rule_artifact: Optional[Path] = None
+    margin: float = Field(0.1, ge=0.0, le=1.0)
+    corruption_fraction: float = Field(0.0, ge=0.0, le=0.05)
+    diagnostic: bool = False
+
+    @field_validator("corruption_fraction")
+    @classmethod
+    def validate_corruption_fraction(cls, value: float) -> float:
+        if value not in {0.0, 0.01, 0.05}:
+            raise ValueError("Anchor corruption must be 0%, 1%, or 5%")
+        return value
+
+    @model_validator(mode="after")
+    def corruption_is_diagnostic(self):
+        if self.corruption_fraction and not self.diagnostic:
+            raise ValueError("Anchor corruption must be explicitly diagnostic")
+        return self
+
     exact_only: bool = Field(False, description="Restrict the anchor set to exact matches.")
     max_passes: int = Field(2, ge=1, le=2, description="Maximum bounded anchor-rescoring passes.")
 
@@ -61,9 +82,13 @@ class ScoreCalibrationConfig(StrictConfigModel):
 class NilConfig(StrictConfigModel):
     """NIL/abstention controls from E04."""
 
-    mode: Literal["off", "accept_model", "heuristic"] = Field(
+    mode: Literal["off", "accept_model", "heuristic", "fitted"] = Field(
         "off", description="NIL scoring mode; off preserves non-NIL behavior."
     )
+    artifact: Optional[Path] = None
+    training_source_labels: Optional[Path] = None
+    pool_miss_development_reference: Optional[Path] = None
+    label_semantics: Literal["unknown", "natural"] = "unknown"
     ranking_scale: Literal["joint_accept_probability"] = Field(
         "joint_accept_probability", description="Common scale for real candidates and NIL."
     )
@@ -112,11 +137,12 @@ class AttributeChannelExperimentConfig(StrictConfigModel):
     polarity: Literal["support_only", "signed"] = Field("support_only")
     bank: Literal["full", "attrs_labels", "attrs_only"] = Field("full")
     signed_property_allowlist: List[str] = Field(default_factory=list)
+    provenance_dedup: bool = False
 
 
 class HierarchyChannelExperimentConfig(StrictConfigModel):
     enabled: bool = Field(False, description="Enable E09 hierarchy-semantic variants.")
-    mode: Literal["labels", "labels_overlap"] = Field("labels")
+    mode: Literal["labels", "labels_overlap", "off"] = Field("labels")
     siblings: bool = Field(False)
     depth: Optional[int] = Field(2, ge=1, description="Ancestor depth; null requests full closure.")
     overlap_weight: float = Field(0.5, ge=0.0, le=1.0)
@@ -144,7 +170,9 @@ class DifferenceChannelExperimentConfig(StrictConfigModel):
 
 class LexicalChannelExperimentConfig(StrictConfigModel):
     enabled: bool = Field(False, description="Enable E26 lexical-quality variants.")
-    quality: Literal["margin", "entropy", "encoder_agreement", "constant"] = Field("margin")
+    quality: Literal["margin", "candidate_margin", "entropy", "encoder_agreement", "constant"] = (
+        Field("margin")
+    )
     entropy_top_m: int = Field(5, ge=2)
     entropy_temperature: float = Field(1.0, gt=0.0)
     deduplicate_labels: bool = False
@@ -170,8 +198,15 @@ class GraphChannelExperimentConfig(StrictConfigModel):
     artifact: Optional[Path] = None
     dump_profile: bool = False
     shuffled: bool = False
-    hierarchy_removal: Literal[0.0, 0.5, 1.0] = 0.0
+    hierarchy_removal: float = Field(0.0, ge=0.0, le=1.0)
     negative_label_policy: Optional[Literal["complete_reference", "confirmed_negatives"]] = None
+
+    @field_validator("hierarchy_removal")
+    @classmethod
+    def validate_hierarchy_removal(cls, value: float) -> float:
+        if value not in {0.0, 0.5, 1.0}:
+            raise ValueError("Hierarchy removal must be 0%, 50%, or 100%")
+        return value
 
 
 class SelectorTuningConfig(StrictConfigModel):
@@ -196,6 +231,7 @@ class SelectorExperimentConfig(StrictConfigModel):
     runtime_enabled: Optional[bool] = Field(
         None, description="Optional experiment override for the CandidateSetSelector stage."
     )
+    runtime_global_only: Optional[bool] = None
     emit_candidate_scores: bool = False
     accept_model: Literal["logistic", "gbdt_monotonic"] = Field("logistic")
     accept_training: Literal["winner_only", "winner_plus_runnerup"] = Field("winner_only")
@@ -212,7 +248,8 @@ class LLMDecisionExperimentConfig(StrictConfigModel):
         Field("raw_joint")
     )
     listwise_max_candidates: int = Field(5, ge=2, le=5)
-    evidence: Literal["generated_brief", "structured_packet"] = "generated_brief"
+    evidence: Literal["generated_brief", "scored_packet", "structured_packet"] = "generated_brief"
+    brief_max_tokens: Literal[64, 256] = 64
     permutations: Literal[1, 2] = 1
     output: Literal["categorical", "hard_choice"] = "categorical"
     max_evidence_packets: Literal[0, 2] = 0
@@ -229,11 +266,18 @@ class LLMGateExperimentConfig(StrictConfigModel):
         "pair_top_fraction",
         "forced_sample",
         "oracle",
+        "oracle_perfect",
+        "oracle_replay",
         "learned",
     ] = Field("analytic")
     threshold: float = Field(0.5, ge=0.0, le=1.0)
     quantile_fraction: float = Field(0.05, gt=0.0, le=1.0)
-    forced_sample_size: int = Field(0, ge=0)
+    strata_artifact: Optional[Path] = Field(
+        None, description="Frozen forced-source strata with permitted development label provenance."
+    )
+    forced_sample_size: int = Field(
+        0, ge=0, le=200, description="Maximum frozen development source groups, not candidate rows."
+    )
     artifact: Optional[Path] = None
 
 
@@ -279,7 +323,19 @@ class AdaptiveKConfig(StrictConfigModel):
         return self
 
 
+class RetrievalTrainingConfig(StrictConfigModel):
+    base_model: str
+    revision: str
+    epochs: int = Field(3, ge=1, le=3)
+    max_steps: int = Field(1000, ge=1, le=10000)
+    batch_size: int = Field(4, ge=1)
+    accumulation: int = Field(8, ge=1)
+    checkpoint_steps: int = Field(25, ge=1, le=100)
+    patience: int = Field(3, ge=1, le=3)
+
+
 class EncoderFinetuneConfig(StrictConfigModel):
+    training: Optional[RetrievalTrainingConfig] = None
     mode: Literal["off", "contrastive"] = Field("off")
     artifact: Optional[Path] = None
     negative_policy: Literal["complete_reference", "confirmed_negative", "positive_unlabelled"] = (
@@ -288,6 +344,7 @@ class EncoderFinetuneConfig(StrictConfigModel):
 
 
 class CrossEncoderConfig(StrictConfigModel):
+    training: Optional[RetrievalTrainingConfig] = None
     mode: Literal["off", "on"] = Field("off")
     artifact: Optional[Path] = None
     top_k: int = Field(20, ge=1)
@@ -309,6 +366,8 @@ class EffectiveTrainingUnitConfig(StrictConfigModel):
 
 
 class SupervisionConfig(StrictConfigModel):
+    transfer_artifact: Optional[Path] = None
+
     negative_label_policy: Literal["unknown", "complete_reference", "confirmed_negatives"] = (
         "unknown"
     )
@@ -337,6 +396,17 @@ class SupervisionConfig(StrictConfigModel):
     )
     artifacts: dict[str, Path] = Field(default_factory=dict)
 
+    @model_validator(mode="after")
+    def validate_transfer_mode(self):
+        if self.transfer_artifact is not None and (
+            self.mode != "label_free"
+            or any(mode != "label_free" for mode in self.components.values())
+        ):
+            raise ValueError(
+                "Donor transfer requires label_free supervision for every recipient component"
+            )
+        return self
+
     def resolve_component(
         self,
         component: str,
@@ -346,7 +416,10 @@ class SupervisionConfig(StrictConfigModel):
     ) -> tuple[str, str]:
         """Resolve one component without silently consuming unavailable labels."""
 
-        requested = str(self.components.get(component, self.mode))
+        components: dict[str, str] = {
+            str(key): str(value) for key, value in self.components.items()
+        }
+        requested = components.get(component, self.mode)
         if requested == "supervised":
             if not training_available:
                 raise ValueError(

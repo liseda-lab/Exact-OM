@@ -123,7 +123,7 @@ class PairAdaptiveChannelsMixin:
             quality_mode = (
                 self.lex_config.get("quality", "margin") if self.lex_enabled else "margin"
             )
-            if quality_mode == "margin":
+            if quality_mode in {"margin", "candidate_margin"}:
                 q_label = margin
             elif quality_mode == "entropy":
                 q_label = entropy
@@ -147,6 +147,11 @@ class PairAdaptiveChannelsMixin:
                     "entropy": entropy,
                     "entropy_quality_defined": entropy_quality_defined,
                     "encoder_agreement": agreement,
+                    "context_pair_score": (
+                        getattr(self, "_last_context_pair_score", None)
+                        if quality_mode == "encoder_agreement"
+                        else None
+                    ),
                     "label_pairs": int(mat.numel()),
                     "raw_source_label_count": raw_label_counts[len(quality_payloads)][0],
                     "raw_target_label_count": raw_label_counts[len(quality_payloads)][1],
@@ -232,7 +237,70 @@ class PairAdaptiveChannelsMixin:
         context_flat = context_matrix.flatten()
         lexical_best = float(torch.max(lexical_flat).item())
         context_best = float(torch.max(context_flat).item())
+        self._last_context_pair_score = context_best
         return self._clip01(1.0 - abs(lexical_best - context_best))
+
+    def _candidate_quality(self, sources, targets, source_labels, target_labels, scores, payloads):
+        """Source top-gap or best-target encoder agreement over distinct target concepts.
+
+        Singletons have no ambiguity comparison and receive zero quality. This is
+        a source-level evidence heuristic, shared by its candidate pair scores.
+        """
+        frame = self._attached_dataset.dataframe
+        context_scores = None
+        if self.lex_config["quality"] == "encoder_agreement":
+            if not self.use_context:
+                raise ValueError("encoder_agreement requires the context encoder")
+            context_scores = [
+                (
+                    float(row["context_pair_score"])
+                    if row.get("context_pair_score") is not None
+                    else float(self.tau)
+                )
+                for row in payloads
+            ]
+        result = torch.zeros_like(scores)
+        for source in sorted(set(sources)):
+            indices = [index for index, value in enumerate(sources) if value == source]
+            observed = {targets[index] for index in indices}
+            expected = set(frame.loc[frame.Src.astype(str) == str(source), "Tgt"].astype(str))
+            if observed != expected:
+                raise ValueError("Candidate quality requires a complete frozen source pool")
+            lexical = {
+                target: max(float(scores[index]) for index in indices if targets[index] == target)
+                for target in observed
+            }
+            ranked = sorted(lexical, key=lambda target: (-lexical[target], target))
+            gap = lexical[ranked[0]] - lexical[ranked[1]] if len(ranked) > 1 else 0.0
+            context_best = None
+            agreement = None
+            if context_scores is not None:
+                contextual = {
+                    target: max(
+                        context_scores[index] for index in indices if targets[index] == target
+                    )
+                    for target in observed
+                }
+                context_best = min(contextual, key=lambda target: (-contextual[target], target))
+                agreement = float(ranked[0] == context_best) if len(ranked) > 1 else 0.0
+            quality = agreement if agreement is not None else self._clip01(gap)
+            result[indices] = quality
+            for index in indices:
+                payloads[index].update(
+                    selected=quality,
+                    candidate_quality_formula=(
+                        "source_top_gap_v1" if agreement is None else "best_target_agreement_v1"
+                    ),
+                    candidate_count=len(ranked),
+                    candidate_quality_defined=len(ranked) > 1,
+                    candidate_top_gap=gap,
+                    lexical_best_target=ranked[0],
+                    context_best_target=context_best,
+                    encoder_score_similarity=payloads[index].get("encoder_agreement"),
+                    best_target_agreement=agreement,
+                    candidate_scores=lexical,
+                )
+        return result
 
     def _score_string_channel(
         self,
@@ -485,6 +553,10 @@ class PairAdaptiveChannelsMixin:
                 ),
             }
         )
+        if self.hier_enabled and self.hier_config.get("mode") == "off":
+            # Preserve the frozen evidence bank used by the auxiliary attribute
+            # channel; remove only this channel's contribution.
+            payload.update(score=self.tau, quality=0.0, control="hierarchy_removed", active=False)
         return payload
 
     def _hierarchy_nodes(
@@ -513,6 +585,7 @@ class PairAdaptiveChannelsMixin:
                     continue
                 distances[neighbor] = next_depth
                 frontier.append((neighbor, next_depth))
+        distances.pop(str(iri), None)
         return distances
 
     def _hierarchy_ic(self, iri: str, side: str) -> float:
@@ -1240,14 +1313,38 @@ class PairAdaptiveChannelsMixin:
         if not self.use_context:
             return payload
 
-        src_items = [
-            self._with_item_id("attribute", "source", item)
-            for item in list(src_attrs[: self.max_attr_items])
-        ]
-        tgt_items = [
-            self._with_item_id("attribute", "target", item)
-            for item in list(tgt_attrs[: self.max_attr_items])
-        ]
+        dedup = self.attr_enabled and self.attr_config.get("provenance_dedup", False)
+
+        def prepare(items, side):
+            records = [self._with_item_id("attribute", side, item) for item in items]
+            if dedup:
+                facts = {}
+                for item in records:
+                    # Literal identity, not sentence similarity: languages, datatypes and
+                    # predicates remain distinct, while repeated provenance adds no mass.
+                    key = json.dumps(
+                        [
+                            item.get("prop_iri") or item.get("prop"),
+                            (
+                                item.get("value")
+                                if item.get("value") is not None
+                                else item.get("text")
+                            ),
+                            item.get("datatype"),
+                            item.get("language"),
+                        ],
+                        ensure_ascii=False,
+                    )
+                    if key not in facts:
+                        facts[key] = {**item, "provenance_items": []}
+                    facts[key]["provenance_items"].append(item["item_id"])
+                records = [facts[key] for key in sorted(facts)]
+                for item in records:
+                    item["provenance_items"] = sorted(set(item["provenance_items"]))
+            return records[: self.max_attr_items]
+
+        src_items = prepare(src_attrs, "source")
+        tgt_items = prepare(tgt_attrs, "target")
         if not src_items and not tgt_items:
             return payload
 
@@ -1390,6 +1487,7 @@ class PairAdaptiveChannelsMixin:
                         "value": self._normalize_text(item.get("value")),
                         "text": self._normalize_text(item.get("text")),
                         "entity_iri": self._normalize_text(item.get("entity_iri")),
+                        "provenance_items": list(item.get("provenance_items", [])),
                         "support": float(support),
                         "weight": float(weight),
                         "importance": float(weighted),
@@ -1475,6 +1573,7 @@ class PairAdaptiveChannelsMixin:
                 "source_links": src_links,
                 "target_links": tgt_links,
                 "bank": bank_mode,
+                "provenance_dedup": bool(dedup),
                 "polarity": polarity,
                 "identifier_disagreement": identifier_disagreement,
                 "identifier_comparable_groups": identifier_comparable_groups,

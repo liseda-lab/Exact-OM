@@ -100,6 +100,16 @@ def _sentence_transformer_resolved_revision(
 
 
 class BaseAlignmentDataset(IDataset):
+    def prepare_retrieval_training(self, configs, **kwargs) -> None:
+        from exact.impl.retrieval.training import prepare_retrieval_training
+
+        prepare_retrieval_training(self, configs, **kwargs)
+
+    def prepare_pool_miss_diagnostic(self, reference_path, **kwargs) -> None:
+        from exact.impl.models.selector.nil_head import prepare_pool_miss_diagnostic
+
+        prepare_pool_miss_diagnostic(self, reference_path, **kwargs)
+
     def __init__(
         self,
         output_path: Path,
@@ -907,7 +917,6 @@ class BaseAlignmentDataset(IDataset):
                 str(fusion_config.get("mode", "max")).lower() != "max"
                 or bool(adaptive_config.get("enabled", False))
                 or str(finetune_config.get("mode", "off")).lower() != "off"
-                or str(cross_encoder_config.get("mode", "off")).lower() != "off"
                 or str(multi_view_config.get("mode", "labels")).lower() != "labels"
             )
             if active_transform:
@@ -926,6 +935,46 @@ class BaseAlignmentDataset(IDataset):
                 pairs = pairs.loc[pairs["Src"].astype(str).isin(self.eligible_source_iris)]
             self._candidates = self._ensure_mapping_kinds(pairs, label="candidate")
             self._candidates = self._filter_candidates_ignored_classes(self._candidates)
+            if str(cross_encoder_config.get("mode", "off")).lower() == "on":
+                if CrossEncoder is None:
+                    raise ImportError(
+                        "Cross-encoder reranking requires sentence_transformers.CrossEncoder"
+                    )
+                counts = self._candidates.groupby("Src", sort=False).size()
+                if not counts.empty and counts.max() > int(cross_encoder_config.get("top_k", 20)):
+                    raise ValueError("Frozen cross-encoder pool exceeds its declared top_k bound")
+                before = set(self._candidates[["Src", "Tgt"]].itertuples(index=False, name=None))
+                if "cand_sim" not in self._candidates:
+                    self._candidates["cand_sim"] = 0.0
+                self._candidate_generation_params["cross_encoder"] = cross_encoder_config
+                artifact = self._configured_retrieval_artifacts()["cross_encoder"]
+                model = CrossEncoder(str(artifact.model_path), device=str(device or "cpu"))
+                rows = self._rerank_with_cross_encoder(
+                    self._candidates.to_dict("records"),
+                    sources=list(self._candidates.Src.astype(str).unique()),
+                    model=model,
+                    top_k=int(counts.max()) if not counts.empty else 1,
+                    adaptive_config={"enabled": False},
+                    encode_batch_size=int(encode_batch_size or 32),
+                )
+                self._candidates = pd.DataFrame(
+                    rows,
+                    columns=list(self._candidates.columns)
+                    + [
+                        name
+                        for name in (
+                            "cand_sim_retrieval",
+                            "cand_sim_cross_encoder",
+                            "cand_channels",
+                        )
+                        if name not in self._candidates
+                    ],
+                )
+                if (
+                    set(self._candidates[["Src", "Tgt"]].itertuples(index=False, name=None))
+                    != before
+                ):
+                    raise ValueError("Cross-encoder changed the frozen candidate pair universe")
             self._annotate_candidate_similarity_stats()
             self._active_candidate_config = {
                 "origin": "provided",

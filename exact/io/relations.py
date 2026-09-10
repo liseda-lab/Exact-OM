@@ -128,7 +128,8 @@ def _hierarchy_heuristic(
 
         for image, weight in images.get(src, ()):
             if tgt == image:
-                equivalent += weight
+                # The queried mapping cannot establish its own equivalence.
+                continue
             elif tgt in ancestors_of(target, image, target_side=True):
                 subsumed_by += weight
             elif tgt in descendants_of(target, image, target_side=True):
@@ -379,6 +380,8 @@ def _widest_path(
         if node == goal:
             break
         for neighbor, edge_weight, evidence in adjacency.get(node, ()):
+            if evidence.startswith("anchor:") and {node, neighbor} == {start, goal}:
+                continue
             candidate = min(width, edge_weight)
             if candidate <= best.get(neighbor, -1.0) + 1.0e-15:
                 continue
@@ -538,6 +541,7 @@ def _semantic_entailment(
             json.dumps(
                 {
                     "backend": "graph_closure",
+                    "query_bridge_excluded": True,
                     "relation": relation,
                     "forward": _path_payload(forward_conf, forward_path, forward_edges),
                     "reverse": _path_payload(reverse_conf, reverse_path, reverse_edges),
@@ -553,6 +557,7 @@ def _semantic_entailment(
     result["relation_semantic_backend"] = "graph_closure"
     result["relation_evidence"] = evidence_rows
     result.attrs["relation_abstentions"] = abstentions
+    result.attrs["coherence_audit"] = relation_coherence_audit(result, source, target)
     result.attrs["relation_anchor_count"] = len(anchor_rows)
     result.attrs["relation_anchors"] = [
         {
@@ -568,6 +573,53 @@ def _semantic_entailment(
     return result
 
 
+def relation_coherence_audit(frame, source, target):
+    """Separate graph SCC collapse from unsupported logical-unsatisfiability claims."""
+    import networkx as nx
+
+    graph = nx.DiGraph()
+    for side, knowledge in (("src", source), ("tgt", target)):
+        for kind in _SUPPORTED_SEMANTIC_KINDS:
+            for iri in knowledge.entities(kind):
+                graph.add_node((side, kind.value, str(iri)))
+                graph.add_edges_from(
+                    ((side, kind.value, str(iri)), (side, kind.value, str(parent)))
+                    for parent in knowledge.direct_parents(str(iri), kind)
+                )
+    before = [
+        component for component in nx.strongly_connected_components(graph) if len(component) > 1
+    ]
+    for index, row in frame.iterrows():
+        src_kind, tgt_kind = _row_kinds(frame, index)
+        if src_kind != tgt_kind or src_kind not in _SUPPORTED_SEMANTIC_KINDS:
+            continue
+        source_node, target_node = ("src", src_kind.value, str(row.SrcEntity)), (
+            "tgt",
+            tgt_kind.value,
+            str(row.TgtEntity),
+        )
+        if row.Relation in {"=", "<"}:
+            graph.add_edge(source_node, target_node)
+        if row.Relation in {"=", ">"}:
+            graph.add_edge(target_node, source_node)
+    after = [
+        component for component in nx.strongly_connected_components(graph) if len(component) > 1
+    ]
+    collapses = [
+        component
+        for component in after
+        if any(sum(node[0] == side for node in component) > 1 for side in ("src", "tgt"))
+    ]
+    return {
+        "profile": "named_class_property_hierarchy",
+        "asserted_scc_count": len(before),
+        "aligned_scc_count": len(after),
+        "scc_with_same_side_collapse": len(collapses),
+        "logical_unsatisfiability": "unknown",
+        "logical_reason": "graph_closure_does_not_decide_owl_satisfiability",
+    }
+
+
 def predict_relations(
     candidates: Any,
     source: KnowledgeSource,
@@ -580,6 +632,7 @@ def predict_relations(
     equivalence_anchor_margin: float = 0.10,
     relation_confidence_threshold: float = 0.5,
     timeout_seconds: float = 60.0,
+    artifact: Any | None = None,
 ) -> pd.DataFrame:
     """Type accepted pairs while preserving the shipped all-equivalent default.
 
@@ -628,10 +681,81 @@ def predict_relations(
             timeout_seconds=float(timeout_seconds),
         )
     if normalized_mode in {"learned_three_way", "semantic_then_learned"}:
-        raise WriterOptionsError(
-            f"relation mode {normalized_mode!r} requires a fitted multinomial relation artifact; "
-            "refusing to execute hierarchy_heuristic as a substitute"
+        if artifact is None:
+            raise WriterOptionsError(
+                "Relation prediction requires a fitted multinomial relation artifact"
+            )
+        from exact.io.relation_head import RELATIONS, predict_relation_head
+
+        probabilities, contributions, logits, state = predict_relation_head(
+            frame, source, target, artifact
         )
+        result = frame.copy()
+        result["Relation"] = [RELATIONS[int(row.argmax())] for row in probabilities]
+        result["relation_confidence"] = probabilities.max(axis=1)
+        result["relation_semantic_backend"] = "multinomial"
+        result["relation_evidence"] = [
+            json.dumps(
+                {
+                    "artifact": state["fit_identity"],
+                    "feature_schema": state["feature_schema"],
+                    "probabilities": p.tolist(),
+                    "logits": z.tolist(),
+                    "bias": state["bias"],
+                    "feature_contributions": c.tolist(),
+                    "explanation_schema": state["explanation_schema"],
+                },
+                sort_keys=True,
+            )
+            for p, c, z in zip(probabilities, contributions, logits)
+        ]
+        abstentions = []
+        if normalized_mode == "semantic_then_learned":
+            semantic = predict_relations(
+                frame,
+                source,
+                target,
+                mode="semantic_entailment",
+                anchors=anchors,
+                semantic_backend=semantic_backend,
+                equivalence_anchor_threshold=equivalence_anchor_threshold,
+                equivalence_anchor_margin=equivalence_anchor_margin,
+                relation_confidence_threshold=relation_confidence_threshold,
+                timeout_seconds=timeout_seconds,
+            )
+            for index, row in semantic.iterrows():
+                if result.at[index, "Relation"] != row.Relation:
+                    abstentions.append(
+                        {
+                            "source": row.SrcEntity,
+                            "target": row.TgtEntity,
+                            "reason": "semantic_learned_conflict",
+                        }
+                    )
+                    result = result.drop(index)
+                else:
+                    result.at[index, "relation_semantic_backend"] = "semantic_then_learned"
+            for unknown in semantic.attrs.get("relation_abstentions", []):
+                if unknown["reason"] in {
+                    "reasoning_timeout",
+                    "unsupported_kind",
+                    "unsupported_profile",
+                }:
+                    mask = (result.SrcEntity == unknown["source"]) & (
+                        result.TgtEntity == unknown["target"]
+                    )
+                    result = result.loc[~mask]
+                    abstentions.append(unknown)
+        rejected = result[result.relation_confidence < relation_confidence_threshold]
+        abstentions.extend(
+            {"source": row.SrcEntity, "target": row.TgtEntity, "reason": "typed_confidence"}
+            for row in rejected.itertuples()
+        )
+        result = result[result.relation_confidence >= relation_confidence_threshold]
+        result.attrs["relation_abstentions"] = abstentions
+        result.attrs["relation_fit_identity"] = state["fit_identity"]
+        result.attrs["coherence_audit"] = relation_coherence_audit(result, source, target)
+        return result
     raise WriterOptionsError(
         "relation prediction must be none, hierarchy_heuristic, semantic_entailment, "
         "learned_three_way, or semantic_then_learned"

@@ -93,6 +93,10 @@ def fusion_scores(
 def fit_fusion_artifact(
     frame, reference_pairs, path, *, mode, application, seed=17, strsim_placement="off", epochs=80
 ):
+    application = {
+        "entity_kinds": sorted(set(frame.SrcKind.astype(str))) if "SrcKind" in frame else ["class"],
+        **application,
+    }
     frame, reference = safe_training_labels(frame, reference_pairs, application)
     if frame.empty or set(frame.Src.astype(str)) & set(application["source_ids"]):
         raise ValueError("Fusion fitting requires disjoint labeled training source groups")

@@ -2,36 +2,15 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
-import math
 import random
 from pathlib import Path
 
 import pandas as pd
 
+from exact.utils.fitted_artifacts import fingerprint, freeze_json
+
 from .calibration_helpers import fit_isotonic_calibrator, fit_platt_calibrator
-
-
-def fingerprint(value):
-    return hashlib.sha256(
-        json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
-    ).hexdigest()
-
-
-def freeze_json(path, payload):
-    """Content-addressed immutable writes; interrupted temporary files are harmless."""
-    path = Path(path)
-    encoded = json.dumps(payload, sort_keys=True, indent=2, allow_nan=False) + "\n"
-    if path.exists():
-        if path.read_text() != encoded:
-            raise ValueError(f"Fitted artifact identity conflict: {path}")
-        return payload
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_suffix(path.suffix + ".partial")
-    temporary.write_text(encoded)
-    temporary.replace(path)
-    return payload
 
 
 def safe_training_labels(frame, reference_pairs, application):
@@ -76,6 +55,12 @@ class FittedSelectorMixin:
         No-positive candidate groups participate only in the acceptance pool-miss
         outcome when their positive reference exists outside the displayed pool.
         """
+        application = {
+            "entity_kinds": sorted(
+                set(training_df.get("SrcKind", pd.Series(["class"])).astype(str))
+            ),
+            **application,
+        }
         frame, ref = safe_training_labels(training_df, reference_pairs, application)
         if "S_pair_final" not in frame:
             frame["S_pair_final"] = frame["S_final"]
@@ -103,6 +88,7 @@ class FittedSelectorMixin:
             "fitting_recipe_version": 2,
             "implementation": self._implementation_fingerprint(),
             "negative_label_policy": application["negative_label_policy"],
+            "accept_training": self.experiment_config.get("accept_training", "winner_only"),
             "seed": self.request_seed,
             "training_sources": source_ids,
             "training_features_sha256": fingerprint(feature_rows),
@@ -211,6 +197,12 @@ class FittedSelectorMixin:
         return payload
 
     def fit_score_calibration_artifact(self, training_df, reference_pairs, path, *, application):
+        application = {
+            "entity_kinds": sorted(
+                set(training_df.get("SrcKind", pd.Series(["class"])).astype(str))
+            ),
+            **application,
+        }
         frame, ref = safe_training_labels(training_df, reference_pairs, application)
         if frame.empty or set(frame.Src.astype(str)) & set(application.get("source_ids", [])):
             raise ValueError("Score calibration requires disjoint labeled training source groups")
@@ -276,8 +268,17 @@ class FittedSelectorMixin:
         }
         if current_recipe != provenance["recipe"]["rerank"]:
             raise ValueError("Fitted selector model/objective mismatch")
+        from exact.utils.artifact_transfer import validate_transferred_artifact
+
+        transferred = validate_transferred_artifact(
+            dataset,
+            self.rerank_config["artifact"],
+            kind="selector",
+            features={"rank": self.RANK_FEATURE_NAMES, "accept": self.ACCEPT_FEATURE_NAMES},
+            score_threshold=score_threshold,
+        )
         expected = provenance["application"].get("dataset_signature")
-        if expected and expected != getattr(dataset, "dataset_signature", None):
+        if not transferred and expected and expected != getattr(dataset, "dataset_signature", None):
             raise ValueError("Fitted selector application dataset mismatch")
         if set(df.Src.astype(str)) & set(provenance["training_sources"]):
             raise ValueError("Reporting sources overlap fitted selector training sources")

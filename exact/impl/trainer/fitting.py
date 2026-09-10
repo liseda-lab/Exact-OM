@@ -35,7 +35,60 @@ def source_batches(frame, batch_size):
 
 
 class TrainingPoolMixin:
+    def fit_relation_head(self):
+        config = getattr(self, "relation_config", {})
+        if config.get("relation_prediction") not in {"learned_three_way", "semantic_then_learned"}:
+            return
+        if getattr(self, "_relation_head_fitted", False):
+            return
+        from exact.io.relation_head import fit_relation_artifact, typed_reference_frame
+
+        artifact = config.get("relation_artifact")
+        training_file = config.get("relation_training_file")
+        if training_file:
+            typed = typed_reference_frame(training_file)
+            artifact = artifact or self.output_dir / "fitting" / "relation_head.json"
+            state = fit_relation_artifact(
+                typed[["Src", "Tgt"]],
+                typed,
+                self.dataset.source,
+                self.dataset.target,
+                artifact,
+                application={
+                    "dataset_signature": self.dataset.dataset_signature,
+                    "source_ids": sorted(set(self.dataset.dataframe.Src.astype(str))),
+                },
+                seed=getattr(self.model, "request_seed", None) or 17,
+            )
+            self.relation_fit_report = {
+                "artifact": str(artifact),
+                "fit_identity": state["fit_identity"],
+                "relation_counts": state["relation_counts"],
+                "folds": state["folds"],
+            }
+        elif not artifact or not Path(artifact).is_file():
+            raise ValueError(
+                "Learned relation typing requires a fitted artifact or disjoint typed training file"
+            )
+        self.relation_artifact = artifact
+        self._relation_head_fitted = True
+
     def fit_training_pool(self, *, batch_size=8):
+        if getattr(self.dataset, "transfer_artifact", None) is not None:
+            from exact.utils.artifact_transfer import validate_transfer
+
+            manifest = validate_transfer(self.dataset)
+            if any(
+                getattr(self, key, None)
+                for key in ("fitting_fusion_config", "fitting_graph_config", "fitting_llm_config")
+            ):
+                raise ValueError("Donor transfer cannot fit missing recipient artifacts")
+            if getattr(self, "relation_config", {}).get("relation_training_file"):
+                raise ValueError("Donor transfer cannot fit recipient relation labels")
+            self.transfer_report = {"recipient_refit": False, "artifacts": manifest["artifacts"]}
+            self._training_pool_fitted = True
+            return
+        self.fit_relation_head()
         if getattr(self, "_training_pool_fitted", False):
             return
         path = getattr(self, "training_candidates_file_path", None)
@@ -46,16 +99,22 @@ class TrainingPoolMixin:
             for model in self.models[1:]
             if hasattr(model, "fit_training_artifact") and model.training_reference_file_path
         ]
+        nil_consumers = [
+            model
+            for model in self.models[1:]
+            if getattr(model, "nil_config", {}).get("mode") == "fitted"
+            and model.nil_config.get("training_source_labels")
+        ]
         pending = any(
             getattr(self, key, None)
             for key in ("fitting_fusion_config", "fitting_graph_config", "fitting_llm_config")
         )
-        if not consumers and not pending:
+        if not consumers and not pending and not nil_consumers:
             return
         seed = getattr(self.model, "request_seed", consumers[0].request_seed if consumers else 17)
         supervision = getattr(self, "supervision_config", {})
         policy = supervision.get("negative_label_policy", "unknown")
-        if policy not in {"complete_reference", "confirmed_negatives"}:
+        if (consumers or pending) and policy not in {"complete_reference", "confirmed_negatives"}:
             raise ValueError(
                 "Supervised fitting lacks a safe negative-label policy: a known positive does not establish other candidate negatives"
             )
@@ -95,6 +154,10 @@ class TrainingPoolMixin:
             "dataset_signature": getattr(self.dataset, "dataset_signature", None),
             "source_ids": sorted(reporting_sources),
             "negative_label_policy": policy,
+            "entity_kinds": [
+                getattr(kind, "value", kind)
+                for kind in getattr(self.dataset, "_entity_kinds", ("class",))
+            ],
         }
         reference_path = getattr(self, "training_reference_file_path", None)
         if reference_path:
@@ -107,7 +170,8 @@ class TrainingPoolMixin:
             reference = consumers[0]._load_training_reference_pairs(getattr(self, "logger", None))
         else:
             raise ValueError("Train-only fitting requires an explicit training reference")
-        raw, reference = safe_training_labels(raw, reference, application)
+        if not nil_consumers:
+            raw, reference = safe_training_labels(raw, reference, application)
         identity = fingerprint(
             self._json_safe_value(
                 {
@@ -258,10 +322,7 @@ class TrainingPoolMixin:
             from exact.impl.models.pair_adaptive_experiments import (
                 JsonExperimentArtifact,
             )
-            from exact.impl.models.selector.fusion_fitting import (
-                fit_fusion_artifact,
-                fusion_scores,
-            )
+            from exact.impl.models.selector.fusion_fitting import fit_fusion_artifact
 
             artifact = fusion_config.get("artifact") or cache_dir / "fusion.json"
             placement = (
@@ -351,6 +412,23 @@ class TrainingPoolMixin:
                         training.at[index, "S_final"] = (1 - weight) * row.S_base + weight * oof[
                             (row.Src, row.Tgt)
                         ]
+        for selector in nil_consumers:
+            from exact.impl.models.selector.nil_head import fit_nil_artifact
+
+            labels = read_table(Path(selector.nil_config["training_source_labels"]))
+            artifact = selector.nil_config.get("artifact") or cache_dir / "natural_nil.json"
+            fit_nil_artifact(
+                training,
+                labels,
+                reference,
+                artifact,
+                application={
+                    **application,
+                    "nil_label_semantics": selector.nil_config.get("label_semantics"),
+                },
+                seed=seed,
+            )
+            selector.nil_config["artifact"] = str(artifact)
         for selector in consumers:
             reference = selector._load_training_reference_pairs(getattr(self, "logger", None))
             if not reference:
@@ -495,13 +573,40 @@ class TrainingPoolMixin:
             or sorted(set(self.dataset.dataframe.Src.astype(str)))
         )
         artifact = config.get("artifact") or directory / "selection.json"
-        payload = select_inference_gate_artifact(
-            records,
-            mode=config["mode"],
-            fraction=config["quantile_fraction"],
-            dataset_signature=signature,
-            source_universe=universe,
-        )
+        if config["mode"] == "forced_sample":
+            from exact.impl.models.selector.llm_gate import fit_forced_sample_artifact
+
+            strata = (
+                json.loads(Path(config["strata_artifact"]).read_text())
+                if config.get("strata_artifact")
+                else None
+            )
+            if strata is not None and strata.get("dataset_signature") != signature:
+                raise ValueError("Forced-source strata differ from the bound development dataset")
+            payload = fit_forced_sample_artifact(
+                records,
+                source_strata=strata["source_strata"] if strata else None,
+                strata_provenance=strata["provenance"] if strata else None,
+                sample_size=config["forced_sample_size"],
+                seed=self.model.request_seed,
+                task_id=str(signature),
+                entity_kind="|".join(
+                    sorted({str(kind) for kind in getattr(self.dataset, "entity_kinds", ["class"])})
+                ),
+                dataset_signature=signature,
+            )
+            payload["selected_count"] = payload["sample_size"]
+            payload["no_candidate_sources"] = sorted(
+                set(universe) - {row["source_iri"] for row in records}
+            )
+        else:
+            payload = select_inference_gate_artifact(
+                records,
+                mode=config["mode"],
+                fraction=config["quantile_fraction"],
+                dataset_signature=signature,
+                source_universe=universe,
+            )
         freeze_json(artifact, payload)
         self.model.llm_experiment_config["gate"] = {**config, "artifact": str(artifact)}
         self.model._gate_artifact = JsonExperimentArtifact.load(

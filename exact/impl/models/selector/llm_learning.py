@@ -203,9 +203,10 @@ def fit_llm_artifacts(model, frame, reference_pairs, directory, *, config, appli
     if config["gate"]["mode"] == "learned" and (
         application["negative_label_policy"] != "complete_reference"
         or config.get("fusion_weight") != "source_first"
+        or config.get("decision", {}).get("evidence", "structured_packet") == "generated_brief"
     ):
         raise ValueError(
-            "Benefit router requires complete source references and frozen source_first integration"
+            "Benefit router requires complete source references, scored or structured packets, and frozen source_first integration"
         )
     sources = sorted(set(frame.Src.astype(str)))
     binding = teacher_identity(model)
@@ -338,6 +339,8 @@ def fit_llm_artifacts(model, frame, reference_pairs, directory, *, config, appli
                 continue
             tokens = sum(
                 float(call.get("usage", {}).get("total_tokens", 0)) for call in teacher["calls"]
+            ) + float(
+                (teacher.get("evidence_acquisition") or {}).get("usage", {}).get("total_tokens", 0)
             )
             if tokens <= 0:
                 continue

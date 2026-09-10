@@ -41,6 +41,7 @@ def type_alignment_relations(
     equivalence_anchor_margin: float = 0.10,
     relation_confidence_threshold: float = 0.5,
     timeout_seconds: float = 60.0,
+    artifact: Any | None = None,
 ) -> Any:
     """Run the configured relation typer over a canonical mapping table."""
 
@@ -60,6 +61,7 @@ def type_alignment_relations(
         equivalence_anchor_margin=equivalence_anchor_margin,
         relation_confidence_threshold=relation_confidence_threshold,
         timeout_seconds=timeout_seconds,
+        **({"artifact": artifact} if artifact is not None else {}),
     )
 
 

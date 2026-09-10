@@ -1028,6 +1028,28 @@ class CalibrationMixin:
                 "sample_weight": sample_weight,
                 "rank_feature": rank_features[winner_idx],
             }
+            if (
+                second_idx is not None
+                and src_text in ref_sources
+                and (src_text, str(group.at[second_idx, "Tgt"])) not in ref_pairs
+            ):
+                runner = group.loc[second_idx]
+                decisions[group_id]["runnerup_negative"] = {
+                    "label": 0.0,
+                    "sample_weight": 1.0,
+                    "accept_features": [
+                        utilities[second_idx],
+                        prob_by_idx[second_idx],
+                        self._clip01(self._safe_float(runner.get("S_pair_final"), 0.0)),
+                        -utility_margin,
+                        -rank_prob_margin,
+                        entropy,
+                        distinctive.get(second_idx, 0.0),
+                        self._safe_float(runner.get("s_label"), 0.0),
+                        self._safe_float(runner.get("S_struct"), 0.0),
+                        self._safe_float(runner.get("s_diff"), 0.5),
+                    ],
+                }
         return decisions
 
     def _fit_accept_model(
@@ -1041,6 +1063,12 @@ class CalibrationMixin:
             for decision in decisions.values()
             if float(decision.get("sample_weight", 0.0)) > 0.0
         ]
+        if self.experiment_config.get("accept_training") == "winner_plus_runnerup":
+            samples.extend(
+                decision["runnerup_negative"]
+                for decision in decisions.values()
+                if decision.get("runnerup_negative")
+            )
         if not samples:
             return None
         positives = sum(1 for sample in samples if float(sample.get("label", 0.0)) > 0.5)

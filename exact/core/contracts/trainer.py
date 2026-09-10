@@ -459,7 +459,23 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
             equivalence_anchor_margin=relation_equivalence_anchor_margin,
             relation_confidence_threshold=relation_confidence_threshold,
             timeout_seconds=relation_reasoning_timeout_seconds,
+            **(
+                {"artifact": self.relation_artifact}
+                if getattr(self, "relation_artifact", None) is not None
+                else {}
+            ),
         )
+        self.relation_audit = {
+            key: typed.attrs[key]
+            for key in ("coherence_audit", "relation_fit_identity", "relation_anchor_count")
+            if key in typed.attrs
+        }
+        if self.relation_audit:
+            audit_dir = self.output_dir / "audit"
+            audit_dir.mkdir(parents=True, exist_ok=True)
+            (audit_dir / "relations.json").write_text(
+                json.dumps(self.relation_audit, indent=2) + "\n"
+            )
         # ``none`` is the compatibility mode: relations remain equality and
         # historical explanation payloads must stay byte-identical.  Only an
         # enabled typer contributes new relation metadata and overlays.

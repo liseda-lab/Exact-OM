@@ -311,6 +311,12 @@ class MatchingConfig(StrictConfigModel):
     relation_prediction: str = Field(
         "none", description="Relation typing mode; none preserves shipped all-equivalent output."
     )
+    relation_artifact: Optional[Path] = Field(
+        None, description="Immutable grouped three-way relation head."
+    )
+    relation_training_file: Optional[Path] = Field(
+        None, description="Disjoint typed training pairs used only to fit the relation head."
+    )
     relation_semantic_backend: Literal["graph_closure", "bridge_reasoner"] = Field(
         "graph_closure", description="E14 semantic relation-typing backend."
     )
@@ -466,14 +472,14 @@ class ProjectorConfig(StrictConfigModel):
 class DatasetConfig(StrictConfigModel):
     _runtime_component: Optional[Type[IDataset]] = PrivateAttr(default=None)
 
+    verbalization_mode: Literal["llm", "deterministic"] = "llm"
+
     reasoner: str = Field("asserted", description="Registered hierarchy reasoner name.")
     num_workers: Optional[int] = Field(None, description="Dataset loading worker count.")
     filter_exact_matches: bool = Field(
         True, description="Remove exact lexical matches before semantic scoring."
     )
     drop_exact_match_sources: bool = Field(
-    verbalization_mode: Literal["llm", "deterministic"] = "llm"
-
         False, description="Remove every candidate for sources with an exact match."
     )
     filter_ignored_alignment_classes: bool = Field(
@@ -1237,6 +1243,21 @@ class ConfigModel(StrictConfigModel):
     _dataset_component: Optional[Type[IDataset]] = PrivateAttr(default=None)
     _trainer_component: Optional[Type[ITrainer]] = PrivateAttr(default=None)
     _legacy_dataset_track: Optional[DataConfig] = PrivateAttr(default=None)
+
+    @model_validator(mode="after")
+    def validate_donor_transfer(self):
+        if self.supervision.transfer_artifact is not None:
+            if any(
+                getattr(self.candidates, name).training is not None
+                for name in ("encoder_finetune", "cross_encoder")
+            ):
+                raise ValueError("Donor transfer cannot train retrieval models on the recipient")
+            if (
+                self.matching.calibration.threshold_mode != "fixed"
+                or self.matching.threshold is None
+            ):
+                raise ValueError("Donor transfer requires a frozen fixed decision threshold")
+        return self
 
     @field_validator("config_version")
     @classmethod

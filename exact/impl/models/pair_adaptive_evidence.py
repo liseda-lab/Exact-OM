@@ -110,7 +110,35 @@ class PairAdaptiveEvidenceMixin:
         return str(text or "").strip()
 
     def _brief_key(self, src_label: str, tgt_label: str, packet: str) -> str:
-        payload = "\u241f".join([src_label or "", tgt_label or "", packet or ""])
+        router = getattr(self, "_llm_router", None)
+        routing = getattr(router, "routing", None)
+        profile_name = getattr(routing, "summary_profile", None) or getattr(
+            routing, "default_profile", None
+        )
+        profile = getattr(router, "profiles", {}).get(profile_name)
+        binding = {
+            key: getattr(profile, key, None) for key in ("backend", "model", "revision", "provider")
+        }
+        config = getattr(self, "llm_experiment_config", {})
+        binding.update(
+            tokens=(
+                config.get("decision", {}).get("brief_max_tokens")
+                if getattr(self, "llm_experiment_enabled", False)
+                else getattr(self, "max_new_tokens_llm", None)
+            ),
+            temperature=getattr(self, "llm_temperature", None),
+            top_p=getattr(self, "llm_top_p", None),
+            seed=getattr(self, "request_seed", None),
+            prompt="pair-brief-v2",
+        )
+        payload = "\u241f".join(
+            [
+                src_label or "",
+                tgt_label or "",
+                packet or "",
+                json.dumps(binding, sort_keys=True, default=str),
+            ]
+        )
         return hashlib.sha1(payload.encode("utf-8")).hexdigest()
 
     def _stable_item_id(

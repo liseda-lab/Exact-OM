@@ -1,5 +1,6 @@
 import csv
 import functools
+import hashlib
 import json
 import logging
 import os
@@ -10,12 +11,12 @@ from typing import Any, Mapping, Optional, Union
 
 import torch
 
-from exact.analysis.candidate_recall import analyze_candidate_recall
 from exact.core.actions.evaluation import run_evaluation
 from exact.core.entities.configs.config import ConfigModel
 from exact.core.entities.registry import ComponentRegistry, ComponentType
 from exact.runs import RunLayout, finalize_artifacts
 from exact.tracks import get_track, provider_from_descriptor
+from exact.utils.candidate_recall import analyze_candidate_recall
 from exact.utils.data import read_table
 from exact.utils.logs import (
     ProgressTask,
@@ -616,6 +617,13 @@ def _run_alignment_session(
         progress_tasks.append(
             ProgressTask("PostInference", "Post-inference", estimate_seconds=60.0)
         )
+    anchor_config = configs.matching.anchor_rescoring.model_dump(mode="python")
+    if anchor_config.get("exact_policy") is not None:
+        configs.dataset_params.filter_exact_matches = anchor_config["exact_policy"] == "hard"
+    if anchor_config.get("corruption_fraction") and str(
+        configs.data.reference_role or ""
+    ).lower() in {"final", "reporting", "test"}:
+        raise ValueError("Diagnostic anchor corruption cannot run on a reporting/final role")
     if configs.dataset_params.filter_exact_matches:
         progress_tasks.append(ProgressTask("Prefilter", "Exact prefilter", estimate_seconds=30.0))
     progress_tasks.extend(
@@ -719,6 +727,23 @@ def _run_alignment_session(
                 cap=configs.run.source_cap,
                 seed=configs.seed,
             )
+        with timing_session.stage("Dataset.FitRetrieval"):
+            dataset.prepare_retrieval_training(
+                configs,
+                training_reference_path=training_reference_file_path,
+                reporting_candidates_path=candidates_file_path,
+                output_dir=output_dir_path,
+                device=device,
+            )
+        nil_diagnostic_reference = configs.matching.nil.pool_miss_development_reference
+        if nil_diagnostic_reference is not None:
+            dataset._candidate_generation_params["nil_pool_miss_diagnostic"] = {
+                "role": "development",
+                "reference_sha256": hashlib.sha256(
+                    Path(nil_diagnostic_reference).read_bytes()
+                ).hexdigest(),
+                "negative_label_policy": configs.supervision.negative_label_policy,
+            }
         dataset_loaded_from_cache = dataset.has_cache()
 
         if dataset_loaded_from_cache:
@@ -761,6 +786,12 @@ def _run_alignment_session(
                     candidates_file_path,
                     device=device,
                     **configs.candidates.model_dump(mode="python"),
+                )
+            if nil_diagnostic_reference is not None:
+                dataset.prepare_pool_miss_diagnostic(
+                    nil_diagnostic_reference,
+                    negative_label_policy=configs.supervision.negative_label_policy,
+                    seed=configs.seed,
                 )
             with timing_session.stage("Dataset.Process"):
                 dataset.process()
@@ -903,6 +934,17 @@ def _run_alignment_session(
         for component in ("rerank", "accept", "calibration")
     }
 
+    if configs.supervision.transfer_artifact is not None:
+        from exact.utils.artifact_transfer import (
+            transfer_feature_contract,
+            validate_transfer,
+        )
+
+        dataset.transfer_artifact = configs.supervision.transfer_artifact
+        dataset.transfer_feature_contract = transfer_feature_contract(configs)
+        dataset.transfer_score_threshold = configs.matching.threshold
+        validate_transfer(dataset)
+
     model_specs = []
     primary = model_sequence[0]
     primary_params = {
@@ -987,6 +1029,7 @@ def _run_alignment_session(
     if primary_params["llm_experiment_config"].get("enabled") and gate["mode"] in {
         "source_top_fraction",
         "pair_top_fraction",
+        "forced_sample",
     }:
         artifact = gate.get("artifact")
         if not artifact or not Path(artifact).is_file():
@@ -1017,6 +1060,8 @@ def _run_alignment_session(
         if model_name == "CandidateSetSelector":
             if configs.selector.runtime_enabled is not None:
                 extra_params["enabled"] = configs.selector.runtime_enabled
+            if configs.selector.runtime_global_only is not None:
+                extra_params["global_only"] = configs.selector.runtime_global_only
             extra_params.setdefault("request_seed", configs.seed)
             extra_params.setdefault("experiment_config", configs.selector.model_dump(mode="python"))
             extra_params.setdefault(
@@ -1052,6 +1097,9 @@ def _run_alignment_session(
         fitting_gate_config=fitting_gate_config,
         supervision_config=configs.supervision.model_dump(mode="python"),
     )
+    trainer.anchor_config = anchor_config
+    trainer.relation_config = configs.matching.model_dump(mode="python")
+    trainer.relation_artifact = configs.matching.relation_artifact
     progress.finish("Trainer", f"models={len(model_specs)}")
 
     logger.info("Computing alignment...")
@@ -1194,6 +1242,23 @@ def _run_alignment_session(
                 "builtin": {"entity_kinds": configs.matching.entity_kinds},
                 "bioml": configs.evaluation.bioml,
             }
+            local_alignment_path = Path(alignment_file_path)
+            local_reference_candidates = effective_candidates_file_path
+            if (
+                local_ranking
+                and evaluation_full_reference is not None
+                and effective_candidates_file_path is not None
+            ):
+                from exact.core.actions.evaluation import (
+                    materialize_local_ranking_inputs,
+                )
+
+                local_alignment_path, local_reference_candidates = materialize_local_ranking_inputs(
+                    local_alignment_path,
+                    Path(effective_candidates_file_path),
+                    Path(evaluation_full_reference),
+                    evaluation_dir / "inputs",
+                )
             if (
                 configs.evaluation.dual_global_local
                 and effective_candidates_file_path is not None
@@ -1240,23 +1305,6 @@ def _run_alignment_session(
                         if not local_ranking and evaluation_full_reference is not None
                         else local_alignment_path
                     ),
-            local_alignment_path = Path(alignment_file_path)
-            local_reference_candidates = effective_candidates_file_path
-            if (
-                local_ranking
-                and evaluation_full_reference is not None
-                and effective_candidates_file_path is not None
-            ):
-                from exact.core.actions.evaluation import (
-                    materialize_local_ranking_inputs,
-                )
-
-                local_alignment_path, local_reference_candidates = materialize_local_ranking_inputs(
-                    local_alignment_path,
-                    Path(effective_candidates_file_path),
-                    Path(evaluation_full_reference),
-                    evaluation_dir / "inputs",
-                )
                     output_dir_path=evaluation_dir,
                     error_on_fail=False,
                     K=configs.k,

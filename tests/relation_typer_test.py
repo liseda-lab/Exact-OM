@@ -107,13 +107,14 @@ def test_semantic_graph_closure_types_paths_and_abstains_when_unresolved() -> No
     relations = {
         (row.SrcEntity, row.TgtEntity): row.Relation for row in typed.itertuples(index=False)
     }
-    assert relations[(BASE + "organ", BASE + "organ")] == "="
-    assert relations[(BASE + "heart", BASE + "heart")] == "="
+    assert (BASE + "organ", BASE + "organ") not in relations
+    assert (BASE + "heart", BASE + "heart") not in relations
     assert relations[(BASE + "atrium", BASE + "organ")] == "<"
     assert relations[(BASE + "heart", BASE + "atrium")] == ">"
     assert (BASE + "blood", BASE + "missing") not in relations
     assert typed.attrs["relation_anchor_count"] == 2
-    assert typed.attrs["relation_abstentions"] == [
+    assert len(typed.attrs["relation_abstentions"]) == 3
+    assert typed.attrs["relation_abstentions"][-1:] == [
         {
             "source": BASE + "blood",
             "target": BASE + "missing",
@@ -148,7 +149,7 @@ def test_semantic_reciprocal_anchor_margin_is_configurable() -> None:
         equivalence_anchor_margin=0.97,
     )
 
-    assert accepted["Relation"].tolist() == ["="]
+    assert accepted.empty  # Its own high-confidence bridge is never independent evidence.
     assert accepted.attrs["relation_anchor_count"] == 1
     assert rejected.empty
     assert rejected.attrs["relation_anchor_count"] == 0

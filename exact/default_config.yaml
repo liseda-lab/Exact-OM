@@ -33,6 +33,8 @@ data:
   refs: {}
   # Optional candidate alignment path.
   candidates:
+  # Frozen eligible source IRIs, one per line.
+  source_universe:
   # Disjoint training candidate pool.
   train_candidates:
   # Explicit task path; null retains legacy candidate-file inference.
@@ -72,6 +74,10 @@ matching:
     - class
   # Relation typing mode; none preserves shipped all-equivalent output.
   relation_prediction: none
+  # Immutable grouped three-way relation head.
+  relation_artifact:
+  # Disjoint typed training pairs used only to fit the relation head.
+  relation_training_file:
   # E14 semantic relation-typing backend.
   relation_semantic_backend: graph_closure
   relation_equivalence_anchor_threshold: 0.95
@@ -92,6 +98,13 @@ matching:
     mode: off
     # Base-score threshold for predicted anchors.
     threshold: 0.95
+    exact_policy:
+    source: predicted
+    trusted_file:
+    rule_artifact:
+    margin: 0.1
+    corruption_fraction: 0.0
+    diagnostic: false
     # Restrict the anchor set to exact matches.
     exact_only: false
     # Maximum bounded anchor-rescoring passes.
@@ -108,6 +121,10 @@ matching:
   nil:
     # NIL scoring mode; off preserves non-NIL behavior.
     mode: off
+    artifact:
+    training_source_labels:
+    pool_miss_development_reference:
+    label_semantics: unknown
     # Common scale for real candidates and NIL.
     ranking_scale: joint_accept_probability
   # E10/E19/E24/E26 evidence-fusion controls.
@@ -178,6 +195,7 @@ matching:
       polarity: support_only
       bank: full
       signed_property_allowlist: []
+      provenance_dedup: false
     # E09 hierarchy-overlap and sibling controls.
     hier:
       # Enable E09 hierarchy-semantic variants.
@@ -239,8 +257,12 @@ matching:
       mode: off
       artifact:
       dump_profile: false
+      shuffled: false
+      hierarchy_removal: 0.0
+      negative_label_policy:
 # Dataset construction and evidence extraction.
 dataset:
+  verbalization_mode: llm
   # Registered hierarchy reasoner name.
   reasoner: asserted
   # Dataset loading worker count.
@@ -489,11 +511,13 @@ candidates:
     k_max: 20
   # E20 fitted retrieval-encoder controls.
   encoder_finetune:
+    training:
     mode: off
     artifact:
     negative_policy: complete_reference
   # E20 supervised pool reranker controls.
   cross_encoder:
+    training:
     mode: off
     artifact:
     top_k: 20
@@ -943,19 +967,28 @@ llm:
       probability: raw_joint
       listwise_max_candidates: 5
       evidence: generated_brief
+      brief_max_tokens: 64
       permutations: 1
       output: categorical
+      max_evidence_packets: 0
       samples_per_permutation: 3
     gate:
       mode: analytic
       threshold: 0.5
       quantile_fraction: 0.05
+      # Frozen forced-source strata with permitted development label provenance.
+      strata_artifact:
+      # Maximum frozen development source groups, not candidate rows.
       forced_sample_size: 0
       artifact:
     exemplars: off
     exemplar_count: 0
+    exemplar_artifact:
     distill: off
     distill_artifact:
+    student_training: gold_teacher
+    teacher_source_cap: 200
+    outcome_policy: unknown
     fusion_weight: beta_u
     constant_weight: 0.5
     fusion_artifact:
@@ -965,6 +998,7 @@ selector:
   enabled: false
   # Optional experiment override for the CandidateSetSelector stage.
   runtime_enabled:
+  runtime_global_only:
   emit_candidate_scores: false
   accept_model: logistic
   accept_training: winner_only
@@ -978,6 +1012,10 @@ selector:
     artifact:
 # Per-component supervision-mode resolution.
 supervision:
+  transfer_artifact:
+  negative_label_policy: unknown
+  label_budget:
+  label_selection: passive
   mode: auto
   components: {}
   auto_policy:

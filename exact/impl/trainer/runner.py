@@ -5,8 +5,8 @@ import inspect  # noqa: F401
 import json  # noqa: F401
 import math
 import os
-import signal
 import re
+import signal
 import time  # noqa: F401
 import uuid
 from collections.abc import Mapping
@@ -38,11 +38,12 @@ except ImportError:  # pragma: no cover - exercised only when optional dependenc
 from exact.core.contracts.alignment_io import bind_alignment_io
 from exact.core.contracts.trainer import ITrainer
 
+from .anchors import AnchorPreparationMixin
 from .audit_io import AuditIOMixin, _semantic_collate_fn
 from .checkpointing import CheckpointingMixin
+from .fitting import TrainingPoolMixin, source_batches
 from .overlays import OverlaysMixin
 from .rationales import RationalesMixin
-from .fitting import TrainingPoolMixin, source_batches
 
 bind_alignment_io(
     relation_typer=predict_relations,
@@ -76,7 +77,13 @@ class _FinalizationState:
 
 
 class SemanticAlignmentRunner(
-    TrainingPoolMixin, CheckpointingMixin, AuditIOMixin, RationalesMixin, OverlaysMixin, ITrainer
+    AnchorPreparationMixin,
+    TrainingPoolMixin,
+    CheckpointingMixin,
+    AuditIOMixin,
+    RationalesMixin,
+    OverlaysMixin,
+    ITrainer,
 ):
     """
     External loop orchestrator for SemanticScorer inference.
@@ -1155,6 +1162,51 @@ class SemanticAlignmentRunner(
                         index=False, name=None
                     )
                 ]
+        nil_models = [
+            model
+            for model in self.models[1:]
+            if getattr(model, "nil_config", {}).get("mode", "off") != "off"
+        ]
+        if nil_models:
+            from exact.impl.models.selector.nil_head import source_decision_records
+
+            nil_config = nil_models[-1].nil_config
+            artifact = (
+                json.loads(Path(nil_config["artifact"]).read_text())
+                if nil_config.get("mode") == "fitted"
+                else None
+            )
+            if artifact and artifact["application"].get("dataset_signature") != getattr(
+                self.dataset, "dataset_signature", None
+            ):
+                raise ValueError("NIL source output dataset binding mismatch")
+            universe = getattr(self.dataset, "eligible_source_iris", None) or sorted(
+                set(candidate_df.Src.astype(str))
+            )
+            nil_frame = (
+                candidate_df
+                if "Src" in candidate_df
+                else pd.DataFrame(columns=["Src", "Tgt", "S_base"])
+            )
+            records = source_decision_records(nil_frame, universe, artifact=artifact)
+            emitted = {}
+            for mapping in predictions:
+                emitted.setdefault(str(mapping.head), []).append(str(mapping.tail))
+            for record in records:
+                record["emitted_targets"] = sorted(emitted.get(record["Src"], []))
+                record["action"] = "emit" if record["emitted_targets"] else "abstain"
+            destination = self.output_dir / "source_decisions.json"
+            temporary = destination.with_suffix(".json.partial")
+            temporary.write_text(
+                json.dumps(
+                    {"schema_version": 1, "mode": nil_config["mode"], "records": records},
+                    sort_keys=True,
+                    allow_nan=False,
+                )
+                + "\n"
+            )
+            temporary.replace(destination)
+            self._nil_source_output = {"path": str(destination), "source_count": len(records)}
         compact_rationale_records = False
         if not candidate_df.empty:
             self._annotate_candidate_dataframe(
@@ -1304,6 +1356,11 @@ class SemanticAlignmentRunner(
             or getattr(self.model, "llm_experiment_config", {}).get("gate", {}).get("mode")
             == "learned"
         )
+        grouped_decisions = grouped_decisions or (
+            getattr(self.model, "lex_enabled", False)
+            and getattr(self.model, "lex_config", {}).get("quality")
+            in {"candidate_margin", "encoder_agreement"}
+        )
         if grouped_decisions:
             columns = [
                 column
@@ -1314,6 +1371,7 @@ class SemanticAlignmentRunner(
                 columns, kind="stable"
             ).reset_index(drop=True)
             self.dataset._invalidate_active_dataframe_cache()
+        self.prepare_anchors(batch_size=batch_size)
         self.prepare_population_gate(batch_size=batch_size)
         self.model.eval()
         for extra_model in getattr(self, "models", [])[1:]:
