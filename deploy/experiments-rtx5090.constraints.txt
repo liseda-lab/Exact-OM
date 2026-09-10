@@ -1,0 +1,10 @@
+# Observed working numerical/model stack on the RTX 5090 node, 2026-09-10.
+# Install with --extra-index-url https://download.pytorch.org/whl/cu128.
+# This is an explicit research-node override of poetry.lock, not a new library default.
+torch==2.7.0+cu128
+triton==3.3.0
+transformers==4.57.6
+tokenizers==0.22.2
+sentence-transformers==2.7.0
+numpy==2.4.6
+pandas==2.3.3
