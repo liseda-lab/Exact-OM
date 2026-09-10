@@ -39,6 +39,11 @@ def transfer_feature_contract(config):
             "dataset": config.dataset.model_dump(mode="json"),
             "score_calibration": config.matching.calibration.model_dump(mode="json"),
             "selector": config.selector.model_dump(mode="json"),
+            **(
+                {"nil": config.matching.nil.model_dump(mode="json")}
+                if config.matching.nil.mode != "off"
+                else {}
+            ),
         }
     )
 
@@ -51,11 +56,13 @@ def artifact_features(payload, kind):
         return payload["feature_schema"]
     if kind == "calibration":
         return ["S_pair_final"]
+    if kind == "nil" and payload.get("kind") in {"natural_nil_head", "benchmark_nil_head"}:
+        return payload["feature_schema"]
     raise ValueError(f"Artifact kind {kind!r} has no donor-transfer contract")
 
 
 def _application(payload):
-    return payload.get("fit_provenance", {}).get("application", {})
+    return payload.get("fit_provenance", {}).get("application", payload.get("application", {}))
 
 
 def freeze_transfer_manifest(
@@ -192,7 +199,15 @@ def validate_transfer_config(config):
         "selector": config.selector.rerank.artifact,
         "fusion": config.matching.fusion.artifact,
         "calibration": config.matching.calibration.artifact,
+        "nil": config.matching.nil.artifact,
     }
+    if "nil" in manifest["artifacts"] and (
+        config.matching.nil.mode != "fitted"
+        or config.matching.nil.training_source_labels is not None
+        or config.data.train_candidates is not None
+        or config.data.refs.get("train") is not None
+    ):
+        raise ValueError("Transferred NIL requires a frozen head and no recipient training inputs")
     if set(manifest["artifacts"]) != {key for key, value in active.items() if value is not None}:
         raise ValueError("Transfer active fitted heads differ from its frozen donor manifest")
     for kind, entry in manifest["artifacts"].items():

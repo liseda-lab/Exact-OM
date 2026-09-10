@@ -84,6 +84,11 @@ class TrainingPoolMixin:
 
             manifest = validate_transfer(self.dataset)
             if any(
+                getattr(model, "nil_config", {}).get("training_source_labels")
+                for model in getattr(self, "models", [])[1:]
+            ):
+                raise ValueError("Transferred NIL cannot consume recipient training source labels")
+            if any(
                 getattr(self, key, None)
                 for key in ("fitting_fusion_config", "fitting_graph_config", "fitting_llm_config")
             ):

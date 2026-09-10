@@ -95,7 +95,9 @@ def fit_nil_artifact(frame, source_labels, reference_pairs, path, *, application
             "NIL fitted arm requires independently annotated examples with declared absence semantics"
         )
     if "in_pool" not in set(labels.Status) or len(labels) < 3:
-        raise ValueError("NIL fitting needs mapped and explicitly annotated rejection source groups")
+        raise ValueError(
+            "NIL fitting needs mapped and explicitly annotated rejection source groups"
+        )
     sources = labels.Src.tolist()
     if set(sources) & set(application.get("source_ids", [])):
         raise ValueError("NIL training overlaps reporting source groups")
@@ -183,6 +185,21 @@ def fit_nil_artifact(frame, source_labels, reference_pairs, path, *, application
         "unknown_labels_excluded": int((source_labels.Status == "unknown").sum()),
     }
     return freeze_json(path, payload)
+
+
+def validate_nil_application(dataset, path, artifact, config):
+    """Use the same strict donor manifest as other heads; never relax its dataset guard."""
+    from exact.utils.artifact_transfer import validate_transferred_artifact
+
+    transferred = validate_transferred_artifact(dataset, path, kind="nil", features=list(FEATURES))
+    if transferred and config.get("training_source_labels"):
+        raise ValueError("Transferred NIL cannot consume recipient training source labels")
+    if not transferred and artifact["application"].get("dataset_signature") != getattr(
+        dataset, "dataset_signature", None
+    ):
+        raise ValueError("NIL artifact application dataset mismatch")
+    if artifact["application"].get("nil_label_semantics") != config.get("label_semantics"):
+        raise ValueError("NIL artifact label-semantics mismatch")
 
 
 def source_decision_records(frame, source_universe, *, artifact=None):

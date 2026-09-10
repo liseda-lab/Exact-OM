@@ -72,16 +72,13 @@ class NilRankingMixin:
             import json
             from pathlib import Path
 
-            from .nil_head import source_decision_records
+            from .nil_head import source_decision_records, validate_nil_application
 
             path = self.nil_config.get("artifact")
             if not path or not Path(path).is_file():
                 raise ValueError("Fitted natural NIL requires a training-source artifact")
             artifact = json.loads(Path(path).read_text())
-            if artifact["application"].get("dataset_signature") != getattr(
-                dataset, "dataset_signature", None
-            ):
-                raise ValueError("NIL artifact application dataset mismatch")
+            validate_nil_application(dataset, path, artifact, self.nil_config)
             records = source_decision_records(df, df.Src.astype(str).unique(), artifact=artifact)
             for record in records:
                 indices = df.index[df.Src.astype(str) == record["Src"]]

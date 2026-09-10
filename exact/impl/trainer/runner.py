@@ -1185,7 +1185,10 @@ class SemanticAlignmentRunner(
             if getattr(model, "nil_config", {}).get("mode", "off") != "off"
         ]
         if nil_models:
-            from exact.impl.models.selector.nil_head import source_decision_records
+            from exact.impl.models.selector.nil_head import (
+                source_decision_records,
+                validate_nil_application,
+            )
 
             nil_config = nil_models[-1].nil_config
             artifact = (
@@ -1193,10 +1196,8 @@ class SemanticAlignmentRunner(
                 if nil_config.get("mode") == "fitted"
                 else None
             )
-            if artifact and artifact["application"].get("dataset_signature") != getattr(
-                self.dataset, "dataset_signature", None
-            ):
-                raise ValueError("NIL source output dataset binding mismatch")
+            if artifact:
+                validate_nil_application(self.dataset, nil_config["artifact"], artifact, nil_config)
             universe = getattr(self.dataset, "eligible_source_iris", None) or sorted(
                 set(candidate_df.Src.astype(str))
             )
