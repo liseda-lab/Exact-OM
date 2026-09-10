@@ -59,3 +59,26 @@ def test_import_bindings_require_explicit_identity(tmp_path, bindings):
     root, _, _ = documents(tmp_path)
     with pytest.raises(SourceOptionsError):
         resolve(root, options={"imports": bindings})
+
+
+def test_relative_imports_enter_recovery_inventory_and_reject_checksum_mutation(tmp_path):
+    from exact.experiments.harness import _path_provenance
+
+    directory = tmp_path / "ontologies"
+    directory.mkdir()
+    root, imported, options = documents(directory)
+    config = {
+        "data": {"root": str(tmp_path), "source": "ontologies/root.ofn", "target": str(root)},
+        "io": {"source_options": options},
+    }
+    key = "source_import_" + sha256(b"urn:imported").hexdigest()
+    original = _path_provenance(config)
+    assert original[key]["path"] == str(imported.resolve())
+    assert original[key]["ontology_iri"] == "urn:imported"
+    assert original[key]["sha256"] == options["imports"]["urn:imported"]["sha256"]
+    imported.write_text("Ontology(<urn:imported> Declaration(Class(<urn:changed>)))")
+    with pytest.raises(ValueError, match="OWL import checksum mismatch"):
+        _path_provenance(config)
+    options["imports"]["urn:imported"]["sha256"] = sha256(imported.read_bytes()).hexdigest()
+    changed = _path_provenance(config)
+    assert changed[key]["sha256"] != original[key]["sha256"]

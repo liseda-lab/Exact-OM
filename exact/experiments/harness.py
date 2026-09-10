@@ -1833,6 +1833,35 @@ def _path_provenance(mapping: Mapping[str, Any]) -> dict[str, Any]:
             result[key] = file_provenance(
                 resolved_file(value, relative_to_root=True, label=f"data.{key}")
             )
+    io = mapping.get("io") or {}
+    for side in ("source", "target"):
+        options = io.get(f"{side}_options") or {}
+        if "imports" not in options:
+            continue
+        bindings = options["imports"]
+        if not isinstance(bindings, Mapping) or side not in result:
+            raise ValueError(
+                "OWL import provenance requires configured ontology paths and bindings"
+            )
+        base = Path(result[side]["path"]).parent
+        for iri, binding in bindings.items():
+            if (
+                not isinstance(iri, str)
+                or not isinstance(binding, Mapping)
+                or set(binding) != {"path", "sha256"}
+                or not isinstance(binding["path"], str)
+                or not isinstance(binding["sha256"], str)
+            ):
+                raise ValueError("OWL import provenance requires IRI/path/SHA256 bindings")
+            import_path = Path(binding["path"]).expanduser()
+            import_path = import_path if import_path.is_absolute() else base / import_path
+            record = file_provenance(
+                resolved_file(import_path, relative_to_root=False, label=f"{side} import")
+            )
+            if record["sha256"] != binding["sha256"]:
+                raise ValueError(f"OWL import checksum mismatch: {side} {iri}")
+            record["ontology_iri"] = iri
+            result[f"{side}_import_{hashlib.sha256(iri.encode()).hexdigest()}"] = record
     descriptor = data.get("descriptor")
     if descriptor:
         result["descriptor"] = file_provenance(
