@@ -28,6 +28,7 @@ class _DummyHosted:
         logit_bias=None,
         provider=None,
         seed=None,
+        role="unspecified",
     ):
         user_text = messages[-1]["content"]
         if "Source entity: src" not in user_text:

@@ -55,6 +55,7 @@ V1_TO_V2: Dict[str, MigrationTarget] = {
     "alignment_params.save_stats_csv": "output.save.stats_csv",
     "alignment_params.append_stats_to_summary_csv": "output.save.append_stats_to_summary",
     "dataset_params.reasoner": "dataset.reasoner",
+    "dataset_params.verbalization_mode": "dataset.verbalization_mode",
     "dataset_params.num_workers": "dataset.num_workers",
     "dataset_params.filter_exact_matches": "dataset.filter_exact_matches",
     "dataset_params.drop_exact_match_sources": "dataset.drop_exact_match_sources",
