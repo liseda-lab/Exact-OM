@@ -78,7 +78,9 @@ listwise first-token probability checks, completed-cache replay and relocated re
 credentials (two completed requests, 56 tokens). Use `--api-key-file api_key` for the validation
 tools; the frozen baseline's older credential locator is unchanged. No key value is logged.
 
-A bounded G0 validation job was launched separately after preparation.
+A bounded G0 validation job was launched separately after preparation. Attempt 03 failed in
+the native signature-count index; the facade now uses public typed enumeration, verified on
+the actual DOID closure. Attempt 04 retains the same campaign inputs and matching configuration.
 See [G0-VALIDATION.md](G0-VALIDATION.md) for the detached monitor, stop command, limits and
 retained attempt history. Its `status.json`/`report.json` are authoritative for completion.
 

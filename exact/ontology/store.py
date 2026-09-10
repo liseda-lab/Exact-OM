@@ -41,7 +41,6 @@ from pyowl_core import (
     OntologySnapshot,
     OntologyView,
     PropertyDomainRangeView,
-    SignatureView,
     SubAnnotationPropertyOf,
     SubClassOf,
     walk,
@@ -466,8 +465,9 @@ class OwlOntologySource(KnowledgeSource):
         return cls.load(Path(path), label_properties=label_properties)
 
     @cached_property
-    def _signature(self) -> SignatureView:
-        return self._snapshot.view(SignatureView, include_builtins=True)
+    def _signature(self) -> tuple[Entity, ...]:
+        # Enumeration needs no reference-count index; retain the public typed closure.
+        return self._snapshot.signature(include_builtins=True)
 
     @cached_property
     def _annotations(self) -> AnnotationAssertionIndex:
@@ -550,7 +550,7 @@ class OwlOntologySource(KnowledgeSource):
             entity.iri.value: (
                 ObjectProperty if entity.kind is CoreEntityKind.OBJECT_PROPERTY else DataProperty
             )
-            for entity in self._signature.iter()
+            for entity in self._signature
             if entity.kind in {CoreEntityKind.OBJECT_PROPERTY, CoreEntityKind.DATA_PROPERTY}
         }
         return _PropertyHierarchy(self._property_view, components, constructors)
@@ -702,7 +702,7 @@ class OwlOntologySource(KnowledgeSource):
         if cached is None:
             core_kind = _CORE_KINDS[normalized_kind]
             cached = tuple(
-                entity.iri.value for entity in self._signature.iter() if entity.kind is core_kind
+                sorted(entity.iri.value for entity in self._signature if entity.kind is core_kind)
             )
             self._entity_cache[normalized_kind] = cached
         return cached

@@ -23,11 +23,11 @@ foundation envelope. Unknown hosted deliveries are not automatically retried.
 
 ## Monitor and stop
 
-Current output: `data/experiments-v2/g0-validation-03/`.
+Current output: `data/experiments-v2/g0-validation-04/`.
 
 ```console
-tmux attach -t exact-g0-03
-.venv/bin/python data/experiments-v2/g0-validation-03/monitor.py
+tmux attach -t exact-g0-04
+.venv/bin/python data/experiments-v2/g0-validation-04/monitor.py
 ```
 
 Detach from tmux with Ctrl-b, then d. `status.json` reports the current phase, process and
@@ -38,7 +38,7 @@ can remain open after completion, so session existence alone does not mean work 
 Request a cooperative stop:
 
 ```console
-touch data/experiments-v2/g0-validation-03/STOP
+touch data/experiments-v2/g0-validation-04/STOP
 ```
 
 The parent forwards STOP to the active worker, including during ontology loading. Completed
@@ -76,3 +76,24 @@ The full closure passes strict native loading: 16 documents, 199,429 effective a
 Evidence: `data/experiments-v2/ontology-normalization/doid-611355c44553/strict-load-report.json`.
 The runtime uses `import-map.normalized.json`; the unnormalized import map is diagnostic history.
 This successful loader check is not yet the full G0 throughput/recovery result.
+
+Attempt `g0-validation-03` stopped after 355.98 seconds while building DOID's entity-kind index,
+before scoring or hosted calls. The shared core's retained `SignatureView` reference-count
+traversal raises `BackendProtocolError: retained signature traversal found an unindexed entity`.
+Exact only needs typed entity enumeration, so its facade now caches the public
+`OntologyView.signature(include_builtins=True)` tuple and preserves lexical IRI ordering per
+kind. The complete snapshot, import closure, axioms and typed/punned entities remain unchanged;
+no dependency monkeypatch or permissive parser fallback is used.
+
+The actual repaired DOID entity-kind index passes: 19,546 classes, 47 object properties and
+61 annotation properties (19,654 distinct matching IRIs). The targeted check took 17.99 seconds
+including strict loading. Evidence is under `data/experiments-v2/g0-signature-repair/`.
+Tiny native/Python closure and overlay regressions also exercise imports, ontology-only
+annotations, undeclared references, punning, cached enumeration and lexical ordering. The
+fresh attempt uses the unchanged revision-06 campaign inputs and matching configuration.
+
+The broader DOID preflight reached its 180-second cap while traversing class labels, after the
+formerly failing index had passed. It does not establish full label/projection throughput;
+those measurements remain part of detached G0. The focused regression suites pass (38 existing
+ontology integration tests, plus 11 signature/import checks), as do scoped static, documentation
+and import-boundary checks.
