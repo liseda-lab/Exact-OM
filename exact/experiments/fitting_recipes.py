@@ -81,7 +81,7 @@ def fitting_arms():
             requirements += [
                 "disjoint_train_candidates",
                 "training_reference",
-                "natural_nil_training_source_labels",
+                "annotated_nil_training_source_labels",
             ]
         if name == "pool_miss":
             requirements += [

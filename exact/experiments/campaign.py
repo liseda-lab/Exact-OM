@@ -121,6 +121,8 @@ class CaseBinding(StrictConfigModel):
     target: Optional[InputBinding] = None
     source_universe: Optional[InputBinding] = None
     evaluation_source_labels: Optional[InputBinding] = None
+    evaluation_candidate_labels: Optional[InputBinding] = None
+    evaluation_label_semantics: Literal["natural", "benchmark_pool"] = "natural"
     references: dict[str, InputBinding] = Field(default_factory=dict)
     local_references: dict[str, InputBinding] = Field(default_factory=dict)
     candidates: dict[str, InputBinding] = Field(default_factory=dict)
@@ -150,6 +152,12 @@ class CaseBinding(StrictConfigModel):
             | set(self.frozen_global_candidates)
         ) - allowed:
             raise ValueError(f"{self.task}: reference/pool role violates {self.role} access")
+        if self.evaluation_label_semantics == "benchmark_pool" and (
+            self.evaluation_source_labels is None or self.evaluation_candidate_labels is None
+        ):
+            raise ValueError(
+                "Benchmark NIL evaluation requires separate source and candidate labels"
+            )
         if (
             self.negative_policy == "complete_reference"
             and self.reference_completeness != "complete"
@@ -674,7 +682,11 @@ def _case_task(case: CaseBinding, case_id: str, mode: str, role: str, root: Path
         "candidates": locate(pools.get(role)),
         "candidate_source": "track" if role in pools else "generated",
         "candidate_provenance": (
-            ("benchmark_supplied" if mode == "local_ranking" else "frozen_generated")
+            (
+                "benchmark_supplied"
+                if mode == "local_ranking" or case.evaluation_label_semantics == "benchmark_pool"
+                else "frozen_generated"
+            )
             if role in pools
             else "generated"
         ),
@@ -835,6 +847,32 @@ def materialize_campaign(path: Path, directory: Path, *, stage: str) -> Any:
                     f"{case_id}-{mode}": {
                         "role": lock.cases[case_id].role,
                         "reference_role": "test" if stage == "confirm" else "valid",
+                        **(
+                            {"label_semantics": "benchmark_pool"}
+                            if lock.cases[case_id].evaluation_label_semantics == "benchmark_pool"
+                            else {}
+                        ),
+                        **(
+                            {
+                                "evaluation_candidate_labels": {
+                                    "path": str(
+                                        (
+                                            root
+                                            / cast(
+                                                InputBinding,
+                                                lock.cases[case_id].evaluation_candidate_labels,
+                                            ).path
+                                        ).resolve()
+                                    ),
+                                    "sha256": cast(
+                                        InputBinding,
+                                        lock.cases[case_id].evaluation_candidate_labels,
+                                    ).sha256,
+                                }
+                            }
+                            if lock.cases[case_id].evaluation_candidate_labels is not None
+                            else {}
+                        ),
                         "evaluation_source_labels": {
                             "path": str(
                                 (

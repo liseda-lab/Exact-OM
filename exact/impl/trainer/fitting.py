@@ -261,7 +261,8 @@ class TrainingPoolMixin:
                         if output.get("graph_features"):
                             row["graph_features"] = output["graph_features"][offset]
                         if "confirmed_label" in raw:
-                            row["confirmed_label"] = raw.iloc[index].confirmed_label
+                            label = raw.iloc[index].confirmed_label
+                            row["confirmed_label"] = None if pd.isna(label) else float(label)
                         row["fusion_channels"] = {
                             name: {
                                 field: float(values[offset].detach().cpu())

@@ -1356,6 +1356,19 @@ def resolve_supervision(
             "reason": reason,
         }
 
+    if config.matching.nil.mode == "fitted":
+        nil_training = training and config.matching.nil.training_source_labels is not None
+        nil_frozen = config.matching.nil.artifact is not None
+        resolved["nil"] = {
+            "requested": "supervised",
+            "resolved": "supervised" if nil_training or nil_frozen else "label_free",
+            "reason": (
+                "explicit_source_labels"
+                if nil_training
+                else "frozen_nil_artifact" if nil_frozen else "training_unavailable"
+            ),
+        }
+
     if arm.supervision_label is not None:
         label = arm.supervision_label
     elif arm.role == "oracle":
@@ -1391,7 +1404,20 @@ def _resolve_config(
         (f"arm {arm.id}", arm.overlay),
     ):
         _validate_overlay_surface(overlay, f"{source.config.experiment_id} {label}")
-    mapping = _merge_many(_base_mapping(source), inherited_overlay, task.overlay, arm.overlay)
+    base_mapping = _base_mapping(source)
+    annotation = source.config.frozen_constants.get("evaluation_diagnostics", {}).get(task.id, {})
+    benchmark_nil = annotation.get("label_semantics") == "benchmark_pool"
+    if benchmark_nil:
+        for label, recipe in (("baseline", base_mapping), ("inherited", inherited_overlay)):
+            if _overlay_artifact_paths(recipe, record_dir=source.path.parent):
+                raise ValueError(
+                    f"Benchmark NIL cannot consume {label} fitted artifacts; fit N0-only heads"
+                )
+    mapping = _merge_many(base_mapping, inherited_overlay, task.overlay, arm.overlay)
+    if benchmark_nil:
+        if not mapping.get("data", {}).get("candidates"):
+            raise ValueError("Benchmark NIL requires its fixed annotated candidate pool")
+        mapping = deep_merge(mapping, {"matching": {"nil": {"label_semantics": "benchmark_pool"}}})
     data_overlay: dict[str, Any] = {"reference_role": task.reference_role}
     if task.track:
         data_overlay["track"] = task.track
@@ -2842,7 +2868,7 @@ def cell_metrics(output_dir: Path) -> dict[str, float]:
             raise ValueError("Invalid posthoc NIL metric artifact")
         values = payload["metrics"]
         applicability = values.get("applicability", {})
-        for category in ("nil_aware", "natural_nil"):
+        for category in ("nil_aware", "natural_nil", "benchmark_nil"):
             score = values.get(category, {}).get("F1")
             if (
                 applicability.get(category, True)

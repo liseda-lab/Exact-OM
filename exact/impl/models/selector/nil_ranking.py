@@ -93,13 +93,13 @@ class NilRankingMixin:
                 )
                 for index, value in conditional.items():
                     df.at[index, "Q_match"] = record["in_pool_probability"] * value
-                    df.at[index, "Q_nil"] = record["ontology_nil_probability"]
+                    df.at[index, "Q_nil"] = record[f"{artifact['statuses'][1]}_probability"]
                     df.at[index, "Q_pool_miss"] = record["pool_miss_probability"]
                     df.at[index, "P_rank"] = record["in_pool_probability"] * value
                     df.at[index, "nil_absence_semantics"] = record["absence_semantics"]
                     df.at[index, "nil_ranking_scale"] = artifact["probability_scale"]
                     df.at[index, "selection_nil_winner"] = (
-                        record["absence_semantics"] == "ontology_nil"
+                        record["absence_semantics"] == artifact["statuses"][1]
                     )
                     if record["action"] == "abstain":
                         df.at[index, "S_select"] = 0.0

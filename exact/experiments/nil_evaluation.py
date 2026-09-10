@@ -8,7 +8,12 @@ import os
 from pathlib import Path
 from typing import Any
 
-from exact.impl.models.selector.nil_head import STATUSES, nil_metrics
+from exact.impl.models.selector.nil_head import (
+    BENCHMARK_STATUSES,
+    STATUSES,
+    benchmark_candidate_labels,
+    nil_metrics,
+)
 from exact.utils.data import read_table
 from exact.utils.provenance import sha256_file
 
@@ -54,6 +59,12 @@ def _reciprocal_rank(record: dict[str, Any], targets: set[str]) -> float | None:
 def evaluate_source_labels(cell: Any) -> dict[str, Any] | None:
     """Evaluate natural NIL without exposing source annotations to scoring or fitting."""
     diagnostics = getattr(cell, "diagnostics", None) or {}
+    semantics = diagnostics.get("label_semantics", "natural")
+    if semantics not in {"natural", "benchmark_pool"}:
+        raise ValueError("Unknown NIL evaluation label semantics")
+    benchmark = semantics == "benchmark_pool"
+    statuses = BENCHMARK_STATUSES if benchmark else STATUSES
+    nil_status = statuses[1]
     binding = diagnostics.get("evaluation_source_labels")
     if binding is None:
         return None
@@ -106,7 +117,7 @@ def evaluate_source_labels(cell: Any) -> dict[str, Any] | None:
         raise ValueError("NIL evaluation labels require Src/Status columns")
     labels = labels[["Src", "Status"]].copy()
     labels["Src"] = labels.Src.astype(str)
-    if labels.Src.duplicated().any() or not set(labels.Status) <= {*STATUSES, "mapped", "unknown"}:
+    if labels.Src.duplicated().any() or not set(labels.Status) <= {*statuses, "mapped", "unknown"}:
         raise ValueError(
             "NIL source annotations must be unique canonical statuses or mapped/unknown"
         )
@@ -134,6 +145,36 @@ def evaluate_source_labels(cell: Any) -> dict[str, Any] | None:
         for row in records
         for candidate in row.get("candidates", [])
     }
+    candidate_binding = diagnostics.get("evaluation_candidate_labels")
+    confirmed = {}
+    if benchmark:
+        if candidate_binding is None:
+            raise ValueError(
+                "Benchmark NIL evaluation requires separate confirmed candidate labels"
+            )
+        candidate_path = Path(candidate_binding["path"])
+        if (
+            not candidate_path.is_absolute()
+            or sha256_file(candidate_path) != candidate_binding["sha256"]
+        ):
+            raise ValueError("Benchmark evaluation candidate labels changed after binding")
+        training_pool = data.get("train_candidates")
+        if training_pool and candidate_path.resolve() == (root / training_pool).resolve():
+            raise ValueError("NIL evaluation cannot consume training candidate labels")
+        confirmed = {
+            pair: value
+            for pair, value in benchmark_candidate_labels(read_table(candidate_path)).items()
+            if pair[0] in universe
+        }
+        confirmed_positives = {pair for pair, value in confirmed.items() if value == 1}
+        if reference & set(confirmed) != confirmed_positives:
+            raise ValueError(
+                "Benchmark evaluation reference conflicts with confirmed candidate labels"
+            )
+    known_sources = set(labels.loc[labels.Status != "unknown", "Src"])
+    unassessed_pool = (
+        {pair for pair in pool if pair[0] in known_sources} - set(confirmed) if benchmark else set()
+    )
     reference_by_source: dict[str, set[str]] = {}
     for source, target in reference:
         reference_by_source.setdefault(source, set()).add(target)
@@ -146,12 +187,14 @@ def evaluate_source_labels(cell: Any) -> dict[str, Any] | None:
     if synthetic and cell.split_role != "development":
         raise ValueError("Synthetic pool-miss interventions are development-only")
     unresolved_pool_status = []
-    complete_reference = getattr(cell, "reference_completeness", "unknown") == "complete"
+    complete_reference = (
+        not benchmark and getattr(cell, "reference_completeness", "unknown") == "complete"
+    )
     for index, row in labels.iterrows():
         positives = {
             (str(row.Src), target) for target in reference_by_source.get(str(row.Src), set())
         }
-        if row.Status == "ontology_nil" and positives:
+        if row.Status == nil_status and positives:
             raise ValueError("Natural NIL source annotation conflicts with a positive mapping")
         if row.Status in {"mapped", "in_pool", "pool_miss"}:
             if not positives:
@@ -182,16 +225,24 @@ def evaluate_source_labels(cell: Any) -> dict[str, Any] | None:
     }
     for row in records:
         row.setdefault("absence_semantics", "unknown")
-    metrics = nil_metrics(records, labels, reference, emitted)
+    metrics = nil_metrics(records, labels, reference, emitted, nil_status=nil_status)
     known = set(labels.loc[labels.Status != "unknown", "Src"])
-    gold_nil = set(labels.loc[labels.Status == "ontology_nil", "Src"])
-    unassessed = {pair for pair in emitted if pair[0] in known - gold_nil and pair not in reference}
-    if getattr(cell, "reference_completeness", "unknown") != "complete" and unassessed:
+    gold_nil = set(labels.loc[labels.Status == nil_status, "Src"])
+    unassessed = {
+        pair
+        for pair in emitted
+        if pair[0] in (known if benchmark else known - gold_nil)
+        and pair not in reference
+        and (not benchmark or pair not in confirmed)
+    }
+    if not complete_reference and unassessed:
         metrics["nil_aware"] = {
             "status": "unavailable",
-            "reason": "incomplete pair reference cannot label emitted alternatives false",
+            "reason": "unannotated emitted alternatives cannot be labeled false",
             "unassessed_emitted_pairs": len(unassessed),
         }
+        if benchmark:
+            metrics["benchmark_nil"] = dict(metrics["nil_aware"])
     non_nil = known - gold_nil
     reciprocal_ranks = {
         str(row["Src"]): _reciprocal_rank(
@@ -202,12 +253,15 @@ def evaluate_source_labels(cell: Any) -> dict[str, Any] | None:
     }
     metrics["non_nil_MRR"] = (
         sum(value for value in reciprocal_ranks.values() if value is not None) / len(non_nil)
-        if non_nil and all(value is not None for value in reciprocal_ranks.values())
+        if non_nil
+        and not unassessed_pool
+        and all(value is not None for value in reciprocal_ranks.values())
         else None
     )
     metrics["non_nil_sources"] = len(non_nil)
     metrics["applicability"] = {
-        "natural_nil": bool(gold_nil),
+        "natural_nil": bool(gold_nil) and not benchmark,
+        "benchmark_nil": bool(gold_nil) and benchmark and not unassessed,
         "nil_aware": bool(known) and metrics["nil_aware"].get("status") != "unavailable",
         "non_nil_MRR": metrics["non_nil_MRR"] is not None,
         "pool_miss_as_nil": bool((labels.Status == "pool_miss").any()),
@@ -215,8 +269,15 @@ def evaluate_source_labels(cell: Any) -> dict[str, Any] | None:
     report = {
         "schema_version": 1,
         "evaluation_only": True,
-        "label_semantics": "natural",
-        "metric_scope": "explicit_source_statuses_and_supplied_positive_reference",
+        "label_semantics": semantics,
+        "ontology_nil_claim": not benchmark,
+        "metric_scope": (
+            "benchmark_confirmed_candidates"
+            if benchmark
+            else "explicit_source_statuses_and_supplied_positive_reference"
+        ),
+        "evaluation_candidate_labels": candidate_binding if benchmark else None,
+        "unassessed_scored_pairs": len(unassessed_pool),
         "role": cell.split_role,
         "reference_role": cell.reference_role,
         "reference_completeness": getattr(cell, "reference_completeness", "unknown"),

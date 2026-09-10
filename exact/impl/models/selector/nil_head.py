@@ -12,7 +12,17 @@ from .fitting import fingerprint, freeze_json
 from .llm_learning import source_features
 
 STATUSES = ("in_pool", "ontology_nil", "pool_miss")
+BENCHMARK_STATUSES = ("in_pool", "benchmark_nil", "pool_miss")
 FEATURES = ("top_score", "top_two_margin", "candidate_entropy", "displayed_count")
+
+
+def benchmark_candidate_labels(frame):
+    """Only author-confirmed candidates define negatives in a fixed benchmark pool."""
+    if not {"Src", "Tgt", "confirmed_label"} <= set(frame):
+        raise ValueError("Benchmark NIL requires explicit confirmed candidate labels")
+    if frame[["Src", "Tgt"]].duplicated().any() or not set(frame.confirmed_label) <= {0, 1}:
+        raise ValueError("Benchmark candidate labels must be unique, complete binary annotations")
+    return {(str(row.Src), str(row.Tgt)): int(row.confirmed_label) for row in frame.itertuples()}
 
 
 def nil_source_features(frame, sources):
@@ -65,34 +75,39 @@ def nil_probabilities(features, model):
 
 
 def fit_nil_artifact(frame, source_labels, reference_pairs, path, *, application, seed=17):
-    """Fit only explicit, natural source labels; omitted/unknown labels are excluded."""
+    """Fit explicit source labels under their declared absence scope."""
+    benchmark = application.get("nil_label_semantics") == "benchmark_pool"
+    statuses = BENCHMARK_STATUSES if benchmark else STATUSES
+    nil_status = statuses[1]
     required = {"Src", "Status"}
     if not required.issubset(source_labels):
-        raise ValueError("Natural NIL training requires explicit Src/Status source labels")
+        raise ValueError("NIL training requires explicit Src/Status source labels")
     labels = source_labels.copy()
     labels["Src"] = labels.Src.astype(str)
-    if labels.Src.duplicated().any() or not set(labels.Status).issubset({*STATUSES, "unknown"}):
-        raise ValueError(
-            "NIL source labels must be unique with in_pool/ontology_nil/pool_miss/unknown status"
-        )
+    if labels.Src.duplicated().any() or not set(labels.Status).issubset({*statuses, "unknown"}):
+        raise ValueError(f"NIL source labels must be unique with {statuses} or unknown status")
     labels = labels[labels.Status != "unknown"].sort_values("Src").reset_index(drop=True)
-    if application.get("nil_label_semantics") != "natural" or "ontology_nil" not in set(
-        labels.Status
-    ):
+    if application.get("nil_label_semantics") not in {
+        "natural",
+        "benchmark_pool",
+    } or nil_status not in set(labels.Status):
         raise ValueError(
-            "NIL fitted arm requires independently annotated natural ontology-NIL examples"
+            "NIL fitted arm requires independently annotated examples with declared absence semantics"
         )
     if "in_pool" not in set(labels.Status) or len(labels) < 3:
-        raise ValueError("NIL fitting needs mapped and natural-NIL source groups")
+        raise ValueError("NIL fitting needs mapped and explicitly annotated rejection source groups")
     sources = labels.Src.tolist()
     if set(sources) & set(application.get("source_ids", [])):
-        raise ValueError("Natural NIL training overlaps reporting source groups")
+        raise ValueError("NIL training overlaps reporting source groups")
     reference = {(str(source), str(target)) for source, target in reference_pairs}
     pool = set(zip(frame.Src.astype(str), frame.Tgt.astype(str)))
+    confirmed = benchmark_candidate_labels(frame) if benchmark else None
+    if benchmark and {pair for pair, value in confirmed.items() if value == 1} != reference:
+        raise ValueError("Benchmark training positives differ from confirmed candidate labels")
     for row in labels.itertuples():
         positives = {pair for pair in reference if pair[0] == row.Src}
-        if row.Status == "ontology_nil" and positives:
-            raise ValueError("Natural NIL label conflicts with a known positive mapping")
+        if row.Status == nil_status and positives:
+            raise ValueError("NIL label conflicts with a known positive mapping")
         if row.Status == "in_pool" and not positives & pool:
             raise ValueError(
                 "in_pool NIL training status has no verified positive in the candidate pool"
@@ -102,7 +117,7 @@ def fit_nil_artifact(frame, source_labels, reference_pairs, path, *, application
                 "pool_miss requires a known outside-pool target and no known positive in the pool"
             )
     features = nil_source_features(frame, sources)
-    targets = [STATUSES.index(status) for status in labels.Status]
+    targets = [statuses.index(status) for status in labels.Status]
     identity = fingerprint(
         {
             "application": application,
@@ -139,8 +154,8 @@ def fit_nil_artifact(frame, source_labels, reference_pairs, path, *, application
                 "predictions": [
                     {
                         "Src": sources[index],
-                        "Status": STATUSES[targets[index]],
-                        "probabilities": dict(zip(STATUSES, prediction)),
+                        "Status": statuses[targets[index]],
+                        "probabilities": dict(zip(statuses, prediction)),
                     }
                     for index, prediction in zip(indices, probabilities)
                 ],
@@ -152,10 +167,12 @@ def fit_nil_artifact(frame, source_labels, reference_pairs, path, *, application
         oof.extend(record["predictions"])
     payload = {
         "schema_version": 1,
-        "kind": "natural_nil_head",
+        "kind": "benchmark_nil_head" if benchmark else "natural_nil_head",
+        "label_semantics": "benchmark_pool" if benchmark else "natural",
+        "ontology_nil_claim": not benchmark,
         "fit_identity": identity,
         "feature_schema": list(FEATURES),
-        "statuses": list(STATUSES),
+        "statuses": list(statuses),
         "application": application,
         "training_sources": sources,
         "source_label_counts": labels.Status.value_counts().to_dict(),
@@ -175,11 +192,15 @@ def source_decision_records(frame, source_universe, *, artifact=None):
         return []
     groups = {str(source): group for source, group in frame.groupby("Src", sort=False)}
     probabilities = None
+    statuses = STATUSES
     if artifact:
-        if artifact.get("kind") != "natural_nil_head" or artifact.get("feature_schema") != list(
-            FEATURES
+        statuses = BENCHMARK_STATUSES if artifact.get("kind") == "benchmark_nil_head" else STATUSES
+        if (
+            artifact.get("kind") not in {"natural_nil_head", "benchmark_nil_head"}
+            or artifact.get("feature_schema") != list(FEATURES)
+            or artifact.get("statuses") != list(statuses)
         ):
-            raise ValueError("Invalid natural NIL feature/schema artifact")
+            raise ValueError("Invalid NIL feature/schema artifact")
         if set(sources) & set(artifact["training_sources"]):
             raise ValueError("NIL inference overlaps training source groups")
         probabilities, contributions, logits = nil_probabilities(
@@ -195,18 +216,19 @@ def source_decision_records(frame, source_universe, *, artifact=None):
             "candidate_count": count,
             "absence_semantics": "unknown",
             "ontology_nil_probability": None,
+            "benchmark_nil_probability": None,
             "pool_miss_probability": None,
         }
         if probabilities is not None:
-            prediction = dict(zip(STATUSES, probabilities[index]))
-            status = STATUSES[
+            prediction = dict(zip(statuses, probabilities[index]))
+            status = statuses[
                 max(range(len(STATUSES)), key=lambda item: probabilities[index][item])
             ]
             if max(probabilities[index]) < 0.5 or (count == 0 and status == "in_pool"):
                 status = "unknown"
             row.update(
                 absence_semantics=status,
-                ontology_nil_probability=prediction["ontology_nil"],
+                **{f"{statuses[1]}_probability": prediction[statuses[1]]},
                 pool_miss_probability=prediction["pool_miss"],
                 in_pool_probability=prediction["in_pool"],
                 feature_contributions=contributions[index],
@@ -245,27 +267,36 @@ def remove_development_positives(frame, reference_pairs, *, role, negative_label
     }
 
 
-def nil_metrics(records, source_labels, reference_pairs, emitted_pairs):
+def nil_metrics(
+    records, source_labels, reference_pairs, emitted_pairs, *, nil_status="ontology_nil"
+):
     """Evaluate after scoring; unknown source labels never become negative outcomes."""
     labels = {str(row.Src): str(row.Status) for row in source_labels.itertuples()}
     known = {source for source, status in labels.items() if status != "unknown"}
     predictions = {row["Src"]: row for row in records}
     if len(predictions) != len(records) or known - set(predictions):
         raise ValueError("NIL evaluation requires one output for every labeled source")
+    emitted_sources = {str(source) for source, _ in emitted_pairs}
     predicted_nil = {
-        source for source in known if predictions[source]["absence_semantics"] == "ontology_nil"
+        source
+        for source in known
+        if (
+            source not in emitted_sources
+            if nil_status == "benchmark_nil"
+            else predictions[source]["absence_semantics"] == nil_status
+        )
     }
-    gold_nil = {source for source in known if labels[source] == "ontology_nil"}
+    gold_nil = {source for source in known if labels[source] == nil_status}
     reference = {
         (str(source), str(target)) for source, target in reference_pairs if str(source) in known
     }
     if any(source in gold_nil for source, _ in reference):
-        raise ValueError("Natural NIL evaluation labels conflict with positive mappings")
-    truth = reference | {(source, "__ONTOLOGY_NIL__") for source in gold_nil}
+        raise ValueError("NIL evaluation labels conflict with positive mappings")
+    truth = reference | {(source, "__NIL__") for source in gold_nil}
     emitted = {
         (str(source), str(target)) for source, target in emitted_pairs if str(source) in known
     }
-    predicted = emitted | {(source, "__ONTOLOGY_NIL__") for source in predicted_nil}
+    predicted = emitted | {(source, "__NIL__") for source in predicted_nil}
 
     def counts(actual, expected):
         tp, fp, fn = len(actual & expected), len(actual - expected), len(expected - actual)
@@ -278,7 +309,9 @@ def nil_metrics(records, source_labels, reference_pairs, emitted_pairs):
 
     return {
         "nil_aware": counts(predicted, truth),
-        "natural_nil": counts(predicted_nil, gold_nil),
+        ("benchmark_nil" if nil_status == "benchmark_nil" else "natural_nil"): counts(
+            predicted_nil, gold_nil
+        ),
         "labeled_sources": len(known),
         "unknown_sources_excluded": len(labels) - len(known),
         "pool_miss_as_nil": len(

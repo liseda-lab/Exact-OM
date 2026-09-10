@@ -88,7 +88,7 @@ class NilConfig(StrictConfigModel):
     artifact: Optional[Path] = None
     training_source_labels: Optional[Path] = None
     pool_miss_development_reference: Optional[Path] = None
-    label_semantics: Literal["unknown", "natural"] = "unknown"
+    label_semantics: Literal["unknown", "natural", "benchmark_pool"] = "unknown"
     ranking_scale: Literal["joint_accept_probability"] = Field(
         "joint_accept_probability", description="Common scale for real candidates and NIL."
     )
