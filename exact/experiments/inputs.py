@@ -105,3 +105,112 @@ def research_partitions(
         role: reference.loc[reference[group_column].astype(str).isin(selected)].copy()
         for role, selected in bounds.items()
     }
+
+
+BIOML_LOCAL_CONTRACT = {
+    "url": "https://bio-ml.oaei-ml.org/tasks/local/",
+    "repository": "https://github.com/liseda-lab/OAEI-Bio-ML",
+    "revision": "ec436a97f49875227dedf634faa5280b1376bda9",
+    "path": "tasks/local/ranking_task_index.md",
+    "sha256": "882c59e3788bd93a9d529a24389179ebef1feccfd4fd083d7ea40c8981e32de5",
+    "interpretation": "provided local-ranking distractors are benchmark negatives; no ontology-wide completeness claim",
+}
+
+
+def prepare_confirmed_bioml_training(
+    path: Path,
+    destination: Path,
+    *,
+    dataset_revision: str,
+    reporting_sources: Iterable[str] = (),
+) -> dict[str, Any]:
+    """Convert the official gold-bearing train pool under its explicit distractor contract.
+
+    This is deliberately separate from generic pool preparation: unlabeled or
+    generated candidates never acquire negative labels through this function.
+    All known alternative train positives override every query's distractors.
+    """
+    from exact.utils.fitted_artifacts import freeze_json
+
+    path = Path(path)
+    if path.name != "local.train.cands.tsv":
+        raise ValueError("Confirmed BioML conversion accepts only local.train.cands.tsv")
+    if len(dataset_revision) != 40 or any(c not in "0123456789abcdef" for c in dataset_revision):
+        raise ValueError("An immutable official dataset revision is required")
+    frame = pd.read_csv(path, sep="\t", dtype=str, keep_default_na=False)
+    if not {"SrcEntity", "TgtEntity", "TgtCandidates"}.issubset(frame.columns):
+        raise ValueError("Official train pools need source, gold and candidate columns")
+    reporting = set(map(str, reporting_sources))
+    if set(frame.SrcEntity) & reporting:
+        raise ValueError("Official train pools overlap frozen reporting source groups")
+    positives: set[tuple[str, str]] = set()
+    candidates: set[tuple[str, str]] = set()
+    for row in frame.itertuples(index=False):
+        pool = ast.literal_eval(row.TgtCandidates)
+        if (
+            not row.SrcEntity
+            or not row.TgtEntity
+            or not isinstance(pool, (list, tuple))
+            or not pool
+            or not all(isinstance(target, str) and target for target in pool)
+            or row.TgtEntity not in pool
+        ):
+            raise ValueError(
+                "Every train query needs a nonempty gold target inside its candidate pool"
+            )
+        positives.add((row.SrcEntity, row.TgtEntity))
+        candidates.update((row.SrcEntity, target) for target in pool)
+    if not positives:
+        raise ValueError("Official training pool has no labeled queries")
+    rows = [
+        (source, target, int((source, target) in positives))
+        for source, target in sorted(candidates)
+    ]
+    destination = Path(destination)
+    destination.mkdir(parents=True, exist_ok=True)
+    outputs = {
+        "candidates": destination / "train.confirmed.candidates.tsv",
+        "reference": destination / "train.local.reference.tsv",
+    }
+    tables = {
+        "candidates": pd.DataFrame(rows, columns=["Src", "Tgt", "confirmed_label"]),
+        "reference": pd.DataFrame(
+            [(source, target, "=", 1.0) for source, target in sorted(positives)],
+            columns=["SrcEntity", "TgtEntity", "Relation", "Score"],
+        ),
+    }
+    for name, table in tables.items():
+        encoded = table.to_csv(sep="\t", index=False)
+        file = outputs[name]
+        if file.exists() and file.read_text() != encoded:
+            raise ValueError(f"Confirmed training input identity conflict: {file}")
+        if not file.exists():
+            temporary = file.with_suffix(file.suffix + ".partial")
+            temporary.write_text(encoded)
+            temporary.replace(file)
+    record = {
+        "schema_version": 1,
+        "transformation": "official_bioml_train_distractors_v1",
+        "role": "train",
+        "dataset": "OAEI-ML/bio-ml",
+        "dataset_revision": dataset_revision,
+        "input_sha256": sha256_file(path),
+        "official_contract": BIOML_LOCAL_CONTRACT,
+        "reference_basis": "standard_unrepaired_local_equivalence",
+        "reference_completeness": "known_incomplete",
+        "negative_policy": "confirmed_only",
+        "negative_scope": "provided_training_candidate_pairs_only",
+        "positive_policy": "union_all_gold_alternatives_per_source_before_assigning_negatives",
+        "sources": int(frame.SrcEntity.nunique()),
+        "original_query_rows": len(frame),
+        "positive_pairs": len(positives),
+        "confirmed_negative_pairs": len(candidates - positives),
+        "reporting_source_overlap": 0,
+        "reporting_sources_checked": len(reporting),
+        "outputs": {
+            name: {"path": str(file.resolve()), "sha256": sha256_file(file)}
+            for name, file in outputs.items()
+        },
+    }
+    freeze_json(destination / "train.confirmed.inputs.json", record)
+    return record
