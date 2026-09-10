@@ -8,6 +8,7 @@ import math
 from pathlib import Path
 
 from exact.utils.fitted_artifacts import fingerprint, freeze_json
+from exact.utils.provenance import dataset_signature_for_paths, sha256_file
 
 
 def transfer_feature_contract(config):
@@ -31,6 +32,13 @@ def transfer_feature_contract(config):
             "channels": config.matching.channels.model_dump(mode="json"),
             "fusion": config.matching.fusion.model_dump(mode="json"),
             "llm": config.llm.model_dump(mode="json"),
+            "llm_profiles": {
+                key: value.model_dump(mode="json") for key, value in config.llm_profiles.items()
+            },
+            "llm_routing": config.llm_routing.model_dump(mode="json"),
+            "dataset": config.dataset.model_dump(mode="json"),
+            "score_calibration": config.matching.calibration.model_dump(mode="json"),
+            "selector": config.selector.model_dump(mode="json"),
         }
     )
 
@@ -58,6 +66,7 @@ def freeze_transfer_manifest(
     feature_contract,
     score_threshold,
     entity_kinds=("class",),
+    application_provenance=None,
 ):
     """Select immutable donor artifacts before recipient scoring; paths are exact, hashes authoritative."""
     if not recipient_signature or not feature_contract or not math.isfinite(score_threshold):
@@ -85,6 +94,8 @@ def freeze_transfer_manifest(
             entries[kind]["accept_threshold"] = payload["accept_threshold"]
     if not entries:
         raise ValueError("Transfer requires at least one frozen donor head")
+    if len({entry["donor_dataset_signature"] for entry in entries.values()}) != 1:
+        raise ValueError("Transfer heads must share the selected donor ontology pair")
     return freeze_json(
         path,
         {
@@ -97,6 +108,7 @@ def freeze_transfer_manifest(
             "score_threshold": float(score_threshold),
             "recipient_refit": False,
             "supervision_label": "cross_pair_transfer",
+            "application_provenance": application_provenance or {},
         },
     )
 
@@ -106,6 +118,14 @@ def validate_transfer(dataset):
     if path is None:
         return None
     manifest = json.loads(Path(path).read_text())
+    if manifest.get("kind") == "cross_pair_transfer_bundle":
+        binding = manifest.get("applications", {}).get(getattr(dataset, "dataset_signature", None))
+        if not binding:
+            raise ValueError("Transfer bundle has no frozen recipient application binding")
+        application_path = Path(binding["path"])
+        if sha256_file(application_path) != binding["sha256"]:
+            raise ValueError("Transfer application manifest hash mismatch")
+        manifest = json.loads(application_path.read_text())
     if (
         manifest.get("schema_version") != 1
         or manifest.get("kind") != "cross_pair_transfer"
@@ -122,6 +142,13 @@ def validate_transfer(dataset):
     threshold = getattr(dataset, "transfer_score_threshold", None)
     if threshold is None or abs(float(threshold) - manifest["score_threshold"]) > 1e-12:
         raise ValueError("Transfer requires the unchanged fixed donor score threshold")
+    population = manifest.get("application_provenance", {}).get("recipient_population")
+    if population and sha256_file(Path(population["path"])) != population["sha256"]:
+        raise ValueError("Transfer recipient population changed after application binding")
+    for side in ("donor_inputs", "recipient_inputs"):
+        for entry in manifest.get("application_provenance", {}).get(side, {}).values():
+            if sha256_file(Path(entry["path"])) != entry["sha256"]:
+                raise ValueError("Transfer ontology content changed after application binding")
     for entry in manifest["artifacts"].values():
         if hashlib.sha256(Path(entry["path"]).read_bytes()).hexdigest() != entry["sha256"]:
             raise ValueError("Transferred donor artifact hash mismatch")
@@ -143,3 +170,32 @@ def validate_transferred_artifact(dataset, path, *, kind, features, score_thresh
     ):
         raise ValueError("Transfer cannot adapt the donor decision threshold")
     return True
+
+
+def validate_transfer_config(config):
+    """Validate the exact consumer configuration before constructing a dataset."""
+    from types import SimpleNamespace
+
+    if config.data.source is None or config.data.target is None:
+        raise ValueError("Transfer requires explicitly bound recipient ontology paths")
+    dataset = SimpleNamespace(
+        transfer_artifact=config.supervision.transfer_artifact,
+        dataset_signature=dataset_signature_for_paths(config.data.source, config.data.target),
+        transfer_feature_contract=transfer_feature_contract(config),
+        transfer_score_threshold=config.matching.threshold,
+        _entity_kinds=config.matching.entity_kinds,
+    )
+    manifest = validate_transfer(dataset)
+    if manifest is None:
+        raise ValueError("Cross-pair transfer requires its bound immutable donor manifest")
+    active = {
+        "selector": config.selector.rerank.artifact,
+        "fusion": config.matching.fusion.artifact,
+        "calibration": config.matching.calibration.artifact,
+    }
+    if set(manifest["artifacts"]) != {key for key, value in active.items() if value is not None}:
+        raise ValueError("Transfer active fitted heads differ from its frozen donor manifest")
+    for kind, entry in manifest["artifacts"].items():
+        if Path(active[kind]).resolve() != Path(entry["path"]).resolve():
+            raise ValueError("Transfer active artifact path differs from its frozen donor manifest")
+    return manifest
