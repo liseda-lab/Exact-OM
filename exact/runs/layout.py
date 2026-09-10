@@ -106,6 +106,11 @@ class RunLayout:
         return self.explanations_dir / "index.json"
 
     @property
+    def source_decisions_path(self) -> Path:
+        """Return the frozen source-level decision audit artifact."""
+        return self.root / "source_decisions.json"
+
+    @property
     def full_explanations_path(self) -> Path:
         if self.version == LAYOUT_VERSION:
             return self.explanations_dir / "full_explanations.json"
