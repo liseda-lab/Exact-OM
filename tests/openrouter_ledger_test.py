@@ -172,3 +172,55 @@ def test_experiment_mode_disables_profile_fallback_and_checks_response_identity(
     with pytest.raises(RuntimeError, match="model identity"):
         call(client, profile)
     assert json.loads(captured[0]["content"])["provider"]["allow_fallbacks"] is False
+
+
+def test_request_budget_stops_before_wire_but_allows_cached_replay(tmp_path, monkeypatch):
+    client, profile = setup_client(tmp_path, monkeypatch)
+    monkeypatch.setenv("EXACT_OPENROUTER_REQUEST_CAP", "1")
+    monkeypatch.setenv("EXACT_OPENROUTER_TOKEN_CAP", "10000")
+    calls = []
+    raw = {
+        "model": profile.model,
+        "choices": [],
+        "usage": {"prompt_tokens": 7, "completion_tokens": 1},
+    }
+    monkeypatch.setattr(client._client, "request", lambda **kw: calls.append(kw) or response(raw))
+    assert call(client, profile) == raw
+    assert call(client, profile) == raw
+    with pytest.raises(ValueError, match="request budget exhausted before transmission"):
+        call(client, profile, temperature=0.7)
+    assert len(calls) == 1
+
+
+def test_unknown_delivery_keeps_reserved_tokens_and_concurrent_claims_share_cap(
+    tmp_path, monkeypatch
+):
+    from concurrent.futures import ThreadPoolExecutor
+
+    monkeypatch.setenv("EXACT_OPENROUTER_REQUEST_CAP", "1")
+    monkeypatch.setenv("EXACT_OPENROUTER_TOKEN_CAP", "10000")
+    ledger = RequestLedger(tmp_path)
+    keys = [
+        ledger.plan({"payload": {"max_tokens": 5, "messages": [{"content": str(i)}]}})
+        for i in range(2)
+    ]
+
+    def claim(key):
+        try:
+            return key, ledger.sent(key)
+        except ValueError:
+            return key, None
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(claim, keys))
+    assert sum(number is not None for _, number in results) == 1
+    key, number = next(row for row in results if row[1] is not None)
+    ledger.unknown(key, number, "test ambiguous transmission")
+    with sqlite3.connect(ledger.path) as db:
+        reserved = db.execute("SELECT tokens FROM reservations").fetchone()[0]
+    monkeypatch.setenv("EXACT_OPENROUTER_REQUEST_CAP", "2")
+    monkeypatch.setenv("EXACT_OPENROUTER_TOKEN_CAP", str(reserved + 1))
+    with pytest.raises(ValueError, match="token budget exhausted before transmission"):
+        ledger.sent(key, retry_unknown=True)
+    with sqlite3.connect(ledger.path) as db:
+        assert db.execute("SELECT COUNT(*) FROM attempts").fetchone()[0] == 1

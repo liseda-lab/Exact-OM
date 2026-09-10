@@ -35,6 +35,10 @@ class RequestLedger:
                 CREATE TABLE IF NOT EXISTS requests (
                     request_id TEXT PRIMARY KEY, identity TEXT NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS reservations (
+                    request_id TEXT NOT NULL, number INTEGER NOT NULL, tokens INTEGER NOT NULL,
+                    PRIMARY KEY(request_id, number)
+                );
                 CREATE TABLE IF NOT EXISTS attempts (
                     request_id TEXT NOT NULL, number INTEGER NOT NULL, state TEXT NOT NULL,
                     pid INTEGER NOT NULL, host TEXT NOT NULL, status INTEGER,
@@ -102,6 +106,40 @@ class RequestLedger:
                         "Unknown paid request; explicit retry authorization is required"
                     )
             number = int(last["number"]) + 1 if last else 1
+            request_cap = os.getenv("EXACT_OPENROUTER_REQUEST_CAP")
+            token_cap = os.getenv("EXACT_OPENROUTER_TOKEN_CAP")
+            if request_cap or token_cap:
+                rows = db.execute(
+                    "SELECT a.usage,r.tokens FROM attempts a LEFT JOIN reservations r USING(request_id,number)"
+                ).fetchall()
+                if request_cap and len(rows) + 1 > int(request_cap):
+                    raise ValueError("OpenRouter request budget exhausted before transmission")
+                identity = json.loads(
+                    db.execute(
+                        "SELECT identity FROM requests WHERE request_id=?", (key,)
+                    ).fetchone()[0]
+                )
+                payload = identity.get("payload", {})
+                if not payload.get("max_tokens"):
+                    raise ValueError("Budgeted hosted requests need a finite max_tokens bound")
+                # UTF-8 bytes bound text token counts conservatively; include framing overhead.
+                reserved = (
+                    len(json.dumps(payload, ensure_ascii=False).encode())
+                    + 256
+                    + int(payload["max_tokens"])
+                )
+                used = 0
+                for row in rows:
+                    usage = json.loads(row["usage"] or "{}")
+                    if "prompt_tokens" in usage and "completion_tokens" in usage:
+                        used += int(usage["prompt_tokens"]) + int(usage["completion_tokens"])
+                    elif row["tokens"] is not None:
+                        used += int(row["tokens"])
+                    else:
+                        raise ValueError("Existing unpriced request lacks a retained token bound")
+                if token_cap and used + reserved > int(token_cap):
+                    raise ValueError("OpenRouter token budget exhausted before transmission")
+                db.execute("INSERT INTO reservations VALUES (?,?,?)", (key, number, reserved))
             db.execute(
                 "INSERT INTO attempts(request_id,number,state,pid,host) VALUES (?,?,?,?,?)",
                 (key, number, "sent", os.getpid(), socket.gethostname()),
