@@ -1,8 +1,8 @@
 """Recovery exercised through harness control flow and the real scorer cache seam."""
 
+import json
 from collections import OrderedDict
 from dataclasses import replace
-import json
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -114,12 +114,19 @@ def test_harness_docs_relocation_and_evaluator_repair_make_no_new_model_calls(
 ):
     cell, suite, revision = fixture(tmp_path, monkeypatch)
     model_calls = []
+    monkeypatch.delenv("OMP_NUM_THREADS", raising=False)
+    monkeypatch.setenv("MKL_NUM_THREADS", "7")
 
     def run(command, **kwargs):
         model_calls.append(command)
         assert kwargs["env"]["EXACT_EXPERIMENT_MODE"] == "1"
+        assert kwargs["env"]["OMP_NUM_THREADS"] == "2"
+        assert kwargs["env"]["MKL_NUM_THREADS"] == "7"
         output = Path(yaml.safe_load(Path(command[-1]).read_text())["job"]["output_dir"])
         write_outputs(output, cell)
+        (output / "fitting").mkdir()
+        (output / "fitting/training_units.json").write_text('{"units": 4}')
+        (output / "source_decisions.json").write_text('{"schema_version": 2}')
         return 0, 0.1, None
 
     monkeypatch.setattr(harness, "_run_subprocess", run)
@@ -135,6 +142,10 @@ def test_harness_docs_relocation_and_evaluator_repair_make_no_new_model_calls(
     replay = harness.execute_cell(moved, suite, workdir=tmp_path, resume=True)
     assert replay["status"] == "complete"
     assert len(model_calls) == 1
+    assert json.loads((moved.output_dir / "fitting/training_units.json").read_text()) == {
+        "units": 4
+    }
+    assert (moved.output_dir / "source_decisions.json").is_file()
     assert replay["recovery"]["reused_stages"] == ["evaluation", "extraction", "inputs"]
     revision["evaluation"] = "evaluator-bug-fixed"
     repaired = harness.execute_cell(
@@ -404,3 +415,94 @@ def test_experiment_verbalization_errors_do_not_become_silent_text_fallback(monk
     monkeypatch.setenv("EXACT_EXPERIMENT_MODE", "1")
     with pytest.raises(AssertionError, match="forbidden generation"):
         scorer._verbalize_object_items([{"triple": ("a", "r", "b")}])
+
+
+def test_relocation_keeps_original_inference_cost_not_cache_replay_wall(tmp_path, monkeypatch):
+    cell, suite, _ = fixture(tmp_path, monkeypatch)
+    timing = {
+        "sessions": [
+            {
+                "stages": [
+                    {"stage": "Total", "seconds": 500},
+                    {"stage": "Dataset.Process", "seconds": 3},
+                    {"stage": "Alignment.Fitting", "seconds": 400},
+                    {"stage": "Alignment.Inference", "seconds": 5},
+                    {"stage": "Alignment.PostInference", "seconds": 2},
+                    {"stage": "Postprocess.Evaluation", "seconds": 10},
+                ]
+            }
+        ]
+    }
+
+    def run(command, **kwargs):
+        write_outputs(cell.output_dir, cell)
+        (cell.output_dir / "timings.json").write_text(json.dumps(timing))
+        return 0, 500, 1
+
+    monkeypatch.setattr(harness, "_run_subprocess", run)
+    original = harness.execute_cell(cell, suite, workdir=tmp_path, resume=False)
+    relocated = replace(
+        cell,
+        output_dir=tmp_path / "relocated/run",
+        recovery={"root": str(tmp_path / "relocated"), "resume_from": str(tmp_path / "campaign")},
+    )
+    monkeypatch.setattr(
+        harness, "_run_subprocess", lambda *args, **kwargs: pytest.fail("replay ran a model")
+    )
+    replay = harness.execute_cell(relocated, suite, workdir=tmp_path, resume=True)
+    assert original["inference_seconds"] == replay["inference_seconds"] == 10
+    assert replay["wall_seconds"] < original["wall_seconds"]
+    assert json.loads((relocated.output_dir / "timings.json").read_text()) == timing
+
+
+def test_published_comparator_uses_shared_recovery_and_replays_full_population_across_seeds(
+    tmp_path, monkeypatch
+):
+    from exact.experiments import published_matcher
+
+    cell, suite, revision = fixture(tmp_path, monkeypatch)
+    binding = {
+        "matcher": "logmap",
+        "bundle": {"path": "/declared/bundle", "sha256": "a" * 64},
+        "jar": "logmap.jar",
+        "timeout_seconds": 30,
+        "java_heap_gb": 1,
+        "java_threads": 1,
+    }
+    cell = replace(cell, published_matcher=binding, seed=17)
+    calls = []
+
+    def run(current):
+        calls.append(current.seed)
+        write_outputs(current.output_dir, current)
+        (current.output_dir / "published").mkdir()
+        (current.output_dir / "published/raw.rdf").write_text("immutable external predictions")
+        (current.output_dir / "evaluation_inputs").mkdir()
+        (current.output_dir / "evaluation_inputs/reference.tsv").write_text("canonical reference")
+        return 0, 1, 2
+
+    monkeypatch.setattr(published_matcher, "run_cell", run)
+    monkeypatch.setattr(
+        harness,
+        "_run_subprocess",
+        lambda *args, **kwargs: pytest.fail("published comparator invoked Exact model runner"),
+    )
+    first = harness.execute_cell(cell, suite, workdir=tmp_path, resume=False)
+    assert first["status"] == "complete"
+    second_cell = replace(cell, seed=29, output_dir=tmp_path / "campaign/second")
+    second = harness.execute_cell(second_cell, suite, workdir=tmp_path, resume=False)
+    assert second["recovery"]["artifacts"] == first["recovery"]["artifacts"]
+    assert calls == [17]
+    assert (
+        second_cell.output_dir / "published/raw.rdf"
+    ).read_text() == "immutable external predictions"
+    assert (second_cell.output_dir / "evaluation_inputs/reference.tsv").is_file()
+    revision["evaluation"] = "fixed-evaluator"
+    evaluated = []
+    monkeypatch.setattr(
+        published_matcher, "evaluate_cell", lambda current: evaluated.append(current.seed)
+    )
+    repaired = harness.execute_cell(second_cell, suite, workdir=tmp_path, resume=True)
+    assert repaired["status"] == "complete"
+    assert evaluated == [29]
+    assert calls == [17]

@@ -444,8 +444,8 @@ def node_profile(path: Path) -> dict[str, Any]:
 
 def validate_baseline(lock: CampaignLock, root: Path) -> Any:
     """Bind R_v2 to its frozen configuration and unchanged historical R_0 parent."""
-    from exact.experiments.schema import load_baseline
     from exact.experiments.harness import _assert_experiment_flags_disabled
+    from exact.experiments.schema import load_baseline
 
     if lock.baseline_manifest is None:
         raise ValueError("R_v2 baseline manifest with historical parent R_0 is missing")
@@ -493,6 +493,15 @@ def campaign_plan(path: Path, *, stage: str, verify_inputs: bool = True) -> dict
         raise ValueError("public stages are screen and confirm")
     lock, blueprint = load_campaign(path)
     root = path.resolve().parent
+    verified: set[tuple[Path, str]] = set()
+
+    def verify(binding: InputBinding) -> None:
+        location = (root / binding.path).resolve()
+        identity = (location, binding.sha256)
+        if identity not in verified:
+            binding.verify(root)
+            verified.add(identity)
+
     try:
         validate_baseline(lock, root)
         baseline_error = None
@@ -520,7 +529,7 @@ def campaign_plan(path: Path, *, stage: str, verify_inputs: bool = True) -> dict
                     input_errors.append(f"{case_id}: {name} binding missing")
                 elif verify_inputs and stage == "screen":
                     try:
-                        binding.verify(root)
+                        verify(binding)
                     except (OSError, ValueError) as exc:
                         input_errors.append(str(exc))
             role = "test" if stage == "confirm" else "valid"
@@ -545,7 +554,7 @@ def campaign_plan(path: Path, *, stage: str, verify_inputs: bool = True) -> dict
             ):
                 if verify_inputs and stage == "screen":
                     try:
-                        binding.verify(root)
+                        verify(binding)
                     except (OSError, ValueError) as exc:
                         input_errors.append(str(exc))
         if step.estimate:
@@ -559,7 +568,7 @@ def campaign_plan(path: Path, *, stage: str, verify_inputs: bool = True) -> dict
             if verify_inputs and stage == "screen":
                 for binding in step.arm_inputs.get(arm.id, {}).values():
                     try:
-                        binding.verify(root)
+                        verify(binding)
                     except (OSError, ValueError) as exc:
                         issues.append(str(exc))
             if baseline_error:
@@ -1289,22 +1298,31 @@ def freeze_final_selection(path: Path, selection_path: Path, destination: Path) 
         if step.seeds != [17, 29, 43] or step.source_cap is not None:
             raise ValueError("final recipes require full populations and paired seeds 17,29,43")
         arm_ids = {arm.id for arm in step.arms}
-        if not {"baseline", "stack_all"}.issubset(arm_ids):
+        published_only = all(arm.published_matcher for arm in step.arms)
+        if published_only and (
+            step.execution_modes != ["global_alignment"] or any(arm.overlay for arm in step.arms)
+        ):
+            raise ValueError("published comparator must retain its unmodified global-only recipe")
+        if not published_only and not {"baseline", "stack_all"}.issubset(arm_ids):
             raise ValueError("every final case requires baseline and stack_all")
         if (
-            main.get("supervision", {}).get("mode") not in {None, "label_free"}
-            or any(
-                value != "label_free"
-                for value in main.get("supervision", {}).get("components", {}).values()
+            (
+                main.get("supervision", {}).get("mode") not in {None, "label_free"}
+                or any(
+                    value != "label_free"
+                    for value in main.get("supervision", {}).get("components", {}).values()
+                )
             )
-        ) and "label_free" not in arm_ids:
+            and "label_free" not in arm_ids
+            and not published_only
+        ):
             raise ValueError("supervised final stack requires its label-free control")
         overlays = {}
         for arm in step.arms:
             if arm.role == "oracle" or not arm.deployable or "confirm" not in arm.stages:
                 raise ValueError("final panel contains a development-only arm")
             composed = dict(main)
-            if arm.id == "baseline":
+            if arm.id == "baseline" or arm.published_matcher:
                 composed = {}
             elif arm.id.startswith("stack_minus_"):
                 component = arm.id.removeprefix("stack_minus_")
@@ -1326,6 +1344,9 @@ def freeze_final_selection(path: Path, selection_path: Path, destination: Path) 
         panel[step.id] = {
             "status": "selected",
             "arms": overlays,
+            "published_matchers": {
+                arm.id: arm.published_matcher for arm in step.arms if arm.published_matcher
+            },
             "cases": cases,
             "design": step.design.model_dump(mode="json"),
             "seeds": step.seeds,
@@ -1390,8 +1411,10 @@ def validate_final_selection(record: Mapping[str, Any], suite: Any) -> dict[str,
         step = steps[config.experiment_id]
         panel = value["experiments"][config.experiment_id]
         actual = {arm.id: arm.overlay for arm in config.arms}
-        if panel["arms"] != actual:
-            raise ValueError("final treatment changed after G4")
+        if panel["arms"] != actual or panel.get("published_matchers", {}) != {
+            arm.id: arm.published_matcher for arm in config.arms if arm.published_matcher
+        }:
+            raise ValueError("final treatment or published matcher changed after G4")
         if (
             config.confirm.source_cap is not None
             or config.confirm.seeds != [17, 29, 43]

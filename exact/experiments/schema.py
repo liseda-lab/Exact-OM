@@ -247,6 +247,7 @@ class ArmConfig(StrictConfigModel):
     stages: List[StageName] = Field(default_factory=_default_arm_stages)
     resource: Optional[ResourceConfig] = None
     required_control: bool = False
+    published_matcher: Optional[Dict[str, Any]] = None
     deployable: bool = True
     supervision_label: Optional[
         Literal[

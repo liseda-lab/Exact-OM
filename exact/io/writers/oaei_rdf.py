@@ -101,11 +101,17 @@ def read_alignment(path: Path) -> pd.DataFrame:
 
     root = ET.parse(path).getroot()
     records: list[dict[str, Any]] = []
-    for cell in root.findall(f".//{_tag('Cell')}"):
-        entity1 = cell.find(_tag("entity1"))
-        entity2 = cell.find(_tag("entity2"))
-        measure = cell.find(_tag("measure"))
-        relation = cell.find(_tag("relation"))
+    cells = [
+        cell
+        for namespace in (ALIGN_NS, ALIGN_NS + "#")
+        for cell in root.findall(f".//{{{namespace}}}Cell")
+    ]
+    for cell in cells:
+        namespace = cell.tag.rsplit("}", 1)[0] + "}"
+        entity1 = cell.find(namespace + "entity1")
+        entity2 = cell.find(namespace + "entity2")
+        measure = cell.find(namespace + "measure")
+        relation = cell.find(namespace + "relation")
         if entity1 is None or entity2 is None or measure is None:
             raise WriterOptionsError(f"Malformed Alignment Cell in {path}")
         source = entity1.get(f"{{{RDF_NS}}}resource")

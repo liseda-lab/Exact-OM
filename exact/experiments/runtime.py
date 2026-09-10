@@ -39,7 +39,7 @@ def _files(root: Path, directories: Sequence[str]) -> dict[str, Path]:
     return {
         path.relative_to(root).as_posix(): path
         for name in directories
-        for path in (root / name).rglob("*")
+        for path in ([root / name] if (root / name).is_file() else (root / name).rglob("*"))
         if path.is_file() and not path.name.endswith(".tmp") and not path.name.startswith(".")
     }
 
@@ -133,6 +133,7 @@ class CellRecovery:
                         "extra_headers",
                     }
                     and (key != "refs" or k in {"train", "training"})
+                    and not (k == "seed" and cell.published_matcher and cell.source_cap is None)
                 }
             if isinstance(value, list):
                 return [normalise(item) for item in value]
@@ -145,6 +146,8 @@ class CellRecovery:
             return value
 
         parameters = normalise(cell.resolved_config)
+        if cell.published_matcher:
+            parameters["published_matcher"] = normalise(cell.published_matcher)
         evaluation_options = parameters.pop("evaluation", {})
         parameters.update(
             source_cap=cell.source_cap,
@@ -155,7 +158,7 @@ class CellRecovery:
         common = dict(
             role=cell.split_role,
             entity_kind=str(cell.resolved_config.get("entity_kind", "all")),
-            seed=cell.seed,
+            seed=None if cell.published_matcher and cell.source_cap is None else cell.seed,
         )
         self.identities = {}
         self.identities["inputs"] = stage_identity(
@@ -277,6 +280,12 @@ class CellRecovery:
                 "dataset",
                 "cache",
                 "evaluation",
+                "timings.json",
+                "source_decisions.json",
+                "published",
+                "evaluation_inputs",
+                "fitting",
+                "diagnostics",
             ):
                 current = self.cell.output_dir / name
                 if current.exists():
@@ -313,6 +322,10 @@ class CellRecovery:
         }
         return {
             **budget,
+            **{
+                name: os.environ.get(name, "2")
+                for name in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS")
+            },
             "EXACT_EXPERIMENT_MODE": "1",
             "EXACT_EXPERIMENT_RUNTIME": str(self.cell.output_dir / "recovery-runtime.json"),
             "EXACT_OPENROUTER_LEDGER_DIR": str(self.store.root / "openrouter"),
@@ -323,6 +336,11 @@ class CellRecovery:
 
     def evaluate(self) -> None:
         """Execute the existing evaluator directly, without loading any scoring model."""
+        if self.cell.published_matcher:
+            from exact.experiments.published_matcher import evaluate_cell
+
+            evaluate_cell(self.cell)
+            return
         from exact.core.actions.evaluation import run_evaluation
 
         data = self.cell.resolved_config.get("data") or {}
@@ -367,7 +385,21 @@ class CellRecovery:
         artifacts = {}
         if status == "complete":
             for stage, directories in (
-                ("extraction", ("alignment", "dataset", "explanations", "stats")),
+                (
+                    "extraction",
+                    (
+                        "alignment",
+                        "dataset",
+                        "explanations",
+                        "stats",
+                        "timings.json",
+                        "published",
+                        "evaluation_inputs",
+                        "fitting",
+                        "diagnostics",
+                        "source_decisions.json",
+                    ),
+                ),
                 ("evaluation", ("evaluation",)),
             ):
                 if stage not in self.reuse:
@@ -419,7 +451,17 @@ def runtime_checkpoint(runner: Any, checkpoint_path: Path, processed: int) -> No
     ]
     if len(ids) != processed or len(set(ids)) != len(ids):
         raise ValueError("Inference checkpoint cannot establish unique completed sample IDs")
-    outputs = _files(root, ("checkpoints", "explanations", "dataset"))
+    outputs = _files(
+        root,
+        (
+            "checkpoints",
+            "explanations",
+            "dataset",
+            "fitting",
+            "timings.json",
+            "source_decisions.json",
+        ),
+    )
     outputs[checkpoint_path.relative_to(root).as_posix()] = checkpoint_path
     ArtifactStore(Path(runtime["root"])).checkpoint(
         runtime["identity"],

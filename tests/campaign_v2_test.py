@@ -451,6 +451,7 @@ def _ready_suite(tmp_path, *, composition=False, plan_only=False):
 
 def _fake_model_run(command, **kwargs):
     import json
+
     from exact.core.actions.evaluation import run_evaluation
 
     wrapper = yaml.safe_load(Path(command[-1]).read_text())["job"]
@@ -509,6 +510,7 @@ def test_shared_stage_retains_partial_selection_and_resumes_current_artifacts(
     tmp_path, monkeypatch
 ):
     import json
+
     from exact.experiments import harness
 
     suite = _ready_suite(tmp_path)
@@ -558,6 +560,7 @@ def test_shared_stage_composition_uses_resolved_source_and_exact_expected_cells(
     tmp_path, monkeypatch
 ):
     import json
+
     from exact.experiments import harness
 
     suite = _ready_suite(tmp_path, composition=True)
@@ -614,7 +617,10 @@ def test_baseline_guard_keeps_historical_parent_and_frozen_bytes(tmp_path):
 
 
 def test_training_encoder_locks_cover_only_active_training_models():
-    from exact.experiments.harness import _bind_model_lock_revisions, _configured_model_ids
+    from exact.experiments.harness import (
+        _bind_model_lock_revisions,
+        _configured_model_ids,
+    )
 
     config = {
         "candidates": {
@@ -634,6 +640,7 @@ def test_training_encoder_locks_cover_only_active_training_models():
 def test_diagnostic_only_comparison_completes_without_promoting_controls(tmp_path, monkeypatch):
     import json
     from dataclasses import replace
+
     from exact.experiments import harness
 
     suite = _ready_suite(tmp_path)
@@ -676,6 +683,7 @@ def test_diagnostic_only_comparison_completes_without_promoting_controls(tmp_pat
 
 def test_component_exports_retain_fusion_ranker_and_judge_without_shared_controls(tmp_path):
     from dataclasses import replace
+
     from exact.experiments import harness
     from exact.experiments.schema import ArmConfig
 

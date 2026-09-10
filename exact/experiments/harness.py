@@ -271,6 +271,7 @@ class RunCell:
     resolved_supervision: dict[str, Any]
     negative_label_policy: str
     recovery: Optional[dict[str, Any]] = None
+    published_matcher: Optional[dict[str, Any]] = None
 
     @property
     def manifest_path(self) -> Path:
@@ -1559,6 +1560,13 @@ def build_cells(
                 validated = ConfigModel.from_mapping(resolved, warn_v1=False)
                 resolved = validated.model_dump(mode="json", by_alias=True)
                 config_hash = validated.fingerprint()
+                if arm.published_matcher:
+                    from exact.experiments.published_matcher import validate_binding
+
+                    binding = validate_binding(arm.published_matcher)
+                    config_hash = hash_payload(
+                        {"config": config_hash, "published_matcher": binding}
+                    )
                 resource_config = arm.resource or config.resource
                 output_dir = (
                     Path(output_root).expanduser().resolve()
@@ -1594,6 +1602,7 @@ def build_cells(
                         resolved_supervision=supervision,
                         negative_label_policy=config.negative_label_policy,
                         recovery=suite.campaign,
+                        published_matcher=arm.published_matcher,
                     )
                 )
     return cells
@@ -2054,7 +2063,10 @@ def _provenance_payload(
         "candidate_pool_design_hash": candidate_design_hash,
         "artifacts": artifacts,
         "models": _model_identities(cell.resolved_config),
-        "llm_required": _llm_runtime_required(cell.resolved_config),
+        "published_matcher": cell.published_matcher,
+        "llm_required": (
+            False if cell.published_matcher else _llm_runtime_required(cell.resolved_config)
+        ),
         "supervision": cell.resolved_supervision,
         "supervision_label": cell.supervision_label,
         "negative_label_policy": cell.negative_label_policy,
@@ -2133,6 +2145,7 @@ def _prepare_cell(
         "reference_completeness": cell.reference_completeness,
         "seed": cell.seed,
         "source_cap": cell.source_cap,
+        "execution_mode": cell.resolved_config.get("data", {}).get("execution_mode"),
         "resource": cell.resource,
         "resolved_config_hash": cell.config_hash,
         "experiment_config_hash": cell.experiment_config_hash,
@@ -2224,6 +2237,32 @@ def _read_optional_json(path: Path) -> Optional[dict[str, Any]]:
     return value if isinstance(value, dict) else None
 
 
+def _inference_seconds(timing: Optional[Mapping[str, Any]]) -> Optional[float]:
+    """Sum nonoverlapping recorded inference stages, retaining work across resumes."""
+    names = {
+        "Dataset.LoadOntologies",
+        "Dataset.LoadCandidates",
+        "Dataset.Process",
+        "Alignment.Inference",
+        "Inference",
+        "Alignment.PostInference",
+        "Alignment.Prefilter",
+        "Postprocess.Rationales",
+        "Postprocess.Outputs",
+    }
+    stages = [
+        stage
+        for session in (timing or {}).get("sessions", [])
+        for stage in session.get("stages", [])
+    ]
+    if not any(stage.get("stage") in {"Alignment.Inference", "Inference"} for stage in stages):
+        return None
+    values = [float(stage["seconds"]) for stage in stages if stage.get("stage") in names]
+    if any(not math.isfinite(value) or value < 0 for value in values):
+        raise ValueError("Inference timing contains invalid stage durations")
+    return sum(values)
+
+
 def _post_run_provenance(cell: RunCell) -> dict[str, Any]:
     dataset_dir = cell.output_dir / "dataset"
     sampled_pool_path = dataset_dir / "candidate_pool_sample_manifest.json"
@@ -2259,6 +2298,7 @@ def _post_run_provenance(cell: RunCell) -> dict[str, Any]:
         "selection_evidence": run_stats.get("selection_evidence"),
         "observed_execution": run_stats.get("observed_execution"),
         "timing_ledger": timing,
+        "inference_seconds": _inference_seconds(timing),
         "llm_usage": llm_usage,
     }
 
@@ -2526,6 +2566,10 @@ def execute_cell(
             if "evaluation" not in recovery.reuse:
                 recovery.evaluate()
             return_code, elapsed, peak_kb = 0, time.monotonic() - started, None
+        elif cell.published_matcher:
+            from exact.experiments.published_matcher import run_cell
+
+            return_code, elapsed, peak_kb = run_cell(cell)
         else:
             runtime_options: dict[str, Any] = (
                 {"env": recovery.environment()} if recovery is not None else {}
@@ -2951,7 +2995,7 @@ def _candidate_pool_guard(
         for arm, cells in sorted(cells_by_arm.items())
     }
     tasks = sorted({task for cells in cells_by_arm.values() for task, _seed in cells})
-    if experiment_id == "E05":
+    if experiment_id in {"E05", "E12-retrieval", "G4"}:
         for arm, cells in cells_by_arm.items():
             for task in tasks:
                 values = {
@@ -2963,13 +3007,13 @@ def _candidate_pool_guard(
                     return (
                         "missing_retrieval_treatment_fingerprint",
                         fingerprints,
-                        f"E05 arm {arm!r} task {task!r} has a missing candidate-pool fingerprint",
+                        f"{experiment_id} arm {arm!r} task {task!r} has a missing candidate-pool fingerprint",
                     )
                 if len(values) != 1:
                     return (
                         "retrieval_treatment_seed_drift",
                         fingerprints,
-                        f"E05 arm {arm!r} task {task!r} changed candidate pool across seeds",
+                        f"{experiment_id} arm {arm!r} task {task!r} changed candidate pool across seeds",
                     )
         return "allowed_retrieval_treatment", fingerprints, None
     if experiment_id == "E20":
@@ -2990,6 +3034,7 @@ def _candidate_pool_guard(
     arms = set(cells_by_arm)
     e17_retrieval_treatment = experiment_id == "E17" and (
         arms == {"rolling", "stack_all"}
+        or {"baseline", "stack_all"}.issubset(arms)
         or "stack_minus_retrieval" in arms
         or any(arm.startswith("interaction_retrieval_") for arm in arms)
     )
@@ -3880,6 +3925,8 @@ def aggregate_stage(
             "task_id": manifest.get("task_id"),
             "seed": manifest.get("seed"),
             "status": manifest.get("status"),
+            "execution_mode": manifest.get("execution_mode"),
+            "inference_seconds": manifest.get("inference_seconds"),
             "supervision_label": manifest.get("supervision_label"),
             "reference_completeness": manifest.get("reference_completeness"),
             "config_hash": manifest.get("resolved_config_hash"),
@@ -4098,6 +4145,11 @@ def _metric_cells_by_arm(
     missing: list[str] = []
     for record in records:
         if record.get("experiment_id") != experiment_id:
+            continue
+        mode = record.get("execution_mode")
+        if (metric.lower().startswith("local.") and mode == "global_alignment") or (
+            metric.lower() in {"f1", "p", "r", "precision", "recall"} and mode == "local_ranking"
+        ):
             continue
         arm = str(record.get("arm_id"))
         if arms is not None and arm not in arms:
@@ -5990,7 +6042,11 @@ def run_stage(
     plan_only = bool(suite.campaign and suite.campaign.get("reuse_plan_only"))
     previous_selections: dict[str, Any] = {}
     if suite.campaign:
-        from exact.experiments.campaign import load_campaign, load_progress, write_progress
+        from exact.experiments.campaign import (
+            load_campaign,
+            load_progress,
+            write_progress,
+        )
 
         campaign_lock, _ = load_campaign(Path(suite.campaign["lock_path"]))
         if stage == "screen" and (resume or plan_only):
@@ -6236,7 +6292,10 @@ def run_stage(
         )
         _require_successful_cells(manifests, stage=stage)
         if config.experiment_id == "E00":
-            from exact.experiments.replay import ReplayValidationError, validate_e00_replay
+            from exact.experiments.replay import (
+                ReplayValidationError,
+                validate_e00_replay,
+            )
 
             replay_path = (
                 Path(output_root).expanduser().resolve()
