@@ -104,6 +104,7 @@ class SourceEvaluation:
     null_reference_sha256: Optional[str] = None
     entity_kind: Optional[str] = None
     relation: Optional[str] = None
+    source_universe_sha256: Optional[str] = None
 
     def __post_init__(self) -> None:
         if not self.reference_sha256:
@@ -134,6 +135,7 @@ class SourceEvaluation:
     def as_dict(self, *, include_sources: bool = True) -> dict[str, Any]:
         result: dict[str, Any] = {
             "reference_sha256": self.reference_sha256,
+            "source_universe_sha256": self.source_universe_sha256,
             "null_reference_sha256": self.null_reference_sha256,
             "alignment_sha256": self.alignment_sha256,
             "entity_kind": self.entity_kind,
@@ -529,6 +531,34 @@ def _validate_builtin_parity(
         )
 
 
+def _frozen_population(report_path: Path) -> tuple[set[str], Optional[str]]:
+    """Recover source membership from the verified-pool artifact, including empty groups."""
+    import hashlib
+
+    evaluation_dir = next(
+        (parent for parent in report_path.parents if parent.name == "evaluation"), None
+    )
+    if evaluation_dir is None:
+        return set(), None
+    directory = evaluation_dir.parent / "dataset"
+    for name in ("candidate_pool_sample_manifest.json", "candidate_pool_manifest.json"):
+        path = directory / name
+        if not path.is_file():
+            continue
+        sample = (_read_json_object(path).get("retrieval_config") or {}).get("source_sample")
+        if not sample:
+            continue
+        groups = sorted(tuple(group) for group in sample["source_kind_groups"])
+        identity = hashlib.sha256(
+            "\n".join(f"{source}\t{kind}" for source, kind in groups).encode()
+        ).hexdigest()
+        sources = {source for source, _ in groups}
+        if identity != sample["sha256"] or sources != set(sample["eligible_source_iris"]):
+            raise ValueError("Frozen source population integrity check failed")
+        return sources, identity
+    return set(), None
+
+
 def recompute_global_prf(
     location: Path,
     *,
@@ -602,7 +632,14 @@ def recompute_global_prf(
         ((row.source, row.target) for row in references),
         null_pairs,
     )
+    population, population_hash = _frozen_population(report_path)
+    if population_hash is not None:
+        if set(overall_counts) - population:
+            raise ValueError("Evaluated sources fall outside the frozen source population")
+        for source in population:
+            overall_counts.setdefault(source, SourceConfusion())
     overall = SourceEvaluation(
+        source_universe_sha256=population_hash,
         reference_sha256=reference_hash,
         null_reference_sha256=train_hash,
         alignment_sha256=alignment_hash,
@@ -626,6 +663,7 @@ def recompute_global_prf(
         for source in overall_counts:
             slice_counts.setdefault(source, SourceConfusion())
         computed_slices[name] = SourceEvaluation(
+            source_universe_sha256=population_hash,
             reference_sha256=reference_hash,
             null_reference_sha256=train_hash,
             alignment_sha256=alignment_hash,
@@ -748,6 +786,9 @@ def bootstrap_f1_contrast(
             for arm in ordered_arms
             for cell_seed in seeds_by_task[task]
         ]
+        populations = {evaluation.source_universe_sha256 for evaluation in evaluations}
+        if len(populations) != 1:
+            raise ValueError(f"task {task!r} has unequal frozen source populations")
         identities = {
             (evaluation.reference_sha256, evaluation.null_reference_sha256)
             for evaluation in evaluations

@@ -334,3 +334,33 @@ def test_e17_interaction_and_holm_adjustment() -> None:
     assert holm_adjust_p_values({"a": 0.01, "b": 0.04, "c": 0.03}) == pytest.approx(
         {"a": 0.03, "b": 0.06, "c": 0.06}
     )
+
+
+def test_frozen_population_keeps_empty_groups_and_rejects_changed_membership(tmp_path):
+    import hashlib
+
+    run = tmp_path / "run"
+    alignment = _write_table(
+        run / "alignment/maps_global.tsv", "SrcEntity\tTgtEntity\tScore", ["s1\tt1\t1"]
+    )
+    reference = _write_table(tmp_path / "reference.tsv", "SrcEntity\tTgtEntity", ["s1\tt1"])
+    _write_report(run, builtin={"P": 1, "R": 1, "F1": 1}, alignment=alignment, reference=reference)
+    dataset = run / "dataset"
+    dataset.mkdir()
+    groups = [["empty", "class"], ["s1", "class"]]
+    identity = hashlib.sha256("empty\tclass\ns1\tclass".encode()).hexdigest()
+    sample = {
+        "eligible_source_iris": ["empty", "s1"],
+        "source_kind_groups": groups,
+        "sha256": identity,
+    }
+    path = dataset / "candidate_pool_sample_manifest.json"
+    path.write_text(json.dumps({"retrieval_config": {"source_sample": sample}}))
+    result = recompute_global_prf(run).overall
+    assert result.by_source["empty"] == SourceConfusion()
+    assert result.source_universe_sha256 == identity
+    assert result.metrics.f1 == 1
+    sample["eligible_source_iris"] = ["s1"]
+    path.write_text(json.dumps({"retrieval_config": {"source_sample": sample}}))
+    with pytest.raises(ValueError, match="integrity"):
+        recompute_global_prf(run)
