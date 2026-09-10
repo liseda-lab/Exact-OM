@@ -41,8 +41,10 @@ E16 initially binds the compatible D1 recipient. The prepared legacy OMIM–ORDO
 remains unadmitted until a safe training-negative pool is available; the two-recipient
 transfer mechanism is fixture-tested. No shared-versus-disjoint transfer result is claimed.
 
-Public Bio-ML final reference labels are organizer-held; final execution remains blocked
-until reporting reference identities and authorized files are supplied.
+Public Bio-ML final reference labels are organizer-held. Per the user's updated instruction,
+final inference will produce reference-free submission mappings after development selection.
+Private test labels are not required for submission generation and must not enter optimization.
+See [LABELS-AND-SUBMISSIONS.md](LABELS-AND-SUBMISSIONS.md) for label derivation and output contracts.
 
 ## Operational evidence
 
@@ -58,9 +60,11 @@ the shared evaluator in approximately 1.35 seconds, with approximately 219 MiB o
 peak memory. This validates the executable/adapter interface only. Raw RDF and normalized
 predictions remain in `data/experiments-v2/comparator/operational-probe/`.
 
-One bounded hosted request returned HTTP 401. Its durable request record is retained under
-`data/experiments-v2/hosted-profile/probe/`; a successful hosted response, decision capability
-check and cache replay remain unverified. No credential value is recorded in this document.
+The original configured key file returned HTTP 401; those attempts remain recorded. With the
+user-updated repository `api_key` file, `hosted-profile/probe-04/result.json` passes binary and
+listwise first-token probability checks, completed-cache replay and relocated replay without
+credentials (two completed requests, 56 tokens). Use `--api-key-file api_key` for the validation
+tools; the frozen baseline's older credential locator is unchanged. No key value is logged.
 
 ## Validation and remaining readiness work
 
