@@ -86,10 +86,14 @@ def build_oracle_artifacts(
     if references & negatives or set(nil) & {source for source, _ in references}:
         raise ValueError("Contradictory positive and negative/NIL labels")
     population_rows, responses, invalid = [], [], []
+    unscored_protected_pairs = []
     for source, record in sorted(source_rows.items()):
         candidates = record.get("candidates", [])
         for row in candidates:
             score_values = [row.get("S_base"), row.get("U")]
+            if row.get("protected_exact") and any(value is None for value in score_values):
+                unscored_protected_pairs.append([source, str(row["target"])])
+                continue
             if any(value is None or not math.isfinite(float(value)) for value in score_values):
                 raise ValueError("Forced response trace lacks finite frozen S_base/U values")
             target = str(row["target"])
@@ -158,6 +162,7 @@ def build_oracle_artifacts(
         "confirmed_negatives_sha256": fingerprint(sorted(negatives)),
         "nil_sources": nil,
         "sampled_sources": sorted(selected),
+        "unscored_protected_pairs": sorted(unscored_protected_pairs),
     }
     threshold_value = llm.get("pair_threshold")
     if threshold_value is None:
@@ -260,3 +265,151 @@ def build_oracle_artifacts(
     }
     freeze_json(destination / "manifest.json", manifest)
     return manifest
+
+
+def materialize_followup(source, suite, manifests, selections):
+    """Bind cached E25 diagnostics to the exact completed forced-judgment recipe."""
+    from exact.core.entities.configs.config import ConfigModel
+    from exact.experiments.harness import (
+        ExperimentSource,
+        _inventory_config,
+        deep_merge,
+        hash_payload,
+    )
+    from exact.experiments.schema import ExperimentConfig
+    from exact.utils.data import read_table
+
+    if source.config.experiment_id not in {"E25-trust", "E25-oracles"}:
+        return source
+    complete = [
+        item
+        for item in manifests
+        if item.get("experiment_id") == "E25-forced"
+        and item.get("stage") == "screen"
+        and item.get("arm_id") == "forced_sources"
+    ]
+    if len(complete) != 1 or complete[0].get("status") != "complete":
+        raise ValueError("E25 cached policies require exactly one completed forced-source cell")
+    item = complete[0]
+    output = Path(item["fingerprint_payload"]["output_dir"]).resolve()
+    config_path = output / "_inputs/resolved.config.yaml"
+    producer = ConfigModel.load_config(config_path).model_dump(mode="json", by_alias=True)
+    if hash_payload(producer) != item.get("resolved_config_hash"):
+        raise ValueError("Forced-source resolved configuration changed")
+    role = producer["data"]["reference_role"]
+    if role not in {
+        "development",
+        "dev",
+        "validation",
+        "valid",
+        "diagnostic",
+        "oracle",
+        "research_development",
+    }:
+        raise ValueError("Cached E25 producer must use a development reference role")
+    trace_path = output / "source_decisions.json"
+    # The shared stage recovery already validates completed manifests; require the
+    # trace's published checksum as well, so stale files cannot supply new policies.
+    recovery = item.get("recovery") or {}
+    artifact_id = (recovery.get("artifacts") or {}).get("extraction")
+    if suite.campaign and not artifact_id:
+        raise ValueError("Cached E25 requires a verified completed extraction artifact")
+    if artifact_id and suite.campaign:
+        from exact.experiments.recovery import ArtifactStore
+
+        store = ArtifactStore(Path(suite.campaign["root"]))
+        record = store.verify(artifact_id)
+        expected = record["outputs"].get("source_decisions.json", {}).get("sha256")
+        if expected != sha256_file(trace_path):
+            raise ValueError("Forced-source trace differs from its immutable extraction artifact")
+    stage = source.config.screen
+    if (
+        len(stage.tasks) != 1
+        or stage.seeds != [item["seed"]]
+        or stage.source_cap != item.get("source_cap")
+        or stage.tasks[0].split_role != "development"
+        or stage.tasks[0].id != item.get("task_id")
+    ):
+        raise ValueError(
+            "Cached E25 replay must preserve the forced run's source cap, seed and development scope"
+        )
+    consumer = _inventory_config(source, stage.tasks[0], "screen").model_dump(
+        mode="json", by_alias=True
+    )
+    from exact.utils.provenance import sha256_path
+
+    for key in ("source", "target", "source_universe", "candidates"):
+        values = []
+        for config in (producer, consumer):
+            data = config["data"]
+            path = data.get(key)
+            values.append(sha256_path(Path(data.get("root") or ".") / path) if path else None)
+        if values[0] != values[1]:
+            raise ValueError(f"Cached E25 changed its frozen {key} input")
+    root = Path(producer["data"].get("root") or ".")
+    refs = producer["data"].get("refs") or {}
+    reference = root / refs[role]
+    frame = read_table(reference)
+    trace = json.loads(trace_path.read_text())
+    sources = set(trace["source_universe"])
+    source_column = "SrcEntity" if "SrcEntity" in frame else "Src"
+    frame = frame.loc[frame[source_column].astype(str).isin(sources)]
+    # A training-pool negative policy never licenses missing development labels.
+    # Only explicit labels in the reporting pool can support the outcome oracle.
+    negatives = []
+    pool = producer["data"].get("candidates")
+    policy = "complete_reference" if item.get("reference_completeness") == "complete" else "unknown"
+    if pool:
+        candidate_frame = read_table(root / pool)
+        if "confirmed_label" in candidate_frame:
+            pairs = candidate_frame.loc[candidate_frame["confirmed_label"].eq(0)]
+            src = "SrcEntity" if "SrcEntity" in pairs else "Src"
+            tgt = "TgtEntity" if "TgtEntity" in pairs else "Tgt"
+            negatives = list(pairs[[src, tgt]].itertuples(index=False, name=None))
+            policy = "confirmed_negatives"
+    campaign_root = Path(suite.campaign["root"]) if suite.campaign else source.directory
+    destination = campaign_root / "policies" / source.config.experiment_id
+    artifacts = build_oracle_artifacts(
+        trace_path,
+        frame.to_dict("records"),
+        destination,
+        reference_role=role,
+        negative_label_policy=policy,
+        confirmed_negatives=negatives,
+        budget=200,
+    )
+    declaration = source.config.model_dump(mode="json")
+    declaration["base_config"] = str(config_path)
+    for arm in declaration["arms"]:
+        name = arm["id"]
+        if name in artifacts["unavailable"]:
+            arm["stages"] = []
+            continue
+        if name == "decision_off":
+            arm["overlay"] = {"llm": {"experiment": {"gate": {"mode": "off", "artifact": None}}}}
+            continue
+        path = Path(artifacts["artifacts"][name])
+        payload = json.loads(path.read_text())
+        fixed = payload["fixed_fusion"]
+        arm["overlay"] = {
+            "llm": {
+                "experiment": {
+                    "enabled": True,
+                    "gate": {"mode": payload["mode"], "artifact": str(path)},
+                    "fusion_weight": fixed["fusion_weight"],
+                    "constant_weight": fixed["constant_weight"],
+                }
+            }
+        }
+        ConfigModel.from_mapping(deep_merge(producer, arm["overlay"]))
+    declaration["frozen_constants"]["resolved_oracle_policy"] = {
+        "producer_config_sha256": sha256_file(config_path),
+        "trace_sha256": sha256_file(trace_path),
+        "manifest_sha256": sha256_file(destination / artifacts["identity"] / "manifest.json"),
+        "unavailable": artifacts["unavailable"],
+        "no_new_hosted_requests": True,
+    }
+    resolved = ExperimentConfig.model_validate(declaration)
+    path = destination / "resolved-experiment.json"
+    freeze_json(path, resolved.model_dump(mode="json"))
+    return ExperimentSource(config=resolved, path=path)

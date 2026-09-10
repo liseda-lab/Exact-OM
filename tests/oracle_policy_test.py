@@ -167,3 +167,120 @@ def test_binary_cache_does_not_invent_a_comparative_choice(tmp_path):
     )
     assert set(result["artifacts"]) == {"trust_shipped", "trust_constant"}
     assert "comparative choices" in result["unavailable"]["trust_source"]
+
+
+def test_unscored_protected_exact_pairs_stay_outside_replay_population(tmp_path):
+    path, _ = forced_trace(tmp_path)
+    trace = json.loads(path.read_text())
+    trace["source_universe"].append("exact")
+    trace["records"].append(
+        {
+            "Src": "exact",
+            "candidates": [
+                {"target": "exact_target", "protected_exact": True, "S_final": 1.0, "emitted": True}
+            ],
+        }
+    )
+    path.write_text(json.dumps(trace))
+    result = build_oracle_artifacts(
+        path,
+        [],
+        tmp_path / "policies",
+        reference_role="diagnostic",
+        negative_label_policy="unknown",
+    )
+    assert result["teacher_binding"]["unscored_protected_pairs"] == [["exact", "exact_target"]]
+    artifact = json.loads(Path(result["artifacts"]["trust_constant"]).read_text())
+    assert len(artifact["population_rows"]) == 6
+    assert all(row["Src"] != "exact" for row in artifact["population_rows"])
+
+
+def test_followup_binds_completed_recipe_and_refuses_population_or_role_changes(
+    tmp_path, monkeypatch
+):
+    from dataclasses import replace
+
+    from exact.core.entities.configs.config import ConfigModel
+    from exact.core.entities.configs.yaml_io import dump_yaml_document
+    from exact.experiments import harness
+    from exact.experiments.oracle_policy import materialize_followup
+    from tests.label_policy_test import declaration
+
+    trace, _ = forced_trace(tmp_path)
+    source_path, target_path, universe = (
+        tmp_path / name for name in ("source.owl", "target.owl", "sources.txt")
+    )
+    source_path.write_text("synthetic source")
+    target_path.write_text("synthetic target")
+    universe.write_text("good\nharm\nnil\n")
+    reference = tmp_path / "valid.tsv"
+    reference.write_text("SrcEntity\tTgtEntity\ngood\tt\nharm\ta\n")
+    overlay = {
+        "data": {
+            "source": str(source_path),
+            "target": str(target_path),
+            "source_universe": str(universe),
+            "refs": {"valid": str(reference)},
+            "reference_role": "valid",
+        }
+    }
+    producer = ConfigModel.from_mapping(
+        harness.deep_merge(ConfigModel().model_dump(mode="json", by_alias=True), overlay)
+    ).model_dump(mode="json", by_alias=True)
+    output = tmp_path / "completed"
+    (output / "_inputs").mkdir(parents=True)
+    config_path = output / "_inputs/resolved.config.yaml"
+    config_path.write_text(dump_yaml_document(producer))
+    (output / "source_decisions.json").write_bytes(trace.read_bytes())
+    arms = [
+        {"id": "trust_shipped", "role": "baseline"},
+        {"id": "trust_constant", "role": "candidate"},
+        {"id": "trust_source", "role": "candidate"},
+    ]
+    source = declaration(tmp_path, "E25-trust", arms, overlay)
+    suite = harness.LoadedSuite("fixture", "R_0", (source,), None, "suite", None, None, {})
+    item = {
+        "experiment_id": "E25-forced",
+        "stage": "screen",
+        "arm_id": "forced_sources",
+        "task_id": "development",
+        "seed": 17,
+        "source_cap": source.config.screen.source_cap,
+        "status": "complete",
+        "reference_completeness": "known_incomplete",
+        "resolved_config_hash": harness.hash_payload(producer),
+        "fingerprint_payload": {"output_dir": str(output)},
+    }
+    bound = materialize_followup(source, suite, [item], {})
+    assert bound.base_config_path == config_path
+    assert bound.config.screen.source_cap == source.config.screen.source_cap
+    assert all(
+        arm.overlay["llm"]["experiment"]["gate"]["mode"] == "oracle_replay"
+        for arm in bound.config.arms
+    )
+    metadata = bound.config.frozen_constants["resolved_oracle_policy"]
+    assert (
+        "oracle_perfect" in metadata["unavailable"]
+    )  # training semantics never license report negatives
+    assert materialize_followup(source, suite, [item], {}).raw_hash() == bound.raw_hash()
+    changed = tmp_path / "changed.sources.txt"
+    changed.write_text("good\n")
+    task = source.config.screen.tasks[0].model_copy(
+        update={"overlay": harness.deep_merge(overlay, {"data": {"source_universe": str(changed)}})}
+    )
+    modified = replace(
+        source,
+        config=source.config.model_copy(
+            update={"screen": source.config.screen.model_copy(update={"tasks": [task]})}
+        ),
+    )
+    with pytest.raises(ValueError, match="frozen source_universe"):
+        materialize_followup(modified, suite, [item], {})
+    producer["data"]["reference_role"] = "test"
+    config_path.write_text(dump_yaml_document(producer))
+    item["resolved_config_hash"] = harness.hash_payload(producer)
+    monkeypatch.setattr(
+        "exact.utils.data.read_table", lambda *args: pytest.fail("read final labels")
+    )
+    with pytest.raises(ValueError, match="development reference role"):
+        materialize_followup(source, suite, [item], {})
