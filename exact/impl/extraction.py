@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from collections import defaultdict, deque
 from dataclasses import dataclass
+import math
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Set, Tuple
 
 from exact.core.entities.mappings.entity import EntityMapping
@@ -286,8 +287,9 @@ def _connected_components(mappings: Sequence[EntityMapping]) -> List[List[Entity
             sorted(
                 [
                     mapping
-                    for (source, target), mapping in edge_lookup.items()
-                    if source in component_sources and target in component_targets
+                    for source in component_sources
+                    for target in source_to_targets[source]
+                    for mapping in [edge_lookup[(source, target)]]
                 ],
                 key=_mapping_order_key,
             )
@@ -295,7 +297,9 @@ def _connected_components(mappings: Sequence[EntityMapping]) -> List[List[Entity
     return components
 
 
-def _assignment_component(mappings: Sequence[EntityMapping]) -> List[EntityMapping]:
+def _assignment_component(
+    mappings: Sequence[EntityMapping], *, threshold: Optional[float] = None
+) -> List[EntityMapping]:
     try:
         import numpy as np
         from scipy.optimize import linear_sum_assignment
@@ -315,12 +319,12 @@ def _assignment_component(mappings: Sequence[EntityMapping]) -> List[EntityMappi
     # partial matching instead of forcing nonexistent or negative-score edges.
     missing_cost = 1.0e12
     costs = np.full((len(sources), len(targets) + len(sources)), missing_cost, dtype=float)
-    costs[:, len(targets) :] = 0.0
+    costs[np.arange(len(sources)), len(targets) + np.arange(len(sources))] = 0.0
     for source_idx, source in enumerate(sources):
         for target_idx, target in enumerate(targets):
             mapping = edge_lookup.get((source, target))
             if mapping is not None:
-                costs[source_idx, target_idx] = -float(mapping.score)
+                costs[source_idx, target_idx] = -(float(mapping.score) - (threshold or 0.0))
 
     row_indices, column_indices = linear_sum_assignment(costs)
     selected: List[EntityMapping] = []
@@ -345,15 +349,28 @@ def extract_global_alignment(
 ) -> ExtractionResult:
     """Extract a global alignment while preserving protected exact pairs.
 
-    Non-greedy modes are one-to-one strategies.  They select on the complete
-    score graph and apply ``threshold`` afterwards, which is important for the
-    assignment arm.  ``greedy`` retains the shipped threshold-then-cascade
-    order.
+    All primary strategies operate on threshold-eligible edges. Assignment
+    maximizes accepted utility (score minus threshold), with zero unmatched
+    utility. Only ``assignment_legacy`` optimizes raw scores before thresholding.
+    ``assignment`` aliases ``assignment_accepted_utility``.
     """
 
     normalized_mode = str(mode or "greedy").strip().lower()
-    if normalized_mode not in {"greedy", "mutual_best", "stable_marriage", "assignment"}:
+    if normalized_mode not in {
+        "greedy",
+        "mutual_best",
+        "stable_marriage",
+        "assignment",
+        "assignment_accepted_utility",
+        "assignment_legacy",
+    }:
         raise ValueError(f"Unknown extraction mode: {mode!r}")
+    if threshold is not None and not math.isfinite(float(threshold)):
+        raise ValueError("extraction threshold must be finite")
+    if any(not math.isfinite(float(mapping.score)) for mapping in mappings):
+        raise ValueError("extraction scores must be finite")
+    if normalized_mode != "greedy" and (source_cardinality != 1 or target_cardinality != 1):
+        raise ValueError("non-greedy extraction requires declared one-to-one cardinality")
     if assignment_component_cap < 1:
         raise ValueError("assignment_component_cap must be at least one")
 
@@ -364,9 +381,12 @@ def extract_global_alignment(
     component_count = 0
     fallback_components = 0
 
-    if normalized_mode == "greedy":
-        eligible, threshold_removed = _threshold_selected(residual, set(), threshold)
-        selected = list(eligible)
+    legacy_assignment = normalized_mode == "assignment_legacy"
+    if not legacy_assignment:
+        residual, threshold_removed = _threshold_selected(residual, set(), threshold)
+
+    def greedy(edges: Sequence[EntityMapping]) -> List[EntityMapping]:
+        selected = list(edges)
         if source_cardinality is not None:
             selected = EntityMapping.filter_top_n_entity_mappings(
                 selected, max(1, int(source_cardinality))
@@ -375,12 +395,14 @@ def extract_global_alignment(
             selected = EntityMapping.filter_top_n_target_entity_mappings(
                 selected, max(1, int(target_cardinality))
             )
+        return selected
+
+    if normalized_mode == "greedy":
+        selected = greedy(residual)
     elif normalized_mode == "mutual_best":
         selected = _mutual_best(residual)
-        selected, threshold_removed = _threshold_selected(selected, set(), threshold)
     elif normalized_mode == "stable_marriage":
         selected = _stable_marriage(residual)
-        selected, threshold_removed = _threshold_selected(selected, set(), threshold)
     else:
         selected = []
         components = _connected_components(residual)
@@ -389,11 +411,19 @@ def extract_global_alignment(
             source_count = len({_source_node(mapping) for mapping in component})
             target_count = len({_target_node(mapping) for mapping in component})
             if source_count + target_count > int(assignment_component_cap):
-                selected.extend(_mutual_best(component))
+                eligible, removed = _threshold_selected(component, set(), threshold)
+                selected.extend(greedy(eligible))
+                threshold_removed += removed
                 fallback_components += 1
             else:
-                selected.extend(_assignment_component(component))
-        selected, threshold_removed = _threshold_selected(selected, set(), threshold)
+                selected.extend(
+                    _assignment_component(
+                        component, threshold=None if legacy_assignment else threshold
+                    )
+                )
+        if legacy_assignment:
+            selected, removed = _threshold_selected(selected, set(), threshold)
+            threshold_removed += removed
 
     output = _deduplicate([*protected, *selected])
     diagnostics: Dict[str, object] = {
@@ -407,6 +437,16 @@ def extract_global_alignment(
         "assignment_components": component_count,
         "assignment_fallback_components": fallback_components,
         "assignment_component_cap": int(assignment_component_cap),
+        "assignment_objective": (
+            ("raw_score_then_threshold" if legacy_assignment else "accepted_utility")
+            if normalized_mode.startswith("assignment")
+            else None
+        ),
+        "assignment_fallback": "threshold_first_greedy",
+        "unmatched_sources": len(
+            {_source_node(mapping) for mapping in mappings}
+            - {_source_node(mapping) for mapping in output}
+        ),
     }
     return ExtractionResult(mappings=output, diagnostics=diagnostics)
 

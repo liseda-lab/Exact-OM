@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib  # noqa: F401
 import json  # noqa: F401
+import math
 from concurrent.futures import ThreadPoolExecutor, as_completed  # noqa: F401
 from typing import Any, Callable, Dict, List, Optional, Tuple  # noqa: F401
 from urllib import error as urlerror  # noqa: F401
@@ -25,6 +26,218 @@ from exact.llm.routing import extract_chat_text, extract_first_token_top_logprob
 
 
 class SemanticLLMMixin:
+    def llm_listwise_probs_batched(self, plans: List[ListwiseCallPlan]) -> List[Dict[str, Any]]:
+        """Execute source plans via the shared hosted ledger, abstaining on invalid output."""
+        if not plans:
+            return []
+        config = self.llm_experiment_config["decision"]
+        hard_choice = config.get("output", "categorical") == "hard_choice"
+        backend = self._llm_router.resolve_task("decision", require_logprobs=not hard_choice)
+        if backend.backend != "openrouter":
+            raise RuntimeError(
+                "Grouped judgments require OpenRouter; no local fallback is permitted"
+            )
+        profile = self._llm_router.profiles[backend.profile_name]
+        self._last_decision_backend_meta = self._resolved_backend_metadata(backend)
+        self._last_decision_backend_meta["decision_scoring_mode"] = (
+            "listwise_hard_choice" if hard_choice else "listwise_categorical"
+        )
+        tokenizer = self._get_hosted_decision_tokenizer(profile)
+
+        def execute(plan):
+            exemplar_sources = []
+            if self.llm_experiment_config.get("exemplars") == "knn":
+                from exact.impl.models.selector.llm_learning import exemplar_prompt
+
+                plan, exemplar_sources = exemplar_prompt(self, plan)
+            acquisition = None
+            if config.get("max_evidence_packets", 0):
+                from exact.impl.models.selector.evidence_acquisition import acquire_plan_evidence
+
+                plan, acquisition = acquire_plan_evidence(self, plan, profile)
+            probabilities, observations, hard_choices = [], [], []
+            for call in plan.calls:
+                labels = listwise_labels(len(call.candidate_ids))
+                bias = {}
+                for letter in labels:
+                    token_ids = self._candidate_token_ids_for_tokenizer(
+                        tokenizer, [letter, " " + letter, "\n" + letter]
+                    )
+                    if not token_ids:
+                        raise ValueError(f"Decision option {letter!r} has no single-token encoding")
+                    bias.update(
+                        {str(token_id): self.hosted_decision_logit_bias for token_id in token_ids}
+                    )
+                payload = self._llm_router.hosted.chat_completion(
+                    profile=profile,
+                    role="decision",
+                    messages=[
+                        {"role": role, "content": call.prompt[role]} for role in ("system", "user")
+                    ],
+                    max_tokens=8,
+                    temperature=call.temperature,
+                    top_p=1.0,
+                    seed=call.seed % (2**31 - 1),
+                    logprobs=not hard_choice,
+                    top_logprobs=min(20, max(len(labels) * 3, 10)) if not hard_choice else None,
+                    logit_bias=bias,
+                )
+                observation = {
+                    "candidate_ids": list(call.candidate_ids),
+                    "seed": call.seed,
+                    "permutation": call.permutation_index,
+                    "sample": call.sample_index,
+                    "provider": payload.get("provider"),
+                    "model": payload.get("model"),
+                    "response_id": payload.get("id"),
+                    "usage": payload.get("usage", {}),
+                    "choice": extract_chat_text(payload),
+                }
+                observations.append(observation)
+                choice = observation["choice"].strip()
+                if choice not in labels:
+                    return {
+                        "source": plan.source_iri,
+                        "valid": False,
+                        "fallback": "base",
+                        "error": "invalid_choice",
+                        "calls": observations,
+                    }
+                hard_choices.append(
+                    LISTWISE_NONE_KEY if choice == "Z" else call.candidate_ids[labels.index(choice)]
+                )
+                if hard_choice:
+                    continue
+                content = ((payload.get("choices") or [{}])[0].get("logprobs") or {}).get(
+                    "content"
+                ) or []
+                token = next((item for item in content if str(item.get("token", "")).strip()), {})
+                grouped = {letter: [] for letter in labels}
+                observed_ids = set()
+                invalid_logprob = False
+                for item in token.get("top_logprobs") or []:
+                    letter = str(item.get("token", "")).strip()
+                    if letter in grouped and item.get("logprob") is not None:
+                        try:
+                            value = float(item["logprob"])
+                            if not math.isfinite(value):
+                                raise ValueError("nonfinite logprob")
+                            grouped[letter].append(value)
+                            if tokenizer is not None:
+                                observed_ids.update(
+                                    str(value)
+                                    for value in self._candidate_token_ids_for_tokenizer(
+                                        tokenizer, [str(item["token"])]
+                                    )
+                                )
+                        except (TypeError, ValueError):
+                            invalid_logprob = True
+                missing = [letter for letter, values in grouped.items() if not values]
+                missing_token_ids = (
+                    sorted(set(bias) - observed_ids) if tokenizer is not None else []
+                )
+                if missing or missing_token_ids or invalid_logprob:
+                    return {
+                        "source": plan.source_iri,
+                        "valid": False,
+                        "fallback": "base",
+                        "error": "incomplete_categorical",
+                        "missing_options": missing,
+                        "missing_token_ids": missing_token_ids,
+                        "calls": observations,
+                        "evidence_acquisition": acquisition,
+                    }
+                probabilities.append(
+                    categorical_probabilities_from_logprobs(
+                        {letter: self._logsumexp(values) for letter, values in grouped.items()},
+                        len(call.candidate_ids),
+                    )
+                )
+            record = {
+                "source": plan.source_iri,
+                "valid": True,
+                "calls": observations,
+                "selected_candidate_ids": list(plan.selected_candidate_ids),
+                "overflow_candidate_ids": list(plan.overflow_candidate_ids),
+                "probability_claim": not hard_choice,
+                "evidence_acquisition": acquisition,
+                "exemplar_sources": exemplar_sources,
+            }
+            if hard_choice:
+                choice = sorted(
+                    set(hard_choices), key=lambda target: (-hard_choices.count(target), target)
+                )[0]
+                return {
+                    **record,
+                    "choice": choice,
+                    "pair_probabilities": {
+                        target: float(target == choice) for target in plan.selected_candidate_ids
+                    },
+                }
+            aggregate = aggregate_listwise_call_probabilities(
+                plan, probabilities, probability_mode=config.get("probability", "raw_joint")
+            )
+            choice = sorted(
+                aggregate.categorical, key=lambda target: (-aggregate.categorical[target], target)
+            )[0]
+            return {
+                **record,
+                "choice": choice,
+                "pair_probabilities": dict(aggregate.pair_probabilities),
+                "categorical": dict(aggregate.categorical),
+                "p_none": aggregate.p_none,
+            }
+
+        workers = max(1, min(int(getattr(self, "llm_decision_batch_size", 1) or 1), len(plans)))
+        with ThreadPoolExecutor(max_workers=workers) as executor:
+            return list(executor.map(execute, plans))
+
+    def llm_grouped_decision_probs(
+        self, src_iris, tgt_iris, src_labels, tgt_labels, briefs, pair_scores, selected_mask
+    ):
+        """Route whole sources, preserving capped candidates and canonical target order."""
+        config = self.llm_experiment_config["decision"]
+        grouped = {}
+        for index, source in enumerate(src_iris):
+            grouped.setdefault(str(source), []).append(index)
+        plans = []
+        for source, indices in sorted(grouped.items()):
+            if not any(bool(selected_mask[index]) for index in indices):
+                continue
+            plans.append(
+                build_listwise_call_plan(
+                    source_iri=source,
+                    source_label=src_labels[indices[0]],
+                    source_summary="",
+                    candidates=[
+                        {
+                            "target_iri": str(tgt_iris[index]),
+                            "score": float(pair_scores[index]),
+                            "brief": f"Target: {tgt_labels[index]}\n{briefs[index]}",
+                        }
+                        for index in indices
+                    ],
+                    mode=config["mode"],
+                    request_seed=self.request_seed,
+                    max_candidates=int(config.get("listwise_max_candidates", 5)),
+                    permutations=int(config.get("permutations", 1)),
+                )
+            )
+        records = self.llm_listwise_probs_batched(plans)
+        values = torch.zeros(len(src_iris), device=self.device)
+        used = torch.zeros(len(src_iris), dtype=torch.bool, device=self.device)
+        positions = {
+            (str(source), str(target)): index
+            for index, (source, target) in enumerate(zip(src_iris, tgt_iris))
+        }
+        for record in records:
+            if not record["valid"]:
+                continue
+            for target, value in record["pair_probabilities"].items():
+                index = positions[(record["source"], target)]
+                values[index], used[index] = value, True
+        return values, used, records
+
     def _run_hosted_chat_prompts(
         self,
         prompts: List[Dict[str, str]],
@@ -42,6 +255,7 @@ class SemanticLLMMixin:
         def _call(prompt: Dict[str, str]) -> str:
             payload = self._llm_router.hosted.chat_completion(
                 profile=profile,
+                role="summary",
                 messages=[
                     {"role": "system", "content": prompt["system"]},
                     {"role": "user", "content": prompt["user"]},
@@ -274,6 +488,7 @@ class SemanticLLMMixin:
             }
             payload = self._llm_router.hosted.chat_completion(
                 profile=profile,
+                role="decision_probe",
                 messages=[
                     {"role": "system", "content": prompt["system"]},
                     {"role": "user", "content": prompt["user"]},
@@ -741,6 +956,7 @@ class SemanticLLMMixin:
             def _call(prompt: Dict[str, str]) -> str:
                 payload = self._llm_router.hosted.chat_completion(
                     profile=profile,
+                    role="rationale",
                     messages=[
                         {"role": "system", "content": prompt["system"]},
                         {"role": "user", "content": prompt["user"]},
@@ -853,6 +1069,10 @@ class SemanticLLMMixin:
                         "debug",
                     )
                 if not probe.get("passed"):
+                    if getattr(self, "llm_experiment_enabled", False):
+                        raise RuntimeError(
+                            f"OpenRouter decision capability probe failed: {probe.get('error')}; experiment stage paused"
+                        )
                     self._last_decision_backend_meta["fallback_triggered"] = True
                     self._last_decision_backend_meta["fallback_reason"] = "decision_probe_failed"
                     self._last_decision_backend_meta["fallback_error"] = probe.get("error")
@@ -916,6 +1136,7 @@ class SemanticLLMMixin:
                             try:
                                 return self._llm_router.hosted.chat_completion(
                                     profile=profile,
+                                    role="decision",
                                     messages=request_payload["messages"],
                                     max_tokens=1,
                                     temperature=0.0,
@@ -970,6 +1191,10 @@ class SemanticLLMMixin:
                         self._last_decision_backend_meta["provider"] = last_provider
                         return torch.tensor(outputs, dtype=torch.float32, device=self.device)
                     except (RuntimeError, ValueError, KeyError, OSError, urlerror.URLError) as exc:
+                        if getattr(self, "llm_experiment_enabled", False):
+                            raise RuntimeError(
+                                "OpenRouter judgment failed; experiment stage paused without local fallback"
+                            ) from exc
                         self.log(
                             f"Hosted decision backend failed; falling back to local LLM. Error: {exc}",
                             "warning",

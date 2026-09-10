@@ -33,6 +33,7 @@ from exact.utils.provenance import file_provenance  # noqa: F401
 from .acceptance import AcceptanceMixin
 from .calibration import CalibrationMixin
 from .features import FeatureEngineeringMixin
+from .fitting import FittedSelectorMixin
 from .grouping import count_source_groups, iter_source_groups
 from .label_free import LabelFreeSelectorMixin
 from .nil_ranking import NilRankingMixin
@@ -40,6 +41,7 @@ from .score_calibration import ScoreCalibrationMixin
 
 
 class CandidateSetSelector(
+    FittedSelectorMixin,
     CalibrationMixin,
     AcceptanceMixin,
     FeatureEngineeringMixin,
@@ -260,7 +262,11 @@ class CandidateSetSelector(
     @classmethod
     def _implementation_fingerprint(cls) -> str:
         try:
-            source = inspect.getsource(cls)
+            source = "\n".join(
+                inspect.getsource(base)
+                for base in cls.__mro__
+                if base.__module__.startswith("exact.impl.models.selector")
+            )
         except (OSError, TypeError):
             source = f"{cls.__module__}.{cls.__qualname__}"
         return cls._sha1(source)
@@ -390,11 +396,16 @@ class CandidateSetSelector(
             raise NotImplementedError("Only the shipped logistic accept model is implemented")
         if self.experiment_config["accept_training"] != "winner_only":
             raise NotImplementedError("winner_plus_runnerup acceptance training is not implemented")
-        if self.rerank_config["mode"] not in {"current", "current_listwise", "analytic"}:
+        if self.rerank_config["mode"] not in {
+            "current",
+            "current_listwise",
+            "analytic",
+            "pairwise",
+        }:
             raise NotImplementedError(
                 f"Rerank objective {self.rerank_config['mode']!r} is not implemented"
             )
-        if self.rerank_config["model"] != "current_linear":
+        if self.rerank_config["model"] not in {"current_linear", "channel_gating", "additive_gam"}:
             raise NotImplementedError(
                 f"Rerank model {self.rerank_config['model']!r} is not implemented"
             )
@@ -606,7 +617,9 @@ class CandidateSetSelector(
             if col not in df.columns:
                 df[col] = value
 
-        if self.experiments_enabled and self.label_free_mode == "score_partition":
+        if self.rerank_config.get("artifact"):
+            df = self._apply_fitted_selector(df, distinctive, reciprocity, dataset, threshold)
+        elif self.experiments_enabled and self.label_free_mode == "score_partition":
             df = self._run_score_partition_selector(df=df, threshold=threshold)
         elif self.experiments_enabled and self.label_free_mode == "reciprocal_consensus":
             df = self._run_reciprocal_consensus_selector(df=df, threshold=threshold)
@@ -770,6 +783,10 @@ class CandidateSetSelector(
         checkpoint_every_groups: Optional[int],
         run_progress: Optional[Any],
     ) -> Optional[pd.DataFrame]:
+        if self.experiments_enabled and self.training_reference_file_path:
+            raise ValueError(
+                "Supervised experiment inference requires a frozen selector artifact fitted from data.train_candidates; reporting rows cannot supply training features"
+            )
         if self.calibration.get("enabled") in {"false", "0", "off", "disabled"}:
             self._log(logger, "Calibrated selector disabled; using heuristic selector.", "info")
             return None

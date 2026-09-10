@@ -299,7 +299,7 @@ def test_hierarchy_overlap_uses_exact_anchors_and_reports_sibling_conflict() -> 
     assert sibling_conflict == pytest.approx(0.0)
 
 
-def test_gate_instrumentation_uses_exact_fitted_quantile_pairs(tmp_path) -> None:
+def test_gate_instrumentation_transfers_cutoff_instead_of_development_pair_ids(tmp_path) -> None:
     path = tmp_path / "quantile-gate.json"
     path.write_text(
         json.dumps(
@@ -345,9 +345,9 @@ def test_gate_instrumentation_uses_exact_fitted_quantile_pairs(tmp_path) -> None
         tgt_iris=["t1", "t2"],
         label=None,
     )
-    assert mask.tolist() == [False, True]
-    assert rows[0]["threshold_source"] == "artifact_exact_pairs"
-    assert rows[1]["would_route"] is True
+    assert mask.tolist() == [True, False]
+    assert rows[0]["threshold_source"] == "development_numeric_cutoff"
+    assert rows[1]["would_route"] is False
     assert rows[1]["U_ind"] == pytest.approx(0.1)
     assert rows[1]["fitted_cutoff"] == pytest.approx(0.8)
 
@@ -355,14 +355,14 @@ def test_gate_instrumentation_uses_exact_fitted_quantile_pairs(tmp_path) -> None
 @pytest.mark.parametrize(
     ("config", "message"),
     [
-        ({"decision": {"mode": "listwise"}}, "candidate-group backend runtime"),
-        ({"exemplars": "knn", "exemplar_count": 2}, "training-only retrieval artifact"),
-        ({"distill": "student", "distill_artifact": "student.json"}, "fitted student"),
+        ({"exemplars": "knn", "exemplar_count": 2}, "immutable training artifact"),
+        ({"distill": "student", "distill_artifact": "student.json"}, "immutable training artifact"),
         ({"gate": {"mode": "router"}}, "legacy 'router' linear head"),
     ],
 )
 def test_unavailable_llm_arms_fail_closed(config: dict, message: str) -> None:
-    with pytest.raises(NotImplementedError, match=message):
+    expected = NotImplementedError if config.get("gate", {}).get("mode") == "router" else ValueError
+    with pytest.raises(expected, match=message):
         _scorer(llm_experiment_config={"enabled": True, **config})
 
 
@@ -447,7 +447,7 @@ def test_oracle_is_analytical_non_deployable_and_never_calls_llm(
 
 def test_unimplemented_graph_arm_fails_closed_instead_of_running_baseline() -> None:
     with pytest.raises(NotImplementedError, match="refusing to execute"):
-        _scorer(graph={"mode": "inductive", "artifact": "graph.json"})
+        _scorer(graph={"mode": "transductive", "artifact": "graph.json"})
 
 
 def test_json_artifact_validation_is_data_only_and_dataset_locked(tmp_path) -> None:

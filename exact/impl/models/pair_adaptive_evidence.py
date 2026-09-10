@@ -129,6 +129,21 @@ class PairAdaptiveEvidenceMixin:
             "value": self._normalize_text(item.get("value")),
             "text": self._normalize_text(item.get("text")),
         }
+        payload.update(
+            {
+                key: self._normalize_text(item[key])
+                for key in (
+                    "subject_iri",
+                    "object_iri",
+                    "rel_iri",
+                    "property_iri",
+                    "prop_iri",
+                    "datatype",
+                    "language",
+                )
+                if item.get(key) is not None
+            }
+        )
         digest = hashlib.sha1(
             json.dumps(payload, ensure_ascii=False, sort_keys=True).encode("utf-8")
         ).hexdigest()[:16]

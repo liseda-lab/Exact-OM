@@ -33,6 +33,12 @@ data:
   refs: {}
   # Optional candidate alignment path.
   candidates:
+  # Disjoint training candidate pool.
+  train_candidates:
+  # Explicit task path; null retains legacy candidate-file inference.
+  execution_mode:
+  # Pool provenance, independent of execution mode.
+  candidate_provenance:
   # Explicit evaluation reference split (for example valid or test).
   reference_role:
   # Use the track pool, the selected split's pool, or generate candidates.
@@ -78,7 +84,7 @@ matching:
   extraction:
     # Global extraction strategy; greedy preserves shipped behavior.
     mode: greedy
-    # Connected-component size above which assignment falls back to mutual-best.
+    # Connected-component size above which assignment falls back to threshold-first greedy.
     assignment_component_cap: 500
   # E02 anchor-guided structural rescoring controls.
   anchor_rescoring:
@@ -188,12 +194,16 @@ matching:
       formulation: normalised
       # Persist pivot-reason diagnostics.
       dump_components: false
+      incompatibilities: []
+      relation_interpretation:
     # E26 lexical-quality controls.
     lex:
       # Enable E26 lexical-quality variants.
       enabled: false
       quality: margin
       entropy_top_m: 5
+      entropy_temperature: 1.0
+      deduplicate_labels: false
     # E11 property evidence groups.
     property:
       # Enable kind-specific experiment evidence switches.
@@ -932,7 +942,9 @@ llm:
       mode: binary
       probability: raw_joint
       listwise_max_candidates: 5
-      permutations: 2
+      evidence: generated_brief
+      permutations: 1
+      output: categorical
       samples_per_permutation: 3
     gate:
       mode: analytic
@@ -945,6 +957,7 @@ llm:
     distill: off
     distill_artifact:
     fusion_weight: beta_u
+    constant_weight: 0.5
     fusion_artifact:
 # Canonical selector experiment controls.
 selector:

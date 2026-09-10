@@ -94,12 +94,24 @@ class FeatureEngineeringMixin:
             score += float(value) * float(weight)
         return float(score)
 
+    @staticmethod
+    def _rank_basis(row, model_type):
+        if model_type == "channel_gating":
+            # Identical permitted feature rows; this model restricts its score to channels.
+            return [float(row[index]) for index in (1, 3, 4, 5, 6)]
+        if model_type == "additive_gam":
+            # Fixed linear splines, one additive contribution per raw feature.
+            return [value for raw in row for value in (float(raw), max(0.0, float(raw) - 0.5))]
+        return row
+
     def _score_rank_model(self, row: Sequence[float], model: Mapping[str, Any]) -> float:
         if str(model.get("model_type", "current_linear")) == "analytic":
             # RANK_FEATURE_NAMES[0] is logit(S_pair_final); invert it so the
             # analytic control uses the shipped bounded score itself.
             return float(self._clip01(self._sigmoid(float(row[0]))))
-        return self._linear_score(row, model)
+        return self._linear_score(
+            self._rank_basis(row, model.get("model_type", "current_linear")), model
+        )
 
     def _score_group(
         self,

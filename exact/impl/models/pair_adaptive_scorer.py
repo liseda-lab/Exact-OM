@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import math
 import hashlib  # noqa: F401
 import json  # noqa: F401
+import math
 from typing import Any, Dict, List, Optional, Sequence, Tuple  # noqa: F401
 
 import torch  # noqa: F401
@@ -96,12 +96,16 @@ class PairAdaptiveSemanticScorer(
             enabled=False,
             formulation="normalised",
             dump_components=False,
+            incompatibilities=[],
+            relation_interpretation=None,
         )
         self.lex_config = self._experiment_config(
             lex,
             enabled=False,
             quality="margin",
             entropy_top_m=5,
+            entropy_temperature=1.0,
+            deduplicate_labels=False,
         )
         self.property_config = self._experiment_config(property, enabled=False)
         self.instance_config = self._experiment_config(instance, enabled=False)
@@ -110,6 +114,9 @@ class PairAdaptiveSemanticScorer(
             mode="off",
             artifact=None,
             dump_profile=False,
+            shuffled=False,
+            hierarchy_removal=0.0,
+            negative_label_policy=None,
         )
         self.fusion_config = self._experiment_config(
             fusion_config,
@@ -129,9 +136,14 @@ class PairAdaptiveSemanticScorer(
             decision={},
             gate={},
             fusion_weight="beta_u",
+            constant_weight=0.5,
             fusion_artifact=None,
             exemplars="off",
-            exemplar_count=0,
+            exemplar_count=3,
+            exemplar_artifact=None,
+            student_training="gold_teacher",
+            teacher_source_cap=200,
+            outcome_policy="unknown",
             distill="off",
             distill_artifact=None,
         )
@@ -140,7 +152,9 @@ class PairAdaptiveSemanticScorer(
             mode="binary",
             probability="raw_joint",
             listwise_max_candidates=5,
-            permutations=2,
+            evidence="generated_brief",
+            permutations=1,
+            output="categorical",
             samples_per_permutation=3,
         )
         raw_llm_config["gate"] = self._experiment_config(
@@ -167,7 +181,16 @@ class PairAdaptiveSemanticScorer(
         self.llm_experiment_enabled = bool(self.llm_experiment_config["enabled"])
         self._fusion_artifact: Optional[JsonExperimentArtifact] = None
         self._gate_artifact: Optional[JsonExperimentArtifact] = None
+        self._graph_artifact: Optional[JsonExperimentArtifact] = None
         self._validate_experiment_configs()
+
+        if self.graph_config["mode"] in {"inductive", "graph_only"}:
+            self._graph_artifact = JsonExperimentArtifact.load(
+                self.graph_config.get("artifact"), expected_mode="inductive", kind="graph head"
+            )
+        if self.graph_config["mode"] == "graph_only":
+            kwargs.update(use_lexical=False, use_context=False, use_llm=False)
+            self.strsim_enabled = False
 
         if self.fusion_enabled:
             kwargs["tau"] = float(self.fusion_config["tau"])
@@ -201,7 +224,14 @@ class PairAdaptiveSemanticScorer(
 
         gate_mode = str(self.llm_experiment_config["gate"]["mode"])
         gate_artifact = self.llm_experiment_config["gate"].get("artifact")
-        if self.llm_experiment_enabled and gate_mode in {"quantile", "forced_sample"}:
+        if self.llm_experiment_enabled and gate_mode in {
+            "quantile",
+            "transferred_threshold",
+            "source_top_fraction",
+            "pair_top_fraction",
+            "forced_sample",
+            "learned",
+        }:
             if not gate_artifact:
                 raise ValueError(
                     f"LLM gate mode {gate_mode!r} requires an immutable selection artifact"
@@ -212,7 +242,13 @@ class PairAdaptiveSemanticScorer(
                 expected_mode=self._gate_mode_alias or gate_mode,
                 kind="LLM gate",
             )
-            if gate_mode in {"quantile", "forced_sample"}:
+            if gate_mode in {
+                "quantile",
+                "transferred_threshold",
+                "source_top_fraction",
+                "pair_top_fraction",
+                "forced_sample",
+            }:
                 self._validate_gate_artifact_contract(gate_mode)
 
         self.attribute_property_weights = dict(
@@ -286,6 +322,7 @@ class PairAdaptiveSemanticScorer(
             raise ValueError(f"unsupported hierarchy mode: {self.hier_config['mode']!r}")
         if self.diff_config["formulation"] not in {
             "normalised",
+            "missingness_aware",
             "absolute",
             "asymmetric",
             "off",
@@ -309,59 +346,130 @@ class PairAdaptiveSemanticScorer(
         }:
             raise ValueError(f"unsupported fusion sigma mode: {self.fusion_config['sigma_mode']!r}")
         graph_mode = self.graph_config["mode"]
-        if graph_mode not in {"off", "inductive", "transductive", "graph_only"}:
+        if graph_mode not in {"off", "features", "inductive", "transductive", "graph_only"}:
             raise ValueError(f"unsupported graph channel mode: {graph_mode!r}")
-        if graph_mode != "off":
+        if graph_mode == "transductive":
             raise NotImplementedError(
                 "E23 graph scoring needs a normalized graph-feature/artifact contract; "
                 "refusing to execute this arm as the graph-off baseline"
             )
-        if bool(self.property_config.get("enabled")) or bool(self.instance_config.get("enabled")):
-            raise NotImplementedError(
-                "property/instance evidence-group switches are not implemented in this scorer"
-            )
+        if self.instance_config.get("enabled") and self.instance_config.get("anchors"):
+            raise ValueError("instance anchors require a separately bound training-link artifact")
         if self.llm_experiment_enabled:
             decision_mode = str(self.llm_experiment_config["decision"]["mode"])
             if decision_mode not in {"binary", "listwise", "listwise_sc"}:
                 raise ValueError(f"unsupported LLM decision mode: {decision_mode!r}")
-            if decision_mode != "binary":
-                raise NotImplementedError(
-                    "E07 listwise prompt/probability primitives are available, but the "
-                    "candidate-group backend runtime is not; refusing to run binary decisions "
-                    f"for decision mode {decision_mode!r}"
+            if decision_mode == "binary" and (
+                self.llm_experiment_config["fusion_weight"] == "source_first"
+                or self.llm_experiment_config["decision"].get("max_evidence_packets", 0)
+            ):
+                raise ValueError(
+                    "Source-first integration and bounded evidence acquisition require comparative judgments"
                 )
-            if self.llm_experiment_config.get("exemplars", "off") != "off":
-                raise NotImplementedError(
-                    "E21 k-NN exemplars require a training-only retrieval artifact and "
-                    "leakage audit; refusing to run the zero-shot prompt as that arm"
+            from exact.impl.models.selector.llm_learning import read_learning_artifact
+
+            self._exemplar_artifact = None
+            self._student_artifact = None
+            if self.llm_experiment_config.get("exemplars") == "knn":
+                self._exemplar_artifact = read_learning_artifact(
+                    self.llm_experiment_config.get("exemplar_artifact"), "llm_exemplars"
                 )
-            if self.llm_experiment_config.get("distill", "off") != "off":
-                raise NotImplementedError(
-                    "E21 distillation requires a fitted student bound to a pinned LLM "
-                    "fingerprint; refusing to call the real LLM as that arm"
+            if self.llm_experiment_config.get("distill") == "student":
+                self._student_artifact = read_learning_artifact(
+                    self.llm_experiment_config.get("distill_artifact"), "llm_student"
                 )
             gate_mode = str(self.llm_experiment_config["gate"]["mode"])
             if gate_mode not in {
                 "off",
                 "analytic",
                 "quantile",
+                "transferred_threshold",
+                "source_top_fraction",
+                "pair_top_fraction",
                 "forced_sample",
                 "oracle",
                 "learned",
             }:
                 raise ValueError(f"unsupported LLM gate mode: {gate_mode!r}")
-            if gate_mode == "learned":
+            if gate_mode == "learned" and self._gate_mode_alias == "router":
                 raise NotImplementedError(
                     "E21 learned gating requires a counterfactual-training artifact bound to "
                     "the complete pinned LLM fingerprint; the legacy 'router' linear head is "
                     "not a scientifically valid substitute"
                 )
-        if self.llm_experiment_enabled and self.llm_experiment_config["fusion_weight"] != "beta_u":
+        if self.llm_experiment_enabled and self.llm_experiment_config["fusion_weight"] not in {
+            "beta_u",
+            "constant",
+            "source_first",
+        }:
             raise NotImplementedError(
                 "learned LLM mixing requires an immutable fitted fusion artifact runtime"
             )
 
+    def _experiment_entity_features(self, iri: str, side: str) -> Dict[str, Any]:
+        dataset = self._attached_dataset
+        base = dataset.get_entity_features(iri, side)
+        kind = dataset.entity_kind_for(iri, side, warn_unknown=False).value
+        config = (
+            self.property_config
+            if kind in {"object_property", "data_property"}
+            else (self.instance_config if kind == "individual" else {})
+        )
+        if not config.get("enabled"):
+            return base
+        selected = dict(base)
+        if not config.get("labels", True):
+            selected["labels"] = []
+        property_kind = kind in {"object_property", "data_property"}
+        if not config.get("hierarchy" if property_kind else "types", True):
+            selected["hierarchy"] = {}
+        if not config.get("annotations" if property_kind else "literals", True):
+            selected["attributes"] = []
+        if property_kind:
+            selected["object_triples"] = [
+                item
+                for item in base.get("object_triples", [])
+                if item.get("property_schema") and config.get("signature", True)
+            ]
+            if any(config.get(field, True) for field in ("signature", "characteristics", "usage")):
+                extras = dataset._property_experiment_extras(side).get(iri, {})
+                selected["object_triples"] += [
+                    item
+                    for item in extras.get("signature", [])
+                    if config.get(item["evidence_group"], True)
+                ]
+                if config.get("usage", True):
+                    selected["object_triples"] += list(extras.get("usage", []))
+        elif not config.get("relations", True):
+            selected["object_triples"] = []
+        elif config.get("relations_shuffled"):
+            selected["object_triples"] = dataset.shuffled_object_bundle(
+                iri, side, self.request_seed
+            )
+        selected["experiment_evidence"] = {
+            "kind": kind,
+            "labels": len(selected.get("labels", [])),
+            "attributes": len(selected.get("attributes", [])),
+            "hierarchy": sum(len(items) for items in selected.get("hierarchy", {}).values()),
+            "relations": len(selected.get("object_triples", [])),
+            "relations_shuffled": bool(config.get("relations_shuffled", False)),
+        }
+        return selected
+
     def attach_dataset(self, dataset: Any) -> None:
+        self._graph_input_dataset = dataset
+        if self.graph_config.get("hierarchy_removal", 0.0):
+            from exact.impl.graph_controls import hierarchy_control_view
+            from exact.impl.models.graph_head import HIERARCHY_PREDICATES
+
+            if self.request_seed is None:
+                raise ValueError("hierarchy removal requires an explicit request_seed")
+            dataset = hierarchy_control_view(
+                dataset,
+                fraction=self.graph_config["hierarchy_removal"],
+                seed=self.request_seed,
+                hierarchy_predicates=HIERARCHY_PREDICATES,
+            )
         super().attach_dataset(dataset)
         self._hierarchy_ic_cache = {}
         self._exact_anchor_src_to_tgt = {}
@@ -376,6 +484,8 @@ class PairAdaptiveSemanticScorer(
                     self._exact_anchor_src_to_tgt.setdefault(src_key, set()).add(tgt_key)
                     self._exact_anchor_tgt_to_src.setdefault(tgt_key, set()).add(src_key)
         dataset_signature = getattr(dataset, "dataset_signature", None)
+        if self._graph_artifact is not None:
+            self._graph_artifact.validate_dataset(dataset_signature, required=True)
         if self._fusion_artifact is not None:
             self._fusion_artifact.validate_dataset(dataset_signature, required=True)
         if self._gate_artifact is not None:
@@ -400,8 +510,10 @@ class PairAdaptiveSemanticScorer(
         if not isinstance(pool_fingerprint, str) or not pool_fingerprint.strip():
             raise ValueError("fusion artifact is missing candidate_pool_fingerprint")
         feature_schema = artifact.payload["feature_schema"]
-        if not isinstance(feature_schema, list) or not all(
-            isinstance(value, str) and value for value in feature_schema
+        if (
+            not isinstance(feature_schema, list)
+            or not feature_schema
+            or not all(isinstance(value, str) and value for value in feature_schema)
         ):
             raise ValueError("fusion artifact feature_schema must be a non-empty string array")
         try:
@@ -412,7 +524,7 @@ class PairAdaptiveSemanticScorer(
             parameters = artifact.scoped_payload("parameters", scope_key="global")
             tau = float(parameters.get("tau", self.fusion_config["tau"]))
             gamma = float(parameters.get("gamma", self.fusion_config["gamma"]))
-            if not 0.0 <= tau <= 1.0 or gamma < 0.0:
+            if not 0.0 <= tau <= 1.0 or not math.isfinite(gamma) or gamma < 0.0:
                 raise ValueError("analytic_fitted fusion artifact has invalid tau or gamma")
             if (
                 "beta" in parameters
@@ -427,7 +539,9 @@ class PairAdaptiveSemanticScorer(
             fitted_values = [
                 float(value) for name, value in multipliers.items() if name != "default"
             ]
-            if not fitted_values or any(value < 0.0 for value in fitted_values):
+            if not fitted_values or any(
+                not math.isfinite(value) or value < 0.0 for value in fitted_values
+            ):
                 raise ValueError("analytic_fitted channel multipliers must be non-negative")
             if abs(sum(fitted_values) / len(fitted_values) - 1.0) > 1.0e-6:
                 raise ValueError("analytic_fitted channel multipliers must have arithmetic mean 1")
@@ -442,6 +556,43 @@ class PairAdaptiveSemanticScorer(
         if artifact is None:
             raise RuntimeError("gate artifact validation requires a loaded artifact")
         payload = artifact.payload
+        if mode in {"source_top_fraction", "pair_top_fraction"}:
+            artifact.require_fields(
+                "dataset_signature",
+                "fraction",
+                "population_fingerprint",
+                "population_pairs",
+                "eligible_count",
+                "selected_count",
+                "pairs",
+                "selected_sources",
+                "tie_rule",
+                kind="LLM inference gate",
+            )
+            fraction = float(payload["fraction"])
+            population = {tuple(pair) for pair in payload["population_pairs"]}
+            selected = {tuple(pair) for pair in payload["pairs"]}
+            if not selected.issubset(population):
+                raise ValueError("inference gate selects pairs outside its population")
+            count = (
+                len(set(payload["selected_sources"]))
+                if mode == "source_top_fraction"
+                else len(selected)
+            )
+            if (
+                not 0.0 <= fraction <= 1.0
+                or count != int(payload["selected_count"])
+                or count != math.ceil(fraction * int(payload["eligible_count"]))
+            ):
+                raise ValueError("inference gate violates its exact population budget")
+            if (
+                abs(fraction - float(self.llm_experiment_config["gate"]["quantile_fraction"]))
+                > 1e-12
+            ):
+                raise ValueError("inference gate fraction differs from its declared policy")
+            if payload["tie_rule"] != "(-statistic, source_iri, target_iri)":
+                raise ValueError("inference gate has an unsupported tie rule")
+            return
         artifact.require_fields(
             "dataset_signature",
             "task_id",
@@ -519,8 +670,10 @@ class PairAdaptiveSemanticScorer(
                 f"fusion artifact {self._fusion_artifact.path} has invalid {field!r} payload"
             )
         fallback = 1.0 if mode == "analytic_fitted" else 0.0
+        if mode == "analytic_fitted" and channel == "lex" and not self.strsim_enabled:
+            channel = "label"
         value = float(values.get(channel, values.get("default", fallback)))
-        if value < 0.0:
+        if not math.isfinite(value) or value < 0.0:
             raise ValueError(f"fusion weight for {channel!r} must be non-negative")
         return value
 
@@ -570,7 +723,7 @@ class PairAdaptiveSemanticScorer(
     ) -> Tuple[torch.Tensor, List[Dict[str, Any]]]:
         """Compute a frozen, per-pair gate and an auditable diagnostic row."""
 
-        if not self.llm_experiment_enabled:
+        if not self.llm_experiment_enabled and self.llm_experiment_config["gate"]["mode"] != "off":
             mask = U >= self.tau_LLM
             return mask, []
 
@@ -587,22 +740,36 @@ class PairAdaptiveSemanticScorer(
             extra["llm_disabled"] = True
         elif mode == "analytic":
             pass
-        elif mode == "quantile":
+        elif mode in {"quantile", "transferred_threshold"}:
             assert self._gate_artifact is not None
             payload = self._gate_artifact.payload
-            selected = {(str(pair[0]), str(pair[1])) for pair in payload["pairs"]}
-            statistic_name = "fitted_quantile_membership"
+            statistic_name = "U"
+            threshold = float(payload["threshold"])
+            extra["target_fraction"] = float(payload["fraction"])
+            extra["threshold_source"] = "development_numeric_cutoff"
+            extra["fitted_cutoff"] = float(payload["threshold"])
+            extra["development_selected_count"] = int(payload["selected_count"])
+        elif mode in {"source_top_fraction", "pair_top_fraction"}:
+            assert self._gate_artifact is not None
+            payload = self._gate_artifact.payload
+            population = {tuple(pair) for pair in payload["population_pairs"]}
+            current = [(str(source), str(target)) for source, target in zip(src_iris, tgt_iris)]
+            if not set(current).issubset(population):
+                raise ValueError("inference gate population differs from scored candidate pool")
+            selected = {tuple(pair) for pair in payload["pairs"]}
+            statistic_name = "inference_population_membership"
             statistic = torch.tensor(
-                [float((str(src), str(tgt)) in selected) for src, tgt in zip(src_iris, tgt_iris)],
-                dtype=torch.float32,
-                device=self.device,
+                [float(pair in selected) for pair in current], device=self.device
             )
             threshold = 0.5
-            extra["target_fraction"] = float(payload["fraction"])
-            extra["threshold_source"] = "artifact_exact_pairs"
-            extra["fitted_cutoff"] = float(payload["threshold"])
-            extra["selected_count"] = int(payload["selected_count"])
-            extra["boundary_ids"] = dict(payload["boundary_ids"])
+            extra.update(
+                {
+                    "threshold_source": "frozen_inference_selection",
+                    "population_fingerprint": payload["population_fingerprint"],
+                    "target_fraction": payload["fraction"],
+                    "selected_count": payload["selected_count"],
+                }
+            )
         elif mode == "forced_sample":
             assert self._gate_artifact is not None
             pairs = self._gate_artifact.payload.get("pairs")
@@ -636,27 +803,31 @@ class PairAdaptiveSemanticScorer(
             threshold = 0.5
             extra["oracle_diagnostic"] = True
         elif mode == "learned":
+            from exact.impl.models.selector.llm_learning import (
+                SOURCE_FEATURES,
+                predict_head,
+                source_features,
+                validate_learning_binding,
+            )
+
             assert self._gate_artifact is not None
             payload = self._gate_artifact.payload
-            weights = payload.get("weights")
-            if not isinstance(weights, dict):
-                raise ValueError("learned gate artifact must contain a 'weights' object")
-            features = {
-                "U_ind": U_ind,
-                "U_dis": U_dis,
-                "U": U,
-                "S_base": S_base,
-                "q_label": q_label,
-                "Q_struct": Q_struct,
-            }
-            linear = torch.full_like(U, float(payload.get("bias", 0.0)))
-            for name, weight in weights.items():
-                if name not in features:
-                    raise ValueError(f"learned gate artifact references unknown feature {name!r}")
-                linear = linear + float(weight) * features[name]
-            statistic_name = "learned_probability"
-            statistic = torch.sigmoid(linear)
-            threshold = float(payload.get("threshold", threshold))
+            validate_learning_binding(payload, self, src_iris)
+            if (
+                payload.get("feature_schema") != SOURCE_FEATURES
+                or payload.get("target") != "correction_minus_harm_per_1000_tokens"
+            ):
+                raise ValueError("Benefit router feature/target schema mismatch")
+            groups = {}
+            for index, source in enumerate(src_iris):
+                groups.setdefault(str(source), []).append(index)
+            statistic = torch.zeros_like(U)
+            for indices in groups.values():
+                features = source_features([float(S_base[index]) for index in indices])
+                value = predict_head([features], payload["model"])[0]
+                statistic[indices] = value
+            statistic_name = "predicted_net_benefit_per_1000_tokens"
+            threshold = float(payload["threshold"])
             extra["artifact"] = dict(self._gate_artifact.provenance)
         else:
             raise ValueError(f"unsupported LLM gate mode: {mode!r}")
@@ -928,7 +1099,11 @@ class PairAdaptiveSemanticScorer(
         progress_callback=None,
         completion_callback=None,
     ) -> List[str]:
-        if not (self.use_llm and self.generate_llm_rationales):
+        if (
+            not (self.use_llm and self.generate_llm_rationales)
+            or self.llm_experiment_config["gate"]["mode"] == "off"
+            or self.llm_experiment_config.get("distill") == "student"
+        ):
             return ["" for _ in records]
         src_labels: List[str] = []
         tgt_labels: List[str] = []
@@ -963,6 +1138,61 @@ class PairAdaptiveSemanticScorer(
         diff_payload: Dict[str, Any],
         attr_payload: Dict[str, Any],
     ) -> str:
+        if (
+            self.llm_experiment_enabled
+            and self.llm_experiment_config["decision"]["evidence"] == "structured_packet"
+        ):
+            facts = []
+            groups = [(f"hierarchy:{name}", value) for name, value in hierarchy_payloads.items()]
+            groups += [
+                ("similarity", sim_payload),
+                ("difference", diff_payload),
+                ("attribute", attr_payload),
+            ]
+            seen = set()
+            for group, payload in groups:
+                for side, field in (("source", "src_selected"), ("target", "tgt_selected")):
+                    for item in payload.get(field, []):
+                        # Keep facts and their provenance; never include channel scores or
+                        # classify an unmatched triple as a logical contradiction.
+                        fact = {
+                            key: item[key]
+                            for key in (
+                                "item_id",
+                                "triple",
+                                "text",
+                                "subject_iri",
+                                "object_iri",
+                                "rel_iri",
+                                "property_iri",
+                                "state",
+                                "contradiction_semantics",
+                                "axiom_id",
+                                "datatype",
+                                "language",
+                            )
+                            if key in item
+                        }
+                        identity = (
+                            side,
+                            json.dumps(
+                                {key: value for key, value in fact.items() if key != "item_id"},
+                                sort_keys=True,
+                            ),
+                        )
+                        if identity not in seen:
+                            facts.append({"side": side, "group": group, **fact})
+                            seen.add(identity)
+            return json.dumps(
+                {
+                    "source_label": src_label,
+                    "target_label": tgt_label,
+                    "facts": facts,
+                    "unknowns": "An absent counterpart is unobserved, not a contradiction.",
+                },
+                ensure_ascii=False,
+                sort_keys=True,
+            )
         lines = [
             "Label evidence",
             f"Source label: {src_label}",
@@ -1089,6 +1319,7 @@ class PairAdaptiveSemanticScorer(
                     "c_x",
                     "c_y",
                     "diff_pivot_reason",
+                    "evidence_states",
                 )
             }
         if self.lex_enabled or self.fusion_enabled:
@@ -1181,13 +1412,34 @@ class PairAdaptiveSemanticScorer(
         tgt_cache_hits = sum(
             1 for iri in tgt_unique_iris if callable(cache_probe) and bool(cache_probe(iri, "tgt"))
         )
-        src_feature_map = {iri: dataset.get_entity_features(iri, "src") for iri in src_unique_iris}
-        tgt_feature_map = {iri: dataset.get_entity_features(iri, "tgt") for iri in tgt_unique_iris}
+        src_feature_map = {
+            iri: self._experiment_entity_features(iri, "src") for iri in src_unique_iris
+        }
+        tgt_feature_map = {
+            iri: self._experiment_entity_features(iri, "tgt") for iri in tgt_unique_iris
+        }
         self._computed_llm_calibration = None
         self._calibration_messages = []
         self._last_summary_backend_meta = {}
         self._last_decision_backend_meta = {}
         self._last_rationale_backend_meta = {}
+
+        src_label_lists = [
+            (
+                []
+                if src_feature_map[iri].get("experiment_evidence", {}).get("labels") == 0
+                else labels
+            )
+            for iri, labels in zip(src_iris, src_label_lists)
+        ]
+        tgt_label_lists = [
+            (
+                []
+                if tgt_feature_map[iri].get("experiment_evidence", {}).get("labels") == 0
+                else labels
+            )
+            for iri, labels in zip(tgt_iris, tgt_label_lists)
+        ]
 
         s_label, q_label, best_pairs, label_quality_payloads = self._score_label_channel(
             src_label_lists, tgt_label_lists
@@ -1380,6 +1632,45 @@ class PairAdaptiveSemanticScorer(
             for key, values in struct_channel_active.items()
         }
 
+        graph_features = []
+        graph_diagnostics = []
+        if self.graph_config["mode"] != "off":
+            from exact.impl.models.graph_head import (
+                graph_pair_features,
+                graph_predictions,
+            )
+
+            graph_features = graph_pair_features(
+                self._graph_input_dataset, src_iris, tgt_iris, self.graph_config, self.request_seed
+            )
+            active = torch.tensor([row["active"] for row in graph_features], device=self.device)
+            graph_scores = torch.full((n_pairs,), self.tau, device=self.device)
+            if self._graph_artifact is not None:
+                graph_probs, graph_contributions, graph_logits = graph_predictions(
+                    graph_features, self._graph_artifact.payload
+                )
+                graph_scores = torch.tensor(graph_probs, dtype=torch.float32, device=self.device)
+                graph_diagnostics = [
+                    {
+                        "features": row["values"],
+                        "active": row["active"],
+                        "feature_schema": self._graph_artifact.payload["feature_schema"],
+                        "logit": float(graph_logits[index]),
+                        "bias": self._graph_artifact.payload["bias"],
+                        "feature_contributions": graph_contributions[index].tolist(),
+                        "graph_fingerprints": row["graph_fingerprints"],
+                        "artifact": dict(self._graph_artifact.provenance),
+                    }
+                    for index, row in enumerate(graph_features)
+                ]
+            channel_score_tensors["graph"] = graph_scores
+            channel_quality_tensors["graph"] = (
+                active.to(torch.float32)
+                if self._graph_artifact is not None
+                else torch.zeros_like(graph_scores)
+            )
+            channel_active_tensors["graph"] = active
+
         sigma_tensors: Dict[str, torch.Tensor] = {}
         for key, score_tensor in channel_score_tensors.items():
             quality_tensor = channel_quality_tensors[key]
@@ -1456,7 +1747,7 @@ class PairAdaptiveSemanticScorer(
             )
 
         fusion_mode = str(self.fusion_config["mode"]) if self.fusion_enabled else "analytic_shipped"
-        if fusion_mode in {"analytic_fitted", "learned_global"}:
+        if fusion_mode == "learned_global":
             if self.strsim_enabled and self.strsim_config["placement"] == "channel":
                 sig_lex = sig_label_inner + sig_strsim_inner
             else:
@@ -1522,12 +1813,36 @@ class PairAdaptiveSemanticScorer(
             self.llm_experiment_enabled
             and str(self.llm_experiment_config["gate"]["mode"]) == "oracle"
         )
-        if self.use_llm and not oracle_mode:
-            w_i = (self.beta * U).clamp(0.0, 1.0)
-            need_llm = would_route
+        decision_enabled = (
+            self.use_llm and not oracle_mode and self.llm_experiment_config["gate"]["mode"] != "off"
+        )
+        if decision_enabled:
+            w_i = (
+                torch.full_like(U, float(self.llm_experiment_config["constant_weight"]))
+                if self.llm_experiment_enabled
+                and self.llm_experiment_config["fusion_weight"] == "constant"
+                else (self.beta * U).clamp(0.0, 1.0)
+            )
+            need_llm = would_route.clone()
         else:
             w_i = torch.zeros_like(U)
             need_llm = torch.zeros_like(U, dtype=torch.bool)
+
+        if decision_enabled and self.llm_experiment_enabled:
+            groups: Dict[str, List[int]] = {}
+            for index, source in enumerate(src_iris):
+                groups.setdefault(str(source), []).append(index)
+            displayed = torch.zeros_like(need_llm)
+            comparative = self.llm_experiment_config["decision"]["mode"] != "binary"
+            limit = int(self.llm_experiment_config["decision"]["listwise_max_candidates"])
+            for indices in groups.values():
+                ordered = sorted(
+                    indices, key=lambda index: (-float(S_base[index]), str(tgt_iris[index]))
+                )[:limit]
+                displayed[ordered] = True
+                if comparative and any(bool(would_route[index]) for index in indices):
+                    need_llm[indices] = True
+            need_llm = need_llm & displayed
 
         pair_packets = [payload["packet"] for payload in pair_payloads]
         pair_briefs = list(pair_packets)
@@ -1537,10 +1852,18 @@ class PairAdaptiveSemanticScorer(
 
         decision_idxs: List[int] = []
         brief_idxs: List[int] = []
-        if self.use_llm and not oracle_mode:
+        if decision_enabled:
             decision_idxs = torch.nonzero(need_llm).flatten().tolist()
-            brief_idxs = list(range(n_pairs)) if self.force_llm_summaries else list(decision_idxs)
-        if self.use_llm and not oracle_mode and brief_idxs:
+            brief_idxs = (
+                list(range(n_pairs))
+                if self.force_llm_summaries and not self.llm_experiment_enabled
+                else list(decision_idxs)
+            )
+        if (
+            decision_enabled
+            and brief_idxs
+            and self.llm_experiment_config["decision"]["evidence"] != "structured_packet"
+        ):
             brief_src = [pair_payloads[i]["src_label"] for i in brief_idxs]
             brief_tgt = [pair_payloads[i]["tgt_label"] for i in brief_idxs]
             brief_packets = [pair_packets[i] for i in brief_idxs]
@@ -1570,7 +1893,64 @@ class PairAdaptiveSemanticScorer(
                 dtype=S_base.dtype,
                 device=self.device,
             )
-        if self.use_llm and not oracle_mode and decision_idxs:
+        grouped_records = []
+        if (
+            decision_enabled
+            and decision_idxs
+            and self.llm_experiment_config.get("distill") == "student"
+        ):
+            from exact.impl.models.selector.llm_learning import (
+                PAIR_FEATURES,
+                predict_head,
+                validate_learning_binding,
+            )
+
+            payload = self._student_artifact
+            validate_learning_binding(payload, self, src_iris)
+            if payload["feature_schema"] != PAIR_FEATURES or payload[
+                "training_recipe"
+            ] != self.llm_experiment_config.get("student_training", "gold_teacher"):
+                raise ValueError("Student feature/training recipe mismatch")
+            features = [
+                [float(S_base[index]), float(U[index]), float(Q_lex[index]), float(Q_struct[index])]
+                for index in decision_idxs
+            ]
+            p_llm[decision_idxs] = torch.tensor(
+                predict_head(features, payload["model"]), device=self.device
+            )
+            S_final[need_llm] = (1.0 - w_i[need_llm]) * S_base[need_llm] + w_i[need_llm] * p_llm[
+                need_llm
+            ]
+            for index in decision_idxs:
+                llm_decisions[index] = "StudentYes" if float(p_llm[index]) >= 0.5 else "StudentNo"
+        elif (
+            decision_enabled
+            and decision_idxs
+            and self.llm_experiment_config["decision"]["mode"] != "binary"
+        ):
+            p_llm, need_llm, grouped_records = self.llm_grouped_decision_probs(
+                src_iris,
+                tgt_iris,
+                [payload["src_label"] for payload in pair_payloads],
+                [payload["tgt_label"] for payload in pair_payloads],
+                pair_briefs,
+                S_base,
+                would_route,
+            )
+            decision_idxs = torch.nonzero(need_llm).flatten().tolist()
+            for idx in decision_idxs:
+                llm_decisions[idx] = "Yes" if float(p_llm[idx]) >= 0.5 else "No"
+            if self.llm_experiment_config["fusion_weight"] == "source_first":
+                # Source ranking is integrated downstream, before acceptance. Pair
+                # evidence/decomposition remains the frozen pre-LLM score.
+                w_i = torch.zeros_like(w_i)
+                for record in grouped_records:
+                    record["integration"] = "source_first"
+            else:
+                S_final[need_llm] = (1.0 - w_i[need_llm]) * S_base[need_llm] + w_i[
+                    need_llm
+                ] * p_llm[need_llm]
+        elif decision_enabled and decision_idxs:
             src_best = [pair_payloads[i]["src_label"] for i in decision_idxs]
             tgt_best = [pair_payloads[i]["tgt_label"] for i in decision_idxs]
             decision_briefs = [pair_briefs[i] for i in decision_idxs]
@@ -1684,6 +2064,7 @@ class PairAdaptiveSemanticScorer(
             "I_attr": I_attr,
             "I_ctx": I_ctx,
             "I_llm": I_llm,
+            "llm_grouped_decisions": grouped_records,
             "llm_decisions": llm_decisions,
             "llm_rationales": llm_rationales,
             "llm_pair_briefs": pair_briefs,
@@ -1717,6 +2098,34 @@ class PairAdaptiveSemanticScorer(
                 "llm_gated_pairs": int(llm_gated_pairs),
                 "brief_requested_pairs": int(brief_requested_pairs),
                 "decision_requested_pairs": int(decision_requested_pairs),
+            },
+        }
+        result["graph_features"] = graph_features
+        result["graph_head"] = graph_diagnostics
+        if "graph" in struct_weights:
+            result["s_graph"] = channel_score_tensors["graph"]
+            result["I_graph"] = I_struct * struct_weights["graph"]
+        result["kind_evidence"] = {
+            "source": {
+                iri: features.get("experiment_evidence")
+                for iri, features in src_feature_map.items()
+            },
+            "target": {
+                iri: features.get("experiment_evidence")
+                for iri, features in tgt_feature_map.items()
+            },
+            "graph_controls": dict(getattr(dataset, "graph_control_manifests", {})),
+        }
+        result["fusion_channels"] = {
+            "label": {"score": s_label, "quality": q_label, "active": label_active},
+            "strsim": {"score": s_strsim, "quality": q_strsim, "active": strsim_active},
+            **{
+                key: {
+                    "score": value,
+                    "quality": channel_quality_tensors[key],
+                    "active": channel_active_tensors[key],
+                }
+                for key, value in channel_score_tensors.items()
             },
         }
         if self.llm_experiment_enabled:
@@ -1767,6 +2176,16 @@ class PairAdaptiveSemanticScorer(
                         gate_diagnostics[idx] if self.llm_experiment_enabled else None
                     ),
                 )
+                kind_source = src_feature_map[src_iris[idx]].get("experiment_evidence")
+                kind_target = tgt_feature_map[tgt_iris[idx]].get("experiment_evidence")
+                if graph_diagnostics:
+                    experiment_diagnostics["graph_head"] = graph_diagnostics[idx]
+                if kind_source or kind_target:
+                    experiment_diagnostics["kind_evidence"] = {
+                        "source": kind_source,
+                        "target": kind_target,
+                        "graph_controls": dict(getattr(dataset, "graph_control_manifests", {})),
+                    }
                 explanations.append(
                     {
                         "explanation_schema_version": 3,
@@ -1892,6 +2311,15 @@ class PairAdaptiveSemanticScorer(
                                 I_struct[idx]
                                 * struct_weights["attr_aux"][idx]
                                 * (s_attr[idx] - self.tau)
+                            ),
+                            "C_graph": (
+                                float(
+                                    I_struct[idx]
+                                    * struct_weights["graph"][idx]
+                                    * (channel_score_tensors["graph"][idx] - self.tau)
+                                )
+                                if "graph" in struct_weights
+                                else 0.0
                             ),
                             "C_llm": float(I_llm[idx] * (p_llm[idx] - S_base[idx])),
                             "C_oracle": (float(S_final[idx] - S_base[idx]) if oracle_mode else 0.0),

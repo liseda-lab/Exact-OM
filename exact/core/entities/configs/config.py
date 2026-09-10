@@ -152,6 +152,16 @@ class DataConfig(StrictConfigModel):
         description="Named reference alignments, such as train, test, and full.",
     )
     candidates: Optional[Path] = Field(None, description="Optional candidate alignment path.")
+    source_universe: Optional[Path] = Field(
+        None, description="Frozen eligible source IRIs, one per line."
+    )
+    train_candidates: Optional[Path] = Field(None, description="Disjoint training candidate pool.")
+    execution_mode: Optional[Literal["global_alignment", "local_ranking"]] = Field(
+        None, description="Explicit task path; null retains legacy candidate-file inference."
+    )
+    candidate_provenance: Optional[
+        Literal["generated", "frozen_generated", "benchmark_supplied"]
+    ] = Field(None, description="Pool provenance, independent of execution mode.")
     reference_role: Optional[str] = Field(
         None,
         description="Explicit evaluation reference split (for example valid or test).",

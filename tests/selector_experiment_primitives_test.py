@@ -299,7 +299,7 @@ def test_unimplemented_selector_arms_fail_explicitly():
         CandidateSetSelector(
             experiment_config=_experiment_config(
                 rerank={
-                    "mode": "pairwise",
+                    "mode": "listwise_nil",
                     "model": "current_linear",
                     "features": "current",
                     "artifact": None,
@@ -375,9 +375,9 @@ def test_listwise_sc_plan_is_six_calls_and_aggregation_is_order_invariant():
         probability_mode="raw_joint",
     )
     assert aggregate.call_count == 6
-    assert aggregate.categorical["t2"] == pytest.approx(0.85)
-    assert aggregate.categorical[LISTWISE_NONE_KEY] == pytest.approx(0.05)
-    assert aggregate.pair_probabilities["t2"] == pytest.approx(0.85)
+    assert aggregate.categorical["t2"] == pytest.approx(0.7)
+    assert aggregate.categorical[LISTWISE_NONE_KEY] == pytest.approx(0.1)
+    assert aggregate.pair_probabilities["t2"] == pytest.approx(0.7)
 
 
 def test_quantile_forced_and_oracle_gate_helpers_are_exact_and_no_call():

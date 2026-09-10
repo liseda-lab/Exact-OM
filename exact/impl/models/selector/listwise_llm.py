@@ -36,6 +36,7 @@ class ListwiseCallPlan:
     selected_candidate_ids: Tuple[str, ...]
     overflow_candidate_ids: Tuple[str, ...]
     calls: Tuple[ListwiseCall, ...]
+    candidate_scores: Tuple[float, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -194,20 +195,23 @@ def build_listwise_call_plan(
     mode: str,
     request_seed: int,
     max_candidates: int = 5,
+    permutations: int = 1,
 ) -> ListwiseCallPlan:
-    """Build the exact two-permutation E07 call plan for one gated source.
+    """Freeze candidates before ordering; primary E07 uses one deterministic call.
 
     Candidate truncation happens before permutation. ``listwise`` makes one
-    deterministic call per permutation; ``listwise_sc`` makes three samples
-    at temperature 0.7 per permutation, for six calls total.
+    deterministic call per permutation; the primary uses one permutation.
+    ``listwise_sc`` makes three samples at temperature 0.7 over two permutations.
     """
 
     normalized_mode = str(mode).strip().lower()
     if normalized_mode not in {"listwise", "listwise_sc"}:
         raise ValueError("listwise call-plan mode must be 'listwise' or 'listwise_sc'")
     cap = int(max_candidates)
-    if cap < 2 or cap > 5:
-        raise ValueError("E07 listwise max_candidates must be between 2 and 5")
+    if cap < 1 or cap > 5:
+        raise ValueError("E07 listwise max_candidates must be between 1 and 5")
+    if permutations not in {1, 2}:
+        raise ValueError("listwise permutations must be 1 or 2")
     source_id = str(source_iri)
     if not source_id:
         raise ValueError("source_iri must not be empty")
@@ -215,8 +219,8 @@ def build_listwise_call_plan(
         _normalize_candidates(candidates),
         key=lambda candidate: (-candidate.score, candidate.target_iri),
     )
-    if len(ordered) < 2:
-        raise ValueError("single-candidate sources must use the binary decision path")
+    if not ordered:
+        raise ValueError("empty candidate pools require the no-candidate fallback")
     selected = ordered[:cap]
     overflow = ordered[cap:]
 
@@ -224,7 +228,9 @@ def build_listwise_call_plan(
     random.Random(_derived_seed(source_id, int(request_seed), "permutation", 0)).shuffle(
         first_order
     )
-    permutation_orders = [first_order, list(reversed(first_order))]
+    permutation_orders = [first_order]
+    if permutations == 2 or normalized_mode == "listwise_sc":
+        permutation_orders.append(list(reversed(first_order)))
     samples_per_permutation = 3 if normalized_mode == "listwise_sc" else 1
     temperature = 0.7 if normalized_mode == "listwise_sc" else 0.0
     calls: List[ListwiseCall] = []
@@ -256,6 +262,7 @@ def build_listwise_call_plan(
         selected_candidate_ids=tuple(candidate.target_iri for candidate in selected),
         overflow_candidate_ids=tuple(candidate.target_iri for candidate in overflow),
         calls=tuple(calls),
+        candidate_scores=tuple(candidate.score for candidate in selected),
     )
 
 
@@ -266,7 +273,7 @@ def aggregate_listwise_call_probabilities(
     probability_mode: str,
     eps: float = 1.0e-12,
 ) -> ListwiseAggregate:
-    """Map calls back to target IRIs and apply the clarified 50/50 aggregate."""
+    """Map calls back to target IRIs and average their raw categorical probabilities."""
 
     if len(call_probabilities) != len(plan.calls):
         raise ValueError(
@@ -274,7 +281,6 @@ def aggregate_listwise_call_probabilities(
         )
     outcomes = (*plan.selected_candidate_ids, LISTWISE_NONE_KEY)
     probability_sums = {outcome: 0.0 for outcome in outcomes}
-    vote_counts = {outcome: 0 for outcome in outcomes}
 
     for call, raw in zip(plan.calls, call_probabilities):
         labels = listwise_labels(len(call.candidate_ids))
@@ -294,22 +300,9 @@ def aggregate_listwise_call_probabilities(
         mapped[LISTWISE_NONE_KEY] = values["Z"]
         for outcome, value in mapped.items():
             probability_sums[outcome] += value
-        winner = min(
-            mapped,
-            key=lambda outcome: (
-                -mapped[outcome],
-                outcome == LISTWISE_NONE_KEY,
-                outcome,
-            ),
-        )
-        vote_counts[winner] += 1
 
     call_count = len(plan.calls)
-    categorical = {
-        outcome: 0.5 * (probability_sums[outcome] / call_count)
-        + 0.5 * (vote_counts[outcome] / call_count)
-        for outcome in outcomes
-    }
+    categorical = {outcome: probability_sums[outcome] / call_count for outcome in outcomes}
     total = sum(categorical.values())
     categorical = {outcome: value / total for outcome, value in categorical.items()}
     p_none = categorical[LISTWISE_NONE_KEY]

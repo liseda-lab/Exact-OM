@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import List, Literal, Optional
 
@@ -13,13 +14,20 @@ from exact.core.entities.configs.strict import StrictConfigModel
 class ExtractionConfig(StrictConfigModel):
     """Post-selector global extraction used by E01."""
 
-    mode: Literal["greedy", "mutual_best", "assignment", "stable_marriage"] = Field(
+    mode: Literal[
+        "greedy",
+        "mutual_best",
+        "assignment",
+        "stable_marriage",
+        "assignment_accepted_utility",
+        "assignment_legacy",
+    ] = Field(
         "greedy", description="Global extraction strategy; greedy preserves shipped behavior."
     )
     assignment_component_cap: int = Field(
         500,
         ge=1,
-        description="Connected-component size above which assignment falls back to mutual-best.",
+        description="Connected-component size above which assignment falls back to threshold-first greedy.",
     )
 
 
@@ -114,16 +122,32 @@ class HierarchyChannelExperimentConfig(StrictConfigModel):
     overlap_weight: float = Field(0.5, ge=0.0, le=1.0)
 
 
+class DifferenceIncompatibility(StrictConfigModel):
+    """A pinned semantic incompatibility between two ontology object values."""
+
+    property_iri: str = Field(min_length=1)
+    source_object: str = Field(min_length=1)
+    target_object: str = Field(min_length=1)
+    semantic_rule: Literal["disjoint_objects", "exclusive_values"]
+    evidence_id: str = Field(min_length=1)
+
+
 class DifferenceChannelExperimentConfig(StrictConfigModel):
     enabled: bool = Field(False, description="Enable E24 contrastive-channel diagnostics/variants.")
-    formulation: Literal["normalised", "absolute", "asymmetric", "off"] = Field("normalised")
+    formulation: Literal["normalised", "absolute", "asymmetric", "missingness_aware", "off"] = (
+        Field("normalised")
+    )
     dump_components: bool = Field(False, description="Persist pivot-reason diagnostics.")
+    incompatibilities: List[DifferenceIncompatibility] = Field(default_factory=list)
+    relation_interpretation: Optional[Literal["<", ">"]] = None
 
 
 class LexicalChannelExperimentConfig(StrictConfigModel):
     enabled: bool = Field(False, description="Enable E26 lexical-quality variants.")
     quality: Literal["margin", "entropy", "encoder_agreement", "constant"] = Field("margin")
     entropy_top_m: int = Field(5, ge=2)
+    entropy_temperature: float = Field(1.0, gt=0.0)
+    deduplicate_labels: bool = False
 
 
 class EvidenceGroupConfig(StrictConfigModel):
@@ -142,9 +166,12 @@ class EvidenceGroupConfig(StrictConfigModel):
 
 
 class GraphChannelExperimentConfig(StrictConfigModel):
-    mode: Literal["off", "inductive", "transductive", "graph_only"] = Field("off")
+    mode: Literal["off", "features", "inductive", "transductive", "graph_only"] = Field("off")
     artifact: Optional[Path] = None
     dump_profile: bool = False
+    shuffled: bool = False
+    hierarchy_removal: Literal[0.0, 0.5, 1.0] = 0.0
+    negative_label_policy: Optional[Literal["complete_reference", "confirmed_negatives"]] = None
 
 
 class SelectorTuningConfig(StrictConfigModel):
@@ -184,15 +211,26 @@ class LLMDecisionExperimentConfig(StrictConfigModel):
     probability: Literal["raw_joint", "conditional_real", "pairwise_vs_none", "max_normalized"] = (
         Field("raw_joint")
     )
-    listwise_max_candidates: int = Field(5, ge=2, le=26)
-    permutations: Literal[2] = 2
+    listwise_max_candidates: int = Field(5, ge=2, le=5)
+    evidence: Literal["generated_brief", "structured_packet"] = "generated_brief"
+    permutations: Literal[1, 2] = 1
+    output: Literal["categorical", "hard_choice"] = "categorical"
+    max_evidence_packets: Literal[0, 2] = 0
     samples_per_permutation: Literal[3] = 3
 
 
 class LLMGateExperimentConfig(StrictConfigModel):
-    mode: Literal["off", "analytic", "quantile", "forced_sample", "oracle", "learned"] = Field(
-        "analytic"
-    )
+    mode: Literal[
+        "off",
+        "analytic",
+        "quantile",
+        "transferred_threshold",
+        "source_top_fraction",
+        "pair_top_fraction",
+        "forced_sample",
+        "oracle",
+        "learned",
+    ] = Field("analytic")
     threshold: float = Field(0.5, ge=0.0, le=1.0)
     quantile_fraction: float = Field(0.05, gt=0.0, le=1.0)
     forced_sample_size: int = Field(0, ge=0)
@@ -208,11 +246,22 @@ class LLMExperimentConfig(StrictConfigModel):
     )
     gate: LLMGateExperimentConfig = Field(default=LLMGateExperimentConfig.model_validate({}))
     exemplars: Literal["off", "knn"] = Field("off")
-    exemplar_count: int = Field(0, ge=0)
+    exemplar_count: int = Field(0, ge=0, le=3)
+    exemplar_artifact: Optional[Path] = None
     distill: Literal["off", "student"] = Field("off")
     distill_artifact: Optional[Path] = None
-    fusion_weight: Literal["beta_u", "learned"] = Field("beta_u")
+    student_training: Literal["gold_only", "gold_teacher"] = "gold_teacher"
+    teacher_source_cap: int = Field(200, ge=1, le=200)
+    outcome_policy: Literal["unknown", "complete_sources"] = "unknown"
+    fusion_weight: Literal["beta_u", "constant", "source_first", "learned"] = Field("beta_u")
+    constant_weight: float = Field(0.5, ge=0.0, le=1.0)
     fusion_artifact: Optional[Path] = None
+
+    @model_validator(mode="after")
+    def validate_exemplar_count(self) -> "LLMExperimentConfig":
+        if self.exemplars == "knn" and self.exemplar_count < 1:
+            raise ValueError("knn exemplars require exemplar_count between 1 and 3")
+        return self
 
 
 class AdaptiveKConfig(StrictConfigModel):
@@ -260,6 +309,12 @@ class EffectiveTrainingUnitConfig(StrictConfigModel):
 
 
 class SupervisionConfig(StrictConfigModel):
+    negative_label_policy: Literal["unknown", "complete_reference", "confirmed_negatives"] = (
+        "unknown"
+    )
+    label_budget: Optional[int] = Field(None, ge=1)
+    label_selection: Literal["passive", "uncertainty"] = "passive"
+
     mode: Literal["auto", "supervised", "label_free"] = Field("auto")
     components: dict[
         Literal[
@@ -287,6 +342,7 @@ class SupervisionConfig(StrictConfigModel):
         component: str,
         *,
         training_available: bool,
+        profile_binding: Optional[dict] = None,
     ) -> tuple[str, str]:
         """Resolve one component without silently consuming unavailable labels."""
 
@@ -323,10 +379,26 @@ class SupervisionConfig(StrictConfigModel):
             )
         if self.auto_policy.artifact is None:
             raise ValueError("profile_rule auto policy requires an immutable artifact")
-        raise NotImplementedError(
-            "profile_rule supervision resolution requires E22's fitted observable-profile "
-            "runtime, which is not implemented"
-        )
+        payload = json.loads(self.auto_policy.artifact.read_text())
+        if payload.get("schema_version") != 1 or payload.get("kind") != "supervision_count_policy":
+            raise ValueError("Invalid frozen supervision policy")
+        units_path = self.artifacts.get("training_units")
+        if units_path is None:
+            return "label_free", "auto_profile_missing_effective_units"
+        units = json.loads(units_path.read_text())
+        if payload["binding"] != units.get("binding"):
+            raise ValueError("Supervision policy effective-unit binding mismatch")
+        if not profile_binding:
+            return "label_free", "auto_profile_missing_runtime_binding"
+        if any(payload["binding"].get(key) != value for key, value in profile_binding.items()):
+            raise ValueError("Supervision policy runtime binding mismatch")
+        rule = payload.get("components", {}).get(component, {})
+        minimum = rule.get("minimum_groups")
+        count = int(units.get("component_units", {}).get(component, 0))
+        definition = units.get("component_definitions", {}).get(component)
+        if minimum is None or definition != payload.get("count_definition") or count < int(minimum):
+            return "label_free", "auto_profile_label_free_fallback"
+        return "supervised", "auto_profile_frozen_count_crossover"
 
 
 __all__ = [

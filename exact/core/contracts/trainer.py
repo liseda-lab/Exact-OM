@@ -24,7 +24,7 @@ from exact.core.entities.mappings import EntityMapping
 from exact.core.entities.registry import ComponentType
 from exact.runs.layout import RunLayout
 from exact.utils.data import read_table
-from exact.utils.mappings import fill_anchored_scores
+from exact.utils.mappings import candidate_table_views, fill_anchored_scores
 
 if TYPE_CHECKING:
     from exact.core.contracts.dataset import IDataset
@@ -729,8 +729,7 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
         local_frame: Optional[pd.DataFrame] = None
         is_local = candidates_one2many_path is not None
         if candidates_one2many_path is not None:
-            candidates_one2many = read_table(candidates_one2many_path)
-            candidates_one2many.columns = ["Src", "Tgt", "Candidates"]
+            _, candidates_one2many = candidate_table_views(read_table(candidates_one2many_path))
             local_frame = pd.DataFrame(
                 fill_anchored_scores(candidates_one2many.values, preds),
                 columns=["SrcEntity", "TgtEntity", "TgtCandidates"],
@@ -805,8 +804,7 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
         alignment_dir = self.alignment_dir
 
         if candidates_one2many_path is not None:
-            candidates_one2many = read_table(candidates_one2many_path)
-            candidates_one2many.columns = ["Src", "Tgt", "Candidates"]
+            _, candidates_one2many = candidate_table_views(read_table(candidates_one2many_path))
             return self._save_local_alignment(preds, candidates_one2many, alignment_dir)
 
         else:

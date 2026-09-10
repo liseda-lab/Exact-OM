@@ -28,6 +28,19 @@ class PairAdaptiveChannelsMixin:
         List[Tuple[str, str]],
         List[Dict[str, Any]],
     ]:
+        raw_label_counts = [
+            (len(src), len(tgt)) for src, tgt in zip(src_label_lists, tgt_label_lists)
+        ]
+        if self.lex_enabled and self.lex_config.get("deduplicate_labels"):
+
+            def unique_labels(labels):
+                canonical = {}
+                for label in labels:
+                    canonical.setdefault(normalize_candidate_text(label), label)
+                return [canonical[key] for key in sorted(canonical)]
+
+            src_label_lists = [unique_labels(labels) for labels in src_label_lists]
+            tgt_label_lists = [unique_labels(labels) for labels in tgt_label_lists]
         n_pairs = len(src_label_lists)
         if not self.use_lexical:
             best_pairs = [
@@ -135,6 +148,18 @@ class PairAdaptiveChannelsMixin:
                     "entropy_quality_defined": entropy_quality_defined,
                     "encoder_agreement": agreement,
                     "label_pairs": int(mat.numel()),
+                    "raw_source_label_count": raw_label_counts[len(quality_payloads)][0],
+                    "raw_target_label_count": raw_label_counts[len(quality_payloads)][1],
+                    "source_label_count": len(src_labels),
+                    "target_label_count": len(tgt_labels),
+                    "entropy_temperature": float(self.lex_config.get("entropy_temperature", 1.0)),
+                    "top_m_similarities": torch.topk(
+                        mat.flatten(),
+                        k=min(int(self.lex_config.get("entropy_top_m", 5)), mat.numel()),
+                    )
+                    .values.detach()
+                    .cpu()
+                    .tolist(),
                     "selected": q_label,
                 }
             )
@@ -177,7 +202,10 @@ class PairAdaptiveChannelsMixin:
             return 0.0, 0.0, False
         top_m = max(2, int(self.lex_config.get("entropy_top_m", 5)))
         values = torch.topk(matrix.flatten(), k=min(top_m, matrix.numel())).values.float()
-        probabilities = torch.softmax(values, dim=0)
+        temperature = float(self.lex_config.get("entropy_temperature", 1.0))
+        if not temperature > 0.0:
+            raise ValueError("lexical entropy temperature must be positive")
+        probabilities = torch.softmax(values / temperature, dim=0)
         entropy = -(probabilities * probabilities.clamp_min(1.0e-12).log()).sum()
         normalizer = torch.log(torch.tensor(float(values.numel()), device=values.device))
         quality = self._clip01(1.0 - float((entropy / normalizer.clamp_min(1.0e-12)).item()))
@@ -602,7 +630,19 @@ class PairAdaptiveChannelsMixin:
         tgt_neighbors = [str(item["triple"][2]) for item in tgt_items]
         rel_mat = self._encode_label_matrix(src_rels, tgt_rels)
         nbr_mat = self._encode_label_matrix(src_neighbors, tgt_neighbors)
-        return (0.5 * rel_mat + 0.5 * nbr_mat).clamp(0.0, 1.0)
+        support = (0.5 * rel_mat + 0.5 * nbr_mat).clamp(0.0, 1.0)
+        if self.property_config.get("enabled"):
+            for src_index, source in enumerate(src_items):
+                for tgt_index, target in enumerate(tgt_items):
+                    if source.get("property_schema") or target.get("property_schema"):
+                        # Domain, range, inverse and characteristic roles are directional
+                        # ontology facts; a similar neighbor cannot erase their role.
+                        if source.get("rel_iri") != target.get("rel_iri") or (
+                            source.get("evidence_group") == "characteristics"
+                            and source.get("object_iri") != target.get("object_iri")
+                        ):
+                            support[src_index, tgt_index] = 0.0
+        return support
 
     def _score_similarity_channel(
         self,
@@ -692,6 +732,11 @@ class PairAdaptiveChannelsMixin:
                     "subject_iri": self._normalize_text(item.get("subject_iri")),
                     "object_iri": self._normalize_text(item.get("object_iri")),
                     "rel_iri": self._normalize_text(item.get("rel_iri")),
+                    **{
+                        key: item[key]
+                        for key in ("axiom_id", "property_schema", "evidence_group")
+                        if key in item
+                    },
                     "importance": float(src_imp[pos] / total_imp),
                 },
             )
@@ -708,6 +753,11 @@ class PairAdaptiveChannelsMixin:
                     "subject_iri": self._normalize_text(item.get("subject_iri")),
                     "object_iri": self._normalize_text(item.get("object_iri")),
                     "rel_iri": self._normalize_text(item.get("rel_iri")),
+                    **{
+                        key: item[key]
+                        for key in ("axiom_id", "property_schema", "evidence_group")
+                        if key in item
+                    },
                     "importance": float(tgt_imp[pos] / total_imp),
                 },
             )
@@ -731,6 +781,124 @@ class PairAdaptiveChannelsMixin:
                 "links": self._matrix_provenance_links(
                     src_selected_rows, tgt_selected_rows, reduced
                 ),
+            }
+        )
+        return payload
+
+    def _score_missingness_aware_difference(
+        self,
+        src_items: Sequence[Dict[str, Any]],
+        tgt_items: Sequence[Dict[str, Any]],
+        payload: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Give signed authority only to facts with pinned incompatibility evidence.
+
+        Similarity and missing counterparts cannot establish contradiction. Duplicate
+        serializations carry one unit of evidence; every classified fact retains its
+        ontology triple and any semantic rule that justifies a contradiction.
+        """
+
+        def key(item):
+            triple = item.get("triple", ("", "", ""))
+            return (str(item.get("rel_iri") or triple[1]), str(item.get("object_iri") or triple[2]))
+
+        def unique(items):
+            by_key = {}
+            for item in items:
+                identity = key(item)
+                if identity not in by_key or float(item.get("score", 0.0)) > float(
+                    by_key[identity].get("score", 0.0)
+                ):
+                    by_key[identity] = item
+            return [by_key[identity] for identity in sorted(by_key)]
+
+        source, target = unique(src_items), unique(tgt_items)
+        rules = self.diff_config.get("incompatibilities", [])
+        conflicts = {}
+        for rule in rules:
+            required = (
+                "property_iri",
+                "source_object",
+                "target_object",
+                "semantic_rule",
+                "evidence_id",
+            )
+            if any(not rule.get(name) for name in required):
+                raise ValueError(
+                    "difference incompatibility requires pinned property, objects, semantic rule, and evidence ID"
+                )
+            if rule["semantic_rule"] not in {"disjoint_objects", "exclusive_values"}:
+                raise ValueError("unsupported difference incompatibility semantic rule")
+            conflicts[
+                (
+                    str(rule["property_iri"]),
+                    frozenset((str(rule["source_object"]), str(rule["target_object"]))),
+                )
+            ] = dict(rule)
+
+        evidence = []
+        contradictions = {"source": [], "target": []}
+        for side, own, other in (("source", source, target), ("target", target, source)):
+            for item in own:
+                relation, object_iri = key(item)
+                opposing = []
+                for counterpart in other:
+                    other_relation, other_object = key(counterpart)
+                    rule = conflicts.get((relation, frozenset((object_iri, other_object))))
+                    if other_relation == relation and object_iri != other_object and rule:
+                        opposing.append({"counterpart_triple": list(counterpart["triple"]), **rule})
+                state = (
+                    "contradicted"
+                    if opposing
+                    else (
+                        "supported"
+                        if any(key(counterpart) == (relation, object_iri) for counterpart in other)
+                        else "unobserved"
+                    )
+                )
+                row = self._with_item_id(
+                    "difference",
+                    side,
+                    {
+                        "triple": list(item["triple"]),
+                        "state": state,
+                        "edge_ic": float(item.get("score", 0.0)),
+                        "subject_iri": str(item.get("subject_iri", "")),
+                        "rel_iri": relation,
+                        "object_iri": object_iri,
+                        "contradiction_semantics": opposing,
+                    },
+                )
+                evidence.append({"side": side, **row})
+                if opposing:
+                    contradictions[side].append(row)
+
+        negative = contradictions["source"] + contradictions["target"]
+        # This channel measures contradiction only. Supported facts remain available
+        # in similarity channels and cannot turn absence of conflict into authority.
+        quality = (
+            self._clip01(self._safe_mean([row["edge_ic"] for row in negative])) if negative else 0.0
+        )
+        for row in negative:
+            row["importance"] = 1.0 / len(negative)
+            row["unsupported_mass"] = row["edge_ic"]
+        payload.update(
+            {
+                "formulation": "missingness_aware",
+                "score": 0.0 if negative else self.tau,
+                "quality": quality,
+                "conflict": 1.0 if negative else 0.0,
+                "coverage": len(negative) / max(1, len(evidence)),
+                "strength": quality,
+                "stability": 1.0 if negative else 0.0,
+                "evidence_states": evidence,
+                "diff_pivot_reason": (
+                    "explicit_contradiction" if negative else "no_justified_contradiction"
+                ),
+                "src_selected": contradictions["source"],
+                "tgt_selected": contradictions["target"],
+                "src_sentences": self._verbalize_object_items(contradictions["source"]),
+                "tgt_sentences": self._verbalize_object_items(contradictions["target"]),
             }
         )
         return payload
@@ -773,6 +941,8 @@ class PairAdaptiveChannelsMixin:
             self.diff_config.get("formulation", "normalised") if self.diff_enabled else "normalised"
         )
         payload["formulation"] = formulation
+        if formulation == "missingness_aware":
+            return self._score_missingness_aware_difference(src_items, tgt_items, payload)
         if formulation == "off":
             payload["diff_pivot_reason"] = "channel_off"
             return payload
@@ -886,6 +1056,11 @@ class PairAdaptiveChannelsMixin:
                     "subject_iri": self._normalize_text(item.get("subject_iri")),
                     "object_iri": self._normalize_text(item.get("object_iri")),
                     "rel_iri": self._normalize_text(item.get("rel_iri")),
+                    **{
+                        key: item[key]
+                        for key in ("axiom_id", "property_schema", "evidence_group")
+                        if key in item
+                    },
                     "unsupported_mass": float(src_vals[pos]),
                     "importance": float(src_vals[pos] / total_imp),
                 },
@@ -902,6 +1077,11 @@ class PairAdaptiveChannelsMixin:
                     "subject_iri": self._normalize_text(item.get("subject_iri")),
                     "object_iri": self._normalize_text(item.get("object_iri")),
                     "rel_iri": self._normalize_text(item.get("rel_iri")),
+                    **{
+                        key: item[key]
+                        for key in ("axiom_id", "property_schema", "evidence_group")
+                        if key in item
+                    },
                     "unsupported_mass": float(tgt_vals[pos]),
                     "importance": float(tgt_vals[pos] / total_imp),
                 },
@@ -1199,6 +1379,8 @@ class PairAdaptiveChannelsMixin:
                         "item_id": self._normalize_text(item.get("item_id")),
                         "property": self._normalize_text(item.get("prop")),
                         "property_iri": self._normalize_text(item.get("prop_iri")),
+                        "datatype": item.get("datatype"),
+                        "language": item.get("language"),
                         "identifier_namespace": self._normalize_text(
                             item.get("identifier_namespace")
                         ),

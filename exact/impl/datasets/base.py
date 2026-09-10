@@ -621,6 +621,8 @@ class BaseAlignmentDataset(IDataset):
                 src_iris = set(self.source.entities(kind))
                 tgt_iris = set(self.target.entities(kind))
 
+            if hasattr(self, "eligible_source_iris"):
+                src_iris = src_iris.intersection(self.eligible_source_iris)
             src_map = {iri: self.source_graph.get_labels(iri) for iri in src_iris}
             tgt_map = {iri: self.target_graph.get_labels(iri) for iri in tgt_iris}
             if self.filter_ignored_alignment_classes:
@@ -917,28 +919,12 @@ class BaseAlignmentDataset(IDataset):
                 self.log(f"Candidates file not found at {file_path}", level="error")
                 raise FileNotFoundError(f"Candidates file not found at {file_path}")
 
-            def get_cands(df: pd.DataFrame) -> pd.DataFrame:
+            from exact.utils.mappings import candidate_table_views
 
-                return pd.DataFrame(
-                    [
-                        [source, cand, 0]
-                        for source, _, target_cands in df.values
-                        for cand in literal_eval(target_cands)
-                    ],
-                    columns=["Src", "Tgt", "Label"],
-                )
-
-            # Load One2Many candidates file
-            candidates = read_table(str(file_path))
-            candidates.columns = ["Src", "Tgt", "Candidates"]
-
-            self.log("#Loaded Candidates Path...", level="debug")
-
-            # Get One2One candidates df
-            self._candidates = self._ensure_mapping_kinds(
-                get_cands(candidates),
-                label="candidate",
-            )
+            pairs, _ = candidate_table_views(read_table(str(file_path)))
+            if hasattr(self, "eligible_source_iris"):
+                pairs = pairs.loc[pairs["Src"].astype(str).isin(self.eligible_source_iris)]
+            self._candidates = self._ensure_mapping_kinds(pairs, label="candidate")
             self._candidates = self._filter_candidates_ignored_classes(self._candidates)
             self._annotate_candidate_similarity_stats()
             self._active_candidate_config = {
@@ -1105,6 +1091,8 @@ class BaseAlignmentDataset(IDataset):
         self._candidate_pool_sizes = {}
         for kind in self.entity_kinds:
             src_iris = list(self.source.entities(kind))
+            if hasattr(self, "eligible_source_iris"):
+                src_iris = [iri for iri in src_iris if str(iri) in self.eligible_source_iris]
             tgt_iris = list(self.target.entities(kind))
             if self.filter_ignored_alignment_classes:
                 n_src_before = len(src_iris)
@@ -2012,7 +2000,25 @@ class BaseAlignmentDataset(IDataset):
     def load_reference(self, file_path: Path) -> None:
 
         self._reference = read_table(file_path)
-        self._reference.columns = ["Src", "Tgt", "Label"]
+        if len(self._reference.columns) < 2:
+            raise ValueError("reference tables need source and target columns")
+        source, target = self._reference.columns[:2]
+        self._reference = self._reference.rename(columns={source: "Src", target: "Tgt"})
+        if "Relation" in self._reference:
+            # Relations are labels; an optional confidence Score remains separate.
+            self._reference = self._reference.rename(columns={"Relation": "Label"})
+        elif "Label" not in self._reference:
+            extra = [
+                name
+                for name in self._reference.columns
+                if name not in {"Src", "Tgt", "Score", "SrcKind", "TgtKind"}
+            ]
+            if len(extra) == 1:
+                self._reference = self._reference.rename(columns={extra[0]: "Label"})
+            elif not extra:
+                self._reference["Label"] = "="
+            else:
+                raise ValueError(f"ambiguous reference label columns: {extra}")
         self._reference = self._ensure_mapping_kinds(
             self._reference,
             label="reference",
@@ -2284,6 +2290,43 @@ class BaseAlignmentDataset(IDataset):
 
         return self
 
+    def freeze_source_universe(self, iris: Sequence[str], *, cap: Optional[int], seed: int) -> None:
+        """Freeze eligible groups before retrieval, retaining sources with empty pools."""
+        canonical = sorted(set(str(iri).strip() for iri in iris if str(iri).strip()))
+        if not canonical:
+            raise ValueError("source universe must contain at least one entity")
+        groups = set()
+        for iri in canonical:
+            kind = self._source_entity_kind_index.get(iri)
+            if kind is None or kind not in self.entity_kinds:
+                raise ValueError(f"source universe entity has no eligible ontology kind: {iri}")
+            if kind == EntityKind.CLASS and iri in self.source_ignored_alignment_classes:
+                raise ValueError(f"source universe includes an excluded alignment entity: {iri}")
+            groups.add((iri, kind.value))
+        ranked = sorted(
+            groups,
+            key=lambda item: (
+                hashlib.sha256(f"{int(seed)}\x1f{item[0]}\x1f{item[1]}".encode()).digest(),
+                item,
+            ),
+        )
+        if cap is not None:
+            if cap < 1:
+                raise ValueError("source cap must be positive")
+            ranked = ranked[:cap]
+        self._eligible_source_groups = set(ranked)
+        self.eligible_source_groups = tuple(sorted(ranked))
+        self.eligible_source_iris = tuple(sorted(iri for iri, _ in ranked))
+        identity = hashlib.sha256(
+            "\n".join(f"{iri}\t{kind}" for iri, kind in sorted(ranked)).encode()
+        ).hexdigest()
+        self._candidate_generation_params = {
+            **self._candidate_generation_params,
+            "source_universe_sha256": identity,
+            "source_cap": cap,
+            "source_seed": seed,
+        }
+
     def restrict_sources(self, cap: int, seed: int) -> set[str]:
         """Restrict processed in-memory frames to deterministic source-kind groups.
 
@@ -2315,7 +2358,9 @@ class BaseAlignmentDataset(IDataset):
                 for src in frame["Src"].dropna().astype(str)
             }
 
-        groups = source_groups(universe)
+        groups = getattr(self, "_eligible_source_groups", None)
+        if groups is None:
+            groups = source_groups(universe)
         ranked_groups = sorted(
             groups,
             key=lambda item: (
@@ -2326,6 +2371,7 @@ class BaseAlignmentDataset(IDataset):
         )
         selected_groups = set(ranked_groups[: min(int(cap), len(ranked_groups))])
         selected_sources = {src for src, _ in selected_groups}
+        self.eligible_source_iris = tuple(sorted(selected_sources))
 
         def restrict(frame: Optional[DataFrame]) -> Optional[DataFrame]:
             if frame is None or "Src" not in frame.columns:
@@ -2376,6 +2422,8 @@ class BaseAlignmentDataset(IDataset):
                 "cap": int(cap),
                 "seed": int(seed),
                 "selected_groups": len(selected_groups),
+                "eligible_source_iris": sorted(selected_sources),
+                "source_kind_groups": sorted(selected_groups),
                 "sha256": hashlib.sha256(sample_payload.encode("utf-8")).hexdigest(),
             },
         }

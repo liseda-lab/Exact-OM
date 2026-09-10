@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import time
+from copy import copy
 from collections import defaultdict
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -11,6 +12,7 @@ import seaborn as sns
 from exact.core.entities.kinds import EntityKind
 from exact.core.entities.ontology import OntologyGraph
 from exact.impl.datasets.contextgraph import ContextDataset
+from exact.impl.graph_controls import shuffle_relations
 from exact.utils.formatting import safe_mean
 
 
@@ -42,6 +44,9 @@ class PairAdaptiveContextDataset(ContextDataset):
         self.max_diff_triples = int(max_diff_triples)
         self.max_attr_items = int(max_attr_items)
         self.pair_adaptive_feature_log_every = max(1, int(pair_adaptive_feature_log_every))
+        self._property_extra_cache = {}
+        self._shuffled_graph_cache = {}
+        self.graph_control_manifests = {}
         self._entity_feature_cache: Dict[Tuple[str, str, str], Dict[str, Any]] = {}
         self._direct_superclass_cache: Dict[Tuple[str, str, str], List[str]] = {}
         self._hierarchy_axiom_targets_cache: Dict[Tuple[str, str], List[Tuple[str, str]]] = {}
@@ -68,6 +73,7 @@ class PairAdaptiveContextDataset(ContextDataset):
         payload = super()._cache_fingerprint_payload()
         payload.update(
             {
+                "evidence_schema": 2,
                 "projection_include_literals": self.projection_include_literals,
                 "hierarchical_relation_families": self.hierarchical_relation_families,
                 "hierarchy_max_depth": self.hierarchy_max_depth,
@@ -425,6 +431,9 @@ class PairAdaptiveContextDataset(ContextDataset):
             items.append(
                 {
                     "prop": prop_label,
+                    "prop_iri": value.property_iri,
+                    "datatype": value.datatype,
+                    "language": value.lang,
                     "value": literal,
                     "text": f"{prop_label}: {literal}",
                     "weight": min(1.0, max(0.1, len(literal.split()) / 12.0)),
@@ -454,6 +463,7 @@ class PairAdaptiveContextDataset(ContextDataset):
                 items.append(
                     {
                         "prop": prop_label,
+                        "prop_iri": rel,
                         "value": literal,
                         "text": f"{prop_label}: {literal}",
                         "weight": min(1.0, max(0.1, len(literal.split()) / 12.0)),
@@ -482,6 +492,84 @@ class PairAdaptiveContextDataset(ContextDataset):
         features = self._base_entity_features(iri, graph, side, EntityKind.CLASS)
         features["object_triples"] = self._object_bundle(iri, graph)
         return features
+
+    def _property_experiment_extras(self, side: str) -> Dict[str, Dict[str, list]]:
+        """Index asserted inverse/characteristic facts and bounded usage once per side."""
+        if side in self._property_extra_cache:
+            return self._property_extra_cache[side]
+        source = self._source_for_side(side)
+        graph = self.source_graph if side == "src" else self.target_graph
+        extras = defaultdict(lambda: {"signature": [], "usage": []})
+        from exact.io.sources.evidence import property_schema_evidence
+
+        for row in property_schema_evidence(source):
+            iri, target = row["subject_iri"], row["object_iri"]
+            extras[iri]["signature"].append(
+                {
+                    **{
+                        key: value
+                        for key, value in row.items()
+                        if key not in {"relation_label", "object_label"}
+                    },
+                    "triple": (
+                        graph.get_labels(iri)[0],
+                        row["relation_label"],
+                        row["object_label"] or graph.get_labels(target)[0],
+                    ),
+                    "score": 1.0,
+                    "property_schema": True,
+                }
+            )
+        for edge in sorted(graph.edges or [], key=lambda edge: edge.astuple()):
+            usage = extras[edge.rel]["usage"]
+            if len(usage) >= min(8, self.max_object_triples):
+                continue
+            usage.append(
+                {
+                    "triple": tuple(graph.get_labels(value)[0] for value in edge.astuple()),
+                    "rel_iri": edge.rel,
+                    "subject_iri": edge.src,
+                    "object_iri": edge.dst,
+                    "score": graph.edge_ic_norm(edge.astuple()),
+                    "evidence_group": "usage",
+                }
+            )
+        self._property_extra_cache[side] = dict(extras)
+        return self._property_extra_cache[side]
+
+    def shuffled_object_bundle(self, iri: str, side: str, seed: int) -> List[Dict[str, Any]]:
+        """Score relation controls from a cached shuffled graph, keeping types unchanged."""
+        if seed is None:
+            raise ValueError("relations_shuffled requires an explicit request_seed")
+        key = (side, int(seed))
+        if key not in self._shuffled_graph_cache:
+            original = self.source_graph if side == "src" else self.target_graph
+            kinds = {
+                entity: kind.value
+                for kind in EntityKind
+                if kind.value != "annotation_property"
+                for entity in self._source_for_side(side).entities(kind)
+            }
+            edges, manifest = shuffle_relations(original.edges or [], seed=seed, kinds=kinds)
+            graph = copy(original)
+            graph.edges = edges
+            graph.out_edges = graph._build_out_edges()
+            graph.graph = graph._build_graph(edges)
+            for field in (
+                "_node_ic_cache",
+                "_edge_ic_cache",
+                "_edge_ic_max_cache",
+                "_incident_edge_cache",
+                "_rel_adj_cache",
+                "_edge_cost_cache",
+                "_example_triples_cache",
+            ):
+                setattr(graph, field, None)
+            graph._raw_neighborhood_cache = {}
+            graph._context_subgraph_cache = {}
+            self._shuffled_graph_cache[key] = graph
+            self.graph_control_manifests[f"{side}:{seed}"] = manifest
+        return self._object_bundle(iri, self._shuffled_graph_cache[key])
 
     def _bundle_for_property(
         self,

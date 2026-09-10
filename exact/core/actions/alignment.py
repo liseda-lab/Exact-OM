@@ -665,6 +665,18 @@ def _run_alignment_session(
     sampled_full_reference_path: Optional[Path] = None
     sampled_training_reference_path: Optional[Path] = None
     effective_candidates_file_path = candidates_file_path
+    declared_mode = configs.data.execution_mode
+    execution_mode = declared_mode or (
+        "local_ranking" if candidates_file_path is not None else "global_alignment"
+    )
+    local_ranking = execution_mode == "local_ranking"
+    if local_ranking and candidates_file_path is None:
+        raise ValueError("data.execution_mode=local_ranking requires a supplied candidate pool")
+    if declared_mode is not None and configs.evaluation.dual_global_local:
+        raise ValueError(
+            "explicit execution_mode requires separate global and local runs; "
+            "dual_global_local cannot evaluate one execution as both tasks"
+        )
     evaluation_full_reference: Any = full_reference_file_path
     evaluation_training_reference: Any = training_reference_file_path
     materialized_full_reference_path: Optional[Path] = None
@@ -701,6 +713,12 @@ def _run_alignment_session(
 
         with timing_session.stage("Dataset.LoadOntologies"):
             dataset.load_ontologies(source_file_path, target_file_path)
+        if configs.data.source_universe is not None:
+            dataset.freeze_source_universe(
+                Path(configs.data.source_universe).read_text(encoding="utf-8").splitlines(),
+                cap=configs.run.source_cap,
+                seed=configs.seed,
+            )
         dataset_loaded_from_cache = dataset.has_cache()
 
         if dataset_loaded_from_cache:
@@ -760,9 +778,9 @@ def _run_alignment_session(
                     **configs.plot_params.model_dump(),
                 )
 
-        if configs.run.source_cap is not None:
+        if configs.run.source_cap is not None or configs.data.source_universe is not None:
             sampled_sources = dataset.restrict_sources(
-                cap=configs.run.source_cap,
+                cap=configs.run.source_cap or len(dataset.eligible_source_iris),
                 seed=configs.seed,
             )
             logger.info(
@@ -797,6 +815,9 @@ def _run_alignment_session(
                     .itertuples(index=False, name=None)
                 }
 
+            if getattr(dataset, "eligible_source_groups", None) is not None:
+                sampled_source_groups = set(dataset.eligible_source_groups)
+
             def sampled_mask(frame: Any) -> Any:
                 source_column = (
                     "Src"
@@ -821,8 +842,6 @@ def _run_alignment_session(
             sampled_inputs_dir = Path(dataset.output_path) / "sampled_inputs"
             if candidates_file_path is not None:
                 candidate_frame = read_table(candidates_file_path)
-                if candidate_frame.empty:
-                    raise ValueError("cannot source-cap an empty candidate file")
                 candidate_frame = candidate_frame.loc[sampled_mask(candidate_frame)].reset_index(
                     drop=True
                 )
@@ -871,11 +890,15 @@ def _run_alignment_session(
 
     training_available = training_reference_file_path is not None
     llm_supervision, _ = configs.supervision.resolve_component(
-        "llm", training_available=training_available
+        "llm",
+        training_available=training_available,
+        profile_binding={"dataset_signature": getattr(dataset, "dataset_signature", None)},
     )
     selector_supervision = {
         component: configs.supervision.resolve_component(
-            component, training_available=training_available
+            component,
+            training_available=training_available,
+            profile_binding={"dataset_signature": getattr(dataset, "dataset_signature", None)},
         )[0]
         for component in ("rerank", "accept", "calibration")
     }
@@ -897,6 +920,82 @@ def _run_alignment_session(
             "llm_calibration_reference_file_path",
             str(training_reference_file_path),
         )
+    fitting_graph_config = None
+    graph = primary_params.get("graph", {})
+    if configs.data.train_candidates is not None and graph.get("mode") in {
+        "inductive",
+        "graph_only",
+    }:
+        if not graph.get("artifact") or not Path(graph["artifact"]).is_file():
+            fitting_graph_config = dict(graph)
+            primary_params["graph"] = {**graph, "mode": "features", "artifact": None}
+            if graph["mode"] == "graph_only":
+                primary_params.update(use_lexical=False, use_context=False, use_llm=False)
+                primary_params["strsim"] = {**primary_params.get("strsim", {}), "enabled": False}
+    fitting_llm_config = None
+    experiment = primary_params["llm_experiment_config"]
+    pending_learning = (
+        (
+            experiment.get("exemplars") == "knn"
+            and (
+                not experiment.get("exemplar_artifact")
+                or not Path(experiment["exemplar_artifact"]).is_file()
+            )
+        )
+        or (
+            experiment.get("distill") == "student"
+            and (
+                not experiment.get("distill_artifact")
+                or not Path(experiment["distill_artifact"]).is_file()
+            )
+        )
+        or (
+            experiment["gate"]["mode"] == "learned"
+            and (
+                not experiment["gate"].get("artifact")
+                or not Path(experiment["gate"]["artifact"]).is_file()
+            )
+        )
+    )
+    if experiment.get("enabled") and configs.data.train_candidates is not None and pending_learning:
+        fitting_llm_config = {**experiment, "gate": dict(experiment["gate"])}
+        primary_params["llm_experiment_config"] = {
+            **experiment,
+            "exemplars": "off",
+            "distill": "off",
+        }
+        if experiment["gate"]["mode"] == "learned":
+            primary_params["llm_experiment_config"]["gate"] = {
+                **experiment["gate"],
+                "mode": "off",
+                "artifact": None,
+            }
+    fitting_fusion_config = None
+    if configs.data.train_candidates is not None and primary_params["fusion_config"].get(
+        "mode"
+    ) in {"analytic_fitted", "learned_global"}:
+        artifact = primary_params["fusion_config"].get("artifact")
+        if not artifact or not Path(artifact).is_file():
+            fitting_fusion_config = dict(primary_params["fusion_config"])
+            primary_params["fusion_config"] = {
+                **fitting_fusion_config,
+                "mode": "analytic_shipped",
+                "artifact": None,
+            }
+    fitting_gate_config = None
+    gate = primary_params["llm_experiment_config"]["gate"]
+    if primary_params["llm_experiment_config"].get("enabled") and gate["mode"] in {
+        "source_top_fraction",
+        "pair_top_fraction",
+    }:
+        artifact = gate.get("artifact")
+        if not artifact or not Path(artifact).is_file():
+            fitting_gate_config = dict(gate)
+            primary_params["llm_experiment_config"]["gate"] = {
+                **gate,
+                "mode": "off",
+                "artifact": None,
+            }
     model_specs.append((primary.name, primary_params))
     for extra in model_sequence[1:]:
         if extra.name is None:
@@ -925,6 +1024,14 @@ def _run_alignment_session(
                 configs.matching.calibration.model_dump(mode="python"),
             )
             extra_params.setdefault("nil_config", configs.matching.nil.model_dump(mode="python"))
+            if (
+                configs.data.train_candidates is not None
+                and extra_params["matching_calibration"]["mode"] != "none"
+                and not extra_params["matching_calibration"].get("artifact")
+            ):
+                extra_params["matching_calibration"]["artifact"] = str(
+                    Path(output_dir_path) / "fitting" / "score_calibrator.json"
+                )
         model_specs.append((extra.name, extra_params))
 
     trainer_factory = configs.trainer_runtime
@@ -937,22 +1044,27 @@ def _run_alignment_session(
         output_dir=output_dir_path,
         logger=logger,
         extraction_config=configs.matching.extraction.model_dump(mode="python"),
+        training_candidates_file_path=configs.data.train_candidates,
+        fitting_fusion_config=fitting_fusion_config,
+        fitting_graph_config=fitting_graph_config,
+        fitting_llm_config=fitting_llm_config,
+        training_reference_file_path=training_reference_file_path,
+        fitting_gate_config=fitting_gate_config,
+        supervision_config=configs.supervision.model_dump(mode="python"),
     )
     progress.finish("Trainer", f"models={len(model_specs)}")
 
     logger.info("Computing alignment...")
     inference_kwargs = configs.inference_params.model_dump()
-    inference_kwargs["local_alignment"] = effective_candidates_file_path is not None
+    inference_kwargs["local_alignment"] = local_ranking
     inference_kwargs["explanation_shard_mb"] = configs.output.explanations.shard_mb
 
     with timing_session.stage("Alignment") as alignment_span:
         progress.start("Inference", f"pairs={len(dataset)}")
         inference_kwargs["run_progress"] = progress
-        if effective_candidates_file_path is None:
+        if not local_ranking:
             inference_kwargs.update(configs.alignment_params.model_dump())
-            alignment, avg_t = trainer.predict(**inference_kwargs)
-        else:
-            alignment, avg_t = trainer.predict(**inference_kwargs)
+        alignment, avg_t = trainer.predict(**inference_kwargs)
         if getattr(progress, "fractions", {}).get("Inference", 0.0) < 1.0:
             progress.finish("Inference", f"avg={avg_t:.4f}s/example")
         if (
@@ -997,7 +1109,7 @@ def _run_alignment_session(
             progress.start("Prefilter", "applying exact matches")
             logger.info("Applying Exact Matches to alignment...")
             with timing_session.stage("Alignment.Prefilter"):
-                if effective_candidates_file_path is None:
+                if not local_ranking:
                     alignment = trainer.apply_prefilter(
                         alignment, **configs.alignment_params.model_dump()
                     )
@@ -1025,7 +1137,7 @@ def _run_alignment_session(
         save_params["save_json"] = False
         output_paths = trainer.save_results(
             alignment,
-            candidates_one2many_path=effective_candidates_file_path,
+            candidates_one2many_path=(effective_candidates_file_path if local_ranking else None),
             sub_dir=task_name,
             output_formats=configs.io.output_formats,
             relation_prediction=configs.matching.relation_prediction,
@@ -1111,7 +1223,9 @@ def _run_alignment_session(
                     target_file_path=dataset.target,
                     train_reference_file_path=None,
                     full_reference_file_path=None,
-                    reference_candidates=effective_candidates_file_path,
+                    reference_candidates=(
+                        effective_candidates_file_path if local_ranking else None
+                    ),
                     logger=logger,
                     backends=configs.evaluation.backends,
                     backend_options=backend_options,
@@ -1125,8 +1239,7 @@ def _run_alignment_session(
                 results = run_evaluation(
                     alignment=Path(
                         evaluation_alignment_path
-                        if effective_candidates_file_path is None
-                        and evaluation_full_reference is not None
+                        if not local_ranking and evaluation_full_reference is not None
                         else alignment_file_path
                     ),
                     output_dir_path=evaluation_dir,
@@ -1136,11 +1249,11 @@ def _run_alignment_session(
                     target_file_path=dataset.target,
                     train_reference_file_path=evaluation_training_reference,
                     full_reference_file_path=(
-                        evaluation_full_reference
-                        if effective_candidates_file_path is None
-                        else None
+                        evaluation_full_reference if not local_ranking else None
                     ),
-                    reference_candidates=effective_candidates_file_path,
+                    reference_candidates=(
+                        effective_candidates_file_path if local_ranking else None
+                    ),
                     logger=logger,
                     backends=configs.evaluation.backends,
                     backend_options=backend_options,
@@ -1207,7 +1320,7 @@ def _run_alignment_session(
                 else None
             ),
         }
-    if configs.run.source_cap is not None:
+    if configs.run.source_cap is not None or configs.data.source_universe is not None:
         sample_config = (dataset.candidate_pool_manifest.get("retrieval_config") or {}).get(
             "source_sample"
         ) or {}
@@ -1242,6 +1355,14 @@ def _run_alignment_session(
             "candidate_pool_fingerprint": dataset.candidate_pool_fingerprint,
             "reference_inputs": reference_inputs,
         }
+    run_metadata["execution"] = {
+        "mode": execution_mode,
+        "explicit": declared_mode is not None,
+        "candidate_provenance": configs.data.candidate_provenance
+        or ("benchmark_supplied" if effective_candidates_file_path else "generated"),
+        "executed_stages": [record.stage for record in trainer_stage_records],
+        "global_extraction": not local_ranking,
+    }
     _merge_run_stats(run_stats_path, run_metadata)
     progress.complete("run stages completed")
     return results, run_stats_path

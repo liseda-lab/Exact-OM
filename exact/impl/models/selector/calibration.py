@@ -844,7 +844,11 @@ class CalibrationMixin:
         train_indices = sorted({idx for group in groups for idx in group["indices"]})
         if not train_indices:
             return None
-        mean, scale = self._feature_mean_scale([features[idx] for idx in train_indices])
+        model_type = self.rerank_config["model"] if self.experiments_enabled else "current_linear"
+        expanded = {idx: self._rank_basis(features[idx], model_type) for idx in train_indices}
+        mean, scale = self._feature_mean_scale([expanded[idx] for idx in train_indices])
+        if model_type == "channel_gating":
+            mean, scale = [0.0] * len(mean), [1.0] * len(scale)
         local_pos = {idx: pos for pos, idx in enumerate(train_indices)}
         max_epochs = int(self.calibration["max_epochs"])
         log_interval = max(25, max(1, max_epochs // 4))
@@ -862,7 +866,7 @@ class CalibrationMixin:
         # predict() runs under torch.no_grad(); calibration still needs autograd.
         with torch.enable_grad():
             x = torch.tensor(
-                [self._standardize(features[idx], mean, scale) for idx in train_indices],
+                [self._standardize(expanded[idx], mean, scale) for idx in train_indices],
                 dtype=torch.float32,
             )
             dim = int(x.shape[1])
@@ -882,13 +886,28 @@ class CalibrationMixin:
                     if not positions or not positive_positions:
                         continue
                     pos_tensor = torch.tensor(positions, dtype=torch.long)
-                    logits = x[pos_tensor].matmul(weights) + bias
+                    effective_weights = (
+                        torch.softmax(weights, dim=0) if model_type == "channel_gating" else weights
+                    )
+                    logits = x[pos_tensor].matmul(effective_weights) + bias
                     log_probs = torch.log_softmax(logits, dim=0)
                     positive_local = torch.tensor(
                         [positions.index(pos_idx) for pos_idx in positive_positions],
                         dtype=torch.long,
                     )
-                    loss = loss - torch.logsumexp(log_probs[positive_local], dim=0)
+                    if self.experiments_enabled and self.rerank_config["mode"] == "pairwise":
+                        negative_local = [
+                            i
+                            for i in range(len(positions))
+                            if positions[i] not in positive_positions
+                        ]
+                        if negative_local:
+                            differences = (
+                                logits[positive_local, None] - logits[negative_local][None, :]
+                            )
+                            loss = loss + torch.nn.functional.softplus(-differences).mean()
+                    else:
+                        loss = loss - torch.logsumexp(log_probs[positive_local], dim=0)
                 loss = loss / n_groups + l2 * torch.sum(weights * weights)
                 loss.backward()
                 opt.step()
@@ -915,7 +934,13 @@ class CalibrationMixin:
                 "debug",
             )
         return {
-            "weights": weights.detach().cpu().tolist(),
+            "model_type": model_type,
+            "weights": (
+                torch.softmax(weights, dim=0) if model_type == "channel_gating" else weights
+            )
+            .detach()
+            .cpu()
+            .tolist(),
             "bias": float(bias.detach().cpu().item()),
             "mean": mean,
             "scale": scale,
@@ -943,6 +968,10 @@ class CalibrationMixin:
             probs = self._softmax(util_values, temperature=self.temperature)
             prob_by_idx = {idx: float(prob) for idx, prob in zip(idxs, probs)}
             order = sorted(idxs, key=lambda idx: utilities[idx], reverse=True)
+            source_choice = str(group.iloc[0].get("llm_source_choice", ""))
+            chosen = [idx for idx in order if str(group.at[idx, "Tgt"]) == source_choice]
+            if chosen:
+                order = chosen + [idx for idx in order if idx not in chosen]
             winner_idx = order[0]
             second_idx = order[1] if len(order) > 1 else None
             utility_margin = utilities[winner_idx] - (
@@ -983,6 +1012,7 @@ class CalibrationMixin:
             decisions[group_id] = {
                 "source": src_text,
                 "source_kind": src_kind,
+                "displayed_none": source_choice == "__NONE__",
                 "indices": idxs,
                 "winner_idx": winner_idx,
                 "winner_pair": winner_pair,

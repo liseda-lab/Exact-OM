@@ -4,6 +4,8 @@ import hashlib  # noqa: F401
 import inspect  # noqa: F401
 import json  # noqa: F401
 import math
+import os
+import signal
 import re
 import time  # noqa: F401
 import uuid
@@ -40,6 +42,7 @@ from .audit_io import AuditIOMixin, _semantic_collate_fn
 from .checkpointing import CheckpointingMixin
 from .overlays import OverlaysMixin
 from .rationales import RationalesMixin
+from .fitting import TrainingPoolMixin, source_batches
 
 bind_alignment_io(
     relation_typer=predict_relations,
@@ -73,7 +76,7 @@ class _FinalizationState:
 
 
 class SemanticAlignmentRunner(
-    CheckpointingMixin, AuditIOMixin, RationalesMixin, OverlaysMixin, ITrainer
+    TrainingPoolMixin, CheckpointingMixin, AuditIOMixin, RationalesMixin, OverlaysMixin, ITrainer
 ):
     """
     External loop orchestrator for SemanticScorer inference.
@@ -90,8 +93,24 @@ class SemanticAlignmentRunner(
         output_dir: Optional[Path] = None,
         logger: Optional[Any] = None,
         extraction_config: Optional[Dict[str, Any]] = None,
+        training_candidates_file_path: Optional[Path] = None,
+        fitting_fusion_config: Optional[Dict[str, Any]] = None,
+        fitting_graph_config: Optional[Dict[str, Any]] = None,
+        fitting_llm_config: Optional[Dict[str, Any]] = None,
+        training_reference_file_path: Optional[Path] = None,
+        fitting_gate_config: Optional[Dict[str, Any]] = None,
+        source_universe: Optional[List[str]] = None,
+        supervision_config: Optional[Dict[str, Any]] = None,
         **kwargs,
     ):
+        self.fitting_graph_config = fitting_graph_config
+        self.fitting_llm_config = fitting_llm_config
+        self.training_reference_file_path = training_reference_file_path
+        self.fitting_gate_config = fitting_gate_config
+        self.source_universe = source_universe
+        self.supervision_config = dict(supervision_config or {})
+        self.fitting_fusion_config = fitting_fusion_config
+        self.training_candidates_file_path = training_candidates_file_path
         self._extraction_config = {
             "mode": "greedy",
             "assignment_component_cap": 500,
@@ -102,6 +121,8 @@ class SemanticAlignmentRunner(
             "greedy",
             "mutual_best",
             "assignment",
+            "assignment_accepted_utility",
+            "assignment_legacy",
             "stable_marriage",
         }:
             raise ValueError(f"Unknown global extraction mode: {extraction_mode!r}")
@@ -1021,6 +1042,22 @@ class SemanticAlignmentRunner(
                     state.threshold,
                     state.cardinality,
                 )
+            if "llm_source_choice" in candidate_df:
+                for source, group in candidate_df.groupby("Src", sort=False):
+                    choices = group["llm_source_choice"].dropna().astype(str).unique()
+                    if not len(choices):
+                        continue
+                    if len(choices) != 1:
+                        raise ValueError(f"Conflicting comparative choices for {source}")
+                    choice = choices[0]
+                    candidate_df.loc[group.index, "S_before_source_choice"] = candidate_df.loc[
+                        group.index, "S_final"
+                    ]
+                    rejected = group.index[group["Tgt"].astype(str) != choice]
+                    candidate_df.loc[rejected, "S_final"] = 0.0
+                    candidate_df.loc[group.index, "source_choice_reason"] = (
+                        "displayed_none" if choice == "__NONE__" else "comparative_choice"
+                    )
             state.all_mappings = list(
                 zip(candidate_df["Src"], candidate_df["Tgt"], candidate_df["S_final"])
             )
@@ -1247,7 +1284,37 @@ class SemanticAlignmentRunner(
         run_progress: Optional[Any] = None,
         **kwargs,
     ) -> Tuple[List[EntityMapping], float]:
+        if os.getenv("EXACT_EXPERIMENT_RUNTIME") and not enable_checkpoints:
+            raise ValueError("Experiment runtime requires checkpoints for bounded stop/recovery")
+        stop_path = (
+            Path(os.environ["EXACT_EXPERIMENT_STOP_FILE"])
+            if os.getenv("EXACT_EXPERIMENT_STOP_FILE")
+            else None
+        )
+        if stop_path is not None:
+            signal.signal(signal.SIGTERM, lambda *_: stop_path.touch())
         self.dataset.default_kind = kind
+        self.fit_training_pool(batch_size=batch_size)
+        grouped_decisions = bool(getattr(self.model, "llm_experiment_enabled", False)) and (
+            getattr(self.model, "llm_experiment_config", {})
+            .get("decision", {})
+            .get("mode", "binary")
+            != "binary"
+            or bool(self.fitting_gate_config)
+            or getattr(self.model, "llm_experiment_config", {}).get("gate", {}).get("mode")
+            == "learned"
+        )
+        if grouped_decisions:
+            columns = [
+                column
+                for column in ("Src", "SrcKind", "Tgt", "TgtKind")
+                if column in self.dataset.dataframe
+            ]
+            self.dataset._df = self.dataset.dataframe.sort_values(
+                columns, kind="stable"
+            ).reset_index(drop=True)
+            self.dataset._invalidate_active_dataframe_cache()
+        self.prepare_population_gate(batch_size=batch_size)
         self.model.eval()
         for extra_model in getattr(self, "models", [])[1:]:
             try:
@@ -1433,10 +1500,15 @@ class SemanticAlignmentRunner(
         if restored_examples > 0:
             dataset_for_dl = Subset(self.dataset, range(restored_examples, total_examples))
 
+        batching = {"batch_size": batch_size, "shuffle": False}
+        if grouped_decisions:
+            remaining_frame = (
+                self.dataset._active_dataframe().iloc[restored_examples:].reset_index(drop=True)
+            )
+            batching = {"batch_sampler": list(source_batches(remaining_frame, int(batch_size)))}
         dl = DataLoader(
             dataset_for_dl,
-            batch_size=batch_size,
-            shuffle=False,
+            **batching,
             num_workers=num_workers,
             pin_memory=True,
             persistent_workers=True if num_workers > 0 else None,
@@ -1457,6 +1529,7 @@ class SemanticAlignmentRunner(
             "info",
         )
 
+        last_checkpoint_at = time.monotonic()
         for step, batch in enumerate(dl, start=1):
             src_iri = batch["src_iri"]
             tgt_iri = batch["tgt_iri"]
@@ -1486,7 +1559,14 @@ class SemanticAlignmentRunner(
                     tgt_ctx_raw=tgt_ctx_raw,
                     src_ctx_bridges=src_ctx_bridges,
                     tgt_ctx_bridges=tgt_ctx_bridges,
-                    label=labels,
+                    label=(
+                        labels
+                        if getattr(self.model, "llm_experiment_config", {})
+                        .get("gate", {})
+                        .get("mode")
+                        == "oracle"
+                        else None
+                    ),
                 )
             self._record_llm_backend_usage(out.get("backend_usage"))
             self._record_llm_calibration(out.get("llm_calibration"))
@@ -1635,6 +1715,23 @@ class SemanticAlignmentRunner(
                 }
                 for output_name, values in optional_experiment_values.items():
                     candidate_row[output_name] = float(values[idx])
+                source_decision = next(
+                    (
+                        record
+                        for record in out.get("llm_grouped_decisions", [])
+                        if record["source"] == str(s)
+                    ),
+                    None,
+                )
+                if source_decision is not None:
+                    candidate_row["llm_grouped_decision"] = json.dumps(
+                        source_decision, sort_keys=True
+                    )
+                    if (
+                        source_decision.get("valid")
+                        and source_decision.get("integration") == "source_first"
+                    ):
+                        candidate_row["llm_source_choice"] = source_decision["choice"]
                 if gate_diagnostics is not None:
                     candidate_row.update(self._gate_candidate_fields(gate_diagnostics[idx]))
                 self._candidate_rows.append(candidate_row)
@@ -1675,7 +1772,12 @@ class SemanticAlignmentRunner(
             if (
                 checkpoint_enabled
                 and cp_path
-                and (step % checkpoint_every == 0 or step == total_batches)
+                and (
+                    step % checkpoint_every == 0
+                    or step == total_batches
+                    or time.monotonic() - last_checkpoint_at >= 300
+                    or (stop_path is not None and stop_path.exists())
+                )
             ):
                 self._write_checkpoint_state(
                     cp_path,
@@ -1685,6 +1787,7 @@ class SemanticAlignmentRunner(
                     mappings=all_mappings,
                     results_json=self.results_json,
                 )
+                last_checkpoint_at = time.monotonic()
                 self._maybe_persist_model_cache(reason="checkpoint")
 
             if step % log_every == 0 or step == total_batches:
