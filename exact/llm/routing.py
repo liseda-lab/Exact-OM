@@ -15,6 +15,7 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 
 import httpx
 
+from exact.llm.ledger import RequestLedger
 from exact.utils.formatting import strip_code_fences
 
 DEFAULT_OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
@@ -245,6 +246,8 @@ class OpenRouterClient:
     def __init__(self, log=None):
         self.log = log or _noop_logger
         self.max_retries = DEFAULT_OPENROUTER_MAX_RETRIES
+        self.ledger_dir: Optional[Path] = None
+        self.retry_unknown_requests = False
         self._client = httpx.Client(
             headers={"Accept": "application/json"},
             limits=httpx.Limits(
@@ -435,10 +438,8 @@ class OpenRouterClient:
         logit_bias: Optional[Dict[str, float]] = None,
         provider: Optional[Dict[str, Any]] = None,
         seed: Optional[int] = None,
+        role: Optional[str] = None,
     ) -> Dict[str, Any]:
-        api_key = self.resolve_api_key(profile)
-        if not api_key:
-            raise RuntimeError(f"Missing OpenRouter API key for profile '{profile.name}'.")
         payload: Dict[str, Any] = {
             "model": profile.model,
             "messages": messages,
@@ -461,12 +462,8 @@ class OpenRouterClient:
         merged_provider = self._merged_provider(profile, provider)
         if merged_provider is not None:
             payload["provider"] = merged_provider
-        return self._http_json(
-            url=f"{profile.api_base}/chat/completions",
-            method="POST",
-            headers=_json_headers(api_key=api_key, extra=profile.extra_headers),
-            payload=payload,
-            timeout_secs=profile.timeout_secs,
+        return self._generation(
+            profile, payload, "chat/completions", role=role, requested_seed=seed
         )
 
     def completion(
@@ -482,10 +479,8 @@ class OpenRouterClient:
         logit_bias: Optional[Dict[str, float]] = None,
         provider: Optional[Dict[str, Any]] = None,
         seed: Optional[int] = None,
+        role: Optional[str] = None,
     ) -> Dict[str, Any]:
-        api_key = self.resolve_api_key(profile)
-        if not api_key:
-            raise RuntimeError(f"Missing OpenRouter API key for profile '{profile.name}'.")
         payload: Dict[str, Any] = {
             "model": profile.model,
             "prompt": prompt,
@@ -508,13 +503,106 @@ class OpenRouterClient:
         merged_provider = self._merged_provider(profile, provider)
         if merged_provider is not None:
             payload["provider"] = merged_provider
-        return self._http_json(
-            url=f"{profile.api_base}/completions",
-            method="POST",
-            headers=_json_headers(api_key=api_key, extra=profile.extra_headers),
-            payload=payload,
-            timeout_secs=profile.timeout_secs,
+        return self._generation(profile, payload, "completions", role=role, requested_seed=seed)
+
+    def _generation(
+        self,
+        profile: LLMProfile,
+        payload: Dict[str, Any],
+        endpoint: str,
+        *,
+        role: Optional[str],
+        requested_seed: Optional[int],
+    ) -> Dict[str, Any]:
+        """Persist each wire attempt and raw response before any parser sees it."""
+        strict = os.getenv("EXACT_EXPERIMENT_MODE") == "1"
+        if strict:
+            payload["provider"] = {**(payload.get("provider") or {}), "allow_fallbacks": False}
+        directory = self.ledger_dir or os.getenv("EXACT_OPENROUTER_LEDGER_DIR")
+        url = f"{profile.api_base}/{endpoint}"
+        if not directory:
+            api_key = self.resolve_api_key(profile)
+            if not api_key:
+                raise RuntimeError(f"Missing OpenRouter API key for profile '{profile.name}'.")
+            return self._http_json(
+                url=url,
+                method="POST",
+                headers=_json_headers(api_key=api_key, extra=profile.extra_headers),
+                payload=payload,
+                timeout_secs=profile.timeout_secs,
+            )
+        ledger = RequestLedger(Path(directory))
+        identity = {
+            "schema_version": 1,
+            "role": role or profile.name,
+            "endpoint": url,
+            "payload": _sanitize_json_payload(payload),
+            "revision": profile.revision,
+            "tokenizer": profile.tokenizer,
+            "tokenizer_revision": profile.tokenizer_revision,
+            "requested_seed": requested_seed,
+        }
+        key = ledger.plan(identity)
+
+        def decode(raw: bytes) -> Dict[str, Any]:
+            result = _load_json_from_text(raw.decode("utf-8"))
+            if strict:
+                if result.get("model") != profile.model:
+                    raise RuntimeError(
+                        "OpenRouter returned an unexpected or missing model identity"
+                    )
+                allowed = (payload.get("provider") or {}).get("only")
+                if allowed and result.get("provider") not in allowed:
+                    raise RuntimeError(
+                        "OpenRouter returned an unexpected or missing provider identity"
+                    )
+            return result
+
+        cached = ledger.cached(key)
+        if cached is not None:
+            return decode(cached)
+        api_key = self.resolve_api_key(profile)
+        if not api_key:
+            raise RuntimeError(f"Missing OpenRouter API key for profile '{profile.name}'.")
+        content = _dump_json_payload(payload)
+        allow_unknown = (
+            self.retry_unknown_requests or os.getenv("EXACT_OPENROUTER_RETRY_UNKNOWN") == "1"
         )
+        for retry in range(self.max_retries + 1):
+            number = ledger.sent(key, retry_unknown=allow_unknown)
+            try:
+                response = self._client.request(
+                    method="POST",
+                    url=url,
+                    headers=_json_headers(api_key=api_key, extra=profile.extra_headers),
+                    content=content,
+                    timeout=profile.timeout_secs,
+                )
+            except httpx.TransportError as exc:
+                ledger.unknown(key, number, type(exc).__name__)
+                # Delivery may have happened. Only explicit policy allows another paid attempt.
+                if allow_unknown and retry < self.max_retries:
+                    self._sleep_before_retry(retry)
+                    continue
+                raise RuntimeError(
+                    f"OpenRouter request {key} has unknown delivery; checkpoint preserved"
+                ) from exc
+            except BaseException as exc:
+                ledger.unknown(key, number, type(exc).__name__)
+                raise
+            # This transaction commits bytes before JSON/probability extraction.
+            ledger.received(key, number, response.content, response.status_code)
+            if response.is_error:
+                if self._should_retry_status(response.status_code) and retry < self.max_retries:
+                    self._sleep_before_retry(retry)
+                    continue
+                raise RuntimeError(
+                    f"OpenRouter HTTP {response.status_code}; request {key} retained"
+                )
+            result = decode(response.content)
+            ledger.usage(key, number, result.get("usage") or {})
+            return result
+        raise RuntimeError("OpenRouter request attempts exhausted")
 
 
 class LLMRouter:
@@ -578,6 +666,12 @@ class LLMRouter:
         fallback_name = self.routing.fallback_for_task(task)
         primary = self._profile(primary_name)
         fallback = self._profile(fallback_name)
+        if os.getenv("EXACT_EXPERIMENT_MODE") == "1":
+            if primary is None or primary.backend != "openrouter":
+                raise RuntimeError(
+                    f"Experiment role '{task}' requires an explicit OpenRouter profile"
+                )
+            fallback = None
 
         if primary is None:
             if fallback is None:

@@ -515,6 +515,7 @@ class ContextDataset(BaseAlignmentDataset):
                 system = self._default_verbaliser_system_prompt
                 user = str(prompt).strip()
             payload = self._llm_router.hosted.chat_completion(
+                role="verbaliser",
                 profile=profile,
                 messages=[
                     {"role": "system", "content": system},
