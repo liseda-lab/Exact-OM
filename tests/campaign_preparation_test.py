@@ -39,10 +39,21 @@ def test_preparation_covers_every_family_without_executing_or_inventing_readines
         ("E25", "E07"),
         ("E07", "E25-trust"),
         ("E19", "E18"),
+        ("E22", "E22-policy"),
         ("G4", "E17"),
     ]:
         assert order.index(before) < order.index(after)
     by_id = {step.id: step for step in lock.steps}
+    assert "E13-enrichment" not in by_id["G4"].requires
+    assert "E22-policy" not in by_id["G4"].requires
+    assert set(by_id["G4"].requires) == {"E00", *lock.composition_sources}
+    assert by_id["E22-policy"].case == "D1"
+    assert "selected_heads" in by_id["E22"].inherits
+    assert by_id["E22-policy"].inherits == ["selected_heads", "E05_initial"]
+    assert by_id["E04"].selection.decisions[0].metric == "nil.nil_aware.F1"
+    assert any(
+        guard.metric == "nil.non_nil_MRR" for guard in by_id["E04"].selection.decisions[0].guards
+    )
     assert by_id["E04-pool-miss"].case == "D0"
     assert by_id["E17"].source_cap is None
     assert by_id["E17"].seeds == [17, 29, 43]
@@ -159,12 +170,13 @@ def test_enrichment_and_progressive_combination_cannot_block_or_fake_initial_res
         )
         == []
     )
-    assert "combined" not in {arm.id for arm in steps["E05"].arms}
     inventory = load_yaml_mapping(path.parent / "arm-prerequisites.yaml")
-    combined = next(arm for arm in inventory["E05"] if arm["arm"] == "combined")
-    assert combined["status"] == "conditional_unadmitted"
-    assert combined["comparisons"] == []
-    assert "supported component results" in combined["reason"]
+    for family in ("E05", "E20"):
+        assert "combined" not in {arm.id for arm in steps[family].arms}
+        combined = next(arm for arm in inventory[family] if arm["arm"] == "combined")
+        assert combined["status"] == "conditional_unadmitted"
+        assert combined["comparisons"] == []
+        assert "supported component results" in combined["reason"]
 
 
 def test_g4_enforces_scoped_local_quality_and_original_inference_cost(tmp_path):
@@ -246,10 +258,12 @@ def test_published_comparator_is_frozen_and_counts_three_additional_final_design
     root = Path(__file__).resolve().parents[1]
     cases = _cases()
     for name in ("H0", "H1", "H2"):
+        universe = tmp_path / f"{name}.sources"
+        universe.write_text("source:one\nsource:two\n")
         cases[name].update(
             source_universe={
-                "path": str(tmp_path / f"{name}.unopened.sources"),
-                "sha256": "a" * 64,
+                "path": str(universe),
+                "sha256": sha256_file(universe),
             },
             references={
                 "test": {"path": str(tmp_path / f"{name}.unopened.gold"), "sha256": "b" * 64}
@@ -277,12 +291,22 @@ def test_published_comparator_is_frozen_and_counts_three_additional_final_design
             step.id: {"status": "screened_out"} for step in lock.steps if step.phase != "final"
         },
     }
+    evidence["experiments"]["E13-enrichment"] = {"status": "implementation_blocked"}
     evidence["selection_hash"] = digest(evidence)
     selected = tmp_path / "selected.json"
     selected.write_text(json.dumps(evidence))
     final = tmp_path / "final.json"
     frozen = freeze_final_selection(path, selected, final)
+    assert frozen["optional_branch_dispositions"]["E13-enrichment"]["empirical_result"] is False
+    assert (
+        frozen["optional_branch_dispositions"]["E13-enrichment"]["status"]
+        == "blocked_input_resolution"
+    )
     assert frozen["final_arm_task_count"] == 21
+    assert frozen["experiments"]["E17"]["independent_group_counts"] == {"H0": 2, "H1": 2, "H2": 2}
+    assert frozen["experiments"]["E17"]["design"]["practical_effect"] == 0.003
+    assert frozen["experiments"]["E17"]["design"]["multiplicity"] == "holm"
+    assert not any(tmp_path.glob("*.unopened.gold"))
     assert frozen["experiments"]["E17-published"]["arms"] == {"logmap": {}}
     assert frozen["experiments"]["E17-published"]["published_matchers"] == {"logmap": binding}
     lock.final_selection = InputBinding(path=final, sha256=sha256_file(final))
@@ -303,3 +327,33 @@ def test_published_comparator_is_frozen_and_counts_three_additional_final_design
     )
     with pytest.raises(ValueError, match="published matcher changed"):
         validate_final_selection(frozen, suite)
+
+
+def test_source_label_binding_never_enters_scoring_or_planning_reads(tmp_path):
+    from exact.experiments import harness
+    from exact.experiments.campaign import materialize_campaign
+
+    root = Path(__file__).resolve().parents[1]
+    cases = _cases()
+    unseen = tmp_path / "unopened.source-labels.json"
+    cases["N0"]["evaluation_source_labels"] = {"path": str(unseen), "sha256": "a" * 64}
+    path = prepare_campaign(
+        root / "specs/experiments/campaign-v2.yaml",
+        root / "exact/default_config.yaml",
+        {"cases": cases},
+        tmp_path / "prepared",
+    )
+    suite = materialize_campaign(path, tmp_path / "materialized", stage="screen")
+    source = suite.by_id["E04"]
+    source.config.implementation.status = "ready"
+    source.config.arms = [next(arm for arm in source.config.arms if arm.role == "baseline")]
+    cells = harness.build_cells(suite, source, stage="screen", output_root=tmp_path / "runs")
+    assert cells
+    for cell in cells:
+        assert cell.diagnostics == {
+            "role": "development",
+            "reference_role": "valid",
+            "evaluation_source_labels": {"path": str(unseen), "sha256": "a" * 64},
+        }
+        assert str(unseen) not in harness.canonical_json(cell.resolved_config)
+    assert not unseen.exists()

@@ -506,3 +506,67 @@ def test_published_comparator_uses_shared_recovery_and_replays_full_population_a
     assert repaired["status"] == "complete"
     assert evaluated == [29]
     assert calls == [17]
+
+
+def test_e00_posthoc_attribution_uses_separate_development_reference(tmp_path, monkeypatch):
+    cell, _, _ = fixture(tmp_path, monkeypatch)
+    mapping = {**cell.resolved_config, "run": {"experiment_audit": True}}
+    mapping["data"] = {**mapping["data"], "refs": {"dev": mapping["data"]["refs"]["full"]}}
+    cell = replace(cell, resolved_config=mapping, negative_label_policy="complete_reference")
+    cell.output_dir.mkdir(parents=True)
+    trace = {
+        "schema_version": 2,
+        "stage": "after_cardinality_and_relation_typing",
+        "source_universe_status": "declared",
+        "source_universe": ["source:1", "source:2"],
+        "policy": {"source_cardinality": 1, "target_cardinality": 1},
+        "records": [
+            {
+                "Src": "source:1",
+                "candidates": [
+                    {"target": "target:1", "S_final": 0.9, "emitted": True, "relation": "="}
+                ],
+                "pre_typing_targets": ["target:1"],
+                "emitted_targets": ["target:1"],
+            },
+            {"Src": "source:2", "candidates": []},
+        ],
+    }
+    (cell.output_dir / "source_decisions.json").write_text(json.dumps(trace))
+    result = harness._post_run_provenance(cell)["error_attribution"]
+    assert result["diagnostic_only"]
+    assert result["observed"]["tp"] == 1
+    assert result["observed"]["fn_known_positive"] == 1
+    saved = json.loads((cell.output_dir / "diagnostics/error_attribution.json").read_text())
+    assert saved["records"][1]["flags"]["candidate_loss"]
+    monkeypatch.setattr(harness, "read_table", lambda *_: pytest.fail("opened reporting reference"))
+    with pytest.raises(ValueError, match="development/diagnostic"):
+        harness._post_run_provenance(replace(cell, split_role="reporting", reference_role="test"))
+
+
+def test_posthoc_failure_reuses_completed_extraction_on_repair(tmp_path, monkeypatch):
+    cell, suite, revision = fixture(tmp_path, monkeypatch)
+    model_calls = []
+
+    def run(command, **kwargs):
+        model_calls.append(command)
+        write_outputs(cell.output_dir, cell)
+        return 0, 0.1, None
+
+    def broken(_cell):
+        raise ValueError("posthoc diagnostic bug")
+
+    monkeypatch.setattr(harness, "_run_subprocess", run)
+    monkeypatch.setattr(harness, "_error_attribution", broken)
+    failed = harness.execute_cell(cell, suite, workdir=tmp_path, resume=False)
+    assert failed["status"] == "failed"
+    assert failed["failure"]["message"] == "posthoc diagnostic bug"
+    assert "extraction" in failed["recovery"]["artifacts"]
+    assert "evaluation" not in failed["recovery"]["artifacts"]
+    revision["evaluation"] = "posthoc-fixed"
+    monkeypatch.setattr(harness, "_error_attribution", lambda _: None)
+    repaired = harness.execute_cell(cell, suite, workdir=tmp_path, resume=True)
+    assert repaired["status"] == "complete"
+    assert repaired["recovery"]["reused_stages"] == ["extraction", "inputs"]
+    assert len(model_calls) == 1
+    assert harness.cell_metrics(cell.output_dir)["F1"] == 1

@@ -93,7 +93,7 @@ def prepare_campaign(
             selectable = ["string_added"]
         diagnostic = (
             family in {"E00", "E13"}
-            or identifier in {"E25-trust", "E04-pool-miss"}
+            or identifier in {"E25-trust", "E25-oracles", "E25-forced", "E04-pool-miss"}
             or all(arm.get("published_matcher") for arm in arms)
         )
         if not selectable and not diagnostic:
@@ -184,6 +184,18 @@ def prepare_campaign(
         value["design"]["assumptions"].append(
             "After quality and cost ties, the declared treatment order is the frozen simplicity priority; canonical arm ID breaks any remaining tie."
         )
+        if family == "E04" and value["selection"]["decisions"]:
+            value["design"]["primary_endpoint"] = "nil.nil_aware.F1"
+            decision = value["selection"]["decisions"][0]
+            decision["metric"] = "nil.nil_aware.F1"
+            decision["guards"].append(
+                {
+                    "id": "non_nil_mrr_noninferiority",
+                    "metric": "nil.non_nil_MRR",
+                    "scope": "each_task",
+                    "min_delta": -0.005,
+                }
+            )
         if identifier == "G4":
             value["execution_modes"] = ["global_alignment", "local_ranking"]
             value["design"]["cost_bound"] = 1.2
@@ -203,13 +215,29 @@ def prepare_campaign(
                 },
             ]
             value["selection"]["decisions"][0]["tie_breaks"][0]["metric"] = "inference_seconds"
+        if value.get("phase") == "final":
+            if identifier == "E17":
+                decision = value["selection"]["decisions"][0]
+                decision["candidates"] = ["stack_all"]
+                decision["tie_breaks"][1]["order"] = ["stack_all"]
+            value["design"].update(
+                primary_comparison="Frozen stack_all versus R_v2 baseline on H0/H1/H2; label-free control reported separately",
+                primary_endpoint="task_macro_global_F1",
+                practical_effect=0.003,
+                non_inferiority_margin=0.005,
+                multiplicity="holm",
+            )
+            value["design"]["assumptions"] += [
+                "Primary gain requires a source-paired 95% CI excluding zero and meeting the frozen practical effect; no secondary endpoint substitution.",
+                "Source bootstrap conditions on these ontology pairs and seeds; descriptive status does not establish a broad domain claim.",
+            ]
         if family == "E26":
             value["design"]["assumptions"].append(
                 "Definitive E26 selection uses the frozen G1 label-free pool; no preliminary change is promoted."
             )
         if "pool_freeze" in requires or family == "E20":
             value["requires"] = list(dict.fromkeys([*requires, "E05_initial"]))
-            value["inherits"] = ["E05_initial"]
+            value["inherits"] = list(dict.fromkeys([*value.get("inherits", []), "E05_initial"]))
             value["design"]["assumptions"].append(
                 "G1 publishes separate label-free and supervised retrieval policies; this comparison inherits the label-free E05 pool."
             )
@@ -222,7 +250,7 @@ def prepare_campaign(
         if family == "E17":
             continue
         arms = deepcopy(recipes[family])
-        if family == "E05":
+        if family in {"E05", "E20"}:
             # A survivor-dependent combination is not an executable copy of baseline.
             arms = [arm for arm in arms if arm["id"] != "combined"]
         if family == "E12":
@@ -286,11 +314,28 @@ def prepare_campaign(
             )
         if family == "E25":
             replay = [arm for arm in arms if arm["id"].startswith("trust_")]
-            arms = [arm for arm in arms if not arm["id"].startswith("trust_")]
-            # The fixed trust control remains a baseline for this distinct replay comparison.
+            oracles = [arm for arm in arms if arm["id"].startswith("oracle_")]
+            forced = next(arm for arm in arms if arm["id"] == "forced_sources")
+            control = deepcopy(next(arm for arm in arms if arm["id"] == "decision_off"))
+            arms = [
+                arm
+                for arm in arms
+                if arm["id"] != "forced_sources" and not arm["id"].startswith(("trust_", "oracle_"))
+            ]
             replay[0]["role"] = "baseline"
-            late.append(
-                ("E25-trust", family, replay, "D0", "llm", ["E25_initial", "E07_judgment_evidence"])
+            late.extend(
+                [
+                    (
+                        "E25-forced",
+                        family,
+                        [forced],
+                        "D0",
+                        "llm",
+                        ["E25_initial", "E07_judgment_evidence", "E05_initial"],
+                    ),
+                    ("E25-oracles", family, [control, *oracles], "D0", "llm", ["E25-forced"]),
+                    ("E25-trust", family, replay, "D0", "llm", ["E25-forced"]),
+                ]
             )
         if family == "E04":
             control = next(arm for arm in arms if arm["role"] == "baseline")
@@ -316,6 +361,8 @@ def prepare_campaign(
         if family == "E26":
             dependencies += ["pool_freeze"]
         extra = {}
+        if family in {"E16", "E22"}:
+            extra["inherits"] = ["selected_heads"]
         if family == "E23":
             dependencies += ["instance_pool_freeze"]
             extra["inherits"] = ["instance_pool_freeze"]
@@ -329,7 +376,10 @@ def prepare_campaign(
             **extra,
         )
     for args in late:
-        make_step(*args, phase="late", source_cap=200)
+        settings: dict[str, Any] = {"source_cap": 300 if args[0].startswith("E25-") else 200}
+        if args[0] == "E25-forced":
+            settings["inherits"] = ["E07_judgment_evidence", "E05_initial"]
+        make_step(*args, phase="late", **settings)
         if args[0] == "E13-enrichment" and not cases["R0_enrichment"].get("source"):
             for roles in steps[-1]["readiness"].values():
                 for readiness in roles.values():
@@ -337,6 +387,18 @@ def prepare_campaign(
                         status="blocked_input_resolution",
                         reason="Awaiting independent BioKG release and provenance-bearing Datalog consequences; matched OWL/CSV parity remains independent.",
                     )
+    make_step(
+        "E22-policy",
+        "E22",
+        [{"id": "fixed_count", "role": "baseline"}, {"id": "fitted_count", "role": "candidate"}],
+        "D1",
+        "extensions",
+        ["E22", "selected_heads", "pool_freeze"],
+        phase="late",
+        source_cap=300,
+        inherits=["selected_heads"],
+        policy_paths=[],
+    )
     component_sources = bindings.get(
         "composition_sources",
         [
@@ -364,7 +426,7 @@ def prepare_campaign(
         [{"id": "baseline", "role": "baseline"}, {"id": "core", "role": "candidate"}],
         "D0",
         "sentinels",
-        [step["id"] for step in steps],
+        list(dict.fromkeys(["E00", *component_sources])),
         phase="freeze",
         additional_cases=["D1"],
         source_cap=1000,
@@ -452,7 +514,7 @@ def prepare_campaign(
                 "comparisons": comparisons,
                 "status": "declared",
             }
-            if family == "E05" and arm["id"] == "combined":
+            if family in {"E05", "E20"} and arm["id"] == "combined":
                 record.update(
                     status="conditional_unadmitted",
                     reason="A progressive combination requires supported component results and a separate frozen recipe/budget; it is omitted from core execution, not scored as baseline.",

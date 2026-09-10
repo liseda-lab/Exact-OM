@@ -570,6 +570,7 @@ class DesignConfig(StrictConfigModel):
     required_slices: List[str] = Field(default_factory=list)
     regression_bound: Optional[float] = None
     non_inferiority_margin: Optional[float] = None
+    practical_effect: Optional[float] = Field(None, ge=0)
     cost_bound: Optional[float] = None
     multiplicity: Literal["none", "holm"] = "none"
     reporting_exclusions: List[str] = Field(default_factory=list)

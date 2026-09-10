@@ -8,7 +8,6 @@ import os
 from pathlib import Path
 from typing import Any
 
-
 from exact.impl.models.selector.nil_head import STATUSES, nil_metrics
 from exact.utils.data import read_table
 from exact.utils.provenance import sha256_file

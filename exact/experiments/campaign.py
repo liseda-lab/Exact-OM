@@ -120,6 +120,7 @@ class CaseBinding(StrictConfigModel):
     source: Optional[InputBinding] = None
     target: Optional[InputBinding] = None
     source_universe: Optional[InputBinding] = None
+    evaluation_source_labels: Optional[InputBinding] = None
     references: dict[str, InputBinding] = Field(default_factory=dict)
     local_references: dict[str, InputBinding] = Field(default_factory=dict)
     candidates: dict[str, InputBinding] = Field(default_factory=dict)
@@ -830,6 +831,42 @@ def materialize_campaign(path: Path, directory: Path, *, stage: str) -> Any:
             "design": step.design.model_dump(mode="json"),
             "negative_label_policy": case.negative_policy,
             "frozen_constants": {
+                "evaluation_diagnostics": {
+                    f"{case_id}-{mode}": {
+                        "role": lock.cases[case_id].role,
+                        "reference_role": "test" if stage == "confirm" else "valid",
+                        "evaluation_source_labels": {
+                            "path": str(
+                                (
+                                    root
+                                    / cast(
+                                        InputBinding, lock.cases[case_id].evaluation_source_labels
+                                    ).path
+                                ).resolve()
+                            ),
+                            "sha256": cast(
+                                InputBinding, lock.cases[case_id].evaluation_source_labels
+                            ).sha256,
+                        },
+                    }
+                    for case_id in [step.case, *step.additional_cases]
+                    for mode in step.execution_modes
+                    if step.family == "E04"
+                    and lock.cases[case_id].evaluation_source_labels is not None
+                },
+                **({"donor_transfer": {"producer": "E18"}} if step.id == "E16" else {}),
+                **(
+                    {
+                        "label_policy_followup": {
+                            "producer": "E22",
+                            "budget": 100,
+                            "fixed_minimum": 100,
+                            "components": ["rerank", "accept"],
+                        }
+                    }
+                    if step.id == "E22-policy"
+                    else {}
+                ),
                 "campaign_v2": {
                     "family": step.family,
                     "arm_inputs": {
@@ -856,7 +893,7 @@ def materialize_campaign(path: Path, directory: Path, *, stage: str) -> Any:
                     },
                     "historical_parent": lock.historical_parent,
                     "blueprint_sha256": lock.blueprint.sha256,
-                }
+                },
             },
         }
         if final is not None:
@@ -1223,6 +1260,20 @@ def compose_development(source: Any, lock: CampaignLock, selections: Mapping[str
     return replace(source, config=config, path=path)
 
 
+def _population_group_counts(lock: CampaignLock, cases: list[str], root: Path) -> dict[str, int]:
+    counts = {}
+    for case_id in cases:
+        binding = lock.cases[case_id].source_universe
+        if binding is None:
+            raise ValueError("final independent source populations must be bound before G4")
+        path = binding.verify(root)
+        sources = [line.strip() for line in path.read_text().splitlines() if line.strip()]
+        if not sources or len(set(sources)) != len(sources):
+            raise ValueError("final source universe must contain unique, nonempty source groups")
+        counts[case_id] = len(sources)
+    return counts
+
+
 def freeze_final_selection(path: Path, selection_path: Path, destination: Path) -> dict[str, Any]:
     """Mechanically freeze the declared final panel from completed development evidence."""
     from exact.experiments.harness import (
@@ -1243,15 +1294,43 @@ def freeze_final_selection(path: Path, selection_path: Path, destination: Path) 
     gate = experiments.get(lock.freeze_step)
     if not gate or gate.get("status") not in {"selected", "screened_out"}:
         raise ValueError("G4 composition/sentinel comparison has not completed")
+    assert lock.freeze_step is not None
+    by_id = {step.id: step for step in lock.steps}
+    producers = {port: step.id for step in lock.steps for port in step.produces}
+    required = {lock.freeze_step, *lock.composition_sources}
+    pending = sorted(required)
+    while pending:
+        for dependency in by_id[pending.pop()].requires:
+            parent = producers.get(dependency, dependency)
+            if parent not in required:
+                required.add(parent)
+                pending.append(parent)
+    optional_dispositions = {}
     for step in lock.steps:
         if step.phase == "final":
             continue
         status = experiments.get(step.id, {}).get("status")
+        if step.id in required and status not in {
+            "selected",
+            "complete",
+            "screened_out",
+            "inapplicable",
+        }:
+            raise ValueError(
+                f"G4 core dependency has no completed empirical disposition: {step.id}"
+            )
         declared_terminal = all(
             step.readiness[arm.id].get("screen")
             and step.readiness[arm.id]["screen"].status
             in {"inapplicable", "deferred_budget", "blocked_input_resolution"}
             for arm in step.arms
+        )
+        missing_inputs = any(
+            case.source is None
+            or case.target is None
+            or case.source_universe is None
+            or "valid" not in case.references
+            for case in (lock.cases[name] for name in [step.case, *step.additional_cases])
         )
         if (
             status
@@ -1264,10 +1343,27 @@ def freeze_final_selection(path: Path, selection_path: Path, destination: Path) 
                 "blocked_input_resolution",
             }
             and not declared_terminal
+            and not (step.id not in required and missing_inputs)
         ):
             raise ValueError(
                 f"G4 waits for an empirical result or explicit input/capability/budget disposition: {step.id}"
             )
+        if step.id not in required:
+            optional_dispositions[step.id] = {
+                "status": (
+                    status
+                    if status
+                    in {"selected", "complete", "screened_out", "inapplicable", "deferred_budget"}
+                    else "blocked_input_resolution"
+                ),
+                "empirical_result": status in {"selected", "complete", "screened_out"},
+                "reason": experiments.get(step.id, {}).get("reason")
+                or (
+                    "Optional branch has unresolved declared inputs/capabilities; no negative empirical conclusion."
+                    if missing_inputs or declared_terminal
+                    else "Completed optional development evidence; outside the frozen core composition."
+                ),
+            }
     gate_step = next(step for step in lock.steps if step.id == lock.freeze_step)
     if len([gate_step.case, *gate_step.additional_cases]) < 2:
         raise ValueError("G4 requires the primary development case and a declared sentinel")
@@ -1351,6 +1447,7 @@ def freeze_final_selection(path: Path, selection_path: Path, destination: Path) 
             "design": step.design.model_dump(mode="json"),
             "seeds": step.seeds,
             "execution_modes": step.execution_modes,
+            "independent_group_counts": _population_group_counts(lock, cases, root),
             "population_hashes": {
                 case_id: {
                     "source_universe": cast(
@@ -1378,6 +1475,7 @@ def freeze_final_selection(path: Path, selection_path: Path, destination: Path) 
         "development_selection_hash": claimed,
         "gate": lock.freeze_step,
         "component_overlays": components,
+        "optional_branch_dispositions": optional_dispositions,
         "experiments": panel,
         "final_arm_task_count": count,
         "no_final_outcomes_consumed": True,
@@ -1455,6 +1553,8 @@ def validate_final_selection(record: Mapping[str, Any], suite: Any) -> dict[str,
             }
             for case in cases
         }
+        if panel.get("independent_group_counts") != _population_group_counts(lock, cases, root):
+            raise ValueError("final independent group counts changed after G4")
         if panel.get("population_hashes") != populations:
             raise ValueError("final source population identity changed after G4")
         if any(

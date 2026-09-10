@@ -54,7 +54,11 @@ from exact.experiments.schema import (
     suite_order,
 )
 from exact.utils.data import read_table
-from exact.utils.provenance import file_provenance, sha256_file
+from exact.utils.provenance import (
+    dataset_signature_for_paths,
+    file_provenance,
+    sha256_file,
+)
 
 SCHEMA_VERSION = 1
 MANIFEST_NAME = "experiment_manifest.json"
@@ -272,6 +276,7 @@ class RunCell:
     negative_label_policy: str
     recovery: Optional[dict[str, Any]] = None
     published_matcher: Optional[dict[str, Any]] = None
+    diagnostics: Optional[dict[str, Any]] = None
 
     @property
     def manifest_path(self) -> Path:
@@ -1332,12 +1337,18 @@ def resolve_supervision(
     training = _training_available(task, config.model_dump(mode="python"))
     root_mode = str(config.supervision.mode)
     overrides = {str(key): str(value) for key, value in config.supervision.components.items()}
+    profile_binding = (
+        {"dataset_signature": dataset_signature_for_paths(config.data.source, config.data.target)}
+        if config.data.source is not None and config.data.target is not None
+        else None
+    )
     resolved: dict[str, Any] = {}
     for component in _COMPONENTS:
         requested = overrides.get(component, root_mode)
         mode, reason = config.supervision.resolve_component(
             component,
             training_available=training,
+            profile_binding=profile_binding,
         )
         resolved[component] = {
             "requested": requested,
@@ -1358,10 +1369,9 @@ def resolve_supervision(
     if label == "in_pair_supervised" and not has_supervised:
         raise ValueError("declared in_pair_supervised arm resolves no supervised component")
     if label == "cross_pair_transfer":
-        raise NotImplementedError(
-            "cross_pair_transfer requires immutable donor-fit and recipient-application "
-            "orchestration; refusing to fit from the recipient task's training reference"
-        )
+        from exact.utils.artifact_transfer import validate_transfer_config
+
+        validate_transfer_config(config)
     return label, resolved
 
 
@@ -1603,6 +1613,9 @@ def build_cells(
                         negative_label_policy=config.negative_label_policy,
                         recovery=suite.campaign,
                         published_matcher=arm.published_matcher,
+                        diagnostics=config.frozen_constants.get("evaluation_diagnostics", {}).get(
+                            task.id
+                        ),
                     )
                 )
     return cells
@@ -2064,6 +2077,7 @@ def _provenance_payload(
         "artifacts": artifacts,
         "models": _model_identities(cell.resolved_config),
         "published_matcher": cell.published_matcher,
+        "diagnostics": cell.diagnostics,
         "llm_required": (
             False if cell.published_matcher else _llm_runtime_required(cell.resolved_config)
         ),
@@ -2263,7 +2277,54 @@ def _inference_seconds(timing: Optional[Mapping[str, Any]]) -> Optional[float]:
     return sum(values)
 
 
-def _post_run_provenance(cell: RunCell) -> dict[str, Any]:
+def _error_attribution(cell: RunCell) -> Optional[dict[str, Any]]:
+    if (
+        not cell.recovery
+        or cell.experiment_id != "E00"
+        or not cell.resolved_config.get("run", {}).get("experiment_audit")
+    ):
+        return None
+    # Check the role before opening any reference, including during reuse.
+    if (
+        cell.split_role not in {"development", "diagnostic"}
+        or cell.reference_role not in _SCREEN_REFERENCE_ROLES
+    ):
+        raise ValueError("E00 attribution requires development/diagnostic references")
+    from exact.experiments.error_attribution import attribute_source_errors
+
+    trace_path = cell.output_dir / "source_decisions.json"
+    trace = json.loads(trace_path.read_text())
+    data = cell.resolved_config.get("data", {})
+    reference = data.get("refs", {}).get(cell.reference_role)
+    if not reference:
+        raise ValueError("E00 attribution requires its separately bound development reference")
+    reference_path = Path(data.get("root") or ".") / reference
+    frame = read_table(reference_path)
+    if len(frame.columns) < 2:
+        raise ValueError("E00 reference needs source and target columns")
+    frame = frame.rename(columns={frame.columns[0]: "SrcEntity", frame.columns[1]: "TgtEntity"})
+    if "Relation" not in frame and "Label" in frame:
+        frame = frame.rename(columns={"Label": "Relation"})
+    report = attribute_source_errors(
+        trace,
+        frame.to_dict(orient="records"),
+        reference_role=cell.reference_role,
+        negative_label_policy=cell.negative_label_policy,
+    )
+    path = cell.output_dir / "diagnostics/error_attribution.json"
+    _atomic_json(path, report)
+    return {
+        "artifact": file_provenance(path),
+        "trace": file_provenance(trace_path),
+        "reference": file_provenance(reference_path),
+        "diagnostic_only": True,
+        "observed": report["observed"],
+    }
+
+
+def _post_run_provenance(cell: RunCell, *, completed: bool = True) -> dict[str, Any]:
+    from exact.experiments.nil_evaluation import evaluate_source_labels
+
     dataset_dir = cell.output_dir / "dataset"
     sampled_pool_path = dataset_dir / "candidate_pool_sample_manifest.json"
     pool_path = (
@@ -2276,6 +2337,8 @@ def _post_run_provenance(cell: RunCell) -> dict[str, Any]:
     timing = _read_optional_json(cell.output_dir / "timings.json")
     llm_usage = _safe_runtime_usage(run_stats.get("llm") or run_stats.get("llm_usage"))
     return {
+        "error_attribution": _error_attribution(cell) if completed else None,
+        "nil_evaluation": evaluate_source_labels(cell) if completed else None,
         "candidate_pool": pool,
         "candidate_pool_fingerprint": (
             pool.get("fingerprint") if isinstance(pool, Mapping) else None
@@ -2581,6 +2644,14 @@ def execute_cell(
                 stderr_path=stderr_path,
                 **runtime_options,
             )
+        manifest["extraction_complete"] = return_code == 0
+        manifest.update(wall_seconds=elapsed, peak_memory_kb=peak_kb, return_code=return_code)
+        post_run = _post_run_provenance(cell, completed=return_code == 0)
+        if return_code == 0:
+            from exact.runs.layout import RunLayout
+            from exact.runs.manifest import refresh_manifest
+
+            refresh_manifest(RunLayout(cell.output_dir, 2))
     except Exception as exc:
         manifest.update(
             {
@@ -2594,7 +2665,6 @@ def execute_cell(
         _atomic_json(cell.manifest_path, manifest)
         return manifest
 
-    post_run = _post_run_provenance(cell)
     manifest.update(
         {
             "status": "complete" if return_code == 0 else "failed",
@@ -2762,9 +2832,32 @@ def _require_successful_cells(
 
 
 def cell_metrics(output_dir: Path) -> dict[str, float]:
-    """Read only the authoritative evaluator JSON metric payloads."""
-
-    return extract_evaluation_metrics(Path(output_dir))
+    """Read authoritative evaluator and separately bound posthoc NIL metrics."""
+    output_dir = Path(output_dir)
+    metrics = extract_evaluation_metrics(output_dir)
+    path = output_dir / "diagnostics/nil_metrics.json"
+    if path.is_file():
+        payload = json.loads(path.read_text())
+        if payload.get("schema_version") != 1 or payload.get("evaluation_only") is not True:
+            raise ValueError("Invalid posthoc NIL metric artifact")
+        values = payload["metrics"]
+        applicability = values.get("applicability", {})
+        for category in ("nil_aware", "natural_nil"):
+            score = values.get(category, {}).get("F1")
+            if (
+                applicability.get(category, True)
+                and isinstance(score, (int, float))
+                and math.isfinite(score)
+            ):
+                metrics[f"nil.{category}.F1"] = float(score)
+        score = values.get("non_nil_MRR")
+        if (
+            applicability.get("non_nil_MRR", True)
+            and isinstance(score, (int, float))
+            and math.isfinite(score)
+        ):
+            metrics["nil.non_nil_MRR"] = float(score)
+    return metrics
 
 
 def _metric_value(metrics: Mapping[str, float], requested: str) -> Optional[float]:
@@ -2874,6 +2967,31 @@ def _stage_cell_keys(config: ExperimentConfig, stage: str) -> set[tuple[str, int
         if task.availability.status == "ready"
         for seed in stage_config.seeds
     }
+
+
+def _global_stage_cell_keys(config: ExperimentConfig, stage: str) -> set[tuple[str, int]]:
+    stage_config = config.screen if stage == "screen" else config.confirm
+    return {
+        (task.id, seed)
+        for task in stage_config.tasks
+        for seed in stage_config.seeds
+        if task.availability.status == "ready"
+        and task.overlay.get("data", {}).get("execution_mode") != "local_ranking"
+    }
+
+
+def _global_records(suite: LoadedSuite, records, stage: str):
+    local_tasks = {
+        (source.config.experiment_id, task.id)
+        for source in suite.sources
+        for task in (source.config.screen if stage == "screen" else source.config.confirm).tasks
+        if task.overlay.get("data", {}).get("execution_mode") == "local_ranking"
+    }
+    return [
+        record
+        for record in records
+        if (record.get("experiment_id"), record.get("task_id")) not in local_tasks
+    ]
 
 
 def _record_index(
@@ -3444,7 +3562,7 @@ def _paired_bootstrap_rows(
     resamples: int,
     seed: int,
 ) -> list[dict[str, Any]]:
-    index, duplicates = _record_index(records)
+    index, duplicates = _record_index(_global_records(suite, records, stage))
     configs = {source.config.experiment_id: source.config for source in suite.sources}
     cache: dict[str, SourceEvaluation] = {}
     rows: list[dict[str, Any]] = []
@@ -3460,8 +3578,10 @@ def _paired_bootstrap_rows(
     )
     for experiment_id, comparisons in sorted(declarations.items()):
         config = configs[experiment_id]
-        expected_cells = _stage_cell_keys(config, stage)
+        expected_cells = _global_stage_cell_keys(config, stage)
         stage_seeds = config.screen.seeds if stage == "screen" else config.confirm.seeds
+        if not expected_cells:
+            continue
         typed_required = {"entity_kind", "relation"}.issubset(set(config.design.required_slices))
         for decision_id, baseline_arm, candidate_arm, confirmatory in comparisons:
             base = _comparison_base(
@@ -3612,13 +3732,13 @@ def _e17_interaction_rows(
     resamples: int,
     seed: int,
 ) -> list[dict[str, Any]]:
-    index, duplicates = _record_index(records)
+    index, duplicates = _record_index(_global_records(suite, records, stage))
     configs = {source.config.experiment_id: source.config for source in suite.sources}
     cache: dict[str, SourceEvaluation] = {}
     rows: list[dict[str, Any]] = []
     for experiment_id, interactions in sorted(_declared_e17_interactions(suite).items()):
         config = configs[experiment_id]
-        expected_cells = _stage_cell_keys(config, stage)
+        expected_cells = _global_stage_cell_keys(config, stage)
         stage_seeds = config.screen.seeds if stage == "screen" else config.confirm.seeds
         for interaction_id, arm_00, arm_10, arm_01, arm_11 in interactions:
             arms = (arm_00, arm_10, arm_01, arm_11)
@@ -3783,6 +3903,31 @@ def _apply_bootstrap_multiplicity(
             row["holm_rank"] = rank[comparison_id]
 
 
+def _final_gain_claims(rows: list[dict[str, Any]], suite: LoadedSuite, *, stage: str) -> None:
+    if stage != "confirm":
+        return
+    for row in rows:
+        design = suite.by_id[str(row["experiment_id"])].config.design
+        if design.practical_effect is None or row.get("endpoint_scope") != "overall":
+            continue
+        row["practical_effect"] = design.practical_effect
+        row["non_inferiority_margin"] = design.non_inferiority_margin
+        eligible = (
+            row.get("status") == "complete"
+            and row.get("inference_status") == "confirmatory"
+            and row.get("precision_claim_status") == "eligible"
+        )
+        passed = (
+            eligible
+            and float(row["ci_low"]) > 0
+            and float(row["ci_low"]) >= design.practical_effect
+            and float(row.get("p_value_adjusted", 1)) <= 0.05
+        )
+        row["primary_gain_claim"] = (
+            "supported" if passed else "not_supported" if eligible else "inconclusive"
+        )
+
+
 def _finalize_stage_reports(
     suite: LoadedSuite,
     *,
@@ -3820,6 +3965,7 @@ def _finalize_stage_reports(
         )
     )
     _apply_bootstrap_multiplicity(bootstrap_rows, suite, stage=stage)
+    _final_gain_claims(bootstrap_rows, suite, stage=stage)
     _atomic_json(
         stage_root / "paired_bootstrap.json",
         {
@@ -5998,6 +6144,47 @@ def _runtime_deferred_selection(
     }
 
 
+def _materialize_campaign_evidence(
+    source, suite, manifests, selections, inherited, *, plan_only=False
+):
+    """Bind the three bounded development artifact producers before scheduling cells."""
+    constants = source.config.frozen_constants
+    if constants.get("label_policy_followup"):
+        from exact.experiments.label_policy import materialize_followup
+
+        materialize, arguments = materialize_followup, (suite, manifests)
+    elif constants.get("donor_transfer"):
+        from exact.experiments.transfer import materialize_transfer
+
+        materialize, arguments = materialize_transfer, (suite, manifests, selections)
+    elif source.config.experiment_id in {"E25-trust", "E25-oracles"}:
+        from exact.experiments.oracle_policy import (
+            materialize_followup as materialize_oracles,
+        )
+
+        materialize, arguments = materialize_oracles, (suite, manifests, selections)
+    else:
+        return source, inherited
+    if plan_only:
+        # No completed producer has been restored by a plan-only traversal.
+        raise ValueError(
+            f"{source.config.experiment_id}: artifact-dependent plan requires completed producer outputs; inspect or resume those producers first"
+        )
+    prepared = replace(
+        source,
+        config=source.config.model_copy(
+            update={
+                "arms": [
+                    arm.model_copy(update={"overlay": deep_merge(inherited, arm.overlay)})
+                    for arm in source.config.arms
+                ],
+                "depends_on": [],
+            }
+        ),
+    )
+    return materialize(prepared, *arguments), {}
+
+
 def run_stage(
     suite: LoadedSuite,
     *,
@@ -6232,6 +6419,18 @@ def run_stage(
             if config.experiment_id == "E17"
             else inherited_selection_overlay(source_selection, config.depends_on)
         )
+        if suite.campaign and stage == "screen":
+            source, inherited = _materialize_campaign_evidence(
+                source, suite, all_manifests, selections, inherited, plan_only=plan_only
+            )
+            config = source.config
+            suite = replace(
+                suite,
+                sources=tuple(
+                    source if item.config.experiment_id == config.experiment_id else item
+                    for item in suite.sources
+                ),
+            )
         cells = build_cells(
             suite,
             source,

@@ -57,6 +57,8 @@ def _code_identity(root: Path, *, evaluation: bool) -> dict[str, Any]:
             "evaluation",
             "evaluator",
             "paper_metrics",
+            "error_attribution",
+            "nil_evaluation",
             "reporting",
             "statistics",
         }
@@ -149,6 +151,15 @@ class CellRecovery:
         if cell.published_matcher:
             parameters["published_matcher"] = normalise(cell.published_matcher)
         evaluation_options = parameters.pop("evaluation", {})
+        if cell.diagnostics:
+            evaluation_options["diagnostics"] = {
+                key: (
+                    {"sha256": value["sha256"]}
+                    if isinstance(value, dict) and "sha256" in value
+                    else value
+                )
+                for key, value in cell.diagnostics.items()
+            }
         parameters.update(
             source_cap=cell.source_cap,
             supervision=cell.resolved_supervision,
@@ -383,7 +394,7 @@ class CellRecovery:
         """Publish successful standard outputs and preserve immutable attempt lineage."""
         status = str(manifest["status"])
         artifacts = {}
-        if status == "complete":
+        if status == "complete" or manifest.get("extraction_complete"):
             for stage, directories in (
                 (
                     "extraction",
@@ -396,12 +407,13 @@ class CellRecovery:
                         "published",
                         "evaluation_inputs",
                         "fitting",
-                        "diagnostics",
                         "source_decisions.json",
                     ),
                 ),
-                ("evaluation", ("evaluation",)),
+                ("evaluation", ("evaluation", "diagnostics")),
             ):
+                if stage == "evaluation" and status != "complete":
+                    continue
                 if stage not in self.reuse:
                     self.store.publish(
                         self.identities[stage], _files(self.cell.output_dir, directories)
