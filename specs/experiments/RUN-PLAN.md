@@ -62,7 +62,7 @@ revised resource/scope requirement. Do not promise a 21-day result on arbitrary 
 | P0 property development | Capability-selected Conference/OAEI-KG/BioKG pair | Property-specific evidence and label semantics; distinct P1 final case |
 | K0 instance/KG development | OAEI-KG v4 starwars-swg, or capability-selected BioKG instance pair | Instance/KG development; explicit research split policy below |
 | T0 typed development | Available BioKG-Align pair with equivalence and both subsumption directions | E14 development; distinct T1 final case |
-| N0 natural-NIL development | DISO stix-d3fend or capability-selected natural-NIL task | E04 development; distinct N1 task/split final |
+| N0 benchmark-NIL development | Bio-LLM 2024 NCIT–DOID, original ontologies/pools | Stratified source 60/20/20 research split; separate N1 SNOMED–FMA reporting case |
 | R0_case representation development | Same-information OWL/CSV view plus available BioKG Datalog case | E13 parity before enrichment; preserve information provenance |
 | K1 extension final | OAEI-KG v4 starwars-swtor | Untouched extension reporting when that claim is selected; disclose the shared source ontology |
 | H0 final in-pair | NCIT–DOID test | Frozen class-stack evaluation |
@@ -99,6 +99,15 @@ the disclosed K0 research-split rule to P0/T0/N0 when no official development sp
 preserve separate final data. A stale repository stub is an implementation/binding gap. If actual
 labels lack a required capability, mark that case inapplicable and use the predeclared eligible
 alternative before exposure, or report the precise remaining input gap. Do not fabricate labels.
+
+E04's 2026-09-10 design revision binds public historical Bio-LLM unmatched examples under
+benchmark-pool semantics. These are not verified ontology-wide NIL. Only N0 training labels
+fit its head; validation selects, while its internal check and N1 remain reporting-only.
+Do not reuse overlapping supervised D0/D1 artifacts. Preserve the original ontology versions
+and candidate inventories, including the one 70-candidate NCIT–DOID pool. See
+[E04](E04-nil-abstention.md) for the scoped claim and [label policy](LABELS-AND-SUBMISSIONS.md)
+for provenance. This is a public historical research experiment, separate from reference-free
+submissions to the current tracks.
 
 Within D0, source sampling is deterministic and nested. Keep all candidates for a selected source.
 Stratify declared diagnostics by observable difficulty and separately label development

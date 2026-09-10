@@ -1,6 +1,6 @@
 # Exact-OM experiment programme v2
 
-**Design revision: 2026-09-09. Implementation validation: 2026-09-10; long campaign not started.**
+**Design revision: 2026-09-10 (E04 benchmark-NIL scope). Implementation validation: 2026-09-10; long campaign not started.**
 See [PREPARATION-STATUS.md](PREPARATION-STATUS.md) for current code, input and operational evidence.
 [G0-VALIDATION.md](G0-VALIDATION.md) records the detached validation handoff;
 [LABELS-AND-SUBMISSIONS.md](LABELS-AND-SUBMISSIONS.md) records the private-label boundary and
@@ -68,9 +68,9 @@ There is one frozen final study, normally on three class pairs, rather than a fu
 confirmation after each of 26 component screens.
 
 Every applicable E00–E26 family receives a small focused screen. E11/E12/E23 use real
-property/instance/KG tasks; E14 uses typed BioKG-Align data; E04 uses a natural-NIL case.
-Public missing data can be downloaded from official OAEI/subtrack sites. The private BioKG-Align
-release remains pending user notice. Resolve paths and capability metadata before assigning cases. Every family gets a status and reason; a genuine capability or budget
+property/instance/KG tasks; E14 uses typed BioKG-Align data; E04 uses explicitly scoped historical Bio-LLM benchmark NIL.
+Public missing data can be downloaded from official OAEI/subtrack sites. The local BioKG-Align
+active release is now bound; its private test answers remain excluded. Resolve paths and capability metadata before assigning cases. Every family gets a status and reason; a genuine capability or budget
 limit is explicit, and is not a negative empirical result.
 
 The normal execution budget is 336 node-hours; a predeclared expanded profile permits 504.

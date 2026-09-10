@@ -1,6 +1,6 @@
-# E04 — Natural NIL, pool misses, and abstention
+# E04 — Benchmark NIL, pool misses, and abstention
 
-**v2 specification, 2026-09-09. Implementation still required.**
+**v2 scientific design revision, 2026-09-10: public Bio-LLM benchmark NIL.**
 This file replaces the v1 matrix for this family. [RUN-PLAN](RUN-PLAN.md),
 [shared clarifications](IMPLEMENTATION-CLARIFICATIONS.md), and
 [checkpoint recovery](CHECKPOINT-RECOVERY.md) are binding. A passing helper test does not
@@ -10,17 +10,18 @@ establish an executable experiment or a performance result.
 
 Inspected baseline: 655f599e714e13d592f702f326ca5a36f6b50b2f.
 
-**Already implemented:** Joint candidate/NIL probability primitives exist; full NIL writer/evaluator and fitted calibration remain incomplete.
+**Already implemented:** Joint candidate/NIL probabilities, grouped fitting, source decisions, and NIL evaluation. See the current preparation ledger for tested scope and execution prerequisites.
 
-**Agent must implement:** Natural-NIL task binding, grouped fit, output/evaluator integration, three-way absence semantics, and optional listwise-none integration.
+**Required contract:** Explicit benchmark-pool labels, grouped fit, output/evaluator integration, distinct absence semantics, and optional listwise-none integration.
 
-**Inputs/bindings to resolve:** User-available DISO/BioKG NIL pools must be located and their natural versus synthetic label semantics recorded.
-The user confirms the OAEI/BioKG data are available. Resolve paths, revisions and capabilities;
-do not perpetuate an old unavailable flag without checking the supplied data.
+**Selected inputs:** Public Bio-LLM 2024 NCIT–DOID and SNOMED–FMA subsets, with original
+ontology versions. Their explicit unmatched labels are benchmark-defined NIL, not verified
+absence throughout an ontology. DISO public pools have no disclosed answers and remain
+submission inputs; BioKG typed preferences are not negative/NIL certificates.
 
 ## Focus and dependencies
 
-Primary focused case: **N0: DISO stix-d3fend or capability-selected NIL task; D0 pool-miss diagnostic**.
+Primary focused case: **N0: legacy Bio-LLM NCIT–DOID research split; D0 pool-miss diagnostic**.
 Resource envelope: **decisions** in RUN-PLAN.
 Prerequisites/consumed outputs: **E00, pool_freeze, E03**. A pool-freeze or selected-head dependency
 accepts the declared baseline output when no candidate wins; optional research must not deadlock
@@ -30,7 +31,21 @@ Start with 300 development source groups (all eligible if fewer), seed 17, excep
 
 ## Question, treatments, and implementation contract
 
-Select a task that really has natural NIL labels; do not invent that capability on NCIT–DOID. Separate ontology NIL, missing candidate, and unresolved evidence. If only test pools exist, predeclare a research development partition and preserve a separate final task/split. Use non-NIL MRR as a guard.
+The user authorized choosing a public NIL task on 2026-09-10. Use the historical Bio-LLM
+reference-defined unmatched examples under `benchmark_pool` semantics. Only the original
+provided candidates receive benchmark positive/negative labels; an unlisted pair remains
+unknown. Do not reinterpret these labels as verified ontology-wide NIL or apply them to the
+expanded Bio-ML 2026 ontologies. Artificial gold removal remains a separate pool-miss diagnostic.
+
+N0 uses a matched/unmatched-stratified 60/20/20 source split, seed 17: 60 training, 20 validation,
+and 20 held-out research sources. Preserve every original pool, including the published
+NCIT–DOID source with 70 candidates; the other 99 pools have 100. Fit only on N0 training,
+select only on validation, and expose the internal-check labels only after freezing. N1 is the
+separate SNOMED–FMA 100-source public historical reporting case. It is not training data.
+Neither supports a blind official-test or nonbiomedical-generalization claim. Do not reuse
+supervised D0/D1 heads whose training sources overlap these historical examples. A transferred
+NIL head requires an explicit frozen application binding; otherwise that arm remains blocked.
+Use non-NIL MRR as a guard. See [label provenance](LABELS-AND-SUBMISSIONS.md).
 
 At most **5 distinct treatment configurations/cells as specified below** before any explicitly declared source expansion. This is a bounded sequential design, not a Cartesian product. Shared deterministic controls are computed once.
 
@@ -46,7 +61,7 @@ use development reference information only under its explicit oracle/diagnostic 
 
 ## Validation and selection
 
-Primary outcome/guard: **NIL-aware F1; natural NIL and pool-miss results separate.**
+Primary outcome/guard: **Benchmark-pool NIL-aware F1; benchmark NIL and artificial pool misses reported separately.**
 Use the family rule plus RUN-PLAN's frozen selection, practical-effect, reconstruction and cost
 criteria. A screen chooses what to evaluate next; it does not establish a reporting-set claim.
 Report all controls, negative results, corrections/harms where relevant, and inapplicable or
@@ -55,7 +70,8 @@ budget-deferred cells. Never suppress a difficult kind or source group from the 
 Broader validation happens on the designated development sentinel after a promising focused
 screen, then only in E17's frozen final panel for the claims selected at G4. Do not run a full
 OAEI confirmation for every treatment. A feature-specific claim needs its matching held-out
-case; NCIT–DOID cannot substitute for property, instance, natural-NIL or typed-relation labels.
+case; class-equivalence labels cannot substitute for property, instance, verified ontology-NIL
+or typed-relation labels.
 No individual experiment uses final outcomes to qualify its component for E17.
 
 ## Acceptance and recovery

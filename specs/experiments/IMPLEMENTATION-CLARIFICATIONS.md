@@ -199,8 +199,11 @@ loss for explicit one-to-one versus other declared benchmark cardinality regimes
 
 NIL candidates share a joint probability scale with real candidates. Keep P(ontology NIL),
 pool-miss, and abstention/unknown distinct where the data support those labels. Artificial
-gold removal is a pool-miss diagnostic, not a natural NIL benchmark. E04 must use a real
-NIL-bearing DISO or eligible BioKG/OAEI task rather than declaring NCIT–DOID to have NIL labels.
+gold removal is a pool-miss diagnostic. E04 uses explicit unmatched examples from the historical
+Bio-LLM subsets under `benchmark_pool` semantics; they establish rejection within the published
+benchmark, not verified ontology-wide absence. Keep that meaning in fitted artifacts, decisions
+and metric names. Unlisted pairs remain unknown. The current Bio-ML training pools and DISO
+public inference pools do not supply these source labels.
 
 ## 9. Fitting, transfer, and metrics
 

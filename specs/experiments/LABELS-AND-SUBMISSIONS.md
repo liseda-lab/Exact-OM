@@ -12,6 +12,7 @@ private references.
 | Input | Permitted use | What absence does not establish |
 | --- | --- | --- |
 | Bio-ML official training candidate pools | Gold targets are positives; provided distractors are scoped benchmark negatives. Union known train alternatives per source before labeling. | Unlisted ontology pairs remain unknown; these pools provide no natural-NIL sources. |
+| Bio-LLM 2024 historical subsets | Explicit unmatched sources are benchmark NIL; positive and negative labels apply only to provided candidates. Use the declared N0 source split and retain N1 for reporting. | No exhaustive ontology-wide absence guarantee; no label transfer to Bio-ML 2026 ontology versions. |
 | DISO public candidate pools | Candidate inventories for inference and submission only. | NIL appears in every pool and public answers are withheld. Empty converted target columns are not NIL labels. |
 | BioKG public train/valid references | Typed positive correspondences and release-defined ranking preferences. | A nonpreferred candidate/relation can have positive hierarchical relevance; preferred-label subtraction is not confirmed semantic-negative generation. |
 | OAEI-KG reference | Listed correspondences are positive; explicitly designated public development partitions retain their recorded research scope. | The official reference is partial; absent pairs and unmatched sources are unknown. |
@@ -36,12 +37,31 @@ Official sources: [Bio-ML local task](https://bio-ml.oaei-ml.org/tasks/local/),
 ## Legacy Bio-LLM NIL examples
 
 The Bio-LLM subsets introduced in 2023 and unchanged in 2024 each contain 50 matched and
-50 unmatched source classes with 100 candidates per source, for NCIT–DOID and SNOMED–FMA.
-They provide an explicit benchmark rejection task. They are evaluation subsets, not a
-separately released NIL training split. Any training reuse requires a declared research split,
-source-disjoint evaluation and pinned legacy ontology versions. Do not transfer their unmatched
-labels to the expanded 2026 ontologies. This legacy option has not been admitted into G0.
-[Official Bio-LLM documentation](https://krr-oxford.github.io/DeepOnto/bio-ml/#oaei-bio-llm-2023).
+50 unmatched source classes for NCIT–DOID and SNOMED–FMA. The documented pool size is 100;
+the actual published NCIT–DOID file has one 70-candidate pool and 99 pools of 100 (9,970 pairs).
+SNOMED–FMA has 10,000 pairs. Preserve these supplied pools without padding.
+[Official Bio-LLM documentation](https://krr-oxford.github.io/DeepOnto/bio-ml/#oaei-bio-llm-2023),
+[pinned NCIT–DOID candidates](https://github.com/KRR-Oxford/LLMap-Prelim/blob/1972457c9be2664c627f822b5f5086bcbd63e274/data/ncit2doid/test_cands.tsv),
+[pinned SNOMED–FMA candidates](https://github.com/KRR-Oxford/LLMap-Prelim/blob/1972457c9be2664c627f822b5f5086bcbd63e274/data/snomed2fma/test_cands.tsv).
+
+There is no separately released NIL training split. The user authorized selecting a public
+benchmark on 2026-09-10; E04 now declares N0 NCIT–DOID as a stratified source-level 60/20/20
+research split, seed 17. This gives 60 training, 20 validation and 20 held-out sources, each
+balanced between mapped and benchmark-unmatched. N1 SNOMED–FMA remains a separate 100-source
+reporting case. Keep every candidate for a source together. Only N0 training labels fit the
+NIL head; validation selects, and reporting labels must remain inaccessible until freeze.
+
+Retain the original [2024 ontology archives](https://zenodo.org/records/13119437). Their
+main-track reference files are not used to supplement this subset. Source status, pair labels,
+and candidate-only inference inputs are separate hashed files. Case references remain
+`known_incomplete`, with `confirmed_only` pair negatives and `benchmark_pool` NIL semantics.
+Unlisted ontology pairs remain unknown. The fitted artifact and evaluation report explicitly
+exclude an ontology-wide NIL claim. Supervised D0/D1 artifacts can overlap these historical
+source IRIs and must not be reused; a frozen fitting recipe is distinct from learned weights.
+
+This public historical research split is not a blind official Bio-LLM result. It provides a
+small biomedical rejection experiment, separate from the current-track submission populations.
+G0's NCIT–DOID operational validation does not train this NIL head.
 
 ## Submission boundary
 

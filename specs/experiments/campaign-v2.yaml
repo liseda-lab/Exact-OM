@@ -1,7 +1,7 @@
 design_schema_version: 2
 kind: exact_om_campaign_design
 campaign_id: exact-om-focused-v2
-design_date: '2026-09-09'
+design_date: '2026-09-10'
 status: specification_only
 executable_with_current_runner: false
 requires_implementation:
@@ -122,9 +122,9 @@ cases:
     selection: one_available_biokg_pair_with_equivalence_and_both_subsumption_labels
     heldout_role: T1
   N0:
-    preferred_track: diso
-    preferred_task: stix-d3fend
-    selection: verify_natural_nil_or_choose_available_eligible_case
+    preferred_track: bio_llm_2024
+    preferred_task: ncit-doid
+    selection: benchmark_pool_nil_stratified_source_60_20_20_seed17
     heldout_role: N1
   R0_case:
     selection: same_information_owl_csv_views_then_independent_datalog_enrichment
@@ -137,7 +137,7 @@ cases:
     roles:
     - final
   N1:
-    selection: heldout_natural_nil_task_or_disjoint_split_selected_with_N0
+    selection: legacy_bio_llm_snomed_fma_reporting_only_original_pool
     roles:
     - final
   R1_case:
@@ -349,7 +349,7 @@ experiments:
   checkpoint_boundaries: OOF folds, calibrator fit, calibrated decisions, evaluation.
 - id: E04
   spec: E04-nil-abstention.md
-  focused_case: 'N0: DISO stix-d3fend or capability-selected NIL task; D0 pool-miss diagnostic'
+  focused_case: 'N0: legacy Bio-LLM NCIT-DOID benchmark NIL; D0 pool-miss diagnostic'
   budget_group: decisions
   initial_treatment_cap: 5
   dependencies:
@@ -365,7 +365,7 @@ experiments:
   readiness: implementation_required
   already_implemented: Joint candidate/NIL probability primitives exist; full NIL writer/evaluator and fitted
     calibration remain incomplete.
-  remaining_implementation: Natural-NIL task binding, grouped fit, output/evaluator integration, three-way
+  remaining_implementation: Scoped benchmark-NIL task binding, grouped fit, output/evaluator integration, three-way
     absence semantics, and optional listwise-none integration.
   checkpoint_boundaries: NIL fit and source-level decisions/output.
 - id: E05
