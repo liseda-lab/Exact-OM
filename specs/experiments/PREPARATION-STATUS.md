@@ -24,7 +24,7 @@ All generated files below are intentionally outside Git, relative to the reposit
 | OAEI-KG | `data/experiments-v2/oaei_kg/`; Starwars–SWG development and Starwars–SWTOR heldout inputs materialized; byte identities pinned |
 | Conference property case | `data/experiments-v2/property-case/case-lock.json`; P0 CMT–confOf, prospective P1 Conference–edas |
 | Matched OWL/CSV representation views | P0 `source-matched-csv` and `target-matched-csv`; normalized evidence parity verified |
-| Private BioKG-Align | Await user notice for `/home/pgcotovio/BioKG-Align/build/release`; an existing archive is not treated as a released dataset |
+| BioKG-Align local release | `data/experiments-v2/biokg-release/v0.2.0-rc3-bbb08d188e48/`; active release pointer verified, public train/valid and test input bindings only; private test answers unopened |
 | Baseline/model locks | `data/experiments-v2/locks/`; corrected `R_v2` with historical `R_0` preserved |
 | Local case bindings | `data/experiments-v2/local-bindings.yaml`; paths, hashes, roles, negative policy and exposure reasons |
 | Published comparator | `data/experiments-v2/comparator/logmap/`; official July 2021 release, selected before current quality outcomes |
@@ -66,6 +66,10 @@ listwise first-token probability checks, completed-cache replay and relocated re
 credentials (two completed requests, 56 tokens). Use `--api-key-file api_key` for the validation
 tools; the frozen baseline's older credential locator is unchanged. No key value is logged.
 
+A bounded G0 validation job was launched separately after preparation.
+See [G0-VALIDATION.md](G0-VALIDATION.md) for the detached monitor, stop command, limits and
+retained attempt history. Its `status.json`/`report.json` are authoritative for completion.
+
 ## Validation and remaining readiness work
 
 Focused regression suites cover numerical controls, grouped fitting, safe training labels,
@@ -88,15 +92,15 @@ relaxed. Full-ontology resource estimates must use this node's measured backend 
 Before admitting real screens, complete G0's prescribed full-input memory/throughput probe,
 300-source vertical acceptance and cost forecast, validate the hosted credential/profile,
 and resolve each feature case's actual labels/artifacts. Natural-NIL cases need expert source
-status labels; K0 graph fitting needs confirmed negatives; typed relations await the private
-BioKG release. The optional E14 bridge-reasoner executor remains unimplemented and explicitly
+status labels; K0 graph fitting needs confirmed negatives. BioKG typed positives are now bound;
+Datalog consequence materialization and family-specific artifacts still need validation. The optional E14 bridge-reasoner executor remains unimplemented and explicitly
 planned; it is outside the implemented graph/learned typing controls. E24's asymmetric arm
 needs a directional typed diagnostic input, which D1 equivalence labels do not provide.
 The planner keeps these separate from fixture readiness. See [NODE-SETUP.md](NODE-SETUP.md) for the observed CUDA stack and concurrency
 limits. Final request/token and node-hour reserves are protected by runtime admission.
 
 The final local declaration snapshot is
-`data/experiments-v2/prepared-campaign-04/campaign.lock.yaml`, with stage declarations under
+`data/experiments-v2/prepared-campaign-05/campaign.lock.yaml`, with stage declarations under
 `runtime/declarations/screen/` and the read-only inventory in `readiness-plan.json`.
 All 27 families are represented by 37 steps: 35 screen declarations and two final declarations.
 The input-hash-verified screen plan has 142 arm rows, all awaiting admission; its missing

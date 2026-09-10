@@ -42,11 +42,11 @@ loading models or making hosted calls. Keep downloaded corpora, model caches, cr
 and generated campaign artifacts outside Git. Model and input manifests identify bytes;
 paths are relocatable bindings.
 
-All generative roles use the pinned OpenRouter profile. The operational request reached
-OpenRouter but returned HTTP 401 using the configured credential file. No successful hosted
-response or cache replay has been demonstrated. Replace the credential through the existing
-`OPENROUTER_API_KEY` or configured key-file mechanism before the bounded hosted capability
-probe; never put its value in a campaign file or commit.
+All generative roles use the pinned OpenRouter profile. The updated repository `api_key`
+file passes actual binary/listwise probability and relocated-cache checks; pass
+`--api-key-file api_key` to validation tools. They load the value into the process environment
+only. The immutable baseline still has the older key-file locator; do not assume that locator
+contains the updated key. Credentials are never written to campaign or source files.
 
 The four-source NCIT–DOID operational proof demonstrates checkpoint interruption, relocation,
 and byte-identical replay with no repeated encodings. It does not estimate full-ontology

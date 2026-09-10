@@ -2,6 +2,9 @@
 
 **Design revision: 2026-09-09. Implementation validation: 2026-09-10; long campaign not started.**
 See [PREPARATION-STATUS.md](PREPARATION-STATUS.md) for current code, input and operational evidence.
+[G0-VALIDATION.md](G0-VALIDATION.md) records the detached validation handoff;
+[LABELS-AND-SUBMISSIONS.md](LABELS-AND-SUBMISSIONS.md) records the private-label boundary and
+reference-free final submission formats.
 This revision implements the accepted 2026-09-07 review and the user's single-node, 2–3 week
 execution constraint. It supersedes the v1 exhaustive matrices, per-component reporting
 requirements, whole-run invalidation rules, and implementation-only handoff. No v2 empirical
