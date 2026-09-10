@@ -1,5 +1,11 @@
 # 04 — Methodology Audit (sanity check of the model & system methodology)
 
+> Historical audit at the original baseline. The accepted 2026-09-09 review and
+> [experiment programme v2](experiments/README.md) supersede its execution/promotion
+> assumptions where they differ, and add reproduced implementation defects, bounded
+> feature-specific screening, and selective checkpoint recovery. Preserve this audit as
+> provenance rather than treating it as a current implementation-readiness statement.
+
 Audit date: 2026-07-16, baseline `9e72ecf`. Sources: full code extraction of the scoring math
 (`pair_adaptive_scorer.py`, `semantic_scorer.py`), the selection/calibration pipeline
 (`candidate_set_selector.py`, `trainer.py`, `evaluator.py`), and the ESWC-2026 paper's Methods

@@ -1,66 +1,79 @@
-# E06 — String-Similarity Ensemble as a Second Lexical Signal
+# E06 — String evidence beyond the lexical encoder
 
-**Motivation** (audit obs. 4): scoring-time lexical evidence is *pure SapBERT cosine* — no
-edit/character similarity anywhere in the scorer. Embedding geometry can miss trivially strong
-string evidence (near-identical spellings, shared rare tokens, abbreviations) and is
-domain-biased (SapBERT is biomedical; Conference/OAEI-KG labels are out-of-domain). PyLogMap's
-parity work showed classic ISUB remains a strong, near-free signal.
+**v2 specification, 2026-09-09. Implementation still required.**
+This file replaces the v1 matrix for this family. [RUN-PLAN](RUN-PLAN.md),
+[shared clarifications](IMPLEMENTATION-CLARIFICATIONS.md), and
+[checkpoint recovery](CHECKPOINT-RECOVERY.md) are binding. A passing helper test does not
+establish an executable experiment or a performance result.
 
-## Research questions
+## Existing implementation and missing work
 
-- **RQ06.1**: Does a character/token string ensemble improve equivalence ranking and global F1
-  beyond embedding-only lexical scoring?
-- **RQ06.2**: Is the ensemble most useful out of domain and on property/instance names, or does
-  it duplicate the retrieval/scoring evidence already present?
-- **RQ06.3**: Is treating string similarity as an independent confidence-weighted channel
-  better calibrated and more interpretable than taking a blunt maximum with the lexical score?
-- **RQ06.4**: Which label-length, abbreviation/expansion, spelling-variation, and
-  compositional-label slices explain its wins and false positives?
+Inspected baseline: 655f599e714e13d592f702f326ca5a36f6b50b2f.
 
-**Hypothesis**: an ISUB/Jaro-Winkler/token-set ensemble folded in as its own channel improves
-F1 on non-biomedical tracks (Conference, OAEI-KG) ≥1 pt and is ≈neutral on Bio-ML (where
-SapBERT already covers strings); it also improves `q_lex` reliability (margin quality) by
-disagreeing with the encoder exactly where the encoder hallucinates similarity. A separate
-abbreviation feature is expected to improve the abbreviation/expansion slice; no acronym claim
-is attributed to ISUB/Jaro-Winkler/token-set alone.
+**Already implemented:** Bounded string metrics, conservative abbreviation matching, and provenance-bearing channel controls exist.
 
-## Change
+**Agent must implement:** V2 case selection, stage replay, full feature attribution, and effective-cost/duplication diagnostics.
 
-New channel `strsim` through the standard σ-mixing (exact importance decomposition preserved):
-- `s_strsim` = max over label-pair ensemble score: `max(isub, jaro_winkler, token_set_ratio)`
-  (each on the normalized label forms already computed for exact matching);
-- Optional `s_abbr`: detect a 2–10-character short form against the other label's token
-  initials/camel humps, plus a conservative ordered-subsequence score for single compound
-  expansions; require the first character to agree and apply length/coverage penalties. Keep
-  this as a separately ablated sub-signal so common subsequences do not silently inflate the
-  base ensemble;
-- when enabled, `s_strsim_effective=max(s_strsim,s_abbr)`; report which sub-signal won for each
-  pair and compute the channel margin from the effective score;
-- `q_strsim` = top-1/top-2 margin (same rule as the lexical channel).
-- Config `matching.channels.strsim: off|on` and
-  `matching.channels.strsim.abbreviation: off|initialism` (+ ensemble weights, exposed per
-  audit F5).
-- Implementation: pure-Python first; ISUB is a named hot-kernel candidate under the
-  performance policy (`03-performance.md`) if profiling demands — with the bit-identical
-  fallback contract.
+**Inputs/bindings to resolve:** Bind one feature-appropriate OAEI development case from the available inventory.
+The user confirms the OAEI/BioKG data are available. Resolve paths, revisions and capabilities;
+do not perpetuate an old unavailable flag without checking the supplied data.
 
-Touched: one new channel module, scorer channel registry, config.
+## Focus and dependencies
 
-## Arms & validation
+Primary focused case: **D0; P0/Conference when abbreviation or non-biomedical behavior is the question**.
+Resource envelope: **channels** in RUN-PLAN.
+Prerequisites/consumed outputs: **E00, pool_freeze**. A pool-freeze or selected-head dependency
+accepts the declared baseline output when no candidate wins; optional research must not deadlock
+other families. Kind-specific pool freezes do not change the already-frozen class pool.
 
-Screen off (baseline) / strsim-as-channel / strsim+abbreviation-as-channel /
-strsim-folded-into-lex on development data with one seed; the folded arm tests whether explicit
-channel treatment matters. Freeze exactly one candidate. Confirm it against off on the eligible
-reporting tasks with three paired seeds and global plus local metrics. Report per-track
-channel-importance shift and cases where string similarity vetoes or rescues the encoder.
-For RQ06.4, pre-register abbreviation pairs from label forms without using mapping correctness;
-report the base ensemble and abbreviation sub-signal separately on that slice.
+Start with 300 development source groups (all eligible if fewer), seed 17, except a stated smaller LLM limit. Expand at most two non-control survivors to 1,000 nested development groups. Every applicable family receives a focused initial screen; widen cases or models only at scheduled gates. Eligibility/power is recorded per kind/relation.
 
-**Promotion**: standard; if gains are non-biomedical-only, promote as default-on with the
-biomedical profile free to disable (per-profile default, like E05).
+## Question, treatments, and implementation contract
 
-**Effort**: S–M. **Risks**: token-set ratio inflates scores on long compositional labels —
-length-normalize; double-counting with retrieval's lexical score — they live at different
-stages, but check the selector feature correlation matrix before/after. Ordered-subsequence
-abbreviation matches can reward accidental short patterns; the first-character/length guards
-and separate ablation prevent those errors being hidden in the base string result.
+Use normalized exact/token/character evidence with frozen conservative abbreviation handling. Keep string and embedding weights distinct. Test qualifier loss, misleading abbreviations, duplicated label evidence, and the selected non-biomedical case without a full multi-track sweep.
+
+At most **4 distinct treatment configurations/cells as specified below** before any explicitly declared source expansion. This is a bounded sequential design, not a Cartesian product. Shared deterministic controls are computed once.
+
+- current: current lexical/context pipeline.
+- string_added: normalized string ensemble as a distinct signal.
+- lexical_only: required simple baseline.
+- string_only: required simple diagnostic.
+
+All generative roles use OpenRouter. Local non-generative encoders/heads use the single RTX 5090.
+Separate target-label-free, in-pair supervised and transferred results. A named diagnostic may
+use development reference information only under its explicit oracle/diagnostic role.
+
+## Validation and selection
+
+Primary outcome/guard: **Global F1 with lexical overlap/abbreviation slices.**
+Use the family rule plus RUN-PLAN's frozen selection, practical-effect, reconstruction and cost
+criteria. A screen chooses what to evaluate next; it does not establish a reporting-set claim.
+Report all controls, negative results, corrections/harms where relevant, and inapplicable or
+budget-deferred cells. Never suppress a difficult kind or source group from the denominator.
+
+Broader validation happens on the designated development sentinel after a promising focused
+screen, then only in E17's frozen final panel for the claims selected at G4. Do not run a full
+OAEI confirmation for every treatment. A feature-specific claim needs its matching held-out
+case; NCIT–DOID cannot substitute for property, instance, natural-NIL or typed-relation labels.
+No individual experiment uses final outcomes to qualify its component for E17.
+
+## Acceptance and recovery
+
+- Adding duplicate synonyms cannot create duplicated explanatory evidence mass.
+- A changed string rule reuses encoder outputs but updates its dependent scores.
+- The string-only and lexical-only controls actually bypass the other scoring signals.
+
+Durable boundaries: **String evidence and score replay.**
+All changed inputs/semantics invalidate their consuming descendants; preserve valid upstream
+artifacts. Store completed source/request/fold IDs and attempt lineage. Tests must demonstrate
+this family's checkpoint/repair boundary, not merely mirror a formula. Mark screen-ready and
+confirm-ready separately in the runtime readiness ledger, with evidence, once these checks pass.
+
+## Deliverable
+
+Produce a result record with actual treatment/configuration, case/role, supervision, artifact
+IDs, source counts, metrics/cost, controls, uncertainty, decision and reason. A legitimate null,
+removal, or inapplicability is a deliverable; an unimplemented arm is not an empirical null.
+Resolve this family's question into numbered research questions and a primary endpoint in the
+executable design before its screen; answer each as supported, not supported or inconclusive
+with evidence. RUN-PLAN section 7 governs incomplete references and claim limitations.

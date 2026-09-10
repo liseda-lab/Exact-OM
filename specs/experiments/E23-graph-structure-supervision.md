@@ -1,157 +1,80 @@
-# E23 — Supervised Graph-Structure Matching for TBox-Poor Inputs
+# E23 — Graph structure with controlled information loss
 
-**Motivation** (audit obs. 23; extends obs. 2, 12, 13): the evidence model is TBox-shaped. The
-hierarchy channel reads depth-2 ancestors with `1/(d+1)` specificity, the attribute channel reads
-annotations, and the lexical channel carries most of the weight. On a deep, well-labelled
-biomedical ontology that is the right design. On a plain knowledge graph — OAEI-KG instance
-tasks, BioKG/KG-Align CSV inputs, any source whose "class hierarchy" is one shallow type level or
-absent — the hierarchy channel degenerates toward its `τ` default and the matcher falls back to
-labels, exactly where labels are least reliable.
+**v2 specification, 2026-09-09. Implementation still required.**
+This file replaces the v1 matrix for this family. [RUN-PLAN](RUN-PLAN.md),
+[shared clarifications](IMPLEMENTATION-CLARIFICATIONS.md), and
+[checkpoint recovery](CHECKPOINT-RECOVERY.md) are binding. A passing helper test does not
+establish an executable experiment or a performance result.
 
-But those inputs are not structurally poor; they are structurally *different*. What they lack in
-subsumption depth they carry in relational density: many typed edges per entity, repeated
-relational patterns, and neighborhoods that identify an entity far more precisely than its name
-does. That is the regime the knowledge-graph entity-alignment literature targets, and its
-methods are supervised almost without exception — cross-graph representations trained from seed
-alignments. Exact-OM has an unsupervised structural method (E02's anchor propagation) and no
-supervised one.
+## Existing implementation and missing work
 
-This experiment adds the supervised structural channel and, more importantly, establishes
-*where on the structural axis it pays*. That crossover is the scientific contribution; a matcher
-that silently applies TBox-shaped evidence to a TBox-free graph is the failure it prevents.
+Inspected baseline: 655f599e714e13d592f702f326ca5a36f6b50b2f.
 
-## Research questions
+**Already implemented:** Graph-channel schema/guards exist; fitted graph-head production and controlled TBox input orchestration are missing.
 
-- **RQ23.1**: On TBox-poor inputs, does a supervised graph-structure channel improve alignment
-  over the current evidence model at fixed retrieval and fixed lexical evidence?
-- **RQ23.2**: Where is the crossover? As an observable structural profile moves from deep-TBox to
-  relation-dense, at what point does the graph channel begin to pay, and where does it stop?
-- **RQ23.3**: How much does it beat E02's label-free anchor propagation, and how many seed
-  alignments does that margin require?
-- **RQ23.4**: Is the gain genuine relational structure, or feature volume and degree?
-- **RQ23.5**: Does a transductive per-pair embedding earn its cost over an inductive structural
-  head that transfers across graphs?
-- **RQ23.6**: Can the channel deliver its gain through σ-mixing with the decomposition invariant
-  intact, or only as a standalone matcher that replaces the evidence model?
+**Agent must implement:** One inductive structural head, degree/predicate-preserving control, controlled hierarchy removal, graph/profile provenance, and supported explanation integration.
 
-## Hypotheses
+**Inputs/bindings to resolve:** Available OAEI/BioKG graph data, safe training seeds, and measured feature memory; resolve capabilities rather than carrying stale unavailable flags.
+The user confirms the OAEI/BioKG data are available. Resolve paths, revisions and capabilities;
+do not perpetuate an old unavailable flag without checking the supplied data.
 
-On TBox-poor tracks the supervised graph channel improves macro F1 by at least 2 points over the
-current model, with the gain concentrated on the non-exact-label slice. On Bio-ML and Anatomy it
-is expected to be neutral to slightly negative: the hierarchy channel already carries that
-structure and adding a correlated channel dilutes σ-mixing. The crossover should be predicted by
-the structural profile rather than by domain — the falsifiable form of the claim, since domain
-and structure are confounded across natural tracks.
+## Focus and dependencies
 
-Transductive embeddings should win within a pair and fail to transfer at all; the inductive head
-should be weaker but portable, which likely makes it the better default. The degree-preserving
-shuffle control is expected to absorb a substantial minority of the naive gain, and reporting the
-gain net of that control is expected to change the ranking of arms.
+Primary focused case: **K0 graph-rich/TBox-poor case plus one controlled TBox-rich development case**.
+Resource envelope: **extensions** in RUN-PLAN.
+Prerequisites/consumed outputs: **E00, kind_pool_freeze, E12, E13, E02_anchors**. A pool-freeze or selected-head dependency
+accepts the declared baseline output when no candidate wins; optional research must not deadlock
+other families. Kind-specific pool freezes do not change the already-frozen class pool.
 
-## Change
+Start with 300 development source groups (all eligible if fewer), seed 17, except a stated smaller LLM limit. Expand at most two non-control survivors to 1,000 nested development groups. Every applicable family receives a focused initial screen; widen cases or models only at scheduled gates. Eligibility/power is recorded per kind/relation.
 
-A new channel through the standard σ-mixing, so the exact importance decomposition is preserved
-by construction — `matching.channels.graph: off|inductive|transductive`:
+## Question, treatments, and implementation contract
 
-- `inductive`: a supervised head over relational features computable without per-pair training —
-  predicate-profile overlap, degree and type signatures, anchored neighborhood agreement reusing
-  E02's machinery, and small motif counts. Portable across graphs; fits with E18's trainer.
-- `transductive`: a cross-graph representation trained on training-split seed alignments over the
-  normalized relational graph, producing `s_graph` from calibrated embedding similarity.
-  Per-pair fitted artifact, bound to both graph hashes.
-- Both supply `q_graph` from neighborhood coverage and degree reliability, so a sparse or hub
-  entity contributes proportionately less authority rather than equally.
-- `graph_only`: a standalone arm scoring on the graph channel alone. Diagnostic ceiling for
-  RQ23.6; it bypasses the evidence model and cannot promote.
+Use one small inductive recipe first. Hold labels, entities, retrieval and seed mappings fixed during TBox ablation. Report graph-only and label-only evidence, non-exact-label and degree slices. Three ablation levels support a coarse structural effect, not a precisely estimated universal crossover. Large transductive training is follow-up unless separately budgeted. Prefer D1 as the TBox-rich case when the class-graph path is eligible; otherwise bind a richer same-kind case before outcomes. Cross-kind results remain separate. No universal TBox crossover is inferred by comparing unrelated cases.
 
-**Structural profile** (added to E00's dataset inventory, and a deliverable regardless
-of promotion): per task and per kind, hierarchy depth distribution, ancestor coverage, class-to-
-instance ratio, axiom density, triples per entity, distinct predicates, and relational entropy,
-reduced to a pre-registered `tbox_richness` and `relational_density` pair. The reduction is fixed
-before any result is opened, since a profile fitted to the outcome would make RQ23.2 circular.
+At most **10 distinct treatment configurations/cells as specified below** before any explicitly declared source expansion. This is a bounded sequential design, not a Cartesian product. Shared deterministic controls are computed once.
 
-**Seed discipline**: seed alignments come from the training split only. The propagation or
-message-passing graph must never contain validation or test pairs as edges — the standard leakage
-failure in this method family, and the one the harness asserts explicitly here. Any contrastive
-negative sampling follows the programme's reference-completeness rule: unlisted cross-graph pairs
-from incomplete references remain unlabelled and require a filtered positive-unlabelled objective
-or explicit semantic incompatibility.
+- rich_case_ablation: graph_off versus inductive at 0%, 50%, 100% hierarchy removal, six cells on one TBox-rich case.
+- natural_kg: graph_off versus the same declared inductive recipe, two cells on K0.
+- graph_only: natural-KG diagnostic with lexical evidence disabled.
+- graph_shuffled: natural-KG diagnostic matched to its inductive arm in degrees/predicates.
 
-Implementation boundary: one channel module plus its registration in the scorer's channel list,
-following E02 and E06. Graph normalization is E13's, consumed and not re-implemented. Embedding
-training is an experiment-side tool; runtime loads a fitted artifact and refuses one whose graph
-hashes do not match. Adding `s_graph/q_graph` changes the fusion feature/explanation schema: an
-E19 learned-fusion artifact fitted without that channel is incompatible and must be refit rather
-than silently reused.
+All generative roles use OpenRouter. Local non-generative encoders/heads use the single RTX 5090.
+Separate target-label-free, in-pair supervised and transferred results. A named diagnostic may
+use development reference information only under its explicit oracle/diagnostic role.
 
-## Arms & validation
+## Validation and selection
 
-Eligible tracks must span the structural axis, not just its poor end — a crossover cannot be
-located from one side. TBox-poor: OAEI-KG instance and class tasks, BioKG/KG-Align CSV pairs when
-published. TBox-rich controls: Bio-ML and Anatomy.
+Primary outcome/guard: **F1 net of shuffle, qualitative structural profile effects, memory/training cost.**
+Use the family rule plus RUN-PLAN's frozen selection, practical-effect, reconstruction and cost
+criteria. A screen chooses what to evaluate next; it does not establish a reporting-set claim.
+Report all controls, negative results, corrections/harms where relevant, and inapplicable or
+budget-deferred cells. Never suppress a difficult kind or source group from the denominator.
 
-**Controlled TBox ablation** (the causal arm for RQ23.2): take a TBox-rich pair and progressively
-remove hierarchy depth and axioms while holding labels, candidates, entities, and seeds fixed,
-synthesizing the poor regime without changing domain. Natural tracks confound structure with
-domain, vocabulary, and reference quality; this arm does not. It is the primary evidence for the
-crossover claim, with natural tracks as its external check.
+Broader validation happens on the designated development sentinel after a promising focused
+screen, then only in E17's frozen final panel for the claims selected at G4. Do not run a full
+OAEI confirmation for every treatment. A feature-specific claim needs its matching held-out
+case; NCIT–DOID cannot substitute for property, instance, natural-NIL or typed-relation labels.
+No individual experiment uses final outcomes to qualify its component for E17.
 
-The primary causal block is {graph off, inductive, transductive} × structural regime with
-retrieval, fusion, and reranking pinned identically within every graph-off/on contrast. Run it
-once under the promoted label-free stack and once under the current/promoted in-pair supervised
-stack where labels exist; do not compare a graph-on arm with E18 enabled against a graph-off arm
-without it. E02 anchor rescoring is the mandatory label-free structural comparator.
+## Acceptance and recovery
 
-On development data, run graph × E18-reranker and graph × E19-fusion 2×2 interactions. Any
-interaction that changes sign or exceeds the relevant MDE becomes a frozen confirmatory contrast,
-and any promoted combination is rechecked in E17. Reuse E12's `relations_shuffled` negative
-control unchanged for RQ23.4 — a degree- and predicate-count-preserving rewiring — and report
-every graph gain both raw and net of it. `graph_only` remains a non-promotable diagnostic.
+- No development/final alignment is inserted as a graph seed.
+- Graph gains must be compared with the matched shuffle and lexical controls.
+- Changing graph/profile schema invalidates consuming fusion heads.
+- 64 GB execution chunks graph features; 128 GB changes throughput, not graph semantics.
 
-Three seeds. Primary: macro F1 on TBox-poor reporting tasks and the mandatory non-exact-label
-slice, with the crossover location from the ablation arm as the other co-primary endpoint declared
-before results open. Secondary: local MRR/Hits@1, candidate recall to prove retrieval was held fixed,
-per-degree-quartile results, channel-importance and weight-entropy shifts, coverage/abstention,
-embedding-training wall time and peak memory reported once per fitted artifact, and per-seed-count
-curves feeding E22.
+Durable boundaries: **Normalized/ablated/shuffled graphs, graph features, fit state and scores.**
+All changed inputs/semantics invalidate their consuming descendants; preserve valid upstream
+artifacts. Store completed source/request/fold IDs and attempt lineage. Tests must demonstrate
+this family's checkpoint/repair boundary, not merely mirror a formula. Mark screen-ready and
+confirm-ready separately in the runtime readiness ledger, with evidence, once these checks pass.
 
-## Promotion
+## Deliverable
 
-Standard criteria, applied within the structural regime rather than globally — a TBox-poor gain
-must not be averaged against a TBox-rich regression, and the channel is expected to be promoted
-per profile, as E06 anticipates for its non-biomedical case.
-
-- The channel must earn its promotion **net of the shuffle control**. A gain that the
-  degree-preserving rewiring reproduces is feature volume and does not promote.
-- The decomposition invariant is a hard constraint: `graph_only` cannot promote regardless of its
-  score, and a promoted channel must reconstruct the final score algebraically.
-- Supervised graph structure ships as a `supervised` resolution of the structural component;
-  **E02's anchor propagation is its `label_free` resolution** and remains the default wherever no
-  seed alignments resolve. E22 fits the effective-seed × structural-profile policy under which
-  `auto` should prefer the supervised channel — for the transductive arm this boundary is expected
-  to be high.
-- A transductive artifact is bound to both graph hashes and may not be reused across pairs. If
-  its per-pair training cost exceeds the run it serves, it is reportable science but a poor
-  default; the results note states that trade-off explicitly rather than burying it in a cost
-  column.
-
-**Pre-registered criterion-3 override**: the transductive arm may exceed the 1.2× wall-time bound
-by its one-time per-pair training cost, reported separately from per-run inference cost, because
-per-pair fitting is the capability under test. Inference-time cost keeps the default bound, and
-the inductive arm receives no override.
-
-**Paper contribution**: ontology matching and knowledge-graph entity alignment are largely
-separate literatures with separate benchmarks, and the second is rarely evaluated inside a
-TBox-oriented matcher or against a strong lexical/evidence baseline. Locating the crossover on a
-measured structural axis — using a controlled TBox ablation rather than a comparison across
-tracks that differ in every other way — is a result neither community currently reports, and it
-converts "use a GNN for KGs" from folklore into a threshold a system can act on.
-
-**Effort**: L. **Risks**: entity-alignment benchmarks are known to be partly solvable by string
-similarity alone, so a headline gain here would be uninformative without the non-exact-label
-slice — it is mandatory, not secondary; hub entities dominate neighborhood overlap, hence
-degree-quartile reporting and degree-normalized evidence; seed edges leaking into the propagation
-graph would invalidate the experiment silently, hence the explicit assertion; transductive
-training cost may exceed any plausible deployment budget, which is a finding rather than a
-failure; and a correlated structural channel can dilute σ-mixing on TBox-rich tracks, which is
-why promotion is per profile and weight entropy is reported.
+Produce a result record with actual treatment/configuration, case/role, supervision, artifact
+IDs, source counts, metrics/cost, controls, uncertainty, decision and reason. A legitimate null,
+removal, or inapplicability is a deliverable; an unimplemented arm is not an empirical null.
+Resolve this family's question into numbered research questions and a primary endpoint in the
+executable design before its screen; answer each as supported, not supported or inconclusive
+with evidence. RUN-PLAN section 7 governs incomplete references and claim limitations.

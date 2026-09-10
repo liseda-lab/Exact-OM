@@ -51,8 +51,14 @@ non-result-changing fixes (F1–F7) are assigned to WPs A/C/D/E/H/J and are part
 
 **Separate plan**: `specs/experiments/` — result-changing methodology improvements and
 capability-validation studies (E00–E26).
-Runs strictly AFTER this suite completes; nothing from it may be folded into an engineering WP
-(promotion rules in its README).
+The 2026-09-09 v2 programme implements the accepted methodology review: focused feature-specific
+screens, one RTX 5090 node, all generative LLM work on OpenRouter, and a 14–21 day execution
+budget. Read [the v2 run plan](experiments/RUN-PLAN.md), [implementation inventory](experiments/IMPLEMENTATION-STATUS.md),
+and [checkpoint/repair contract](experiments/CHECKPOINT-RECOVERY.md). G0 requires a supported,
+pinned baseline and the applicable engineering acceptance evidence; unrelated engineering
+work is not a blanket prerequisite. Result-changing experiment promotion remains separate
+from behavior-preserving engineering work. Current v1 experiment declarations are blocked
+until the implementing agent migrates them to v2.
 
 **Separate suite**: [`specs/exact-repair/`](exact-repair/) — proposed Exact-Repair post-processor
 (XR-1); it has independent gates and promotion rules, and no work package in this suite depends on

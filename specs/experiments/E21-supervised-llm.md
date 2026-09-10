@@ -1,122 +1,81 @@
-# E21 — Supervised LLM Use: Exemplars, Learned Gating, and Distillation
+# E21 — Exemplars, net-benefit routing, and a justified student
 
-**Motivation** (audit obs. 21; extends obs. 6): E07 makes the LLM's *frame* comparative, but
-every one of its arms remains zero-shot, and the decision to invoke the LLM at all is still the
-fixed uncertainty rule `U ≥ τ_LLM` with mixing weight `w_i = β·U`
-(`pair_adaptive_scorer.py:678-683`). The only supervised LLM machinery that exists today
-calibrates the returned probability after the fact
-(`_apply_llm_calibration` / `_collect_calibration_samples`, `pair_adaptive_scorer.py:718-736`).
+**v2 specification, 2026-09-09. Implementation still required.**
+This file replaces the v1 matrix for this family. [RUN-PLAN](RUN-PLAN.md),
+[shared clarifications](IMPLEMENTATION-CLARIFICATIONS.md), and
+[checkpoint recovery](CHECKPOINT-RECOVERY.md) are binding. A passing helper test does not
+establish an executable experiment or a performance result.
 
-Three levers remain unused, and one of them is the sharpest cost result available in the
-programme. The current gate fires on *uncertainty*, which is only a proxy for the thing that
-matters: whether the call will change the decision. Most gated pairs are presumably confirmations
-of what `S_base` already concluded, and every one of those is a paid call that buys nothing. With
-training labels, a gate can be trained on the real target instead of the proxy.
+## Existing implementation and missing work
 
-## Research questions
+Inspected baseline: 655f599e714e13d592f702f326ca5a36f6b50b2f.
 
-- **RQ21.1**: Do k-NN-retrieved labelled exemplars in the prompt improve LLM decision accuracy
-  over zero-shot at an equal number of calls?
-- **RQ21.2**: Can a learned gate — trained to predict whether an LLM call will change the
-  decision, and change it correctly — reduce calls at equal or better quality compared with
-  `U ≥ τ_LLM`?
-- **RQ21.3**: Can a student distilled from LLM judgements recover most of the LLM's contribution
-  at a fraction of its cost, and on which slices does distillation fail?
-- **RQ21.4**: Does a learned fusion weight beat `w_i = β·U`, and does refitting calibration on
-  training labels beat the currently fitted calibration?
-- **RQ21.5**: Do these gains hold across models, or are they artifacts of one model's behavior —
-  and what happens to a fitted gate or student when the provider's model changes?
+**Already implemented:** Canonical controls/guards exist; exemplars, counterfactual router labels, student training and fitted trust are missing.
 
-## Hypotheses
+**Agent must implement:** Training-only exemplar retrieval, actual forced-call counterfactual data, net-benefit router fitting, gold-only/student comparison, and immutable teacher bindings.
 
-Exemplars help most on out-of-domain tracks, where the model has the weakest domain priors and
-the most to gain from being shown what a correct alignment looks like in that vocabulary; on
-Bio-ML the effect is expected to be small. Learned gating cuts calls by at least 50% at
-non-inferior quality, because the majority of currently gated pairs are confirmations.
-Distillation is expected to recover a majority but not all of the LLM's contribution, degrading
-specifically where the contribution is genuine world knowledge rather than a recoverable pattern
-over the evidence — which slice that is, is itself the interesting finding. A learned fusion
-weight is expected to beat `β·U` modestly, since proportionality to uncertainty is an assumption
-that has never been tested.
+**Inputs/bindings to resolve:** OpenRouter teacher identity and allocated spend; actual fitting code and compatible non-generative student.
+The user confirms the OAEI/BioKG data are available. Resolve paths, revisions and capabilities;
+do not perpetuate an old unavailable flag without checking the supplied data.
 
-## Change
+## Focus and dependencies
 
-Under `llm.*`, defaulting to current behavior:
+Primary focused case: **D0 or the E07-selected feature case**.
+Resource envelope: **llm** in RUN-PLAN.
+Prerequisites/consumed outputs: **E00, E07_judgment_evidence, E25_initial**. A pool-freeze or selected-head dependency
+accepts the declared baseline output when no candidate wins; optional research must not deadlock
+other families. Kind-specific pool freezes do not change the already-frozen class pool.
 
-1. `llm.exemplars: off|knn` with `exemplar_count` and a retrieval configuration. Exemplars are
-   retrieved from **training-split mappings only**, by embedding similarity to the query source
-   entity. The harness asserts no exemplar originates in a validation or test reference, and that
-   a query pair can never retrieve itself.
-2. `llm.gate: uncertainty|learned`. The learned gate is a small classifier over the same
-   pre-LLM features available at gating time — `S_base`, channel scores and qualities, `U`, pool
-   statistics — trained on **counterfactual training data**: for a sample of training pairs, run
-   the pipeline both with and without the LLM call and label each pair by whether the call
-   changed the decision and whether the change was correct. This one-time training-split LLM
-   sweep is a real cost and is reported as such. “Correct” is assigned only where the training
-   reference is complete for that source/kind/relation or the outcome is explicitly adjudicated;
-   an unlisted mapping in an incomplete reference is unknown and is excluded from the supervised
-   gate target rather than labelled incorrect.
-3. `llm.distill: off|student` — a student trained on LLM judgements over **training-split**
-   sources plus gold labels, used in place of the call at inference. Training a student on LLM
-   outputs over reporting sources would be transductive; if run at all, it is a labelled
-   diagnostic arm that cannot promote.
-4. `llm.fusion_weight: beta_u|learned` and a refit of the existing probability calibration on
-   training labels.
+Start with 300 development source groups (all eligible if fewer), seed 17, except a stated smaller LLM limit. Expand at most two non-control survivors to 1,000 nested development groups. Every applicable family receives a focused initial screen; widen cases or models only at scheduled gates. Eligibility/power is recorded per kind/relation.
 
-Implementation boundary: prompt assembly and exemplar retrieval in `exact/impl/models/
-semantic_llm.py`; the gate and student are heads under `exact/impl/models/`, consulted at the
-existing gating and decision points in `pair_adaptive_scorer.py`. The router is untouched.
+## Question, treatments, and implementation contract
 
-## Arms & validation
+First establish that the judge can improve decisions. A null old uncertainty gate does not cancel this test; a demonstrably unhelpful judge can screen out supervised extensions. Initial broad screen uses one small recipe each, then only a survivor expands. Include teacher-data generation cost and preserve all raw responses.
 
-Screen the exemplar count, gate, student, and supported combinations on Bio-ML
-train/validation with one seed and the fixed collection budget. Apply a predeclared selection rule
-per explicit lever and retain only candidates that clear their quality/cost guard; freeze one
-combined configuration when more than one lever survives.
+At most **5 distinct treatment configurations/cells as specified below** before any explicitly declared source expansion. This is a bounded sequential design, not a Cartesian product. Shared deterministic controls are computed once.
 
-Confirm only the frozen candidate(s), the necessary single-lever controls, and the promoted E07
-label-free comparator on eligible reporting tracks with three paired seeds and a declared
-counterfactual-label/completeness policy. Do not send the complete development factorial to
-reporting data.
+- frozen_judge: selected E07 control.
+- knn_exemplars: at most three training-source exemplars.
+- benefit_router: predicted correction-minus-harm per token.
+- student_gold: same small student trained on gold only.
+- student_distilled: same student plus pinned teacher judgments.
 
-Primary: macro F1. **Co-primary, declared before results open**: LLM calls and tokens. For the
-gate and distillation arms the cost endpoint is primary and quality is held to a non-inferiority
-margin, following E07's pattern — the CI lower bound of the quality delta must sit above −0.5
-macro F1 points, and the call reduction must have a CI excluding zero.
+All generative roles use OpenRouter. Local non-generative encoders/heads use the single RTX 5090.
+Separate target-label-free, in-pair supervised and transferred results. A named diagnostic may
+use development reference information only under its explicit oracle/diagnostic role.
 
-Secondary: local MRR, decision-flip counts and their correctness, gate precision/recall against
-the counterfactual label, per-slice distillation gap, ECE/Brier after fusion, and the one-time
-counterfactual-collection and student-training costs reported separately from per-run cost.
+## Validation and selection
 
-All arms pin E00's complete LLM fingerprint. Because a learned gate and a distilled student are
-fitted to one model's behavior, this experiment carries an additional artifact rule: the fitted
-gate and student record the resolved model identity, and the harness refuses to apply them under
-a different fingerprint. RQ21.5's cross-model replication runs on one development task with a
-second pinned model; if the effect reverses, the claim is scoped to the primary model and
-cross-model generalization is recorded as inconclusive rather than assumed.
+Primary outcome/guard: **Net final decision benefit per cost; teacher agreement alone is insufficient.**
+Use the family rule plus RUN-PLAN's frozen selection, practical-effect, reconstruction and cost
+criteria. A screen chooses what to evaluate next; it does not establish a reporting-set claim.
+Report all controls, negative results, corrections/harms where relevant, and inapplicable or
+budget-deferred cells. Never suppress a difficult kind or source group from the denominator.
 
-## Promotion
+Broader validation happens on the designated development sentinel after a promising focused
+screen, then only in E17's frozen final panel for the claims selected at G4. Do not run a full
+OAEI confirmation for every treatment. A feature-specific claim needs its matching held-out
+case; NCIT–DOID cannot substitute for property, instance, natural-NIL or typed-relation labels.
+No individual experiment uses final outcomes to qualify its component for E17.
 
-Standard criteria for the exemplar and fusion-weight arms. For the gate and distillation arms,
-the pre-registered cost-primary endpoint above governs.
+## Acceptance and recovery
 
-- The learned gate and the distilled student ship as the **`supervised` resolution** of the LLM
-  component under `supervision.mode`. The uncertainty gate remains the `label_free` resolution
-  and stays the default wherever no training reference resolves.
-- A fitted gate or student may only ship bound to an immutable model deployment. A provider
-  exposing only a mutable alias cannot carry one of these artifacts into a product default, by
-  the same rule E00 applies to confirmatory LLM comparisons.
+- No exemplar retrieves the query or a development/final reference as training gold.
+- Router targets use complete/adjudicated outcomes and distinguish correction, harm and no change.
+- Student variants share architecture/features/data budgets except teacher information.
+- Provider/model changes invalidate teacher/router compatibility rather than silently changing deployment.
 
-**Paper contribution**: the literature reports LLM-assisted matching largely as an accuracy
-story, with cost mentioned as an afterthought. RQ21.2 inverts that: it asks how much of the LLM
-budget a matcher actually needs, and answers it with a gate trained on the counterfactual rather
-than on a hand-set uncertainty threshold. The distillation slice analysis (RQ21.3) is the
-complementary scientific question — it localizes what the LLM contributes that the evidence
-model cannot reconstruct.
+Durable boundaries: **Teacher request ledger, counterfactual examples, exemplars, router/student training.**
+All changed inputs/semantics invalidate their consuming descendants; preserve valid upstream
+artifacts. Store completed source/request/fold IDs and attempt lineage. Tests must demonstrate
+this family's checkpoint/repair boundary, not merely mirror a formula. Mark screen-ready and
+confirm-ready separately in the runtime readiness ledger, with evidence, once these checks pass.
 
-**Effort**: M–L. **Risks**: provider model drift invalidates fitted gates and students, which is
-both an experimental hazard and a genuine product limitation that the results note must state
-plainly; counterfactual data collection costs a full training-split LLM sweep, so budget it
-before scheduling; exemplar retrieval is a leakage surface and is asserted, not assumed; a gate
-that learns to suppress calls on a slice where the LLM was quietly helping would show up as a
-slice regression, so per-slice reporting is mandatory rather than optional here.
+## Deliverable
+
+Produce a result record with actual treatment/configuration, case/role, supervision, artifact
+IDs, source counts, metrics/cost, controls, uncertainty, decision and reason. A legitimate null,
+removal, or inapplicability is a deliverable; an unimplemented arm is not an empirical null.
+Resolve this family's question into numbered research questions and a primary endpoint in the
+executable design before its screen; answer each as supported, not supported or inconclusive
+with evidence. RUN-PLAN section 7 governs incomplete references and claim limitations.

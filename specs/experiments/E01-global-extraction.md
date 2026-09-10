@@ -1,65 +1,81 @@
-# E01 — Global Alignment Extraction (mutual-best / assignment)
+# E01 — Threshold-aware global extraction
 
-**Motivation** (audit obs. 1): extraction is greedy per-source top-1 (threshold → per-source
-`nlargest` → exact re-injection → per-target `nlargest`), with the selector zeroing non-winner
-rows first. Two sources claiming the same target are resolved by score order alone; the loser
-gets nothing even when its runner-up was fine. Classic OM systems gain precision from global
-1-1 extraction.
+**v2 specification, 2026-09-09. Implementation still required.**
+This file replaces the v1 matrix for this family. [RUN-PLAN](RUN-PLAN.md),
+[shared clarifications](IMPLEMENTATION-CLARIFICATIONS.md), and
+[checkpoint recovery](CHECKPOINT-RECOVERY.md) are binding. A passing helper test does not
+establish an executable experiment or a performance result.
 
-## Research questions
+## Existing implementation and missing work
 
-- **RQ01.1**: Does mutual-best, stable marriage, or optimal assignment improve global F1 over
-  greedy extraction when the reference is predominantly one-to-one?
-- **RQ01.2**: Are gains precision-led, and how often does global extraction recover a valid
-  runner-up after resolving a target collision?
-- **RQ01.3**: How does extraction interact with the selector, exact-match protection, and
-  tracks whose true cardinality is not one-to-one?
-- **RQ01.4**: Which observable cardinality statistic is safe for choosing an extraction mode
-  without consulting test references?
+Inspected baseline: 655f599e714e13d592f702f326ca5a36f6b50b2f.
 
-**Hypothesis**: on near-1-1 tracks (Anatomy, Bio-ML equiv), mutual-best or optimal assignment
-raises precision ≥0.5 pts at ≤0.3 pts recall cost vs. the greedy cascade; assignment ≥
-mutual-best.
+**Already implemented:** Greedy, mutual-best, stable marriage, component assignment, protected-match checks, and component-cap fallback primitives exist.
 
-## Change
+**Agent must implement:** True global frozen-pool execution and threshold-aware accepted-edge assignment; current assignment applies threshold after optimization.
 
-New post-selector extraction strategies behind `matching.extraction` (default `greedy` =
-current), operating on the pre-zeroed score frame (selector emits per-candidate scores instead
-of zeroing when a global strategy is active — flag-gated in the selector):
+**Inputs/bindings to resolve:** Resolve the primary class reference and declared cardinality; the user confirms the broader OAEI tasks are available.
+The user confirms the OAEI/BioKG data are available. Resolve paths, revisions and capabilities;
+do not perpetuate an old unavailable flag without checking the supplied data.
 
-- `mutual_best`: keep (s,t) iff t = argmax over T_s and s = argmax over sources proposing t.
-- `assignment`: Jonker-Volgenant (scipy `linear_sum_assignment`) on the sparse candidate score
-  matrix per connected component, threshold applied after assignment.
-- `stable_marriage`: Gale-Shapley on mutual candidate lists (cheap ordering-robust middle
-  ground).
-Exact matches stay protected (pre-assigned before optimization). Local/ranking task unaffected.
+## Focus and dependencies
 
-Touched: `impl/models/selector/acceptance.py` (score emission mode),
-`core/entities/mappings/entity.py` extraction functions, new `impl/extraction.py`.
+Primary focused case: **D0**.
+Resource envelope: **decisions** in RUN-PLAN.
+Prerequisites/consumed outputs: **E00, pool_freeze**. A pool-freeze or selected-head dependency
+accepts the declared baseline output when no candidate wins; optional research must not deadlock
+other families. Kind-specific pool freezes do not change the already-frozen class pool.
 
-## Arms & validation
+Start with 300 development source groups (all eligible if fewer), seed 17, except a stated smaller LLM limit. Expand at most two non-control survivors to 1,000 nested development groups. Every applicable family receives a focused initial screen; widen cases or models only at scheduled gates. Eligibility/power is recorded per kind/relation.
 
-Screen greedy (baseline) / mutual_best / assignment / stable_marriage on development data
-with one seed; cross selector {on, off} on one development task to check the interaction. Freeze one
-extraction candidate per explicit cardinality regime. Confirm each frozen candidate against greedy
-on the eligible reporting tasks with three paired seeds; carry the selector 2×2 into confirmation
-only if it is named in the frozen design record. Primary: macro F1; secondary: per-task P/R and
-count of sources changed.
+## Question, treatments, and implementation contract
 
-For RQ01.4, compute only reference-free task statistics: source/target signature-size ratio,
-candidate-graph component density, target-collision rate among source top-1s, reciprocal-top-1
-rate, and accepted-score margin distribution. Choose any extraction-mode rule on development
-tasks, validate it leave-one-development-task-out, then freeze and apply it to every reporting
-task. Reporting references assess the frozen rule only; reference cardinality is examined post
-hoc and cannot select the mode.
+Hold scores/selector fixed. Compare the five strategies with source/target cardinality declared from the task contract. Use a selector on/off interaction only for the selected strategy at G4; do not multiply the initial grid. Record changed sources, target collisions, dummy matches, and cap fallbacks.
 
-On Anatomy, Conference, and KG tasks whose inventory does not declare complete gold, invoke
-the shared blinded disagreement-adjudication protocol. Report adjusted precision beside the
-official raw precision so a precision-led extraction arm is not rejected solely for proposing
-valid novel mappings absent from the reference.
+At most **5 distinct treatment configurations/cells as specified below** before any explicitly declared source expansion. This is a bounded sequential design, not a Cartesian product. Shared deterministic controls are computed once.
 
-**Promotion**: standard criteria; expect `assignment` default for equivalence tracks if it
-holds; keep `greedy` for n-m tracks (cardinality >1) — decision may be per-cardinality-config.
+- greedy: threshold-first current control.
+- mutual_best: reciprocal top candidate among eligible edges.
+- stable_marriage: source-proposing, canonical ties.
+- assignment_accepted_utility: eligible edges with utility score-threshold and zero unmatched utility.
+- assignment_legacy: raw-score optimization followed by threshold, diagnostic only.
 
-**Effort**: S. **Risks**: assignment on huge components (SNOMED) — cap component size, fall
-back to mutual-best above it; measure runtime via ledger.
+All generative roles use OpenRouter. Local non-generative encoders/heads use the single RTX 5090.
+Separate target-label-free, in-pair supervised and transferred results. A named diagnostic may
+use development reference information only under its explicit oracle/diagnostic role.
+
+## Validation and selection
+
+Primary outcome/guard: **Global F1; local pair scores must be unchanged.**
+Use the family rule plus RUN-PLAN's frozen selection, practical-effect, reconstruction and cost
+criteria. A screen chooses what to evaluate next; it does not establish a reporting-set claim.
+Report all controls, negative results, corrections/harms where relevant, and inapplicable or
+budget-deferred cells. Never suppress a difficult kind or source group from the denominator.
+
+Broader validation happens on the designated development sentinel after a promising focused
+screen, then only in E17's frozen final panel for the claims selected at G4. Do not run a full
+OAEI confirmation for every treatment. A feature-specific claim needs its matching held-out
+case; NCIT–DOID cannot substitute for property, instance, natural-NIL or typed-relation labels.
+No individual experiment uses final outcomes to qualify its component for E17.
+
+## Acceptance and recovery
+
+- The 0.90/0.69/0.69 graph at threshold 0.70 retains 0.90 under primary assignment.
+- All strategies enforce declared cardinality and deterministic ties.
+- Non-greedy global arms work with frozen candidate files and reject local-ranking semantics.
+- Hard anchor conflicts are explicit; soft-anchor behavior is owned by E02.
+
+Durable boundaries: **Decisions, per-component extraction, evaluation.**
+All changed inputs/semantics invalidate their consuming descendants; preserve valid upstream
+artifacts. Store completed source/request/fold IDs and attempt lineage. Tests must demonstrate
+this family's checkpoint/repair boundary, not merely mirror a formula. Mark screen-ready and
+confirm-ready separately in the runtime readiness ledger, with evidence, once these checks pass.
+
+## Deliverable
+
+Produce a result record with actual treatment/configuration, case/role, supervision, artifact
+IDs, source counts, metrics/cost, controls, uncertainty, decision and reason. A legitimate null,
+removal, or inapplicability is a deliverable; an unimplemented arm is not an empirical null.
+Resolve this family's question into numbered research questions and a primary endpoint in the
+executable design before its screen; answer each as supported, not supported or inconclusive
+with evidence. RUN-PLAN section 7 governs incomplete references and claim limitations.

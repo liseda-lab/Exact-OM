@@ -1,67 +1,78 @@
-# E10 — Fusion & Selector Ablations (γ/τ_LLM sweep, GBDT accept, pairwise accept training)
+# E10 — Bounded analytic constants and acceptance training
 
-**Motivation** (audit obs. 8, 10 + finding F3): core constants have drifted through iterations
-(docs said γ=0.73, shipped config says 2.0; τ_LLM has three different values across doc/config/
-class default) — evidence they were once swept but the record is lost. And the acceptance
-classifier trains on exactly one sample per source (its winner), discarding runner-up and
-pairwise structure; both stages are linear models chosen for interpretability but never
-benchmarked against stronger tabular learners on the same features.
+**v2 specification, 2026-09-09. Implementation still required.**
+This file replaces the v1 matrix for this family. [RUN-PLAN](RUN-PLAN.md),
+[shared clarifications](IMPLEMENTATION-CLARIFICATIONS.md), and
+[checkpoint recovery](CHECKPOINT-RECOVERY.md) are binding. A passing helper test does not
+establish an executable experiment or a performance result.
 
-## Research questions
+## Existing implementation and missing work
 
-- **RQ10.1**: What region of the γ/τ_LLM/β fusion surface gives the best quality/cost trade-off,
-  and are the shipped constants on a stable plateau?
-- **RQ10.2**: Does a monotonic GBDT accept model improve F1 or abstention calibration enough to
-  justify its reduced linear interpretability?
-- **RQ10.3**: Does adding runner-up negatives improve acceptance beyond winner-only training?
-- **RQ10.4**: How pair-, domain-, and entity-kind-specific are the learned coefficients and
-  thresholds, motivating the label-free and transfer experiments E15/E16?
+Inspected baseline: 655f599e714e13d592f702f326ca5a36f6b50b2f.
 
-**Hypothesis**: (a) the fusion surface around (γ, τ_LLM, β) is flat near the shipped values —
-confirming them — OR reveals a better region (either outcome is valuable; the doc/config
-mismatch suggests uncertainty); (b) a monotonic-constrained GBDT accept model beats logistic
-by a small margin on F1 at some interpretability cost; (c) pairwise/augmented accept training
-(winner + runner-up as explicit negative) improves abstention quality (AUROC of p_match) even
-if F1 moves little.
+**Already implemented:** Fusion controls and the existing listwise-linear/acceptance baseline exist; the earlier 45-cell/two-phase training orchestration is incomplete.
 
-## Change
+**Agent must implement:** Cached-score constant replay, bounded two-phase selection, winner-plus-runner-up fitting, and immutable training artifacts.
 
-All config-only or selector-internal, gated:
-1. Sweep harness configs for γ ∈ {0.5, 0.73, 1, 2, 3}, τ_LLM ∈ {0.35, 0.5, 0.6}, β ∈
-   {0.6, 0.8, 1.0} (3-D grid pruned by early kills on one dev task; needs WP-J's exposure of
-   these as sweepable config — already true — and the tuner).
-2. `selector.accept_model: logistic|gbdt_monotonic` (lightgbm with monotone constraints on
-   evidence features; keep the linear model's feature set identical).
-3. `selector.accept_training: winner_only|winner_plus_runnerup`.
-4. Deliverable regardless of promotion: a versioned **constants provenance table** stored
-   with the experiment results — final swept values plus development evidence — replacing
-   folklore defaults (closes finding F3's origin problem for good).
+**Inputs/bindings to resolve:** Usable source-group training labels and pinned feature schema.
+The user confirms the OAEI/BioKG data are available. Resolve paths, revisions and capabilities;
+do not perpetuate an old unavailable flag without checking the supplied data.
 
-## Arms & validation
+## Focus and dependencies
 
-Screen phase A: sweep γ/τ_LLM/β on two development tasks with one seed and prune to the
-top three configurations using the predeclared rule. Screen phase B: cross those survivors with
-{logistic, gbdt} × {winner_only, winner_plus_runnerup}, still on development data and one seed.
-Freeze at most one fusion candidate and one accept-model/training candidate because they are
-separate paper/default decisions; if both survive, freeze their 2×2 interaction. Confirmation runs
-only those candidates, their shipped controls, and the required 2×2 on reporting data with three
-paired seeds. Primary: macro F1 plus local MRR; secondary: p_match AUROC, LLM invocation rate
-(tau_LLM moves it directly, so cost is mandatory), and an explanation-impact note. GBDT loses
-exact linear attributions for the accept step; the pairwise-score decomposition is untouched, but
-the paper and promotion decision must state that trade-off explicitly.
+Primary focused case: **D0**.
+Resource envelope: **channels** in RUN-PLAN.
+Prerequisites/consumed outputs: **E00, pool_freeze, E26**. A pool-freeze or selected-head dependency
+accepts the declared baseline output when no candidate wins; optional research must not deadlock
+other families. Kind-specific pool freezes do not change the already-frozen class pool.
 
-**Promotion**: standard criteria; GBDT additionally requires the interpretability trade-off to
-be explicitly accepted by the owner (it changes the "fully inspectable decision process"
-story — flag, don't decide, in the results note).
+Start with 300 development source groups (all eligible if fewer), seed 17, except a stated smaller LLM limit. Expand at most two non-control survivors to 1,000 nested development groups. Every applicable family receives a focused initial screen; widen cases or models only at scheduled gates. Eligibility/power is recorded per kind/relation.
 
-**Effort**: M–L (mostly compute). **Risks**: sweep overfitting to dev tasks — reporting matrix
-is untouched until stage 2; lightgbm is a new dependency — optional extra, experiment-only
-until promoted.
+## Question, treatments, and implementation contract
 
-**Relation to the supervised experiments**: E10 sweeps the fusion constants and swaps the accept
-head while keeping both mechanisms' functional forms fixed. E19 fits the σ-mixing weights from
-labels — its fitted-constants table and this experiment's swept provenance table answer the
-constants question from two directions and are read together. E18 audits and extends the
-existing listwise-linear candidate ranker with alternative objectives and model families. Because
-ranking and acceptance can absorb the same signal, an E18×E10 promotion remains a mandatory 2×2
-contrast rather than an assumed sum.
+Do not run the old 45-cell gamma/gate/beta grid. The six analytic settings include the shipped gamma=2,tau=0.5. Freeze one on development, then compare the two acceptance recipes. Keep beta and LLM routing fixed; E25/E21 own asking versus trusting. Publish constants/ranges even if no arm improves.
+
+At most **8 distinct treatment configurations/cells as specified below** before any explicitly declared source expansion. This is a bounded sequential design, not a Cartesian product. Shared deterministic controls are computed once.
+
+- analytic_grid: six cached replays gamma={1,2,3} by tau={0.4,0.5}, decision LLM off.
+- winner_only: current acceptance training on the selected analytic setting.
+- winner_runnerup: same head/features with safe runner-up negatives.
+
+All generative roles use OpenRouter. Local non-generative encoders/heads use the single RTX 5090.
+Separate target-label-free, in-pair supervised and transferred results. A named diagnostic may
+use development reference information only under its explicit oracle/diagnostic role.
+
+## Validation and selection
+
+Primary outcome/guard: **Global F1; constants table and selected-comparison cost required.**
+Use the family rule plus RUN-PLAN's frozen selection, practical-effect, reconstruction and cost
+criteria. A screen chooses what to evaluate next; it does not establish a reporting-set claim.
+Report all controls, negative results, corrections/harms where relevant, and inapplicable or
+budget-deferred cells. Never suppress a difficult kind or source group from the denominator.
+
+Broader validation happens on the designated development sentinel after a promising focused
+screen, then only in E17's frozen final panel for the claims selected at G4. Do not run a full
+OAEI confirmation for every treatment. A feature-specific claim needs its matching held-out
+case; NCIT–DOID cannot substitute for property, instance, natural-NIL or typed-relation labels.
+No individual experiment uses final outcomes to qualify its component for E17.
+
+## Acceptance and recovery
+
+- Every grid setting reuses the same raw evidence and records its changed numerical parameters.
+- Runner-up negatives respect completeness and known alternative positives.
+- No selected analytic constants are read from reporting data.
+
+Durable boundaries: **Analytic score replay, grouped head training, acceptance.**
+All changed inputs/semantics invalidate their consuming descendants; preserve valid upstream
+artifacts. Store completed source/request/fold IDs and attempt lineage. Tests must demonstrate
+this family's checkpoint/repair boundary, not merely mirror a formula. Mark screen-ready and
+confirm-ready separately in the runtime readiness ledger, with evidence, once these checks pass.
+
+## Deliverable
+
+Produce a result record with actual treatment/configuration, case/role, supervision, artifact
+IDs, source counts, metrics/cost, controls, uncertainty, decision and reason. A legitimate null,
+removal, or inapplicability is a deliverable; an unimplemented arm is not an empirical null.
+Resolve this family's question into numbered research questions and a primary endpoint in the
+executable design before its screen; answer each as supported, not supported or inconclusive
+with evidence. RUN-PLAN section 7 governs incomplete references and claim limitations.

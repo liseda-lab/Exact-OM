@@ -1,126 +1,80 @@
-# E20 — Supervised Retrieval: Contrastive Fine-Tuning and Cross-Encoder Reranking
+# E20 — One supervised retrieval recipe and a cross-encoder comparator
 
-**Motivation** (audit obs. 20; extends obs. 3): E05 asks which *off-the-shelf* encoder to use and
-how to fuse retrieval channels — every one of its arms is zero-shot. But retrieval is the stated
-recall ceiling: a gold target outside the pool is unrecoverable no matter how good scoring,
-fusion, or acceptance become, so it is the one stage where a label-driven gain cannot be
-recovered elsewhere. The labels needed are already on disk. Training references supply positive
-pairs, and the existing candidate pools supply hard negatives for free: the non-gold entries a
-zero-shot encoder ranked above or beside the gold target are precisely the confusions a
-fine-tuned encoder should learn to separate.
+**v2 specification, 2026-09-09. Implementation still required.**
+This file replaces the v1 matrix for this family. [RUN-PLAN](RUN-PLAN.md),
+[shared clarifications](IMPLEMENTATION-CLARIFICATIONS.md), and
+[checkpoint recovery](CHECKPOINT-RECOVERY.md) are binding. A passing helper test does not
+establish an executable experiment or a performance result.
 
-Supervised retrieval also carries a methodological trap that must be handled explicitly, and is
-the reason this experiment is specified separately rather than folded into E05: once the encoder
-is fitted, candidate recall measured on training-split sources is optimistic by construction.
+## Existing implementation and missing work
 
-## Research questions
+Inspected baseline: 655f599e714e13d592f702f326ca5a36f6b50b2f.
 
-- **RQ20.1**: Does contrastive fine-tuning of the retrieval encoder on training mappings raise
-  candidate recall at fixed mean pool size over the best zero-shot E05 configuration?
-- **RQ20.2**: Does a supervised cross-encoder over the top-k improve ranking beyond E18's
-  feature-based reranker, and at what latency multiple?
-- **RQ20.3**: When the same labelled source pool is reusable by every compatible stage, what is
-  the marginal value of enabling supervised retrieval relative to fusion, reranking, and
-  acceptance? This experiment contributes the retrieval arm of E22's shared-label comparison.
-- **RQ20.4**: Do fine-tuned encoders transfer to other ontology pairs and domains, or do they
-  overfit the training pair's vocabulary?
-- **RQ20.5**: Do supervised recall gains survive end-to-end, or do the additional near-miss
-  candidates they surface cost precision — E05's RQ05.3, re-asked with a supervised pool?
+**Already implemented:** Fitted retrieval loaders and bounded cross-reranking exist; safe mining and immutable trainers are incomplete.
 
-## Hypotheses
+**Agent must implement:** Source-group-safe negative mining, encoder/cross-encoder fitting and resumable state, matched-pool comparison, and early G1 orchestration.
 
-Contrastive fine-tuning raises recall@k by 2–4 points at equal pool size on biomedical tracks,
-and by more on out-of-domain tracks where the base encoder is weakest and therefore has the most
-headroom. The cross-encoder is expected to improve ranking but to cost at least 5× candidate-
-scoring latency, most likely failing the cost gate as a shipped default while remaining valuable
-as a quality ceiling that bounds what any feature-based reranker could achieve. Transfer across
-pairs that share an ontology (SNOMED appears in two Bio-ML pairs) is expected to look
-substantially better than transfer to disjoint pairs; reporting only the pooled number would
-overstate generalization.
+**Inputs/bindings to resolve:** Resolve pretrained encoder/cross-encoder revisions; these non-generative models run locally on the GPU.
+The user confirms the OAEI/BioKG data are available. Resolve paths, revisions and capabilities;
+do not perpetuate an old unavailable flag without checking the supplied data.
 
-## Change
+## Focus and dependencies
 
-Under `candidates.*`, defaulting to current behavior:
+Primary focused case: **D0; selected D1 check before G1**.
+Resource envelope: **retrieval** in RUN-PLAN.
+Prerequisites/consumed outputs: **E00, E05_initial**. A pool-freeze or selected-head dependency
+accepts the declared baseline output when no candidate wins; optional research must not deadlock
+other families. Kind-specific pool freezes do not change the already-frozen class pool.
 
-1. `encoder_finetune: off|contrastive` with mining parameters. Positives are training-split
-   mappings. A non-reference candidate is a hard negative only when the inventory declares that
-   training reference complete for the task×kind×relation, or the dataset provides an explicit
-   negative. In-batch negatives are filtered against every known positive and are used as
-   confirmed negatives only under the same completeness rule. For `known_incomplete` references,
-   use a pre-registered positive-unlabelled contrastive objective or semantically certified
-   incompatible negatives; `unknown`-completeness negative-mining arms are descriptive and cannot
-   establish a promotion claim. The fine-tuned encoder artifact records base model, training
-   pairs, completeness/negative policy, mining configuration, dataset lock, epochs, and seed.
-2. `candidates.cross_encoder: off|on` with `cross_encoder_top_k`. A supervised pair classifier
-   re-scores the top-k pool entries before the pool is handed downstream.
-3. The candidate-pool manifest defined in E05 gains the encoder-artifact hash. A pool built with
-   a fitted encoder is never fingerprint-compatible with a zero-shot pool, and the harness must
-   refuse to reuse a downstream fitted head across that boundary.
+Start with 300 development source groups (all eligible if fewer), seed 17, except a stated smaller LLM limit. Expand at most two non-control survivors to 1,000 nested development groups. Every applicable family receives a focused initial screen; widen cases or models only at scheduled gates. Eligibility/power is recorded per kind/relation.
 
-**Leakage discipline** (this experiment's central risk): encoder training consumes training-split
-mappings only. Validation-split mappings may select hyperparameters and early stopping; test
-mappings are never touched. The harness asserts this at startup, as it does for the selector.
-Reference completeness controls the meaning of negatives, not merely reporting: absence from an
-incomplete reference is never silently converted into a negative label.
+## Question, treatments, and implementation contract
 
-**Optimistic-recall rule**: candidate recall is reported on **test-split sources** as the
-headline number. Training-split recall is reported separately and labelled optimistic; it
-measures memorization, not retrieval quality, and may never be used for an arm decision or a
-promotion claim.
+Use at most three epochs with frozen patience/step limits and one base encoder per recipe; record effective batch/accumulation for the RTX 5090. Negatives require complete or explicit incompatible labels. No reporting gold in mining. Fit before pool consumers; cost includes one-time training and amortized encoding.
 
-Implementation boundary: fine-tuning and cross-encoder inference live in
-`exact/utils/candidate_generation.py` and the dataset pool assembly in
-`exact/impl/datasets/base.py`, alongside E05's changes. Training itself is an experiment-side
-tool, not runtime code; the runtime only loads a fitted artifact.
+At most **4 distinct treatment configurations/cells as specified below** before any explicitly declared source expansion. This is a bounded sequential design, not a Cartesian product. Shared deterministic controls are computed once.
 
-## Arms & validation
+- zero_shot: E05-selected retriever.
+- contrastive: one bounded encoder fine-tuning recipe.
+- cross_encoder: one trained pair scorer on a fixed retrieved pool.
+- combined: at most one progressive combination if development warrants it.
 
-Following E05's two-stage shape, because retrieval screening is cheap and end-to-end runs are
-not:
+All generative roles use OpenRouter. Local non-generative encoders/heads use the single RTX 5090.
+Separate target-label-free, in-pair supervised and transferred results. A named diagnostic may
+use development reference information only under its explicit oracle/diagnostic role.
 
-Screen on development data with one seed: {best zero-shot E05 arm, contrastive fine-tuned}
-× pool sizes × {cross_encoder off, on}, first by candidate recall and gold-rank median/p90 and then
-by a bounded end-to-end check. Freeze exactly one combined supervised-retrieval candidate using
-the predeclared rule.
+## Validation and selection
 
-Confirm the frozen candidate against the promoted zero-shot E05 label-free comparator with three
-paired end-to-end seeds on Bio-ML test and every eligible track with a training split and declared
-negative-label policy. Report `cross_pair_transfer` for that same frozen encoder separately for
-shared-ontology and disjoint-ontology slices, per RQ20.4; it is a distinct supervision regime, not
-another arm selected from reporting data.
+Primary outcome/guard: **Matched-cost candidate recall and final F1; cross-encoder is also the E07 comparator.**
+Use the family rule plus RUN-PLAN's frozen selection, practical-effect, reconstruction and cost
+criteria. A screen chooses what to evaluate next; it does not establish a reporting-set claim.
+Report all controls, negative results, corrections/harms where relevant, and inapplicable or
+budget-deferred cells. Never suppress a difficult kind or source group from the denominator.
 
-Primary: end-to-end macro F1. Co-primary declared in advance: test-split candidate recall at
-fixed mean pool size, since a retrieval experiment whose recall claim is only secondary cannot
-answer RQ20.1. Secondary: local MRR/Hits@1, precision (RQ20.5), mean pool size, dataset-build and
-per-candidate scoring wall time, peak memory, and encoder training cost reported once per
-artifact.
+Broader validation happens on the designated development sentinel after a promising focused
+screen, then only in E17's frozen final panel for the claims selected at G4. Do not run a full
+OAEI confirmation for every treatment. A feature-specific claim needs its matching held-out
+case; NCIT–DOID cannot substitute for property, instance, natural-NIL or typed-relation labels.
+No individual experiment uses final outcomes to qualify its component for E17.
 
-## Promotion
+## Acceptance and recovery
 
-Standard criteria, plus:
+- Known alternative positives are filtered from in-batch/hard negatives.
+- Optimizer/RNG/sampler state resumes without repeating completed epochs.
+- Training recall is labeled optimistic and cannot select the reporting claim.
+- Pool and model hashes invalidate incompatible downstream heads.
 
-- E05's ordering discipline applies in full. A promotion here changes candidate pools, so every
-  downstream experiment's product-promotion evidence becomes stale until refit and reconfirmed
-  under E17. Schedule E20 in the same slot discipline as E05, never after downstream pools have
-  been frozen.
-- Fine-tuning ships as the **`supervised` resolution** of the retrieval component under
-  `supervision.mode`; the promoted zero-shot configuration remains the `label_free` resolution.
-- **Pre-registered criterion-3 override**: dataset-build time may reach 2× for the fine-tuned
-  encoder arm, because encoding is amortized by the existing embedding cache across runs and the
-  fitted artifact is trained once, not per run. Per-candidate scoring time keeps the default 1.2×
-  bound. The results note reports both gates. No override is offered for the cross-encoder arm;
-  it is a per-run inference cost and must pass the default bound to ship as a default.
+Durable boundaries: **Mining inventory, training steps, embeddings/index, generated pools.**
+All changed inputs/semantics invalidate their consuming descendants; preserve valid upstream
+artifacts. Store completed source/request/fold IDs and attempt lineage. Tests must demonstrate
+this family's checkpoint/repair boundary, not merely mirror a formula. Mark screen-ready and
+confirm-ready separately in the runtime readiness ledger, with evidence, once these checks pass.
 
-**Paper contribution**: fine-tuned retrieval is standard practice in entity linking and largely
-assumed in ontology matching, but the size of its contribution *relative to supervising later
-stages of the same pipeline* is not established. Because E18, E19, and E20 share a harness,
-tracks, and the same reusable labelled-source pool, this programme can report the marginal value
-of enabling supervision at each stage without pretending that one mapping label is consumed by
-only one component — a question usually answered one component at a time, on different data.
+## Deliverable
 
-**Effort**: L. **Risks**: GPU training cost and reproducibility of the fitted artifact — pin
-seeds, commit the artifact hash, document GPU jitter as E00 does; false hard negatives from
-incomplete or one-to-many references — enforce the completeness/positive-unlabelled rule above;
-overfitting to the training pair's vocabulary, which the disjoint-ontology transfer slice is
-designed to expose; and the optimistic-recall trap above, which would silently invalidate RQ20.1
-if training-split sources entered the headline number.
+Produce a result record with actual treatment/configuration, case/role, supervision, artifact
+IDs, source counts, metrics/cost, controls, uncertainty, decision and reason. A legitimate null,
+removal, or inapplicability is a deliverable; an unimplemented arm is not an empirical null.
+Resolve this family's question into numbered research questions and a primary endpoint in the
+executable design before its screen; answer each as supported, not supported or inconclusive
+with evidence. RUN-PLAN section 7 governs incomplete references and claim limitations.

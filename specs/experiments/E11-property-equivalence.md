@@ -1,89 +1,79 @@
-# E11 — Property-Equivalence Matching
+# E11 — Property matching on a property-bearing case
 
-**Motivation** (audit obs. 11; WP-F capability gap): object and data properties now flow
-through the matcher, but plumbing success is not evidence that the class-oriented evidence
-model produces good property alignments. Property identity is often expressed through
-domain/range, super-property structure, inverse/characteristic axioms, and usage patterns rather
-than labels alone. Results aggregated with classes would hide poor property performance because
-property references are usually much smaller.
+**v2 specification, 2026-09-09. Implementation still required.**
+This file replaces the v1 matrix for this family. [RUN-PLAN](RUN-PLAN.md),
+[shared clarifications](IMPLEMENTATION-CLARIFICATIONS.md), and
+[checkpoint recovery](CHECKPOINT-RECOVERY.md) are binding. A passing helper test does not
+establish an executable experiment or a performance result.
 
-## Research questions
+## Existing implementation and missing work
 
-- **RQ11.1**: At fixed candidate-pool size, does the kind-aware pipeline retrieve and align
-  object and data properties better than a lexical-only property baseline?
-- **RQ11.2**: Which property evidence contributes independently: annotations, domain/range,
-  `subPropertyOf`, inverse/characteristic axioms, or local usage edges?
-- **RQ11.3**: Are gains consistent for object and data properties, and for exact-label versus
-  lexically-dissimilar matches?
-- **RQ11.4**: Do class-derived scoring/selector constants remain calibrated for properties, or
-  is a property-specific profile required?
+Inspected baseline: 655f599e714e13d592f702f326ca5a36f6b50b2f.
 
-## Hypotheses
+**Already implemented:** Entity-kind plumbing and typed I/O exist; property-specific evidence switches are not fully integrated.
 
-The full property bundle improves property-macro F1 by at least 2 points over lexical-only on
-at least one eligible reporting track, with domain/range and `subPropertyOf` providing the
-largest gains on lexically-dissimilar pairs. A class-default selector is expected to
-over-abstain on the smaller property pools; target-label-free recalibration from E15 should
-recover some of that loss without requiring property gold labels.
+**Agent must implement:** Property evidence bundles/signatures, per-kind retrieval/fitting, actual reference inventory, and case-scoped evaluation.
 
-## Experimental change
+**Inputs/bindings to resolve:** User-available OAEI/BioKG property references; choose P0 and a distinct held-out P1 by capability before outcomes.
+The user confirms the OAEI/BioKG data are available. Resolve paths, revisions and capabilities;
+do not perpetuate an old unavailable flag without checking the supplied data.
 
-No new entity-kind plumbing belongs here; WP-F is the fixed foundation. Add config-gated
-property evidence groups so they can be ablated without changing the class or instance bundle:
+## Focus and dependencies
 
-- `labels_annotations`: property labels, aliases, and literal annotations;
-- `signature`: anchored domain/range classes, with domain and range kept distinct;
-- `hierarchy`: direct/transitive `subPropertyOf` evidence;
-- `characteristics`: inverse-of, equivalent-property, functional/symmetric/transitive flags;
-- `usage`: predicate-neighborhood summaries from assertion/projection edges.
+Primary focused case: **P0: capability-selected Conference pair or K0 with sufficient property references**.
+Resource envelope: **extensions** in RUN-PLAN.
+Prerequisites/consumed outputs: **E00, kind_pool_freeze**. A pool-freeze or selected-head dependency
+accepts the declared baseline output when no candidate wins; optional research must not deadlock
+other families. Kind-specific pool freezes do not change the already-frozen class pool.
 
-All candidates remain within kind. Object and data properties use separate retrieval indexes
-and results slices. Annotation properties remain out of scope until WP-F exposes them as a
-supported matching kind.
+Start with 300 development source groups (all eligible if fewer), seed 17, except a stated smaller LLM limit. Expand at most two non-control survivors to 1,000 nested development groups. Every applicable family receives a focused initial screen; widen cases or models only at scheduled gates. Eligibility/power is recorded per kind/relation.
 
-Implementation boundary: experiment flags live under `matching.channels.property.*` and are
-consumed by `exact/impl/datasets/pair_adaptive_context.py` and
-`exact/impl/models/pair_adaptive_channels.py`; property-aware retrieval stays in the existing
-dataset/candidate-generation layer. Selector changes are limited to kind-specific feature
-normalization and remain flag-gated.
+## Question, treatments, and implementation contract
 
-## Arms
+Choose one pair with real object/data-property references and useful signatures. Distinguish equivalent names, inverse properties, broad/narrow relations and domain/range compatibility. Use all property sources if fewer than 300 and label power honestly. Never repurpose class labels as property training labels.
 
-Stage 1 holds retrieval and selection fixed: lexical-only / lexical+annotations / full bundle,
-then leave-one-evidence-group-out ablations of the full bundle. Stage 2 runs the surviving
-scorer with {class-default selector, property-specific supervised selector where train refs
-exist, strongest target-label-free selector from E15}. The property-specific supervised arm uses
-E18's ranking head and E19's fusion weights fitted on the property slice rather than a
-separate property-only design; property results are a supervision-regime slice of those
-experiments, and RQ11.4's calibration question is the per-kind scope arm in E19. A candidate-recall diagnostic compares
-label-only retrieval with label+domain/range retrieval at the same mean pool size; it is kept
-separate from the scorer ablation.
+At most **4 distinct treatment configurations/cells as specified below** before any explicitly declared source expansion. This is a bounded sequential design, not a Cartesian product. Shared deterministic controls are computed once.
 
-## Validation
+- property_labels: lexical property baseline.
+- property_annotations: add definitions/annotations.
+- property_signature: add domain/range, inverse and characteristic evidence.
+- property_usage: selected signature arm plus bounded usage context.
 
-Use the E00 inventory to admit only tasks with kind-resolved property references: OAEI-KG is
-the primary reporting family; eligible Conference or other pinned pairs may be added when the
-inventory confirms property gold. Report object-property and data-property results separately,
-then their unweighted macro—never pooled with classes. Three seeds.
+All generative roles use OpenRouter. Local non-generative encoders/heads use the single RTX 5090.
+Separate target-label-free, in-pair supervised and transferred results. A named diagnostic may
+use development reference information only under its explicit oracle/diagnostic role.
 
-Primary metric: macro F1 over eligible task×property-kind cells. Secondary: candidate
-recall@k, MRR/Hits@1, P/R, abstention rate, ECE, evidence coverage, and F1 slices for exact-label
-versus non-exact matches. Report full-pipeline results and an oracle-candidate result so a small
-property vocabulary does not conceal retrieval misses.
+## Validation and selection
 
-## Promotion
+Primary outcome/guard: **Per-kind F1; object and data properties separately.**
+Use the family rule plus RUN-PLAN's frozen selection, practical-effect, reconstruction and cost
+criteria. A screen chooses what to evaluate next; it does not establish a reporting-set claim.
+Report all controls, negative results, corrections/harms where relevant, and inapplicable or
+budget-deferred cells. Never suppress a difficult kind or source group from the denominator.
 
-Standard criteria apply within each property kind. A property-specific default promotes only
-if it beats lexical-only with a 95% paired-bootstrap CI excluding zero on the property macro
-and no eligible property task regresses by more than 1 F1 point. A data-property result cannot
-be inferred from an object-property win (or vice versa). If no track has enough data-property
-gold for a powered test, RQ11.3 is recorded as inconclusive.
+Broader validation happens on the designated development sentinel after a promising focused
+screen, then only in E17's frozen final panel for the claims selected at G4. Do not run a full
+OAEI confirmation for every treatment. A feature-specific claim needs its matching held-out
+case; NCIT–DOID cannot substitute for property, instance, natural-NIL or typed-relation labels.
+No individual experiment uses final outcomes to qualify its component for E17.
 
-**Pre-registered criterion-2 override**: the per-property-task bound is 1 F1 point rather than
-the plan default of 0.5 because the eligible property references are small; the property macro
-CI and per-kind decision remain mandatory. The results note also reports whether the 0.5-point
-default gate would have passed.
+## Acceptance and recovery
 
-**Effort**: M. **Risks**: very small reference sets; domain/range anchors may import class
-matching errors; usage edges can reward hubs. Report anchor coverage and degree-stratified
-results, and include gold-class-anchor diagnostics only as a non-deployable oracle.
+- Class/object/data-property kind restrictions survive retrieval, scoring and writing.
+- Inverse/direction confusions are not treated as equivalence by string similarity alone.
+- Per-kind reference counts and complete/unknown-negative semantics reach fitting and metrics.
+
+Durable boundaries: **Property signatures/usage, kind-specific pools and heads.**
+All changed inputs/semantics invalidate their consuming descendants; preserve valid upstream
+artifacts. Store completed source/request/fold IDs and attempt lineage. Tests must demonstrate
+this family's checkpoint/repair boundary, not merely mirror a formula. Mark screen-ready and
+confirm-ready separately in the runtime readiness ledger, with evidence, once these checks pass.
+
+## Deliverable
+
+Produce a result record with actual treatment/configuration, case/role, supervision, artifact
+IDs, source counts, metrics/cost, controls, uncertainty, decision and reason. A legitimate null,
+removal, or inapplicability is a deliverable; an unimplemented arm is not an empirical null.
+Resolve this family's question into numbered research questions and a primary endpoint in the
+executable design before its screen; answer each as supported, not supported or inconclusive
+with evidence. RUN-PLAN section 7 governs incomplete references and claim limitations.

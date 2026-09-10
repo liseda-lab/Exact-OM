@@ -1,7 +1,13 @@
+# Legacy v1 scaffold: BLOCKED until migrated to the v2 campaign contract.
 schema_version: 1
 experiment_id: E12
 title: Instance-equivalence evidence and multi-view retrieval
-implementation: {status: deferred_unavailable, reason_code: oaei_kg_v4_not_materialized, missing_capability: instance_reference_bundle, expected_dataset: OAEI-KG-v4/starwars-swg, reason: "The required OAEI-KG v4 instance task is not materialized locally; evidence bundles, relation shuffle, and anchor cross remain incomplete."}
+implementation:
+  status: blocked
+  reason_code: v2_campaign_migration_required
+  reason: Legacy v1 matrix retained for implementation reference only. Implement the bounded v2 treatments,
+    explicit execution modes and recovery contract in specs/experiments/E12-instance-equivalence.md; use specs/experiments/campaign-v2.yaml.
+    This flag is not a claim of unavailable data.
 base_config: ../../../exact/default_config.yaml
 baseline_id: R_0
 depends_on: [E00]
@@ -38,3 +44,17 @@ design:
   cost_bound: 1.5
   multiplicity: none
 negative_label_policy: positive_unlabelled_when_incomplete
+frozen_constants:
+  v2_migration:
+    design_blueprint: ../../../specs/experiments/campaign-v2.yaml
+    design_blueprint_sha256: f9e56843d3bc542ea951394647c875ad78ffa22629c55ea957a234ee4fe37394
+    legacy_matrix_not_executable: true
+    previous_v1_implementation_status:
+      status: deferred_unavailable
+      reason_code: oaei_kg_v4_not_materialized
+      missing_capability: instance_reference_bundle
+      expected_dataset: OAEI-KG-v4/starwars-swg
+      reason: The required OAEI-KG v4 instance task is not materialized locally; evidence bundles, relation
+        shuffle, and anchor cross remain incomplete.
+    user_declared_datasets_available: true
+    active_spec: ../../../specs/experiments/E12-instance-equivalence.md

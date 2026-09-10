@@ -1,58 +1,79 @@
-# E08 — Attribute-Channel Polarity & Evidence Double-Counting
+# E08 — Attribute polarity and duplicated evidence
 
-**Motivation** (audit obs. 5): two structural quirks in the attribute channel:
-(a) `s_attr = max(τ, r_attr)` — attributes can only ever *support* a match, never oppose it,
-even when, e.g., cross-references or codes actively contradict; (b) each side's attributes are
-matched against a bank containing the **other side's labels + selected hierarchy/similarity
-sentences**, so evidence already consumed by the lexical/hierarchy/sim channels re-enters
-through the attribute channel — correlated channels inflate σ-mixing confidence and muddy the
-"independent channels" explanation story.
+**v2 specification, 2026-09-09. Implementation still required.**
+This file replaces the v1 matrix for this family. [RUN-PLAN](RUN-PLAN.md),
+[shared clarifications](IMPLEMENTATION-CLARIFICATIONS.md), and
+[checkpoint recovery](CHECKPOINT-RECOVERY.md) are binding. A passing helper test does not
+establish an executable experiment or a performance result.
 
-## Research questions
+## Existing implementation and missing work
 
-- **RQ08.1**: Does signed identifier/xref disagreement improve precision without unacceptable
-  recall loss on attribute-rich tasks?
-- **RQ08.2**: How much attribute evidence is duplicated from labels, hierarchy, and similarity
-  sentences, and does removing it change F1 or calibration?
-- **RQ08.3**: Which property semantics make a mismatch a valid negative signal rather than
-  merely missing or related information?
-- **RQ08.4**: Do the conclusions differ for classes, properties, and literal-rich instances?
+Inspected baseline: 655f599e714e13d592f702f326ca5a36f6b50b2f.
 
-**Hypothesis**: (a) allowing signed attribute evidence (identifier/xref mismatch pushes below
-τ) raises precision on identifier-rich tracks (OMIM-ORDO, NCIT-DOID) with small recall cost;
-(b) restricting the bank to attributes-vs-attributes (+labels only, no channel sentences)
-reduces cross-channel correlation without hurting F1 — cleaner and at worst neutral.
+**Already implemented:** Attribute-bank controls and allowlisted signed-identifier primitives exist.
 
-## Change
+**Agent must implement:** Task descriptors with real property/namespace semantics, cross-bank deduplication validation, and bounded conditional interaction assembly.
 
-Config under `matching.channels.attr`:
-- `polarity: support_only|signed` — signed mode: for high-weight *identifier-class* properties
-  (xref/id/code, weight ≥0.8 in the existing property-weight map), a strong best-match to a
-  *different* entity's identifier bank contributes negative deviation (s_attr can drop below
-  τ); free-text attributes stay support-only (definitions legitimately differ).
-- `bank: full|attrs_labels|attrs_only` — controls the cross-channel bank composition.
+**Inputs/bindings to resolve:** Resolve actual property allowlists from the available ontology descriptors; availability alone does not establish identifier semantics.
+The user confirms the OAEI/BioKG data are available. Resolve paths, revisions and capabilities;
+do not perpetuate an old unavailable flag without checking the supplied data.
 
-Touched: `_score_attribute_channel` + bank builder only; mixing untouched (a below-τ `s_attr`
-already flows correctly through σ-weighting).
+## Focus and dependencies
 
-## Arms & validation
+Primary focused case: **D0; a case with valid identifier semantics for signed evidence**.
+Resource envelope: **channels** in RUN-PLAN.
+Prerequisites/consumed outputs: **E00, pool_freeze**. A pool-freeze or selected-head dependency
+accepts the declared baseline output when no candidate wins; optional research must not deadlock
+other families. Kind-specific pool freezes do not change the already-frozen class pool.
 
-Screen the 2×3 polarity×bank factorial on development data with one seed. Freeze at most one
-signed-polarity candidate and one bank-restriction candidate because they are separate paper/default
-decisions. If both survive, pre-register their 2×2 interaction. Confirm only the baseline, frozen
-candidate(s), and that interaction on the reporting tasks with three paired seeds. Primary: macro
-F1; secondary: per-track P/R, channel-correlation matrix (Pearson over per-pair channel scores —
-report shrinkage), and count of pairs where signed attributes flipped the decision. On
-incomplete/unknown references, feed the union of confirmatory-arm disagreement mappings into the
-shared blinded adjudication protocol (power-derived sample, identical evidence packets, arm
-identity hidden) and report adjusted precision plus veto correctness. A separate qualitative
-table may explain 30 adjudicated flips, but it does not replace the weighted precision estimate.
+Start with 300 development source groups (all eligible if fewer), seed 17, except a stated smaller LLM limit. Expand at most two non-control survivors to 1,000 nested development groups. Every applicable family receives a focused initial screen; widen cases or models only at scheduled gates. Eligibility/power is recorded per kind/relation.
 
-**Promotion**: standard; the bank-restriction explanation arm may promote when cross-channel
-correlation decreases with a 95% CI excluding zero and macro F1 is non-inferior (quality-delta
-CI lower bound above −0.5 points). Correlation reduction is the pre-registered primary endpoint
-for that arm; a non-significant F1 delta alone is not evidence of neutrality.
+## Question, treatments, and implementation contract
 
-**Effort**: M. **Risks**: xref conventions differ per ontology pair (same-as vs related-to
-xrefs) — gate signed mode on property IRI allowlists per profile; sparse attributes on
-Conference make (a) untestable there — scope claims to attribute-rich tracks.
+Keep definitions, synonyms, identifiers, and other literals distinguishable. A mismatched xref is not automatically contradictory. Test matched/mismatched namespaces, duplicated facts, and unknown metadata. Reuse score/evidence artifacts where bank selection is unchanged.
+
+At most **4 distinct treatment configurations/cells as specified below** before any explicitly declared source expansion. This is a bounded sequential design, not a Cartesian product. Shared deterministic controls are computed once.
+
+- current: historical attribute treatment.
+- unified_bank: combine comparable annotation evidence.
+- provenance_dedup: prevent repeated facts from gaining independent mass.
+- signed_identifiers: only semantically justified incompatibilities.
+
+All generative roles use OpenRouter. Local non-generative encoders/heads use the single RTX 5090.
+Separate target-label-free, in-pair supervised and transferred results. A named diagnostic may
+use development reference information only under its explicit oracle/diagnostic role.
+
+## Validation and selection
+
+Primary outcome/guard: **F1 and correction/harm on identifier-bearing and definition-bearing sources.**
+Use the family rule plus RUN-PLAN's frozen selection, practical-effect, reconstruction and cost
+criteria. A screen chooses what to evaluate next; it does not establish a reporting-set claim.
+Report all controls, negative results, corrections/harms where relevant, and inapplicable or
+budget-deferred cells. Never suppress a difficult kind or source group from the denominator.
+
+Broader validation happens on the designated development sentinel after a promising focused
+screen, then only in E17's frozen final panel for the claims selected at G4. Do not run a full
+OAEI confirmation for every treatment. A feature-specific claim needs its matching held-out
+case; NCIT–DOID cannot substitute for property, instance, natural-NIL or typed-relation labels.
+No individual experiment uses final outcomes to qualify its component for E17.
+
+## Acceptance and recovery
+
+- Polarity is impossible without an explicit compatible namespace/property rule.
+- Same fact repeated through two properties retains its provenance without double weight.
+- Missing metadata is unknown rather than negative evidence.
+
+Durable boundaries: **Annotation evidence/bank selection and dependent scores.**
+All changed inputs/semantics invalidate their consuming descendants; preserve valid upstream
+artifacts. Store completed source/request/fold IDs and attempt lineage. Tests must demonstrate
+this family's checkpoint/repair boundary, not merely mirror a formula. Mark screen-ready and
+confirm-ready separately in the runtime readiness ledger, with evidence, once these checks pass.
+
+## Deliverable
+
+Produce a result record with actual treatment/configuration, case/role, supervision, artifact
+IDs, source counts, metrics/cost, controls, uncertainty, decision and reason. A legitimate null,
+removal, or inapplicability is a deliverable; an unimplemented arm is not an empirical null.
+Resolve this family's question into numbered research questions and a primary endpoint in the
+executable design before its screen; answer each as supported, not supported or inconclusive
+with evidence. RUN-PLAN section 7 governs incomplete references and claim limitations.

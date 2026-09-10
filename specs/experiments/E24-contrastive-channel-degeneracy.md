@@ -1,123 +1,81 @@
-# E24 — Contrastive-Channel Degeneracy: Why the Only Penalising Signal Never Fires
+# E24 — Missingness-aware contrastive evidence
 
-**Motivation** (review-response WP1/WP6, `Paper/specs/review-response/`): the contrastive channel
-is the system's only mechanism able to push a pair below the neutrality pivot, and it is inert on
-every task measured so far.
+**v2 specification, 2026-09-09. Implementation still required.**
+This file replaces the v1 matrix for this family. [RUN-PLAN](RUN-PLAN.md),
+[shared clarifications](IMPLEMENTATION-CLARIFICATIONS.md), and
+[checkpoint recovery](CHECKPOINT-RECOVERY.md) are binding. A passing helper test does not
+establish an executable experiment or a performance result.
 
-| Measurement | OMIM–ORDO (300 src) | SNOMED–FMA Body (300 src) |
-|---|---:|---:|
-| pairs with `sigma_diff < 1e-6` | 100.0% | 96.7% |
-| pairs with `q_diff > 0` | — | 58.2% |
-| of those, still at `\|s_diff − τ\| < 1e-6` | — | **94.4%** |
-| ΔMRR from removing the channel entirely | 0.000 | not measured |
+## Existing implementation and missing work
 
-FMA has the densest relational graph in the benchmark, so this is not simply "sparse pools". The
-channel *finds evidence* on the majority of FMA pairs and still returns exactly the neutral score,
-which the informative deviation then multiplies to zero. That is a degeneracy in the confidence
-map $s_{\mathrm{diff}} = 1 - \tfrac12(c_x + c_y)$, not a tuning problem — a channel whose output is
-a constant carries no information regardless of its weight.
+Inspected baseline: 655f599e714e13d592f702f326ca5a36f6b50b2f.
 
-This experiment is diagnostic first and corrective second. It is a prerequisite for any claim that
-the system can penalise conflicting evidence, and therefore for the precision story on
-same-family confounders.
+**Already implemented:** Normalized, absolute, asymmetric and off difference primitives with diagnostics exist.
 
-## Research questions
+**Agent must implement:** Supported/contradicted/unobserved semantics, zero contradiction authority for unjustified one-sided absence, controlled perturbations and valid typed asymmetry binding.
 
-- **RQ24.1**: Why does $s_{\mathrm{diff}}$ concentrate at $\tau$? Decompose the pivot mass into
-  (a) empty pool on one or both sides, (b) $c_x + c_y \approx 1$ arising from the normalisation,
-  (c) explicit neutral fallback in code, and (d) genuinely balanced unsupported mass.
-- **RQ24.2**: On pairs where the channel is active, does $s_{\mathrm{diff}}$ separate correct from
-  incorrect pairs at all, measured per source rather than over the pooled table?
-- **RQ24.3**: Does an unnormalised or asymmetric formulation of unsupported mass produce a
-  non-degenerate distribution without inverting the channel's meaning?
-- **RQ24.4**: Does a working contrastive channel improve precision on same-family confounders
-  specifically, which is the case it was designed for and the case the paper's running example
-  illustrates?
-- **RQ24.5**: Does the relational-similarity channel share the same failure mode? It draws on the
-  same object-relation pools and is inactive on 100% (OMIM) and 96.7% (FMA) of pairs.
+**Inputs/bindings to resolve:** Resolve a relation-bearing case and actual incompatibility semantics from the available data.
+The user confirms the OAEI/BioKG data are available. Resolve paths, revisions and capabilities;
+do not perpetuate an old unavailable flag without checking the supplied data.
 
-**Hypotheses**: (a) the dominant pivot mass is structural — empty-pool fallback plus a
-normalisation that forces $c_x + c_y \to 1$ whenever both sides are comparably unsupported —
-rather than genuine balance; (b) an unnormalised formulation, scoring absolute unsupported IC mass
-against a pool-size-aware baseline, yields a distribution with usable spread; (c) the corrected
-channel improves precision on confounder-heavy sources by 1–3 F1 points on identifier-poor tasks,
-with negligible effect where lexical evidence already dominates; (d) relational similarity fails
-for a related but distinct reason (pool intersection is empty rather than balanced) and needs its
-own fix.
+## Focus and dependencies
 
-## Change
+Primary focused case: **D1 or feature-selected relation-bearing pair, with D0 control**.
+Resource envelope: **channels** in RUN-PLAN.
+Prerequisites/consumed outputs: **E00, pool_freeze**. A pool-freeze or selected-head dependency
+accepts the declared baseline output when no candidate wins; optional research must not deadlock
+other families. Kind-specific pool freezes do not change the already-frozen class pool.
 
-1. **Diagnostic instrumentation** (no behaviour change): extend the channel dump with
-   `n_triples_src`, `n_triples_tgt`, `unsupported_mass_src`, `unsupported_mass_tgt`, `c_x`, `c_y`,
-   and a categorical `diff_pivot_reason` recording which of RQ24.1's branches produced the value.
-   Default off, as with the existing `channel_dump`.
-2. **Alternative confidence maps**, config-selected under `channels.diff.formulation`:
-   - `normalised` (current): $1 - \tfrac12(c_x + c_y)$;
-   - `absolute`: unsupported IC mass scaled by a pool-size baseline, so a pair with two well-matched
-     triples is distinguishable from a pair with none;
-   - `asymmetric`: penalise unsupported mass on the *target* side only, on the argument that a
-     target asserting facts absent from the source is the confounder signature;
-   - `off`: explicit control.
-3. **Empty-pool handling** made explicit rather than implicit: a channel with no evidence must
-   report inactive, not neutral, so that "no evidence" and "balanced evidence" stop being the same
-   number.
+Start with 300 development source groups (all eligible if fewer), seed 17, except a stated smaller LLM limit. Expand at most two non-control survivors to 1,000 nested development groups. Every applicable family receives a focused initial screen; widen cases or models only at scheduled gates. Eligibility/power is recorded per kind/relation.
 
-## Arms & sweep
+## Question, treatments, and implementation contract
 
-| Arm | Purpose |
-|---|---|
-| `R_n` baseline | current normalised formulation |
-| `diff_off` | control; isolates what the channel currently contributes (expected: nothing) |
-| `diff_absolute` | primary corrective arm |
-| `diff_asymmetric` | secondary corrective arm |
-| `diff_absolute` × `sim_fix` | factorial with RQ24.5's relational fix, only if both are individually non-null |
+Reproduce the one-sided-empty example and show why 0.50/0.90/0.00 are different semantics, not mere scaling. Test deletion, duplication, irrelevant insertion, equivalent serialization and side reversal. Measure corrected and harmed decisions; a more active negative channel alone is not success.
 
-Screen the diagnostic and corrective arms on the frozen 300-source OMIM–ORDO and SNOMED–FMA
-subsets with one seed. Freeze at most one corrective or removal candidate; include `diff_off` as a
-required control when the paper claims the shipped channel is inert. Confirm only the baseline,
-frozen candidate, and required control on the full eligible task set with at least three paired
-seeds.
+At most **5 distinct treatment configurations/cells as specified below** before any explicitly declared source expansion. This is a bounded sequential design, not a Cartesian product. Shared deterministic controls are computed once.
 
-## Validation
+- normalised: current control.
+- diff_off: removal control.
+- missingness_aware: semantically justified contradiction only.
+- absolute: raw absolute formulation diagnostic.
+- asymmetric: optional typed-interpretation diagnostic, not automatic promotion.
 
-Eligible tasks: all five Bio-ML pairs plus Anatomy, since the hypothesis concerns relational
-density and Anatomy is relationally rich with weak lexical overlap. Entity kind: classes.
-Supervision label: `target_label_free` — no arm here reads target labels.
+All generative roles use OpenRouter. Local non-generative encoders/heads use the single RTX 5090.
+Separate target-label-free, in-pair supervised and transferred results. A named diagnostic may
+use development reference information only under its explicit oracle/diagnostic role.
 
-Primary metric is macro F1 on the global task. **A confounder-restricted secondary slice is
-mandatory and pre-registered**: sources whose candidate pool contains at least one non-reference
-target sharing a label token with the reference target. This is the population the channel exists
-to serve, and a whole-task metric will dilute the effect to invisibility.
+## Validation and selection
 
-Report alongside: the activity fraction per arm (a corrective arm that is still inert on 90% of
-pairs has not been fixed), the $s_{\mathrm{diff}}$ distribution, and per-source discrimination AUC.
+Primary outcome/guard: **F1 and correction-minus-harm under natural and controlled missingness.**
+Use the family rule plus RUN-PLAN's frozen selection, practical-effect, reconstruction and cost
+criteria. A screen chooses what to evaluate next; it does not establish a reporting-set claim.
+Report all controls, negative results, corrections/harms where relevant, and inapplicable or
+budget-deferred cells. Never suppress a difficult kind or source group from the denominator.
 
-## Promotion decision rule
+Broader validation happens on the designated development sentinel after a promising focused
+screen, then only in E17's frozen final panel for the claims selected at G4. Do not run a full
+OAEI confirmation for every treatment. A feature-specific claim needs its matching held-out
+case; NCIT–DOID cannot substitute for property, instance, natural-NIL or typed-relation labels.
+No individual experiment uses final outcomes to qualify its component for E17.
 
-Primary comparison: `diff_absolute` against `R_n`, endpoint macro F1, paired bootstrap CI
-excluding zero on ≥3 seeds. **Pre-registered override**: because the channel is currently inert,
-criterion 2's task-regression bound is applied to the confounder slice as well as globally; an arm
-that improves the confounder slice while holding whole-task F1 within non-inferiority
-($-0.3$ F1) is promotion-eligible, since the channel's purpose is precision on a minority of hard
-sources rather than average-case gain.
+## Acceptance and recovery
 
-If every corrective arm is null, the deliverable is the RQ24.1 decomposition plus a documented
-decision either to remove the channel or to retain it with an honest statement of when it fires.
-Removing a channel that demonstrably contributes nothing is a legitimate promotion outcome and
-simplifies the explanation surface.
+- Unobserved relation on one side is not automatically contradictory.
+- Explicit incompatible facts can contribute negatively with traceable semantics.
+- Empty-both and empty-one cases have declared score/quality behavior.
+- Changed contrastive semantics preserve reusable ontology/vectors but invalidate their score descendants.
 
-## Effort & risks
+Durable boundaries: **Difference raw components, perturbation inventories, scores.**
+All changed inputs/semantics invalidate their consuming descendants; preserve valid upstream
+artifacts. Store completed source/request/fold IDs and attempt lineage. Tests must demonstrate
+this family's checkpoint/repair boundary, not merely mirror a formula. Mark screen-ready and
+confirm-ready separately in the runtime readiness ledger, with evidence, once these checks pass.
 
-Size: M. Diagnostic stage is cheap (re-analysis plus one instrumented run per subset). Corrective
-arms are one config flag each.
+## Deliverable
 
-Risks: (a) the asymmetric formulation could encode a directional assumption that fails on
-subsumption-typed references — gate it behind E14's relation typing before promotion; (b) making
-empty pools report inactive changes $\sum \omega_k$ normalisation on affected pairs, so the
-explanation invariant must be re-verified (promotion criterion 4); (c) a channel that starts
-firing changes $U$, so any E04/E07/E21/E25 comparison running alongside must pin its fusion arm.
-
-## Results note
-
-*(stored outside `specs/` after running; must answer RQ24.1–RQ24.5 with `supported`, `not supported`, or
-`inconclusive`, and include the power declaration and both gate outcomes)*
+Produce a result record with actual treatment/configuration, case/role, supervision, artifact
+IDs, source counts, metrics/cost, controls, uncertainty, decision and reason. A legitimate null,
+removal, or inapplicability is a deliverable; an unimplemented arm is not an empirical null.
+Resolve this family's question into numbered research questions and a primary endpoint in the
+executable design before its screen; answer each as supported, not supported or inconclusive
+with evidence. RUN-PLAN section 7 governs incomplete references and claim limitations.

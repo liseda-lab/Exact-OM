@@ -1,118 +1,78 @@
-# E00 — Lean Paper Experiment Runner & Frozen Baseline
+# E00 — Runnable baseline, stage artifacts, and recovery
 
-**Blocks all other experiments. No result-changing intent.** This is a small, paper-grade
-execution and measurement layer, not a general workflow platform. Size: S–M.
+**v2 specification, 2026-09-09. Implementation still required.**
+This file replaces the v1 matrix for this family. [RUN-PLAN](RUN-PLAN.md),
+[shared clarifications](IMPLEMENTATION-CLARIFICATIONS.md), and
+[checkpoint recovery](CHECKPOINT-RECOVERY.md) are binding. A passing helper test does not
+establish an executable experiment or a performance result.
 
-## Research questions
+## Existing implementation and missing work
 
-- **RQ00.1**: Can the same runner screen many arms cheaply and then confirm a frozen survivor
-  without changing code paths, metrics, or data semantics?
-- **RQ00.2**: Does every result carry enough split, supervision, configuration, model, dataset,
-  candidate-pool, and source-code provenance to audit leakage and reproduce the comparison?
-- **RQ00.3**: Can paired arms produce per-source evidence and paper-ready quality, coverage, and
-  cost summaries with deterministic aggregation?
-- **RQ00.4**: Does the frozen post-migration baseline reproduce current production behavior, and
-  do disabled experiment flags leave its decisions unchanged?
-- **RQ00.5**: Can independent runs execute concurrently, resume safely, and reuse only artifacts
-  whose fingerprints match?
+Inspected baseline: 655f599e714e13d592f702f326ca5a36f6b50b2f.
 
-These are measurement-system questions. E00 does not test a better matcher and does not need a
-complete benchmark or product-release service before screening can begin.
+**Already implemented:** Strict screen/confirm schemas, task/arm expansion, provenance, source-level metrics, same-fingerprint resume, inference/additional-model checkpoints, atomic explanation storage, and E17 composition helpers exist.
 
-## Single-suite execution model
+**Agent must implement:** Explicit task-mode routing; v2 per-stage identities and readiness; cross-directory import; selective repair/reuse; budget and broad-search planning; reporting access ledger; per-role OpenRouter cost admission; relocated and interrupted end-to-end proof.
 
-`tools/run_experiment.py` implements one suite with `screen` and `confirm` stages:
+**Inputs/bindings to resolve:** Locate the user-available task/model files and node access; resolve OpenRouter identities and budget. Current local review environment lacked installed Exact-OM distribution metadata.
+The user confirms the OAEI/BioKG data are available. Resolve paths, revisions and capabilities;
+do not perpetuate an old unavailable flag without checking the supplied data.
 
-- `screen` runs the full development arm sweep, normally with one seed and an optional
-  deterministic source cap. It may use only development labels or a spec-named frozen diagnostic
-  subset. The experiment config declares the selection rule before execution.
-- `confirm` accepts a frozen selection record from `screen` and runs only the selected candidate,
-  the current baseline, and required controls on untouched reporting data with at least three
-  paired seeds. It refuses to run if the selection record, design declaration, base configuration,
-  or reporting matrix has changed.
+## Focus and dependencies
 
-There is no separate pilot runner. Both stages resolve the same base config plus arm overlay, use
-the same metrics, and write the same schema. If no candidate passes the development selection
-rule, the experiment ends as `screened_out` without opening reporting data.
+Primary focused case: **D0**.
+Resource envelope: **foundation** in RUN-PLAN.
+Prerequisites/consumed outputs: **none; E00 supplies the foundation**. A pool-freeze or selected-head dependency
+accepts the declared baseline output when no candidate wins; optional research must not deadlock
+other families. Kind-specific pool freezes do not change the already-frozen class pool.
 
-## Required deliverables
+Use the 64-source G0 throughput probe and a bounded 300-source development vertical replay; fixture interruption tests precede long jobs. These are operational acceptance checks, with no treatment winner.
 
-1. **Lean runner**: read one experiment YAML under `exp/experiments/EXX/`, resolve its base config,
-   arms, tasks, stage, seeds, and optional source cap, then execute locally by reusing
-   `tools/run_exact_job.py`. Support `--dry-run`, `--resume`, and bounded `--jobs`. CPU-independent
-   runs may run concurrently; GPU and LLM runs are serialized per device/profile unless an
-   explicit safe concurrency limit is configured.
-2. **Isolated artifacts**: one directory per experiment×stage×arm×task×seed. A completed run is
-   reused only when its manifest fingerprint matches; partial or failed runs retain a reason and
-   can resume without being mistaken for results.
-3. **Run manifest**: record stage, experiment/arm, seed, commit, Exact-OM version, pyowlcore
-   version, resolved-config hash, dataset and reference hashes, split role, supervision label,
-   candidate-pool fingerprint, fitted-artifact hashes, model revisions, selection-record hash,
-   design-declaration hash, start/end time, and status. Do not record secrets.
-4. **Frozen paper baseline**: after the Exact-OM 2.1.0 / pyowlcore 0.2.0 migration and production
-   tests pass, freeze the current default as the paper's `R_n` baseline manifest. Preserve
-   historical `B0` as an optional longitudinal comparator; E00 does not need a complete rolling
-   lineage service. A retrieval change creates a new candidate-pool fingerprint before any
-   downstream confirmation.
-5. **Results**: retain per-source decisions/ranks and aggregate per task×entity kind×relation.
-   Emit machine-readable CSV or JSON for P/R/F1, MRR/Hits@1, candidate recall, coverage,
-   abstention, wall time, peak memory when relevant, and LLM calls/tokens when used. Also report
-   macro summaries; never silently pool entity kinds or relation types.
-6. **Statistics**: provide a small paired-bootstrap utility over per-source decisions or ranks,
-   with 10,000 resamples by default, delta and 95% CI. Cluster instance sensitivity analyses by
-   connected component only where the experiment requires it. Unit-test the utility on synthetic
-   identical, positive-effect, and deterministic cases.
-7. **Dataset inventory**: emit CSV or JSON only for tasks declared in the paper matrix, including
-   split availability, entity/reference counts, candidate coverage, representation, relation and
-   entity-kind support, reference completeness, and any experiment-specific capability field.
-   Building an inventory for unused tracks is not an E00 prerequisite.
-8. **Leakage and supervision guards**: reporting references cannot be used by screening,
-   calibration, training, threshold selection, routing, early stopping, or fallback selection.
-   `label_free` ignores available training labels; `supervised` fails when usable training data is
-   absent. Every result's declared supervision must equal its resolved runtime mode.
-9. **LLM provenance**: when an LLM arm is confirmed, record provider, requested and resolved model
-   IDs/revisions, endpoint identity without credentials, tokenizer, prompt hash, decoding
-   parameters, seed, cache key, and request time. A model-identity change within paired arms aborts
-   the comparison. Mutable hosted aliases are exploratory-only.
+## Question, treatments, and implementation contract
 
-## Frozen design declaration
+Materialize stage artifacts and train/dev/report pools separately. Fit one current selector on actual train features and apply it on development. Verify every control executes the intended path. Produce source-level error attribution and distinct oracle ceilings for retrieval, ranking, acceptance/NIL, exact anchors, collisions, and typing. Preserve shared lexical, lexical-plus-definition/attribute, active-equal-weight and current supervised controls. Resolve the bounded published-matcher comparison in RUN-PLAN section 7; relative improvement alone does not establish competitiveness.
 
-Before `confirm`, write and hash a design record alongside the experiment config containing:
+At most **2 distinct treatment configurations/cells as specified below** before any explicitly declared source expansion. This is a bounded sequential design, not a Cartesian product. Shared deterministic controls are computed once.
 
-- selected arm and development selection rule/result;
-- reporting tasks and exclusions;
-- primary comparison and endpoint;
-- required slices and controls;
-- paired seeds;
-- independent-unit definition;
-- hypothesized effect or non-inferiority margin;
-- `powered|underpowered|descriptive` status and its assumptions;
-- multiplicity rule when more than one confirmatory comparison remains.
+- production: intended current global and local paths, with experimental switches off.
+- replay: identical numerical configuration after interruption and relocation.
 
-This record is immutable once any reporting result exists. A full automated power simulator is
-optional; an explicit design declaration is mandatory. The runner never writes into `specs/`.
+All generative roles use OpenRouter. Local non-generative encoders/heads use the single RTX 5090.
+Separate target-label-free, in-pair supervised and transferred results. A named diagnostic may
+use development reference information only under its explicit oracle/diagnostic role.
 
-## Acceptance
+## Validation and selection
 
-- A dry run prints the exact stage×arm×task×seed matrix and resolved output paths.
-- A one-seed development screen produces a selection record without reading reporting references.
-- Confirmation rejects an unfrozen, missing, or mismatched selection/design record.
-- Repeating a deterministic same-seed run reproduces decisions and metrics within a documented
-  CPU tolerance; GPU nondeterminism is measured and recorded.
-- With every experiment flag disabled, runner output matches the frozen production baseline.
-- A changed config, dataset, candidate pool, fitted artifact, split, or model identity prevents
-  unsafe resume/reuse.
-- A deliberately mislabelled supervised or label-free run fails before inference.
-- Two independent CPU runs can execute concurrently without sharing mutable output files; device
-  limits prevent GPU/LLM oversubscription.
-- Aggregation reports missing/failed cells rather than silently dropping them and emits the
-  per-source data required for paired inference.
+Primary outcome/guard: **Exact replay and operational acceptance; descriptive, no gain selection.**
+Use the family rule plus RUN-PLAN's frozen selection, practical-effect, reconstruction and cost
+criteria. A screen chooses what to evaluate next; it does not establish a reporting-set claim.
+Report all controls, negative results, corrections/harms where relevant, and inapplicable or
+budget-deferred cells. Never suppress a difficult kind or source group from the denominator.
 
-## Explicit non-goals
+Broader validation happens on the designated development sentinel after a promising focused
+screen, then only in E17's frozen final panel for the claims selected at G4. Do not run a full
+OAEI confirmation for every treatment. A feature-specific claim needs its matching held-out
+case; NCIT–DOID cannot substitute for property, instance, natural-NIL or typed-relation labels.
+No individual experiment uses final outcomes to qualify its component for E17.
 
-E00 does not require Parquet, automatic sbatch generation, a dashboard, a workflow database,
-automatic prose/table insertion into specs, a complete B0/R_n ancestry manager, a full inventory
-of every available benchmark, automated expert adjudication, or exhaustive power simulation.
-Those may be added only when a selected experiment or the paper submission actually requires
-them. Simplifying orchestration never relaxes split isolation, provenance, paired statistics, or
-the frozen confirmatory design.
+## Acceptance and recovery
+
+- All ten CHECKPOINT-RECOVERY acceptance scenarios pass.
+- Candidate files cannot silently turn global runs into local runs; global selector/extraction counters prove execution.
+- A no-op comparison reproduces mappings and metrics; changed fusion and evaluator repairs demonstrate zero unnecessary encoder calls.
+- Replace legacy experiment-wide ready with verified per-arm/per-stage capability readiness.
+
+Durable boundaries: **All stages and attempt lineage.**
+All changed inputs/semantics invalidate their consuming descendants; preserve valid upstream
+artifacts. Store completed source/request/fold IDs and attempt lineage. Tests must demonstrate
+this family's checkpoint/repair boundary, not merely mirror a formula. Mark screen-ready and
+confirm-ready separately in the runtime readiness ledger, with evidence, once these checks pass.
+
+## Deliverable
+
+Produce a result record with actual treatment/configuration, case/role, supervision, artifact
+IDs, source counts, metrics/cost, controls, uncertainty, decision and reason. A legitimate null,
+removal, or inapplicability is a deliverable; an unimplemented arm is not an empirical null.
+Resolve this family's question into numbered research questions and a primary endpoint in the
+executable design before its screen; answer each as supported, not supported or inconclusive
+with evidence. RUN-PLAN section 7 governs incomplete references and claim limitations.

@@ -1,7 +1,13 @@
+# Legacy v1 scaffold: BLOCKED until migrated to the v2 campaign contract.
 schema_version: 1
 experiment_id: E19
 title: Supervised evidence fusion
-implementation: {status: deferred, reason_code: fitting_pipeline_unavailable, reason: "Strict artifact-backed inference exists, but artifact fitting, per-kind scope, learned-adaptive gating, and source-disjoint training are not supplied."}
+implementation:
+  status: blocked
+  reason_code: v2_campaign_migration_required
+  reason: Legacy v1 matrix retained for implementation reference only. Implement the bounded v2 treatments,
+    explicit execution modes and recovery contract in specs/experiments/E19-supervised-fusion.md; use specs/experiments/campaign-v2.yaml.
+    This flag is not a claim of unavailable data.
 base_config: ../../../exact/default_config.yaml
 baseline_id: R_0
 depends_on: [E00, E10, E20, E26]
@@ -26,6 +32,17 @@ selection:
   decisions:
     - {id: fusion_provider, baseline: analytic_shipped, candidates: [analytic_fitted_global, analytic_fitted_per_kind, learned_global, learned_global_per_kind, learned_adaptive], metric: F1, min_delta: 0.001}
 frozen_constants:
+  v2_migration:
+    design_blueprint: ../../../specs/experiments/campaign-v2.yaml
+    design_blueprint_sha256: f9e56843d3bc542ea951394647c875ad78ffa22629c55ea957a234ee4fe37394
+    legacy_matrix_not_executable: true
+    previous_v1_implementation_status:
+      status: deferred
+      reason_code: fitting_pipeline_unavailable
+      reason: Strict artifact-backed inference exists, but artifact fitting, per-kind scope, learned-adaptive
+        gating, and source-disjoint training are not supplied.
+    user_declared_datasets_available: true
+    active_spec: ../../../specs/experiments/E19-supervised-fusion.md
   beta: {source: E10_confirmed_selection, fitted_in_E19: false, status: required_before_activation}
   analytic_fitted_parameters: [tau, gamma, normalized_channel_multipliers]
   artifact_binding: [candidate_pool_fingerprint, dataset_lock_hash, feature_schema_hash, seed]

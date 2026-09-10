@@ -1,7 +1,13 @@
+# Legacy v1 scaffold: BLOCKED until migrated to the v2 campaign contract.
 schema_version: 1
 experiment_id: E18
 title: Supervised reranking objectives and model families
-implementation: {status: deferred, reason_code: reranker_training_artifacts_unavailable, reason: "The analytic/current controls are available, but channel-gating and diagnostic objective/model trainers do not yet produce immutable out-of-fold artifacts with the required split, pool, negative-policy, and explanation-schema bindings."}
+implementation:
+  status: blocked
+  reason_code: v2_campaign_migration_required
+  reason: Legacy v1 matrix retained for implementation reference only. Implement the bounded v2 treatments,
+    explicit execution modes and recovery contract in specs/experiments/E18-supervised-reranking.md; use specs/experiments/campaign-v2.yaml.
+    This flag is not a claim of unavailable data.
 base_config: ../../../exact/default_config.yaml
 baseline_id: R_0
 depends_on: [E00, E15, E20]
@@ -45,3 +51,16 @@ design:
   regression_bound: 0.005
   multiplicity: none
 negative_label_policy: complete_reference_or_positive_unlabelled
+frozen_constants:
+  v2_migration:
+    design_blueprint: ../../../specs/experiments/campaign-v2.yaml
+    design_blueprint_sha256: f9e56843d3bc542ea951394647c875ad78ffa22629c55ea957a234ee4fe37394
+    legacy_matrix_not_executable: true
+    previous_v1_implementation_status:
+      status: deferred
+      reason_code: reranker_training_artifacts_unavailable
+      reason: The analytic/current controls are available, but channel-gating and diagnostic objective/model
+        trainers do not yet produce immutable out-of-fold artifacts with the required split, pool, negative-policy,
+        and explanation-schema bindings.
+    user_declared_datasets_available: true
+    active_spec: ../../../specs/experiments/E18-supervised-reranking.md

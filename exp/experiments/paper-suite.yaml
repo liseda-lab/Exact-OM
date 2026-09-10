@@ -1,11 +1,12 @@
+# Planning freeze only; all legacy cells are blocked pending v2 implementation.
 schema_version: 1
-suite_id: exact-om-paper-v1
+suite_id: exact-om-v2-planning-scaffold
 baseline_id: R_0
 baseline_manifest: baselines/R_0.yaml
 specification:
   path: ../../specs/experiments
-  sha256: 58c95fe891eaa7f6040d81dd6efe1f3dc3ab021d7600310647b8abfcedd5836e
-  files: 29
+  sha256: d51cace0190f2b62305db3c72d3d98374c72ef837df5c107306a935ea1893d26
+  files: 35
   algorithm: sha256-length-prefixed-v1
 dataset_lock: datasets.lock.yaml
 model_lock: models.lock.yaml

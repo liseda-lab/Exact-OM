@@ -1,99 +1,79 @@
-# E15 — Target-Label-Free Selection and Calibration
+# E15 — Label-free selection and honest supervision modes
 
-**Motivation** (audit obs. 15; builds on obs. 8/10): the strongest global acceptance path fits a
-classifier and threshold from reference mappings, but many tracks provide no training
-alignment. A fixed threshold or an implicit fallback is not a satisfactory unsupervised
-method. E03 tests individual threshold/calibration choices; this experiment tests complete,
-deployable acceptance strategies when the target ontology pair has no labels.
+**v2 specification, 2026-09-09. Implementation still required.**
+This file replaces the v1 matrix for this family. [RUN-PLAN](RUN-PLAN.md),
+[shared clarifications](IMPLEMENTATION-CLARIFICATIONS.md), and
+[checkpoint recovery](CHECKPOINT-RECOVERY.md) are binding. A passing helper test does not
+establish an executable experiment or a performance result.
 
-## Research questions
+## Existing implementation and missing work
 
-- **RQ15.1**: Which target-label-free selector best balances precision, recall, and abstention
-  across ontology pairs, entity kinds, and candidate-pool densities?
-- **RQ15.2**: How much performance is lost relative to an in-pair supervised selector, and is
-  that gap mostly calibration, ranking, or missing candidate recall?
-- **RQ15.3**: Do score-distribution methods or structural/reciprocal consensus generalize more
-  reliably under domain shift?
-- **RQ15.4**: Can high-confidence pseudo-label self-training improve over a rule-based selector
-  without collapsing on sparse or low-exact-match tasks?
-- **RQ15.5**: Are label-free confidence estimates calibrated enough for NIL/abstention and
-  typed-relation pipelines?
+Inspected baseline: 655f599e714e13d592f702f326ca5a36f6b50b2f.
 
-## Hypotheses
+**Already implemented:** Mode resolution and several heuristic selector controls exist; mixed-capability matrix handling remains incomplete.
 
-A reciprocal, margin-normalized consensus selector should beat the current no-training
-fallback by at least 1 macro F1 point and remain within 1.5 points of in-pair supervision on at
-least half of eligible class-equivalence tasks. Distribution-only thresholds are expected to
-be brittle when match prevalence changes. One conservative self-training iteration may improve
-recall, while repeated iterations are expected to propagate errors.
+**Agent must implement:** Strict per-component label-free execution with present train files, Otsu/margin and reciprocal controls in the true global path, and capability-correct comparison.
 
-## Methods and arms
+**Inputs/bindings to resolve:** No new dataset requirement; use the available primary/sentinel pair with recorded capabilities.
+The user confirms the OAEI/BioKG data are available. Resolve paths, revisions and capabilities;
+do not perpetuate an old unavailable flag without checking the supplied data.
 
-Every deployable arm is forbidden from reading target-pair reference labels:
+## Focus and dependencies
 
-1. `current_fallback`: shipped heuristic/fixed-threshold behavior.
-2. `score_partition`: best pre-registered E03 distribution rule (Otsu/knee) and a two-component
-   beta mixture over bounded `S_final`; select the high-score component using posterior
-   confidence, with a declared degenerate-distribution fallback.
-3. `reciprocal_consensus`: accept reciprocal top-1 candidates whose robust within-source margin
-   exceeds a median/MAD rule and whose independent channel ranks agree; collision and
-   kind/semantic conflicts cause abstention.
-4. `pseudo_label_accept`: pseudo-positives are exact or reciprocal/high-margin multi-channel
-   agreements; pseudo-negatives are low-tail candidates and structurally incompatible winners.
-   Fit the existing interpretable accept head once, with confidence weights. No iterative arm
-   beyond one update may promote in this experiment.
-5. `in_pair_supervised`: current OOF-trained selector, reported as an upper comparator where
-   train refs exist. Once E18–E23 report, the strongest applicable promoted supervised configuration
-   replaces it as this comparator, so the label-free gap is measured against what the system
-   actually does with labels rather than against the weakest supervised path.
-6. `oracle_threshold`: post-hoc best target threshold, diagnostic ceiling only.
+Primary focused case: **D0; one D1 robustness check**.
+Resource envelope: **decisions** in RUN-PLAN.
+Prerequisites/consumed outputs: **E00, pool_freeze, E03**. A pool-freeze or selected-head dependency
+accepts the declared baseline output when no candidate wins; optional research must not deadlock
+other families. Kind-specific pool freezes do not change the already-frozen class pool.
 
-The target-label-free methods may inspect unlabelled target scores, graph structure, and
-candidate sets. Method hyperparameters and fallback rules are frozen before reporting. Results
-record whether those constants were analytical defaults or chosen on named, disjoint
-development pairs; neither case permits target-pair labels.
+Start with 300 development source groups (all eligible if fewer), seed 17, except a stated smaller LLM limit. Expand at most two non-control survivors to 1,000 nested development groups. Every applicable family receives a focused initial screen; widen cases or models only at scheduled gates. Eligibility/power is recorded per kind/relation.
 
-Implementation boundary: add `selector.label_free_mode` and method parameters in
-`exact/impl/models/selector/`; reuse its feature and acceptance code for pseudo-label fitting.
-E03 owns reusable calibration primitives. The default remains the current fallback until this
-experiment promotes a replacement.
+## Question, treatments, and implementation contract
 
-## Validation
+Hold pool/evidence fixed and make the target-label-free mode an explicit runtime override. Do not label an entire run unsupervised because its LLM is zero-shot. Pretraining/domain knowledge and source-pair development remain disclosed.
 
-First hide training references on Bio-ML and other label-rich development pairs to measure the
-gap against supervision under controlled conditions. Then report on truly no-training-label
-tracks: eligible Anatomy, Conference, OAEI-KG, DISO, and BioKG/KG-Align tasks. Use the same
-candidate pools and scorer across selector arms. Run class, property, and instance slices when
-their evidence configuration has been frozen by E11/E12. Three seeds.
+At most **4 distinct treatment configurations/cells as specified below** before any explicitly declared source expansion. This is a bounded sequential design, not a Cartesian product. Shared deterministic controls are computed once.
 
-Primary: task×kind macro F1 against `current_fallback`. Secondary: P/R, candidate recall,
-coverage/abstention, threshold distribution, ECE/Brier, NIL AUROC where available, and regret
-to `in_pair_supervised` and `oracle_threshold`. Report prevalence, candidate-pool size, exact-
-anchor coverage, and score-separation diagnostics for every task. Pseudo-label precision/recall
-may be measured against gold **after** the run for analysis only.
+- analytic_fixed: no target fitting.
+- distribution_margin: frozen score-distribution and candidate-margin rule.
+- reciprocal_consensus: reciprocal top candidate plus declared support.
+- current_supervised: existing fitted selector, separately labeled.
 
-## Promotion
+All generative roles use OpenRouter. Local non-generative encoders/heads use the single RTX 5090.
+Separate target-label-free, in-pair supervised and transferred results. A named diagnostic may
+use development reference information only under its explicit oracle/diagnostic role.
 
-Choose one label-free default only if it improves macro F1 over `current_fallback` with CI
-excluding zero, no task×kind slice regresses by more than 1 point, coverage does not collapse by
-more than 5 absolute percentage points from `current_fallback` on any task×kind slice, and it
-has deterministic degenerate-case behavior. The supervised and oracle arms cannot become
-no-label defaults. If no method dominates, select via an observable,
-pre-registered task characteristic (for example score-mixture separation), validated
-leave-one-task-out rather than chosen on each task's gold.
+## Validation and selection
 
-**Pre-registered criterion-2 override**: target-label-free task×kind slices use a 1-point
-regression bound because several no-training tracks have small or incomplete references. The
-task×kind macro CI, the absolute coverage guard above, and the default 0.5-point-gate outcome
-remain mandatory.
+Primary outcome/guard: **Global F1 and risk/coverage; supervised control reported distinctly.**
+Use the family rule plus RUN-PLAN's frozen selection, practical-effect, reconstruction and cost
+criteria. A screen chooses what to evaluate next; it does not establish a reporting-set claim.
+Report all controls, negative results, corrections/harms where relevant, and inapplicable or
+budget-deferred cells. Never suppress a difficult kind or source group from the denominator.
 
-The promoted method here is the `label_free` resolution of the acceptance component and remains
-reachable by explicit config on every track, including tracks that do have training labels. E22
-decides whether it also becomes the `auto` default; a label-free selector that matches
-supervision at achievable label budgets is a promotable outcome, not a fallback.
+Broader validation happens on the designated development sentinel after a promising focused
+screen, then only in E17's frozen final panel for the claims selected at G4. Do not run a full
+OAEI confirmation for every treatment. A feature-specific claim needs its matching held-out
+case; NCIT–DOID cannot substitute for property, instance, natural-NIL or typed-relation labels.
+No individual experiment uses final outcomes to qualify its component for E17.
 
-**Effort**: M. **Risks**: pseudo-labels may encode the same errors as the scorer; exact anchors
-are sparse in some domains; incomplete gold distorts apparent precision; unsupervised
-thresholds can infer the wrong match prevalence. Keep methods conservative, expose coverage,
-and treat target-label-free as a supervision claim—not as a claim that no labelled data was
-ever used during method development.
+## Acceptance and recovery
+
+- A supplied target train file is ignored by every explicitly label-free component.
+- Declared and resolved supervision labels agree or execution fails.
+- No valid label-free run fails merely because target labels are absent.
+
+Durable boundaries: **Resolved policy, source decisions and calibration artifacts where applicable.**
+All changed inputs/semantics invalidate their consuming descendants; preserve valid upstream
+artifacts. Store completed source/request/fold IDs and attempt lineage. Tests must demonstrate
+this family's checkpoint/repair boundary, not merely mirror a formula. Mark screen-ready and
+confirm-ready separately in the runtime readiness ledger, with evidence, once these checks pass.
+
+## Deliverable
+
+Produce a result record with actual treatment/configuration, case/role, supervision, artifact
+IDs, source counts, metrics/cost, controls, uncertainty, decision and reason. A legitimate null,
+removal, or inapplicability is a deliverable; an unimplemented arm is not an empirical null.
+Resolve this family's question into numbered research questions and a primary endpoint in the
+executable design before its screen; answer each as supported, not supported or inconclusive
+with evidence. RUN-PLAN section 7 governs incomplete references and claim limitations.

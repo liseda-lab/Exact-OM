@@ -1,113 +1,82 @@
-# E14 — Typed Correspondence Semantics: Equivalence vs Subsumption
+# E14 — Equivalence versus subsumption on typed BioKG data
 
-**Motivation** (audit obs. 14; WP-G heuristic gap): BioKG/KG-Align-style outputs distinguish
-`equivalent`, `source_subsumed_by_target`, and `source_subsumes_target`, while the core score
-estimates match compatibility and the current relation typer is only a hierarchy heuristic.
-Pair detection and relation typing are different problems. A high untyped F1 can coexist with
-systematically wrong relation directions.
+**v2 specification, 2026-09-09. Implementation still required.**
+This file replaces the v1 matrix for this family. [RUN-PLAN](RUN-PLAN.md),
+[shared clarifications](IMPLEMENTATION-CLARIFICATIONS.md), and
+[checkpoint recovery](CHECKPOINT-RECOVERY.md) are binding. A passing helper test does not
+establish an executable experiment or a performance result.
 
-Internal direction is fixed throughout this experiment: `<` means `Src ⊑ Tgt`
-(`source_subsumed_by_target`); `>` means `Tgt ⊑ Src` (`source_subsumes_target`).
+## Existing implementation and missing work
 
-## Research questions
+Inspected baseline: 655f599e714e13d592f702f326ca5a36f6b50b2f.
 
-- **RQ14.1**: How much typed performance is lost in pair detection versus relation
-  classification, and which relation/direction causes the loss?
-- **RQ14.2**: Can a label-free semantic pipeline—high-confidence equivalence anchors followed
-  by normalized graph closure or OWL bridge-axiom entailment—outperform the current hierarchy
-  heuristic?
-- **RQ14.3**: Does a supervised three-way relation model outperform semantic inference, and
-  does a semantics-constrained hybrid outperform both?
-- **RQ14.4**: Are relation probabilities calibrated well enough to abstain when neither
-  equivalence nor either subsumption direction is supported?
-- **RQ14.5**: Do conclusions hold for OWL hierarchies and CSV/CSV+Datalog KGs after relation
-  normalization?
-- **RQ14.6**: Do predicted equivalence/subsumption mappings preserve coherence when added to
-  the merged hierarchy, or create cross-KG subsumption cycles and contradictions?
+**Already implemented:** Heuristic/graph relation primitives and typed writers exist; trained typer, full bridge integration and coherence audit are incomplete.
 
-## Hypotheses
+**Agent must implement:** Replace stale BioKG stub with the available data descriptor; grouped typed fitting, leave-query-bridge-out semantics, oracle-pair/full-pipeline evaluation and supported-profile reasoning audit.
 
-Semantic entailment should primarily improve directional precision and eliminate direction
-reversals. A learned model should improve recall where anchors/closure are sparse. The hybrid
-is expected to obtain the best relation-macro F1: entailed directions are hard constraints and
-the learned head handles unresolved cases. Because equivalence is often the majority class,
-micro typed F1 alone is expected to overstate quality.
+**Inputs/bindings to resolve:** The user states BioKG-Align is available; resolve its actual paths/revision/typed split. Do not retain the old biokg_not_published deferral.
+The user confirms the OAEI/BioKG data are available. Resolve paths, revisions and capabilities;
+do not perpetuate an old unavailable flag without checking the supplied data.
 
-## Methods
+## Focus and dependencies
 
-All arms consume the same candidate pairs and frozen pair scores:
+Primary focused case: **T0: available BioKG-Align pair with =,<,> labels; distinct T1 final**.
+Resource envelope: **extensions** in RUN-PLAN.
+Prerequisites/consumed outputs: **E00, E13, typed_pool_freeze**. A pool-freeze or selected-head dependency
+accepts the declared baseline output when no candidate wins; optional research must not deadlock
+other families. Kind-specific pool freezes do not change the already-frozen class pool.
 
-1. `all_equivalent`: required lower baseline, implemented by the existing
-   `matching.relation_prediction: none` mode (the writer emits `=`/`equivalent` for every
-   accepted pair).
-2. `hierarchy_heuristic`: current WP-G implementation.
-3. `semantic_entailment` (**target-label-free**): first detect high-precision equivalence
-   anchors using exact/mutual-best multi-channel agreement, then test subsumption. Its portable
-   `graph_closure` backend adds anchors as bidirectional cross-source edges and materializes the
-   normalized subclass/subproperty graph. A path `Src→Tgt` implies `<`, the reverse implies
-   `>`, and paths in both directions imply `=`. Its OWL-only `bridge_reasoner` backend builds a
-   temporary merged ontology containing the accepted equivalence bridge axioms and asks the
-   configured reasoner whether each named `Src ⊑ Tgt` or `Tgt ⊑ Src` axiom is entailed. Compare
-   the two backends on the supported OWL profile. CSV+Datalog consumes only independently
-   pre-materialized facts through `graph_closure`. Unsupported cases abstain or fall back to
-   equivalence according to a separate arm.
-4. `learned_three_way` (**in-pair supervised**): multinomial/ordinal relation head over pair
-   score, directional ancestor/descendant coverage, mapped parent/child agreement, lexical
-   generality cues, entity kind, and evidence-missingness flags. Split by source entity and use
-   class weights; never create negative/directional labels from the test reference.
-5. `semantic_then_learned`: semantic entailments are hard predictions when consistent; the
-   learned head handles unresolved candidates. A conflict is exposed and abstained, never
-   silently overwritten.
+Start with 300 development source groups (all eligible if fewer), seed 17, except a stated smaller LLM limit. Expand at most two non-control survivors to 1,000 nested development groups. Every applicable family receives a focused initial screen; widen cases or models only at scheduled gates. Eligibility/power is recorded per kind/relation.
 
-Config: `matching.relation_prediction: none|hierarchy_heuristic|semantic_entailment|
-learned_three_way|semantic_then_learned`, `matching.relation_semantic_backend:
-graph_closure|bridge_reasoner`, with separate equivalence-anchor and relation-confidence
-thresholds. Explanations record paths/entailed axioms and anchors or learned feature
-contributions, plus `relation_confidence`.
+## Question, treatments, and implementation contract
 
-Implementation boundary: extend the pure semantic path in `exact/io/relations.py`; place the
-optional learned head with the other model implementations and invoke both through one
-relation-typer interface before the existing writers. Extend the config enum and typed
-evaluator, but keep `none` and `hierarchy_heuristic` behavior unchanged when new modes are off.
+Choose one actual typed pair for broad method screening. Run oracle-pair typing separately from end-to-end pair detection. No calibration or rule may use T1 outcomes. Exclude the queried mapping as its own bridge. Cycles/SCC collapse and logical unsatisfiability have different metrics.
 
-## Validation
+At most **6 distinct treatment configurations/cells as specified below** before any explicitly declared source expansion. This is a bounded sequential design, not a Cartesian product. Shared deterministic controls are computed once.
 
-Stage A uses an **oracle-pair protocol**: provide true entity pairs and score only their
-relation labels. This isolates typing. Stage B uses the full pipeline and reports untyped pair
-F1 beside typed mapping F1. Use only pinned tracks whose inventory confirms all needed relation
-labels and split provenance; published BioKG/KG-Align is primary, with any other typed OAEI
-track admitted explicitly. Synthetic closure fixtures validate direction and consistency but
-provide no research result. Three seeds for learned/full-pipeline arms.
+- all_equivalent: required lower control.
+- hierarchy_heuristic: current control.
+- graph_entailment: relation paths conditional on declared anchors.
+- learned_three_way: bounded multinomial relation head.
+- semantic_then_learned: selected hybrid with explicit conflict abstention.
+- bridge_parity: optional supported-OWL reasoner comparison.
 
-Primary: relation-macro F1 under the oracle-pair and full-pipeline protocols. Secondary:
-per-relation P/R/F1, typed mapping micro F1, direction accuracy conditional on a correct pair,
-abstention/coverage, ECE/Brier score, contradiction count, and performance by entity kind and
-format. For coherence, quotient predicted equivalence components, add normalized directional
-subsumption edges to the merged hierarchy, and report new cross-KG strongly connected
-components/cycles, opposing directions, and cycle size. With `bridge_reasoner`, additionally
-report merged-ontology satisfiability and newly unsatisfiable named classes. Distinguish cycles
-already present inside an input from those introduced by mappings. Also report graph/reasoner
-agreement and runtime on OWL tasks, plus an oracle-anchor semantic arm to separate missing
-anchors from bad entailment; it is diagnostic and cannot promote.
+All generative roles use OpenRouter. Local non-generative encoders/heads use the single RTX 5090.
+Separate target-label-free, in-pair supervised and transferred results. A named diagnostic may
+use development reference information only under its explicit oracle/diagnostic role.
 
-## Promotion
+## Validation and selection
 
-A typer promotes only if relation-macro F1 improves with CI excluding zero, each directional
-relation has non-zero recall and does not regress by more than 1 F1 point, direction reversals
-decrease, and explanations reproduce the semantic path or learned decision. Promotion is
-regime-specific: `semantic_entailment` is the `label_free` resolution of the relation component
-while a learned/hybrid head is its `supervised` resolution, selected per
-`supervision.components.relation`. E22 fits how many relation-balanced effective training units the learned head
-requires before `auto` should prefer it.
+Primary outcome/guard: **Relation-macro F1 with oracle-pair and full-pipeline results separately.**
+Use the family rule plus RUN-PLAN's frozen selection, practical-effect, reconstruction and cost
+criteria. A screen chooses what to evaluate next; it does not establish a reporting-set claim.
+Report all controls, negative results, corrections/harms where relevant, and inapplicable or
+budget-deferred cells. Never suppress a difficult kind or source group from the denominator.
 
-**Pre-registered criterion-2 override**: each directional-relation slice uses a 1-point
-regression bound rather than 0.5 because typed references are smaller and strongly imbalanced.
-Relation-macro significance, non-zero recall in both directions, and the default-gate outcome
-are still required in the results note. A promoted typer must not introduce more cross-KG
-cycles/unsatisfiable named classes than `hierarchy_heuristic`; any increase requires explicit
-adjudication and blocks automatic promotion.
+Broader validation happens on the designated development sentinel after a promising focused
+screen, then only in E17's frozen final panel for the claims selected at G4. Do not run a full
+OAEI confirmation for every treatment. A feature-specific claim needs its matching held-out
+case; NCIT–DOID cannot substitute for property, instance, natural-NIL or typed-relation labels.
+No individual experiment uses final outcomes to qualify its component for E17.
 
-**Effort**: L. **Risks**: incomplete references and hierarchies; severe relation imbalance;
-wrong equivalence anchors create false cross-KG paths; OWL and Datalog closure may cover
-different semantics. Report relation support counts, predicted-anchor and oracle-anchor arms,
-and never infer a typed-performance claim from the mini fixture.
+## Acceptance and recovery
+
+- < means source-subsumed-by-target consistently in every adapter/writer.
+- A mapping cannot be independently justified solely by inserting itself.
+- All relation labels have real counts/provenance; unresolved label completeness remains explicit.
+- Reasoner timeout/unsupported profile is unknown, not safe or proven equivalent.
+
+Durable boundaries: **Typed train features/heads, bridge queries, typed predictions.**
+All changed inputs/semantics invalidate their consuming descendants; preserve valid upstream
+artifacts. Store completed source/request/fold IDs and attempt lineage. Tests must demonstrate
+this family's checkpoint/repair boundary, not merely mirror a formula. Mark screen-ready and
+confirm-ready separately in the runtime readiness ledger, with evidence, once these checks pass.
+
+## Deliverable
+
+Produce a result record with actual treatment/configuration, case/role, supervision, artifact
+IDs, source counts, metrics/cost, controls, uncertainty, decision and reason. A legitimate null,
+removal, or inapplicability is a deliverable; an unimplemented arm is not an empirical null.
+Resolve this family's question into numbered research questions and a primary endpoint in the
+executable design before its screen; answer each as supported, not supported or inconclusive
+with evidence. RUN-PLAN section 7 governs incomplete references and claim limitations.

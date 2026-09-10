@@ -1,0 +1,819 @@
+design_schema_version: 2
+kind: exact_om_campaign_design
+campaign_id: exact-om-focused-v2
+design_date: '2026-09-09'
+status: specification_only
+executable_with_current_runner: false
+requires_implementation:
+- X0
+- X1
+- X2
+- X3
+- X4
+- X5
+inspected_code_revision: 655f599e714e13d592f702f326ca5a36f6b50b2f
+authority:
+- RUN-PLAN.md
+- CHECKPOINT-RECOVERY.md
+- IMPLEMENTATION-CLARIFICATIONS.md
+hardware:
+  nodes: 1
+  gpu_model: RTX 5090
+  gpus: 1
+  host_ram_gb_profiles:
+  - 64
+  - 128
+  heavy_gpu_workers: 1
+  numerical_semantics_identical_between_ram_profiles: true
+input_availability:
+  user_confirmed:
+  - OAEI
+  - BioKG-Align
+  binding_status: resolve_paths_revisions_and_capabilities
+  stale_unavailable_flags_are_not_authoritative: true
+llm:
+  provider: OpenRouter
+  all_generative_roles: true
+  local_generative_fallback: false
+  primary_profile: resolve_existing_openrouter_profile
+  authorization: user_broad_spending_discretion
+  hard_usd_cap: null
+  track_projected_and_actual_usd: true
+  primary_models: 1
+  maximum_extended_sensitivity_models: 1
+  initial_concurrency: 4
+  maximum_concurrency: 8
+  reserve_final_calls_before_screen: true
+  unique_verbalization_and_preparation_requests_count_towards_budget: true
+profiles:
+  core_14d:
+    node_hours_cap: 336
+    recovery_reserve_hours: 60
+    final_hours_reserved: 54
+    llm_request_planning_cap: 20000
+    llm_token_planning_cap: 32000000
+    final_arm_task_design_cap: 24
+  extended_21d:
+    node_hours_cap: 504
+    recovery_reserve_hours: 84
+    final_hours_reserved: 72
+    llm_request_planning_cap: 40000
+    llm_token_planning_cap: 64000000
+    final_arm_task_design_cap: 36
+budget_envelopes_core_hours:
+  foundation: 12
+  retrieval: 48
+  channels: 48
+  decisions: 36
+  llm: 42
+  extensions: 18
+  sentinels: 18
+  final: 54
+  reserve: 60
+budget_envelopes_extended_extra_hours:
+  foundation: 0
+  retrieval: 24
+  channels: 18
+  decisions: 18
+  llm: 24
+  extensions: 36
+  sentinels: 6
+  final: 18
+  reserve: 24
+screen:
+  public_stage: screen
+  initial_source_cap: 300
+  expanded_source_cap: 1000
+  initial_training_source_cap: 2000
+  training_expansion_requires_named_comparison: true
+  forced_llm_source_cap: 200
+  seed: 17
+  max_expanded_candidates_per_family: 2
+  coverage: initial_screen_for_every_applicable_family
+  case_choice: feature_capability_before_quality_outcomes
+  case_lock_required: true
+  no_cartesian_expansion: true
+cases:
+  D0:
+    track: bioml_hf
+    task: ncit-doid
+    roles:
+    - train
+    - valid
+  D1:
+    track: bioml_hf
+    task: snomed-fma
+    roles:
+    - train
+    - valid
+  D2:
+    selection: optional_pinned_omim_ordo_valid
+    roles:
+    - development
+  P0:
+    selection: one_property_capable_conference_oaei_kg_or_biokg_pair
+    heldout_role: P1
+  K0:
+    preferred_track: oaei_kg
+    preferred_task: starwars-swg
+    selection: verify_instance_graph_capabilities_or_bind_available_biokg_case
+    heldout_role: K1
+  T0:
+    selection: one_available_biokg_pair_with_equivalence_and_both_subsumption_labels
+    heldout_role: T1
+  N0:
+    preferred_track: diso
+    preferred_task: stix-d3fend
+    selection: verify_natural_nil_or_choose_available_eligible_case
+    heldout_role: N1
+  R0_case:
+    selection: same_information_owl_csv_views_then_independent_datalog_enrichment
+  P1:
+    selection: distinct_heldout_property_case_selected_with_P0
+    roles:
+    - final
+  T1:
+    selection: distinct_heldout_typed_case_selected_with_T0
+    roles:
+    - final
+  N1:
+    selection: heldout_natural_nil_task_or_disjoint_split_selected_with_N0
+    roles:
+    - final
+  R1_case:
+    selection: heldout_representation_case_when_claimed
+    roles:
+    - final
+  H0:
+    track: bioml_hf
+    task: ncit-doid
+    roles:
+    - test
+  H1:
+    track: bioml_hf
+    task: snomed-fma
+    roles:
+    - test
+  H2:
+    track: bioml_hf
+    task: snomed-ncit
+    roles:
+    - test
+    claim: held_out_pair_not_unseen_ontology
+  K1:
+    preferred_track: oaei_kg
+    preferred_task: starwars-swtor
+    selection: distinct_heldout_case_compatible_with_K0
+    roles:
+    - final
+gates:
+- G0_runnable_foundation
+- G1_pool_freeze
+- G2_focused_method_search
+- G3_llm_value
+- G4_development_composition_freeze
+- G5_single_final_study
+dependency_ports:
+  baseline_evidence:
+    producers:
+    - E00
+  E05_initial:
+    producers:
+    - E05
+    phase: initial_retrieval
+  pool_freeze:
+    producers:
+    - E05
+    - E20
+    gate: G1
+    null_output: frozen_baseline_policy_per_task_kind_role
+  kind_pool_freeze:
+    producers:
+    - E00
+    instance_replacement: E12_initial_retrieval
+    no_dependency_on_instance_evidence_phase: true
+  typed_pool_freeze:
+    producers:
+    - E00
+    - E13
+    phase: baseline_pair_pool
+  selected_heads:
+    producers:
+    - E03
+    - E15
+    - E18
+    - E19
+    null_output: current_compatible_fitted_control
+  E02_anchors:
+    producers:
+    - E02
+    null_output: E00_anchor_free_or_current_safe
+  E25_initial:
+    producers:
+    - E25
+    phase: initial_gates_and_forced_data
+    experiment_completion_required: false
+  E07_judgment_evidence:
+    producers:
+    - E07
+    fit_responses_role: train_only
+    development_responses: selection_and_assessment_only
+  G4_frozen_selection:
+    gate: G4
+    requires: all_admitted_screens_terminal
+late_phases:
+  E25_trust_replay:
+    experiment: E25
+    requires:
+    - E25_initial
+    - E07_judgment_evidence
+    new_llm_calls: 0
+  E04_listwise_integration:
+    experiment: E04
+    requires:
+    - E07_judgment_evidence
+    optional: true
+shared_controls:
+- corrected_v2_baseline_with_parent_R0
+- lexical_only
+- lexical_plus_definition_attribute
+- equal_active_channels
+- current_supervised_ranker_acceptance
+published_comparator:
+  maximum_recipes: 1
+  binding: available_pinned_project_matcher_or_verified_compatible_saved_predictions
+  selection: capability_and_reproducibility_before_current_outcomes
+  count_inside_final_cap: true
+  competitive_claim_requires_compatible_comparison: true
+confirm:
+  public_stage: confirm
+  default_class_panel:
+  - H0
+  - H1
+  - H2
+  feature_panels: selected_claims_require_their_matching_heldout_cases
+  paired_stochastic_seeds:
+  - 17
+  - 29
+  - 43
+  reuse_identical_deterministic_artifacts: true
+  primary_endpoint: task_macro_global_F1
+  max_claimed_h0_components: 4
+  max_h0_interactions: 2
+  no_component_test_selection_before_stack_freeze: true
+recovery:
+  checkpoint_target_minutes: 5
+  relocatable: true
+  resume_from_previous_directory: true
+  impact_plan_required_for_repairs: true
+  invalidate: changed_stages_and_descendants
+  preserve_immutable_attempts: true
+  old_test_exposure_never_becomes_fresh: true
+experiments:
+- id: E00
+  spec: E00-harness.md
+  focused_case: D0
+  budget_group: foundation
+  initial_treatment_cap: 2
+  dependencies: []
+  treatments:
+  - 'production: intended current global and local paths, with experimental switches off'
+  - 'replay: identical numerical configuration after interruption and relocation'
+  readiness: implementation_required
+  already_implemented: Strict screen/confirm schemas, task/arm expansion, provenance, source-level metrics,
+    same-fingerprint resume, inference/additional-model checkpoints, atomic explanation storage, and E17 composition
+    helpers exist.
+  remaining_implementation: Explicit task-mode routing; v2 per-stage identities and readiness; cross-directory
+    import; selective repair/reuse; budget and broad-search planning; reporting access ledger; per-role OpenRouter
+    cost admission; relocated and interrupted end-to-end proof.
+  checkpoint_boundaries: All stages and attempt lineage.
+- id: E01
+  spec: E01-global-extraction.md
+  focused_case: D0
+  budget_group: decisions
+  initial_treatment_cap: 5
+  dependencies:
+  - E00
+  - pool_freeze
+  treatments:
+  - 'greedy: threshold-first current control'
+  - 'mutual_best: reciprocal top candidate among eligible edges'
+  - 'stable_marriage: source-proposing, canonical ties'
+  - 'assignment_accepted_utility: eligible edges with utility score-threshold and zero unmatched utility'
+  - 'assignment_legacy: raw-score optimization followed by threshold, diagnostic only'
+  readiness: implementation_required
+  already_implemented: Greedy, mutual-best, stable marriage, component assignment, protected-match checks,
+    and component-cap fallback primitives exist.
+  remaining_implementation: True global frozen-pool execution and threshold-aware accepted-edge assignment;
+    current assignment applies threshold after optimization.
+  checkpoint_boundaries: Decisions, per-component extraction, evaluation.
+- id: E02
+  spec: E02-anchor-rescoring.md
+  focused_case: D0; D1 or K0 for structural efficacy
+  budget_group: channels
+  initial_treatment_cap: 6
+  dependencies:
+  - E00
+  - pool_freeze
+  treatments:
+  - 'single_pass_hard: historical exact-anchor baseline'
+  - 'single_pass_soft: exact lexical matches remain high-priority candidates'
+  - 'second_pass_trusted: one rescore using declared trusted/training anchors'
+  - 'second_pass_predicted: one rescore using a frozen development-selected anchor rule'
+  - 'anchor_noise_001: 1% deterministic corruption on development only'
+  - 'anchor_noise_005: 5% corruption of the same predeclared anchor population'
+  readiness: implementation_required
+  already_implemented: Exact-anchor and graph evidence helpers exist; the bounded second pass is not integrated
+    for every declared arm.
+  remaining_implementation: Soft-anchor competition, stage-level second-pass runner integration, explicit anchor
+    provenance, self-confirmation exclusion, noise diagnostics, and checkpointed rescore.
+  checkpoint_boundaries: Anchors, structural evidence, one rescoring pass.
+- id: E03
+  spec: E03-calibration-thresholds.md
+  focused_case: D0; D1 development transfer
+  budget_group: decisions
+  initial_treatment_cap: 5
+  dependencies:
+  - E00
+  - pool_freeze
+  treatments:
+  - 'none: fixed score threshold control'
+  - 'platt: OOF fitted logistic calibration'
+  - 'isotonic: bounded complexity OOF calibration'
+  - 'distribution_threshold: one frozen Otsu rule, label-free'
+  - 'fp_only: optional changed-loss diagnostic on the selected calibration recipe'
+  readiness: implementation_required
+  already_implemented: Platt/isotonic application and distribution-threshold primitives exist.
+  remaining_implementation: Grouped OOF fitting/export, correct train-pool features, donor-to-recipient application,
+    risk/coverage reporting, and replayable threshold selection.
+  checkpoint_boundaries: OOF folds, calibrator fit, calibrated decisions, evaluation.
+- id: E04
+  spec: E04-nil-abstention.md
+  focused_case: 'N0: DISO stix-d3fend or capability-selected NIL task; D0 pool-miss diagnostic'
+  budget_group: decisions
+  initial_treatment_cap: 5
+  dependencies:
+  - E00
+  - pool_freeze
+  - E03
+  treatments:
+  - 'nil_off: current acceptance control'
+  - 'nil_heuristic: joint-scale label-free abstention'
+  - 'nil_fitted: calibrated joint candidate/NIL head'
+  - 'pool_miss: remove gold from development pools, diagnostic only'
+  - 'listwise_none: conditional paired integration with the E07 winner'
+  readiness: implementation_required
+  already_implemented: Joint candidate/NIL probability primitives exist; full NIL writer/evaluator and fitted
+    calibration remain incomplete.
+  remaining_implementation: Natural-NIL task binding, grouped fit, output/evaluator integration, three-way
+    absence semantics, and optional listwise-none integration.
+  checkpoint_boundaries: NIL fit and source-level decisions/output.
+- id: E05
+  spec: E05-retrieval-upgrades.md
+  focused_case: D0; D1 after survivor selection
+  budget_group: retrieval
+  initial_treatment_cap: 6
+  dependencies:
+  - E00
+  treatments:
+  - 'baseline: current MiniLM/lexical policy at mean k=20'
+  - 'sapbert: encoder-only replacement'
+  - 'rrf: retrieval-fusion-only replacement'
+  - 'adaptive_k: k in [10,50] at matched mean budget'
+  - 'combined: at most one progressive combination of development survivors'
+  - 'query_rescue: optional grounded OpenRouter query/profile augmentation before G1'
+  readiness: implementation_required
+  already_implemented: Bounded encoder/fusion/adaptive-k controls, pool diagnostics, and matched-pool selection
+    primitives exist.
+  remaining_implementation: Bounded progressive orchestration, reusable embedding/index artifacts, per-role
+    leakage checks, and an explicit G1 policy freeze; optional grounded query-rescue path.
+  checkpoint_boundaries: Entity embeddings, retrieval index, per-source pools.
+- id: E06
+  spec: E06-string-similarity-channel.md
+  focused_case: D0; P0/Conference when abbreviation or non-biomedical behavior is the question
+  budget_group: channels
+  initial_treatment_cap: 4
+  dependencies:
+  - E00
+  - pool_freeze
+  treatments:
+  - 'current: current lexical/context pipeline'
+  - 'string_added: normalized string ensemble as a distinct signal'
+  - 'lexical_only: required simple baseline'
+  - 'string_only: required simple diagnostic'
+  readiness: implementation_required
+  already_implemented: Bounded string metrics, conservative abbreviation matching, and provenance-bearing channel
+    controls exist.
+  remaining_implementation: V2 case selection, stage replay, full feature attribution, and effective-cost/duplication
+    diagnostics.
+  checkpoint_boundaries: String evidence and score replay.
+- id: E07
+  spec: E07-listwise-llm.md
+  focused_case: D0 or a feature-selected hard/NIL case; maximum 200 forced-screen sources
+  budget_group: llm
+  initial_treatment_cap: 7
+  dependencies:
+  - E00
+  - pool_freeze
+  - E25_initial
+  treatments:
+  - 'brief_binary: current compressed-brief binary control'
+  - 'brief_256_binary: same source facts and brief schema with a 256-token generation ceiling'
+  - 'packet_binary: same candidates judged from the direct scored packet'
+  - 'facts_binary: score-blind structured ontology evidence'
+  - 'facts_listwise: same facts/candidates, one comparative call including none'
+  - 'retrieved_listwise: at most two extra evidence packets then one judgment'
+  - 'second_model: extended-only sensitivity of the frozen comparison'
+  readiness: implementation_required
+  already_implemented: Listwise prompt, categorical probability, order, and aggregation primitives exist; scorer
+    grouped execution still rejects listwise modes.
+  remaining_implementation: OpenRouter grouped runtime, source-level eligibility, score-blind direct packets,
+    no-summary comparison, bounded evidence requests, complete response/cost ledger, and source-level integration.
+  checkpoint_boundaries: Source request plans, fetched evidence, raw responses, parsing and calibrated decisions.
+- id: E08
+  spec: E08-attribute-polarity.md
+  focused_case: D0; a case with valid identifier semantics for signed evidence
+  budget_group: channels
+  initial_treatment_cap: 4
+  dependencies:
+  - E00
+  - pool_freeze
+  treatments:
+  - 'current: historical attribute treatment'
+  - 'unified_bank: combine comparable annotation evidence'
+  - 'provenance_dedup: prevent repeated facts from gaining independent mass'
+  - 'signed_identifiers: only semantically justified incompatibilities'
+  readiness: implementation_required
+  already_implemented: Attribute-bank controls and allowlisted signed-identifier primitives exist.
+  remaining_implementation: Task descriptors with real property/namespace semantics, cross-bank deduplication
+    validation, and bounded conditional interaction assembly.
+  checkpoint_boundaries: Annotation evidence/bank selection and dependent scores.
+- id: E09
+  spec: E09-hierarchy-semantics.md
+  focused_case: D1 SNOMED–FMA development, with D0 control
+  budget_group: channels
+  initial_treatment_cap: 4
+  dependencies:
+  - E00
+  - pool_freeze
+  treatments:
+  - 'current: embedded hierarchy context control'
+  - 'ancestor_ic: aligned ancestor overlap with IC weighting'
+  - 'sibling_context: one explicitly qualified sibling signal'
+  - 'hierarchy_removed: diagnostic with other evidence fixed'
+  readiness: implementation_required
+  already_implemented: IC-weighted hierarchy overlap and sibling evidence primitives exist.
+  remaining_implementation: Feature-appropriate case binding, controlled representation/noise checks, and complete
+    hierarchy-versus-lexical contribution reporting.
+  checkpoint_boundaries: Hierarchy/anchor evidence and score replay.
+- id: E10
+  spec: E10-fusion-selector-ablations.md
+  focused_case: D0
+  budget_group: channels
+  initial_treatment_cap: 8
+  dependencies:
+  - E00
+  - pool_freeze
+  - E26
+  treatments:
+  - 'analytic_grid: six cached replays gamma={1,2,3} by tau={0.4,0.5}, decision LLM off'
+  - 'winner_only: current acceptance training on the selected analytic setting'
+  - 'winner_runnerup: same head/features with safe runner-up negatives'
+  readiness: implementation_required
+  already_implemented: Fusion controls and the existing listwise-linear/acceptance baseline exist; the earlier
+    45-cell/two-phase training orchestration is incomplete.
+  remaining_implementation: Cached-score constant replay, bounded two-phase selection, winner-plus-runner-up
+    fitting, and immutable training artifacts.
+  checkpoint_boundaries: Analytic score replay, grouped head training, acceptance.
+- id: E11
+  spec: E11-property-equivalence.md
+  focused_case: 'P0: capability-selected Conference pair or K0 with sufficient property references'
+  budget_group: extensions
+  initial_treatment_cap: 4
+  dependencies:
+  - E00
+  - kind_pool_freeze
+  treatments:
+  - 'property_labels: lexical property baseline'
+  - 'property_annotations: add definitions/annotations'
+  - 'property_signature: add domain/range, inverse and characteristic evidence'
+  - 'property_usage: selected signature arm plus bounded usage context'
+  readiness: implementation_required
+  already_implemented: Entity-kind plumbing and typed I/O exist; property-specific evidence switches are not
+    fully integrated.
+  remaining_implementation: Property evidence bundles/signatures, per-kind retrieval/fitting, actual reference
+    inventory, and case-scoped evaluation.
+  checkpoint_boundaries: Property signatures/usage, kind-specific pools and heads.
+- id: E12
+  spec: E12-instance-equivalence.md
+  focused_case: K0 OAEI-KG starwars-swg or a richer available BioKG instance pair
+  budget_group: extensions
+  initial_treatment_cap: 5
+  dependencies:
+  - E00
+  treatments:
+  - 'labels: lexical baseline'
+  - 'types_literals: typed attribute evidence'
+  - 'relations: bounded relation context'
+  - 'relations_shuffled: structural negative control'
+  - 'multi_view: one retrieval variant evaluated before its kind-pool freeze'
+  readiness: implementation_required
+  already_implemented: Instance-kind plumbing exists; complete evidence bundles, shuffle and anchor crosses
+    are incomplete.
+  remaining_implementation: Type/literal/relation bundles, kind-specific multi-view retrieval, grouped research
+    partitions, deterministic degree/predicate-preserving shuffle, and instance evaluation.
+  checkpoint_boundaries: Instance pool, relational features, seeded/shuffled graph and heads.
+- id: E13
+  spec: E13-representation-robustness.md
+  focused_case: 'R0_case: same-information OWL/CSV pair, then available BioKG CSV/Datalog case'
+  budget_group: extensions
+  initial_treatment_cap: 4
+  dependencies:
+  - E00
+  treatments:
+  - 'owl_parity: normalized OWL evidence on the matched-information case'
+  - 'csv_parity: identical facts serialized as CSV on that same case'
+  - 'csv_raw: independent BioKG case before added Datalog consequences'
+  - 'csv_materialized: that same BioKG case with provenance-bearing Datalog consequences'
+  readiness: implementation_required
+  already_implemented: OWL/RDF/CSV adapters and closure interfaces exist; paired parity/enrichment harness
+    is incomplete.
+  remaining_implementation: Lossless matched snapshots, feature/evidence parity comparison, explicit information-loss
+    inventory, and independent materialization artifacts.
+  checkpoint_boundaries: Canonical snapshots, graph closure and evidence inventories.
+- id: E14
+  spec: E14-typed-relations.md
+  focused_case: 'T0: available BioKG-Align pair with =,<,> labels; distinct T1 final'
+  budget_group: extensions
+  initial_treatment_cap: 6
+  dependencies:
+  - E00
+  - E13
+  - typed_pool_freeze
+  treatments:
+  - 'all_equivalent: required lower control'
+  - 'hierarchy_heuristic: current control'
+  - 'graph_entailment: relation paths conditional on declared anchors'
+  - 'learned_three_way: bounded multinomial relation head'
+  - 'semantic_then_learned: selected hybrid with explicit conflict abstention'
+  - 'bridge_parity: optional supported-OWL reasoner comparison'
+  readiness: implementation_required
+  already_implemented: Heuristic/graph relation primitives and typed writers exist; trained typer, full bridge
+    integration and coherence audit are incomplete.
+  remaining_implementation: Replace stale BioKG stub with the available data descriptor; grouped typed fitting,
+    leave-query-bridge-out semantics, oracle-pair/full-pipeline evaluation and supported-profile reasoning
+    audit.
+  checkpoint_boundaries: Typed train features/heads, bridge queries, typed predictions.
+- id: E15
+  spec: E15-label-free-selection.md
+  focused_case: D0; one D1 robustness check
+  budget_group: decisions
+  initial_treatment_cap: 4
+  dependencies:
+  - E00
+  - pool_freeze
+  - E03
+  treatments:
+  - 'analytic_fixed: no target fitting'
+  - 'distribution_margin: frozen score-distribution and candidate-margin rule'
+  - 'reciprocal_consensus: reciprocal top candidate plus declared support'
+  - 'current_supervised: existing fitted selector, separately labeled'
+  readiness: implementation_required
+  already_implemented: Mode resolution and several heuristic selector controls exist; mixed-capability matrix
+    handling remains incomplete.
+  remaining_implementation: Strict per-component label-free execution with present train files, Otsu/margin
+    and reciprocal controls in the true global path, and capability-correct comparison.
+  checkpoint_boundaries: Resolved policy, source decisions and calibration artifacts where applicable.
+- id: E16
+  spec: E16-cross-pair-transfer.md
+  focused_case: D0 donor to at most two development recipients selected by shared/disjoint ontology profile
+  budget_group: decisions
+  initial_treatment_cap: 3
+  dependencies:
+  - E00
+  - pool_freeze
+  - E15
+  - selected_heads
+  treatments:
+  - 'label_free: required recipient comparator'
+  - 'in_pair_supervised: recipient train fit under the frozen recipe'
+  - 'donor_transfer: unchanged selected donor artifact and threshold'
+  readiness: implementation_required
+  already_implemented: Strict artifact-consuming paths exist; donor training/export and transfer orchestration
+    are incomplete.
+  remaining_implementation: Source-pair-only fit, held-out recipient application without silent refit, metadata
+    for ontology/label overlap, and limited transfer reporting.
+  checkpoint_boundaries: Donor fit, portable artifact validation, recipient predictions.
+- id: E17
+  spec: E17-promoted-stack-integration.md
+  focused_case: H0/H1/H2 plus selected feature-specific held-out cases
+  budget_group: final
+  initial_treatment_cap: final_matrix_contract
+  dependencies:
+  - E00
+  - G4_frozen_selection
+  treatments:
+  - 'baseline: frozen v2 production baseline'
+  - 'stack_all: one G4-selected stack'
+  - 'label_free: mandatory where the main stack uses target supervision'
+  - 'stack_minus_component: at most four H0 attribution contrasts'
+  - 'interaction: at most two predeclared high-risk 2x2 boundaries'
+  - 'optional_profile: only if separately selected and fully budgeted'
+  readiness: implementation_required
+  already_implemented: Composition, leave-one-out/interaction generation and paired global-F1 reporting helpers
+    exist.
+  remaining_implementation: Development-only stack selection, new bounded final panel, explicit task mode across
+    pool ablation, compatible refitting, fresh-role enforcement, and repair-aware result-set aggregation.
+  checkpoint_boundaries: Frozen composition, predictions, evaluation and final result-set lineage.
+- id: E18
+  spec: E18-supervised-reranking.md
+  focused_case: D0
+  budget_group: decisions
+  initial_treatment_cap: 5
+  dependencies:
+  - E00
+  - pool_freeze
+  - E15
+  treatments:
+  - 'analytic: current pair-score ranking'
+  - 'current_listwise: existing linear ranker'
+  - 'pairwise: same feature set, source-group RankNet objective'
+  - 'channel_gating: normalized nonnegative channel weights'
+  - 'additive_gam: feature-additive diagnostic on identical features'
+  readiness: implementation_required
+  already_implemented: Current listwise-linear training/ranking and analytic controls exist; new objective/model
+    artifact trainers are incomplete.
+  remaining_implementation: Grouped trainer/export for pairwise and channel-gating variants, fixed-feature
+    comparisons, additive diagnostic, and acceptance interaction.
+  checkpoint_boundaries: OOF folds, model/optimizer states and source ranking outputs.
+- id: E19
+  spec: E19-supervised-fusion.md
+  focused_case: D0
+  budget_group: channels
+  initial_treatment_cap: 4
+  dependencies:
+  - E00
+  - pool_freeze
+  - E26
+  - E10
+  treatments:
+  - 'analytic_shipped: nested analytic control'
+  - 'analytic_fitted: same family, tau/gamma and mean-one nonnegative multipliers fitted'
+  - 'learned_global: explicitly distinct normalized weighted-score family'
+  - 'learned_adaptive: extended-only small nonnegative gating function'
+  readiness: implementation_required
+  already_implemented: Artifact-backed analytic_fitted/learned_global consumers exist; fitting and adaptive
+    providers are incomplete. Analytic_fitted currently changes the outer aggregation.
+  remaining_implementation: Neutral-parameter identity correction, grouped fitting/export, explicit family
+    names, optional bounded adaptive weights, and raw quality-component handling.
+  checkpoint_boundaries: Fit state, frozen weight provider, fusion/uncertainty outputs.
+- id: E20
+  spec: E20-supervised-retrieval.md
+  focused_case: D0; selected D1 check before G1
+  budget_group: retrieval
+  initial_treatment_cap: 4
+  dependencies:
+  - E00
+  - E05_initial
+  treatments:
+  - 'zero_shot: E05-selected retriever'
+  - 'contrastive: one bounded encoder fine-tuning recipe'
+  - 'cross_encoder: one trained pair scorer on a fixed retrieved pool'
+  - 'combined: at most one progressive combination if development warrants it'
+  readiness: implementation_required
+  already_implemented: Fitted retrieval loaders and bounded cross-reranking exist; safe mining and immutable
+    trainers are incomplete.
+  remaining_implementation: Source-group-safe negative mining, encoder/cross-encoder fitting and resumable
+    state, matched-pool comparison, and early G1 orchestration.
+  checkpoint_boundaries: Mining inventory, training steps, embeddings/index, generated pools.
+- id: E21
+  spec: E21-supervised-llm.md
+  focused_case: D0 or the E07-selected feature case
+  budget_group: llm
+  initial_treatment_cap: 5
+  dependencies:
+  - E00
+  - E07_judgment_evidence
+  - E25_initial
+  treatments:
+  - 'frozen_judge: selected E07 control'
+  - 'knn_exemplars: at most three training-source exemplars'
+  - 'benefit_router: predicted correction-minus-harm per token'
+  - 'student_gold: same small student trained on gold only'
+  - 'student_distilled: same student plus pinned teacher judgments'
+  readiness: implementation_required
+  already_implemented: Canonical controls/guards exist; exemplars, counterfactual router labels, student training
+    and fitted trust are missing.
+  remaining_implementation: Training-only exemplar retrieval, actual forced-call counterfactual data, net-benefit
+    router fitting, gold-only/student comparison, and immutable teacher bindings.
+  checkpoint_boundaries: Teacher request ledger, counterfactual examples, exemplars, router/student training.
+- id: E22
+  spec: E22-label-efficiency-and-mode-resolution.md
+  focused_case: D0; feature-specific kind when labels differ
+  budget_group: decisions
+  initial_treatment_cap: 5
+  dependencies:
+  - E00
+  - selected_heads
+  treatments:
+  - 'budget_25: 25 effective training source groups'
+  - 'budget_100: 100 groups'
+  - 'budget_400: 400 groups or all available, explicitly recorded'
+  - 'label_free: selected zero-target-label control'
+  - 'active_100: optional active versus passive selection at the same 100-group budget'
+  readiness: implementation_required
+  already_implemented: Supervision modes/policy fields exist; grouped budget subsampling, active selection
+    and fitted policy artifacts are missing.
+  remaining_implementation: Nested deterministic label budgets, component-specific effective-unit counts, one
+    active-versus-passive comparison, and frozen crossover/policy fitting.
+  checkpoint_boundaries: Budget memberships, active-query history, per-budget fits and frozen policy.
+- id: E23
+  spec: E23-graph-structure-supervision.md
+  focused_case: K0 graph-rich/TBox-poor case plus one controlled TBox-rich development case
+  budget_group: extensions
+  initial_treatment_cap: 10
+  dependencies:
+  - E00
+  - kind_pool_freeze
+  - E12
+  - E13
+  - E02_anchors
+  treatments:
+  - 'rich_case_ablation: graph_off versus inductive at 0%, 50%, 100% hierarchy removal, six cells on one TBox-rich
+    case'
+  - 'natural_kg: graph_off versus the same declared inductive recipe, two cells on K0'
+  - 'graph_only: natural-KG diagnostic with lexical evidence disabled'
+  - 'graph_shuffled: natural-KG diagnostic matched to its inductive arm in degrees/predicates'
+  readiness: implementation_required
+  already_implemented: Graph-channel schema/guards exist; fitted graph-head production and controlled TBox
+    input orchestration are missing.
+  remaining_implementation: One inductive structural head, degree/predicate-preserving control, controlled
+    hierarchy removal, graph/profile provenance, and supported explanation integration.
+  checkpoint_boundaries: Normalized/ablated/shuffled graphs, graph features, fit state and scores.
+- id: E24
+  spec: E24-contrastive-channel-degeneracy.md
+  focused_case: D1 or feature-selected relation-bearing pair, with D0 control
+  budget_group: channels
+  initial_treatment_cap: 5
+  dependencies:
+  - E00
+  - pool_freeze
+  treatments:
+  - 'normalised: current control'
+  - 'diff_off: removal control'
+  - 'missingness_aware: semantically justified contradiction only'
+  - 'absolute: raw absolute formulation diagnostic'
+  - 'asymmetric: optional typed-interpretation diagnostic, not automatic promotion'
+  readiness: implementation_required
+  already_implemented: Normalized, absolute, asymmetric and off difference primitives with diagnostics exist.
+  remaining_implementation: Supported/contradicted/unobserved semantics, zero contradiction authority for unjustified
+    one-sided absence, controlled perturbations and valid typed asymmetry binding.
+  checkpoint_boundaries: Difference raw components, perturbation inventories, scores.
+- id: E25
+  spec: E25-llm-gate-viability.md
+  focused_case: D0 plus one feature-appropriate confounder/NIL development case
+  budget_group: llm
+  initial_treatment_cap: 11
+  dependencies:
+  - E00
+  - pool_freeze
+  treatments:
+  - 'decision_off: disabled decision/brief/rationale roles with shared upstream evidence'
+  - 'analytic: shipped pair gate control'
+  - 'source_top_001: top 1% eligible sources'
+  - 'source_top_005: top 5%'
+  - 'source_top_010: top 10%'
+  - 'forced_sources: up to 200 stratified development sources, diagnostic'
+  - 'oracle_perfect: perfect-answer ceiling with fixed interventions, development only, no live calls'
+  - 'oracle_observed: budget-matched routing ceiling using already-recorded real forced responses'
+  - 'trust_shipped: cached forced-response replay with the current beta*U weight'
+  - 'trust_constant: same cached per-candidate probabilities with constant weight 0.5'
+  - 'trust_source: use the frozen comparative choice as the routed within-source ranking, with separately frozen
+    acceptance/cardinality'
+  readiness: implementation_required
+  already_implemented: Analytic/quantile/forced/oracle primitives and gate instrumentation exist; off control
+    and development-ID transfer are defective.
+  remaining_implementation: Actual decision-off wiring, source-top-fraction and transferred-threshold policies,
+    stratified forced judgments, decoupled trust, and budget-matched real-response oracle diagnostics.
+  checkpoint_boundaries: Source statistics, selection policy, request/response ledger, judgment/decision traces.
+- id: E26
+  spec: E26-quality-proxy-validity.md
+  focused_case: D0; D1 for a populated structural channel
+  budget_group: channels
+  initial_treatment_cap: 9
+  dependencies:
+  - E00
+  - baseline_evidence
+  treatments:
+  - 'decomposition: full, constant_q, no_sharpening, suppression_only, uniform; five shared-evidence arms'
+  - 'candidate_margin: target-concept ambiguity quality on the selected decomposition'
+  - 'entropy_count_control: frozen temperature and explicit singleton/count behavior'
+  - 'encoder_agreement: inspect best-target agreement separately from score similarity'
+  - 'reliability_head: one optional source-group-supervised conditional-error head'
+  readiness: implementation_required
+  already_implemented: Five sigma decomposition modes and lexical quality variants exist; component dumps and
+    fitted reliability path remain incomplete.
+  remaining_implementation: Complete quality-component artifacts, duplicate/singleton/count-aware checks, candidate-level
+    ambiguity quality, controlled entropy temperature and conditional reliability fitting.
+  checkpoint_boundaries: Raw quality components, normalized label/candidate statistics, replayed fusion or
+    reliability fit.

@@ -1,7 +1,13 @@
+# Legacy v1 scaffold: BLOCKED until migrated to the v2 campaign contract.
 schema_version: 1
 experiment_id: E13
 title: Representation parity and materialized-fact robustness
-implementation: {status: deferred, reason_code: representation_parity_pipeline_incomplete, reason: "Source adapters exist, but paired lossless snapshots, evidence parity comparison, and independently materialized closure controls are not implemented in the harness."}
+implementation:
+  status: blocked
+  reason_code: v2_campaign_migration_required
+  reason: Legacy v1 matrix retained for implementation reference only. Implement the bounded v2 treatments,
+    explicit execution modes and recovery contract in specs/experiments/E13-representation-robustness.md; use
+    specs/experiments/campaign-v2.yaml. This flag is not a claim of unavailable data.
 base_config: ../../../exact/default_config.yaml
 baseline_id: R_0
 depends_on: [E00]
@@ -37,3 +43,15 @@ design:
   cost_bound: 1.5
   multiplicity: none
 negative_label_policy: not_applicable
+frozen_constants:
+  v2_migration:
+    design_blueprint: ../../../specs/experiments/campaign-v2.yaml
+    design_blueprint_sha256: f9e56843d3bc542ea951394647c875ad78ffa22629c55ea957a234ee4fe37394
+    legacy_matrix_not_executable: true
+    previous_v1_implementation_status:
+      status: deferred
+      reason_code: representation_parity_pipeline_incomplete
+      reason: Source adapters exist, but paired lossless snapshots, evidence parity comparison, and independently
+        materialized closure controls are not implemented in the harness.
+    user_declared_datasets_available: true
+    active_spec: ../../../specs/experiments/E13-representation-robustness.md

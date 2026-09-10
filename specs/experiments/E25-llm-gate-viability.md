@@ -1,125 +1,87 @@
-# E25 — LLM Gate Viability: Does the Branch Ever Fire, and Does It Help When It Does?
+# E25 — LLM viability with valid off and transferable routing
 
-**Motivation** (review-response WP1/WP3/WP4 and the earlier `omim-ordo-val` comparison): the
-uncertainty-gated LLM branch is a headline design element that, on all evidence collected so far,
-never activates and does not improve results when it does.
+**v2 specification, 2026-09-09. Implementation still required.**
+This file replaces the v1 matrix for this family. [RUN-PLAN](RUN-PLAN.md),
+[shared clarifications](IMPLEMENTATION-CLARIFICATIONS.md), and
+[checkpoint recovery](CHECKPOINT-RECOVERY.md) are binding. A passing helper test does not
+establish an executable experiment or a performance result.
 
-| Measurement | Result |
-|---|---|
-| LLM invocations, reported OMIM–ORDO ranking run | 0 / 30,404 pairs |
-| LLM invocations, SNOMED–FMA 300-source run | 0 / 32,724 pairs |
-| Sources routed to the LLM, all 8 global selector settings (WP3) | 0 |
-| `tau=0.6` sweep arm | 4 pairs gated out of 30,404 |
-| Ranking MRR with vs without `p_LLM` (`omim-ordo-val`) | 0.810 with, **0.826 without** |
+## Existing implementation and missing work
 
-Two distinct failures are entangled here and must be separated before either E07 (listwise
-arbitration) or E21 (supervised LLM) can be interpreted. Both of those specs presuppose a
-population of gated pairs; if that population is empty or worthless, their results are about a
-mechanism that does not engage. **E25 is therefore a prerequisite for E07 and E21**, not a
-parallel line of work.
+Inspected baseline: 655f599e714e13d592f702f326ca5a36f6b50b2f.
 
-The failure is not simply that `tau_LLM` is set too high. $U = \max(U_{\mathrm{ind}},
-U_{\mathrm{dis}})$ reaches $\tau_{\mathrm{LLM}} = 0.5$ only when the mixed score sits within 0.25
-of the pivot or two well-supported channels disagree by a wide margin, and the measured score
-distribution is strongly bimodal away from the pivot. Lowering the threshold alone would gate
-pairs the system is already confident about, which is the opposite of the design intent.
+**Already implemented:** Analytic/quantile/forced/oracle primitives and gate instrumentation exist; off control and development-ID transfer are defective.
 
-## Research questions
+**Agent must implement:** Actual decision-off wiring, source-top-fraction and transferred-threshold policies, stratified forced judgments, decoupled trust, and budget-matched real-response oracle diagnostics.
 
-- **RQ25.1**: What is the joint distribution of $U_{\mathrm{ind}}$ and $U_{\mathrm{dis}}$, and what
-  threshold would gate a target fraction (1%, 5%, 10%) of pairs? Is either term ever the binding
-  one in practice?
-- **RQ25.2**: On pairs the system currently gets **wrong**, is $U$ elevated relative to pairs it
-  gets right? That is: is $U$ a useful error detector at all, independent of any threshold?
-- **RQ25.3**: When the LLM is invoked on a forced sample (gate disabled, fixed budget), what is its
-  standalone accuracy, and does mixing it at weight $w_i = \beta U$ improve or degrade the pair
-  decision relative to the unmixed score?
-- **RQ25.4**: What is the oracle ceiling — if an oracle chose which pairs to route and always
-  answered correctly, how much macro F1 is available? This bounds every possible gating policy.
-- **RQ25.5**: Is a learned router over the channel evidence better than the analytic $U$ at
-  selecting pairs where LLM arbitration changes the outcome correctly?
+**Inputs/bindings to resolve:** OpenRouter primary identity/logprobs and budget; complete or justified development labels for counterfactual outcomes.
+The user confirms the OAEI/BioKG data are available. Resolve paths, revisions and capabilities;
+do not perpetuate an old unavailable flag without checking the supplied data.
 
-**Hypotheses**: (a) $U$ is near-zero for the overwhelming majority of pairs because the lexical
-channel dominates the mixture and is rarely near the pivot; (b) $U$ is only weakly elevated on
-errors, so it is a poor error detector and no threshold on it recovers a useful population;
-(c) forced LLM arbitration is accurate on lexically ambiguous same-family confounders and harmful
-on pairs where structural evidence already decides, which is why unconditional mixing lowers MRR;
-(d) the oracle ceiling is small in absolute terms (< 2 F1) on lexically rich tasks and larger on
-identifier-poor ones; (e) a learned router beats analytic $U$ but not by enough to justify the
-cost unless (d) is large.
+## Focus and dependencies
 
-## Change
+Primary focused case: **D0 plus one feature-appropriate confounder/NIL development case**.
+Resource envelope: **llm** in RUN-PLAN.
+Prerequisites/consumed outputs: **E00, pool_freeze**. A pool-freeze or selected-head dependency
+accepts the declared baseline output when no candidate wins; optional research must not deadlock
+other families. Kind-specific pool freezes do not change the already-frozen class pool.
 
-1. **Gate instrumentation**: log $U_{\mathrm{ind}}$, $U_{\mathrm{dis}}$, $U$, and the gate outcome
-   for every scored pair, independent of whether the LLM is called. Currently only invocations are
-   counted, which makes the gate distribution unobservable.
-2. **`llm.gate.mode`**: `analytic` (current), `quantile` (route the top-$p$ fraction by $U$, giving
-   a controllable budget), `forced_sample` (route a fixed random sample, for RQ25.3), `oracle`
-   (route pairs the reference says are errors — diagnostic only, never deployable), and `router`
-   (learned, for RQ25.5).
-3. **Decoupled mixing**: allow the LLM's contribution weight to be set independently of the gating
-   statistic, so "when to ask" and "how much to trust the answer" can be measured separately. They
-   are currently tied through $U$.
+Start with 300 development source groups (all eligible if fewer), seed 17, except a stated smaller LLM limit. Expand at most two non-control survivors to 1,000 nested development groups. Every applicable family receives a focused initial screen; widen cases or models only at scheduled gates. Eligibility/power is recorded per kind/relation.
 
-## Arms & sweep
+## Question, treatments, and implementation contract
 
-| Arm | Supervision label | Purpose |
-|---|---|---|
-| `R_n` baseline | `target_label_free` | current analytic gate (expected: ~0 invocations) |
-| `llm_off` | `target_label_free` | explicit control |
-| `quantile_p` ∈ {0.01, 0.05, 0.10} | `target_label_free` | controllable budget; the practical candidate |
-| `forced_sample` | `target_label_free` | RQ25.3 standalone accuracy |
-| `oracle_route` | `oracle_diagnostic` | RQ25.4 ceiling; never promotable |
-| `router` | `in_pair_supervised` | RQ25.5; consumes E21's machinery if E21 has run |
+Do not replay development pair identities at inference. Compare gate error detection with its ability to find errors this judge can fix. Include confident errors, close candidates, natural NIL, pool misses, collisions and clear controls. Force the same source sample when comparing judge formats. Standalone accuracy, correction, harm and post-selector effect are separate outputs. The three trust replays are a separate sequential diagnostic after E07 supplies a compatible judge, using the same observed responses and no new calls; do not cross every routing fraction with every trust setting. Keep pre-LLM and post-LLM decisions, and freeze acceptance on permitted train/development groups. A fitted trust weight is a later E21 variant.
 
-## Validation
+At most **11 distinct treatment configurations/cells as specified below** before any explicitly declared source expansion. This is a bounded sequential design, not a Cartesian product. Shared deterministic controls are computed once.
 
-Screen analytic/off, the quantile sweep, and a bounded forced sample on development data with one
-seed. Run the oracle only as a development diagnostic. Freeze one quantile candidate only if the
-LLM and quality/cost selection rule passes; the router remains deferred to E21 machinery. If no
-candidate passes, freeze the explicit removal recommendation and do not spend reporting LLM calls.
+- decision_off: disabled decision/brief/rationale roles with shared upstream evidence.
+- analytic: shipped pair gate control.
+- source_top_001: top 1% eligible sources.
+- source_top_005: top 5%.
+- source_top_010: top 10%.
+- forced_sources: up to 200 stratified development sources, diagnostic.
+- oracle_perfect: perfect-answer ceiling with fixed interventions, development only, no live calls.
+- oracle_observed: budget-matched routing ceiling using already-recorded real forced responses.
+- trust_shipped: cached forced-response replay with the current beta*U weight.
+- trust_constant: same cached per-candidate probabilities with constant weight 0.5.
+- trust_source: use the frozen comparative choice as the routed within-source ranking, with separately frozen acceptance/cardinality.
 
-Confirm the frozen candidate or removal claim against the analytic/off controls on all five
-eligible Bio-ML reporting pairs plus at least one identifier-poor track (Anatomy or Conference),
-with three paired seeds where an LLM candidate survives. Classes. Primary metric macro F1 (global)
-and macro MRR (local).
+All generative roles use OpenRouter. Local non-generative encoders/heads use the single RTX 5090.
+Separate target-label-free, in-pair supervised and transferred results. A named diagnostic may
+use development reference information only under its explicit oracle/diagnostic role.
 
-**Cost reporting is a first-class endpoint here, not a footnote**: call count, token count, and
-wall time per arm, since the design's stated justification is selective use. An arm that improves
-quality by routing 10% of pairs is a different product than one routing 0.1%.
+## Validation and selection
 
-Mandatory secondary slice, pre-registered: pairs where the top-2 candidates are same-family
-confounders, since RQ25.3's hypothesis is that this is the only population where the LLM helps.
+Primary outcome/guard: **Net final F1/cost and useful-call headroom; no blanket conclusion about every LLM role.**
+Use the family rule plus RUN-PLAN's frozen selection, practical-effect, reconstruction and cost
+criteria. A screen chooses what to evaluate next; it does not establish a reporting-set claim.
+Report all controls, negative results, corrections/harms where relevant, and inapplicable or
+budget-deferred cells. Never suppress a difficult kind or source group from the denominator.
 
-## Promotion decision rule
+Broader validation happens on the designated development sentinel after a promising focused
+screen, then only in E17's frozen final panel for the claims selected at G4. Do not run a full
+OAEI confirmation for every treatment. A feature-specific claim needs its matching held-out
+case; NCIT–DOID cannot substitute for property, instance, natural-NIL or typed-relation labels.
+No individual experiment uses final outcomes to qualify its component for E17.
 
-Primary comparison: the best `quantile_p` arm against `R_n`, endpoint macro F1, paired bootstrap CI
-excluding zero, ≥3 seeds, with LLM token cost reported beside it.
+## Acceptance and recovery
 
-**This experiment has an explicit removal outcome.** If RQ25.2 shows $U$ does not discriminate
-errors and RQ25.4's oracle ceiling is below 1 F1 point, the recommended promotion is to **remove
-the LLM branch from the default configuration** and document it as an optional component. That is a
-positive result: it removes a hosted-model dependency, a reproducibility risk, an unbounded cost,
-and the one component of the explanation that carries no fidelity guarantee. The paper's
-auditability claim is strictly stronger without a branch whose contribution cannot be traced to
-ontology evidence.
+- Every disabled role has zero OpenRouter requests; experiment.enabled=false is not accepted as off.
+- A previously unseen high-uncertainty source can route under the frozen source policy.
+- An oracle cannot make live calls, select a product or read final gold during screening.
+- Constant or fitted trust can be tested independently of beta*U; malformed outputs and zero denominators follow a frozen fallback.
 
-If the branch is retained, promotion requires that the gated population be non-empty by
-construction (`quantile` mode) rather than incidental, so that its behaviour is measurable in
-future runs rather than silently zero.
+Durable boundaries: **Source statistics, selection policy, request/response ledger, judgment/decision traces.**
+All changed inputs/semantics invalidate their consuming descendants; preserve valid upstream
+artifacts. Store completed source/request/fold IDs and attempt lineage. Tests must demonstrate
+this family's checkpoint/repair boundary, not merely mirror a formula. Mark screen-ready and
+confirm-ready separately in the runtime readiness ledger, with evidence, once these checks pass.
 
-## Effort & risks
+## Deliverable
 
-Size: M. Instrumentation is small; `forced_sample` and `oracle_route` need a bounded LLM budget
-declared before running.
-
-Risks: (a) hosted-model drift confounds any comparison spanning weeks — pin a dated snapshot and
-cache responses for the reporting runs; (b) the oracle arm must never leak into a promotion path,
-enforced by the existing `oracle_diagnostic` label; (c) if E24 succeeds and the contrastive channel
-begins firing, $U_{\mathrm{dis}}$ changes distribution, so E24 and E25 must not have reporting runs
-in flight against different fusion arms.
-
-## Results note
-
-*(stored outside `specs/` after running; must answer RQ25.1–RQ25.5 and state explicitly whether the branch is
-retained, re-gated, or removed)*
+Produce a result record with actual treatment/configuration, case/role, supervision, artifact
+IDs, source counts, metrics/cost, controls, uncertainty, decision and reason. A legitimate null,
+removal, or inapplicability is a deliverable; an unimplemented arm is not an empirical null.
+Resolve this family's question into numbered research questions and a primary endpoint in the
+executable design before its screen; answer each as supported, not supported or inconclusive
+with evidence. RUN-PLAN section 7 governs incomplete references and claim limitations.

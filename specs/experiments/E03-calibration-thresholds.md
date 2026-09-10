@@ -1,69 +1,81 @@
-# E03 — Score Calibration, Threshold Transfer & Tuning-Objective Ablation
+# E03 — Calibration, threshold transfer, and decision loss
 
-**Motivation** (audit obs. 8 + findings F4): three intertwined choices are currently
-unmeasured: (a) `S_final` is not a calibrated probability, yet a fixed global threshold (0.7)
-is shared across tasks — and silently replaced by the median learned acceptance threshold when
-the calibrated selector runs; (b) the acceptance-threshold tuner double-counts wrong-winner
-reference sources as FP **and** FN — an implicit precision bias; (c) with no training
-reference, the heuristic selector's constants (support weight 0.60, no-match 0.55) are folklore.
+**v2 specification, 2026-09-09. Implementation still required.**
+This file replaces the v1 matrix for this family. [RUN-PLAN](RUN-PLAN.md),
+[shared clarifications](IMPLEMENTATION-CLARIFICATIONS.md), and
+[checkpoint recovery](CHECKPOINT-RECOVERY.md) are binding. A passing helper test does not
+establish an executable experiment or a performance result.
 
-## Research questions
+## Existing implementation and missing work
 
-- **RQ03.1**: Does Platt or isotonic calibration improve probability calibration and make a
-  shared threshold more stable across tasks without reducing F1?
-- **RQ03.2**: How much F1 is lost when a threshold selected on one task transfers to another,
-  compared with a target-pair threshold, across the full donor×recipient matrix?
-- **RQ03.3**: What precision/recall effect is caused by counting a wrong winner as FP+FN versus
-  FP only?
-- **RQ03.4**: Which single score-distribution threshold is the strongest no-target-label
-  primitive to carry into the complete label-free selectors in E15?
+Inspected baseline: 655f599e714e13d592f702f326ca5a36f6b50b2f.
 
-**Hypothesis**: per-task calibration (Platt/isotonic on the train split) makes one universal
-threshold transfer across tasks within 0.3 F1 pts of per-task tuned thresholds; removing the
-FP+FN double-count shifts the P/R balance measurably (direction: recall up) — whether F1
-improves is the open question.
+**Already implemented:** Platt/isotonic application and distribution-threshold primitives exist.
 
-## Change
+**Agent must implement:** Grouped OOF fitting/export, correct train-pool features, donor-to-recipient application, risk/coverage reporting, and replayable threshold selection.
 
-1. `matching.calibration: none|platt|isotonic` — fit on train-split OOF decisions (never
-   full reference; harness guards this), applied to `S_final` before threshold/extraction.
-2. `selector.tuning.count_reference_miss_as: fp_fn|fp` — expose the double-count rule.
-3. Unsupervised threshold arm: replace fixed 0.7 with Otsu/knee-point selection over the
-   per-task score distribution (for the no-training-reference regime).
-4. Report reliability diagrams + ECE per task (extend `exact/analysis/` with a calibration
-   plot) — a deliverable regardless of promotion.
+**Inputs/bindings to resolve:** Verify label completeness and group counts; no new model family is required.
+The user confirms the OAEI/BioKG data are available. Resolve paths, revisions and capabilities;
+do not perpetuate an old unavailable flag without checking the supplied data.
 
-Touched: selector tuning path, small calibration module, analysis plot.
+## Focus and dependencies
 
-## Arms & validation
+Primary focused case: **D0; D1 development transfer**.
+Resource envelope: **decisions** in RUN-PLAN.
+Prerequisites/consumed outputs: **E00, pool_freeze**. A pool-freeze or selected-head dependency
+accepts the declared baseline output when no candidate wins; optional research must not deadlock
+other families. Kind-specific pool freezes do not change the already-frozen class pool.
 
-{none, platt, isotonic} × {fp_fn, fp} on Bio-ML (train splits exist). Compute threshold transfer
-from saved score frames—no additional matcher runs:
+Start with 300 development source groups (all eligible if fewer), seed 17, except a stated smaller LLM limit. Expand at most two non-control survivors to 1,000 nested development groups. Every applicable family receives a focused initial screen; widen cases or models only at scheduled gates. Eligibility/power is recorded per kind/relation.
 
-1. **Deployable matrix**: every task with a legitimate validation reference is a donor; tune on
-   that donor validation split and apply unchanged to every recipient. No-label tasks are
-   recipients only. Reporting recipients are evaluated together in the one frozen final pass.
-2. **Symmetric oracle diagnostic**: after all predictions are frozen, let every task act as a
-   donor using its labelled reference and compute the full task×task arithmetic matrix. Mark
-   every such threshold `oracle_diagnostic`; it cannot select a method or promote, but exposes
-   compatibility for E15/E16.
+## Question, treatments, and implementation contract
 
-For each cell report donor threshold, recipient F1/regret to its own oracle threshold,
-prevalence/score-quantile shift, and whether the loss exceeds E00's recipient MDE. Summarize the
-median, p90, worst-case, and within-/cross-domain transfer loss rather than basing RQ03.2 on one
-arbitrary donor. Unsupervised arms remain on Conference/Anatomy. Three seeds. Primary: macro F1;
-secondary: ECE and threshold variance.
+Use train groups for fit and development for frozen selection. FP+FN for a wrong winner is correct set-F1 accounting; FP-only tests another loss. Transfer donor calibrator and threshold unchanged to D1. No full donor-by-recipient sweep in the core campaign.
 
-The unsupervised arm is a threshold-component experiment only; E15 owns the claim that a full
-acceptance strategy works without target-pair training labels. Platt/isotonic fitting is the
-`supervised` resolution of the calibration component and the distribution rule is its
-`label_free` resolution; E22 fits how many usable labelled source groups the former needs before it is worth
-selecting.
+At most **5 distinct treatment configurations/cells as specified below** before any explicitly declared source expansion. This is a bounded sequential design, not a Cartesian product. Shared deterministic controls are computed once.
 
-**Promotion**: standard; the declared robustness arm may promote on lower cross-task threshold
-variance when its 95% CI excludes zero and macro F1 is non-inferior (quality-delta CI lower
-bound above −0.5 points). This pre-registers threshold variance as that arm's primary endpoint
-rather than treating a non-significant F1 difference as evidence of equality.
+- none: fixed score threshold control.
+- platt: OOF fitted logistic calibration.
+- isotonic: bounded complexity OOF calibration.
+- distribution_threshold: one frozen Otsu rule, label-free.
+- fp_only: optional changed-loss diagnostic on the selected calibration recipe.
 
-**Effort**: S–M. **Risks**: isotonic overfits small train splits — cap bins; Conference refs
-are tiny, treat unsupervised arm as exploratory.
+All generative roles use OpenRouter. Local non-generative encoders/heads use the single RTX 5090.
+Separate target-label-free, in-pair supervised and transferred results. A named diagnostic may
+use development reference information only under its explicit oracle/diagnostic role.
+
+## Validation and selection
+
+Primary outcome/guard: **Global F1; calibrated risk/coverage and transfer regret are required.**
+Use the family rule plus RUN-PLAN's frozen selection, practical-effect, reconstruction and cost
+criteria. A screen chooses what to evaluate next; it does not establish a reporting-set claim.
+Report all controls, negative results, corrections/harms where relevant, and inapplicable or
+budget-deferred cells. Never suppress a difficult kind or source group from the denominator.
+
+Broader validation happens on the designated development sentinel after a promising focused
+screen, then only in E17's frozen final panel for the claims selected at G4. Do not run a full
+OAEI confirmation for every treatment. A feature-specific claim needs its matching held-out
+case; NCIT–DOID cannot substitute for property, instance, natural-NIL or typed-relation labels.
+No individual experiment uses final outcomes to qualify its component for E17.
+
+## Acceptance and recovery
+
+- Calibrator inputs/labels cannot originate from the reporting candidate file.
+- Wrong-winner sufficient statistics contain one FP and one FN.
+- Threshold or calibration changes reuse pair evidence but invalidate relevant decisions/evaluation.
+- Brier/ECE and risk/coverage show base rates and source denominators.
+
+Durable boundaries: **OOF folds, calibrator fit, calibrated decisions, evaluation.**
+All changed inputs/semantics invalidate their consuming descendants; preserve valid upstream
+artifacts. Store completed source/request/fold IDs and attempt lineage. Tests must demonstrate
+this family's checkpoint/repair boundary, not merely mirror a formula. Mark screen-ready and
+confirm-ready separately in the runtime readiness ledger, with evidence, once these checks pass.
+
+## Deliverable
+
+Produce a result record with actual treatment/configuration, case/role, supervision, artifact
+IDs, source counts, metrics/cost, controls, uncertainty, decision and reason. A legitimate null,
+removal, or inapplicability is a deliverable; an unimplemented arm is not an empirical null.
+Resolve this family's question into numbered research questions and a primary endpoint in the
+executable design before its screen; answer each as supported, not supported or inconclusive
+with evidence. RUN-PLAN section 7 governs incomplete references and claim limitations.
