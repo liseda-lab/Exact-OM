@@ -56,7 +56,12 @@ class TrainingPoolMixin:
                 artifact,
                 application={
                     "dataset_signature": self.dataset.dataset_signature,
-                    "source_ids": sorted(set(self.dataset.dataframe.Src.astype(str))),
+                    "source_ids": sorted(
+                        set(
+                            getattr(self.dataset, "eligible_source_iris", None)
+                            or self.dataset.dataframe.Src.astype(str)
+                        )
+                    ),
                 },
                 seed=getattr(self.model, "request_seed", None) or 17,
             )
@@ -147,7 +152,10 @@ class TrainingPoolMixin:
                 "Training candidate pool must provide Src/Tgt or a Bio-ML candidate list"
             )
         raw = raw.drop_duplicates(["Src", "Tgt"]).sort_values(["Src", "Tgt"]).reset_index(drop=True)
-        reporting_sources = set(self.dataset.dataframe.Src.astype(str))
+        reporting_sources = set(
+            getattr(self.dataset, "eligible_source_iris", None)
+            or self.dataset.dataframe.Src.astype(str)
+        )
         if set(raw.Src.astype(str)) & reporting_sources:
             raise ValueError("Training candidate pool overlaps reporting source groups")
         application = {

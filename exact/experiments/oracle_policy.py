@@ -73,6 +73,10 @@ def build_oracle_artifacts(
     if len(selected) != len(sample["selected_sources"]) or not 1 <= len(selected) <= 200:
         raise ValueError("Invalid frozen forced-source sample")
     source_rows = {str(row["Src"]): row for row in trace["records"]}
+    if len(source_rows) != len(trace["records"]) or len(set(trace["source_universe"])) != len(
+        trace["source_universe"]
+    ):
+        raise ValueError("Forced source trace contains duplicate source identities")
     if set(source_rows) != set(trace["source_universe"]) or not selected <= set(source_rows):
         raise ValueError("Forced-source IDs must belong to the complete frozen source universe")
     references = set()

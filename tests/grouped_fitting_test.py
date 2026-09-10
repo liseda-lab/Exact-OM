@@ -810,3 +810,21 @@ def test_benefit_router_confirmed_pool_labels_fail_before_calls_when_incomplete(
             application=coverage,
         )
     assert not model.calls
+
+
+def test_training_pool_cannot_use_frozen_reporting_source_with_empty_pool(tmp_path):
+    pool = tmp_path / "training.tsv"
+    pool.write_text("Src\tTgt\nempty-report\tt0\n")
+    reference = tmp_path / "reference.tsv"
+    reference.write_text("Src\tTgt\nempty-report\tt0\n")
+    head = selector()
+    head.training_reference_file_path = str(reference)
+    dataset = TinyDataset(pd.DataFrame({"Src": ["report"], "Tgt": ["report-0"]}))
+    dataset.eligible_source_iris = ["report", "empty-report"]
+    scorer = TinyScorer()
+    runner = tiny_runner(tmp_path, dataset, scorer, head)
+    runner.supervision_config = {"negative_label_policy": "complete_reference"}
+    runner.training_candidates_file_path = pool
+    with pytest.raises(ValueError, match="overlaps reporting source groups"):
+        runner.fit_training_pool(batch_size=5)
+    assert scorer.calls == []

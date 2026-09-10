@@ -284,3 +284,43 @@ def test_followup_binds_completed_recipe_and_refuses_population_or_role_changes(
     )
     with pytest.raises(ValueError, match="development reference role"):
         materialize_followup(source, suite, [item], {})
+
+
+@pytest.mark.parametrize("field", ["records", "source_universe"])
+def test_cached_policy_rejects_duplicate_source_identity_before_mapping(tmp_path, field):
+    path, _ = forced_trace(tmp_path)
+    trace = json.loads(path.read_text())
+    trace[field].append(trace[field][0])
+    path.write_text(json.dumps(trace))
+    with pytest.raises(ValueError, match="duplicate source identities"):
+        build_oracle_artifacts(
+            path,
+            [],
+            tmp_path / "policies",
+            reference_role="development",
+            negative_label_policy="unknown",
+        )
+
+
+def test_label_repairs_change_cached_policy_identity_without_reusing_old_artifacts(tmp_path):
+    path, _ = forced_trace(tmp_path)
+    results = []
+    for refs, negatives, nil in [
+        ([], [], []),
+        ([{"Src": "good", "Tgt": "t"}], [], []),
+        ([], [("good", "a")], []),
+        ([], [], ["nil"]),
+    ]:
+        results.append(
+            build_oracle_artifacts(
+                path,
+                refs,
+                tmp_path / "policies",
+                reference_role="development",
+                negative_label_policy="unknown",
+                confirmed_negatives=negatives,
+                nil_sources=nil,
+            )
+        )
+    assert len({result["identity"] for result in results}) == 4
+    assert len({result["artifacts"]["trust_shipped"] for result in results}) == 4
