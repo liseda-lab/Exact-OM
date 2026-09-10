@@ -165,6 +165,26 @@ class RunLayout:
         return self.root / "dataset"
 
     @property
+    def fitting_dir(self) -> Path:
+        """Return immutable fitted-head and training metadata artifacts."""
+        return self.root / "fitting"
+
+    @property
+    def diagnostics_dir(self) -> Path:
+        """Return post-scoring diagnostic and error-attribution artifacts."""
+        return self.root / "diagnostics"
+
+    @property
+    def published_dir(self) -> Path:
+        """Return raw published-matcher outputs and executable provenance."""
+        return self.root / "published"
+
+    @property
+    def evaluation_inputs_dir(self) -> Path:
+        """Return the canonical reference population used by evaluation."""
+        return self.root / "evaluation_inputs"
+
+    @property
     def cache_dir(self) -> Path:
         """Return the run-local dataset and model cache directory."""
 

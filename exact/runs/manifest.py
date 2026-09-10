@@ -13,7 +13,14 @@ from typing import Any, Iterable, Optional
 from .layout import LAYOUT_VERSION, RunLayout
 
 MANIFEST_SCHEMA_VERSION = 1
-DELIVERABLE_KINDS = {"alignment", "evaluation"}
+DELIVERABLE_KINDS = {
+    "alignment",
+    "evaluation",
+    "fitting",
+    "diagnostic",
+    "published_matcher",
+    "evaluation_input",
+}
 
 
 def _known_checkpoint_artifact(path: Path, checkpoint_dir: Path) -> bool:
@@ -239,6 +246,10 @@ def refresh_manifest(
         (layout.checkpoints_dir, "checkpoint"),
         (layout.dataset_dir, "dataset"),
         (layout.cache_dir, "dataset_cache"),
+        (layout.fitting_dir, "fitting"),
+        (layout.diagnostics_dir, "diagnostic"),
+        (layout.published_dir, "published_matcher"),
+        (layout.evaluation_inputs_dir, "evaluation_input"),
     ):
         if not directory.is_dir():
             continue

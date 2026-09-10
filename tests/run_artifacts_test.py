@@ -324,8 +324,22 @@ def test_manifest_indexes_dynamic_deliverables_and_dataset_cache(
     dataset.write_text("Src,Tgt\nsource,target\n", encoding="utf-8")
     layout.legacy_times_path.write_text("# derived\nTotal: 1.0 minutes\n", encoding="utf-8")
 
+    retained = {
+        layout.fitting_dir / "head.json": "fitting",
+        layout.diagnostics_dir / "nil_metrics.json": "diagnostic",
+        layout.published_dir / "raw.rdf": "published_matcher",
+        layout.evaluation_inputs_dir / "reference.tsv": "evaluation_input",
+    }
+    for path in retained:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("evidence", encoding="utf-8")
+
     manifest = refresh_manifest(layout, run_id="session")
     artifacts = {item["path"]: item for item in manifest.payload["artifacts"]}
+    for path, kind in retained.items():
+        item = artifacts[str(path.relative_to(layout.root))]
+        assert item["kind"] == kind
+        assert len(item["sha256"]) == 64
 
     assert len(artifacts["alignment/alignment.rdf"]["sha256"]) == 64
     assert len(artifacts["evaluation/backend-report.txt"]["sha256"]) == 64
