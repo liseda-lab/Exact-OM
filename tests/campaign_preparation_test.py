@@ -65,7 +65,11 @@ def test_preparation_covers_every_family_without_executing_or_inventing_readines
         for roles in step.readiness.values()
         for record in roles.values()
     )
-    assert set((tmp_path / "prepared").iterdir()) == {path, path.parent / "arm-prerequisites.yaml"}
+    assert set((tmp_path / "prepared").iterdir()) == {
+        path,
+        path.parent / "arm-prerequisites.yaml",
+        path.parent / "blueprint.yaml",
+    }
     with pytest.raises(FileExistsError):
         prepare_campaign(
             root / "specs/experiments/campaign-v2.yaml",
@@ -357,3 +361,20 @@ def test_source_label_binding_never_enters_scoring_or_planning_reads(tmp_path):
         }
         assert str(unseen) not in harness.canonical_json(cell.resolved_config)
     assert not unseen.exists()
+
+
+def test_prepared_design_survives_workspace_blueprint_revision(tmp_path):
+    root = Path(__file__).resolve().parents[1]
+    blueprint = tmp_path / "working-design.yaml"
+    original = (root / "specs/experiments/campaign-v2.yaml").read_bytes()
+    blueprint.write_bytes(original)
+    path = prepare_campaign(
+        blueprint, root / "exact/default_config.yaml", {"cases": _cases()}, tmp_path / "frozen"
+    )
+    blueprint.write_text("kind: subsequent-scientific-revision\n")
+    lock, design = load_campaign(path)
+    assert design["kind"] == "exact_om_campaign_design"
+    assert lock.blueprint.verify(path.parent).read_bytes() == original
+    lock.blueprint.verify(path.parent).write_text("changed frozen design\n")
+    with pytest.raises(ValueError, match="materialized input changed"):
+        load_campaign(path)

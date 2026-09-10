@@ -481,7 +481,7 @@ def prepare_campaign(
         raise ValueError(f"unknown comparison overrides: {sorted(overrides)}")
     value = {
         "campaign_id": design["campaign_id"],
-        "blueprint": {"path": str(blueprint.resolve()), "sha256": sha256_file(blueprint)},
+        "blueprint": {"path": "blueprint.yaml", "sha256": sha256_file(blueprint)},
         "base_config": str(base_config.resolve()),
         "cases": cases,
         "steps": steps,
@@ -492,10 +492,13 @@ def prepare_campaign(
     lock = CampaignLock.model_validate(value)
     destination.mkdir(parents=True, exist_ok=True)
     path = destination / "campaign.lock.yaml"
-    if path.exists():
+    snapshot = destination / "blueprint.yaml"
+    if path.exists() or snapshot.exists():
         raise FileExistsError(
             "Preparation output exists; preserve its immutable design and use a new directory"
         )
+    with snapshot.open("xb") as stream:
+        stream.write(blueprint.read_bytes())
     path.write_text(dump_yaml_document(lock.model_dump(mode="json")))
     load_campaign(path)
     inventory: dict[str, list[dict[str, Any]]] = {}
