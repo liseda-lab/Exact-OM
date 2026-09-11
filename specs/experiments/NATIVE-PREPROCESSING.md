@@ -27,6 +27,16 @@ lookups are disabled. These remove repeated whole-ontology scans; label renderin
 wrappers and per-entity feature assembly still include Python work. Existing per-entity caches
 remain in use. Dataset timing also records ontology setup before a dataset-cache hit.
 
+Loading and first projection have different materialization boundaries from an eager OWL
+object API. Native loading parses and retains the complete ontology. Python OWL objects are
+decoded on demand, while native projection requests a separate encoded column view from the
+retained native owner. Publishing and validating those columns therefore appears in the
+first projection time. Root-scoped annotation provenance requests another view with its own
+scope cache key; this can repeat column construction and validation without rereading XML.
+Compare **load plus first projection** for equivalent inputs and graph semantics, and report
+warm reuse separately. Moving view construction into loading changes the phase attribution,
+not the total cost; extra validation and repeated scoped construction remain real work.
+
 ## Benchmark workflow
 
 `tools/benchmark_native_preprocessing.py` reads the selected ontology and locked imports from
