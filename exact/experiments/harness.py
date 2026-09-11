@@ -2249,7 +2249,7 @@ def _write_cell_inputs(cell: RunCell) -> tuple[Path, Path]:
             "name": cell.cell_id.replace("/", "-"),
             "output_dir": str(cell.output_dir),
             "config_file": str(config_path),
-            "run_eval": True,
+            "run_eval": (cell.recovery or {}).get("evaluation_enabled", True),
             "save_logs": True,
         },
     }
@@ -2391,9 +2391,10 @@ def _post_run_provenance(cell: RunCell, *, completed: bool = True) -> dict[str, 
     run_stats = _read_optional_json(cell.output_dir / "stats" / "run_stats.json") or {}
     timing = _read_optional_json(cell.output_dir / "timings.json")
     llm_usage = _safe_runtime_usage(run_stats.get("llm") or run_stats.get("llm_usage"))
+    evaluate = completed and (cell.recovery or {}).get("evaluation_enabled", True)
     return {
-        "error_attribution": _error_attribution(cell) if completed else None,
-        "nil_evaluation": evaluate_source_labels(cell) if completed else None,
+        "error_attribution": _error_attribution(cell) if evaluate else None,
+        "nil_evaluation": evaluate_source_labels(cell) if evaluate else None,
         "candidate_pool": pool,
         "candidate_pool_fingerprint": (
             pool.get("fingerprint") if isinstance(pool, Mapping) else None

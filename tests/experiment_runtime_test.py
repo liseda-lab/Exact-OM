@@ -88,7 +88,7 @@ def fixture(tmp_path, monkeypatch):
     return cell, suite, revision
 
 
-def write_outputs(output, cell):
+def write_outputs(output, cell, *, evaluate=True):
     (output / "alignment").mkdir(exist_ok=True)
     (output / "dataset").mkdir(exist_ok=True)
     (output / "alignment/maps_global.tsv").write_text(
@@ -97,6 +97,8 @@ def write_outputs(output, cell):
     (output / "dataset/candidate_pool_manifest.json").write_text(
         json.dumps({"fingerprint": "pool-v1"})
     )
+    if not evaluate:
+        return
     # Invoke the actual existing evaluator, so replay checks meaningful persisted metrics.
     from exact.core.actions.evaluation import run_evaluation
 
@@ -570,3 +572,70 @@ def test_posthoc_failure_reuses_completed_extraction_on_repair(tmp_path, monkeyp
     assert repaired["recovery"]["reused_stages"] == ["extraction", "inputs"]
     assert len(model_calls) == 1
     assert harness.cell_metrics(cell.output_dir)["F1"] == 1
+
+
+def test_disabled_evaluation_publishes_only_real_outputs_and_replays_without_worker(
+    tmp_path, monkeypatch
+):
+    cell, suite, revision = fixture(tmp_path, monkeypatch)
+    cell.resolved_config["data"]["refs"] = {}
+    cell = replace(cell, recovery={**cell.recovery, "evaluation_enabled": False})
+    calls = []
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("Disabled evaluation must not invoke a worker on replay or an evaluator")
+
+    monkeypatch.setattr(harness, "_error_attribution", forbidden)
+    monkeypatch.setattr("exact.experiments.nil_evaluation.evaluate_source_labels", forbidden)
+
+    def run(command, **kwargs):
+        calls.append(command)
+        job = yaml.safe_load(Path(command[-1]).read_text())["job"]
+        assert job["run_eval"] is False
+        output = Path(job["output_dir"])
+        write_outputs(output, cell, evaluate=False)
+        return 0, 0.1, None
+
+    monkeypatch.setattr(harness, "_run_subprocess", run)
+    original = harness.execute_cell(cell, suite, workdir=tmp_path, resume=False)
+    assert original["status"] == "complete"
+    assert set(original["recovery"]["artifacts"]) == {"inputs", "extraction"}
+    assert not (cell.output_dir / "evaluation").exists()
+    store = runtime.ArtifactStore(Path(cell.recovery["root"]))
+    for artifact in original["recovery"]["artifacts"].values():
+        assert store.verify(artifact)["outputs"]
+
+    monkeypatch.setattr(harness, "_run_subprocess", forbidden)
+    monkeypatch.setattr("exact.core.actions.evaluation.run_evaluation", forbidden)
+    revision["evaluation"] = "evaluator-revision-irrelevant-to-disabled-stage"
+    relocated_root = tmp_path / "relocated-no-evaluation"
+    relocated = replace(
+        cell,
+        output_dir=relocated_root / "run",
+        recovery={
+            "root": str(relocated_root),
+            "resume_from": cell.recovery["root"],
+            "evaluation_enabled": False,
+        },
+    )
+    replay = harness.execute_cell(relocated, suite, workdir=tmp_path, resume=True)
+    assert replay["status"] == "complete" and len(calls) == 1
+    assert replay["recovery"]["reused_stages"] == ["extraction", "inputs"]
+    assert replay["recovery"]["artifacts"] == original["recovery"]["artifacts"]
+    assert (relocated.output_dir / "alignment/maps_global.tsv").read_bytes() == (
+        cell.output_dir / "alignment/maps_global.tsv"
+    ).read_bytes()
+    assert not (relocated.output_dir / "evaluation").exists()
+
+
+def test_enabled_evaluation_cannot_publish_an_empty_completed_stage(tmp_path, monkeypatch):
+    cell, suite, _ = fixture(tmp_path, monkeypatch)
+
+    def run(command, **kwargs):
+        output = Path(yaml.safe_load(Path(command[-1]).read_text())["job"]["output_dir"])
+        write_outputs(output, cell, evaluate=False)
+        return 0, 0.1, None
+
+    monkeypatch.setattr(harness, "_run_subprocess", run)
+    with pytest.raises(ValueError, match="completed artifact must have durable outputs"):
+        harness.execute_cell(cell, suite, workdir=tmp_path, resume=False)

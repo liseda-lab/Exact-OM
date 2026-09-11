@@ -74,6 +74,9 @@ class CellRecovery:
     def __init__(self, cell: Any, provenance: Mapping[str, Any], workdir: Path):
         self.cell = cell
         self.metadata = dict(cell.recovery or {})
+        self.evaluation_enabled = self.metadata.get("evaluation_enabled", True)
+        if not isinstance(self.evaluation_enabled, bool):
+            raise ValueError("recovery.evaluation_enabled must be a boolean")
         self.store = ArtifactStore(Path(self.metadata["root"]))
         self.index_relative = (
             Path("recovery/cells") / f"{_hash([cell.suite_id, cell.cell_id])}.json"
@@ -202,17 +205,18 @@ class CellRecovery:
             },
             **common,
         )
-        self.identities["evaluation"] = stage_identity(
-            "evaluation",
-            parameters=evaluation_options,
-            inputs=reporting_hashes,
-            parents=[self.identities["extraction"]["artifact_id"]],
-            implementation=_code_identity(workdir, evaluation=True),
-            dependencies={
-                name: packages.get(name) for name in ("numpy", "pandas", "oaei-bioml-eval")
-            },
-            **common,
-        )
+        if self.evaluation_enabled:
+            self.identities["evaluation"] = stage_identity(
+                "evaluation",
+                parameters=evaluation_options,
+                inputs=reporting_hashes,
+                parents=[self.identities["extraction"]["artifact_id"]],
+                implementation=_code_identity(workdir, evaluation=True),
+                dependencies={
+                    name: packages.get(name) for name in ("numpy", "pandas", "oaei-bioml-eval")
+                },
+                **common,
+            )
         repair = self.metadata.get("repair_record") or {}
         if isinstance(repair, (str, Path)):
             repair = json.loads(Path(repair).read_text())
@@ -346,7 +350,9 @@ class CellRecovery:
         }
 
     def evaluate(self) -> None:
-        """Execute the existing evaluator directly, without loading any scoring model."""
+        """Execute an enabled evaluator directly, without loading any scoring model."""
+        if not self.evaluation_enabled:
+            return
         if self.cell.published_matcher:
             from exact.experiments.published_matcher import evaluate_cell
 
@@ -412,7 +418,7 @@ class CellRecovery:
                 ),
                 ("evaluation", ("evaluation", "diagnostics")),
             ):
-                if stage == "evaluation" and status != "complete":
+                if stage == "evaluation" and (not self.evaluation_enabled or status != "complete"):
                     continue
                 if stage not in self.reuse:
                     self.store.publish(
