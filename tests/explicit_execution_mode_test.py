@@ -39,7 +39,7 @@ def test_public_action_uses_declared_mode_with_same_frozen_pool(tmp_path, monkey
             "dataset": {
                 "filter_exact_matches": False,
                 "which": [],
-                "projector": {"backend": "python"},
+                "projector": {"backend": "native"},
             },
             "matching": {
                 "threshold": 0.1,
