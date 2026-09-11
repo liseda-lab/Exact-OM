@@ -722,11 +722,12 @@ def _run_alignment_session(
         with timing_session.stage("Dataset.LoadOntologies"):
             dataset.load_ontologies(source_file_path, target_file_path)
         if configs.data.source_universe is not None:
-            dataset.freeze_source_universe(
-                Path(configs.data.source_universe).read_text(encoding="utf-8").splitlines(),
-                cap=configs.run.source_cap,
-                seed=configs.seed,
-            )
+            with timing_session.stage("Dataset.SourceUniverse"):
+                dataset.freeze_source_universe(
+                    Path(configs.data.source_universe).read_text(encoding="utf-8").splitlines(),
+                    cap=configs.run.source_cap,
+                    seed=configs.seed,
+                )
         with timing_session.stage("Dataset.FitRetrieval"):
             dataset.prepare_retrieval_training(
                 configs,
@@ -744,10 +745,11 @@ def _run_alignment_session(
                 ).hexdigest(),
                 "negative_label_policy": configs.supervision.negative_label_policy,
             }
-        dataset_loaded_from_cache = dataset.has_cache()
+        with timing_session.stage("Dataset.CacheCheck"):
+            dataset_loaded_from_cache = dataset.has_cache()
 
         if dataset_loaded_from_cache:
-            dataset_span.cache_status = CacheStatus.SKIPPED
+            dataset_span.cache_status = CacheStatus.CACHE_HIT
             timing_session.record(
                 "Dataset.LoadCandidates",
                 seconds=0.0,
@@ -799,7 +801,8 @@ def _run_alignment_session(
                 dataset.save()
 
             if getattr(dataset, "emit_feature_metrics_on_build", lambda: False)():
-                dataset.save_feature_metrics()
+                with timing_session.stage("Dataset.FeatureMetrics"):
+                    dataset.save_feature_metrics()
 
             if configs.output.sanity_checks.enabled:
                 dataset.log_sanity_examples(**configs.sanity_check_params.model_dump())
