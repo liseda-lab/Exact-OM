@@ -96,9 +96,66 @@ This benchmark is operational evidence, not a G0 pass or campaign admission. It 
 encoding, fitted heads, hosted judgment, extraction and end-to-end recovery checks. Preserve
 all earlier timings and attempts, including cold64's original worker duration and cumulative
 budget charge. Attempt 05's cold-reload forecast term is a conservative policy calculation,
-not a measured warm duration. New measurements must support any revised forecast; no new
-full-ontology speed or matching-quality result is claimed here. See
+not a measured warm duration. New measurements must support any revised forecast; the
+preprocessing measurements below do not establish matching quality. See
 [G0-VALIDATION.md](G0-VALIDATION.md) for admission and retained attempt history.
+
+## Completed NCIT measurement and historical comparison
+
+The September 11, 2026 `data/experiments-v2/native-preprocessing-03` diagnostic completed
+successfully, with actual worker exit 0. Its `source.json`, `stages.jsonl` and
+`completed-summary.json` preserve the measurements. It used the unchanged full NCIT input
+(SHA-256 `1a7182a7327ebc4181f7d6b0f7e81ed04dd258f1a86bd8f560e4a0d61439d58a`),
+3,506,377 axioms, 211,958 classes, one document with no imports, and the saved 64 source
+entities. Total benchmark time was 3,999.5 seconds and peak RSS was 11.66 GiB.
+
+| Phase | Wall time |
+| --- | ---: |
+| Native ontology loading | 218.3 s |
+| First projection | 2,464.4 s |
+| Exclusions | 1,025.0 s |
+| Raw features for the 64 saved entities | 254.5 s |
+
+Projection produced 630,404 edges with digest
+`370ef2ea5f7c8d4ba53dee63b4e371b27f7d1e6321bf63f14599925242ff6244`.
+The encoded-native report records zero scalar compilation/materialization counters. This
+establishes native compilation, not the absence of Python work inside the shared packages:
+column publication and validation still include Python loops.
+
+The nested profile attributes 314.2 seconds to encoded ingestion/selection, 1,229.1 seconds
+to preparation, and 920.4 seconds to edge iteration. Preparation includes another scoped
+view and its validation; edge iteration combines native batch generation, Python edge
+wrapping and canonical sorting/spill. These boundaries do not isolate individual operations.
+CPU time closely tracks wall time, consistent with predominantly single-core CPU work.
+Exact's adapter adds less than one second outside the upstream projection call.
+
+Historical logs under `exp/test/Full_global_bioml` explicitly report the following
+`OWL2VecStarProjector` timings with `only_taxonomy=False`:
+
+| Input | Projection | Edges | Log and line |
+| --- | ---: | ---: | --- |
+| NCIT task module | 1.35 s | 57,654 | `ncit-doid/exact.log:19`, April 25 |
+| DOID task module | 0.42 s | 34,323 | `ncit-doid/exact.log:24`, April 25 |
+| SNOMED body module | 1.21 s | 117,924 | `snomed-fma.body/exact.log:21`, April 30 |
+| FMA body module | 4.94 s | 533,556 | `snomed-fma.body/exact.log:26`, April 30 |
+
+These intervals exclude ontology loading and ELK setup. The historical NCIT/DOID run reports
+15,762/8,465 classes and loads `data/ncit-doid/{ncit,doid}.owl`; it is not the current full
+ontology pair despite the experiment directory's name. Exact historical package versions
+and effective literal flags are not recorded in those log headers. Edge counts alone do
+not measure input complexity. The logs confirm fast historical task-module projection but
+cannot establish a matched Java/native speed ratio.
+
+The installed package code identifies two concrete optimization targets. Core validates
+retained native columns in Python (`pyowl_core/backends/native_views.py`, `_validate_columns`),
+and the projector validates column references again (`pyowl2vec_star_projector/encoded.py`).
+Use native validation or reuse validation bound to an immutable owner and schema; preserve
+validation at untrusted boundaries. Also, `_native_annotation_provenance_selection` creates
+a ROOT view and compiler before checking equality with the closure buffers. On this
+single-document input that second view is ultimately discarded as equal. Proving scope
+equivalence before rebuilding it could avoid duplicate work. Neither opportunity has an
+isolated speedup measurement yet. Split native edge generation from canonical handling
+before attributing the remaining 920 seconds, and retain exclusions as a separate bottleneck.
 
 ## Remaining experiment work
 
