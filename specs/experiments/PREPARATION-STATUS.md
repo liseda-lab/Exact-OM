@@ -80,7 +80,9 @@ tools; the frozen baseline's older credential locator is unchanged. No key value
 
 A bounded G0 validation job was launched separately after preparation. Attempt 03 failed in
 the native signature-count index; the facade now uses public typed enumeration, verified on
-the actual DOID closure. Attempt 04 retains the same campaign inputs and matching configuration.
+the actual DOID closure. Attempt 04 completed cold64, then failed registering a disabled
+evaluation stage. That bookkeeping is fixed; attempt 05 adopts its verified outputs and original
+timing, but the cumulative feasibility gate blocks further work within the remaining allowance.
 See [G0-VALIDATION.md](G0-VALIDATION.md) for the detached monitor, stop command, limits and
 retained attempt history. Its `status.json`/`report.json` are authoritative for completion.
 

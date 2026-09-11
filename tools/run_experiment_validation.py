@@ -179,16 +179,43 @@ def forecast(rows, *, elapsed, max_seconds, requests, tokens, limits):
     }
 
 
-def worker(config_path, output, evaluate):
+class ValidationBudgetExceeded(RuntimeError):
+    pass
+
+
+def cold_budget_bound(cold, *, elapsed, limits):
+    """Reject an impossible continuation without spending hosted or fitting work."""
+    seconds = 1.5 * 4 * cold["wall_seconds"]
+    return {
+        "safety_factor": 1.5,
+        "elapsed_seconds": elapsed,
+        "remaining_seconds_lower_bound": seconds,
+        "fits_limits": elapsed + seconds <= limits["soft_seconds"],
+        "limits": limits,
+        "unmeasured": ["warm64", "hosted20", "fit64", "production300"],
+        "scope": "Cold reload term of the existing G0 forecast; omitted terms are nonnegative",
+    }
+
+
+def worker(config_path, output, evaluate, require_dataset_cache=False):
     import torch
 
     from exact.core.actions.alignment import run_alignment
+    from exact.impl.datasets.base import BaseAlignmentDataset
     from exact.impl.models.scorer_common import ScorerCommonMixin
     from exact.llm.routing import OpenRouterClient
 
     counts = {"scorer_encoder_batches": 0, "scorer_encoded_texts": 0}
     original_encode = ScorerCommonMixin._encode_texts
     original_init = OpenRouterClient.__init__
+    original_has_cache = BaseAlignmentDataset.has_cache
+
+    def has_cache(self):
+        cached = original_has_cache(self)
+        if not cached:
+            raise ValueError("Warm dataset cache is incompatible; refusing a silent cold rebuild")
+        counts["dataset_cache_hits"] = counts.get("dataset_cache_hits", 0) + 1
+        return True
 
     def encode(self, tokenizer, model, texts, max_len):
         counts["scorer_encoder_batches"] += 1
@@ -202,6 +229,8 @@ def worker(config_path, output, evaluate):
 
     ScorerCommonMixin._encode_texts = encode
     OpenRouterClient.__init__ = client_init
+    if require_dataset_cache:
+        BaseAlignmentDataset.has_cache = has_cache
     started = time.monotonic()
     code = 0
     try:
@@ -314,6 +343,49 @@ def execute(args):
         "status": "prepared",
         "stages": [],
     }
+    # Downtime is not charged, but a continuation retains all previous active time.
+    started = time.monotonic()
+    prior_elapsed = 0.0
+    imported_cold = None
+    if args.resume_from:
+        from tools.validation_resume import adopt_cold_probe
+
+        expected, _ = validation_config(
+            base,
+            case,
+            lock_root,
+            training,
+            mode="global_alignment",
+            cap=64,
+            hosted=False,
+            fit=False,
+            evaluate=False,
+        )
+        expected = harness._bind_model_lock_revisions(
+            expected,
+            dict(load_yaml_mapping(lock.model_lock.verify(lock_root))),
+            require_complete=True,
+            hosted_only=True,
+        )
+        imported_cold, prior_elapsed = adopt_cold_probe(
+            args.resume_from.resolve(),
+            output,
+            campaign_sha256=info["campaign_sha256"],
+            limits=limits,
+            expected_config=expected,
+            materialize=args.execute,
+        )
+        info["resume"] = {
+            "from": str(args.resume_from.resolve()),
+            "previous_elapsed_seconds": prior_elapsed,
+            "scope": "Adopt verified cold64; budget-gate remaining work before a fresh warm64 worker",
+        }
+        info["stages"].append(imported_cold)
+        write_json(output / "cold64.measurement.json", imported_cold)
+
+    def elapsed_seconds():
+        return prior_elapsed + time.monotonic() - started
+
     write_json(output / "plan.json", info)
     if not args.execute:
         print(
@@ -326,10 +398,9 @@ def execute(args):
             )
         )
         return 0
-    started = time.monotonic()
     shared = output / "shared"
     stop = output / "STOP"
-    current = {"evaluate": False, "phase": "starting", "worker_calls": 0}
+    current = {"evaluate": False, "phase": "starting", "worker_calls": 0, "warm_from": None}
     original_run = harness._run_subprocess
     suite = LoadedSuite(
         "g0-validation",
@@ -353,6 +424,10 @@ def execute(args):
     def run(command, *, cwd, stdout_path, stderr_path, env=None):
         wrapper = load_yaml_mapping(Path(command[-1]))["job"]
         worker_output = Path(wrapper["output_dir"])
+        if current["warm_from"] is not None:
+            from tools.validation_resume import seed_warm_dataset
+
+            seed_warm_dataset(Path(current["warm_from"]), worker_output)
         worker_env = {
             **os.environ,
             **(env or {}),
@@ -379,6 +454,8 @@ def execute(args):
         ]
         if current["evaluate"]:
             launch.append("--evaluate")
+        if current["warm_from"] is not None:
+            launch.append("--require-dataset-cache")
         current["worker_calls"] += 1
         wall_start = time.monotonic()
         peak = 0
@@ -393,7 +470,7 @@ def execute(args):
             )
             stop_forwarded = False
             while process.poll() is None:
-                elapsed = time.monotonic() - started
+                elapsed = elapsed_seconds()
                 try:
                     parent = psutil.Process(process.pid)
                     rss = sum(
@@ -441,10 +518,13 @@ def execute(args):
         mode="global_alignment",
         resume_from=None,
         interrupt=False,
+        warm_from=None,
     ):
         if stop.exists():
             raise InterruptedError("Validation STOP exists; completed artifacts retained")
-        current.update(evaluate=evaluate, phase=name)
+        if elapsed_seconds() >= limits["soft_seconds"]:
+            raise ValidationBudgetExceeded("The cumulative validation time reached its soft limit")
+        current.update(evaluate=evaluate, phase=name, warm_from=warm_from)
         config, task = validation_config(
             base,
             case,
@@ -460,7 +540,12 @@ def execute(args):
             config, suite.model_lock_payload, require_complete=True, hosted_only=True
         )
         stage_root = output / name
-        metadata = {"root": str(stage_root), "stage": "screen", "stop_after_checkpoint": interrupt}
+        metadata = {
+            "root": str(stage_root),
+            "stage": "screen",
+            "stop_after_checkpoint": interrupt,
+            "evaluation_enabled": evaluate,
+        }
         if resume_from:
             metadata["resume_from"] = str(cells[resume_from].output_dir.parent)
         cell = RunCell(
@@ -520,7 +605,7 @@ def execute(args):
                 "status": "running",
                 "phase": name,
                 "completed_stages": info["stages"],
-                "elapsed_seconds": time.monotonic() - started,
+                "elapsed_seconds": elapsed_seconds(),
             },
         )
         write_json(output / f"{name}.measurement.json", row)
@@ -530,8 +615,15 @@ def execute(args):
         return row
 
     try:
-        stage("cold64", cap=64, hosted=False)
-        stage("warm64", cap=64, hosted=False)
+        cold = imported_cold or stage("cold64", cap=64, hosted=False)
+        bound = cold_budget_bound(cold, elapsed=elapsed_seconds(), limits=limits)
+        if not bound["fits_limits"]:
+            write_json(output / "budget-plan.json", bound)
+            raise ValidationBudgetExceeded(
+                "The measured cold-reload term alone exceeds the remaining validation budget; "
+                "warm, hosted, fitting and production300 stages were not started."
+            )
+        stage("warm64", cap=64, hosted=False, warm_from=cold["output_dir"])
         if not args.skip_hosted:
             stage("hosted20", cap=20, hosted=True)
         stage("fit64", cap=64, hosted=False, fit=True)
@@ -541,7 +633,7 @@ def execute(args):
         totals = ledger_totals(shared / "openrouter")
         bound = forecast(
             info["stages"],
-            elapsed=time.monotonic() - started,
+            elapsed=elapsed_seconds(),
             max_seconds=limits["soft_seconds"],
             requests=totals["attempts"],
             tokens=totals["prompt_tokens"] + totals["completion_tokens"],
@@ -596,6 +688,8 @@ def execute(args):
             if replay["new_worker_calls"] or replay["new_usage"]["attempts"]:
                 raise ValueError("Completed local replay performed new model work")
             info["status"] = "passed"
+    except ValidationBudgetExceeded as exc:
+        info.update(status="blocked_budget", reason=str(exc))
     except InterruptedError as exc:
         info.update(status="interrupted", reason=str(exc))
     except Exception as exc:
@@ -607,7 +701,7 @@ def execute(args):
         harness._run_subprocess = original_run
         info.update(
             ended_at=time.time(),
-            elapsed_seconds=time.monotonic() - started,
+            elapsed_seconds=elapsed_seconds(),
             hosted_usage=ledger_totals(shared / "openrouter"),
             g0_admission="not_granted; review measurements, omitted scenarios and family-specific forecasts",
         )
@@ -622,6 +716,11 @@ def main():
     parser.add_argument("--output-root", type=Path)
     parser.add_argument("--scratch-root", type=Path)
     parser.add_argument(
+        "--resume-from",
+        type=Path,
+        help="Adopt a verified cold64 completed before the empty-evaluation bookkeeping failure",
+    )
+    parser.add_argument(
         "--api-key-file",
         type=Path,
         help="Read the key into worker environment only; never write its value to artifacts",
@@ -635,9 +734,10 @@ def main():
     parser.add_argument("--worker", type=Path, help=argparse.SUPPRESS)
     parser.add_argument("--worker-output", type=Path, help=argparse.SUPPRESS)
     parser.add_argument("--evaluate", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument("--require-dataset-cache", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args()
     if args.worker:
-        return worker(args.worker, args.worker_output, args.evaluate)
+        return worker(args.worker, args.worker_output, args.evaluate, args.require_dataset_cache)
     if not args.campaign or not args.output_root:
         parser.error("--campaign and --output-root are required")
     if (

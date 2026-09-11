@@ -23,11 +23,12 @@ foundation envelope. Unknown hosted deliveries are not automatically retried.
 
 ## Monitor and stop
 
-Current output: `data/experiments-v2/g0-validation-04/`.
+Current recovery output: `data/experiments-v2/g0-validation-05/`.
+Attempt 04 contains the original completed cold probe; attempt 05 preserves its timing and identity.
 
 ```console
-tmux attach -t exact-g0-04
-.venv/bin/python data/experiments-v2/g0-validation-04/monitor.py
+tmux attach -t exact-g0-05
+.venv/bin/python data/experiments-v2/g0-validation-05/monitor.py
 ```
 
 Detach from tmux with Ctrl-b, then d. `status.json` reports the current phase, process and
@@ -38,7 +39,7 @@ can remain open after completion, so session existence alone does not mean work 
 Request a cooperative stop:
 
 ```console
-touch data/experiments-v2/g0-validation-04/STOP
+touch data/experiments-v2/g0-validation-05/STOP
 ```
 
 The parent forwards STOP to the active worker, including during ontology loading. Completed
@@ -97,3 +98,31 @@ formerly failing index had passed. It does not establish full label/projection t
 those measurements remain part of detached G0. The focused regression suites pass (38 existing
 ontology integration tests, plus 11 signature/import checks), as do scoped static, documentation
 and import-boundary checks.
+
+
+Attempt `g0-validation-04` completed cold64 successfully: 25,927.18 worker seconds, 13.57 GB
+peak process RSS and 2.77 GB peak reserved GPU memory. Its 64 source decisions, 1,245 scored
+pairs, 35 protected exact pairs and committed extraction artifact reconcile. No reference labels
+or hosted requests were used. The outer controller then tried to publish an empty evaluation
+artifact even though evaluation was disabled. The fix omits that stage, including evaluator
+callbacks, while retaining the requirement that every completed artifact has durable outputs.
+
+`--resume-from data/experiments-v2/g0-validation-04` verifies the saved campaign, configuration,
+input/output artifacts and successful worker evidence, then adopts cold64 under its original
+implementation identity. The original files remain unchanged; the old outer manifest still
+records the interrupted bookkeeping. The new `cold64.adoption.json` and stage measurement record
+that recovery, with zero new worker calls and the original cold wall time. Preparation without
+`--execute` verifies the evidence without copying shared caches; execution uses SQLite backups.
+
+Resume carries forward 26,003.85 seconds of active validation time, leaving at most 4h16m36s
+of the original 11h30 allowance, or 3h46m36s before the soft stop. Downtime does not reset spend.
+The saved caches contain candidate tables and embeddings, but no durable ontology graphs or
+raw entity features. A fresh warm worker would rebuild those expensive structures: the cold
+source projection alone took approximately 3h42m, before annotation indexing and scoring.
+A completed-output replay therefore cannot be reported as a measured warm run.
+
+The existing forecast's cold-reload term alone requires 43.21 hours with its safety factor.
+The resumed controller records `blocked_budget` before launching warm64, hosted20, fitting or
+production300. These remain unmeasured; G0 is not passed. The next runnable continuation needs
+an explicitly revised resource plan or a measured reduction in graph/evidence construction
+cost. The launcher never replaces cold timing with the near-zero cost of adopting its outputs.

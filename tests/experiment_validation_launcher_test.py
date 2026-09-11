@@ -202,3 +202,85 @@ def test_stop_interrupts_worker_before_trainer_checkpoint_poll(tmp_path):
         if process.poll() is None:
             process.kill()
         process.wait()
+
+
+def test_saved_cold_measurement_alone_blocks_unaffordable_continuation():
+    from tools.run_experiment_validation import cold_budget_bound
+
+    bound = cold_budget_bound(
+        {"wall_seconds": 25927.17662280702, "new_worker_calls": 0},
+        elapsed=26003.846488725016,
+        limits={"seconds": 41400, "soft_seconds": 39600},
+    )
+    assert bound["fits_limits"] is False
+    assert bound["remaining_seconds_lower_bound"] == pytest.approx(155563.05973684211)
+    assert "warm64" in bound["unmeasured"]
+
+
+def test_resumed_validation_retains_budget_and_never_restarts_cold(tmp_path, monkeypatch):
+    from argparse import Namespace
+    from types import SimpleNamespace
+
+    from exact.core.entities.configs import yaml_io
+    from exact.experiments import campaign, harness
+    from tools import run_experiment_validation as launcher
+    from tools import validation_resume
+
+    case = case_fixture(tmp_path)
+    campaign_path = tmp_path / "campaign.yaml"
+    campaign_path.write_text("immutable campaign")
+    lock = SimpleNamespace(
+        cases={"D0": case},
+        base_config=tmp_path / "baseline.yaml",
+        openrouter_profile={},
+        baseline_id="fixture",
+        model_lock=case.source,
+    )
+    monkeypatch.setattr(campaign, "load_campaign", lambda *_: (lock, None))
+    monkeypatch.setattr(campaign, "validate_baseline", lambda *_: None)
+    monkeypatch.setattr(campaign, "openrouter_only", lambda base, *_: base)
+    monkeypatch.setattr(yaml_io, "load_yaml_mapping", lambda *_: {})
+    monkeypatch.setattr(harness, "_bind_model_lock_revisions", lambda config, *a, **kw: config)
+    monkeypatch.setattr(launcher, "bounded_training", lambda *a: {})
+    monkeypatch.setattr(launcher, "validation_config", lambda *a, **kw: ({}, {}))
+    monkeypatch.setattr(launcher, "node_info", lambda *_: {})
+    monkeypatch.setattr(launcher.signal, "signal", lambda *a: None)
+    totals = {"attempts": 0, "prompt_tokens": 0, "completion_tokens": 0}
+    monkeypatch.setattr(launcher, "ledger_totals", lambda *_: totals)
+    prior = 26003.846488725016
+    row = {
+        "id": "cold64",
+        "status": "complete",
+        "wall_seconds": 25927.17662280702,
+        "new_worker_calls": 0,
+        "imported": True,
+        "output_dir": str(tmp_path / "saved/run"),
+    }
+    monkeypatch.setattr(validation_resume, "adopt_cold_probe", lambda *a, **kw: (row, prior))
+    clock = iter((100.0, 110.0, 130.0))
+    monkeypatch.setattr(launcher.time, "monotonic", lambda: next(clock))
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("No worker may run for this unaffordable continuation")
+
+    monkeypatch.setattr(harness, "execute_cell", forbidden)
+    args = Namespace(
+        api_key_file=None,
+        output_root=tmp_path / "resumed",
+        campaign=campaign_path,
+        max_seconds=41400,
+        ram_gb=56,
+        requests_cap=2000,
+        tokens_cap=3200000,
+        resume_from=tmp_path / "previous",
+        execute=True,
+        scratch_root=None,
+        skip_hosted=False,
+    )
+    assert launcher.execute(args) == 2
+    report = json.loads((args.output_root / "report.json").read_text())
+    assert report["status"] == "blocked_budget"
+    assert report["elapsed_seconds"] == pytest.approx(prior + 30)
+    assert report["stages"] == [row]
+    assert report["hosted_usage"] == totals
+    assert report["resume"]["previous_elapsed_seconds"] == prior
