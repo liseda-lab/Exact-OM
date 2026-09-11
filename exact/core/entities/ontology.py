@@ -66,7 +66,6 @@ class OntologyGraph:
         self._raw_neighborhood_cache: Dict[Tuple[str, int, bool], List[Tuple[str, str, str]]] = {}
 
         self._build_projection()
-        self.precompute_all_labels()
 
     def __repr__(self) -> str:
         return (
@@ -409,8 +408,10 @@ class OntologyGraph:
 
     def precompute_all_labels(self) -> None:
         """
-        Precomputes and caches labels for all IRIs that appear in the projection.
-        This includes source, destination, and relation IRIs. The extraction is parallelized.
+        Explicitly warm labels for every IRI in the projection.
+
+        Normal graph construction leaves labels lazy so bounded source probes do not
+        traverse unrelated source entities. Callers requesting all labels may opt in.
         """
         iris = set()
         # Collect IRIs from each edge in the projection.
