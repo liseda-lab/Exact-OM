@@ -23,7 +23,6 @@ if __package__ in {None, ""}:
     sys.path.insert(0, str(ROOT))
 
 import pyowl_core  # noqa: E402
-from pyowl2vec_star_projector import ProjectionOptions  # noqa: E402
 
 from exact.ontology import load_ontology  # noqa: E402
 from exact.ontology.projection import (  # noqa: E402
@@ -536,8 +535,8 @@ def measure(
     *,
     buffer_edges: int,
     include_literals: bool,
-    load_backend: LoadBackend = "python",
-    projector_backend: ProjectorBackend = "python",
+    load_backend: LoadBackend = "native",
+    projector_backend: ProjectorBackend = "native",
     reasoner_name: ReasonerName | None = None,
     reasoner_backend: str = "auto",
     reasoner_workers: int = 0,
@@ -547,6 +546,13 @@ def measure(
 ) -> dict[str, Any]:
     """Measure one source while asserting the WP-N handoff invariants."""
 
+    if load_backend not in {"auto", "native"} or projector_backend not in {"auto", "native"}:
+        raise ValueError(
+            "Exact scale measurements require native loading and projection; Python is rejected"
+        )
+    if type(buffer_edges) is not int or buffer_edges < 1:
+        raise ValueError("buffer_edges must be positive (legacy non-operative option)")
+    load_backend = projector_backend = "native"
     print(f"[owl-stack-scale] hashing {path.name}", file=sys.stderr, flush=True)
     input_bytes = path.stat().st_size
     input_sha256 = _sha256_file(path)
@@ -576,31 +582,16 @@ def measure(
         initial_fingerprints = _fingerprints(snapshot)
         initial_axioms = snapshot.report.effective_axiom_count
 
-        options = ProjectionOptions(
-            profile=source.projector_settings.profile,
-            include_literals=include_literals,
-            duplicates="unique",
-            order="canonical",
-            compatibility_state="isolated",
-            backend=projector_backend,
-        )
         projection_started = time.perf_counter()
         projection_cpu_started = _cpu_seconds()
         projection_operations_before = core_operations.snapshot()
         print(f"[owl-stack-scale] projecting {path.name}", file=sys.stderr, flush=True)
-        iterator = source.projector.iter_edges(
-            snapshot,
-            options=options,
-            buffer_edges=buffer_edges,
-        )
+        projected_edges = source.projection_edges(include_literals=include_literals)
+        cache_fill_seconds = time.perf_counter() - projection_started
         edge_digest = hashlib.sha256()
-        first_edge_seconds: float | None = None
-        edge_count = 0
-        for projected_edge in iterator:
-            if first_edge_seconds is None:
-                first_edge_seconds = time.perf_counter() - projection_started
+        edge_count = len(projected_edges)
+        for projected_edge in projected_edges:
             edge_digest.update(_edge_record(projected_edge))
-            edge_count += 1
         projection_seconds = time.perf_counter() - projection_started
         projection_cpu_seconds = _cpu_seconds() - projection_cpu_started
         projection_operation_delta = _counter_delta(
@@ -630,9 +621,9 @@ def measure(
 
         cache_operations_before = core_operations.snapshot()
         cache_started = time.perf_counter()
-        print(f"[owl-stack-scale] filling cache for {path.name}", file=sys.stderr, flush=True)
+        print(f"[owl-stack-scale] checking cache for {path.name}", file=sys.stderr, flush=True)
         first_cache_edges = source.projection_edges(include_literals=include_literals)
-        cache_fill_seconds = time.perf_counter() - cache_started
+        first_cache_hit_seconds = time.perf_counter() - cache_started
         first_cache_count = len(first_cache_edges)
         first_cache_digest = hashlib.sha256()
         for cached_edge in first_cache_edges:
@@ -848,7 +839,10 @@ def measure(
             "result_sha256": result_sha256,
             "wall_seconds": projection_seconds,
             "cpu_seconds": projection_cpu_seconds,
-            "time_to_first_edge_seconds": first_edge_seconds,
+            "time_to_first_edge_seconds": None,
+            "edge_delivery": "guarded-materialized-list",
+            "buffer_edges_effective": None,
+            "buffer_edges_note": "Legacy option is non-operative; the production facade owns buffering",
             "encoded_view_publication_seconds": (first_ingestion.encoded_view_publication_seconds),
             "consumer_compile_seconds": first_ingestion.consumer_compile_seconds,
             "publication_compile_timing_note": (
@@ -858,7 +852,7 @@ def measure(
                     first_ingestion.path != "encoded-native"
                     or first_ingestion.encoded_view_publication_seconds is not None
                 )
-                else "included in time_to_first_edge_seconds because the public consumer "
+                else "included in wall_seconds because the public consumer "
                 "report omitted a phase timing"
             ),
             "edges_per_second": (
@@ -873,6 +867,7 @@ def measure(
             "edges": first_cache_count,
             "result_sha256": first_cache_sha256,
             "fill_seconds": cache_fill_seconds,
+            "first_hit_seconds": first_cache_hit_seconds,
             "hit_seconds": cache_hit_seconds,
             "hit_faster_than_fill": cache_hit_seconds <= cache_fill_seconds,
         },
@@ -910,17 +905,22 @@ def measure(
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("ontology", type=Path, nargs="+")
-    parser.add_argument("--buffer-edges", type=int, default=250_000)
+    parser.add_argument(
+        "--buffer-edges",
+        type=int,
+        default=250_000,
+        help="legacy compatibility option; production projection controls its own buffering",
+    )
     parser.add_argument("--include-literals", action="store_true")
     parser.add_argument(
         "--load-backend",
-        choices=("auto", "python", "native"),
-        default="python",
+        choices=("auto", "native"),
+        default="native",
     )
     parser.add_argument(
         "--projector-backend",
-        choices=("auto", "python", "native"),
-        default="python",
+        choices=("auto", "native"),
+        default="native",
     )
     parser.add_argument(
         "--reasoner",
@@ -955,7 +955,7 @@ def main() -> None:
         )
         for path in paths
     ]
-    payload = {
+    payload: dict[str, Any] = {
         "schema_version": 5,
         "environment": {
             "python": platform.python_version(),
@@ -972,6 +972,8 @@ def main() -> None:
         },
         "configuration": {
             "buffer_edges": args.buffer_edges,
+            "buffer_edges_effective": None,
+            "projection_delivery": "guarded-materialized-list",
             "include_literals": args.include_literals,
             "load_backend": args.load_backend,
             "projector_backend": args.projector_backend,
@@ -985,7 +987,7 @@ def main() -> None:
                 args.reasoner_worker_wire if args.reasoner is not None else False
             ),
             "require_encoded_consumers": args.require_encoded_consumers,
-            "cache_state": "cold-load; projection cache fill then hit",
+            "cache_state": "cold-load; guarded projection fills cache then repeated hits",
         },
         "measurements": measurements,
     }

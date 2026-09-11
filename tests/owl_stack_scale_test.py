@@ -172,7 +172,13 @@ def test_streaming_edge_digest_matches_public_projector_artifact_contract() -> N
     assert digest.hexdigest() == canonical_edges_sha256(edges)
 
 
-def test_scale_measurement_records_path_free_wpn_handoff_evidence() -> None:
+def test_scale_measurement_records_path_free_wpn_handoff_evidence(monkeypatch) -> None:
+    from pyowl2vec_star_projector import Projector
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("Scale benchmark must not enter inherited streaming projection")
+
+    monkeypatch.setattr(Projector, "iter_edges", forbidden)
     path = FIXTURES / "mini_src.owl"
 
     result = measure(
@@ -196,9 +202,13 @@ def test_scale_measurement_records_path_free_wpn_handoff_evidence() -> None:
         "open_snapshot": 0,
     }
     projection = result["projection"]
-    assert projection["consumer"]["ingestion_path"] == "scalar-python"
+    assert result["load_backend"] == projection["requested_backend"] == "native"
+    assert projection["consumer"]["ingestion_path"] == "encoded-native"
+    assert projection["time_to_first_edge_seconds"] is None
+    assert projection["edge_delivery"] == "guarded-materialized-list"
+    assert projection["buffer_edges_effective"] is None
     assert projection["consumer_compile_seconds"] >= 0.0
-    assert projection["encoded_view_publication_seconds"] is None
+    assert projection["encoded_view_publication_seconds"] >= 0.0
     assert projection["publication_compile_timing_note"] is None
     assert projection["consumer"]["counters"]["materialized_scalar_rows"] == 0
     assert projection["edges"] > 0
@@ -212,10 +222,10 @@ def test_scale_measurement_records_path_free_wpn_handoff_evidence() -> None:
     assert len(reasoner["results"]["result_sha256"]) == 64
     materialization = result["materialization_and_copy"]
     assert materialization["public_counters"]["projector"]["materialized_scalar_rows"] == 0
-    assert materialization["complete_public_counter_coverage"] is False
+    assert materialization["complete_public_counter_coverage"] is True
     acceptance = materialization["acceptance_evidence"]
-    assert acceptance["acceptance_ready"] is False
-    assert acceptance["projector"]["selected_ingestion_path"] == "scalar-python"
+    assert acceptance["acceptance_ready"] is True
+    assert acceptance["projector"]["selected_ingestion_path"] == "encoded-native"
     assert acceptance["unexpected_core_operation_calls"] == {}
     assert result["second_ontology_representation"] is False
 
@@ -224,18 +234,24 @@ def test_scale_measurement_records_path_free_wpn_handoff_evidence() -> None:
     assert "object at 0x" not in encoded
 
 
-def test_required_encoded_mode_rejects_scalar_consumer_selection() -> None:
+@pytest.mark.parametrize("option", ["load_backend", "projector_backend"])
+def test_python_selection_is_rejected_before_loading_or_hashing(monkeypatch, option) -> None:
     original_load = pyowl_core.load_snapshot
 
-    with pytest.raises(RuntimeError, match="projector did not select required encoded-native"):
+    def forbidden(*args, **kwargs):
+        raise AssertionError("Invalid backend must fail before input work")
+
+    monkeypatch.setattr("benchmarks.owl_stack_scale._sha256_file", forbidden)
+    with pytest.raises(
+        ValueError, match="require native loading and projection; Python is rejected"
+    ):
         measure(
-            FIXTURES / "mini_src.owl",
+            Path("does-not-exist.owl"),
             buffer_edges=32,
             include_literals=False,
-            projector_backend="python",
             require_encoded_consumers=True,
+            **{option: "python"},
         )
-
     assert pyowl_core.load_snapshot is original_load
 
 
@@ -361,5 +377,10 @@ def test_cli_emits_versioned_configuration(monkeypatch, capsys) -> None:
 
     payload = json.loads(capsys.readouterr().out)
     assert payload["schema_version"] == 5
-    assert payload["configuration"]["cache_state"] == ("cold-load; projection cache fill then hit")
+    assert payload["configuration"]["cache_state"] == (
+        "cold-load; guarded projection fills cache then repeated hits"
+    )
+    assert payload["configuration"]["load_backend"] == "native"
+    assert payload["configuration"]["projector_backend"] == "native"
+    assert payload["configuration"]["buffer_edges_effective"] is None
     assert payload["measurements"][0]["load_calls"] == 1
