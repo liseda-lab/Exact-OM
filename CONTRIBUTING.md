@@ -33,6 +33,17 @@ on implementation or delivery layers, ontology/I/O cannot depend on delivery, an
 parser dependencies stay isolated in their backend modules. Add a small protocol or registry
 seam instead of importing across a forbidden boundary.
 
+The one shared-projector implementation exception is
+`exact/ontology/native_projection.py`. In upstream projector 0.2.0, the public
+`backend="native"` option can still run the Python compiler. Exact therefore selects the
+upstream encoded native compiler directly and rejects any decline before scalar work. The
+bridge reuses upstream edge policies and its report builder; it adds no projection rules.
+Its exact 0.2.0/API-1/compiler-schema check is intentional. Dependency upgrades must validate
+native/reference edge parity, imported closure, and failure without scalar work before
+changing that check. `tests/owl_public_boundary_test.py` permits only three named native
+helpers in that file; compiler internals, private core backends, and imports elsewhere remain
+forbidden. Never widen the exception to restore automatic fallback.
+
 Run-artifact paths belong in `exact.runs.RunLayout`; consumers use `RunReader`. Code outside
 trainer checkpointing and `exact.runs` must not write checkpoint files.
 

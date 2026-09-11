@@ -50,8 +50,15 @@ jobs:
             echo "Legacy ontology runtime import found" >&2
             exit 1
           fi
-          if git grep -n -E 'pyowl_core\.backends|pyowl2vec_star_projector\.(compiler|native)' -- exact; then
+          if git grep -n -E 'pyowl_core\.backends|pyowl2vec_star_projector\.compiler' -- exact; then
             echo "Consumer imported a shared-stack implementation module" >&2
+            exit 1
+          fi
+          # Only the tested 0.2.0 bridge may select the native compiler directly.
+          # owl_public_boundary_test.py restricts its imports to three exact helpers.
+          if git grep -n -E 'pyowl2vec_star_projector\.native' -- \
+            exact ':!exact/ontology/native_projection.py'; then
+            echo "Native projector implementation import outside the strict bridge" >&2
             exit 1
           fi
       - run: poetry run pytest -m "not requires_data and not slow and not requires_cuda and not requires_openrouter" --cov=exact
