@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import inspect
+from dataclasses import replace
 from typing import TypeGuard, cast
 
 import pyowl_core
@@ -50,4 +51,13 @@ def retain_ontology_view(value: object) -> OntologyView:
     return retained
 
 
-__all__ = ["is_ontology_view", "retain_ontology_view"]
+def native_load_options(options: pyowl_core.LoadOptions | None) -> pyowl_core.LoadOptions:
+    """Require native document parsing without changing import or strictness options."""
+
+    selected = options or pyowl_core.LoadOptions()
+    if selected.backend is pyowl_core.BackendPreference.PYTHON:
+        raise ValueError("Exact requires the native pyowl-core parser; Python is unsupported")
+    return replace(selected, backend=pyowl_core.BackendPreference.NATIVE)
+
+
+__all__ = ["is_ontology_view", "native_load_options", "retain_ontology_view"]

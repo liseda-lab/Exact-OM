@@ -30,6 +30,8 @@ from pyowl_core import (
     SubObjectPropertyOf,
 )
 
+from exact.ontology.view_contract import native_load_options
+
 NamedClass = Class
 ParsedOntology = OntologySnapshot
 PropertyDomain = ObjectPropertyDomain
@@ -55,7 +57,7 @@ def parse(
     snapshot = pyowl_core.load_snapshot(
         source,
         document_iri=document_iri,
-        options=options,
+        options=native_load_options(options),
         resolver=resolver,
     )
     if not isinstance(snapshot, OntologySnapshot):  # pragma: no cover - core contract

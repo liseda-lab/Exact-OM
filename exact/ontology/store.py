@@ -16,7 +16,7 @@ from pyowl_core import (
     IRI,
     RDF_PLAIN_LITERAL_IRI,
     XSD_STRING_IRI,
-    AnnotationAssertionIndex,
+    AnnotationAssertion,
     AnnotationProperty,
     AssertedClassHierarchyView,
     AssertedPropertyHierarchyView,
@@ -52,7 +52,7 @@ from exact.core.entities.graph import AnnotationValue, Edge
 from exact.core.entities.kinds import EntityKind
 from exact.core.values import ANNOTATION_IRI
 from exact.ontology.projection import ProjectorSettings, SharedProjectionAdapter
-from exact.ontology.view_contract import retain_ontology_view
+from exact.ontology.view_contract import native_load_options, retain_ontology_view
 
 RDFS_LABEL = "http://www.w3.org/2000/01/rdf-schema#label"
 OWL_DEPRECATED = "http://www.w3.org/2002/07/owl#deprecated"
@@ -382,7 +382,7 @@ class OwlOntologySource(KnowledgeSource):
         *,
         label_properties: Sequence[str] | None = None,
         origin: Path | None = None,
-        projector_backend: str = "auto",
+        projector_backend: str = "native",
         projector_profile: str = REFERENCE_PROFILE,
     ) -> None:
         snapshot = retain_ontology_view(snapshot)
@@ -425,7 +425,7 @@ class OwlOntologySource(KnowledgeSource):
         resolver: pyowl_core.ImportResolver | None = None,
         document_iri: pyowl_core.IRI | str | None = None,
         label_properties: Sequence[str] | None = None,
-        projector_backend: str = "auto",
+        projector_backend: str = "native",
         projector_profile: str = REFERENCE_PROFILE,
     ) -> "OwlOntologySource":
         """Load one closure exactly once and retain the resulting snapshot."""
@@ -437,7 +437,7 @@ class OwlOntologySource(KnowledgeSource):
         snapshot = pyowl_core.load_snapshot(
             source,
             document_iri=document_iri,
-            options=options,
+            options=native_load_options(options),
             resolver=resolver,
         )
         origin: Path | None = None
@@ -470,24 +470,46 @@ class OwlOntologySource(KnowledgeSource):
         return self._snapshot.signature(include_builtins=True)
 
     @cached_property
-    def _annotations(self) -> AnnotationAssertionIndex:
-        return self._snapshot.view(AnnotationAssertionIndex)
+    def _annotations(self) -> dict[str, tuple[AnnotationValue, ...]]:
+        # The shared annotation view also walks every unrelated axiom root. Entity
+        # attributes need only assertion rows from the retained native type partition.
+        values: dict[str, set[AnnotationValue]] = defaultdict(set)
+        for assertion in self._axioms.iter(AnnotationAssertion):
+            if isinstance(assertion.subject, IRI):
+                converted = _annotation_value(assertion.property.iri.value, assertion.value)
+                if converted is not None:
+                    values[assertion.subject.value].add(converted)
+        return {
+            iri: tuple(
+                sorted(
+                    rows,
+                    key=lambda value: (
+                        value.property_iri,
+                        value.value,
+                        value.lang or "",
+                        value.datatype or "",
+                        value.is_literal,
+                    ),
+                )
+            )
+            for iri, rows in values.items()
+        }
 
     @cached_property
     def _axioms(self) -> AxiomTypeIndex:
-        return self._snapshot.view(AxiomTypeIndex)
+        return self._snapshot.view(AxiomTypeIndex, include_origins=False)
 
     @cached_property
     def _class_view(self) -> AssertedClassHierarchyView:
-        return self._snapshot.view(AssertedClassHierarchyView)
+        return self._snapshot.view(AssertedClassHierarchyView, include_origins=False)
 
     @cached_property
     def _property_view(self) -> AssertedPropertyHierarchyView:
-        return self._snapshot.view(AssertedPropertyHierarchyView)
+        return self._snapshot.view(AssertedPropertyHierarchyView, include_origins=False)
 
     @cached_property
     def _domain_range(self) -> PropertyDomainRangeView:
-        return self._snapshot.view(PropertyDomainRangeView)
+        return self._snapshot.view(PropertyDomainRangeView, include_origins=False)
 
     @cached_property
     def _class_features(
@@ -642,7 +664,7 @@ class OwlOntologySource(KnowledgeSource):
     def configure_projector(
         self,
         *,
-        backend: str = "auto",
+        backend: str = "native",
         profile: str = REFERENCE_PROFILE,
     ) -> None:
         """Select semantics before use while retaining the exact snapshot identity."""
@@ -707,30 +729,8 @@ class OwlOntologySource(KnowledgeSource):
             self._entity_cache[normalized_kind] = cached
         return cached
 
-    @lru_cache(maxsize=None)
     def _annotation_rows(self, iri: str) -> tuple[AnnotationValue, ...]:
-        try:
-            subject = IRI(iri)
-        except InvalidIRIError:
-            return ()
-        values: set[AnnotationValue] = set()
-        for posting in self._annotations.iter_subject(subject):
-            assertion = posting.assertion
-            converted = _annotation_value(assertion.property.iri.value, assertion.value)
-            if converted is not None:
-                values.add(converted)
-        return tuple(
-            sorted(
-                values,
-                key=lambda value: (
-                    value.property_iri,
-                    value.value,
-                    value.lang or "",
-                    value.datatype or "",
-                    value.is_literal,
-                ),
-            )
-        )
+        return self._annotations.get(iri, ())
 
     def labels(self, iri: str) -> list[str]:
         selected = {
@@ -862,19 +862,15 @@ class OwlOntologySource(KnowledgeSource):
 
     def _build_exclusions(self) -> frozenset[str]:
         excluded: set[str] = set()
-        for subject in self._annotations.subjects():
-            if not isinstance(subject, IRI):
-                continue
-            for posting in self._annotations.iter_subject(subject):
-                assertion = posting.assertion
-                if not isinstance(assertion.value, Literal):
+        for subject, values in self._annotations.items():
+            for value in values:
+                if not value.is_literal:
                     continue
-                lexical = assertion.value.lexical_form.strip().lower()
-                property_iri = assertion.property.iri.value
-                if property_iri == ANNOTATION_IRI and lexical in {"false", "0"}:
-                    excluded.add(subject.value)
-                elif property_iri == OWL_DEPRECATED and lexical in {"true", "1"}:
-                    excluded.add(subject.value)
+                lexical = value.value.strip().lower()
+                if value.property_iri == ANNOTATION_IRI and lexical in {"false", "0"}:
+                    excluded.add(subject)
+                elif value.property_iri == OWL_DEPRECATED and lexical in {"true", "1"}:
+                    excluded.add(subject)
         return frozenset(excluded)
 
     def excluded_from_alignment(self) -> frozenset[str]:
