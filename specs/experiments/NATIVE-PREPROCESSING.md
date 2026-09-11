@@ -73,3 +73,22 @@ budget charge. Attempt 05's cold-reload forecast term is a conservative policy c
 not a measured warm duration. New measurements must support any revised forecast; no new
 full-ontology speed or matching-quality result is claimed here. See
 [G0-VALIDATION.md](G0-VALIDATION.md) for admission and retained attempt history.
+
+## Remaining experiment work
+
+These are confirmed structural reuse limits, not measured post-repair costs. Use the bounded
+native measurements before changing cache boundaries or resource forecasts.
+
+- **Warm evidence is incomplete:** [dataset seeding](../../tools/validation_resume.py#L21) copies CSV/manifests; [raw entity features](../../exact/impl/datasets/pair_adaptive_context.py#L590) remain process-local.
+  A fresh worker can rebuild projection and features despite a compatible dataset-cache hit.
+- **Recovery is coarse:** [extraction identity](../../exact/experiments/runtime.py#L186) binds the full method configuration; [invalidation](../../exact/experiments/runtime.py#L287) archives dataset/cache together.
+  Fusion-only changes can repeat compatible preprocessing. Verified completed extraction already skips the worker; preserve that guarantee.
+- **Forecasts multiply fixed costs:** [validation extrapolation](../../tools/run_experiment_validation.py#L146) scales whole warm/hosted runtimes by source counts and also reserves cold reloads.
+  Separate measured setup and incremental work before revising this conservative admission policy; its lower-bound term is a bound on the forecast, not physical runtime.
+- **Optional typed indexes:** [property hierarchy and domain/range views](../../exact/ontology/store.py#L507) remain lazy upstream builders with five and six typed whole-closure scans respectively.
+  Their current cost is unmeasured; extend the class-partition approach only if relevant measurements justify it.
+
+Any new reuse must bind ontology/import content, parser/projector/reasoner semantics, entity
+kind, evidence controls and implementation schema; bind source/candidate populations where
+features depend on them, and model/tokenizer/precision identities for encoded artifacts.
+Reusing incompatible evidence can change metrics; changing forecasts alone changes admission.
