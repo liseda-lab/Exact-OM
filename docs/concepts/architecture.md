@@ -42,7 +42,7 @@ flowchart LR
     Input[OWL path / bytes / stream] --> Core[pyowl-core 0.2 OntologyView]
     Core --> Facade[OwlOntologySource]
     Core --> Views[Shared structural views]
-    Core --> Projector[Public OWL2Vec* projector API]
+    Core --> Projector[Guarded encoded-native OWL2Vec* compiler]
     Core --> Reasoner[Asserted / public optional reasoner API]
     Views --> Dataset[Alignment dataset]
     Projector --> Dataset
@@ -61,12 +61,19 @@ materialize a second ontology-sized representation. Optional process isolation w
 owner once with the current public core wire writer, then a worker verifies and opens it
 read-only with mmap. The worker never receives the original OWL path.
 
-Native ingestion is capability-negotiated through public core and consumer attributes,
-including the encoded schema and
-`pyowl_core.EncodedStructuralView.DESCRIPTOR_SHA256`. Exact neither infers support from a
-distribution version nor calls a private extension. A missing encoded capability selects the
-consumer's complete scalar path; an incompatible advertised capability fails before output
-and is not retried from an OWL path.
+Exact requires native loading and encoded-native OWL projection. Legacy `auto` projector
+configuration resolves to native; Python/scalar fallback is rejected. The encoded schema and
+`pyowl_core.EncodedStructuralView.DESCRIPTOR_SHA256` are checked before accepting results.
+The narrow `exact.ontology.native_projection` bridge invokes the installed upstream compiler,
+edge policy and report builder under a checked 0.2.0/API-1 contract. Its private compiler/report
+coupling is confined to that module; it does not decode buffers or implement projection rules.
+Missing capabilities, unsupported inputs and incompatible reports fail explicitly.
+
+The installed projector cannot retain the tested mmap owner's buffers. Mmap remains a public
+core/reasoner storage capability, but Exact projection rejects that unsupported owner without
+scalar fallback or reparsing. Native document snapshots and supported layered views retain
+their original owners. Graph labels are cached on demand; annotation and class-hierarchy
+preparation use public typed axiom partitions without unused origin materialization.
 
 ## Reproducibility
 

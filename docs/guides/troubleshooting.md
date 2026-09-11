@@ -31,14 +31,20 @@ are then recorded in `ontology_stack`.
 
 ## A native backend was not selected
 
-The core and projector expose complete Python paths. `backend: auto` may report that a
-platform-native wheel is unavailable. Use `backend: python` for an explicit portable choice.
-Use `native` only when compatible published upstream wheels are installed; Exact never runs
-Cargo during installation.
+Exact requires compatible native loader and projector wheels. Projector `backend: auto` is
+a compatibility alias for native, and explicit Python selection is rejected. Exact never runs
+Cargo during installation and never retries projection through a scalar/Python compiler.
 
-Exact negotiates encoded ingestion from public capabilities, not package-version guesses. An
-advertised schema or descriptor mismatch is a hard compatibility error. Do not work around it
-by retrying with an OWL path or importing a private native module.
+Check the selected backend and encoded-native counters in `ontology_stack`. The narrow
+upstream compiler/report bridge currently requires projector 0.2.0/API 1; a dependency upgrade
+needs compatibility and parity validation. Missing encoded capabilities, unsupported input
+shapes, and advertised schema/descriptor mismatches are errors, not invitations to select
+Python or reparse the ontology. Private compiler/report access is confined to the reviewed
+`exact.ontology.native_projection` bridge.
+
+The installed native projector does not support the tested mmap owner. Use the supported
+native document-loading path for a new run; preserve the original failed attempt and inputs.
+Do not conceal the failure by copying, decoding or relabeling a mmap view inside a consumer.
 
 ## An ontology cache is rebuilt after upgrading
 
