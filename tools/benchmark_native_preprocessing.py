@@ -103,6 +103,7 @@ def benchmark(
             name: _sha256(implementation / name)
             for name in (
                 "exact/ontology/store.py",
+                "exact/ontology/index_views.py",
                 "exact/ontology/projection.py",
                 "exact/ontology/native_projection.py",
                 "exact/ontology/view_contract.py",
