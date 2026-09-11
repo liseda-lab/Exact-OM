@@ -56,7 +56,7 @@ def test_ontology_stack_provenance_is_complete_and_path_free() -> None:
     assert len(core["closure"]["resolver_configuration_sha256"]) == 64
     assert core["closure"]["source_documents"]
     assert provenance["projector"]["profile"] == "mowl-d993536-v1"
-    assert provenance["projector"]["selection"]["effective"] == "python"
+    assert provenance["projector"]["selection"]["effective"] == "native"
     assert provenance["reasoner"]["selection"]["effective"] == "asserted"
     handoff = provenance["consumer_handoff"]
     assert handoff["schema_version"] == 2
@@ -107,38 +107,20 @@ def test_ontology_stack_provenance_redacts_consumer_diagnostics() -> None:
 
 def test_consumer_handoff_records_projector_public_ingestion_report() -> None:
     source = load_ontology(FIXTURES / "mini_src.owl")
-    source.configure_projector(backend="python")
     assert source.projection_edges()
 
     handoff = source.ontology_stack_provenance()["consumer_handoff"]
 
-    assert handoff["projector"]["ingestion_path"] == "scalar-python"
-    assert handoff["projector"]["selected_backend"] == "python"
+    assert handoff["projector"]["ingestion_path"] == "encoded-native"
+    assert handoff["projector"]["selected_backend"] == "native"
     assert handoff["projector"]["consumer_compile_seconds"] >= 0.0
-    assert handoff["projector"]["counters"] == {
-        "base_flattening_bytes": 0,
-        "encoded_buffer_bytes": 0,
-        "encoded_buffer_count": 0,
-        "encoded_compiler_gil_released": False,
-        "encoded_detached_buffer_count": 0,
-        "encoded_indexed_buffer_count": 0,
-        "encoded_posting_bytes": 0,
-        "encoded_referenced_view_count": 0,
-        "encoded_segment_count": 0,
-        "encoded_staging_copy_bytes": 0,
-        "encoded_zero_copy_buffers": 0,
-        "materialized_scalar_rows": 0,
-        "parser_calls": 0,
-        "per_row_ffi_calls": 0,
-        "resolver_calls": 0,
-        "scalar_axiom_materializations": 0,
-        "scalar_term_materializations": 0,
-        "structural_copy_bytes": 0,
-        "wire_decoder_calls": 0,
-        "wire_encoder_calls": 0,
-    }
-    assert "encoded_view_publication_seconds" not in handoff["projector"]
-    assert "schema_name" not in handoff["projector"]
+    counters = handoff["projector"]["counters"]
+    assert counters["encoded_compiler_gil_released"] is True
+    assert counters["encoded_buffer_count"] > 0
+    for name in ("materialized_scalar_rows", "parser_calls", "scalar_axiom_materializations"):
+        assert counters[name] == 0
+    assert handoff["projector"]["encoded_view_publication_seconds"] >= 0.0
+    assert handoff["projector"]["schema_name"] == pyowl_core.EncodedStructuralView.SCHEMA_NAME
 
 
 @pytest.mark.parametrize(

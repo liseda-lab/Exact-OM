@@ -230,14 +230,17 @@ def test_projector_config_invalidates_dataset_cache(
         output_path=tmp_path / "projector-auto",
         projector={"backend": "auto", "profile": "mowl-d993536-v1"},
     )
-    python = KindDataset(
-        output_path=tmp_path / "projector-python",
-        projector={"backend": "python", "profile": "mowl-d993536-v1"},
+    native = KindDataset(
+        output_path=tmp_path / "projector-native",
+        projector={"backend": "native", "profile": "mowl-d993536-v1"},
     )
 
-    assert automatic.cache_fingerprint != python.cache_fingerprint
-    assert automatic._cache_fingerprint_payload()["ontology_backend_version"] == 5
-    assert python._cache_fingerprint_payload()["projector"]["backend"] == "python"
+    assert automatic.cache_fingerprint == native.cache_fingerprint
+    identity = native._cache_fingerprint_payload()["projector"]
+    assert identity["backend"] == "native"
+    assert identity["execution_contract"] == "exact/encoded-native-only/v1"
+    with pytest.raises(ValueError, match="native projector"):
+        KindDataset(output_path=tmp_path / "rejected", projector={"backend": "python"})
 
 
 def test_base_dataset_uses_run_layout_and_source_registry(tmp_path: Path) -> None:

@@ -12,14 +12,15 @@ from typing import Literal, Mapping, TypeAlias, cast
 
 import pyowl2vec_star_projector as shared_projector
 import pyowl_core
-from pyowl2vec_star_projector import REFERENCE_PROFILE, ProjectionOptions, Projector
+from pyowl2vec_star_projector import REFERENCE_PROFILE, ProjectionOptions
 from pyowl_core import OntologyView
 
 from exact.core.entities.graph import Edge
+from exact.ontology.native_projection import NativeProjector
 from exact.ontology.versions import distribution_version
 from exact.ontology.view_contract import retain_ontology_view
 
-ProjectorBackend: TypeAlias = Literal["auto", "native", "python"]
+ProjectorBackend: TypeAlias = Literal["native"]
 ProjectionMethod: TypeAlias = Literal["owl2vecstar", "taxonomy"]
 
 _ENCODED_BUFFER_WIDTHS: Mapping[str, int] = {
@@ -50,12 +51,16 @@ _ENCODED_COMPILER_HANDOFF_FIELDS = frozenset(
 class ProjectorSettings:
     """Exact's intentionally small shared-projector configuration surface."""
 
-    backend: ProjectorBackend = "auto"
+    backend: ProjectorBackend = "native"
     profile: str = REFERENCE_PROFILE
 
     def __post_init__(self) -> None:
-        if self.backend not in {"auto", "native", "python"}:
-            raise ValueError("projector backend must be one of: auto, native, python")
+        if self.backend == "auto":
+            object.__setattr__(self, "backend", "native")
+        if self.backend != "native":
+            raise ValueError(
+                "Exact requires the native projector; Python/auto fallback is forbidden"
+            )
         if not isinstance(self.profile, str) or not self.profile:
             raise ValueError("projector profile must be a nonempty string")
         # Upstream is authoritative for supported profiles and validation text.
@@ -74,7 +79,7 @@ class ProjectorSettings:
         unknown = sorted(set(map(str, value)) - {"backend", "profile"})
         if unknown:
             raise ValueError(f"unknown projector option(s): {', '.join(unknown)}")
-        backend = value.get("backend", "auto")
+        backend = value.get("backend", "native")
         profile = value.get("profile", REFERENCE_PROFILE)
         return cls(
             backend=cast(ProjectorBackend, str(backend)),
@@ -267,6 +272,7 @@ class ProjectionCacheKey:
     duplicates: Literal["unique"] = "unique"
     order: Literal["canonical"] = "canonical"
     compatibility_state: Literal["isolated"] = "isolated"
+    execution_contract: str = "exact/encoded-native-only/v1"
 
 
 def normalize_method(method: str) -> ProjectionMethod:
@@ -328,6 +334,7 @@ def projector_cache_identity(settings: ProjectorSettings) -> dict[str, object]:
         "encoded_contract": encoded_contract_identity().as_dict(),
         "profile": settings.profile,
         "backend": settings.backend,
+        "execution_contract": "exact/encoded-native-only/v1",
         "duplicates": "unique",
         "order": "canonical",
         "compatibility_state": "isolated",
@@ -339,6 +346,43 @@ def projector_cache_identity(settings: ProjectorSettings) -> dict[str, object]:
     }
 
 
+def require_native_report(projector: object) -> dict[str, object]:
+    """Reject any successful result that does not prove encoded native work."""
+    report = getattr(projector, "last_report", None)
+    if report is None:
+        raise RuntimeError("native projection completed without an execution report")
+    payload = cast(dict[str, object], report.to_dict())
+    provenance = cast(Mapping[str, object], payload["provenance"])
+    ingestion = cast(Mapping[str, object], provenance.get("ingestion", {}))
+    options = cast(Mapping[str, object], provenance.get("options", {}))
+    if (
+        provenance.get("selected_backend") != "native"
+        or options.get("backend") != "native"
+        or ingestion.get("path") != "encoded-native"
+        or ingestion.get("reason") is not None
+    ):
+        raise RuntimeError("Exact requires encoded-native projection; scalar fallback is forbidden")
+    counters = cast(Mapping[str, object], ingestion.get("counters", {}))
+    for name in (
+        "materialized_scalar_rows",
+        "scalar_axiom_materializations",
+        "scalar_term_materializations",
+        "parser_calls",
+        "resolver_calls",
+        "wire_decoder_calls",
+        "wire_encoder_calls",
+        "per_row_ffi_calls",
+    ):
+        if type(counters.get(name)) is not int or counters[name] != 0:
+            raise RuntimeError(f"native projection reported forbidden scalar work: {name}")
+    if counters.get("encoded_compiler_gil_released") is not True:
+        raise RuntimeError("native projection did not report native compilation")
+    diagnostics = cast(list[Mapping[str, object]], payload.get("diagnostics", []))
+    if any(item.get("severity") == "error" for item in diagnostics):
+        raise RuntimeError("native projection reported an error")
+    return payload
+
+
 class SharedProjectionAdapter:
     """Thread-safe projection/cache facade retaining the exact shared snapshot."""
 
@@ -347,11 +391,15 @@ class SharedProjectionAdapter:
         snapshot: OntologyView,
         settings: ProjectorSettings | None = None,
         *,
-        projector: Projector | None = None,
+        projector: NativeProjector | None = None,
     ) -> None:
+        if projector is not None and not isinstance(projector, NativeProjector):
+            raise TypeError(
+                "Exact requires NativeProjector; injectable scalar fallback is forbidden"
+            )
         self.snapshot = retain_ontology_view(snapshot)
         self.settings = settings or ProjectorSettings()
-        self.projector = projector or Projector()
+        self.projector = projector or NativeProjector()
         self._cache: dict[ProjectionCacheKey, tuple[Edge, ...]] = {}
         self._lock = RLock()
 
@@ -387,6 +435,7 @@ class SharedProjectionAdapter:
                         backend=self.settings.backend,
                     )
                     rows = self.projector.project(self.snapshot, options=options)
+                require_native_report(self.projector)
                 cached = tuple(Edge(row.source, row.relation, row.destination) for row in rows)
                 self._cache[key] = cached
         return list(cached)

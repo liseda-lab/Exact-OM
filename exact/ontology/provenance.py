@@ -21,6 +21,7 @@ from exact.ontology.projection import (
     _validate_encoded_compiler_handoff,
     encoded_contract_identity,
     projector_cache_identity,
+    require_native_report,
 )
 from exact.ontology.versions import distribution_version
 from exact.ontology.view_contract import retain_ontology_view
@@ -266,7 +267,7 @@ def _projector_provenance(
     last_report = getattr(projector, "last_report", None)
     last_projection: dict[str, object] | None
     if last_report is not None:
-        last_projection = cast(dict[str, object], last_report.to_dict())
+        last_projection = require_native_report(projector)
         last = cast(dict[str, object], last_projection["provenance"])
         selected = str(last["selected_backend"])
         fallback_reason = None

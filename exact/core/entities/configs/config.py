@@ -458,15 +458,20 @@ class DatasetLegacyConfig(StrictConfigModel):
 class ProjectorConfig(StrictConfigModel):
     """Shared OWL projector selection; semantics remain versioned upstream."""
 
-    backend: Literal["auto", "native", "python"] = Field(
-        "auto",
-        description="Projector backend selection with complete Python fallback.",
+    backend: Literal["native"] = Field(
+        "native",
+        description="Native encoded OWL projection; Python and automatic fallback are forbidden.",
     )
     profile: str = Field(
         "mowl-d993536-v1",
         min_length=1,
         description="Versioned shared-projector compatibility profile.",
     )
+
+    @field_validator("backend", mode="before")
+    @classmethod
+    def normalize_legacy_auto(cls, value: object) -> object:
+        return "native" if value == "auto" else value
 
 
 class DatasetConfig(StrictConfigModel):

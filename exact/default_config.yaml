@@ -277,8 +277,8 @@ dataset:
   projection_include_literals: true
   # Shared OWL projector profile and backend selection.
   projector:
-    # Projector backend selection with complete Python fallback.
-    backend: auto
+    # Native encoded OWL projection; Python and automatic fallback are forbidden.
+    backend: native
     # Versioned shared-projector compatibility profile.
     profile: mowl-d993536-v1
   # Maximum hierarchy depth collected for each configured family.

@@ -183,7 +183,7 @@ def test_overlay_and_composite_views_retain_identity_through_exact_consumers():
 
     for view, owner_kind in ((overlay, "overlay"), (composite, "composite")):
         source = load_ontology(view)
-        source.configure_projector(backend="python")
+        source.configure_projector(backend="native")
 
         assert source.owl_snapshot() is view
         assert source.reasoner.ontology is view
@@ -246,16 +246,23 @@ def test_projector_encoded_native_parity_preserves_layered_view_identity():
     composite = pyowl_core.compose_views(overlay, target, roles=("source", "target"))
 
     for view in (base, overlay, composite):
-        python = load_ontology(view)
+        python = shared_projector.Projector()
         native = load_ontology(view)
-        python.configure_projector(backend="python")
+        expected = python.project(
+            view,
+            options=shared_projector.ProjectionOptions(
+                backend="python", duplicates="unique", order="canonical"
+            ),
+        )
         native.configure_projector(backend="native")
 
-        assert native.projection_edges() == python.projection_edges()
+        assert [edge.astuple() for edge in native.projection_edges()] == [
+            (edge.source, edge.relation, edge.destination) for edge in expected
+        ]
         assert native.projector.last_view is view
-        assert python.projector.last_view is view
+        assert python.last_view is view
         native_report = native.projector.last_report.to_dict()["provenance"]
-        python_report = python.projector.last_report.to_dict()["provenance"]
+        python_report = python.last_report.to_dict()["provenance"]
         assert native_report["counts"] == python_report["counts"]
         assert native_report["diagnostics_digest"] == python_report["diagnostics_digest"]
         ingestion = native_report["ingestion"]
@@ -324,7 +331,7 @@ def test_projection_only_source_does_not_eagerly_build_exact_feature_indexes():
     }
 
     assert feature_indexes.isdisjoint(source.__dict__)
-    source.configure_projector(backend="python")
+    source.configure_projector(backend="native")
     assert source.projection_edges()
     assert feature_indexes.isdisjoint(source.__dict__)
 
@@ -335,7 +342,7 @@ def test_projection_only_source_does_not_eagerly_build_exact_feature_indexes():
 
 def test_projection_cache_key_covers_shared_semantic_versions():
     source = load_ontology(FIXTURE)
-    source.configure_projector(backend="python", profile="mowl-d993536-v1")
+    source.configure_projector(backend="native", profile="mowl-d993536-v1")
 
     assert len(source.projection_edges()) == 42
     assert len(source.projection_edges()) == 42
@@ -344,7 +351,7 @@ def test_projection_cache_key_covers_shared_semantic_versions():
     assert len(keys) == 1
     assert keys[0] == cache_key(
         source.owl_snapshot(),
-        ProjectorSettings(backend="python"),
+        ProjectorSettings(backend="native"),
         method="owl2vecstar",
         include_literals=False,
     )
@@ -361,7 +368,7 @@ def test_projection_cache_key_covers_shared_semantic_versions():
 
 def test_projection_cache_key_invalidates_on_public_descriptor_change(monkeypatch):
     source = load_ontology(FIXTURE)
-    settings = ProjectorSettings(backend="python")
+    settings = ProjectorSettings(backend="native")
     before = cache_key(
         source.owl_snapshot(),
         settings,

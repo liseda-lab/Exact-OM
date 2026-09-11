@@ -200,41 +200,39 @@ def test_projector_public_owner_matrix_preserves_identity_results_and_ledgers(
     with _public_owners(tmp_path) as owners:
         assert tuple(owners) == OWNER_KINDS
         for owner_kind, view in owners.items():
-            with _forbid_exact_conversion():
-                scalar_edges, scalar = _project(view, "python")
-                native_edges, native = _project(view, "native")
+            oracle = pyowl2vec_star_projector.Projector()
+            rows = oracle.project(
+                view,
+                options=pyowl2vec_star_projector.ProjectionOptions(
+                    backend="python", duplicates="unique", order="canonical"
+                ),
+            )
+            scalar_edges = tuple((row.source, row.relation, row.destination) for row in rows)
             expected_edges = scalar_edges if expected_edges is None else expected_edges
+            if owner_kind == "mmap":
+                # The installed native compiler cannot retain this owner's buffers.
+                # Exact must reject it instead of quietly compiling scalar rows.
+                with _forbid_exact_conversion(), pytest.raises(
+                    pyowl2vec_star_projector.NativeBackendUnavailableError,
+                    match="forbids scalar projection",
+                ):
+                    _project(view, "native")
+                continue
+            with _forbid_exact_conversion():
+                native_edges, native = _project(view, "native")
             assert scalar_edges == native_edges == expected_edges
-            assert scalar["consumer_handoff"]["core"]["owner_kind"] == owner_kind
             assert native["consumer_handoff"]["core"]["owner_kind"] == owner_kind
-
-            scalar_handoff = scalar["consumer_handoff"]["projector"]
             native_handoff = native["consumer_handoff"]["projector"]
-            assert scalar_handoff["ingestion_path"] == "scalar-python"
-            _assert_scalar_encoded_resources_are_empty(scalar_handoff["counters"])
-            expected_path = CONTRACT["projector_handoff"]["tested_owner_ingestion_paths"][
-                owner_kind
-            ]
-            assert native_handoff["ingestion_path"] == expected_path
-            if expected_path == "encoded-native":
-                _assert_advertised_ledger(native_handoff["counters"], PROJECTOR_COUNTERS)
-                assert native_handoff["schema_name"] == CONTRACT["encoded_contract"]["schema_name"]
-                assert (
-                    native_handoff["schema_version"]
-                    == CONTRACT["encoded_contract"]["schema_version"]
-                )
-                assert (
-                    native_handoff["descriptor_sha256"]
-                    == CONTRACT["encoded_contract"]["descriptor_sha256"]
-                )
-            else:
-                assert owner_kind == "mmap"
-                assert set(native_handoff["counters"]) == PROJECTOR_SCALAR_COUNTERS
-                _assert_scalar_encoded_resources_are_empty(native_handoff["counters"])
-                fallback_reason = native["projector"]["last_projection"]["provenance"]["ingestion"][
-                    "reason"
-                ]
-                assert "zero-copy retention requires" in fallback_reason
+            assert native_handoff["ingestion_path"] == "encoded-native"
+            _assert_advertised_ledger(native_handoff["counters"], PROJECTOR_COUNTERS)
+            assert native_handoff["schema_name"] == CONTRACT["encoded_contract"]["schema_name"]
+            assert (
+                native_handoff["schema_version"] == CONTRACT["encoded_contract"]["schema_version"]
+            )
+            assert (
+                native_handoff["descriptor_sha256"]
+                == CONTRACT["encoded_contract"]["descriptor_sha256"]
+            )
             semantic_fingerprints.add(
                 (
                     native["core"]["fingerprints"]["logical"],
