@@ -3,6 +3,8 @@
 **Design revision: 2026-09-10 (E04 benchmark-NIL scope). Implementation validation: 2026-09-10; long campaign not started.**
 See [PREPARATION-STATUS.md](PREPARATION-STATUS.md) for current code, input and operational evidence.
 [G0-VALIDATION.md](G0-VALIDATION.md) records the detached validation handoff;
+[NATIVE-PREPROCESSING.md](NATIVE-PREPROCESSING.md) describes the native-only repair and bounded
+model-free measurement workflow;
 [LABELS-AND-SUBMISSIONS.md](LABELS-AND-SUBMISSIONS.md) records the private-label boundary and
 reference-free final submission formats.
 This revision implements the accepted 2026-09-07 review and the user's single-node, 2–3 week

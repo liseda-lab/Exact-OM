@@ -103,13 +103,19 @@ adapter plus existing IO sources pass 20. The declaration-repair helper passes s
 These overlapping focused suites are not a new full-suite test count. Current scoped static
 checks, strict documentation build and five import boundary contracts pass.
 
-The seven-repeat fixture benchmark check fails six historical timing thresholds. Repeating the
-same command at unchanged pre-implementation revision
-`655f599e714e13d592f702f326ca5a36f6b50b2f`, in the same environment, fails the same six thresholds.
-For example hierarchy medians are 0.11196 s current / 0.11076 s baseline and closure medians
-0.11837 s / 0.11703 s. Profiling locates most hierarchy time in the installed pyowl native-storage
-index/canonicalization path; the projector also reports its Python backend. Thresholds were not
-relaxed. Full-ontology resource estimates must use this node's measured backend behavior.
+Historical seven-repeat fixture checks failed six timing thresholds. Repeating the same
+command at unchanged pre-implementation revision
+`655f599e714e13d592f702f326ca5a36f6b50b2f`, in the same environment, failed the same six thresholds.
+Before the native preprocessing repair, recorded hierarchy medians were 0.11196 s / 0.11076 s
+baseline and closure medians were 0.11837 s / 0.11703 s. Those profiles located substantial
+hierarchy cost in native-storage index/canonicalization, while projection reported Python.
+These measurements remain historical evidence; thresholds were not relaxed.
+
+The subsequent repair requires native loading and encoded-native projection without scalar
+fallback, lazy graph labels and typed axiom partitions. Its fixture checks do not establish a
+new full-ontology runtime. [NATIVE-PREPROCESSING.md](NATIVE-PREPROCESSING.md) records the bounded
+model-free benchmark workflow, compatibility limits and evidence required before revising
+resource estimates. Old cold64 timings and cumulative budget charges remain unchanged.
 
 Before admitting real screens, complete G0's prescribed full-input memory/throughput probe,
 300-source vertical acceptance and cost forecast, validate the hosted credential/profile,
