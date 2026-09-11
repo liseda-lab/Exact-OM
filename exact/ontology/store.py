@@ -51,6 +51,7 @@ from exact.core.contracts.knowledge import KnowledgeSource
 from exact.core.entities.graph import AnnotationValue, Edge
 from exact.core.entities.kinds import EntityKind
 from exact.core.values import ANNOTATION_IRI
+from exact.ontology.index_views import TypedClassHierarchyView
 from exact.ontology.projection import ProjectorSettings, SharedProjectionAdapter
 from exact.ontology.view_contract import native_load_options, retain_ontology_view
 
@@ -501,7 +502,7 @@ class OwlOntologySource(KnowledgeSource):
 
     @cached_property
     def _class_view(self) -> AssertedClassHierarchyView:
-        return self._snapshot.view(AssertedClassHierarchyView, include_origins=False)
+        return self._snapshot.view(TypedClassHierarchyView, include_origins=False)
 
     @cached_property
     def _property_view(self) -> AssertedPropertyHierarchyView:
