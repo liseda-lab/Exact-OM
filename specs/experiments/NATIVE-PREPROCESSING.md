@@ -74,6 +74,14 @@ times overlap and must not be added together. A start without an end identifies 
 boundary when an external timeout stops the process. Native provenance is saved immediately
 after successful projection, before annotation or feature work can time out.
 
+Use boundary timers and fatal-error-only trace capture in the current Python 3.12.3
+environment. A standalone Python-only diagnostic reproduced a SIGSEGV from periodic
+`faulthandler.dump_traceback_later`; avoid that watchdog when profiling native calls here.
+The symptom matches reported [frame traversal](https://github.com/python/cpython/issues/140815)
+and [thread-state traversal](https://github.com/python/cpython/issues/116008) crashes.
+A sampled stack is not a crash backtrace: an interrupted dump does not identify the faulting
+native operation. Preserve the failed run and compare a run without periodic dumping.
+
 This benchmark is operational evidence, not a G0 pass or campaign admission. It omits retrieval,
 encoding, fitted heads, hosted judgment, extraction and end-to-end recovery checks. Preserve
 all earlier timings and attempts, including cold64's original worker duration and cumulative
