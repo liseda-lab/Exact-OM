@@ -53,18 +53,26 @@ full-ontology loading or projection.
 
 The report records input/import and implementation hashes, native execution evidence, entity
 selection, counts and signature/exclusion/label/edge/feature digests. Ordered phases measure
-load, signature, projection, edge hashing, exclusions, labels, graph construction, feature
-wrapper initialization, cold feature lookup, cached feature lookup and provenance. Times are
+load, signature, projection, native provenance, edge hashing, exclusions, labels, graph
+construction, feature wrapper initialization, cold feature lookup and cached feature lookup. Times are
 incremental in that order; RSS is the cumulative process high-water mark. Cached lookup time
 is not cold throughput. Compare digests with identical input bytes, settings and selected
 entities when assessing a repair.
 
 Reports are written at phase boundaries. If a timeout kills native code, the last phase may
 remain `running`; that is incomplete evidence. Existing reports cannot be overwritten. The
-six focused tests in `tests/native_preprocessing_benchmark_test.py` cover native fixture
+focused tests in `tests/native_preprocessing_benchmark_test.py` cover native fixture
 execution, stable digests, pinned imports, forbidden model/network calls and failure records.
 The native bridge has separate parity and fallback-rejection tests in
 `tests/ontology_native_projection_test.py`.
+
+For a stalled projection, add `--profile-stages PATH.jsonl`. The optional diagnostic records
+nested start/end events with wall and CPU durations for the cache key, encoded publication,
+native preparation, edge delivery, report construction and adapter checks. It wraps the
+existing calls and restores them afterward; it does not change projection semantics. Nested
+times overlap and must not be added together. A start without an end identifies the active
+boundary when an external timeout stops the process. Native provenance is saved immediately
+after successful projection, before annotation or feature work can time out.
 
 This benchmark is operational evidence, not a G0 pass or campaign admission. It omits retrieval,
 encoding, fitted heads, hosted judgment, extraction and end-to-end recovery checks. Preserve

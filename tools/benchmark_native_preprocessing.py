@@ -16,8 +16,11 @@ import platform
 import resource
 import sys
 import time
+from contextlib import contextmanager
+from dataclasses import asdict
+from functools import wraps
 from pathlib import Path
-from typing import Any, Callable, Iterable
+from typing import Any, Callable, Iterable, Iterator
 
 import yaml
 
@@ -56,6 +59,93 @@ def _write(path: Path, payload: dict[str, Any]) -> None:
     temporary.replace(path)
 
 
+@contextmanager
+def _profile_boundaries(path: Path | None) -> Iterator[None]:
+    """Time diagnostic boundaries without changing arguments, results or iteration."""
+    if path is None:
+        yield
+        return
+    import exact.ontology.native_projection as native
+    import exact.ontology.projection as projection
+
+    boundaries = (
+        (projection.SharedProjectionAdapter, "edges", "adapter_total", False),
+        (projection, "cache_key", "cache_key_and_fingerprints", False),
+        (native.NativeProjector, "_project", "native_projection_total", False),
+        (native, "select_ingestion", "native_ingestion_selection", False),
+        (native, "prepare_native_encoded_compilation", "native_prepare_compile", False),
+        (native, "iter_edge_policy", "edge_policy_iteration", True),
+        (native.NativeProjector, "_report", "native_report", False),
+        (projection, "require_native_report", "adapter_report_validation", False),
+    )
+    path.parent.mkdir(parents=True, exist_ok=True)
+    originals: list[tuple[Any, str, Any, bool]] = []
+    with path.open("x", encoding="utf-8") as stream:
+        started = time.perf_counter()
+        stack: list[int] = []
+        calls = 0
+
+        def emit(row: dict[str, Any]) -> None:
+            stream.write(json.dumps(row, sort_keys=True, allow_nan=False) + "\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+
+        @contextmanager
+        def span(name: str) -> Iterator[None]:
+            nonlocal calls
+            calls += 1
+            call = calls
+            wall, cpu = time.perf_counter(), time.process_time()
+            row = {
+                "stage": name,
+                "call": call,
+                "parent_call": stack[-1] if stack else None,
+                "elapsed_start_seconds": wall - started,
+            }
+            emit({**row, "status": "running"})
+            stack.append(call)
+            status = "failed"
+            try:
+                yield
+                status = "complete"
+            finally:
+                stack.pop()
+                emit(
+                    {
+                        **row,
+                        "status": status,
+                        "wall_seconds": time.perf_counter() - wall,
+                        "cpu_seconds": time.process_time() - cpu,
+                    }
+                )
+
+        def instrument(original: Callable, name: str, iterable: bool) -> Callable:
+            @wraps(original)
+            def call(*args, **kwargs):
+                with span(name):
+                    return original(*args, **kwargs)
+
+            @wraps(original)
+            def iterate(*args, **kwargs):
+                with span(name):
+                    yield from original(*args, **kwargs)
+
+            return iterate if iterable else call
+
+        try:
+            for owner, attribute, name, iterable in boundaries:
+                original = getattr(owner, attribute)
+                originals.append((owner, attribute, original, attribute in vars(owner)))
+                setattr(owner, attribute, instrument(original, name, iterable))
+            yield
+        finally:
+            for owner, attribute, original, owned in reversed(originals):
+                if owned:
+                    setattr(owner, attribute, original)
+                else:
+                    delattr(owner, attribute)
+
+
 def benchmark(
     config_path: Path,
     output: Path,
@@ -63,6 +153,7 @@ def benchmark(
     side: str = "source",
     entity_limit: int = 64,
     entities_path: Path | None = None,
+    profile_stages: Path | None = None,
 ) -> dict[str, Any]:
     """Record model-free costs and semantic digests using the actual Exact facade."""
     started = time.perf_counter()
@@ -70,6 +161,8 @@ def benchmark(
         raise ValueError("side must be source/target and entity_limit must be positive")
     if output.exists():
         raise FileExistsError(f"Refusing to overwrite benchmark evidence: {output}")
+    if profile_stages is not None and profile_stages.exists():
+        raise FileExistsError(f"Refusing to overwrite profiling evidence: {profile_stages}")
     config = yaml.safe_load(config_path.read_text())
     parameters = dict(config["dataset"])
     parameters.update(parameters.pop("legacy", {}) or {})
@@ -122,6 +215,12 @@ def benchmark(
             "entity_selection": "explicit_IRIs" if entities_path else "sha256(seed,kind,IRI)",
         },
         "scope": "Single-ontology preprocessing; no reference, candidate, encoder or LLM calls",
+        "boundary_profile": {
+            "path": str(profile_stages) if profile_stages else None,
+            "enabled": profile_stages is not None,
+            "scope": "First projection only; nested inclusive spans; boundary logging overhead included",
+            "adapter_remainder": "Includes row conversion, cache publication and other uninstrumented adapter work",
+        },
         "timing_semantics": "Sequential incremental phases; RSS is cumulative process high-water mark",
         "phases": [],
     }
@@ -174,9 +273,16 @@ def benchmark(
             "sha256": _digest(sorted(signatures.items())),
         }
         include_literals = bool(parameters.get("projection_include_literals", False))
-        edges = phase(
-            "projection", lambda: source.projection_edges(include_literals=include_literals)
-        )
+        with _profile_boundaries(profile_stages):
+            edges = phase(
+                "projection", lambda: source.projection_edges(include_literals=include_literals)
+            )
+        spill = getattr(getattr(source, "projector", None), "last_spill_metrics", None)
+        report["projection_spill"] = asdict(spill) if spill is not None else None
+        report["ontology_stack"] = phase("provenance", source.ontology_stack_provenance)
+        if report["ontology_stack"]["projector"]["selection"]["effective"] != "native":
+            raise ValueError("Projection did not use the native backend")
+        _write(output, report)
         report["edges"] = {
             "count": len(edges),
             "sha256": phase(
@@ -262,9 +368,6 @@ def benchmark(
         )
         if _digest(warm) != report["features"]["sha256"]:
             raise ValueError("Cached entity features changed semantics")
-        report["ontology_stack"] = phase("provenance", source.ontology_stack_provenance)
-        if report["ontology_stack"]["projector"]["selection"]["effective"] != "native":
-            raise ValueError("Projection did not use the native backend")
         report["status"] = "complete"
     except BaseException as exc:
         report.update(status="failed", failure={"type": type(exc).__name__, "message": str(exc)})
@@ -282,6 +385,9 @@ def main() -> None:
     parser.add_argument("--side", choices=("source", "target"), default="source")
     parser.add_argument("--entity-limit", type=int, default=64)
     parser.add_argument("--entities", type=Path, help="Optional frozen entity IRIs, one per line")
+    parser.add_argument(
+        "--profile-stages", type=Path, help="Optional new JSONL file for native boundary timings"
+    )
     args = parser.parse_args()
     benchmark(
         args.config,
@@ -289,6 +395,7 @@ def main() -> None:
         side=args.side,
         entity_limit=args.entity_limit,
         entities_path=args.entities,
+        profile_stages=args.profile_stages,
     )
 
 
