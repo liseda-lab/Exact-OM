@@ -157,6 +157,9 @@ equivalence before rebuilding it could avoid duplicate work. Neither opportunity
 isolated speedup measurement yet. Split native edge generation from canonical handling
 before attributing the remaining 920 seconds, and retain exclusions as a separate bottleneck.
 
+The broader [native stack audit](NATIVE-STACK-AUDIT.md) inspects all four upstream
+repositories, including native annotation lookup complexity and reasoner query reuse.
+
 ## Remaining experiment work
 
 These are confirmed structural reuse limits, not measured post-repair costs. Use the bounded
