@@ -5,6 +5,8 @@ See [PREPARATION-STATUS.md](PREPARATION-STATUS.md) for current code, input and o
 [G0-VALIDATION.md](G0-VALIDATION.md) records the detached validation handoff;
 [NATIVE-PREPROCESSING.md](NATIVE-PREPROCESSING.md) describes the native-only repair and bounded
 model-free measurement workflow;
+[the native optimization plan](../native-optimization/README.md) specifies behavior-preserving
+upstream performance work and its correctness/resource gates;
 [LABELS-AND-SUBMISSIONS.md](LABELS-AND-SUBMISSIONS.md) records the private-label boundary and
 reference-free final submission formats.
 This revision implements the accepted 2026-09-07 review and the user's single-node, 2–3 week

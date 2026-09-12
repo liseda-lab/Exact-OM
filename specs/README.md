@@ -4,6 +4,11 @@
 - **Audience**: implementation agents executing the work packages (WPs) below. Each WP spec is self-contained, but read this file, `01-target-architecture.md`, and `02-shared-contracts.md` before starting any WP.
 - **Prime directive**: this is a research system with published results. Unless a spec explicitly says otherwise, changes are **behavior-preserving** — same alignments, same scores, same output files — verified by tests and by the parity gates defined in WP-B.
 
+**Native performance follow-up (2026-09-12):**
+[implementation plan and specs](native-optimization/README.md) for behavior-preserving
+optimization of pyOWLCore, the projector, pyELK and pyHermiT. This is separate from the
+historical overhaul and migration/release scope below.
+
 ## Goals
 
 1. **Code quality & organization** — remove accumulated iteration cruft, dead code, oversized modules, packaging bugs (WP-A, WP-D).
