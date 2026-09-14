@@ -8,6 +8,7 @@ from functools import lru_cache
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import distribution as installed_distribution
 from importlib.metadata import version
+from importlib.util import find_spec
 from pathlib import Path
 
 
@@ -44,6 +45,19 @@ def distribution_code_fingerprint(name: str) -> str | None:
         metadata = installed_distribution(name)
     except PackageNotFoundError:
         return None
+    module_name = {
+        "pyowl-core": "pyowl_core",
+        "pyowl2vec-star-projector": "pyowl2vec_star_projector",
+        "pyelk-reasoner": "pyelk",
+        "pyhermit": "pyhermit",
+    }.get(name)
+    if module_name is not None:
+        spec = find_spec(module_name)
+        expected = Path(str(metadata.locate_file(f"{module_name}/__init__.py"))).resolve()
+        if spec is None or spec.origin is None or Path(spec.origin).resolve() != expected:
+            raise RuntimeError(
+                f"{name} import does not resolve to its fingerprinted installed wheel"
+            )
     files = {}
     for entry in metadata.files or ():
         relative = Path(str(entry))

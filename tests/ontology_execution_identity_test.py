@@ -64,3 +64,25 @@ def test_dataset_cache_identity_tracks_only_selected_native_dependencies(monkeyp
     assert reasoning.reasoner_cache_identity("hermit") != hermit
     revisions["pyowl-core"] = "rebuilt-core"
     assert projection.projector_cache_identity(projection.ProjectorSettings()) != projector
+
+
+def test_same_version_source_shadow_cannot_claim_installed_wheel_identity(tmp_path, monkeypatch):
+    installed = tmp_path / "installed" / "pyhermit"
+    shadow = tmp_path / "source" / "pyhermit"
+    for path in (installed, shadow):
+        path.mkdir(parents=True)
+        (path / "__init__.py").write_text('__version__ = "0.2.0"\n')
+    monkeypatch.setattr(
+        versions,
+        "installed_distribution",
+        lambda name: SimpleNamespace(
+            version="0.2.0",
+            files=[Path("pyhermit/__init__.py")],
+            locate_file=lambda entry: installed.parent / entry,
+        ),
+    )
+    monkeypatch.setattr(
+        versions, "find_spec", lambda name: SimpleNamespace(origin=str(shadow / "__init__.py"))
+    )
+    with pytest.raises(RuntimeError, match="fingerprinted installed wheel"):
+        versions.distribution_code_fingerprint("pyhermit")
