@@ -173,12 +173,13 @@ def test_streaming_edge_digest_matches_public_projector_artifact_contract() -> N
 
 
 def test_scale_measurement_records_path_free_wpn_handoff_evidence(monkeypatch) -> None:
-    from pyowl2vec_star_projector import Projector
+    import pyowl2vec_star_projector.api as projector_api
 
     def forbidden(*args, **kwargs):
-        raise AssertionError("Scale benchmark must not enter inherited streaming projection")
+        raise AssertionError("Scale benchmark must not enter scalar projection")
 
-    monkeypatch.setattr(Projector, "iter_edges", forbidden)
+    monkeypatch.setattr(projector_api, "prepare_streaming_compilation", forbidden)
+    monkeypatch.setattr(projector_api, "prepare_encoded_subset_compilation", forbidden)
     path = FIXTURES / "mini_src.owl"
 
     result = measure(
@@ -211,6 +212,8 @@ def test_scale_measurement_records_path_free_wpn_handoff_evidence(monkeypatch) -
     assert projection["encoded_view_publication_seconds"] >= 0.0
     assert projection["publication_compile_timing_note"] is None
     assert projection["consumer"]["counters"]["materialized_scalar_rows"] == 0
+    assert projection["consumer"]["counters"]["native_validation_receipt"] is True
+    assert projection["consumer"]["counters"]["native_canonical_sort_calls"] >= 1
     assert projection["edges"] > 0
     assert len(projection["result_sha256"]) == 64
     assert projection["result_sha256"] == result["projection_cache"]["result_sha256"]
