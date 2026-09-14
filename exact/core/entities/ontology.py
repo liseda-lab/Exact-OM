@@ -403,6 +403,9 @@ class OntologyGraph:
                         continue
                     seen.add(triple)
                     triples.append(triple)
+        # Feature budgets use stable score sorts: tied edges must have a defined
+        # order before truncation, independent of set/hash or projection order.
+        triples.sort()
         self._raw_neighborhood_cache[key] = list(triples)
         return triples
 

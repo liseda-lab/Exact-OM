@@ -73,7 +73,7 @@ class PairAdaptiveContextDataset(ContextDataset):
         payload = super()._cache_fingerprint_payload()
         payload.update(
             {
-                "evidence_schema": 2,
+                "evidence_schema": 3,
                 "projection_include_literals": self.projection_include_literals,
                 "hierarchical_relation_families": self.hierarchical_relation_families,
                 "hierarchy_max_depth": self.hierarchy_max_depth,
