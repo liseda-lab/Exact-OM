@@ -185,32 +185,73 @@ ELK mypy reports an existing unreachable statement in `reasoning/completeness.py
 newer Rust clippy rejects the pre-existing large `NativeError` result type, also used by new
 bindings. Neither is represented as a clean full-repository check.
 
+## First T4 result and feature-order correction
+
+The immutable first attempt, `native-optimization-01/job.json`, stopped with
+`semantic_mismatch`. NCIT finished normally in 502.7 seconds; inputs, effective axiom count,
+signatures, canonical edges, exclusions, labels and selected entities matched. The 64-feature
+digest differed, so DOID did not start. This attempt is not recorded as passed.
+
+The investigation reproduced a pre-existing correctness defect: Python set iteration supplied
+neighborhood triples to a stable score-only sort and truncation. Identical 12-edge graphs
+retained different top-four neighbors under four interpreter hash seeds. Both affected files
+were unchanged since baseline `00941f5`; their blob IDs and the full reproduction are retained
+in `native-optimization-02/correction-evidence.json` and `baseline-ordering-repro.json`.
+
+Separate correctness commit `eb3d86a` sorts only the requested unique neighborhood triples by
+(source, relation, destination) before the existing ranking and truncation. This establishes a
+stable tie order without changing edges, scores or budgets. Dataset evidence schema 3 rejects
+cached features selected under the old policy; recovery already binds extraction to graph code.
+This is an explicit baseline-bug resolution, not a claim that one historical arbitrary ordering
+must be reproduced. Commit `eb1abcb` saves exact hashed feature rows in `.features.jsonl`, without
+normalizing lists or overwriting old evidence.
+
+The correction passes 42 focused regressions; scoped formatting/type checks pass. The original
+class logic matches 1,920 tiny comparisons across 32 graphs, and annotation fixtures match across
+imports, nested annotations, language tags, datatypes and duplicate roots. The complete paired
+wrapper passes six ordered feature rows in `native-optimization-02/smoke02/source.oracle.json`.
+The first tiny wrapper failure is preserved in `smoke/`; its overly strict asserted-adapter guard
+was corrected before the real input was restarted.
+
 ## Detached T4 handoff
 
-The prepared gate is now running in tmux session `exact-native-validation`, launcher PID
-`1133887`. Its authoritative terminal result will be
-`data/experiments-v2/native-optimization-01/job.json`; the tracked manifest records the launch
-state, not an automatic promise of success. Monitor from the Exact repository with:
+The second gate is running in tmux session `exact-native-validation`, launcher PID `1167866`.
+Its authoritative terminal result will be `data/experiments-v2/native-optimization-02/job.json`.
+The tracked manifest records the launch state, not an automatic promise of success. Monitor from
+the Exact repository with:
 
 ```sh
-watch -n 10 cat data/experiments-v2/native-optimization-01/job.json
+watch -n 10 cat data/experiments-v2/native-optimization-02/job.json
 ```
 
-`source.stages.jsonl` and `target.stages.jsonl` contain phase progress. Each side has a
-`.log`, `.fatal.log`, result `.json` and terminal `.exitcode`. The launcher runs source and
-target sequentially in fresh processes, with ceilings of 120 and 30 minutes respectively.
-The current address-space cap is 50,294,480,896 bytes (below 48 GiB), with 12 GiB initial
-headroom reserved. BLAS is capped at two threads; native import parsing retains its declared
-eight-thread cap. All compiler builds stopped before launch. Periodic traceback sampling is
-disabled; fatal-only capture remains enabled.
+The same native wheels, frozen 64-entity selections, configuration and locked imports are used.
+The gate still compares input/import identities, effective axiom counts, signatures, canonical
+edges, exclusions and labels with the saved baselines. The unstable historical feature hash is
+retained and reported separately; it is not replaced with a candidate-generated golden.
 
-The gate uses frozen 64-entity selections, unchanged configuration and locked import hashes.
-It compares input/import identities, effective axiom counts, signatures, canonical edges,
-exclusions, labels and selected feature outputs with retained NCIT/DOID baselines. A failure
-or mismatch stops the sequence and preserves the attempt; no automatic retry is scheduled.
-No model, encoder, reference-label or G0 calls are made. The result does not establish
-large-ontology reasoner performance or admit a scientific experiment block.
+After candidate timing finishes, the same retained native snapshot feeds a bounded test-only
+reference using the pinned original hierarchy algorithms and original annotation conversion.
+Both feature builders use the separately corrected deterministic neighborhood policy. Acceptance
+requires exact ordered agreement for all 64 complete feature rows, including matching digests and
+counts. Candidate and reference rows are retained separately. No second ontology load, projection
+or whole-ontology annotation materialization is required.
 
-N11 remains `in_progress` until this comparison passes. No end-to-end timing improvement is
-claimed before inspecting the completed measurement. N08 and N10 retain their explicit
-conditional dispositions above.
+The reference shares native parsing, native annotation selection, verified edges and unchanged
+IC statistics. Its selection substrate is tested separately against complete small raw-axiom
+scans; this is not an independent full ontology parser/index oracle. Class hierarchy construction
+uses independently consumed typed rows and original algorithms, with a 400,000-row/120-second
+constructor bound. It rejects limits without truncation. Oracle wall time and lifetime peak RSS
+are recorded separately from the completed candidate preprocessing measurement.
+
+`source.stages.jsonl`/`target.stages.jsonl` show candidate phase progress; `source.oracle.json`/
+`target.oracle.json` show the subsequent feature check. Each side also has `.log`, `.fatal.log`,
+result `.json` and terminal `.exitcode` files. Source and target run sequentially in fresh
+processes, with 120- and 30-minute total ceilings. The second attempt's address-space cap is
+50,082,639,872 bytes (below 48 GiB), retaining 12 GiB initial headroom. BLAS uses two threads;
+native imports retain their eight-thread cap. GPU visibility is disabled. No compiler builds
+compete with the job; fatal-only trace capture is used.
+
+Failures or mismatches stop the sequence and preserve the attempt. No automatic retry, model,
+encoder, reference-label or G0 calls are made. N11 remains `in_progress` until the comparison
+passes; neither large-ontology reasoner performance nor scientific campaign admission follows
+from this preprocessing gate. N08 and N10 retain their explicit conditional dispositions.

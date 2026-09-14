@@ -272,10 +272,31 @@
         "data/experiments-v2/native-optimization-01/core-n04-index-evidence.json",
         "data/experiments-v2/native-optimization-01/elk_workers.json",
         "data/experiments-v2/native-optimization-01/quality-final.json",
-        "data/experiments-v2/native-optimization-01/job.json"
+        "data/experiments-v2/native-optimization-01/job.json",
+        "data/experiments-v2/native-optimization-02/correction-evidence.json",
+        "data/experiments-v2/native-optimization-02/regressions.json",
+        "data/experiments-v2/native-optimization-02/smoke02/source.oracle.json",
+        "data/experiments-v2/native-optimization-02/job.json"
       ],
       "installed_T3": "passed",
-      "real_input_T4": "running"
+      "real_input_T4": "running",
+      "previous_real_input_attempts": [
+        {
+          "evidence": "data/experiments-v2/native-optimization-01/job.json",
+          "status": "semantic_mismatch",
+          "matched": [
+            "input",
+            "signature",
+            "edges",
+            "exclusions",
+            "labels",
+            "entities",
+            "effective_axiom_count"
+          ],
+          "mismatch": "features"
+        }
+      ],
+      "real_input_feature_policy": "exact ordered candidate/legacy comparison under separately corrected deterministic neighborhood ordering; historical hash mismatch retained"
     },
     "packages": {
       "pyowl-core": {
@@ -491,7 +512,8 @@
         "projector profile and options",
         "canonical projection edges",
         "reasoner query answers"
-      ]
+      ],
+      "feature_evidence_schema": 3
     }
   }
 }
