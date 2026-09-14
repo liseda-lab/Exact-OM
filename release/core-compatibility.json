@@ -262,8 +262,9 @@
     "version_alone_identifies_artifacts": false,
     "verification": {
       "artifact_bindings": "pending",
-      "full_input_T3": "pending",
-      "evidence": []
+      "evidence": [],
+      "installed_T3": "pending",
+      "real_input_T4": "pending"
     },
     "packages": {
       "pyowl-core": {
@@ -390,6 +391,7 @@
       ],
       "required_zero_counters": [
         "base_flattening_bytes",
+        "encoded_indexed_buffer_count",
         "materialized_scalar_rows",
         "parser_calls",
         "per_row_ffi_calls",

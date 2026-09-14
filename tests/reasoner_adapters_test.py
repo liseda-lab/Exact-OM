@@ -416,17 +416,29 @@ def test_exact_rejects_python_reasoning_before_construction(
         load_reasoner(reasoner_name, reasoning_source, backend="python")
 
 
-def test_failed_native_result_attestation_does_not_publish(reasoning_source, monkeypatch):
+@pytest.mark.parametrize(
+    ("counter", "value", "message"),
+    [
+        ("native_result_validation", False, "native pipeline"),
+        ("native_metadata_domain_copies", 1, "forbidden scalar work"),
+        ("encoded_indexed_buffer_count", 1, "forbidden scalar work"),
+        ("base_flattening_bytes", 1, "forbidden scalar work"),
+        ("structural_copy_bytes", 1, "forbidden scalar work"),
+    ],
+)
+def test_failed_native_result_attestation_does_not_publish(
+    reasoning_source, monkeypatch, counter, value, message
+):
     reasoner = load_reasoner("elk", reasoning_source)
     cls = type(reasoner.shared_reasoner)
     diagnostics = cls.diagnostics
 
     def unverified(self):
-        return {**diagnostics(self), "native_result_validation": False}
+        return {**diagnostics(self), counter: value}
 
     monkeypatch.setattr(cls, "diagnostics", unverified)
     try:
-        with pytest.raises(RuntimeError, match="verify the required native pipeline"):
+        with pytest.raises(RuntimeError, match=message):
             reasoner.direct_parents("urn:exact:test:A")
     finally:
         reasoner.close()

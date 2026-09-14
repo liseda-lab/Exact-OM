@@ -365,6 +365,8 @@ def require_native_report(projector: object) -> dict[str, object]:
         raise RuntimeError("Exact requires encoded-native projection; scalar fallback is forbidden")
     counters = cast(Mapping[str, object], ingestion.get("counters", {}))
     for name in (
+        "base_flattening_bytes",
+        "structural_copy_bytes",
         "materialized_scalar_rows",
         "scalar_axiom_materializations",
         "scalar_term_materializations",

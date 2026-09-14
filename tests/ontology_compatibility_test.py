@@ -208,15 +208,21 @@ def test_published_baseline_content_is_not_rewritten_by_candidate_metadata() -> 
 def test_native_candidate_requires_its_own_artifact_and_full_input_evidence() -> None:
     baseline = _contract()
     candidate = baseline["native_pipeline_candidate"]
-    assert candidate["status"] == "pending"
+    assert candidate["status"] in {"pending", "installed_validated", "validated"}
     assert candidate["release_state"] == "unreleased-local-wheels"
     assert candidate["performance_claim"] is False
     assert candidate["version_alone_identifies_artifacts"] is False
-    assert candidate["verification"] == {
-        "artifact_bindings": "pending",
-        "full_input_T3": "pending",
-        "evidence": [],
-    }
+    verification = candidate["verification"]
+    assert verification["artifact_bindings"] in {"pending", "passed"}
+    assert verification["installed_T3"] in {"pending", "passed"}
+    assert verification["real_input_T4"] in {"pending", "running", "passed", "failed", "timed_out"}
+    if candidate["status"] in {"installed_validated", "validated"}:
+        assert verification["installed_T3"] == "passed"
+    if candidate["status"] == "validated":
+        assert verification["real_input_T4"] == "passed"
+    if verification["installed_T3"] == "passed":
+        assert verification["artifact_bindings"] == "passed"
+        assert verification["evidence"]
     assert set(candidate["packages"]) == {
         "pyowl-core",
         "pyowl2vec-star-projector",
@@ -224,11 +230,15 @@ def test_native_candidate_requires_its_own_artifact_and_full_input_evidence() ->
         "pyhermit",
     }
     for name, record in candidate["packages"].items():
-        assert record == {
-            **baseline["tested_stack"][name],
-            "source_commit": None,
-            "wheel_sha256": None,
-        }
+        assert record["repository"] == baseline["tested_stack"][name]["repository"]
+        assert record["version"] == baseline["tested_stack"][name]["version"]
+        for field, size in (("source_commit", 40), ("wheel_sha256", 64)):
+            value = record[field]
+            if verification["artifact_bindings"] == "passed":
+                assert isinstance(value, str) and len(value) == size
+                assert set(value) <= set("0123456789abcdef")
+            else:
+                assert value is None
     contract = candidate["execution_contract"]
     assert contract == "exact/native-pipeline/v2"
     assert (
@@ -270,7 +280,9 @@ def test_candidate_counter_vocabulary_matches_current_provenance_boundaries() ->
         "native_result_validation"
     }
     assert set(reasoner["required_true_after_query"]) == set(reasoner["boolean_counters"])
-    assert set(projector["required_zero_counters"]) == FORBIDDEN_NATIVE_WORK
+    assert set(projector["required_zero_counters"]) == FORBIDDEN_NATIVE_WORK | {
+        "encoded_indexed_buffer_count"
+    }
     assert set(reasoner["required_zero_counters"]) == FORBIDDEN_NATIVE_WORK | {
         "encoded_indexed_buffer_count",
         "native_metadata_domain_copies",

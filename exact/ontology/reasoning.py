@@ -673,6 +673,8 @@ def _require_native_handoff(reasoner: object, *, result: bool = False) -> Consum
     if any(counters.get(name) is not True for name in flags):
         raise RuntimeError("reasoner did not verify the required native pipeline stages")
     for name in (
+        "base_flattening_bytes",
+        "structural_copy_bytes",
         "materialized_scalar_rows",
         "scalar_axiom_materializations",
         "scalar_term_materializations",

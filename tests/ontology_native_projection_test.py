@@ -96,6 +96,8 @@ def test_native_failure_never_invokes_scalar_fallback(monkeypatch, method, failu
 @pytest.mark.parametrize(
     ("counter", "value", "message"),
     [
+        ("base_flattening_bytes", 1, "forbidden scalar work"),
+        ("structural_copy_bytes", 1, "forbidden scalar work"),
         ("scalar_axiom_materializations", 1, "forbidden scalar work"),
         ("encoded_indexed_buffer_count", 1, "forbidden scalar work"),
         ("native_validation_receipt", False, "validated native publication"),
