@@ -78,6 +78,10 @@ def test_real_native_phases_preserve_semantics_without_models(tmp_path, monkeypa
     assert first["edges"]["count"] == 42
     assert isinstance(first["projection_spill"], dict)
     assert first["entities"]["count"] == first["features"]["count"] == 3
+    feature_rows = Path(first["feature_rows"]["path"])
+    rows = [json.loads(line) for line in feature_rows.read_text().splitlines()]
+    assert len(rows) == first["features"]["count"]
+    assert _sha256(feature_rows) == _digest(rows) == first["features"]["sha256"]
     assert first["native_indexes"]["class_view"]["backend"] == "native"
     assert "domain_range" not in first["native_indexes"]
     for field in ("signature", "exclusions", "labels", "edges", "entities", "features"):
@@ -195,3 +199,11 @@ def test_boundary_profile_restores_callables_after_failure(tmp_path, monkeypatch
         with _profile_boundaries(path):
             pass
     assert projection.cache_key is original_key
+
+
+def test_orphan_feature_evidence_is_not_overwritten(tmp_path):
+    evidence = tmp_path / "report.features.jsonl"
+    evidence.write_text("retained feature evidence\n")
+    with pytest.raises(FileExistsError, match="Refusing to overwrite"):
+        benchmark(config_file(tmp_path), tmp_path / "report.json")
+    assert evidence.read_text() == "retained feature evidence\n"

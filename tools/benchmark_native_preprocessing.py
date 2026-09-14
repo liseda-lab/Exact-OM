@@ -165,8 +165,10 @@ def benchmark(
     started = time.perf_counter()
     if side not in {"source", "target"} or entity_limit < 1:
         raise ValueError("side must be source/target and entity_limit must be positive")
-    if output.exists():
-        raise FileExistsError(f"Refusing to overwrite benchmark evidence: {output}")
+    feature_rows_path = output.with_suffix(".features.jsonl")
+    for evidence_path in (output, feature_rows_path):
+        if evidence_path.exists():
+            raise FileExistsError(f"Refusing to overwrite benchmark evidence: {evidence_path}")
     if profile_stages is not None and profile_stages.exists():
         raise FileExistsError(f"Refusing to overwrite profiling evidence: {profile_stages}")
     config = yaml.safe_load(config_path.read_text())
@@ -365,6 +367,12 @@ def benchmark(
             ],
         )
         report["features"] = {"count": len(features), "sha256": _digest(features)}
+        # Retain the exact hashed rows so a mismatch is diagnosable without another
+        # ontology load. List order is semantic here; do not normalize it away.
+        with feature_rows_path.open("x", encoding="utf-8", newline="\n") as stream:
+            for row in features:
+                stream.write(json.dumps(row, sort_keys=True, ensure_ascii=False) + "\n")
+        report["feature_rows"] = {"path": str(feature_rows_path), **report["features"]}
         warm = phase(
             "entity_features_cached",
             lambda: [
