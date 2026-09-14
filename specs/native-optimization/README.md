@@ -1,6 +1,6 @@
 # Native ontology optimization plan
 
-**Status: in progress. Implementation authorized; see [IMPLEMENTATION.md](IMPLEMENTATION.md).**
+**Implementation complete; installed checks pass. T4 is running detached; see [IMPLEMENTATION.md](IMPLEMENTATION.md).**
 
 Implement the opportunities in the [native stack audit](../experiments/NATIVE-STACK-AUDIT.md)
 while preserving intended algorithm behavior. The deliverable is a smaller amount of work

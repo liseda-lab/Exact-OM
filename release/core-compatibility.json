@@ -256,40 +256,51 @@
   "record_scope": "published_baseline",
   "native_pipeline_candidate": {
     "execution_contract": "exact/native-pipeline/v2",
-    "status": "pending",
+    "status": "installed_validated",
     "release_state": "unreleased-local-wheels",
     "performance_claim": false,
     "version_alone_identifies_artifacts": false,
     "verification": {
-      "artifact_bindings": "pending",
-      "evidence": [],
-      "installed_T3": "pending",
-      "real_input_T4": "pending"
+      "artifact_bindings": "passed",
+      "evidence": [
+        "data/experiments-v2/native-optimization-01/artifacts.json",
+        "data/experiments-v2/native-optimization-01/candidate-installed.json",
+        "data/experiments-v2/native-optimization-01/capabilities.json",
+        "data/experiments-v2/native-optimization-01/installed-T3-exact.json",
+        "data/experiments-v2/native-optimization-01/installed-T3-hermit.json",
+        "data/experiments-v2/native-optimization-01/pyhermit-n07-evidence.json",
+        "data/experiments-v2/native-optimization-01/core-n04-index-evidence.json",
+        "data/experiments-v2/native-optimization-01/elk_workers.json",
+        "data/experiments-v2/native-optimization-01/quality-final.json",
+        "data/experiments-v2/native-optimization-01/job.json"
+      ],
+      "installed_T3": "passed",
+      "real_input_T4": "running"
     },
     "packages": {
       "pyowl-core": {
         "repository": "https://github.com/OAEI-ML/pyOWLCore",
         "version": "0.2.0",
-        "source_commit": null,
-        "wheel_sha256": null
+        "source_commit": "5fd93c8839318f0ccc1afff4d3ec537509c72e87",
+        "wheel_sha256": "f66c068f3a88d0ae59553103fefef4994c43ecca1282300b4dd2486bcbd905d9"
       },
       "pyowl2vec-star-projector": {
         "repository": "https://github.com/OAEI-ML/pyOwl2Vec-Star-projector",
         "version": "0.2.0",
-        "source_commit": null,
-        "wheel_sha256": null
+        "source_commit": "a0676012c5f6437c304b4ed04bc2b41b6a083da1",
+        "wheel_sha256": "53c752e345d8c18ac1784000609902118b724d61fd8b59d7a79e5cb693d1e0fd"
       },
       "pyelk-reasoner": {
         "repository": "https://github.com/OAEI-ML/pyELK",
         "version": "0.2.0",
-        "source_commit": null,
-        "wheel_sha256": null
+        "source_commit": "bce95f8552ed8396315c9a9e4ddce184ad95596f",
+        "wheel_sha256": "3ae4a551d2288b0d703c43edc116b9d5a458f663a36812ac19801f1595b4caef"
       },
       "pyhermit": {
         "repository": "https://github.com/OAEI-ML/pyHermiT",
         "version": "0.2.0",
-        "source_commit": null,
-        "wheel_sha256": null
+        "source_commit": "bbf31c26ce7ae03bd092f04bcb8955466b1fe3e0",
+        "wheel_sha256": "0bf0121e856afd9954bc32ef7358c3c28ec9b0de7ca9fe01eaeff8c5331fffa5"
       }
     },
     "required_capabilities": {
