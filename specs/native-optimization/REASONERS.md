@@ -1,6 +1,8 @@
 # Reasoner optimization specifications
 
-Status: **proposed; not implemented or benchmark-qualified**. Scope: N05–N08 only.
+Implementation progress and artifact identities: [IMPLEMENTATION.md](IMPLEMENTATION.md).
+
+Scope: N05–N08 acceptance requirements; current completion is recorded separately.
 These changes preserve public reasoning behavior under [CONTRACT.md](CONTRACT.md).
 Acceptance follows [VALIDATION.md](VALIDATION.md). The [source audit](../experiments/NATIVE-STACK-AUDIT.md) supplies the inspected baseline:
 pyELK `b7b373165f6cbc3452f022c542731d7b5f2f73be`;

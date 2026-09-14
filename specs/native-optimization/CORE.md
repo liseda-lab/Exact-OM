@@ -1,6 +1,8 @@
 # Core publication, selection and queries
 
-Status: proposed implementation work; no optimization below is declared complete.
+Implementation progress and artifact identities: [IMPLEMENTATION.md](IMPLEMENTATION.md).
+
+This file defines acceptance requirements; current completion is recorded separately.
 This specifies pyOWLCore changes and the small Exact/consumer integrations they require.
 The [shared contract](CONTRACT.md) and [validation plan](VALIDATION.md) govern every item.
 Evidence: [native-stack audit](../experiments/NATIVE-STACK-AUDIT.md#2-pyowlcore-stop-reconstructing-native-data-in-python),

@@ -1,6 +1,8 @@
 # Projector optimization specification
 
-Status: **proposed; not implemented**. Correctness is a hard acceptance requirement.
+Implementation progress and artifact identities: [IMPLEMENTATION.md](IMPLEMENTATION.md).
+
+Correctness is a hard acceptance requirement; current completion is recorded separately.
 Follow [CONTRACT](CONTRACT.md) and [VALIDATION](VALIDATION.md); resolve conflicts before coding.
 Baseline: projector `d7e4dc147dc7303d75353887352afb66e7840588` / package 0.2.0.
 The [source audit](../experiments/NATIVE-STACK-AUDIT.md#1-projector-replace-repeated-native-class-membership-scans-first)

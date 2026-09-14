@@ -1,7 +1,9 @@
 # Validation, resources and implementation evidence
 
-Status: specified only. These are future implementation gates; writing this plan starts
-no builds, benchmarks, G0 validation or long campaign. [CONTRACT.md](CONTRACT.md) governs
+Implementation progress and artifact identities: [IMPLEMENTATION.md](IMPLEMENTATION.md).
+
+These gates govern the authorized implementation. Passing them does not authorize
+G0 validation or the long campaign. [CONTRACT.md](CONTRACT.md) governs
 semantic equivalence. Reuse current package tests and Exact's existing preprocessing tool;
 add focused fixtures/counters rather than a new test or execution framework.
 

@@ -1,12 +1,12 @@
 # Native ontology optimization plan
 
-**Status: specified; implementation not started. Date: 2026-09-12.**
+**Status: in progress. Implementation authorized; see [IMPLEMENTATION.md](IMPLEMENTATION.md).**
 
 Implement the opportunities in the [native stack audit](../experiments/NATIVE-STACK-AUDIT.md)
 while preserving intended algorithm behavior. The deliverable is a smaller amount of work
 for the same inputs, settings and semantic results, with Python serving as the interface to
-native ontology-scale routines. This suite specifies work; it does not report optimizations
-as implemented or authorize a long experiment during this planning task.
+native ontology-scale routines. The package specifications define acceptance; the implementation record identifies completed
+checks and outstanding gates. No long scientific experiment is authorized by this suite.
 
 ## Authority and scope
 
@@ -32,7 +32,7 @@ Read CONTRACT and VALIDATION first, then the relevant package spec:
 
 ## Work packages
 
-All rows start **specified**. A dependency means evidence or an interface is required before
+Current statuses are recorded in IMPLEMENTATION.md. A dependency means evidence or an interface is required before
 integration; independent code work may proceed against the agreed contract.
 
 | ID | Work | Owner repository | Depends on | Required completion |
