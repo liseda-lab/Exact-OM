@@ -213,45 +213,67 @@ wrapper passes six ordered feature rows in `native-optimization-02/smoke02/sourc
 The first tiny wrapper failure is preserved in `smoke/`; its overly strict asserted-adapter guard
 was corrected before the real input was restarted.
 
+## Reference timeout and recovery
+
+The second attempt, `native-optimization-02/job.json`, preserved a complete NCIT candidate
+measurement of 495.4369 seconds and exact 64-row feature JSONL. The subsequent test-only
+reference constructor exceeded its 120-second limit while the generic asserted-view accessors
+repeatedly serialized class axioms. No new semantic mismatch was established; DOID did not start.
+The failed report and original candidate measurement remain unchanged.
+
+The third attempt keeps the pinned original feature algorithms, replacing only their generic
+asserted-view input accessor with a small test-only endpoint map over native-selected raw axioms.
+It preserves per-kind restriction order and avoids repeated Python axiom serialization. This
+reference change passes 2,688 comparisons against the previous reference across 32 small graphs,
+including cycles, equivalences, unions/intersections, built-ins and annotation variants. Row/time
+limits and progress reporting are tested. The constructor now has a 1,800-second allowance.
+
+The NCIT candidate report, code/input/import identities, exact ordered entity list, feature-file
+hash and installed package identities are verified before reuse. The saved 495.4369-second result
+is never relabeled as a new measurement. The native snapshot must reload because the old process
+exited. The previous projection spool was transient and no full edge artifact survived; the graph
+is restored once through the public native projector, checked against its saved 630,404-edge digest,
+and checkpointed before reference construction. Later retries can read that verified edge artifact.
+Checkpoint corruption, option mismatch and incomplete publication reject explicitly without retrying
+projection; seven small checkpoint tests pass.
+
+The complete wrapper passes three small paths: saved-candidate recovery with projection restoration,
+recovery using the durable projection checkpoint, and fresh candidate execution for the pending target.
+It recomputes the full ordered reference feature rows from a fresh reference graph/dataset. Only the
+native snapshot/selection substrate and verified projection are shared; original annotation conversion
+and hierarchy algorithms are evaluated independently. No candidate feature fields are copied into
+the reference result.
+
 ## Detached T4 handoff
 
-The second gate is running in tmux session `exact-native-validation`, launcher PID `1167866`.
-Its authoritative terminal result will be `data/experiments-v2/native-optimization-02/job.json`.
-The tracked manifest records the launch state, not an automatic promise of success. Monitor from
-the Exact repository with:
+Attempt three is running in tmux session `exact-native-validation`, launcher PID `1189215`.
+Its authoritative result will be `data/experiments-v2/native-optimization-03/job.json`.
+Monitor from the Exact repository with:
 
 ```sh
-watch -n 10 cat data/experiments-v2/native-optimization-02/job.json
+watch -n 10 cat data/experiments-v2/native-optimization-03/job.json
 ```
 
-The same native wheels, frozen 64-entity selections, configuration and locked imports are used.
-The gate still compares input/import identities, effective axiom counts, signatures, canonical
-edges, exclusions and labels with the saved baselines. The unstable historical feature hash is
-retained and reported separately; it is not replaced with a candidate-generated golden.
+`source.restore.json` shows restoration progress and separate cost; `source.oracle.json` then shows
+reference stages and row counts. Corresponding target records appear after NCIT passes. Canonical
+`.edges.jsonl` files and adjacent verified receipts persist before the oracle starts. Reference
+`.oracle.features.jsonl` and existing candidate feature files permit direct mismatch diagnosis.
+The tracked compatibility manifest records launch status; the job record determines the outcome.
 
-After candidate timing finishes, the same retained native snapshot feeds a bounded test-only
-reference using the pinned original hierarchy algorithms and original annotation conversion.
-Both feature builders use the separately corrected deterministic neighborhood policy. Acceptance
-requires exact ordered agreement for all 64 complete feature rows, including matching digests and
-counts. Candidate and reference rows are retained separately. No second ontology load, projection
-or whole-ontology annotation materialization is required.
+The same native wheels, frozen 64-entity populations, configuration and locked imports are used.
+All successful candidate structural digests are checked against the original baseline. The old
+hash-seed-dependent feature golden remains historical evidence: acceptance requires exact complete
+ordered candidate/reference rows under the separately corrected deterministic neighborhood policy.
+It never substitutes a candidate hash for missing reference evidence.
 
-The reference shares native parsing, native annotation selection, verified edges and unchanged
-IC statistics. Its selection substrate is tested separately against complete small raw-axiom
-scans; this is not an independent full ontology parser/index oracle. Class hierarchy construction
-uses independently consumed typed rows and original algorithms, with a 400,000-row/120-second
-constructor bound. It rejects limits without truncation. Oracle wall time and lifetime peak RSS
-are recorded separately from the completed candidate preprocessing measurement.
+Source and target run sequentially in fresh processes. The constructor has a 30-minute allowance,
+inside a 120-minute source and 60-minute target ceiling. The third attempt's address-space cap is
+50,160,947,200 bytes (below 48 GiB), with 12 GiB initial headroom. BLAS uses two threads; native imports
+retain their eight-thread cap. GPU visibility is disabled, no compiler builds compete, and tracing
+is fatal-only. Reference construction remains bounded by 400,000 selected class axioms and never
+truncates on a resource limit.
 
-`source.stages.jsonl`/`target.stages.jsonl` show candidate phase progress; `source.oracle.json`/
-`target.oracle.json` show the subsequent feature check. Each side also has `.log`, `.fatal.log`,
-result `.json` and terminal `.exitcode` files. Source and target run sequentially in fresh
-processes, with 120- and 30-minute total ceilings. The second attempt's address-space cap is
-50,082,639,872 bytes (below 48 GiB), retaining 12 GiB initial headroom. BLAS uses two threads;
-native imports retain their eight-thread cap. GPU visibility is disabled. No compiler builds
-compete with the job; fatal-only trace capture is used.
-
-Failures or mismatches stop the sequence and preserve the attempt. No automatic retry, model,
-encoder, reference-label or G0 calls are made. N11 remains `in_progress` until the comparison
-passes; neither large-ontology reasoner performance nor scientific campaign admission follows
-from this preprocessing gate. N08 and N10 retain their explicit conditional dispositions.
+Failures stop the sequence and preserve evidence; no blind automatic retry is scheduled. No model,
+encoder, reference-label or G0 calls occur. N11 remains `in_progress` until the comparison passes;
+preprocessing success does not admit the scientific campaign or establish large-ontology reasoner
+performance. N08 and N10 retain their explicit conditional dispositions.

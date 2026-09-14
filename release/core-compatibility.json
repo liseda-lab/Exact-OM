@@ -276,7 +276,10 @@
         "data/experiments-v2/native-optimization-02/correction-evidence.json",
         "data/experiments-v2/native-optimization-02/regressions.json",
         "data/experiments-v2/native-optimization-02/smoke02/source.oracle.json",
-        "data/experiments-v2/native-optimization-02/job.json"
+        "data/experiments-v2/native-optimization-02/job.json",
+        "data/experiments-v2/native-optimization-03/recovery-evidence.json",
+        "data/experiments-v2/native-optimization-03/resume-smokes.json",
+        "data/experiments-v2/native-optimization-03/job.json"
       ],
       "installed_T3": "passed",
       "real_input_T4": "running",
@@ -294,6 +297,12 @@
             "effective_axiom_count"
           ],
           "mismatch": "features"
+        },
+        {
+          "evidence": "data/experiments-v2/native-optimization-02/job.json",
+          "status": "failed",
+          "candidate_preprocessing": "complete",
+          "failure": "test-only reference constructor exceeded120s; no completed feature comparison"
         }
       ],
       "real_input_feature_policy": "exact ordered candidate/legacy comparison under separately corrected deterministic neighborhood ordering; historical hash mismatch retained"
