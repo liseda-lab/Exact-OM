@@ -252,5 +252,233 @@
     "consumer_path_retry": false,
     "java_runtime": false,
     "oaei_is_ontology_runtime_dependency": false
+  },
+  "record_scope": "published_baseline",
+  "native_pipeline_candidate": {
+    "execution_contract": "exact/native-pipeline/v2",
+    "status": "pending",
+    "release_state": "unreleased-local-wheels",
+    "performance_claim": false,
+    "version_alone_identifies_artifacts": false,
+    "verification": {
+      "artifact_bindings": "pending",
+      "full_input_T3": "pending",
+      "evidence": []
+    },
+    "packages": {
+      "pyowl-core": {
+        "repository": "https://github.com/OAEI-ML/pyOWLCore",
+        "version": "0.2.0",
+        "source_commit": null,
+        "wheel_sha256": null
+      },
+      "pyowl2vec-star-projector": {
+        "repository": "https://github.com/OAEI-ML/pyOwl2Vec-Star-projector",
+        "version": "0.2.0",
+        "source_commit": null,
+        "wheel_sha256": null
+      },
+      "pyelk-reasoner": {
+        "repository": "https://github.com/OAEI-ML/pyELK",
+        "version": "0.2.0",
+        "source_commit": null,
+        "wheel_sha256": null
+      },
+      "pyhermit": {
+        "repository": "https://github.com/OAEI-ML/pyHermiT",
+        "version": "0.2.0",
+        "source_commit": null,
+        "wheel_sha256": null
+      }
+    },
+    "required_capabilities": {
+      "pyowl-core": [
+        "LoadOptions.backend=NATIVE",
+        "native_validation_available",
+        "EncodedStructuralViewV2(require_native_validation=True)",
+        "validate_encoded_structural_view_v2(require_native_validation=True)",
+        "encoded_scopes_equivalent",
+        "AnnotationAssertionIndex.supports_native",
+        "ClassFeatureView.supports_native",
+        "AssertedPropertyHierarchyView.supports_native",
+        "PropertyDomainRangeView.supports_native",
+        "AxiomTypeIndex.supports_native"
+      ],
+      "pyowl2vec-star-projector": [
+        "require_native_pipeline_support",
+        "ProjectionOptions.require_native_pipeline=True",
+        "native-canonical-v1"
+      ],
+      "pyelk-reasoner": [
+        "require_native_pipeline_support",
+        "require_native_pipeline=True"
+      ],
+      "pyhermit": [
+        "require_native_pipeline_support",
+        "require_native_pipeline=True"
+      ]
+    },
+    "strict_consumer_handoff": {
+      "ingestion_path": "encoded-native",
+      "in_process_owner": "direct-retained-native-snapshot",
+      "imported_selections": "native ROOT/CLOSURE/document scope",
+      "encoded_unsupported_owners": [
+        "decoded",
+        "mmap",
+        "overlay",
+        "composite"
+      ],
+      "worker_wire_supported": false,
+      "consumer_path_retry": false,
+      "encoded_contract_ref": "encoded_contract"
+    },
+    "projector": {
+      "counter_vocabulary": [
+        "base_flattening_bytes",
+        "encoded_buffer_bytes",
+        "encoded_buffer_count",
+        "encoded_compiler_gil_released",
+        "encoded_detached_buffer_count",
+        "encoded_indexed_buffer_count",
+        "encoded_posting_bytes",
+        "encoded_referenced_view_count",
+        "encoded_segment_count",
+        "encoded_staging_copy_bytes",
+        "encoded_zero_copy_buffers",
+        "materialized_scalar_rows",
+        "native_batch_edges",
+        "native_boundary_calls",
+        "native_canonical_distinct_edges",
+        "native_canonical_merge_passes",
+        "native_canonical_peak_reserved_bytes",
+        "native_canonical_peak_spill_bytes",
+        "native_canonical_published_edges",
+        "native_canonical_raw_edges",
+        "native_canonical_runs",
+        "native_canonical_sort_calls",
+        "native_canonical_spill_bytes",
+        "native_class_index_build_visits",
+        "native_class_index_builds",
+        "native_class_index_keys",
+        "native_class_index_peak_bytes",
+        "native_class_index_retained_bytes",
+        "native_class_membership_comparisons",
+        "native_class_membership_queries",
+        "native_compiled_edges",
+        "native_edge_batches",
+        "native_output_vector_edges",
+        "native_peak_buffered_edges",
+        "native_retained_inverse_properties",
+        "native_retained_subrole_properties",
+        "native_validation_receipt",
+        "parser_calls",
+        "per_row_ffi_calls",
+        "resolver_calls",
+        "scalar_axiom_materializations",
+        "scalar_term_materializations",
+        "structural_copy_bytes",
+        "wire_decoder_calls",
+        "wire_encoder_calls"
+      ],
+      "boolean_counters": [
+        "encoded_compiler_gil_released",
+        "native_validation_receipt"
+      ],
+      "required_true_counters": [
+        "encoded_compiler_gil_released",
+        "native_validation_receipt"
+      ],
+      "required_zero_counters": [
+        "base_flattening_bytes",
+        "materialized_scalar_rows",
+        "parser_calls",
+        "per_row_ffi_calls",
+        "resolver_calls",
+        "scalar_axiom_materializations",
+        "scalar_term_materializations",
+        "structural_copy_bytes",
+        "wire_decoder_calls",
+        "wire_encoder_calls"
+      ]
+    },
+    "reasoner": {
+      "counter_vocabulary": [
+        "base_flattening_bytes",
+        "encoded_buffer_bytes",
+        "encoded_buffer_count",
+        "encoded_compiler_gil_released",
+        "encoded_detached_buffer_count",
+        "encoded_indexed_buffer_count",
+        "encoded_posting_bytes",
+        "encoded_private_ir_bytes",
+        "encoded_referenced_view_count",
+        "encoded_segment_count",
+        "encoded_staging_copy_bytes",
+        "encoded_zero_copy_buffers",
+        "materialized_scalar_rows",
+        "native_core_receipt_validated",
+        "native_live_result_envelopes",
+        "native_metadata_domain_copies",
+        "native_metadata_validation",
+        "native_pipeline_required",
+        "native_result_publications",
+        "native_result_validation",
+        "native_symbol_lookups",
+        "native_symbol_rows_materialized",
+        "parser_calls",
+        "per_row_ffi_calls",
+        "resolver_calls",
+        "scalar_axiom_materializations",
+        "scalar_term_materializations",
+        "structural_copy_bytes",
+        "wire_decoder_calls",
+        "wire_encoder_calls"
+      ],
+      "boolean_counters": [
+        "encoded_compiler_gil_released",
+        "native_core_receipt_validated",
+        "native_metadata_validation",
+        "native_pipeline_required",
+        "native_result_validation"
+      ],
+      "required_true_before_query": [
+        "encoded_compiler_gil_released",
+        "native_core_receipt_validated",
+        "native_metadata_validation",
+        "native_pipeline_required"
+      ],
+      "required_true_after_query": [
+        "encoded_compiler_gil_released",
+        "native_core_receipt_validated",
+        "native_metadata_validation",
+        "native_pipeline_required",
+        "native_result_validation"
+      ],
+      "required_zero_counters": [
+        "base_flattening_bytes",
+        "encoded_indexed_buffer_count",
+        "materialized_scalar_rows",
+        "native_metadata_domain_copies",
+        "parser_calls",
+        "per_row_ffi_calls",
+        "resolver_calls",
+        "scalar_axiom_materializations",
+        "scalar_term_materializations",
+        "structural_copy_bytes",
+        "wire_decoder_calls",
+        "wire_encoder_calls"
+      ]
+    },
+    "scientific_identity": {
+      "execution_contract_separates_cache_entries": true,
+      "timing_counters_are_diagnostics": true,
+      "published_baseline_verification_does_not_verify_candidate": true,
+      "required_unchanged_semantics": [
+        "core model and encoded schema",
+        "projector profile and options",
+        "canonical projection edges",
+        "reasoner query answers"
+      ]
+    }
   }
 }
