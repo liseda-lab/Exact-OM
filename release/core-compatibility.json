@@ -256,7 +256,7 @@
   "record_scope": "published_baseline",
   "native_pipeline_candidate": {
     "execution_contract": "exact/native-pipeline/v2",
-    "status": "installed_validated",
+    "status": "validated",
     "release_state": "unreleased-local-wheels",
     "performance_claim": false,
     "version_alone_identifies_artifacts": false,
@@ -279,10 +279,11 @@
         "data/experiments-v2/native-optimization-02/job.json",
         "data/experiments-v2/native-optimization-03/recovery-evidence.json",
         "data/experiments-v2/native-optimization-03/resume-smokes.json",
-        "data/experiments-v2/native-optimization-03/job.json"
+        "data/experiments-v2/native-optimization-03/job.json",
+        "data/experiments-v2/native-optimization-03/completed-summary.json"
       ],
       "installed_T3": "passed",
-      "real_input_T4": "running",
+      "real_input_T4": "passed",
       "previous_real_input_attempts": [
         {
           "evidence": "data/experiments-v2/native-optimization-01/job.json",

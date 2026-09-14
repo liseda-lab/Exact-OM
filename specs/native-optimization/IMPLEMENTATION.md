@@ -1,9 +1,8 @@
 # Native stack implementation record
 
-Status: **in_progress (T4)**, 2026-09-14. Implementation is complete; the applicable T1–T3
-checks pass. One bounded NCIT–DOID validation is running detached. The long scientific
-campaign has not been started. This record distinguishes package fixtures, installed-stack
-integration and the pending real-input result.
+Status: **validated**, 2026-09-14. Implementation and applicable T1–T4 gates pass.
+NCIT and DOID each pass exact comparison of 64 ordered feature rows under the documented
+deterministic feature policy. The long scientific campaign and G0 have not been started.
 
 ## Scope and current gates
 
@@ -25,12 +24,12 @@ version numbers, **not published releases**. Versions alone cannot identify this
 | N07 | validated | Native assertion deltas share immutable rules, joins, role/datatype/blocking state; isolated bounded batches and rebuild parity |
 | N08 | deferred_with_reason | Exact's current static hierarchy adapters make no recurring committed update calls |
 | N09 | validated | Native canonical sort/dedup/spill/merge with bounded working storage |
-| N10 | deferred_with_reason | No post-change real-input evidence yet selects another recurring canonical/compiler phase |
-| N11 | in_progress | Public Exact integration and final T3 pass; one detached T4 comparison is running |
+| N10 | deferred_with_reason | Residual loading/projection costs measured; no specific additional canonical/compiler pass selected |
+| N11 | validated | Final installed integration and NCIT–DOID T4 pass, including 128 exact ordered feature rows |
 
 `validated` above applies to the package mechanism and its completed T1/T2/installed
-fixtures. N11 remains open until the relevant integrated gates are recorded. No end-to-end
-speedup is claimed from these statuses or operation counts. T4 preprocessing does not pass
+fixtures. N11 includes the completed integrated gates below. No general speedup is claimed
+from statuses or operation counts. T4 preprocessing does not pass
 G0, admit an experiment block, or establish large-ontology reasoner performance.
 
 ## Final installed candidates
@@ -45,7 +44,7 @@ G0, admit an experiment block, or establish large-ontology reasoner performance.
 Exact adoption is committed in `637f7c8`, the scale fixture update in `542af42`, stricter
 counter gates in `a34f08e`, and the separate published-baseline/candidate manifest in
 `76e5659`. Final artifact bindings and gate status are in `release/core-compatibility.json`.
-The candidate status is `installed_validated`; full `validated` requires T4 to pass.
+The candidate status is `validated`: artifact bindings, installed T3 and real-input T4 pass.
 
 The tested runtime is CPython 3.12.3 on Linux x86_64, with core model/encoded schema 2,
 wire 1.2 and the unchanged encoded descriptor
@@ -244,36 +243,41 @@ native snapshot/selection substrate and verified projection are shared; original
 and hierarchy algorithms are evaluated independently. No candidate feature fields are copied into
 the reference result.
 
-## Detached T4 handoff
+## Completed T4 result
 
-Attempt three is running in tmux session `exact-native-validation`, launcher PID `1189215`.
-Its authoritative result will be `data/experiments-v2/native-optimization-03/job.json`.
-Monitor from the Exact repository with:
+Attempt three passed at 2026-09-14 19:07:27 UTC. Both worker exits were zero; the detached
+session has ended. Authoritative results are in
+`data/experiments-v2/native-optimization-03/job.json` and `completed-summary.json`.
 
-```sh
-watch -n 10 cat data/experiments-v2/native-optimization-03/job.json
-```
+For both NCIT and DOID, input/import identities, effective axiom counts, signatures, canonical
+edges, exclusions, labels and entity selections match the saved structural baseline. All 64
+complete ordered feature rows per ontology match the independent reference: 128 rows, zero
+mismatches. The old nondeterministic feature digests remain recorded as historical mismatches;
+acceptance uses the separately documented deterministic policy applied to both implementations.
 
-`source.restore.json` shows restoration progress and separate cost; `source.oracle.json` then shows
-reference stages and row counts. Corresponding target records appear after NCIT passes. Canonical
-`.edges.jsonl` files and adjacent verified receipts persist before the oracle starts. Reference
-`.oracle.features.jsonl` and existing candidate feature files permit direct mismatch diagnosis.
-The tracked compatibility manifest records launch status; the job record determines the outcome.
+| Measured phase | Saved baseline | Native candidate |
+| --- | ---: | ---: |
+| NCIT preprocessing | 3,999.53 s | 495.44 s |
+| NCIT projection | 2,464.37 s | 177.86 s |
+| DOID preprocessing | 184.28 s | 40.60 s |
+| DOID projection | 98.21 s | 15.48 s |
 
-The same native wheels, frozen 64-entity populations, configuration and locked imports are used.
-All successful candidate structural digests are checked against the original baseline. The old
-hash-seed-dependent feature golden remains historical evidence: acceptance requires exact complete
-ordered candidate/reference rows under the separately corrected deterministic neighborhood policy.
-It never substitutes a candidate hash for missing reference evidence.
+These are single diagnostic observations, not a repeated timing study or a general large-ontology
+speedup claim. Peak RSS was 11.82 GiB for the NCIT candidate and 1.31 GiB for DOID. NCIT's completed
+candidate result was reused without changing its timing. Attempt-three restoration and reference
+work are separate: source reference 99.74 seconds, target reference 8.68 seconds. The final recovery
+job took 573.15 seconds including restoration, target preprocessing, reference checks and process
+setup; that duration is not substituted for either preprocessing measurement.
 
-Source and target run sequentially in fresh processes. The constructor has a 30-minute allowance,
-inside a 120-minute source and 60-minute target ceiling. The third attempt's address-space cap is
-50,160,947,200 bytes (below 48 GiB), with 12 GiB initial headroom. BLAS uses two threads; native imports
-retain their eight-thread cap. GPU visibility is disabled, no compiler builds compete, and tracing
-is fatal-only. Reference construction remains bounded by 400,000 selected class axioms and never
-truncates on a resource limit.
+`source.restore.json`/`target.restore.json` record restoration and checkpoint costs;
+`source.oracle.json`/`target.oracle.json` record exact comparisons and reference stages. Canonical
+`.edges.jsonl` files and verified receipts remain available, as do both sets of feature JSONL rows.
+The same local wheels, frozen populations, configuration and locked imports were used throughout.
+Native parsing/annotation selection and verified graph edges are shared; the reference independently
+evaluates the pinned hierarchy and annotation-conversion logic with fresh graph/feature caches.
 
-Failures stop the sequence and preserve evidence; no blind automatic retry is scheduled. No model,
-encoder, reference-label or G0 calls occur. N11 remains `in_progress` until the comparison passes;
-preprocessing success does not admit the scientific campaign or establish large-ontology reasoner
-performance. N08 and N10 retain their explicit conditional dispositions.
+The jobs ran sequentially with no competing builds, GPU visibility disabled, two BLAS threads,
+an eight-thread native import cap, fatal-only tracing and a per-process address-space cap below
+48 GiB. All earlier failed attempts remain unchanged. No models, encoders, reference labels or
+G0 calls were used. N11 is now validated; scientific campaign admission and large-ontology reasoner
+performance remain separate. N08 and N10 retain their explicit conditional dispositions.
