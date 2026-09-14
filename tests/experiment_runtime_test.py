@@ -639,3 +639,29 @@ def test_enabled_evaluation_cannot_publish_an_empty_completed_stage(tmp_path, mo
     monkeypatch.setattr(harness, "_run_subprocess", run)
     with pytest.raises(ValueError, match="completed artifact must have durable outputs"):
         harness.execute_cell(cell, suite, workdir=tmp_path, resume=False)
+
+
+def test_native_build_change_invalidates_extraction_but_keeps_locked_inputs(tmp_path, monkeypatch):
+    cell, _, _ = fixture(tmp_path, monkeypatch)
+    inputs = harness._path_provenance(cell.resolved_config)
+
+    def recovery(code):
+        return runtime.CellRecovery(
+            cell,
+            {
+                "fingerprint_payload": {
+                    "inputs": inputs,
+                    "ontology_artifacts": {"pyowl-core": code},
+                },
+                "packages": {"pyowl-core": "0.2.0"},
+            },
+            tmp_path,
+        )
+
+    first = recovery("first-wheel")
+    changed = recovery("rebuilt-wheel")
+    assert first.identities["inputs"] == changed.identities["inputs"]
+    assert (
+        first.identities["extraction"]["artifact_id"]
+        != changed.identities["extraction"]["artifact_id"]
+    )

@@ -17,7 +17,7 @@ from pyowl_core import OntologyView
 
 from exact.core.entities.graph import Edge
 from exact.ontology.native_projection import NativeProjector, require_native_support
-from exact.ontology.versions import distribution_version
+from exact.ontology.versions import distribution_version, ontology_execution_identity
 from exact.ontology.view_contract import retain_ontology_view
 
 ProjectorBackend: TypeAlias = Literal["native"]
@@ -320,7 +320,7 @@ def cache_key(
 
 
 def projector_cache_identity(settings: ProjectorSettings) -> dict[str, object]:
-    """Return path-free semantic fields for Exact dataset cache fingerprints."""
+    """Return path-free semantic and installed-code fields for dataset caches."""
 
     core_package_version = distribution_version(pyowl_core, "pyowl-core")
     projector_package_version = distribution_version(
@@ -335,6 +335,7 @@ def projector_cache_identity(settings: ProjectorSettings) -> dict[str, object]:
         "profile": settings.profile,
         "backend": settings.backend,
         "execution_contract": "exact/native-pipeline/v2",
+        "installed_code": ontology_execution_identity(),
         "duplicates": "unique",
         "order": "canonical",
         "compatibility_state": "isolated",

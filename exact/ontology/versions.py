@@ -2,7 +2,13 @@
 
 from __future__ import annotations
 
-from importlib.metadata import PackageNotFoundError, version
+import hashlib
+import json
+from functools import lru_cache
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import distribution as installed_distribution
+from importlib.metadata import version
+from pathlib import Path
 
 
 def distribution_version(module: object, distribution: str) -> str:
@@ -27,4 +33,44 @@ def distribution_version(module: object, distribution: str) -> str:
     return module_version or installed_version or "unknown"
 
 
-__all__ = ["distribution_version"]
+@lru_cache(maxsize=4)
+def distribution_code_fingerprint(name: str) -> str | None:
+    """Hash installed wheel code once per process, independent of its install path.
+
+    Installed dependencies must remain immutable for a running experiment, as with
+    the existing package-version cache. Local candidate wheels can share a version.
+    """
+    try:
+        metadata = installed_distribution(name)
+    except PackageNotFoundError:
+        return None
+    files = {}
+    for entry in metadata.files or ():
+        relative = Path(str(entry))
+        if relative.is_absolute() or ".." in relative.parts:
+            continue
+        if relative.suffix not in {".py", ".so", ".dll", ".dylib"}:
+            continue
+        path = Path(str(metadata.locate_file(entry)))
+        digest = hashlib.sha256()
+        with path.open("rb") as stream:
+            for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                digest.update(chunk)
+        files[relative.as_posix()] = digest.hexdigest()
+    if not files:
+        raise RuntimeError(
+            f"{name} requires an installed wheel code inventory for execution identity"
+        )
+    return hashlib.sha256(json.dumps(files, sort_keys=True).encode()).hexdigest()
+
+
+def ontology_execution_identity(reasoner: str = "asserted") -> dict[str, str | None]:
+    """Bind only the ontology dependencies selected by an execution path."""
+    names = ["pyowl-core", "pyowl2vec-star-projector"]
+    optional = {"elk": "pyelk-reasoner", "hermit": "pyhermit"}.get(reasoner.strip().lower())
+    if optional is not None:
+        names.append(optional)
+    return {name: distribution_code_fingerprint(name) for name in names}
+
+
+__all__ = ["distribution_version", "distribution_code_fingerprint", "ontology_execution_identity"]

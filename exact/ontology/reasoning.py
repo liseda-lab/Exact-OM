@@ -30,7 +30,7 @@ from exact.ontology.projection import (
     encoded_contract_identity,
 )
 from exact.ontology.store import OWL_NOTHING, OWL_THING, OwlOntologySource
-from exact.ontology.versions import distribution_version
+from exact.ontology.versions import distribution_version, ontology_execution_identity
 
 ReasonerFallback = Literal["error", "asserted"]
 _OWL_BOUNDS = frozenset({OWL_THING, OWL_NOTHING})
@@ -596,6 +596,7 @@ def reasoner_cache_identity(
     return {
         "selection": normalized,
         "execution_contract": "exact/native-pipeline/v2",
+        "installed_code": ontology_execution_identity(normalized),
         "package_version": package_version,
         "backend": selected.backend,
         "workers": selected.workers,

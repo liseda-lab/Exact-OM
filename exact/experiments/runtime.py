@@ -190,18 +190,21 @@ class CellRecovery:
             parents=[self.identities["inputs"]["artifact_id"]],
             implementation=_code_identity(workdir, evaluation=False),
             dependencies={
-                name: packages.get(name)
-                for name in (
-                    "torch",
-                    "transformers",
-                    "tokenizers",
-                    "numpy",
-                    "scipy",
-                    "pyowl-core",
-                    "pyowl2vec-star-projector",
-                    "sentence-transformers",
-                    "pandas",
-                )
+                **{
+                    name: packages.get(name)
+                    for name in (
+                        "torch",
+                        "transformers",
+                        "tokenizers",
+                        "numpy",
+                        "scipy",
+                        "pyowl-core",
+                        "pyowl2vec-star-projector",
+                        "sentence-transformers",
+                        "pandas",
+                    )
+                },
+                "ontology_artifacts": fingerprint.get("ontology_artifacts", {}),
             },
             **common,
         )

@@ -53,6 +53,7 @@ from exact.experiments.schema import (
     load_suite,
     suite_order,
 )
+from exact.ontology.versions import ontology_execution_identity
 from exact.utils.data import read_table
 from exact.utils.provenance import (
     dataset_signature_for_paths,
@@ -2114,6 +2115,9 @@ def _provenance_payload(
         "code_commit": git.get("commit"),
         "worktree_source": git.get("worktree_source"),
         "package_versions_sha256": hash_payload(packages),
+        "ontology_artifacts": ontology_execution_identity(
+            str(cell.resolved_config.get("dataset", {}).get("reasoner", "asserted"))
+        ),
         "cell": cell.cell_id,
         "output_dir": str(cell.output_dir),
         "config_hash": cell.config_hash,
