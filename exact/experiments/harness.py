@@ -2643,6 +2643,54 @@ def _validate_reused_candidate_pool(
                 raise ValueError(f"candidate-pool {name} input {key} changed for {cell.cell_id}")
 
 
+def _execution_measurement(
+    cell: RunCell,
+    recovery: Any,
+    *,
+    elapsed: float,
+    peak_kb: Optional[int],
+    complete: bool,
+    continued: bool,
+) -> dict[str, Any]:
+    """Keep scientific execution cost with its predictions, separate from replay cost."""
+    path = cell.output_dir / "stats/execution_measurement.json"
+    artifact_id = recovery.identities["extraction"]["artifact_id"] if recovery else None
+    if recovery is not None and "extraction" in recovery.reuse:
+        measurement = _read_optional_json(path)
+        if measurement is None:
+            return {
+                "schema_version": 1,
+                "status": "unavailable",
+                "reason": "legacy artifact has no original execution measurement",
+                "artifact_id": artifact_id,
+                "wall_seconds": None,
+                "peak_memory_kb": None,
+            }
+        if measurement.get("schema_version") != 1 or measurement.get("artifact_id") != artifact_id:
+            raise ValueError("execution measurement does not match restored predictions")
+        return measurement
+    measured = complete and not continued
+    measurement = {
+        "schema_version": 1,
+        "status": "measured" if measured else "unavailable",
+        "reason": (
+            None
+            if measured
+            else (
+                "checkpoint continuation lacks complete wall evidence"
+                if continued
+                else "incomplete execution"
+            )
+        ),
+        "artifact_id": artifact_id,
+        "origin_attempt": recovery.attempt["attempt_id"] if recovery else None,
+        "wall_seconds": elapsed if measured else None,
+        "peak_memory_kb": peak_kb if measured else None,
+    }
+    _atomic_json(path, measurement)
+    return measurement
+
+
 def execute_cell(
     cell: RunCell,
     suite: LoadedSuite,
@@ -2670,6 +2718,11 @@ def execute_cell(
         return manifest
     if recovery is not None:
         recovery.prepare()
+    continued = bool(
+        recovery is not None
+        and "extraction" not in recovery.reuse
+        and any(path.is_file() for path in (cell.output_dir / "checkpoints").rglob("*"))
+    )
     _, wrapper_path = _write_cell_inputs(cell)
     manifest["status"] = "running"
     manifest["started_at"] = _utc_now()
@@ -2706,6 +2759,14 @@ def execute_cell(
             )
         manifest["extraction_complete"] = return_code == 0
         manifest.update(wall_seconds=elapsed, peak_memory_kb=peak_kb, return_code=return_code)
+        manifest["execution_measurement"] = _execution_measurement(
+            cell,
+            recovery,
+            elapsed=elapsed,
+            peak_kb=peak_kb,
+            complete=return_code == 0,
+            continued=continued,
+        )
         post_run = _post_run_provenance(cell, completed=return_code == 0)
         if return_code == 0:
             from exact.runs.layout import RunLayout
@@ -4123,6 +4184,12 @@ def aggregate_stage(
                 metrics = cell_metrics(output_dir)
             except (OSError, TypeError, ValueError) as exc:
                 metric_error = {"type": type(exc).__name__, "message": str(exc)}
+        measurement = manifest.get("execution_measurement")
+        if not isinstance(measurement, Mapping):
+            # Legacy original runs retain their measured cost. Replays without a
+            # bound original measurement cannot establish a scientific wall cost.
+            reused_stages = (manifest.get("recovery") or {}).get("reused_stages", [])
+            measurement = {} if "extraction" in reused_stages else manifest
         row: dict[str, Any] = {
             "output_dir": str(output_dir),
             "experiment_id": manifest.get("experiment_id"),
@@ -4154,8 +4221,11 @@ def aggregate_stage(
             "metric_applicability": manifest.get("metric_applicability"),
             "explanation_reconstruction": manifest.get("explanation_reconstruction"),
             "selection_evidence": manifest.get("selection_evidence"),
-            "wall_seconds": manifest.get("wall_seconds"),
-            "peak_memory_kb": manifest.get("peak_memory_kb"),
+            "wall_seconds": measurement.get("wall_seconds"),
+            "peak_memory_kb": measurement.get("peak_memory_kb"),
+            "attempt_wall_seconds": manifest.get("wall_seconds"),
+            "attempt_peak_memory_kb": manifest.get("peak_memory_kb"),
+            "execution_measurement": manifest.get("execution_measurement"),
             "failure": (manifest.get("failure") or {}).get("message"),
             "metric_error": metric_error,
             "metrics": metrics,
@@ -4203,6 +4273,9 @@ def aggregate_stage(
         "selection_evidence",
         "wall_seconds",
         "peak_memory_kb",
+        "attempt_wall_seconds",
+        "attempt_peak_memory_kb",
+        "execution_measurement",
         "failure",
         "metric_error",
         *metric_keys,
@@ -4216,6 +4289,7 @@ def aggregate_stage(
             flattened = {key: record.get(key) for key in fieldnames}
             for structured_field in (
                 "fitted_artifacts",
+                "execution_measurement",
                 "llm_usage",
                 "metric_error",
                 "candidate_recall_diagnostics",

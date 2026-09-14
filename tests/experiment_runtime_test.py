@@ -197,6 +197,10 @@ def test_harness_interruption_imports_real_checkpoint_and_executes_only_missing_
     )
     resumed = harness.execute_cell(moved, suite, workdir=tmp_path, resume=True)
     assert resumed["status"] == "complete"
+    assert resumed["execution_measurement"]["status"] == "unavailable"
+    assert resumed["execution_measurement"]["wall_seconds"] is None
+    assert resumed["wall_seconds"] == 0.1
+    assert first["wall_seconds"] == 0.1
     assert encoded == [0, 1]
     assert harness.cell_metrics(moved.output_dir)["F1"] == pytest.approx(1.0)
 
@@ -420,7 +424,7 @@ def test_experiment_verbalization_errors_do_not_become_silent_text_fallback(monk
 
 
 def test_relocation_keeps_original_inference_cost_not_cache_replay_wall(tmp_path, monkeypatch):
-    cell, suite, _ = fixture(tmp_path, monkeypatch)
+    cell, suite, revision = fixture(tmp_path, monkeypatch)
     timing = {
         "sessions": [
             {
@@ -454,7 +458,70 @@ def test_relocation_keeps_original_inference_cost_not_cache_replay_wall(tmp_path
     replay = harness.execute_cell(relocated, suite, workdir=tmp_path, resume=True)
     assert original["inference_seconds"] == replay["inference_seconds"] == 10
     assert replay["wall_seconds"] < original["wall_seconds"]
+    assert replay["execution_measurement"] == original["execution_measurement"]
+    assert replay["execution_measurement"]["wall_seconds"] == 500
+    assert replay["execution_measurement"]["origin_attempt"] == original["recovery"]["attempt_id"]
+    original_measurement = (cell.output_dir / "stats/execution_measurement.json").read_bytes()
+    assert (
+        relocated.output_dir / "stats/execution_measurement.json"
+    ).read_bytes() == original_measurement
     assert json.loads((relocated.output_dir / "timings.json").read_text()) == timing
+    revision["evaluation"] = "repaired-evaluator"
+    repaired = harness.execute_cell(
+        replace(relocated, recovery={"root": str(tmp_path / "relocated")}),
+        suite,
+        workdir=tmp_path,
+        resume=True,
+    )
+    assert repaired["recovery"]["reused_stages"] == ["extraction", "inputs"]
+    assert repaired["execution_measurement"] == original["execution_measurement"]
+    assert (
+        relocated.output_dir / "stats/execution_measurement.json"
+    ).read_bytes() == original_measurement
+    rows = harness.aggregate_stage(
+        suite,
+        stage="screen",
+        output_root=tmp_path / "reports",
+        manifests=[repaired],
+        finalize_reports=False,
+    )
+    assert rows[0]["wall_seconds"] == 500
+    assert rows[0]["peak_memory_kb"] == 1
+    assert rows[0]["attempt_wall_seconds"] == repaired["wall_seconds"]
+    assert rows[0]["attempt_wall_seconds"] < 500
+    assert harness._selection_metric_value(rows[0], "wall_seconds") == 500
+
+
+def test_legacy_replay_cannot_turn_missing_scientific_measurement_into_zero_cost(
+    tmp_path, monkeypatch
+):
+    cell, suite, _ = fixture(tmp_path, monkeypatch)
+
+    def run(*_args, **_kwargs):
+        write_outputs(cell.output_dir, cell)
+        return 0, 123, 4
+
+    monkeypatch.setattr(harness, "_run_subprocess", run)
+    with monkeypatch.context() as legacy:
+        legacy.setattr(harness, "_execution_measurement", lambda *args, **kwargs: None)
+        original = harness.execute_cell(cell, suite, workdir=tmp_path, resume=False)
+    monkeypatch.setattr(
+        harness, "_run_subprocess", lambda *args, **kwargs: pytest.fail("replay ran a model")
+    )
+    replay = harness.execute_cell(cell, suite, workdir=tmp_path, resume=True)
+    assert replay["status"] == "complete"
+    assert replay["execution_measurement"]["status"] == "unavailable"
+    rows = harness.aggregate_stage(
+        suite,
+        stage="screen",
+        output_root=tmp_path / "reports",
+        manifests=[replay],
+        finalize_reports=False,
+    )
+    assert rows[0]["wall_seconds"] is None
+    assert harness._selection_metric_value(rows[0], "wall_seconds") is None
+    assert rows[0]["attempt_wall_seconds"] == replay["wall_seconds"]
+    assert original["wall_seconds"] == 123
 
 
 def test_published_comparator_uses_shared_recovery_and_replays_full_population_across_seeds(
