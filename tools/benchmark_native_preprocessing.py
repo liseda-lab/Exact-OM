@@ -65,17 +65,23 @@ def _profile_boundaries(path: Path | None) -> Iterator[None]:
     if path is None:
         yield
         return
+    import pyowl2vec_star_projector as shared_projector
+
     import exact.ontology.native_projection as native
     import exact.ontology.projection as projection
 
     boundaries = (
         (projection.SharedProjectionAdapter, "edges", "adapter_total", False),
         (projection, "cache_key", "cache_key_and_fingerprints", False),
-        (native.NativeProjector, "_project", "native_projection_total", False),
-        (native, "select_ingestion", "native_ingestion_selection", False),
-        (native, "prepare_native_encoded_compilation", "native_prepare_compile", False),
-        (native, "iter_edge_policy", "edge_policy_iteration", True),
-        (native.NativeProjector, "_report", "native_report", False),
+        (native.NativeProjector, "project", "native_projection_total", False),
+        (native.NativeProjector, "project_taxonomy", "native_projection_total", False),
+        (shared_projector.Projector, "iter_edges", "native_projection_iterator", True),
+        (
+            shared_projector.Projector,
+            "iter_taxonomy_edges",
+            "native_projection_iterator",
+            True,
+        ),
         (projection, "require_native_report", "adapter_report_validation", False),
     )
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -196,7 +202,6 @@ def benchmark(
             name: _sha256(implementation / name)
             for name in (
                 "exact/ontology/store.py",
-                "exact/ontology/index_views.py",
                 "exact/ontology/projection.py",
                 "exact/ontology/native_projection.py",
                 "exact/ontology/view_contract.py",
@@ -368,6 +373,18 @@ def benchmark(
         )
         if _digest(warm) != report["features"]["sha256"]:
             raise ValueError("Cached entity features changed semantics")
+        # Observe only indexes already demanded by these features: reporting must
+        # never construct an additional ontology-scale index or alter timings.
+        report["native_indexes"] = {
+            name.removeprefix("_"): dict(view.native_report)
+            for name in (
+                "_axioms",
+                "_class_view",
+                "_property_view",
+                "_domain_range",
+            )
+            if (view := vars(source).get(name)) is not None
+        }
         report["status"] = "complete"
     except BaseException as exc:
         report.update(status="failed", failure={"type": type(exc).__name__, "message": str(exc)})

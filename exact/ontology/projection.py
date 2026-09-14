@@ -16,7 +16,7 @@ from pyowl2vec_star_projector import REFERENCE_PROFILE, ProjectionOptions
 from pyowl_core import OntologyView
 
 from exact.core.entities.graph import Edge
-from exact.ontology.native_projection import NativeProjector
+from exact.ontology.native_projection import NativeProjector, require_native_support
 from exact.ontology.versions import distribution_version
 from exact.ontology.view_contract import retain_ontology_view
 
@@ -272,7 +272,7 @@ class ProjectionCacheKey:
     duplicates: Literal["unique"] = "unique"
     order: Literal["canonical"] = "canonical"
     compatibility_state: Literal["isolated"] = "isolated"
-    execution_contract: str = "exact/encoded-native-only/v1"
+    execution_contract: str = "exact/native-pipeline/v2"
 
 
 def normalize_method(method: str) -> ProjectionMethod:
@@ -334,7 +334,7 @@ def projector_cache_identity(settings: ProjectorSettings) -> dict[str, object]:
         "encoded_contract": encoded_contract_identity().as_dict(),
         "profile": settings.profile,
         "backend": settings.backend,
-        "execution_contract": "exact/encoded-native-only/v1",
+        "execution_contract": "exact/native-pipeline/v2",
         "duplicates": "unique",
         "order": "canonical",
         "compatibility_state": "isolated",
@@ -358,6 +358,7 @@ def require_native_report(projector: object) -> dict[str, object]:
     if (
         provenance.get("selected_backend") != "native"
         or options.get("backend") != "native"
+        or options.get("require_native_pipeline") is not True
         or ingestion.get("path") != "encoded-native"
         or ingestion.get("reason") is not None
     ):
@@ -372,11 +373,22 @@ def require_native_report(projector: object) -> dict[str, object]:
         "wire_decoder_calls",
         "wire_encoder_calls",
         "per_row_ffi_calls",
+        "encoded_indexed_buffer_count",
     ):
         if type(counters.get(name)) is not int or counters[name] != 0:
             raise RuntimeError(f"native projection reported forbidden scalar work: {name}")
     if counters.get("encoded_compiler_gil_released") is not True:
         raise RuntimeError("native projection did not report native compilation")
+    if counters.get("native_validation_receipt") is not True:
+        raise RuntimeError("native projection did not report validated native publication")
+    counts = cast(Mapping[str, object], provenance.get("counts", {}))
+    if (
+        type(counters.get("native_canonical_sort_calls")) is not int
+        or cast(int, counters["native_canonical_sort_calls"]) < 1
+        or type(counters.get("native_canonical_published_edges")) is not int
+        or counters["native_canonical_published_edges"] != counts.get("edges")
+    ):
+        raise RuntimeError("native projection did not report complete native canonical output")
     diagnostics = cast(list[Mapping[str, object]], payload.get("diagnostics", []))
     if any(item.get("severity") == "error" for item in diagnostics):
         raise RuntimeError("native projection reported an error")
@@ -397,6 +409,7 @@ class SharedProjectionAdapter:
             raise TypeError(
                 "Exact requires NativeProjector; injectable scalar fallback is forbidden"
             )
+        require_native_support()
         self.snapshot = retain_ontology_view(snapshot)
         self.settings = settings or ProjectorSettings()
         self.projector = projector or NativeProjector()

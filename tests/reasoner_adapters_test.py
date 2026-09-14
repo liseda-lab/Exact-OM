@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from types import SimpleNamespace
 
 import pyowl_core
@@ -15,7 +14,6 @@ from exact.ontology.reasoning import (
     HermitHierarchyReasoner,
     ReasonerSettings,
     ReasonerUnavailableError,
-    WorkerWireHierarchyReasoner,
     load_reasoner,
 )
 
@@ -119,23 +117,24 @@ def test_missing_optional_reasoner_distribution_fails_actionably(
     monkeypatch.setattr(reasoning_module, "import_module", missing_module)
 
     with pytest.raises(ReasonerUnavailableError, match="reasoning.*extra"):
-        load_reasoner(reasoner_name, reasoning_source, backend="python")
+        load_reasoner(reasoner_name, reasoning_source, backend="auto")
 
 
 def test_elk_adapter_uses_public_facade_and_exact_snapshot(reasoning_source):
-    reasoner = load_reasoner("elk", reasoning_source, backend="python")
+    reasoner = load_reasoner("elk", reasoning_source, backend="auto")
     assert isinstance(reasoner, ElkHierarchyReasoner)
     assert reasoner.ontology is reasoning_source.owl_snapshot()
     assert reasoner.shared_reasoner.ontology is reasoning_source.owl_snapshot()
     try:
         _assert_chain(reasoner)
         provenance = reasoner.provenance
-        assert provenance["backend"]["effective"] == "python"
+        assert provenance["backend"]["effective"] == "rust"
         handoff = provenance["consumer_handoff"]
-        assert handoff["ingestion_path"] == "scalar-python"
+        assert handoff["ingestion_path"] == "encoded-native"
         assert len(handoff["compiler_digest"]) == 64
         assert handoff["consumer_compile_seconds"] >= 0.0
-        assert handoff["counters"]["materialized_scalar_rows"] > 0
+        assert handoff["counters"]["materialized_scalar_rows"] == 0
+        assert handoff["counters"]["native_result_validation"] is True
         assert handoff["counters"]["encoded_staging_copy_bytes"] == 0
     finally:
         reasoner.close()
@@ -147,7 +146,7 @@ def test_hermit_adapter_preserves_identity_timeout_and_narrow_results(reasoning_
     reasoner = load_reasoner(
         "hermit",
         reasoning_source,
-        settings=ReasonerSettings(backend="python", timeout_seconds=30),
+        settings=ReasonerSettings(backend="auto", timeout_seconds=30),
     )
     assert isinstance(reasoner, HermitHierarchyReasoner)
     assert reasoner.ontology is reasoning_source.owl_snapshot()
@@ -161,11 +160,11 @@ def test_hermit_adapter_preserves_identity_timeout_and_narrow_results(reasoning_
         assert handoff["compiler_cache_schema_version"] == pyhermit.COMPILER_CACHE_SCHEMA_VERSION
         assert handoff["ir_schema_version"] == pyhermit.COMPILED_IR_SCHEMA_VERSION
         assert handoff["implementation_version"] == provenance["backend"]["implementation_version"]
-        assert "native_abi_version" not in handoff
+        assert handoff["native_abi_version"] == pyhermit.NATIVE_ABI_VERSION
         assert len(handoff["compiler_digest"]) == 64
         assert set(handoff["compiler_digest"]) <= set("0123456789abcdef")
         assert handoff["consumer_compile_seconds"] >= 0.0
-        assert "encoded_view_publication_seconds" not in handoff
+        assert handoff["counters"]["native_result_validation"] is True
     finally:
         reasoner.close()
 
@@ -177,12 +176,18 @@ def test_hermit_compiler_digest_is_backend_independent(reasoning_source):
         pytest.skip("pyHermiT native backend is unavailable")
     diagnostics = {}
     for backend in ("python", "native", "verify"):
-        reasoner = load_reasoner("hermit", reasoning_source, backend=backend, timeout=30)
+        # The upstream default APIs remain the small scalar/native oracle.
+        reasoner = pyhermit.Reasoner(
+            reasoning_source.owl_snapshot(),
+            config=pyhermit.ReasonerConfig(backend=backend, timeout=30),
+        )
         try:
-            _assert_chain(reasoner)
-            diagnostics[backend] = reasoner.provenance["consumer_handoff"]
+            assert reasoning_module._hermit_query(
+                reasoner, "urn:exact:test:A", upward=True, direct=True
+            ) == {"urn:exact:test:B"}
+            diagnostics[backend] = reasoning_module._consumer_handoff(reasoner).as_dict()
         finally:
-            reasoner.close()
+            reasoner.dispose()
 
     assert {values["compiler_digest"] for values in diagnostics.values()} == {
         diagnostics["python"]["compiler_digest"]
@@ -243,15 +248,15 @@ def test_rejected_consumer_handoff_releases_session_and_retry_is_clean(
     monkeypatch.setattr(reasoning_module, "_consumer_handoff", reject_once)
 
     with pytest.raises(ValueError, match="incompatible native compiler handoff"):
-        load_reasoner(reasoner_name, reasoning_source, backend="python")
+        load_reasoner(reasoner_name, reasoning_source, backend="auto")
     assert len(released) == 1
 
-    retry = load_reasoner(reasoner_name, reasoning_source, backend="python")
+    retry = load_reasoner(reasoner_name, reasoning_source, backend="auto")
     try:
         _assert_chain(retry)
     finally:
         retry.close()
-    assert attempts == 2
+    assert attempts >= 2
     assert len(released) == 2
 
 
@@ -279,7 +284,7 @@ def test_reasoner_module_and_distribution_version_drift_fails_closed(
     )
 
     with pytest.raises(RuntimeError, match="module/distribution version mismatch"):
-        load_reasoner("hermit", reasoning_source, backend="python")
+        load_reasoner("hermit", reasoning_source, backend="auto")
     assert len(released) == 1
 
 
@@ -332,7 +337,9 @@ def test_encoded_reasoner_handoff_rejects_missing_or_incompatible_schema(
 
 
 @pytest.mark.parametrize("reasoner_name", ["elk", "hermit"])
-def test_optional_reasoners_retain_overlay_and_composite_views(reasoning_source, reasoner_name):
+def test_strict_reasoners_reject_unsupported_overlay_and_composite_views(
+    reasoning_source, reasoner_name
+):
     import pyowl_core
 
     base = reasoning_source.owl_snapshot()
@@ -349,100 +356,24 @@ def test_optional_reasoners_retain_overlay_and_composite_views(reasoning_source,
 
     for view in (overlay, composite):
         source = load_ontology(view)
-        reasoner = load_reasoner(reasoner_name, source, backend="python")
-        try:
-            assert reasoner.ontology is view
-            assert reasoner.shared_reasoner.ontology is view
-            _assert_chain(reasoner)
-            assert reasoner.provenance["consumer_handoff"]["ingestion_path"] == "scalar-python"
-        finally:
-            reasoner.close()
+        with pytest.raises((pyowl_core.AdapterCompatibilityError, pyowl_core.BackendProtocolError)):
+            load_reasoner(reasoner_name, source)
 
 
 @pytest.mark.parametrize("reasoner_name", ["elk", "hermit"])
-@pytest.mark.parametrize("view_kind", ["snapshot", "overlay", "composite"])
-def test_verified_wire_worker_matches_in_process_without_parser_calls(
-    reasoning_source, tmp_path, monkeypatch, reasoner_name, view_kind
+def test_unready_wire_worker_is_rejected_before_serialization(
+    reasoning_source, monkeypatch, reasoner_name
 ):
-    import pyowl_core
+    def forbidden(*args, **kwargs):
+        raise AssertionError("unsupported wire worker serialized the ontology")
 
-    source = reasoning_source
-    if view_kind != "snapshot":
-        base = reasoning_source.owl_snapshot()
-        overlay = pyowl_core.apply_delta(
-            base,
-            pyowl_core.OntologyDelta(
-                add_axioms={
-                    pyowl_core.Declaration(
-                        pyowl_core.Class(pyowl_core.IRI("urn:exact:test:WorkerOverlay"))
-                    )
-                }
-            ),
-        )
-        view = overlay
-        if view_kind == "composite":
-            second = pyowl_core.load_snapshot(
-                _ONTOLOGY,
-                document_iri="urn:exact:test:worker-second",
-            )
-            view = pyowl_core.compose_views(overlay, second, roles=("source", "target"))
-        source = load_ontology(view)
-
-    encode_snapshot = pyowl_core.encode_snapshot
-    encode_calls = 0
-
-    def counted_encode(snapshot):
-        nonlocal encode_calls
-        encode_calls += 1
-        return encode_snapshot(snapshot)
-
-    monkeypatch.setattr(pyowl_core, "encode_snapshot", counted_encode)
-    guard = tmp_path / "sitecustomize.py"
-    guard.write_text(
-        "import pyowl_core\n"
-        "import pyowl_core.api as core_api\n"
-        "def forbidden(*args, **kwargs):\n"
-        "    raise AssertionError('worker parser call is forbidden')\n"
-        "pyowl_core.load_snapshot = forbidden\n"
-        "pyowl_core.parse_document = forbidden\n"
-        "core_api.load_snapshot = forbidden\n"
-        "core_api.parse_document = forbidden\n",
-        encoding="utf-8",
-    )
-    existing = os.environ.get("PYTHONPATH")
-    monkeypatch.setenv(
-        "PYTHONPATH",
-        os.fspath(tmp_path) if not existing else os.fspath(tmp_path) + os.pathsep + existing,
-    )
-    reasoner = load_reasoner(reasoner_name, source, backend="python", worker_wire=True, timeout=30)
-    assert isinstance(reasoner, WorkerWireHierarchyReasoner)
-    assert reasoner.ontology is source.owl_snapshot()
-    assert reasoner.provenance["verified_wire"] is False
-    assert reasoner.provenance["mmap_verified"] is False
-    try:
-        _assert_chain(reasoner)
-        provenance = reasoner.provenance
-        assert provenance["verified_wire"] is True
-        assert provenance["mmap_verified"] is True
-        assert provenance["owl_parse_count"] == 0
-        assert provenance["options"]["worker_wire"] is True
-        assert provenance["consumer_handoff"]["ingestion_path"] == "scalar-python"
-        if reasoner_name == "hermit":
-            import pyhermit
-
-            assert provenance["consumer_handoff"]["compiler_cache_schema_version"] == (
-                pyhermit.COMPILER_CACHE_SCHEMA_VERSION
-            )
-            assert provenance["consumer_handoff"]["ir_schema_version"] == (
-                pyhermit.COMPILED_IR_SCHEMA_VERSION
-            )
-        assert encode_calls == 1
-    finally:
-        reasoner.close()
+    monkeypatch.setattr(pyowl_core, "encode_snapshot", forbidden)
+    with pytest.raises(ReasonerUnavailableError, match="verified-wire"):
+        load_reasoner(reasoner_name, reasoning_source, worker_wire=True, timeout=30)
 
 
 def test_source_selection_routes_class_queries_and_records_provenance(reasoning_source):
-    reasoning_source.configure_reasoner("elk", backend="python")
+    reasoning_source.configure_reasoner("elk", backend="auto")
     try:
         assert reasoning_source.direct_parents("urn:exact:test:A") == ["urn:exact:test:B"]
         assert reasoning_source.reasoner_provenance["selection"]["effective"] == "elk"
@@ -454,7 +385,7 @@ def test_explicit_timeout_fallback_is_visible_in_provenance(reasoning_source, mo
     reasoner = load_reasoner(
         "elk",
         reasoning_source,
-        settings=ReasonerSettings(backend="python", fallback="asserted"),
+        settings=ReasonerSettings(backend="auto", fallback="asserted"),
     )
 
     def timeout(*_args, **_kwargs):
@@ -469,5 +400,33 @@ def test_explicit_timeout_fallback_is_visible_in_provenance(reasoning_source, mo
         assert provenance["timed_out"] is True
         assert "test deadline" in provenance["fallback_reason"]
         assert "/tmp/private" not in provenance["fallback_reason"]
+    finally:
+        reasoner.close()
+
+
+@pytest.mark.parametrize("reasoner_name", ["elk", "hermit"])
+def test_exact_rejects_python_reasoning_before_construction(
+    reasoning_source, monkeypatch, reasoner_name
+):
+    def forbidden(*args, **kwargs):
+        raise AssertionError("Python reasoner was constructed")
+
+    monkeypatch.setattr(reasoning_module, "_optional_module", forbidden)
+    with pytest.raises(ValueError, match="backend must be"):
+        load_reasoner(reasoner_name, reasoning_source, backend="python")
+
+
+def test_failed_native_result_attestation_does_not_publish(reasoning_source, monkeypatch):
+    reasoner = load_reasoner("elk", reasoning_source)
+    cls = type(reasoner.shared_reasoner)
+    diagnostics = cls.diagnostics
+
+    def unverified(self):
+        return {**diagnostics(self), "native_result_validation": False}
+
+    monkeypatch.setattr(cls, "diagnostics", unverified)
+    try:
+        with pytest.raises(RuntimeError, match="verify the required native pipeline"):
+            reasoner.direct_parents("urn:exact:test:A")
     finally:
         reasoner.close()

@@ -187,8 +187,8 @@ def test_overlay_and_composite_views_retain_identity_through_exact_consumers():
 
         assert source.owl_snapshot() is view
         assert source.reasoner.ontology is view
-        assert source.projection_edges()
-        assert source.projector.last_view is view
+        with pytest.raises(shared_projector.SnapshotCompatibilityError):
+            source.projection_edges()
         provenance = source.ontology_stack_provenance()
         assert provenance["consumer_handoff"]["core"]["owner_kind"] == owner_kind
         closure = provenance["core"]["closure"]
@@ -255,6 +255,11 @@ def test_projector_encoded_native_parity_preserves_layered_view_identity():
             ),
         )
         native.configure_projector(backend="native")
+        if view is not base:
+            with pytest.raises(shared_projector.SnapshotCompatibilityError):
+                native.projection_edges()
+            assert native.owl_snapshot() is view
+            continue
 
         assert [edge.astuple() for edge in native.projection_edges()] == [
             (edge.source, edge.relation, edge.destination) for edge in expected

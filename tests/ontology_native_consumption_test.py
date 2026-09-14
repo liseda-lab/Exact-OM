@@ -91,10 +91,19 @@ def test_annotations_use_only_native_type_partition_without_origins_or_full_scan
         raise AssertionError("annotation lookup traversed unrelated axioms or an unused index")
 
     monkeypatch.setattr(type(snapshot), "iter_axioms", forbidden)
-    monkeypatch.setattr(core.AnnotationAssertionIndex, "_build", classmethod(forbidden))
+    column_queries = []
+    original_columns = core.AnnotationAssertionIndex.iter_columns
+
+    def columns(index, **kwargs):
+        assert index.options.require_native_pipeline is True
+        column_queries.append(kwargs)
+        return original_columns(index, **kwargs)
+
+    monkeypatch.setattr(core.AnnotationAssertionIndex, "iter_columns", columns)
     assert source.labels("urn:C") == (
         ["Class", "Classe", "Overlay"] if overlay else ["Class", "Classe"]
     )
+    assert {prop.iri.value for prop in column_queries[-1]["properties"]} == {RDFS_LABEL}
     assert source.labels("urn:Imported") == ["Imported"]
     assert source.annotations("urn:C", ["urn:link"]) == [
         AnnotationValue("urn:link", "urn:Elsewhere", False)
@@ -107,6 +116,11 @@ def test_annotations_use_only_native_type_partition_without_origins_or_full_scan
         "urn:count", "2", True, datatype="http://www.w3.org/2001/XMLSchema#integer"
     ) in source.attributes("urn:C")
     assert source.excluded_from_alignment() == frozenset({"urn:C", "urn:Imported"})
+    assert {prop.iri.value for prop in column_queries[-1]["properties"]} == {
+        ANNOTATION_IRI,
+        OWL_DEPRECATED,
+    }
+    assert "subjects" not in column_queries[-1]
     assert source.owl_snapshot() is owner
     assert source._axioms.options.include_origins is False
     assert "_class_view" not in source.__dict__

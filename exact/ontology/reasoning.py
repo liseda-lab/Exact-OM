@@ -2,8 +2,8 @@
 
 The built-in asserted mode remains dependency free.  ELK and HermiT are imported
 only when explicitly selected and receive the exact snapshot owned by the source.
-Process isolation uses pyowl-core's verified wire format, never an OWL source path
-or a pickled ontology graph.
+The strict native pipeline requires a retained native snapshot; verified-wire
+workers are rejected until their mapped owners support native receipts.
 """
 
 from __future__ import annotations
@@ -37,6 +37,15 @@ _OWL_BOUNDS = frozenset({OWL_THING, OWL_NOTHING})
 _WORKER_SCHEMA_VERSION = 3
 _PATH_FRAGMENT = re.compile(r"(?<![A-Za-z0-9])(?:[A-Za-z]:[\\/]|/)[^\s\"']+")
 _INGESTION_PATHS = frozenset({"scalar-python", "scalar-native", "scalar-wire", "encoded-native"})
+_HANDOFF_BOOLEAN_COUNTERS = frozenset(
+    {
+        "encoded_compiler_gil_released",
+        "native_pipeline_required",
+        "native_core_receipt_validated",
+        "native_metadata_validation",
+        "native_result_validation",
+    }
+)
 _HANDOFF_COUNTERS = frozenset(
     {
         "base_flattening_bytes",
@@ -51,6 +60,15 @@ _HANDOFF_COUNTERS = frozenset(
         "encoded_referenced_view_count",
         "encoded_posting_bytes",
         "encoded_compiler_gil_released",
+        "native_pipeline_required",
+        "native_core_receipt_validated",
+        "native_metadata_validation",
+        "native_result_validation",
+        "native_metadata_domain_copies",
+        "native_symbol_rows_materialized",
+        "native_symbol_lookups",
+        "native_result_publications",
+        "native_live_result_envelopes",
         "materialized_scalar_rows",
         "parser_calls",
         "per_row_ffi_calls",
@@ -85,6 +103,10 @@ _ENCODED_ONLY_COUNTER_DEFAULTS: Mapping[str, int | bool] = {
     "encoded_referenced_view_count": 0,
     "encoded_posting_bytes": 0,
     "encoded_compiler_gil_released": False,
+    "native_pipeline_required": False,
+    "native_core_receipt_validated": False,
+    "native_metadata_validation": False,
+    "native_result_validation": False,
 }
 _SHA256_HEX = re.compile(r"[0-9a-f]{64}\Z")
 _MISSING = object()
@@ -212,7 +234,7 @@ class ConsumerHandoffProvenance:
         ):
             raise ValueError("reasoner handoff counters are not canonical")
         for name, value in self.counters:
-            if name == "encoded_compiler_gil_released":
+            if name in _HANDOFF_BOOLEAN_COUNTERS:
                 if not isinstance(value, bool):
                     raise TypeError("reasoner GIL diagnostic must be boolean")
             elif isinstance(value, bool) or not isinstance(value, int) or value < 0:
@@ -573,6 +595,7 @@ def reasoner_cache_identity(
             package_version = "not-installed"
     return {
         "selection": normalized,
+        "execution_contract": "exact/native-pipeline/v2",
         "package_version": package_version,
         "backend": selected.backend,
         "workers": selected.workers,
@@ -604,12 +627,68 @@ def _optional_module(module_name: str, extra_label: str) -> Any:
 
 def _validate_backend(name: str, backend: str) -> None:
     choices = {
-        "elk": {"auto", "python", "rust"},
-        "hermit": {"auto", "python", "native", "verify"},
+        "elk": {"auto", "rust"},
+        "hermit": {"auto", "native"},
     }[name]
     if backend not in choices:
         rendered = ", ".join(sorted(choices))
         raise ValueError(f"{name} backend must be one of: {rendered}")
+
+
+def require_native_reasoner_support(
+    name: str, settings: ReasonerSettings | Mapping[str, object] | None = None
+) -> None:
+    """Reject an incompatible optional reasoner before loading ontology inputs."""
+    name = str(name).strip().lower()
+    if name not in {"elk", "hermit"}:
+        return
+    selected = ReasonerSettings.from_value(settings)
+    _validate_backend(name, selected.backend)
+    module = _optional_module("pyelk" if name == "elk" else "pyhermit", name)
+    check = getattr(module, "require_native_pipeline_support", None)
+    if not callable(check):
+        raise ReasonerUnavailableError(
+            f"{name} lacks the required public native pipeline capability"
+        )
+    check()
+    if selected.worker_wire or (name == "elk" and selected.timeout_seconds is not None):
+        raise ReasonerUnavailableError(
+            f"{name} verified-wire workers lack native receipt support; "
+            "the current strict pipeline requires an in-process retained snapshot"
+        )
+
+
+def _require_native_handoff(reasoner: object, *, result: bool = False) -> ConsumerHandoffProvenance:
+    handoff = _consumer_handoff(reasoner)
+    if handoff is None or handoff.ingestion_path != "encoded-native":
+        raise RuntimeError("Exact requires encoded-native reasoner ingestion")
+    counters = dict(handoff.counters)
+    flags: tuple[str, ...] = (
+        "native_pipeline_required",
+        "native_core_receipt_validated",
+        "native_metadata_validation",
+    )
+    if result:
+        flags += ("native_result_validation",)
+    if any(counters.get(name) is not True for name in flags):
+        raise RuntimeError("reasoner did not verify the required native pipeline stages")
+    for name in (
+        "materialized_scalar_rows",
+        "scalar_axiom_materializations",
+        "scalar_term_materializations",
+        "encoded_indexed_buffer_count",
+        "native_metadata_domain_copies",
+        "parser_calls",
+        "resolver_calls",
+        "wire_decoder_calls",
+        "wire_encoder_calls",
+        "per_row_ffi_calls",
+    ):
+        if type(counters.get(name)) is not int or counters[name] != 0:
+            raise RuntimeError(f"reasoner reported forbidden scalar work: {name}")
+    if counters.get("encoded_compiler_gil_released") is not True:
+        raise RuntimeError("reasoner did not report native compilation")
+    return handoff
 
 
 class AssertedHierarchyReasoner:
@@ -777,10 +856,11 @@ def _release_failed_reasoner(reasoner: object, method_name: str) -> None:
 def _create_elk(
     snapshot: OntologyView, settings: ReasonerSettings
 ) -> tuple[Any, ReasonerProvenance, type[Exception]]:
-    _validate_backend("elk", settings.backend)
+    require_native_reasoner_support("elk", settings)
     pyelk = _optional_module("pyelk", "elk")
     config = pyelk.ReasonerConfig(
         backend=settings.backend,
+        require_native_pipeline=True,
         workers=settings.workers,
         allow_fresh_entities=True,
         unsupported="ignore",
@@ -801,7 +881,7 @@ def _create_elk(
             implementation_version=str(backend.implementation_version),
             backend_fallback_reason=backend.fallback_reason,
         )
-        provenance = replace(provenance, consumer_handoff=_consumer_handoff(reasoner))
+        provenance = replace(provenance, consumer_handoff=_require_native_handoff(reasoner))
         error_type = cast(type[Exception], import_module("pyelk.exceptions").PyElkError)
         return reasoner, provenance, error_type
     except Exception:
@@ -827,7 +907,11 @@ class ElkHierarchyReasoner(_InferredHierarchyReasoner):
         return isinstance(error, (TimeoutError, self._error_type))
 
     def _query(self, iri: str, *, upward: bool, direct: bool) -> set[str]:
-        return _elk_query(self._reasoner, iri, upward=upward, direct=direct)
+        values = _elk_query(self._reasoner, iri, upward=upward, direct=direct)
+        self._provenance = replace(
+            self._provenance, consumer_handoff=_require_native_handoff(self._reasoner, result=True)
+        )
+        return values
 
     def close(self) -> None:
         self._reasoner.close()
@@ -869,10 +953,11 @@ def _hermit_query(reasoner: Any, iri: str, *, upward: bool, direct: bool) -> set
 def _create_hermit(
     snapshot: OntologyView, settings: ReasonerSettings
 ) -> tuple[Any, ReasonerProvenance, type[Exception]]:
-    _validate_backend("hermit", settings.backend)
+    require_native_reasoner_support("hermit", settings)
     pyhermit = _optional_module("pyhermit", "hermit")
     config = pyhermit.ReasonerConfig(
         backend=settings.backend,
+        require_native_pipeline=True,
         timeout=settings.timeout_seconds,
         workers=settings.workers,
     )
@@ -891,7 +976,7 @@ def _create_hermit(
             implementation_version=str(backend.implementation_version),
             backend_fallback_reason=_hermit_fallback_reason(pyhermit, settings, backend),
         )
-        provenance = replace(provenance, consumer_handoff=_consumer_handoff(reasoner))
+        provenance = replace(provenance, consumer_handoff=_require_native_handoff(reasoner))
         error_type = cast(type[Exception], pyhermit.PyHermiTError)
         return reasoner, provenance, error_type
     except Exception:
@@ -917,7 +1002,11 @@ class HermitHierarchyReasoner(_InferredHierarchyReasoner):
         return isinstance(error, (TimeoutError, self._error_type))
 
     def _query(self, iri: str, *, upward: bool, direct: bool) -> set[str]:
-        return _hermit_query(self._reasoner, iri, upward=upward, direct=direct)
+        values = _hermit_query(self._reasoner, iri, upward=upward, direct=direct)
+        self._provenance = replace(
+            self._provenance, consumer_handoff=_require_native_handoff(self._reasoner, result=True)
+        )
+        return values
 
     def close(self) -> None:
         self._reasoner.dispose()
@@ -1067,7 +1156,7 @@ class WorkerWireHierarchyReasoner(_InferredHierarchyReasoner):
         settings: ReasonerSettings,
     ) -> None:
         selected = replace(settings, worker_wire=True)
-        _validate_backend(reasoner_name, selected.backend)
+        require_native_reasoner_support(reasoner_name, selected)
         super().__init__(store, selected)
         self.reasoner_name = reasoner_name
         module = _optional_module("pyelk" if reasoner_name == "elk" else "pyhermit", reasoner_name)
@@ -1154,9 +1243,9 @@ def load_reasoner(
 ) -> ReasonerProtocol:
     """Load an explicit built-in/shared adapter or an ``exact.reasoners`` plugin.
 
-    A pyELK timeout automatically selects the verified-wire worker because pyELK's
-    in-process facade has no cancellable deadline.  HermiT receives its timeout in
-    process unless ``worker_wire`` is explicitly requested.
+    HermiT supports an in-process native deadline. ELK deadlines and explicit
+    verified-wire workers fail native admission until mapped receipts are supported;
+    an explicitly configured asserted fallback remains available.
     """
 
     if not isinstance(store, OwlOntologySource):
@@ -1229,4 +1318,5 @@ __all__ = [
     "WorkerWireHierarchyReasoner",
     "load_reasoner",
     "reasoner_cache_identity",
+    "require_native_reasoner_support",
 ]

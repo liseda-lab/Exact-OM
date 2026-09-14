@@ -51,16 +51,12 @@ def test_real_native_phases_preserve_semantics_without_models(tmp_path, monkeypa
     import exact.ontology.native_projection as native
     import exact.ontology.projection as projection
 
-    original_prepare = native.prepare_native_encoded_compilation
+    original_project = native.NativeProjector.project
     original_cache_key = projection.cache_key
-    original_report = native.NativeProjector._report
-    owns_report = "_report" in vars(native.NativeProjector)
     profile = tmp_path / "profile.jsonl"
     second = benchmark(config, tmp_path / "second.json", entity_limit=3, profile_stages=profile)
-    assert native.prepare_native_encoded_compilation is original_prepare
+    assert native.NativeProjector.project is original_project
     assert projection.cache_key is original_cache_key
-    assert native.NativeProjector._report is original_report
-    assert ("_report" in vars(native.NativeProjector)) is owns_report
     events = [json.loads(line) for line in profile.read_text().splitlines()]
     starts = {row["call"]: row for row in events if row["status"] == "running"}
     ends = {row["call"]: row for row in events if row["status"] != "running"}
@@ -69,10 +65,7 @@ def test_real_native_phases_preserve_semantics_without_models(tmp_path, monkeypa
         "adapter_total",
         "cache_key_and_fingerprints",
         "native_projection_total",
-        "native_ingestion_selection",
-        "native_prepare_compile",
-        "edge_policy_iteration",
-        "native_report",
+        "native_projection_iterator",
         "adapter_report_validation",
     }
     assert all(row["wall_seconds"] >= 0 and row["cpu_seconds"] >= 0 for row in ends.values())
@@ -85,6 +78,8 @@ def test_real_native_phases_preserve_semantics_without_models(tmp_path, monkeypa
     assert first["edges"]["count"] == 42
     assert isinstance(first["projection_spill"], dict)
     assert first["entities"]["count"] == first["features"]["count"] == 3
+    assert first["native_indexes"]["class_view"]["backend"] == "native"
+    assert "domain_range" not in first["native_indexes"]
     for field in ("signature", "exclusions", "labels", "edges", "entities", "features"):
         assert first[field]["sha256"] == second[field]["sha256"]
     assert [phase["name"] for phase in first["phases"]] == [
@@ -185,13 +180,13 @@ def test_boundary_profile_restores_callables_after_failure(tmp_path, monkeypatch
     def fail(*args, **kwargs):
         raise RuntimeError("profile fixture failure")
 
-    monkeypatch.setattr(native, "prepare_native_encoded_compilation", fail)
+    monkeypatch.setattr(native.NativeProjector, "project", fail)
     original_key = projection.cache_key
     path = tmp_path / "failed-profile.jsonl"
     with pytest.raises(RuntimeError, match="profile fixture failure"):
         with _profile_boundaries(path):
-            native.prepare_native_encoded_compilation()
-    assert native.prepare_native_encoded_compilation is fail
+            native.NativeProjector().project(None)
+    assert native.NativeProjector.project is fail
     assert projection.cache_key is original_key
     rows = [json.loads(line) for line in path.read_text().splitlines()]
     assert [row["status"] for row in rows] == ["running", "failed"]

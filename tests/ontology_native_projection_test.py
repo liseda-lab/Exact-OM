@@ -7,6 +7,7 @@ from types import SimpleNamespace
 
 import pyowl2vec_star_projector as upstream
 import pyowl2vec_star_projector.api as upstream_api
+import pyowl2vec_star_projector.native as upstream_native
 import pyowl_core
 import pytest
 
@@ -61,7 +62,7 @@ def test_native_projection_matches_reference_without_scalar_work(
     assert report["ingestion"]["path"] == "encoded-native"
     assert report["ingestion"]["counters"]["scalar_axiom_materializations"] == 0
     # A cached result must not make another compiler call.
-    monkeypatch.setattr(native, "prepare_native_encoded_compilation", _forbid)
+    monkeypatch.setattr(upstream_api, "prepare_native_encoded_compilation", _forbid)
     assert source.projection_edges(method=method, include_literals=include_literals) == edges
 
 
@@ -80,23 +81,33 @@ def test_native_failure_never_invokes_scalar_fallback(monkeypatch, method, failu
 
     def fail(*args, **kwargs):
         if failure == "unsupported":
-            raise native.NativeEncodedDirectUnsupported("fixture shape")
+            raise upstream_native.NativeEncodedDirectUnsupported("fixture shape")
         if failure == "unavailable":
             raise upstream.NativeBackendUnavailableError("fixture native unavailable")
         return None, "fixture native decline"
 
-    monkeypatch.setattr(native, "prepare_native_encoded_compilation", fail)
+    monkeypatch.setattr(upstream_api, "prepare_native_encoded_compilation", fail)
     with pytest.raises(upstream.NativeBackendUnavailableError, match="fixture"):
         source.projection_edges(method=method)
     assert source._projection.cache_keys == ()
     assert source.projector.last_report is None
 
 
-def test_reported_scalar_work_cannot_be_cached(monkeypatch):
+@pytest.mark.parametrize(
+    ("counter", "value", "message"),
+    [
+        ("scalar_axiom_materializations", 1, "forbidden scalar work"),
+        ("encoded_indexed_buffer_count", 1, "forbidden scalar work"),
+        ("native_validation_receipt", False, "validated native publication"),
+        ("native_canonical_sort_calls", 0, "complete native canonical output"),
+        ("native_canonical_published_edges", -1, "complete native canonical output"),
+    ],
+)
+def test_unverified_native_work_cannot_be_cached(monkeypatch, counter, value, message):
     source = load_ontology(FIXTURES / "ontologies/mini_src.owl")
     source.projection_edges()
     payload = source.projector.last_report.to_dict()
-    payload["provenance"]["ingestion"]["counters"]["scalar_axiom_materializations"] = 1
+    payload["provenance"]["ingestion"]["counters"][counter] = value
 
     class TamperedProjector(native.NativeProjector):
         def project(self, *args, **kwargs):
@@ -108,7 +119,7 @@ def test_reported_scalar_work_cannot_be_cached(monkeypatch):
 
     fake = TamperedProjector()
     adapter = SharedProjectionAdapter(source.owl_snapshot(), projector=fake)
-    with pytest.raises(RuntimeError, match="forbidden scalar work"):
+    with pytest.raises(RuntimeError, match=message):
         adapter.edges()
     assert adapter.cache_keys == ()
 
@@ -141,7 +152,8 @@ def test_imported_closure_is_projected_natively(monkeypatch, tmp_path):
         f"Ontology(<urn:root> Import(<{imported.as_uri()}>) Declaration(Class(<urn:A>)) SubClassOf(<urn:A> <urn:B>))"
     )
     source = load_ontology(
-        root, resolver=pyowl_core.MappingResolver({imported.as_uri(): imported.read_bytes()})
+        root,
+        resolver=pyowl_core.MappingResolver({imported.as_uri(): imported.read_bytes()}),
     )
     view = source.owl_snapshot()
     assert view.is_complete
@@ -156,3 +168,20 @@ def test_plain_upstream_projector_injection_is_rejected():
     source = load_ontology(FIXTURES / "ontologies/mini_src.owl")
     with pytest.raises(TypeError, match="injectable scalar fallback"):
         SharedProjectionAdapter(source.owl_snapshot(), projector=upstream.Projector())
+
+
+@pytest.mark.parametrize("capability", ["projector", "core", "features", "typed", "domains"])
+def test_incompatible_native_stack_is_rejected_before_loading(monkeypatch, capability):
+    monkeypatch.setattr(pyowl_core, "load_snapshot", _forbid)
+    if capability == "projector":
+        monkeypatch.delattr(upstream, "require_native_pipeline_support")
+    elif capability == "core":
+        monkeypatch.setattr(pyowl_core, "native_validation_available", lambda: False)
+    elif capability == "features":
+        monkeypatch.setattr(pyowl_core.ClassFeatureView, "supports_native", lambda: False)
+    elif capability == "typed":
+        monkeypatch.setattr(pyowl_core.AxiomTypeIndex, "supports_native", lambda: False)
+    else:
+        monkeypatch.setattr(pyowl_core.PropertyDomainRangeView, "supports_native", lambda: False)
+    with pytest.raises(upstream.NativeBackendUnavailableError):
+        load_ontology(FIXTURES / "ontologies/mini_src.owl")

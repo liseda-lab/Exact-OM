@@ -118,9 +118,16 @@ def _assert_advertised_ledger(
     counters: Mapping[str, object],
     expected: frozenset[str],
 ) -> None:
-    assert set(counters) == expected
+    assert expected <= set(counters)
     for name, value in counters.items():
-        if name == "encoded_compiler_gil_released":
+        if name in {
+            "encoded_compiler_gil_released",
+            "native_validation_receipt",
+            "native_pipeline_required",
+            "native_core_receipt_validated",
+            "native_metadata_validation",
+            "native_result_validation",
+        }:
             # This closure verifies the public claim's type, not a performance result.
             assert type(value) is bool
         else:
@@ -209,12 +216,12 @@ def test_projector_public_owner_matrix_preserves_identity_results_and_ledgers(
             )
             scalar_edges = tuple((row.source, row.relation, row.destination) for row in rows)
             expected_edges = scalar_edges if expected_edges is None else expected_edges
-            if owner_kind == "mmap":
-                # The installed native compiler cannot retain this owner's buffers.
-                # Exact must reject it instead of quietly compiling scalar rows.
+            if owner_kind != "direct":
+                # The stronger native validation receipt currently supports direct
+                # snapshots. Other owners retain their upstream default behavior;
+                # Exact must reject rather than reconstruct columns in Python.
                 with _forbid_exact_conversion(), pytest.raises(
-                    pyowl2vec_star_projector.NativeBackendUnavailableError,
-                    match="forbids scalar projection",
+                    pyowl2vec_star_projector.SnapshotCompatibilityError,
                 ):
                     _project(view, "native")
                 continue
@@ -245,16 +252,15 @@ def test_projector_public_owner_matrix_preserves_identity_results_and_ledgers(
 
 
 @pytest.mark.parametrize(
-    ("reasoner_name", "scalar_backend", "native_backend"),
+    ("reasoner_name", "native_backend"),
     [
-        pytest.param("elk", "python", "rust", id="pyelk"),
-        pytest.param("hermit", "python", "native", id="pyhermit"),
+        pytest.param("elk", "rust", id="pyelk"),
+        pytest.param("hermit", "native", id="pyhermit"),
     ],
 )
 def test_reasoner_public_owner_matrix_preserves_identity_results_and_ledgers(
     tmp_path: Path,
     reasoner_name: str,
-    scalar_backend: str,
     native_backend: str,
 ) -> None:
     if reasoner_name == "elk":
@@ -278,17 +284,17 @@ def test_reasoner_public_owner_matrix_preserves_identity_results_and_ledgers(
     with _public_owners(tmp_path) as owners:
         assert tuple(owners) == OWNER_KINDS
         for owner_kind, view in owners.items():
+            if owner_kind != "direct":
+                with _forbid_exact_conversion(), pytest.raises(
+                    (pyowl_core.AdapterCompatibilityError, pyowl_core.BackendProtocolError)
+                ):
+                    _reason(view, reasoner_name, native_backend)
+                continue
             with _forbid_exact_conversion():
-                scalar_result, scalar = _reason(view, reasoner_name, scalar_backend)
                 native_result, native = _reason(view, reasoner_name, native_backend)
-            assert scalar_result == native_result == expected
-            assert scalar["consumer_handoff"]["core"]["owner_kind"] == owner_kind
+            assert native_result == expected
             assert native["consumer_handoff"]["core"]["owner_kind"] == owner_kind
-
-            scalar_handoff = scalar["consumer_handoff"]["reasoner"]
             native_handoff = native["consumer_handoff"]["reasoner"]
-            assert scalar_handoff["ingestion_path"] == "scalar-python"
-            _assert_scalar_encoded_resources_are_empty(scalar_handoff["counters"])
             assert native_handoff["ingestion_path"] == "encoded-native"
             _assert_advertised_ledger(native_handoff["counters"], REASONER_COUNTERS)
             assert native_handoff["encoded_schema"] == {

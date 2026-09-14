@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-from collections import defaultdict
-from collections.abc import Iterable, Mapping, Sequence
-from functools import cached_property, lru_cache
+from collections.abc import Mapping, Sequence
+from functools import cached_property
 from os import PathLike
 from pathlib import Path
-from typing import BinaryIO, TypeAlias
+from typing import BinaryIO
 from urllib.parse import unquote, urlsplit
 
 import pyowl_core
@@ -16,13 +15,13 @@ from pyowl_core import (
     IRI,
     RDF_PLAIN_LITERAL_IRI,
     XSD_STRING_IRI,
-    AnnotationAssertion,
+    AnnotationAssertionIndex,
     AnnotationProperty,
-    AssertedClassHierarchyView,
     AssertedPropertyHierarchyView,
     AxiomTypeIndex,
     Class,
     ClassAssertion,
+    ClassExpression,
     DataProperty,
     DataPropertyAssertion,
     Datatype,
@@ -30,28 +29,24 @@ from pyowl_core import (
 )
 from pyowl_core import EntityKind as CoreEntityKind
 from pyowl_core import (
-    EquivalentClasses,
     InvalidIRIError,
     Literal,
     NamedIndividual,
-    ObjectIntersectionOf,
     ObjectProperty,
     ObjectSomeValuesFrom,
-    ObjectUnionOf,
     OntologySnapshot,
     OntologyView,
     PropertyDomainRangeView,
     SubAnnotationPropertyOf,
-    SubClassOf,
     walk,
 )
-from pyowl_core.index import ClassComponent, PropertyComponent
+from pyowl_core.index import PropertyComponent
 
 from exact.core.contracts.knowledge import KnowledgeSource
 from exact.core.entities.graph import AnnotationValue, Edge
 from exact.core.entities.kinds import EntityKind
 from exact.core.values import ANNOTATION_IRI
-from exact.ontology.index_views import TypedClassHierarchyView
+from exact.ontology.native_projection import require_native_support
 from exact.ontology.projection import ProjectorSettings, SharedProjectionAdapter
 from exact.ontology.view_contract import native_load_options, retain_ontology_view
 
@@ -67,9 +62,6 @@ _CORE_KINDS = {
     EntityKind.ANNOTATION_PROPERTY: CoreEntityKind.ANNOTATION_PROPERTY,
     EntityKind.INDIVIDUAL: CoreEntityKind.NAMED_INDIVIDUAL,
 }
-_OWL_BOUNDS = frozenset({OWL_THING, OWL_NOTHING})
-_ClassNode: TypeAlias = Class | ClassComponent
-_PropertyNode: TypeAlias = ObjectProperty | DataProperty | PropertyComponent
 
 
 def _named_classes(value: object) -> tuple[str, ...]:
@@ -103,275 +95,56 @@ def _annotation_value(property_iri: str, value: object) -> AnnotationValue | Non
 
 
 class _ClassHierarchy:
-    """Exact directness semantics over the shared asserted class view.
+    """IRI wrappers around native structural feature queries."""
 
-    The core deliberately exposes asserted endpoints, not transitive reduction.  This
-    adapter performs reduction only for queried rows and keeps no second edge graph.
-    """
-
-    def __init__(
-        self,
-        view: AssertedClassHierarchyView,
-        components: Mapping[str, tuple[str, ...]],
-        extra_parents: Mapping[str, tuple[str, ...]],
-    ) -> None:
+    def __init__(self, view: pyowl_core.ClassFeatureView) -> None:
         self._view = view
-        self._components = dict(components)
-        self._extra_parents = dict(extra_parents)
-        children: dict[str, set[str]] = defaultdict(set)
-        for child, parents in extra_parents.items():
-            for parent in parents:
-                children[parent].add(child)
-        self._extra_children = {
-            parent: tuple(sorted(values)) for parent, values in children.items()
-        }
 
-    def _component(self, iri: str) -> tuple[str, ...]:
-        return self._components.get(str(iri), (str(iri),))
-
-    def _raw_parents(self, component: tuple[str, ...]) -> set[tuple[str, ...]]:
-        parents: set[tuple[str, ...]] = set()
-        for member in component:
-            try:
-                entity = Class(IRI(member))
-            except InvalidIRIError:
-                continue
-            parents.update(
-                self._component(parent.iri.value)
-                for parent in self._view.asserted_parents(entity)
-                if isinstance(parent, Class)
-            )
-            parents.update(
-                self._component(parent) for parent in self._extra_parents.get(member, ())
-            )
-        parents.discard(component)
-        return parents
-
-    def _raw_children(self, component: tuple[str, ...]) -> set[tuple[str, ...]]:
-        children: set[tuple[str, ...]] = set()
-        for member in component:
-            try:
-                entity = Class(IRI(member))
-            except InvalidIRIError:
-                continue
-            children.update(
-                self._component(child.iri.value)
-                for child in self._view.asserted_children(entity)
-                if isinstance(child, Class)
-            )
-            children.update(
-                self._component(child) for child in self._extra_children.get(member, ())
-            )
-        children.discard(component)
-        return children
-
-    def _is_ancestor(self, descendant: tuple[str, ...], ancestor: tuple[str, ...]) -> bool:
-        seen: set[tuple[str, ...]] = set()
-        stack = list(self._raw_parents(descendant))
-        while stack:
-            current = stack.pop()
-            if current == ancestor:
-                return True
-            if current in seen:
-                continue
-            seen.add(current)
-            stack.extend(self._raw_parents(current) - seen)
-        return False
-
-    @lru_cache(maxsize=None)
-    def _direct_parent_components(self, iri: str) -> tuple[tuple[str, ...], ...]:
-        component = self._component(iri)
-        candidates = self._raw_parents(component)
-        return tuple(
-            sorted(
-                (
-                    parent
-                    for parent in candidates
-                    if not any(
-                        parent != other and self._is_ancestor(other, parent) for other in candidates
-                    )
-                ),
-                key=lambda values: tuple(item.encode("utf-8") for item in values),
-            )
-        )
+    def _query(self, method: str, iri: str) -> list[str]:
+        try:
+            value = Class(IRI(str(iri)))
+        except InvalidIRIError:
+            return []
+        return [item.iri.value for item in getattr(self._view, method)(value)]
 
     def direct_parents(self, iri: str) -> list[str]:
-        return sorted(
-            member
-            for component in self._direct_parent_components(str(iri))
-            for member in component
-            if member not in _OWL_BOUNDS
-        )
-
-    @lru_cache(maxsize=None)
-    def _direct_child_components(self, iri: str) -> tuple[tuple[str, ...], ...]:
-        component = self._component(iri)
-        return tuple(
-            sorted(
-                (
-                    child
-                    for child in self._raw_children(component)
-                    if component in self._direct_parent_components(child[0])
-                ),
-                key=lambda values: tuple(item.encode("utf-8") for item in values),
-            )
-        )
+        return self._query("direct_parents", iri)
 
     def direct_children(self, iri: str) -> list[str]:
-        return sorted(
-            member
-            for component in self._direct_child_components(str(iri))
-            for member in component
-            if member not in _OWL_BOUNDS
-        )
+        return self._query("direct_children", iri)
 
     def ancestors(self, iri: str) -> set[str]:
-        seen: set[str] = set()
-        stack = self.direct_parents(iri)
-        while stack:
-            current = stack.pop()
-            if current in seen:
-                continue
-            seen.add(current)
-            stack.extend(self.direct_parents(current))
-        return seen
+        return set(self._query("ancestors", iri))
 
     def descendants(self, iri: str) -> set[str]:
-        seen: set[str] = set()
-        stack = self.direct_children(iri)
-        while stack:
-            current = stack.pop()
-            if current in seen:
-                continue
-            seen.add(current)
-            stack.extend(self.direct_children(current))
-        return seen
-
-    def equivalent_entities(self, iri: str) -> frozenset[str]:
-        return frozenset(member for member in self._component(iri) if member != iri)
+        return set(self._query("descendants", iri))
 
 
 class _PropertyHierarchy:
-    """Directness and equivalence normalization over a shared property view."""
+    """Requested IRI rows over native component reduction."""
 
-    def __init__(
-        self,
-        view: AssertedPropertyHierarchyView,
-        components: Mapping[str, tuple[str, ...]],
-        constructors: Mapping[str, type[ObjectProperty] | type[DataProperty]],
-    ) -> None:
+    def __init__(self, view: AssertedPropertyHierarchyView) -> None:
         self._view = view
-        self._components = dict(components)
-        self._constructors = dict(constructors)
 
-    def _component(self, iri: str) -> tuple[str, ...]:
-        return self._components.get(str(iri), (str(iri),))
-
-    def _entity(self, iri: str) -> ObjectProperty | DataProperty | None:
-        constructor = self._constructors.get(iri)
-        if constructor is None:
-            return None
+    def _query(self, method: str, iri: str) -> list[str]:
         try:
-            return constructor(IRI(iri))
+            value = IRI(str(iri))
         except InvalidIRIError:
-            return None
-
-    def _raw_parents(self, component: tuple[str, ...]) -> set[tuple[str, ...]]:
-        parents: set[tuple[str, ...]] = set()
-        for member in component:
-            entity = self._entity(member)
-            if entity is None:
-                continue
-            parents.update(
-                self._component(parent.iri.value)
-                for parent in self._view.asserted_parents(entity)
-                if isinstance(parent, (ObjectProperty, DataProperty))
-            )
-        parents.discard(component)
-        return parents
-
-    def _raw_children(self, component: tuple[str, ...]) -> set[tuple[str, ...]]:
-        children: set[tuple[str, ...]] = set()
-        for member in component:
-            entity = self._entity(member)
-            if entity is None:
-                continue
-            children.update(
-                self._component(child.iri.value)
-                for child in self._view.asserted_children(entity)
-                if isinstance(child, (ObjectProperty, DataProperty))
-            )
-        children.discard(component)
-        return children
-
-    def _is_ancestor(self, descendant: tuple[str, ...], ancestor: tuple[str, ...]) -> bool:
-        seen: set[tuple[str, ...]] = set()
-        stack = list(self._raw_parents(descendant))
-        while stack:
-            current = stack.pop()
-            if current == ancestor:
-                return True
-            if current in seen:
-                continue
-            seen.add(current)
-            stack.extend(self._raw_parents(current) - seen)
-        return False
-
-    @lru_cache(maxsize=None)
-    def _direct_parents(self, iri: str) -> tuple[tuple[str, ...], ...]:
-        candidates = self._raw_parents(self._component(iri))
-        return tuple(
-            sorted(
-                parent
-                for parent in candidates
-                if not any(
-                    parent != other and self._is_ancestor(other, parent) for other in candidates
-                )
-            )
-        )
+            return []
+        result: set[str] = set()
+        # Exact's IRI presentation accepts either named property kind. The source
+        # rejects ambiguous object/data punning before constructing this adapter.
+        for constructor in (ObjectProperty, DataProperty):
+            for node in getattr(self._view, method)(constructor(value)):
+                members = node.members if isinstance(node, PropertyComponent) else (node,)
+                result.update(member.iri.value for member in members)
+        return sorted(result)
 
     def direct_parents(self, iri: str) -> list[str]:
-        return sorted(member for node in self._direct_parents(str(iri)) for member in node)
+        return self._query("direct_parents", iri)
 
     def direct_children(self, iri: str) -> list[str]:
-        component = self._component(str(iri))
-        return sorted(
-            member
-            for child in self._raw_children(component)
-            if component in self._direct_parents(child[0])
-            for member in child
-        )
-
-
-def _equivalence_components(
-    groups: Iterable[Iterable[Entity]],
-) -> dict[str, tuple[str, ...]]:
-    parent: dict[str, str] = {}
-
-    def find(value: str) -> str:
-        parent.setdefault(value, value)
-        while parent[value] != value:
-            parent[value] = parent[parent[value]]
-            value = parent[value]
-        return value
-
-    def union(left: str, right: str) -> None:
-        left_root, right_root = find(left), find(right)
-        if left_root != right_root:
-            parent[max(left_root, right_root)] = min(left_root, right_root)
-
-    for group in groups:
-        values = [item.iri.value for item in group]
-        for value in values[1:]:
-            union(values[0], value)
-    members: dict[str, list[str]] = defaultdict(list)
-    for value in parent:
-        members[find(value)].append(value)
-    result: dict[str, tuple[str, ...]] = {}
-    for values in members.values():
-        component = tuple(sorted(values))
-        result.update((value, component) for value in component)
-    return result
+        return self._query("direct_children", iri)
 
 
 class OwlOntologySource(KnowledgeSource):
@@ -435,10 +208,12 @@ class OwlOntologySource(KnowledgeSource):
             source, (str, PathLike, bytes, bytearray, memoryview)
         ):
             document_iri = "urn:exact-om:stream-root"
+        selected_options = native_load_options(options)
+        require_native_support()
         snapshot = pyowl_core.load_snapshot(
             source,
             document_iri=document_iri,
-            options=native_load_options(options),
+            options=selected_options,
             resolver=resolver,
         )
         origin: Path | None = None
@@ -471,173 +246,110 @@ class OwlOntologySource(KnowledgeSource):
         return self._snapshot.signature(include_builtins=True)
 
     @cached_property
-    def _annotations(self) -> dict[str, tuple[AnnotationValue, ...]]:
-        # The shared annotation view also walks every unrelated axiom root. Entity
-        # attributes need only assertion rows from the retained native type partition.
-        values: dict[str, set[AnnotationValue]] = defaultdict(set)
-        for assertion in self._axioms.iter(AnnotationAssertion):
-            if isinstance(assertion.subject, IRI):
-                converted = _annotation_value(assertion.property.iri.value, assertion.value)
-                if converted is not None:
-                    values[assertion.subject.value].add(converted)
-        return {
-            iri: tuple(
-                sorted(
-                    rows,
-                    key=lambda value: (
-                        value.property_iri,
-                        value.value,
-                        value.lang or "",
-                        value.datatype or "",
-                        value.is_literal,
-                    ),
-                )
-            )
-            for iri, rows in values.items()
-        }
+    def _annotation_index(self) -> AnnotationAssertionIndex:
+        return self._snapshot.view(
+            AnnotationAssertionIndex,
+            include_origins=False,
+            include_nested=False,
+            require_native_pipeline=True,
+        )
 
     @cached_property
     def _axioms(self) -> AxiomTypeIndex:
-        return self._snapshot.view(AxiomTypeIndex, include_origins=False)
+        return self._snapshot.view(
+            AxiomTypeIndex, include_origins=False, require_native_pipeline=True
+        )
 
     @cached_property
-    def _class_view(self) -> AssertedClassHierarchyView:
-        return self._snapshot.view(TypedClassHierarchyView, include_origins=False)
+    def _class_view(self) -> pyowl_core.ClassFeatureView:
+        return self._snapshot.view(
+            pyowl_core.ClassFeatureView,
+            equivalent_operands=True,
+            include_builtins=False,
+            require_native_pipeline=True,
+        )
 
     @cached_property
     def _property_view(self) -> AssertedPropertyHierarchyView:
-        return self._snapshot.view(AssertedPropertyHierarchyView, include_origins=False)
+        return self._snapshot.view(
+            AssertedPropertyHierarchyView,
+            include_origins=False,
+            equivalence_handling="component",
+            require_native_pipeline=True,
+        )
 
     @cached_property
     def _domain_range(self) -> PropertyDomainRangeView:
-        return self._snapshot.view(PropertyDomainRangeView, include_origins=False)
+        return self._snapshot.view(
+            PropertyDomainRangeView, include_origins=False, require_native_pipeline=True
+        )
 
     @cached_property
-    def _class_features(
-        self,
-    ) -> tuple[dict[str, tuple[pyowl_core.StructuralNode, ...]], _ClassHierarchy]:
-        class_components = _equivalence_components(
-            record.classes for record in self._class_view.equivalence_sets()
-        )
-        extra_parents: dict[str, set[str]] = defaultdict(set)
-        restrictions: dict[str, list[pyowl_core.StructuralNode]] = defaultdict(list)
-        for subclass_axiom in self._axioms.iter(SubClassOf):
-            if isinstance(subclass_axiom.sub_class, Class):
-                restrictions[subclass_axiom.sub_class.iri.value].append(subclass_axiom.super_class)
-        for equivalent_axiom in self._axioms.iter(EquivalentClasses):
-            anchors = tuple(
-                expression
-                for expression in equivalent_axiom.expressions
-                if isinstance(expression, Class)
-            )
-            for anchor in anchors:
-                anchor_iri = anchor.iri.value
-                for expression in equivalent_axiom.expressions:
-                    if isinstance(expression, Class):
-                        continue
-                    restrictions[anchor_iri].append(expression)
-                    if isinstance(expression, ObjectUnionOf):
-                        for operand in expression.operands:
-                            if isinstance(operand, Class):
-                                extra_parents[operand.iri.value].add(anchor_iri)
-                    elif isinstance(expression, ObjectIntersectionOf):
-                        for operand in expression.operands:
-                            if isinstance(operand, Class):
-                                extra_parents[anchor_iri].add(operand.iri.value)
-        expressions = {iri: tuple(dict.fromkeys(values)) for iri, values in restrictions.items()}
-        hierarchy = _ClassHierarchy(
-            self._class_view,
-            class_components,
-            {iri: tuple(sorted(values)) for iri, values in extra_parents.items()},
-        )
-        return expressions, hierarchy
-
-    @property
-    def _restriction_expressions(
-        self,
-    ) -> dict[str, tuple[pyowl_core.StructuralNode, ...]]:
-        return self._class_features[0]
-
-    @property
     def hierarchy(self) -> _ClassHierarchy:
-        """Return the lazily constructed asserted class hierarchy adapter."""
-
-        return self._class_features[1]
+        """Return the lazily constructed native structural hierarchy adapter."""
+        return _ClassHierarchy(self._class_view)
 
     @cached_property
     def _property_hierarchy(self) -> _PropertyHierarchy:
-        components = _equivalence_components(
-            record.properties for record in self._property_view.equivalence_sets()
-        )
-        constructors = {
-            entity.iri.value: (
-                ObjectProperty if entity.kind is CoreEntityKind.OBJECT_PROPERTY else DataProperty
+        if self._axioms.native_report["has_object_data_property_punning"]:
+            raise pyowl_core.BackendProtocolError(
+                "Exact native property features cannot preserve ambiguous object/data IRI punning",
+                code="NATIVE_VIEW_REQUIRED",
             )
-            for entity in self._signature
-            if entity.kind in {CoreEntityKind.OBJECT_PROPERTY, CoreEntityKind.DATA_PROPERTY}
-        }
-        return _PropertyHierarchy(self._property_view, components, constructors)
+        return _PropertyHierarchy(self._property_view)
 
-    @cached_property
-    def _individual_features(
-        self,
-    ) -> tuple[dict[str, tuple[str, ...]], dict[str, tuple[str, ...]]]:
-        individual_parents: dict[str, set[str]] = defaultdict(set)
-        class_individuals: dict[str, set[str]] = defaultdict(set)
-        for class_assertion in self._axioms.iter(ClassAssertion):
-            if not isinstance(class_assertion.individual, NamedIndividual):
-                continue
-            individual = class_assertion.individual.iri.value
-            for class_iri in _named_classes(class_assertion.class_expression):
-                individual_parents[individual].add(class_iri)
-                class_individuals[class_iri].add(individual)
-        return (
-            {iri: tuple(sorted(values)) for iri, values in individual_parents.items()},
-            {iri: tuple(sorted(values)) for iri, values in class_individuals.items()},
+    def _individual_parents(self, iri: str) -> list[str]:
+        try:
+            individual = NamedIndividual(IRI(iri))
+        except InvalidIRIError:
+            return []
+        return sorted(
+            {
+                value
+                for row in self._axioms.iter(ClassAssertion, referencing=individual)
+                if row.individual == individual
+                for value in _named_classes(row.class_expression)
+            }
         )
 
-    @property
-    def _individual_parents(self) -> dict[str, tuple[str, ...]]:
-        return self._individual_features[0]
-
-    @property
-    def _class_individuals(self) -> dict[str, tuple[str, ...]]:
-        return self._individual_features[1]
-
-    @cached_property
-    def _data_values(self) -> dict[str, tuple[AnnotationValue, ...]]:
-        data_values: dict[str, list[AnnotationValue]] = defaultdict(list)
-        for data_assertion in self._axioms.iter(DataPropertyAssertion):
-            if not isinstance(data_assertion.source, NamedIndividual):
-                continue
-            converted = _annotation_value(data_assertion.property.iri.value, data_assertion.value)
-            if converted is not None:
-                data_values[data_assertion.source.iri.value].append(converted)
-        return {iri: tuple(values) for iri, values in data_values.items()}
-
-    @cached_property
-    def _annotation_property_features(
-        self,
-    ) -> tuple[dict[str, tuple[str, ...]], dict[str, tuple[str, ...]]]:
-        annotation_parents: dict[str, set[str]] = defaultdict(set)
-        annotation_children: dict[str, set[str]] = defaultdict(set)
-        for subproperty_axiom in self._axioms.iter(SubAnnotationPropertyOf):
-            child = subproperty_axiom.sub_property.iri.value
-            parent = subproperty_axiom.super_property.iri.value
-            annotation_parents[child].add(parent)
-            annotation_children[parent].add(child)
-        return (
-            {iri: tuple(sorted(values)) for iri, values in annotation_parents.items()},
-            {iri: tuple(sorted(values)) for iri, values in annotation_children.items()},
+    def _class_individuals(self, iri: str) -> list[str]:
+        try:
+            entity = Class(IRI(iri))
+        except InvalidIRIError:
+            return []
+        return sorted(
+            {
+                row.individual.iri.value
+                for row in self._axioms.iter(ClassAssertion, referencing=entity)
+                if isinstance(row.individual, NamedIndividual)
+                and iri in _named_classes(row.class_expression)
+            }
         )
 
-    @property
-    def _annotation_property_parents(self) -> dict[str, tuple[str, ...]]:
-        return self._annotation_property_features[0]
+    def _data_values(self, iri: str) -> tuple[AnnotationValue, ...]:
+        try:
+            individual = NamedIndividual(IRI(iri))
+        except InvalidIRIError:
+            return ()
+        return tuple(
+            converted
+            for row in self._axioms.iter(DataPropertyAssertion, referencing=individual)
+            if row.source == individual
+            and (converted := _annotation_value(row.property.iri.value, row.value)) is not None
+        )
 
-    @property
-    def _annotation_property_children(self) -> dict[str, tuple[str, ...]]:
-        return self._annotation_property_features[1]
+    def _annotation_property_relations(self, iri: str, *, upward: bool) -> list[str]:
+        try:
+            entity = AnnotationProperty(IRI(iri))
+        except InvalidIRIError:
+            return []
+        return sorted(
+            {
+                (row.super_property if upward else row.sub_property).iri.value
+                for row in self._axioms.iter(SubAnnotationPropertyOf, referencing=entity)
+                if (row.sub_property if upward else row.super_property) == entity
+            }
+        )
 
     @cached_property
     def _excluded(self) -> frozenset[str]:
@@ -730,13 +442,44 @@ class OwlOntologySource(KnowledgeSource):
             self._entity_cache[normalized_kind] = cached
         return cached
 
-    def _annotation_rows(self, iri: str) -> tuple[AnnotationValue, ...]:
-        return self._annotations.get(iri, ())
+    def _annotation_rows(
+        self, iri: str, properties: tuple[str, ...] | None = None
+    ) -> tuple[AnnotationValue, ...]:
+        try:
+            subject = IRI(iri)
+        except InvalidIRIError:
+            return ()
+        selected = None
+        if properties is not None:
+            selected = []
+            for name in properties:
+                try:
+                    selected.append(AnnotationProperty(IRI(name)))
+                except InvalidIRIError:
+                    continue
+        values: set[AnnotationValue] = set()
+        for page in self._annotation_index.iter_columns(subjects=(subject,), properties=selected):
+            for prop, value in zip(page.properties, page.values):
+                converted = _annotation_value(prop.iri.value, value)
+                if converted is not None:
+                    values.add(converted)
+        return tuple(
+            sorted(
+                values,
+                key=lambda value: (
+                    value.property_iri,
+                    value.value,
+                    value.lang or "",
+                    value.datatype or "",
+                    value.is_literal,
+                ),
+            )
+        )
 
     def labels(self, iri: str) -> list[str]:
         selected = {
             value
-            for value in self._annotation_rows(str(iri))
+            for value in self._annotation_rows(str(iri), self.label_properties)
             if value.is_literal and value.property_iri in self._label_property_set
         }
         return [
@@ -747,11 +490,8 @@ class OwlOntologySource(KnowledgeSource):
     def annotations(
         self, iri: str, properties: Sequence[str] | None = None
     ) -> list[AnnotationValue]:
-        values = self._annotation_rows(str(iri))
-        if properties is None:
-            return list(values)
-        selected = frozenset(map(str, properties))
-        return [value for value in values if value.property_iri in selected]
+        selected = None if properties is None else tuple(sorted(set(map(str, properties))))
+        return list(self._annotation_rows(str(iri), selected))
 
     def attributes(self, iri: str) -> list[AnnotationValue]:
         values = {
@@ -759,7 +499,7 @@ class OwlOntologySource(KnowledgeSource):
             for value in self._annotation_rows(str(iri))
             if value.is_literal and value.property_iri not in self._label_property_set
         }
-        values.update(self._data_values.get(str(iri), ()))
+        values.update(self._data_values(str(iri)))
         return sorted(
             values,
             key=lambda value: (
@@ -777,9 +517,9 @@ class OwlOntologySource(KnowledgeSource):
                 return list(getattr(self._reasoner, "direct_parents")(str(iri)))
             return self.hierarchy.direct_parents(str(iri))
         if normalized_kind is EntityKind.INDIVIDUAL:
-            return list(self._individual_parents.get(str(iri), ()))
+            return self._individual_parents(str(iri))
         if normalized_kind is EntityKind.ANNOTATION_PROPERTY:
-            return list(self._annotation_property_parents.get(str(iri), ()))
+            return self._annotation_property_relations(str(iri), upward=True)
         return self._property_hierarchy.direct_parents(str(iri))
 
     def direct_children(self, iri: str, kind: EntityKind = EntityKind.CLASS) -> list[str]:
@@ -789,9 +529,9 @@ class OwlOntologySource(KnowledgeSource):
                 return list(getattr(self._reasoner, "direct_children")(str(iri)))
             return self.hierarchy.direct_children(str(iri))
         if normalized_kind is EntityKind.INDIVIDUAL:
-            return list(self._class_individuals.get(str(iri), ()))
+            return self._class_individuals(str(iri))
         if normalized_kind is EntityKind.ANNOTATION_PROPERTY:
-            return list(self._annotation_property_children.get(str(iri), ()))
+            return self._annotation_property_relations(str(iri), upward=False)
         return self._property_hierarchy.direct_children(str(iri))
 
     def hierarchy_bundle(
@@ -799,7 +539,17 @@ class OwlOntologySource(KnowledgeSource):
     ) -> dict[str, list[str]]:
         selected_iri = str(iri)
         result: dict[str, list[str]] = {}
-        expressions = self._restriction_expressions.get(selected_iri, ())
+        expressions: tuple[ClassExpression, ...]
+        try:
+            expression_owner = Class(IRI(selected_iri))
+        except InvalidIRIError:
+            expressions = ()
+        else:
+            expressions = (
+                tuple(self._class_view.restrictions(expression_owner))
+                if any(family != "is_a" for family in families)
+                else ()
+            )
         for family, property_iris in families.items():
             if family == "is_a":
                 result[family] = self.direct_parents(selected_iri)
@@ -863,15 +613,16 @@ class OwlOntologySource(KnowledgeSource):
 
     def _build_exclusions(self) -> frozenset[str]:
         excluded: set[str] = set()
-        for subject, values in self._annotations.items():
-            for value in values:
-                if not value.is_literal:
+        properties = tuple(AnnotationProperty(IRI(iri)) for iri in (ANNOTATION_IRI, OWL_DEPRECATED))
+        for page in self._annotation_index.iter_columns(properties=properties):
+            for subject, prop, value in zip(page.subjects, page.properties, page.values):
+                if not isinstance(subject, IRI) or not isinstance(value, Literal):
                     continue
-                lexical = value.value.strip().lower()
-                if value.property_iri == ANNOTATION_IRI and lexical in {"false", "0"}:
-                    excluded.add(subject)
-                elif value.property_iri == OWL_DEPRECATED and lexical in {"true", "1"}:
-                    excluded.add(subject)
+                lexical = value.lexical_form.strip().lower()
+                if prop.iri.value == ANNOTATION_IRI and lexical in {"false", "0"}:
+                    excluded.add(subject.value)
+                elif prop.iri.value == OWL_DEPRECATED and lexical in {"true", "1"}:
+                    excluded.add(subject.value)
         return frozenset(excluded)
 
     def excluded_from_alignment(self) -> frozenset[str]:

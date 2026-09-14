@@ -86,10 +86,18 @@ def test_complete_typed_signature_preserves_lexical_order_without_count_view(
         "urn:annotationOnly",
         "urn:ontologyOnly",
     )
-    assert source.labels("urn:Imported") == ["Imported label"]
-    assert source.direct_parents("urn:usedProperty", EntityKind.OBJECT_PROPERTY) == [
-        "urn:parentProperty"
-    ]
+    if backend is core.BackendPreference.PYTHON:
+        with pytest.raises(core.BackendProtocolError, match="native annotation"):
+            source.labels("urn:Imported")
+    else:
+        assert source.labels("urn:Imported") == ["Imported label"]
+        if overlay:
+            with pytest.raises(core.BackendProtocolError, match="native axiom index"):
+                source.direct_parents("urn:usedProperty", EntityKind.OBJECT_PROPERTY)
+        else:
+            assert source.direct_parents("urn:usedProperty", EntityKind.OBJECT_PROPERTY) == [
+                "urn:parentProperty"
+            ]
     assert source.entities() == tuple(sorted((*expected_classes, changed)))
     assert signature_calls == [owner]
     assert snapshot.contains(removed)

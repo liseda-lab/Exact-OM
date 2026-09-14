@@ -51,6 +51,23 @@ _PROJECTOR_HANDOFF_COUNTERS = frozenset(
         "native_batch_edges",
         "native_boundary_calls",
         "native_compiled_edges",
+        "native_validation_receipt",
+        "native_canonical_raw_edges",
+        "native_canonical_distinct_edges",
+        "native_canonical_published_edges",
+        "native_canonical_runs",
+        "native_canonical_merge_passes",
+        "native_canonical_peak_spill_bytes",
+        "native_canonical_spill_bytes",
+        "native_canonical_peak_reserved_bytes",
+        "native_canonical_sort_calls",
+        "native_class_index_builds",
+        "native_class_index_build_visits",
+        "native_class_index_keys",
+        "native_class_membership_queries",
+        "native_class_membership_comparisons",
+        "native_class_index_retained_bytes",
+        "native_class_index_peak_bytes",
         "native_edge_batches",
         "native_output_vector_edges",
         "native_peak_buffered_edges",
@@ -80,6 +97,15 @@ _REASONER_HANDOFF_COUNTERS = frozenset(
         "encoded_referenced_view_count",
         "encoded_posting_bytes",
         "encoded_compiler_gil_released",
+        "native_pipeline_required",
+        "native_core_receipt_validated",
+        "native_metadata_validation",
+        "native_result_validation",
+        "native_metadata_domain_copies",
+        "native_symbol_rows_materialized",
+        "native_symbol_lookups",
+        "native_result_publications",
+        "native_live_result_envelopes",
         "materialized_scalar_rows",
         "parser_calls",
         "per_row_ffi_calls",
@@ -114,6 +140,10 @@ _ENCODED_ONLY_COUNTER_DEFAULTS: Mapping[str, int | bool] = {
     "encoded_referenced_view_count": 0,
     "encoded_posting_bytes": 0,
     "encoded_compiler_gil_released": False,
+    "native_pipeline_required": False,
+    "native_core_receipt_validated": False,
+    "native_metadata_validation": False,
+    "native_result_validation": False,
 }
 _SHA256_HEX = re.compile(r"[0-9a-f]{64}\Z")
 
@@ -424,7 +454,7 @@ def _projector_consumer_handoff(projector: Mapping[str, object]) -> dict[str, ob
                 raise TypeError("projector ingestion counters are incompatible")
             bounded: dict[str, int | bool] = {}
             for name, value in counters.items():
-                if name == "encoded_compiler_gil_released":
+                if name in {"encoded_compiler_gil_released", "native_validation_receipt"}:
                     if type(value) is not bool:
                         raise TypeError("projector encoded compiler GIL diagnostic is invalid")
                 elif type(value) is not int or value < 0:
@@ -481,7 +511,13 @@ def _reasoner_consumer_handoff(reasoner: Mapping[str, object]) -> dict[str, obje
         ):
             raise TypeError("reasoner consumer handoff counters are incompatible")
         for name, value in counters.items():
-            if name == "encoded_compiler_gil_released":
+            if name in (
+                "encoded_compiler_gil_released",
+                "native_pipeline_required",
+                "native_core_receipt_validated",
+                "native_metadata_validation",
+                "native_result_validation",
+            ):
                 if not isinstance(value, bool):
                     raise TypeError("reasoner consumer handoff GIL diagnostic is invalid")
             elif isinstance(value, bool) or not isinstance(value, int) or value < 0:

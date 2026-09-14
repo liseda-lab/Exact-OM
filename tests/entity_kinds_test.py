@@ -238,7 +238,7 @@ def test_projector_config_invalidates_dataset_cache(
     assert automatic.cache_fingerprint == native.cache_fingerprint
     identity = native._cache_fingerprint_payload()["projector"]
     assert identity["backend"] == "native"
-    assert identity["execution_contract"] == "exact/encoded-native-only/v1"
+    assert identity["execution_contract"] == "exact/native-pipeline/v2"
     with pytest.raises(ValueError, match="native projector"):
         KindDataset(output_path=tmp_path / "rejected", projector={"backend": "python"})
 

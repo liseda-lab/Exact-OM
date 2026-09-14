@@ -42,7 +42,10 @@ from exact.impl.retrieval import (
 )
 from exact.io.sources import resolve as resolve_source
 from exact.ontology.projection import ProjectorSettings, projector_cache_identity
-from exact.ontology.reasoning import reasoner_cache_identity
+from exact.ontology.reasoning import (
+    reasoner_cache_identity,
+    require_native_reasoner_support,
+)
 from exact.runs.layout import RunLayout
 from exact.utils.candidate_generation import (
     adaptive_candidate_count,
@@ -682,6 +685,7 @@ class BaseAlignmentDataset(IDataset):
 
     def load_ontologies(self, source_path: Path, target_path: Path) -> None:
 
+        require_native_reasoner_support(self._reasoner_name)
         self._source_path = Path(source_path).resolve()
         self._target_path = Path(target_path).resolve()
         self._dataset_signature = None
