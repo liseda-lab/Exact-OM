@@ -1,8 +1,9 @@
 # Detached G0 validation
 
-The user authorized bounded validation on 2026-09-10, with monitoring handed back rather than
-waiting through the job. This does not authorize launching the long screen/confirmation campaign.
-The detached job uses only NCIT–DOID train/development inputs; no private test references.
+The user authorized bounded validation on 2026-09-10 and a fresh post-native G0 attempt on
+2026-09-14, with monitoring handed back rather than waiting through the job. This does not
+authorize launching the long screen/confirmation campaign. The detached job uses only
+NCIT–DOID train/development inputs; no private test references.
 
 ## Work and limits
 
@@ -16,19 +17,36 @@ operational replay, deliberate interruption, relocation/resume, and completed-ca
 The fit population is explicitly bounded for validation, so this is not a full-training-quality
 result or a component-selection experiment. A failed or unaffordable phase stops the job.
 
-One GPU worker, two numerical CPU threads, at most 56 GiB process RAM, 2,000 hosted requests and
-3.2 million hosted tokens are permitted. The relaunch is limited to 11h30 with a 30-minute
-checkpoint margin, retaining headroom for earlier failed attempts and bounded loader diagnostics within the 12-hour
-foundation envelope. Unknown hosted deliveries are not automatically retried.
+Attempt 06 has an explicit budget amendment: 41,400 seconds hard limit (11h30), with a
+39,600-second soft stop (11h) and a 30-minute checkpoint margin. It permits one GPU worker,
+two numerical CPU threads, at most 56 GiB process RAM, 2,000 hosted requests and 3.2 million
+hosted tokens. Unknown hosted deliveries are not automatically retried.
+
+For this authorized recovery, the former 12-hour foundation ceiling is superseded by the
+new attempt allowance; prior spend is not reset or erased. Attempt 06's `resource-plan.json`
+retains the historical costs and this amendment: prior G0 attempts used 26,756.58 seconds
+(7h25m56.58); adding the new hard allowance gives a cumulative G0 ceiling of 68,156.58 seconds
+(18h55m56.58), not a claim that the full allowance has been spent. Any future scientific
+campaign must include historical plus new spend and protect final-stage and recovery reserves.
+That campaign remains unadmitted.
 
 ## Monitor and stop
 
-Current recovery output: `data/experiments-v2/g0-validation-05/`.
-Attempt 04 contains the original completed cold probe; attempt 05 preserves its timing and identity.
+Current output: `data/experiments-v2/g0-validation-06/`. Preparation passed and the detached
+job launched on 2026-09-14 using `/tmp/exact-native-candidate/bin/python`, with job and monitor
+windows in tmux session `exact-g0-06`.
+The installed native identity is recorded in `native-execution.json`. Status and measured
+forecasts determine progress; neither G0 completion nor an ETA is claimed in advance.
+
+[Native T4 validation](../native-optimization/IMPLEMENTATION.md#completed-t4-result) passed
+128 exact ordered feature rows across NCIT–DOID. Fresh cold64 is required because native
+implementation fingerprints and pair-adaptive evidence schema 3 changed. Attempt 04's original
+cold measurement and cost remain unchanged; attempt 05 retains its historical adoption and
+budget block. Attempt 06 does not use `--resume-from` to relabel those measurements.
 
 ```console
-tmux attach -t exact-g0-05
-.venv/bin/python data/experiments-v2/g0-validation-05/monitor.py
+tmux attach -t exact-g0-06
+/tmp/exact-native-candidate/bin/python data/experiments-v2/g0-validation-06/monitor.py
 ```
 
 Detach from tmux with Ctrl-b, then d. `status.json` reports the current phase, process and
@@ -39,7 +57,7 @@ can remain open after completion, so session existence alone does not mean work 
 Request a cooperative stop:
 
 ```console
-touch data/experiments-v2/g0-validation-05/STOP
+touch data/experiments-v2/g0-validation-06/STOP
 ```
 
 The parent forwards STOP to the active worker, including during ontology loading. Completed
@@ -114,15 +132,16 @@ records the interrupted bookkeeping. The new `cold64.adoption.json` and stage me
 that recovery, with zero new worker calls and the original cold wall time. Preparation without
 `--execute` verifies the evidence without copying shared caches; execution uses SQLite backups.
 
-Resume carries forward 26,003.85 seconds of active validation time, leaving at most 4h16m36s
+Attempt 05 carried forward 26,003.85 seconds of active validation time, leaving at most 4h16m36s
 of the original 11h30 allowance, or 3h46m36s before the soft stop. Downtime does not reset spend.
 The saved caches contain candidate tables and embeddings, but no durable ontology graphs or
 raw entity features. A fresh warm worker would rebuild those expensive structures: the cold
 source projection alone took approximately 3h42m, before annotation indexing and scoring.
 A completed-output replay therefore cannot be reported as a measured warm run.
 
-The existing forecast's cold-reload term alone requires 43.21 hours with its safety factor.
-The resumed controller records `blocked_budget` before launching warm64, hosted20, fitting or
-production300. These remain unmeasured; G0 is not passed. The next runnable continuation needs
-an explicitly revised resource plan or a measured reduction in graph/evidence construction
-cost. The launcher never replaces cold timing with the near-zero cost of adopting its outputs.
+Attempt 05's forecast used the original cold-reload term, requiring 43.21 hours with its
+safety factor. Its controller recorded `blocked_budget` before launching warm64, hosted20,
+fitting or production300. That historical outcome remains intact. The native validation and
+explicit resource amendment above permit a fresh attempt 06; its measured forecast must still
+admit later phases. G0 is not yet passed. The launcher never replaces cold timing with the
+near-zero cost of adopting its outputs.

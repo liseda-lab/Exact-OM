@@ -78,13 +78,27 @@ listwise first-token probability checks, completed-cache replay and relocated re
 credentials (two completed requests, 56 tokens). Use `--api-key-file api_key` for the validation
 tools; the frozen baseline's older credential locator is unchanged. No key value is logged.
 
-A bounded G0 validation job was launched separately after preparation. Attempt 03 failed in
-the native signature-count index; the facade now uses public typed enumeration, verified on
-the actual DOID closure. Attempt 04 completed cold64, then failed registering a disabled
-evaluation stage. That bookkeeping is fixed; attempt 05 adopts its verified outputs and original
-timing, but the cumulative feasibility gate blocks further work within the remaining allowance.
-See [G0-VALIDATION.md](G0-VALIDATION.md) for the detached monitor, stop command, limits and
-retained attempt history. Its `status.json`/`report.json` are authoritative for completion.
+Historical G0 attempt 03 failed in the native signature-count index; the facade now uses
+public typed enumeration. Attempt 04 completed cold64, then failed registering a disabled
+evaluation stage. That bookkeeping is fixed; attempt 05 adopted its verified outputs and
+original timing, but its cumulative feasibility gate blocked further work. Those costs and
+outcomes remain unchanged.
+
+On 2026-09-14, preparation passed and fresh G0-06 launched detached after
+[native T4 validation](../native-optimization/IMPLEMENTATION.md#completed-t4-result) matched
+128 exact ordered NCIT–DOID feature rows. It uses `/tmp/exact-native-candidate/bin/python`,
+tmux `exact-g0-06`, and output `data/experiments-v2/g0-validation-06/`; its
+`native-execution.json` records the installed stack. Fresh cold64 measures the changed native
+fingerprints and evidence schema 3; historical caches are not substituted for that measurement.
+
+The user authorized an explicit recovery budget amendment: 41,400 seconds hard limit,
+39,600 seconds soft stop, at most 56 GiB RAM, two CPU threads, one GPU worker, 2,000 hosted
+requests and 3.2 million tokens. The former 12-hour foundation ceiling is superseded for this
+attempt, with all prior costs retained in `g0-validation-06/resource-plan.json`. A future
+scientific campaign remains unadmitted and must include historical plus new spend while
+protecting final and recovery reserves. No G0 completion or ETA is claimed before measurement.
+See [G0-VALIDATION.md](G0-VALIDATION.md) for monitor/STOP commands and retained attempt history;
+`status.json` and `report.json` remain authoritative for progress and completion.
 
 ## Validation and remaining readiness work
 
@@ -112,10 +126,11 @@ hierarchy cost in native-storage index/canonicalization, while projection report
 These measurements remain historical evidence; thresholds were not relaxed.
 
 The subsequent repair requires native loading and encoded-native projection without scalar
-fallback, lazy graph labels and typed axiom partitions. Its fixture checks do not establish a
-new full-ontology runtime. [NATIVE-PREPROCESSING.md](NATIVE-PREPROCESSING.md) records the bounded
-model-free benchmark workflow, compatibility limits and evidence required before revising
-resource estimates. Old cold64 timings and cumulative budget charges remain unchanged.
+fallback, lazy graph labels and typed axiom partitions. Native T4 now establishes the bounded
+full-input preprocessing and exact feature-parity result documented above; it does not pass
+G0's encoder, fitting, hosted or 300-source operational checks.
+[NATIVE-PREPROCESSING.md](NATIVE-PREPROCESSING.md) records the model-free workflow and
+compatibility limits. Old cold64 timings and cumulative budget charges remain unchanged.
 
 Before admitting real screens, complete G0's prescribed full-input memory/throughput probe,
 300-source vertical acceptance and cost forecast, validate the hosted credential/profile,
@@ -156,5 +171,5 @@ verified baseline/model locks and local bindings.
   --output-root data/experiments-v2/new-campaign/runtime
 ```
 
-The current task authorizes implementation and preparation only. Starting the long screen or
-confirmation campaign is outside this handoff.
+The current authorization includes bounded G0 execution and its explicit recovery budget
+amendment. Starting the long screen or confirmation campaign remains outside this handoff.
