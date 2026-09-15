@@ -1,52 +1,63 @@
 # Detached G0 validation
 
-The user authorized bounded validation on 2026-09-10 and a fresh post-native G0 attempt on
-2026-09-14, with monitoring handed back rather than waiting through the job. This does not
-authorize launching the long screen/confirmation campaign. The detached job uses only
-NCIT–DOID train/development inputs; no private test references.
+The user authorized operational validation on 2026-09-10, a fresh post-native attempt on
+2026-09-14, and a restart without a wall-time limit on 2026-09-15. Monitoring is handed back
+rather than waiting through the job. This does not authorize launching the long
+screen/confirmation campaign. G0 uses only NCIT–DOID train/development inputs; no private
+test references.
 
 ## Work and limits
 
 The launcher measures full ontology-closure loading/projection and cold/warm 64-source
 scoring with the pinned SapBERT/BGE encoders, followed by at most 20 hosted source groups and
 one 64-training-source selector fit. The local resource probe explicitly disables generation;
-the hosted probe and later production-method replay retain the frozen hosted settings.
+the hosted probe and later production-method replay retain the frozen matching settings.
+Generative posthoc rationales are off by default for all experiments and require explicit
+opt-in. Matching decisions, scores and exact numerical explanation traces remain enabled.
 
 After a measured forecast with a 1.5 safety multiplier, it may run the 300-source global/local
 operational replay, deliberate interruption, relocation/resume, and completed-cache checks.
 The fit population is explicitly bounded for validation, so this is not a full-training-quality
 result or a component-selection experiment. A failed or unaffordable phase stops the job.
 
-Attempt 06 has an explicit budget amendment: 41,400 seconds hard limit (11h30), with a
-39,600-second soft stop (11h) and a 30-minute checkpoint margin. It permits one GPU worker,
-two numerical CPU threads, at most 56 GiB process RAM, 2,000 hosted requests and 3.2 million
-hosted tokens. Unknown hosted deliveries are not automatically retried.
+Attempt 07 is configured with `--no-time-limit --requests-cap 100000 --tokens-cap 32000000`.
+The user removed G0's wall deadline and approved finite hosted headroom for fitting and
+replays. One GPU worker, two numerical CPU threads, at most 56 GiB process RAM, cooperative
+STOP and the request/token caps remain enforced. Unknown hosted deliveries are not
+automatically retried. Runtime forecasts remain reported as conservative estimates; they
+are not wall-deadline gates. Request/token admission still applies.
 
-For this authorized recovery, the former 12-hour foundation ceiling is superseded by the
-new attempt allowance; prior spend is not reset or erased. Attempt 06's `resource-plan.json`
-retains the historical costs and this amendment: prior G0 attempts used 26,756.58 seconds
-(7h25m56.58); adding the new hard allowance gives a cumulative G0 ceiling of 68,156.58 seconds
-(18h55m56.58), not a claim that the full allowance has been spent. Any future scientific
-campaign must include historical plus new spend and protect final-stage and recovery reserves.
-That campaign remains unadmitted.
+The recovery plan adopts verified attempt 06 cold64, warm64 and fit64 artifacts under their
+original identities and measured durations. It measures hosted20 afresh with rationales off,
+then completes the admitted global/local and interruption/replay checks. Historical hosted
+usage stays charged; changing an output policy does not erase completed requests.
+
+This supersedes attempt 06's 41,400-second hard/39,600-second soft allowance and its
+2,000-request/3.2-million-token caps for the new G0 continuation only. Attempt 06 and all
+previous reports remain unchanged. Cumulative historical plus new G0 time, requests, tokens
+and reported cost must remain visible even though the new wall allowance is unlimited.
+Scientific campaign budgets and protected final/recovery reserves are unchanged, and the
+campaign remains unadmitted.
 
 ## Monitor and stop
 
-Current output: `data/experiments-v2/g0-validation-06/`. Preparation passed and the detached
-job launched on 2026-09-14 using `/tmp/exact-native-candidate/bin/python`, with job and monitor
-windows in tmux session `exact-g0-06`.
-The installed native identity is recorded in `native-execution.json`. Status and measured
-forecasts determine progress; neither G0 completion nor an ETA is claimed in advance.
+G0-07 restart is configured for `data/experiments-v2/g0-validation-07/`, using
+`/tmp/exact-native-candidate/bin/python` and tmux session `exact-g0-07`.
+`status.json` and `report.json` are authoritative for runtime status. The installed native
+identity, adoption evidence and resource amendment belong with this attempt's plan.
+Neither completion nor an ETA is claimed.
 
 [Native T4 validation](../native-optimization/IMPLEMENTATION.md#completed-t4-result) passed
-128 exact ordered feature rows across NCIT–DOID. Fresh cold64 is required because native
-implementation fingerprints and pair-adaptive evidence schema 3 changed. Attempt 04's original
-cold measurement and cost remain unchanged; attempt 05 retains its historical adoption and
-budget block. Attempt 06 does not use `--resume-from` to relabel those measurements.
+128 exact ordered feature rows across NCIT–DOID. Attempt 06 then measured the changed native
+fingerprints and evidence schema 3 in a fresh cold64 run. Attempt 07 preserves that measurement;
+it does not substitute attempt 04's older implementation or count an artifact replay as a
+new cold/warm timing.
+
+After launch, monitor with:
 
 ```console
-tmux attach -t exact-g0-06
-/tmp/exact-native-candidate/bin/python data/experiments-v2/g0-validation-06/monitor.py
+tmux attach -t exact-g0-07
+/tmp/exact-native-candidate/bin/python data/experiments-v2/g0-validation-07/monitor.py
 ```
 
 Detach from tmux with Ctrl-b, then d. `status.json` reports the current phase, process and
@@ -57,7 +68,7 @@ can remain open after completion, so session existence alone does not mean work 
 Request a cooperative stop:
 
 ```console
-touch data/experiments-v2/g0-validation-06/STOP
+touch data/experiments-v2/g0-validation-07/STOP
 ```
 
 The parent forwards STOP to the active worker, including during ontology loading. Completed
@@ -142,6 +153,27 @@ A completed-output replay therefore cannot be reported as a measured warm run.
 Attempt 05's forecast used the original cold-reload term, requiring 43.21 hours with its
 safety factor. Its controller recorded `blocked_budget` before launching warm64, hosted20,
 fitting or production300. That historical outcome remains intact. The native validation and
-explicit resource amendment above permit a fresh attempt 06; its measured forecast must still
-admit later phases. G0 is not yet passed. The launcher never replaces cold timing with the
-near-zero cost of adopting its outputs.
+explicit resource amendment permitted fresh attempt 06. Its outcome is recorded below;
+G0 is not yet passed. The launcher never replaces cold timing with the near-zero cost of
+adopting its outputs.
+
+
+## Attempt 06 measurements and restart policy
+
+Attempt 06 finished `blocked_budget` after all four probes completed: cold64 **848.92 s**,
+warm64 **581.41 s**, hosted20 **756.06 s** and fit64 **1,749.54 s**. These are complete stage
+wall times, including setup. Warm64 encoded zero new texts, confirming embedding-cache reuse;
+it still rebuilt ontology/graph state. Total active attempt time was **3,936.42 s**.
+
+Actual hosted usage was **522 requests, 377,208 tokens and USD 0.09027675**, with no unknown
+or unpriced requests. The forecast, rather than actual exhaustion, blocked continuation:
+17.55 hours total versus the 11-hour soft allowance, 24,012 requests versus 2,000, and
+17,351,568 tokens versus 3.2 million. The whole-probe time extrapolation repeatedly includes
+fixed setup; it is conservative planning evidence, not observed remaining runtime.
+The 300-source global/local and interruption/replay checks did not run.
+
+Within those observed calls, the non-rationale roles account for **133 requests, 19,779 tokens
+and USD 0.00401265**, including one validation-only probe. This is a role-accounting subtotal,
+not a new rationale-free run or a guaranteed future cost. The user explicitly requested the
+new rationale-free default and sufficient hosted headroom; attempt 07 measures the resulting
+hosted behavior rather than relabeling attempt 06. All prior rationale costs stay in history.

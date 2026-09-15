@@ -84,6 +84,12 @@ readiness acceptance is separate. See RUN-PLAN for protected final-study and rep
 
 ## Shared experimental discipline
 
+- Generated LLM rationales are disabled for G0 and all experiment runs. They are not
+  evaluated by this programme. Production defaults and recorded decision evidence remain
+  unchanged. A future rationale study must explicitly set `generate_rationales: true` in
+  its experiment declaration or campaign lock (`--generate-rationales` for G0). The
+  resolved configuration and design hashes record this choice; existing artifacts remain
+  immutable.
 - Keep one runner and one pipeline. Public stages remain screen and confirm; discovery,
   expansion, sentinel checks, and freeze are internal screen phases. Do not build another matcher.
 - Execution mode is explicit: global alignment versus supplied-pool local ranking. Candidate
@@ -100,6 +106,8 @@ readiness acceptance is separate. See RUN-PLAN for protected final-study and rep
   configuration, prompts, and component dependencies. A model name or mutable alias is not a lock.
 - CPU work can overlap within one node; admit only one heavy accelerator job by default.
   Count encoding, training, LLM preparation/judgment/rationale, retries, and evaluation costs.
+- Generative posthoc rationales are off by default unless explicitly requested. Preserve matching
+  decisions, scores and exact numerical explanation traces; record costs of any opted-in narratives.
 - Reuse semantically identical deterministic artifacts once; do not count copies as independent
   seeds. Repeat stochastic training/prompt-order procedures with paired seeds at confirmation.
 - Retain removals and nulls. Screen results are developmental; only frozen final contrasts

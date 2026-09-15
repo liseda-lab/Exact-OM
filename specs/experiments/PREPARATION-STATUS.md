@@ -84,20 +84,26 @@ evaluation stage. That bookkeeping is fixed; attempt 05 adopted its verified out
 original timing, but its cumulative feasibility gate blocked further work. Those costs and
 outcomes remain unchanged.
 
-On 2026-09-14, preparation passed and fresh G0-06 launched detached after
-[native T4 validation](../native-optimization/IMPLEMENTATION.md#completed-t4-result) matched
-128 exact ordered NCIT–DOID feature rows. It uses `/tmp/exact-native-candidate/bin/python`,
-tmux `exact-g0-06`, and output `data/experiments-v2/g0-validation-06/`; its
-`native-execution.json` records the installed stack. Fresh cold64 measures the changed native
-fingerprints and evidence schema 3; historical caches are not substituted for that measurement.
+Native T4 passed [128 exact ordered NCIT–DOID feature rows](../native-optimization/IMPLEMENTATION.md#completed-t4-result).
+G0-06 subsequently completed cold64 (848.92 s), warm64 (581.41 s), hosted20 (756.06 s) and
+fit64 (1,749.54 s), then stopped `blocked_budget`. Its time/request/token forecasts exceeded
+the declared limits; actual usage was 3,936.42 s, 522 hosted requests, 377,208 tokens and
+USD 0.09027675. No global/local 300-source or interruption/replay validation ran. Its original
+report, native identity and measurements remain under `data/experiments-v2/g0-validation-06/`.
 
-The user authorized an explicit recovery budget amendment: 41,400 seconds hard limit,
-39,600 seconds soft stop, at most 56 GiB RAM, two CPU threads, one GPU worker, 2,000 hosted
-requests and 3.2 million tokens. The former 12-hour foundation ceiling is superseded for this
-attempt, with all prior costs retained in `g0-validation-06/resource-plan.json`. A future
-scientific campaign remains unadmitted and must include historical plus new spend while
-protecting final and recovery reserves. No G0 completion or ETA is claimed before measurement.
-See [G0-VALIDATION.md](G0-VALIDATION.md) for monitor/STOP commands and retained attempt history;
+On 2026-09-15, the user authorized G0-07 with no wall-time limit and finite headroom of
+100,000 hosted requests/32 million tokens; 56 GiB RAM, two numerical CPU threads, one GPU
+worker, STOP and unknown-delivery protections remain. Rationales are off by default for all
+experiments unless explicitly requested; matching and numerical explanation traces are
+unchanged. The non-rationale subtotal of G0-06 was 133 requests/19,779 tokens/USD 0.00401265,
+including its one validation-only probe; this is not a newly measured rationale-free run.
+
+G0-07 restart is configured with `/tmp/exact-native-candidate/bin/python`,
+tmux `exact-g0-07`, output `data/experiments-v2/g0-validation-07/`. Its plan adopts
+verified G0-06 cold/warm/fit artifacts with their original timings, measures hosted20 with
+rationales off, and retains all historical spend. Time forecasts remain conservative estimates;
+finite hosted caps still govern admission. The long scientific campaign remains unadmitted.
+See [G0-VALIDATION.md](G0-VALIDATION.md) for monitor/STOP commands and retained history;
 `status.json` and `report.json` remain authoritative for progress and completion.
 
 ## Validation and remaining readiness work
