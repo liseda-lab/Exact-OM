@@ -96,7 +96,10 @@ def test_probe_is_explicit_variant_and_production_keeps_frozen_encoders_and_llm(
         fit=True,
         evaluate=True,
     )
-    assert production["pipeline"] == baseline["pipeline"]
+    from exact.experiments.rationale_policy import apply_rationale_policy
+
+    assert production["pipeline"] == apply_rationale_policy(baseline)["pipeline"]
+    assert production["pipeline"][0]["params"]["generate_llm_rationales"] is False
     assert production["dataset"]["verbalization_mode"] == baseline["dataset"]["verbalization_mode"]
     assert set(production["data"]["refs"]) == {"train", "valid"}
     assert production["data"]["train_candidates"] == train["pool"]
@@ -284,3 +287,84 @@ def test_resumed_validation_retains_budget_and_never_restarts_cold(tmp_path, mon
     assert report["stages"] == [row]
     assert report["hosted_usage"] == totals
     assert report["resume"]["previous_elapsed_seconds"] == prior
+
+
+@pytest.mark.parametrize("requested", [False, True])
+def test_g0_narratives_require_explicit_opt_in(tmp_path, requested):
+    case = case_fixture(tmp_path)
+    training = bounded_training(case, tmp_path, tmp_path / "output")
+    base = ConfigModel().model_dump(mode="json", by_alias=True)
+    base["pipeline"][0]["params"]["generate_llm_rationales"] = True
+    resolved, _ = validation_config(
+        base,
+        case,
+        tmp_path,
+        training,
+        mode="global_alignment",
+        cap=20,
+        hosted=True,
+        fit=False,
+        evaluate=False,
+        generate_rationales=requested,
+    )
+    assert resolved["pipeline"][0]["params"]["generate_llm_rationales"] is requested
+    assert base["pipeline"][0]["params"]["generate_llm_rationales"] is True
+
+
+def test_unlimited_wall_still_enforces_hosted_allowances():
+    from tools.run_experiment_validation import cold_budget_bound
+
+    limits = {"seconds": None, "soft_seconds": None, "requests": 100000, "tokens": 32000000}
+    rows = [{"id": name, "wall_seconds": 1e9} for name in ("cold64", "warm64", "fit64")]
+    assert cold_budget_bound(rows[0], elapsed=1e9, limits=limits)["fits_limits"]
+    rows.append(
+        {
+            "id": "hosted20",
+            "wall_seconds": 1e9,
+            "new_usage": {"attempts": 133, "prompt_tokens": 17455, "completion_tokens": 2324},
+        }
+    )
+    kwargs = dict(elapsed=1e9, max_seconds=None, requests=655, tokens=396987, limits=limits)
+    estimate = forecast(rows, **kwargs)
+    assert estimate["fits_limits"]
+    assert estimate["remaining_seconds"] > 1e9
+    assert json.loads(json.dumps(estimate))["limits"]["soft_seconds"] is None
+    limits["requests"] = 2000
+    assert not forecast(rows, **kwargs)["fits_limits"]
+    limits["requests"] = 100000
+    limits["tokens"] = 400000
+    assert not forecast(rows, **kwargs)["fits_limits"]
+
+
+@pytest.mark.parametrize("extra,expected", [([], 43200), (["--no-time-limit"], None)])
+def test_cli_explicit_unlimited_wall_and_revised_hosted_caps(monkeypatch, extra, expected):
+    from tools import run_experiment_validation as launcher
+
+    captured = {}
+
+    def execute(args):
+        captured.update(vars(args))
+        return 0
+
+    monkeypatch.setattr(launcher, "execute", execute)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "validation",
+            "--campaign",
+            "campaign.yaml",
+            "--output-root",
+            "new",
+            "--requests-cap",
+            "100000",
+            "--tokens-cap",
+            "32000000",
+            *extra,
+        ],
+    )
+    assert launcher.main() == 0
+    assert captured["max_seconds"] is expected or captured["max_seconds"] == expected
+    assert captured["requests_cap"] == 100000
+    assert captured["tokens_cap"] == 32000000
+    assert captured["generate_rationales"] is False

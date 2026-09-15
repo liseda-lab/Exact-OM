@@ -102,10 +102,13 @@ def bounded_training(case, root, output, limit=64):
     }
 
 
-def validation_config(base, case, root, training, *, mode, cap, hosted, fit, evaluate):
+def validation_config(
+    base, case, root, training, *, mode, cap, hosted, fit, evaluate, generate_rationales=False
+):
     from exact.core.entities.configs.config import ConfigModel
     from exact.experiments.campaign import _case_task
     from exact.experiments.harness import deep_merge
+    from exact.experiments.rationale_policy import apply_rationale_policy
 
     task = _case_task(case, "D0", mode, "valid", root)
     config = deep_merge(base, task["overlay"])
@@ -125,6 +128,7 @@ def validation_config(base, case, root, training, *, mode, cap, hosted, fit, eva
             if model["name"] == "PairAdaptiveSemanticScorer":
                 model["params"].update(use_llm=False, generate_llm_rationales=False)
     config = ConfigModel.from_mapping(config, warn_v1=False).model_dump(mode="json", by_alias=True)
+    config = apply_rationale_policy(config, generate_rationales=hosted and generate_rationales)
     return config, task
 
 
@@ -161,7 +165,7 @@ def forecast(rows, *, elapsed, max_seconds, requests, tokens, limits):
             / 20
         )
     fits = (
-        elapsed + remaining_seconds <= max_seconds
+        (max_seconds is None or elapsed + remaining_seconds <= max_seconds)
         and requests + remaining_requests <= limits["requests"]
         and tokens + remaining_tokens <= limits["tokens"]
     )
@@ -190,7 +194,9 @@ def cold_budget_bound(cold, *, elapsed, limits):
         "safety_factor": 1.5,
         "elapsed_seconds": elapsed,
         "remaining_seconds_lower_bound": seconds,
-        "fits_limits": elapsed + seconds <= limits["soft_seconds"],
+        "fits_limits": (
+            limits["soft_seconds"] is None or elapsed + seconds <= limits["soft_seconds"]
+        ),
         "limits": limits,
         "unmeasured": ["warm64", "hosted20", "fit64", "production300"],
         "scope": "Cold reload term of the existing G0 forecast; omitted terms are nonnegative",
@@ -324,7 +330,7 @@ def execute(args):
         "requests": args.requests_cap,
         "tokens": args.tokens_cap,
         "seconds": args.max_seconds,
-        "soft_seconds": args.max_seconds - 1800,
+        "soft_seconds": args.max_seconds - 1800 if args.max_seconds is not None else None,
         "ram_gb": args.ram_gb,
     }
     info = {
@@ -339,6 +345,7 @@ def execute(args):
         "target": case.target.model_dump(mode="json"),
         "development_only": True,
         "changes_campaign_readiness": False,
+        "generate_rationales": getattr(args, "generate_rationales", False),
         "production_scope": "300 development groups; frozen matching configuration, bounded64-group training population",
         "status": "prepared",
         "stages": [],
@@ -347,6 +354,8 @@ def execute(args):
     started = time.monotonic()
     prior_elapsed = 0.0
     imported_cold = None
+    imported_probes = {}
+    prior_usage = {}
     if args.resume_from:
         from tools.validation_resume import adopt_cold_probe
 
@@ -382,6 +391,51 @@ def execute(args):
         }
         info["stages"].append(imported_cold)
         write_json(output / "cold64.measurement.json", imported_cold)
+    elif getattr(args, "resume_probes_from", None):
+        from tools.validation_resume import adopt_completed_probes
+
+        expected_configs = {}
+        for name in ("cold64", "warm64", "fit64"):
+            expected, _ = validation_config(
+                base,
+                case,
+                lock_root,
+                training,
+                mode="global_alignment",
+                cap=64,
+                hosted=False,
+                fit=name == "fit64",
+                evaluate=False,
+            )
+            expected_configs[name] = harness._bind_model_lock_revisions(
+                expected,
+                dict(load_yaml_mapping(lock.model_lock.verify(lock_root))),
+                require_complete=True,
+                hosted_only=True,
+            )
+        imported_probes, prior_elapsed = adopt_completed_probes(
+            args.resume_probes_from.resolve(),
+            output,
+            campaign_sha256=info["campaign_sha256"],
+            expected_configs=expected_configs,
+            materialize=args.execute,
+        )
+        imported_cold = imported_probes["cold64"]
+        prior_usage = imported_cold["adoption_evidence"]["prior_hosted_usage"]
+        if (
+            prior_usage["attempts"] >= args.requests_cap
+            or prior_usage["prompt_tokens"] + prior_usage["completion_tokens"] >= args.tokens_cap
+        ):
+            raise ValueError("Hosted allowance must exceed retained prior usage")
+        info["resume"] = {
+            "from": str(args.resume_probes_from.resolve()),
+            "previous_elapsed_seconds": prior_elapsed,
+            "previous_hosted_usage": prior_usage,
+            "scope": "Reuse verified local probes; remeasure hosted20 with fresh responses and current rationale policy",
+        }
+        for name, row in imported_probes.items():
+            info["stages"].append(row)
+            write_json(output / f"{name}.measurement.json", row)
 
     def elapsed_seconds():
         return prior_elapsed + time.monotonic() - started
@@ -399,6 +453,11 @@ def execute(args):
         )
         return 0
     shared = output / "shared"
+
+    def usage_totals():
+        current_usage = ledger_totals(shared / "openrouter")
+        return {key: value + prior_usage.get(key, 0) for key, value in current_usage.items()}
+
     stop = output / "STOP"
     current = {"evaluate": False, "phase": "starting", "worker_calls": 0, "warm_from": None}
     original_run = harness._run_subprocess
@@ -433,8 +492,12 @@ def execute(args):
             **(env or {}),
             "EXACT_OPENROUTER_LEDGER_DIR": str(shared / "openrouter"),
             "EXACT_EMBEDDING_CACHE_DIR": str(shared / "embeddings"),
-            "EXACT_OPENROUTER_REQUEST_CAP": str(args.requests_cap),
-            "EXACT_OPENROUTER_TOKEN_CAP": str(args.tokens_cap),
+            "EXACT_OPENROUTER_REQUEST_CAP": str(args.requests_cap - prior_usage.get("attempts", 0)),
+            "EXACT_OPENROUTER_TOKEN_CAP": str(
+                args.tokens_cap
+                - prior_usage.get("prompt_tokens", 0)
+                - prior_usage.get("completion_tokens", 0)
+            ),
             "EXACT_OPENROUTER_RETRY_UNKNOWN": "0",
             "EXACT_EXPERIMENT_STOP_FILE": str(stop),
             "HF_HUB_OFFLINE": "1",
@@ -481,12 +544,12 @@ def execute(args):
                 except (psutil.NoSuchProcess, psutil.AccessDenied):
                     rss = 0
                 peak = max(peak, rss)
-                if elapsed >= limits["soft_seconds"]:
+                if limits["soft_seconds"] is not None and elapsed >= limits["soft_seconds"]:
                     stop.write_text("foundation soft deadline\n")
                 if rss > args.ram_gb * 1024**3:
                     stop.write_text("RAM limit exceeded\n")
                 stop_forwarded = forward_stop(process, stop, stop_forwarded)
-                if elapsed >= args.max_seconds:
+                if args.max_seconds is not None and elapsed >= args.max_seconds:
                     os.killpg(process.pid, signal.SIGKILL)
                 write_json(
                     output / "status.json",
@@ -522,7 +585,7 @@ def execute(args):
     ):
         if stop.exists():
             raise InterruptedError("Validation STOP exists; completed artifacts retained")
-        if elapsed_seconds() >= limits["soft_seconds"]:
+        if limits["soft_seconds"] is not None and elapsed_seconds() >= limits["soft_seconds"]:
             raise ValidationBudgetExceeded("The cumulative validation time reached its soft limit")
         current.update(evaluate=evaluate, phase=name, warm_from=warm_from)
         config, task = validation_config(
@@ -535,6 +598,7 @@ def execute(args):
             hosted=hosted,
             fit=fit,
             evaluate=evaluate,
+            generate_rationales=getattr(args, "generate_rationales", False),
         )
         config = harness._bind_model_lock_revisions(
             config, suite.model_lock_payload, require_complete=True, hosted_only=True
@@ -571,14 +635,15 @@ def execute(args):
             {},
             "confirmed_negatives",
             recovery=metadata,
+            generate_rationales=getattr(args, "generate_rationales", False),
         )
         before, calls_before, wall = (
-            ledger_totals(shared / "openrouter"),
+            usage_totals(),
             current["worker_calls"],
             time.monotonic(),
         )
         result = harness.execute_cell(cell, suite, workdir=ROOT, resume=False)
-        after = ledger_totals(shared / "openrouter")
+        after = usage_totals()
         row = {
             "id": name,
             "status": result["status"],
@@ -623,14 +688,15 @@ def execute(args):
                 "The measured cold-reload term alone exceeds the remaining validation budget; "
                 "warm, hosted, fitting and production300 stages were not started."
             )
-        stage("warm64", cap=64, hosted=False, warm_from=cold["output_dir"])
+        if "warm64" not in imported_probes:
+            stage("warm64", cap=64, hosted=False, warm_from=cold["output_dir"])
         if not args.skip_hosted:
             stage("hosted20", cap=20, hosted=True)
-        stage("fit64", cap=64, hosted=False, fit=True)
-        fits = list(cells["fit64"].output_dir.glob("fitting/**/training_units.json"))
+        fitted = imported_probes.get("fit64") or stage("fit64", cap=64, hosted=False, fit=True)
+        fits = list(Path(fitted["output_dir"]).glob("fitting/**/training_units.json"))
         if not fits:
             raise RuntimeError("Small current-selector fit produced no training-unit artifact")
-        totals = ledger_totals(shared / "openrouter")
+        totals = usage_totals()
         bound = forecast(
             info["stages"],
             elapsed=elapsed_seconds(),
@@ -702,7 +768,7 @@ def execute(args):
         info.update(
             ended_at=time.time(),
             elapsed_seconds=elapsed_seconds(),
-            hosted_usage=ledger_totals(shared / "openrouter"),
+            hosted_usage=usage_totals(),
             g0_admission="not_granted; review measurements, omitted scenarios and family-specific forecasts",
         )
         write_json(output / "report.json", info)
@@ -715,10 +781,16 @@ def main():
     parser.add_argument("--campaign", type=Path)
     parser.add_argument("--output-root", type=Path)
     parser.add_argument("--scratch-root", type=Path)
-    parser.add_argument(
+    recovery = parser.add_mutually_exclusive_group()
+    recovery.add_argument(
         "--resume-from",
         type=Path,
         help="Adopt a verified cold64 completed before the empty-evaluation bookkeeping failure",
+    )
+    recovery.add_argument(
+        "--resume-probes-from",
+        type=Path,
+        help="Reuse verified cold64/warm64/fit64 from a budget-blocked G0; remeasure hosted20",
     )
     parser.add_argument(
         "--api-key-file",
@@ -727,7 +799,20 @@ def main():
     )
     parser.add_argument("--execute", action="store_true")
     parser.add_argument("--skip-hosted", action="store_true")
-    parser.add_argument("--max-seconds", type=int, default=43200)
+    parser.add_argument(
+        "--generate-rationales",
+        action="store_true",
+        help="Explicitly opt into narrative explanations",
+    )
+    wall_limit = parser.add_mutually_exclusive_group()
+    wall_limit.add_argument("--max-seconds", type=int, default=43200)
+    wall_limit.add_argument(
+        "--no-time-limit",
+        dest="max_seconds",
+        action="store_const",
+        const=None,
+        help="Disable wall-time admission and deadlines; retain STOP, RAM and hosted limits",
+    )
     parser.add_argument("--ram-gb", type=float, default=56)
     parser.add_argument("--requests-cap", type=int, default=2000)
     parser.add_argument("--tokens-cap", type=int, default=3200000)
@@ -741,12 +826,14 @@ def main():
     if not args.campaign or not args.output_root:
         parser.error("--campaign and --output-root are required")
     if (
-        not 1800 < args.max_seconds <= 43200
+        (args.max_seconds is not None and not 1800 < args.max_seconds <= 43200)
         or not 0 < args.ram_gb <= 60
-        or not 0 < args.requests_cap <= 2000
-        or not 0 < args.tokens_cap <= 3200000
+        or args.requests_cap <= 0
+        or args.tokens_cap <= 0
     ):
-        parser.error("Validation limits must remain within12h,60GiB,2000requests and3.2M tokens")
+        parser.error(
+            "Use a wall limit within (30min,12h] or --no-time-limit, RAM within (0,60] GiB, and positive hosted caps"
+        )
     return execute(args)
 
 
