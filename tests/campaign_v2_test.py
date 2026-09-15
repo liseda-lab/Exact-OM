@@ -857,3 +857,19 @@ def test_e13_bound_views_change_graphs_without_changing_sources_or_gold(tmp_path
     step["arms"][1]["overlay"] = {"data": {"refs": {"valid": "different-gold.tsv"}}}
     with pytest.raises(ValueError, match="arm data overrides"):
         CampaignStep.model_validate(step)
+
+
+@pytest.mark.parametrize("generate_rationales", [False, True])
+def test_campaign_materializes_explicit_rationale_policy(tmp_path, generate_rationales):
+    path = _lock(tmp_path)
+    if generate_rationales:
+        payload = yaml.safe_load(path.read_text())
+        payload["generate_rationales"] = True
+        path.write_text(yaml.safe_dump(payload))
+    original = path.read_bytes()
+    lock, _ = load_campaign(path)
+    assert lock.generate_rationales is generate_rationales
+    suite = materialize_campaign(path, tmp_path / "materialized", stage="screen")
+    assert suite.sources
+    assert all(source.config.generate_rationales is generate_rationales for source in suite.sources)
+    assert path.read_bytes() == original

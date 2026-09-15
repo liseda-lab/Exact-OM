@@ -42,6 +42,13 @@ def fixture(tmp_path, monkeypatch):
         ResourceConfig(),
         root / "run",
         {
+            "config_version": 2,
+            "pipeline": [
+                {
+                    "name": "PairAdaptiveSemanticScorer",
+                    "params": {"generate_llm_rationales": False},
+                }
+            ],
             "data": {
                 "root": str(tmp_path),
                 "source": str(source),

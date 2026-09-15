@@ -33,6 +33,10 @@ from exact.experiments.paper_metrics import (
     paired_global_f1_bootstrap,
     recompute_global_prf,
 )
+from exact.experiments.rationale_policy import (
+    apply_rationale_policy,
+    require_rationale_policy,
+)
 from exact.experiments.reporting import (
     enrich_inventory_from_manifests,
     inspect_dataset_task,
@@ -278,6 +282,7 @@ class RunCell:
     recovery: Optional[dict[str, Any]] = None
     published_matcher: Optional[dict[str, Any]] = None
     diagnostics: Optional[dict[str, Any]] = None
+    generate_rationales: bool = False
 
     @property
     def manifest_path(self) -> Path:
@@ -1195,6 +1200,7 @@ def _experiment_design_payload(
     return {
         "experiment_id": config.experiment_id,
         "baseline_id": config.baseline_id,
+        "generate_rationales": config.generate_rationales,
         "baseline_manifest_hash": baseline_manifest_hash,
         "selection": config.selection,
         "design": config.design,
@@ -1437,6 +1443,7 @@ def _resolve_config(
     )
     if stage == "screen":
         mapping = _screen_safe_mapping(mapping, task=task)
+    mapping = apply_rationale_policy(mapping, generate_rationales=source.config.generate_rationales)
     validated = ConfigModel.from_mapping(mapping, warn_v1=False)
     resolved = validated.model_dump(mode="json", by_alias=True)
     if stage == "screen":
@@ -1638,6 +1645,7 @@ def build_cells(
                         supervision_label=label,
                         resolved_supervision=supervision,
                         negative_label_policy=config.negative_label_policy,
+                        generate_rationales=config.generate_rationales,
                         recovery=suite.campaign,
                         published_matcher=arm.published_matcher,
                         diagnostics=config.frozen_constants.get("evaluation_diagnostics", {}).get(
@@ -2143,6 +2151,7 @@ def _provenance_payload(
         "supervision": cell.resolved_supervision,
         "supervision_label": cell.supervision_label,
         "negative_label_policy": cell.negative_label_policy,
+        "generate_rationales": cell.generate_rationales,
     }
     package_names = {name.lower(): version for name, version in packages.items()}
     return {
@@ -2234,6 +2243,7 @@ def _prepare_cell(
         "supervision_label": cell.supervision_label,
         "resolved_supervision": cell.resolved_supervision,
         "negative_label_policy": cell.negative_label_policy,
+        "generate_rationales": cell.generate_rationales,
         "status": "pending",
         **provenance,
     }
@@ -2698,6 +2708,7 @@ def execute_cell(
     workdir: Path,
     resume: bool,
 ) -> dict[str, Any]:
+    require_rationale_policy(cell.resolved_config, generate_rationales=cell.generate_rationales)
     recovery = None
     if cell.recovery:
         from exact.experiments.runtime import CellRecovery

@@ -189,7 +189,16 @@ def _run_cell(output_dir: Path) -> RunCell:
         source_cap=None,
         resource=ResourceConfig(),
         output_dir=output_dir,
-        resolved_config={"data": {}},
+        resolved_config={
+            "config_version": 2,
+            "data": {},
+            "pipeline": [
+                {
+                    "name": "PairAdaptiveSemanticScorer",
+                    "params": {"generate_llm_rationales": False},
+                }
+            ],
+        },
         config_hash="config-sha",
         experiment_config_hash="experiment-sha",
         design_hash="design-sha",
@@ -2469,3 +2478,87 @@ def test_frozen_selection_cannot_be_overwritten_after_confirm_artifact(
 
     with pytest.raises(FileExistsError, match="confirm artifacts"):
         write_selection_record(suite, {}, output_root=tmp_path)
+
+
+@pytest.mark.parametrize("generate_rationales", [False, True])
+def test_rationales_require_explicit_experiment_opt_in(tmp_path, generate_rationales):
+    mapping = _experiment_mapping()
+    if generate_rationales:
+        mapping["generate_rationales"] = True
+    source, suite = _source_and_suite(tmp_path, mapping)
+    cells = build_cells(suite, source, stage="screen", output_root=tmp_path / "runs")
+    assert cells
+    for cell in cells:
+        assert cell.generate_rationales is generate_rationales
+        assert (
+            cell.resolved_config["pipeline"][0]["params"]["generate_llm_rationales"]
+            is generate_rationales
+        )
+        assert cell.resolved_config["pipeline"][0]["params"]["return_explanations"] is True
+        assert cell.config_hash == ConfigModel.from_mapping(cell.resolved_config).fingerprint()
+    changed = replace(
+        source,
+        config=source.config.model_copy(update={"generate_rationales": not generate_rationales}),
+    )
+    assert experiment_design_hash(source) != experiment_design_hash(changed)
+    for task in source.config.confirm.tasks:
+        resolved, *_ = harness._resolve_config(
+            source,
+            task=task,
+            arm=source.config.arms[0],
+            stage="confirm",
+            seed=7,
+            source_cap=None,
+            inherited_overlay={},
+        )
+        assert resolved["pipeline"][0]["params"]["generate_llm_rationales"] is generate_rationales
+
+
+def test_rationale_policy_resolves_missing_defaults_and_preserves_production():
+    from exact.experiments.rationale_policy import apply_rationale_policy
+
+    production = ConfigModel().model_dump(mode="json", by_alias=True)
+    original = json.loads(json.dumps(production))
+    assert production["pipeline"][0]["params"]["generate_llm_rationales"] is True
+    disabled = apply_rationale_policy({"config_version": 2})
+    assert disabled["pipeline"][0]["params"]["generate_llm_rationales"] is False
+    assert apply_rationale_policy(production, generate_rationales=True) == production
+    assert apply_rationale_policy(disabled, generate_rationales=True) == disabled
+    assert production == original
+
+
+def test_rationale_policy_overrides_inherited_and_arm_settings(tmp_path):
+    mapping = _experiment_mapping()
+    enabled = {
+        "pipeline": [
+            {
+                "name": "PairAdaptiveSemanticScorer",
+                "params": {
+                    "generate_llm_rationales": True,
+                },
+            }
+        ]
+    }
+    mapping["arms"][0]["overlay"] = enabled
+    source, suite = _source_and_suite(tmp_path, mapping)
+    cells = build_cells(
+        suite, source, stage="screen", output_root=tmp_path / "runs", inherited_overlay=enabled
+    )
+    assert all(
+        cell.resolved_config["pipeline"][0]["params"]["generate_llm_rationales"] is False
+        for cell in cells
+    )
+
+
+def test_execute_rejects_prebuilt_rationales_without_opt_in(tmp_path, monkeypatch):
+    _, suite = _source_and_suite(tmp_path)
+    production = ConfigModel().model_dump(mode="json", by_alias=True)
+    cell = replace(_run_cell(tmp_path / "run"), resolved_config=production)
+    with pytest.raises(ValueError, match="requires explicit generate_rationales"):
+        harness.execute_cell(cell, suite, workdir=tmp_path, resume=False)
+    assert not cell.output_dir.exists()
+    monkeypatch.setattr(harness, "_prepare_cell", lambda *a, **k: ({"status": "complete"}, True))
+    result = harness.execute_cell(
+        replace(cell, generate_rationales=True), suite, workdir=tmp_path, resume=True
+    )
+    assert result["status"] == "complete"

@@ -690,6 +690,7 @@ class ExperimentConfig(StrictConfigModel):
     implementation: ImplementationConfig = Field(default=ImplementationConfig.model_validate({}))
     base_config: Path
     baseline_id: str = "R_0"
+    generate_rationales: bool = False
     depends_on: List[str] = Field(default_factory=list)
     resource: ResourceConfig = Field(default=ResourceConfig.model_validate({}))
     screen: StageConfig

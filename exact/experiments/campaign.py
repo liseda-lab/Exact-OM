@@ -321,6 +321,7 @@ class CampaignLock(StrictConfigModel):
     profile: Literal["core_14d", "extended_21d"] = "core_14d"
     base_config: Path
     baseline_id: str = "R_v2"
+    generate_rationales: bool = False
     historical_parent: Literal["R_0"] = "R_0"
     model_lock: Optional[InputBinding] = None
     cases: dict[str, CaseBinding]
@@ -819,6 +820,7 @@ def materialize_campaign(path: Path, directory: Path, *, stage: str) -> Any:
             "depends_on": [producers.get(item, item) for item in step.inherits],
             "base_config": str(resolved_base),
             "baseline_id": lock.baseline_id,
+            "generate_rationales": lock.generate_rationales,
             "implementation": (
                 {
                     "status": "blocked",
