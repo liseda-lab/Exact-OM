@@ -234,3 +234,229 @@ def test_warm_seed_copies_only_verified_dataset_with_identical_config(saved, tmp
     (output / "_inputs/resolved.config.yaml").write_text(yaml.safe_dump(config))
     with pytest.raises(ValueError):
         seed_warm_dataset(run, output)
+
+
+@pytest.fixture
+def completed(saved, tmp_path, monkeypatch):
+    from tools import validation_resume
+
+    previous, _, original, campaign, limits, key, _, _ = saved
+    native = {"pyowl-core": "a" * 64, "pyowl2vec-star-projector": "b" * 64}
+    monkeypatch.setattr(validation_resume, "ontology_execution_identity", lambda _: native)
+    expected = {}
+    rows = []
+    for index, name in enumerate(("cold64", "warm64", "fit64")):
+        run = previous / name / "run"
+        (run / "_inputs").mkdir(parents=True, exist_ok=True)
+        config = deepcopy(original)
+        config["data"]["reference_role"] = None
+        config["dataset"]["reasoner"] = "asserted"
+        config["pipeline"] = [
+            {
+                "name": "PairAdaptiveSemanticScorer",
+                "params": {"use_llm": False, "generate_llm_rationales": False},
+            }
+        ]
+        if name == "fit64":
+            inputs = previous / "inputs"
+            inputs.mkdir(exist_ok=True)
+            for filename in ("train.candidates.tsv", "train.reference.tsv"):
+                (inputs / filename).write_text("frozen training bytes")
+            config["data"].update(
+                train_candidates=str(inputs / "train.candidates.tsv"),
+                refs={"train": str(inputs / "train.reference.tsv")},
+            )
+        (run / "_inputs/resolved.config.yaml").write_text(yaml.safe_dump(config))
+        expected[name] = deepcopy(config)
+        outputs = {
+            name: b"frozen output"
+            for name in (
+                *DATASET_FILES,
+                "alignment/maps_global.tsv",
+                "source_decisions.json",
+                "timings.json",
+            )
+        }
+        if name == "fit64":
+            outputs["fitting/labels/training_units.json"] = b'{"groups":64}'
+        for path, data in outputs.items():
+            target = run / path
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(data)
+        store = ArtifactStore(run.parent)
+        identity = stage_identity(
+            "extraction",
+            parameters={},
+            inputs={},
+            role="development",
+            entity_kind="all",
+            implementation={"sha256": f"original-{name}"},
+            dependencies={"ontology_artifacts": native},
+            seed=17,
+        )
+        store.publish(identity, outputs)
+        (run / "recovery-runtime.json").write_text(json.dumps({"identity": identity}))
+        recovery = {"artifacts": {"extraction": identity["artifact_id"]}}
+        manifest = {
+            "status": "complete",
+            "experiment_id": "G0",
+            "source_cap": 64,
+            "resolved_config_hash": hash_payload(config),
+            "experiment_config_hash": campaign,
+            "recovery": recovery,
+        }
+        (run / "experiment_manifest.json").write_text(json.dumps(manifest))
+        worker = {
+            "return_code": 0,
+            "wall_seconds": 50 + index,
+            "scorer_encoded_texts": 0 if name == "warm64" else 10,
+        }
+        if name == "warm64":
+            worker["dataset_cache_hits"] = 2
+        (run / "validation-worker.json").write_text(json.dumps(worker))
+        row = {
+            "id": name,
+            "status": "complete",
+            "source_cap": 64,
+            "hosted": False,
+            "evaluate": False,
+            "new_worker_calls": 1,
+            "new_usage": dict.fromkeys(validation_resume.USAGE_KEYS, 0),
+            "output_dir": str(run),
+            "manifest": str(run / "experiment_manifest.json"),
+            "wall_seconds": 100 + index,
+            "worker_measurement": worker,
+            "recovery": recovery,
+        }
+        rows.append(row)
+        (previous / f"{name}.measurement.json").write_text(json.dumps(row))
+    report = json.loads((previous / "report.json").read_text())
+    report.update(
+        status="blocked_budget",
+        reason="measured cap exceeded",
+        elapsed_seconds=500,
+        stages=rows + [{"id": "hosted20", "status": "complete", "hosted": True}],
+    )
+    (previous / "report.json").write_text(json.dumps(report))
+    return previous, expected, campaign, key
+
+
+def test_completed_probe_adoption_retains_measurements_and_charges_with_cold_hosted_cache(
+    completed, tmp_path
+):
+    from tools.validation_resume import adopt_completed_probes
+
+    previous, expected, campaign, key = completed
+    before = {
+        str(p): sha256_file(p)
+        for p in previous.rglob("*")
+        if p.is_file() and not p.name.endswith("-shm")
+    }
+    output = tmp_path / "resumed"
+    planned, elapsed = adopt_completed_probes(
+        previous, output, campaign_sha256=campaign, expected_configs=expected, materialize=False
+    )
+    assert not output.exists() and elapsed == 500
+    rows, elapsed = adopt_completed_probes(
+        previous, output, campaign_sha256=campaign, expected_configs=expected
+    )
+    assert set(rows) == {"cold64", "warm64", "fit64"}
+    for index, name in enumerate(("cold64", "warm64", "fit64")):
+        row = rows[name]
+        assert row["wall_seconds"] == planned[name]["wall_seconds"] == 100 + index
+        assert row["new_worker_calls"] == 0 and not any(row["new_usage"].values())
+        assert row["adoption_evidence"]["prior_hosted_usage"]["attempts"] == 1
+        assert row["adoption_evidence"]["hosted_cache_reused"] is False
+        assert (
+            row["recovery"]["original_identity"]["artifact_id"]
+            == row["recovery"]["artifacts"]["extraction"]
+        )
+    ledger = RequestLedger(output / "shared/openrouter")
+    assert ledger.cached(key) is None and ledger.summary()["roles"] == {}
+    with sqlite3.connect(output / "shared/embeddings/vectors.sqlite3") as db:
+        assert db.execute("SELECT raw FROM vectors").fetchone()[0] == b"values"
+    assert before == {
+        str(p): sha256_file(p)
+        for p in previous.rglob("*")
+        if p.is_file() and not p.name.endswith("-shm")
+    }
+
+
+def test_completed_fitting_allows_only_content_equal_training_relocation(completed, tmp_path):
+    from tools.validation_resume import adopt_completed_probes
+
+    previous, configs, campaign, _ = completed
+    fit = configs["fit64"]["data"]
+    relocated = tmp_path / "relocated.tsv"
+    relocated.write_text("frozen training bytes")
+    fit["train_candidates"] = str(relocated)
+    fit["refs"]["train"] = str(relocated)
+    adopt_completed_probes(
+        previous,
+        tmp_path / "new",
+        campaign_sha256=campaign,
+        expected_configs=configs,
+        materialize=False,
+    )
+    relocated.write_text("changed training bytes")
+    with pytest.raises(ValueError, match="training bytes"):
+        adopt_completed_probes(
+            previous,
+            tmp_path / "new",
+            campaign_sha256=campaign,
+            expected_configs=configs,
+            materialize=False,
+        )
+
+
+@pytest.mark.parametrize(
+    "change",
+    ["native", "worker", "measurement", "output", "config", "charges", "status", "warm_cache"],
+)
+def test_completed_probe_adoption_rejects_changed_evidence(
+    completed, tmp_path, monkeypatch, change
+):
+    from tools import validation_resume
+
+    previous, configs, campaign, _ = completed
+    if change == "native":
+        monkeypatch.setattr(
+            validation_resume, "ontology_execution_identity", lambda _: {"pyowl-core": "changed"}
+        )
+    elif change == "config":
+        configs["cold64"]["run"]["seed"] = 99
+    elif change in {"charges", "status"}:
+        p = previous / "report.json"
+        report = json.loads(p.read_text())
+        if change == "charges":
+            report["hosted_usage"]["attempts"] = 0
+        else:
+            report["status"] = "failed"
+        p.write_text(json.dumps(report))
+    elif change == "output":
+        (previous / "fit64/run/fitting/labels/training_units.json").write_text("tampered")
+    elif change == "warm_cache":
+        worker_path = previous / "warm64/run/validation-worker.json"
+        worker = json.loads(worker_path.read_text())
+        worker["dataset_cache_hits"] = 0
+        worker_path.write_text(json.dumps(worker))
+        path = previous / "warm64.measurement.json"
+        row = json.loads(path.read_text())
+        row["worker_measurement"] = worker
+        path.write_text(json.dumps(row))
+        path = previous / "report.json"
+        report = json.loads(path.read_text())
+        report["stages"][1] = row
+        path.write_text(json.dumps(report))
+    else:
+        p = previous / (
+            "warm64/run/validation-worker.json" if change == "worker" else "warm64.measurement.json"
+        )
+        d = json.loads(p.read_text())
+        d["wall_seconds"] = 0.001
+        p.write_text(json.dumps(d))
+    with pytest.raises(ValueError):
+        validation_resume.adopt_completed_probes(
+            previous, tmp_path / "new", campaign_sha256=campaign, expected_configs=configs
+        )
+    assert not (tmp_path / "new/shared").exists()
