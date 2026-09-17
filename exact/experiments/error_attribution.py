@@ -15,8 +15,15 @@ from typing import Any, Iterable, Mapping
 from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import maximum_flow
 
+from exact.experiments.paper_metrics import normalize_relation
+
 Pair = tuple[str, str]
 TypedPair = tuple[str, str, str]
+_CANONICAL_RELATIONS = {
+    "equivalence": "=",
+    "source_subsumed_by_target": "<",
+    "source_subsumes_target": ">",
+}
 _DEVELOPMENT = {
     "development",
     "dev",
@@ -97,7 +104,8 @@ def attribute_source_errors(
     """Attribute known errors; no model calls, fitted state changes, or inferred negatives.
 
     References are positive rows with SrcEntity/TgtEntity (or Src/Tgt), optionally
-    Relation in =/< />. Complete-reference policy explicitly declares closed-world
+    Relation using canonical symbols or recognized report aliases (including <=/>=).
+    Complete-reference policy explicitly declares closed-world
     negatives within this source universe; other policies require explicit negative
     pairs or NIL source labels to count a false positive.
     """
@@ -123,7 +131,7 @@ def attribute_source_errors(
     excluded = 0
     for row in reference_rows:
         source, target = row.get("SrcEntity", row.get("Src")), row.get("TgtEntity", row.get("Tgt"))
-        relation = str(row.get("Relation", "="))
+        relation = _CANONICAL_RELATIONS.get(normalize_relation(str(row.get("Relation", "="))))
         if source is None or target is None or relation not in {"=", "<", ">"}:
             raise ValueError("E00 reference rows require source, target, and a canonical relation")
         if str(source) not in universe:

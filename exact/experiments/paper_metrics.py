@@ -25,9 +25,11 @@ _RELATION_NAMES = {
     "equivalence": "equivalence",
     "equivalent": "equivalence",
     "<": "source_subsumed_by_target",
+    "<=": "source_subsumed_by_target",
     "subsumed_by": "source_subsumed_by_target",
     "source_subsumed_by_target": "source_subsumed_by_target",
     ">": "source_subsumes_target",
+    ">=": "source_subsumes_target",
     "subsumes": "source_subsumes_target",
     "source_subsumes_target": "source_subsumes_target",
 }

@@ -364,3 +364,14 @@ def test_frozen_population_keeps_empty_groups_and_rejects_changed_membership(tmp
     path.write_text(json.dumps({"retrieval_config": {"source_sample": sample}}))
     with pytest.raises(ValueError, match="integrity"):
         recompute_global_prf(run)
+
+
+@pytest.mark.parametrize(
+    "alias,canonical",
+    [("<=", "source_subsumed_by_target"), (">=", "source_subsumes_target")],
+)
+def test_bioml_subsumption_relation_aliases(alias, canonical):
+    from exact.experiments.paper_metrics import normalize_relation
+
+    assert normalize_relation(alias) == canonical
+    assert normalize_relation(f" {alias} ") == canonical

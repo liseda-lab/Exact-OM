@@ -167,3 +167,41 @@ def test_typing_oracle_distinguishes_pair_correctness_from_canonical_relation():
     assert report["observed_typed"]["tp"] == 0
     assert report["oracle_ceilings"]["typing"]["typed_metrics"]["tp"] == 2
     assert next(row for row in report["records"] if row["Src"] == "correct")["flags"]["typing"]
+
+
+@pytest.mark.parametrize(
+    "alias,canonical",
+    [
+        (" = ", "="),
+        ("equivalent", "="),
+        ("EQUIVALENCE", "="),
+        ("<=", "<"),
+        (">=", ">"),
+        ("subsumed_by", "<"),
+        ("subsumes", ">"),
+        ("source_subsumed_by_target", "<"),
+        ("source_subsumes_target", ">"),
+    ],
+)
+def test_report_relation_aliases_preserve_typed_directions(alias, canonical):
+    trace, reference = fixture()
+    correct = next(row for row in trace["records"] if row["Src"] == "correct")
+    correct["candidates"][0]["relation"] = canonical
+    target = next(row for row in reference if row["SrcEntity"] == "correct")
+    target["Relation"] = canonical
+    options = dict(reference_role="development", negative_label_policy="complete_reference")
+    expected = attribute_source_errors(trace, reference, **options)
+    target["Relation"] = alias
+    observed = attribute_source_errors(trace, reference, **options)
+    assert observed == expected
+    assert observed["observed_typed"]["tp"] == 1
+
+
+@pytest.mark.parametrize("relation", [None, float("nan"), "", " ", "<?rel>", "unknown"])
+def test_explicit_missing_or_unknown_reference_relations_fail_closed(relation):
+    trace, reference = fixture()
+    reference[0]["Relation"] = relation
+    with pytest.raises(ValueError, match="relation"):
+        attribute_source_errors(
+            trace, reference, reference_role="development", negative_label_policy="unknown"
+        )
