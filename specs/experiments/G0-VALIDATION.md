@@ -21,7 +21,7 @@ operational replay, deliberate interruption, relocation/resume, and completed-ca
 The fit population is explicitly bounded for validation, so this is not a full-training-quality
 result or a component-selection experiment. A failed or unaffordable phase stops the job.
 
-Attempt 08 retains `--no-time-limit --requests-cap 100000 --tokens-cap 32000000`.
+Attempt 09 retains `--no-time-limit --requests-cap 100000 --tokens-cap 32000000`.
 The user removed G0's wall deadline and approved finite hosted headroom for fitting and
 replays. One GPU worker, two numerical CPU threads, at most 56 GiB process RAM, cooperative
 STOP and the request/token caps remain enforced. Unknown hosted deliveries are not
@@ -29,12 +29,12 @@ automatically retried. Runtime forecasts remain reported as conservative estimat
 are not wall-deadline gates. Request/token admission still applies.
 
 The recovery plan retains the verified cold64, warm64 and fit64 artifacts originally measured
-in attempt 06 and adopts attempt 07's successful rationale-free hosted20 probe. Attempt 07's
-completed global300 scoring/selector checkpoint is eligible for output repair only after
-strict validation that the scoring implementation and inputs are unchanged; an AST comparison
-limits the permitted production change to the source-decision writer. Completed model work
-must not be repeated as a new measurement. Historical hosted usage stays charged, and the
-failed attempt's files and original measurements remain unchanged.
+in attempt 06 and attempt 07's successful rationale-free hosted20 probe. Attempt 09 adopts
+attempt 08's complete, content-addressed global300 extraction artifact and reruns reporting
+without a model worker. Identity checks limit the intervening change to posthoc relation
+normalization; scoring, selector fitting and saved mappings are unchanged. Completed model
+work is not a new measurement. Historical time and hosted usage stay charged, and previous
+attempt files remain unchanged.
 
 This supersedes attempt 06's 41,400-second hard/39,600-second soft allowance and its
 2,000-request/3.2-million-token caps for the new G0 continuation only. Attempt 06 and all
@@ -45,8 +45,8 @@ campaign remains unadmitted.
 
 ## Monitor and stop
 
-G0-08 recovery is configured for `data/experiments-v2/g0-validation-08/`, using
-`/tmp/exact-native-candidate/bin/python` and tmux session `exact-g0-08`. This records the
+G0-09 recovery is configured for `data/experiments-v2/g0-validation-09/`, using
+`/tmp/exact-native-candidate/bin/python` and tmux session `exact-g0-09`. This records the
 restart configuration, not a claim that the job has launched.
 `status.json` and `report.json` are authoritative for runtime status. The installed native
 identity, adoption evidence and resource amendment belong with this attempt's plan.
@@ -54,15 +54,15 @@ Neither completion nor an ETA is claimed.
 
 [Native T4 validation](../native-optimization/IMPLEMENTATION.md#completed-t4-result) passed
 128 exact ordered feature rows across NCIT–DOID. Attempt 06 then measured the changed native
-fingerprints and evidence schema 3 in a fresh cold64 run. Attempts 07 and 08 preserve that
-measurement; neither substitutes attempt 04's older implementation or counts an artifact
+fingerprints and evidence schema 3 in a fresh cold64 run. Subsequent attempts preserve that
+measurement; none substitutes attempt 04's older implementation or counts an artifact
 replay as a new cold/warm timing.
 
 After launch, monitor with:
 
 ```console
-tmux attach -t exact-g0-08
-/tmp/exact-native-candidate/bin/python data/experiments-v2/g0-validation-08/monitor.py
+tmux attach -t exact-g0-09
+/tmp/exact-native-candidate/bin/python data/experiments-v2/g0-validation-09/monitor.py
 ```
 
 Detach from tmux with Ctrl-b, then d. `status.json` reports the current phase, process and
@@ -73,7 +73,7 @@ can remain open after completion, so session existence alone does not mean work 
 Request a cooperative stop:
 
 ```console
-touch data/experiments-v2/g0-validation-08/STOP
+touch data/experiments-v2/g0-validation-09/STOP
 ```
 
 The parent forwards STOP to the active worker, including during ontology loading. Completed
@@ -204,9 +204,18 @@ pairs**, with every final score preserved and the same 300 emitted mappings. The
 no model calls and used no reference labels. Hashed evidence is retained under
 `data/experiments-v2/g0-audit-repair-01/`.
 
-Attempt 08 continues in a new output directory using verified completed probes and the
-completed global300 checkpoint. The recovery path must verify input/configuration identity,
-unchanged scoring code outside the repaired writer, checkpoint completeness and saved
-outputs before adoption. It retains the failed attempt and all historical time/hosted charges;
-G0 remains unpassed until the new report confirms the outstanding global/local and
-interruption/relocation/cache checks.
+Attempt 08 recovered the complete global300 checkpoint after the input/configuration and
+writer-only AST checks. It completed audit export and builtin evaluation with **zero new
+encoded texts and zero hosted requests**, then failed in posthoc E00 attribution. The public
+development reference uses `<=` and `>=`, whose canonical meanings `<` and `>` are already
+specified in [IMPLEMENTATION-CLARIFICATIONS.md](IMPLEMENTATION-CLARIFICATIONS.md). Attribution
+rejected those valid aliases. The repair uses the shared relation normalizer and preserves
+all source/target identities and directionality; it changes evaluation only.
+The real saved-output postprocessing check passes attribution, builtin evaluation and replay
+comparison with zero mapping-score/metric drift across all 300 mappings and no model calls.
+Hashed evidence is in `data/experiments-v2/g0-postprocessing-repair-01/`.
+
+Attempt 09 is configured to adopt the complete global300 extraction artifact, repeat
+reporting without a worker, and continue the remaining local/global recovery checks. Attempt
+08's failure, completed outputs and cumulative historical charges remain intact. G0 remains
+unpassed until the new report confirms all prescribed checks.

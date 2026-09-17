@@ -454,7 +454,11 @@ def execute(args):
             "previous_hosted_usage": previous_usage,
             "copied_hosted_usage": copied_usage,
             "scope": (
-                "Reuse completed probes and restore the verified output-repair checkpoint"
+                (
+                    "Reuse completed probes and restore the verified output-repair checkpoint"
+                    if global_repair.get("checkpoint_repair")
+                    else "Reuse completed probes and extraction; rerun failed reporting"
+                )
                 if failed_from
                 else "Reuse verified local probes; remeasure hosted20 with fresh responses"
             ),
@@ -848,7 +852,7 @@ def main():
     recovery.add_argument(
         "--resume-failed-from",
         type=Path,
-        help="Recover verified completed probes and global300 after the source-decision writer failure",
+        help="Recover verified probes and global300 after an output or reporting failure",
     )
     parser.add_argument(
         "--api-key-file",

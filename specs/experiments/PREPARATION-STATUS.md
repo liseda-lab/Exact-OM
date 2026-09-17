@@ -111,15 +111,22 @@ G0 artifacts reproduced the failure and verified the repair: 300 source records,
 candidates (158 protected exact), unchanged final scores and the same 300 emitted mappings,
 without model calls. Hashed evidence is in `data/experiments-v2/g0-audit-repair-01/`.
 
-On 2026-09-17 the user authorized repair and rerun. G0-08 recovery is configured with
-`/tmp/exact-native-candidate/bin/python`, tmux `exact-g0-08`, output
-`data/experiments-v2/g0-validation-08/`; this configuration does not itself establish launch.
-It adopts verified completed probes and repairs outputs from the completed global300
-checkpoint only after strict input/configuration checks and an AST check limiting the
-production change to the audit writer. Historical costs and original cold/warm/fit timings
-remain charged. Rationales remain off, with no wall deadline and the unchanged finite
-100,000-request/32-million-token allowance. The remaining global/local and recovery checks
-must pass before G0 is complete. The long scientific campaign remains unadmitted.
+G0-08 recovered the verified global300 checkpoint, completed audit export and builtin
+evaluation with zero new encoded texts/hosted requests, then failed in posthoc E00 attribution.
+The public development reference uses `<=`/`>=`, whose canonical `<`/`>` meanings are already
+specified; the diagnostic parser rejected those aliases. The evaluator-only repair uses the
+shared relation normalizer, preserving identities, directionality, scoring and saved mappings.
+Actual saved-output attribution/evaluation/replay checks now pass with zero score or metric
+drift; evidence is in `data/experiments-v2/g0-postprocessing-repair-01/`.
+
+Under the user's 2026-09-17 repair/rerun authorization, G0-09 recovery is configured with
+`/tmp/exact-native-candidate/bin/python`, tmux `exact-g0-09`, output
+`data/experiments-v2/g0-validation-09/`; configuration does not itself establish launch.
+It adopts verified probes and the complete content-addressed global300 extraction artifact,
+then reruns reporting without a model worker before the remaining checks. Prior attempts,
+historical charges and original cold/warm/fit timings remain intact. Rationales remain off,
+with no wall deadline and the unchanged 100,000-request/32-million-token allowance. G0 is
+not yet complete, and the long scientific campaign remains unadmitted.
 See [G0-VALIDATION.md](G0-VALIDATION.md) for monitor/STOP commands and retained history;
 `status.json` and `report.json` remain authoritative for progress and completion.
 
