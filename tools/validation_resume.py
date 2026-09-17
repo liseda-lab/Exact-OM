@@ -633,8 +633,30 @@ def adopt_failed_validation(
     expected_configs: dict[str, dict],
     materialize: bool = True,
 ) -> tuple[dict[str, dict], float, dict]:
-    """Adopt G0's unchanged probes and declare the completed-inference output repair."""
+    """Adopt unchanged G0 probes and repair only the failed downstream stage."""
+    return _adopt_failed_validation(
+        previous,
+        output,
+        campaign_sha256=campaign_sha256,
+        expected_configs=expected_configs,
+        materialize=materialize,
+    )
+
+
+def _adopt_failed_validation(
+    previous: Path,
+    output: Path,
+    *,
+    campaign_sha256: str,
+    expected_configs: dict[str, dict],
+    materialize: bool,
+    history_only: bool = False,
+    ancestors: frozenset[Path] = frozenset(),
+) -> tuple[dict[str, dict], float, dict]:
     previous, output = previous.resolve(), output.resolve()
+    if previous in ancestors:
+        raise ValueError("Validation resume history contains a cycle")
+    ancestors = ancestors | {previous}
     if output == previous or output.is_relative_to(previous) or previous.is_relative_to(output):
         raise ValueError("Resume output must be separate from the saved validation root")
     if set(expected_configs) != {"cold64", "warm64", "fit64", "hosted20", "global300"}:
@@ -656,17 +678,34 @@ def adopt_failed_validation(
         or report["resume"].get("previous_hosted_usage") != origin_report["hosted_usage"]
     ):
         raise ValueError("Imported historical charges or elapsed evidence changed")
-    inherited, _ = adopt_completed_probes(
-        origin,
-        output,
-        campaign_sha256=campaign_sha256,
-        expected_configs={name: expected_configs[name] for name in ("cold64", "warm64", "fit64")},
-        materialize=False,
-    )
+    copied_usage = dict.fromkeys(USAGE_KEYS, 0)
+    if origin_report.get("status") == "blocked_budget":
+        inherited, _ = adopt_completed_probes(
+            origin,
+            output,
+            campaign_sha256=campaign_sha256,
+            expected_configs={
+                name: expected_configs[name] for name in ("cold64", "warm64", "fit64")
+            },
+            materialize=False,
+        )
+    else:
+        inherited, _, _ = _adopt_failed_validation(
+            origin,
+            output,
+            campaign_sha256=campaign_sha256,
+            expected_configs=expected_configs,
+            materialize=False,
+            history_only=True,
+            ancestors=ancestors,
+        )
+        copied_usage = report["resume"].get("copied_hosted_usage", {})
+        _verify_usage(origin, copied_usage)
     ledger_usage = _ledger_usage(previous)
     usage = report["hosted_usage"]
     expected_usage = {
-        key: ledger_usage[key] + origin_report["hosted_usage"][key] for key in USAGE_KEYS
+        key: ledger_usage[key] + origin_report["hosted_usage"][key] - copied_usage[key]
+        for key in USAGE_KEYS
     }
     if (
         any(
@@ -700,11 +739,13 @@ def adopt_failed_validation(
             manifest = json.loads((run / "experiment_manifest.json").read_text())
             worker = json.loads((run / "validation-worker.json").read_text())
             complete = name == "hosted20"
+            extraction_complete = manifest.get("extraction_complete") is True
             if (
                 Path(row["output_dir"]).resolve() != run
                 or Path(row["manifest"]).resolve() != run / "experiment_manifest.json"
                 or row["worker_measurement"] != worker
-                or worker.get("return_code") != (0 if complete else 1)
+                or worker.get("return_code") != (0 if complete or extraction_complete else 1)
+                or (extraction_complete and manifest.get("return_code") != 0)
                 or row.get("status") != ("complete" if complete else "failed")
                 or manifest.get("status") != row["status"]
                 or manifest.get("experiment_config_hash") != campaign_sha256
@@ -714,14 +755,43 @@ def adopt_failed_validation(
                 >= _positive(worker["wall_seconds"], "worker wall")
             ):
                 raise ValueError("Hosted stage does not bind the original worker and configuration")
-            if complete:
+            if complete or extraction_complete:
                 _, artifact = _verified_extraction(run)
+                if any(
+                    item.get("recovery", {}).get("artifacts", {}).get("extraction")
+                    != artifact["identity"]["artifact_id"]
+                    for item in (row, manifest)
+                ):
+                    raise ValueError("Saved extraction differs from reported recovery identity")
                 if artifact["identity"]["dependencies"].get(
                     "ontology_artifacts"
                 ) != ontology_execution_identity(
                     str(config.get("dataset", {}).get("reasoner", "asserted"))
                 ):
                     raise ValueError("Hosted probe native implementation changed")
+                if extraction_complete and not complete:
+                    if not history_only and artifact["identity"][
+                        "implementation"
+                    ] != _code_identity(REPOSITORY, evaluation=False):
+                        raise ValueError(
+                            "Evaluation-only repair changes the extraction implementation"
+                        )
+                    repair = {
+                        "resume_from": str(run.parent),
+                        "repair_record": {
+                            "kind": "g0_completed_extraction_evaluation_repair",
+                            "affected_stages": ["evaluation"],
+                            "scientific_choices_unchanged": True,
+                            "reporting_labels_exposed": True,
+                            "exposure_scope": "development evaluation; no private/final labels",
+                            "original_artifact_id": artifact["identity"]["artifact_id"],
+                            "original_manifest_sha256": sha256_file(
+                                run / "experiment_manifest.json"
+                            ),
+                            "original_wall_seconds": row["wall_seconds"],
+                        },
+                    }
+                    continue
             else:
                 stderr = (run / "experiment.stderr.log").read_text()
                 if (
@@ -751,11 +821,12 @@ def adopt_failed_validation(
                     "original_wall_seconds": row["wall_seconds"],
                 }
                 _repair_checkpoint(record)
-                _audit_repair_compatibility(
-                    identity["implementation"],
-                    _code_identity(REPOSITORY, evaluation=False),
-                    record["original_revision"],
-                )
+                if not history_only:
+                    _audit_repair_compatibility(
+                        identity["implementation"],
+                        _code_identity(REPOSITORY, evaluation=False),
+                        record["original_revision"],
+                    )
                 repair = {
                     "resume_from": str(store.root),
                     "checkpoint_repair": record,
@@ -788,7 +859,9 @@ def adopt_failed_validation(
         key: sum(row["new_usage"][key] for row in report["stages"]) for key in USAGE_KEYS
     }
     if any(
-        not math.isclose(measured_usage[key], ledger_usage[key], rel_tol=0, abs_tol=1e-12)
+        not math.isclose(
+            measured_usage[key], ledger_usage[key] - copied_usage[key], rel_tol=0, abs_tol=1e-12
+        )
         for key in USAGE_KEYS
     ):
         raise ValueError("Stage request measurements differ from copied ledger usage")

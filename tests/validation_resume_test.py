@@ -744,3 +744,192 @@ def test_failed_adoption_rejects_changed_policy_or_history(failed_validation, tm
             expected_configs=configs,
             materialize=False,
         )
+
+
+@pytest.fixture
+def posthoc_validation(failed_validation, tmp_path):
+    from tools import validation_resume as resume
+
+    previous, configs, campaign, key = failed_validation
+    current = tmp_path / "posthoc"
+    probes, prior_elapsed, _ = resume.adopt_failed_validation(
+        previous, current, campaign_sha256=campaign, expected_configs=configs
+    )
+    for name, row in probes.items():
+        (current / f"{name}.measurement.json").write_text(json.dumps(row))
+    run = current / "global300/run"
+    (run / "_inputs").mkdir(parents=True)
+    config = configs["global300"]
+    (run / "_inputs/resolved.config.yaml").write_text(yaml.safe_dump(config))
+    identity = stage_identity(
+        "extraction",
+        parameters={"configuration": config},
+        inputs={},
+        role="development",
+        entity_kind="all",
+        implementation=resume._code_identity(resume.REPOSITORY, evaluation=False),
+        dependencies={"ontology_artifacts": resume.ontology_execution_identity("asserted")},
+        seed=17,
+    )
+    outputs = {
+        name: b"finished extraction"
+        for name in (
+            *resume.DATASET_FILES,
+            "alignment/maps_global.tsv",
+            "source_decisions.json",
+            "timings.json",
+        )
+    }
+    for name, data in outputs.items():
+        path = run / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
+    ArtifactStore(run.parent).publish(identity, outputs)
+    (run / "recovery-runtime.json").write_text(json.dumps({"identity": identity}))
+    worker = {"return_code": 0, "wall_seconds": 3, "scorer_encoded_texts": 0}
+    (run / "validation-worker.json").write_text(json.dumps(worker))
+    recovery = {"artifacts": {"extraction": identity["artifact_id"]}}
+    manifest = {
+        "experiment_id": "G0",
+        "status": "failed",
+        "return_code": 0,
+        "source_cap": 300,
+        "extraction_complete": True,
+        "resolved_config_hash": hash_payload(config),
+        "experiment_config_hash": campaign,
+        "recovery": recovery,
+        "failure": {
+            "type": "ValueError",
+            "message": "E00 reference rows require source, target, and a canonical relation",
+        },
+    }
+    (run / "experiment_manifest.json").write_text(json.dumps(manifest))
+    row = {
+        "id": "global300",
+        "status": "failed",
+        "source_cap": 300,
+        "hosted": True,
+        "evaluate": True,
+        "new_worker_calls": 1,
+        "new_usage": dict.fromkeys(resume.USAGE_KEYS, 0),
+        "output_dir": str(run),
+        "manifest": str(run / "experiment_manifest.json"),
+        "wall_seconds": 5,
+        "worker_measurement": worker,
+        "recovery": recovery,
+    }
+    (current / "global300.measurement.json").write_text(json.dumps(row))
+    previous_report = json.loads((previous / "report.json").read_text())
+    report = {
+        "status": "failed",
+        "reason": "RuntimeError: global300: E00 posthoc failure",
+        "campaign_sha256": campaign,
+        "elapsed_seconds": prior_elapsed + 10,
+        "stages": [*probes.values(), row],
+        "hosted_usage": previous_report["hosted_usage"],
+        "resume": {
+            "from": str(previous),
+            "previous_elapsed_seconds": prior_elapsed,
+            "previous_hosted_usage": previous_report["hosted_usage"],
+            "copied_hosted_usage": resume._ledger_usage(previous),
+        },
+        "limits": {"seconds": None, "requests": 100000, "tokens": 32000000},
+    }
+    (current / "report.json").write_text(json.dumps(report))
+    return current, configs, campaign, key
+
+
+def test_posthoc_failure_reuses_extraction_and_preserves_multi_attempt_charges(
+    posthoc_validation, tmp_path, monkeypatch
+):
+    from exact.experiments.recovery import build_reuse_plan
+    from tools import validation_resume as resume
+
+    previous, configs, campaign, key = posthoc_validation
+    # A historical output repair must not be reclassified against a later evaluator fix.
+    monkeypatch.setattr(
+        resume, "_audit_repair_compatibility", lambda *_: pytest.fail("old repair revalidated")
+    )
+    evaluator = resume.REPOSITORY / "exact/experiments/error_attribution.py"
+    evaluator.parent.mkdir(parents=True)
+    evaluator.write_text("evaluation_fix = True\n")
+    output = tmp_path / "final"
+    rows, elapsed, metadata = resume.adopt_failed_validation(
+        previous, output, campaign_sha256=campaign, expected_configs=configs
+    )
+    assert elapsed == 710
+    assert "checkpoint_repair" not in metadata
+    assert metadata["repair_record"]["affected_stages"] == ["evaluation"]
+    assert rows["hosted20"]["measurement_usage"]["attempts"] == 1
+    assert rows["cold64"]["wall_seconds"] == 100
+    for row in rows.values():
+        assert row["adoption_evidence"]["prior_hosted_usage"]["attempts"] == 2
+        assert row["adoption_evidence"]["prior_ledger_usage"]["attempts"] == 1
+        assert row["new_worker_calls"] == 0 and not any(row["new_usage"].values())
+    assert (
+        RequestLedger(output / "shared/openrouter").cached(key) == b'{"response":"rationale-free"}'
+    )
+    # The normal recovery dependency graph, with no checkpoint seeding, reuses extraction.
+    identity = json.loads((previous / "global300/run/recovery-runtime.json").read_text())[
+        "identity"
+    ]
+    target = ArtifactStore(output / "global300")
+    target.import_artifact(previous / "global300", identity["artifact_id"])
+    evaluation = stage_identity(
+        "evaluation",
+        parameters={},
+        inputs={},
+        role="development",
+        entity_kind="all",
+        implementation={"fixed": True},
+        dependencies={},
+        parents=[identity["artifact_id"]],
+    )
+    plan = build_reuse_plan(
+        target,
+        {"extraction": identity, "evaluation": evaluation},
+        {"extraction": identity["artifact_id"]},
+        changed_stages=["evaluation"],
+    )
+    assert [(r["stage"], r["action"]) for r in plan["stages"]] == [
+        ("extraction", "reuse"),
+        ("evaluation", "recompute"),
+    ]
+
+
+@pytest.mark.parametrize(
+    "change",
+    ["copied_charges", "elapsed", "extraction", "implementation", "imported_probe", "new_usage"],
+)
+def test_posthoc_failure_rejects_incomplete_extraction_and_changed_chain(
+    posthoc_validation, tmp_path, change
+):
+    from tools import validation_resume as resume
+
+    previous, configs, campaign, _ = posthoc_validation
+    path = previous / "report.json"
+    report = json.loads(path.read_text())
+    if change == "copied_charges":
+        report["resume"]["copied_hosted_usage"]["attempts"] += 1
+    elif change == "elapsed":
+        report["elapsed_seconds"] = report["resume"]["previous_elapsed_seconds"]
+    elif change == "extraction":
+        (previous / "global300/run/source_decisions.json").write_bytes(b"changed")
+    elif change == "implementation":
+        audit = resume.REPOSITORY / resume.AUDIT_FILE
+        audit.write_text(audit.read_text().replace("'fixed'", "'new scoring'"))
+    elif change == "imported_probe":
+        report["stages"][3]["measurement_usage"]["attempts"] += 1
+        (previous / "hosted20.measurement.json").write_text(json.dumps(report["stages"][3]))
+    else:
+        report["stages"][-1]["new_usage"]["attempts"] = 1
+        (previous / "global300.measurement.json").write_text(json.dumps(report["stages"][-1]))
+    path.write_text(json.dumps(report))
+    with pytest.raises(ValueError):
+        resume.adopt_failed_validation(
+            previous,
+            tmp_path / "new",
+            campaign_sha256=campaign,
+            expected_configs=configs,
+            materialize=False,
+        )
