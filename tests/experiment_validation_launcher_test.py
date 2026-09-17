@@ -368,3 +368,136 @@ def test_cli_explicit_unlimited_wall_and_revised_hosted_caps(monkeypatch, extra,
     assert captured["requests_cap"] == 100000
     assert captured["tokens_cap"] == 32000000
     assert captured["generate_rationales"] is False
+
+
+@pytest.mark.parametrize(
+    "fault", [None, "changed_mapping", "changed_local_mapping", "global_request", "local_request"]
+)
+def test_full_validation_recovery_flow_rejects_changed_or_paid_replay(tmp_path, monkeypatch, fault):
+    """Exercise every launcher stage with deterministic, offline cell results."""
+    from argparse import Namespace
+    from types import SimpleNamespace
+
+    from exact.core.entities.configs import yaml_io
+    from exact.experiments import campaign, harness
+    from tools import run_experiment_validation as launcher
+
+    case = case_fixture(tmp_path)
+    campaign_path = tmp_path / "campaign.yaml"
+    campaign_path.write_text("immutable development campaign")
+    lock = SimpleNamespace(
+        cases={"D0": case},
+        base_config=tmp_path / "baseline.yaml",
+        openrouter_profile={},
+        baseline_id="fixture",
+        model_lock=case.source,
+    )
+    base = ConfigModel().model_dump(mode="json", by_alias=True)
+    base["data"]["refs"]["test"] = "/never-open-private-test.tsv"
+    base["pipeline"][0]["params"]["generate_llm_rationales"] = True
+    monkeypatch.setattr(campaign, "load_campaign", lambda *_: (lock, None))
+    monkeypatch.setattr(campaign, "validate_baseline", lambda *_: None)
+    monkeypatch.setattr(campaign, "openrouter_only", lambda base, *_: base)
+    monkeypatch.setattr(yaml_io, "load_yaml_mapping", lambda *_: base)
+    monkeypatch.setattr(harness, "_bind_model_lock_revisions", lambda config, *a, **kw: config)
+    monkeypatch.setattr(launcher, "node_info", lambda *_: {})
+    monkeypatch.setattr(launcher.signal, "signal", lambda *a: None)
+    usage = {"attempts": 0, "prompt_tokens": 0, "completion_tokens": 0}
+    monkeypatch.setattr(launcher, "ledger_totals", lambda *_: dict(usage))
+    cells = {}
+
+    def execute_cell(cell, suite, *, workdir, resume):
+        name = cell.output_dir.parent.name
+        cells[name] = cell
+        assert cell.resolved_config["pipeline"][0]["params"]["generate_llm_rationales"] is False
+        assert "/never-open-private-test.tsv" not in json.dumps(cell.resolved_config)
+        assert cell.split_role == "development"
+        cell.output_dir.mkdir(parents=True)
+        if cell.resolved_config["data"].get("train_candidates"):
+            fit = cell.output_dir / "fitting/selector/training_units.json"
+            fit.parent.mkdir(parents=True)
+            fit.write_text('{"effective_groups": 64}')
+        if name.startswith("global300"):
+            alignment = cell.output_dir / "alignment/maps_global.tsv"
+            alignment.parent.mkdir()
+            score = "0.8" if fault == "changed_mapping" and name == "global300-resume" else "0.9"
+            alignment.write_text(f"SrcEntity\tTgtEntity\tScore\ndev:0\tt:0\t{score}\n")
+        if name.startswith("local300"):
+            alignment = cell.output_dir / "alignment/maps_local.tsv"
+            alignment.parent.mkdir()
+            score = (
+                "0.8" if fault == "changed_local_mapping" and name == "local300-replay" else "0.9"
+            )
+            alignment.write_text(
+                f"SrcEntity\tTgtEntity\tTgtCandidates\ndev:0\t\t[('t:0', {score})]\n"
+            )
+        if (fault, name) in {
+            ("global_request", "global300-replay"),
+            ("local_request", "local300-replay"),
+        }:
+            usage["attempts"] += 1
+        return {"status": "interrupted" if cell.recovery["stop_after_checkpoint"] else "complete"}
+
+    monkeypatch.setattr(harness, "execute_cell", execute_cell)
+    args = Namespace(
+        api_key_file=None,
+        output_root=tmp_path / "g0",
+        campaign=campaign_path,
+        max_seconds=None,
+        ram_gb=48,
+        requests_cap=100000,
+        tokens_cap=32000000,
+        resume_from=None,
+        resume_probes_from=None,
+        resume_failed_from=None,
+        execute=True,
+        scratch_root=None,
+        skip_hosted=False,
+        generate_rationales=False,
+    )
+    assert launcher.execute(args) == (0 if fault is None else 2)
+    report = json.loads((args.output_root / "report.json").read_text())
+    assert report["status"] == ("passed" if fault is None else "failed")
+    assert report["limits"]["soft_seconds"] is None
+    assert report["generate_rationales"] is False
+    for name, parent in (
+        ("global300-resume", "global300-stop"),
+        ("global300-replay", "global300-resume"),
+    ):
+        assert cells[name].recovery["resume_from"] == str(cells[parent].output_dir.parent)
+    if fault in {None, "changed_local_mapping", "local_request"}:
+        assert cells["local300"].resolved_config["data"]["execution_mode"] == "local_ranking"
+        assert cells["local300-replay"].recovery["resume_from"] == str(
+            cells["local300"].output_dir.parent
+        )
+        assert all(cells[name].source_cap == 300 for name in cells if "300" in name)
+    if fault is None:
+        assert len(cells) == 10
+        assert all(row["new_usage"]["attempts"] == 0 for row in report["stages"])
+    elif fault in {"changed_mapping", "changed_local_mapping"}:
+        assert "changed mappings" in report["reason"]
+    else:
+        assert "performed new model work" in report["reason"]
+
+
+def test_forecast_retains_imported_hosted_measurement_without_new_usage():
+    rows = [{"id": name, "wall_seconds": 1} for name in ("cold64", "warm64", "fit64")]
+    rows.append(
+        {
+            "id": "hosted20",
+            "wall_seconds": 1,
+            "new_usage": {"attempts": 0, "prompt_tokens": 0, "completion_tokens": 0},
+            "measurement_usage": {"attempts": 10, "prompt_tokens": 1000, "completion_tokens": 100},
+        }
+    )
+    estimate = forecast(
+        rows,
+        elapsed=100,
+        max_seconds=None,
+        requests=10,
+        tokens=1100,
+        limits={"requests": 400, "tokens": 32000000},
+    )
+    assert estimate["remaining_requests"] == 450
+    assert estimate["remaining_tokens"] == 49500
+    assert estimate["fits_limits"] is False

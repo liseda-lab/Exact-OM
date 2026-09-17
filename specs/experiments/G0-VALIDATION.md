@@ -1,8 +1,9 @@
 # Detached G0 validation
 
 The user authorized operational validation on 2026-09-10, a fresh post-native attempt on
-2026-09-14, and a restart without a wall-time limit on 2026-09-15. Monitoring is handed back
-rather than waiting through the job. This does not authorize launching the long
+2026-09-14, a restart without a wall-time limit on 2026-09-15, and repair/recovery of the
+output-writing failure on 2026-09-17. Monitoring is handed back rather than waiting through
+the job. This does not authorize launching the long
 screen/confirmation campaign. G0 uses only NCIT–DOID train/development inputs; no private
 test references.
 
@@ -20,17 +21,20 @@ operational replay, deliberate interruption, relocation/resume, and completed-ca
 The fit population is explicitly bounded for validation, so this is not a full-training-quality
 result or a component-selection experiment. A failed or unaffordable phase stops the job.
 
-Attempt 07 is configured with `--no-time-limit --requests-cap 100000 --tokens-cap 32000000`.
+Attempt 08 retains `--no-time-limit --requests-cap 100000 --tokens-cap 32000000`.
 The user removed G0's wall deadline and approved finite hosted headroom for fitting and
 replays. One GPU worker, two numerical CPU threads, at most 56 GiB process RAM, cooperative
 STOP and the request/token caps remain enforced. Unknown hosted deliveries are not
 automatically retried. Runtime forecasts remain reported as conservative estimates; they
 are not wall-deadline gates. Request/token admission still applies.
 
-The recovery plan adopts verified attempt 06 cold64, warm64 and fit64 artifacts under their
-original identities and measured durations. It measures hosted20 afresh with rationales off,
-then completes the admitted global/local and interruption/replay checks. Historical hosted
-usage stays charged; changing an output policy does not erase completed requests.
+The recovery plan retains the verified cold64, warm64 and fit64 artifacts originally measured
+in attempt 06 and adopts attempt 07's successful rationale-free hosted20 probe. Attempt 07's
+completed global300 scoring/selector checkpoint is eligible for output repair only after
+strict validation that the scoring implementation and inputs are unchanged; an AST comparison
+limits the permitted production change to the source-decision writer. Completed model work
+must not be repeated as a new measurement. Historical hosted usage stays charged, and the
+failed attempt's files and original measurements remain unchanged.
 
 This supersedes attempt 06's 41,400-second hard/39,600-second soft allowance and its
 2,000-request/3.2-million-token caps for the new G0 continuation only. Attempt 06 and all
@@ -41,23 +45,24 @@ campaign remains unadmitted.
 
 ## Monitor and stop
 
-G0-07 restart is configured for `data/experiments-v2/g0-validation-07/`, using
-`/tmp/exact-native-candidate/bin/python` and tmux session `exact-g0-07`.
+G0-08 recovery is configured for `data/experiments-v2/g0-validation-08/`, using
+`/tmp/exact-native-candidate/bin/python` and tmux session `exact-g0-08`. This records the
+restart configuration, not a claim that the job has launched.
 `status.json` and `report.json` are authoritative for runtime status. The installed native
 identity, adoption evidence and resource amendment belong with this attempt's plan.
 Neither completion nor an ETA is claimed.
 
 [Native T4 validation](../native-optimization/IMPLEMENTATION.md#completed-t4-result) passed
 128 exact ordered feature rows across NCIT–DOID. Attempt 06 then measured the changed native
-fingerprints and evidence schema 3 in a fresh cold64 run. Attempt 07 preserves that measurement;
-it does not substitute attempt 04's older implementation or count an artifact replay as a
-new cold/warm timing.
+fingerprints and evidence schema 3 in a fresh cold64 run. Attempts 07 and 08 preserve that
+measurement; neither substitutes attempt 04's older implementation or counts an artifact
+replay as a new cold/warm timing.
 
 After launch, monitor with:
 
 ```console
-tmux attach -t exact-g0-07
-/tmp/exact-native-candidate/bin/python data/experiments-v2/g0-validation-07/monitor.py
+tmux attach -t exact-g0-08
+/tmp/exact-native-candidate/bin/python data/experiments-v2/g0-validation-08/monitor.py
 ```
 
 Detach from tmux with Ctrl-b, then d. `status.json` reports the current phase, process and
@@ -68,7 +73,7 @@ can remain open after completion, so session existence alone does not mean work 
 Request a cooperative stop:
 
 ```console
-touch data/experiments-v2/g0-validation-07/STOP
+touch data/experiments-v2/g0-validation-08/STOP
 ```
 
 The parent forwards STOP to the active worker, including during ontology loading. Completed
@@ -177,3 +182,31 @@ and USD 0.00401265**, including one validation-only probe. This is a role-accoun
 not a new rationale-free run or a guaranteed future cost. The user explicitly requested the
 new rationale-free default and sufficient hosted headroom; attempt 07 measures the resulting
 hosted behavior rather than relabeling attempt 06. All prior rationale costs stay in history.
+
+
+## Attempt 07 failure and attempt 08 recovery
+
+Attempt 07 reused the completed cold/warm/fitting probes and passed hosted20 with rationales
+off. Global300 completed scoring and selector processing for **5,842 candidate pairs** and
+wrote **300 final mappings**, then failed while writing `source_decisions.json`. Its dataset
+contains both `Scores` (protected exact confidence) and `Score` (candidate metadata). The
+audit writer renamed both to `S_final`, producing duplicate columns and a pandas
+`InvalidIndexError`. This was an output failure; no time, RAM or hosted cap stopped the job.
+Local300 and the remaining recovery checks did not complete.
+
+Commit `1ed45c3` makes the audit writer select `Scores` before `Score`, matching the existing
+prefilter/extraction decision semantics, without renaming both fields. It also accepts
+consistent/complementary entity aliases and rejects conflicting source/target identities.
+The scoring and selection algorithms are unchanged. The focused export/replay suite passes
+**23 tests**. Replaying the actual saved global300 artifacts reproduces the old failure and
+then produces **300 source records and 6,000 candidates**, including **158 protected exact
+pairs**, with every final score preserved and the same 300 emitted mappings. The replay made
+no model calls and used no reference labels. Hashed evidence is retained under
+`data/experiments-v2/g0-audit-repair-01/`.
+
+Attempt 08 continues in a new output directory using verified completed probes and the
+completed global300 checkpoint. The recovery path must verify input/configuration identity,
+unchanged scoring code outside the repaired writer, checkpoint completeness and saved
+outputs before adoption. It retains the failed attempt and all historical time/hosted charges;
+G0 remains unpassed until the new report confirms the outstanding global/local and
+interruption/relocation/cache checks.

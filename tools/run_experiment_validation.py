@@ -152,17 +152,15 @@ def forecast(rows, *, elapsed, max_seconds, requests, tokens, limits):
     by_id = {row["id"]: row for row in rows}
     cold, warm, fit = (by_id[key]["wall_seconds"] for key in ("cold64", "warm64", "fit64"))
     hosted = by_id.get("hosted20")
+    hosted_usage = hosted.get("measurement_usage", hosted["new_usage"]) if hosted else None
     # Production, independent warm recovery check, and local production: 900 source-visits.
     remaining_seconds = 1.5 * (cold * 4 + 900 * warm / 64 + 3 * fit)
     remaining_requests = remaining_tokens = 0
     if hosted:
         remaining_seconds += 1.5 * hosted["wall_seconds"] * 600 / 20
-        remaining_requests = int(1.5 * hosted["new_usage"]["attempts"] * 600 / 20)
+        remaining_requests = int(1.5 * hosted_usage["attempts"] * 600 / 20)
         remaining_tokens = int(
-            1.5
-            * (hosted["new_usage"]["prompt_tokens"] + hosted["new_usage"]["completion_tokens"])
-            * 600
-            / 20
+            1.5 * (hosted_usage["prompt_tokens"] + hosted_usage["completion_tokens"]) * 600 / 20
         )
     fits = (
         (max_seconds is None or elapsed + remaining_seconds <= max_seconds)
@@ -356,6 +354,7 @@ def execute(args):
     imported_cold = None
     imported_probes = {}
     prior_usage = {}
+    global_repair = None
     if args.resume_from:
         from tools.validation_resume import adopt_cold_probe
 
@@ -391,21 +390,30 @@ def execute(args):
         }
         info["stages"].append(imported_cold)
         write_json(output / "cold64.measurement.json", imported_cold)
-    elif getattr(args, "resume_probes_from", None):
-        from tools.validation_resume import adopt_completed_probes
+    elif getattr(args, "resume_probes_from", None) or getattr(args, "resume_failed_from", None):
+        from tools.validation_resume import (
+            adopt_completed_probes,
+            adopt_failed_validation,
+        )
 
+        failed_from = getattr(args, "resume_failed_from", None)
+        previous = failed_from or args.resume_probes_from
         expected_configs = {}
-        for name in ("cold64", "warm64", "fit64"):
+        names = ("cold64", "warm64", "fit64")
+        if failed_from:
+            names += ("hosted20", "global300")
+        for name in names:
             expected, _ = validation_config(
                 base,
                 case,
                 lock_root,
                 training,
                 mode="global_alignment",
-                cap=64,
-                hosted=False,
-                fit=name == "fit64",
-                evaluate=False,
+                cap=300 if name == "global300" else 20 if name == "hosted20" else 64,
+                hosted=name in {"hosted20", "global300"},
+                fit=name in {"fit64", "global300"},
+                evaluate=name == "global300",
+                generate_rationales=getattr(args, "generate_rationales", False),
             )
             expected_configs[name] = harness._bind_model_lock_revisions(
                 expected,
@@ -413,25 +421,44 @@ def execute(args):
                 require_complete=True,
                 hosted_only=True,
             )
-        imported_probes, prior_elapsed = adopt_completed_probes(
-            args.resume_probes_from.resolve(),
-            output,
+        options = dict(
             campaign_sha256=info["campaign_sha256"],
             expected_configs=expected_configs,
             materialize=args.execute,
         )
+        if failed_from:
+            imported_probes, prior_elapsed, global_repair = adopt_failed_validation(
+                previous.resolve(), output, **options
+            )
+        else:
+            imported_probes, prior_elapsed = adopt_completed_probes(
+                previous.resolve(), output, **options
+            )
         imported_cold = imported_probes["cold64"]
-        prior_usage = imported_cold["adoption_evidence"]["prior_hosted_usage"]
+        evidence = imported_cold["adoption_evidence"]
+        previous_usage = evidence["prior_hosted_usage"]
+        copied_usage = evidence.get("prior_ledger_usage", {})
+        prior_usage = {
+            key: value - copied_usage.get(key, 0) for key, value in previous_usage.items()
+        }
+        if any(value < 0 for value in prior_usage.values()):
+            raise ValueError("Copied hosted usage exceeds the retained cumulative charges")
         if (
             prior_usage["attempts"] >= args.requests_cap
             or prior_usage["prompt_tokens"] + prior_usage["completion_tokens"] >= args.tokens_cap
         ):
             raise ValueError("Hosted allowance must exceed retained prior usage")
         info["resume"] = {
-            "from": str(args.resume_probes_from.resolve()),
+            "from": str(previous.resolve()),
             "previous_elapsed_seconds": prior_elapsed,
-            "previous_hosted_usage": prior_usage,
-            "scope": "Reuse verified local probes; remeasure hosted20 with fresh responses and current rationale policy",
+            "previous_hosted_usage": previous_usage,
+            "copied_hosted_usage": copied_usage,
+            "scope": (
+                "Reuse completed probes and restore the verified output-repair checkpoint"
+                if failed_from
+                else "Reuse verified local probes; remeasure hosted20 with fresh responses"
+            ),
+            "global_repair": global_repair,
         }
         for name, row in imported_probes.items():
             info["stages"].append(row)
@@ -460,7 +487,10 @@ def execute(args):
 
     stop = output / "STOP"
     current = {"evaluate": False, "phase": "starting", "worker_calls": 0, "warm_from": None}
+    from exact.experiments.runtime import CellRecovery
+
     original_run = harness._run_subprocess
+    original_prepare = CellRecovery.prepare
     suite = LoadedSuite(
         "g0-validation",
         lock.baseline_id,
@@ -568,7 +598,15 @@ def execute(args):
             code = process.wait()
         return code, time.monotonic() - wall_start, peak // 1024
 
+    def prepare(recovery):
+        original_prepare(recovery)
+        if recovery.metadata.get("checkpoint_repair"):
+            from tools.validation_resume import seed_repaired_checkpoint
+
+            seed_repaired_checkpoint(recovery.metadata, recovery.cell.output_dir)
+
     harness._run_subprocess = run
+    CellRecovery.prepare = prepare
     cells = {}
 
     def stage(
@@ -582,6 +620,7 @@ def execute(args):
         resume_from=None,
         interrupt=False,
         warm_from=None,
+        repair_metadata=None,
     ):
         if stop.exists():
             raise InterruptedError("Validation STOP exists; completed artifacts retained")
@@ -612,6 +651,8 @@ def execute(args):
         }
         if resume_from:
             metadata["resume_from"] = str(cells[resume_from].output_dir.parent)
+        if repair_metadata:
+            metadata.update(repair_metadata)
         cell = RunCell(
             "g0-validation",
             "E00" if evaluate else "G0",
@@ -690,7 +731,7 @@ def execute(args):
             )
         if "warm64" not in imported_probes:
             stage("warm64", cap=64, hosted=False, warm_from=cold["output_dir"])
-        if not args.skip_hosted:
+        if not args.skip_hosted and "hosted20" not in imported_probes:
             stage("hosted20", cap=20, hosted=True)
         fitted = imported_probes.get("fit64") or stage("fit64", cap=64, hosted=False, fit=True)
         fits = list(Path(fitted["output_dir"]).glob("fitting/**/training_units.json"))
@@ -717,7 +758,14 @@ def execute(args):
                 "Measured conservative production-validation forecast exceeds the remaining foundation limits."
             )
         else:
-            stage("global300", cap=300, hosted=True, fit=True, evaluate=True)
+            stage(
+                "global300",
+                cap=300,
+                hosted=True,
+                fit=True,
+                evaluate=True,
+                repair_metadata=global_repair,
+            )
             stage("global300-stop", cap=300, hosted=True, fit=True, evaluate=True, interrupt=True)
             stage(
                 "global300-resume",
@@ -751,6 +799,10 @@ def execute(args):
                 mode="local_ranking",
                 resume_from="local300",
             )
+            if (cells["local300-replay"].output_dir / "alignment/maps_local.tsv").read_bytes() != (
+                cells["local300"].output_dir / "alignment/maps_local.tsv"
+            ).read_bytes():
+                raise ValueError("Local relocation replay changed mappings")
             if replay["new_worker_calls"] or replay["new_usage"]["attempts"]:
                 raise ValueError("Completed local replay performed new model work")
             info["status"] = "passed"
@@ -765,6 +817,7 @@ def execute(args):
         )
     finally:
         harness._run_subprocess = original_run
+        CellRecovery.prepare = original_prepare
         info.update(
             ended_at=time.time(),
             elapsed_seconds=elapsed_seconds(),
@@ -791,6 +844,11 @@ def main():
         "--resume-probes-from",
         type=Path,
         help="Reuse verified cold64/warm64/fit64 from a budget-blocked G0; remeasure hosted20",
+    )
+    recovery.add_argument(
+        "--resume-failed-from",
+        type=Path,
+        help="Recover verified completed probes and global300 after the source-decision writer failure",
     )
     parser.add_argument(
         "--api-key-file",

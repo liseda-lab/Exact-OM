@@ -98,11 +98,28 @@ experiments unless explicitly requested; matching and numerical explanation trac
 unchanged. The non-rationale subtotal of G0-06 was 133 requests/19,779 tokens/USD 0.00401265,
 including its one validation-only probe; this is not a newly measured rationale-free run.
 
-G0-07 restart is configured with `/tmp/exact-native-candidate/bin/python`,
-tmux `exact-g0-07`, output `data/experiments-v2/g0-validation-07/`. Its plan adopts
-verified G0-06 cold/warm/fit artifacts with their original timings, measures hosted20 with
-rationales off, and retains all historical spend. Time forecasts remain conservative estimates;
-finite hosted caps still govern admission. The long scientific campaign remains unadmitted.
+G0-07 reused the verified cold/warm/fit probes and passed hosted20 with rationales off.
+Global300 completed 5,842 scored candidate pairs and wrote 300 mappings, then failed in the
+source-decision audit writer: renaming both dataset `Scores` and `Score` to `S_final` created
+duplicate columns. This was an output-writing failure, not resource exhaustion. The failed
+attempt, completed checkpoint, original measurements and historical hosted charges remain
+under `data/experiments-v2/g0-validation-07/`.
+
+The writer repair (`1ed45c3`) preserves the existing exact-score precedence and validates
+entity aliases. All 23 focused export/replay tests pass. A label-free replay of the actual saved
+G0 artifacts reproduced the failure and verified the repair: 300 source records, 6,000 audit
+candidates (158 protected exact), unchanged final scores and the same 300 emitted mappings,
+without model calls. Hashed evidence is in `data/experiments-v2/g0-audit-repair-01/`.
+
+On 2026-09-17 the user authorized repair and rerun. G0-08 recovery is configured with
+`/tmp/exact-native-candidate/bin/python`, tmux `exact-g0-08`, output
+`data/experiments-v2/g0-validation-08/`; this configuration does not itself establish launch.
+It adopts verified completed probes and repairs outputs from the completed global300
+checkpoint only after strict input/configuration checks and an AST check limiting the
+production change to the audit writer. Historical costs and original cold/warm/fit timings
+remain charged. Rationales remain off, with no wall deadline and the unchanged finite
+100,000-request/32-million-token allowance. The remaining global/local and recovery checks
+must pass before G0 is complete. The long scientific campaign remains unadmitted.
 See [G0-VALIDATION.md](G0-VALIDATION.md) for monitor/STOP commands and retained history;
 `status.json` and `report.json` remain authoritative for progress and completion.
 
