@@ -82,7 +82,17 @@ class AuditIOMixin:
                     for row in self.results_json or []
                 ]
             )
-        frame = frame.rename(columns={"src_iri": "Src", "tgt_iri": "Tgt"}).copy()
+        frame = frame.copy()
+        for alias, column in (("src_iri", "Src"), ("tgt_iri", "Tgt")):
+            if alias not in frame:
+                continue
+            if column in frame:
+                populated = frame[column].notna() & frame[alias].notna()
+                if (frame.loc[populated, column] != frame.loc[populated, alias]).any():
+                    raise ValueError(f"Conflicting source-decision columns: {column} and {alias}")
+                frame[column] = frame[column].combine_first(frame[alias])
+            else:
+                frame = frame.rename(columns={alias: column})
         if "Src" not in frame or "Tgt" not in frame:
             frame = pd.DataFrame(columns=["Src", "Tgt", "S_final"])
         dataset_frame = getattr(self.dataset, "dataframe", None)
@@ -92,8 +102,14 @@ class AuditIOMixin:
             protected = set(exact[["Src", "Tgt"]].itertuples(index=False, name=None))
             present = set(frame[["Src", "Tgt"]].itertuples(index=False, name=None))
             absent = [tuple(row) not in present for row in exact[["Src", "Tgt"]].values]
-            exact = exact.loc[absent].rename(columns={"Scores": "S_final", "Score": "S_final"})
-            frame = pd.concat([frame, exact], ignore_index=True)
+            exact = exact.loc[absent].copy()
+            if not exact.empty:
+                # Match apply_prefilter/extraction: Scores is the exact confidence;
+                # Score may coexist as unrelated candidate metadata (including NaN).
+                score_column = next((name for name in ("Scores", "Score") if name in exact), None)
+                if score_column is not None:
+                    exact["S_final"] = exact[score_column]
+                frame = pd.concat([frame, exact], ignore_index=True)
         before_typing = {
             (str(item.head), str(item.tail)): float(item.score) for item in predictions
         }

@@ -81,14 +81,20 @@ def test_pair_explanations_reconstruct_every_llm_mixture_without_encoder(
     assert stats["explanation_reconstruction"]["failed_rows"] == 0
 
 
-def test_source_trace_is_after_target_cardinality_and_keeps_empty_and_exact_sources(tmp_path):
+@pytest.mark.parametrize(
+    "exact_scores", [{"Scores": 1.0}, {"Score": 1.0}, {"Scores": 1.0, "Score": 0.1}]
+)
+@pytest.mark.parametrize("exact_already_present", [False, True])
+def test_source_trace_is_after_target_cardinality_and_keeps_empty_and_exact_sources(
+    tmp_path, exact_scores, exact_already_present
+):
     dataset = _Dataset()
     dataset.eligible_source_iris = ["empty", "exact", "s1", "s2"]
     dataset.dataframe = pd.DataFrame(
         {
             "Src": ["exact", "s1", "s2"],
             "Tgt": ["t0", "t1", "t1"],
-            "Scores": [1.0, 0.9, 0.8],
+            **{column: [score, 0.9, 0.8] for column, score in exact_scores.items()},
             DatasetMask.prefiltered: [True, False, False],
         }
     )
@@ -102,6 +108,8 @@ def test_source_trace_is_after_target_cardinality_and_keeps_empty_and_exact_sour
             "S_final": [0.9, 0.8],
         }
     )
+    if exact_already_present:
+        runner._final_candidate_frame.loc[len(runner._final_candidate_frame)] = ["exact", "t0", 1.0]
     runner._decision_policy = {
         "threshold": 0.7,
         "source_cardinality": 1,
@@ -120,11 +128,56 @@ def test_source_trace_is_after_target_cardinality_and_keeps_empty_and_exact_sour
     assert trace["source_universe"] == dataset.eligible_source_iris
     assert trace["reference_labels_used"] is False
     assert rows["empty"]["empty_candidate_pool"]
-    assert rows["exact"]["candidates"][0]["protected_exact"]
+    exact = rows["exact"]["candidates"]
+    assert len(exact) == 1
+    assert exact[0]["protected_exact"]
+    assert exact[0]["threshold_positive"]
+    assert exact[0]["S_final"] == 1.0
+    assert exact[0]["emitted"]
+    assert next(item.score for item in predictions if item.head == "exact") == 1.0
     assert rows["s1"]["emitted_targets"] == ["t1"]
     assert rows["s2"]["emitted_targets"] == []
     assert rows["s2"]["candidates"][0]["reason"] == "cardinality_or_extraction"
     assert rows["s2"]["competing_sources_by_target"] == {"t1": ["s1"]}
+
+
+@pytest.mark.parametrize("alias,column", [("src_iri", "Src"), ("tgt_iri", "Tgt")])
+@pytest.mark.parametrize("canonical_value", ["same", None])
+def test_source_trace_coalesces_consistent_identity_aliases(
+    tmp_path, alias, column, canonical_value
+):
+    runner = SemanticAlignmentRunner(
+        dataset=_Dataset(), model=_Model, device=torch.device("cpu"), output_dir=tmp_path
+    )
+    frame = pd.DataFrame([{"Src": "source", "Tgt": "target", "S_final": 0.9}])
+    frame[alias] = frame[column]
+    if canonical_value is None:
+        frame[column] = None
+    runner._final_candidate_frame = frame
+    original = frame.copy(deep=True)
+    paths = runner.save_results(
+        [EntityMapping("source", "target", score=0.9)], output_formats=["tsv-global"]
+    )
+    record = json.loads(paths["source_decisions_json"].read_text())["records"][0]
+    assert record["Src"] == "source"
+    assert record["emitted_targets"] == ["target"]
+    assert record["candidates"][0]["S_final"] == 0.9
+    pd.testing.assert_frame_equal(frame, original)
+
+
+@pytest.mark.parametrize("alias,column", [("src_iri", "Src"), ("tgt_iri", "Tgt")])
+def test_source_trace_rejects_conflicting_identity_aliases(tmp_path, alias, column):
+    runner = SemanticAlignmentRunner(
+        dataset=_Dataset(), model=_Model, device=torch.device("cpu"), output_dir=tmp_path
+    )
+    runner._final_candidate_frame = pd.DataFrame(
+        [{"Src": "source", "Tgt": "target", alias: "different", "S_final": 0.9}]
+    )
+    with pytest.raises(
+        ValueError, match=f"Conflicting source-decision columns: {column} and {alias}"
+    ):
+        runner._write_source_decisions([], pd.DataFrame())
+    assert not (tmp_path / "source_decisions.json").exists()
 
 
 @pytest.mark.parametrize("quality", ["candidate_margin", "entropy"])
