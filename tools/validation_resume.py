@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import ast
+import hashlib
 import json
 import math
 import os
 import shutil
 import sqlite3
+import subprocess
 import tempfile
 from copy import deepcopy
 from pathlib import Path
@@ -15,10 +18,14 @@ from typing import Any
 from exact.core.entities.configs.yaml_io import load_yaml_mapping
 from exact.experiments.harness import hash_payload
 from exact.experiments.recovery import ArtifactStore
+from exact.experiments.runtime import _code_identity
 from exact.llm.ledger import RequestLedger
 from exact.ontology.versions import ontology_execution_identity
 from exact.utils.fitted_artifacts import freeze_json
 from exact.utils.provenance import sha256_file
+
+REPOSITORY = Path(__file__).resolve().parents[1]
+AUDIT_FILE = "exact/impl/trainer/audit_io.py"
 
 DATASET_FILES = tuple(
     f"dataset/{name}"
@@ -87,10 +94,8 @@ def _configuration(saved_run: Path) -> dict:
     return config
 
 
-def _verify_usage(previous: Path, expected: dict) -> None:
-    """Check historical charges without opening a writable ledger or exposing prompts."""
-    if not isinstance(expected, dict) or set(expected) != set(USAGE_KEYS):
-        raise ValueError("Saved cumulative hosted usage is missing")
+def _ledger_usage(previous: Path) -> dict:
+    """Read charges without opening a writable ledger or exposing prompts."""
     path = previous / "shared/openrouter/requests.sqlite3"
     with sqlite3.connect(path.resolve().as_uri() + "?mode=ro", uri=True) as db:
         rows = db.execute(
@@ -107,6 +112,13 @@ def _verify_usage(previous: Path, expected: dict) -> None:
             actual["unpriced_attempts"] += 1
         else:
             actual["reported_cost_usd"] += float(usage["cost"])
+    return actual
+
+
+def _verify_usage(previous: Path, expected: dict) -> None:
+    if not isinstance(expected, dict) or set(expected) != set(USAGE_KEYS):
+        raise ValueError("Saved cumulative hosted usage is missing")
+    actual = _ledger_usage(previous)
     if any(
         (
             not math.isclose(actual[key], expected[key], rel_tol=0, abs_tol=1e-12)
@@ -145,7 +157,11 @@ def _copy_shared(
                         raise ValueError(f"Invalid shared SQLite cache: {relative}")
         roles = RequestLedger(temporary / "openrouter").summary()["roles"]
         usage = {key: sum(item[key] for item in roles.values()) for key in USAGE_KEYS}
-        if usage != (expected_usage if reuse_hosted else dict.fromkeys(USAGE_KEYS, 0)):
+        expected_copy = expected_usage if reuse_hosted else dict.fromkeys(USAGE_KEYS, 0)
+        if any(
+            not math.isclose(usage[key], expected_copy[key], rel_tol=0, abs_tol=1e-12)
+            for key in USAGE_KEYS
+        ):
             raise ValueError("Copied request ledger has unexpected cumulative usage")
         for path in temporary.rglob("*.sqlite3"):
             with path.open("rb") as stream:
@@ -456,3 +472,335 @@ def seed_warm_dataset(saved_run: Path, worker_output: Path) -> dict[str, str]:
             shutil.copyfile(store.root / extraction["outputs"][name]["path"], temporary)
             temporary.replace(target)
     return copied
+
+
+def _source_at_revision(revision: str, relative: str) -> bytes:
+    if len(revision) != 40 or any(c not in "0123456789abcdef" for c in revision):
+        raise ValueError("Repair requires the original full Git revision")
+    return subprocess.check_output(["git", "show", f"{revision}:{relative}"], cwd=REPOSITORY)
+
+
+def _audit_repair_compatibility(original: dict, current: dict, revision: str) -> None:
+    """Prove every extraction file except the output-writer body is unchanged."""
+    old, new = original["files"], current["files"]
+    changed = {name for name in old.keys() | new.keys() if old.get(name) != new.get(name)}
+    if changed != {AUDIT_FILE}:
+        raise ValueError(f"Output repair has unrelated implementation changes: {sorted(changed)}")
+    previous = _source_at_revision(revision, AUDIT_FILE)
+    if hashlib.sha256(previous).hexdigest() != old[AUDIT_FILE]:
+        raise ValueError("Original audit source does not match checkpoint implementation")
+
+    def outside_writer(source: bytes) -> str:
+        tree = ast.parse(source)
+        methods = [
+            method
+            for item in tree.body
+            if isinstance(item, ast.ClassDef) and item.name == "AuditIOMixin"
+            for method in item.body
+            if isinstance(method, ast.FunctionDef) and method.name == "_write_source_decisions"
+        ]
+        if len(methods) != 1:
+            raise ValueError("Expected exactly one audit writer method")
+        methods[0].body = [ast.Pass()]
+        return ast.dump(tree, include_attributes=False)
+
+    if outside_writer(previous) != outside_writer((REPOSITORY / AUDIT_FILE).read_bytes()):
+        raise ValueError("Output repair changes code outside the audit writer body")
+
+
+def _hosted_configuration(saved_run: Path, expected: dict, *, cap: int) -> dict:
+    config = dict(load_yaml_mapping(saved_run / "_inputs/resolved.config.yaml"))
+    normalized = deepcopy(expected)
+    for parent, field in (("data", "train_candidates"), ("refs", "train")):
+        old = config.get("data", {})
+        new = normalized.get("data", {})
+        if parent == "refs":
+            old, new = old.get("refs", {}), new.get("refs", {})
+        if old.get(field) != new.get(field):
+            if not old.get(field) or not new.get(field):
+                raise ValueError("Hosted probe training binding changed")
+            if sha256_file(Path(old[field])) != sha256_file(Path(new[field])):
+                raise ValueError("Hosted probe training bytes changed")
+            new[field] = old[field]
+    scorers = [
+        item
+        for item in config.get("pipeline", [])
+        if item.get("name") == "PairAdaptiveSemanticScorer"
+    ]
+    if (
+        config.get("run", {}).get("source_cap") != cap
+        or config.get("run", {}).get("seed") != 17
+        or config.get("data", {}).get("execution_mode") != "global_alignment"
+        or not scorers
+        or any(
+            item.get("params", {}).get("use_llm") is not True
+            or item.get("params", {}).get("generate_llm_rationales") is not False
+            for item in scorers
+        )
+        or hash_payload(config) != hash_payload(normalized)
+    ):
+        raise ValueError("Hosted probe configuration or rationale policy changed")
+    return config
+
+
+def _repair_checkpoint(record: dict) -> tuple[ArtifactStore, dict]:
+    store = ArtifactStore(Path(record["source_root"]))
+    if (
+        sha256_file(store.root / "run/experiment_manifest.json")
+        != record["original_manifest_sha256"]
+    ):
+        raise ValueError("Original repair run manifest changed")
+    path = (
+        store.directory / "checkpoints" / record["artifact_id"] / f"{record['sequence']:08d}.json"
+    )
+    if sha256_file(path) != record["checkpoint_sha256"]:
+        raise ValueError("Original repair checkpoint manifest changed")
+    checkpoint = store.latest_checkpoint(record["artifact_id"])
+    if checkpoint is None or checkpoint["sequence"] != record["sequence"]:
+        raise ValueError("Declared repair checkpoint or its bytes are unavailable")
+    cursor = checkpoint["cursor"]
+    if (
+        not isinstance(cursor.get("dataset_rows"), int)
+        or cursor["dataset_rows"] <= 0
+        or cursor.get("next_pair") != cursor["dataset_rows"]
+        or len(checkpoint["completed_ids"]) != cursor["dataset_rows"]
+    ):
+        raise ValueError("Output repair requires completed pair inference")
+    additional = [
+        name
+        for name in checkpoint["outputs"]
+        if name.startswith("checkpoints/inference_additional_models_") and name.endswith(".json")
+    ]
+    if len(additional) != 1:
+        raise ValueError("Output repair requires one completed selector checkpoint")
+    item = checkpoint["outputs"][additional[0]]
+    selector = json.loads((store.root / item["path"]).read_text())
+    if (
+        selector.get("complete") is not True
+        or selector.get("candidate_records_count") != cursor["dataset_rows"]
+    ):
+        raise ValueError("Output repair selector checkpoint is incomplete")
+    if not {*DATASET_FILES, additional[0] + "l.zst"}.issubset(checkpoint["outputs"]):
+        raise ValueError("Output repair lacks its frozen dataset or selector rows")
+    return store, checkpoint
+
+
+def seed_repaired_checkpoint(metadata: dict, worker_output: Path) -> dict:
+    """Restore original checkpoint bytes after prepare, before continuation detection.
+
+    The caller declares extraction/evaluation repair through the ordinary repair plan.
+    This does not publish a completed artifact or rename the original checkpoint ID.
+    """
+    record = metadata["checkpoint_repair"]
+    store, checkpoint = _repair_checkpoint(record)
+    runtime_path = worker_output / "recovery-runtime.json"
+    runtime = json.loads(runtime_path.read_text())
+    original, current = checkpoint["identity"], runtime["identity"]
+    omit = {"artifact_id", "implementation"}
+    if {k: v for k, v in original.items() if k not in omit} != {
+        k: v for k, v in current.items() if k not in omit
+    }:
+        raise ValueError("Repaired extraction inputs, parameters or dependencies changed")
+    if current["implementation"] != _code_identity(REPOSITORY, evaluation=False):
+        raise ValueError("Current repair runtime identity differs from executable source")
+    _audit_repair_compatibility(
+        original["implementation"], current["implementation"], record["original_revision"]
+    )
+    allowed = {"checkpoints", "dataset", "fitting", "explanations"}
+    if any(
+        Path(name).parts[0] not in allowed and name not in {"timings.json", "source_decisions.json"}
+        for name in checkpoint["outputs"]
+    ):
+        raise ValueError("Repair checkpoint contains outputs outside inference state")
+    restored = store.restore_checkpoint(checkpoint, worker_output)
+    evidence = {
+        "original_identity": original,
+        "current_identity": current,
+        "original_checkpoint": record,
+        "restored_outputs": {name: checkpoint["outputs"][name]["sha256"] for name in restored},
+        "scope": "completed inference retained; output writer and evaluation rerun",
+        "new_inference_measurement": False,
+    }
+    freeze_json(worker_output / "checkpoint-repair.json", evidence)
+    return evidence
+
+
+def adopt_failed_validation(
+    previous: Path,
+    output: Path,
+    *,
+    campaign_sha256: str,
+    expected_configs: dict[str, dict],
+    materialize: bool = True,
+) -> tuple[dict[str, dict], float, dict]:
+    """Adopt G0's unchanged probes and declare the completed-inference output repair."""
+    previous, output = previous.resolve(), output.resolve()
+    if output == previous or output.is_relative_to(previous) or previous.is_relative_to(output):
+        raise ValueError("Resume output must be separate from the saved validation root")
+    if set(expected_configs) != {"cold64", "warm64", "fit64", "hosted20", "global300"}:
+        raise ValueError("Failed validation adoption requires exactly five expected configurations")
+    report_path = previous / "report.json"
+    report = json.loads(report_path.read_text())
+    if (
+        report.get("status") != "failed"
+        or report.get("campaign_sha256") != campaign_sha256
+        or not str(report.get("reason", "")).startswith("RuntimeError: global300:")
+    ):
+        raise ValueError("Only this campaign's global300 output failure can be repaired")
+    elapsed = _positive(report.get("elapsed_seconds"), "prior cumulative elapsed")
+    origin = Path(report["resume"]["from"]).resolve()
+    origin_report_path = origin / "report.json"
+    origin_report = json.loads(origin_report_path.read_text())
+    if (
+        report["resume"].get("previous_elapsed_seconds") != origin_report["elapsed_seconds"]
+        or report["resume"].get("previous_hosted_usage") != origin_report["hosted_usage"]
+    ):
+        raise ValueError("Imported historical charges or elapsed evidence changed")
+    inherited, _ = adopt_completed_probes(
+        origin,
+        output,
+        campaign_sha256=campaign_sha256,
+        expected_configs={name: expected_configs[name] for name in ("cold64", "warm64", "fit64")},
+        materialize=False,
+    )
+    ledger_usage = _ledger_usage(previous)
+    usage = report["hosted_usage"]
+    expected_usage = {
+        key: ledger_usage[key] + origin_report["hosted_usage"][key] for key in USAGE_KEYS
+    }
+    if (
+        any(
+            not math.isclose(usage[key], expected_usage[key], rel_tol=0, abs_tol=1e-12)
+            for key in USAGE_KEYS
+        )
+        or usage["unknown"]
+        or usage["unpriced_attempts"]
+    ):
+        raise ValueError("Cumulative hosted charges differ from current and historical ledgers")
+    rows = {}
+    for name in expected_configs:
+        matches = [row for row in report["stages"] if row.get("id") == name]
+        if len(matches) != 1:
+            raise ValueError(f"Expected exactly one saved {name} measurement")
+        row = matches[0]
+        measurement_path = previous / f"{name}.measurement.json"
+        if row != json.loads(measurement_path.read_text()):
+            raise ValueError("Saved report and stage measurement differ")
+        if name in inherited:
+            evidence = row.get("adoption_evidence", {})
+            if evidence.get("previous_report_sha256") != sha256_file(origin_report_path) or {
+                k: v for k, v in row.items() if k != "adoption_evidence"
+            } != {k: v for k, v in inherited[name].items() if k != "adoption_evidence"}:
+                raise ValueError("Imported completed measurement or original evidence changed")
+        else:
+            run = previous / name / "run"
+            config = _hosted_configuration(
+                run, expected_configs[name], cap=20 if name == "hosted20" else 300
+            )
+            manifest = json.loads((run / "experiment_manifest.json").read_text())
+            worker = json.loads((run / "validation-worker.json").read_text())
+            complete = name == "hosted20"
+            if (
+                Path(row["output_dir"]).resolve() != run
+                or Path(row["manifest"]).resolve() != run / "experiment_manifest.json"
+                or row["worker_measurement"] != worker
+                or worker.get("return_code") != (0 if complete else 1)
+                or row.get("status") != ("complete" if complete else "failed")
+                or manifest.get("status") != row["status"]
+                or manifest.get("experiment_config_hash") != campaign_sha256
+                or manifest.get("resolved_config_hash") != hash_payload(config)
+                or not elapsed
+                >= _positive(row["wall_seconds"], "probe wall")
+                >= _positive(worker["wall_seconds"], "worker wall")
+            ):
+                raise ValueError("Hosted stage does not bind the original worker and configuration")
+            if complete:
+                _, artifact = _verified_extraction(run)
+                if artifact["identity"]["dependencies"].get(
+                    "ontology_artifacts"
+                ) != ontology_execution_identity(
+                    str(config.get("dataset", {}).get("reasoner", "asserted"))
+                ):
+                    raise ValueError("Hosted probe native implementation changed")
+            else:
+                stderr = (run / "experiment.stderr.log").read_text()
+                if (
+                    "audit_io.py" not in stderr
+                    or "InvalidIndexError: Reindexing only valid with uniquely valued Index objects"
+                    not in stderr
+                ):
+                    raise ValueError("Saved failure is not the audited output-column collision")
+                identity = json.loads((run / "recovery-runtime.json").read_text())["identity"]
+                store = ArtifactStore(run.parent)
+                checkpoint = store.latest_checkpoint(identity["artifact_id"])
+                if checkpoint is None or checkpoint["identity"] != identity:
+                    raise ValueError("Failed stage has no verified matching inference checkpoint")
+                checkpoint_path = (
+                    store.directory
+                    / "checkpoints"
+                    / identity["artifact_id"]
+                    / f"{checkpoint['sequence']:08d}.json"
+                )
+                record = {
+                    "source_root": str(store.root),
+                    "artifact_id": identity["artifact_id"],
+                    "sequence": checkpoint["sequence"],
+                    "checkpoint_sha256": sha256_file(checkpoint_path),
+                    "original_revision": manifest["git"]["commit"],
+                    "original_manifest_sha256": sha256_file(run / "experiment_manifest.json"),
+                    "original_wall_seconds": row["wall_seconds"],
+                }
+                _repair_checkpoint(record)
+                _audit_repair_compatibility(
+                    identity["implementation"],
+                    _code_identity(REPOSITORY, evaluation=False),
+                    record["original_revision"],
+                )
+                repair = {
+                    "resume_from": str(store.root),
+                    "checkpoint_repair": record,
+                    "repair_record": {
+                        "kind": "g0_completed_inference_output_repair",
+                        "affected_stages": ["extraction"],
+                        "scientific_choices_unchanged": True,
+                        "reporting_labels_exposed": True,
+                        "exposure_scope": "development evaluator smoke; no private/final labels",
+                        "original_checkpoint": record,
+                    },
+                }
+                continue
+        adopted = deepcopy(row)
+        adopted.update(imported=True, new_worker_calls=0, new_usage=dict.fromkeys(USAGE_KEYS, 0))
+        adopted["measurement_usage"] = row.get("measurement_usage", row["new_usage"])
+        adopted["adoption_evidence"] = {
+            **row.get("adoption_evidence", {}),
+            "previous_report": str(report_path),
+            "previous_report_sha256": sha256_file(report_path),
+            "original_measurement_sha256": sha256_file(measurement_path),
+            "prior_elapsed_seconds": elapsed,
+            "prior_hosted_usage": usage,
+            "prior_ledger_usage": ledger_usage,
+            "prior_limits": report.get("limits"),
+            "hosted_cache_reused": True,
+        }
+        rows[name] = adopted
+    measured_usage = {
+        key: sum(row["new_usage"][key] for row in report["stages"]) for key in USAGE_KEYS
+    }
+    if any(
+        not math.isclose(measured_usage[key], ledger_usage[key], rel_tol=0, abs_tol=1e-12)
+        for key in USAGE_KEYS
+    ):
+        raise ValueError("Stage request measurements differ from copied ledger usage")
+    incremental_wall = sum(
+        row["wall_seconds"] for row in report["stages"] if row.get("new_worker_calls") == 1
+    )
+    if elapsed < origin_report["elapsed_seconds"] + incremental_wall:
+        raise ValueError("Prior elapsed time omits completed or failed worker charges")
+    if materialize:
+        backups = _copy_shared(previous, output, ledger_usage, reuse_hosted=True)
+        for name, row in rows.items():
+            row["adoption_evidence"]["shared_backups"] = backups
+            freeze_json(output / f"{name}.adoption.json", row)
+        freeze_json(output / "global300.repair.json", repair)
+    return rows, elapsed, repair

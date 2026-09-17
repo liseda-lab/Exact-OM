@@ -460,3 +460,287 @@ def test_completed_probe_adoption_rejects_changed_evidence(
             previous, tmp_path / "new", campaign_sha256=campaign, expected_configs=configs
         )
     assert not (tmp_path / "new/shared").exists()
+
+
+@pytest.fixture
+def failed_validation(completed, tmp_path, monkeypatch):
+    from tools import validation_resume as resume
+
+    origin, configs, campaign, _ = completed
+    previous = tmp_path / "failed"
+    adopted, _ = resume.adopt_completed_probes(
+        origin, previous, campaign_sha256=campaign, expected_configs=configs
+    )
+    origin_report = json.loads((origin / "report.json").read_text())
+    rows = list(adopted.values())
+    for row in rows:
+        (previous / f"{row['id']}.measurement.json").write_text(json.dumps(row))
+    ledger = RequestLedger(previous / "shared/openrouter")
+    key = ledger.plan({"role": "decision", "payload": {"max_tokens": 3}})
+    attempt = ledger.sent(key)
+    ledger.received(key, attempt, b'{"response":"rationale-free"}', 200)
+    ledger.usage(key, attempt, {"prompt_tokens": 7, "completion_tokens": 1, "cost": 0.002})
+    local_usage = resume._ledger_usage(previous)
+    native = resume.ontology_execution_identity("asserted")
+    repository = tmp_path / "repository"
+    audit = repository / resume.AUDIT_FILE
+    audit.parent.mkdir(parents=True)
+    old_code = b"class AuditIOMixin:\n def _write_source_decisions(self):\n  return 'old'\n def untouched(self):\n  return 42\n"
+    audit.write_bytes(old_code)
+    monkeypatch.setattr(resume, "REPOSITORY", repository)
+    monkeypatch.setattr(resume, "_source_at_revision", lambda *_: old_code)
+    old_implementation = resume._code_identity(repository, evaluation=False)
+    audit.write_bytes(old_code.replace(b"'old'", b"'fixed'"))
+    expected = deepcopy(configs)
+    for name, cap in (("hosted20", 20), ("global300", 300)):
+        run = previous / name / "run"
+        (run / "_inputs").mkdir(parents=True)
+        config = deepcopy(configs["cold64"])
+        config["run"]["source_cap"] = cap
+        config["pipeline"][0]["params"]["use_llm"] = True
+        expected[name] = config
+        (run / "_inputs/resolved.config.yaml").write_text(yaml.safe_dump(config))
+        outputs = {name: b"saved bytes" for name in resume.DATASET_FILES}
+        outputs.update(
+            {
+                "alignment/maps_global.tsv": b"mapping",
+                "source_decisions.json": b"{}",
+                "timings.json": b"[]",
+            }
+        )
+        complete = name == "hosted20"
+        store = ArtifactStore(run.parent)
+        identity = stage_identity(
+            "extraction",
+            parameters={"configuration": config},
+            inputs={},
+            role="development",
+            entity_kind="all",
+            implementation=old_implementation,
+            dependencies={"ontology_artifacts": native},
+            seed=17,
+        )
+        if complete:
+            store.publish(identity, outputs)
+        else:
+            outputs = {
+                name: data for name, data in outputs.items() if not name.startswith("alignment/")
+            }
+            outputs.update(
+                {
+                    "checkpoints/inference_1.json": b'{"processed_examples":2}',
+                    "checkpoints/inference_additional_models_1.json": json.dumps(
+                        {"complete": True, "candidate_records_count": 2}
+                    ).encode(),
+                    "checkpoints/inference_additional_models_1.jsonl.zst": b"two saved rows",
+                }
+            )
+            store.checkpoint(
+                identity,
+                completed_ids=["pair1", "pair2"],
+                cursor={"next_pair": 2, "dataset_rows": 2},
+                outputs=outputs,
+            )
+            (run / "experiment.stderr.log").write_text(
+                "audit_io.py\nInvalidIndexError: Reindexing only valid with uniquely valued Index objects"
+            )
+        for relative, data in outputs.items():
+            path = run / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(data)
+        (run / "recovery-runtime.json").write_text(json.dumps({"identity": identity}))
+        worker = {"return_code": 0 if complete else 1, "wall_seconds": 15}
+        (run / "validation-worker.json").write_text(json.dumps(worker))
+        recovery = {"artifacts": {"extraction": identity["artifact_id"]} if complete else {}}
+        manifest = {
+            "status": "complete" if complete else "failed",
+            "experiment_id": "G0",
+            "source_cap": cap,
+            "resolved_config_hash": hash_payload(config),
+            "experiment_config_hash": campaign,
+            "recovery": recovery,
+            "git": {"commit": "a" * 40},
+        }
+        (run / "experiment_manifest.json").write_text(json.dumps(manifest))
+        row = {
+            "id": name,
+            "status": manifest["status"],
+            "source_cap": cap,
+            "hosted": True,
+            "evaluate": not complete,
+            "new_worker_calls": 1,
+            "new_usage": local_usage if complete else dict.fromkeys(resume.USAGE_KEYS, 0),
+            "output_dir": str(run),
+            "manifest": str(run / "experiment_manifest.json"),
+            "wall_seconds": 20,
+            "worker_measurement": worker,
+            "recovery": recovery,
+        }
+        rows.append(row)
+        (previous / f"{name}.measurement.json").write_text(json.dumps(row))
+    report = {
+        "status": "failed",
+        "reason": "RuntimeError: global300: worker failed",
+        "campaign_sha256": campaign,
+        "elapsed_seconds": 700,
+        "stages": rows,
+        "hosted_usage": {
+            k: local_usage[k] + origin_report["hosted_usage"][k] for k in resume.USAGE_KEYS
+        },
+        "resume": {
+            "from": str(origin),
+            "previous_elapsed_seconds": origin_report["elapsed_seconds"],
+            "previous_hosted_usage": origin_report["hosted_usage"],
+        },
+        "limits": {"seconds": None, "requests": 100000, "tokens": 32000000},
+    }
+    (previous / "report.json").write_text(json.dumps(report))
+    return previous, expected, campaign, key
+
+
+def test_failed_adoption_preserves_inherited_measurements_and_copied_ledger_charges(
+    failed_validation, tmp_path
+):
+    from tools import validation_resume as resume
+
+    previous, expected, campaign, key = failed_validation
+    before = {
+        str(p): sha256_file(p)
+        for p in previous.rglob("*")
+        if p.is_file() and not p.name.endswith("-shm")
+    }
+    output = tmp_path / "repaired"
+    rows, elapsed, repair = resume.adopt_failed_validation(
+        previous, output, campaign_sha256=campaign, expected_configs=expected, materialize=False
+    )
+    assert not output.exists() and elapsed == 700
+    rows, elapsed, repair = resume.adopt_failed_validation(
+        previous, output, campaign_sha256=campaign, expected_configs=expected
+    )
+    assert set(rows) == {"cold64", "warm64", "fit64", "hosted20"}
+    assert rows["hosted20"]["measurement_usage"]["attempts"] == 1
+    for row in rows.values():
+        assert row["new_worker_calls"] == 0 and not any(row["new_usage"].values())
+        assert row["adoption_evidence"]["prior_hosted_usage"]["attempts"] == 2
+        assert row["adoption_evidence"]["prior_ledger_usage"]["attempts"] == 1
+    assert (
+        RequestLedger(output / "shared/openrouter").cached(key) == b'{"response":"rationale-free"}'
+    )
+    assert repair["repair_record"]["affected_stages"] == ["extraction"]
+    assert before == {
+        str(p): sha256_file(p)
+        for p in previous.rglob("*")
+        if p.is_file() and not p.name.endswith("-shm")
+    }
+
+
+def _prepared_repair(fixture, tmp_path):
+    from tools import validation_resume as resume
+
+    previous, expected, campaign, _ = fixture
+    _, _, repair = resume.adopt_failed_validation(
+        previous,
+        tmp_path / "new",
+        campaign_sha256=campaign,
+        expected_configs=expected,
+        materialize=False,
+    )
+    old = json.loads((previous / "global300/run/recovery-runtime.json").read_text())["identity"]
+    current = stage_identity(
+        **{
+            k: v
+            for k, v in old.items()
+            if k not in {"artifact_id", "schema_version", "implementation"}
+        },
+        implementation=resume._code_identity(resume.REPOSITORY, evaluation=False),
+    )
+    output = tmp_path / "worker"
+    output.mkdir()
+    (output / "recovery-runtime.json").write_text(json.dumps({"identity": current}))
+    (output / "_locked_inputs").mkdir()
+    (output / "_locked_inputs/current").write_text("current verified input")
+    return repair, output, old, current
+
+
+def test_output_repair_restores_exact_completed_rows_without_relabeling_runtime(
+    failed_validation, tmp_path
+):
+    from tools.validation_resume import seed_repaired_checkpoint
+
+    repair, output, old, current = _prepared_repair(failed_validation, tmp_path)
+    evidence = seed_repaired_checkpoint(repair, output)
+    assert evidence["original_identity"] == old and evidence["current_identity"] == current
+    assert json.loads((output / "recovery-runtime.json").read_text())["identity"] == current
+    assert (output / "_locked_inputs/current").read_text() == "current verified input"
+    assert (
+        output / "checkpoints/inference_additional_models_1.jsonl.zst"
+    ).read_bytes() == b"two saved rows"
+    assert any((output / "checkpoints").iterdir())  # Harness sees a continuation before launch.
+    assert evidence["new_inference_measurement"] is False
+
+
+@pytest.mark.parametrize(
+    "change", ["parameters", "native", "other_file", "other_method", "blob", "checkpoint"]
+)
+def test_output_repair_rejects_scope_and_checkpoint_changes(failed_validation, tmp_path, change):
+    from tools import validation_resume as resume
+
+    repair, output, _, _ = _prepared_repair(failed_validation, tmp_path)
+    path = output / "recovery-runtime.json"
+    runtime = json.loads(path.read_text())
+    if change in {"parameters", "native"}:
+        runtime["identity"]["parameters" if change == "parameters" else "dependencies"][
+            "changed"
+        ] = True
+        path.write_text(json.dumps(runtime))
+    elif change in {"other_file", "other_method"}:
+        audit = resume.REPOSITORY / resume.AUDIT_FILE
+        if change == "other_file":
+            (audit.parent / "scorer.py").write_text("new_scoring = True\n")
+        else:
+            audit.write_text(audit.read_text().replace("return 42", "return 43"))
+        runtime["identity"]["implementation"] = resume._code_identity(
+            resume.REPOSITORY, evaluation=False
+        )
+        path.write_text(json.dumps(runtime))
+    else:
+        store, checkpoint = resume._repair_checkpoint(repair["checkpoint_repair"])
+        path = (
+            store.root / next(iter(checkpoint["outputs"].values()))["path"]
+            if change == "blob"
+            else store.directory
+            / "checkpoints"
+            / checkpoint["identity"]["artifact_id"]
+            / "00000001.json"
+        )
+        path.write_bytes(b"corrupt")
+    with pytest.raises(ValueError):
+        resume.seed_repaired_checkpoint(repair, output)
+    assert not (output / "checkpoints").exists()
+
+
+@pytest.mark.parametrize("change", ["rationale", "charges", "imported_measurement", "failed_kind"])
+def test_failed_adoption_rejects_changed_policy_or_history(failed_validation, tmp_path, change):
+    from tools import validation_resume as resume
+
+    previous, configs, campaign, _ = failed_validation
+    path = previous / "report.json"
+    report = json.loads(path.read_text())
+    if change == "rationale":
+        configs["hosted20"]["pipeline"][0]["params"]["generate_llm_rationales"] = True
+    elif change == "charges":
+        report["hosted_usage"]["attempts"] += 1
+    elif change == "imported_measurement":
+        report["stages"][0]["wall_seconds"] += 1
+        (previous / "cold64.measurement.json").write_text(json.dumps(report["stages"][0]))
+    else:
+        (previous / "global300/run/experiment.stderr.log").write_text("a different worker failure")
+    path.write_text(json.dumps(report))
+    with pytest.raises(ValueError):
+        resume.adopt_failed_validation(
+            previous,
+            tmp_path / "new",
+            campaign_sha256=campaign,
+            expected_configs=configs,
+            materialize=False,
+        )
