@@ -1,6 +1,6 @@
 # Exact-OM experiment programme v2
 
-**Design revision: 2026-09-10 (E04 benchmark-NIL scope). G0 passed 2026-09-18; the first bounded retrieval wave failed during relation verbalisation.**
+**Design revision: 2026-09-10 (E04 benchmark-NIL scope). G0 passed 2026-09-18; the first retrieval wave has an authenticated recovery prepared after its verbaliser failure.**
 See [PREPARATION-STATUS.md](PREPARATION-STATUS.md) for current code, input and operational evidence.
 [FIRST-SCREEN.md](FIRST-SCREEN.md) records the E05 scope and handoff inside the existing interactive allocation.
 [G0-VALIDATION.md](G0-VALIDATION.md) records the detached validation handoff;

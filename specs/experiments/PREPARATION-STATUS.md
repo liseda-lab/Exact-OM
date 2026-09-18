@@ -233,3 +233,9 @@ LLM relation-template path omitted from the zero-hosted-call preflight and recei
 Rationales remained off; no E05 cell completed. The interactive allocation remains alive.
 Later comparisons and final reporting remain gated.
 See [FIRST-SCREEN.md](FIRST-SCREEN.md) for scope, validation, limits and monitoring commands.
+
+Revision 08 corrects E05 relation-verbaliser admission and supplies the updated key explicitly.
+The retry under `first-screen-02/` preserves scientific configurations and uses verified G0
+templates, saved datasets and encoder vectors through the normal recovery checks. Prior failure
+usage and the successful 135-token authentication probe remain charged. The revised conservative
+allowance is 8.28 hours; rationales remain off. `launch-status.json` records actual launch state.

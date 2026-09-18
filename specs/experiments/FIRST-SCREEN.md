@@ -1,93 +1,102 @@
 # First bounded retrieval screen
 
-The user authorized fixing the remaining issues and submitting this wave on 2026-09-18.
-The wave started at **17:59 UTC** inside the existing interactive allocation **14212**,
-as Slurm step **14212.2**, in detached tmux session `exact-screen-01`. This preserves the
-interactive shell and VS Code access. The earlier pending batch job **14217** was cancelled
-before execution when the user clarified this requirement; its submission record is retained.
-The wave **failed at 18:48 UTC** with exit code 2; none of the four E05 cells completed.
-All four finished dataset preparation, then the difference-scoring channel reached the
-inherited relation verbaliser (`dataset.verbalization_mode: llm`). This separate generation
-path was missed by the zero-hosted-call preflight. The launcher did not supply the updated API key,
-and the ledger records 28 rejected HTTP 401 attempts with no returned usage. Rationales
-remained disabled. The interactive allocation and shell survived. G0 acceptance remains
-valid; no E05 selection or quality result was produced. The full campaign remains gated.
+The first attempt ran inside interactive allocation **14212**, as Slurm step **14212.2**,
+from 17:59 to 18:48 UTC on 2026-09-18. All four E05 cells finished dataset preparation but
+failed when the difference-scoring channel reached LLM relation-template generation. The
+launcher had not supplied the updated API key. The ledger retains 28 rejected HTTP 401
+attempts; no cell completed and no E05 result or selection was produced. Rationales remained
+disabled, and the interactive shell and VS Code access survived.
+
+The user authorized repair and resubmission. Revision 08 preserves every resolved scientific
+configuration and corrects operational admission for the relation verbaliser. The authenticated
+retry is prepared in `data/experiments-v2/first-screen-02/`; its `launch-status.json` records
+whether it has started or finished. The earlier attempt remains intact in `first-screen-01/`.
+The full scientific campaign remains gated by later results.
 
 ## Frozen work
 
-Preparation: `data/experiments-v2/prepared-campaign-07/campaign.lock.yaml`.
-Output and launch records: `data/experiments-v2/first-screen-01/`.
+Preparation: `data/experiments-v2/prepared-campaign-08/campaign.lock.yaml`.
+Output and launch records: `data/experiments-v2/first-screen-02/`.
+Repair and recovery evidence: `data/experiments-v2/first-screen-repair-01/`.
 
 Only E05's baseline, SapBERT, reciprocal-rank fusion and adaptive-k arms are admitted:
 300 NCIT–DOID development sources, seed 17, global mode, target-label-free components.
 The frozen primary endpoint is candidate recall with the declared matched-mean-k guard.
-No fitting, hosted matching, or rationale generation is enabled. No private test references
-are accessed. E00 imports G0's verified operational acceptance at its actual 300-development/
-64-training-source scope; it creates no new cells, treatment winner, fitted policy, or claim
-of current-code prediction compatibility. E24/E26 and other steps retain explicit dependency,
-capability and resource blocks; this wave does not complete the G1 pool freeze by itself.
+No fitting, hosted matching, or rationale generation is enabled. Relation verbalisation
+retains its original LLM mode: it supplies scoring evidence and is independent of matching
+and rationale flags. No private test references are accessed. E00 imports verified G0
+operational acceptance at its actual 300-development/64-training-source scope, with no new
+cells, treatment winner, fitted policy, or claim of current-code prediction compatibility.
+E24/E26 and later work retain their dependency, capability and resource blocks.
 
-`E05-budget-plan.json` records an **8.03-hour conservative admission allowance**, not an
-expected duration or a wall-time cutoff. It charges four cold process setups, candidate-pair
-work including adaptive-k's maximum 50 candidates, a fresh SapBERT retrieval-index allowance,
-and a 1.5 safety factor. Shared deterministic embeddings are cached, but the forecast does
-not assume durable ontology-graph reuse. The first wave planned zero hosted requests/tokens;
-the unexpected rejected attempts above remain recorded in its ledger.
-The prior G0 ledger retains all 4,405 requests and USD 0.4454526. A 12-hour historical foundation
-reservation covers its measured lower bound and an explicit unmeasured allowance without
-inventing wall intervals. The missing interrupted tail remains unknown. Implementation/test
-work stays separately recorded. Final-study and recovery reserves remain protected.
+The revised **8.28-hour conservative admission allowance** is not an expected duration or
+wall-time cutoff. It retains the original cold/warm, candidate-pair and fresh retrieval-index
+allowances, with a hosted contingency. Matching cache fingerprints allow all four arms to
+reuse G0's 121 relation templates. The contingency reserves 2,904 wire attempts, 5,947,392
+tokens and a USD 4 admission allowance if generation is needed; these are conservative
+allowances, not expected usage or quoted pricing. Final-study and recovery reserves remain
+protected. No new template requests are expected when the validated cache is reused.
 
-One GPU worker runs at a time with two numerical CPU threads and the full 16-CPU node allocation.
-The persistent validated native interpreter and four native package fingerprints are pinned.
-Worker commands now use the current Python interpreter instead of resolving `exact` on PATH.
-A SQLite backup of G0's compatible encoder cache seeds the persistent campaign cache; model,
-tokenizer, role and input identities still govern each reused vector. Source files are hashed
-at submission and checked at launch so a queued job cannot silently execute changed code.
+One GPU worker runs at a time with two numerical CPU threads and the full 16-CPU allocation.
+The persistent native interpreter and four native package fingerprints are pinned. Worker
+commands use the current Python interpreter. The campaign CLI explicitly loads the repository
+`api_key` through `--api-key-file`; the secret stays in the process environment and never
+enters command arguments or artifacts. Source hashes are verified before execution.
 
-## Validation
+## Repair and validation
 
-The sampled local evaluator repair reproduces G0's original 300-source/310-query population
-and metrics from saved outputs without rescoring. The 24 runtime, 39 campaign, and 15 launcher/
-configuration tests pass. A separate audit passed 52 recovery/ledger/population/replay and tiny
-CPU training fixtures plus two reporting-amendment guard checks. Integrated ontology/raw-evidence
-recovery retains the limits recorded in `first-screen-preflight/recovery-fixtures.json`.
-All four real E05 configurations passed model-free materialization/preflight with pinned model
-revisions, label-free resolved components, hosted gate off, and rationales off. These checks
-did not exercise the inherited relation-template generation reached by the difference channel.
-A repair must validate that path before restart. Switching it to deterministic verbalisation
-would change model inputs and requires an explicit revised configuration, not a silent fallback.
+The original preflight checked the matching gate and rationale flag but missed the inherited
+relation verbaliser. The repair adds explicit credential-file loading, with missing/empty files
+rejected before expensive work. Five CLI tests cover early failure, worker inheritance, and
+absence of the secret from output/artifacts. Fourteen focused relation-template, model-revision
+and numerical-control tests pass, including the actual difference-channel call and cache replay.
+
+A live probe repeated one previously rejected public NCIT relation request with the updated
+key. The pinned model/provider returned a valid template: 135 tokens, USD 0.00003015. This
+usage is separately retained and charged. All four real resolved configurations are checked
+against the failed attempt; G0 template bytes are accepted only through normal fingerprint
+validation. Cached difference-channel checks forbid hosted calls and model loading.
+
+Recovery retains the original input artifacts and dataset caches in explicit checkpoints
+with zero scored pairs. Verified templates are added through a new checkpoint version.
+No old campaign selection or progress is imported into the forecast-amended suite. The
+original numerical identities must match before dataset restoration; normal dataset/native
+cache validation remains active. Ontology objects still load where needed for inference.
+SQLite backups preserve compatible encoder vectors and all failed request records. The
+budget retains G0, failed E05 work, measured launcher overhead and the authentication probe.
+
+The earlier sampled-local evaluator repair reproduced G0's 300-source/310-query population
+and saved metrics without rescoring. Its 24 runtime tests, 39 campaign tests and 15 launcher/
+configuration tests passed. The separate 52-fixture recovery audit and two reporting guards
+retain the limitations in `first-screen-preflight/recovery-fixtures.json`.
 
 ## Handoff
 
-Keep allocation **14212** and its interactive shell alive: they carry the experiment and
-VS Code access. The failed experiment used a separate overlapping Slurm step within that
-allocation. Its tmux pane is retained after exit; no experiment worker is currently running.
-To inspect the retained session from liseda-01, attach with the command below; press **Ctrl-b**,
-then **d** to detach. Future runs must also use Slurm steps inside the active interactive
-allocation, as recorded in [NODE-SETUP.md](NODE-SETUP.md).
+Keep allocation **14212** and its interactive shell alive for experiment and VS Code access.
+Future launches use Slurm steps inside the existing allocation, as specified in
+[NODE-SETUP.md](NODE-SETUP.md). Detached tmux hosts `srun`; detaching does not release the
+allocation. The new session is `exact-screen-02`; the failed `exact-screen-01` pane is retained.
 
 ```console
-tmux attach -t exact-screen-01
+tmux attach -t exact-screen-02
 squeue --steps -j 14212
-tail -f /home/pgcotovio/Exact-OM/data/experiments-v2/first-screen-01/launcher.log
+tail -f /home/pgcotovio/Exact-OM/data/experiments-v2/first-screen-02/launcher.log
 ```
 
-`interactive-launch.json` records the active launch command and allocation; `launch-status.json`
-records the launcher state. The runtime `screen/progress.json`, per-cell `experiment_manifest.json`,
-and eventual `screen/selection.json` record experimental progress. `exit-code` appears when the
-launcher exits. Logs append and launch attempts have separate records. The allocation has
-unlimited Slurm wall time. This interactive run has **no automatic batch requeue**: tmux survives
-detachment but not a node reboot or allocation cancellation. Persistent checkpoints permit
-explicit recovery after restoring access; they do not prevent the unresolved host resets.
+Press **Ctrl-b**, then **d** to detach. `interactive-launch.json` records the actual Slurm
+launch; `launch-status.json` records launcher state. Runtime `screen/progress.json`, per-cell
+`experiment_manifest.json` and eventual `screen/selection.json` record scientific progress.
+Detailed worker output is in each cell's `exact.log` and `experiment.stderr.log`. `exit-code`
+appears when the launcher exits. The allocation has unlimited wall time. This interactive
+run has no automatic batch requeue; persistent checkpoints allow explicit recovery after a
+node reboot, but tmux cannot survive a reboot or allocation cancellation.
 
-Cooperatively stop scheduling/work at the next supported boundary:
+Cooperatively stop at the next supported boundary:
 
 ```console
-touch data/experiments-v2/first-screen-01/runtime/exact-om-focused-v2/STOP
+touch data/experiments-v2/first-screen-02/runtime/exact-om-focused-v2/STOP
 ```
 
-The launcher preserves an existing STOP file on restart. Review the reason and remove it
-only when intentionally resuming. Do not edit the frozen campaign or overwrite historical
-attempts. This submission does not authorize changing production defaults or making reporting
-claims from development selections.
+The launcher preserves an existing STOP file. Review its reason before intentionally resuming.
+Do not overwrite frozen declarations or historical attempts. Development selections do not
+authorize final reporting claims or changes to production defaults.
