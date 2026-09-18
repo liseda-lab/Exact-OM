@@ -238,4 +238,6 @@ Revision 08 corrects E05 relation-verbaliser admission and supplies the updated 
 The retry under `first-screen-02/` preserves scientific configurations and uses verified G0
 templates, saved datasets and encoder vectors through the normal recovery checks. Prior failure
 usage and the successful 135-token authentication probe remain charged. The revised conservative
-allowance is 8.28 hours; rationales remain off. `launch-status.json` records actual launch state.
+allowance is 8.28 hours; rationales remain off. The retry started at 19:58 UTC in Slurm
+step **14212.3**, detached in tmux `exact-screen-02` within the existing interactive allocation.
+`launch-status.json` records current launcher state.

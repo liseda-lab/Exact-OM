@@ -9,8 +9,9 @@ disabled, and the interactive shell and VS Code access survived.
 
 The user authorized repair and resubmission. Revision 08 preserves every resolved scientific
 configuration and corrects operational admission for the relation verbaliser. The authenticated
-retry is prepared in `data/experiments-v2/first-screen-02/`; its `launch-status.json` records
-whether it has started or finished. The earlier attempt remains intact in `first-screen-01/`.
+retry started at **19:58 UTC** in Slurm step **14212.3**, with tmux session `exact-screen-02`,
+inside the existing interactive allocation. Its records are in
+`data/experiments-v2/first-screen-02/`; `launch-status.json` records current launcher state. The earlier attempt remains intact in `first-screen-01/`.
 The full scientific campaign remains gated by later results.
 
 ## Frozen work
