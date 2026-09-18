@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import logging
+import os
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -209,7 +212,8 @@ def test_job_runner_supports_v2_data_paths_and_tracks(tmp_path: Path) -> None:
             },
         }
     )
-    assert explicit[1:5] == [
+    assert explicit[:3] == [sys.executable, "-m", "exact.delivery.cli.main"]
+    assert explicit[3:7] == [
         "-s",
         str((tmp_path / "source.owl").resolve()),
         "-t",
@@ -247,3 +251,37 @@ def test_job_runner_supports_v2_data_paths_and_tracks(tmp_path: Path) -> None:
 def test_default_yaml_is_valid_yaml_12() -> None:
     payload = YAML(typ="safe").load(Path("exact/default_config.yaml").read_text(encoding="utf-8"))
     assert payload["config_version"] == 2
+
+
+@pytest.mark.parametrize("hostile_launcher", [False, True])
+def test_job_runner_uses_current_python_with_no_usable_exact_on_path(
+    tmp_path: Path, hostile_launcher: bool
+) -> None:
+    path_dir = tmp_path / "path"
+    path_dir.mkdir()
+    if hostile_launcher:
+        launcher = path_dir / "exact"
+        launcher.write_text("#!/bin/sh\nexit 97\n", encoding="utf-8")
+        launcher.chmod(0o755)
+    command = build_exact_command(
+        {
+            "data": {"source": "unused-source.owl", "target": "unused-target.owl"},
+            "job": {
+                "output_dir": str(tmp_path / "run"),
+                "config_file": str(tmp_path / "unused-config.yaml"),
+            },
+        }
+    )
+    assert command[:3] == [sys.executable, "-m", "exact.delivery.cli.main"]
+    result = subprocess.run(
+        [*command, "--help"],
+        env={**os.environ, "PATH": str(path_dir)},
+        cwd=Path(__file__).resolve().parents[1],
+        capture_output=True,
+        text=True,
+        timeout=45,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "usage:" in result.stdout.lower()
+    assert not (tmp_path / "run").exists()

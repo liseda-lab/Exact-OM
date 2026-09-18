@@ -7,6 +7,7 @@ import argparse
 import os
 import shlex
 import subprocess
+import sys
 from pathlib import Path
 from typing import Dict, List
 
@@ -108,7 +109,9 @@ def build_exact_command(cfg: Dict) -> List[str]:
         return str(p.resolve())
 
     cmd = [
-        "exact",
+        sys.executable,
+        "-m",
+        "exact.delivery.cli.main",
         "-o",
         str(Path(job_cfg["output_dir"]).resolve()),
         "-y",
@@ -122,7 +125,7 @@ def build_exact_command(cfg: Dict) -> List[str]:
     if source or target:
         if not source or not target:
             raise ValueError("data.source and data.target must be supplied together")
-        cmd[1:1] = ["-s", source, "-t", target]
+        cmd[3:3] = ["-s", source, "-t", target]
     elif not dataset_cfg.get("track"):
         raise ValueError("data must provide source/target paths or a track")
 
