@@ -933,3 +933,392 @@ def test_posthoc_failure_rejects_incomplete_extraction_and_changed_chain(
             expected_configs=configs,
             materialize=False,
         )
+
+
+@pytest.fixture
+def completed_globals(posthoc_validation, tmp_path, request):
+    from tools import validation_resume as resume
+
+    previous, configs, campaign, key = posthoc_validation
+    current = tmp_path / "completed-globals"
+    probes, prior_elapsed, _ = resume.adopt_failed_validation(
+        previous, current, campaign_sha256=campaign, expected_configs=configs
+    )
+    options = getattr(request, "param", {})
+    rows = list(probes.values())
+    config = configs["global300"]
+    for name in ("global300", "global300-stop", "global300-resume", "global300-replay"):
+        run = current / name / "run"
+        (run / "_inputs").mkdir(parents=True)
+        (run / "_inputs/resolved.config.yaml").write_text(yaml.safe_dump(config))
+        identity = stage_identity(
+            "extraction",
+            parameters={"configuration": config},
+            inputs={},
+            role="development",
+            entity_kind="all",
+            implementation=resume._code_identity(resume.REPOSITORY, evaluation=False),
+            dependencies={"ontology_artifacts": resume.ontology_execution_identity("asserted")},
+            seed=17,
+        )
+        interrupted = name.endswith("-stop")
+        worker = name.endswith(("-stop", "-resume"))
+        outputs = {name: b"frozen" for name in resume.DATASET_FILES}
+        score = 0.8 + (
+            options.get("score_delta", 8e-8)
+            if name in {"global300-resume", "global300-replay"}
+            else 0
+        )
+        if name == "global300-replay":
+            score += options.get("cache_score_delta", 0)
+        target = options.get("target", "t") if name != "global300" else "t"
+        outputs.update(
+            {
+                "alignment/maps_global.tsv": f"SrcEntity\tTgtEntity\tScore\tRelation\ns\t{target}\t{score}\t=\n".encode(),
+                "source_decisions.json": b"{}",
+                "timings.json": b"[]",
+                "stats/run_stats.json": json.dumps(
+                    {
+                        "observed_execution": {
+                            "device_type": "cuda",
+                            "device": (
+                                options.get("device", "cuda:0") if name != "global300" else "cuda:0"
+                            ),
+                        }
+                    }
+                ).encode(),
+            }
+        )
+        store = ArtifactStore(run.parent)
+        if interrupted:
+            outputs = {k: v for k, v in outputs.items() if k.startswith("dataset/")}
+            outputs["checkpoints/inference_1.json"] = b'{"processed_examples":1}'
+            initial_timing = {
+                "schema_version": 1,
+                "sessions": [
+                    {
+                        "run_id": "stop",
+                        "ended_at": None,
+                        "stages": [{"stage": "Dataset", "cache_status": "fresh", "seconds": 0.2}],
+                    }
+                ],
+            }
+            outputs["timings.json"] = json.dumps(initial_timing).encode()
+            store.checkpoint(
+                identity,
+                completed_ids=["pair1"],
+                cursor={"next_pair": 1, "dataset_rows": 2},
+                outputs=outputs,
+            )
+            (run / "interrupted.json").write_text(
+                json.dumps({"status": "interrupted", "completed_pairs": 1})
+            )
+            artifacts = {}
+        else:
+            store.publish(identity, outputs)
+            evaluation = stage_identity(
+                "evaluation",
+                parameters={},
+                inputs={},
+                role="development",
+                entity_kind="all",
+                implementation=resume._code_identity(resume.REPOSITORY, evaluation=True),
+                dependencies={},
+                parents=[identity["artifact_id"]],
+            )
+            metric = 0.8 + (options.get("metric_delta", 0) if name != "global300" else 0)
+            evaluation_outputs = {
+                "evaluation/evaluation_results.json": json.dumps(
+                    {
+                        "builtin": {"P": metric, "R": metric, "F1": metric},
+                        "meta": {"refs": {"full_reference": {"path": "fixture"}}},
+                    }
+                ).encode()
+            }
+            store.publish(evaluation, evaluation_outputs)
+            outputs.update(evaluation_outputs)
+            artifacts = {
+                "extraction": identity["artifact_id"],
+                "evaluation": evaluation["artifact_id"],
+            }
+        for relative, data in outputs.items():
+            path = run / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(data)
+        if name == "global300":
+            stats_path = run / "stats/run_stats.json"
+            stats = json.loads(stats_path.read_text())
+            stats["evaluation_inputs"] = {"full_reference": {"path": "fixture"}}
+            stats_path.write_text(json.dumps(stats))
+        (run / "recovery-runtime.json").write_text(
+            json.dumps({"identity": identity, "stop_after_checkpoint": interrupted})
+        )
+        recovery = {"artifacts": artifacts}
+        manifest = {
+            "status": "interrupted" if interrupted else "complete",
+            "return_code": 130 if interrupted else 0,
+            "extraction_complete": not interrupted,
+            "resolved_config_hash": hash_payload(config),
+            "experiment_config_hash": campaign,
+            "recovery": recovery,
+        }
+        if interrupted:
+            finalized_timing = deepcopy(initial_timing)
+            finalized_timing["sessions"][0]["stages"].extend(
+                [
+                    {"stage": "Alignment", "cache_status": "fresh", "seconds": 0.3},
+                    {"stage": "Total", "cache_status": "fresh", "seconds": 0.6},
+                ]
+            )
+            (run / "timings.json").write_text(json.dumps(finalized_timing))
+            manifest["timing_ledger"] = finalized_timing
+        (run / "experiment_manifest.json").write_text(json.dumps(manifest))
+        row = {
+            "id": name,
+            "status": manifest["status"],
+            "source_cap": 300,
+            "hosted": True,
+            "evaluate": True,
+            "new_worker_calls": int(worker),
+            "new_usage": dict.fromkeys(resume.USAGE_KEYS, 0),
+            "output_dir": str(run),
+            "manifest": str(run / "experiment_manifest.json"),
+            "wall_seconds": 2,
+            "recovery": recovery,
+        }
+        if interrupted:
+            row["timing_ledger"] = finalized_timing
+        if worker:
+            measurement = {"return_code": manifest["return_code"], "wall_seconds": 1}
+            row["worker_measurement"] = measurement
+            (run / "validation-worker.json").write_text(json.dumps(measurement))
+        rows.append(row)
+    for row in rows:
+        (current / f"{row['id']}.measurement.json").write_text(json.dumps(row))
+    old = json.loads((previous / "report.json").read_text())
+    report = {
+        "status": "failed",
+        "reason": "ValueError: Global interruption/relocation replay changed mappings",
+        "campaign_sha256": campaign,
+        "elapsed_seconds": prior_elapsed + 10,
+        "stages": rows,
+        "hosted_usage": old["hosted_usage"],
+        "resume": {
+            "from": str(previous),
+            "previous_elapsed_seconds": prior_elapsed,
+            "previous_hosted_usage": old["hosted_usage"],
+            "copied_hosted_usage": resume._ledger_usage(previous),
+        },
+    }
+    (current / "report.json").write_text(json.dumps(report))
+    return current, configs, campaign, key
+
+
+def test_adopts_completed_globals_using_declared_tolerance_and_exact_cache(
+    completed_globals, tmp_path
+):
+    from tools import validation_resume as resume
+
+    previous, configs, campaign, key = completed_globals
+    before = {
+        str(p): sha256_file(p)
+        for p in previous.rglob("*")
+        if p.is_file() and not p.name.endswith("-shm")
+    }
+    output = tmp_path / "local-continuation"
+    rows, elapsed, repair = resume.adopt_failed_validation(
+        previous, output, campaign_sha256=campaign, expected_configs=configs
+    )
+    assert len(rows) == 8 and elapsed == 720 and repair == {}
+    assert rows["global300-stop"]["status"] == "interrupted"
+    assert rows["hosted20"]["measurement_usage"]["attempts"] == 1
+    for row in rows.values():
+        assert row["new_worker_calls"] == 0 and not any(row["new_usage"].values())
+        assert row["adoption_evidence"]["prior_hosted_usage"]["attempts"] == 2
+        assert row["adoption_evidence"]["prior_ledger_usage"]["attempts"] == 1
+    evidence = json.loads((output / "global300.replay-validation.json").read_text())
+    assert 0 < evidence["interruption"]["max_score_delta"] < 1e-5
+    assert evidence["completed_cache"]["completed_cache_bytes_verified"] is True
+    stop_timing = evidence["verified_stages"]["global300-stop"]["timing_finalization"]
+    assert stop_timing["original_sha256"] != stop_timing["final_sha256"]
+    stats = evidence["verified_stages"]["global300"]["statistics_provenance"]
+    assert stats["original_sha256"] != stats["current_sha256"]
+    assert (
+        stats["verified_by_evaluation"]
+        == evidence["verified_stages"]["global300"]["evaluation_artifact_id"]
+    )
+    assert rows["global300-replay"]["adoption_evidence"]["replay_validation"] == evidence
+    assert (
+        RequestLedger(output / "shared/openrouter").cached(key) == b'{"response":"rationale-free"}'
+    )
+    assert before == {
+        str(p): sha256_file(p)
+        for p in previous.rglob("*")
+        if p.is_file() and not p.name.endswith("-shm")
+    }
+
+
+@pytest.mark.parametrize(
+    "completed_globals",
+    [
+        {"score_delta": 0.001},
+        {"target": "changed"},
+        {"cache_score_delta": 1e-9},
+        {"metric_delta": 0.001},
+        {"device": "cpu"},
+    ],
+    indirect=True,
+)
+def test_completed_global_adoption_rejects_real_replay_changes(completed_globals, tmp_path):
+    from tools import validation_resume as resume
+
+    previous, configs, campaign, _ = completed_globals
+    with pytest.raises(ValueError):
+        resume.adopt_failed_validation(
+            previous,
+            tmp_path / "new",
+            campaign_sha256=campaign,
+            expected_configs=configs,
+            materialize=False,
+        )
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        "checkpoint",
+        "evaluation",
+        "worker",
+        "usage",
+        "implementation",
+        "stats_refs",
+        "stats_measurement",
+    ],
+)
+def test_completed_global_adoption_rejects_changed_evidence(completed_globals, tmp_path, change):
+    from tools import validation_resume as resume
+
+    previous, configs, campaign, _ = completed_globals
+    if change == "checkpoint":
+        (previous / "global300-stop/run/interrupted.json").write_text(
+            '{"status":"interrupted","completed_pairs":2}'
+        )
+    elif change == "evaluation":
+        (previous / "global300-resume/run/evaluation/evaluation_results.json").write_text("{}")
+    elif change == "worker":
+        (previous / "global300-replay/run/validation-worker.json").write_text('{"return_code":0}')
+    elif change == "implementation":
+        (resume.REPOSITORY / "exact/scorer.py").write_text("changed = True\n")
+    elif change.startswith("stats_"):
+        path = previous / "global300/run/stats/run_stats.json"
+        stats = json.loads(path.read_text())
+        if change == "stats_refs":
+            stats["evaluation_inputs"]["full_reference"]["path"] = "unverified"
+        else:
+            stats["wall_seconds"] = 0
+        path.write_text(json.dumps(stats))
+    else:
+        path = previous / "report.json"
+        report = json.loads(path.read_text())
+        report["hosted_usage"]["attempts"] += 1
+        path.write_text(json.dumps(report))
+    with pytest.raises(ValueError):
+        resume.adopt_failed_validation(
+            previous,
+            tmp_path / "new",
+            campaign_sha256=campaign,
+            expected_configs=configs,
+            materialize=False,
+        )
+
+
+@pytest.mark.parametrize("change", ["prefix", "total", "unbound"])
+def test_interrupted_timing_finalization_cannot_replace_prior_measurements(
+    completed_globals, tmp_path, change
+):
+    from tools import validation_resume as resume
+
+    previous, configs, campaign, _ = completed_globals
+    run = previous / "global300-stop/run"
+    timing = json.loads((run / "timings.json").read_text())
+    timing["sessions"][0]["stages"][0 if change == "prefix" else -1]["seconds"] = (
+        0.1 if change == "prefix" else 100
+    )
+    (run / "timings.json").write_text(json.dumps(timing))
+    if change != "unbound":
+        manifest_path = run / "experiment_manifest.json"
+        manifest = json.loads(manifest_path.read_text())
+        manifest["timing_ledger"] = timing
+        manifest_path.write_text(json.dumps(manifest))
+        report_path = previous / "report.json"
+        report = json.loads(report_path.read_text())
+        row = next(row for row in report["stages"] if row["id"] == "global300-stop")
+        row["timing_ledger"] = timing
+        report_path.write_text(json.dumps(report))
+        (previous / "global300-stop.measurement.json").write_text(json.dumps(row))
+    with pytest.raises(ValueError, match="timing finalization"):
+        resume.adopt_failed_validation(
+            previous,
+            tmp_path / "new",
+            campaign_sha256=campaign,
+            expected_configs=configs,
+            materialize=False,
+        )
+
+
+@pytest.mark.parametrize(
+    "change", [None, "metric", "reference_hash", "reference_path", "file_bytes"]
+)
+def test_evaluator_relocation_preserves_metrics_and_verified_reference_content(tmp_path, change):
+    from tools.validation_resume import _verify_run_outputs
+
+    old = tmp_path / "old/run/alignment/maps_global.tsv"
+    new = tmp_path / "new/run/alignment/maps_global.tsv"
+    for path in (old, new):
+        path.parent.mkdir(parents=True)
+        path.write_bytes(b"unchanged mapping rows")
+    original = {
+        "builtin": {"F1": 0.8},
+        "meta": {
+            "refs": {
+                "alignment": {
+                    "path": str(old),
+                    "sha256": sha256_file(old),
+                    "bytes": old.stat().st_size,
+                    "rows": 1,
+                }
+            }
+        },
+    }
+    store = ArtifactStore(new.parents[2])
+    identity = stage_identity(
+        "evaluation",
+        parameters={},
+        inputs={},
+        role="development",
+        entity_kind="all",
+        implementation={"fixture": True},
+        dependencies={},
+    )
+    payload = store.publish(
+        identity, {"evaluation/evaluation_results.json": json.dumps(original).encode()}
+    )
+    current = deepcopy(original)
+    current["meta"]["refs"]["alignment"]["path"] = str(new)
+    if change == "metric":
+        current["builtin"]["F1"] += 0.001
+    elif change == "reference_hash":
+        current["meta"]["refs"]["alignment"]["sha256"] = "0" * 64
+    elif change == "reference_path":
+        current["meta"]["refs"]["alignment"]["path"] = str(tmp_path / "unrelated")
+    elif change == "file_bytes":
+        new.write_bytes(b"changed mapping rows")
+    report = new.parents[1] / "evaluation/evaluation_results.json"
+    report.parent.mkdir()
+    report.write_text(json.dumps(current))
+    verified = store.verify(payload["identity"]["artifact_id"])
+    if change is None:
+        _verify_run_outputs(new.parents[1], verified, store=store)
+    else:
+        with pytest.raises(ValueError, match="differs from verified artifact"):
+            _verify_run_outputs(new.parents[1], verified, store=store)

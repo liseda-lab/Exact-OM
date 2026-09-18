@@ -54,7 +54,9 @@ def _positive(value: Any, label: str) -> float:
     return float(value)
 
 
-def _verified_extraction(saved_run: Path) -> tuple[ArtifactStore, dict]:
+def _verified_extraction(
+    saved_run: Path, *, evaluation: dict | None = None
+) -> tuple[ArtifactStore, dict]:
     runtime = json.loads((saved_run / "recovery-runtime.json").read_text())
     store = ArtifactStore(saved_run.parent)
     payload = store.verify(runtime["identity"]["artifact_id"])
@@ -68,6 +70,17 @@ def _verified_extraction(saved_run: Path) -> tuple[ArtifactStore, dict]:
     }
     if not required.issubset(payload["outputs"]):
         raise ValueError("Saved extraction lacks required durable outputs")
+    _verify_run_outputs(saved_run, payload, store=store, evaluation=evaluation)
+    return store, payload
+
+
+def _verify_run_outputs(
+    saved_run: Path,
+    payload: dict,
+    *,
+    store: ArtifactStore | None = None,
+    evaluation: dict | None = None,
+) -> None:
     for name, item in payload["outputs"].items():
         path = saved_run / name
         if not path.resolve().is_relative_to(saved_run.resolve()):
@@ -77,8 +90,52 @@ def _verified_extraction(saved_run: Path) -> tuple[ArtifactStore, dict]:
             or path.stat().st_size != item["bytes"]
             or sha256_file(path) != item["sha256"]
         ):
-            raise ValueError(f"Saved output differs from verified extraction: {name}")
-    return store, payload
+            if (
+                name == "evaluation/evaluation_results.json"
+                and store is not None
+                and payload["identity"]["stage"] == "evaluation"
+            ):
+                original = json.loads((store.root / item["path"]).read_text())
+                relocated = deepcopy(original)
+                refs = relocated.get("meta", {}).get("refs", {})
+                if not isinstance(refs.get("alignment"), dict) or not refs["alignment"].get("path"):
+                    raise ValueError("Evaluation metadata does not bind a verified relocation")
+                old_alignment = Path(refs["alignment"]["path"])
+                old_root = old_alignment.parent.parent
+                rebound = []
+                for reference in refs.values():
+                    if not isinstance(reference, dict) or not reference.get("path"):
+                        continue
+                    old_path = Path(reference["path"])
+                    if old_path.is_relative_to(old_root):
+                        new_path = saved_run / old_path.relative_to(old_root)
+                        if new_path != old_path:
+                            reference["path"] = str(new_path)
+                            rebound.append((new_path, reference))
+                if (
+                    old_alignment.parent.name == "alignment"
+                    and rebound
+                    and json.loads(path.read_text()) == relocated
+                    and all(
+                        new_path.resolve().is_relative_to(saved_run.resolve())
+                        and sha256_file(new_path) == reference.get("sha256")
+                        and new_path.stat().st_size == reference.get("bytes")
+                        for new_path, reference in rebound
+                    )
+                ):
+                    continue
+            # Re-evaluation repackages only input provenance in the retained run stats.
+            # Its replacement must be bound by the verified downstream evaluator artifact.
+            if name == "stats/run_stats.json" and evaluation is not None and store is not None:
+                original = json.loads((store.root / item["path"]).read_text())
+                current = json.loads(path.read_text())
+                report_item = evaluation["outputs"]["evaluation/evaluation_results.json"]
+                report = json.loads((store.root / report_item["path"]).read_text())
+                if current.get("evaluation_inputs") == report.get("meta", {}).get("refs") and {
+                    k: v for k, v in original.items() if k != "evaluation_inputs"
+                } == {k: v for k, v in current.items() if k != "evaluation_inputs"}:
+                    continue
+            raise ValueError(f"Saved output differs from verified artifact: {name}")
 
 
 def _configuration(saved_run: Path) -> dict:
@@ -643,6 +700,154 @@ def adopt_failed_validation(
     )
 
 
+def _verify_completed_global(
+    previous: Path,
+    row: dict,
+    expected: dict,
+    campaign_sha256: str,
+    elapsed: float,
+) -> dict:
+    """Verify one saved global stage, including the intentionally interrupted boundary."""
+    name = row["id"]
+    run = previous / name / "run"
+    config = _hosted_configuration(run, expected, cap=300)
+    manifest = json.loads((run / "experiment_manifest.json").read_text())
+    runtime = json.loads((run / "recovery-runtime.json").read_text())
+    interrupted = name == "global300-stop"
+    worker_expected = name in {"global300-stop", "global300-resume"}
+    if (
+        Path(row["output_dir"]).resolve() != run
+        or Path(row["manifest"]).resolve() != run / "experiment_manifest.json"
+        or row.get("source_cap") != 300
+        or row.get("hosted") is not True
+        or row.get("evaluate") is not True
+        or row.get("new_worker_calls") != int(worker_expected)
+        or row.get("status") != ("interrupted" if interrupted else "complete")
+        or manifest.get("status") != row["status"]
+        or manifest.get("return_code") != (130 if interrupted else 0)
+        or manifest.get("extraction_complete") is not (not interrupted)
+        or manifest.get("experiment_config_hash") != campaign_sha256
+        or manifest.get("resolved_config_hash") != hash_payload(config)
+        or not elapsed >= _positive(row["wall_seconds"], "saved global duration")
+    ):
+        raise ValueError("Saved global stage does not bind its configuration and completion")
+    if worker_expected:
+        worker = json.loads((run / "validation-worker.json").read_text())
+        if (
+            worker != row.get("worker_measurement")
+            or worker.get("return_code") != manifest["return_code"]
+            or row["wall_seconds"] < _positive(worker.get("wall_seconds"), "global worker duration")
+        ):
+            raise ValueError("Saved global worker evidence changed")
+    elif row.get("worker_measurement") or (run / "validation-worker.json").exists():
+        raise ValueError("Completed extraction replay unexpectedly records a worker")
+    if interrupted:
+        store = ArtifactStore(run.parent)
+        artifact = store.latest_checkpoint(runtime["identity"]["artifact_id"])
+        stop = json.loads((run / "interrupted.json").read_text())
+        if artifact is None:
+            raise ValueError("Interrupted global stage has no verified checkpoint")
+        cursor = artifact["cursor"]
+        if (
+            runtime.get("stop_after_checkpoint") is not True
+            or stop.get("status") != "interrupted"
+            or not 0 < cursor["next_pair"] < cursor["dataset_rows"]
+            or stop.get("completed_pairs") != cursor["next_pair"]
+            or len(artifact["completed_ids"]) != cursor["next_pair"]
+        ):
+            raise ValueError("Interrupted global checkpoint is not a committed partial boundary")
+        evidence = {"checkpoint_sequence": artifact["sequence"], "cursor": cursor}
+        checked = artifact
+        timing_item = artifact["outputs"].get("timings.json")
+        if timing_item and sha256_file(run / "timings.json") != timing_item["sha256"]:
+            original = json.loads((store.root / timing_item["path"]).read_text())
+            final = json.loads((run / "timings.json").read_text())
+            if (
+                not (run / "timings.json").resolve().is_relative_to(run.resolve())
+                or final != manifest.get("timing_ledger")
+                or final != row.get("timing_ledger")
+                or len(original.get("sessions", [])) != 1
+                or len(final.get("sessions", [])) != 1
+                or {k: v for k, v in original.items() if k != "sessions"}
+                != {k: v for k, v in final.items() if k != "sessions"}
+            ):
+                raise ValueError(
+                    "Interrupted timing finalization lacks matching measurement evidence"
+                )
+            old_session, new_session = original["sessions"][0], final["sessions"][0]
+            prefix = old_session["stages"]
+            appended = new_session["stages"][len(prefix) :]
+            if (
+                {k: v for k, v in old_session.items() if k != "stages"}
+                != {k: v for k, v in new_session.items() if k != "stages"}
+                or new_session["stages"][: len(prefix)] != prefix
+                or [item.get("stage") for item in appended] != ["Alignment", "Total"]
+                or any(item.get("cache_status") != "fresh" for item in appended)
+                or not 0
+                < _positive(appended[0]["seconds"], "final alignment duration")
+                <= _positive(appended[1]["seconds"], "final total duration")
+                <= worker["wall_seconds"]
+            ):
+                raise ValueError("Interrupted timing finalization changed committed measurements")
+            evidence["timing_finalization"] = {
+                "original_sha256": timing_item["sha256"],
+                "final_sha256": sha256_file(run / "timings.json"),
+                "worker_wall_seconds": worker["wall_seconds"],
+            }
+            checked = {
+                **artifact,
+                "outputs": {k: v for k, v in artifact["outputs"].items() if k != "timings.json"},
+            }
+        _verify_run_outputs(run, checked)
+    else:
+        store = ArtifactStore(run.parent)
+        ids = manifest.get("recovery", {}).get("artifacts", {})
+        if ids != row.get("recovery", {}).get("artifacts", {}) or not ids.get("evaluation"):
+            raise ValueError(
+                "Completed global stage lacks matching extraction/evaluation identities"
+            )
+        evaluation = store.verify(ids["evaluation"])
+        _verify_run_outputs(run, evaluation, store=store)
+        store, artifact = _verified_extraction(run, evaluation=evaluation)
+        if ids.get("extraction") != artifact["identity"]["artifact_id"]:
+            raise ValueError("Completed global stage has a different extraction identity")
+        if evaluation["identity"]["parents"] != [artifact["identity"]["artifact_id"]] or evaluation[
+            "identity"
+        ]["implementation"] != _code_identity(REPOSITORY, evaluation=True):
+            raise ValueError("Completed global evaluation implementation or parent changed")
+        evidence = {"evaluation_artifact_id": ids["evaluation"]}
+        report_item = evaluation["outputs"].get("evaluation/evaluation_results.json")
+        if (
+            report_item
+            and sha256_file(run / "evaluation/evaluation_results.json") != report_item["sha256"]
+        ):
+            evidence["evaluation_relocation"] = {
+                "original_sha256": report_item["sha256"],
+                "current_sha256": sha256_file(run / "evaluation/evaluation_results.json"),
+                "reference_content_hashes_unchanged": True,
+            }
+        stats = artifact["outputs"].get("stats/run_stats.json")
+        if stats and sha256_file(run / "stats/run_stats.json") != stats["sha256"]:
+            evidence["statistics_provenance"] = {
+                "original_sha256": stats["sha256"],
+                "current_sha256": sha256_file(run / "stats/run_stats.json"),
+                "verified_by_evaluation": ids["evaluation"],
+            }
+    identity = artifact["identity"]
+    if (
+        identity != runtime["identity"]
+        or identity["implementation"] != _code_identity(REPOSITORY, evaluation=False)
+        or identity["dependencies"].get("ontology_artifacts")
+        != ontology_execution_identity(str(config.get("dataset", {}).get("reasoner", "asserted")))
+    ):
+        raise ValueError("Completed global extraction implementation changed")
+    return {
+        **evidence,
+        "extraction_artifact_id": identity["artifact_id"],
+        "manifest_sha256": sha256_file(run / "experiment_manifest.json"),
+    }
+
+
 def _adopt_failed_validation(
     previous: Path,
     output: Path,
@@ -663,10 +868,15 @@ def _adopt_failed_validation(
         raise ValueError("Failed validation adoption requires exactly five expected configurations")
     report_path = previous / "report.json"
     report = json.loads(report_path.read_text())
+    replay_failure = (
+        report.get("reason") == "ValueError: Global interruption/relocation replay changed mappings"
+    )
     if (
         report.get("status") != "failed"
         or report.get("campaign_sha256") != campaign_sha256
-        or not str(report.get("reason", "")).startswith("RuntimeError: global300:")
+        or not (
+            replay_failure or str(report.get("reason", "")).startswith("RuntimeError: global300:")
+        )
     ):
         raise ValueError("Only this campaign's global300 output failure can be repaired")
     elapsed = _positive(report.get("elapsed_seconds"), "prior cumulative elapsed")
@@ -717,7 +927,12 @@ def _adopt_failed_validation(
     ):
         raise ValueError("Cumulative hosted charges differ from current and historical ledgers")
     rows = {}
-    for name in expected_configs:
+    repair = {}
+    global_evidence = {}
+    names = [*expected_configs]
+    if replay_failure:
+        names.extend(("global300-stop", "global300-resume", "global300-replay"))
+    for name in names:
         matches = [row for row in report["stages"] if row.get("id") == name]
         if len(matches) != 1:
             raise ValueError(f"Expected exactly one saved {name} measurement")
@@ -731,6 +946,14 @@ def _adopt_failed_validation(
                 k: v for k, v in row.items() if k != "adoption_evidence"
             } != {k: v for k, v in inherited[name].items() if k != "adoption_evidence"}:
                 raise ValueError("Imported completed measurement or original evidence changed")
+        elif replay_failure and name.startswith("global300"):
+            global_evidence[name] = _verify_completed_global(
+                previous,
+                row,
+                expected_configs["global300"],
+                campaign_sha256,
+                elapsed,
+            )
         else:
             run = previous / name / "run"
             config = _hosted_configuration(
@@ -855,6 +1078,24 @@ def _adopt_failed_validation(
             "hosted_cache_reused": True,
         }
         rows[name] = adopted
+    if replay_failure:
+        from tools.run_experiment_validation import compare_validation_replay
+
+        if len({item["extraction_artifact_id"] for item in global_evidence.values()}) != 1:
+            raise ValueError("Global interruption and replay stages changed extraction identity")
+        replay = rows["global300-replay"]
+        if any(replay["measurement_usage"].values()):
+            raise ValueError("Completed global replay incurred new hosted charges")
+        baseline = Path(rows["global300"]["output_dir"])
+        resumed = Path(rows["global300-resume"]["output_dir"])
+        cached = Path(replay["output_dir"])
+        evidence = {
+            "verified_stages": global_evidence,
+            "interruption": compare_validation_replay(baseline, resumed),
+            "relocation": compare_validation_replay(baseline, cached),
+            "completed_cache": compare_validation_replay(resumed, cached, completed_cache=True),
+        }
+        replay["adoption_evidence"]["replay_validation"] = evidence
     measured_usage = {
         key: sum(row["new_usage"][key] for row in report["stages"]) for key in USAGE_KEYS
     }
@@ -875,5 +1116,8 @@ def _adopt_failed_validation(
         for name, row in rows.items():
             row["adoption_evidence"]["shared_backups"] = backups
             freeze_json(output / f"{name}.adoption.json", row)
-        freeze_json(output / "global300.repair.json", repair)
+        if replay_failure:
+            freeze_json(output / "global300.replay-validation.json", evidence)
+        else:
+            freeze_json(output / "global300.repair.json", repair)
     return rows, elapsed, repair
