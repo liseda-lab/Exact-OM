@@ -181,6 +181,37 @@ def forecast(rows, *, elapsed, max_seconds, requests, tokens, limits):
     }
 
 
+def compare_validation_replay(
+    baseline_output, replay_output, *, completed_cache=False, local=False
+):
+    """Use declared numerical tolerances; completed cache copies also retain exact bytes."""
+    from exact.experiments.replay import compare_replay_outputs, normalize_execution_device
+
+    baseline_output, replay_output = Path(baseline_output), Path(replay_output)
+    devices = [
+        normalize_execution_device(
+            json.loads((output / "stats/run_stats.json").read_text())["observed_execution"]
+        )
+        for output in (baseline_output, replay_output)
+    ]
+    if devices[0] != devices[1]:
+        raise ValueError("Validation replay changed its observed execution device")
+    record = compare_replay_outputs(
+        baseline_output,
+        replay_output,
+        observed_execution=devices[1],
+        declared_execution={"kind": "gpu", "device": "0"},
+    )
+    if completed_cache:
+        name = "maps_local.tsv" if local else "maps_global.tsv"
+        if (baseline_output / "alignment" / name).read_bytes() != (
+            replay_output / "alignment" / name
+        ).read_bytes():
+            raise ValueError("Completed validation cache replay changed mapping bytes")
+    record["completed_cache_bytes_verified"] = completed_cache
+    return record
+
+
 class ValidationBudgetExceeded(RuntimeError):
     pass
 
@@ -455,9 +486,13 @@ def execute(args):
             "copied_hosted_usage": copied_usage,
             "scope": (
                 (
-                    "Reuse completed probes and restore the verified output-repair checkpoint"
-                    if global_repair.get("checkpoint_repair")
-                    else "Reuse completed probes and extraction; rerun failed reporting"
+                    "Reuse completed probes and global checks; run remaining local checks"
+                    if "global300" in imported_probes
+                    else (
+                        "Reuse completed probes and restore the verified output-repair checkpoint"
+                        if global_repair.get("checkpoint_repair")
+                        else "Reuse completed probes and extraction; rerun failed reporting"
+                    )
                 )
                 if failed_from
                 else "Reuse verified local probes; remeasure hosted20 with fresh responses"
@@ -611,7 +646,7 @@ def execute(args):
 
     harness._run_subprocess = run
     CellRecovery.prepare = prepare
-    cells = {}
+    stage_outputs = {name: Path(row["output_dir"]) for name, row in imported_probes.items()}
 
     def stage(
         name,
@@ -626,6 +661,8 @@ def execute(args):
         warm_from=None,
         repair_metadata=None,
     ):
+        if name in imported_probes:
+            return imported_probes[name]
         if stop.exists():
             raise InterruptedError("Validation STOP exists; completed artifacts retained")
         if limits["soft_seconds"] is not None and elapsed_seconds() >= limits["soft_seconds"]:
@@ -654,7 +691,7 @@ def execute(args):
             "evaluation_enabled": evaluate,
         }
         if resume_from:
-            metadata["resume_from"] = str(cells[resume_from].output_dir.parent)
+            metadata["resume_from"] = str(stage_outputs[resume_from].parent)
         if repair_metadata:
             metadata.update(repair_metadata)
         cell = RunCell(
@@ -708,7 +745,7 @@ def execute(args):
         if measurement.exists():
             row["worker_measurement"] = json.loads(measurement.read_text())
         info["stages"].append(row)
-        cells[name] = cell
+        stage_outputs[name] = cell.output_dir
         write_json(
             output / "status.json",
             {
@@ -787,10 +824,16 @@ def execute(args):
                 evaluate=True,
                 resume_from="global300-resume",
             )
-            expected = (cells["global300"].output_dir / "alignment/maps_global.tsv").read_bytes()
-            for name in ("global300-resume", "global300-replay"):
-                if (cells[name].output_dir / "alignment/maps_global.tsv").read_bytes() != expected:
-                    raise ValueError("Global interruption/relocation replay changed mappings")
+            info["replay_checks"] = {
+                name: compare_validation_replay(stage_outputs["global300"], stage_outputs[name])
+                for name in ("global300-resume", "global300-replay")
+            }
+            info["replay_checks"]["global300-cache"] = compare_validation_replay(
+                stage_outputs["global300-resume"],
+                stage_outputs["global300-replay"],
+                completed_cache=True,
+            )
+            write_json(output / "replay-checks.json", info["replay_checks"])
             if replay["new_worker_calls"] or replay["new_usage"]["attempts"]:
                 raise ValueError("Completed global replay performed new model work")
             stage("local300", cap=300, hosted=True, fit=True, evaluate=True, mode="local_ranking")
@@ -803,10 +846,13 @@ def execute(args):
                 mode="local_ranking",
                 resume_from="local300",
             )
-            if (cells["local300-replay"].output_dir / "alignment/maps_local.tsv").read_bytes() != (
-                cells["local300"].output_dir / "alignment/maps_local.tsv"
-            ).read_bytes():
-                raise ValueError("Local relocation replay changed mappings")
+            info["replay_checks"]["local300-cache"] = compare_validation_replay(
+                stage_outputs["local300"],
+                stage_outputs["local300-replay"],
+                completed_cache=True,
+                local=True,
+            )
+            write_json(output / "replay-checks.json", info["replay_checks"])
             if replay["new_worker_calls"] or replay["new_usage"]["attempts"]:
                 raise ValueError("Completed local replay performed new model work")
             info["status"] = "passed"
@@ -852,7 +898,7 @@ def main():
     recovery.add_argument(
         "--resume-failed-from",
         type=Path,
-        help="Recover verified probes and global300 after an output or reporting failure",
+        help="Recover verified probes and global stages after an output, reporting, or replay-comparison failure",
     )
     parser.add_argument(
         "--api-key-file",

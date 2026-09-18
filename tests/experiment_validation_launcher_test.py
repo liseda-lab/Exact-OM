@@ -371,7 +371,20 @@ def test_cli_explicit_unlimited_wall_and_revised_hosted_caps(monkeypatch, extra,
 
 
 @pytest.mark.parametrize(
-    "fault", [None, "changed_mapping", "changed_local_mapping", "global_request", "local_request"]
+    "fault",
+    [
+        None,
+        "roundoff",
+        "resumed_globals",
+        "changed_mapping",
+        "changed_identity",
+        "changed_relation",
+        "changed_metrics",
+        "changed_local_mapping",
+        "global_request",
+        "local_request",
+        "changed_cache_score",
+    ],
 )
 def test_full_validation_recovery_flow_rejects_changed_or_paid_replay(tmp_path, monkeypatch, fault):
     """Exercise every launcher stage with deterministic, offline cell results."""
@@ -417,11 +430,38 @@ def test_full_validation_recovery_flow_rejects_changed_or_paid_replay(tmp_path, 
             fit = cell.output_dir / "fitting/selector/training_units.json"
             fit.parent.mkdir(parents=True)
             fit.write_text('{"effective_groups": 64}')
+        reconstructed = name in {"global300-resume", "global300-replay"}
+        if "300" in name:
+            stats = cell.output_dir / "stats/run_stats.json"
+            stats.parent.mkdir()
+            stats.write_text(
+                json.dumps({"observed_execution": {"device_type": "cuda", "device": "cuda:0"}})
+            )
+            evaluation = cell.output_dir / "evaluation/evaluation_results.json"
+            evaluation.parent.mkdir()
+            metric = 0.81 if fault == "changed_metrics" and reconstructed else 0.8
+            role = "reference_candidates" if name.startswith("local") else "full_reference"
+            evaluation.write_text(
+                json.dumps(
+                    {
+                        "builtin": {"P": metric, "R": metric, "F1": metric},
+                        "meta": {"refs": {role: {"path": "fixture"}}},
+                    }
+                )
+            )
         if name.startswith("global300"):
             alignment = cell.output_dir / "alignment/maps_global.tsv"
             alignment.parent.mkdir()
-            score = "0.8" if fault == "changed_mapping" and name == "global300-resume" else "0.9"
-            alignment.write_text(f"SrcEntity\tTgtEntity\tScore\ndev:0\tt:0\t{score}\n")
+            score = "0.8" if fault == "changed_mapping" and reconstructed else "0.9"
+            if (fault == "roundoff" and reconstructed) or (
+                fault == "changed_cache_score" and name == "global300-replay"
+            ):
+                score = "0.9000000000000004"
+            target = "other" if fault == "changed_identity" and reconstructed else "t:0"
+            relation = "<" if fault == "changed_relation" and reconstructed else "="
+            alignment.write_text(
+                f"SrcEntity\tTgtEntity\tScore\tRelation\ndev:0\t{target}\t{score}\t{relation}\n"
+            )
         if name.startswith("local300"):
             alignment = cell.output_dir / "alignment/maps_local.tsv"
             alignment.parent.mkdir()
@@ -430,6 +470,9 @@ def test_full_validation_recovery_flow_rejects_changed_or_paid_replay(tmp_path, 
             )
             alignment.write_text(
                 f"SrcEntity\tTgtEntity\tTgtCandidates\ndev:0\t\t[('t:0', {score})]\n"
+            )
+            (alignment.parent / "paper.maps_global.tsv").write_text(
+                "SrcEntity\tTgtEntity\tScore\tRelation\ndev:0\tt:0\t0.9\t=\n"
             )
         if (fault, name) in {
             ("global_request", "global300-replay"),
@@ -455,9 +498,10 @@ def test_full_validation_recovery_flow_rejects_changed_or_paid_replay(tmp_path, 
         skip_hosted=False,
         generate_rationales=False,
     )
-    assert launcher.execute(args) == (0 if fault is None else 2)
+    passes = fault in {None, "roundoff", "resumed_globals"}
+    assert launcher.execute(args) == (0 if passes else 2)
     report = json.loads((args.output_root / "report.json").read_text())
-    assert report["status"] == ("passed" if fault is None else "failed")
+    assert report["status"] == ("passed" if passes else "failed")
     assert report["limits"]["soft_seconds"] is None
     assert report["generate_rationales"] is False
     for name, parent in (
@@ -465,19 +509,59 @@ def test_full_validation_recovery_flow_rejects_changed_or_paid_replay(tmp_path, 
         ("global300-replay", "global300-resume"),
     ):
         assert cells[name].recovery["resume_from"] == str(cells[parent].output_dir.parent)
-    if fault in {None, "changed_local_mapping", "local_request"}:
+    if passes or fault in {"changed_local_mapping", "local_request"}:
         assert cells["local300"].resolved_config["data"]["execution_mode"] == "local_ranking"
         assert cells["local300-replay"].recovery["resume_from"] == str(
             cells["local300"].output_dir.parent
         )
         assert all(cells[name].source_cap == 300 for name in cells if "300" in name)
-    if fault is None:
+    if passes:
         assert len(cells) == 10
         assert all(row["new_usage"]["attempts"] == 0 for row in report["stages"])
-    elif fault in {"changed_mapping", "changed_local_mapping"}:
-        assert "changed mappings" in report["reason"]
-    else:
-        assert "performed new model work" in report["reason"]
+        checks = json.loads((args.output_root / "replay-checks.json").read_text())
+        assert checks == report["replay_checks"]
+        assert checks["global300-resume"]["max_score_delta"] < 1e-5
+        assert checks["global300-cache"]["completed_cache_bytes_verified"]
+        assert checks["local300-cache"]["completed_cache_bytes_verified"]
+    if fault == "resumed_globals":
+        from copy import deepcopy
+        from tools import validation_resume
+
+        imported = {row["id"]: deepcopy(row) for row in report["stages"][:8]}
+        for row in imported.values():
+            row.update(imported=True, new_worker_calls=0, new_usage=dict(usage))
+            row["measurement_usage"] = dict(usage)
+        imported["cold64"]["adoption_evidence"] = {
+            "prior_hosted_usage": dict(usage),
+            "prior_ledger_usage": dict(usage),
+        }
+        monkeypatch.setattr(
+            validation_resume,
+            "adopt_failed_validation",
+            lambda *a, **kw: (imported, report["elapsed_seconds"], {}),
+        )
+        args.resume_failed_from = args.output_root
+        args.output_root = tmp_path / "remaining"
+        cells.clear()
+        assert launcher.execute(args) == 0
+        resumed = json.loads((args.output_root / "report.json").read_text())
+        assert list(cells) == ["local300", "local300-replay"]
+        assert resumed["stages"][:8] == list(imported.values())
+        assert [row["id"] for row in resumed["stages"][-2:]] == list(cells)
+        assert resumed["elapsed_seconds"] >= report["elapsed_seconds"]
+        assert resumed["resume"]["scope"] == (
+            "Reuse completed probes and global checks; run remaining local checks"
+        )
+    elif not passes:
+        message = {
+            "changed_mapping": "score drift",
+            "changed_identity": "canonical IDs",
+            "changed_relation": "relation labels",
+            "changed_metrics": "metric drift",
+            "changed_local_mapping": "cache replay changed mapping bytes",
+            "changed_cache_score": "cache replay changed mapping bytes",
+        }.get(fault, "performed new model work")
+        assert message in report["reason"]
 
 
 def test_forecast_retains_imported_hosted_measurement_without_new_usage():
