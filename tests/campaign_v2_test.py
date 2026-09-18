@@ -873,3 +873,210 @@ def test_campaign_materializes_explicit_rationale_policy(tmp_path, generate_rati
     assert suite.sources
     assert all(source.config.generate_rationales is generate_rationales for source in suite.sources)
     assert path.read_bytes() == original
+
+
+def _external_acceptance_fixture(tmp_path):
+    import json
+
+    suite = _ready_suite(tmp_path)
+    path = Path(suite.campaign["lock_path"])
+    raw = yaml.safe_load(path.read_text())
+    raw["model_lock"] = _binding(tmp_path / "models.yaml", "status: complete\nmodels: {}\n")
+    step = raw["steps"][0]
+    step.update(id="E00", training_source_cap=64, estimate=None)
+    historical = _binding(tmp_path / "historical.yaml", yaml.safe_dump(raw))
+    record = {
+        "schema_version": 1,
+        "kind": "exact_om_g0_acceptance",
+        "campaign": historical,
+        "source_cap": 300,
+        "training_source_cap": 64,
+        "manifests": {},
+        "outputs": {},
+    }
+    report = {
+        "status": "passed",
+        "development_only": True,
+        "generate_rationales": False,
+        "campaign_sha256": historical["sha256"],
+        "baseline": "R_v2",
+        "source": raw["cases"]["D0"]["source"],
+        "target": raw["cases"]["D0"]["target"],
+        "training": {"source_groups": 64},
+        "replay_checks": {
+            name: {"status": "passed", "completed_cache_bytes_verified": True}
+            for name in [
+                "global300-resume",
+                "global300-replay",
+                "global300-cache",
+                "local300-cache",
+            ]
+        },
+        "stages": [],
+    }
+    for mode, stage_id, filename in [
+        ("global_alignment", "global300", "maps_global.tsv"),
+        ("local_ranking", "local300", "maps_local.tsv"),
+    ]:
+        run = tmp_path / "historical" / stage_id / "run"
+        (run / "alignment").mkdir(parents=True)
+        manifest = {
+            "status": "complete",
+            "return_code": 0,
+            "extraction_complete": True,
+            "execution_mode": mode,
+            "source_cap": 300,
+            "seed": 17,
+            "split_role": "development",
+            "generate_rationales": False,
+        }
+        record["manifests"][mode] = _binding(run / "experiment_manifest.json", json.dumps(manifest))
+        record["outputs"][mode] = _binding(
+            run / "alignment" / filename, "source\ttarget\tScore\na\tb\t0.7\n"
+        )
+        report["stages"].append({"id": stage_id, "status": "complete", "output_dir": str(run)})
+    record["report"] = _binding(tmp_path / "g0.report.json", json.dumps(report))
+    step["external_acceptance"] = _binding(tmp_path / "acceptance.json", json.dumps(record))
+    path.write_text(yaml.safe_dump(raw))
+    return path, raw, record
+
+
+def test_external_g0_acceptance_preserves_scope_and_needs_no_new_forecast(tmp_path):
+    from exact.experiments.campaign import external_acceptance_selection
+
+    path, _, _ = _external_acceptance_fixture(tmp_path)
+    lock, _ = load_campaign(path)
+    result = external_acceptance_selection(lock, lock.steps[0], path.parent)
+    assert result["status"] == "complete" and result["new_cells"] == 0
+    assert result["training_source_cap"] == 64 and result["source_cap"] == 300
+    assert result["decisions"] == [] and not result["quality_claim"]
+    assert not result["current_code_prediction_compatibility"]
+    assert "selected_overlay" not in result
+    plan = campaign_plan(path, stage="screen")
+    assert not plan["budget_errors"] and all(not row["issues"] for row in plan["rows"])
+
+
+@pytest.mark.parametrize(
+    "change", ["record", "output", "report", "scope", "model", "inputs", "cache", "mode"]
+)
+def test_external_g0_acceptance_rejects_changed_evidence(tmp_path, change):
+    import json
+
+    from exact.experiments.campaign import external_acceptance_selection
+
+    path, raw, record = _external_acceptance_fixture(tmp_path)
+    if change in {"record", "output", "report"}:
+        target = (
+            raw["steps"][0]["external_acceptance"]["path"]
+            if change == "record"
+            else (
+                record["outputs"]["local_ranking"]["path"]
+                if change == "output"
+                else record["report"]["path"]
+            )
+        )
+        Path(target).write_text("changed")
+    elif change == "scope":
+        raw["steps"][0]["training_source_cap"] = 2000
+    elif change == "model":
+        raw["model_lock"] = _binding(tmp_path / "different-models.yaml", "status: different\n")
+    elif change == "inputs":
+        raw["cases"]["D0"]["source"] = _binding(tmp_path / "new.owl", "other ontology\n")
+    else:
+        target = record["report"] if change == "cache" else record["manifests"]["local_ranking"]
+        content = json.loads(Path(target["path"]).read_text())
+        if change == "cache":
+            content["replay_checks"]["local300-cache"]["completed_cache_bytes_verified"] = False
+        else:
+            content["execution_mode"] = "global_alignment"
+        target.update(_binding(Path(target["path"]), json.dumps(content)))
+        raw["steps"][0]["external_acceptance"] = _binding(
+            tmp_path / "acceptance.json", json.dumps(record)
+        )
+    path.write_text(yaml.safe_dump(raw))
+    lock, _ = load_campaign(path)
+    with pytest.raises(ValueError):
+        external_acceptance_selection(lock, lock.steps[0], path.parent)
+
+
+@pytest.mark.parametrize(
+    "change",
+    [{"id": "E05"}, {"family": "E05"}, {"phase": "expansion"}, {"additional_cases": ["D1"]}],
+)
+def test_external_acceptance_cannot_admit_other_experiments(tmp_path, change):
+    _, raw, _ = _external_acceptance_fixture(tmp_path)
+    with pytest.raises(ValueError, match="only an initial E00"):
+        CampaignStep.model_validate({**raw["steps"][0], **change})
+
+
+def test_external_g0_acceptance_unlocks_only_dependent_cells_without_e00_worker(
+    tmp_path, monkeypatch
+):
+    import copy
+    import json
+    from dataclasses import replace
+
+    from exact.experiments import harness
+
+    path, raw, _ = _external_acceptance_fixture(tmp_path)
+    downstream = copy.deepcopy(raw["steps"][0])
+    downstream.update(
+        id="E06",
+        family="E06",
+        external_acceptance=None,
+        requires=["E00"],
+        estimate={
+            "cold_seconds": 0,
+            "units": 1,
+            "seconds_per_unit": 1,
+            "peak_ram_gb": 1,
+            "measurement_artifact": _binding(tmp_path / "measured.json", "{}"),
+        },
+    )
+    raw["steps"].append(downstream)
+    blueprint = yaml.safe_load(Path(raw["blueprint"]["path"]).read_text())
+    blueprint["experiments"].append({"id": "E06", "initial_treatment_cap": 2})
+    raw["blueprint"] = _binding(tmp_path / "expanded-blueprint.yaml", yaml.safe_dump(blueprint))
+    path.write_text(yaml.safe_dump(raw))
+    suite = materialize_campaign(path, tmp_path / "external-declarations", stage="screen")
+    root = tmp_path / "new-results" / suite.suite_id
+    suite = replace(
+        suite,
+        model_lock_payload={"status": "unresolved"},
+        campaign={
+            "lock_path": str(path),
+            "root": str(root),
+            "stage": "screen",
+            "allowed_steps": ["E00", "E06"],
+            "budget_limits": {
+                "envelopes_hours": {"foundation": 12},
+                "requests_cap": 100,
+                "tokens_cap": 1000,
+            },
+        },
+    )
+    calls = []
+
+    def worker(command, **kwargs):
+        job = yaml.safe_load(Path(command[-1]).read_text())["job"]
+        assert "E00" not in Path(job["output_dir"]).parts
+        calls.append(job["output_dir"])
+        return _fake_model_run(command, **kwargs)
+
+    monkeypatch.setattr(harness, "_run_subprocess", worker)
+    monkeypatch.setattr(harness, "build_dataset_inventory", lambda *args, **kwargs: None)
+    result = harness.run_stage(
+        suite,
+        stage="screen",
+        output_root=tmp_path / "new-results",
+        jobs=1,
+        resume=False,
+        workdir=tmp_path,
+    )
+    selection = json.loads(result.read_text())
+    assert selection["experiments"]["E00"]["outcome"] == "external_operational_acceptance"
+    assert selection["experiments"]["E00"]["decisions"] == []
+    assert len(calls) == 2
+    current = json.loads((root / "screen/current-result-set.json").read_text())
+    assert len(current["cells"]) == 2
+    assert all(row["cell_id"].startswith("E06/") for row in current["cells"])

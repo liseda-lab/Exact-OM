@@ -6542,9 +6542,28 @@ def run_stage(
                 persist()
                 continue
         if suite.campaign and stage == "screen":
-            from exact.experiments.campaign import compose_development
+            from exact.experiments.campaign import (
+                compose_development,
+                external_acceptance_selection,
+            )
 
             assert campaign_lock is not None
+            step = next(item for item in campaign_lock.steps if item.id == config.experiment_id)
+            if step.external_acceptance is not None:
+                selections[config.experiment_id] = {
+                    **_runtime_deferred_selection(
+                        source,
+                        suite,
+                        reason_code="external_operational_acceptance",
+                        reason="Verified historical G0 operational acceptance",
+                    ),
+                    **external_acceptance_selection(
+                        campaign_lock, step, Path(suite.campaign["lock_path"]).resolve().parent
+                    ),
+                    "experiment_config_hash": source.raw_hash(),
+                }
+                persist()
+                continue
             source = compose_development(source, campaign_lock, selections)
             config = source.config
             suite = replace(

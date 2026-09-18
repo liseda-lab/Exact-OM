@@ -252,6 +252,7 @@ class CampaignStep(StrictConfigModel):
         default=["global_alignment"]
     )
     estimate: Optional[WorkEstimate] = None
+    external_acceptance: Optional[InputBinding] = None
     selection: SelectionConfig
     design: DesignConfig
 
@@ -262,6 +263,15 @@ class CampaignStep(StrictConfigModel):
 
     @model_validator(mode="after")
     def bounded(self) -> "CampaignStep":
+        if self.external_acceptance is not None and (
+            self.id != "E00"
+            or self.family != "E00"
+            or self.phase != "initial"
+            or self.additional_cases
+            or self.inherits
+            or self.estimate is not None
+        ):
+            raise ValueError("external acceptance is only an initial E00 operational result")
         ids = [arm.id for arm in self.arms]
         if not ids or len(ids) != len(set(ids)):
             raise ValueError("step arms must be nonempty and unique")
@@ -497,6 +507,117 @@ def load_campaign(path: Path) -> tuple[CampaignLock, dict[str, Any]]:
     return lock, dict(design)
 
 
+def external_acceptance_selection(lock: CampaignLock, step: CampaignStep, root: Path) -> dict:
+    """Verify historical G0 acceptance without claiming current prediction compatibility."""
+    if step.external_acceptance is None:
+        raise ValueError("external acceptance binding missing")
+    record_path = step.external_acceptance.verify(root)
+    record = json.loads(record_path.read_text())
+    if record.get("schema_version") != 1 or record.get("kind") != "exact_om_g0_acceptance":
+        raise ValueError("unsupported external acceptance record")
+
+    def binding(value: Any) -> Path:
+        return InputBinding.model_validate(value).verify(record_path.parent)
+
+    report_path = binding(record["report"])
+    report = json.loads(report_path.read_text())
+    old_path = binding(record["campaign"])
+    old = load_yaml_mapping(old_path)
+    if (
+        report.get("status") != "passed"
+        or report.get("development_only") is not True
+        or report.get("generate_rationales") != lock.generate_rationales
+        or report.get("campaign_sha256") != record["campaign"]["sha256"]
+        or report.get("baseline") != lock.baseline_id
+        or old.get("model_lock", {}).get("sha256") != getattr(lock.model_lock, "sha256", None)
+        or lock.model_lock is None
+    ):
+        raise ValueError(
+            "external G0 acceptance has incompatible status, data role or model identity"
+        )
+    case = lock.cases[step.case]
+    old_case = old.get("cases", {}).get(step.case, {})
+    for name in (
+        "source",
+        "target",
+        "source_universe",
+        "references",
+        "local_references",
+        "candidates",
+    ):
+        current = getattr(case, name)
+        expected = old_case.get(name, {})
+        current_hashes = (
+            {key: value.sha256 for key, value in current.items()}
+            if isinstance(current, dict)
+            else getattr(current, "sha256", None)
+        )
+        old_hashes = (
+            {key: value["sha256"] for key, value in expected.items()}
+            if isinstance(current, dict)
+            else expected.get("sha256")
+        )
+        if current_hashes != old_hashes:
+            raise ValueError(f"external acceptance case input changed: {name}")
+    if case.overlay != old_case.get("overlay", {}) or case.role != "development":
+        raise ValueError(
+            "external acceptance requires the original development ontology configuration"
+        )
+    for name in ("source", "target"):
+        if report.get(name, {}).get("sha256") != getattr(case, name).sha256:
+            raise ValueError(f"external G0 report has a different {name}")
+    if (
+        record.get("source_cap") != step.source_cap
+        or step.source_cap != 300
+        or record.get("training_source_cap") != step.training_source_cap
+        or report.get("training", {}).get("source_groups") != step.training_source_cap
+    ):
+        raise ValueError("external acceptance must declare its actual source and training caps")
+    checks = report.get("replay_checks", {})
+    required = {"global300-resume", "global300-replay", "global300-cache", "local300-cache"}
+    if set(checks) != required or any(checks[name].get("status") != "passed" for name in required):
+        raise ValueError("external acceptance requires all global/local recovery checks")
+    for name in ("global300-cache", "local300-cache"):
+        if checks[name].get("completed_cache_bytes_verified") is not True:
+            raise ValueError("external acceptance requires exact completed-cache mappings")
+    rows = {row["id"]: row for row in report["stages"]}
+    for mode, stage_id, filename in (
+        ("global_alignment", "global300", "maps_global.tsv"),
+        ("local_ranking", "local300", "maps_local.tsv"),
+    ):
+        manifest_path = binding(record["manifests"][mode])
+        output_path = binding(record["outputs"][mode])
+        row = rows[stage_id]
+        manifest = json.loads(manifest_path.read_text())
+        if (
+            row.get("status") != "complete"
+            or manifest_path != Path(row["output_dir"]).resolve() / "experiment_manifest.json"
+            or output_path != manifest_path.parent / "alignment" / filename
+            or manifest.get("status") != "complete"
+            or manifest.get("return_code") != 0
+            or manifest.get("extraction_complete") is not True
+            or manifest.get("execution_mode") != mode
+            or manifest.get("source_cap") != 300
+            or manifest.get("seed") != 17
+            or manifest.get("split_role") != "development"
+            or manifest.get("generate_rationales") != lock.generate_rationales
+        ):
+            raise ValueError("external acceptance output does not match its completed G0 stage")
+    return {
+        "status": "complete",
+        "outcome": "external_operational_acceptance",
+        "decisions": [],
+        "acceptance": step.external_acceptance.model_dump(mode="json"),
+        "source_cap": step.source_cap,
+        "training_source_cap": step.training_source_cap,
+        "execution_modes": ["global_alignment", "local_ranking"],
+        "new_cells": 0,
+        "quality_claim": False,
+        "current_code_prediction_compatibility": False,
+        "reason": "Historical G0 operational acceptance; no treatment selection or inherited policy",
+    }
+
+
 def campaign_plan(path: Path, *, stage: str, verify_inputs: bool = True) -> dict[str, Any]:
     """Return a bounded work/readiness inventory without opening reporting labels."""
     if stage not in {"screen", "confirm"}:
@@ -531,6 +652,11 @@ def campaign_plan(path: Path, *, stage: str, verify_inputs: bool = True) -> dict
         if (step.phase == "final") != (stage == "confirm"):
             continue
         input_errors = []
+        if step.external_acceptance is not None:
+            try:
+                external_acceptance_selection(lock, step, root)
+            except (OSError, ValueError, KeyError, TypeError) as exc:
+                input_errors.append(f"external acceptance: {exc}")
         for case_id in [step.case, *step.additional_cases]:
             case = lock.cases[case_id]
             for name in ("source", "target", "source_universe"):
@@ -585,7 +711,11 @@ def campaign_plan(path: Path, *, stage: str, verify_inputs: bool = True) -> dict
                 issues.append(baseline_error)
             if status not in {"screen_ready", "confirm_ready", "complete"}:
                 issues.append(readiness.reason if readiness else f"{stage} readiness missing")
-            if step.estimate is None and status not in TERMINAL:
+            if (
+                step.estimate is None
+                and step.external_acceptance is None
+                and status not in TERMINAL
+            ):
                 issues.append("measured cold/warm resource forecast missing")
             if stage == "confirm" and lock.final_selection is None:
                 issues.append("G4 frozen final selection missing")
