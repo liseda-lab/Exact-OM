@@ -224,7 +224,9 @@ verified baseline/model locks and local bindings.
 
 On 2026-09-18 the user authorized the first bounded retrieval wave after the sampled
 evaluator repair. Revision 07 admits only E05's four label-free arms and imports verified
-G0 operational acceptance without new E00 cells. Slurm job **14217** is submitted, pending
-release of interactive allocation 14212. The conservative forecast is 8.03 hours, with zero
-hosted calls and no wall-time cutoff. Later comparisons and final reporting remain gated.
+G0 operational acceptance without new E00 cells. At the user's request, pending batch job
+**14217** was cancelled before execution. The wave started at 17:59 UTC inside interactive
+allocation **14212**, as step **14212.2** in detached tmux session `exact-screen-01`, preserving
+the shell and VS Code access. The conservative forecast is 8.03 hours, with zero hosted calls
+and no wall-time cutoff. Later comparisons and final reporting remain gated.
 See [FIRST-SCREEN.md](FIRST-SCREEN.md) for scope, validation, limits and monitoring commands.

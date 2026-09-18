@@ -1,9 +1,12 @@
 # First bounded retrieval screen
 
 The user authorized fixing the remaining issues and submitting this wave on 2026-09-18.
-Slurm job **14217** (`exact-e05-screen`) was submitted at 17:33 UTC. It waits for the existing
-interactive allocation **14212** to finish. Submission is not evidence that the experiment
-has started or succeeded. The full scientific campaign remains gated by later results.
+The wave started at **17:59 UTC** inside the existing interactive allocation **14212**,
+as Slurm step **14212.2**, in detached tmux session `exact-screen-01`. This preserves the
+interactive shell and VS Code access. The earlier pending batch job **14217** was cancelled
+before execution when the user clarified this requirement; its submission record is retained.
+Starting the wave does not establish success. The full scientific campaign remains gated
+by later results.
 
 ## Frozen work
 
@@ -48,21 +51,24 @@ revisions, label-free resolved components, hosted gate off, and rationales off.
 
 ## Handoff
 
-Release allocation 14212 when finished with that interactive session. From the cluster login
-node, `scancel 14212` releases it explicitly; this terminates its interactive processes.
-The queued batch job can then acquire liseda-01 without an attached terminal.
+Keep allocation **14212** and its interactive shell alive: they carry the experiment and
+VS Code access. The experiment runs in a separate overlapping Slurm step within that allocation.
+To view the detached session from liseda-01, attach with the command below; press **Ctrl-b**,
+then **d** to detach again while leaving the experiment running.
 
 ```console
-squeue -j 14217
-tail -f /home/pgcotovio/Exact-OM/data/experiments-v2/first-screen-01/slurm-14217.out
-tail -f /home/pgcotovio/Exact-OM/data/experiments-v2/first-screen-01/slurm-14217.err
+tmux attach -t exact-screen-01
+squeue --steps -j 14212
+tail -f /home/pgcotovio/Exact-OM/data/experiments-v2/first-screen-01/launcher.log
 ```
 
-`batch-status.json` records the launcher state; the runtime `screen/progress.json`, per-cell
-`experiment_manifest.json`, and eventual `screen/selection.json` record experimental progress.
-`exit-code` appears when the launcher exits. Logs append across Slurm requeues and batch attempts
-have separate records. The job has unlimited Slurm wall time and requeue enabled; persistent
-stage checkpoints permit resume, but do not prevent the unresolved host resets.
+`interactive-launch.json` records the active launch command and allocation; `launch-status.json`
+records the launcher state. The runtime `screen/progress.json`, per-cell `experiment_manifest.json`,
+and eventual `screen/selection.json` record experimental progress. `exit-code` appears when the
+launcher exits. Logs append and launch attempts have separate records. The allocation has
+unlimited Slurm wall time. This interactive run has **no automatic batch requeue**: tmux survives
+detachment but not a node reboot or allocation cancellation. Persistent checkpoints permit
+explicit recovery after restoring access; they do not prevent the unresolved host resets.
 
 Cooperatively stop scheduling/work at the next supported boundary:
 
@@ -70,7 +76,7 @@ Cooperatively stop scheduling/work at the next supported boundary:
 touch data/experiments-v2/first-screen-01/runtime/exact-om-focused-v2/STOP
 ```
 
-The batch wrapper preserves an existing STOP file on requeue. Review the reason and remove it
+The launcher preserves an existing STOP file on restart. Review the reason and remove it
 only when intentionally resuming. Do not edit the frozen campaign or overwrite historical
 attempts. This submission does not authorize changing production defaults or making reporting
 claims from development selections.
