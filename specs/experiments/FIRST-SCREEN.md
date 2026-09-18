@@ -11,14 +11,22 @@ The user authorized repair and resubmission. Revision 08 preserves every resolve
 configuration and corrects operational admission for the relation verbaliser. The authenticated
 retry started at **19:58 UTC** in Slurm step **14212.3**, with tmux session `exact-screen-02`,
 inside the existing interactive allocation. Its records are in
-`data/experiments-v2/first-screen-02/`; `launch-status.json` records current launcher state. The earlier attempt remains intact in `first-screen-01/`.
+`data/experiments-v2/first-screen-02/`. This attempt was interrupted by the node reboot
+around 20:24 UTC; Slurm closed step 14212.3 at 20:25:45. A second boot occurred at 20:35.
+Its unclosed running marker is stale. The baseline retained a verified checkpoint of
+512/5,842 scored pairs; no arm completed and no new hosted requests occurred. The earlier attempt remains intact in `first-screen-01/`.
+The user authorized resuming that checkpoint in the current interactive allocation **14220**.
+The continuation started at **22:39 UTC** as Slurm step **14220.1**, detached in
+`exact-screen-03`, using the same revision 08 campaign and outputs in `first-screen-03/`.
+Its `launch-status.json` records the new attempt; earlier attempt files remain intact.
 The full scientific campaign remains gated by later results.
 
 ## Frozen work
 
 Preparation: `data/experiments-v2/prepared-campaign-08/campaign.lock.yaml`.
-Output and launch records: `data/experiments-v2/first-screen-02/`.
-Repair and recovery evidence: `data/experiments-v2/first-screen-repair-01/`.
+Current output and launch records: `data/experiments-v2/first-screen-03/`.
+Verbaliser repair evidence: `data/experiments-v2/first-screen-repair-01/`.
+Node-reboot recovery evidence: `data/experiments-v2/first-screen-reboot-01/`.
 
 Only E05's baseline, SapBERT, reciprocal-rank fusion and adaptive-k arms are admitted:
 300 NCIT–DOID development sources, seed 17, global mode, target-label-free components.
@@ -66,6 +74,14 @@ cache validation remains active. Ontology objects still load where needed for in
 SQLite backups preserve compatible encoder vectors and all failed request records. The
 budget retains G0, failed E05 work, measured launcher overhead and the authentication probe.
 
+Reboot recovery combines the latest 512-pair baseline checkpoint with the other three arms'
+prepared boundaries, preserving signed progress for the unchanged campaign. The interrupted
+SQLite database and its journal are copied before recovery; SQLite rolls back only the copy.
+Original database bytes and prior attempts remain intact. The interrupted reservation is
+settled at the 1,618-second Slurm allocation interval, explicitly a conservative bound including
+preparation and possible controller delay after node loss. It is not a measured compute time.
+The original forecast and all prior hosted usage remain recorded.
+
 The earlier sampled-local evaluator repair reproduced G0's 300-source/310-query population
 and saved metrics without rescoring. Its 24 runtime tests, 39 campaign tests and 15 launcher/
 configuration tests passed. The separate 52-fixture recovery audit and two reporting guards
@@ -73,15 +89,15 @@ retain the limitations in `first-screen-preflight/recovery-fixtures.json`.
 
 ## Handoff
 
-Keep allocation **14212** and its interactive shell alive for experiment and VS Code access.
+Keep allocation **14220** and its interactive shell alive for experiment and VS Code access.
 Future launches use Slurm steps inside the existing allocation, as specified in
 [NODE-SETUP.md](NODE-SETUP.md). Detached tmux hosts `srun`; detaching does not release the
-allocation. The new session is `exact-screen-02`; the failed `exact-screen-01` pane is retained.
+allocation. The continuation session is `exact-screen-03`. Earlier tmux sessions were lost with the reboot.
 
 ```console
-tmux attach -t exact-screen-02
-squeue --steps -j 14212
-tail -f /home/pgcotovio/Exact-OM/data/experiments-v2/first-screen-02/launcher.log
+tmux attach -t exact-screen-03
+squeue --steps -j 14220
+tail -f /home/pgcotovio/Exact-OM/data/experiments-v2/first-screen-03/launcher.log
 ```
 
 Press **Ctrl-b**, then **d** to detach. `interactive-launch.json` records the actual Slurm
@@ -95,7 +111,7 @@ node reboot, but tmux cannot survive a reboot or allocation cancellation.
 Cooperatively stop at the next supported boundary:
 
 ```console
-touch data/experiments-v2/first-screen-02/runtime/exact-om-focused-v2/STOP
+touch data/experiments-v2/first-screen-03/runtime/exact-om-focused-v2/STOP
 ```
 
 The launcher preserves an existing STOP file. Review its reason before intentionally resuming.

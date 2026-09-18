@@ -241,3 +241,12 @@ usage and the successful 135-token authentication probe remain charged. The revi
 allowance is 8.28 hours; rationales remain off. The retry started at 19:58 UTC in Slurm
 step **14212.3**, detached in tmux `exact-screen-02` within the existing interactive allocation.
 `launch-status.json` records current launcher state.
+
+The 19:58 retry was interrupted by the node reboot around 20:24 UTC; step 14212.3 closed
+at 20:25:45. It saved 512/5,842 baseline pairs, with every checkpoint output verified,
+and made no new hosted requests. The user authorized continuation under allocation 14220.
+`first-screen-03/` uses the same revision 08 campaign and combines that scored boundary with
+the other arms' prepared caches. SQLite recovery operates on copies, preserving prior files.
+See the current handoff in [FIRST-SCREEN.md](FIRST-SCREEN.md).
+The continuation started at **22:39 UTC** as step **14220.1**, in detached tmux session
+`exact-screen-03`. Source/native pins passed; the launcher preserves the interactive shell.
