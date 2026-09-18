@@ -2,7 +2,7 @@
 
 The user authorized operational validation on 2026-09-10, a fresh post-native attempt on
 2026-09-14, a restart without a wall-time limit on 2026-09-15, and repair/recovery of the
-output-writing failure on 2026-09-17. Monitoring is handed back rather than waiting through
+output-writing failure on 2026-09-17 and replay-comparison recovery on 2026-09-18. Monitoring is handed back rather than waiting through
 the job. This does not authorize launching the long
 screen/confirmation campaign. G0 uses only NCIT–DOID train/development inputs; no private
 test references.
@@ -21,7 +21,7 @@ operational replay, deliberate interruption, relocation/resume, and completed-ca
 The fit population is explicitly bounded for validation, so this is not a full-training-quality
 result or a component-selection experiment. A failed or unaffordable phase stops the job.
 
-Attempt 09 retains `--no-time-limit --requests-cap 100000 --tokens-cap 32000000`.
+Attempt 10 retains `--no-time-limit --requests-cap 100000 --tokens-cap 32000000`.
 The user removed G0's wall deadline and approved finite hosted headroom for fitting and
 replays. One GPU worker, two numerical CPU threads, at most 56 GiB process RAM, cooperative
 STOP and the request/token caps remain enforced. Unknown hosted deliveries are not
@@ -29,12 +29,12 @@ automatically retried. Runtime forecasts remain reported as conservative estimat
 are not wall-deadline gates. Request/token admission still applies.
 
 The recovery plan retains the verified cold64, warm64 and fit64 artifacts originally measured
-in attempt 06 and attempt 07's successful rationale-free hosted20 probe. Attempt 09 adopts
-attempt 08's complete, content-addressed global300 extraction artifact and reruns reporting
-without a model worker. Identity checks limit the intervening change to posthoc relation
-normalization; scoring, selector fitting and saved mappings are unchanged. Completed model
-work is not a new measurement. Historical time and hosted usage stay charged, and previous
-attempt files remain unchanged.
+in attempt 06 and attempt 07's successful rationale-free hosted20 probe. Attempt 10 also
+adopts attempt 09's completed global run, deliberate interruption, resumed run and cache replay
+with verified artifact and checkpoint evidence. It rechecks their equivalence using the existing
+replay policy before executing local300 and its completed-cache replay. Scoring and selector
+fitting are unchanged. Imported stages retain their original measurements and are not new
+model work. Historical time and hosted usage stay charged; previous files remain unchanged.
 
 This supersedes attempt 06's 41,400-second hard/39,600-second soft allowance and its
 2,000-request/3.2-million-token caps for the new G0 continuation only. Attempt 06 and all
@@ -45,8 +45,8 @@ campaign remains unadmitted.
 
 ## Monitor and stop
 
-G0-09 recovery is configured for `data/experiments-v2/g0-validation-09/`, using
-`/tmp/exact-native-candidate/bin/python` and tmux session `exact-g0-09`. This records the
+G0-10 recovery is configured for `data/experiments-v2/g0-validation-10/`, using
+`/tmp/exact-native-candidate/bin/python` and tmux session `exact-g0-10`. This records the
 restart configuration, not a claim that the job has launched.
 `status.json` and `report.json` are authoritative for runtime status. The installed native
 identity, adoption evidence and resource amendment belong with this attempt's plan.
@@ -61,8 +61,8 @@ replay as a new cold/warm timing.
 After launch, monitor with:
 
 ```console
-tmux attach -t exact-g0-09
-/tmp/exact-native-candidate/bin/python data/experiments-v2/g0-validation-09/monitor.py
+tmux attach -t exact-g0-10
+/tmp/exact-native-candidate/bin/python data/experiments-v2/g0-validation-10/monitor.py
 ```
 
 Detach from tmux with Ctrl-b, then d. `status.json` reports the current phase, process and
@@ -73,7 +73,7 @@ can remain open after completion, so session existence alone does not mean work 
 Request a cooperative stop:
 
 ```console
-touch data/experiments-v2/g0-validation-09/STOP
+touch data/experiments-v2/g0-validation-10/STOP
 ```
 
 The parent forwards STOP to the active worker, including during ontology loading. Completed
@@ -215,7 +215,23 @@ The real saved-output postprocessing check passes attribution, builtin evaluatio
 comparison with zero mapping-score/metric drift across all 300 mappings and no model calls.
 Hashed evidence is in `data/experiments-v2/g0-postprocessing-repair-01/`.
 
-Attempt 09 is configured to adopt the complete global300 extraction artifact, repeat
-reporting without a worker, and continue the remaining local/global recovery checks. Attempt
-08's failure, completed outputs and cumulative historical charges remain intact. G0 remains
-unpassed until the new report confirms all prescribed checks.
+Attempt 09 recovered global300 reporting without a model worker and completed the global
+interruption/resume/cache-replay sequence. It stopped after 2,111.19 seconds of new active work
+because the launcher compared the resumed output with the original TSV byte for byte. All
+300 mapping identities and aggregate metrics match; six scores differ by at most
+`3.3306690738754696e-16`. The existing [RUN-PLAN.md](RUN-PLAN.md) policy permits `1e-5` score
+drift on the pinned GPU. The resumed output and its completed-cache replay are byte-identical.
+Attempt 09 added no hosted requests, retaining 785 cumulative requests and USD 0.1034658.
+
+Attempt 10 is configured to reuse these verified global stages and apply the existing replay
+comparator, which requires exact mapping/relation identities and checks score and metric
+tolerances. Completed-cache copies must still be byte-identical and perform no new model work.
+Only local300 and its cache replay remain to run. No scoring algorithm, reference, hypothesis
+or tolerance is changed. G0 remains unpassed until the new report confirms every check.
+
+Preflight evidence is retained in `data/experiments-v2/g0-replay-repair-01/`: the actual global
+outputs pass the corrected comparison, and the local writer/evaluator/attribution path passes
+with the actual 300-source frozen candidate pool. Local smoke scores are synthetic transport
+fixtures, not quality measurements. The local reporting-only reevaluation path has a separate
+sample-population issue recorded in that evidence; the immediate completed-cache replay imports
+the original evaluation artifact and does not invoke that path.

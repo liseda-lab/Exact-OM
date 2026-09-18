@@ -119,14 +119,21 @@ shared relation normalizer, preserving identities, directionality, scoring and s
 Actual saved-output attribution/evaluation/replay checks now pass with zero score or metric
 drift; evidence is in `data/experiments-v2/g0-postprocessing-repair-01/`.
 
-Under the user's 2026-09-17 repair/rerun authorization, G0-09 recovery is configured with
-`/tmp/exact-native-candidate/bin/python`, tmux `exact-g0-09`, output
-`data/experiments-v2/g0-validation-09/`; configuration does not itself establish launch.
-It adopts verified probes and the complete content-addressed global300 extraction artifact,
-then reruns reporting without a model worker before the remaining checks. Prior attempts,
-historical charges and original cold/warm/fit timings remain intact. Rationales remain off,
-with no wall deadline and the unchanged 100,000-request/32-million-token allowance. G0 is
-not yet complete, and the long scientific campaign remains unadmitted.
+G0-09 completed the repaired reporting and global interruption/resume/cache sequence, then
+failed an overly strict byte comparison. All 300 mappings and metrics match; six scores differ
+by at most `3.33e-16`, within the already specified pinned-GPU `1e-5` tolerance. The resumed
+output and completed-cache replay are byte-identical. Attempt 09 took 2,111.19 seconds of new
+active work and added no hosted requests.
+
+Under the user's 2026-09-18 repair/rerun authorization, G0-10 is configured with
+`/tmp/exact-native-candidate/bin/python`, tmux `exact-g0-10`, output
+`data/experiments-v2/g0-validation-10/`; configuration does not itself establish launch.
+It adopts the verified probes and all four global stages, rechecks their equivalence with the
+existing replay comparator, then runs local300 and its completed-cache replay. Cache copies
+still require exact bytes and zero new model work. Prior attempts, historical charges and
+original measurements remain intact. Rationales remain off, with no wall deadline and the
+unchanged 100,000-request/32-million-token allowance. G0 is not yet complete, and the long
+scientific campaign remains unadmitted.
 See [G0-VALIDATION.md](G0-VALIDATION.md) for monitor/STOP commands and retained history;
 `status.json` and `report.json` remain authoritative for progress and completion.
 
