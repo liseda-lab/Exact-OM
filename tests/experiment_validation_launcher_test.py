@@ -376,6 +376,10 @@ def test_cli_explicit_unlimited_wall_and_revised_hosted_caps(monkeypatch, extra,
         None,
         "roundoff",
         "resumed_globals",
+        "reboot_replay",
+        "reboot_worker",
+        "reboot_api",
+        "reboot_missing_cache",
         "changed_mapping",
         "changed_identity",
         "changed_relation",
@@ -418,10 +422,23 @@ def test_full_validation_recovery_flow_rejects_changed_or_paid_replay(tmp_path, 
     usage = {"attempts": 0, "prompt_tokens": 0, "completion_tokens": 0}
     monkeypatch.setattr(launcher, "ledger_totals", lambda *_: dict(usage))
     cells = {}
+    reboot_attempt = False
 
     def execute_cell(cell, suite, *, workdir, resume):
         name = cell.output_dir.parent.name
         cells[name] = cell
+        if reboot_attempt:
+            assert name == "local300-replay"
+            if fault == "reboot_worker":
+                harness._run_subprocess([], cwd=tmp_path, stdout_path=None, stderr_path=None)
+            elif fault == "reboot_api":
+                from exact.llm.routing import OpenRouterClient
+
+                OpenRouterClient.__init__(object())
+            elif fault == "reboot_missing_cache":
+                from exact.experiments.runtime import CellRecovery
+
+                CellRecovery.prepare(SimpleNamespace(reuse={"inputs", "extraction"}))
         assert cell.resolved_config["pipeline"][0]["params"]["generate_llm_rationales"] is False
         assert "/never-open-private-test.tsv" not in json.dumps(cell.resolved_config)
         assert cell.split_role == "development"
@@ -493,12 +510,14 @@ def test_full_validation_recovery_flow_rejects_changed_or_paid_replay(tmp_path, 
         resume_from=None,
         resume_probes_from=None,
         resume_failed_from=None,
+        resume_interrupted_from=None,
         execute=True,
         scratch_root=None,
         skip_hosted=False,
         generate_rationales=False,
     )
-    passes = fault in {None, "roundoff", "resumed_globals"}
+    reboot = str(fault).startswith("reboot_")
+    passes = reboot or fault in {None, "roundoff", "resumed_globals"}
     assert launcher.execute(args) == (0 if passes else 2)
     report = json.loads((args.output_root / "report.json").read_text())
     assert report["status"] == ("passed" if passes else "failed")
@@ -523,11 +542,15 @@ def test_full_validation_recovery_flow_rejects_changed_or_paid_replay(tmp_path, 
         assert checks["global300-resume"]["max_score_delta"] < 1e-5
         assert checks["global300-cache"]["completed_cache_bytes_verified"]
         assert checks["local300-cache"]["completed_cache_bytes_verified"]
-    if fault == "resumed_globals":
+    if reboot or fault == "resumed_globals":
         from copy import deepcopy
         from tools import validation_resume
+        from exact.experiments.runtime import CellRecovery
+        from exact.llm.routing import OpenRouterClient
 
-        imported = {row["id"]: deepcopy(row) for row in report["stages"][:8]}
+        original_hooks = (harness._run_subprocess, CellRecovery.prepare, OpenRouterClient.__init__)
+        saved_count = 9 if reboot else 8
+        imported = {row["id"]: deepcopy(row) for row in report["stages"][:saved_count]}
         for row in imported.values():
             row.update(imported=True, new_worker_calls=0, new_usage=dict(usage))
             row["measurement_usage"] = dict(usage)
@@ -535,23 +558,57 @@ def test_full_validation_recovery_flow_rejects_changed_or_paid_replay(tmp_path, 
             "prior_hosted_usage": dict(usage),
             "prior_ledger_usage": dict(usage),
         }
+        if reboot:
+            imported["cold64"]["adoption_evidence"]["elapsed_accounting"] = {
+                "status": "lower_bound",
+                "elapsed_seconds_lower_bound": report["elapsed_seconds"],
+                "final_elapsed_seconds": None,
+            }
         monkeypatch.setattr(
             validation_resume,
-            "adopt_failed_validation",
+            "adopt_interrupted_validation" if reboot else "adopt_failed_validation",
             lambda *a, **kw: (imported, report["elapsed_seconds"], {}),
         )
-        args.resume_failed_from = args.output_root
+        if reboot:
+            args.resume_interrupted_from = args.output_root
+        else:
+            args.resume_failed_from = args.output_root
         args.output_root = tmp_path / "remaining"
         cells.clear()
-        assert launcher.execute(args) == 0
+        reboot_attempt = reboot
+        rejects_work = reboot and fault != "reboot_replay"
+        assert launcher.execute(args) == (2 if rejects_work else 0)
         resumed = json.loads((args.output_root / "report.json").read_text())
-        assert list(cells) == ["local300", "local300-replay"]
-        assert resumed["stages"][:8] == list(imported.values())
-        assert [row["id"] for row in resumed["stages"][-2:]] == list(cells)
-        assert resumed["elapsed_seconds"] >= report["elapsed_seconds"]
-        assert resumed["resume"]["scope"] == (
-            "Reuse completed probes and global checks; run remaining local checks"
+        assert original_hooks == (
+            harness._run_subprocess,
+            CellRecovery.prepare,
+            OpenRouterClient.__init__,
         )
+        assert list(cells) == (["local300-replay"] if reboot else ["local300", "local300-replay"])
+        assert resumed["stages"][:saved_count] == list(imported.values())
+        assert resumed["elapsed_seconds"] >= report["elapsed_seconds"]
+        if reboot:
+            assert resumed["replay_only"] is True
+            assert resumed["elapsed_accounting"]["status"] == "lower_bound"
+            assert (
+                resumed["elapsed_accounting"]["elapsed_seconds_lower_bound"]
+                == resumed["elapsed_seconds"]
+            )
+            assert resumed["elapsed_accounting"]["final_elapsed_seconds"] is None
+            assert resumed["resume"]["scope"] == (
+                "Finalize the local cache replay without model workers or hosted requests"
+            )
+            if rejects_work:
+                assert "Replay-only finalization" in resumed["reason"]
+            else:
+                assert resumed["stages"][-1]["id"] == "local300-replay"
+                assert resumed["stages"][-1]["new_worker_calls"] == 0
+                assert resumed["stages"][-1]["new_usage"]["attempts"] == 0
+        else:
+            assert [row["id"] for row in resumed["stages"][-2:]] == list(cells)
+            assert resumed["resume"]["scope"] == (
+                "Reuse completed probes and global checks; run remaining local checks"
+            )
     elif not passes:
         message = {
             "changed_mapping": "score drift",

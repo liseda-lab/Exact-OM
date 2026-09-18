@@ -314,6 +314,9 @@ def forward_stop(process, stop, forwarded):
 def execute(args):
     import psutil
 
+    interrupted_from = getattr(args, "resume_interrupted_from", None)
+    replay_only = interrupted_from is not None
+
     from exact.core.entities.configs.yaml_io import load_yaml_mapping
     from exact.experiments import harness
     from exact.experiments.campaign import (
@@ -375,6 +378,7 @@ def execute(args):
         "development_only": True,
         "changes_campaign_readiness": False,
         "generate_rationales": getattr(args, "generate_rationales", False),
+        "replay_only": replay_only,
         "production_scope": "300 development groups; frozen matching configuration, bounded64-group training population",
         "status": "prepared",
         "stages": [],
@@ -421,29 +425,35 @@ def execute(args):
         }
         info["stages"].append(imported_cold)
         write_json(output / "cold64.measurement.json", imported_cold)
-    elif getattr(args, "resume_probes_from", None) or getattr(args, "resume_failed_from", None):
+    elif (
+        getattr(args, "resume_probes_from", None)
+        or getattr(args, "resume_failed_from", None)
+        or interrupted_from
+    ):
         from tools.validation_resume import (
             adopt_completed_probes,
             adopt_failed_validation,
         )
 
         failed_from = getattr(args, "resume_failed_from", None)
-        previous = failed_from or args.resume_probes_from
+        previous = interrupted_from or failed_from or args.resume_probes_from
         expected_configs = {}
         names = ("cold64", "warm64", "fit64")
-        if failed_from:
+        if failed_from or replay_only:
             names += ("hosted20", "global300")
+        if replay_only:
+            names += ("local300",)
         for name in names:
             expected, _ = validation_config(
                 base,
                 case,
                 lock_root,
                 training,
-                mode="global_alignment",
-                cap=300 if name == "global300" else 20 if name == "hosted20" else 64,
-                hosted=name in {"hosted20", "global300"},
-                fit=name in {"fit64", "global300"},
-                evaluate=name == "global300",
+                mode="local_ranking" if name == "local300" else "global_alignment",
+                cap=300 if name in {"global300", "local300"} else 20 if name == "hosted20" else 64,
+                hosted=name in {"hosted20", "global300", "local300"},
+                fit=name in {"fit64", "global300", "local300"},
+                evaluate=name in {"global300", "local300"},
                 generate_rationales=getattr(args, "generate_rationales", False),
             )
             expected_configs[name] = harness._bind_model_lock_revisions(
@@ -457,7 +467,13 @@ def execute(args):
             expected_configs=expected_configs,
             materialize=args.execute,
         )
-        if failed_from:
+        if replay_only:
+            from tools.validation_resume import adopt_interrupted_validation
+
+            imported_probes, prior_elapsed, global_repair = adopt_interrupted_validation(
+                previous.resolve(), output, **options
+            )
+        elif failed_from:
             imported_probes, prior_elapsed, global_repair = adopt_failed_validation(
                 previous.resolve(), output, **options
             )
@@ -467,6 +483,8 @@ def execute(args):
             )
         imported_cold = imported_probes["cold64"]
         evidence = imported_cold["adoption_evidence"]
+        if replay_only:
+            info["elapsed_accounting"] = dict(evidence["elapsed_accounting"])
         previous_usage = evidence["prior_hosted_usage"]
         copied_usage = evidence.get("prior_ledger_usage", {})
         prior_usage = {
@@ -485,17 +503,21 @@ def execute(args):
             "previous_hosted_usage": previous_usage,
             "copied_hosted_usage": copied_usage,
             "scope": (
-                (
-                    "Reuse completed probes and global checks; run remaining local checks"
-                    if "global300" in imported_probes
-                    else (
-                        "Reuse completed probes and restore the verified output-repair checkpoint"
-                        if global_repair.get("checkpoint_repair")
-                        else "Reuse completed probes and extraction; rerun failed reporting"
+                "Finalize the local cache replay without model workers or hosted requests"
+                if replay_only
+                else (
+                    (
+                        "Reuse completed probes and global checks; run remaining local checks"
+                        if "global300" in imported_probes
+                        else (
+                            "Reuse completed probes and restore the verified output-repair checkpoint"
+                            if global_repair.get("checkpoint_repair")
+                            else "Reuse completed probes and extraction; rerun failed reporting"
+                        )
                     )
+                    if failed_from
+                    else "Reuse verified local probes; remeasure hosted20 with fresh responses"
                 )
-                if failed_from
-                else "Reuse verified local probes; remeasure hosted20 with fresh responses"
             ),
             "global_repair": global_repair,
         }
@@ -527,7 +549,9 @@ def execute(args):
     stop = output / "STOP"
     current = {"evaluate": False, "phase": "starting", "worker_calls": 0, "warm_from": None}
     from exact.experiments.runtime import CellRecovery
+    from exact.llm.routing import OpenRouterClient
 
+    original_client_init = OpenRouterClient.__init__
     original_run = harness._run_subprocess
     original_prepare = CellRecovery.prepare
     suite = LoadedSuite(
@@ -549,7 +573,12 @@ def execute(args):
     signal.signal(signal.SIGINT, stopped)
     signal.signal(signal.SIGTERM, stopped)
 
+    def refuse_new_work(*args, **kwargs):
+        raise RuntimeError("Replay-only finalization prohibits model workers and hosted requests")
+
     def run(command, *, cwd, stdout_path, stderr_path, env=None):
+        if replay_only:
+            refuse_new_work()
         wrapper = load_yaml_mapping(Path(command[-1]))["job"]
         worker_output = Path(wrapper["output_dir"])
         if current["warm_from"] is not None:
@@ -638,6 +667,8 @@ def execute(args):
         return code, time.monotonic() - wall_start, peak // 1024
 
     def prepare(recovery):
+        if replay_only and recovery.reuse != {"inputs", "extraction", "evaluation"}:
+            raise ValueError("Replay-only finalization requires all completed cache stages")
         original_prepare(recovery)
         if recovery.metadata.get("checkpoint_repair"):
             from tools.validation_resume import seed_repaired_checkpoint
@@ -646,6 +677,8 @@ def execute(args):
 
     harness._run_subprocess = run
     CellRecovery.prepare = prepare
+    if replay_only:
+        OpenRouterClient.__init__ = refuse_new_work
     stage_outputs = {name: Path(row["output_dir"]) for name, row in imported_probes.items()}
 
     def stage(
@@ -764,7 +797,7 @@ def execute(args):
     try:
         cold = imported_cold or stage("cold64", cap=64, hosted=False)
         bound = cold_budget_bound(cold, elapsed=elapsed_seconds(), limits=limits)
-        if not bound["fits_limits"]:
+        if not replay_only and not bound["fits_limits"]:
             write_json(output / "budget-plan.json", bound)
             raise ValidationBudgetExceeded(
                 "The measured cold-reload term alone exceeds the remaining validation budget; "
@@ -779,13 +812,23 @@ def execute(args):
         if not fits:
             raise RuntimeError("Small current-selector fit produced no training-unit artifact")
         totals = usage_totals()
-        bound = forecast(
-            info["stages"],
-            elapsed=elapsed_seconds(),
-            max_seconds=limits["soft_seconds"],
-            requests=totals["attempts"],
-            tokens=totals["prompt_tokens"] + totals["completion_tokens"],
-            limits=limits,
+        bound = (
+            {
+                "scope": "Completed model stages restored; only cache replay remains",
+                "remaining_requests": 0,
+                "remaining_tokens": 0,
+                "fits_limits": True,
+                "limits": limits,
+            }
+            if replay_only
+            else forecast(
+                info["stages"],
+                elapsed=elapsed_seconds(),
+                max_seconds=limits["soft_seconds"],
+                requests=totals["attempts"],
+                tokens=totals["prompt_tokens"] + totals["completion_tokens"],
+                limits=limits,
+            )
         )
         write_json(output / "budget-plan.json", bound)
         if args.skip_hosted:
@@ -868,12 +911,15 @@ def execute(args):
     finally:
         harness._run_subprocess = original_run
         CellRecovery.prepare = original_prepare
+        OpenRouterClient.__init__ = original_client_init
         info.update(
             ended_at=time.time(),
             elapsed_seconds=elapsed_seconds(),
             hosted_usage=usage_totals(),
             g0_admission="not_granted; review measurements, omitted scenarios and family-specific forecasts",
         )
+        if replay_only:
+            info["elapsed_accounting"]["elapsed_seconds_lower_bound"] = info["elapsed_seconds"]
         write_json(output / "report.json", info)
         write_json(output / "status.json", info)
     return 0 if info["status"] == "passed" else 2
@@ -899,6 +945,11 @@ def main():
         "--resume-failed-from",
         type=Path,
         help="Recover verified probes and global stages after an output, reporting, or replay-comparison failure",
+    )
+    recovery.add_argument(
+        "--resume-interrupted-from",
+        type=Path,
+        help="Finish a verified post-reboot local cache replay without model or hosted work",
     )
     parser.add_argument(
         "--api-key-file",
