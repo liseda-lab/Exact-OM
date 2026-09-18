@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 from typing import Optional, Sequence
@@ -32,6 +33,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="A dependency-aware experiment suite manifest.",
     )
     source.add_argument("--campaign", type=Path, help="A strict v2 campaign lock.")
+    parser.add_argument(
+        "--api-key-file",
+        type=Path,
+        help="Read an OpenRouter key into the worker environment; never write it to artifacts.",
+    )
     parser.add_argument(
         "--materialize-only",
         action="store_true",
@@ -103,6 +109,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     if args.jobs < 1:
         parser.error("--jobs must be positive")
     try:
+        if args.api_key_file is not None:
+            key = args.api_key_file.expanduser().read_text(encoding="utf-8").strip()
+            if not key:
+                raise ValueError("API-key file is empty")
+            os.environ["OPENROUTER_API_KEY"] = key
         if args.campaign:
             from exact.experiments.campaign import (
                 campaign_plan,
