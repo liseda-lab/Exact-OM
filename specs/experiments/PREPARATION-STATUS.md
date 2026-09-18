@@ -183,9 +183,9 @@ G0's encoder, fitting, hosted or 300-source operational checks.
 [NATIVE-PREPROCESSING.md](NATIVE-PREPROCESSING.md) records the model-free workflow and
 compatibility limits. Old cold64 timings and cumulative budget charges remain unchanged.
 
-Before admitting real screens, complete G0's prescribed full-input memory/throughput probe,
-300-source vertical acceptance and cost forecast, validate the hosted credential/profile,
-and validate each feature case's actual labels/artifacts. E04 now uses explicitly scoped
+G0's bounded full-input memory/throughput probe, 300-source operational acceptance and
+hosted capability checks passed. Wider admission still requires case-specific forecasts
+and validation of each feature case's actual labels/artifacts. E04 now uses explicitly scoped
 Bio-LLM benchmark NIL; verified ontology-wide NIL remains unavailable. K0 graph fitting needs confirmed negatives. BioKG typed positives are now bound;
 Datalog consequence materialization and family-specific artifacts still need validation. The optional E14 bridge-reasoner executor remains unimplemented and explicitly
 planned; it is outside the implemented graph/learned typing controls. E24's asymmetric arm
@@ -193,7 +193,7 @@ needs a directional typed diagnostic input, which D1 equivalence labels do not p
 The planner keeps these separate from fixture readiness. See [NODE-SETUP.md](NODE-SETUP.md) for the observed CUDA stack and concurrency
 limits. Final request/token and node-hour reserves are protected by runtime admission.
 
-The final local declaration snapshot is
+The full pre-admission declaration snapshot is
 `data/experiments-v2/prepared-campaign-06/campaign.lock.yaml`, with stage declarations under
 `runtime/declarations/screen/` and the read-only inventory in `readiness-plan.json`.
 All 27 families are represented by 37 steps: 35 screen declarations and two final declarations.
@@ -222,5 +222,9 @@ verified baseline/model locks and local bindings.
   --output-root data/experiments-v2/new-campaign/runtime
 ```
 
-The current authorization includes bounded G0 execution and its explicit recovery budget
-amendment. Starting the long screen or confirmation campaign remains outside this handoff.
+On 2026-09-18 the user authorized the first bounded retrieval wave after the sampled
+evaluator repair. Revision 07 admits only E05's four label-free arms and imports verified
+G0 operational acceptance without new E00 cells. Slurm job **14217** is submitted, pending
+release of interactive allocation 14212. The conservative forecast is 8.03 hours, with zero
+hosted calls and no wall-time cutoff. Later comparisons and final reporting remain gated.
+See [FIRST-SCREEN.md](FIRST-SCREEN.md) for scope, validation, limits and monitoring commands.

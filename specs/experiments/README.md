@@ -1,7 +1,8 @@
 # Exact-OM experiment programme v2
 
-**Design revision: 2026-09-10 (E04 benchmark-NIL scope). Implementation validation: 2026-09-10; long campaign not started.**
+**Design revision: 2026-09-10 (E04 benchmark-NIL scope). G0 passed 2026-09-18; the first bounded retrieval wave is submitted.**
 See [PREPARATION-STATUS.md](PREPARATION-STATUS.md) for current code, input and operational evidence.
+[FIRST-SCREEN.md](FIRST-SCREEN.md) records the submitted E05 scope and batch handoff.
 [G0-VALIDATION.md](G0-VALIDATION.md) records the detached validation handoff;
 [NATIVE-PREPROCESSING.md](NATIVE-PREPROCESSING.md) describes the native-only repair and bounded
 model-free measurement workflow;
