@@ -417,6 +417,123 @@ def test_local_evaluator_replay_joins_stripped_pool_without_models(tmp_path, mon
     assert result["builtin"]["MRR"] == 1.0
 
 
+def test_sampled_local_evaluator_repair_preserves_pool_and_denominator(tmp_path, monkeypatch):
+    from exact.core.actions.evaluation import (
+        materialize_local_ranking_inputs,
+        run_evaluation,
+    )
+
+    cell, suite, revision = fixture(tmp_path, monkeypatch)
+    reference = Path(cell.resolved_config["data"]["refs"]["full"])
+    reference.write_text(
+        "SrcEntity\tTgtEntity\n"
+        "source:1\ttarget:1\nsource:1\ttarget:alternate\n"
+        "source:empty\ttarget:missing\nsource:outside\ttarget:outside\n"
+    )
+    pool = tmp_path / "full_pool.tsv"
+    sampled_pool = (
+        "SrcEntity\tTgtEntity\tTgtCandidates\n"
+        "source:1\t\t['target:1', 'target:alternate']\nsource:empty\t\t[]\n"
+    )
+    pool.write_text(sampled_pool + "source:outside\t\t['target:outside']\n")
+    config = {
+        **cell.resolved_config,
+        "data": {
+            **cell.resolved_config["data"],
+            "execution_mode": "local_ranking",
+            "candidates": str(pool),
+        },
+    }
+    cell = replace(cell, source_cap=2, resolved_config=config)
+
+    def fresh_worker(command, **kwargs):
+        output = cell.output_dir
+        (output / "alignment").mkdir(parents=True)
+        inputs = output / "dataset/sampled_inputs"
+        inputs.mkdir(parents=True)
+        (output / "dataset/candidate_pool_sample_manifest.json").write_text(
+            json.dumps({"fingerprint": "sampled-local-pool"})
+        )
+        candidates = inputs / "reference_candidates.tsv"
+        candidates.write_text(sampled_pool)
+        alignment = output / "alignment/maps_local.tsv"
+        alignment.write_text(
+            "SrcEntity\tTgtEntity\tTgtCandidates\n"
+            "source:1\t\t[('target:1', 0.9), ('target:alternate', 0.8)]\n"
+            "source:empty\t\t[]\n"
+        )
+        ranked, reference_pool = materialize_local_ranking_inputs(
+            alignment, candidates, reference, output / "evaluation/inputs"
+        )
+        run_evaluation(
+            ranked,
+            output / "evaluation",
+            reference_candidates=reference_pool,
+            error_on_fail=True,
+            backends=["builtin"],
+            run_stats_path=output / "stats/run_stats.json",
+        )
+        return 0, 5, None
+
+    monkeypatch.setattr(harness, "_run_subprocess", fresh_worker)
+    assert harness.execute_cell(cell, suite, workdir=tmp_path, resume=False)["status"] == "complete"
+    fresh = json.loads((cell.output_dir / "evaluation/evaluation_results.json").read_text())
+    original_pool = (
+        cell.output_dir / "dataset/sampled_inputs/reference_candidates.tsv"
+    ).read_bytes()
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("Evaluator-only repair attempted a scoring worker")
+
+    monkeypatch.setattr(harness, "_run_subprocess", forbidden)
+    revision["evaluation"] = "sampled-evaluator-v2"
+    moved_root = tmp_path / "relocated_local"
+    moved = replace(
+        cell,
+        output_dir=moved_root / "run",
+        recovery={"root": str(moved_root), "resume_from": cell.recovery["root"]},
+    )
+    replay = harness.execute_cell(moved, suite, workdir=tmp_path, resume=True)
+    assert replay["status"] == "complete"
+    plan = json.loads((moved.output_dir / "reuse-plan.json").read_text())
+    assert {row["stage"] for row in plan["stages"] if row["action"] == "reuse"} == {
+        "inputs",
+        "extraction",
+    }
+    recovered = json.loads((moved.output_dir / "evaluation/evaluation_results.json").read_text())
+    assert recovered["builtin"] == fresh["builtin"]
+    assert recovered["builtin"]["MRR"] == 0.5
+    population = json.loads((moved.output_dir / "evaluation/inputs/provenance.json").read_text())
+    assert (population["sources"], population["queries"]) == (2, 3)
+    evaluated = pd.read_csv(
+        moved.output_dir / "evaluation/inputs/reference_candidates.tsv", sep="\t"
+    )
+    assert set(evaluated.SrcEntity) == {"source:1", "source:empty"}
+    assert evaluated.loc[evaluated.SrcEntity == "source:empty", "TgtCandidates"].tolist() == ["[]"]
+    assert (
+        cell.output_dir / "dataset/sampled_inputs/reference_candidates.tsv"
+    ).read_bytes() == original_pool
+
+
+@pytest.mark.parametrize("sampling", ["cell_cap", "config_cap", "source_universe"])
+def test_sampled_local_evaluator_rejects_missing_saved_pool(tmp_path, monkeypatch, sampling):
+    cell, _, _ = fixture(tmp_path, monkeypatch)
+    config = {
+        **cell.resolved_config,
+        "data": {**cell.resolved_config["data"], "execution_mode": "local_ranking"},
+    }
+    if sampling == "source_universe":
+        config["data"]["source_universe"] = "frozen-sources.txt"
+    elif sampling == "config_cap":
+        config["run"] = {"source_cap": 2}
+    cell = replace(cell, resolved_config=config, source_cap=2 if sampling == "cell_cap" else None)
+    (cell.output_dir / "alignment").mkdir(parents=True)
+    (cell.output_dir / "alignment/maps_local.tsv").write_text("unused scored rows")
+    recovery = SimpleNamespace(cell=cell, evaluation_enabled=True)
+    with pytest.raises(FileNotFoundError, match="saved candidate pool"):
+        runtime.CellRecovery.evaluate(recovery)
+
+
 def test_experiment_verbalization_errors_do_not_become_silent_text_fallback(monkeypatch):
     from exact.impl.models.pair_adaptive_evidence import PairAdaptiveEvidenceMixin
 

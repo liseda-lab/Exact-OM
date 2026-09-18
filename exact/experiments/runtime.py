@@ -380,6 +380,24 @@ class CellRecovery:
         if mode != "local_ranking" and not report:
             raise ValueError("Global evaluator replay requires the declared role's reference")
         candidates = root / data["candidates"] if data.get("candidates") else None
+        if mode == "local_ranking":
+            sampled_candidates = (
+                self.cell.output_dir / "dataset/sampled_inputs/reference_candidates.tsv"
+            )
+            sampled = (
+                self.cell.source_cap is not None
+                or (self.cell.resolved_config.get("run") or {}).get("source_cap") is not None
+                or data.get("source_universe") is not None
+            )
+            if sampled and not sampled_candidates.is_file():
+                raise FileNotFoundError(
+                    f"Sampled local evaluator replay requires its saved candidate pool: "
+                    f"{sampled_candidates}"
+                )
+            if sampled_candidates.is_file():
+                # This extraction artifact preserves empty groups and the exact sampled
+                # denominator. Reporting labels are joined below, only after scoring.
+                candidates = sampled_candidates
         if mode == "local_ranking" and report and candidates:
             from exact.core.actions.evaluation import materialize_local_ranking_inputs
 
