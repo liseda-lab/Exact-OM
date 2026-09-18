@@ -5,8 +5,13 @@ The wave started at **17:59 UTC** inside the existing interactive allocation **1
 as Slurm step **14212.2**, in detached tmux session `exact-screen-01`. This preserves the
 interactive shell and VS Code access. The earlier pending batch job **14217** was cancelled
 before execution when the user clarified this requirement; its submission record is retained.
-Starting the wave does not establish success. The full scientific campaign remains gated
-by later results.
+The wave **failed at 18:48 UTC** with exit code 2; none of the four E05 cells completed.
+All four finished dataset preparation, then the difference-scoring channel reached the
+inherited relation verbaliser (`dataset.verbalization_mode: llm`). This separate generation
+path was missed by the zero-hosted-call preflight. The launcher did not supply the updated API key,
+and the ledger records 28 rejected HTTP 401 attempts with no returned usage. Rationales
+remained disabled. The interactive allocation and shell survived. G0 acceptance remains
+valid; no E05 selection or quality result was produced. The full campaign remains gated.
 
 ## Frozen work
 
@@ -26,7 +31,8 @@ capability and resource blocks; this wave does not complete the G1 pool freeze b
 expected duration or a wall-time cutoff. It charges four cold process setups, candidate-pair
 work including adaptive-k's maximum 50 candidates, a fresh SapBERT retrieval-index allowance,
 and a 1.5 safety factor. Shared deterministic embeddings are cached, but the forecast does
-not assume durable ontology-graph reuse. The first wave plans zero hosted requests/tokens.
+not assume durable ontology-graph reuse. The first wave planned zero hosted requests/tokens;
+the unexpected rejected attempts above remain recorded in its ledger.
 The prior G0 ledger retains all 4,405 requests and USD 0.4454526. A 12-hour historical foundation
 reservation covers its measured lower bound and an explicit unmeasured allowance without
 inventing wall intervals. The missing interrupted tail remains unknown. Implementation/test
@@ -47,14 +53,19 @@ configuration tests pass. A separate audit passed 52 recovery/ledger/population/
 CPU training fixtures plus two reporting-amendment guard checks. Integrated ontology/raw-evidence
 recovery retains the limits recorded in `first-screen-preflight/recovery-fixtures.json`.
 All four real E05 configurations passed model-free materialization/preflight with pinned model
-revisions, label-free resolved components, hosted gate off, and rationales off.
+revisions, label-free resolved components, hosted gate off, and rationales off. These checks
+did not exercise the inherited relation-template generation reached by the difference channel.
+A repair must validate that path before restart. Switching it to deterministic verbalisation
+would change model inputs and requires an explicit revised configuration, not a silent fallback.
 
 ## Handoff
 
 Keep allocation **14212** and its interactive shell alive: they carry the experiment and
-VS Code access. The experiment runs in a separate overlapping Slurm step within that allocation.
-To view the detached session from liseda-01, attach with the command below; press **Ctrl-b**,
-then **d** to detach again while leaving the experiment running.
+VS Code access. The failed experiment used a separate overlapping Slurm step within that
+allocation. Its tmux pane is retained after exit; no experiment worker is currently running.
+To inspect the retained session from liseda-01, attach with the command below; press **Ctrl-b**,
+then **d** to detach. Future runs must also use Slurm steps inside the active interactive
+allocation, as recorded in [NODE-SETUP.md](NODE-SETUP.md).
 
 ```console
 tmux attach -t exact-screen-01

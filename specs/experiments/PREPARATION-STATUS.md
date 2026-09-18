@@ -228,5 +228,8 @@ G0 operational acceptance without new E00 cells. At the user's request, pending 
 **14217** was cancelled before execution. The wave started at 17:59 UTC inside interactive
 allocation **14212**, as step **14212.2** in detached tmux session `exact-screen-01`, preserving
 the shell and VS Code access. The conservative forecast is 8.03 hours, with zero hosted calls
-and no wall-time cutoff. Later comparisons and final reporting remain gated.
+and no wall-time cutoff. The wave failed at 18:48 UTC: all four cells reached an inherited
+LLM relation-template path omitted from the zero-hosted-call preflight and received HTTP 401.
+Rationales remained off; no E05 cell completed. The interactive allocation remains alive.
+Later comparisons and final reporting remain gated.
 See [FIRST-SCREEN.md](FIRST-SCREEN.md) for scope, validation, limits and monitoring commands.

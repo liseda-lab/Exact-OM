@@ -30,6 +30,12 @@ OpenRouter requests; start with two numerical CPU threads per worker to avoid mu
 BLAS/OpenMP thread pools. LogMap is separately bounded to four Java processors, 24 GiB heap,
 and a two-hour timeout. Its forecast must still pass the same node budget admission.
 
+Launch experiments as Slurm job steps inside the active interactive allocation, using
+`srun --jobid=<allocation-id> --overlap` with resources within that allocation. A detached
+tmux session may host `srun`; keep the interactive shell and allocation alive for VS Code
+access. Do not replace this with an independent `sbatch` job or release the allocation
+unless the user changes this instruction. The first E05 launch used step `14212.2`.
+
 ```console
 export OMP_NUM_THREADS=2
 export MKL_NUM_THREADS=2
