@@ -1,5 +1,9 @@
 # Detached G0 validation
 
+**G0 passed on 2026-09-18 at 15:36 UTC.** The final result is
+`data/experiments-v2/g0-validation-11/report.json` (`exit-code: 0`). The cache-only
+finalization added no model workers or hosted requests. The long campaign remains unadmitted.
+
 The user authorized operational validation on 2026-09-10, a fresh post-native attempt on
 2026-09-14, a restart without a wall-time limit on 2026-09-15, and repair/recovery of the
 output-writing failure on 2026-09-17 and replay-comparison recovery on 2026-09-18. Monitoring is handed back rather than waiting through
@@ -21,7 +25,7 @@ operational replay, deliberate interruption, relocation/resume, and completed-ca
 The fit population is explicitly bounded for validation, so this is not a full-training-quality
 result or a component-selection experiment. A failed or unaffordable phase stops the job.
 
-Attempt 10 retains `--no-time-limit --requests-cap 100000 --tokens-cap 32000000`.
+Attempt 11 retains `--no-time-limit --requests-cap 100000 --tokens-cap 32000000`.
 The user removed G0's wall deadline and approved finite hosted headroom for fitting and
 replays. One GPU worker, two numerical CPU threads, at most 56 GiB process RAM, cooperative
 STOP and the request/token caps remain enforced. Unknown hosted deliveries are not
@@ -45,12 +49,15 @@ campaign remains unadmitted.
 
 ## Monitor and stop
 
-G0-10 recovery is configured for `data/experiments-v2/g0-validation-10/`, using
-`/tmp/exact-native-candidate/bin/python` and tmux session `exact-g0-10`. This records the
-restart configuration, not a claim that the job has launched.
+G0-11 finalization launched at 15:32 UTC on 2026-09-18 in
+`data/experiments-v2/g0-validation-11/`, using
+`data/experiments-v2/runtime/native-candidate/bin/python` and tmux session `exact-g0-11`.
+It verifies and adopts nine completed stages from attempt 10, then runs only the final
+local completed-cache replay. Model workers, hosted clients, and incomplete cache reuse
+were blocked. No API key was supplied. The final report confirms `passed`.
 `status.json` and `report.json` are authoritative for runtime status. The installed native
 identity, adoption evidence and resource amendment belong with this attempt's plan.
-Neither completion nor an ETA is claimed.
+The detached final replay has finished; the original interrupted attempt remains unchanged.
 
 [Native T4 validation](../native-optimization/IMPLEMENTATION.md#completed-t4-result) passed
 128 exact ordered feature rows across NCIT–DOID. Attempt 06 then measured the changed native
@@ -61,8 +68,8 @@ replay as a new cold/warm timing.
 After launch, monitor with:
 
 ```console
-tmux attach -t exact-g0-10
-/tmp/exact-native-candidate/bin/python data/experiments-v2/g0-validation-10/monitor.py
+tmux attach -t exact-g0-11
+data/experiments-v2/runtime/native-candidate/bin/python data/experiments-v2/g0-validation-11/monitor.py
 ```
 
 Detach from tmux with Ctrl-b, then d. `status.json` reports the current phase, process and
@@ -73,7 +80,7 @@ can remain open after completion, so session existence alone does not mean work 
 Request a cooperative stop:
 
 ```console
-touch data/experiments-v2/g0-validation-10/STOP
+touch data/experiments-v2/g0-validation-11/STOP
 ```
 
 The parent forwards STOP to the active worker, including during ontology loading. Completed
@@ -159,7 +166,7 @@ Attempt 05's forecast used the original cold-reload term, requiring 43.21 hours 
 safety factor. Its controller recorded `blocked_budget` before launching warm64, hosted20,
 fitting or production300. That historical outcome remains intact. The native validation and
 explicit resource amendment permitted fresh attempt 06. Its outcome is recorded below;
-G0 is not yet passed. The launcher never replaces cold timing with the near-zero cost of
+G0 was not yet passed at that point. The launcher never replaces cold timing with the near-zero cost of
 adopting its outputs.
 
 
@@ -226,8 +233,9 @@ Attempt 09 added no hosted requests, retaining 785 cumulative requests and USD 0
 Attempt 10 is configured to reuse these verified global stages and apply the existing replay
 comparator, which requires exact mapping/relation identities and checks score and metric
 tolerances. Completed-cache copies must still be byte-identical and perform no new model work.
-Only local300 and its cache replay remain to run. No scoring algorithm, reference, hypothesis
-or tolerance is changed. G0 remains unpassed until the new report confirms every check.
+At that restart, only local300 and its cache replay remained to run. No scoring algorithm,
+reference, hypothesis or tolerance was changed. Attempt 11 subsequently completed G0 as
+recorded below.
 
 Preflight evidence is retained in `data/experiments-v2/g0-replay-repair-01/`: the actual global
 outputs pass the corrected comparison, and the local writer/evaluator/attribution path passes
@@ -235,3 +243,49 @@ with the actual 300-source frozen candidate pool. Local smoke scores are synthet
 fixtures, not quality measurements. The local reporting-only reevaluation path has a separate
 sample-population issue recorded in that evidence; the immediate completed-cache replay imports
 the original evaluation artifact and does not invoke that path.
+
+
+## Attempt 10 node interruption and attempt 11 finalization
+
+Attempt 10 completed local300 successfully in 5,231.10 seconds, including setup. Its model
+worker used approximately 12.62 GiB peak process memory and 2.61 GiB peak reserved GPU memory.
+It added 3,620 hosted requests and USD 0.3419868. All nine completed stage measurements and
+the local extraction/evaluation artifacts survived on persistent storage.
+
+The node rebooted unexpectedly at 12:17 UTC on 2026-09-18, interrupting only the final local
+completed-cache replay. A second unexpected reboot at 14:56 UTC occurred without a G0 model
+job running. Both stopped the interactive Slurm step. Supplied administrator journals end
+abruptly with no recorded cause in their excerpts; persistent crash directories are empty.
+Available resource samples show no memory pressure. The cause remains unknown; the exporter
+warning about `fabric.state N/A` does not establish a GPU fault. Diagnostic evidence is retained
+in `data/experiments-v2/node-abort-2026-09-18/diagnosis.json`.
+
+Attempt 11 uses `--resume-interrupted-from` to verify the reportless interrupted controller's
+plan, durable status, original measurements, native identities, artifact contents, and hosted
+ledger. It does not fabricate a final report for attempt 10 or adopt its unfinished replay.
+The validated native wheels were restored offline under the persistent runtime directory;
+all four installed code fingerprints match attempt 10 exactly. This repair changes only
+validation tools, with 74 helper and 40 launcher/replay focused regression checks passing.
+
+Cumulative hosted usage remains 4,405 requests, 2,726,711 tokens and USD 0.4454526 before
+finalization. The last persisted controller elapsed value is a lower bound, and the unknown
+interrupted tail remains null. Historical G0 active time is at least 41,156.66 seconds before
+new finalization work; diagnostic/build/test time is separately retained and not fully
+aggregated. Request charges are preserved exactly once. Rationales remain off, and no long
+scientific campaign is authorized by this continuation.
+
+
+Attempt 11 finished **passed at 15:36 UTC**, with exit code 0, after 247.70 seconds of
+launcher wall time. All four global/local replay comparisons pass. Both completed-cache
+checks are byte-identical with zero score and metric drift; the local comparison contains
+26,743 mapping rows across the bounded source population. The global interruption comparison
+retains its previously declared `3.33e-16` maximum score difference and zero metric drift.
+All nine original stages were adopted, and only the final local cache replay was executed.
+There were **zero new model workers, hosted requests, or tokens**. Historical G0 active time
+is at least 41,396.25 seconds, with the missing interrupted tail still unknown. The report,
+`completion-verification.json`, and `resource-plan.json` preserve this distinction.
+
+This passes the bounded operational G0 gate. It does not measure full-training quality,
+resolve the node's reset cause, or admit all scientific experiment families. Family forecasts,
+unmeasured cases, and the documented sampled local reevaluation issue still need review before
+a long campaign.

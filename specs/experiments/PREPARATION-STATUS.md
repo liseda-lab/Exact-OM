@@ -125,15 +125,29 @@ by at most `3.33e-16`, within the already specified pinned-GPU `1e-5` tolerance.
 output and completed-cache replay are byte-identical. Attempt 09 took 2,111.19 seconds of new
 active work and added no hosted requests.
 
-Under the user's 2026-09-18 repair/rerun authorization, G0-10 is configured with
-`/tmp/exact-native-candidate/bin/python`, tmux `exact-g0-10`, output
-`data/experiments-v2/g0-validation-10/`; configuration does not itself establish launch.
-It adopts the verified probes and all four global stages, rechecks their equivalence with the
-existing replay comparator, then runs local300 and its completed-cache replay. Cache copies
-still require exact bytes and zero new model work. Prior attempts, historical charges and
-original measurements remain intact. Rationales remain off, with no wall deadline and the
-unchanged 100,000-request/32-million-token allowance. G0 is not yet complete, and the long
-scientific campaign remains unadmitted.
+G0-10 adopted the verified global stages and completed local300 successfully in 5,231.10
+seconds. The node rebooted unexpectedly while publishing the final local completed-cache
+replay, leaving nine completed measurements and all local extraction/evaluation artifacts
+intact. A second unexpected reboot occurred without a G0 model job running. The available
+journal excerpts and empty persistent crash directories do not identify the reset cause.
+
+G0-11 launched at 15:32 UTC on 2026-09-18 to finish only that cache replay with
+`--resume-interrupted-from`,
+using `data/experiments-v2/runtime/native-candidate/bin/python`. The four validated native
+code fingerprints match attempt 10. The continuation verifies saved measurements and artifacts,
+blocks model workers and hosted clients, and requires input, extraction and evaluation cache
+reuse together. It supplies no API key and does not repeat scoring. All 74 helper and 40
+launcher/replay focused checks pass. Prior files remain intact, and all 4,405 requests,
+2,726,711 tokens and USD 0.4454526 remain charged. Missing interrupted elapsed time stays
+explicitly unknown; cumulative active time is reported as a lower bound.
+
+G0-11 **passed at 15:36 UTC on 2026-09-18**, with exit code 0. Finalization took 247.70 seconds
+of launcher wall time and added zero model workers, hosted requests or tokens. All four
+replay checks passed; completed-cache mappings are byte-identical with zero score/metric
+drift. The final report is `data/experiments-v2/g0-validation-11/report.json`. This completes
+bounded operational validation; family-specific forecasts, unmeasured cases and the sampled
+local reevaluation issue still require review. Rationales remain off. No long scientific
+campaign has started or been admitted.
 See [G0-VALIDATION.md](G0-VALIDATION.md) for monitor/STOP commands and retained history;
 `status.json` and `report.json` remain authoritative for progress and completion.
 
