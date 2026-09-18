@@ -4,6 +4,7 @@ import hashlib
 import json
 import sqlite3
 from copy import deepcopy
+from pathlib import Path
 
 import pytest
 import yaml
@@ -1322,3 +1323,270 @@ def test_evaluator_relocation_preserves_metrics_and_verified_reference_content(t
     else:
         with pytest.raises(ValueError, match="differs from verified artifact"):
             _verify_run_outputs(new.parents[1], verified, store=store)
+
+
+@pytest.fixture
+def interrupted_validation(completed_globals, tmp_path):
+    from tools import validation_resume as resume
+
+    origin, configs, campaign, key = completed_globals
+    current = tmp_path / "reportless"
+    inherited, prior_elapsed, _ = resume.adopt_failed_validation(
+        origin, current, campaign_sha256=campaign, expected_configs=configs
+    )
+    expected = deepcopy(configs)
+    config = deepcopy(configs["global300"])
+    config["data"]["execution_mode"] = "local_ranking"
+    expected["local300"] = config
+    old_usage = resume._ledger_usage(current)
+    ledger = RequestLedger(current / "shared/openrouter")
+    local_key = ledger.plan({"role": "decision", "payload": {"max_tokens": 4}})
+    attempt = ledger.sent(local_key)
+    ledger.received(local_key, attempt, b'{"response":"local-scored"}', 200)
+    ledger.usage(local_key, attempt, {"prompt_tokens": 11, "completion_tokens": 1, "cost": 0.003})
+    usage = resume._ledger_usage(current)
+    run = current / "local300/run"
+    (run / "_inputs").mkdir(parents=True)
+    (run / "_inputs/resolved.config.yaml").write_text(yaml.safe_dump(config))
+    store = ArtifactStore(run.parent)
+    inputs = stage_identity(
+        "inputs",
+        parameters={},
+        inputs={},
+        role="development",
+        entity_kind="all",
+        implementation={"fixture": True},
+        dependencies={},
+    )
+    store.publish(inputs, {"locked_input": b"safe"})
+    identity = stage_identity(
+        "extraction",
+        parameters={"configuration": config},
+        inputs={},
+        role="development",
+        entity_kind="all",
+        implementation=resume._code_identity(resume.REPOSITORY, evaluation=False),
+        dependencies={"ontology_artifacts": resume.ontology_execution_identity("asserted")},
+        seed=17,
+        parents=[inputs["artifact_id"]],
+    )
+    outputs = {
+        name: b"local scoring complete"
+        for name in (
+            *resume.DATASET_FILES,
+            "alignment/maps_local.tsv",
+            "alignment/paper.maps_global.tsv",
+            "source_decisions.json",
+            "timings.json",
+        )
+    }
+    for relative, data in outputs.items():
+        path = run / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
+    store.publish(identity, outputs)
+    evaluation = stage_identity(
+        "evaluation",
+        parameters={},
+        inputs={},
+        role="development",
+        entity_kind="all",
+        implementation=resume._code_identity(resume.REPOSITORY, evaluation=True),
+        dependencies={},
+        parents=[identity["artifact_id"]],
+    )
+    evaluation_outputs = {"evaluation/evaluation_results.json": b'{"builtin":{"MRR":0.8}}'}
+    store.publish(evaluation, evaluation_outputs)
+    for relative, data in evaluation_outputs.items():
+        path = run / relative
+        path.parent.mkdir(parents=True)
+        path.write_bytes(data)
+    (run / "recovery-runtime.json").write_text(json.dumps({"identity": identity}))
+    worker = {"return_code": 0, "wall_seconds": 10}
+    (run / "validation-worker.json").write_text(json.dumps(worker))
+    ids = {
+        "inputs": inputs["artifact_id"],
+        "extraction": identity["artifact_id"],
+        "evaluation": evaluation["artifact_id"],
+    }
+    manifest = {
+        "status": "complete",
+        "return_code": 0,
+        "extraction_complete": True,
+        "resolved_config_hash": hash_payload(config),
+        "experiment_config_hash": campaign,
+        "recovery": {"artifacts": ids},
+    }
+    (run / "experiment_manifest.json").write_text(json.dumps(manifest))
+    local = {
+        "id": "local300",
+        "status": "complete",
+        "source_cap": 300,
+        "hosted": True,
+        "evaluate": True,
+        "new_worker_calls": 1,
+        "new_usage": {k: usage[k] - old_usage[k] for k in resume.USAGE_KEYS},
+        "output_dir": str(run),
+        "manifest": str(run / "experiment_manifest.json"),
+        "wall_seconds": 12,
+        "worker_measurement": worker,
+        "recovery": {"artifacts": ids},
+    }
+    rows = [*inherited.values(), local]
+    for row in rows:
+        (current / f"{row['id']}.measurement.json").write_text(json.dumps(row))
+    old = json.loads((origin / "report.json").read_text())
+    plan = {
+        "status": "prepared",
+        "campaign_sha256": campaign,
+        "resume": {
+            "from": str(origin),
+            "previous_elapsed_seconds": prior_elapsed,
+            "previous_hosted_usage": old["hosted_usage"],
+            "copied_hosted_usage": old_usage,
+        },
+        "limits": {"seconds": None},
+    }
+    (current / "plan.json").write_text(json.dumps(plan))
+    (current / "status.json").write_text(
+        json.dumps(
+            {
+                "status": "running",
+                "phase": "local300",
+                "elapsed_seconds": prior_elapsed + 14,
+                "completed_stages": rows,
+            }
+        )
+    )
+    pending = current / "local300-replay/run"
+    (pending / "_inputs").mkdir(parents=True)
+    (pending / "_inputs/resolved.config.yaml").write_text(yaml.safe_dump(config))
+    (pending / "recovery-runtime.json").write_text(json.dumps({"identity": identity}))
+    (pending / "experiment_manifest.json").write_text(
+        json.dumps(
+            {
+                "status": "running",
+                "started_at": "2026-09-18T12:16:40+00:00",
+                "resolved_config_hash": hash_payload(config),
+                "experiment_config_hash": campaign,
+            }
+        )
+    )
+    (pending / "reuse-plan.json").write_text(
+        json.dumps(
+            {"stages": [{"stage": k, "artifact_id": v, "action": "reuse"} for k, v in ids.items()]}
+        )
+    )
+    return current, expected, campaign, local_key
+
+
+def test_reportless_adoption_preserves_nine_stages_and_unknown_elapsed_tail(
+    interrupted_validation, tmp_path
+):
+    from tools import validation_resume as resume
+
+    previous, configs, campaign, local_key = interrupted_validation
+    before = {
+        str(p): sha256_file(p)
+        for p in previous.rglob("*")
+        if p.is_file() and not p.name.endswith("-shm")
+    }
+    output = tmp_path / "final-replay"
+    rows, elapsed, repair = resume.adopt_interrupted_validation(
+        previous, output, campaign_sha256=campaign, expected_configs=configs, materialize=False
+    )
+    assert not output.exists()
+    assert len(rows) == 9 and "local300-replay" not in rows and repair == {}
+    rows, actual_elapsed, _ = resume.adopt_interrupted_validation(
+        previous, output, campaign_sha256=campaign, expected_configs=configs
+    )
+    assert actual_elapsed == elapsed == 734
+    assert (
+        rows["local300"]["wall_seconds"] == 12
+        and rows["local300"]["measurement_usage"]["attempts"] == 1
+    )
+    assert rows["global300-stop"]["status"] == "interrupted"
+    for row in rows.values():
+        evidence = row["adoption_evidence"]
+        assert evidence["prior_hosted_usage"]["attempts"] == 3
+        assert evidence["prior_ledger_usage"]["attempts"] == 2
+        assert evidence["elapsed_accounting"]["status"] == "lower_bound"
+        assert evidence["elapsed_accounting"]["final_elapsed_seconds"] is None
+        assert evidence["elapsed_accounting"]["unrecorded_interval_seconds"] is None
+        assert row["new_worker_calls"] == 0 and not any(row["new_usage"].values())
+    assert (
+        RequestLedger(output / "shared/openrouter").cached(local_key)
+        == b'{"response":"local-scored"}'
+    )
+    assert not (previous / "report.json").exists()
+    after = {
+        str(p): sha256_file(p)
+        for p in previous.rglob("*")
+        if p.is_file() and not p.name.endswith("-shm")
+    }
+    assert all(after.get(path) == digest for path, digest in before.items())
+    # SQLite may create empty WAL bookkeeping even for a read-only backup.
+    assert all(
+        path.endswith("-wal") and Path(path).stat().st_size == 0
+        for path in after.keys() - before.keys()
+    )
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        "status_row",
+        "local_mapping",
+        "replay_plan",
+        "replay_identity",
+        "replay_worker",
+        "elapsed",
+        "charges",
+        "extra_stage",
+        "final_report",
+    ],
+)
+def test_reportless_adoption_rejects_missing_or_changed_evidence(
+    interrupted_validation, tmp_path, change
+):
+    from tools import validation_resume as resume
+
+    previous, configs, campaign, _ = interrupted_validation
+    status_path = previous / "status.json"
+    status = json.loads(status_path.read_text())
+    if change == "status_row":
+        status["completed_stages"][-1]["wall_seconds"] += 1
+    elif change == "local_mapping":
+        (previous / "local300/run/alignment/maps_local.tsv").write_bytes(b"changed")
+    elif change == "replay_plan":
+        path = previous / "local300-replay/run/reuse-plan.json"
+        plan = json.loads(path.read_text())
+        plan["stages"][1]["action"] = "recompute"
+        path.write_text(json.dumps(plan))
+    elif change == "replay_identity":
+        path = previous / "local300-replay/run/recovery-runtime.json"
+        runtime = json.loads(path.read_text())
+        runtime["identity"]["parameters"]["changed"] = True
+        path.write_text(json.dumps(runtime))
+    elif change == "replay_worker":
+        (previous / "local300-replay/run/validation-worker.json").write_text('{"return_code":0}')
+    elif change == "elapsed":
+        status["elapsed_seconds"] = 720
+    elif change == "charges":
+        status["completed_stages"][-1]["new_usage"]["attempts"] += 1
+        (previous / "local300.measurement.json").write_text(
+            json.dumps(status["completed_stages"][-1])
+        )
+    elif change == "extra_stage":
+        status["completed_stages"].append({"id": "local300-replay", "status": "complete"})
+    else:
+        (previous / "report.json").write_text('{"status":"passed"}')
+    status_path.write_text(json.dumps(status))
+    with pytest.raises(ValueError):
+        resume.adopt_interrupted_validation(
+            previous,
+            tmp_path / "new",
+            campaign_sha256=campaign,
+            expected_configs=configs,
+            materialize=False,
+        )

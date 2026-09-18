@@ -55,7 +55,7 @@ def _positive(value: Any, label: str) -> float:
 
 
 def _verified_extraction(
-    saved_run: Path, *, evaluation: dict | None = None
+    saved_run: Path, *, evaluation: dict | None = None, mode: str = "global_alignment"
 ) -> tuple[ArtifactStore, dict]:
     runtime = json.loads((saved_run / "recovery-runtime.json").read_text())
     store = ArtifactStore(saved_run.parent)
@@ -64,7 +64,7 @@ def _verified_extraction(
         raise ValueError("Saved extraction identity differs from its runtime record")
     required = {
         *DATASET_FILES,
-        "alignment/maps_global.tsv",
+        "alignment/maps_local.tsv" if mode == "local_ranking" else "alignment/maps_global.tsv",
         "source_decisions.json",
         "timings.json",
     }
@@ -565,7 +565,9 @@ def _audit_repair_compatibility(original: dict, current: dict, revision: str) ->
         raise ValueError("Output repair changes code outside the audit writer body")
 
 
-def _hosted_configuration(saved_run: Path, expected: dict, *, cap: int) -> dict:
+def _hosted_configuration(
+    saved_run: Path, expected: dict, *, cap: int, mode: str = "global_alignment"
+) -> dict:
     config = dict(load_yaml_mapping(saved_run / "_inputs/resolved.config.yaml"))
     normalized = deepcopy(expected)
     for parent, field in (("data", "train_candidates"), ("refs", "train")):
@@ -587,7 +589,7 @@ def _hosted_configuration(saved_run: Path, expected: dict, *, cap: int) -> dict:
     if (
         config.get("run", {}).get("source_cap") != cap
         or config.get("run", {}).get("seed") != 17
-        or config.get("data", {}).get("execution_mode") != "global_alignment"
+        or config.get("data", {}).get("execution_mode") != mode
         or not scorers
         or any(
             item.get("params", {}).get("use_llm") is not True
@@ -706,15 +708,17 @@ def _verify_completed_global(
     expected: dict,
     campaign_sha256: str,
     elapsed: float,
+    *,
+    mode: str = "global_alignment",
 ) -> dict:
     """Verify one saved global stage, including the intentionally interrupted boundary."""
     name = row["id"]
     run = previous / name / "run"
-    config = _hosted_configuration(run, expected, cap=300)
+    config = _hosted_configuration(run, expected, cap=300, mode=mode)
     manifest = json.loads((run / "experiment_manifest.json").read_text())
     runtime = json.loads((run / "recovery-runtime.json").read_text())
     interrupted = name == "global300-stop"
-    worker_expected = name in {"global300-stop", "global300-resume"}
+    worker_expected = name in {"global300-stop", "global300-resume", "local300"}
     if (
         Path(row["output_dir"]).resolve() != run
         or Path(row["manifest"]).resolve() != run / "experiment_manifest.json"
@@ -808,7 +812,7 @@ def _verify_completed_global(
             )
         evaluation = store.verify(ids["evaluation"])
         _verify_run_outputs(run, evaluation, store=store)
-        store, artifact = _verified_extraction(run, evaluation=evaluation)
+        store, artifact = _verified_extraction(run, evaluation=evaluation, mode=mode)
         if ids.get("extraction") != artifact["identity"]["artifact_id"]:
             raise ValueError("Completed global stage has a different extraction identity")
         if evaluation["identity"]["parents"] != [artifact["identity"]["artifact_id"]] or evaluation[
@@ -1121,3 +1125,172 @@ def _adopt_failed_validation(
         else:
             freeze_json(output / "global300.repair.json", repair)
     return rows, elapsed, repair
+
+
+def adopt_interrupted_validation(
+    previous: Path,
+    output: Path,
+    *,
+    campaign_sha256: str,
+    expected_configs: dict[str, dict],
+    materialize: bool = True,
+) -> tuple[dict[str, dict], float, dict]:
+    """Finish a reportless controller interruption using its nine durable stage rows.
+
+    The last persisted controller clock is a lower bound. No end time, missing
+    interval, or successful final replay is inferred from the host reboot.
+    """
+    previous, output = previous.resolve(), output.resolve()
+    if output == previous or output.is_relative_to(previous) or previous.is_relative_to(output):
+        raise ValueError("Resume output must be separate from the saved validation root")
+    if (previous / "report.json").exists() or (
+        previous / "local300-replay.measurement.json"
+    ).exists():
+        raise ValueError("Reportless continuation requires an unfinished final replay")
+    if set(expected_configs) != {"cold64", "warm64", "fit64", "hosted20", "global300", "local300"}:
+        raise ValueError("Interrupted validation adoption requires six expected configurations")
+    plan_path, status_path = previous / "plan.json", previous / "status.json"
+    plan, status = json.loads(plan_path.read_text()), json.loads(status_path.read_text())
+    if (
+        plan.get("campaign_sha256") != campaign_sha256
+        or plan.get("status") != "prepared"
+        or status.get("status") != "running"
+        or status.get("phase") not in {"local300", "local300-replay"}
+    ):
+        raise ValueError("Saved plan/status does not bind the unfinished local replay")
+    origin = Path(plan["resume"]["from"]).resolve()
+    inherited, origin_elapsed, repair = adopt_failed_validation(
+        origin,
+        output,
+        campaign_sha256=campaign_sha256,
+        expected_configs={
+            name: config for name, config in expected_configs.items() if name != "local300"
+        },
+        materialize=False,
+    )
+    expected_ids = {*inherited, "local300"}
+    saved_rows = status.get("completed_stages", [])
+    if (
+        repair
+        or len(inherited) != 8
+        or len(saved_rows) != 9
+        or {row.get("id") for row in saved_rows} != expected_ids
+    ):
+        raise ValueError(
+            "Interrupted controller lacks exactly eight prior checks and completed local300"
+        )
+    origin_report_path = origin / "report.json"
+    origin_report = json.loads(origin_report_path.read_text())
+    if (
+        plan["resume"].get("previous_elapsed_seconds") != origin_elapsed
+        or plan["resume"].get("previous_hosted_usage") != origin_report["hosted_usage"]
+    ):
+        raise ValueError("Interrupted controller changed its inherited charges or elapsed time")
+    copied_usage = plan["resume"].get("copied_hosted_usage", {})
+    _verify_usage(origin, copied_usage)
+    ledger_usage = _ledger_usage(previous)
+    total_usage = {
+        key: ledger_usage[key] + origin_report["hosted_usage"][key] - copied_usage[key]
+        for key in USAGE_KEYS
+    }
+    if ledger_usage["unknown"] or ledger_usage["unpriced_attempts"]:
+        raise ValueError("Interrupted controller has unresolved hosted charges")
+    elapsed = _positive(status.get("elapsed_seconds"), "last recorded cumulative elapsed")
+    rows = {}
+    for row in saved_rows:
+        name = row["id"]
+        measurement_path = previous / f"{name}.measurement.json"
+        if row != json.loads(measurement_path.read_text()):
+            raise ValueError("Interrupted status differs from its durable stage measurement")
+        if name in inherited:
+            if row.get("adoption_evidence", {}).get("previous_report_sha256") != sha256_file(
+                origin_report_path
+            ) or {k: v for k, v in row.items() if k != "adoption_evidence"} != {
+                k: v for k, v in inherited[name].items() if k != "adoption_evidence"
+            }:
+                raise ValueError("Interrupted controller changed an inherited measurement")
+        else:
+            _verify_completed_global(
+                previous,
+                row,
+                expected_configs[name],
+                campaign_sha256,
+                elapsed,
+                mode="local_ranking",
+            )
+        rows[name] = deepcopy(row)
+    if elapsed < origin_elapsed + _positive(
+        rows["local300"]["wall_seconds"], "completed local duration"
+    ):
+        raise ValueError("Last recorded elapsed omits completed local work")
+    measured_usage = {
+        key: sum(row["new_usage"][key] for row in rows.values()) for key in USAGE_KEYS
+    }
+    if any(
+        not math.isclose(
+            measured_usage[key], ledger_usage[key] - copied_usage[key], rel_tol=0, abs_tol=1e-12
+        )
+        for key in USAGE_KEYS
+    ):
+        raise ValueError("Interrupted controller ledger differs from its recorded stage charges")
+    pending = previous / "local300-replay/run"
+    config = _hosted_configuration(
+        pending, expected_configs["local300"], cap=300, mode="local_ranking"
+    )
+    manifest = json.loads((pending / "experiment_manifest.json").read_text())
+    runtime = json.loads((pending / "recovery-runtime.json").read_text())
+    reuse = json.loads((pending / "reuse-plan.json").read_text())
+    local_ids = rows["local300"]["recovery"]["artifacts"]
+    local_runtime = json.loads(
+        (Path(rows["local300"]["output_dir"]) / "recovery-runtime.json").read_text()
+    )
+    if (
+        set(local_ids) != {"inputs", "extraction", "evaluation"}
+        or runtime["identity"] != local_runtime["identity"]
+        or manifest.get("status") != "running"
+        or manifest.get("return_code") is not None
+        or not manifest.get("started_at")
+        or manifest.get("ended_at") is not None
+        or manifest.get("resolved_config_hash") != hash_payload(config)
+        or manifest.get("experiment_config_hash") != campaign_sha256
+        or (pending / "validation-worker.json").exists()
+        or runtime["identity"]["artifact_id"] != local_ids.get("extraction")
+        or {item["stage"]: item["artifact_id"] for item in reuse["stages"]} != local_ids
+        or any(item.get("action") != "reuse" for item in reuse["stages"])
+    ):
+        raise ValueError("Interrupted final stage was not a verified completed-artifact replay")
+    accounting = {
+        "status": "lower_bound",
+        "elapsed_seconds_lower_bound": elapsed,
+        "final_elapsed_seconds": None,
+        "unrecorded_interval_seconds": None,
+        "source": str(status_path),
+        "source_sha256": sha256_file(status_path),
+        "last_recorded_phase": status["phase"],
+        "unfinished_replay_started_at": manifest["started_at"],
+        "reason": "Controller final report absent after interruption; missing tail is not estimated",
+    }
+    for name, row in rows.items():
+        row["measurement_usage"] = row.get("measurement_usage", row["new_usage"])
+        row.update(imported=True, new_worker_calls=0, new_usage=dict.fromkeys(USAGE_KEYS, 0))
+        row["adoption_evidence"] = {
+            **row.get("adoption_evidence", {}),
+            "previous_status": str(status_path),
+            "previous_status_sha256": sha256_file(status_path),
+            "previous_plan_sha256": sha256_file(plan_path),
+            "original_measurement_sha256": sha256_file(previous / f"{name}.measurement.json"),
+            "prior_elapsed_seconds": elapsed,
+            "elapsed_accounting": accounting,
+            "prior_hosted_usage": total_usage,
+            "prior_ledger_usage": ledger_usage,
+            "prior_limits": plan.get("limits"),
+            "hosted_cache_reused": True,
+            "unfinished_replay_manifest_sha256": sha256_file(pending / "experiment_manifest.json"),
+        }
+    if materialize:
+        backups = _copy_shared(previous, output, ledger_usage)
+        for name, row in rows.items():
+            row["adoption_evidence"]["shared_backups"] = backups
+            freeze_json(output / f"{name}.adoption.json", row)
+        freeze_json(output / "interruption-accounting.json", accounting)
+    return rows, elapsed, {}
