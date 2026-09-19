@@ -1,0 +1,54 @@
+{
+  "extends": "pilot.json",
+  "campaign_id": "xr2-smoke-v1",
+  "phase": "conformance_smoke",
+  "data": {
+    "groups_per_family": {
+      "train": 1,
+      "development": 1,
+      "test": 1
+    },
+    "corruptions_per_group": 1,
+    "generated_objects": [
+      2
+    ]
+  },
+  "teacher": {
+    "max_assignments": 256,
+    "max_queries": 32,
+    "case_deadline_seconds": 10
+  },
+  "training": {
+    "seeds": [
+      13
+    ],
+    "max_epochs": 2,
+    "patience": 2,
+    "batch_cases": 2,
+    "development_decode_every_epochs": 1
+  },
+  "analysis": {
+    "bootstrap_replicates": 20
+  },
+  "resources": {
+    "run_deadline_seconds": 10,
+    "verification_call_seconds": 2,
+    "initial_diagnosis_seconds": 2,
+    "campaign_deadline_seconds": 3600,
+    "stage_deadline_seconds": {
+      "qualify": 120,
+      "corpus": 120,
+      "candidates": 300,
+      "label": 900,
+      "train": 300,
+      "freeze": 60,
+      "evaluate": 1200,
+      "report": 120
+    }
+  },
+  "circuit": {
+    "compile_seconds": 2,
+    "max_nodes": 100000,
+    "max_draws_per_object": 32
+  }
+}

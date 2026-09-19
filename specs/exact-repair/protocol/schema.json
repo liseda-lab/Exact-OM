@@ -1,0 +1,1146 @@
+{
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "const": "xr-2-v1"
+    },
+    "campaign_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "phase": {
+      "enum": [
+        "exploratory_pilot",
+        "conformance_smoke"
+      ]
+    },
+    "data": {
+      "type": "object",
+      "properties": {
+        "cohorts": {
+          "const": [
+            "generated",
+            "real_structure_corruptions",
+            "conference_2025",
+            "bio_ml_2024",
+            "bio_ml_2026"
+          ]
+        },
+        "split_seed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "families": {
+          "const": [
+            "directional_strengthening",
+            "subclass_specialisation_source",
+            "subclass_specialisation_target",
+            "necessary_condition_source",
+            "necessary_condition_target",
+            "endpoint_confusion",
+            "disjointness_revision",
+            "superclass_conjunct_removal",
+            "ontology_subclass_specialisation",
+            "superclass_generalisation",
+            "domain_generalisation",
+            "range_generalisation",
+            "existential_filler_generalisation",
+            "interaction_redundant",
+            "interaction_complementary",
+            "mixed"
+          ]
+        },
+        "groups_per_family": {
+          "type": "object",
+          "properties": {
+            "train": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "development": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "test": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          "required": [
+            "train",
+            "development",
+            "test"
+          ],
+          "additionalProperties": false
+        },
+        "corruptions_per_group": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "clean_controls_per_group": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_generation_attempts_per_group": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "generated_objects": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "split_unit": {
+          "const": "clean_structural_parent"
+        },
+        "real_split_unit": {
+          "const": "ontology_pair"
+        },
+        "conference": {
+          "type": "object",
+          "properties": {
+            "revision": {
+              "const": "2025"
+            },
+            "reference": {
+              "const": "ra1"
+            },
+            "expected_pairs": {
+              "const": 21
+            },
+            "whole_ontology_holdout": {
+              "type": "string",
+              "minLength": 1
+            },
+            "role": {
+              "const": "grouped_train_development_test"
+            },
+            "matcher_strata": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "minItems": 1,
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "revision",
+            "reference",
+            "expected_pairs",
+            "whole_ontology_holdout",
+            "role",
+            "matcher_strata"
+          ],
+          "additionalProperties": false
+        },
+        "bio_ml": {
+          "type": "object",
+          "properties": {
+            "releases": {
+              "const": [
+                "2024_selected",
+                "2026_whole"
+              ]
+            },
+            "data_revision_2026": {
+              "const": "c454644a334ab43754bc1070c0fb7fdd56a90a1d"
+            },
+            "published_coherence_revision": {
+              "const": "ec436a97f49875227dedf634faa5280b1376bda9"
+            },
+            "expected_whole_pairs": {
+              "const": 3
+            },
+            "report_shared_ontology_overlap": {
+              "const": true
+            }
+          },
+          "required": [
+            "releases",
+            "data_revision_2026",
+            "published_coherence_revision",
+            "expected_whole_pairs",
+            "report_shared_ontology_overlap"
+          ],
+          "additionalProperties": false
+        },
+        "evidence": {
+          "type": "object",
+          "properties": {
+            "simulator": {
+              "const": "label_jaccard_plus_noise_v2"
+            },
+            "noise_std": {
+              "type": "number",
+              "minimum": 0
+            },
+            "misleading_label_fraction": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "counterbalance_provenance": {
+              "const": true
+            },
+            "latent_corruption_features": {
+              "const": false
+            }
+          },
+          "required": [
+            "simulator",
+            "noise_std",
+            "misleading_label_fraction",
+            "counterbalance_provenance",
+            "latent_corruption_features"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "cohorts",
+        "split_seed",
+        "families",
+        "groups_per_family",
+        "corruptions_per_group",
+        "clean_controls_per_group",
+        "max_generation_attempts_per_group",
+        "generated_objects",
+        "split_unit",
+        "real_split_unit",
+        "conference",
+        "bio_ml",
+        "evidence"
+      ],
+      "additionalProperties": false
+    },
+    "actions": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "const": [
+            "keep",
+            "delete",
+            "retain_subsumption",
+            "replace_endpoint",
+            "specialise_subclass",
+            "add_necessary_condition",
+            "complex_equivalence",
+            "composite",
+            "remove_disjointness",
+            "remove_superclass_conjunct",
+            "specialise_ontology_subclass",
+            "generalise_superclass",
+            "generalise_domain",
+            "generalise_range",
+            "generalise_existential_filler"
+          ]
+        },
+        "ontology_edits": {
+          "const": true
+        },
+        "eligibility": {
+          "const": "explicit_occurrence_manifest"
+        },
+        "directional_reversal": {
+          "const": false
+        },
+        "max_changed_endpoints": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_states": {
+          "type": "object",
+          "properties": {
+            "generated": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "conference": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "bio_ml": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          "required": [
+            "generated",
+            "conference",
+            "bio_ml"
+          ],
+          "additionalProperties": false
+        },
+        "preserve_elementary_and_family_representatives": {
+          "const": true
+        },
+        "ontology_patch_only": {
+          "const": true
+        }
+      },
+      "required": [
+        "enabled",
+        "ontology_edits",
+        "eligibility",
+        "directional_reversal",
+        "max_changed_endpoints",
+        "max_states",
+        "preserve_elementary_and_family_representatives",
+        "ontology_patch_only"
+      ],
+      "additionalProperties": false
+    },
+    "grammar": {
+      "type": "object",
+      "properties": {
+        "constructors": {
+          "const": [
+            "named_class",
+            "intersection",
+            "existential"
+          ]
+        },
+        "max_depth": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_constructors": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "retrieval_hops": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "classes_per_side": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "properties_per_side": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "endpoints_per_side": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "canonical_unused_slots": {
+          "const": true
+        },
+        "unique_encoding_or_sum": {
+          "const": true
+        }
+      },
+      "required": [
+        "constructors",
+        "max_depth",
+        "max_constructors",
+        "retrieval_hops",
+        "classes_per_side",
+        "properties_per_side",
+        "endpoints_per_side",
+        "canonical_unused_slots",
+        "unique_encoding_or_sum"
+      ],
+      "additionalProperties": false
+    },
+    "graph": {
+      "type": "object",
+      "properties": {
+        "encoder": {
+          "const": "hgt"
+        },
+        "control": {
+          "const": "rgcn_matched_attention"
+        },
+        "hidden_width": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "layers": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "attention_heads": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "dropout": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "context_hops": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_nodes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_edges": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_explanations": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_text_tokens": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "proposal_head": {
+          "const": "shared_per_object"
+        },
+        "value_head": {
+          "const": "shared_per_completed_candidate"
+        },
+        "pair_factor_limit_per_object": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "encoder",
+        "control",
+        "hidden_width",
+        "layers",
+        "attention_heads",
+        "dropout",
+        "context_hops",
+        "max_nodes",
+        "max_edges",
+        "max_explanations",
+        "max_text_tokens",
+        "proposal_head",
+        "value_head",
+        "pair_factor_limit_per_object"
+      ],
+      "additionalProperties": false
+    },
+    "circuit": {
+      "type": "object",
+      "properties": {
+        "distribution": {
+          "const": "conditioned_mixture_of_products"
+        },
+        "components": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "component_control": {
+          "const": 1
+        },
+        "posterior_weights": {
+          "const": "pi_times_Z_component"
+        },
+        "normaliser_in_training": {
+          "const": true
+        },
+        "compile_seconds": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_nodes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_draws_per_object": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "zero_normaliser": {
+          "const": "no_proposal"
+        },
+        "grammar_only_guarantee": {
+          "const": true
+        }
+      },
+      "required": [
+        "distribution",
+        "components",
+        "component_control",
+        "posterior_weights",
+        "normaliser_in_training",
+        "compile_seconds",
+        "max_nodes",
+        "max_draws_per_object",
+        "zero_normaliser",
+        "grammar_only_guarantee"
+      ],
+      "additionalProperties": false
+    },
+    "policy": {
+      "type": "object",
+      "properties": {
+        "consistency": {
+          "const": true
+        },
+        "relative_named_class_coherence": {
+          "const": true
+        },
+        "baseline_exceptions": {
+          "const": "proved_source_only"
+        },
+        "selected_expression_nonvacuity": {
+          "const": true
+        },
+        "required_queries": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 0,
+          "uniqueItems": true
+        },
+        "prohibited_queries": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 0,
+          "uniqueItems": true
+        },
+        "unknown_authorizes_acceptance": {
+          "const": false
+        },
+        "all_off_required": {
+          "const": false
+        },
+        "modules": {
+          "const": false
+        },
+        "initial_full_classification_required": {
+          "const": false
+        },
+        "acceptance": {
+          "const": "complete_supported_scope"
+        },
+        "fast_detection": {
+          "const": "sound_incomplete_allowed"
+        },
+        "production_java_dependency": {
+          "const": false
+        }
+      },
+      "required": [
+        "consistency",
+        "relative_named_class_coherence",
+        "baseline_exceptions",
+        "selected_expression_nonvacuity",
+        "required_queries",
+        "prohibited_queries",
+        "unknown_authorizes_acceptance",
+        "all_off_required",
+        "modules",
+        "initial_full_classification_required",
+        "acceptance",
+        "fast_detection",
+        "production_java_dependency"
+      ],
+      "additionalProperties": false
+    },
+    "solver": {
+      "type": "object",
+      "properties": {
+        "backend": {
+          "const": "pysat_rc2"
+        },
+        "objective_arms": {
+          "const": [
+            "unary",
+            "bounded_pairwise"
+          ]
+        },
+        "quantization_scale": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "rounding": {
+          "const": "half_even"
+        },
+        "default_cut": {
+          "const": "complete_assignment"
+        },
+        "support_cut": {
+          "const": "all_axiom_origins_with_activations"
+        },
+        "pending_in_upper_bound": {
+          "const": true
+        },
+        "pending_are_logical_cuts": {
+          "const": false
+        },
+        "max_pending_retries": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "shrink_max_checks": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "backend",
+        "objective_arms",
+        "quantization_scale",
+        "rounding",
+        "default_cut",
+        "support_cut",
+        "pending_in_upper_bound",
+        "pending_are_logical_cuts",
+        "max_pending_retries",
+        "shrink_max_checks"
+      ],
+      "additionalProperties": false
+    },
+    "teacher": {
+      "type": "object",
+      "properties": {
+        "query_semantics": {
+          "const": "typed_desired_unwanted_unspecified"
+        },
+        "max_assignments": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_queries": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "case_deadline_seconds": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "false_positive_weight": {
+          "type": "number",
+          "minimum": 0
+        },
+        "desired_family_weight": {
+          "type": "number",
+          "minimum": 0
+        },
+        "disjointness_nonvacuity": {
+          "const": "each_operand"
+        },
+        "unknown_query_label": {
+          "const": "masked"
+        },
+        "exact_distribution_requires_complete_cache": {
+          "const": true
+        },
+        "partial_verified_comparisons": {
+          "const": true
+        },
+        "temperature": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "anchor": {
+          "const": "verified_feasible_repair"
+        }
+      },
+      "required": [
+        "query_semantics",
+        "max_assignments",
+        "max_queries",
+        "case_deadline_seconds",
+        "false_positive_weight",
+        "desired_family_weight",
+        "disjointness_nonvacuity",
+        "unknown_query_label",
+        "exact_distribution_requires_complete_cache",
+        "partial_verified_comparisons",
+        "temperature",
+        "anchor"
+      ],
+      "additionalProperties": false
+    },
+    "preferences": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "const": "declared_nonnegative_weights"
+        },
+        "cost_weights": {
+          "type": "object",
+          "properties": {
+            "mapping_deletion": {
+              "type": "number",
+              "minimum": 0
+            },
+            "removed_direction": {
+              "type": "number",
+              "minimum": 0
+            },
+            "endpoint_change": {
+              "type": "number",
+              "minimum": 0
+            },
+            "subclass_specialisation": {
+              "type": "number",
+              "minimum": 0
+            },
+            "necessary_condition": {
+              "type": "number",
+              "minimum": 0
+            },
+            "new_constructor": {
+              "type": "number",
+              "minimum": 0
+            },
+            "ontology_edit": {
+              "type": "number",
+              "minimum": 0
+            },
+            "human_ontology_edit": {
+              "type": "number",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "mapping_deletion",
+            "removed_direction",
+            "endpoint_change",
+            "subclass_specialisation",
+            "necessary_condition",
+            "new_constructor",
+            "ontology_edit",
+            "human_ontology_edit"
+          ],
+          "additionalProperties": false
+        },
+        "human_edit_extra_positive": {
+          "const": true
+        },
+        "learned_profile": {
+          "const": "regularised_nonnegative_pairwise"
+        },
+        "real_feedback_required_for_user_claims": {
+          "const": true
+        }
+      },
+      "required": [
+        "mode",
+        "cost_weights",
+        "human_edit_extra_positive",
+        "learned_profile",
+        "real_feedback_required_for_user_claims"
+      ],
+      "additionalProperties": false
+    },
+    "training": {
+      "type": "object",
+      "properties": {
+        "device": {
+          "const": "auto"
+        },
+        "dtype": {
+          "const": "float32"
+        },
+        "threads": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "seeds": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "optimizer": {
+          "const": "adamw"
+        },
+        "learning_rate": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "weight_decay": {
+          "type": "number",
+          "minimum": 0
+        },
+        "clip_gradient_norm": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "batch_cases": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_epochs": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "patience": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "min_dev_improvement": {
+          "type": "number",
+          "minimum": 0
+        },
+        "smooth_l1_beta": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "ranking_temperature": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "max_repair_pairs_per_case": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "development_decode_every_epochs": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "benefit_loss": {
+          "const": "anchored_full_repair_huber_plus_ranking"
+        },
+        "proposal_loss": {
+          "const": "complete_cache_marginal_cross_entropy"
+        },
+        "benefit_loss_weight": {
+          "type": "number",
+          "minimum": 0
+        },
+        "ranking_loss_weight": {
+          "type": "number",
+          "minimum": 0
+        },
+        "proposal_loss_weight": {
+          "type": "number",
+          "minimum": 0
+        },
+        "controls": {
+          "const": [
+            "uniform",
+            "confidence",
+            "symbolic",
+            "mlp",
+            "rgcn_matched_attention"
+          ]
+        },
+        "adaptation_arms": {
+          "const": [
+            "generated_only",
+            "training_side_real_adaptation"
+          ]
+        },
+        "checkpoint_selection": {
+          "const": "development_decoded_teacher_regret_on_complete_subset"
+        },
+        "held_out_supervision": {
+          "const": false
+        }
+      },
+      "required": [
+        "device",
+        "dtype",
+        "threads",
+        "seeds",
+        "optimizer",
+        "learning_rate",
+        "weight_decay",
+        "clip_gradient_norm",
+        "batch_cases",
+        "max_epochs",
+        "patience",
+        "min_dev_improvement",
+        "smooth_l1_beta",
+        "ranking_temperature",
+        "max_repair_pairs_per_case",
+        "development_decode_every_epochs",
+        "benefit_loss",
+        "proposal_loss",
+        "benefit_loss_weight",
+        "ranking_loss_weight",
+        "proposal_loss_weight",
+        "controls",
+        "adaptation_arms",
+        "checkpoint_selection",
+        "held_out_supervision"
+      ],
+      "additionalProperties": false
+    },
+    "experiments": {
+      "type": "object",
+      "properties": {
+        "studies": {
+          "const": [
+            "XR-E00",
+            "XR-E01",
+            "XR-E02",
+            "XR-E03",
+            "XR-E04",
+            "XR-E05",
+            "XR-E06",
+            "XR-E07",
+            "XR-E08",
+            "XR-E09"
+          ]
+        },
+        "candidate_caps": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "scale_objects": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "runtime_deadlines_seconds": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "score_noise_std": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "feature_dropout": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "composition_holdout": {
+          "const": "mixed"
+        }
+      },
+      "required": [
+        "studies",
+        "candidate_caps",
+        "scale_objects",
+        "runtime_deadlines_seconds",
+        "score_noise_std",
+        "feature_dropout",
+        "composition_holdout"
+      ],
+      "additionalProperties": false
+    },
+    "analysis": {
+      "type": "object",
+      "properties": {
+        "bootstrap_replicates": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "bootstrap_seed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "interval": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "cluster_unit": {
+          "const": "structural_parent_or_ontology_pair"
+        },
+        "multiplicity": {
+          "const": "holm"
+        },
+        "alpha": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "real_pair_tables": {
+          "const": true
+        },
+        "include_unresolved": {
+          "const": true
+        }
+      },
+      "required": [
+        "bootstrap_replicates",
+        "bootstrap_seed",
+        "interval",
+        "cluster_unit",
+        "multiplicity",
+        "alpha",
+        "real_pair_tables",
+        "include_unresolved"
+      ],
+      "additionalProperties": false
+    },
+    "resources": {
+      "type": "object",
+      "properties": {
+        "workers": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "run_deadline_seconds": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "verification_call_seconds": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "initial_diagnosis_seconds": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "cleanup_grace_seconds": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "memory_mb": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "campaign_deadline_seconds": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "unlimited_retries": {
+          "const": false
+        },
+        "stage_deadline_seconds": {
+          "type": "object",
+          "properties": {
+            "qualify": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "corpus": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "candidates": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "label": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "train": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "freeze": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "evaluate": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "report": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          "required": [
+            "qualify",
+            "corpus",
+            "candidates",
+            "label",
+            "train",
+            "freeze",
+            "evaluate",
+            "report"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "workers",
+        "run_deadline_seconds",
+        "verification_call_seconds",
+        "initial_diagnosis_seconds",
+        "cleanup_grace_seconds",
+        "memory_mb",
+        "campaign_deadline_seconds",
+        "unlimited_retries",
+        "stage_deadline_seconds"
+      ],
+      "additionalProperties": false
+    },
+    "publication": {
+      "type": "object",
+      "properties": {
+        "production_default_enabled": {
+          "const": false
+        },
+        "require_safety_replay": {
+          "const": true
+        },
+        "require_scoped_optimality_replay": {
+          "const": true
+        },
+        "public_results_are_ours": {
+          "const": false
+        }
+      },
+      "required": [
+        "production_default_enabled",
+        "require_safety_replay",
+        "require_scoped_optimality_replay",
+        "public_results_are_ours"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "schema_version",
+    "campaign_id",
+    "phase",
+    "data",
+    "actions",
+    "grammar",
+    "graph",
+    "circuit",
+    "policy",
+    "solver",
+    "teacher",
+    "preferences",
+    "training",
+    "experiments",
+    "analysis",
+    "resources",
+    "publication"
+  ],
+  "additionalProperties": false,
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Resolved Exact-Repair XR-2 experiment protocol"
+}
