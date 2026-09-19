@@ -35,6 +35,7 @@ from exact.core.entities.kinds import (
     normalize_entity_kinds,
 )
 from exact.core.entities.ontology import OntologyGraph
+from exact.impl.datasets import prepared_cache
 from exact.impl.datasets.options import candidate_config, mapping_options
 from exact.impl.retrieval import (
     LocalRetrievalArtifact,
@@ -2152,6 +2153,7 @@ class BaseAlignmentDataset(IDataset):
 
         self.dataframe.to_csv(str(self._df_save_path), index=False)
         self._write_cache_metadata()
+        prepared_cache.publish(self.output_path, self.cache_fingerprint)
 
         self.log(f"#Dataset saved to {self._df_save_path}", level="debug")
 
@@ -2170,6 +2172,9 @@ class BaseAlignmentDataset(IDataset):
             self._candidates_generated = True
 
     def has_cache(self) -> bool:
+        shared = False
+        if self._cache_ok and not self._df_save_path.exists():
+            shared = prepared_cache.restore(self.output_path, self.cache_fingerprint)
         if self._cache_ok and self._df_save_path.exists():
             meta = self._load_cache_metadata()
             cache_schema = meta.get("cache_schema_version")
@@ -2194,6 +2199,8 @@ class BaseAlignmentDataset(IDataset):
                 self._cache_state = "hit"
                 return True
             self._cache_state = "invalidated"
+            if shared:
+                raise ValueError("Shared dataset cache failed native/schema compatibility checks")
             if not self._cache_warning_emitted:
                 reason = "missing metadata" if not meta else "fingerprint mismatch"
                 if versions_current and not pool_manifest_current:

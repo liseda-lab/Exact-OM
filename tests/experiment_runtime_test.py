@@ -920,3 +920,29 @@ def test_sampled_global_replay_rejects_missing_saved_reference(
     (inputs / f"{other}.tsv").write_text("SrcEntity\tTgtEntity\n")
     with pytest.raises(FileNotFoundError, match="saved reference"):
         runtime.CellRecovery.evaluate(SimpleNamespace(cell=cell, evaluation_enabled=True))
+
+
+def test_shared_dataset_namespace_keeps_reference_bindings_separate(tmp_path, monkeypatch):
+    cell, suite, _ = fixture(tmp_path, monkeypatch)
+    provenance = harness._provenance_payload(cell, suite, tmp_path)
+    first = runtime.CellRecovery(cell, provenance, tmp_path)
+    changed_cell = replace(
+        cell,
+        arm_id="other-arm",
+        resolved_config={
+            **cell.resolved_config,
+            "matching": {"fusion": {"sigma_mode": "constant_q"}},
+        },
+    )
+    same_inputs = runtime.CellRecovery(changed_cell, provenance, tmp_path)
+    assert (
+        first.environment()["EXACT_DATASET_CACHE_DIR"]
+        == same_inputs.environment()["EXACT_DATASET_CACHE_DIR"]
+    )
+    changed = json.loads(json.dumps(provenance))
+    changed["fingerprint_payload"]["inputs"]["references"]["full"]["sha256"] = "9" * 64
+    different_labels = runtime.CellRecovery(changed_cell, changed, tmp_path)
+    assert (
+        first.environment()["EXACT_DATASET_CACHE_DIR"]
+        != different_labels.environment()["EXACT_DATASET_CACHE_DIR"]
+    )

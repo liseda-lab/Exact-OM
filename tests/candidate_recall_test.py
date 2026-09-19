@@ -160,9 +160,9 @@ def cached_reporting_dataset(tmp_path):
         def log_sanity_examples(self, *args, **kwargs):
             pass
 
-    def make():
+    def make(output_path=None):
         dataset = CandidateRecallCacheDataset(
-            output_path=tmp_path, entity_kinds=["class", "object_property"]
+            output_path=output_path or tmp_path, entity_kinds=["class", "object_property"]
         )
         dataset._source = dataset._target = SimpleNamespace(entities=lambda kind: ())
         dataset._eligible_source_groups = {("s", "class"), ("p", "object_property")}
@@ -258,3 +258,33 @@ def test_cached_recall_rejects_unavailable_or_changed_raw_pool(cached_reporting_
     else:
         with pytest.raises(ValueError, match="candidate-recall pool"):
             _candidate_recall_run_stats(warm, training_reference_path=None)
+
+
+def test_shared_prepared_cache_uses_normal_native_gate(
+    cached_reporting_dataset, tmp_path, monkeypatch
+):
+    from exact.impl.datasets import prepared_cache
+
+    cold, make, reference = cached_reporting_dataset
+    monkeypatch.setenv("EXACT_DATASET_CACHE_DIR", str(tmp_path / "shared"))
+    monkeypatch.setenv("EXACT_EXPERIMENT_ROLE", "development")
+    prepared_cache.publish(cold.output_path, cold.cache_fingerprint)
+    warm = make(tmp_path / "new-arm")
+    assert warm.has_cache()
+    warm.load()
+    warm._reference = reference
+    assert _candidate_recall_run_stats(warm, training_reference_path=None)["candidate_recall"] > 0
+
+    # A different candidate policy cannot consume the shared prepared rows.
+    changed = make(tmp_path / "changed-arm")
+    changed._candidate_generation_params["top_k"] = 99
+    assert not changed.has_cache()
+
+    # Even an integrity-valid shared snapshot must pass the existing schema gate.
+    metadata = json.loads(cold._cache_meta_path.read_text())
+    metadata["cache_schema_version"] = 1
+    cold._cache_meta_path.write_text(json.dumps(metadata))
+    monkeypatch.setenv("EXACT_DATASET_CACHE_DIR", str(tmp_path / "legacy-shared"))
+    prepared_cache.publish(cold.output_path, cold.cache_fingerprint)
+    with pytest.raises(ValueError, match="native/schema compatibility"):
+        make(tmp_path / "legacy-arm").has_cache()

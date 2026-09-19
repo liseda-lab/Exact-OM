@@ -174,6 +174,18 @@ class CellRecovery:
             entity_kind=str(cell.resolved_config.get("entity_kind", "all")),
             seed=None if cell.published_matcher and cell.source_cap is None else cell.seed,
         )
+        # Prepared CSVs can contain reporting labels; never share them across
+        # different reference bindings, even when feature fingerprints agree.
+        self.dataset_cache_scope = _hash(
+            {
+                **{
+                    key: value
+                    for key, value in input_hashes.items()
+                    if key.startswith("references/")
+                },
+                **reporting_hashes,
+            }
+        )
         self.identities = {}
         self.identities["inputs"] = stage_identity(
             "inputs",
@@ -348,6 +360,7 @@ class CellRecovery:
             "EXACT_EXPERIMENT_RUNTIME": str(self.cell.output_dir / "recovery-runtime.json"),
             "EXACT_OPENROUTER_LEDGER_DIR": str(self.store.root / "openrouter"),
             "EXACT_EMBEDDING_CACHE_DIR": str(self.store.root / "embeddings"),
+            "EXACT_DATASET_CACHE_DIR": str(self.store.root / "datasets" / self.dataset_cache_scope),
             "EXACT_EXPERIMENT_ROLE": self.cell.split_role,
             "EXACT_EXPERIMENT_STOP_FILE": str(self.store.root / "STOP"),
         }
