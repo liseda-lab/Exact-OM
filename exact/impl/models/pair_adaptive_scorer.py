@@ -1924,7 +1924,7 @@ class PairAdaptiveSemanticScorer(
         S_base = torch.full((n_pairs,), float(self.tau), device=self.device)
         if torch.any(only_lex):
             S_base = S_base.clone()
-            S_base[only_lex] = S_lex[only_lex]
+            S_base[only_lex] = S_lex[only_lex].to(dtype=S_base.dtype)
         if torch.any(only_struct):
             S_base = S_base.clone()
             S_base[only_struct] = S_struct[only_struct]

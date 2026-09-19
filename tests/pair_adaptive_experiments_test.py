@@ -534,3 +534,66 @@ def test_end_to_end_string_channel_reconstructs_explanation_contributions() -> N
     )
     assert reconstructed == pytest.approx(result["S_final"].item() - scorer.tau)
     assert explanation["experiment_diagnostics"]["string_similarity"]["winner"] == ("abbreviation")
+
+
+@pytest.mark.parametrize("n_pairs", [1, 2])
+@pytest.mark.parametrize("dtype", [torch.float16, torch.bfloat16, torch.float32])
+@pytest.mark.parametrize("channels", ["lexical", "structural", "both", "neither"])
+def test_channel_fusion_preserves_fp32_output_with_mixed_precision_embeddings(
+    monkeypatch: pytest.MonkeyPatch, dtype: torch.dtype, channels: str, n_pairs: int
+) -> None:
+    scorer = _scorer(return_explanations=True)
+    scorer.use_lexical = channels in {"lexical", "both"}
+    scorer.use_context = channels in {"structural", "both"}
+    dataset = _TinyDataset()
+    features = dataset.get_entity_features
+
+    def entity_features(iri: str, side: str) -> dict:
+        result = features(iri, side)
+        result["hierarchy"] = {
+            "is_a": [{"triple": (iri, "subClassOf", "parent"), "specificity": 0.5}]
+        }
+        return result
+
+    monkeypatch.setattr(dataset, "get_entity_features", entity_features)
+    monkeypatch.setattr(
+        scorer,
+        "encode_labels_batch",
+        lambda labels: torch.tensor(
+            [[1.0, 0.0] if label == "source" else [0.6, 0.8] for label in labels],
+            dtype=dtype,
+        ),
+    )
+    monkeypatch.setattr(
+        scorer,
+        "_encode_label_matrix",
+        lambda left, right: torch.full((len(left), len(right)), 0.875, dtype=dtype),
+    )
+    monkeypatch.setattr(scorer, "_context_similarity_from_sentences", lambda *args: 0.875)
+    scorer.attach_dataset(dataset)
+    result = scorer(
+        src_iris=["s"] * n_pairs,
+        tgt_iris=["t"] * n_pairs,
+        src_label_lists=[["source"]] * n_pairs,
+        tgt_label_lists=[["target"]] * n_pairs,
+    )
+    assert result["S_base"].dtype == torch.float32
+    assert torch.equal(result["S_base"], result["S_final"])
+    assert torch.isfinite(result["S_final"]).all()
+    if channels in {"lexical", "both"}:
+        assert result["s_label"].dtype == dtype
+    if channels == "lexical":
+        assert torch.equal(result["S_base"], result["s_label"].float())
+        assert result["w_struct"][0].item() == 0.0
+    elif channels == "structural":
+        assert result["S_base"][0].item() == pytest.approx(0.875)
+        assert result["w_struct"][0].item() == 1.0
+    elif channels == "both":
+        assert result["s_label"][0].item() < result["S_base"][0].item() < 0.875
+        assert 0.0 < result["w_struct"][0].item() < 1.0
+    else:
+        assert result["S_base"][0].item() == scorer.tau
+    contributions = result["explanations"][0]["contributions"]
+    assert sum(
+        contributions[key] for key in ("C_label", "C_strsim", "C_struct", "C_llm")
+    ) == pytest.approx(result["S_final"][0].item() - scorer.tau, abs=1.0e-7)
