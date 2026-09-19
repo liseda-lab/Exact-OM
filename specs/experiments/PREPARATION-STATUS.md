@@ -250,3 +250,12 @@ the other arms' prepared caches. SQLite recovery operates on copies, preserving 
 See the current handoff in [FIRST-SCREEN.md](FIRST-SCREEN.md).
 The continuation started at **22:39 UTC** as step **14220.1**, in detached tmux session
 `exact-screen-03`. Source/native pins passed; the launcher preserves the interactive shell.
+
+All four E05 cells completed by 00:30 UTC on 2026-09-19. Selection then stopped on missing
+candidate recall: cached datasets omitted the development reference and raw retrieval ranks.
+The node did not reboot. The committed repair restores scoped references, persists raw ranks
+in future caches, and rejects incomplete audited caches before scoring. Sixty-three focused
+tests pass. `first-screen-04/` launched at 10:56 UTC on 2026-09-19 for retrieval-only reconstruction plus saved-prediction
+evaluation; exact candidate fingerprints must reproduce and no scientific settings change.
+Original prediction artifacts and all previous charges remain intact. See FIRST-SCREEN.md
+for the current interactive-step handoff.

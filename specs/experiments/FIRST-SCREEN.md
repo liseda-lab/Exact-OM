@@ -18,13 +18,19 @@ Its unclosed running marker is stale. The baseline retained a verified checkpoin
 The user authorized resuming that checkpoint in the current interactive allocation **14220**.
 The continuation started at **22:39 UTC** as Slurm step **14220.1**, detached in
 `exact-screen-03`, using the same revision 08 campaign and outputs in `first-screen-03/`.
-Its `launch-status.json` records the new attempt; earlier attempt files remain intact.
+All four arms completed by **00:30 UTC on 2026-09-19**, with saved scoring outputs.
+Final selection then stopped because cached datasets did not restore the development
+reference or raw retrieval diagnostics. The node stayed up. The user authorized recovery
+in `first-screen-04/`: regenerate only raw retrieval lists, require their original exact
+fingerprints, and evaluate the saved predictions. Earlier attempts remain intact.
 The full scientific campaign remains gated by later results.
 
 ## Frozen work
 
 Preparation: `data/experiments-v2/prepared-campaign-08/campaign.lock.yaml`.
-Current output and launch records: `data/experiments-v2/first-screen-03/`.
+Current recovery output and launch records: `data/experiments-v2/first-screen-04/`.
+Completed scoring outputs: `data/experiments-v2/first-screen-03/`.
+Evaluation repair scripts/evidence: `data/experiments-v2/first-screen-evaluation-repair-01/`.
 Verbaliser repair evidence: `data/experiments-v2/first-screen-repair-01/`.
 Node-reboot recovery evidence: `data/experiments-v2/first-screen-reboot-01/`.
 
@@ -87,17 +93,32 @@ and saved metrics without rescoring. Its 24 runtime tests, 39 campaign tests and
 configuration tests passed. The separate 52-fixture recovery audit and two reporting guards
 retain the limitations in `first-screen-preflight/recovery-fixtures.json`.
 
+Cached evaluation now restores and scopes the development reference on both paths. New
+caches also preserve raw candidate ranks and exact rows in a checksum-pinned reporting
+sidecar. Audited legacy caches fail before inference when that sidecar is unavailable.
+Global evaluator replay requires the saved sampled references. The focused suites pass
+63 tests, including cold/cache recall parity, exact matches outside retrieval, empty-source
+denominators and missing-reference rejection.
+
+The current repair shares native ontology objects across retrieval arms and uses production
+label access without full projection. A tiny native parity check passed. Raw candidate hashes
+must match the historical pools before any metrics are accepted; no thresholds or k values
+are revised. Pair scoring, hosted calls and rationales are disabled. Finalization imports the
+historical extraction artifacts unchanged, publishes new evaluation artifacts with explicit
+repair lineage, and preserves original timing measurements and cumulative charges. Current
+code is not claimed to be prediction-identical to the earlier extraction implementation.
+
 ## Handoff
 
 Keep allocation **14220** and its interactive shell alive for experiment and VS Code access.
 Future launches use Slurm steps inside the existing allocation, as specified in
 [NODE-SETUP.md](NODE-SETUP.md). Detached tmux hosts `srun`; detaching does not release the
-allocation. The continuation session is `exact-screen-03`. Earlier tmux sessions were lost with the reboot.
+allocation. The repair started at **10:56 UTC on 2026-09-19** as Slurm step **14220.2**, in `exact-screen-04`. Earlier tmux sessions were lost with the reboot.
 
 ```console
-tmux attach -t exact-screen-03
+tmux attach -t exact-screen-04
 squeue --steps -j 14220
-tail -f /home/pgcotovio/Exact-OM/data/experiments-v2/first-screen-03/launcher.log
+tail -f /home/pgcotovio/Exact-OM/data/experiments-v2/first-screen-04/launcher.log
 ```
 
 Press **Ctrl-b**, then **d** to detach. `interactive-launch.json` records the actual Slurm
@@ -108,12 +129,7 @@ appears when the launcher exits. The allocation has unlimited wall time. This in
 run has no automatic batch requeue; persistent checkpoints allow explicit recovery after a
 node reboot, but tmux cannot survive a reboot or allocation cancellation.
 
-Cooperatively stop at the next supported boundary:
-
-```console
-touch data/experiments-v2/first-screen-03/runtime/exact-om-focused-v2/STOP
-```
-
-The launcher preserves an existing STOP file. Review its reason before intentionally resuming.
+The repair has no pair-scoring checkpoint loop. To interrupt it, cancel only the repair's
+Slurm step (the step ID is in `launch-status.json`), preserving allocation 14220 and step 0.
 Do not overwrite frozen declarations or historical attempts. Development selections do not
 authorize final reporting claims or changes to production defaults.
