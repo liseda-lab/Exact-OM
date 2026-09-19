@@ -7,6 +7,7 @@
 - Guides
     - [Datasets and tracks](guides/datasets-tracks.md)
     - [Ontology matching](guides/ontology-matching.md)
+    - [Alignment repair](guides/repair.md)
     - [KG matching](guides/kg-matching.md)
     - [Property and instance matching](guides/property-instance-matching.md)
     - [Evaluation](guides/evaluation.md)

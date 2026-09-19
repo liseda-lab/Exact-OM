@@ -56,6 +56,8 @@ projector, reasoner, import-closure, diagnostic, and semantic-fingerprint proven
 
 ## Documentation
 
+Opt-in standalone and sequential alignment repair is documented in [Exact-Repair](docs/guides/repair.md).
+
 - [Quickstart and expected outputs](https://liseda-lab.github.io/Exact-OM/getting-started/quickstart/)
 - [Datasets and tracks](https://liseda-lab.github.io/Exact-OM/guides/datasets-tracks/)
 - [Ontology and KG matching guides](https://liseda-lab.github.io/Exact-OM/guides/ontology-matching/)
