@@ -997,7 +997,9 @@ def load_suite_or_experiment(
     )
 
 
-def _validate_overlay_surface(overlay: Mapping[str, Any], label: str) -> None:
+def _validate_overlay_surface(
+    overlay: Mapping[str, Any], label: str, *, baseline: Optional[Mapping[str, Any]] = None
+) -> None:
     pipeline = overlay.get("pipeline")
     if pipeline is None:
         return
@@ -1010,7 +1012,19 @@ def _validate_overlay_surface(overlay: Mapping[str, Any], label: str) -> None:
         if not isinstance(params, Mapping):
             continue
         reserved = sorted(set(params).intersection(_RESERVED_PIPELINE_PARAMS))
-        legacy = sorted(set(params).intersection({"tau", "gamma", "beta", "tau_LLM"}))
+        originals = [
+            item.get("params", {})
+            for item in (baseline or {}).get("pipeline", [])
+            if isinstance(item, Mapping) and item.get("name") == entry.get("name")
+        ]
+        original = originals[0] if len(originals) == 1 else {}
+        # Full pipeline snapshots may repeat unchanged baseline aliases. They
+        # are not treatment controls; changed aliases still require canonical keys.
+        legacy = sorted(
+            name
+            for name in set(params).intersection({"tau", "gamma", "beta", "tau_LLM"})
+            if name not in original or params[name] != original[name]
+        )
         if reserved or legacy:
             names = reserved + legacy
             raise ValueError(
@@ -1405,13 +1419,15 @@ def _resolve_config(
     source_cap: Optional[int],
     inherited_overlay: Mapping[str, Any],
 ) -> tuple[dict[str, Any], str, str, dict[str, Any]]:
+    base_mapping = _base_mapping(source)
     for label, overlay in (
         ("inherited overlay", inherited_overlay),
         (f"task {task.id}", task.overlay),
         (f"arm {arm.id}", arm.overlay),
     ):
-        _validate_overlay_surface(overlay, f"{source.config.experiment_id} {label}")
-    base_mapping = _base_mapping(source)
+        _validate_overlay_surface(
+            overlay, f"{source.config.experiment_id} {label}", baseline=base_mapping
+        )
     annotation = source.config.frozen_constants.get("evaluation_diagnostics", {}).get(task.id, {})
     benchmark_nil = annotation.get("label_semantics") == "benchmark_pool"
     if benchmark_nil:
@@ -6545,6 +6561,7 @@ def run_stage(
             from exact.experiments.campaign import (
                 compose_development,
                 external_acceptance_selection,
+                external_selection_result,
             )
 
             assert campaign_lock is not None
@@ -6559,6 +6576,20 @@ def run_stage(
                     ),
                     **external_acceptance_selection(
                         campaign_lock, step, Path(suite.campaign["lock_path"]).resolve().parent
+                    ),
+                    "experiment_config_hash": source.raw_hash(),
+                }
+                persist()
+                continue
+            if step.external_selection is not None:
+                historical = external_selection_result(
+                    campaign_lock, step, Path(suite.campaign["lock_path"]).resolve().parent
+                )
+                selections[config.experiment_id] = {
+                    **historical,
+                    "historical_design_hash": historical["design_hash"],
+                    "design_hash": experiment_design_hash(
+                        source, baseline_manifest_hash=suite.baseline_manifest_hash
                     ),
                     "experiment_config_hash": source.raw_hash(),
                 }

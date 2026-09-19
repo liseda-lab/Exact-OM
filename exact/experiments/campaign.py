@@ -253,6 +253,7 @@ class CampaignStep(StrictConfigModel):
     )
     estimate: Optional[WorkEstimate] = None
     external_acceptance: Optional[InputBinding] = None
+    external_selection: Optional[InputBinding] = None
     selection: SelectionConfig
     design: DesignConfig
 
@@ -272,6 +273,12 @@ class CampaignStep(StrictConfigModel):
             or self.estimate is not None
         ):
             raise ValueError("external acceptance is only an initial E00 operational result")
+        if self.external_selection is not None and (
+            self.phase != "initial"
+            or self.external_acceptance is not None
+            or self.estimate is not None
+        ):
+            raise ValueError("external selection is only a completed initial development screen")
         ids = [arm.id for arm in self.arms]
         if not ids or len(ids) != len(set(ids)):
             raise ValueError("step arms must be nonempty and unique")
@@ -618,6 +625,116 @@ def external_acceptance_selection(lock: CampaignLock, step: CampaignStep, root: 
     }
 
 
+def external_selection_result(lock: CampaignLock, step: CampaignStep, root: Path) -> dict:
+    """Carry a verified historical decision forward without reusing prediction identities."""
+    if step.external_selection is None:
+        raise ValueError("external selection binding missing")
+    record_path = step.external_selection.verify(root)
+    record = json.loads(record_path.read_text())
+    if record.get("schema_version") != 1 or record.get("kind") != "exact_om_prior_selection":
+        raise ValueError("unsupported external selection record")
+
+    def binding(value: Any) -> Path:
+        return InputBinding.model_validate(value).verify(record_path.parent)
+
+    def content(value: Any) -> Any:
+        if isinstance(value, dict):
+            if set(value) == {"path", "sha256"}:
+                return {"sha256": value["sha256"]}
+            return {key: content(item) for key, item in value.items()}
+        if isinstance(value, list):
+            return [content(item) for item in value]
+        return value
+
+    old_path = binding(record["campaign"])
+    old, _ = load_campaign(old_path)
+    old_step = next((item for item in old.steps if item.id == step.id), None)
+    if old_step is None or old_step.external_selection is not None:
+        raise ValueError("external selection requires an original completed comparison")
+    operational = {"readiness", "estimate", "external_selection"}
+    if content(step.model_dump(mode="json", exclude=operational)) != content(
+        old_step.model_dump(mode="json", exclude=operational)
+    ):
+        raise ValueError("external selection scientific step changed")
+    for field in (
+        "baseline_id",
+        "baseline_manifest",
+        "model_lock",
+        "generate_rationales",
+        "openrouter_profile",
+    ):
+        current, prior = getattr(lock, field), getattr(old, field)
+        if hasattr(current, "model_dump"):
+            current = current.model_dump(mode="json")
+        if hasattr(prior, "model_dump"):
+            prior = prior.model_dump(mode="json")
+        if content(current) != content(prior):
+            raise ValueError(f"external selection {field} changed")
+    if sha256_file(root / lock.base_config) != sha256_file(old_path.parent / old.base_config):
+        raise ValueError("external selection base configuration changed")
+    for case_id in [step.case, *step.additional_cases]:
+        case = lock.cases[case_id]
+        if case.role != "development" or content(case.model_dump(mode="json")) != content(
+            old.cases[case_id].model_dump(mode="json")
+        ):
+            raise ValueError("external selection development inputs changed")
+    selection = json.loads(binding(record["selection"]).read_text())
+    claimed = selection.pop("selection_hash", None)
+    if (
+        claimed != digest(selection)
+        or selection.get("stage") != "screen"
+        or selection.get("suite_hash") != campaign_identity(old, old_path.parent)
+    ):
+        raise ValueError("external selection signature or historical design mismatch")
+    result = selection["experiments"][step.id]
+    if result.get("status") not in {"selected", "screened_out"}:
+        raise ValueError("external selection must be a finished development decision")
+    result_set = json.loads(binding(record["result_set"]).read_text())
+    rows = {row["cell_id"]: row for row in result_set["cells"]}
+    expected = {
+        (arm.id, mode, seed)
+        for arm in step.arms
+        for mode in step.execution_modes
+        for seed in step.seeds
+    }
+    if step.additional_cases:
+        raise ValueError("external selection currently supports a single development case")
+    observed = set()
+    for item in record["cells"]:
+        manifest = json.loads(binding(item).read_text())
+        key = (manifest.get("arm_id"), manifest.get("execution_mode"), manifest.get("seed"))
+        cell_id = f"{step.id}/screen/{key[0]}/{step.case}-{key[1]}/seed-{key[2]}"
+        if (
+            key not in expected
+            or key in observed
+            or cell_id not in rows
+            or manifest.get("status") != "complete"
+            or manifest.get("return_code") != 0
+            or manifest.get("extraction_complete") is not True
+            or manifest.get("experiment_id") != step.id
+            or manifest.get("stage") != "screen"
+            or manifest.get("split_role") != "development"
+            or manifest.get("source_cap") != step.source_cap
+            or manifest.get("generate_rationales") != lock.generate_rationales
+            or manifest.get("recovery", {}).get("artifacts") != rows[cell_id]["artifacts"]
+        ):
+            raise ValueError("external selection cell is incomplete or mismatched")
+        observed.add(key)
+    if observed != expected:
+        raise ValueError("external selection is missing completed cells")
+    if not record.get("evidence"):
+        raise ValueError("external selection requires immutable supporting evidence")
+    for item in record["evidence"]:
+        binding(item)
+    return {
+        **result,
+        "external_selection": step.external_selection.model_dump(mode="json"),
+        "historical_selection_hash": claimed,
+        "new_cells": 0,
+        "current_code_prediction_compatibility": False,
+    }
+
+
 def campaign_plan(path: Path, *, stage: str, verify_inputs: bool = True) -> dict[str, Any]:
     """Return a bounded work/readiness inventory without opening reporting labels."""
     if stage not in {"screen", "confirm"}:
@@ -657,6 +774,11 @@ def campaign_plan(path: Path, *, stage: str, verify_inputs: bool = True) -> dict
                 external_acceptance_selection(lock, step, root)
             except (OSError, ValueError, KeyError, TypeError) as exc:
                 input_errors.append(f"external acceptance: {exc}")
+        if step.external_selection is not None:
+            try:
+                external_selection_result(lock, step, root)
+            except (OSError, ValueError, KeyError, TypeError) as exc:
+                input_errors.append(f"external selection: {exc}")
         for case_id in [step.case, *step.additional_cases]:
             case = lock.cases[case_id]
             for name in ("source", "target", "source_universe"):
@@ -714,6 +836,7 @@ def campaign_plan(path: Path, *, stage: str, verify_inputs: bool = True) -> dict
             if (
                 step.estimate is None
                 and step.external_acceptance is None
+                and step.external_selection is None
                 and status not in TERMINAL
             ):
                 issues.append("measured cold/warm resource forecast missing")
@@ -1385,6 +1508,8 @@ def campaign_identity(lock: CampaignLock, root: Path) -> str:
     value = lock.model_dump(mode="json", exclude={"final_selection"})
     for step in value["steps"]:
         step.pop("readiness")
+        if step.get("external_selection") is None:
+            step.pop("external_selection", None)
     base = lock.base_config if lock.base_config.is_absolute() else root / lock.base_config
     value["base_config"] = {"sha256": sha256_file(base)}
 

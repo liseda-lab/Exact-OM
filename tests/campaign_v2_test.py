@@ -1080,3 +1080,266 @@ def test_external_g0_acceptance_unlocks_only_dependent_cells_without_e00_worker(
     current = json.loads((root / "screen/current-result-set.json").read_text())
     assert len(current["cells"]) == 2
     assert all(row["cell_id"].startswith("E06/") for row in current["cells"])
+
+
+def _external_selection_fixture(tmp_path):
+    import json
+
+    from exact.experiments.campaign import campaign_identity, digest
+
+    suite = _ready_suite(tmp_path)
+    path = Path(suite.campaign["lock_path"])
+    raw = yaml.safe_load(path.read_text())
+    step = raw["steps"][0]
+    step["id"] = "E05"
+    historical = _binding(tmp_path / "historical.lock.yaml", yaml.safe_dump(raw))
+    old, _ = load_campaign(Path(historical["path"]))
+    from exact.experiments import harness
+
+    prior = materialize_campaign(
+        Path(historical["path"]), tmp_path / "prior-declarations", stage="screen"
+    )
+    source = prior.sources[0]
+    result = harness._runtime_deferred_selection(
+        source, prior, reason_code="fixture", reason="Completed historical control"
+    )
+    result.update(
+        status="screened_out",
+        selected_overlay={},
+        resolved_arms_hash=harness.hash_payload(
+            {arm.id: arm.overlay for arm in harness._component_arms(source.config)}
+        ),
+    )
+    selected = {
+        "stage": "screen",
+        "suite_hash": campaign_identity(old, tmp_path),
+        "experiments": {"E05": result},
+    }
+    selected["selection_hash"] = digest(selected)
+    cells, rows = [], []
+    for arm in step["arms"]:
+        artifacts = {"extraction": f"{arm['id']}-extraction"}
+        cells.append(
+            _binding(
+                tmp_path / f"{arm['id']}.json",
+                json.dumps(
+                    {
+                        "arm_id": arm["id"],
+                        "experiment_id": "E05",
+                        "stage": "screen",
+                        "status": "complete",
+                        "return_code": 0,
+                        "extraction_complete": True,
+                        "execution_mode": "global_alignment",
+                        "seed": 17,
+                        "source_cap": 300,
+                        "split_role": "development",
+                        "generate_rationales": False,
+                        "recovery": {"artifacts": artifacts},
+                    }
+                ),
+            )
+        )
+        rows.append(
+            {
+                "cell_id": f"E05/screen/{arm['id']}/D0-global_alignment/seed-17",
+                "artifacts": artifacts,
+            }
+        )
+    record = {
+        "schema_version": 1,
+        "kind": "exact_om_prior_selection",
+        "campaign": historical,
+        "selection": _binding(tmp_path / "historical-selection.json", json.dumps(selected)),
+        "result_set": _binding(tmp_path / "historical-results.json", json.dumps({"cells": rows})),
+        "cells": cells,
+        "evidence": [_binding(tmp_path / "reporting-proof.json", "{}")],
+    }
+    step.update(
+        estimate=None,
+        external_selection=_binding(tmp_path / "prior-selection.json", json.dumps(record)),
+    )
+    path.write_text(yaml.safe_dump(raw))
+    return path, raw, record
+
+
+def test_external_selection_preserves_completed_policy_without_new_cells(tmp_path):
+    from exact.experiments.campaign import external_selection_result
+
+    path, _, _ = _external_selection_fixture(tmp_path)
+    lock, _ = load_campaign(path)
+    result = external_selection_result(lock, lock.steps[0], tmp_path)
+    assert result["status"] == "screened_out"
+    assert result["selected_overlay"] == {}
+    assert result["new_cells"] == 0
+    assert not result["current_code_prediction_compatibility"]
+    assert result["historical_selection_hash"]
+    plan = campaign_plan(path, stage="screen")
+    assert not plan["budget_errors"]
+    assert all(not row["issues"] for row in plan["rows"])
+
+
+@pytest.mark.parametrize(
+    "change", ["selection", "signature", "cell", "missing_cell", "artifacts", "case", "step"]
+)
+def test_external_selection_rejects_changed_decisions_cells_or_scope(tmp_path, change):
+    import json
+
+    from exact.experiments.campaign import external_selection_result
+
+    path, raw, record = _external_selection_fixture(tmp_path)
+    if change == "selection":
+        Path(record["selection"]["path"]).write_text("tampered")
+    elif change in {"signature", "cell", "artifacts"}:
+        target = (
+            record["selection"]
+            if change == "signature"
+            else record["cells"][0] if change == "cell" else record["result_set"]
+        )
+        content = json.loads(Path(target["path"]).read_text())
+        if change == "signature":
+            content["selection_hash"] = "0" * 64
+        elif change == "cell":
+            content["extraction_complete"] = False
+        else:
+            content["cells"][0]["artifacts"]["extraction"] = "different-extraction"
+        target.update(_binding(Path(target["path"]), json.dumps(content)))
+    elif change == "missing_cell":
+        record["cells"].pop()
+    elif change == "case":
+        raw["cases"]["D0"]["source"] = _binding(tmp_path / "new-source.owl", "different ontology")
+    else:
+        raw["steps"][0]["arms"][1]["overlay"]["matching"]["threshold"] = 0.4
+    raw["steps"][0]["external_selection"] = _binding(
+        tmp_path / "prior-selection.json", json.dumps(record)
+    )
+    path.write_text(yaml.safe_dump(raw))
+    lock, _ = load_campaign(path)
+    with pytest.raises(ValueError):
+        external_selection_result(lock, lock.steps[0], tmp_path)
+
+
+def test_campaign_identity_retains_legacy_serialization_without_external_selection(tmp_path):
+    from types import SimpleNamespace
+
+    from exact.experiments.campaign import campaign_identity
+
+    path = _lock(tmp_path)
+    lock, _ = load_campaign(path)
+    legacy = lock.model_dump(mode="json", exclude={"final_selection"})
+    for step in legacy["steps"]:
+        assert step.pop("external_selection") is None
+    old_schema = SimpleNamespace(base_config=lock.base_config, model_dump=lambda **_: legacy)
+    assert campaign_identity(lock, tmp_path) == campaign_identity(old_schema, tmp_path)
+
+
+def test_external_selection_stage_does_not_launch_completed_e05_cells(tmp_path, monkeypatch):
+    import json
+    from dataclasses import replace
+
+    from exact.experiments import harness
+
+    path, _, _ = _external_selection_fixture(tmp_path)
+    suite = materialize_campaign(path, tmp_path / "historical-declarations", stage="screen")
+    root = tmp_path / "new-results" / suite.suite_id
+    suite = replace(
+        suite,
+        model_lock_payload={"status": "unresolved"},
+        campaign={
+            "lock_path": str(path),
+            "root": str(root),
+            "stage": "screen",
+            "allowed_steps": ["E05"],
+            "budget_limits": {
+                "envelopes_hours": {"foundation": 12},
+                "requests_cap": 100,
+                "tokens_cap": 1000,
+            },
+        },
+    )
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("Historical E05 selection launched a new worker")
+
+    monkeypatch.setattr(harness, "_run_subprocess", forbidden)
+    monkeypatch.setattr(harness, "build_dataset_inventory", lambda *args, **kwargs: None)
+    result = harness.run_stage(
+        suite,
+        stage="screen",
+        output_root=tmp_path / "new-results",
+        jobs=1,
+        resume=False,
+        workdir=tmp_path,
+    )
+    selected = json.loads(result.read_text())["experiments"]["E05"]
+    assert selected["status"] == "screened_out" and selected["new_cells"] == 0
+    assert json.loads((root / "screen/current-result-set.json").read_text())["cells"] == []
+
+
+@pytest.mark.parametrize("alias", ["tau", "gamma", "beta", "tau_LLM"])
+def test_pipeline_snapshot_allows_only_unchanged_baseline_aliases(alias):
+    from exact.experiments.harness import _validate_overlay_surface
+
+    baseline = {"pipeline": [{"name": "Scorer", "params": {alias: 0.5}}]}
+    snapshot = {"pipeline": [{"name": "Scorer", "params": {alias: 0.5, "use_context": False}}]}
+    _validate_overlay_surface(snapshot, "copied snapshot", baseline=baseline)
+    snapshot["pipeline"][0]["params"][alias] = 0.4
+    with pytest.raises(ValueError, match="must use matching"):
+        _validate_overlay_surface(snapshot, "changed alias", baseline=baseline)
+
+
+@pytest.mark.parametrize(
+    "case", ["missing_base", "missing_alias", "wrong_component", "duplicate_component"]
+)
+def test_pipeline_snapshot_requires_one_matching_original_component(case):
+    from exact.experiments.harness import _validate_overlay_surface
+
+    snapshot = {"pipeline": [{"name": "Scorer", "params": {"tau": 0.5}}]}
+    if case == "missing_base":
+        baseline = None
+    elif case == "missing_alias":
+        baseline = {"pipeline": [{"name": "Scorer", "params": {}}]}
+    elif case == "wrong_component":
+        baseline = {"pipeline": [{"name": "OtherScorer", "params": {"tau": 0.5}}]}
+    else:
+        baseline = {"pipeline": snapshot["pipeline"] * 2}
+    with pytest.raises(ValueError, match="must use matching"):
+        _validate_overlay_surface(snapshot, case, baseline=baseline)
+
+
+@pytest.mark.parametrize(
+    "reserved",
+    ["anchor_rescoring_config", "experiment_config", "fusion_config", "llm_experiment_config"],
+)
+def test_copied_pipeline_snapshots_never_admit_reserved_controls(reserved):
+    from exact.experiments.harness import _validate_overlay_surface
+
+    snapshot = {"pipeline": [{"name": "Scorer", "params": {reserved: {"enabled": False}}}]}
+    with pytest.raises(ValueError, match="must use matching"):
+        _validate_overlay_surface(snapshot, "reserved control", baseline=snapshot)
+
+
+def test_resolved_pipeline_snapshot_keeps_unchanged_aliases_and_declared_treatment(tmp_path):
+    import copy
+
+    from exact.experiments import harness
+
+    suite = _ready_suite(tmp_path)
+    source = suite.sources[0]
+    pipeline = copy.deepcopy(harness._base_mapping(source)["pipeline"])
+    pipeline[0]["params"]["use_context"] = False
+    arm = source.config.arms[1].model_copy(update={"overlay": {"pipeline": pipeline}})
+    resolved, _, _, _ = harness._resolve_config(
+        source,
+        task=source.config.screen.tasks[0],
+        arm=arm,
+        stage="screen",
+        seed=17,
+        source_cap=300,
+        inherited_overlay={},
+    )
+    assert resolved["pipeline"][0]["params"]["use_context"] is False
+    assert all(
+        resolved["pipeline"][0]["params"][name] == pipeline[0]["params"][name]
+        for name in ("tau", "gamma", "beta", "tau_LLM")
+    )
