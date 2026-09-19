@@ -20,9 +20,20 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--max-attempts", type=int, default=2, help="cap interrupted attempts per scheduled arm"
     )
+    parser.add_argument(
+        "--matrix",
+        action="store_true",
+        help="declare matched model/profile controls, preserving unavailable arms",
+    )
+    parser.add_argument("--campaign-seconds", type=float, default=3600.0)
     args = parser.parse_args(argv)
     started = time.monotonic()
     cases, arms, seed = load_schedule(args.schedule)
+    if args.matrix:
+        from exact.repair.comparisons import freeze_controls, research_arms
+
+        cases = tuple(freeze_controls(case) for case in cases)
+        arms = research_arms()
     write_artifact(
         Path(args.output) / "loading.json",
         {
@@ -32,7 +43,14 @@ def main(argv: list[str] | None = None) -> int:
             "scheduled_cases": len(cases),
         },
     )
-    result = run_study(cases, args.output, arms=arms, seed=seed, max_attempts=args.max_attempts)
+    result = run_study(
+        cases,
+        args.output,
+        arms=arms,
+        seed=seed,
+        max_attempts=args.max_attempts,
+        campaign_seconds=args.campaign_seconds,
+    )
     print(
         json.dumps(
             {
