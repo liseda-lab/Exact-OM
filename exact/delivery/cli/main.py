@@ -12,6 +12,10 @@ def main(argv: Optional[Sequence[str]] = None):
     arguments = list(sys.argv[1:] if argv is None else argv)
     if arguments:
         command = arguments[0]
+        if command == "repair":
+            from exact.delivery.cli.repair import main as repair_main
+
+            return repair_main(arguments[1:])
         if command == "data":
             from exact.delivery.cli.data import main as data_main
 

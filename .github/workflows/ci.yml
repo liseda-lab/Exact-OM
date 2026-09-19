@@ -25,7 +25,7 @@ jobs:
         with:
           path: .venv
           key: venv-${{ runner.os }}-${{ matrix.python-version }}-${{ hashFiles('poetry.lock') }}
-      - run: poetry install --with prebuild --extras "viz reasoning bioml-eval"
+      - run: poetry install --with prebuild --extras "viz reasoning bioml-eval repair"
       - run: poetry run black --check exact exact_inspect tests tools study_visualizer_runtime
       - run: poetry run isort --check-only exact exact_inspect tests tools study_visualizer_runtime
       - run: poetry run flake8 exact exact_inspect tests tools study_visualizer_runtime
