@@ -25,6 +25,52 @@ in `first-screen-04/`: regenerate only raw retrieval lists, require their origin
 fingerprints, and evaluate the saved predictions. Earlier attempts remain intact.
 The full scientific campaign remains gated by later results.
 
+## Completed E05 decision and next batch
+
+E05 recovery completed at **11:08 UTC on 2026-09-19**, step **14220.2**, exit 0.
+It reused all four saved scoring outputs with zero new scored pairs or hosted requests.
+The frozen decision retained **top-k 20**: baseline recall was 250/253; SapBERT reached
+251/253 but missed the required 0.005 improvement; RRF reached 245/253; adaptive-k
+retained 250/253 while exceeding the matched mean-pool-size guard. These are development
+results for this 300-source sample, not final benchmark claims.
+
+The next immutable declaration is
+`data/experiments-v2/prepared-campaign-09/campaign.lock.yaml`: **12 new D0 cells**, comprising
+all eight E26 channel-quality arms and all four E06 lexical/string arms, seed 17, global
+mode. It imports the signed historical E05 decision without rerunning retrieval selection.
+Optional supervised E20 is explicitly deferred pending measured training throughput;
+this is an operational disposition, not a negative empirical result. All other readiness
+blocks remain in place. Method settings and selection rules remain unchanged.
+
+Validated prepared data, raw retrieval diagnostics, 121 relation templates and compatible
+encoder embeddings are reused. Shared prepared data is isolated by reference bindings and
+experiment role, with content hashes and native/schema checks. Scoring outputs are computed
+for the new treatments. The complete prior budget and hosted-request ledger are retained.
+The batch has a **13.8-hour conservative admission allowance**, including a 1.5 safety factor;
+this is not a wall-time limit. It runs one heavy GPU worker with two numerical CPU threads.
+Matching calls, fitting and rationales remain disabled; private test references are excluded.
+
+Validation: **95 campaign/scoring tests and 51 cache/runtime tests passed**, with formatting,
+lint and focused type checks. All 12 resolved configurations passed a separate admission
+check. The candidate-quality guard now validates the scored source pool after exact-match
+prefiltering; baseline pipeline snapshots may repeat unchanged legacy values, while changed
+experimental controls still require the canonical configuration surface.
+
+The channel batch started at **20:31 UTC on 2026-09-19** as **Slurm step 14220.3**
+in the existing unlimited interactive allocation, detached in tmux `exact-channels-01`.
+The interactive shell remains step 14220.0. Startup source/native/cache verification passed;
+this records launch, not completed experimental outcomes.
+
+```bash
+tail -f /home/pgcotovio/Exact-OM/data/experiments-v2/channel-screen-01/launcher.log
+cat /home/pgcotovio/Exact-OM/data/experiments-v2/channel-screen-01/launch-status.json
+```
+
+Progress and cell results are under
+`channel-screen-01/runtime/exact-om-focused-v2/screen/`; `exit-code` appears when the
+launcher exits. Detaching the interactive shell does not release the allocation. To stop
+only this batch, cancel step `14220.3`, not allocation `14220`.
+
 ## Frozen work
 
 Preparation: `data/experiments-v2/prepared-campaign-08/campaign.lock.yaml`.
