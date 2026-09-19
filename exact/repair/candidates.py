@@ -82,6 +82,24 @@ def intersection(*expressions: Any) -> Any:
     return canonical_expression(owl.ObjectIntersectionOf(owl.CanonicalSet(unique)))
 
 
+def expression_order_key(expression: Any) -> tuple:
+    """Stable structural order usable by both finite enumeration and slot constraints."""
+    expression = canonical_expression(expression)
+    if isinstance(expression, owl.Class):
+        return (0, str(expression.iri.value))
+    if isinstance(expression, owl.ObjectSomeValuesFrom):
+        return (
+            2,
+            str(cast(owl.ObjectProperty, expression.property).iri.value),
+            expression_order_key(expression.filler),
+        )
+    operands = sorted(expression_order_key(e) for e in expression.operands)
+    result = operands[-1]
+    for operand in reversed(operands[:-1]):
+        result = (1, operand, result)
+    return result
+
+
 def expression_tree(expression: Any) -> tuple:
     """Return the fixed right-associated binary encoding of a canonical expression."""
     expression = canonical_expression(expression)
@@ -93,7 +111,7 @@ def expression_tree(expression: Any) -> tuple:
             str(cast(owl.ObjectProperty, expression.property).iri.value),
             expression_tree(expression.filler),
         )
-    operands = sorted(expression.operands, key=_key)
+    operands = sorted(expression.operands, key=expression_order_key)
     children = [expression_tree(item) for item in operands]
     result = children[-1]
     for child in reversed(children[:-1]):
@@ -188,6 +206,116 @@ def _expression_cost(axioms: Iterable[Any]) -> float:
             for node in owl.walk(axiom)
         )
     )
+
+
+def replacement_cost_features(
+    original_axioms: Iterable[Any],
+    emitted_axioms: Iterable[Any],
+    *,
+    kind: str = "mapping",
+    authorship: str = "unknown",
+    active_expressions: Iterable[Any] = (),
+) -> tuple[tuple[str, float], ...]:
+    """Derive protocol costs from complete emitted syntax, independent of aliases.
+
+    Removed directions count original mapping inclusions absent from the bundle.
+    Constructor increments count introduced canonical constructor occurrences;
+    existing constructors retained by an edit are not charged as newly created.
+    """
+    from collections import Counter
+
+    if kind not in {"mapping", "ontology_axiom"}:
+        raise ValueError("cost features require a mapping or ontology-axiom object")
+    original, emitted = normalise_axioms(original_axioms), normalise_axioms(emitted_axioms)
+    edited = original != emitted or bool(tuple(active_expressions))
+    mapping_edit = kind == "mapping" and edited
+    ontology_edit = kind == "ontology_axiom" and edited
+
+    def constructors(axioms: tuple[Any, ...]) -> Counter[bytes]:
+        result: Counter[bytes] = Counter()
+        for axiom in axioms:
+            for node in owl.walk(axiom):
+                count = (
+                    len(node.operands) - 1
+                    if isinstance(node, owl.ObjectIntersectionOf)
+                    else int(isinstance(node, owl.ObjectSomeValuesFrom))
+                )
+                if count:
+                    result[_key(node)] += count
+        return result
+
+    introduced = constructors(emitted) - constructors(original)
+    directed = (owl.SubClassOf, owl.SubObjectPropertyOf, owl.SubDataPropertyOf)
+    removed = (
+        sum(isinstance(a, directed) and a not in emitted for a in original) if mapping_edit else 0
+    )
+    original_classes = [a for a in original if isinstance(a, owl.SubClassOf)]
+    emitted_classes = [a for a in emitted if isinstance(a, owl.SubClassOf)]
+
+    def operands(expression: Any) -> set[Any]:
+        return (
+            set(expression.operands)
+            if isinstance(expression, owl.ObjectIntersectionOf)
+            else {expression}
+        )
+
+    specialised = {
+        a
+        for a in emitted_classes
+        if a not in original
+        and any(
+            a.super_class == old.super_class
+            and a.sub_class != old.sub_class
+            and isinstance(a.sub_class, owl.ObjectIntersectionOf)
+            and operands(old.sub_class) < operands(a.sub_class)
+            for old in original_classes
+        )
+    }
+
+    def endpoint_pair(axioms: list[Any]) -> set[Any] | None:
+        if not axioms or any(
+            not isinstance(e, owl.Class) for a in axioms for e in (a.sub_class, a.super_class)
+        ):
+            return None
+        if len(axioms) == 1:
+            return {axioms[0].sub_class, axioms[0].super_class}
+        if (
+            len(axioms) == 2
+            and axioms[0].sub_class == axioms[1].super_class
+            and axioms[0].super_class == axioms[1].sub_class
+        ):
+            return {axioms[0].sub_class, axioms[0].super_class}
+        return None
+
+    before, after = endpoint_pair(original_classes), endpoint_pair(emitted_classes)
+    endpoint_change = bool(
+        mapping_edit
+        and len(original_classes) == len(emitted_classes)
+        and before is not None
+        and after is not None
+        and before != after
+    )
+    necessary = (
+        sum(a not in original and a not in specialised for a in emitted_classes)
+        if mapping_edit and not endpoint_change
+        else 0
+    )
+    values = {
+        "edit": float(edited),
+        "delete": float(edited and not emitted),
+        "mapping_deletion": float(mapping_edit and not emitted),
+        "relation_change": float(mapping_edit),
+        "removed_direction": float(removed),
+        "endpoint_change": float(endpoint_change),
+        "subclass_specialisation": float(len(specialised)),
+        "necessary_condition": float(necessary),
+        "expression_size": _expression_cost(emitted) if edited else 0.0,
+        "new_constructor": float(sum(introduced.values())) if edited else 0.0,
+        "ontology_edit": float(ontology_edit),
+        "human_ontology_edit": float(ontology_edit and authorship == "human"),
+        "human_authored_ontology_edit": float(ontology_edit and authorship == "human"),
+    }
+    return tuple(sorted(values.items()))
 
 
 def make_candidate(
@@ -308,10 +436,8 @@ def mapping_candidates(
         if tag not in actions:
             return
         values = tuple(axioms)
-        cost = [("edit", 1.0), ("delete", float(not values)), ("relation_change", 1.0)]
-        if tag == "replace_endpoint":
-            cost.append(("endpoint_change", 1.0))
-        cost.append(("expression_size", _expression_cost(values)))
+        active = tuple(active)
+        cost = replacement_cost_features(original, values, active_expressions=active)
         result.append(
             make_candidate(
                 object_id,
@@ -416,6 +542,7 @@ def ontology_candidates(
         if premise is not None:
             provenance.append(("fixed_premise", owl.structural_hexdigest(premise)))
         emitted = [*retained, *replacements]
+        active = tuple(active)
         result.append(
             make_candidate(
                 revision.object_id,
@@ -423,13 +550,13 @@ def ontology_candidates(
                 [tag],
                 active_expressions=active,
                 provenance=provenance,
-                cost_features=[
-                    ("edit", 1.0),
-                    ("ontology_edit", 1.0),
-                    ("human_authored_ontology_edit", float(revision.authorship == "human")),
-                    ("delete", float(not emitted)),
-                    ("expression_size", _expression_cost(emitted)),
-                ],
+                cost_features=replacement_cost_features(
+                    originals,
+                    emitted,
+                    kind="ontology_axiom",
+                    authorship=revision.authorship,
+                    active_expressions=active,
+                ),
             )
         )
 
@@ -549,7 +676,7 @@ def budget_candidates(
     mandatory = {
         c.candidate_id
         for c in unique
-        if {"keep", "delete", "retain_subsumption"} & set(c.action_tags)
+        if {"keep", "delete", "retain_subsumption", "replace_endpoint"} & set(c.action_tags)
     }
     families = (
         set(enabled_actions)

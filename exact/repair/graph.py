@@ -165,22 +165,46 @@ class ObservableGraph:
         return tuple(sorted(selected))
 
 
-def _features(value: Any, prefix: str = "") -> dict[str, float]:
+def _features(
+    value: Any,
+    prefix: str = "",
+    *,
+    max_text_tokens: int | None = None,
+    omitted_text: list[str] | None = None,
+) -> dict[str, float]:
     """Flatten arbitrary observed channels; text uses tokens, never IRI-specific weights."""
     result: dict[str, float] = {}
     if isinstance(value, Mapping):
         for key, item in sorted(value.items()):
             if key in {"omitted", "evidence_omissions"}:
                 continue
-            result.update(_features(item, f"{prefix}/{key}"))
+            result.update(
+                _features(
+                    item,
+                    f"{prefix}/{key}",
+                    max_text_tokens=max_text_tokens,
+                    omitted_text=omitted_text,
+                )
+            )
     elif isinstance(value, (list, tuple)):
         for index, item in enumerate(value):
-            result.update(_features(item, f"{prefix}/{index}"))
+            result.update(
+                _features(
+                    item,
+                    f"{prefix}/{index}",
+                    max_text_tokens=max_text_tokens,
+                    omitted_text=omitted_text,
+                )
+            )
     elif isinstance(value, (int, float)):
         result[prefix] = float(value)
     elif isinstance(value, str):
-        for token in re.findall(r"[\w]+", value.lower()):
-            key = f"{prefix}/token:{token}"
+        for index, match in enumerate(re.finditer(r"[\w]+", value.lower())):
+            if max_text_tokens is not None and index >= max_text_tokens:
+                if omitted_text is not None:
+                    omitted_text.append(f"text_tokens:{prefix}")
+                break
+            key = f"{prefix}/token:{match.group(0)}"
             result[key] = result.get(key, 0.0) + 1.0
     elif value is None:
         result[f"{prefix}/missing"] = 1.0
@@ -197,6 +221,9 @@ def build_observable_graph(
     explanations: Iterable[GraphExplanation] = (),
     retrieved_symbols: Iterable[Any] = (),
     max_nodes: int | None = None,
+    max_edges: int | None = None,
+    max_explanations: int | None = None,
+    max_text_tokens: int | None = None,
 ) -> ObservableGraph:
     """Build syntax, occurrence, diagnosis and evidence nodes before encoding a round.
 
@@ -206,8 +233,15 @@ def build_observable_graph(
     """
     evidence = evidence or {}
     validate_observable_evidence(evidence)
-    if max_nodes is not None and max_nodes < 1:
-        raise ValueError("max_nodes must be positive")
+    for name, limit, minimum in (
+        ("max_nodes", max_nodes, 1),
+        ("max_edges", max_edges, 1),
+        ("max_explanations", max_explanations, 0),
+        ("max_text_tokens", max_text_tokens, 1),
+    ):
+        if limit is not None and (type(limit) is not int or limit < minimum):
+            raise ValueError(f"{name} must be an integer >= {minimum}")
+    omitted_text: list[str] = []
     entity_sides: dict[str, set[str]] = {}
     for side, axioms in (("source", source_axioms), ("target", target_axioms)):
         for axiom in axioms:
@@ -261,7 +295,13 @@ def build_observable_graph(
 
     def add_evidence(owner: str, payload: Any) -> None:
         node_id = f"evidence:{owner}"
-        add_node(node_id, "evidence", _features(payload, "observed"))
+        add_node(
+            node_id,
+            "evidence",
+            _features(
+                payload, "observed", max_text_tokens=max_text_tokens, omitted_text=omitted_text
+            ),
+        )
         connect(node_id, "supports", owner)
 
     for obj in sorted(objects, key=lambda item: item.object_id):
@@ -305,20 +345,37 @@ def build_observable_graph(
             add_evidence(owner, payload)
         elif owner not in object_nodes and owner != "evidence_omissions":
             node_id = f"evidence:global:{owner}"
-            add_node(node_id, "evidence", _features(payload, f"observed/{owner}"))
+            add_node(
+                node_id,
+                "evidence",
+                _features(
+                    payload,
+                    f"observed/{owner}",
+                    max_text_tokens=max_text_tokens,
+                    omitted_text=omitted_text,
+                ),
+            )
             for object_node in object_nodes.values():
                 connect(node_id, "global_context", object_node)
-    if max_nodes is not None and len(nodes) > max_nodes:
-        raise ValueError("Context budget cannot fit mandatory object/evidence/retrieval nodes")
+
+    def exceeds_budget() -> bool:
+        return (max_nodes is not None and len(nodes) > max_nodes) or (
+            max_edges is not None and len(edges) + len(nodes) > max_edges
+        )
+
+    if exceeds_budget():
+        raise ValueError(
+            "Context budget cannot fit mandatory object/evidence/retrieval nodes and edges"
+        )
 
     def try_include(build: Any, label: str, *, support: bool = False) -> None:
         nonlocal transaction_nodes, transaction_edges
-        if max_nodes is None:
+        if max_nodes is None and max_edges is None:
             build()
             return
         transaction_nodes, transaction_edges = [], []
         build()
-        if len(nodes) > max_nodes:
+        if exceeds_budget():
             omitted_nodes.extend(transaction_nodes)
             if support:
                 omitted_supports.append(label)
@@ -334,6 +391,9 @@ def build_observable_graph(
         seen_explanations.add(explanation.explanation_id)
         if not explanation.available_before_decision:
             raise ValueError("Post-decision explanations cannot be model input")
+        if max_explanations is not None and len(seen_explanations) > max_explanations:
+            omitted_supports.append(explanation.explanation_id)
+            continue
 
         def add_explanation() -> None:
             node_id = f"explanation:{explanation.explanation_id}"
@@ -372,7 +432,8 @@ def build_observable_graph(
         tuple(sorted(object_nodes.items())),
         tuple(sorted(set(omitted_nodes) - nodes.keys())),
         tuple(omitted_supports),
-        tuple(str(item) for item in evidence.get("evidence_omissions", ())),
+        tuple(str(item) for item in evidence.get("evidence_omissions", ()))
+        + tuple(sorted(set(omitted_text))),
     )
 
 
@@ -386,3 +447,65 @@ def feature_vector(node: GraphNode, dimension: int = 128) -> list[float]:
         index = int.from_bytes(digest, "big") % dimension
         result[index] += value if digest[0] & 1 else -value
     return result
+
+
+def observable_interaction_pairs(
+    problem: Any,
+    *,
+    per_object_limit: int = 16,
+    explanations: Iterable[GraphExplanation] = (),
+) -> tuple[tuple[int, int], ...]:
+    """Select deterministic bounded interactions from observed support hyperedges.
+
+    Visit shared entities, asserted ontology supports and diagnosis supports in a
+    fixed order. Saturated objects are removed before expanding each support, so
+    a hub never creates its unbounded quadratic pair inventory first.
+    """
+    from collections import defaultdict
+
+    if type(per_object_limit) is not int or per_object_limit < 0:
+        raise ValueError("Pair-factor degree limit must be a nonnegative integer")
+    if per_object_limit == 0:
+        return ()
+    objects = problem.objects
+    entity_objects: dict[Any, set[int]] = defaultdict(set)
+    object_index = {obj.object_id: index for index, obj in enumerate(objects)}
+    for index, obj in enumerate(objects):
+        for axiom in obj.original_axioms:
+            for entity in owl.signature(axiom):
+                entity_objects[entity].add(index)
+    degrees = [0] * len(objects)
+    pairs: set[tuple[int, int]] = set()
+
+    def include(indices: Iterable[int]) -> None:
+        active = sorted(set(i for i in indices if degrees[i] < per_object_limit))
+        for position, first in enumerate(active):
+            if degrees[first] >= per_object_limit:
+                continue
+            for offset in range(position + 1, len(active)):
+                second = active[offset]
+                if degrees[first] >= per_object_limit:
+                    break
+                if degrees[second] < per_object_limit and (first, second) not in pairs:
+                    pairs.add((first, second))
+                    degrees[first] += 1
+                    degrees[second] += 1
+
+    for entity in sorted(entity_objects, key=structural_id):
+        include(entity_objects[entity])
+    for axiom in sorted(problem.fixed_axioms, key=structural_id):
+        include(
+            index for entity in owl.signature(axiom) for index in entity_objects.get(entity, ())
+        )
+    for explanation in sorted(explanations, key=lambda e: e.explanation_id):
+        if not explanation.available_before_decision:
+            raise ValueError("Post-decision explanations cannot select interactions")
+        indices = {
+            object_index[key] for key in explanation.support_object_ids if key in object_index
+        }
+        for axiom in explanation.support_axioms:
+            indices.update(
+                index for entity in owl.signature(axiom) for index in entity_objects.get(entity, ())
+            )
+        include(indices)
+    return tuple(sorted(pairs))

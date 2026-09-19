@@ -9,7 +9,7 @@ import os
 import tempfile
 from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from .records import (
     BudgetsV2,
@@ -21,6 +21,10 @@ from .records import (
     canonical_hash,
     make_objective,
 )
+
+if TYPE_CHECKING:
+    from .retrieval import RetrievalConfig
+
 
 # Evaluation/teacher channels must never become deployment features. All other
 # observed matching channels are retained rather than reduced to one score.
@@ -58,11 +62,15 @@ def observable_evidence(value: Any, *, path: str = "") -> tuple[Any, tuple[str, 
     """Preserve observed features while recording omitted evaluation-only channels."""
     omitted: list[str] = []
     if isinstance(value, Mapping):
+        if value.get("available_before_decision") is False:
+            return {}, (path or "<root>",)
         result = {}
         for key, child in value.items():
             key = str(key)
             location = f"{path}.{key}" if path else key
-            if key.lower().replace("-", "_") in _PRIVATE_KEYS:
+            if key.lower().replace("-", "_") in _PRIVATE_KEYS or (
+                isinstance(child, Mapping) and child.get("available_before_decision") is False
+            ):
                 omitted.append(location)
             else:
                 result[key], exclusions = observable_evidence(child, path=location)
@@ -71,6 +79,9 @@ def observable_evidence(value: Any, *, path: str = "") -> tuple[Any, tuple[str, 
     if isinstance(value, (list, tuple)):
         items = []
         for i, child in enumerate(value):
+            if isinstance(child, Mapping) and child.get("available_before_decision") is False:
+                omitted.append(f"{path}[{i}]")
+                continue
             item, exclusions = observable_evidence(child, path=f"{path}[{i}]")
             items.append(item)
             omitted.extend(exclusions)
@@ -163,18 +174,22 @@ def prepare_repair(
     endpoint_alternatives: Mapping[str, Sequence[tuple[str, Any]]] | None = None,
     policy: PolicyV2 | None = None,
     budgets: BudgetsV2 | None = None,
+    retrieve: bool = True,
+    retrieval_config: RetrievalConfig | None = None,
 ) -> RepairInputV2:
     """Adapt any alignment without invoking a matcher or discarding rich evidence.
 
     Existing core snapshots are reused. Ontology objects name occurrences from
     :func:`ontology_occurrences`; their originals are removed only at that exact
     occurrence. Property/individual mappings remain typed logical axioms.
+    Bounded observable retrieval prepares side-specific expression menus and
+    endpoint controls by default; ``retrieve=False`` keeps an explicit inventory.
     """
     import pyowl_core as owl
 
     from exact.io.writers._frames import canonical_frame
 
-    from .candidates import mapping_candidates
+    from .candidates import deduplicate_candidates, mapping_candidates
 
     source, target = owl.coerce_snapshot(source), owl.coerce_snapshot(target)
     occurrences = ontology_occurrences(source, target)
@@ -220,6 +235,7 @@ def prepare_repair(
                 )
             )
     objects = []
+    object_relations = {}
     features: dict[str, Any] = {}
     entities = {
         "class": owl.Class,
@@ -262,6 +278,7 @@ def prepare_repair(
             expressions=expressions,
             endpoint_alternatives=(endpoint_alternatives or {}).get(object_id, ()),
         )
+        object_relations[object_id] = relation
         row["object_id"] = object_id
         keep = next(c for c in candidates if "keep" in c.action_tags)
         objects.append(
@@ -324,7 +341,7 @@ def prepare_repair(
             )
         ),
     )
-    return RepairInputV2(
+    problem = RepairInputV2(
         tuple(sorted(fixed, key=canonical_hash)),
         all_objects,
         policy,
@@ -338,6 +355,39 @@ def prepare_repair(
         source_documents=_document_identities(source),
         target_documents=_document_identities(target),
     )
+    if retrieve:
+        from .retrieval import retrieve_vocabulary
+
+        retrieved = retrieve_vocabulary(problem, config=retrieval_config)
+        augmented = []
+        for obj in problem.objects:
+            alternatives = retrieved.for_object(obj.object_id).endpoint_alternatives
+            if obj.kind == "mapping" and alternatives:
+                candidates = mapping_candidates(
+                    obj.object_id,
+                    obj.source_entity,
+                    obj.target_entity,
+                    object_relations[obj.object_id],
+                    eligible=obj.eligible,
+                    locked=obj.locked,
+                    endpoint_alternatives=alternatives,
+                    enabled_actions=("keep", "replace_endpoint"),
+                )
+                augmented.append(
+                    dataclasses.replace(
+                        obj, candidates=deduplicate_candidates((*obj.candidates, *candidates))
+                    )
+                )
+            else:
+                augmented.append(obj)
+        problem = dataclasses.replace(
+            problem,
+            objects=tuple(augmented),
+            evidence=tuple(
+                sorted({**dict(problem.evidence), "retrieval": retrieved.capture()}.items())
+            ),
+        )
+    return problem
 
 
 def matching_run_evidence(run_dir: str | Path) -> tuple[Any, dict[str, Any]]:

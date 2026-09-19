@@ -23,6 +23,7 @@ __all__ = [
     "repair",
     "prepare_repair",
     "repair_alignment",
+    "bounded_freeze_neural_round",
 ]
 
 
@@ -35,6 +36,10 @@ def repair(*args, **kwargs):
 
 def __getattr__(name):
     """Load preparation/integration adapters only when explicitly requested."""
+    if name == "bounded_freeze_neural_round":
+        from .pipeline import bounded_freeze_neural_round
+
+        return bounded_freeze_neural_round
     if name in {"prepare_repair", "repair_alignment"}:
         from . import api
 

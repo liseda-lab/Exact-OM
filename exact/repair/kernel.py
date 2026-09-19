@@ -206,6 +206,7 @@ def repair(
     lower: int | None = None
     incumbent: tuple[int, ...] | None = None
     incumbent_report: VerificationReportV2 | None = None
+    first_verified_seconds: float | None = None
     cuts: list[tuple[tuple[int, ...], VerificationReportV2]] = []
     pending: dict[tuple[int, ...], PendingAssignmentV2] = {}
     checked_feasible: set[tuple[int, ...]] = set()
@@ -220,7 +221,12 @@ def repair(
     def stage_call(stage: str, function: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
         before = time.monotonic()
         try:
-            return bounded_call(function, *args, **kwargs)
+            return bounded_call(
+                function,
+                *args,
+                **kwargs,
+                **({"memory_mb": budgets.memory_mb} if budgets.memory_mb is not None else {}),
+            )
         finally:
             timings[stage] += time.monotonic() - before
 
@@ -243,12 +249,14 @@ def repair(
     def accept_report(
         assignment: tuple[int, ...], report: VerificationReportV2, attempts: int = 1
     ) -> None:
-        nonlocal incumbent, incumbent_report, lower
+        nonlocal incumbent, incumbent_report, lower, first_verified_seconds
         value = objective.score(assignment)
         if report.authorizes:
             pending.pop(assignment, None)
             checked_feasible.add(assignment)
             if lower is None or value > lower:
+                if incumbent is None:
+                    first_verified_seconds = time.monotonic() - started
                 incumbent, incumbent_report, lower = assignment, report, value
         elif report.verdict == "VERIFIED_INFEASIBLE" and any(
             q.complete and q.verdict == "fail" for q in report.obligations
@@ -323,6 +331,7 @@ def repair(
                 baseline,
                 elapsed_seconds=time.monotonic() - started,
                 stage_seconds=tuple(sorted(timings.items())),
+                first_verified_seconds=first_verified_seconds,
             )
 
     while solves < budgets.max_solves and checks < budgets.max_checks and remaining(1) > 0:
@@ -381,6 +390,7 @@ def repair(
         baseline,
         elapsed_seconds=time.monotonic() - started,
         stage_seconds=tuple(sorted(timings.items())),
+        first_verified_seconds=first_verified_seconds,
     )
 
 
@@ -401,6 +411,7 @@ def _result(
     *,
     elapsed_seconds: float = 0.0,
     stage_seconds: tuple[tuple[str, float], ...] = (),
+    first_verified_seconds: float | None = None,
 ) -> RepairResultV2:
     selected = (
         ()
@@ -445,6 +456,7 @@ def _result(
         model_status=problem.model_status,
         elapsed_seconds=elapsed_seconds,
         stage_seconds=stage_seconds,
+        first_verified_seconds=first_verified_seconds,
     )
 
 

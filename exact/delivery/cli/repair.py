@@ -55,6 +55,7 @@ def _prepare_input(args: argparse.Namespace) -> tuple[Any, Any]:
             total_seconds=args.seconds,
             solver_seconds=args.stage_seconds,
             verification_seconds=args.stage_seconds,
+            memory_mb=args.memory_mb,
         ),
     )
     objective = make_objective(
@@ -82,6 +83,27 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--seconds", type=float, default=60.0)
     parser.add_argument("--stage-seconds", type=float, default=10.0)
+    parser.add_argument(
+        "--model", type=Path, help="frozen XR-2 model checkpoint; enables learned proposals"
+    )
+    parser.add_argument(
+        "--proposal-arm",
+        choices=(
+            "grammar_mixture",
+            "grammar_product",
+            "grammar_uniform",
+            "bounded_enumeration",
+            "rejection",
+        ),
+        default="grammar_mixture",
+    )
+    parser.add_argument("--proposal-seconds", type=float, default=30.0)
+    parser.add_argument("--compile-seconds", type=float, default=10.0)
+    parser.add_argument("--candidate-cap", type=int, default=64)
+    parser.add_argument("--draws", type=int, default=32)
+    parser.add_argument("--grammar-depth", type=int, default=2)
+    parser.add_argument("--constructors", type=int, default=2)
+    parser.add_argument("--memory-mb", type=float, help="sampled Linux worker-tree RSS cap")
     args = parser.parse_args(argv)
     if not args.problem and (not args.source or not args.target):
         parser.error("--source and --target are required for alignment inputs")
@@ -95,9 +117,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         total_seconds=args.seconds,
         solver_seconds=args.stage_seconds,
         verification_seconds=args.stage_seconds,
+        memory_mb=args.memory_mb,
     )
     started = time.monotonic()
-    prepared = bounded_call(_prepare_input, args, timeout=min(args.seconds, args.stage_seconds))
+    prepared = bounded_call(
+        _prepare_input,
+        args,
+        timeout=min(args.seconds, args.stage_seconds),
+        memory_mb=args.memory_mb,
+    )
     if prepared.status != "complete":
         write_artifact(
             args.output,
@@ -121,9 +149,65 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         return 2
     problem, objective = prepared.value
+    preparation_seconds = time.monotonic() - started
+    proposal_seconds = 0.0
+    proposal_failure = ""
+    if args.model:
+        from exact.repair.pipeline import freeze_checkpoint
+
+        before = time.monotonic()
+        available = args.seconds - (before - started)
+        reserve = min(args.stage_seconds, available / 2)
+        proposed = bounded_call(
+            freeze_checkpoint,
+            problem,
+            str(args.model),
+            timeout=min(args.proposal_seconds, available - reserve),
+            memory_mb=args.memory_mb,
+            compile_seconds=args.compile_seconds,
+            proposal_arm=args.proposal_arm,
+            candidate_cap=args.candidate_cap,
+            draws_per_object=args.draws,
+            max_depth=args.grammar_depth,
+            max_constructors=args.constructors,
+            profile=objective.profile,
+        )
+        proposal_seconds = time.monotonic() - before
+        if proposed.status != "complete":
+            proposal_failure = f"proposal: {proposed.status}: {proposed.detail}"
+            problem = dataclasses.replace(
+                problem,
+                candidate_coverage="captured_pool_fallback",
+                model_status="proposal unavailable; captured frozen objective control",
+                proposal_provenance=(
+                    {"stage": "proposal", "status": proposed.status, "detail": proposed.detail},
+                ),
+            )
+        else:
+            problem, objective = proposed.value.problem, proposed.value.objective
     remaining = args.seconds - (time.monotonic() - started)
     if remaining <= 0:
-        parser.error("total repair budget exhausted during preparation")
+        write_artifact(
+            args.output,
+            {
+                "schema": "exact-repair/run/v2",
+                "input": problem.to_dict(),
+                "logical_status": "UNKNOWN",
+                "search_status": "UNRESOLVED",
+                "stage": "budget",
+                "failure": "total repair budget exhausted before selection",
+            },
+        )
+        print(
+            json.dumps(
+                {
+                    "logical_status": "UNKNOWN",
+                    "search_status": "UNRESOLVED",
+                    "output": str(args.output),
+                }
+            )
+        )
+        return 2
     problem = dataclasses.replace(
         problem,
         budgets=dataclasses.replace(
@@ -131,9 +215,12 @@ def main(argv: Sequence[str] | None = None) -> int:
             total_seconds=min(problem.budgets.total_seconds, remaining),
             solver_seconds=min(problem.budgets.solver_seconds, args.stage_seconds),
             verification_seconds=min(problem.budgets.verification_seconds, args.stage_seconds),
+            memory_mb=args.memory_mb if args.memory_mb is not None else problem.budgets.memory_mb,
         ),
     )
     result = repair(problem, objective)
+    if proposal_failure:
+        result = dataclasses.replace(result, failures=(proposal_failure, *result.failures))
     # Serialization is a separately bounded stage; the complete verified result
     # remains owned by the parent if persistence fails.
     payload = {
@@ -141,6 +228,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         "input": problem.to_dict(),
         "objective": objective.to_dict(),
         "result": result.to_dict(),
+        "stage_seconds": {
+            "preparation": preparation_seconds,
+            "proposal": proposal_seconds,
+            "selection": result.elapsed_seconds,
+        },
     }
     saved = bounded_call(write_artifact, args.output, payload, timeout=args.stage_seconds)
     if saved.status != "complete":

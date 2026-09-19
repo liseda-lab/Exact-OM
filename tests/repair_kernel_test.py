@@ -344,7 +344,7 @@ def test_supervisor_completion_timeout_and_crash_are_distinct():
     assert "without a result" in crashed.detail
 
 
-def worker_partial_frame(connection, function, args, kwargs):
+def worker_partial_frame(connection, function, args, kwargs, own_group=False):
     # Simulate a crashed/stalled transport after the frame becomes readable.
     os.write(connection.fileno(), struct.pack("!i", 2000) + b"incomplete")
     time.sleep(5)

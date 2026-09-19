@@ -205,9 +205,14 @@ class BudgetsV2(Record):
     max_solves: int = 100
     max_checks: int = 100
     retries: int = 0
+    memory_mb: float | None = None
 
     def __post_init__(self) -> None:
         super().__post_init__()
+        if self.memory_mb is not None and (
+            not math.isfinite(self.memory_mb) or self.memory_mb <= 0
+        ):
+            raise ValueError("memory_mb must be positive and finite")
         for value in (self.total_seconds, self.solver_seconds, self.verification_seconds):
             if not math.isfinite(value) or value <= 0:
                 raise ValueError("time budgets must be finite and positive")
@@ -300,6 +305,37 @@ def quantize(value: float | Decimal, scale: int) -> int:
     return int((number * scale).quantize(Decimal(1), rounding=ROUND_HALF_EVEN))
 
 
+def candidate_cost(
+    obj: RevisionObjectV2,
+    candidate: ReplacementCandidateV2,
+    profile: tuple[tuple[str, float], ...],
+) -> float:
+    """Apply declared preferences to structural features, including XR-2 public names.
+
+    An alias is a name for the same coefficient, not a second cost. Supplying both
+    spellings is rejected, preventing accidental double subtraction.
+    """
+    aliases = {"mapping_deletion": "delete", "human_ontology_edit": "human_authored_ontology_edit"}
+    weights = {}
+    for name, weight in profile:
+        key = aliases.get(name, name)
+        if key in weights or not math.isfinite(weight) or weight < 0:
+            raise ValueError("cost profile requires unique nonnegative finite weights")
+        weights[key] = weight
+    features: dict[str, float] = {}
+    for name, value in candidate.cost_features:
+        if obj.kind != "mapping" and name == "mapping_deletion":
+            continue
+        key = aliases.get(name, name)
+        if key in features and features[key] != value:
+            raise ValueError(f"conflicting structural cost aliases for {key}")
+        features[key] = value
+    # The public mapping-deletion preference does not also charge ontology edits.
+    if obj.kind != "mapping" and any(name == "mapping_deletion" for name, _ in profile):
+        weights.pop("delete", None)
+    return sum(weight * features.get(name, 0.0) for name, weight in weights.items())
+
+
 def make_objective(
     objects: tuple[RevisionObjectV2, ...],
     benefits: tuple[tuple[float, ...], ...] | None = None,
@@ -323,10 +359,7 @@ def make_objective(
         len(row) != len(obj.candidates) for row, obj in zip(benefits, objects)
     ):
         raise ValueError("benefit shape does not match the candidate inventory")
-    costs = tuple(
-        tuple(sum(costs_by_name.get(k, 0) * v for k, v in c.cost_features) for c in obj.candidates)
-        for obj in objects
-    )
+    costs = tuple(tuple(candidate_cost(obj, c, profile) for c in obj.candidates) for obj in objects)
     unary = tuple(
         tuple(quantize(Decimal(str(b)) - Decimal(str(c)), scale) for b, c in zip(br, cr))
         for br, cr in zip(benefits, costs)
@@ -412,6 +445,7 @@ class RepairResultV2(Record):
     model_status: str = "untrained; explicit frozen objective"
     elapsed_seconds: float = 0.0
     stage_seconds: tuple[tuple[str, float], ...] = ()
+    first_verified_seconds: float | None = None
 
     @property
     def gap(self) -> int | None:

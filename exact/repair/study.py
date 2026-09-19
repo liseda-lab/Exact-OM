@@ -7,17 +7,21 @@ manufactures Conference/Bio-ML benchmark inputs, labels, or trained models.
 from __future__ import annotations
 
 import dataclasses
+import hashlib
 import importlib.metadata
+import importlib.util
 import json
 import math
 import os
 import platform
 import resource
 import time
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Callable, Sequence
 
 from .api import write_artifact
+from .evaluation import outcome_metrics
 from .kernel import materialize, repair, verify_assignment
 from .records import (
     ObjectiveV2,
@@ -28,6 +32,7 @@ from .records import (
     RepairResultV2,
     VerificationReportV2,
     canonical_hash,
+    canonical_json,
     read_record,
 )
 from .workers import bounded_call
@@ -59,6 +64,7 @@ class StudyCaseV2(Record):
     teacher_cache_hash: str = ""
     availability: str = "available"
     detail: str = ""
+    declared_split: str = ""
 
     def __post_init__(self) -> None:
         super().__post_init__()
@@ -71,6 +77,8 @@ class StudyCaseV2(Record):
             raise ValueError(
                 "case requires an ID, explicit cohort/version, and structural parent/pair group"
             )
+        if self.declared_split not in {"", "train", "development", "test"}:
+            raise ValueError("invalid declared study split")
         if self.availability not in {"available", "unavailable", "invalid"}:
             raise ValueError("invalid case availability")
         if self.availability == "available":
@@ -162,6 +170,7 @@ class StudyOutcomeV2(Record):
     exact_external_regret: int | None = None
     resources: tuple[tuple[str, float], ...] = ()
     detail: str = ""
+    metrics: tuple[tuple[str, Any], ...] = ()
 
 
 def grouped_splits(cases: Sequence[StudyCaseV2], *, seed: int = 0) -> dict[str, str]:
@@ -172,11 +181,19 @@ def grouped_splits(cases: Sequence[StudyCaseV2], *, seed: int = 0) -> dict[str, 
     """
     if type(seed) is not int:
         raise ValueError("split seed must be an integer")
+    declared: dict[str, str] = {}
+    for case in cases:
+        if case.declared_split:
+            if case.group_id in declared and declared[case.group_id] != case.declared_split:
+                raise ValueError("declared splits divide a structural/pair group")
+            declared[case.group_id] = case.declared_split
     result = {}
     for case in cases:
         group = case.group_id
         bucket = int(canonical_hash((seed, group))[:16], 16) % 100
-        result[case.case_id] = "train" if bucket < 70 else "development" if bucket < 85 else "test"
+        result[case.case_id] = declared.get(
+            group, "train" if bucket < 70 else "development" if bucket < 85 else "test"
+        )
     return result
 
 
@@ -268,9 +285,9 @@ def _captured_scores(case: StudyCaseV2) -> dict[str, float]:
     assert case.problem is not None
     for obj in case.problem.objects:
         record = dict(case.problem.evidence).get(obj.object_id, {})
-        if isinstance(record, dict):
+        if isinstance(record, Mapping):
             mapping = record.get("mapping", {})
-            score = mapping.get("Score") if isinstance(mapping, dict) else None
+            score = mapping.get("Score") if isinstance(mapping, Mapping) else None
             if score is not None and math.isfinite(float(score)):
                 scores.setdefault(obj.object_id, float(score))
     return scores
@@ -317,7 +334,15 @@ def _greedy(
         current = tuple(assignment)
         checks += 1
         outcome = bounded_call(
-            verifier, problem, current, timeout=min(remaining, problem.budgets.verification_seconds)
+            verifier,
+            problem,
+            current,
+            timeout=min(remaining, problem.budgets.verification_seconds),
+            **(
+                {"memory_mb": problem.budgets.memory_mb}
+                if problem.budgets.memory_mb is not None
+                else {}
+            ),
         )
         candidate_report = outcome.value
         if (
@@ -399,7 +424,12 @@ def _usage() -> tuple[float, float]:
 
 
 def evaluate_case(
-    case: StudyCaseV2, arm: StudyArmV2, *, split: str, verifier: Verifier = verify_assignment
+    case: StudyCaseV2,
+    arm: StudyArmV2,
+    *,
+    split: str,
+    verifier: Verifier = verify_assignment,
+    seconds: float | None = None,
 ) -> StudyOutcomeV2:
     """Produce a status for every scheduled arm, preserving unknowns and failures."""
     started = time.monotonic()
@@ -416,6 +446,16 @@ def evaluate_case(
             stage_started = time.monotonic()
             problem, objective, indices = filter_inventory(case, arm)
             preparation_seconds = time.monotonic() - stage_started
+            remaining = (
+                problem.budgets.total_seconds
+                if seconds is None
+                else min(seconds, problem.budgets.total_seconds)
+            ) - preparation_seconds
+            if remaining <= 0:
+                raise TimeoutError("case budget exhausted during preparation")
+            problem = dataclasses.replace(
+                problem, budgets=dataclasses.replace(problem.budgets, total_seconds=remaining)
+            )
             stage_started = time.monotonic()
             result = (
                 _greedy(problem, objective, _captured_scores(case), verifier)
@@ -459,6 +499,11 @@ def evaluate_case(
             ("parent_process_high_water_rss_kib", peak_rss),
         ),
         detail,
+        (
+            tuple(sorted(outcome_metrics(problem, result).items()))
+            if problem is not None and result is not None
+            else ()
+        ),
     )
 
 
@@ -478,6 +523,23 @@ def runtime_manifest() -> dict[str, Any]:
             versions[package] = importlib.metadata.version(package)
         except importlib.metadata.PackageNotFoundError:
             versions[package] = "unavailable"
+    implementations = {}
+    for module in ("pyowl_core", "pyowl2vec_star_projector", "pyhermit", "pyelk"):
+        spec = importlib.util.find_spec(module)
+        if spec is None or spec.origin is None:
+            implementations[module] = {"status": "unavailable"}
+            continue
+        root = Path(spec.origin).parent
+        digest = hashlib.sha256()
+        for path in sorted(
+            p for p in root.rglob("*") if p.is_file() and p.suffix in {".py", ".so"}
+        ):
+            digest.update(str(path.relative_to(root)).encode())
+            digest.update(path.read_bytes())
+        implementations[module] = {
+            "path": str(root),
+            "source_and_native_sha256": digest.hexdigest(),
+        }
     code = {
         path.name: canonical_hash(path.read_bytes().hex())
         for path in sorted(Path(__file__).parent.glob("*.py"))
@@ -488,6 +550,7 @@ def runtime_manifest() -> dict[str, Any]:
         "processor": platform.processor(),
         "cpu_count": os.cpu_count(),
         "dependencies": versions,
+        "ontology_implementations": implementations,
         "code_hashes": code,
         "cache_policy": "fresh verifier/master workers; frozen artifacts reused",
         "memory_scope": "parent process lifetime high-water RSS; not isolated per-arm peak",
@@ -502,6 +565,7 @@ def run_study(
     seed: int = 0,
     verifier: Verifier = verify_assignment,
     max_attempts: int = 2,
+    campaign_seconds: float = 3600.0,
 ) -> dict[str, Any]:
     """Persist a fixed schedule, resume completed outcomes, and cap interrupted retries."""
     if len({case.case_id for case in cases}) != len(cases) or len(
@@ -510,6 +574,9 @@ def run_study(
         raise ValueError("scheduled case and arm IDs must be unique")
     if type(max_attempts) is not int or max_attempts < 1:
         raise ValueError("max_attempts must be a positive integer")
+    if not math.isfinite(campaign_seconds) or campaign_seconds <= 0:
+        raise ValueError("campaign_seconds must be positive and finite")
+    deadline = time.monotonic() + campaign_seconds
     root = Path(directory)
     root.mkdir(parents=True, exist_ok=True)
     splits = grouped_splits(cases, seed=seed)
@@ -517,6 +584,7 @@ def run_study(
         "schema": STUDY_SCHEMA,
         "seed": seed,
         "max_attempts": max_attempts,
+        "campaign_seconds": campaign_seconds,
         "cases": [case.to_dict() for case in cases],
         "arms": [arm.to_dict() for arm in arms],
         "splits": splits,
@@ -575,9 +643,25 @@ def run_study(
                         state_path,
                         {"plan_hash": plan_hash, "attempts": attempts + 1, "status": "running"},
                     )
-                    outcome = evaluate_case(
-                        case, arm, split=splits[case.case_id], verifier=verifier
-                    )
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        outcome = StudyOutcomeV2(
+                            case.case_id,
+                            arm.arm_id,
+                            case.content_hash,
+                            arm.content_hash,
+                            "timeout",
+                            splits[case.case_id],
+                            detail="campaign deadline exhausted",
+                        )
+                    else:
+                        outcome = evaluate_case(
+                            case,
+                            arm,
+                            split=splits[case.case_id],
+                            verifier=verifier,
+                            seconds=remaining,
+                        )
                 outcome = dataclasses.replace(
                     outcome,
                     resources=outcome.resources
@@ -614,6 +698,10 @@ def run_study(
                     ),
                     "artifact": str(destination.relative_to(root)),
                     "artifact_hash": outcome.content_hash,
+                    "external_value": outcome.external_value,
+                    "exact_external_regret": outcome.exact_external_regret,
+                    "metrics": json.loads(canonical_json(dict(outcome.metrics))),
+                    "resources": dict(outcome.resources),
                 }
             )
             write_artifact(
@@ -644,6 +732,8 @@ def load_schedule(path: str | Path) -> tuple[tuple[StudyCaseV2, ...], tuple[Stud
     cases = []
     for entry in payload["cases"]:
         metadata = {key: entry[key] for key in ("case_id", "cohort", "source_version", "group_id")}
+        if "declared_split" in entry:
+            metadata["declared_split"] = entry["declared_split"]
         try:
             record = read_record(json.loads((schedule_path.parent / entry["artifact"]).read_text()))
             if not isinstance(record, StudyCaseV2) or any(

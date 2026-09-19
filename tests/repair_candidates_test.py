@@ -264,3 +264,54 @@ def test_outside_grammar_assertions_remain_available_without_illegal_specialisat
     assert select(pool, "keep")[0].axioms == (original,)
     assert select(pool, "delete")
     assert not select(pool, "specialise_ontology_subclass")
+
+
+def test_protocol_costs_describe_emitted_edits_and_retain_constructor_credit():
+    from exact.repair.candidates import replacement_cost_features
+
+    source, target, filler = map(cls, ("S", "T", "A"))
+    condition = owl.ObjectSomeValuesFrom(prop("r"), filler)
+    original = (owl.SubClassOf(source, target), owl.SubClassOf(target, source))
+    specialised = intersection(source, condition)
+    emitted = (owl.SubClassOf(specialised, target), original[1])
+    costs = dict(replacement_cost_features(original, emitted, active_expressions=(specialised,)))
+    assert costs["removed_direction"] == 1
+    assert costs["subclass_specialisation"] == 1
+    assert costs["necessary_condition"] == 0
+    assert costs["new_constructor"] == 2
+    assert costs["mapping_deletion"] == costs["ontology_edit"] == 0
+    composite = dict(
+        replacement_cost_features(
+            original,
+            (*emitted, owl.SubClassOf(target, condition)),
+            active_expressions=(specialised,),
+        )
+    )
+    assert composite["necessary_condition"] == 1
+    assert composite["new_constructor"] == 3
+    reused = dict(
+        replacement_cost_features(
+            (owl.SubClassOf(source, condition),),
+            (owl.SubClassOf(target, condition),),
+            kind="ontology_axiom",
+        )
+    )
+    assert reused["expression_size"] == 1
+    assert reused["new_constructor"] == 0
+    human_delete = dict(
+        replacement_cost_features(original, (), kind="ontology_axiom", authorship="human")
+    )
+    assert human_delete["human_ontology_edit"] == human_delete["human_authored_ontology_edit"] == 1
+    assert human_delete["mapping_deletion"] == 0
+    assert all(value == 0 for _, value in replacement_cost_features(original, original))
+
+
+def test_every_retrieved_endpoint_control_is_mandatory_even_with_low_score():
+    source, target, x, y = map(cls, ("S", "T", "X", "Y"))
+    pool = mapping_candidates(
+        "m", source, target, endpoint_alternatives=(("target", x), ("target", y))
+    )
+    endpoint_ids = {c.candidate_id for c in pool if "replace_endpoint" in c.action_tags}
+    with pytest.raises(ValueError, match="mandatory"):
+        budget_candidates(pool, len(pool) - 1)
+    assert endpoint_ids <= {c.candidate_id for c in budget_candidates(pool, len(pool))}

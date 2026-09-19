@@ -1,9 +1,9 @@
 """Existing SDD compiler and differentiable, conditioned Bernoulli mixtures.
 
-This implementation compiles a bounded-enumerated inventory of canonical
-replacement encodings. Enumeration/compilation costs are explicit; no claim is
-made that a succinct arbitrary grammar can always be compiled efficiently.
-PySDD and torch are imported only when compilation or evaluation is requested.
+The same differentiable evaluator supports direct typed-slot grammars and the
+bounded-enumeration reference arm. Compilation costs are explicit; no claim is
+made that arbitrary finite grammars always admit small circuits. PySDD and torch
+are imported only when compilation or evaluation is requested.
 """
 
 from __future__ import annotations
@@ -191,9 +191,9 @@ def encode_candidates(
 
 @dataclass(frozen=True)
 class CompiledCircuit:
-    """Owned PySDD manager/root and reproducible compilation measurements."""
+    """Compiled root plus native manager or immutable transported compiler artifact."""
 
-    encoding: ProposalEncoding
+    encoding: Any
     manager: Any
     root: Any
     cache_key: str
@@ -300,27 +300,103 @@ class ConditionedMixture:
             self.log_mixture + self.component_log_normalizers, dim=0
         )
         self._candidate_by_assignment = dict(
-            zip(circuit.encoding.assignments, circuit.encoding.candidate_ids)
+            zip(
+                getattr(circuit.encoding, "assignments", ()),
+                getattr(circuit.encoding, "candidate_ids", ()),
+            )
         )
+        self._grammar = hasattr(circuit.encoding, "decode")
+
+    def accepts(self, assignment: Sequence[bool]) -> bool:
+        """Evaluate a complete assignment without allocating new compiler nodes."""
+        key = tuple(assignment)
+        if len(key) != self.circuit.encoding.variable_count or any(
+            type(v) is not bool for v in key
+        ):
+            return False
+        if not self._grammar:
+            return key in self._candidate_by_assignment
+        values: dict[int, bool] = {}
+        pending = [(self.circuit.root, False)]
+        while pending:
+            node, expanded = pending.pop()
+            if node.id in values:
+                continue
+            if node.is_false():
+                values[node.id] = False
+            elif node.is_true():
+                values[node.id] = True
+            elif node.is_literal():
+                values[node.id] = key[abs(node.literal) - 1] == (node.literal > 0)
+            elif expanded:
+                values[node.id] = any(values[p.id] and values[s.id] for p, s in node.elements())
+            else:
+                pending.append((node, True))
+                pending.extend(
+                    (child, False)
+                    for pair in node.elements()
+                    for child in pair
+                    if child.id not in values
+                )
+        return values[self.circuit.root.id]
+
+    def candidate(self, assignment: Sequence[bool]) -> ReplacementCandidateV2:
+        """Materialize one directly generated replacement after validating its slots."""
+        if not self._grammar:
+            raise TypeError("bounded-enumeration circuits do not own candidate values")
+        if not self.accepts(assignment):
+            raise ValueError("assignment is outside the constrained grammar")
+        return cast(ReplacementCandidateV2, self.circuit.encoding.decode(assignment))
+
+    def candidate_log_probability(self, candidate: ReplacementCandidateV2) -> Any:
+        """Sum probability of every encoding of an identical bundle and activation."""
+        import torch
+
+        if self._grammar:
+            assignments = self.circuit.encoding.candidate_assignments(candidate)
+        else:
+            assignments = tuple(
+                a
+                for a, identifier in self._candidate_by_assignment.items()
+                if identifier == candidate.candidate_id
+            )
+        terms = [self.log_probability(a) for a in assignments if self.accepts(a)]
+        if not terms:
+            return self.literal_logits.new_tensor(-float("inf"))
+        return torch.logsumexp(torch.stack(terms), dim=0)
 
     def _evaluate(self, node: Any) -> Any:
         import torch
 
-        if node.id in self._values:
-            return self._values[node.id]
-        if node.is_false():
-            result = self.literal_logits.new_full((self.literal_logits.shape[0],), -float("inf"))
-        elif node.is_true():
-            # Missing scopes are smoothed implicitly: p(z)+p(not z)=1.
-            result = self.literal_logits.new_zeros(self.literal_logits.shape[0])
-        elif node.is_literal():
-            literal = node.literal
-            result = (self.log_positive if literal > 0 else self.log_negative)[:, abs(literal) - 1]
-        else:
-            terms = [self._evaluate(prime) + self._evaluate(sub) for prime, sub in node.elements()]
-            result = torch.logsumexp(torch.stack(terms), dim=0)
-        self._values[node.id] = result
-        return result
+        pending = [(node, False)]
+        while pending:
+            current, expanded = pending.pop()
+            if current.id in self._values:
+                continue
+            if current.is_false():
+                value = self.literal_logits.new_full((self.literal_logits.shape[0],), -float("inf"))
+            elif current.is_true():
+                # Missing scopes are smoothed implicitly: p(z)+p(not z)=1.
+                value = self.literal_logits.new_zeros(self.literal_logits.shape[0])
+            elif current.is_literal():
+                literal = current.literal
+                value = (self.log_positive if literal > 0 else self.log_negative)[
+                    :, abs(literal) - 1
+                ]
+            elif expanded:
+                terms = [self._values[p.id] + self._values[s.id] for p, s in current.elements()]
+                value = torch.logsumexp(torch.stack(terms), dim=0)
+            else:
+                pending.append((current, True))
+                pending.extend(
+                    (child, False)
+                    for pair in current.elements()
+                    for child in pair
+                    if child.id not in self._values
+                )
+                continue
+            self._values[current.id] = value
+        return self._values[node.id]
 
     def log_probability(self, assignment: Sequence[bool]) -> Any:
         """Compute exact mixture likelihood including the differentiable log normalizer."""
@@ -331,7 +407,7 @@ class ConditionedMixture:
             type(v) is not bool for v in key
         ):
             raise ValueError("proposal assignment must be a Boolean vector of the circuit width")
-        if key not in self._candidate_by_assignment:
+        if not self.accepts(key):
             return self.literal_logits.new_tensor(-float("inf"))
         selected = torch.tensor(key, device=self.literal_logits.device, dtype=torch.bool)
         terms = torch.where(selected, self.log_positive, self.log_negative).sum(dim=1)
@@ -345,6 +421,7 @@ class ConditionedMixture:
             raise ValueError("sample count must be a nonnegative integer")
         generator = torch.Generator(device=self.literal_logits.device).manual_seed(seed)
         samples = []
+        candidate_masses: dict[str, float] = {}
         with torch.no_grad():
             for _ in range(count):
                 component = int(
@@ -352,7 +429,9 @@ class ConditionedMixture:
                 )
                 assignment: dict[int, bool] = {}
 
-                def descend(node: Any) -> None:
+                pending = [self.circuit.root]
+                while pending:
+                    node = pending.pop()
                     if node.is_false():
                         raise RuntimeError("a zero-probability SDD branch was selected")
                     if node.is_literal():
@@ -370,10 +449,8 @@ class ConditionedMixture:
                                 torch.softmax(weights, dim=0), 1, generator=generator
                             ).item()
                         )
-                        for child in elements[selected]:
-                            descend(child)
+                        pending.extend(reversed(elements[selected]))
 
-                descend(self.circuit.root)
                 for variable in range(self.circuit.encoding.variable_count):
                     if variable not in assignment:
                         probability = torch.sigmoid(self.literal_logits[component, variable])
@@ -382,16 +459,25 @@ class ConditionedMixture:
                             < probability
                         )
                 key = tuple(assignment[i] for i in range(self.circuit.encoding.variable_count))
-                if key not in self._candidate_by_assignment:
+                if not self.accepts(key):
                     raise RuntimeError(
                         "compiled circuit sampled an assignment outside its language"
                     )
-                samples.append(
-                    ProposalSample(
-                        self._candidate_by_assignment[key],
-                        key,
-                        component,
-                        float(self.log_probability(key).item()),
+                candidate = self.candidate(key) if self._grammar else None
+                candidate_id = (
+                    candidate.candidate_id
+                    if candidate is not None
+                    else self._candidate_by_assignment[key]
+                )
+                if candidate_id not in candidate_masses:
+                    candidate_masses[candidate_id] = float(
+                        (
+                            self.candidate_log_probability(candidate)
+                            if candidate is not None
+                            else self.log_probability(key)
+                        ).item()
                     )
+                samples.append(
+                    ProposalSample(candidate_id, key, component, candidate_masses[candidate_id])
                 )
         return tuple(samples)
