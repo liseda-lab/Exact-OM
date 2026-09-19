@@ -246,7 +246,10 @@ class PairAdaptiveChannelsMixin:
         Singletons have no ambiguity comparison and receive zero quality. This is
         a source-level evidence heuristic, shared by its candidate pair scores.
         """
-        frame = self._attached_dataset.dataframe
+        dataset = self._attached_dataset
+        active_frame = getattr(dataset, "_active_dataframe", None)
+        # Exact-prefiltered rows bypass scoring and are absent from runner batches.
+        frame = active_frame() if callable(active_frame) else dataset.dataframe
         context_scores = None
         if self.lex_config["quality"] == "encoder_agreement":
             if not self.use_context:

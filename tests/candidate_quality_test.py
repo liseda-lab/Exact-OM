@@ -70,3 +70,21 @@ def test_singleton_quality_is_undefined_and_partial_source_batch_rejected():
     partial = _Scorer("candidate_margin", ["a", "b"])
     with pytest.raises(ValueError, match="complete frozen source pool"):
         partial.score([["source"]], [["A"]], ["a"])
+
+
+@pytest.mark.parametrize("mode", ["candidate_margin", "encoder_agreement"])
+def test_candidate_quality_uses_complete_scored_pool_after_exact_prefilter(mode):
+    model = _Scorer(mode, ["exact", "a", "b"])
+    frame = model._attached_dataset.dataframe
+    frame["SrcKind"] = frame["TgtKind"] = "class"
+    frame["inference"] = [False, True, True]
+    frame["prefiltered"] = [True, False, False]
+    model._attached_dataset._active_dataframe = lambda: frame.loc[frame.inference]
+
+    quality, payloads = model.score([["source"], ["source"]], [["A"], ["B"]], ["a", "b"])
+    expected = 0.1 if mode == "candidate_margin" else 0.0
+    torch.testing.assert_close(quality, torch.full((2,), expected))
+    assert all(payload["candidate_count"] == 2 for payload in payloads)
+    assert all(set(payload["candidate_scores"]) == {"a", "b"} for payload in payloads)
+    with pytest.raises(ValueError, match="complete frozen source pool"):
+        model.score([["source"]], [["A"]], ["a"])
