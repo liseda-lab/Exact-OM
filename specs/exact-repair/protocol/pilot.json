@@ -1,0 +1,328 @@
+{
+  "schema_version": "xr-2-v1",
+  "campaign_id": "xr2-methodology-pilot-v1",
+  "phase": "exploratory_pilot",
+  "data": {
+    "cohorts": [
+      "generated",
+      "real_structure_corruptions",
+      "conference_2025",
+      "bio_ml_2024",
+      "bio_ml_2026"
+    ],
+    "split_seed": 1729,
+    "families": [
+      "directional_strengthening",
+      "subclass_specialisation_source",
+      "subclass_specialisation_target",
+      "necessary_condition_source",
+      "necessary_condition_target",
+      "endpoint_confusion",
+      "disjointness_revision",
+      "superclass_conjunct_removal",
+      "ontology_subclass_specialisation",
+      "superclass_generalisation",
+      "domain_generalisation",
+      "range_generalisation",
+      "existential_filler_generalisation",
+      "interaction_redundant",
+      "interaction_complementary",
+      "mixed"
+    ],
+    "groups_per_family": {
+      "train": 8,
+      "development": 2,
+      "test": 2
+    },
+    "corruptions_per_group": 2,
+    "clean_controls_per_group": 1,
+    "max_generation_attempts_per_group": 30,
+    "generated_objects": [
+      2,
+      3
+    ],
+    "split_unit": "clean_structural_parent",
+    "real_split_unit": "ontology_pair",
+    "conference": {
+      "revision": "2025",
+      "reference": "ra1",
+      "expected_pairs": 21,
+      "whole_ontology_holdout": "ekaw",
+      "role": "grouped_train_development_test",
+      "matcher_strata": [
+        "public_2025_outputs",
+        "captured_exact_om",
+        "lexical_control"
+      ]
+    },
+    "bio_ml": {
+      "releases": [
+        "2024_selected",
+        "2026_whole"
+      ],
+      "data_revision_2026": "c454644a334ab43754bc1070c0fb7fdd56a90a1d",
+      "published_coherence_revision": "ec436a97f49875227dedf634faa5280b1376bda9",
+      "expected_whole_pairs": 3,
+      "report_shared_ontology_overlap": true
+    },
+    "evidence": {
+      "simulator": "label_jaccard_plus_noise_v2",
+      "noise_std": 0.1,
+      "misleading_label_fraction": 0.25,
+      "counterbalance_provenance": true,
+      "latent_corruption_features": false
+    }
+  },
+  "actions": {
+    "enabled": [
+      "keep",
+      "delete",
+      "retain_subsumption",
+      "replace_endpoint",
+      "specialise_subclass",
+      "add_necessary_condition",
+      "complex_equivalence",
+      "composite",
+      "remove_disjointness",
+      "remove_superclass_conjunct",
+      "specialise_ontology_subclass",
+      "generalise_superclass",
+      "generalise_domain",
+      "generalise_range",
+      "generalise_existential_filler"
+    ],
+    "ontology_edits": true,
+    "eligibility": "explicit_occurrence_manifest",
+    "directional_reversal": false,
+    "max_changed_endpoints": 1,
+    "max_states": {
+      "generated": 16,
+      "conference": 32,
+      "bio_ml": 64
+    },
+    "preserve_elementary_and_family_representatives": true,
+    "ontology_patch_only": true
+  },
+  "grammar": {
+    "constructors": [
+      "named_class",
+      "intersection",
+      "existential"
+    ],
+    "max_depth": 2,
+    "max_constructors": 2,
+    "retrieval_hops": 2,
+    "classes_per_side": 16,
+    "properties_per_side": 8,
+    "endpoints_per_side": 16,
+    "canonical_unused_slots": true,
+    "unique_encoding_or_sum": true
+  },
+  "graph": {
+    "encoder": "hgt",
+    "control": "rgcn_matched_attention",
+    "hidden_width": 128,
+    "layers": 3,
+    "attention_heads": 4,
+    "dropout": 0.1,
+    "context_hops": 2,
+    "max_nodes": 4096,
+    "max_edges": 32768,
+    "max_explanations": 64,
+    "max_text_tokens": 128,
+    "proposal_head": "shared_per_object",
+    "value_head": "shared_per_completed_candidate",
+    "pair_factor_limit_per_object": 16
+  },
+  "circuit": {
+    "distribution": "conditioned_mixture_of_products",
+    "components": 4,
+    "component_control": 1,
+    "posterior_weights": "pi_times_Z_component",
+    "normaliser_in_training": true,
+    "compile_seconds": 20,
+    "max_nodes": 1000000,
+    "max_draws_per_object": 256,
+    "zero_normaliser": "no_proposal",
+    "grammar_only_guarantee": true
+  },
+  "policy": {
+    "consistency": true,
+    "relative_named_class_coherence": true,
+    "baseline_exceptions": "proved_source_only",
+    "selected_expression_nonvacuity": true,
+    "required_queries": [],
+    "prohibited_queries": [],
+    "unknown_authorizes_acceptance": false,
+    "all_off_required": false,
+    "modules": false,
+    "initial_full_classification_required": false,
+    "acceptance": "complete_supported_scope",
+    "fast_detection": "sound_incomplete_allowed",
+    "production_java_dependency": false
+  },
+  "solver": {
+    "backend": "pysat_rc2",
+    "objective_arms": [
+      "unary",
+      "bounded_pairwise"
+    ],
+    "quantization_scale": 10000,
+    "rounding": "half_even",
+    "default_cut": "complete_assignment",
+    "support_cut": "all_axiom_origins_with_activations",
+    "pending_in_upper_bound": true,
+    "pending_are_logical_cuts": false,
+    "max_pending_retries": 1,
+    "shrink_max_checks": 8
+  },
+  "teacher": {
+    "query_semantics": "typed_desired_unwanted_unspecified",
+    "max_assignments": 4096,
+    "max_queries": 256,
+    "case_deadline_seconds": 120,
+    "false_positive_weight": 1.0,
+    "desired_family_weight": 1.0,
+    "disjointness_nonvacuity": "each_operand",
+    "unknown_query_label": "masked",
+    "exact_distribution_requires_complete_cache": true,
+    "partial_verified_comparisons": true,
+    "temperature": 0.2,
+    "anchor": "verified_feasible_repair"
+  },
+  "preferences": {
+    "mode": "declared_nonnegative_weights",
+    "cost_weights": {
+      "mapping_deletion": 0.1,
+      "removed_direction": 0.025,
+      "endpoint_change": 0.08,
+      "subclass_specialisation": 0.04,
+      "necessary_condition": 0.02,
+      "new_constructor": 0.005,
+      "ontology_edit": 0.15,
+      "human_ontology_edit": 0.15
+    },
+    "human_edit_extra_positive": true,
+    "learned_profile": "regularised_nonnegative_pairwise",
+    "real_feedback_required_for_user_claims": true
+  },
+  "training": {
+    "device": "auto",
+    "dtype": "float32",
+    "threads": 1,
+    "seeds": [
+      13,
+      37,
+      73
+    ],
+    "optimizer": "adamw",
+    "learning_rate": 0.001,
+    "weight_decay": 0.0001,
+    "clip_gradient_norm": 1.0,
+    "batch_cases": 8,
+    "max_epochs": 100,
+    "patience": 10,
+    "min_dev_improvement": 0.001,
+    "smooth_l1_beta": 1.0,
+    "ranking_temperature": 1.0,
+    "max_repair_pairs_per_case": 64,
+    "development_decode_every_epochs": 5,
+    "benefit_loss": "anchored_full_repair_huber_plus_ranking",
+    "proposal_loss": "complete_cache_marginal_cross_entropy",
+    "benefit_loss_weight": 1.0,
+    "ranking_loss_weight": 0.2,
+    "proposal_loss_weight": 1.0,
+    "controls": [
+      "uniform",
+      "confidence",
+      "symbolic",
+      "mlp",
+      "rgcn_matched_attention"
+    ],
+    "adaptation_arms": [
+      "generated_only",
+      "training_side_real_adaptation"
+    ],
+    "checkpoint_selection": "development_decoded_teacher_regret_on_complete_subset",
+    "held_out_supervision": false
+  },
+  "experiments": {
+    "studies": [
+      "XR-E00",
+      "XR-E01",
+      "XR-E02",
+      "XR-E03",
+      "XR-E04",
+      "XR-E05",
+      "XR-E06",
+      "XR-E07",
+      "XR-E08",
+      "XR-E09"
+    ],
+    "candidate_caps": [
+      16,
+      32,
+      64
+    ],
+    "scale_objects": [
+      2,
+      4,
+      8,
+      16,
+      32
+    ],
+    "runtime_deadlines_seconds": [
+      1,
+      10,
+      60,
+      300
+    ],
+    "score_noise_std": [
+      0.0,
+      0.1,
+      0.3
+    ],
+    "feature_dropout": [
+      0.0,
+      0.25,
+      0.5
+    ],
+    "composition_holdout": "mixed"
+  },
+  "analysis": {
+    "bootstrap_replicates": 2000,
+    "bootstrap_seed": 991,
+    "interval": 0.95,
+    "cluster_unit": "structural_parent_or_ontology_pair",
+    "multiplicity": "holm",
+    "alpha": 0.05,
+    "real_pair_tables": true,
+    "include_unresolved": true
+  },
+  "resources": {
+    "workers": 1,
+    "run_deadline_seconds": 300,
+    "verification_call_seconds": 30,
+    "initial_diagnosis_seconds": 20,
+    "cleanup_grace_seconds": 2,
+    "memory_mb": 8192,
+    "campaign_deadline_seconds": 86400,
+    "unlimited_retries": false,
+    "stage_deadline_seconds": {
+      "qualify": 1800,
+      "corpus": 1800,
+      "candidates": 3600,
+      "label": 21600,
+      "train": 14400,
+      "freeze": 300,
+      "evaluate": 36000,
+      "report": 1800
+    }
+  },
+  "publication": {
+    "production_default_enabled": false,
+    "require_safety_replay": true,
+    "require_scoped_optimality_replay": true,
+    "public_results_are_ours": false
+  }
+}
