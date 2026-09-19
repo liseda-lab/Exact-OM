@@ -71,6 +71,48 @@ Progress and cell results are under
 launcher exits. Detaching the interactive shell does not release the allocation. To stop
 only this batch, cancel step `14220.3`, not allocation `14220`.
 
+### Mixed-precision repair
+
+The initial channel batch stopped at **21:26 UTC on 2026-09-19** after E06 `current`,
+`string_added` and `string_only` completed. E06 `lexical_only` failed when a masked
+assignment attempted to copy half-precision lexical scores into an FP32 fusion tensor.
+All eight E26 cells remained pending. The allocation stayed active and the new batch
+made zero hosted requests.
+
+Commit `0cc9810` adds one explicit destination-dtype conversion at that assignment;
+upstream channel calculations and all experimental settings remain unchanged. Validation
+includes 52 tests, 42 exactly matching previously successful E06 forward cases, six repaired
+error cases, and 48 successful checks across the frozen E26 arms and tensor precisions.
+Evidence is in `data/experiments-v2/channel-repair-01/`.
+
+Three completed cells are retained only after verifying original artifact hashes, unchanged
+input/configuration/model identities and the exact one-line implementation difference. New
+artifact identities record the compatibility proof. Predictions and evaluation bytes stay
+unchanged; only the extraction-artifact pointer in the copied execution measurement is
+rebound, preserving the original timing and resource values. The original results, attempts
+and accounting remain intact.
+
+Recovery completed with all three normal-runner reuse checks and paired result-set
+validation passing, with zero new scored pairs or hosted requests. Preparation took
+637.76 seconds and is charged to the recovery reserve. Its receipt is
+`channel-repair-01/preparation-receipt.json`.
+
+The restart began at **22:26 UTC on 2026-09-19**, **Slurm step 14220.4**, detached in
+`exact-channels-02`, with **three completed cells reused and nine pending**. It uses
+`--resume` against the verified new runtime; historical provenance is retained in the
+repair record without repeatedly importing the old store. Launch source/native/cache
+checks passed. The step remains inside unlimited allocation 14220; shell step 14220.0
+and VS Code access are preserved. This is a startup confirmation, not a completed result.
+
+```bash
+tail -f /home/pgcotovio/Exact-OM/data/experiments-v2/channel-screen-02/launcher.log
+cat /home/pgcotovio/Exact-OM/data/experiments-v2/channel-screen-02/launch-status.json
+```
+
+Current per-cell manifests and eventual selection are under
+`channel-screen-02/runtime/exact-om-focused-v2/screen/`. To stop only the restarted batch,
+cancel step `14220.4`; preserve allocation `14220` for the interactive shell.
+
 ## Frozen work
 
 Preparation: `data/experiments-v2/prepared-campaign-08/campaign.lock.yaml`.
