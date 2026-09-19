@@ -135,7 +135,6 @@ def _candidate_recall_run_stats(
         ]
 
     reference = getattr(dataset, "reference", None)
-    candidates = getattr(dataset, "candidates", None)
     if reference is None or reference.empty:
         return {
             "metric_applicability": {"candidate_recall": False},
@@ -145,8 +144,22 @@ def _candidate_recall_run_stats(
             },
         }
 
+    candidates = getattr(dataset, "candidates", None)
+    exact_matches = getattr(dataset, "exact_matches", None)
+    diagnostic_frames = getattr(dataset, "candidate_recall_frames", None)
+    if callable(diagnostic_frames):
+        candidates, exact_matches = diagnostic_frames()
+    if candidates is None:
+        return {
+            "metric_applicability": {"candidate_recall": False},
+            "candidate_recall_diagnostics": {
+                "status": "not_applicable",
+                "reason": "raw candidate pool is unavailable in this dataset cache",
+            },
+        }
+
     candidate_input: Any = []
-    if candidates is not None and not candidates.empty:
+    if not candidates.empty:
         source, target = pair_columns(candidates, "candidate pool")
         score = next(
             (
@@ -171,7 +184,7 @@ def _candidate_recall_run_stats(
         candidate_input,
         pairs(reference, "stage reference"),
         train_pairs=training_pairs,
-        exact_pairs=pairs(getattr(dataset, "exact_matches", None), "exact prefilter"),
+        exact_pairs=pairs(exact_matches, "exact prefilter"),
     )
     counts = dict(analysis["counts"])
     metrics = dict(analysis["metrics"])
@@ -181,7 +194,13 @@ def _candidate_recall_run_stats(
         pool_manifest.get("gold_free_summary") if isinstance(pool_manifest, Mapping) else None
     )
     mean_pool_size: Optional[float] = None
-    if isinstance(pool_summary, Mapping) and pool_summary.get("mean_pool_size") is not None:
+    if (
+        callable(diagnostic_frames)
+        and isinstance(pool_summary, Mapping)
+        and pool_summary.get("source_entities")
+    ):
+        mean_pool_size = len(candidates) / int(pool_summary["source_entities"])
+    elif isinstance(pool_summary, Mapping) and pool_summary.get("mean_pool_size") is not None:
         mean_pool_size = float(pool_summary["mean_pool_size"])
     elif candidates is not None and not candidates.empty:
         source, _target = pair_columns(candidates, "candidate pool")
@@ -748,7 +767,23 @@ def _run_alignment_session(
         with timing_session.stage("Dataset.CacheCheck"):
             dataset_loaded_from_cache = dataset.has_cache()
 
+        # References are reporting inputs, not part of the prepared feature cache.
+        # Attach them on either path before restrict_sources scopes evaluation.
+        if full_reference_file_path is not None:
+            with timing_session.stage("Dataset.LoadReference"):
+                dataset.load_reference(full_reference_file_path)
+
         if dataset_loaded_from_cache:
+            if (
+                run_eval
+                and configs.run.experiment_audit
+                and full_reference_file_path is not None
+                and getattr(dataset, "candidate_recall_cache_path", None) is None
+            ):
+                raise ValueError(
+                    "Audited cached evaluation requires the original raw candidate pool; "
+                    "replay retrieval to recover it or rebuild the dataset before scoring"
+                )
             dataset_span.cache_status = CacheStatus.CACHE_HIT
             timing_session.record(
                 "Dataset.LoadCandidates",
@@ -782,8 +817,6 @@ def _run_alignment_session(
                 cache_status=CacheStatus.SKIPPED,
             )
             with timing_session.stage("Dataset.LoadCandidates"):
-                if full_reference_file_path is not None:
-                    dataset.load_reference(full_reference_file_path)
                 dataset.load_candidates(
                     candidates_file_path,
                     device=device,

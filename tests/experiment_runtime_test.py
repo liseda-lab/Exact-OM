@@ -856,3 +856,67 @@ def test_native_build_change_invalidates_extraction_but_keeps_locked_inputs(tmp_
         first.identities["extraction"]["artifact_id"]
         != changed.identities["extraction"]["artifact_id"]
     )
+
+
+def test_sampled_global_replay_keeps_reference_sources_without_predictions(tmp_path, monkeypatch):
+    cell, _, _ = fixture(tmp_path, monkeypatch)
+    parent = Path(cell.resolved_config["data"]["refs"]["full"])
+    parent.write_text(
+        "SrcEntity\tTgtEntity\nsource:1\ttarget:1\nsource:empty\tmissing\noutside\tother\n"
+    )
+    train = tmp_path / "train.tsv"
+    train.write_text("SrcEntity\tTgtEntity\nsource:1\ttarget:1\n")
+    config = {
+        **cell.resolved_config,
+        "data": {
+            **cell.resolved_config["data"],
+            "refs": {"full": str(parent), "train": str(train)},
+        },
+    }
+    cell = replace(cell, source_cap=2, resolved_config=config)
+    alignment = cell.output_dir / "alignment/maps_global.tsv"
+    alignment.parent.mkdir(parents=True)
+    alignment.write_text("SrcEntity\tTgtEntity\tScore\nsource:1\ttarget:1\t0.9\n")
+    inputs = cell.output_dir / "dataset/sampled_inputs"
+    inputs.mkdir(parents=True)
+    (inputs / "full_reference.tsv").write_text(
+        "SrcEntity\tTgtEntity\nsource:1\ttarget:1\nsource:empty\tmissing\n"
+    )
+    (inputs / "training_reference.tsv").write_text("SrcEntity\tTgtEntity\n")
+    original = alignment.read_bytes()
+    recovery = SimpleNamespace(cell=cell, evaluation_enabled=True)
+    runtime.CellRecovery.evaluate(recovery)
+    result = json.loads((cell.output_dir / "evaluation/evaluation_results.json").read_text())
+    assert result["builtin"]["R"] == 0.5
+    assert result["meta"]["refs"]["full_reference"]["rows"] == 2
+    assert result["meta"]["refs"]["train_reference"]["rows"] == 0
+    assert alignment.read_bytes() == original
+
+
+@pytest.mark.parametrize("sampling", ["cell_cap", "config_cap", "source_universe"])
+@pytest.mark.parametrize("missing", ["full_reference", "training_reference"])
+def test_sampled_global_replay_rejects_missing_saved_reference(
+    tmp_path, monkeypatch, sampling, missing
+):
+    cell, _, _ = fixture(tmp_path, monkeypatch)
+    config = {
+        **cell.resolved_config,
+        "data": {
+            **cell.resolved_config["data"],
+            "refs": {**cell.resolved_config["data"]["refs"], "train": "train.tsv"},
+        },
+    }
+    if sampling == "source_universe":
+        config["data"]["source_universe"] = "sources.txt"
+    elif sampling == "config_cap":
+        config["run"] = {"source_cap": 2}
+    cell = replace(cell, resolved_config=config, source_cap=2 if sampling == "cell_cap" else None)
+    alignment = cell.output_dir / "alignment/maps_global.tsv"
+    alignment.parent.mkdir(parents=True)
+    alignment.write_text("unused scored rows")
+    inputs = cell.output_dir / "dataset/sampled_inputs"
+    inputs.mkdir(parents=True)
+    other = "training_reference" if missing == "full_reference" else "full_reference"
+    (inputs / f"{other}.tsv").write_text("SrcEntity\tTgtEntity\n")
+    with pytest.raises(FileNotFoundError, match="saved reference"):
+        runtime.CellRecovery.evaluate(SimpleNamespace(cell=cell, evaluation_enabled=True))

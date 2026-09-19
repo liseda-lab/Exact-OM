@@ -296,6 +296,38 @@ class BaseAlignmentDataset(IDataset):
         return self._candidates
 
     @property
+    def candidate_recall_cache_path(self) -> Optional[Path]:
+        expected = self._load_cache_metadata().get("candidate_recall_sha256")
+        if expected is None:
+            return None  # Legacy caches did not preserve the raw retrieval pool.
+        path = self.output_path / "candidate_recall.tsv"
+        if not path.is_file() or file_provenance(path)["sha256"] != expected:
+            raise ValueError("Cached candidate-recall pool is missing or has changed")
+        return path
+
+    def candidate_recall_frames(self) -> Tuple[Optional[DataFrame], Optional[DataFrame]]:
+        """Read reporting-only raw pools without changing cached inference inputs."""
+        if self._candidates is not None:
+            return self._candidates, self._exact_matches
+        path = self.candidate_recall_cache_path
+        if path is None:
+            return None, None
+        frame = pd.read_csv(path, sep="\t", float_precision="round_trip")
+        groups = self._active_candidate_config.get("source_sample", {}).get("source_kind_groups")
+        if groups is not None:
+            selected = {tuple(group) for group in groups}
+            frame = frame.loc[
+                [
+                    (str(src), str(kind)) in selected
+                    for src, kind in frame[["Src", "SrcKind"]].itertuples(index=False, name=None)
+                ]
+            ]
+        return tuple(
+            frame.loc[frame["pool_role"] == role].drop(columns="pool_role").reset_index(drop=True)
+            for role in ("candidate", "exact")
+        )
+
+    @property
     def candidates_generated(self) -> bool:
         return self._candidates_generated
 
@@ -860,7 +892,34 @@ class BaseAlignmentDataset(IDataset):
         return value if isinstance(value, dict) else {}
 
     def _write_cache_metadata(self) -> None:
+        candidate_recall_sha256 = None
+        if self._candidates is not None:
+            frames = []
+            for role, frame in (("candidate", self._candidates), ("exact", self._exact_matches)):
+                if frame is not None:
+                    columns = [
+                        name
+                        for name in frame.columns
+                        if name
+                        in {
+                            "Src",
+                            "Tgt",
+                            "SrcKind",
+                            "TgtKind",
+                            "cand_sim",
+                            "Score",
+                            "Scores",
+                            "similarity",
+                        }
+                    ]
+                    frames.append(frame[columns].assign(pool_role=role))
+            path = self.output_path / "candidate_recall.tsv"
+            temporary = path.with_suffix(".tsv.tmp")
+            pd.concat(frames, ignore_index=True).to_csv(temporary, sep="\t", index=False)
+            os.replace(temporary, path)
+            candidate_recall_sha256 = file_provenance(path)["sha256"]
         payload = {
+            "candidate_recall_sha256": candidate_recall_sha256,
             "cache_schema_version": _DATASET_CACHE_SCHEMA_VERSION,
             "ontology_backend_version": _ONTOLOGY_BACKEND_VERSION,
             "fingerprint": self.cache_fingerprint,

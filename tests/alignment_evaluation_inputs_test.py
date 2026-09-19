@@ -1,6 +1,8 @@
+import json
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
 from exact.core.actions.alignment import _materialize_evaluation_reference
 
@@ -163,3 +165,139 @@ def test_local_reporting_join_keeps_all_positives_and_empty_candidate_groups(tmp
         annotated, tmp_path / "evaluation", reference_candidates=queries, error_on_fail=True
     )
     assert metrics["MRR"] == 0.5  # (1 + 1/2 + empty-pool zero) / three official queries
+
+
+def test_cache_hit_attaches_and_scopes_reporting_reference_before_training(tmp_path):
+    from exact.core.actions.alignment import _run_alignment_session
+    from exact.core.entities.configs.config import ConfigModel
+    from exact.utils.timing import TimingLedger
+
+    fixtures = Path(__file__).parent / "fixtures" / "ontologies"
+    source, target = "http://example.org/mini/src#", "http://example.org/mini/tgt#"
+    universe = tmp_path / "sources.txt"
+    universe.write_text(source + "Heart\n" + source + "Lung\n")
+    pool = tmp_path / "pool.tsv"
+    pool.write_text("SrcEntity\tTgtEntity\n" + source + "Heart\t" + target + "CardiacOrgan\n")
+    reference = tmp_path / "valid.tsv"
+    reference.write_text(
+        "SrcEntity\tTgtEntity\tRelation\n"
+        + source
+        + "Heart\t"
+        + target
+        + "CardiacOrgan\t=\n"
+        + source
+        + "Lung\t"
+        + target
+        + "PulmonaryOrgan\t=\n"
+        + source
+        + "Kidney\t"
+        + target
+        + "RenalOrgan\t=\n"
+    )
+    config = ConfigModel.from_mapping(
+        {
+            "config_version": 2,
+            "run": {"use_file_cache": True, "source_cap": 2, "seed": 17, "experiment_audit": True},
+            "data": {"execution_mode": "global_alignment", "source_universe": str(universe)},
+            "dataset": {
+                "filter_exact_matches": False,
+                "which": [],
+                "projector": {"backend": "native"},
+            },
+            "llm": {"verbaliser": {"model": None}},
+            "pipeline": [
+                {
+                    "name": "PairAdaptiveSemanticScorer",
+                    "params": {"use_lexical": False, "use_context": False, "use_llm": False},
+                }
+            ],
+            "output": {"sanity_checks": {"enabled": False}},
+        }
+    )
+    config.resolve_dependencies()
+    datasets = []
+
+    class DatasetReady(Exception):
+        pass
+
+    def stop_before_training(**kwargs):
+        datasets.append(kwargs["dataset"])
+        raise DatasetReady
+
+    config._trainer_component = stop_before_training
+    output = tmp_path / "run"
+    ledger = TimingLedger.open(output)
+    snapshots = []
+    for _ in range(2):
+        with pytest.raises(DatasetReady), ledger.session(
+            command="align", config_fingerprint=config.fingerprint()
+        ) as session:
+            _run_alignment_session(
+                fixtures / "mini_src.owl",
+                fixtures / "mini_tgt.owl",
+                output,
+                config,
+                full_reference_file_path=reference,
+                candidates_file_path=pool,
+                run_eval=True,
+                timing_ledger=ledger,
+                timing_session=session,
+            )
+        snapshots.append((output / "dataset/dataset.csv").read_bytes())
+        for relative in (
+            "dataset/sampled_inputs/full_reference.tsv",
+            "evaluation_inputs/full_reference.tsv",
+        ):
+            rows = pd.read_csv(output / relative, sep="\t")
+            # Keep the gold-bearing source with no candidates; exclude the unsampled source.
+            assert set(rows.SrcEntity) == {source + "Heart", source + "Lung"}
+        # A real resume may restore only the prepared dataset, not derived reporting files.
+        (output / "dataset/sampled_inputs/full_reference.tsv").unlink()
+        (output / "evaluation_inputs/full_reference.tsv").unlink()
+    assert snapshots[0] == snapshots[1]
+    assert datasets[0].candidates is not None
+    assert datasets[1].candidates is None
+    assert len(datasets[1].reference) == 2
+    columns = ["Src", "Tgt", "SrcKind", "TgtKind", "Label", "inference", "prefiltered"]
+    pd.testing.assert_frame_equal(
+        datasets[0].dataframe[columns], datasets[1].dataframe[columns], check_dtype=False
+    )
+
+    # Legacy caches must fail before constructing any scoring model, while ordinary
+    # cached execution and unlabelled prediction remain available.
+    metadata_path = output / "dataset/dataset.meta.json"
+    metadata = json.loads(metadata_path.read_text())
+    metadata.pop("candidate_recall_sha256")
+    metadata_path.write_text(json.dumps(metadata))
+    with pytest.raises(ValueError, match="replay retrieval"), ledger.session(
+        command="align", config_fingerprint=config.fingerprint()
+    ) as session:
+        _run_alignment_session(
+            fixtures / "mini_src.owl",
+            fixtures / "mini_tgt.owl",
+            output,
+            config,
+            full_reference_file_path=reference,
+            candidates_file_path=pool,
+            run_eval=True,
+            timing_ledger=ledger,
+            timing_session=session,
+        )
+    assert len(datasets) == 2
+    for audit, reporting_reference in ((False, reference), (True, None)):
+        config.run.experiment_audit = audit
+        with pytest.raises(DatasetReady), ledger.session(
+            command="align", config_fingerprint=config.fingerprint()
+        ) as session:
+            _run_alignment_session(
+                fixtures / "mini_src.owl",
+                fixtures / "mini_tgt.owl",
+                output,
+                config,
+                full_reference_file_path=reporting_reference,
+                candidates_file_path=pool,
+                run_eval=True,
+                timing_ledger=ledger,
+                timing_session=session,
+            )
+    assert len(datasets) == 4

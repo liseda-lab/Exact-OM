@@ -379,15 +379,34 @@ class CellRecovery:
         report = refs.get(self.cell.reference_role) or refs.get("full")
         if mode != "local_ranking" and not report:
             raise ValueError("Global evaluator replay requires the declared role's reference")
+        full_reference = root / report if report else None
+        training_reference = root / train if train else None
+        sampled = (
+            self.cell.source_cap is not None
+            or (self.cell.resolved_config.get("run") or {}).get("source_cap") is not None
+            or data.get("source_universe") is not None
+        )
+        if mode != "local_ranking":
+            # Replay the original population, including sources without mappings.
+            # A missing sample must never fall back to the full denominator.
+            inputs = self.cell.output_dir / "dataset/sampled_inputs"
+            for name, configured in (("full_reference", report), ("training_reference", train)):
+                saved = inputs / f"{name}.tsv"
+                if sampled and configured and not saved.is_file():
+                    raise FileNotFoundError(
+                        f"Sampled global evaluator replay requires its saved reference: {saved}"
+                    )
+            materialized = self.cell.output_dir / "evaluation_inputs/full_reference.tsv"
+            if (inputs / "full_reference.tsv").is_file():
+                full_reference = inputs / "full_reference.tsv"
+            elif materialized.is_file():
+                full_reference = materialized
+            if (inputs / "training_reference.tsv").is_file():
+                training_reference = inputs / "training_reference.tsv"
         candidates = root / data["candidates"] if data.get("candidates") else None
         if mode == "local_ranking":
             sampled_candidates = (
                 self.cell.output_dir / "dataset/sampled_inputs/reference_candidates.tsv"
-            )
-            sampled = (
-                self.cell.source_cap is not None
-                or (self.cell.resolved_config.get("run") or {}).get("source_cap") is not None
-                or data.get("source_universe") is not None
             )
             if sampled and not sampled_candidates.is_file():
                 raise FileNotFoundError(
@@ -409,8 +428,8 @@ class CellRecovery:
             self.cell.output_dir / "evaluation",
             error_on_fail=True,
             K=options.get("k"),
-            train_reference_file_path=root / train if train else None,
-            full_reference_file_path=root / report if report and mode != "local_ranking" else None,
+            train_reference_file_path=training_reference,
+            full_reference_file_path=full_reference if mode != "local_ranking" else None,
             reference_candidates=candidates if mode == "local_ranking" else None,
             backends=options.get("backends"),
             backend_options={"bioml": options.get("bioml") or {}},
