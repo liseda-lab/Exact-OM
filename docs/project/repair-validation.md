@@ -1,33 +1,49 @@
 # Exact-Repair implementation validation
 
-Implementation commit: `37db8f5`.
+Validation date: 19 September 2026. These are component-conformance and small integration results, not benchmark or model-quality claims. The initial implementation was `37db8f5`; `e033026` adds direct grammar, retrieval and supervised runtime paths; the following training/study commit completes the protocol tools described below.
 
-Local validation on 19 September 2026 used Python 3.12, pyowl-core 0.2.0, pyHermiT 0.2.0, pyelk-reasoner 0.2.0, PySAT 1.8.dev24, PySDD 1.0.6, torch 2.7.0 and torch-geometric 2.6.1. These are component-conformance results, not benchmark or model-quality claims.
+## Local optimized ontology stack
+
+Repair validation used isolated copies of the latest local source checkouts and their built native extensions, without modifying the checkouts or the matching model's environment:
+
+| Component | Local revision |
+| --- | --- |
+| pyowl-core | `5fd93c8839318f0ccc1afff4d3ec537509c72e87` |
+| pyowl2vec-star-projector | `a0676012c5f6437c304b4ed04bc2b41b6a083da1` |
+| pyHermiT | `bbf31c26ce7ae03bd092f04bcb8955466b1fe3e0` |
+| pyELK | `bce95f8552ed8396315c9a9e4ddce184ad95596f` |
+
+The temporary overlay is `/tmp/exact-repair-local-stack`; its `manifest.json` records source/native hashes. Study runtime manifests also hash the ontology implementations actually imported. Python 3.12, PySAT 1.8.dev24, PySDD 1.0.6, torch 2.7.0 and torch-geometric 2.6.1 supplied the other components. No package version was substituted for capability checks.
+
+## Executed checks
 
 | Check | Result |
 | --- | --- |
-| `pytest tests/repair_*_test.py -q` | 106 passed |
-| XR-2 finite specification reference | 37 passed |
-| Pilot and smoke protocol validation | Both passed; static validation only |
-| Available CLI, run artifacts, alignment IO, public OWL boundary and workflow regressions | 25 passed, 1 skipped |
-| Mypy over all repair modules, delivery CLI and repair tools | Passed |
-| Black, isort, flake8 over repair changes | Passed |
-| Import-linter repository architecture contracts | 5 kept, 0 broken |
-| Dependency lock validation | Passed; existing package versions unchanged |
+| `PYTHONPATH=/tmp/exact-repair-local-stack .venv/bin/python -m pytest tests/repair_*_test.py -q` | 166 passed |
+| Finite XR-2 specification reference | 37 passed |
+| Pilot and smoke protocol validation | Passed; static only |
+| Targeted mypy | 28 modules passed |
+| Black, isort, flake8 | Passed |
+| Repository import contracts | 5 kept, 0 broken |
 
-The repair tests include every action family, mirrored templates, all five specified semantic examples against both qualified reasoners, activated-expression non-vacuity, duplicate origins, unsupported constructs, exact signed/pairwise objective comparisons, pending assignments, bounds, independent replay, process crashes/timeouts, circuit probabilities/gradients, typed teacher masks, grouped splits, source/target roles, rich matching evidence and standalone/sequential handoff.
+## Conformance scope
 
-Two additional tiny integration checks ran in temporary directories:
+- Every action family, mirrored directions, canonical expressions, activated non-vacuity, duplicate occurrences, unsupported inputs, pending alternatives, signed/pairwise MaxSAT coefficients and safety/optimality replay.
+- Direct typed-slot grammar versus independent finite enumeration, exact mixture normalizers/posteriors, summed alias probabilities and gradients, side restrictions and canonical emitted-expression bounds.
+- Killable native compilation and immutable circuit transport, nested worker cleanup, partially received pipe frames, crashes, timeouts, sampled worker-tree RSS caps and explicit proposal fallback.
+- Standalone and sequential preparation, full matching feature channels, nested matcher alternatives, bounded retrieval and graph omissions, evaluator-label exclusion.
+- Connected structural corpus variation, protocol family/split counts, typed partial teachers, local real-pair preparation, decoded checkpoint selection and generated-pool coverage.
+- Matched generation controls, captured study inventories/objectives, declared release/split validation, all-scheduled status accounting, partial references, grouped paired effects and multiplicity correction.
 
-- One synthetic captured alignment through deletion, directional and greedy study controls. All three returned verified repairs; exact controls certified their finite-pool optimum and greedy retained an honest gap.
-- HGT training on two generated training parents and one development parent: 10 assignments decided, seven complete feasible labels, two epochs, with a saved development-selected checkpoint and teacher/cache provenance.
+The finite XR-2 specification reference passed 37 tests. Pilot and smoke protocol files passed static validation; this did not execute either campaign. Repair-targeted mypy, Black, isort, flake8 and repository import contracts are checked separately from matching-stack work.
 
-No full-scale generated campaign, Conference/Bio-ML benchmark, or real-data adaptation was run. The current generator is a fixture-based, mirrored structural corpus with coherent and retrieval-miss controls. The circuit implementation is the bounded-enumeration arm. Broad corpus variation, adaptation campaigns and scale/model-quality evaluation require separately scheduled work.
+## Executed small integrations
 
-## Existing environment limitations
+- A saved model through the standalone repair CLI, with the selected full OWL bundle independently safety-replayed.
+- Compiler-free bounded enumeration and rejection versus a conditioned product on one tiny captured input; all three completed.
+- Two generated cases with six assignments each, one training epoch, saved versioned checkpoint and actual training/development provenance. All teacher assignments were decided; common-inventory decoded development regret was zero and useful generated-candidate coverage was complete. A novel generated selected bundle was correctly reported unknown because it was absent from the teacher cache. These numbers describe that fixture only.
+- Local `.ofn` source/target preparation with explicit clean/observed alignment supervision and whole-ontology holdout rejection.
 
-A broader selection of legacy tests produced 22 failures, 34 passes and one skip. Failures concern missing local test fixtures and the installed shared ontology/projector stack lacking native feature/projection methods required by existing matching code. Representative failures reproduce on an unchanged `HEAD` checkout. The repair path uses the qualified shared snapshot/reasoner interfaces directly and its tests pass.
+No full-scale generated campaign, Conference/Bio-ML benchmark, or real-data adaptation training was run. The tools for preparing and scheduling those studies are implemented. Their runtime, transfer quality and comparative efficiency remain empirical questions.
 
-Repository-wide mypy reports 12 errors in unchanged `exact/ontology/native_projection.py` and `exact/ontology/store.py`, involving the same missing installed native APIs. The repair modules and tools pass their targeted type check. This validation does not claim the entire repository suite is green in this environment.
-
-The system Poetry 2.0.0 resolver stalled while locking the optional graph dependencies. A temporary Poetry 2.4.3 installation generated and checked the lock successfully; the user's global tooling was not replaced.
+The in-memory neural API snapshots model tensors before entering its proposal worker; this setup is measured against its budget but is not itself a killable native operation. The checkpoint CLI performs loading inside supervision. Memory enforcement samples Linux worker-tree RSS, can overshoot between samples, and excludes parent inputs and accelerator allocations. Neither interface claims an operating-system-wide hard memory quota.

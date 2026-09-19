@@ -47,7 +47,7 @@ result = repair(problem, objective)
 
 Use a `if __name__ == "__main__":` guard for scripts calling repair, because native operations run in spawned processes. Existing shared snapshots are retained at the preparation boundary; repair does not require a second OWL parser or a matching invocation.
 
-Soft features remain separate from asserted axioms. Scores are neither assumed calibrated nor used as semantic truth. Reference answers, corruption traces, teacher outcomes and future explanations are excluded from deployment evidence, with omissions recorded. The default CLI objective is an explicit edit-cost control; it does not claim to be a trained repair model.
+Soft features remain separate from asserted axioms. Scores are neither assumed calibrated nor used as semantic truth. Reference answers, corruption traces, teacher outcomes and future explanations are excluded from deployment evidence, with omissions recorded. Without `--model`, the CLI objective is an explicit edit-cost control. Bounded retrieval uses ontology labels/definitions, structural neighborhoods, typed matcher alternatives and pre-decision diagnosis supports. Its exact menus, omissions and evidence identity are captured for replay.
 
 ## Actions and ontology occurrences
 
@@ -61,18 +61,39 @@ Every candidate emits its complete replacement. Specialised antecedents activate
 
 `build_observable_graph` retains typed entities, axiom/expression roles, revision objects, diagnosis supports and optional evidence channels. `RepairModel` provides HGT, matched R-GCN and no-graph controls, shared object/candidate attention, syntax-aware candidate values and optional signed pair factors.
 
-`freeze_neural_round(problem, model, ...)` connects shared proposal logits to PySDD conditioning, samples candidates, preserves elementary controls and action-family representatives, computes completed-candidate benefits, and freezes the integer objective before exact selection:
+Direct grammar generation represents template, retained-direction and canonical expression slots. PySDD compiles their Boolean constraints without first enumerating complete expressions or candidate bundles. The conditioned mixture uses exact normalisers and posterior component weights. If several encodings emit the same bundle and activations, their probability masses are summed. Only sampled replacements and mandatory controls need completed-candidate scoring.
 
-```python
-from exact.repair.pipeline import freeze_neural_round
+Use a frozen checkpoint through either standalone or sequential input:
 
-round = freeze_neural_round(problem, model, profile=profile, seed=13)
-result = repair(round.problem, round.objective)
+```bash
+exact repair --source source.owl --target target.owl \
+  --matching-run output/run --model training/model.pt \
+  --output output/repair.json --proposal-arm grammar_mixture \
+  --proposal-seconds 30 --compile-seconds 10 --candidate-cap 64
 ```
 
-The current circuit route compiles a bounded-enumerated canonical language. Its support, normalisers, mixture posterior, likelihood and gradients are checked against tiny exhaustive references. It does not establish scalability of compiling a large grammar. Empty distributions and insufficient candidate budgets fail explicitly.
+In memory, call `bounded_freeze_neural_round(problem, model, ...)`; a successful result contains `.value.problem` and `.value.objective` for `repair`. The model snapshot is prepared in the caller; the worker deadline covers retrieval, graph encoding, compilation, sampling and scoring. The checkpoint CLI loads and snapshots inside the supervised worker as well. `freeze_neural_round` is the local variant for an already supervised training/campaign stage.
 
-`exact.repair.learning` supplies typed symbolic probes, complete/partial teacher caches, exact marginals only for complete caches, feasible-anchor benefit differences and ranking losses, grouped splits, and nonnegative preference fitting. `tools/repair` contains the generated-corpus, training and comparison entry points. Training and study runs are explicit actions; importing repair or invoking the default CLI never starts them.
+Every keep/delete/direction/endpoint control remains deterministic, with at least one representative of each available action family. Insufficient caps fail explicitly. If checkpoint loading or proposal generation fails, the CLI records the failure and attempts the captured pool with its frozen objective within the remaining budget. It never relaxes grammar constraints or reports the failed learned arm as successful.
+
+The comparison controls use the same menus/templates/bounds: bounded enumeration, uniform constrained sampling, one conditioned product, conditioned mixtures, and unconstrained generation with rejection. Enumeration and rejection do not pay for circuit compilation. Circuit construction still has exponential worst cases; these implementations do not establish which approach is fastest on a benchmark.
+
+`exact.repair.learning` supplies typed symbolic probes, masked partial teachers, complete-cache marginals, whole-repair benefit/ranking losses and nonnegative preference fitting. Generated parents vary connected paths, branching, explanation overlap, expression depth, redundant/complementary interactions, mixed compositions and observable evidence. Corruptions, renamings and controls share their clean parent's split.
+
+Preparation and training are separate explicit commands:
+
+```bash
+python -m tools.repair.train --protocol specs/exact-repair/protocol/smoke.json \
+  --prepare-only --output preparation
+python -m tools.repair.train --protocol specs/exact-repair/protocol/smoke.json \
+  --prepared preparation/preparation.json --output training
+```
+
+`--case-limit` permits smaller conformance preparation; use it when checking the workflow without preparing a whole smoke schedule. `--real-manifest` accepts explicit local source/target files, observed/clean alignments, permitted probes and declared splits; no dataset is downloaded. A separate adaptation run requires a generated checkpoint via `--warm-start`. Teacher labels and clean intentions remain outside deployment features.
+
+Checkpoints use periodic decoded development regret on a complete common teacher inventory, with generated useful-candidate availability recorded separately. Novel generated bundles without cached policy labels remain unknown. Training/development groups, model/config hashes, grammar/retrieval schemas and adaptation provenance accompany the checkpoint. Held-out cases cannot select it.
+
+`tools.repair.compare_proposals` compares generation controls; `tools.repair.run_study --matrix` declares matched action, scoring and model controls over captured inputs. Missing models and datasets remain unavailable rows. `tools.repair.report_study` computes paired effects over structural/pair groups and includes unresolved-case counts. A study schedule records its candidate/objective artifacts and declared splits and resumes only when their identities match. `tools.repair.prepare_study` validates local Conference/Bio-ML capture identities and release declarations, preserves whole-ontology holdouts, and reports missing scheduled assets without downloading them. Paired reports can read protocol confidence levels, group resampling and Holm-adjusted contrasts.
 
 ## Verification, bounds and artifacts
 
@@ -87,7 +108,7 @@ The default policy monitors the complete original named-class signature, consist
 | `lower_bound`, `upper_bound` | Exact integer objective bounds, including unresolved alternatives |
 | `pending` | Assignments with unknown verification; these are never logical cuts |
 
-The supervisor bounds solver/reasoner calls and retains completed incumbent evidence in the parent. Stage timeouts and crashes remain visible. Cleanup and artifact persistence have their own bounded allowance. A timeout never proves infeasibility, and absence of an incumbent produces no repaired alignment.
+The supervisor bounds compiler/solver/reasoner calls and retains completed incumbent evidence in the parent. Nested workers share a process group for cancellation. Optional `--memory-mb` monitors Linux worker-tree RSS; its sampled cap excludes parent-owned inputs and device memory. Graph node/edge/explanation/text limits record omissions. Stage timeouts, memory limits and crashes remain visible. Cleanup and artifact persistence have their own bounded allowance. A timeout never proves infeasibility, and absence of an incumbent produces no repaired alignment.
 
 The `repair.json` artifact contains versioned, content-hashed input, objective and result records. Complex output is the canonical shared-core OWL bundle in the record; it is not silently projected to a simple mapping table. Loading v1 repair records fails explicitly. `--problem` accepts the input/objective bundle for a recorded inventory. `replay_safety` reconstructs and checks the selected theory without the neural model or optimiser. `replay_optimality` performs a fresh bounded exact search rather than trusting a copied zero gap.
 
@@ -99,6 +120,6 @@ poetry run python -m unittest discover -s specs/exact-repair/reference -q
 poetry run python specs/exact-repair/reference/validate_protocol.py
 ```
 
-These tests exercise small semantic fixtures, brute-force finite comparisons, circuit distributions/gradients, feature isolation, typed learning, CLI replay and process failures. They are not Conference/Bio-ML evaluation, throughput measurements or evidence of learned model quality. Full-scale experiments and checkpoint selection remain separate, explicitly scheduled work.
+These tests exercise small semantic fixtures, brute-force finite comparisons, circuit distributions/gradients, feature isolation, typed learning, CLI replay and process failures. They are not Conference/Bio-ML evaluation, throughput measurements or evidence of learned model quality. Full-scale experiments and model-quality claims require separate, explicitly scheduled work.
 
-See the [dated validation record](../project/repair-validation.md) for executed checks and existing environment limitations.
+See the [dated validation record](../project/repair-validation.md) for executed checks and the local optimized dependency revisions used.
