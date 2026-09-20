@@ -278,6 +278,9 @@ passed; this does not establish full native before/after semantic parity.
 `data/experiments-v2/fma-reification-repair-01/receipt.json` binds the derivative and audit.
 The target-only probe under `d1-native-probe-02/` started at **13:24:15 UTC** on
 2026-09-20 in Slurm step **14234.14**, detached in tmux `exact-d1-native-02`, using PyPI
-0.2.1. Target native loading is underway. Full E09 remains blocked by the native, production recovery,
-hierarchy and resource gates in `d1-native-probe-02/e09-readiness-audit.json`.
+0.2.1, and completed successfully at **13:39:30 UTC** (914.85s, 3.32GiB peak RAM).
+Full native loading, projection and 300 target feature queries passed. The separate
+`fma-reification-repair-01/native-acceptance.json` binds this completion without changing the
+original repair receipt. Production candidate/recovery and hierarchy qualification remain
+for E09; the native-input gate in the earlier readiness audit is now satisfied.
 [MECHANISM-SCREEN.md](MECHANISM-SCREEN.md) records the repair and validation limits.

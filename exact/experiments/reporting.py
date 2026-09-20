@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import math
 from ast import literal_eval
-from collections import defaultdict
+from collections import defaultdict, deque
 from pathlib import Path
 from statistics import fmean
 from typing import Any, Mapping, Optional, Sequence
@@ -17,9 +17,11 @@ from exact.core.entities.mappings import EntityMapping, ReferenceMapping
 from exact.io.sources import infer_format
 from exact.io.sources import resolve as resolve_source
 from exact.io.sources.datalog import read_facts
+from exact.runs.reader import RunReader
 from exact.utils.data import read_table
 from exact.utils.provenance import sha256_file
 
+from .paper_metrics import PRFMetrics, SourceConfusion, recompute_global_prf
 from .statistics import paired_bootstrap
 
 _RELATION_NAMES = {
@@ -427,6 +429,146 @@ def _llm_counter(
     return None, None, None
 
 
+def _selected_hierarchy_shape(source: str, edges: set[tuple[str, str]]) -> tuple[str, str]:
+    """Describe only saved, capped edges; these are not full ontology statistics."""
+    parents: dict[str, set[str]] = defaultdict(set)
+    children: dict[str, set[str]] = defaultdict(set)
+    for child, parent in edges:
+        parents[child].add(parent)
+        children[parent].add(child)
+    distances = {source: 0}
+    pending = deque([source])
+    while pending:
+        child = pending.popleft()
+        for parent in parents[child]:
+            if parent not in distances:
+                distances[parent] = distances[child] + 1
+                pending.append(parent)
+    depth = max(distances.values())
+    depth_bin = "unreachable" if edges and depth == 0 else str(min(depth, 2))
+    branching = max((len(values) for values in children.values()), default=0)
+    return depth_bin.replace("2", "2_plus"), str(min(branching, 2)).replace("2", "2_plus")
+
+
+def hierarchy_metric_rows(record: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """E09 source slices from verified outcomes and selected explanation evidence.
+
+    Missing explanations remain unobserved in the frozen denominator. Contributions
+    are averaged within source first, so large candidate pools do not dominate.
+    These descriptive, treatment-specific slices never participate in selection.
+    """
+    if record.get("experiment_id") != "E09" or record.get("status") != "complete":
+        return []
+    run = Path(str(record["output_dir"]))
+    evaluation = recompute_global_prf(run).overall
+    if evaluation.source_universe_sha256 is None:
+        raise ValueError("Hierarchy diagnostics require a verified frozen source population")
+    population = set(evaluation.by_source)
+    edges: dict[str, dict[str, set[tuple[str, str]]]] = defaultdict(dict)
+    contributions: dict[str, dict[str, list[float]]] = defaultdict(lambda: defaultdict(list))
+    seen: set[tuple[str, str]] = set()
+    families = {"is_a", "part_of", "has_part"}
+    for explanation in RunReader.open(run).iter_explanations():
+        source, target = str(explanation["src_iri"]), str(explanation["tgt_iri"])
+        if source not in population:
+            raise ValueError(f"Hierarchy explanation source is outside frozen population: {source}")
+        if (source, target) in seen:
+            raise ValueError(f"Duplicate hierarchy explanation pair: {source}, {target}")
+        seen.add((source, target))
+        values = explanation.get("contributions", {})
+        for name, components in (("lexical", ("C_label", "C_strsim")), ("hierarchy", ("C_hier",))):
+            if all(key in values for key in components):
+                contributions[source][name].append(
+                    sum(_finite_metric_value(values[key], label=key) for key in components)
+                )
+        for family, evidence in (
+            explanation.get("triple_attributions", {}).get("hierarchy", {}).items()
+        ):
+            families.add(family)
+            selected = edges[source].setdefault(family, set())
+            for item in evidence.get("source", []):
+                child, parent = item.get("subject_iri"), item.get("object_iri")
+                if not child or not parent:
+                    raise ValueError(
+                        "Selected hierarchy diagnostics require actual subject/object IRIs"
+                    )
+                selected.add((str(child), str(parent)))
+
+    identity = {key: record.get(key) for key in ("experiment_id", "arm_id", "task_id", "seed")}
+    rows: list[dict[str, Any]] = []
+    for family in sorted(families):
+        slices: dict[tuple[str, str], list[str]] = {
+            (dimension, bucket): []
+            for dimension, buckets in (
+                ("coverage", ("present", "absent", "unobserved")),
+                ("depth", ("0", "1", "2_plus", "unreachable", "unobserved")),
+                ("branching", ("0", "1", "2_plus", "unobserved")),
+            )
+            for bucket in buckets
+        }
+        for source in sorted(population):
+            selected = edges.get(source, {}).get(family)
+            if selected is None:
+                coverage = depth = branching = "unobserved"
+            else:
+                coverage = "present" if selected else "absent"
+                depth, branching = _selected_hierarchy_shape(source, selected)
+            for dimension, bucket in (
+                ("coverage", coverage),
+                ("depth", depth),
+                ("branching", branching),
+            ):
+                slices[(dimension, bucket)].append(source)
+        for (dimension, bucket), sources in slices.items():
+            counts = sum((evaluation.by_source[source] for source in sources), SourceConfusion())
+            metrics = {
+                "source_count": (len(sources), "sources"),
+                "source_fraction": (
+                    len(sources) / len(population) if population else None,
+                    "proportion",
+                ),
+                "F1": (PRFMetrics.from_counts(counts).f1 if sources else None, "proportion"),
+            }
+            for name in ("lexical", "hierarchy"):
+                means = [
+                    fmean(contributions[source][name])
+                    for source in sources
+                    if contributions[source][name]
+                ]
+                metrics[f"{name}_contribution"] = (
+                    fmean(means) if means else None,
+                    "score_contribution",
+                )
+                metrics[f"{name}_observed_sources"] = (len(means), "sources")
+            for endpoint, (value, unit) in metrics.items():
+                metric = f"selected_hierarchy.{family}.{dimension}.{bucket}.{endpoint}"
+                rows.append(
+                    {
+                        **identity,
+                        "entity_kind": "all",
+                        "relation": family,
+                        "metric": metric,
+                        "metric_family": "hierarchy_diagnostic",
+                        "metric_endpoint": metric,
+                        "value": value,
+                        "unit": unit,
+                        "availability": "available" if value is not None else "unavailable",
+                        "availability_reason": None if value is not None else "no_observed_sources",
+                        "source": "verified_global_outcomes_and_saved_explanations",
+                        "diagnostic_only": True,
+                        "evidence_scope": "selected_explanation_evidence_not_full_ontology",
+                        "slice_membership_sha256": hashlib.sha256(
+                            "\n".join(sources).encode()
+                        ).hexdigest(),
+                        "frozen_source_count": len(population),
+                        "source_count": len(sources),
+                        "reference_sha256": evaluation.reference_sha256,
+                        "alignment_sha256": evaluation.alignment_sha256,
+                    }
+                )
+    return rows
+
+
 def cell_metric_rows(record: Mapping[str, Any]) -> list[dict[str, Any]]:
     """Represent raw, runtime, and explicitly unavailable mandatory cell metrics."""
 
@@ -572,6 +714,7 @@ def cell_metric_rows(record: Mapping[str, Any]) -> list[dict[str, Any]]:
             row["availability_detail"] = llm_availability_details[endpoint]
             row["availability_reason"] = "runtime_counter_unavailable"
         rows.append(row)
+    rows.extend(hierarchy_metric_rows(record))
     rows.sort(
         key=lambda row: (
             str(row["metric_family"]),

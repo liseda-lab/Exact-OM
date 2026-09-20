@@ -258,3 +258,20 @@ D0 control binding. `d1-native-probe-02/e09-readiness-audit.json` records these 
 The observed source features contain is-a evidence for 126/300 entities and no selected
 part-of/has-part items; aliases and the six-item feature cap can limit this observation,
 so it does not establish full ontology coverage. No E09 arm is admitted by this repair.
+
+
+## Native target acceptance, 2026-09-20
+
+Step **14234.14** completed with exit zero at **13:39:30 UTC**, after **914.85s**
+(15m15s), using **3.32GiB peak worker RSS**. FMA loading took813.87s, projection41.76s,
+and300 feature queries7.93s. The corrected ontology contains104,721 classes and
+produced421,339 projected edges. Native loading/projection and all measured phases
+completed, with zero hosted requests and rationales off. The original FMA bytes remain
+unchanged. `fma-reification-repair-01/native-acceptance.json` binds the completion,
+repair and regression records; the earlier pending repair record is retained.
+
+The user authorized advancing to the next batch. E02, E05, E06 and E26 remain complete;
+no cells from those screens need rerunning. Next is E09's four hierarchy treatments on
+D1 with its D0 control. Production candidate preparation, cold/warm scoring and recovery,
+and family-specific semantic/reporting checks are being prepared. This entry does not
+claim that the full E09 screen is admitted or submitted. Allocation14234 is preserved.
