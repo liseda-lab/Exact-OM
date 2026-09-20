@@ -1,0 +1,20 @@
+{
+  "artifact_type": "study_state",
+  "contract_version": "exact-study/1.0",
+  "study_revision": "synthetic-study/v1",
+  "session_id": "synthetic-session",
+  "revision": 9,
+  "stage": "case",
+  "assignment_id": "synthetic-assignment",
+  "current_case_id": "case-alpha",
+  "current_presentation_id": "presentation-alpha",
+  "draft_response_id": "synthetic-draft",
+  "saved_ranked_candidate_ids": [
+    "candidate-3",
+    "candidate-2"
+  ],
+  "completed_cases": 0,
+  "assigned_case_count": 24,
+  "resume_source": "invitation_exchange",
+  "fixture_provenance": "Synthetic design fixture; no participant, matcher run, invitation or hosted study exists. Do not deploy this as real study content."
+}

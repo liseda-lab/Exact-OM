@@ -1,0 +1,685 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://exact-om.local/specs/explanation-framework/study/1.0",
+  "title": "Design-time study shared envelopes",
+  "description": "Synthetic seed fixtures, not implemented route models. No token secret or private case key belongs in these participant-facing shapes. B0 must complete runtime route schemas and cross-resource validation.",
+  "oneOf": [
+    {
+      "$ref": "#/definitions/StudyCase"
+    },
+    {
+      "$ref": "#/definitions/RankingResponse"
+    },
+    {
+      "$ref": "#/definitions/CaseConsultation"
+    },
+    {
+      "$ref": "#/definitions/StudyState"
+    },
+    {
+      "$ref": "#/definitions/InteractionEvent"
+    }
+  ],
+  "definitions": {
+    "EntityRef": {
+      "type": "object",
+      "properties": {
+        "ontology_version_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "iri": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "enum": [
+            "class",
+            "object_property",
+            "data_property",
+            "individual"
+          ]
+        }
+      },
+      "required": [
+        "ontology_version_id",
+        "iri",
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "Candidate": {
+      "type": "object",
+      "properties": {
+        "candidate_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "entity": {
+          "$ref": "#/definitions/EntityRef"
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "score": {
+          "type": "number"
+        },
+        "score_meaning": {
+          "type": "string",
+          "minLength": 1
+        },
+        "display_position": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5
+        }
+      },
+      "required": [
+        "candidate_id",
+        "entity",
+        "label",
+        "display_position",
+        "score",
+        "score_meaning"
+      ],
+      "additionalProperties": false
+    },
+    "StudyCase": {
+      "type": "object",
+      "properties": {
+        "artifact_type": {
+          "const": "study_case"
+        },
+        "contract_version": {
+          "const": "exact-study/1.0"
+        },
+        "study_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "case_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "presentation_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "condition": {
+          "enum": [
+            "explanation",
+            "ontology_baseline"
+          ]
+        },
+        "source": {
+          "$ref": "#/definitions/EntityRef"
+        },
+        "source_label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "candidates": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Candidate"
+          },
+          "minItems": 5,
+          "maxItems": 5
+        },
+        "explanation_refs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "ontology_resource_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 2
+        },
+        "fixture_provenance": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "artifact_type",
+        "contract_version",
+        "study_revision",
+        "case_id",
+        "presentation_id",
+        "condition",
+        "source",
+        "source_label",
+        "candidates",
+        "explanation_refs",
+        "ontology_resource_ids",
+        "fixture_provenance"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "condition": {
+                "const": "ontology_baseline"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "explanation_refs": {
+                "maxItems": 0
+              }
+            }
+          }
+        }
+      ]
+    },
+    "RankingResponse": {
+      "type": "object",
+      "properties": {
+        "artifact_type": {
+          "const": "ranking_response"
+        },
+        "contract_version": {
+          "const": "exact-study/1.0"
+        },
+        "study_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "session_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "case_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "presentation_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "workflow_state": {
+          "enum": [
+            "draft",
+            "submitted"
+          ]
+        },
+        "response_type": {
+          "enum": [
+            "ranked_candidates",
+            "none_of_these",
+            "insufficient_evidence",
+            null
+          ]
+        },
+        "ranked_candidate_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "maxItems": 5,
+          "uniqueItems": true
+        },
+        "timing_segment_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "saved_at": {
+          "type": "string",
+          "minLength": 1
+        },
+        "submitted_at": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "fixture_provenance": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "artifact_type",
+        "contract_version",
+        "study_revision",
+        "session_id",
+        "case_id",
+        "presentation_id",
+        "revision",
+        "workflow_state",
+        "response_type",
+        "ranked_candidate_ids",
+        "timing_segment_ids",
+        "saved_at",
+        "submitted_at",
+        "fixture_provenance"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "workflow_state": {
+                "const": "submitted"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "response_type": {
+                "enum": [
+                  "ranked_candidates",
+                  "none_of_these",
+                  "insufficient_evidence"
+                ]
+              },
+              "submitted_at": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "workflow_state": {
+                "const": "draft"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "submitted_at": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "response_type": {
+                "const": "ranked_candidates"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "ranked_candidate_ids": {
+                "minItems": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "response_type": {
+                "enum": [
+                  "none_of_these",
+                  "insufficient_evidence",
+                  null
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "ranked_candidate_ids": {
+                "maxItems": 0
+              }
+            }
+          }
+        }
+      ]
+    },
+    "CaseConsultation": {
+      "type": "object",
+      "properties": {
+        "artifact_type": {
+          "const": "case_consultation"
+        },
+        "contract_version": {
+          "const": "exact-study/1.0"
+        },
+        "study_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "session_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "case_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "consulted_external_ontologies": {
+          "type": "boolean"
+        },
+        "methods": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "protege",
+              "other_editor",
+              "plain_files",
+              "other_resource"
+            ]
+          },
+          "uniqueItems": true
+        },
+        "other_editor": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 160
+        },
+        "other_resource": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 160
+        },
+        "saved_at": {
+          "type": "string",
+          "minLength": 1
+        },
+        "fixture_provenance": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "artifact_type",
+        "contract_version",
+        "study_revision",
+        "session_id",
+        "case_id",
+        "revision",
+        "consulted_external_ontologies",
+        "methods",
+        "other_editor",
+        "other_resource",
+        "saved_at",
+        "fixture_provenance"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "consulted_external_ontologies": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "methods": {
+                "minItems": 1
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "methods": {
+                "maxItems": 0
+              },
+              "other_editor": {
+                "type": "null"
+              },
+              "other_resource": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "StudyState": {
+      "type": "object",
+      "properties": {
+        "artifact_type": {
+          "const": "study_state"
+        },
+        "contract_version": {
+          "const": "exact-study/1.0"
+        },
+        "study_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "session_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "stage": {
+          "enum": [
+            "welcome",
+            "setup",
+            "background",
+            "practice",
+            "case",
+            "consultation",
+            "final",
+            "completed",
+            "paused",
+            "closed",
+            "revoked"
+          ]
+        },
+        "assignment_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "current_case_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "current_presentation_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "draft_response_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "saved_ranked_candidate_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true,
+          "maxItems": 5
+        },
+        "completed_cases": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "assigned_case_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "resume_source": {
+          "enum": [
+            "invitation_exchange",
+            "session_cookie"
+          ]
+        },
+        "fixture_provenance": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "artifact_type",
+        "contract_version",
+        "study_revision",
+        "session_id",
+        "revision",
+        "stage",
+        "assignment_id",
+        "current_case_id",
+        "current_presentation_id",
+        "draft_response_id",
+        "saved_ranked_candidate_ids",
+        "completed_cases",
+        "assigned_case_count",
+        "resume_source",
+        "fixture_provenance"
+      ],
+      "additionalProperties": false
+    },
+    "InteractionEvent": {
+      "type": "object",
+      "properties": {
+        "artifact_type": {
+          "const": "interaction_event"
+        },
+        "contract_version": {
+          "const": "exact-study/1.0"
+        },
+        "study_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "session_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "event_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "page_instance_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sequence": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "case_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "presentation_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "type": {
+          "enum": [
+            "case_ready",
+            "candidate_inspected",
+            "rank_add",
+            "rank_remove",
+            "rank_move",
+            "keep_initial_order",
+            "response_type_change",
+            "hierarchy_expand",
+            "hierarchy_collapse",
+            "definition_open",
+            "axiom_open",
+            "evidence_open",
+            "table_open",
+            "graph_open",
+            "comparison_open",
+            "graph_zoom",
+            "graph_fit",
+            "external_resource_link",
+            "pause",
+            "resume",
+            "visibility",
+            "submit",
+            "revision"
+          ]
+        },
+        "component_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "element_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "client_monotonic_ms": {
+          "type": "number",
+          "minimum": 0
+        },
+        "server_received_at": {
+          "type": "string",
+          "minLength": 1
+        },
+        "fixture_provenance": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "artifact_type",
+        "contract_version",
+        "study_revision",
+        "session_id",
+        "event_id",
+        "page_instance_id",
+        "sequence",
+        "case_id",
+        "presentation_id",
+        "type",
+        "component_id",
+        "element_id",
+        "client_monotonic_ms",
+        "server_received_at",
+        "fixture_provenance"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

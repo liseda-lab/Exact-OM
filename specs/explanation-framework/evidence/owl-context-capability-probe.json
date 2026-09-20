@@ -1,0 +1,1209 @@
+{
+  "purpose": "Synthetic API capability fixture. Not a real Bio-ML ontology output, throughput test, native-backend test, or reasoner-completeness evaluation.",
+  "generated_at_utc": "2026-09-19T21:36:08.775618+00:00",
+  "core_repository": "/Users/pedrocotovio/Documents/Repos/OM/pyOWLCore",
+  "core_revision": "d39fe9c9bb9513db8c14fe2bc6d4864377901ad1",
+  "core_worktree_status": "",
+  "core_module": "/Users/pedrocotovio/Documents/Repos/OM/pyOWLCore/src/pyowl_core/__init__.py",
+  "core_api_version": [
+    0,
+    2
+  ],
+  "core_model_schema": 2,
+  "python": "3.12.3 (main, Apr  9 2024, 08:09:14) [Clang 15.0.0 (clang-1500.3.9.4)]",
+  "platform": "macOS-26.5.2-x86_64-i386-64bit",
+  "fixture": {
+    "path": "/Users/pedrocotovio/.codex/.chatgpt-projects/g-p-6a9da48723a8819192c9268933d1a9e4/ui-feasibility-2026-09-19/owl-context-capability-probe.ofn",
+    "sha256": "d2be2c3596bd0e0fb566147d65fea250eaa81fd8743161051ab804c439371895"
+  },
+  "load_options": {
+    "type": "LoadOptions",
+    "format": "functional",
+    "imports": "resolve_local",
+    "backend": "python",
+    "limits": {
+      "type": "ParseLimits",
+      "max_source_bytes": 2147483648,
+      "max_documents": 1000,
+      "max_total_source_bytes": 8589934592,
+      "max_axioms": 100000000,
+      "max_terms": 500000000,
+      "max_nesting_depth": 512,
+      "max_rdf_list_length": 10000000,
+      "max_literal_bytes": 67108864,
+      "max_iri_bytes": 1048576,
+      "max_prefixes": 1000000,
+      "max_import_depth": 128,
+      "max_redirects": 5,
+      "max_diagnostics": 10000,
+      "max_memory_bytes": null,
+      "deadline_seconds": null,
+      "max_triples": 100000000,
+      "max_strings": 500000000,
+      "max_annotations": 100000000,
+      "max_rule_atoms": 10000000,
+      "max_sequence_arity": 10000000,
+      "max_catalog_rewrites": 128,
+      "max_resolver_attempts": 10000,
+      "max_concurrent_fetches": 8,
+      "max_source_map_entries": 100000000,
+      "max_origin_entries": 100000000,
+      "max_overlay_depth": 32,
+      "max_delta_entries": 10000000,
+      "max_composite_members": 1024,
+      "max_index_rows": 500000000,
+      "max_index_bytes": 17179869184,
+      "max_wire_rows": 500000000,
+      "max_wire_bytes": 17179869184,
+      "max_temporary_bytes": 17179869184,
+      "max_disk_cache_bytes": 68719476736,
+      "max_decompressed_bytes": 8589934592,
+      "max_canonical_work": 1000000000,
+      "cancellation_check_interval": 4096
+    },
+    "offline": true,
+    "preserve_source_map": true,
+    "collect_provenance": true,
+    "validate_owl2_dl": false,
+    "deterministic": true,
+    "allow_partial_rdf_mapping": false
+  },
+  "checks": {
+    "two_asserted_parents": true,
+    "opaque_iao_definition_iri_retained": true,
+    "definition_language_retained": true,
+    "nested_citation_annotation_retained": true,
+    "source_span_retained": true,
+    "existential_universal_cardinality_retained": true,
+    "complex_domain_retained": true,
+    "property_characteristic_retained": true,
+    "individual_assertions_retained": true,
+    "reference_roles_available": true,
+    "wire_structural_fingerprint_retained": true,
+    "wire_nested_annotation_retained": true
+  },
+  "all_checks_pass": true,
+  "observations": {
+    "annotations": [
+      {
+        "type": "AnnotationAssertionPosting",
+        "assertion": {
+          "type": "AnnotationAssertion",
+          "property": {
+            "type": "AnnotationProperty",
+            "kind": "annotation_property",
+            "iri": {
+              "type": "IRI",
+              "value": "http://purl.obolibrary.org/obo/IAO_0000115"
+            }
+          },
+          "subject": {
+            "type": "IRI",
+            "value": "urn:context#A"
+          },
+          "value": {
+            "type": "Literal",
+            "lexical_form": "Entity A definition",
+            "datatype": {
+              "type": "Datatype",
+              "kind": "datatype",
+              "iri": {
+                "type": "IRI",
+                "value": "http://www.w3.org/1999/02/22-rdf-syntax-ns#PlainLiteral"
+              }
+            },
+            "language": "en"
+          },
+          "annotations": [
+            {
+              "type": "Annotation",
+              "property": {
+                "type": "AnnotationProperty",
+                "kind": "annotation_property",
+                "iri": {
+                  "type": "IRI",
+                  "value": "urn:context#citation"
+                }
+              },
+              "value": {
+                "type": "IRI",
+                "value": "https://example.org/source"
+              },
+              "annotations": []
+            }
+          ]
+        },
+        "origins": [
+          {
+            "type": "OriginOccurrence",
+            "document_key": "d2:7df2311f5d82133cd8e5c25c24324b716fdc9ff591950ef6d2ce4283782229bb",
+            "occurrence": 4,
+            "span": {
+              "type": "SourceSpan",
+              "byte_start": 203,
+              "byte_end": 347,
+              "line_start": 8,
+              "column_start": 1,
+              "line_end": null,
+              "column_end": null
+            }
+          }
+        ]
+      }
+    ],
+    "asserted_parents": [
+      {
+        "type": "Class",
+        "kind": "class",
+        "iri": {
+          "type": "IRI",
+          "value": "urn:context#B"
+        }
+      },
+      {
+        "type": "Class",
+        "kind": "class",
+        "iri": {
+          "type": "IRI",
+          "value": "urn:context#C"
+        }
+      }
+    ],
+    "restrictions": [
+      {
+        "type": "SubClassOf",
+        "sub_class": {
+          "type": "Class",
+          "kind": "class",
+          "iri": {
+            "type": "IRI",
+            "value": "urn:context#A"
+          }
+        },
+        "super_class": {
+          "type": "ObjectSomeValuesFrom",
+          "property": {
+            "type": "ObjectProperty",
+            "kind": "object_property",
+            "iri": {
+              "type": "IRI",
+              "value": "urn:context#p"
+            }
+          },
+          "filler": {
+            "type": "Class",
+            "kind": "class",
+            "iri": {
+              "type": "IRI",
+              "value": "urn:context#B"
+            }
+          }
+        },
+        "annotations": []
+      },
+      {
+        "type": "SubClassOf",
+        "sub_class": {
+          "type": "Class",
+          "kind": "class",
+          "iri": {
+            "type": "IRI",
+            "value": "urn:context#A"
+          }
+        },
+        "super_class": {
+          "type": "ObjectAllValuesFrom",
+          "property": {
+            "type": "ObjectProperty",
+            "kind": "object_property",
+            "iri": {
+              "type": "IRI",
+              "value": "urn:context#p"
+            }
+          },
+          "filler": {
+            "type": "Class",
+            "kind": "class",
+            "iri": {
+              "type": "IRI",
+              "value": "urn:context#C"
+            }
+          }
+        },
+        "annotations": []
+      },
+      {
+        "type": "SubClassOf",
+        "sub_class": {
+          "type": "Class",
+          "kind": "class",
+          "iri": {
+            "type": "IRI",
+            "value": "urn:context#A"
+          }
+        },
+        "super_class": {
+          "type": "ObjectExactCardinality",
+          "cardinality": 2,
+          "property": {
+            "type": "ObjectProperty",
+            "kind": "object_property",
+            "iri": {
+              "type": "IRI",
+              "value": "urn:context#p"
+            }
+          },
+          "filler": {
+            "type": "Class",
+            "kind": "class",
+            "iri": {
+              "type": "IRI",
+              "value": "urn:context#B"
+            }
+          }
+        },
+        "annotations": []
+      }
+    ],
+    "references_to_class_a": [
+      {
+        "type": "ReferenceOccurrence",
+        "key": {
+          "type": "Class",
+          "kind": "class",
+          "iri": {
+            "type": "IRI",
+            "value": "urn:context#A"
+          }
+        },
+        "axiom": {
+          "type": "Declaration",
+          "entity": {
+            "type": "Class",
+            "kind": "class",
+            "iri": {
+              "type": "IRI",
+              "value": "urn:context#A"
+            }
+          },
+          "annotations": []
+        },
+        "container": {
+          "type": "Declaration",
+          "entity": {
+            "type": "Class",
+            "kind": "class",
+            "iri": {
+              "type": "IRI",
+              "value": "urn:context#A"
+            }
+          },
+          "annotations": []
+        },
+        "origins": [
+          {
+            "type": "OriginOccurrence",
+            "document_key": "d2:7df2311f5d82133cd8e5c25c24324b716fdc9ff591950ef6d2ce4283782229bb",
+            "occurrence": 0,
+            "span": {
+              "type": "SourceSpan",
+              "byte_start": 102,
+              "byte_end": 124,
+              "line_start": 4,
+              "column_start": 1,
+              "line_end": null,
+              "column_end": null
+            }
+          }
+        ],
+        "constructor_path": [
+          {
+            "type": "ConstructorPathStep",
+            "field_id": {
+              "type": "FieldID",
+              "constructor_tag": 60,
+              "field_ordinal": 0
+            },
+            "item_index": null
+          }
+        ],
+        "role": "declaration",
+        "polarity_hint": null
+      },
+      {
+        "type": "ReferenceOccurrence",
+        "key": {
+          "type": "Class",
+          "kind": "class",
+          "iri": {
+            "type": "IRI",
+            "value": "urn:context#A"
+          }
+        },
+        "axiom": {
+          "type": "SubClassOf",
+          "sub_class": {
+            "type": "Class",
+            "kind": "class",
+            "iri": {
+              "type": "IRI",
+              "value": "urn:context#A"
+            }
+          },
+          "super_class": {
+            "type": "Class",
+            "kind": "class",
+            "iri": {
+              "type": "IRI",
+              "value": "urn:context#B"
+            }
+          },
+          "annotations": []
+        },
+        "container": {
+          "type": "SubClassOf",
+          "sub_class": {
+            "type": "Class",
+            "kind": "class",
+            "iri": {
+              "type": "IRI",
+              "value": "urn:context#A"
+            }
+          },
+          "super_class": {
+            "type": "Class",
+            "kind": "class",
+            "iri": {
+              "type": "IRI",
+              "value": "urn:context#B"
+            }
+          },
+          "annotations": []
+        },
+        "origins": [
+          {
+            "type": "OriginOccurrence",
+            "document_key": "d2:7df2311f5d82133cd8e5c25c24324b716fdc9ff591950ef6d2ce4283782229bb",
+            "occurrence": 5,
+            "span": {
+              "type": "SourceSpan",
+              "byte_start": 348,
+              "byte_end": 365,
+              "line_start": 9,
+              "column_start": 1,
+              "line_end": null,
+              "column_end": null
+            }
+          }
+        ],
+        "constructor_path": [
+          {
+            "type": "ConstructorPathStep",
+            "field_id": {
+              "type": "FieldID",
+              "constructor_tag": 61,
+              "field_ordinal": 0
+            },
+            "item_index": null
+          }
+        ],
+        "role": "subclass",
+        "polarity_hint": null
+      },
+      {
+        "type": "ReferenceOccurrence",
+        "key": {
+          "type": "Class",
+          "kind": "class",
+          "iri": {
+            "type": "IRI",
+            "value": "urn:context#A"
+          }
+        },
+        "axiom": {
+          "type": "SubClassOf",
+          "sub_class": {
+            "type": "Class",
+            "kind": "class",
+            "iri": {
+              "type": "IRI",
+              "value": "urn:context#A"
+            }
+          },
+          "super_class": {
+            "type": "Class",
+            "kind": "class",
+            "iri": {
+              "type": "IRI",
+              "value": "urn:context#C"
+            }
+          },
+          "annotations": []
+        },
+        "container": {
+          "type": "SubClassOf",
+          "sub_class": {
+            "type": "Class",
+            "kind": "class",
+            "iri": {
+              "type": "IRI",
+              "value": "urn:context#A"
+            }
+          },
+          "super_class": {
+            "type": "Class",
+            "kind": "class",
+            "iri": {
+              "type": "IRI",
+              "value": "urn:context#C"
+            }
+          },
+          "annotations": []
+        },
+        "origins": [
+          {
+            "type": "OriginOccurrence",
+            "document_key": "d2:7df2311f5d82133cd8e5c25c24324b716fdc9ff591950ef6d2ce4283782229bb",
+            "occurrence": 6,
+            "span": {
+              "type": "SourceSpan",
+              "byte_start": 366,
+              "byte_end": 383,
+              "line_start": 10,
+              "column_start": 1,
+              "line_end": null,
+              "column_end": null
+            }
+          }
+        ],
+        "constructor_path": [
+          {
+            "type": "ConstructorPathStep",
+            "field_id": {
+              "type": "FieldID",
+              "constructor_tag": 61,
+              "field_ordinal": 0
+            },
+            "item_index": null
+          }
+        ],
+        "role": "subclass",
+        "polarity_hint": null
+      },
+      {
+        "type": "ReferenceOccurrence",
+        "key": {
+          "type": "Class",
+          "kind": "class",
+          "iri": {
+            "type": "IRI",
+            "value": "urn:context#A"
+          }
+        },
+        "axiom": {
+          "type": "SubClassOf",
+          "sub_class": {
+            "type": "Class",
+            "kind": "class",
+            "iri": {
+              "type": "IRI",
+              "value": "urn:context#A"
+            }
+          },
+          "super_class": {
+            "type": "ObjectSomeValuesFrom",
+            "property": {
+              "type": "ObjectProperty",
+              "kind": "object_property",
+              "iri": {
+                "type": "IRI",
+                "value": "urn:context#p"
+              }
+            },
+            "filler": {
+              "type": "Class",
+              "kind": "class",
+              "iri": {
+                "type": "IRI",
+                "value": "urn:context#B"
+              }
+            }
+          },
+          "annotations": []
+        },
+        "container": {
+          "type": "SubClassOf",
+          "sub_class": {
+            "type": "Class",
+            "kind": "class",
+            "iri": {
+              "type": "IRI",
+              "value": "urn:context#A"
+            }
+          },
+          "super_class": {
+            "type": "ObjectSomeValuesFrom",
+            "property": {
+              "type": "ObjectProperty",
+              "kind": "object_property",
+              "iri": {
+                "type": "IRI",
+                "value": "urn:context#p"
+              }
+            },
+            "filler": {
+              "type": "Class",
+              "kind": "class",
+              "iri": {
+                "type": "IRI",
+                "value": "urn:context#B"
+              }
+            }
+          },
+          "annotations": []
+        },
+        "origins": [
+          {
+            "type": "OriginOccurrence",
+            "document_key": "d2:7df2311f5d82133cd8e5c25c24324b716fdc9ff591950ef6d2ce4283782229bb",
+            "occurrence": 7,
+            "span": {
+              "type": "SourceSpan",
+              "byte_start": 384,
+              "byte_end": 426,
+              "line_start": 11,
+              "column_start": 1,
+              "line_end": null,
+              "column_end": null
+            }
+          }
+        ],
+        "constructor_path": [
+          {
+            "type": "ConstructorPathStep",
+            "field_id": {
+              "type": "FieldID",
+              "constructor_tag": 61,
+              "field_ordinal": 0
+            },
+            "item_index": null
+          }
+        ],
+        "role": "subclass",
+        "polarity_hint": null
+      },
+      {
+        "type": "ReferenceOccurrence",
+        "key": {
+          "type": "Class",
+          "kind": "class",
+          "iri": {
+            "type": "IRI",
+            "value": "urn:context#A"
+          }
+        },
+        "axiom": {
+          "type": "SubClassOf",
+          "sub_class": {
+            "type": "Class",
+            "kind": "class",
+            "iri": {
+              "type": "IRI",
+              "value": "urn:context#A"
+            }
+          },
+          "super_class": {
+            "type": "ObjectAllValuesFrom",
+            "property": {
+              "type": "ObjectProperty",
+              "kind": "object_property",
+              "iri": {
+                "type": "IRI",
+                "value": "urn:context#p"
+              }
+            },
+            "filler": {
+              "type": "Class",
+              "kind": "class",
+              "iri": {
+                "type": "IRI",
+                "value": "urn:context#C"
+              }
+            }
+          },
+          "annotations": []
+        },
+        "container": {
+          "type": "SubClassOf",
+          "sub_class": {
+            "type": "Class",
+            "kind": "class",
+            "iri": {
+              "type": "IRI",
+              "value": "urn:context#A"
+            }
+          },
+          "super_class": {
+            "type": "ObjectAllValuesFrom",
+            "property": {
+              "type": "ObjectProperty",
+              "kind": "object_property",
+              "iri": {
+                "type": "IRI",
+                "value": "urn:context#p"
+              }
+            },
+            "filler": {
+              "type": "Class",
+              "kind": "class",
+              "iri": {
+                "type": "IRI",
+                "value": "urn:context#C"
+              }
+            }
+          },
+          "annotations": []
+        },
+        "origins": [
+          {
+            "type": "OriginOccurrence",
+            "document_key": "d2:7df2311f5d82133cd8e5c25c24324b716fdc9ff591950ef6d2ce4283782229bb",
+            "occurrence": 8,
+            "span": {
+              "type": "SourceSpan",
+              "byte_start": 427,
+              "byte_end": 468,
+              "line_start": 12,
+              "column_start": 1,
+              "line_end": null,
+              "column_end": null
+            }
+          }
+        ],
+        "constructor_path": [
+          {
+            "type": "ConstructorPathStep",
+            "field_id": {
+              "type": "FieldID",
+              "constructor_tag": 61,
+              "field_ordinal": 0
+            },
+            "item_index": null
+          }
+        ],
+        "role": "subclass",
+        "polarity_hint": null
+      },
+      {
+        "type": "ReferenceOccurrence",
+        "key": {
+          "type": "Class",
+          "kind": "class",
+          "iri": {
+            "type": "IRI",
+            "value": "urn:context#A"
+          }
+        },
+        "axiom": {
+          "type": "SubClassOf",
+          "sub_class": {
+            "type": "Class",
+            "kind": "class",
+            "iri": {
+              "type": "IRI",
+              "value": "urn:context#A"
+            }
+          },
+          "super_class": {
+            "type": "ObjectExactCardinality",
+            "cardinality": 2,
+            "property": {
+              "type": "ObjectProperty",
+              "kind": "object_property",
+              "iri": {
+                "type": "IRI",
+                "value": "urn:context#p"
+              }
+            },
+            "filler": {
+              "type": "Class",
+              "kind": "class",
+              "iri": {
+                "type": "IRI",
+                "value": "urn:context#B"
+              }
+            }
+          },
+          "annotations": []
+        },
+        "container": {
+          "type": "SubClassOf",
+          "sub_class": {
+            "type": "Class",
+            "kind": "class",
+            "iri": {
+              "type": "IRI",
+              "value": "urn:context#A"
+            }
+          },
+          "super_class": {
+            "type": "ObjectExactCardinality",
+            "cardinality": 2,
+            "property": {
+              "type": "ObjectProperty",
+              "kind": "object_property",
+              "iri": {
+                "type": "IRI",
+                "value": "urn:context#p"
+              }
+            },
+            "filler": {
+              "type": "Class",
+              "kind": "class",
+              "iri": {
+                "type": "IRI",
+                "value": "urn:context#B"
+              }
+            }
+          },
+          "annotations": []
+        },
+        "origins": [
+          {
+            "type": "OriginOccurrence",
+            "document_key": "d2:7df2311f5d82133cd8e5c25c24324b716fdc9ff591950ef6d2ce4283782229bb",
+            "occurrence": 9,
+            "span": {
+              "type": "SourceSpan",
+              "byte_start": 469,
+              "byte_end": 515,
+              "line_start": 13,
+              "column_start": 1,
+              "line_end": null,
+              "column_end": null
+            }
+          }
+        ],
+        "constructor_path": [
+          {
+            "type": "ConstructorPathStep",
+            "field_id": {
+              "type": "FieldID",
+              "constructor_tag": 61,
+              "field_ordinal": 0
+            },
+            "item_index": null
+          }
+        ],
+        "role": "subclass",
+        "polarity_hint": null
+      },
+      {
+        "type": "ReferenceOccurrence",
+        "key": {
+          "type": "Class",
+          "kind": "class",
+          "iri": {
+            "type": "IRI",
+            "value": "urn:context#A"
+          }
+        },
+        "axiom": {
+          "type": "ObjectPropertyDomain",
+          "property": {
+            "type": "ObjectProperty",
+            "kind": "object_property",
+            "iri": {
+              "type": "IRI",
+              "value": "urn:context#p"
+            }
+          },
+          "domain": {
+            "type": "ObjectIntersectionOf",
+            "operands": [
+              {
+                "type": "Class",
+                "kind": "class",
+                "iri": {
+                  "type": "IRI",
+                  "value": "urn:context#A"
+                }
+              },
+              {
+                "type": "Class",
+                "kind": "class",
+                "iri": {
+                  "type": "IRI",
+                  "value": "urn:context#B"
+                }
+              }
+            ]
+          },
+          "annotations": []
+        },
+        "container": {
+          "type": "ObjectPropertyDomain",
+          "property": {
+            "type": "ObjectProperty",
+            "kind": "object_property",
+            "iri": {
+              "type": "IRI",
+              "value": "urn:context#p"
+            }
+          },
+          "domain": {
+            "type": "ObjectIntersectionOf",
+            "operands": [
+              {
+                "type": "Class",
+                "kind": "class",
+                "iri": {
+                  "type": "IRI",
+                  "value": "urn:context#A"
+                }
+              },
+              {
+                "type": "Class",
+                "kind": "class",
+                "iri": {
+                  "type": "IRI",
+                  "value": "urn:context#B"
+                }
+              }
+            ]
+          },
+          "annotations": []
+        },
+        "origins": [
+          {
+            "type": "OriginOccurrence",
+            "document_key": "d2:7df2311f5d82133cd8e5c25c24324b716fdc9ff591950ef6d2ce4283782229bb",
+            "occurrence": 10,
+            "span": {
+              "type": "SourceSpan",
+              "byte_start": 516,
+              "byte_end": 568,
+              "line_start": 14,
+              "column_start": 1,
+              "line_end": null,
+              "column_end": null
+            }
+          }
+        ],
+        "constructor_path": [
+          {
+            "type": "ConstructorPathStep",
+            "field_id": {
+              "type": "FieldID",
+              "constructor_tag": 74,
+              "field_ordinal": 1
+            },
+            "item_index": null
+          },
+          {
+            "type": "ConstructorPathStep",
+            "field_id": {
+              "type": "FieldID",
+              "constructor_tag": 30,
+              "field_ordinal": 0
+            },
+            "item_index": 0
+          }
+        ],
+        "role": "operand",
+        "polarity_hint": null
+      },
+      {
+        "type": "ReferenceOccurrence",
+        "key": {
+          "type": "Class",
+          "kind": "class",
+          "iri": {
+            "type": "IRI",
+            "value": "urn:context#A"
+          }
+        },
+        "axiom": {
+          "type": "ClassAssertion",
+          "class_expression": {
+            "type": "Class",
+            "kind": "class",
+            "iri": {
+              "type": "IRI",
+              "value": "urn:context#A"
+            }
+          },
+          "individual": {
+            "type": "NamedIndividual",
+            "kind": "named_individual",
+            "iri": {
+              "type": "IRI",
+              "value": "urn:context#i"
+            }
+          },
+          "annotations": []
+        },
+        "container": {
+          "type": "ClassAssertion",
+          "class_expression": {
+            "type": "Class",
+            "kind": "class",
+            "iri": {
+              "type": "IRI",
+              "value": "urn:context#A"
+            }
+          },
+          "individual": {
+            "type": "NamedIndividual",
+            "kind": "named_individual",
+            "iri": {
+              "type": "IRI",
+              "value": "urn:context#i"
+            }
+          },
+          "annotations": []
+        },
+        "origins": [
+          {
+            "type": "OriginOccurrence",
+            "document_key": "d2:7df2311f5d82133cd8e5c25c24324b716fdc9ff591950ef6d2ce4283782229bb",
+            "occurrence": 12,
+            "span": {
+              "type": "SourceSpan",
+              "byte_start": 598,
+              "byte_end": 619,
+              "line_start": 16,
+              "column_start": 1,
+              "line_end": null,
+              "column_end": null
+            }
+          }
+        ],
+        "constructor_path": [
+          {
+            "type": "ConstructorPathStep",
+            "field_id": {
+              "type": "FieldID",
+              "constructor_tag": 112,
+              "field_ordinal": 0
+            },
+            "item_index": null
+          }
+        ],
+        "role": "class_expression",
+        "polarity_hint": null
+      }
+    ],
+    "property_domains": [
+      {
+        "type": "DomainRangeRecord",
+        "property": {
+          "type": "ObjectProperty",
+          "kind": "object_property",
+          "iri": {
+            "type": "IRI",
+            "value": "urn:context#p"
+          }
+        },
+        "kind": "domain",
+        "value": {
+          "type": "ObjectIntersectionOf",
+          "operands": [
+            {
+              "type": "Class",
+              "kind": "class",
+              "iri": {
+                "type": "IRI",
+                "value": "urn:context#A"
+              }
+            },
+            {
+              "type": "Class",
+              "kind": "class",
+              "iri": {
+                "type": "IRI",
+                "value": "urn:context#B"
+              }
+            }
+          ]
+        },
+        "axiom": {
+          "type": "ObjectPropertyDomain",
+          "property": {
+            "type": "ObjectProperty",
+            "kind": "object_property",
+            "iri": {
+              "type": "IRI",
+              "value": "urn:context#p"
+            }
+          },
+          "domain": {
+            "type": "ObjectIntersectionOf",
+            "operands": [
+              {
+                "type": "Class",
+                "kind": "class",
+                "iri": {
+                  "type": "IRI",
+                  "value": "urn:context#A"
+                }
+              },
+              {
+                "type": "Class",
+                "kind": "class",
+                "iri": {
+                  "type": "IRI",
+                  "value": "urn:context#B"
+                }
+              }
+            ]
+          },
+          "annotations": []
+        },
+        "origins": [
+          {
+            "type": "OriginOccurrence",
+            "document_key": "d2:7df2311f5d82133cd8e5c25c24324b716fdc9ff591950ef6d2ce4283782229bb",
+            "occurrence": 10,
+            "span": {
+              "type": "SourceSpan",
+              "byte_start": 516,
+              "byte_end": 568,
+              "line_start": 14,
+              "column_start": 1,
+              "line_end": null,
+              "column_end": null
+            }
+          }
+        ]
+      }
+    ],
+    "property_characteristics": [
+      {
+        "type": "TransitiveObjectProperty",
+        "property": {
+          "type": "ObjectProperty",
+          "kind": "object_property",
+          "iri": {
+            "type": "IRI",
+            "value": "urn:context#p"
+          }
+        },
+        "annotations": []
+      }
+    ],
+    "class_assertions": [
+      {
+        "type": "ClassAssertion",
+        "class_expression": {
+          "type": "Class",
+          "kind": "class",
+          "iri": {
+            "type": "IRI",
+            "value": "urn:context#A"
+          }
+        },
+        "individual": {
+          "type": "NamedIndividual",
+          "kind": "named_individual",
+          "iri": {
+            "type": "IRI",
+            "value": "urn:context#i"
+          }
+        },
+        "annotations": []
+      }
+    ],
+    "object_property_assertions": [
+      {
+        "type": "ObjectPropertyAssertion",
+        "property": {
+          "type": "ObjectProperty",
+          "kind": "object_property",
+          "iri": {
+            "type": "IRI",
+            "value": "urn:context#p"
+          }
+        },
+        "source": {
+          "type": "NamedIndividual",
+          "kind": "named_individual",
+          "iri": {
+            "type": "IRI",
+            "value": "urn:context#i"
+          }
+        },
+        "target": {
+          "type": "NamedIndividual",
+          "kind": "named_individual",
+          "iri": {
+            "type": "IRI",
+            "value": "urn:context#j"
+          }
+        },
+        "annotations": []
+      }
+    ],
+    "import_closure_complete": true,
+    "capabilities": {
+      "type": "CoreCapabilities",
+      "adapter_protocol": 1,
+      "model_schema": 2,
+      "wire_format": [
+        1,
+        2
+      ],
+      "features": [
+        "document-boundaries",
+        "immutable-snapshot",
+        "encoded-structural-view",
+        "owl2-structural",
+        "structural-indexes",
+        "source-map",
+        "import-manifest",
+        "document-scoped-anonymous",
+        "ontology-identity-index"
+      ],
+      "encoded_view_schemas": "FrozenMap({'pyowl-core/structural-columns': 2})",
+      "backend": "python"
+    },
+    "import_manifest": {
+      "type": "ImportManifest",
+      "policy": "resolve_local",
+      "offline": true,
+      "resolver_configuration_fingerprint": "52ee331006a67fd86ad16cd4f7bd4be7cff89b81f0617c210618765cbf6872d8",
+      "documents": [
+        {
+          "type": "DocumentRecord",
+          "document_key": "d2:7df2311f5d82133cd8e5c25c24324b716fdc9ff591950ef6d2ce4283782229bb",
+          "ontology_id": {
+            "type": "OntologyID",
+            "ontology_iri": {
+              "type": "IRI",
+              "value": "urn:context"
+            },
+            "version_iri": null
+          },
+          "document_iri": null,
+          "source_sha256": "d2be2c3596bd0e0fb566147d65fea250eaa81fd8743161051ab804c439371895",
+          "document_fingerprint": {
+            "type": "Fingerprint",
+            "algorithm": "sha256",
+            "schema": 2,
+            "digest": "b46a34ac6381c718b5d8c7c88eae6aeef38ccb895493b0a351ad3ce05f46dc44"
+          },
+          "format": "functional",
+          "status": "root"
+        }
+      ],
+      "edges": []
+    },
+    "structural_fingerprint": {
+      "type": "Fingerprint",
+      "algorithm": "sha256",
+      "schema": 2,
+      "digest": "d99cb8e05066df28cebfeb51cd29373c9dabdece0916782089850318288753fb"
+    },
+    "wire_bytes": 10079
+  }
+}

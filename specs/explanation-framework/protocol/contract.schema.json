@@ -1,0 +1,873 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://exact-om.local/specs/explanation-framework/contract/1.0",
+  "title": "Exact explanation shared target contract primitives",
+  "description": "Design-time target, not current runtime implementation. Route models extend these primitives and enforce cross-resource invariants in 01-contracts.md. Fixture provenance is required in this fixture envelope; production serialization must use the equivalent artifact provenance manifest.",
+  "oneOf": [
+    {
+      "$ref": "#/definitions/EntityContext"
+    },
+    {
+      "$ref": "#/definitions/PairDecisionTrace"
+    },
+    {
+      "$ref": "#/definitions/GeneratedExplanation"
+    }
+  ],
+  "definitions": {
+    "EntityRef": {
+      "type": "object",
+      "properties": {
+        "ontology_version_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "iri": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "enum": [
+            "class",
+            "object_property",
+            "data_property",
+            "individual"
+          ]
+        }
+      },
+      "required": [
+        "ontology_version_id",
+        "iri",
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "Scope": {
+      "type": "object",
+      "properties": {
+        "ontology_version_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "context_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "basis": {
+          "enum": [
+            "literal_asserted",
+            "structural_navigation",
+            "reasoner_inferred",
+            "root_document",
+            "resolved_closure",
+            "run_selected"
+          ]
+        },
+        "visibility_policy_hash": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "filter_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "ontology_version_id",
+        "context_revision",
+        "basis",
+        "visibility_policy_hash",
+        "filter_id"
+      ],
+      "additionalProperties": false
+    },
+    "Term": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "term_type": {
+              "const": "iri"
+            },
+            "iri": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "term_type",
+            "iri"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "term_type": {
+              "const": "literal"
+            },
+            "lexical_form": {
+              "type": "string"
+            },
+            "datatype": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "language": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "term_type",
+            "lexical_form",
+            "datatype",
+            "language"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "term_type": {
+              "const": "expression_ref"
+            },
+            "expression_id": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "term_type",
+            "expression_id"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "Origin": {
+      "type": "object",
+      "properties": {
+        "document_sha256": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "axiom_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "source_span": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "start": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "end": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "unit": {
+                  "enum": [
+                    "byte",
+                    "line"
+                  ]
+                }
+              },
+              "required": [
+                "start",
+                "end",
+                "unit"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        },
+        "provenance_status": {
+          "enum": [
+            "recorded",
+            "derived_from_saved_artifacts",
+            "raw_profile_extraction",
+            "unavailable"
+          ]
+        }
+      },
+      "required": [
+        "document_sha256",
+        "axiom_id",
+        "source_span",
+        "provenance_status"
+      ],
+      "additionalProperties": false
+    },
+    "Fact": {
+      "type": "object",
+      "properties": {
+        "fact_id": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "subject": {
+          "$ref": "#/definitions/EntityRef"
+        },
+        "predicate_iri": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "value": {
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Term"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "axiom_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "interpretation": {
+          "enum": [
+            "asserted",
+            "structurally_derived",
+            "reasoner_inferred",
+            "projected",
+            "matcher_comparison",
+            "generated"
+          ]
+        },
+        "origins": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Origin"
+          }
+        },
+        "premise_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "derivation_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "fact_id",
+        "subject",
+        "predicate_iri",
+        "value",
+        "axiom_ref",
+        "interpretation",
+        "origins",
+        "premise_ids",
+        "derivation_id"
+      ],
+      "additionalProperties": false
+    },
+    "FactPage": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Fact"
+          }
+        },
+        "returned_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "total_count": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "next_cursor": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "truncated": {
+          "type": "boolean"
+        },
+        "scope": {
+          "$ref": "#/definitions/Scope"
+        },
+        "status": {
+          "enum": [
+            "available",
+            "absent_in_scope",
+            "not_exported",
+            "unavailable_source",
+            "unresolved_import",
+            "unsupported",
+            "filtered",
+            "partial",
+            "failed",
+            "not_requested",
+            "not_run"
+          ]
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "items",
+        "returned_count",
+        "total_count",
+        "next_cursor",
+        "truncated",
+        "scope",
+        "status",
+        "reason"
+      ],
+      "additionalProperties": false
+    },
+    "Label": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string",
+          "minLength": 1
+        },
+        "language": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "predicate_iri": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "text",
+        "language",
+        "predicate_iri"
+      ],
+      "additionalProperties": false
+    },
+    "EntityContext": {
+      "type": "object",
+      "properties": {
+        "artifact_type": {
+          "const": "entity_context"
+        },
+        "contract_version": {
+          "const": "exact-explain/1.0"
+        },
+        "entity": {
+          "$ref": "#/definitions/EntityRef"
+        },
+        "labels": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Label"
+          }
+        },
+        "definitions": {
+          "$ref": "#/definitions/FactPage"
+        },
+        "synonyms": {
+          "$ref": "#/definitions/FactPage"
+        },
+        "parents": {
+          "$ref": "#/definitions/FactPage"
+        },
+        "capabilities": {
+          "type": "object",
+          "additionalProperties": {
+            "enum": [
+              "available",
+              "partial",
+              "unsupported",
+              "not_exported",
+              "not_run"
+            ]
+          }
+        },
+        "context_scope": {
+          "$ref": "#/definitions/Scope"
+        },
+        "fixture_provenance": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "artifact_type",
+        "contract_version",
+        "entity",
+        "labels",
+        "definitions",
+        "synonyms",
+        "parents",
+        "capabilities",
+        "context_scope",
+        "fixture_provenance"
+      ],
+      "additionalProperties": false
+    },
+    "Score": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "stage": {
+          "type": "string",
+          "minLength": 1
+        },
+        "value": {
+          "type": "number"
+        },
+        "meaning": {
+          "type": "string",
+          "minLength": 1
+        },
+        "range": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "min": {
+                  "type": "number"
+                },
+                "max": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "min",
+                "max"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        },
+        "calibration_status": {
+          "enum": [
+            "not_established",
+            "validated",
+            "not_applicable"
+          ]
+        },
+        "calibration_artifact": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "name",
+        "stage",
+        "value",
+        "meaning",
+        "range",
+        "calibration_status",
+        "calibration_artifact"
+      ],
+      "additionalProperties": false
+    },
+    "StageEvent": {
+      "type": "object",
+      "properties": {
+        "stage": {
+          "enum": [
+            "retrieval",
+            "prefilter",
+            "pair_scoring",
+            "llm_signal",
+            "selection",
+            "threshold",
+            "cardinality",
+            "extraction",
+            "relation_typing",
+            "repair"
+          ]
+        },
+        "status": {
+          "enum": [
+            "completed",
+            "not_run",
+            "not_recorded",
+            "failed"
+          ]
+        },
+        "outcome": {
+          "enum": [
+            "retained",
+            "rejected",
+            "abstained",
+            "selected",
+            "not_selected",
+            "not_applicable",
+            "unknown"
+          ]
+        },
+        "reason_code": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scores": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Score"
+          }
+        },
+        "competitor_pair_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "artifact_refs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "implementation_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "provenance_status": {
+          "enum": [
+            "recorded",
+            "derived_from_saved_artifacts",
+            "recomputed",
+            "unavailable"
+          ]
+        }
+      },
+      "required": [
+        "stage",
+        "status",
+        "outcome",
+        "reason_code",
+        "scores",
+        "competitor_pair_ids",
+        "artifact_refs",
+        "implementation_id",
+        "provenance_status"
+      ],
+      "additionalProperties": false
+    },
+    "PairDecisionTrace": {
+      "type": "object",
+      "properties": {
+        "artifact_type": {
+          "const": "pair_decision_trace"
+        },
+        "contract_version": {
+          "const": "exact-explain/1.0"
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pair_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source": {
+          "$ref": "#/definitions/EntityRef"
+        },
+        "target": {
+          "$ref": "#/definitions/EntityRef"
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/StageEvent"
+          }
+        },
+        "saved_alignment_member": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "relation": {
+          "enum": [
+            "equivalent",
+            "source_narrower",
+            "source_broader",
+            "not_equivalent",
+            "unresolved",
+            null
+          ]
+        },
+        "relation_basis": {
+          "enum": [
+            "default_convention",
+            "graph_closure_with_anchors",
+            "recorded_other",
+            "unavailable"
+          ]
+        },
+        "assumption_refs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "fixture_provenance": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "artifact_type",
+        "contract_version",
+        "run_id",
+        "pair_id",
+        "source",
+        "target",
+        "events",
+        "saved_alignment_member",
+        "relation",
+        "relation_basis",
+        "assumption_refs",
+        "fixture_provenance"
+      ],
+      "additionalProperties": false
+    },
+    "Claim": {
+      "type": "object",
+      "properties": {
+        "claim_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1
+        },
+        "fact_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$"
+          }
+        },
+        "category": {
+          "enum": [
+            "meaning",
+            "scope",
+            "key_fact",
+            "agreement",
+            "difference",
+            "explicit_incompatibility",
+            "unknown",
+            "review_question"
+          ]
+        }
+      },
+      "required": [
+        "claim_id",
+        "text",
+        "fact_ids",
+        "category"
+      ],
+      "additionalProperties": false
+    },
+    "GenerationManifest": {
+      "type": "object",
+      "properties": {
+        "ontology_context_hashes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$"
+          }
+        },
+        "visibility_policy_hash": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "packet_hash": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "prompt_hash": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "output_schema": {
+          "type": "string",
+          "minLength": 1
+        },
+        "requested_model": {
+          "type": "string",
+          "minLength": 1
+        },
+        "returned_model": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "provider": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "parameters_hash": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "language": {
+          "type": "string",
+          "minLength": 1
+        },
+        "response_hash": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^sha256:[a-f0-9]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status": {
+          "enum": [
+            "pending",
+            "dispatched",
+            "response_saved",
+            "validated",
+            "failed",
+            "ambiguous"
+          ]
+        }
+      },
+      "required": [
+        "ontology_context_hashes",
+        "visibility_policy_hash",
+        "packet_hash",
+        "prompt_hash",
+        "output_schema",
+        "requested_model",
+        "returned_model",
+        "provider",
+        "parameters_hash",
+        "language",
+        "response_hash",
+        "status"
+      ],
+      "additionalProperties": false
+    },
+    "GeneratedExplanation": {
+      "type": "object",
+      "properties": {
+        "artifact_type": {
+          "const": "generated_explanation"
+        },
+        "contract_version": {
+          "const": "exact-explain/1.0"
+        },
+        "explanation_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "task": {
+          "enum": [
+            "entity_profile",
+            "pair_comparison"
+          ]
+        },
+        "entities": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/EntityRef"
+          },
+          "minItems": 1,
+          "maxItems": 2
+        },
+        "claims": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Claim"
+          }
+        },
+        "grounding_status": {
+          "enum": [
+            "validated",
+            "unverified",
+            "rejected"
+          ]
+        },
+        "manifest": {
+          "$ref": "#/definitions/GenerationManifest"
+        },
+        "limitations": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "fixture_provenance": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "artifact_type",
+        "contract_version",
+        "explanation_id",
+        "task",
+        "entities",
+        "claims",
+        "grounding_status",
+        "manifest",
+        "limitations",
+        "fixture_provenance"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

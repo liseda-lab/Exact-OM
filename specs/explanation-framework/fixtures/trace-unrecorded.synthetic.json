@@ -1,0 +1,34 @@
+{
+  "artifact_type": "pair_decision_trace",
+  "contract_version": "exact-explain/1.0",
+  "run_id": "synthetic-legacy-case",
+  "pair_id": "synthetic-unrecorded",
+  "source": {
+    "ontology_version_id": "root-sha256:1a7182a7327ebc4181f7d6b0f7e81ed04dd258f1a86bd8f560e4a0d61439d58a",
+    "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C114940",
+    "kind": "class"
+  },
+  "target": {
+    "ontology_version_id": "root-sha256:611355c445537fcf4bae2c519f1b3598af5a8fea793274316e35525b7d05e945",
+    "iri": "http://purl.obolibrary.org/obo/DOID_11665",
+    "kind": "class"
+  },
+  "events": [
+    {
+      "stage": "selection",
+      "status": "not_recorded",
+      "outcome": "unknown",
+      "reason_code": "legacy_artifact_has_no_selection_trace",
+      "scores": [],
+      "competitor_pair_ids": [],
+      "artifact_refs": [],
+      "implementation_id": null,
+      "provenance_status": "unavailable"
+    }
+  ],
+  "saved_alignment_member": null,
+  "relation": null,
+  "relation_basis": "unavailable",
+  "assumption_refs": [],
+  "fixture_provenance": "Synthetic missing-trace contract case using real entity identities. No matching/clinical assertion is made about this pair."
+}

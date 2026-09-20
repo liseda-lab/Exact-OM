@@ -1,0 +1,72 @@
+{
+  "schema": "exact-study-design-blueprint/1",
+  "status": "design_only_not_current_runtime_config",
+  "primary_task": "partial_candidate_ranking",
+  "candidates_per_case": 5,
+  "conditions": [
+    "explanation",
+    "ontology_baseline"
+  ],
+  "design": "within_participant_disjoint_cases_counterbalanced_across_participants",
+  "recommended_preset": "balanced_24",
+  "selected_live_preset": null,
+  "presets": {
+    "balanced_24": {
+      "total": 24,
+      "answer_present": 20,
+      "answer_absent": 4,
+      "per_condition": 12,
+      "positive_rank_counts": [
+        4,
+        4,
+        4,
+        4,
+        4
+      ],
+      "per_condition_positive_rank_counts": [
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "per_condition_negatives": 2
+    },
+    "short_20": {
+      "total": 20,
+      "answer_present": 16,
+      "answer_absent": 4,
+      "per_condition": 10,
+      "positive_rank_counts": [
+        4,
+        3,
+        3,
+        3,
+        3
+      ],
+      "per_condition_positive_rank_counts": null,
+      "per_condition_negatives": 2
+    }
+  },
+  "response_types": [
+    "ranked_candidates",
+    "none_of_these",
+    "insufficient_evidence"
+  ],
+  "primary_metric": "answer_present_MRR",
+  "negative_metrics": [
+    "correct_none_rate",
+    "false_endorsement_rate",
+    "insufficient_evidence_rate"
+  ],
+  "unsubmitted_is_missing": true,
+  "original_order_preserved": true,
+  "public_negative_flag": false,
+  "protege_preparation_required": true,
+  "consultation_asked_each_case": true,
+  "tab_hidden_automatically_pauses": false,
+  "invitation_consumed_on_first_use": false,
+  "participant_identity_fields": [],
+  "case_count_finalization": "duration_pilot_and_study_publication_lock",
+  "invitation_expiry": "configured_at_study_publication_not_browser_session_expiry"
+}

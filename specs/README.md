@@ -65,6 +65,15 @@ work is not a blanket prerequisite. Result-changing experiment promotion remains
 from behavior-preserving engineering work. Current v1 experiment declarations are blocked
 until the implementing agent migrates them to v2.
 
+**Separate suite**: [explanation framework and interface](explanation-framework/README.md) —
+2026-09-20 implementation specifications for two products (local exploration/fixed demo and a
+complete anonymous ranking study on Render), independent ontology context, Exact decision/evidence
+exports, grounded OpenRouter descriptions, recoverable preparation, study controls and the new UI.
+Its [inventory](explanation-framework/00-status-and-scope.md) distinguishes existing foundations
+from required work. Follow its own B0–B5 backend gates, then F1 full implementation by the
+specialized frontend agent; the historical overhaul waves below are not its execution plan.
+See [the agent handoff](explanation-framework/AGENT-HANDOFF.md). All new runtime gates are pending.
+
 **Separate suite**: [`specs/exact-repair/`](exact-repair/) — proposed Exact-Repair post-processor
 (XR-1); it has independent gates and promotion rules, and no work package in this suite depends on
 it.
