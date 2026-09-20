@@ -1,8 +1,9 @@
 # Exact-OM experiment programme v2
 
-**Design revision: 2026-09-10 (E04 benchmark-NIL scope). G0 passed; E05 completed 2026-09-19 and retained top-k 20. The E26/E06 follow-up resumed at 22:26 UTC as Slurm step 14220.4 (channel-screen-02), reusing three completed cells with nine pending.**
+**Design revision: 2026-09-10 (E04 benchmark-NIL scope). G0 passed; E05 retained top-k 20. E26/E06 completed at 00:39 UTC on 2026-09-20 (step 14220.4); both retained their controls. The full six-arm E02 screen is prepared for the next detached Slurm step.**
 See [PREPARATION-STATUS.md](PREPARATION-STATUS.md) for current code, input and operational evidence.
-[FIRST-SCREEN.md](FIRST-SCREEN.md) records E05 results and the E26/E06 handoff inside the existing interactive allocation.
+[FIRST-SCREEN.md](FIRST-SCREEN.md) records E05 and E26/E06 history;
+[MECHANISM-SCREEN.md](MECHANISM-SCREEN.md) records E02 admission and monitoring.
 [G0-VALIDATION.md](G0-VALIDATION.md) records the detached validation handoff;
 [NATIVE-PREPROCESSING.md](NATIVE-PREPROCESSING.md) describes the native-only repair and bounded
 model-free measurement workflow;

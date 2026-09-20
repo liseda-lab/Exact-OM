@@ -94,3 +94,111 @@ def test_cycle_cannot_turn_query_anchor_into_its_own_ancestor_support(monkeypatc
     scorer._exact_anchor_src_to_tgt = {"s": {"t"}}
     scorer._exact_anchor_tgt_to_src = {"t": {"s"}}
     assert scorer._hierarchy_anchor_terms("s", "t")[:2] == (0.0, 0.0)
+
+
+def test_predicted_anchor_resume_skips_base_scoring_and_rebinds_changed_corruption(tmp_path):
+    import torch
+
+    from exact.core.entities.kinds import EntityKind
+    from exact.impl.models.selector.fitting import fingerprint
+
+    blocked, scored = [False], []
+
+    class Source:
+        def __init__(self, entities):
+            self.iris = entities
+
+        def entities(self, kind):
+            assert not blocked[0], "resume must not reload ontology signatures"
+            assert kind == EntityKind.CLASS
+            return self.iris
+
+    class Data:
+        dataset_signature = "predicted-anchor-fixture"
+        dataframe = pd.DataFrame({"Src": ["s1", "s1", "s2"], "Tgt": ["t1", "t2", "t2"]})
+        source, target = Source(("s1", "s2")), Source(("t1", "t2"))
+
+        def __getitem__(self, index):
+            assert not blocked[0], "resume must not regenerate candidate features"
+            row = self.dataframe.iloc[index]
+            return {
+                "src_iri": row.Src,
+                "tgt_iri": row.Tgt,
+                "src_labels": [row.Src],
+                "tgt_labels": [row.Tgt],
+            }
+
+        def entity_kind_for(self, iri, side, *, warn_unknown):
+            assert not blocked[0], "resume must reuse the verified anchor inventory"
+            return EntityKind.CLASS
+
+    class Model:
+        use_llm, request_seed = True, 17
+
+        def __init__(self):
+            self.hier_config = {}
+
+        def runtime_fingerprint_payload(self):
+            return {"model": "fixed-base-scorer", "seed": self.request_seed}
+
+        def forward(self, *, src_iris, tgt_iris, **kwargs):
+            assert not blocked[0], "resume must not score a candidate again"
+            assert self.use_llm is False, "anchor selection must never call the decision LLM"
+            pairs = list(zip(src_iris, tgt_iris))
+            scored.extend(pairs)
+            scores = {("s1", "t1"): 0.99, ("s1", "t2"): 0.1, ("s2", "t2"): 0.98}
+            return {"S_base": torch.tensor([scores[pair] for pair in pairs])}
+
+    rule = tmp_path / "rule.json"
+    rule.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "mode": "predicted_anchor_rule",
+                "development_provenance": {"selection": "prespecified", "seed": 17},
+                "threshold": 0.95,
+                "margin": 0.1,
+            }
+        )
+    )
+
+    def trainer(corruption=0.0):
+        value = Trainer()
+        value.dataset, value.model, value.output_dir = Data(), Model(), tmp_path
+        value.anchor_config = {
+            "mode": "one_pass",
+            "source": "predicted",
+            "rule_artifact": str(rule),
+            "corruption_fraction": corruption,
+            "diagnostic": bool(corruption),
+        }
+        return value
+
+    original = trainer()
+    original.prepare_anchors(batch_size=2)
+    assert scored == [("s1", "t1"), ("s1", "t2"), ("s2", "t2")]
+    assert original.model.use_llm is True
+    path = Path(original.anchor_manifest["artifact"])
+    frozen = path.read_bytes()
+    inventory = json.loads(frozen)
+    assert inventory["inventory_sha256"] == fingerprint(inventory["rows"])
+    assert inventory["corruptions"] == []
+    assert original.model._exact_anchor_src_to_tgt == {"s1": {"t1"}, "s2": {"t2"}}
+
+    blocked[0] = True
+    resumed = trainer()
+    resumed.prepare_anchors(batch_size=2)
+    assert resumed.anchor_manifest == original.anchor_manifest
+    assert resumed.model._exact_anchor_src_to_tgt == original.model._exact_anchor_src_to_tgt
+    assert resumed.model.use_llm is True
+    assert len(scored) == 3 and path.read_bytes() == frozen
+
+    blocked[0] = False
+    diagnostic = trainer(corruption=0.5)
+    diagnostic.prepare_anchors(batch_size=2)
+    changed = json.loads(Path(diagnostic.anchor_manifest["artifact"]).read_text())
+    assert diagnostic.anchor_manifest["artifact"] != str(path)
+    assert changed["diagnostic"] is True and len(changed["corruptions"]) == 1
+    assert changed["realized_corruption_fraction"] == 0.5
+    assert changed["input_identity"] != inventory["input_identity"]
+    assert path.read_bytes() == frozen
