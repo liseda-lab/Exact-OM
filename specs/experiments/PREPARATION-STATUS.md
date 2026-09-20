@@ -305,3 +305,13 @@ a cooperative 56 GiB process-tree RSS guard preserves checkpoints.
 Monitoring and the submission receipt are in
 `data/experiments-v2/prepared-campaign-11/HANDOFF.md` and
 `data/experiments-v2/d1-production-probe-01/submission.json`.
+
+On 2026-09-20 the node reboot interrupted step **14234.16** during ontology loading,
+before a scored-pair checkpoint or prepared dataset was published. Its 325-second
+Slurm interval was conservatively charged as interrupted, with zero new hosted
+requests/tokens. Original launch bindings, logs and accounting are preserved under
+`d1-production-probe-01/interrupted-14234-16/`. The unchanged experiment queue was
+resubmitted at **19:10 UTC** as step **14250.1**, detached in the same tmux session
+within the user's replacement interactive allocation. Only operational allocation
+and submission bindings changed; standard recovery retains the artifact store and
+shared caches while restarting unfinished cold preparation.
