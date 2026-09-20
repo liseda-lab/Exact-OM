@@ -315,6 +315,9 @@ def run_alignment(
     else:
         configs = ConfigModel.load_config(configs_file_path)
     configs.resolve_dependencies()
+    exact_policy = configs.matching.anchor_rescoring.exact_policy
+    if exact_policy is not None:
+        configs.dataset.filter_exact_matches = exact_policy == "hard"
     _write_resolved_config(configs, run_layout)
     configure_exact_logger(
         logging.getLogger("exact"),
@@ -637,8 +640,6 @@ def _run_alignment_session(
             ProgressTask("PostInference", "Post-inference", estimate_seconds=60.0)
         )
     anchor_config = configs.matching.anchor_rescoring.model_dump(mode="python")
-    if anchor_config.get("exact_policy") is not None:
-        configs.dataset_params.filter_exact_matches = anchor_config["exact_policy"] == "hard"
     if anchor_config.get("corruption_fraction") and str(
         configs.data.reference_role or ""
     ).lower() in {"final", "reporting", "test"}:

@@ -77,3 +77,49 @@ arms; six analytic arms alone cannot complete the eight-arm family. E08 still
 needs verified signed-identifier semantics and broader provenance deduplication.
 E09 requires native runtime/resource admission on its specified D1 case; D0
 cannot replace it. These families remain blocked, not empirically screened out.
+
+## Reboot and exact-policy repair, 2026-09-20
+
+Step **14220.5** ended when the node rebooted at **04:56:14 UTC**; Slurm closed
+the step/allocation at04:57:03. No application traceback was recorded. The host
+reboot's hardware/OS cause remains undetermined. The user has a new unlimited
+interactive allocation, **14234**, and authorized restarting the experiment.
+
+Native anchor validation passed before screening: all2,000 endpoints were present
+on each side, peak RSS11.68GiB, elapsed267.47s. Two cell executions completed, but
+inspection found that the soft treatment still used hard exact-match filtering.
+The alignment action assigned its policy to `configs.dataset_params`, which returns
+a temporary compatibility object. The assignment was discarded.
+
+The fix updates `configs.dataset.filter_exact_matches` before configuration output
+and timing fingerprints. Six propagation cases check hard, soft and unspecified
+policies against both original flag values; the two incorrect override branches
+failed before the fix. All18 focused tests passed with the native environment.
+This repair implements the already-declared treatment; it does not change its
+selection rule, source population, supervision or parameter choices.
+
+The hard baseline already usedTrue and is compatible. Its saved scientific output
+bytes and original measured cost are verified before migration. The old soft result
+is invalid and remains historical evidence, not an empirical result for selection.
+The trusted arm stopped during ontology loading without an inference checkpoint;
+the remaining three arms had not started. Therefore **one cell is reused and five
+need execution**. Native validation and exact-key hosted/embedding caches are retained.
+
+`mechanism-repair-01/` records the source hashes, regression proof, invalidation,
+interruption accounting and hard-only artifact migration. `mechanism-screen-02/`
+is the continuation; the original wave is preserved. Its closed attempt accounts
+for3 new hosted requests,1,097 tokens and$0.0001659, with zero unknown deliveries.
+The charged interval runs from completed native validation to Slurm cancellation
+and includes possible controller delay; it is not an exact active-compute measure.
+
+The continuation uses a Slurm step inside allocation14234, one GPU worker, two
+numerical threads, disabled rationales and no wall-time limit. Its status and log
+are authoritative once submitted:
+
+```bash
+cat /home/pgcotovio/Exact-OM/data/experiments-v2/mechanism-screen-02/launch-status.json
+tail -f /home/pgcotovio/Exact-OM/data/experiments-v2/mechanism-screen-02/launcher.log
+tmux attach -t exact-mechanism-02
+```
+
+Keep allocation14234 and shell step14234.0; detach tmux with Ctrl-b then d.

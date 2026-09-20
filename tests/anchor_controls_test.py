@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
 from exact.impl.trainer.anchors import (
     AnchorPreparationMixin,
@@ -14,6 +15,63 @@ from tests.pair_adaptive_experiments_test import _scorer
 dataset = kind_evidence_controls_test.dataset
 SRC = kind_evidence_controls_test.SRC
 TGT = "http://example.org/mini/tgt#"
+
+
+@pytest.mark.parametrize(
+    "policy, configured_filter, expected_filter",
+    [
+        (None, True, True),
+        (None, False, False),
+        ("hard", True, True),
+        ("hard", False, True),
+        ("soft", True, False),
+        ("soft", False, False),
+    ],
+)
+def test_anchor_exact_policy_reaches_runtime_saved_config_and_timing_identity(
+    tmp_path, monkeypatch, policy, configured_filter, expected_filter
+):
+    import exact.core.actions.alignment as alignment
+    from exact.core.entities.configs.config import ConfigModel
+    from exact.core.entities.configs.yaml_io import load_yaml_mapping
+    from exact.utils.timing import config_fingerprint
+
+    config = ConfigModel.model_validate(
+        {
+            "dataset": {"filter_exact_matches": configured_filter},
+            "matching": {"anchor_rescoring": {"exact_policy": policy}},
+        }
+    )
+    expected = config.model_copy(deep=True)
+    expected.dataset.filter_exact_matches = expected_filter
+    source, target, output = tmp_path / "source.owl", tmp_path / "target.owl", tmp_path / "run"
+    source.touch()
+    target.touch()
+    calls = []
+    monkeypatch.setattr(ConfigModel, "resolve_dependencies", lambda self: None)
+
+    def session(**kwargs):
+        calls.append(kwargs)
+        runtime = kwargs["configs"]
+        assert runtime.dataset.filter_exact_matches is expected_filter
+        assert runtime.dataset_params.filter_exact_matches is expected_filter
+        assert runtime.model_dump(mode="json") == expected.model_dump(mode="json")
+        assert load_yaml_mapping(output / "config.yaml") == expected.model_dump(
+            mode="json", by_alias=True
+        )
+        assert kwargs["timing_session"].config_fingerprint == config_fingerprint(
+            expected, run_dir=output
+        )
+        return None, None
+
+    monkeypatch.setattr(alignment, "_run_alignment_session", session)
+    alignment.run_alignment(
+        source_file_path=source,
+        target_file_path=target,
+        output_dir_path=output,
+        configs_file_path=config,
+    )
+    assert len(calls) == 1
 
 
 def test_predicted_anchor_rule_is_reciprocal_threshold_and_margin_only():
