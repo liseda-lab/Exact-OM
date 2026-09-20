@@ -284,3 +284,24 @@ Full native loading, projection and 300 target feature queries passed. The separ
 original repair receipt. Production candidate/recovery and hierarchy qualification remain
 for E09; the native-input gate in the earlier readiness audit is now satisfied.
 [MECHANISM-SCREEN.md](MECHANISM-SCREEN.md) records the repair and validation limits.
+
+
+## E09 continuation submitted, 2026-09-20
+
+The E09 queue started at **18:56 UTC** in Slurm step **14234.16**, detached in
+tmux `exact-d1-production-01` within the existing interactive allocation.
+It uses isolated source commit `75c4d7a` and the published native 0.2.1 environment;
+112 focused hierarchy/recovery/reporting checks passed before submission.
+
+`data/experiments-v2/d1-production-probe-01/` first runs cold/warm D1 production
+preparation, completed-cache replay, ancestor/sibling checkpoint measurements, and
+a separate D0 current-control evaluation. If measured resource admission passes,
+`prepared-campaign-11/advance.py` continues automatically into the four E09 D1
+arms under `mechanism-screen-03/`. The D0 control does not enter D1 winner selection.
+Completed E02/E05/E06/E26 decisions are retained. Hosted template verbalization is
+preserved, with decision calls and rationales off. There is no wall-time deadline;
+a cooperative 56 GiB process-tree RSS guard preserves checkpoints.
+
+Monitoring and the submission receipt are in
+`data/experiments-v2/prepared-campaign-11/HANDOFF.md` and
+`data/experiments-v2/d1-production-probe-01/submission.json`.
