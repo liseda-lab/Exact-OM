@@ -24,22 +24,23 @@ CONTRACT_SCHEMA = "exact-om.ontology-stack-compatibility/1"
 HASH_SCHEMA = "exact-om.distribution-hashes/1"
 
 _BASE_REQUIREMENTS = {
-    "pyowl-core": ">=0.2,<0.3",
-    "pyowl2vec-star-projector": ">=0.2,<0.3",
+    "pyowl-core": ">=0.2.1,<0.3",
+    "pyowl2vec-star-projector": ">=0.2.1,<0.3",
 }
 _EXTRA_REQUIREMENTS = {
-    "pyelk-reasoner": (">=0.2,<0.3", "reasoning"),
-    "pyhermit": (">=0.2,<0.3", "reasoning"),
+    "pyelk-reasoner": (">=0.2.1,<0.3", "reasoning"),
+    "pyhermit": (">=0.2.1,<0.3", "reasoning"),
     "oaei-bioml-eval": (">=0.2.1,<0.3", "bioml-eval"),
     "fastapi": (None, "viz"),
     "pydantic-settings": (None, "viz"),
     "uvicorn": (None, "viz"),
 }
+_NATIVE_STACK_NAMES = ("pyowl-core", "pyowl2vec-star-projector", "pyelk-reasoner", "pyhermit")
 _STACK_RANGES = {
-    "pyowl-core": SpecifierSet("==0.2.0"),
-    "pyowl2vec-star-projector": SpecifierSet(">=0.2,<0.3"),
-    "pyelk-reasoner": SpecifierSet(">=0.2,<0.3"),
-    "pyhermit": SpecifierSet(">=0.2,<0.3"),
+    "pyowl-core": SpecifierSet(">=0.2.1,<0.3"),
+    "pyowl2vec-star-projector": SpecifierSet(">=0.2.1,<0.3"),
+    "pyelk-reasoner": SpecifierSet(">=0.2.1,<0.3"),
+    "pyhermit": SpecifierSet(">=0.2.1,<0.3"),
     "oaei-bioml-eval": SpecifierSet(">=0.2.1,<0.3"),
 }
 
@@ -152,9 +153,12 @@ def _published_stack(contract: dict[str, Any]) -> dict[str, str]:
     tested = contract.get("tested_stack")
     if not isinstance(tested, dict):
         raise SystemExit("compatibility manifest has no tested_stack object")
+    native = contract.get("published_native_stack")
+    if not isinstance(native, dict):
+        raise SystemExit("compatibility manifest has no published_native_stack object")
     versions: dict[str, str] = {}
     for name, allowed in _STACK_RANGES.items():
-        record = tested.get(name)
+        record = (native if name in _NATIVE_STACK_NAMES else tested).get(name)
         if not isinstance(record, dict) or not isinstance(record.get("version"), str):
             raise SystemExit(f"compatibility manifest has no tested version for {name}")
         raw_version = record["version"]

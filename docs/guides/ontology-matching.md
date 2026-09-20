@@ -25,33 +25,30 @@ restrictions, property metadata, and exclusions behind `KnowledgeSource`.
 
 ## Shared projector and reasoner
 
-The base install uses `pyowl-core>=0.2,<0.3` and
-`pyowl2vec-star-projector>=0.2,<0.3`, with a complete Python projector and asserted
-hierarchy. Select the deterministic Python projector explicitly when warning-free portability
-is more useful than selecting a published native wheel:
+The base install uses `pyowl-core>=0.2.1,<0.3` and
+`pyowl2vec-star-projector>=0.2.1,<0.3`, with native loading, native projection, and an
+asserted hierarchy. The current published stack is 0.2.1. Configure native projection:
 
 ```yaml
 dataset:
   reasoner: asserted
   projector:
-    backend: python
+    backend: native
     profile: mowl-d993536-v1
 ```
 
 For inferred hierarchies, install `exact-om[reasoning]` and set `dataset.reasoner` to `elk`
 or `hermit`. Missing optional packages fail with an installation hint; Exact never silently
 changes requested inferred semantics to asserted semantics. Programmatic integrations can use
-`OwlOntologySource.configure_reasoner(...)` for backend, timeout, fallback, worker, and
-verified-wire options.
+`OwlOntologySource.configure_reasoner(...)` to select supported native backend settings.
 
-All in-process modes consume `source.owl_snapshot()` directly, including public core
-overlays and composites. Worker mode writes that view once with the current public core wire
-writer and opens a verified read-only mmap in the child; it never passes an OWL path.
+The strict pipeline consumes `source.owl_snapshot()` directly and retains its native
+validation receipt. Decoded, mmap, overlay, composite, and verified-wire worker paths are not
+supported by this execution contract.
 
-Consumer provenance reports `scalar-python`, `scalar-native`/`scalar-wire`, or
-`encoded-native`. Encoded-native selection requires the public schema-2 capability and
-`pyowl_core.EncodedStructuralView.DESCRIPTOR_SHA256`; Exact never requests or decodes the
-buffers. Acceleration may change diagnostics and timing, but not projected edges, hierarchy
+Consumer provenance must report `encoded-native`. This requires the public schema-2
+capability, native validation, and `pyowl_core.EncodedStructuralView.DESCRIPTOR_SHA256`;
+Exact never requests or decodes the buffers and does not retry through scalar/Python paths. Acceleration may change diagnostics and timing, but not projected edges, hierarchy
 answers, coherence, or alignment output.
 
 `run_manifest.json` records effective public core/projector/reasoner selections under

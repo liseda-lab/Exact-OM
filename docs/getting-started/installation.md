@@ -27,14 +27,16 @@ Do not request a CUDA device on a CPU-only host; omitting `--device` selects CPU
 
 The base distribution installs the released Java-free shared stack:
 
-- `pyowl-core>=0.2,<0.3` (including `pyowl-core==0.2.0`);
-- `pyowl2vec-star-projector>=0.2,<0.3`;
-- `pyelk-reasoner>=0.2,<0.3` and `pyhermit>=0.2,<0.3` only with `reasoning`; and
+- `pyowl-core>=0.2.1,<0.3`;
+- `pyowl2vec-star-projector>=0.2.1,<0.3`;
+- `pyelk-reasoner>=0.2.1,<0.3` and `pyhermit>=0.2.1,<0.3` only with `reasoning`; and
 - `oaei-bioml-eval>=0.2.1,<0.3` only with `bioml-eval`.
 
-Release artifacts are tested against one exact published set recorded in
-`release/core-compatibility.json`. Editable installs, source checkouts, development builds,
-and release candidates are not release evidence.
+The current native package set is recorded under `published_native_stack` in
+`release/core-compatibility.json`; the historical baseline and local validation records are
+preserved separately. The current set uses PyPI 0.2.1 wheels for all four ontology packages.
+Editable installs, source checkouts, development builds, and release candidates are not
+published-wheel evidence.
 
 ## Optional features
 
@@ -56,8 +58,8 @@ requested.
 
 The base wheel includes the shared `pyowl-core` snapshot API and OWL2Vec* projector. It does
 not require Java, a JDK, Cargo, a compiler, visualization services, or either optional
-reasoner. Native accelerators are selected only from compatible published upstream wheels;
-the complete Python projection path remains available on Python 3.10–3.12.
+reasoner. OWL loading and projection require compatible native upstream wheels. Exact
+checks native capabilities and execution reports and does not fall back to Python processing.
 
 ## Verify the installation
 

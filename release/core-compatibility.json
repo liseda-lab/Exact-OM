@@ -525,5 +525,23 @@
       ],
       "feature_evidence_schema": 3
     }
+  },
+  "published_native_stack": {
+    "pyowl-core": {
+      "version": "0.2.1",
+      "index": "https://pypi.org/simple"
+    },
+    "pyowl2vec-star-projector": {
+      "version": "0.2.1",
+      "index": "https://pypi.org/simple"
+    },
+    "pyelk-reasoner": {
+      "version": "0.2.1",
+      "index": "https://pypi.org/simple"
+    },
+    "pyhermit": {
+      "version": "0.2.1",
+      "index": "https://pypi.org/simple"
+    }
   }
 }

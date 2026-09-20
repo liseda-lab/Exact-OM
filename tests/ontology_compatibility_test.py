@@ -153,9 +153,8 @@ def test_published_schema_and_counter_record_remain_unchanged() -> None:
     assert reasoner["advertised_ingestion_path"] == "encoded-native"
 
 
-def test_dependency_ranges_extras_and_artifact_inclusion_stay_coordinated() -> None:
+def test_published_baseline_dependency_ranges_remain_historical() -> None:
     contract = _contract()
-    metadata = PYPROJECT_PATH.read_text(encoding="utf-8")
 
     assert contract["dependency_constraints"] == {
         "base": {
@@ -170,11 +169,22 @@ def test_dependency_ranges_extras_and_artifact_inclusion_stay_coordinated() -> N
             "oaei-bioml-eval": ">=0.2.1,<0.3",
         },
     }
+
+
+def test_current_dependency_ranges_extras_and_artifact_inclusion_stay_coordinated() -> None:
+    contract = _contract()
+    metadata = PYPROJECT_PATH.read_text(encoding="utf-8")
+
+    assert contract["published_native_stack"] == {
+        name: {"version": "0.2.1", "index": "https://pypi.org/simple"}
+        for name in ("pyowl-core", "pyowl2vec-star-projector", "pyelk-reasoner", "pyhermit")
+    }
+
     for line in (
-        'pyowl-core = ">=0.2,<0.3"',
-        'pyowl2vec-star-projector = ">=0.2,<0.3"',
-        'pyelk-reasoner = {version = ">=0.2,<0.3", optional = true}',
-        'pyhermit = {version = ">=0.2,<0.3", optional = true}',
+        'pyowl-core = ">=0.2.1,<0.3"',
+        'pyowl2vec-star-projector = ">=0.2.1,<0.3"',
+        'pyelk-reasoner = {version = ">=0.2.1,<0.3", optional = true}',
+        'pyhermit = {version = ">=0.2.1,<0.3", optional = true}',
         'oaei-bioml-eval = {version = ">=0.2.1,<0.3", extras = ["reasoner"], optional = true}',
         'reasoning = ["pyelk-reasoner", "pyhermit"]',
         'bioml-eval = ["oaei-bioml-eval"]',
@@ -197,6 +207,7 @@ def test_dependency_ranges_extras_and_artifact_inclusion_stay_coordinated() -> N
 def test_published_baseline_content_is_not_rewritten_by_candidate_metadata() -> None:
     contract = _contract()
     contract.pop("native_pipeline_candidate")
+    contract.pop("published_native_stack")
     contract.pop("record_scope")
     actual = hashlib.sha256(
         json.dumps(contract, sort_keys=True, separators=(",", ":")).encode()

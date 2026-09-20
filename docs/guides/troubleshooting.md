@@ -2,8 +2,8 @@
 
 ## Shared OWL packages are missing or incompatible
 
-The base distribution requires `pyowl-core>=0.2,<0.3` and
-`pyowl2vec-star-projector>=0.2,<0.3`; released `pyowl-core==0.2.0` is supported. If importing
+The base distribution requires `pyowl-core>=0.2.1,<0.3` and
+`pyowl2vec-star-projector>=0.2.1,<0.3`, including native wheel support. If importing
 Exact reports either package as missing or incompatible, confirm that the installer used the
 same Python 3.10–3.12 environment as `exact`, then run:
 
@@ -13,8 +13,8 @@ python -m pip show exact-om pyowl-core pyowl2vec-star-projector
 ```
 
 Do not install `py-horned-owl`, mOWL, JPype, DeepOnto, or a JDK as a fallback. The exact
-published package set used for a release is recorded in
-`release/core-compatibility.json`.
+published native package set is recorded under `published_native_stack` in
+`release/core-compatibility.json`; historical 0.2.0 records remain separate.
 
 ## An optional reasoner is unavailable
 
@@ -24,7 +24,7 @@ published package set used for a release is recorded in
 python -m pip install "exact-om[reasoning]"
 ```
 
-This selects compatible `pyelk-reasoner>=0.2,<0.3` and `pyhermit>=0.2,<0.3` releases.
+This selects compatible `pyelk-reasoner>=0.2.1,<0.3` and `pyhermit>=0.2.1,<0.3` releases.
 Selecting an unavailable or incompatible reasoner is an error by default. Programmatic callers
 may explicitly choose an asserted fallback policy; the requested/effective reasoner and reason
 are then recorded in `ontology_stack`.
@@ -35,12 +35,10 @@ Exact requires compatible native loader and projector wheels. Projector `backend
 a compatibility alias for native, and explicit Python selection is rejected. Exact never runs
 Cargo during installation and never retries projection through a scalar/Python compiler.
 
-Check the selected backend and encoded-native counters in `ontology_stack`. The narrow
-upstream compiler/report bridge currently requires projector 0.2.0/API 1; a dependency upgrade
-needs compatibility and parity validation. Missing encoded capabilities, unsupported input
-shapes, and advertised schema/descriptor mismatches are errors, not invitations to select
-Python or reparse the ontology. Private compiler/report access is confined to the reviewed
-`exact.ontology.native_projection` bridge.
+Check the selected backend and encoded-native counters in `ontology_stack`. The current
+published stack uses 0.2.1 and the projector's public native pipeline API. Missing encoded
+capabilities, unsupported input shapes, and schema/descriptor mismatches are errors. Install
+compatible native wheels rather than selecting Python or reparsing the ontology.
 
 The installed native projector does not support the tested mmap owner. Use the supported
 native document-loading path for a new run; preserve the original failed attempt and inputs.

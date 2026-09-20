@@ -15,6 +15,7 @@ from typing import Any
 
 from generate_sbom import spdx_document
 from packaging.utils import canonicalize_name
+from verify_distribution_artifacts import _published_stack
 
 _ONTOLOGY = b"""<?xml version="1.0"?>
 <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
@@ -101,12 +102,9 @@ def _assert_installed_versions(contract: dict[str, Any], names: tuple[str, ...])
     exact = contract.get("exact")
     if not isinstance(exact, dict) or exact.get("version") != _distribution_version("exact-om"):
         raise SystemExit("installed Exact version does not match the compatibility manifest")
-    tested = contract.get("tested_stack")
-    if not isinstance(tested, dict):
-        raise SystemExit("compatibility manifest has no tested_stack")
+    versions = _published_stack(contract)
     for name in names:
-        record = tested.get(name)
-        if not isinstance(record, dict) or record.get("version") != _distribution_version(name):
+        if versions[name] != _distribution_version(name):
             raise SystemExit(f"installed {name} version does not match the compatibility manifest")
 
 
@@ -132,16 +130,19 @@ def _assert_public_core_contract(contract: dict[str, Any]) -> None:
         )
 
 
-def _projection(backend: str) -> tuple[object, ...]:
+def _projection() -> tuple[object, ...]:
     from exact.ontology import load_ontology
+    from exact.ontology.projection import require_native_report
 
     source = load_ontology(_ONTOLOGY)
-    source.configure_projector(backend=backend)
+    source.configure_projector(backend="native")
     edges = tuple(source.projection_edges())
-    if not edges:
-        raise SystemExit(f"{backend} projection returned no fixture edges")
+    expected = ("urn:A", "http://subclassof", "urn:B")
+    if tuple(edge.astuple() for edge in edges) != (expected,):
+        raise SystemExit("native projection differs from the fixture subclass edge")
     if source.projector.last_view is not source.owl_snapshot():
-        raise SystemExit(f"{backend} projector did not retain the Exact core owner")
+        raise SystemExit("native projector did not retain the Exact core owner")
+    require_native_report(source.projector)
     return edges
 
 
@@ -153,7 +154,7 @@ def _base_smoke(contract: dict[str, Any], sbom_output: Path | None) -> None:
     for module in _BASE_ABSENT_MODULES:
         if importlib.util.find_spec(module) is not None:
             raise SystemExit(f"optional or forbidden module is installed in base: {module}")
-    _projection("python")
+    _projection()
 
     payload = spdx_document("exact-om")
     names = {canonicalize_name(str(item["name"])) for item in payload["packages"]}
@@ -173,10 +174,8 @@ def _base_smoke(contract: dict[str, Any], sbom_output: Path | None) -> None:
 
 def _native_smoke(contract: dict[str, Any]) -> None:
     _assert_installed_versions(contract, ("pyowl-core", "pyowl2vec-star-projector"))
-    python_edges = _projection("python")
-    native_edges = _projection("native")
-    if native_edges != python_edges:
-        raise SystemExit("published native projection differs from pure-Python projection")
+    _assert_public_core_contract(contract)
+    _projection()
 
 
 def _viz_smoke() -> None:
@@ -194,7 +193,7 @@ def _reasoning_smoke(contract: dict[str, Any]) -> None:
     for name in ("elk", "hermit"):
         source = load_ontology(_ONTOLOGY)
         snapshot = source.owl_snapshot()
-        source.configure_reasoner(name, backend="auto")
+        source.configure_reasoner(name, backend="rust" if name == "elk" else "native")
         if source.reasoner.ontology is not snapshot:
             raise SystemExit(f"{name} reasoner did not retain the Exact core owner")
         if source.reasoner.ancestors("urn:A") != {"urn:B"}:

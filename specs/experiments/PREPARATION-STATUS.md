@@ -259,3 +259,20 @@ tests pass. `first-screen-04/` launched at 10:56 UTC on 2026-09-19 for retrieval
 evaluation; exact candidate fingerprints must reproduce and no scientific settings change.
 Original prediction artifacts and all previous charges remain intact. See FIRST-SCREEN.md
 for the current interactive-step handoff.
+
+
+## Published native runtime, 2026-09-20
+
+The active interpreter for new experiment work is `.venv/bin/python`, with all four
+native ontology packages installed from PyPI at 0.2.1. Published native wheel hashes
+and installed-code fingerprints are recorded in
+`data/experiments-v2/pypi-transition-01/`; 100 native integration tests passed with
+zero skips. The previous `runtime/native-candidate` environment is retained only
+for historical execution identities. Do not mutate frozen prior launch bindings or
+reuse prepared artifacts across package identities without verified compatibility.
+
+E02 finalized successfully and retains the hard-anchor baseline. D1 SNOMED native
+preparation completed; FMA failed strict axiom-reification validation. The same
+failure is reproduced on PyPI 0.2.1; its input repair remains outstanding.
+[MECHANISM-SCREEN.md](MECHANISM-SCREEN.md) records the diagnosis, resource evidence
+and the required normalization/parity checks. No experiment is currently running.

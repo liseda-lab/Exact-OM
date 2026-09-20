@@ -186,3 +186,41 @@ tail -F /home/pgcotovio/Exact-OM/data/experiments-v2/d1-native-probe-01/{source,
 Keep allocation 14234 and interactive shell step 14234.0 alive. The probe is already
 detached; ending the allocation terminates its step. No further experiment is queued
 automatically after this measurement.
+
+
+## D1 outcome and PyPI transition, 2026-09-20
+
+Step 14234.3 ended at **11:19:58 UTC** with exit 1. SNOMED completed in 433.37s,
+including 144.73s loading and 111.12s projection, with **8.85GiB peak RSS**,
+385,973 classes, 1,818,750 axioms and 1,364,467 projected edges. All 300 source
+feature queries completed and their warm-cache digests agreed.
+
+FMA failed during strict native loading after 16.19s total, with 2.77GiB peak RSS.
+The error is `native owl:Axiom reification main triple is absent`; projection
+never started. This was neither a memory exhaustion nor a wall-time termination.
+An XML audit found 90 annotations across 54 classes that point to freshly serialized
+anonymous restrictions; each has exactly one structurally identical restriction
+already asserted under the same class, with a different blank-node identity.
+
+The failure reproduces on the published pyowl-core 0.2.1 using a minimal fixture.
+Reconnecting the annotation to the existing restriction with `rdf:nodeID` passes
+strict native loading while preserving the subclass axiom and its annotation.
+The original FMA input remains unchanged. A full repair must retain the original
+bytes, record a derivative's hash and transformation, reject ambiguous matches,
+and verify preservation of every asserted axiom and annotation before a target-only
+retry. Existing SNOMED evidence remains an observation of the earlier local build;
+it must not be relabeled as a measurement of the new PyPI binaries.
+
+The main `.venv` now installs pyowl-core, pyowl2vec-star-projector, pyelk-reasoner
+and pyhermit **0.2.1 from PyPI**, using verified native Linux wheels. All 100 focused
+native integration tests passed, with zero skips. Historical candidate wheels and
+completed experiment artifacts are retained. New launches use `.venv/bin/python`
+and bind the new package identities; frozen old launch receipts are not rewritten.
+`data/experiments-v2/pypi-transition-01/` stores installation/artifact hashes,
+installed-code fingerprints, validation logs and the FMA reproduction/diagnosis.
+Only the four ontology distribution versions changed. The existing six unrelated
+legacy dependency warnings from `pip check` are unchanged and recorded before/after.
+
+No experiment or probe remains running. Allocation 14234 and its interactive shell
+remain alive. E02 is complete; E09 remains blocked by the FMA input repair and the
+remaining hierarchy/resource qualification, without consuming hosted tokens.

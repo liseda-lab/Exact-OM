@@ -6,16 +6,17 @@ and immutable completed run artifacts remain readable.
 
 ## 2.0 to 2.1 OWL-stack changes
 
-The base package requires `pyowl-core>=0.2,<0.3` and
-`pyowl2vec-star-projector>=0.2,<0.3`; `pyowl-core==0.2.0` is the minimum supported core.
-Optional Java-free reasoners use `pyelk-reasoner>=0.2,<0.3` and
-`pyhermit>=0.2,<0.3`. Bio-ML evaluation uses
+The base package requires `pyowl-core>=0.2.1,<0.3` and
+`pyowl2vec-star-projector>=0.2.1,<0.3`; 0.2.1 is the minimum supported native package release.
+Optional Java-free reasoners use `pyelk-reasoner>=0.2.1,<0.3` and
+`pyhermit>=0.2.1,<0.3`. Bio-ML evaluation uses
 `oaei-bioml-eval>=0.2.1,<0.3`.
 
 Core 0.2 introduces model schema 2, including corrected anonymous-individual and repeated
 isomorphic-component scoping. Exact retains one immutable core view for each OWL source.
-Concrete snapshots, overlays, composites, and provider results are retained by identity; the
-source facade, structural views, projector, and selected reasoner consume that exact object.
+The source facade, structural views, projector, and selected reasoner consume the same native
+snapshot. The strict native pipeline requires its validation receipt; decoded, mmap, overlay,
+and composite owners are not supported for this execution path.
 RDFLib remains restricted to generic RDF/OAEI formats.
 
 ### Ontology-cache boundary
@@ -32,8 +33,9 @@ results, but a run cannot resume through a schema-1 ontology cache.
 The base wheel remains Java- and build-tool-free. Install `exact-om[reasoning]` only for
 optional pyELK or pyHermiT. New OWL runs record path-free public core/projector/reasoner
 versions, model/wire/encoded contracts, fingerprints, closure/document digests, bounded
-ingestion diagnostics, options, backend selection, cache state, and verified-wire/mmap state
-under `ontology_stack`.
+ingestion diagnostics, options, backend selection, and cache state under `ontology_stack`.
+Published 0.2.1 wheels replace the local development builds; their installation identities
+remain distinct for cache and experiment recovery.
 
 ## Required actions
 
