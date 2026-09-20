@@ -1,6 +1,6 @@
 # Exact-OM experiment programme v2
 
-**Design revision: 2026-09-10 (E04 benchmark-NIL scope). G0 passed; E05/E26/E06 screens retained their controls. E02 was interrupted by the node reboot on 2026-09-20 at 04:56 UTC. Its hard baseline is retained; an exact-policy propagation fix invalidates the old soft result. Recovery is prepared for allocation 14234.**
+**Design revision: 2026-09-10 (E04 benchmark-NIL scope). G0 passed; E05/E26/E06 screens retained their controls. All six E02 cells and final reports completed on 2026-09-20; E02 retained the hard-anchor baseline. The reporting repair reused every scientific output and made zero new model calls. D1 native preparation measurement is running in Slurm step14234.3; full E09 remains pending admission.**
 See [PREPARATION-STATUS.md](PREPARATION-STATUS.md) for current code, input and operational evidence.
 [FIRST-SCREEN.md](FIRST-SCREEN.md) records E05 and E26/E06 history;
 [MECHANISM-SCREEN.md](MECHANISM-SCREEN.md) records E02 admission and monitoring.

@@ -112,7 +112,7 @@ for3 new hosted requests,1,097 tokens and$0.0001659, with zero unknown deliverie
 The charged interval runs from completed native validation to Slurm cancellation
 and includes possible controller delay; it is not an exact active-compute measure.
 
-The continuation uses a Slurm step inside allocation14234, one GPU worker, two
+The continuation uses a Slurm step inside allocation 14234, one GPU worker, two
 numerical threads, disabled rationales and no wall-time limit. Its status and log
 are authoritative once submitted:
 
@@ -122,4 +122,67 @@ tail -f /home/pgcotovio/Exact-OM/data/experiments-v2/mechanism-screen-02/launche
 tmux attach -t exact-mechanism-02
 ```
 
-Keep allocation14234 and shell step14234.0; detach tmux with Ctrl-b then d.
+Keep allocation 14234 and shell step 14234.0; detach tmux with Ctrl-b then d.
+
+
+## E02 reporting repair, 2026-09-20
+
+All six E02 cells completed successfully in continuation step **14234.1**, which
+ran from 05:41:59 to 07:04:29 UTC. Final reporting then rejected unequal candidate-pool
+fingerprints. These fingerprints include post-retrieval hard-anchor filtering and
+cache metadata, so equality was inappropriate for the declared hard/soft contrast.
+The original failed launch status remains historical evidence.
+
+The E02-only guard now verifies the raw retrieval manifest, canonical retrieved
+source/target pairs and entity kinds, and the frozen source population, including
+sources with no candidates. Sampled manifests remain checked against their recorded
+SHA-256. Missing/corrupt manifests, changed pairs or populations still fail; other
+experiment families retain their existing checks. All six saved datasets have the
+same 6,000 candidate pairs and 300 sources. The fix passed 116 focused tests.
+
+`mechanism-report-repair-01/` finalizes the original six extraction/evaluation
+artifacts without rescoring, new hosted calls or prediction-key migration. It
+archives the original reports, verifies scientific output identities before and
+after reporting, and charges finalization time to the cumulative reserve ledger.
+Its separate status file records Slurm step 14234.2; the original launch failure is
+not overwritten. This repair changes reporting validation only, not the treatments,
+population, selection rule or scientific outputs.
+
+Finalization completed successfully at **11:09:16 UTC**, after 137.81 seconds.
+E02 is **screened_out**: no candidate met the predeclared promotion rule, so the
+hard-anchor baseline remains selected. The final selection and paired reports are
+under `mechanism-screen-02/runtime/exact-om-focused-v2/`; the repair receipt records
+six reused cells, zero new scored pairs and zero hosted requests. This is a
+300-source development decision, not a confirmatory finding on the final benchmarks.
+
+
+## D1 native preparation measurement
+
+With E02 finalized, a model-free D1 probe started at **11:12:19 UTC on 2026-09-20**
+as Slurm step **14234.3**, detached in tmux `exact-d1-native-01`. It processes the
+full SNOMED ontology and then FMA in separate native workers, retaining phase times,
+peak RSS, projection provenance and cold/cached feature records. Source features
+use the frozen seed17 sample of 300 public development entities. Target features
+use 300 deterministic eligible entities; these are not an E09 retrieved candidate pool.
+
+The probe uses the existing native benchmark and a 16-thread cap, with no wall-time
+limit, model calls, generated rationales or private references. It reserves 2 hours
+from the cumulative repair/resource envelope as a planning allowance, not a timeout,
+and records actual elapsed time. A 56GiB worker RSS threshold requests cooperative
+interruption to leave host/shell headroom; the actual D1 memory requirement is still
+being measured. Per-ontology peaks do not bound full alignment memory use.
+
+`data/experiments-v2/d1-native-probe-01/` contains the immutable input/config/code
+bindings, launcher, status, per-side logs and phase reports. This is preparation
+measurement, not the four-arm E09 screen. E09 still needs actual hierarchy coverage,
+semantic/recovery checks and candidate runtime admission, including ancestor-IC
+traversal cost; baseline preprocessing alone cannot establish those properties.
+
+```bash
+cat /home/pgcotovio/Exact-OM/data/experiments-v2/d1-native-probe-01/status.json
+tail -F /home/pgcotovio/Exact-OM/data/experiments-v2/d1-native-probe-01/{source,target}.log
+```
+
+Keep allocation 14234 and interactive shell step 14234.0 alive. The probe is already
+detached; ending the allocation terminates its step. No further experiment is queued
+automatically after this measurement.
