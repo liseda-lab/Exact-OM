@@ -3249,6 +3249,89 @@ def _arm_cell_records(
     return by_arm, {}
 
 
+def _e02_retrieval_identity(record: Mapping[str, Any]) -> dict[str, str]:
+    """Compare retrieval before the declared hard-anchor filtering treatment."""
+
+    directory = Path(str(record["output_dir"])) / "dataset"
+    sampled_path = directory / "candidate_pool_sample_manifest.json"
+    provenance = record["candidate_pool_manifest_provenance"]
+    if sha256_file(sampled_path) != provenance["sha256"]:
+        raise ValueError("sampled candidate-pool manifest SHA-256 mismatch")
+    sampled = json.loads(sampled_path.read_text())
+    if sampled["fingerprint"] != record["candidate_pool_fingerprint"]:
+        raise ValueError("sampled candidate-pool fingerprint changed")
+    raw = json.loads((directory / "candidate_pool_manifest.json").read_text())
+
+    # Verify the existing dataset manifest fingerprint, not a newly trusted digest.
+    config = dict(raw["retrieval_config"])
+    config.pop("path", None)
+    encoder = raw["models"].get("encoder") or {}
+    artifacts = {
+        name: artifact
+        for name, artifact in (
+            ("encoder", encoder.get("artifact")),
+            ("cross_encoder", raw["models"].get("cross_encoder")),
+        )
+        if artifact is not None
+    }
+    for name, artifact in (("encoder_finetune", "encoder"), ("cross_encoder", "cross_encoder")):
+        if isinstance(config.get(name), Mapping) and artifact in artifacts:
+            config[name] = {**config[name], "artifact": artifacts[artifact]["sha256"]}
+    basis = {
+        "schema_version": raw["schema_version"],
+        "origin": raw["origin"],
+        "retrieval_config": config,
+        "model_hashes": {name: artifact["sha256"] for name, artifact in artifacts.items()},
+        "input_hashes": {
+            name: value.get("sha256")
+            for name, value in raw["inputs"].items()
+            if isinstance(value, Mapping)
+        },
+        "per_kind": raw["per_kind"],
+    }
+    if encoder.get("model_lock") is not None:
+        basis["model_lock"] = encoder["model_lock"]
+    if hashlib.sha256(canonical_json(basis).encode()).hexdigest() != raw["fingerprint"]:
+        raise ValueError("raw candidate-pool manifest fingerprint mismatch")
+    if raw["inputs"] != sampled["inputs"]:
+        raise ValueError("raw and sampled candidate-pool inputs differ")
+
+    population = sampled["retrieval_config"]["source_sample"]
+    groups = sorted(tuple(group) for group in population["source_kind_groups"])
+    population_hash = hashlib.sha256(
+        "\n".join(f"{source}\t{kind}" for source, kind in groups).encode()
+    ).hexdigest()
+    if (
+        population_hash != population["sha256"]
+        or len(set(groups)) != len(groups)
+        or len(groups) != population["selected_groups"]
+        or {source for source, _ in groups} != set(population["eligible_source_iris"])
+    ):
+        raise ValueError("frozen source population integrity check failed")
+    with (directory / "dataset.csv").open(newline="") as handle:
+        rows = csv.DictReader(handle)
+        pairs = sorted((row["Src"], row["Tgt"], row["SrcKind"], row["TgtKind"]) for row in rows)
+    per_kind = raw["per_kind"]
+    if any(not all(pair) or pair[2] not in per_kind for pair in pairs):
+        raise ValueError("raw candidate rows have missing or unbound entity kinds")
+    for kind, summary in per_kind.items():
+        kind_pairs = [pair for pair in pairs if pair[2] == kind]
+        if (
+            len(kind_pairs) != summary["candidate_pairs"]
+            or len({pair[0] for pair in kind_pairs}) != summary["covered_sources"]
+        ):
+            raise ValueError("raw candidate rows do not match the retrieval manifest")
+    selected = set(groups)
+    selected_pairs = [pair for pair in pairs if (pair[0], pair[2]) in selected]
+    return {
+        "raw_retrieval_fingerprint": raw["fingerprint"],
+        "source_population_sha256": population_hash,
+        "retrieved_pairs_sha256": hashlib.sha256(
+            canonical_json(selected_pairs).encode()
+        ).hexdigest(),
+    }
+
+
 def _candidate_pool_guard(
     experiment_id: str,
     cells_by_arm: Mapping[str, Mapping[tuple[str, int], Mapping[str, Any]]],
@@ -3260,6 +3343,17 @@ def _candidate_pool_guard(
         }
         for arm, cells in sorted(cells_by_arm.items())
     }
+    if experiment_id == "E02":
+        try:
+            fingerprints = {
+                arm: {
+                    f"{task}/seed-{seed}": _e02_retrieval_identity(record)
+                    for (task, seed), record in sorted(cells.items())
+                }
+                for arm, cells in sorted(cells_by_arm.items())
+            }
+        except (OSError, KeyError, TypeError, ValueError) as exc:
+            return "retrieval_artifact_verification_failed", fingerprints, str(exc)
     tasks = sorted({task for cells in cells_by_arm.values() for task, _seed in cells})
     if experiment_id in {"E05", "E12-retrieval", "G4"}:
         for arm, cells in cells_by_arm.items():
@@ -3348,7 +3442,12 @@ def _candidate_pool_guard(
     cell_keys = sorted({cell for cells in cells_by_arm.values() for cell in cells})
     for task, seed in cell_keys:
         values = {
-            cells[(task, seed)].get("candidate_pool_fingerprint") for cells in cells_by_arm.values()
+            (
+                canonical_json(fingerprints[arm][f"{task}/seed-{seed}"])
+                if experiment_id == "E02"
+                else cells[(task, seed)].get("candidate_pool_fingerprint")
+            )
+            for arm, cells in cells_by_arm.items()
         }
         if None in values or "" in values:
             return (
@@ -4231,6 +4330,9 @@ def aggregate_stage(
             "reference_completeness": manifest.get("reference_completeness"),
             "config_hash": manifest.get("resolved_config_hash"),
             "candidate_pool_fingerprint": manifest.get("candidate_pool_fingerprint"),
+            "candidate_pool_manifest_provenance": manifest.get(
+                "candidate_pool_manifest_provenance"
+            ),
             "candidate_pool_design_hash": (manifest.get("fingerprint_payload") or {}).get(
                 "candidate_pool_design_hash"
             ),

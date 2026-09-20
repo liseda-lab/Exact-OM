@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import hashlib
 import json
 from pathlib import Path
 from typing import Any
@@ -330,6 +331,115 @@ def test_fixed_retrieval_compares_arms_within_each_task_seed() -> None:
     status, _fingerprints, error = _candidate_pool_guard("E18", cells)
     assert status == "candidate_pool_mismatch"
     assert "seed-2" in str(error)
+
+
+def _e02_pool_cells(tmp_path: Path) -> dict:
+    from copy import deepcopy
+
+    from exact.experiments.harness import canonical_json
+
+    groups = [("s1", "class"), ("s2", "class"), ("empty", "class")]
+    population = {
+        "source_kind_groups": sorted(groups),
+        "eligible_source_iris": sorted(source for source, _ in groups),
+        "selected_groups": len(groups),
+        "sha256": hashlib.sha256(
+            "\n".join(f"{source}\t{kind}" for source, kind in sorted(groups)).encode()
+        ).hexdigest(),
+    }
+    raw = {
+        "schema_version": 1,
+        "origin": "generated",
+        "retrieval_config": {"top_k": 2},
+        "models": {"encoder": {}, "cross_encoder": None},
+        "inputs": {"source": {"sha256": "a" * 64}, "target": {"sha256": "b" * 64}},
+        "per_kind": {"class": {"candidate_pairs": 3, "covered_sources": 2}},
+    }
+    basis = {key: raw[key] for key in ("schema_version", "origin", "retrieval_config", "per_kind")}
+    basis.update(model_hashes={}, input_hashes={"source": "a" * 64, "target": "b" * 64})
+    raw["fingerprint"] = hashlib.sha256(canonical_json(basis).encode()).hexdigest()
+    cells = {}
+    for arm, scored in (("single_pass_hard", 2), ("single_pass_soft", 3)):
+        output = tmp_path / arm
+        directory = output / "dataset"
+        directory.mkdir(parents=True)
+        (directory / "candidate_pool_manifest.json").write_text(json.dumps(raw))
+        # Cached features and row order may differ; the actual retrieved pairs do not.
+        rows = [("s1", "t1"), ("s1", "t2"), ("s2", "t3")]
+        if arm.endswith("soft"):
+            rows.reverse()
+        with (directory / "dataset.csv").open("w", newline="") as handle:
+            writer = csv.writer(handle)
+            writer.writerow(["Src", "Tgt", "SrcKind", "TgtKind", "prefiltered"])
+            writer.writerows(
+                (src, tgt, "class", "class", arm.endswith("hard")) for src, tgt in rows
+            )
+        (directory / "dataset.meta.json").write_text(
+            json.dumps({"filter_exact_matches": scored == 2})
+        )
+        sample = deepcopy(raw)
+        sample["fingerprint"] = str(scored) * 64
+        sample["retrieval_config"]["source_sample"] = population
+        sample["per_kind"]["class"]["candidate_pairs"] = scored
+        sample_path = directory / "candidate_pool_sample_manifest.json"
+        sample_path.write_text(json.dumps(sample))
+        cells[arm] = {
+            ("task", 17): {
+                "output_dir": str(output),
+                "candidate_pool_fingerprint": sample["fingerprint"],
+                "candidate_pool_manifest_provenance": file_provenance(sample_path),
+            }
+        }
+    return cells
+
+
+def test_e02_compares_raw_retrieval_and_frozen_population_before_anchor_filtering(tmp_path):
+    cells = _e02_pool_cells(tmp_path)
+    status, fingerprints, error = _candidate_pool_guard("E02", cells)
+    assert status == "matched_fixed_retrieval" and error is None
+    assert fingerprints["single_pass_hard"] == fingerprints["single_pass_soft"]
+    # Other fixed-retrieval families still require equal scored-pool fingerprints.
+    assert _candidate_pool_guard("E18", cells)[0] == "candidate_pool_mismatch"
+
+
+@pytest.mark.parametrize(
+    "change", ["pair", "population", "raw_tamper", "raw_missing", "sample_tamper"]
+)
+def test_e02_pool_guard_rejects_real_changes_and_unverified_artifacts(tmp_path, change):
+    cells = _e02_pool_cells(tmp_path)
+    record = cells["single_pass_soft"][("task", 17)]
+    directory = Path(record["output_dir"]) / "dataset"
+    if change == "pair":
+        path = directory / "dataset.csv"
+        path.write_text(path.read_text().replace("s1,t1,", "s1,changed-target,"))
+    elif change == "population":
+        path = directory / "candidate_pool_sample_manifest.json"
+        sample = json.loads(path.read_text())
+        population = sample["retrieval_config"]["source_sample"]
+        # Removing an empty source must still change the frozen denominator.
+        population["source_kind_groups"].remove(["empty", "class"])
+        population["eligible_source_iris"].remove("empty")
+        population["selected_groups"] -= 1
+        population["sha256"] = hashlib.sha256(b"s1\tclass\ns2\tclass").hexdigest()
+        path.write_text(json.dumps(sample))
+        record["candidate_pool_manifest_provenance"] = file_provenance(path)
+    elif change == "raw_tamper":
+        path = directory / "candidate_pool_manifest.json"
+        raw = json.loads(path.read_text())
+        raw["retrieval_config"]["top_k"] = 9
+        path.write_text(json.dumps(raw))
+    elif change == "raw_missing":
+        (directory / "candidate_pool_manifest.json").unlink()
+    else:
+        path = directory / "candidate_pool_sample_manifest.json"
+        path.write_text(path.read_text() + "\n")
+    status, _fingerprints, error = _candidate_pool_guard("E02", cells)
+    assert status == (
+        "candidate_pool_mismatch"
+        if change in {"pair", "population"}
+        else "retrieval_artifact_verification_failed"
+    )
+    assert error
 
 
 def test_e20_allows_seed_specific_retrieval_treatment_pools() -> None:
