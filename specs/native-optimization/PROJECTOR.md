@@ -4,7 +4,7 @@ Implementation progress and artifact identities: [IMPLEMENTATION.md](IMPLEMENTAT
 
 Correctness is a hard acceptance requirement; current completion is recorded separately.
 Follow [CONTRACT](CONTRACT.md) and [VALIDATION](VALIDATION.md); resolve conflicts before coding.
-Baseline: projector `d7e4dc147dc7303d75353887352afb66e7840588` / package 0.2.0.
+Current dependency: published `pyowl2vec-star-projector==0.2.1` under the [stack contract](../native-stack.md).
 The [source audit](../experiments/NATIVE-STACK-AUDIT.md#1-projector-replace-repeated-native-class-membership-scans-first)
 records evidence and measurement limits. Neither item promises a speedup or changes projection semantics.
 Use existing immutable encoded owners and native kernels; add no parser, shadow ontology or cache framework.
@@ -14,10 +14,11 @@ Any semantic defect requires a separate reproducer and separately documented cor
 
 ### Trigger and bounded change
 
-Literal-inclusive projection currently checks class membership for each whitelisted annotation.
-[Direct lookup](https://github.com/OAEI-ML/pyOwl2Vec-Star-projector/blob/d7e4dc147dc7303d75353887352afb66e7840588/native/src/encoded_direct.rs#L5261)
-scans all N encoded nodes; counting and emission repeat it, giving worst-case O(A × N) work.
-The composite equivalent scans C reachable class coordinates per annotation, O(A × C).
+Before optimization, literal-inclusive projection checked class membership for each
+whitelisted annotation. The [historical lookup assessment](../experiments/NATIVE-STACK-AUDIT.md#1-projector-replace-repeated-native-class-membership-scans-first)
+found scans of all N encoded nodes, repeated during counting and emission: worst-case
+O(A × N) work. The composite equivalent scanned C reachable class coordinates per annotation,
+O(A × C). The following requirements define the replacement index.
 A counts annotation occurrences that reach this predicate, including subjects absent from the class set.
 Replace only this predicate's scan with a native index per prepared table and semantic class selection.
 Preserve existing literal/taxonomy suppression; build at most once per successful, non-replayed pass.

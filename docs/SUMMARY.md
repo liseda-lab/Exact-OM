@@ -33,5 +33,11 @@
     - [Migration from 1.x](project/migration.md)
     - [Contributing](project/contributing.md)
     - [Benchmarks](project/benchmarks.md)
+    - [Repair validation](project/repair-validation.md)
     - [Legacy user-guide redirect](user-guide.md)
     - [Legacy defaults redirect](semantic_scorer_defaults.md)
+- Historical native-stack evidence
+    - [Overview](archive/native-stack/README.md)
+    - [Source audit](archive/native-stack/NATIVE-STACK-AUDIT.md)
+    - [Implementation validation](archive/native-stack/IMPLEMENTATION.md)
+    - [Repair validation](archive/native-stack/repair-validation.md)

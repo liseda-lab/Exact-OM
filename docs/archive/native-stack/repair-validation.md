@@ -2,22 +2,24 @@
 
 Validation date: 19 September 2026. These are component-conformance and small integration results, not benchmark or model-quality claims. The initial implementation was `37db8f5`; `e033026` adds direct grammar, retrieval and supervised runtime paths; the following training/study commit completes the protocol tools described below.
 
-## Published ontology stack and historical evidence
+## Local optimized ontology stack
 
-Current repair execution uses the [published native stack](https://github.com/liseda-lab/Exact-OM/blob/main/specs/native-stack.md):
-`pyowl-core`, `pyowl2vec-star-projector`, `pyhermit` and `pyelk-reasoner` are locked to `0.2.1`;
-the reasoners remain optional. Qualify actual capabilities for each selected operation.
+Repair validation used isolated copies of the latest local source checkouts and their built native extensions, without modifying the checkouts or the matching model's environment:
 
-The checks below ran before adoption of the published packages. The complete
-[19 September validation record](../archive/native-stack/repair-validation.md) preserves
-the original dependency identities, commands and environment. These counts describe those
-runs; they have not been relabelled as validation of the published `0.2.1` artifacts.
+| Component | Local revision |
+| --- | --- |
+| pyowl-core | `5fd93c8839318f0ccc1afff4d3ec537509c72e87` |
+| pyowl2vec-star-projector | `a0676012c5f6437c304b4ed04bc2b41b6a083da1` |
+| pyHermiT | `bbf31c26ce7ae03bd092f04bcb8955466b1fe3e0` |
+| pyELK | `bce95f8552ed8396315c9a9e4ddce184ad95596f` |
+
+The temporary overlay is `/tmp/exact-repair-local-stack`; its `manifest.json` records source/native hashes. Study runtime manifests also hash the ontology implementations actually imported. Python 3.12, PySAT 1.8.dev24, PySDD 1.0.6, torch 2.7.0 and torch-geometric 2.6.1 supplied the other components. No package version was substituted for capability checks.
 
 ## Executed checks
 
 | Check | Result |
 | --- | --- |
-| Repair component tests (historical environment) | 166 passed |
+| `PYTHONPATH=/tmp/exact-repair-local-stack .venv/bin/python -m pytest tests/repair_*_test.py -q` | 166 passed |
 | Finite XR-2 specification reference | 37 passed |
 | Pilot and smoke protocol validation | Passed; static only |
 | Targeted mypy | 28 modules passed |

@@ -9,11 +9,12 @@ add focused fixtures/counters rather than a new test or execution framework.
 
 ## N00: Freeze a reviewable baseline before code changes
 
-Record the audited commits from [the source assessment](../experiments/NATIVE-STACK-AUDIT.md),
-Exact commit, installed package/native-binary identities, compiler/build mode, interpreter,
-encoded/model schemas, relevant options and machine limits. Build an isolated native baseline
-from the pinned sources when a source-level performance comparison needs it; do not assume
-an installed extension was built from the checkout just because Python sources match.
+Use the [published stack](../native-stack.md) resolved by `poetry.lock`. Record the Exact
+commit, installed distribution versions and wheel/native-binary hashes, compiler/build mode,
+interpreter, encoded/model schemas, relevant options and machine limits. Validate installed
+artifacts in an isolated environment. Keep any historical comparison bound to its original
+artifact identities in the [source assessment archive](../experiments/NATIVE-STACK-AUDIT.md);
+do not infer native build identity from matching Python sources or relabel earlier results.
 Do not rebuild a large ontology merely to recreate already trustworthy evidence.
 
 Keep `native-preprocessing-03` immutable. It is a measured installed-package reference:

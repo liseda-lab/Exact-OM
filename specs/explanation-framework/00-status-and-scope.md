@@ -17,7 +17,7 @@
 | Data retrieval | `exact/tracks/builtin/bioml_hf.yaml` | Update hosted files, checksum names/keys, validation references and removed pool paths |
 | Tests | `tests/exact_inspect_test.py`, `user_study_analysis_test.py`, ontology/run/rationale suites | Extend meaningful semantic, recovery, API and scale checks; avoid duplicate test frameworks |
 
-The old shipped OMIM–ORDO bundle lacks identifiers/context that current producers can emit. Keep it as a legacy/sparsity fixture. It is not the schema to copy. The sibling-source pyOWLCore probe demonstrates possible APIs, not installed-release/native/full-file acceptance. Verify the supported installed 0.2.x package and record wheel/version/hash.
+The old shipped OMIM–ORDO bundle lacks identifiers/context that current producers can emit. Keep it as a legacy/sparsity fixture. It is not the schema to copy. The sibling-source pyOWLCore probe demonstrates possible APIs, not installed-release/native/full-file acceptance. Verify the [published native stack](../native-stack.md) (`0.2.1` in the current lock) and record wheel/version/hash.
 
 ## Owners and order
 

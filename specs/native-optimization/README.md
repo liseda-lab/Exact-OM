@@ -1,6 +1,8 @@
 # Native ontology optimization plan
 
-**Implementation and applicable T1–T4 validation complete; see [IMPLEMENTATION.md](IMPLEMENTATION.md). G0 remains separate.**
+**Published `0.2.1` packages adopted; see the [stack contract](../native-stack.md).**
+The completed implementation and applicable T1–T4 evidence are recorded in
+[IMPLEMENTATION.md](IMPLEMENTATION.md). G0 remains separate.
 
 Implement the opportunities in the [native stack audit](../experiments/NATIVE-STACK-AUDIT.md)
 while preserving intended algorithm behavior. The deliverable is a smaller amount of work
@@ -75,12 +77,12 @@ resource limits in VALIDATION apply across workers, not independently per agent.
 
 ## N11 integration requirements
 
-1. Build candidate wheels in isolated environments at recorded commits; test installed
-   artifacts, not a mixture of source checkout imports and an old native extension. Keep
-   the current Exact environment and saved baseline artifacts usable for comparison.
-2. Publish a compatibility matrix of tested core/consumer package versions and encoded,
-   model and validation-capability versions. Prefer additive capabilities over a needless
-   schema break. Select actual release numbers using existing repository conventions.
+1. Install the published distributions resolved by `poetry.lock` in isolated environments;
+   test installed artifacts and record distribution versions and wheel/native-binary hashes.
+   Keep saved baseline artifacts usable for comparison.
+2. Maintain a compatibility matrix of tested core/consumer package versions and encoded,
+   model and validation-capability versions. The current published set is `0.2.1`. Prefer
+   additive capabilities over a needless schema break.
 3. Exact requests the strict pipeline only when every used path supports it; it must fail
    before expensive processing on an incompatible combination. Partial optimization commits
    can be evaluated without being represented as full native-pipeline compliance.
@@ -98,9 +100,9 @@ resource limits in VALIDATION apply across workers, not independently per agent.
 Each implementation change gets a scoped commit in its owning repository, with problem,
 behavior-preservation argument, relevant tests and measured evidence. Separate localized
 algorithm changes, shared interface changes and consumer adoption so regressions are
-bisectable. Keep commit hashes in the integration record; publishing packages/defaults is
-separate from developing and testing local candidates. Avoid unrelated refactors and
-permanent runtime shadow implementations.
+bisectable. Identify consumed dependencies by published versions and installed artifact
+hashes; retain source/build provenance in the corresponding historical evidence. Avoid
+unrelated refactors and permanent runtime shadow implementations.
 
 A work package is done only when its requirements, relevant native-path checks and output
 parity pass, the intended repeated work is demonstrably removed, and the evidence is saved.

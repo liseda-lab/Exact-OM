@@ -4,6 +4,10 @@
 
 This revision incorporates the decisions in *Exact-Repair: Learning to Repair Ontology Alignments* (19 September 2026). It replaces XR-1/XR-P1 as the current specification. The previous methodology report remains an implementation reference; older proposals are historical context. No trusted/provisional mapping partition is required.
 
+Repair uses the [published native stack](../native-stack.md), including the shared core
+and available optional reasoners, in both standalone and sequential execution. Matching
+artifacts remain optional; available matching evidence follows the full input contract below.
+
 ## Scope
 
 Input is two ontologies with resolved imports, a provisional alignment from any matcher, scores, and optional explanations, decompositions, alternative candidates, and other evidence. Output is a repaired alignment, an explicit patch for selected ontology axioms, and separate verification and optimisation records. The prototype studies mapping deletion, directional weakening, complex correspondences, endpoint revision, and selective ontology-axiom revision.

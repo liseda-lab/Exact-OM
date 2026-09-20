@@ -1,3 +1,14 @@
 # Scope of the retained capability probe
 
-The adjacent JSON/OFN record a tiny synthetic Python-backend Functional Syntax probe against sibling pyOWLCore source revision `d39fe9c9bb9513db8c14fe2bc6d4864377901ad1`; all 12 checks passed. It demonstrates API feasibility, not installed-release/native/RDFXML parity, full Bio-ML coverage, performance or reasoner completeness. Load options included offline local-import handling, `preserve_source_map=True` and `collect_provenance=True`. Names/citation URLs in the input are synthetic. Local paths in the historical JSON are provenance only; do not use them as execution bindings. B0/B2 must reproduce required capabilities with the supported installed packages and actual locked inputs.
+The [archived JSON](../../../docs/archive/native-stack/owl-context-capability-probe.json)
+and [Functional Syntax fixture](../../../docs/archive/native-stack/owl-context-capability-probe.ofn)
+record a tiny synthetic Python-backend probe; all 12 checks passed. It demonstrates API
+feasibility, not installed-release/native/RDFXML parity, full Bio-ML coverage, performance
+or reasoner completeness. Load options included offline local-import handling,
+`preserve_source_map=True` and `collect_provenance=True`. Names/citation URLs are synthetic.
+The archived source identity and local paths are historical provenance only.
+
+B0/B2 must reproduce required capabilities with the [published native stack](../../native-stack.md)
+and actual locked inputs. Exact currently locks `pyowl-core==0.2.1` and supports
+`>=0.2.1,<0.3`. Record the installed package and artifact identities for new checks;
+the archived probe does not establish acceptance for the published release.

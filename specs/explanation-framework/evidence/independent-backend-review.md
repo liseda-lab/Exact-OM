@@ -8,7 +8,7 @@ This review checks the existing implementation against the earlier [feasibility 
 
 **1. First establish that the proposed parser/runtime and dataset actually run together.**
 
-The small successful capability probe imported sibling pyOWLCore source directly and used its Python backend. Exact declares `pyowl-core >=0.2,<0.3`; the probe is useful evidence of capability, but not proof of a supported installed native runtime. The current Bio-ML descriptor still has the old checksum-manifest name, user-supplied NCIT/DOID/FMA declarations, and obsolete repaired candidate paths. These are implementation prerequisites, not frontend issues.
+The small successful capability probe imported sibling pyOWLCore source directly and used its Python backend. The probe is useful evidence of capability, but not proof of a supported installed native runtime. Current implementation must use the [published stack contract](../../native-stack.md), with `pyowl-core >=0.2.1,<0.3` and `0.2.1` in the lock. The current Bio-ML descriptor still has the old checksum-manifest name, user-supplied NCIT/DOID/FMA declarations, and obsolete repaired candidate paths. These are implementation prerequisites, not frontend issues.
 
 Require a pinned environment and pinned NCIT–DOID root/import manifest, a native load/index build on the target node, and a fresh bounded Exact run using that same identity. Compare selected raw definitions and expressions against the resulting API. Record effective parser/backend, package versions, options, imports, warnings and peak RAM. A parser fallback must be reported rather than silently treated as equivalent. Do not make a complete new matching campaign a prerequisite.
 

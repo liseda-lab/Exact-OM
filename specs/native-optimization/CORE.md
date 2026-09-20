@@ -5,8 +5,9 @@ Implementation progress and artifact identities: [IMPLEMENTATION.md](IMPLEMENTAT
 This file defines acceptance requirements; current completion is recorded separately.
 This specifies pyOWLCore changes and the small Exact/consumer integrations they require.
 The [shared contract](CONTRACT.md) and [validation plan](VALIDATION.md) govern every item.
-Evidence: [native-stack audit](../experiments/NATIVE-STACK-AUDIT.md#2-pyowlcore-stop-reconstructing-native-data-in-python),
-reviewed core commit `d39fe9c9bb9513db8c14fe2bc6d4864377901ad1` (0.2.0).
+Current dependency: published `pyowl-core==0.2.1` under the [stack contract](../native-stack.md).
+The [historical audit](../experiments/NATIVE-STACK-AUDIT.md#2-pyowlcore-stop-reconstructing-native-data-in-python)
+records the evidence that motivated these requirements.
 The measured exclusion and publication intervals contain multiple operations; they do not
 establish an isolated saving or justify changing ontology semantics.
 

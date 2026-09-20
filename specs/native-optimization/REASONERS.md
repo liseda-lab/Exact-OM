@@ -4,9 +4,10 @@ Implementation progress and artifact identities: [IMPLEMENTATION.md](IMPLEMENTAT
 
 Scope: N05–N08 acceptance requirements; current completion is recorded separately.
 These changes preserve public reasoning behavior under [CONTRACT.md](CONTRACT.md).
-Acceptance follows [VALIDATION.md](VALIDATION.md). The [source audit](../experiments/NATIVE-STACK-AUDIT.md) supplies the inspected baseline:
-pyELK `b7b373165f6cbc3452f022c542731d7b5f2f73be`;
-pyHermiT `c4bdbbc7581281cd46803a5c0eafd1f8a1f3c2af`.
+Acceptance follows [VALIDATION.md](VALIDATION.md). Current dependencies are published
+`pyelk-reasoner==0.2.1` and `pyhermit==0.2.1` under the [stack contract](../native-stack.md).
+The [historical source audit](../experiments/NATIVE-STACK-AUDIT.md) records the findings
+that motivated these requirements.
 
 ## Shared boundaries
 

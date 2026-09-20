@@ -3,13 +3,14 @@
 ## 1. Published package set
 
 Exact must declare compatible minor-line ranges while the lock and release evidence identify one
-exact published set:
+exact published set. The current lock resolves all four native distributions to `0.2.1`;
+see the [published stack contract](../native-stack.md):
 
 ```toml
-pyowl-core = ">=0.2,<0.3"
-pyowl2vec-star-projector = ">=0.2,<0.3"
-pyelk-reasoner = { version = ">=0.2,<0.3", optional = true }
-pyhermit = { version = ">=0.2,<0.3", optional = true }
+pyowl-core = ">=0.2.1,<0.3"
+pyowl2vec-star-projector = ">=0.2.1,<0.3"
+pyelk-reasoner = { version = ">=0.2.1,<0.3", optional = true }
+pyhermit = { version = ">=0.2.1,<0.3", optional = true }
 oaei-bioml-eval = { version = ">=0.2.1,<0.3", optional = true }
 ```
 
@@ -24,7 +25,7 @@ contract is:
 
 | Contract | Required value/behavior |
 |---|---|
-| package | released `pyowl-core==0.2.0` must work |
+| package | released `pyowl-core==0.2.1` must work |
 | API version | `(0, 2)` |
 | model schema | `2` |
 | wire | core-declared readable range includes version `2`; new payloads use the current writer |

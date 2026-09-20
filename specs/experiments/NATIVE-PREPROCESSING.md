@@ -14,7 +14,8 @@ fails explicitly. Import policies, strict parsing and hashed local import bindin
 force; inputs are not reparsed with a permissive backend.
 
 The narrow bridge in `exact/ontology/native_projection.py` uses the installed upstream
-compiler and edge policy, with a checked **0.2.0 / API 1** contract. It does not implement a
+compiler and edge policy from the [published native stack](../native-stack.md), with
+projector `0.2.1` in the current lock and its public **API 1** contract. It does not implement a
 second projection algorithm. Upgrading that dependency requires compatibility and parity
 checks. The installed compiler cannot retain the tested mmap owner's buffers; that owner is
 explicitly unsupported, with no scalar fallback. Normal document loading uses a native

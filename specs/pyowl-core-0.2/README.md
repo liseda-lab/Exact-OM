@@ -1,13 +1,14 @@
 # Exact-OM pyOWL 0.2 migration suite
 
 **Target Exact release:** `2.1.0`
-**Required core release:** `pyowl-core==0.2.0` supported through `>=0.2,<0.3`
-**Status:** ready for implementation
+**Required native releases:** published `0.2.1`, supported through `>=0.2.1,<0.3`
+**Dependency status:** adopted in Exact-OM; see the [published stack contract](../native-stack.md).
+Migration and release acceptance remain governed by the gates below.
 
 ## Authority and reading order
 
-This directory is the complete, normative implementation specification for migrating the current
-Exact-OM `2.0.0` codebase to the published pyOWL 0.2 stack and releasing Exact-OM `2.1.0`.
+This directory defines the migration from Exact-OM `2.0.0` to the published pyOWL 0.2
+API/model contracts and Exact-OM `2.1.0`. The current native package baseline is `0.2.1`.
 
 Implementation agents must read only this suite for migration scope and acceptance:
 
@@ -23,8 +24,8 @@ remain unchanged historical design records. They are not prerequisites for this 
 their former scale/performance release gates do not apply. If an old specification conflicts with
 this suite, this suite controls the Exact-OM `2.1.0` migration.
 
-The user phrase “0.2.1 version” is resolved here as Exact-OM `2.1.0`: the repository is currently
-Exact-OM `2.0.0`, while the dependency being adopted is `pyowl-core 0.2.0`.
+Exact-OM `2.1.0` and the native dependency release `0.2.1` have independent version numbers.
+Core API `(0, 2)` and model/encoded schema `2` remain the compatibility contract.
 
 ## Goal
 
@@ -80,7 +81,7 @@ The migration is complete only when:
 
 1. every preserved feature row and applicable audit defect in
    `00-legacy-compliance-closure.md` is closed;
-2. the lock resolves to published compatible 0.2 packages;
+2. the lock resolves to published compatible packages in `>=0.2.1,<0.3`;
 3. all normal CI and focused schema-2 tests pass on Python 3.10–3.12;
 4. base, `viz`, and `reasoning` distribution smoke tests pass without Java;
 5. schema-1 ontology caches are rejected and rebuilt rather than converted;

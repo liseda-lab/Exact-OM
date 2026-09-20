@@ -93,7 +93,7 @@ Exact retains the full shared ontology snapshot through [OwlOntologySource](../.
 | Individual meaning | Class/object/data assertions, negative assertions, same/different individuals | Instance-specific cards; types are not class parents; missing assertions are not negative assertions |
 | Source reliability/status | Document identities and hashes, imports, diagnostics, structural fingerprints and optional source spans | Portable manifest and clear unavailable/incomplete/filtered/truncated states |
 
-The [synthetic API probe](capability-probe-scope.md) demonstrates retrieval of these richer structures from current pyOWLCore source. It uses its Python backend and a tiny Functional Syntax fixture, not native parsing of the full Bio-ML files. Native RDF/XML performance and capability parity still need a bounded implementation check.
+The [synthetic API probe](capability-probe-scope.md) demonstrates retrieval of these richer structures from the historical pyOWLCore implementation tested. It uses its Python backend and a tiny Functional Syntax fixture, not native parsing of the full Bio-ML files. Native RDF/XML performance and capability parity still need a bounded implementation check.
 
 Two semantic details must be explicit in the shared contract. First, Exact's current “asserted” hierarchy facade performs reduction and adds some consequences of equivalent expressions. Literal asserted axioms, structurally derived navigation edges, and reasoner-inferred edges are different products. Second, an existential class restriction is a statement about instances of a class; it is not an ordinary factual link between two class nodes. The readable renderer must preserve that distinction. [Hierarchy adapter](../../../exact/ontology/store.py).
 

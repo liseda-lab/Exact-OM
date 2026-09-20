@@ -8,7 +8,7 @@ Install its optional dependencies:
 poetry install --extras repair
 ```
 
-The qualified component versions are PySAT 1.8.dev24 (RC2/Glucose3), PySDD 1.0.6, torch-geometric 2.6.1, and the shared pyowl-core/pyHermiT/pyELK 0.2 interfaces. Neural modules and external solvers are imported only when used.
+The component validation record covers PySAT 1.8.dev24 (RC2/Glucose3), PySDD 1.0.6 and torch-geometric 2.6.1. Current ontology dependencies follow the [published native stack](https://github.com/liseda-lab/Exact-OM/blob/main/specs/native-stack.md): `0.2.1` is locked for core, projector and optional reasoners, with the shared 0.2 API contracts. Neural modules and external solvers are imported only when used.
 
 ## Standalone and sequential use
 
@@ -122,4 +122,4 @@ poetry run python specs/exact-repair/reference/validate_protocol.py
 
 These tests exercise small semantic fixtures, brute-force finite comparisons, circuit distributions/gradients, feature isolation, typed learning, CLI replay and process failures. They are not Conference/Bio-ML evaluation, throughput measurements or evidence of learned model quality. Full-scale experiments and model-quality claims require separate, explicitly scheduled work.
 
-See the [dated validation record](../project/repair-validation.md) for executed checks and the local optimized dependency revisions used.
+See the [validation record](../project/repair-validation.md) for the current dependency contract and dated historical checks.
