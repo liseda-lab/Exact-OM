@@ -1,0 +1,62 @@
+{
+  "NCIT-DOID/train": {
+    "file": "/Users/pedrocotovio/Documents/Repos/OM/bio-ml/NCIT-DOID/refs_equiv/train.tsv",
+    "sha256": "e295deceb202c0fd6dda78a80b4055b9d08430df3a0301d054abaad55f05087f",
+    "rows": 3262,
+    "relation_counts": {
+      "=": 3085,
+      "<=": 165,
+      ">=": 12
+    }
+  },
+  "NCIT-DOID/valid": {
+    "file": "/Users/pedrocotovio/Documents/Repos/OM/bio-ml/NCIT-DOID/refs_equiv/valid.tsv",
+    "sha256": "2ac2115167c5470f6632a215d233b071e6844177706305f16d33b9683664583a",
+    "rows": 530,
+    "relation_counts": {
+      "=": 505,
+      "<=": 24,
+      ">=": 1
+    }
+  },
+  "SNOMED-FMA/train": {
+    "file": "/Users/pedrocotovio/Documents/Repos/OM/bio-ml/SNOMED-FMA/refs_equiv/train.tsv",
+    "sha256": "bb50d427b907b3488664cc0d4d96bc628eab42323bd68b953c6b36bbb4fd858c",
+    "rows": 3239,
+    "relation_counts": {
+      "<=": 2809,
+      "=": 406,
+      ">=": 24
+    }
+  },
+  "SNOMED-FMA/valid": {
+    "file": "/Users/pedrocotovio/Documents/Repos/OM/bio-ml/SNOMED-FMA/refs_equiv/valid.tsv",
+    "sha256": "5f6c752de78d4a7d3cfcc9a1e41a216109b32dc4bfba309f4a5521b3404abec3",
+    "rows": 541,
+    "relation_counts": {
+      "<=": 472,
+      "=": 67,
+      ">=": 2
+    }
+  },
+  "SNOMED-NCIT/train": {
+    "file": "/Users/pedrocotovio/Documents/Repos/OM/bio-ml/SNOMED-NCIT/refs_equiv/train.tsv",
+    "sha256": "8817be6600afa787f1c97466e317389859b5712ea45fb88a273b41dc6743c78a",
+    "rows": 17283,
+    "relation_counts": {
+      "<=": 354,
+      "=": 16901,
+      ">=": 28
+    }
+  },
+  "SNOMED-NCIT/valid": {
+    "file": "/Users/pedrocotovio/Documents/Repos/OM/bio-ml/SNOMED-NCIT/refs_equiv/valid.tsv",
+    "sha256": "78fab8470d94856c5f5fb3a3b1018d87bb1a4c55241cd6b8a1787c13e9267617",
+    "rows": 2864,
+    "relation_counts": {
+      "=": 2814,
+      ">=": 3,
+      "<=": 47
+    }
+  }
+}

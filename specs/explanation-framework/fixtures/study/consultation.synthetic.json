@@ -1,0 +1,17 @@
+{
+  "artifact_type": "case_consultation",
+  "contract_version": "exact-study/1.0",
+  "study_revision": "synthetic-study/v1",
+  "session_id": "synthetic-session",
+  "case_id": "case-alpha",
+  "revision": 1,
+  "consulted_external_ontologies": true,
+  "methods": [
+    "protege",
+    "plain_files"
+  ],
+  "other_editor": null,
+  "other_resource": null,
+  "saved_at": "2026-09-20T12:00:05Z",
+  "fixture_provenance": "Synthetic design fixture; no participant, matcher run, invitation or hosted study exists. Do not deploy this as real study content."
+}

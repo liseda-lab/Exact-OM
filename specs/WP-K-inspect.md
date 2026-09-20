@@ -6,6 +6,14 @@ PR-D3 (delivery consolidation) on the CLI shim. **Size**: M.
 vars honored via shims); local usage gains a simpler entry point.
 **Status**: Done (2026-07-16).
 
+**Follow-on scope (2026-09-19):** The [explanation-framework suite](explanation-framework/README.md)
+governs the new independent ontology context, richer APIs, explanation products and full UI
+redesign. WP-K's completed repackaging remains the foundation; it does not mean those new
+features are implemented. The new suite explicitly supersedes limited selected-graph context
+where stated, preserves legacy compatibility, and admits its frontend specialist only after
+backend readiness.
+
+
 ## Context
 
 The alignment/explanation viewer is currently three loosely stapled pieces:

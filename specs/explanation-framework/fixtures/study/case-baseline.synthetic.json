@@ -1,0 +1,82 @@
+{
+  "artifact_type": "study_case",
+  "contract_version": "exact-study/1.0",
+  "study_revision": "synthetic-study/v1",
+  "case_id": "case-alpha",
+  "presentation_id": "presentation-alpha",
+  "condition": "ontology_baseline",
+  "source": {
+    "ontology_version_id": "synthetic-source/v1",
+    "iri": "urn:fixture:source",
+    "kind": "class"
+  },
+  "source_label": "Synthetic source",
+  "candidates": [
+    {
+      "candidate_id": "candidate-1",
+      "entity": {
+        "ontology_version_id": "synthetic-target/v1",
+        "iri": "urn:fixture:target:1",
+        "kind": "class"
+      },
+      "label": "Synthetic candidate 1",
+      "score": 0.9,
+      "score_meaning": "Synthetic numeric ordering only; no probability or actual matcher claim.",
+      "display_position": 1
+    },
+    {
+      "candidate_id": "candidate-2",
+      "entity": {
+        "ontology_version_id": "synthetic-target/v1",
+        "iri": "urn:fixture:target:2",
+        "kind": "class"
+      },
+      "label": "Synthetic candidate 2",
+      "score": 0.8,
+      "score_meaning": "Synthetic numeric ordering only; no probability or actual matcher claim.",
+      "display_position": 2
+    },
+    {
+      "candidate_id": "candidate-3",
+      "entity": {
+        "ontology_version_id": "synthetic-target/v1",
+        "iri": "urn:fixture:target:3",
+        "kind": "class"
+      },
+      "label": "Synthetic candidate 3",
+      "score": 0.7,
+      "score_meaning": "Synthetic numeric ordering only; no probability or actual matcher claim.",
+      "display_position": 3
+    },
+    {
+      "candidate_id": "candidate-4",
+      "entity": {
+        "ontology_version_id": "synthetic-target/v1",
+        "iri": "urn:fixture:target:4",
+        "kind": "class"
+      },
+      "label": "Synthetic candidate 4",
+      "score": 0.6,
+      "score_meaning": "Synthetic numeric ordering only; no probability or actual matcher claim.",
+      "display_position": 4
+    },
+    {
+      "candidate_id": "candidate-5",
+      "entity": {
+        "ontology_version_id": "synthetic-target/v1",
+        "iri": "urn:fixture:target:5",
+        "kind": "class"
+      },
+      "label": "Synthetic candidate 5",
+      "score": 0.5,
+      "score_meaning": "Synthetic numeric ordering only; no probability or actual matcher claim.",
+      "display_position": 5
+    }
+  ],
+  "explanation_refs": [],
+  "ontology_resource_ids": [
+    "synthetic-source-resource",
+    "synthetic-target-resource"
+  ],
+  "fixture_provenance": "Synthetic design fixture; no participant, matcher run, invitation or hosted study exists. Do not deploy this as real study content."
+}

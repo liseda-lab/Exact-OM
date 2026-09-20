@@ -1,0 +1,186 @@
+{
+  "artifact_type": "entity_context",
+  "contract_version": "exact-explain/1.0",
+  "entity": {
+    "ontology_version_id": "root-sha256:611355c445537fcf4bae2c519f1b3598af5a8fea793274316e35525b7d05e945",
+    "iri": "http://purl.obolibrary.org/obo/DOID_11665",
+    "kind": "class"
+  },
+  "labels": [
+    {
+      "text": "Patau syndrome",
+      "language": null,
+      "predicate_iri": "http://www.w3.org/2000/01/rdf-schema#label"
+    }
+  ],
+  "definitions": {
+    "items": [],
+    "returned_count": 0,
+    "total_count": 0,
+    "next_cursor": null,
+    "truncated": false,
+    "scope": {
+      "ontology_version_id": "root-sha256:611355c445537fcf4bae2c519f1b3598af5a8fea793274316e35525b7d05e945",
+      "context_revision": "raw-profile/2026-09-19",
+      "basis": "root_document",
+      "visibility_policy_hash": "sha256:35fb8b7b1159ef0deba1eb36e4937834110305b6e06e2f095786216473e693ed",
+      "filter_id": "fixture-original-annotations"
+    },
+    "status": "absent_in_scope",
+    "reason": "No assertion of this category found in the profiled root document; imports/inference were not loaded."
+  },
+  "synonyms": {
+    "items": [
+      {
+        "fact_id": "sha256:67d8c15eef4e11b9914936370dd758735e1fbb2cc5dd0e40f0f733db2ea8d992",
+        "subject": {
+          "ontology_version_id": "root-sha256:611355c445537fcf4bae2c519f1b3598af5a8fea793274316e35525b7d05e945",
+          "iri": "http://purl.obolibrary.org/obo/DOID_11665",
+          "kind": "class"
+        },
+        "predicate_iri": "http://www.geneontology.org/formats/oboInOwl#hasExactSynonym",
+        "value": {
+          "term_type": "literal",
+          "lexical_form": "D1 Trisomy",
+          "datatype": null,
+          "language": null
+        },
+        "axiom_ref": null,
+        "interpretation": "asserted",
+        "origins": [
+          {
+            "document_sha256": "sha256:611355c445537fcf4bae2c519f1b3598af5a8fea793274316e35525b7d05e945",
+            "axiom_id": null,
+            "source_span": null,
+            "provenance_status": "raw_profile_extraction"
+          }
+        ],
+        "premise_ids": [],
+        "derivation_id": null
+      },
+      {
+        "fact_id": "sha256:8128400a09c19eddbbd7599cdd2704dce196e8a27c35cbe156396a671bb7f6dc",
+        "subject": {
+          "ontology_version_id": "root-sha256:611355c445537fcf4bae2c519f1b3598af5a8fea793274316e35525b7d05e945",
+          "iri": "http://purl.obolibrary.org/obo/DOID_11665",
+          "kind": "class"
+        },
+        "predicate_iri": "http://www.geneontology.org/formats/oboInOwl#hasExactSynonym",
+        "value": {
+          "term_type": "literal",
+          "lexical_form": "trisomy 13",
+          "datatype": null,
+          "language": null
+        },
+        "axiom_ref": null,
+        "interpretation": "asserted",
+        "origins": [
+          {
+            "document_sha256": "sha256:611355c445537fcf4bae2c519f1b3598af5a8fea793274316e35525b7d05e945",
+            "axiom_id": null,
+            "source_span": null,
+            "provenance_status": "raw_profile_extraction"
+          }
+        ],
+        "premise_ids": [],
+        "derivation_id": null
+      },
+      {
+        "fact_id": "sha256:c48d86b7e12b0458f40b9a5a4b3f3ec83b07940689f9c6fb244ef2e6533cefe8",
+        "subject": {
+          "ontology_version_id": "root-sha256:611355c445537fcf4bae2c519f1b3598af5a8fea793274316e35525b7d05e945",
+          "iri": "http://purl.obolibrary.org/obo/DOID_11665",
+          "kind": "class"
+        },
+        "predicate_iri": "http://www.geneontology.org/formats/oboInOwl#hasRelatedSynonym",
+        "value": {
+          "term_type": "literal",
+          "lexical_form": "Patau's syndrome",
+          "datatype": null,
+          "language": null
+        },
+        "axiom_ref": null,
+        "interpretation": "asserted",
+        "origins": [
+          {
+            "document_sha256": "sha256:611355c445537fcf4bae2c519f1b3598af5a8fea793274316e35525b7d05e945",
+            "axiom_id": null,
+            "source_span": null,
+            "provenance_status": "raw_profile_extraction"
+          }
+        ],
+        "premise_ids": [],
+        "derivation_id": null
+      }
+    ],
+    "returned_count": 3,
+    "total_count": 3,
+    "next_cursor": null,
+    "truncated": false,
+    "scope": {
+      "ontology_version_id": "root-sha256:611355c445537fcf4bae2c519f1b3598af5a8fea793274316e35525b7d05e945",
+      "context_revision": "raw-profile/2026-09-19",
+      "basis": "root_document",
+      "visibility_policy_hash": "sha256:35fb8b7b1159ef0deba1eb36e4937834110305b6e06e2f095786216473e693ed",
+      "filter_id": "fixture-original-annotations"
+    },
+    "status": "available",
+    "reason": null
+  },
+  "parents": {
+    "items": [
+      {
+        "fact_id": "sha256:5943cd20bffb002d17fe494be493f844baada8111ec97a405a2b126562ffe231",
+        "subject": {
+          "ontology_version_id": "root-sha256:611355c445537fcf4bae2c519f1b3598af5a8fea793274316e35525b7d05e945",
+          "iri": "http://purl.obolibrary.org/obo/DOID_11665",
+          "kind": "class"
+        },
+        "predicate_iri": "http://www.w3.org/2000/01/rdf-schema#subClassOf",
+        "value": {
+          "term_type": "iri",
+          "iri": "http://purl.obolibrary.org/obo/DOID_0080014"
+        },
+        "axiom_ref": null,
+        "interpretation": "asserted",
+        "origins": [
+          {
+            "document_sha256": "sha256:611355c445537fcf4bae2c519f1b3598af5a8fea793274316e35525b7d05e945",
+            "axiom_id": null,
+            "source_span": null,
+            "provenance_status": "raw_profile_extraction"
+          }
+        ],
+        "premise_ids": [],
+        "derivation_id": null
+      }
+    ],
+    "returned_count": 1,
+    "total_count": 1,
+    "next_cursor": null,
+    "truncated": false,
+    "scope": {
+      "ontology_version_id": "root-sha256:611355c445537fcf4bae2c519f1b3598af5a8fea793274316e35525b7d05e945",
+      "context_revision": "raw-profile/2026-09-19",
+      "basis": "root_document",
+      "visibility_policy_hash": "sha256:35fb8b7b1159ef0deba1eb36e4937834110305b6e06e2f095786216473e693ed",
+      "filter_id": "fixture-original-annotations"
+    },
+    "status": "available",
+    "reason": null
+  },
+  "capabilities": {
+    "original_axiom_provenance": "not_exported",
+    "restrictions": "not_exported",
+    "inference": "not_run",
+    "source_spans": "not_exported"
+  },
+  "context_scope": {
+    "ontology_version_id": "root-sha256:611355c445537fcf4bae2c519f1b3598af5a8fea793274316e35525b7d05e945",
+    "context_revision": "raw-profile/2026-09-19",
+    "basis": "root_document",
+    "visibility_policy_hash": "sha256:35fb8b7b1159ef0deba1eb36e4937834110305b6e06e2f095786216473e693ed",
+    "filter_id": "fixture-original-annotations"
+  },
+  "fixture_provenance": "Actual pinned root-ontology annotations from raw streaming profile, adapted to target schema. Not native-context acceptance, a fresh Exact run, a generated profile or a complete production entity payload. Literal datatype/language were not retained by every profiling category; null denotes unknown, not proof of untyped text."
+}

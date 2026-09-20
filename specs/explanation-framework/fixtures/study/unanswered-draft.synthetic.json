@@ -1,0 +1,18 @@
+{
+  "artifact_type": "ranking_response",
+  "contract_version": "exact-study/1.0",
+  "study_revision": "synthetic-study/v1",
+  "session_id": "synthetic-session",
+  "case_id": "case-alpha",
+  "presentation_id": "presentation-alpha",
+  "revision": 2,
+  "workflow_state": "draft",
+  "response_type": null,
+  "ranked_candidate_ids": [],
+  "timing_segment_ids": [
+    "synthetic-segment-1"
+  ],
+  "saved_at": "2026-09-20T12:00:00Z",
+  "submitted_at": null,
+  "fixture_provenance": "Synthetic design fixture; no participant, matcher run, invitation or hosted study exists. Do not deploy this as real study content."
+}

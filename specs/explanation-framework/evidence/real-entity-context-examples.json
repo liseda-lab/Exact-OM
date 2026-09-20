@@ -1,0 +1,410 @@
+{
+  "schema": "feasibility-context-example/0; not a finalized API",
+  "dataset_revision": {
+    "repo": "OAEI-ML/bio-ml",
+    "revision": "2026",
+    "sha": "c454644a334ab43754bc1070c0fb7fdd56a90a1d"
+  },
+  "purpose": "Concrete original-ontology context for interface/data-contract design. Candidate pairs taken from public training data, without reference judgment fields in case payloads. Not a matcher run, formal entailment proof, adjudication answer key, or LLM result.",
+  "examples": [
+    {
+      "case_id": "C114940",
+      "development_purpose": "Both definitions, restrictions, and multiple target parents",
+      "entities": {
+        "NCIT": {
+          "identity": {
+            "ontology_id": "NCIT",
+            "snapshot_sha256": "1a7182a7327ebc4181f7d6b0f7e81ed04dd258f1a86bd8f560e4a0d61439d58a",
+            "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C114940",
+            "kind": "class"
+          },
+          "label": "Malignant Cardiovascular Neoplasm",
+          "definitions": [
+            {
+              "predicate_iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#P97",
+              "text": "A primary or metastatic malignant neoplasm involving the cardiovascular system.",
+              "language": null
+            }
+          ],
+          "definition_status": "present",
+          "synonyms": [
+            {
+              "predicate_iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#P90",
+              "text": "Malignant Cardiovascular Neoplasm"
+            }
+          ],
+          "literal_asserted_named_parents": [],
+          "children": {
+            "total_count": 0,
+            "items": [],
+            "status": "counted_but_not_exported_in_this_example"
+          },
+          "class_description_expressions": {
+            "format": "RDF/XML subClassOf/equivalentClass fragments",
+            "items": [
+              "<ns0:equivalentClass xmlns:ns0=\"http://www.w3.org/2002/07/owl#\" xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">\n            <ns0:Class>\n                <ns0:intersectionOf rdf:parseType=\"Collection\">\n                    <rdf:Description rdf:about=\"http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C4784\" />\n                    <rdf:Description rdf:about=\"http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C9305\" />\n                    <ns0:Restriction>\n                        <ns0:onProperty rdf:resource=\"http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#R100\" />\n                        <ns0:someValuesFrom rdf:resource=\"http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C12686\" />\n                    </ns0:Restriction>\n                </ns0:intersectionOf>\n            </ns0:Class>\n        </ns0:equivalentClass>\n        "
+            ],
+            "contains_restrictions": 1
+          },
+          "predicate_lookup": {
+            "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#R100": {
+              "label": "Disease_Has_Associated_Anatomic_Site",
+              "status": "present_in_root"
+            }
+          },
+          "context_scope": "root document only; import closure and inference not loaded",
+          "imports_declared": [],
+          "source_span_status": "not_collected_by_this_streaming_profile"
+        },
+        "DOID": {
+          "identity": {
+            "ontology_id": "DOID",
+            "snapshot_sha256": "611355c445537fcf4bae2c519f1b3598af5a8fea793274316e35525b7d05e945",
+            "iri": "http://purl.obolibrary.org/obo/DOID_176",
+            "kind": "class"
+          },
+          "label": "cardiovascular cancer",
+          "definitions": [
+            {
+              "predicate_iri": "http://purl.obolibrary.org/obo/IAO_0000115",
+              "text": "An organ system cancer that located_in the heart and blood vessels.",
+              "language": "en"
+            }
+          ],
+          "definition_status": "present",
+          "synonyms": [
+            {
+              "predicate_iri": "http://www.geneontology.org/formats/oboInOwl#hasExactSynonym",
+              "text": "Cardiovascular tumors"
+            },
+            {
+              "predicate_iri": "http://www.geneontology.org/formats/oboInOwl#hasExactSynonym",
+              "text": "cardiovascular neoplasm"
+            }
+          ],
+          "literal_asserted_named_parents": [
+            {
+              "iri": "http://purl.obolibrary.org/obo/DOID_0050686",
+              "label": "organ system cancer"
+            },
+            {
+              "iri": "http://purl.obolibrary.org/obo/DOID_1287",
+              "label": "cardiovascular system disease"
+            }
+          ],
+          "children": {
+            "total_count": 2,
+            "items": [],
+            "status": "counted_but_not_exported_in_this_example"
+          },
+          "class_description_expressions": {
+            "format": "RDF/XML subClassOf/equivalentClass fragments",
+            "items": [
+              "<ns0:equivalentClass xmlns:ns0=\"http://www.w3.org/2002/07/owl#\" xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">\n            <ns0:Class>\n                <ns0:intersectionOf rdf:parseType=\"Collection\">\n                    <rdf:Description rdf:about=\"http://purl.obolibrary.org/obo/DOID_162\" />\n                    <ns0:Restriction>\n                        <ns0:onProperty rdf:resource=\"http://purl.obolibrary.org/obo/RO_0004026\" />\n                        <ns0:someValuesFrom rdf:resource=\"http://purl.obolibrary.org/obo/UBERON_0004535\" />\n                    </ns0:Restriction>\n                </ns0:intersectionOf>\n            </ns0:Class>\n        </ns0:equivalentClass>\n        "
+            ],
+            "contains_restrictions": 1
+          },
+          "predicate_lookup": {
+            "http://purl.obolibrary.org/obo/RO_0004026": {
+              "label": null,
+              "status": "not_declared_or_unlabelled_in_root"
+            }
+          },
+          "context_scope": "root document only; import closure and inference not loaded",
+          "imports_declared": [
+            "http://purl.obolibrary.org/obo/doid/obo/ext.owl"
+          ],
+          "source_span_status": "not_collected_by_this_streaming_profile"
+        }
+      },
+      "matcher_evidence": {
+        "status": "not_generated_for_this_feasibility_probe"
+      },
+      "decision_trace": {
+        "status": "not_generated_for_this_feasibility_probe"
+      },
+      "generated_prose": {
+        "status": "not_generated; these are original ontology annotations"
+      }
+    },
+    {
+      "case_id": "C101223",
+      "development_purpose": "Source definition present; target definition absent",
+      "entities": {
+        "NCIT": {
+          "identity": {
+            "ontology_id": "NCIT",
+            "snapshot_sha256": "1a7182a7327ebc4181f7d6b0f7e81ed04dd258f1a86bd8f560e4a0d61439d58a",
+            "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C101223",
+            "kind": "class"
+          },
+          "label": "Complete Trisomy 13 Syndrome",
+          "definitions": [
+            {
+              "predicate_iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#P97",
+              "text": "A syndrome characterized by the presence of three complete copies of genetic material for chromosome 13, instead of the normal two. It leads to a variety of abnormalities that include mental retardation, microcephaly, low-set ears, eye structural defects, polydactyly, and limb abnormalities.",
+              "language": null
+            }
+          ],
+          "definition_status": "present",
+          "synonyms": [
+            {
+              "predicate_iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#P90",
+              "text": "Complete Trisomy 13 Syndrome"
+            },
+            {
+              "predicate_iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#P90",
+              "text": "Patau Syndrome"
+            }
+          ],
+          "literal_asserted_named_parents": [
+            {
+              "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C28193",
+              "label": "Syndrome"
+            }
+          ],
+          "children": {
+            "total_count": 0,
+            "items": [],
+            "status": "counted_but_not_exported_in_this_example"
+          },
+          "class_description_expressions": {
+            "format": "RDF/XML subClassOf/equivalentClass fragments",
+            "items": [
+              "<ns0:subClassOf xmlns:ns0=\"http://www.w3.org/2000/01/rdf-schema#\" xmlns:ns1=\"http://www.w3.org/2002/07/owl#\" xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">\n            <ns1:Restriction>\n                <ns1:onProperty rdf:resource=\"http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#R106\" />\n                <ns1:someValuesFrom rdf:resource=\"http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C36529\" />\n            </ns1:Restriction>\n        </ns0:subClassOf>\n        ",
+              "<ns0:subClassOf xmlns:ns0=\"http://www.w3.org/2000/01/rdf-schema#\" xmlns:ns1=\"http://www.w3.org/2002/07/owl#\" xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">\n            <ns1:Restriction>\n                <ns1:onProperty rdf:resource=\"http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#R174\" />\n                <ns1:someValuesFrom rdf:resource=\"http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C13208\" />\n            </ns1:Restriction>\n        </ns0:subClassOf>\n        "
+            ],
+            "contains_restrictions": 2
+          },
+          "predicate_lookup": {
+            "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#R106": {
+              "label": "Disease_Has_Molecular_Abnormality",
+              "status": "present_in_root"
+            },
+            "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#R174": {
+              "label": "Disease_Mapped_To_Chromosome",
+              "status": "present_in_root"
+            }
+          },
+          "context_scope": "root document only; import closure and inference not loaded",
+          "imports_declared": [],
+          "source_span_status": "not_collected_by_this_streaming_profile"
+        },
+        "DOID": {
+          "identity": {
+            "ontology_id": "DOID",
+            "snapshot_sha256": "611355c445537fcf4bae2c519f1b3598af5a8fea793274316e35525b7d05e945",
+            "iri": "http://purl.obolibrary.org/obo/DOID_11665",
+            "kind": "class"
+          },
+          "label": "Patau syndrome",
+          "definitions": [],
+          "definition_status": "no_definition_assertion_in_root_document",
+          "synonyms": [
+            {
+              "predicate_iri": "http://www.geneontology.org/formats/oboInOwl#hasExactSynonym",
+              "text": "D1 Trisomy"
+            },
+            {
+              "predicate_iri": "http://www.geneontology.org/formats/oboInOwl#hasExactSynonym",
+              "text": "trisomy 13"
+            },
+            {
+              "predicate_iri": "http://www.geneontology.org/formats/oboInOwl#hasRelatedSynonym",
+              "text": "Patau's syndrome"
+            }
+          ],
+          "literal_asserted_named_parents": [
+            {
+              "iri": "http://purl.obolibrary.org/obo/DOID_0080014",
+              "label": "chromosomal disease"
+            }
+          ],
+          "children": {
+            "total_count": 0,
+            "items": [],
+            "status": "counted_but_not_exported_in_this_example"
+          },
+          "class_description_expressions": {
+            "format": "RDF/XML subClassOf/equivalentClass fragments",
+            "items": [],
+            "contains_restrictions": 0
+          },
+          "predicate_lookup": {},
+          "context_scope": "root document only; import closure and inference not loaded",
+          "imports_declared": [
+            "http://purl.obolibrary.org/obo/doid/obo/ext.owl"
+          ],
+          "source_span_status": "not_collected_by_this_streaming_profile"
+        }
+      },
+      "matcher_evidence": {
+        "status": "not_generated_for_this_feasibility_probe"
+      },
+      "decision_trace": {
+        "status": "not_generated_for_this_feasibility_probe"
+      },
+      "generated_prose": {
+        "status": "not_generated; these are original ontology annotations"
+      }
+    },
+    {
+      "case_id": "C116573",
+      "development_purpose": "Domain-readable disease example with structured restrictions",
+      "entities": {
+        "NCIT": {
+          "identity": {
+            "ontology_id": "NCIT",
+            "snapshot_sha256": "1a7182a7327ebc4181f7d6b0f7e81ed04dd258f1a86bd8f560e4a0d61439d58a",
+            "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C116573",
+            "kind": "class"
+          },
+          "label": "Dravet Syndrome",
+          "definitions": [
+            {
+              "predicate_iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#P325",
+              "text": "A severe form of epilepsy that presents in early childhood and is characterized by frequent, prolonged febrile or myoclonic seizures that may progress to status epilepticus and poor development of language, motor, and socialization skills.",
+              "language": null
+            },
+            {
+              "predicate_iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#P97",
+              "text": "A severe form of epilepsy that presents in early childhood and is characterized by frequent, prolonged febrile or myoclonic seizures that may progress to status epilepticus and poor development of language, motor, and socialization skills.",
+              "language": null
+            }
+          ],
+          "definition_status": "present",
+          "synonyms": [
+            {
+              "predicate_iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#P90",
+              "text": "Dravet Syndrome"
+            },
+            {
+              "predicate_iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#P90",
+              "text": "SMEI"
+            },
+            {
+              "predicate_iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#P90",
+              "text": "Severe Myoclonic Epilepsy of Infancy"
+            }
+          ],
+          "literal_asserted_named_parents": [
+            {
+              "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C28193",
+              "label": "Syndrome"
+            },
+            {
+              "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C3020",
+              "label": "Seizure Disorder"
+            }
+          ],
+          "children": {
+            "total_count": 0,
+            "items": [],
+            "status": "counted_but_not_exported_in_this_example"
+          },
+          "class_description_expressions": {
+            "format": "RDF/XML subClassOf/equivalentClass fragments",
+            "items": [
+              "<ns0:subClassOf xmlns:ns0=\"http://www.w3.org/2000/01/rdf-schema#\" xmlns:ns1=\"http://www.w3.org/2002/07/owl#\" xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">\n            <ns1:Restriction>\n                <ns1:onProperty rdf:resource=\"http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#R176\" />\n                <ns1:someValuesFrom rdf:resource=\"http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C102447\" />\n            </ns1:Restriction>\n        </ns0:subClassOf>\n        "
+            ],
+            "contains_restrictions": 1
+          },
+          "predicate_lookup": {
+            "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#R176": {
+              "label": "Disease_Mapped_To_Gene",
+              "status": "present_in_root"
+            }
+          },
+          "context_scope": "root document only; import closure and inference not loaded",
+          "imports_declared": [],
+          "source_span_status": "not_collected_by_this_streaming_profile"
+        },
+        "DOID": {
+          "identity": {
+            "ontology_id": "DOID",
+            "snapshot_sha256": "611355c445537fcf4bae2c519f1b3598af5a8fea793274316e35525b7d05e945",
+            "iri": "http://purl.obolibrary.org/obo/DOID_0080422",
+            "kind": "class"
+          },
+          "label": "Dravet syndrome",
+          "definitions": [
+            {
+              "predicate_iri": "http://purl.obolibrary.org/obo/IAO_0000115",
+              "text": "A developmental and epileptic encephalopathy characterized by onset of seizures that are usually refractory to treatment in the first year of life after normal early development and impaired psychomoter development starting around the second year of life that has_material_basis_in heterozygous mutation in the SCN1A gene on chromosome 2q24.",
+              "language": "en"
+            }
+          ],
+          "definition_status": "present",
+          "synonyms": [
+            {
+              "predicate_iri": "http://www.geneontology.org/formats/oboInOwl#hasExactSynonym",
+              "text": "DEE6"
+            },
+            {
+              "predicate_iri": "http://www.geneontology.org/formats/oboInOwl#hasExactSynonym",
+              "text": "DEE6A"
+            },
+            {
+              "predicate_iri": "http://www.geneontology.org/formats/oboInOwl#hasExactSynonym",
+              "text": "developmental and epileptic encephalopathy 6"
+            },
+            {
+              "predicate_iri": "http://www.geneontology.org/formats/oboInOwl#hasExactSynonym",
+              "text": "developmental and epileptic encephalopathy 6A"
+            },
+            {
+              "predicate_iri": "http://www.geneontology.org/formats/oboInOwl#hasExactSynonym",
+              "text": "early infantile epileptic encephalopathy 6"
+            },
+            {
+              "predicate_iri": "http://www.geneontology.org/formats/oboInOwl#hasExactSynonym",
+              "text": "severe myoclonic epilepsy of infancy"
+            }
+          ],
+          "literal_asserted_named_parents": [
+            {
+              "iri": "http://purl.obolibrary.org/obo/DOID_0050736",
+              "label": "autosomal dominant disease"
+            },
+            {
+              "iri": "http://purl.obolibrary.org/obo/DOID_0112202",
+              "label": "developmental and epileptic encephalopathy"
+            }
+          ],
+          "children": {
+            "total_count": 0,
+            "items": [],
+            "status": "counted_but_not_exported_in_this_example"
+          },
+          "class_description_expressions": {
+            "format": "RDF/XML subClassOf/equivalentClass fragments",
+            "items": [
+              "<ns0:subClassOf xmlns:ns0=\"http://www.w3.org/2000/01/rdf-schema#\" xmlns:ns1=\"http://www.w3.org/2002/07/owl#\" xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">\n            <ns1:Restriction>\n                <ns1:onProperty rdf:resource=\"http://purl.obolibrary.org/obo/IDO_0000664\" />\n                <ns1:someValuesFrom rdf:resource=\"http://purl.obolibrary.org/obo/GENO_0000147\" />\n            </ns1:Restriction>\n        </ns0:subClassOf>\n        "
+            ],
+            "contains_restrictions": 1
+          },
+          "predicate_lookup": {
+            "http://purl.obolibrary.org/obo/IDO_0000664": {
+              "label": "has material basis in",
+              "status": "present_in_root"
+            }
+          },
+          "context_scope": "root document only; import closure and inference not loaded",
+          "imports_declared": [
+            "http://purl.obolibrary.org/obo/doid/obo/ext.owl"
+          ],
+          "source_span_status": "not_collected_by_this_streaming_profile"
+        }
+      },
+      "matcher_evidence": {
+        "status": "not_generated_for_this_feasibility_probe"
+      },
+      "decision_trace": {
+        "status": "not_generated_for_this_feasibility_probe"
+      },
+      "generated_prose": {
+        "status": "not_generated; these are original ontology annotations"
+      }
+    }
+  ]
+}

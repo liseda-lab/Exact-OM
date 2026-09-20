@@ -1,0 +1,119 @@
+{
+  "scope": "Streaming RDF/XML scan of named owl:Class top-level declarations. Direct named rdfs:subClassOf edges counted literally. Nested OWL restrictions counted as syntax, not entailments. No inference/import loading. Definition predicates explicitly NCIT P97/P325, IAO_0000115 and FMA definition; synonyms NCIT P90, OBO synonym predicates and FMA synonym. Training cohort is local.train.cands.tsv reference endpoints, not held-out test. Global repaired refs are not used as equivalence truth.",
+  "dataset_revision": {
+    "repo": "OAEI-ML/bio-ml",
+    "revision": "2026",
+    "sha": "c454644a334ab43754bc1070c0fb7fdd56a90a1d"
+  },
+  "ontologies": {
+    "NCIT": {
+      "bytes": 747403746,
+      "sha256": "1a7182a7327ebc4181f7d6b0f7e81ed04dd258f1a86bd8f560e4a0d61439d58a",
+      "all_named_class_declarations": {
+        "named_class_count": 211958,
+        "with_label": 211958,
+        "with_definition": 181014,
+        "with_synonym": 211958,
+        "with_named_direct_parent": 188090,
+        "with_multiple_named_direct_parents": 18284,
+        "with_named_direct_children": 27070,
+        "with_restriction_expression": 45727,
+        "with_equivalent_expression": 23849,
+        "owl_deprecated_true": 5579,
+        "max_direct_child_count": 3234
+      },
+      "local_train_reference_endpoints": {
+        "named_class_count": 3741,
+        "with_label": 3741,
+        "with_definition": 3741,
+        "with_synonym": 3741,
+        "with_named_direct_parent": 1943,
+        "with_multiple_named_direct_parents": 492,
+        "with_named_direct_children": 649,
+        "with_restriction_expression": 1785,
+        "with_equivalent_expression": 1798,
+        "owl_deprecated_true": 0,
+        "max_direct_child_count": 576
+      },
+      "expected_training_endpoint_count": 3741,
+      "missing_training_endpoint_count": 0
+    },
+    "DOID": {
+      "bytes": 28385948,
+      "sha256": "611355c445537fcf4bae2c519f1b3598af5a8fea793274316e35525b7d05e945",
+      "all_named_class_declarations": {
+        "named_class_count": 14703,
+        "with_label": 14703,
+        "with_definition": 10528,
+        "with_synonym": 9759,
+        "with_named_direct_parent": 12190,
+        "with_multiple_named_direct_parents": 4709,
+        "with_named_direct_children": 2447,
+        "with_restriction_expression": 6684,
+        "with_equivalent_expression": 731,
+        "owl_deprecated_true": 2512,
+        "max_direct_child_count": 1793
+      },
+      "local_train_reference_endpoints": {
+        "named_class_count": 3625,
+        "with_label": 3625,
+        "with_definition": 2577,
+        "with_synonym": 2582,
+        "with_named_direct_parent": 3624,
+        "with_multiple_named_direct_parents": 1053,
+        "with_named_direct_children": 1172,
+        "with_restriction_expression": 1754,
+        "with_equivalent_expression": 398,
+        "owl_deprecated_true": 0,
+        "max_direct_child_count": 465
+      },
+      "expected_training_endpoint_count": 3625,
+      "missing_training_endpoint_count": 0
+    },
+    "FMA": {
+      "bytes": 208047132,
+      "sha256": "beb3dc47979ad5434ef70fd02af4307f147f2023f7d8c2c57103b995191194c3",
+      "all_named_class_declarations": {
+        "named_class_count": 104721,
+        "with_label": 104720,
+        "with_definition": 2140,
+        "with_synonym": 36758,
+        "with_named_direct_parent": 104714,
+        "with_multiple_named_direct_parents": 0,
+        "with_named_direct_children": 34127,
+        "with_restriction_expression": 54897,
+        "with_equivalent_expression": 7,
+        "owl_deprecated_true": 0,
+        "max_direct_child_count": 226
+      },
+      "local_train_reference_endpoints": {
+        "named_class_count": 6653,
+        "with_label": 6653,
+        "with_definition": 548,
+        "with_synonym": 3978,
+        "with_named_direct_parent": 6653,
+        "with_multiple_named_direct_parents": 0,
+        "with_named_direct_children": 3205,
+        "with_restriction_expression": 3553,
+        "with_equivalent_expression": 3,
+        "owl_deprecated_true": 0,
+        "max_direct_child_count": 224
+      },
+      "expected_training_endpoint_count": 6653,
+      "missing_training_endpoint_count": 0
+    }
+  },
+  "paired_training_context": {
+    "training_rows": 3845,
+    "both_endpoints_present": 3845,
+    "both_have_definition": 2759,
+    "either_has_restriction": 2799,
+    "both_have_restriction": 941,
+    "both_have_parent": 2005
+  },
+  "limitations": [
+    "Raw RDF/XML syntax only; no imports or reasoning",
+    "Training reference endpoint cohort, not all candidates or held-out test",
+    "Counts are not native-stack performance acceptance"
+  ]
+}

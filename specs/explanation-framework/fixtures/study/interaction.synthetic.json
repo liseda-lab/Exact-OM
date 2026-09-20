@@ -1,0 +1,17 @@
+{
+  "artifact_type": "interaction_event",
+  "contract_version": "exact-study/1.0",
+  "study_revision": "synthetic-study/v1",
+  "session_id": "synthetic-session",
+  "event_id": "synthetic-event-01",
+  "page_instance_id": "synthetic-page-after-reload",
+  "sequence": 1,
+  "case_id": "case-alpha",
+  "presentation_id": "presentation-alpha",
+  "type": "hierarchy_expand",
+  "component_id": "source-hierarchy",
+  "element_id": "urn:fixture:source",
+  "client_monotonic_ms": 4500,
+  "server_received_at": "2026-09-20T12:00:01Z",
+  "fixture_provenance": "Synthetic design fixture; no participant, matcher run, invitation or hosted study exists. Do not deploy this as real study content."
+}

@@ -1,0 +1,526 @@
+{
+  "scope": "researcher-only synthetic design checks; never a participant response",
+  "profiles": {
+    "24": {
+      "case_inventory": [
+        {
+          "case_id": "case-001",
+          "kind": "answer_present",
+          "system_accepted_rank": 1
+        },
+        {
+          "case_id": "case-002",
+          "kind": "answer_present",
+          "system_accepted_rank": 1
+        },
+        {
+          "case_id": "case-003",
+          "kind": "answer_present",
+          "system_accepted_rank": 1
+        },
+        {
+          "case_id": "case-004",
+          "kind": "answer_present",
+          "system_accepted_rank": 1
+        },
+        {
+          "case_id": "case-005",
+          "kind": "answer_present",
+          "system_accepted_rank": 2
+        },
+        {
+          "case_id": "case-006",
+          "kind": "answer_present",
+          "system_accepted_rank": 2
+        },
+        {
+          "case_id": "case-007",
+          "kind": "answer_present",
+          "system_accepted_rank": 2
+        },
+        {
+          "case_id": "case-008",
+          "kind": "answer_present",
+          "system_accepted_rank": 2
+        },
+        {
+          "case_id": "case-009",
+          "kind": "answer_present",
+          "system_accepted_rank": 3
+        },
+        {
+          "case_id": "case-010",
+          "kind": "answer_present",
+          "system_accepted_rank": 3
+        },
+        {
+          "case_id": "case-011",
+          "kind": "answer_present",
+          "system_accepted_rank": 3
+        },
+        {
+          "case_id": "case-012",
+          "kind": "answer_present",
+          "system_accepted_rank": 3
+        },
+        {
+          "case_id": "case-013",
+          "kind": "answer_present",
+          "system_accepted_rank": 4
+        },
+        {
+          "case_id": "case-014",
+          "kind": "answer_present",
+          "system_accepted_rank": 4
+        },
+        {
+          "case_id": "case-015",
+          "kind": "answer_present",
+          "system_accepted_rank": 4
+        },
+        {
+          "case_id": "case-016",
+          "kind": "answer_present",
+          "system_accepted_rank": 4
+        },
+        {
+          "case_id": "case-017",
+          "kind": "answer_present",
+          "system_accepted_rank": 5
+        },
+        {
+          "case_id": "case-018",
+          "kind": "answer_present",
+          "system_accepted_rank": 5
+        },
+        {
+          "case_id": "case-019",
+          "kind": "answer_present",
+          "system_accepted_rank": 5
+        },
+        {
+          "case_id": "case-020",
+          "kind": "answer_present",
+          "system_accepted_rank": 5
+        },
+        {
+          "case_id": "case-021",
+          "kind": "answer_absent",
+          "system_accepted_rank": null
+        },
+        {
+          "case_id": "case-022",
+          "kind": "answer_absent",
+          "system_accepted_rank": null
+        },
+        {
+          "case_id": "case-023",
+          "kind": "answer_absent",
+          "system_accepted_rank": null
+        },
+        {
+          "case_id": "case-024",
+          "kind": "answer_absent",
+          "system_accepted_rank": null
+        }
+      ],
+      "schedules": [
+        {
+          "schedule_id": "A-explanation",
+          "form": "A",
+          "block_order": [
+            "explanation",
+            "ontology_baseline"
+          ],
+          "case_allocation": {
+            "explanation": [
+              "case-001",
+              "case-002",
+              "case-005",
+              "case-006",
+              "case-009",
+              "case-010",
+              "case-013",
+              "case-014",
+              "case-017",
+              "case-018",
+              "case-021",
+              "case-022"
+            ],
+            "ontology_baseline": [
+              "case-003",
+              "case-004",
+              "case-007",
+              "case-008",
+              "case-011",
+              "case-012",
+              "case-015",
+              "case-016",
+              "case-019",
+              "case-020",
+              "case-023",
+              "case-024"
+            ]
+          }
+        },
+        {
+          "schedule_id": "A-ontology_baseline",
+          "form": "A",
+          "block_order": [
+            "ontology_baseline",
+            "explanation"
+          ],
+          "case_allocation": {
+            "explanation": [
+              "case-001",
+              "case-002",
+              "case-005",
+              "case-006",
+              "case-009",
+              "case-010",
+              "case-013",
+              "case-014",
+              "case-017",
+              "case-018",
+              "case-021",
+              "case-022"
+            ],
+            "ontology_baseline": [
+              "case-003",
+              "case-004",
+              "case-007",
+              "case-008",
+              "case-011",
+              "case-012",
+              "case-015",
+              "case-016",
+              "case-019",
+              "case-020",
+              "case-023",
+              "case-024"
+            ]
+          }
+        },
+        {
+          "schedule_id": "B-explanation",
+          "form": "B",
+          "block_order": [
+            "explanation",
+            "ontology_baseline"
+          ],
+          "case_allocation": {
+            "explanation": [
+              "case-003",
+              "case-004",
+              "case-007",
+              "case-008",
+              "case-011",
+              "case-012",
+              "case-015",
+              "case-016",
+              "case-019",
+              "case-020",
+              "case-023",
+              "case-024"
+            ],
+            "ontology_baseline": [
+              "case-001",
+              "case-002",
+              "case-005",
+              "case-006",
+              "case-009",
+              "case-010",
+              "case-013",
+              "case-014",
+              "case-017",
+              "case-018",
+              "case-021",
+              "case-022"
+            ]
+          }
+        },
+        {
+          "schedule_id": "B-ontology_baseline",
+          "form": "B",
+          "block_order": [
+            "ontology_baseline",
+            "explanation"
+          ],
+          "case_allocation": {
+            "explanation": [
+              "case-003",
+              "case-004",
+              "case-007",
+              "case-008",
+              "case-011",
+              "case-012",
+              "case-015",
+              "case-016",
+              "case-019",
+              "case-020",
+              "case-023",
+              "case-024"
+            ],
+            "ontology_baseline": [
+              "case-001",
+              "case-002",
+              "case-005",
+              "case-006",
+              "case-009",
+              "case-010",
+              "case-013",
+              "case-014",
+              "case-017",
+              "case-018",
+              "case-021",
+              "case-022"
+            ]
+          }
+        }
+      ]
+    },
+    "20": {
+      "case_inventory": [
+        {
+          "case_id": "case-001",
+          "kind": "answer_present",
+          "system_accepted_rank": 1
+        },
+        {
+          "case_id": "case-002",
+          "kind": "answer_present",
+          "system_accepted_rank": 1
+        },
+        {
+          "case_id": "case-003",
+          "kind": "answer_present",
+          "system_accepted_rank": 1
+        },
+        {
+          "case_id": "case-004",
+          "kind": "answer_present",
+          "system_accepted_rank": 1
+        },
+        {
+          "case_id": "case-005",
+          "kind": "answer_present",
+          "system_accepted_rank": 2
+        },
+        {
+          "case_id": "case-006",
+          "kind": "answer_present",
+          "system_accepted_rank": 2
+        },
+        {
+          "case_id": "case-007",
+          "kind": "answer_present",
+          "system_accepted_rank": 2
+        },
+        {
+          "case_id": "case-008",
+          "kind": "answer_present",
+          "system_accepted_rank": 3
+        },
+        {
+          "case_id": "case-009",
+          "kind": "answer_present",
+          "system_accepted_rank": 3
+        },
+        {
+          "case_id": "case-010",
+          "kind": "answer_present",
+          "system_accepted_rank": 3
+        },
+        {
+          "case_id": "case-011",
+          "kind": "answer_present",
+          "system_accepted_rank": 4
+        },
+        {
+          "case_id": "case-012",
+          "kind": "answer_present",
+          "system_accepted_rank": 4
+        },
+        {
+          "case_id": "case-013",
+          "kind": "answer_present",
+          "system_accepted_rank": 4
+        },
+        {
+          "case_id": "case-014",
+          "kind": "answer_present",
+          "system_accepted_rank": 5
+        },
+        {
+          "case_id": "case-015",
+          "kind": "answer_present",
+          "system_accepted_rank": 5
+        },
+        {
+          "case_id": "case-016",
+          "kind": "answer_present",
+          "system_accepted_rank": 5
+        },
+        {
+          "case_id": "case-017",
+          "kind": "answer_absent",
+          "system_accepted_rank": null
+        },
+        {
+          "case_id": "case-018",
+          "kind": "answer_absent",
+          "system_accepted_rank": null
+        },
+        {
+          "case_id": "case-019",
+          "kind": "answer_absent",
+          "system_accepted_rank": null
+        },
+        {
+          "case_id": "case-020",
+          "kind": "answer_absent",
+          "system_accepted_rank": null
+        }
+      ],
+      "schedules": [
+        {
+          "schedule_id": "A-explanation",
+          "form": "A",
+          "block_order": [
+            "explanation",
+            "ontology_baseline"
+          ],
+          "case_allocation": {
+            "explanation": [
+              "case-001",
+              "case-002",
+              "case-005",
+              "case-006",
+              "case-008",
+              "case-011",
+              "case-012",
+              "case-014",
+              "case-017",
+              "case-018"
+            ],
+            "ontology_baseline": [
+              "case-003",
+              "case-004",
+              "case-007",
+              "case-009",
+              "case-010",
+              "case-013",
+              "case-015",
+              "case-016",
+              "case-019",
+              "case-020"
+            ]
+          }
+        },
+        {
+          "schedule_id": "A-ontology_baseline",
+          "form": "A",
+          "block_order": [
+            "ontology_baseline",
+            "explanation"
+          ],
+          "case_allocation": {
+            "explanation": [
+              "case-001",
+              "case-002",
+              "case-005",
+              "case-006",
+              "case-008",
+              "case-011",
+              "case-012",
+              "case-014",
+              "case-017",
+              "case-018"
+            ],
+            "ontology_baseline": [
+              "case-003",
+              "case-004",
+              "case-007",
+              "case-009",
+              "case-010",
+              "case-013",
+              "case-015",
+              "case-016",
+              "case-019",
+              "case-020"
+            ]
+          }
+        },
+        {
+          "schedule_id": "B-explanation",
+          "form": "B",
+          "block_order": [
+            "explanation",
+            "ontology_baseline"
+          ],
+          "case_allocation": {
+            "explanation": [
+              "case-003",
+              "case-004",
+              "case-007",
+              "case-009",
+              "case-010",
+              "case-013",
+              "case-015",
+              "case-016",
+              "case-019",
+              "case-020"
+            ],
+            "ontology_baseline": [
+              "case-001",
+              "case-002",
+              "case-005",
+              "case-006",
+              "case-008",
+              "case-011",
+              "case-012",
+              "case-014",
+              "case-017",
+              "case-018"
+            ]
+          }
+        },
+        {
+          "schedule_id": "B-ontology_baseline",
+          "form": "B",
+          "block_order": [
+            "ontology_baseline",
+            "explanation"
+          ],
+          "case_allocation": {
+            "explanation": [
+              "case-003",
+              "case-004",
+              "case-007",
+              "case-009",
+              "case-010",
+              "case-013",
+              "case-015",
+              "case-016",
+              "case-019",
+              "case-020"
+            ],
+            "ontology_baseline": [
+              "case-001",
+              "case-002",
+              "case-005",
+              "case-006",
+              "case-008",
+              "case-011",
+              "case-012",
+              "case-014",
+              "case-017",
+              "case-018"
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "runtime_rule": "persist actual within-block random order and seed once; these lists test allocation before shuffling"
+}

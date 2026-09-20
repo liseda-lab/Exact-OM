@@ -1,0 +1,134 @@
+{
+  "artifact_type": "entity_context",
+  "contract_version": "exact-explain/1.0",
+  "entity": {
+    "ontology_version_id": "root-sha256:1a7182a7327ebc4181f7d6b0f7e81ed04dd258f1a86bd8f560e4a0d61439d58a",
+    "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C114940",
+    "kind": "class"
+  },
+  "labels": [
+    {
+      "text": "Malignant Cardiovascular Neoplasm",
+      "language": null,
+      "predicate_iri": "http://www.w3.org/2000/01/rdf-schema#label"
+    }
+  ],
+  "definitions": {
+    "items": [
+      {
+        "fact_id": "sha256:ebb8b1b49697b1c5985e7dd19fd5685e1313101564629bfb65cdce469432a5e1",
+        "subject": {
+          "ontology_version_id": "root-sha256:1a7182a7327ebc4181f7d6b0f7e81ed04dd258f1a86bd8f560e4a0d61439d58a",
+          "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C114940",
+          "kind": "class"
+        },
+        "predicate_iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#P97",
+        "value": {
+          "term_type": "literal",
+          "lexical_form": "A primary or metastatic malignant neoplasm involving the cardiovascular system.",
+          "datatype": null,
+          "language": null
+        },
+        "axiom_ref": null,
+        "interpretation": "asserted",
+        "origins": [
+          {
+            "document_sha256": "sha256:1a7182a7327ebc4181f7d6b0f7e81ed04dd258f1a86bd8f560e4a0d61439d58a",
+            "axiom_id": null,
+            "source_span": null,
+            "provenance_status": "raw_profile_extraction"
+          }
+        ],
+        "premise_ids": [],
+        "derivation_id": null
+      }
+    ],
+    "returned_count": 1,
+    "total_count": 1,
+    "next_cursor": null,
+    "truncated": false,
+    "scope": {
+      "ontology_version_id": "root-sha256:1a7182a7327ebc4181f7d6b0f7e81ed04dd258f1a86bd8f560e4a0d61439d58a",
+      "context_revision": "raw-profile/2026-09-19",
+      "basis": "root_document",
+      "visibility_policy_hash": "sha256:35fb8b7b1159ef0deba1eb36e4937834110305b6e06e2f095786216473e693ed",
+      "filter_id": "fixture-original-annotations"
+    },
+    "status": "available",
+    "reason": null
+  },
+  "synonyms": {
+    "items": [
+      {
+        "fact_id": "sha256:481d2416b74d7ce7a93764b79fb8ef21c02b4cefe6a429893ec63622bc28a79b",
+        "subject": {
+          "ontology_version_id": "root-sha256:1a7182a7327ebc4181f7d6b0f7e81ed04dd258f1a86bd8f560e4a0d61439d58a",
+          "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C114940",
+          "kind": "class"
+        },
+        "predicate_iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#P90",
+        "value": {
+          "term_type": "literal",
+          "lexical_form": "Malignant Cardiovascular Neoplasm",
+          "datatype": null,
+          "language": null
+        },
+        "axiom_ref": null,
+        "interpretation": "asserted",
+        "origins": [
+          {
+            "document_sha256": "sha256:1a7182a7327ebc4181f7d6b0f7e81ed04dd258f1a86bd8f560e4a0d61439d58a",
+            "axiom_id": null,
+            "source_span": null,
+            "provenance_status": "raw_profile_extraction"
+          }
+        ],
+        "premise_ids": [],
+        "derivation_id": null
+      }
+    ],
+    "returned_count": 1,
+    "total_count": 1,
+    "next_cursor": null,
+    "truncated": false,
+    "scope": {
+      "ontology_version_id": "root-sha256:1a7182a7327ebc4181f7d6b0f7e81ed04dd258f1a86bd8f560e4a0d61439d58a",
+      "context_revision": "raw-profile/2026-09-19",
+      "basis": "root_document",
+      "visibility_policy_hash": "sha256:35fb8b7b1159ef0deba1eb36e4937834110305b6e06e2f095786216473e693ed",
+      "filter_id": "fixture-original-annotations"
+    },
+    "status": "available",
+    "reason": null
+  },
+  "parents": {
+    "items": [],
+    "returned_count": 0,
+    "total_count": 0,
+    "next_cursor": null,
+    "truncated": false,
+    "scope": {
+      "ontology_version_id": "root-sha256:1a7182a7327ebc4181f7d6b0f7e81ed04dd258f1a86bd8f560e4a0d61439d58a",
+      "context_revision": "raw-profile/2026-09-19",
+      "basis": "root_document",
+      "visibility_policy_hash": "sha256:35fb8b7b1159ef0deba1eb36e4937834110305b6e06e2f095786216473e693ed",
+      "filter_id": "fixture-original-annotations"
+    },
+    "status": "absent_in_scope",
+    "reason": "No assertion of this category found in the profiled root document; imports/inference were not loaded."
+  },
+  "capabilities": {
+    "original_axiom_provenance": "not_exported",
+    "restrictions": "not_exported",
+    "inference": "not_run",
+    "source_spans": "not_exported"
+  },
+  "context_scope": {
+    "ontology_version_id": "root-sha256:1a7182a7327ebc4181f7d6b0f7e81ed04dd258f1a86bd8f560e4a0d61439d58a",
+    "context_revision": "raw-profile/2026-09-19",
+    "basis": "root_document",
+    "visibility_policy_hash": "sha256:35fb8b7b1159ef0deba1eb36e4937834110305b6e06e2f095786216473e693ed",
+    "filter_id": "fixture-original-annotations"
+  },
+  "fixture_provenance": "Actual pinned root-ontology annotations from raw streaming profile, adapted to target schema. Not native-context acceptance, a fresh Exact run, a generated profile or a complete production entity payload. Literal datatype/language were not retained by every profiling category; null denotes unknown, not proof of untyped text."
+}

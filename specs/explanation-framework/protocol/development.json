@@ -1,0 +1,155 @@
+{
+  "schema": "exact-explain-development-blueprint/1",
+  "status": "design_only_not_current_runtime_config",
+  "audited_exact_revision": "e81865aceed0cd1257580097bc788329cd9084ae",
+  "sequence": [
+    "B0",
+    "B1+B2",
+    "B3+B4",
+    "B5",
+    "F1"
+  ],
+  "frontend_start_gate": "B5_G5_passed",
+  "early_frontend_agent": false,
+  "dataset": {
+    "repository": "OAEI-ML/bio-ml",
+    "revision": "c454644a334ab43754bc1070c0fb7fdd56a90a1d",
+    "primary_task": "NCIT-DOID",
+    "development_split": "public_train",
+    "final_cases_must_be_disjoint": true,
+    "imports": {
+      "policy": "resolve_and_pin_before_native_gate",
+      "status": "unresolved_in_blueprint"
+    }
+  },
+  "hardware": {
+    "node_count": 1,
+    "ram_gib_profiles": [
+      64,
+      128
+    ],
+    "gpu": "RTX 5090",
+    "gpu_count": 1,
+    "serve_requires_gpu": false,
+    "prepare_rss_limit_gib": {
+      "64": 48,
+      "128": 96
+    },
+    "serve_rss_limit_gib": 4
+  },
+  "cases": {
+    "operational_pairs": 12,
+    "development_pairs": 48,
+    "source_grouped": true,
+    "seed": 1729,
+    "strata": [
+      "well_described",
+      "missing_or_asymmetric",
+      "structural_complexity",
+      "close_alternative_or_scope"
+    ],
+    "optional_sentinel_pairs": [
+      "SNOMED-FMA",
+      "SNOMED-NCIT"
+    ],
+    "legacy_regression": "OMIM-ORDO sparse exported context"
+  },
+  "generation": {
+    "provider": "openrouter",
+    "baseline_profile": null,
+    "challenger_profile": null,
+    "profile_bindings_required_before_dispatch": true,
+    "max_concurrency": 4,
+    "max_repair_attempts": 2,
+    "request_ledger_required": true,
+    "policy_before_generation": true,
+    "llm_calls_on_read": false,
+    "spending_policy": "user_broad_discretion_with_cost_ledger_not_an_invented_cap"
+  },
+  "api_limits": {
+    "page_default": 20,
+    "page_max": 100,
+    "hierarchy_page_default": 50,
+    "hierarchy_page_max": 200,
+    "ancestor_nodes_default": 500,
+    "ancestor_nodes_max": 1000,
+    "graph_nodes_default": 150,
+    "graph_edges_default": 300,
+    "summary_response_bytes_max": 2097152
+  },
+  "recovery": {
+    "resume": true,
+    "resume_from_prior_directory": true,
+    "atomic_publication": true,
+    "prompt_only_regeneration": true,
+    "visibility_hash_in_cache_key": true
+  },
+  "deferred_not_frontend_blockers": [
+    "full_ontology_inference",
+    "owl_proof_justifications",
+    "production_repair",
+    "complete_KGA_adapter",
+    "all_property_matching_studies",
+    "final_human_study"
+  ],
+  "unresolved_bindings": [
+    "dataset_local_paths",
+    "DOID_import_manifest",
+    "installed_distribution_versions_and_hashes",
+    "OpenRouter_profile_bindings",
+    "fresh_Exact_run_artifact",
+    "visibility_policy_lock",
+    "chosen_case_ids",
+    "study_final_case_count_and_adjudicated_keys",
+    "study_forms_consent_analysis_lock",
+    "Render_deployment_database_and_retention"
+  ],
+  "lock_policy": {
+    "scope": "per_stage",
+    "pending_future_bindings_do_not_block_independent_stages": true,
+    "required_before_context": [
+      "verified_ontology_and_imports",
+      "installed_runtime",
+      "context_schema_and_policy"
+    ],
+    "required_before_run_import": [
+      "completed_Exact_run_hash"
+    ],
+    "required_before_generation": [
+      "consuming_profile_binding",
+      "filtered_packet_hash",
+      "visibility_policy_hash"
+    ],
+    "challenger_required_for_baseline_gate": false
+  },
+  "products": {
+    "exploration_app": [
+      "local_app",
+      "public_demo"
+    ],
+    "study_application": [
+      "study"
+    ],
+    "local_bundle_import": true,
+    "demo_import_enabled": false,
+    "shared_engine": true
+  },
+  "study": {
+    "spec_revision": "2026-09-20",
+    "protocol": "study-design.json",
+    "case_count_is_configurable": true,
+    "anonymous_no_participant_account": true,
+    "reusable_invitation_resume": true,
+    "state_backend": "postgresql",
+    "external_setup_required": [
+      "protege",
+      "source_ontology",
+      "target_ontology"
+    ],
+    "per_case_consultation": true,
+    "mixed_case_types": true,
+    "frontend_includes_full_survey": true,
+    "invitation_exchange_is_replay_safe": true,
+    "researcher_key_separate": true
+  }
+}

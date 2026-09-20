@@ -1,0 +1,272 @@
+{
+  "scope": "researcher-only synthetic scoring examples; no real answer key or participant result",
+  "cases": [
+    {
+      "name": "positive_reference_second",
+      "case_kind": "answer_present",
+      "acceptable_candidate_ids": [
+        "candidate-2"
+      ],
+      "response": {
+        "artifact_type": "ranking_response",
+        "contract_version": "exact-study/1.0",
+        "study_revision": "synthetic-study/v1",
+        "session_id": "synthetic-session",
+        "case_id": "case-alpha",
+        "presentation_id": "presentation-alpha",
+        "revision": 2,
+        "workflow_state": "submitted",
+        "response_type": "ranked_candidates",
+        "ranked_candidate_ids": [
+          "candidate-3",
+          "candidate-2"
+        ],
+        "timing_segment_ids": [
+          "synthetic-segment-1"
+        ],
+        "saved_at": "2026-09-20T12:00:00Z",
+        "submitted_at": "2026-09-20T12:00:00Z",
+        "fixture_provenance": "Synthetic design fixture; no participant, matcher run, invitation or hosted study exists. Do not deploy this as real study content."
+      },
+      "expected": {
+        "rr": 0.5
+      }
+    },
+    {
+      "name": "positive_reference_omitted",
+      "case_kind": "answer_present",
+      "acceptable_candidate_ids": [
+        "candidate-2"
+      ],
+      "response": {
+        "artifact_type": "ranking_response",
+        "contract_version": "exact-study/1.0",
+        "study_revision": "synthetic-study/v1",
+        "session_id": "synthetic-session",
+        "case_id": "case-alpha",
+        "presentation_id": "presentation-alpha",
+        "revision": 2,
+        "workflow_state": "submitted",
+        "response_type": "ranked_candidates",
+        "ranked_candidate_ids": [
+          "candidate-3"
+        ],
+        "timing_segment_ids": [
+          "synthetic-segment-1"
+        ],
+        "saved_at": "2026-09-20T12:00:00Z",
+        "submitted_at": "2026-09-20T12:00:00Z",
+        "fixture_provenance": "Synthetic design fixture; no participant, matcher run, invitation or hosted study exists. Do not deploy this as real study content."
+      },
+      "expected": {
+        "rr": 0.0
+      }
+    },
+    {
+      "name": "positive_explicit_none",
+      "case_kind": "answer_present",
+      "acceptable_candidate_ids": [
+        "candidate-2"
+      ],
+      "response": {
+        "artifact_type": "ranking_response",
+        "contract_version": "exact-study/1.0",
+        "study_revision": "synthetic-study/v1",
+        "session_id": "synthetic-session",
+        "case_id": "case-alpha",
+        "presentation_id": "presentation-alpha",
+        "revision": 2,
+        "workflow_state": "submitted",
+        "response_type": "none_of_these",
+        "ranked_candidate_ids": [],
+        "timing_segment_ids": [
+          "synthetic-segment-1"
+        ],
+        "saved_at": "2026-09-20T12:00:00Z",
+        "submitted_at": "2026-09-20T12:00:00Z",
+        "fixture_provenance": "Synthetic design fixture; no participant, matcher run, invitation or hosted study exists. Do not deploy this as real study content."
+      },
+      "expected": {
+        "rr": 0.0
+      }
+    },
+    {
+      "name": "positive_uncertain",
+      "case_kind": "answer_present",
+      "acceptable_candidate_ids": [
+        "candidate-2"
+      ],
+      "response": {
+        "artifact_type": "ranking_response",
+        "contract_version": "exact-study/1.0",
+        "study_revision": "synthetic-study/v1",
+        "session_id": "synthetic-session",
+        "case_id": "case-alpha",
+        "presentation_id": "presentation-alpha",
+        "revision": 2,
+        "workflow_state": "submitted",
+        "response_type": "insufficient_evidence",
+        "ranked_candidate_ids": [],
+        "timing_segment_ids": [
+          "synthetic-segment-1"
+        ],
+        "saved_at": "2026-09-20T12:00:00Z",
+        "submitted_at": "2026-09-20T12:00:00Z",
+        "fixture_provenance": "Synthetic design fixture; no participant, matcher run, invitation or hosted study exists. Do not deploy this as real study content."
+      },
+      "expected": {
+        "rr": 0.0
+      }
+    },
+    {
+      "name": "positive_multiple_accepted",
+      "case_kind": "answer_present",
+      "acceptable_candidate_ids": [
+        "candidate-2",
+        "candidate-3"
+      ],
+      "response": {
+        "artifact_type": "ranking_response",
+        "contract_version": "exact-study/1.0",
+        "study_revision": "synthetic-study/v1",
+        "session_id": "synthetic-session",
+        "case_id": "case-alpha",
+        "presentation_id": "presentation-alpha",
+        "revision": 2,
+        "workflow_state": "submitted",
+        "response_type": "ranked_candidates",
+        "ranked_candidate_ids": [
+          "candidate-3",
+          "candidate-2"
+        ],
+        "timing_segment_ids": [
+          "synthetic-segment-1"
+        ],
+        "saved_at": "2026-09-20T12:00:00Z",
+        "submitted_at": "2026-09-20T12:00:00Z",
+        "fixture_provenance": "Synthetic design fixture; no participant, matcher run, invitation or hosted study exists. Do not deploy this as real study content."
+      },
+      "expected": {
+        "rr": 1.0
+      }
+    },
+    {
+      "name": "negative_correct_none",
+      "case_kind": "answer_absent",
+      "acceptable_candidate_ids": [],
+      "response": {
+        "artifact_type": "ranking_response",
+        "contract_version": "exact-study/1.0",
+        "study_revision": "synthetic-study/v1",
+        "session_id": "synthetic-session",
+        "case_id": "case-alpha",
+        "presentation_id": "presentation-alpha",
+        "revision": 2,
+        "workflow_state": "submitted",
+        "response_type": "none_of_these",
+        "ranked_candidate_ids": [],
+        "timing_segment_ids": [
+          "synthetic-segment-1"
+        ],
+        "saved_at": "2026-09-20T12:00:00Z",
+        "submitted_at": "2026-09-20T12:00:00Z",
+        "fixture_provenance": "Synthetic design fixture; no participant, matcher run, invitation or hosted study exists. Do not deploy this as real study content."
+      },
+      "expected": {
+        "rr": null,
+        "correct_none": 1,
+        "false_endorsement": 0,
+        "uncertain": 0
+      }
+    },
+    {
+      "name": "negative_false_endorsement",
+      "case_kind": "answer_absent",
+      "acceptable_candidate_ids": [],
+      "response": {
+        "artifact_type": "ranking_response",
+        "contract_version": "exact-study/1.0",
+        "study_revision": "synthetic-study/v1",
+        "session_id": "synthetic-session",
+        "case_id": "case-alpha",
+        "presentation_id": "presentation-alpha",
+        "revision": 2,
+        "workflow_state": "submitted",
+        "response_type": "ranked_candidates",
+        "ranked_candidate_ids": [
+          "candidate-3"
+        ],
+        "timing_segment_ids": [
+          "synthetic-segment-1"
+        ],
+        "saved_at": "2026-09-20T12:00:00Z",
+        "submitted_at": "2026-09-20T12:00:00Z",
+        "fixture_provenance": "Synthetic design fixture; no participant, matcher run, invitation or hosted study exists. Do not deploy this as real study content."
+      },
+      "expected": {
+        "rr": null,
+        "correct_none": 0,
+        "false_endorsement": 1,
+        "uncertain": 0
+      }
+    },
+    {
+      "name": "negative_uncertain",
+      "case_kind": "answer_absent",
+      "acceptable_candidate_ids": [],
+      "response": {
+        "artifact_type": "ranking_response",
+        "contract_version": "exact-study/1.0",
+        "study_revision": "synthetic-study/v1",
+        "session_id": "synthetic-session",
+        "case_id": "case-alpha",
+        "presentation_id": "presentation-alpha",
+        "revision": 2,
+        "workflow_state": "submitted",
+        "response_type": "insufficient_evidence",
+        "ranked_candidate_ids": [],
+        "timing_segment_ids": [
+          "synthetic-segment-1"
+        ],
+        "saved_at": "2026-09-20T12:00:00Z",
+        "submitted_at": "2026-09-20T12:00:00Z",
+        "fixture_provenance": "Synthetic design fixture; no participant, matcher run, invitation or hosted study exists. Do not deploy this as real study content."
+      },
+      "expected": {
+        "rr": null,
+        "correct_none": 0,
+        "false_endorsement": 0,
+        "uncertain": 1
+      }
+    },
+    {
+      "name": "unfinished_is_missing",
+      "case_kind": "answer_present",
+      "acceptable_candidate_ids": [
+        "candidate-2"
+      ],
+      "response": {
+        "artifact_type": "ranking_response",
+        "contract_version": "exact-study/1.0",
+        "study_revision": "synthetic-study/v1",
+        "session_id": "synthetic-session",
+        "case_id": "case-alpha",
+        "presentation_id": "presentation-alpha",
+        "revision": 2,
+        "workflow_state": "draft",
+        "response_type": null,
+        "ranked_candidate_ids": [],
+        "timing_segment_ids": [
+          "synthetic-segment-1"
+        ],
+        "saved_at": "2026-09-20T12:00:00Z",
+        "submitted_at": null,
+        "fixture_provenance": "Synthetic design fixture; no participant, matcher run, invitation or hosted study exists. Do not deploy this as real study content."
+      },
+      "expected": {
+        "missing": true,
+        "rr": null
+      }
+    }
+  ]
+}

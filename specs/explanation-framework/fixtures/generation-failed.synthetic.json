@@ -1,0 +1,35 @@
+{
+  "artifact_type": "generated_explanation",
+  "contract_version": "exact-explain/1.0",
+  "explanation_id": "synthetic-provider-failure",
+  "task": "entity_profile",
+  "entities": [
+    {
+      "ontology_version_id": "root-sha256:1a7182a7327ebc4181f7d6b0f7e81ed04dd258f1a86bd8f560e4a0d61439d58a",
+      "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C114940",
+      "kind": "class"
+    }
+  ],
+  "claims": [],
+  "grounding_status": "unverified",
+  "manifest": {
+    "ontology_context_hashes": [
+      "sha256:721f09cf2e5d1bfb292a1366eacd90962c1a85b0c120f892a18527ee9c017e70"
+    ],
+    "visibility_policy_hash": "sha256:35fb8b7b1159ef0deba1eb36e4937834110305b6e06e2f095786216473e693ed",
+    "packet_hash": "sha256:7e84e8c4956a02ecffca2a2d1e55296244665fe5456ef467c4d443106073f0f7",
+    "prompt_hash": "sha256:bf944689dedac4ec8c5414c65e72085f71f029d8e8c4b484770457d178df620a",
+    "output_schema": "exact-explain/1.0",
+    "requested_model": "synthetic-not-a-provider-request",
+    "returned_model": null,
+    "provider": null,
+    "parameters_hash": "sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+    "language": "en",
+    "response_hash": null,
+    "status": "failed"
+  },
+  "limitations": [
+    "Synthetic failed generation; serve original ontology facts instead."
+  ],
+  "fixture_provenance": "Synthetic failure fixture. No LLM call was made and no model output is fabricated."
+}
