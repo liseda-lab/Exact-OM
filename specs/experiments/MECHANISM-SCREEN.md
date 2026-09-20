@@ -221,6 +221,40 @@ installed-code fingerprints, validation logs and the FMA reproduction/diagnosis.
 Only the four ontology distribution versions changed. The existing six unrelated
 legacy dependency warnings from `pip check` are unchanged and recorded before/after.
 
-No experiment or probe remains running. Allocation 14234 and its interactive shell
-remain alive. E02 is complete; E09 remains blocked by the FMA input repair and the
-remaining hierarchy/resource qualification, without consuming hosted tokens.
+## FMA normalization and target-only retry
+
+The repair completed in Slurm step **14234.13** in **16.36s**, reconnecting 90 annotation
+links across 54 classes. The original SHA-256 remains
+`beb3dc47979ad5434ef70fd02af4307f147f2023f7d8c2c57103b995191194c3`;
+the normalized derivative is
+`071b0e854884bfc8a964ce16df6ee8b50f1ab527f85948ecdc972b74751902ed`.
+`data/experiments-v2/fma-reification-repair-01/receipt.json` records the transformation
+and full XML structural-preservation audit. All **17 regression tests passed**.
+This is not full before/after native semantic parity. The earlier failed normalization
+attempt in step **14234.9** is retained.
+
+The target-only native retry started at **13:24:15 UTC on 2026-09-20** in Slurm step
+**14234.14**, detached in tmux `exact-d1-native-02`, using PyPI 0.2.1. Target native loading
+is underway. The original source measurement and frozen 300-source sample remain unchanged;
+the old measurement is not relabeled as PyPI evidence.
+
+Monitor `data/experiments-v2/d1-native-probe-02/status.json`, `target.log`,
+`target.phases.jsonl` and the eventual `target.json` receipt. The probe has no hard wall-time
+limit; a 56GiB worker RSS guard requests cooperative interruption. Rationales are off and
+hosted calls are disabled. Existing allocation 14234 and its interactive shell are preserved.
+
+```bash
+cat /home/pgcotovio/Exact-OM/data/experiments-v2/d1-native-probe-02/status.json
+tail -F /home/pgcotovio/Exact-OM/data/experiments-v2/d1-native-probe-02/target.log
+tmux attach -t exact-d1-native-02
+```
+
+Detach tmux with Ctrl-b then d; keep the interactive allocation alive.
+
+E02 is complete. Full four-arm E09 remains blocked: it still needs successful target
+native preprocessing, a production retrieval/checkpoint and cold/warm resource forecast,
+frozen anchor/relation qualification, hierarchy slices and semantic controls, and its
+D0 control binding. `d1-native-probe-02/e09-readiness-audit.json` records these gates.
+The observed source features contain is-a evidence for 126/300 entities and no selected
+part-of/has-part items; aliases and the six-item feature cap can limit this observation,
+so it does not establish full ontology coverage. No E09 arm is admitted by this repair.

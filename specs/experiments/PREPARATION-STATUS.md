@@ -272,7 +272,12 @@ for historical execution identities. Do not mutate frozen prior launch bindings 
 reuse prepared artifacts across package identities without verified compatibility.
 
 E02 finalized successfully and retains the hard-anchor baseline. D1 SNOMED native
-preparation completed; FMA failed strict axiom-reification validation. The same
-failure is reproduced on PyPI 0.2.1; its input repair remains outstanding.
-[MECHANISM-SCREEN.md](MECHANISM-SCREEN.md) records the diagnosis, resource evidence
-and the required normalization/parity checks. No experiment is currently running.
+preparation completed. FMA normalization repaired 90 annotation links across 54 classes
+without changing the original file. The full XML structural audit and 17 regression tests
+passed; this does not establish full native before/after semantic parity.
+`data/experiments-v2/fma-reification-repair-01/receipt.json` binds the derivative and audit.
+The target-only probe under `d1-native-probe-02/` started at **13:24:15 UTC** on
+2026-09-20 in Slurm step **14234.14**, detached in tmux `exact-d1-native-02`, using PyPI
+0.2.1. Target native loading is underway. Full E09 remains blocked by the native, production recovery,
+hierarchy and resource gates in `d1-native-probe-02/e09-readiness-audit.json`.
+[MECHANISM-SCREEN.md](MECHANISM-SCREEN.md) records the repair and validation limits.
