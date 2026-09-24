@@ -84,7 +84,7 @@ class ExecutionLock(WireModel):
     implementations: dict[str, str] = Field(
         default_factory=lambda: {
             "context-index": "context/2",
-            "run-import": "decision-adapter/2",
+            "run-import": "decision-adapter/3",
             "profiles": "grounding-excerpts-and-comparisons/4",
             "comparisons": "grounding-excerpts-and-comparisons/4",
             "portable-export": "inspection-bundle/2",

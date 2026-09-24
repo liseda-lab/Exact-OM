@@ -152,15 +152,18 @@ def build_context_package(
         "logical_fingerprint": snapshot.logical_fingerprint.hex,
     }
     version = canonical_hash(identity)
-    preparation_key = canonical_hash(
-        {
-            "ontology_version_id": version,
-            "matcher_scope": matcher_scope,
-            "alignment_eligible": sorted(alignment_eligible or ()),
-            "source_derivation": source_derivation,
-            "ontology_name": ontology_name,
-        }
-    )
+    preparation_inputs: dict[str, Any] = {
+        "ontology_version_id": version,
+        "matcher_scope": matcher_scope,
+        "alignment_eligible": sorted(alignment_eligible or ()),
+        "source_derivation": source_derivation,
+        "ontology_name": ontology_name,
+    }
+    # Retain the exact existing identity for unbound builds/checkpoints. Explicit
+    # empty sets must differ from absent eligibility input for all future builds.
+    if alignment_eligible is not None:
+        preparation_inputs["alignment_eligibility_bound"] = True
+    preparation_key = canonical_hash(preparation_inputs)
     destination = Path(destination)
     if destination.exists():
         existing = OntologyContext(destination)
@@ -519,6 +522,7 @@ def build_context_package(
             "sources": sources,
             "scope": scope,
             "matcher_scope": matcher_scope,
+            "alignment_eligibility_bound": alignment_eligible is not None,
             "context_extension": matcher_scope is not None and matcher_scope != scope,
             "capabilities": {
                 "provider": "owl",

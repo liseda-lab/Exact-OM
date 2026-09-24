@@ -85,6 +85,10 @@ class EntityContextResponse(ResourceModel):
     artifact_type: Literal["entity_context"]
     contract_version: Literal["exact-explain/1.0"]
     entity: EntityRef
+    alignment_eligible: bool | None = None
+    alignment_eligibility_status: Literal["available", "not_requested", "not_exported"] = (
+        "not_exported"
+    )
     labels: list[Label]
     definitions: Page[Fact]
     synonyms: Page[Fact]

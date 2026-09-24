@@ -150,3 +150,34 @@ def test_invalid_prepared_candidate_has_safe_contract_error(read_package, monkey
     assert response.status_code == 409
     assert response.json()["code"] == "invalid_prepared_resource"
     assert "artifact_hash" not in response.text
+
+
+def test_saved_pair_reads_without_matching_or_preparation_dependencies(read_package):
+    import subprocess
+    import sys
+
+    _, store, _, _, _ = read_package
+    package = store.directory.parent / "package.json"
+    code = r"""
+import importlib.abc
+import sys
+from pathlib import Path
+class ServingOnly(importlib.abc.MetaPathFinder):
+    def find_spec(self, fullname, path=None, target=None):
+        if fullname.split(".")[0] in {"exact", "pandas", "torch", "pyowl_core", "transformers", "sentence_transformers", "openai"}:
+            raise AssertionError("Read route imported an offline dependency: " + fullname)
+sys.meta_path.insert(0, ServingOnly())
+from fastapi.testclient import TestClient
+from exact_inspect.service import create_prepared_app
+with TestClient(create_prepared_app(Path(sys.argv[1]))) as client:
+    sources = client.get("/api/v1/runs/fixture-run/sources")
+    assert sources.status_code == 200, sources.text
+    candidates = client.get("/api/v1/runs/fixture-run/candidates", params={"source":"urn:A"})
+    assert candidates.status_code == 200, candidates.text
+    pair = candidates.json()["items"][0]["pair_id"]
+    for route in ("pair", "pair-evidence"):
+        response = client.get("/api/v1/runs/fixture-run/" + route, params={"pair_id":pair})
+        assert response.status_code == 200, response.text
+    assert not any(name in sys.modules for name in ("exact", "pandas", "torch", "pyowl_core", "openai"))
+"""
+    subprocess.run([sys.executable, "-c", code, str(package)], check=True)

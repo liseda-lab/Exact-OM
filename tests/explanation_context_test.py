@@ -94,7 +94,8 @@ def test_punning_duplicate_labels_exact_annotations_and_missingness(context):
     sparse = index.entity_context(ref(index, "urn:sparse"))
     assert sparse["categories"]["definitions"]["status"] == "absent_in_scope"
     assert sparse["completeness"]["imports_complete"] is False
-    assert sparse["alignment_eligible"] is False
+    assert sparse["alignment_eligible"] is None
+    assert sparse["alignment_eligibility_status"] == "not_requested"
     assert index.resolve_predicate("urn:imported-predicate")["status"] == "unresolved_import"
 
 
@@ -608,3 +609,82 @@ os._exit(7)
     assert index.manifest["runtime"]["resumed_axiom_count"] == 6
     assert index.search(term="uncommitted")["total_count"] == 0
     assert index.manifest["completeness"]["axiom_count"] == len(list(snapshot.iter_axioms()))
+
+
+def test_ontology_resource_recovers_interrupted_receipt_publication(context, tmp_path, monkeypatch):
+    import exact_inspect.context_resources as resources
+
+    index, _ = context
+    destination = tmp_path / "interrupted.ofn"
+    original_publish = resources.atomic_json
+
+    def interrupted(path, value):
+        if path.name.endswith(".receipt.json"):
+            raise OSError("interrupted publication")
+        original_publish(path, value)
+
+    monkeypatch.setattr(resources, "atomic_json", interrupted)
+    with pytest.raises(OSError, match="interrupted publication"):
+        resources.export_ontology_resource(index, destination, VisibilityPolicy())
+    assert destination.exists()
+    assert not destination.with_suffix(".ofn.receipt.json").exists()
+    monkeypatch.setattr(resources, "atomic_json", original_publish)
+    receipt = resources.export_ontology_resource(index, destination, VisibilityPolicy())
+    resources.validate_ontology_resource(destination, receipt)
+
+
+def test_ontology_export_does_not_replace_unowned_output(context, tmp_path):
+    from exact_inspect.context_resources import export_ontology_resource
+
+    index, _ = context
+    destination = tmp_path / "existing.ofn"
+    destination.write_bytes(b"existing unrelated ontology")
+    with pytest.raises(ValueError, match="no matching preparation receipt"):
+        export_ontology_resource(index, destination, VisibilityPolicy())
+    assert destination.read_bytes() == b"existing unrelated ontology"
+
+
+def test_alignment_eligibility_distinguishes_unknown_explicit_exclusion_and_legacy(
+    context, tmp_path
+):
+    from exact_inspect.context_export import export_policy_context
+    from exact_inspect.contracts import canonical_hash
+
+    unbound, snapshot = context
+    # The previous default preparation identity remains compatible with running checkpoints.
+    assert unbound.manifest["preparation_key"] == canonical_hash(
+        {
+            "ontology_version_id": unbound.ontology_version_id,
+            "matcher_scope": None,
+            "alignment_eligible": [],
+            "source_derivation": None,
+            "ontology_name": None,
+        }
+    )
+    assert build_context_package(snapshot, unbound.path).manifest == unbound.manifest
+    assert all(row["alignment_eligible"] is None for row in unbound.search()["items"])
+    empty = build_context_package(snapshot, tmp_path / "explicit-empty", alignment_eligible=set())
+    selected = build_context_package(
+        snapshot, tmp_path / "explicit-set", alignment_eligible={("urn:A", "class")}
+    )
+    assert empty.ontology_version_id == selected.ontology_version_id == unbound.ontology_version_id
+    assert empty.manifest["preparation_key"] != unbound.manifest["preparation_key"]
+    with pytest.raises(ValueError, match="coverage"):
+        build_context_package(snapshot, unbound.path, alignment_eligible=set())
+    assert empty.entity_context(ref(empty))["alignment_eligible"] is False
+    assert selected.entity_context(ref(selected))["alignment_eligible"] is True
+    excluded = selected.entity_context(ref(selected, "urn:duplicate"))
+    assert excluded["alignment_eligible"] is False
+    assert excluded["alignment_eligibility_status"] == "available"
+    visible = export_policy_context(selected, tmp_path / "visible", VisibilityPolicy())
+    assert visible.entity_context(ref(visible, "urn:duplicate"))["alignment_eligible"] is False
+    legacy_manifest = selected.path / "manifest.json"
+    legacy = json.loads(legacy_manifest.read_text())
+    legacy.pop("alignment_eligibility_bound")
+    legacy_manifest.write_text(json.dumps(legacy))
+    reopened = OntologyContext(selected.path)
+    rows = {row["entity"]["iri"]: row for row in reopened.search(kind="class")["items"]}
+    assert rows["urn:A"]["alignment_eligible"] is True
+    assert rows["urn:A"]["alignment_eligibility_status"] == "available"
+    assert rows["urn:duplicate"]["alignment_eligible"] is None
+    assert rows["urn:duplicate"]["alignment_eligibility_status"] == "not_exported"

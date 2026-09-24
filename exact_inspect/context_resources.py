@@ -14,6 +14,7 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
+from .artifacts import atomic_json
 from .context_semantics import ANNOTATION_REGISTRY, _allowed, decode_payload
 from .contracts import VisibilityPolicy, canonical_hash, file_hash
 
@@ -48,12 +49,25 @@ def export_ontology_resource(
         raise ValueError("Ontology resource policy must permit the declared logical ontology scope")
     destination = Path(destination)
     receipt_path = destination.with_suffix(destination.suffix + ".receipt.json")
-    if destination.exists() or receipt_path.exists():
+    if receipt_path.exists():
         validate_ontology_resource(
             destination, receipt_path, policy_hash=policy.policy_hash, ontology_ids=[version]
         )
         return receipt_path
     destination.parent.mkdir(parents=True, exist_ok=True)
+    pending_path = receipt_path.with_suffix(receipt_path.suffix + ".pending")
+    pending = {
+        "source_context_sha256": context.manifest["artifacts"]["context.sqlite"],
+        "ontology_version_id": version,
+        "policy_hash": policy.policy_hash,
+    }
+    if pending_path.exists():
+        if json.loads(pending_path.read_text(encoding="utf-8")) != pending:
+            raise ValueError("Incomplete ontology export has different inputs")
+    elif destination.exists():
+        raise ValueError("Existing ontology resource has no matching preparation receipt")
+    else:
+        atomic_json(pending_path, pending)
     template = core.load_snapshot(
         b"Ontology()", options=core.LoadOptions(imports=core.ImportPolicy.IGNORE)
     ).root
@@ -143,9 +157,8 @@ def export_ontology_resource(
             "exporter": "exact-policy-ontology/1",
         }
         receipt["receipt_hash"] = canonical_hash(receipt)
-        receipt_path.write_text(
-            json.dumps(receipt, sort_keys=True, indent=2) + "\n", encoding="utf-8"
-        )
+        atomic_json(receipt_path, receipt)
+        pending_path.unlink(missing_ok=True)
     finally:
         Path(temporary).unlink(missing_ok=True)
     return receipt_path

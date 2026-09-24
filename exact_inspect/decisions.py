@@ -9,15 +9,6 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Callable
 
-from exact.runs.decisions import (
-    STAGES,
-    candidate_values,
-    feature_terms,
-    pair_key,
-    typed_pair,
-)
-from exact.runs.reader import RunReader
-
 from .contracts import (
     CONTRACT_VERSION,
     DomainError,
@@ -38,6 +29,9 @@ _SCORE_MEANINGS = {
     "Q_match": "Candidate mass on the saved joint candidate/NIL scale.",
     "w_llm": "Mixture weight; neither correctness probability nor counterfactual necessity.",
 }
+
+
+ADAPTER_REVISION = "decision-adapter/3"
 
 
 def _score(name, value, stage):
@@ -125,6 +119,8 @@ def _feature_items(record):
 
 
 def selected_evidence(record, source, target, *, resolver=None):
+    from exact.runs.decisions import feature_terms, pair_key
+
     items = []
     for ordinal, (channel, side, family, raw) in enumerate(_feature_items(record)):
         item = dict(raw)
@@ -290,6 +286,9 @@ def import_run(
     evidence_resolver: Callable | None = None,
 ) -> dict:
     """Freeze a relocatable gold-free indexed view; never rerun scoring or NLP."""
+    from exact.runs.decisions import STAGES, candidate_values, pair_key, typed_pair
+    from exact.runs.reader import RunReader
+
     reader = RunReader.open(Path(run_dir))
     manifest = reader.manifest()
     dependencies = {}
@@ -386,6 +385,7 @@ def import_run(
         key_map[key] = canonical_hash({"run_id": run_id, "source": refs[0], "target": refs[1]})
     revision = canonical_hash(
         {
+            "implementation": ADAPTER_REVISION,
             "dependencies": dependencies,
             "source": source_ontology_version_id,
             "target": target_ontology_version_id,
@@ -576,6 +576,7 @@ def import_run(
     result = {
         "contract_version": CONTRACT_VERSION,
         "artifact_type": "run_decision_package",
+        "implementation": ADAPTER_REVISION,
         "run_id": run_id,
         "revision": revision,
         "source_ontology_version_id": source_ontology_version_id,

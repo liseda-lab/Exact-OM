@@ -260,11 +260,20 @@ class OntologyContext:
                 {
                     "entity": ref,
                     "preferred_label": self._label(ref, language, policy),
-                    "alignment_eligible": bool(row["eligible"]),
+                    **self._alignment_eligibility(row["eligible"]),
                 }
             )
         key = [rows[limit - 1]["iri"], rows[limit - 1]["kind"]] if more else None
         return self._page(items, total, scope, next_key=key)
+
+    def _alignment_eligibility(self, stored: Any) -> dict[str, Any]:
+        bound = self.manifest.get("alignment_eligibility_bound")
+        if bound is True or stored:
+            return {"alignment_eligible": bool(stored), "alignment_eligibility_status": "available"}
+        return {
+            "alignment_eligible": None,
+            "alignment_eligibility_status": "not_requested" if bound is False else "not_exported",
+        }
 
     def _label(self, ref: dict[str, Any], language: str | None, policy: Any) -> dict[str, Any]:
         if not _allowed(policy, self.ontology_version_id, "labels"):
@@ -432,7 +441,7 @@ class OntologyContext:
             "entity": ref,
             "ontology_version_id": self.ontology_version_id,
             "preferred_label": self._label(ref, language, policy),
-            "alignment_eligible": eligible,
+            **self._alignment_eligibility(eligible),
             "categories": categories,
             "capabilities": {
                 "typed_expressions": "available",

@@ -199,6 +199,7 @@ def export_policy_context(
                 "sources",
                 "scope",
                 "matcher_scope",
+                "alignment_eligibility_bound",
                 "context_extension",
                 "portable",
             )
