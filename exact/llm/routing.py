@@ -11,6 +11,7 @@ import sys
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
+from time import monotonic
 from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 
 import httpx
@@ -570,6 +571,7 @@ class OpenRouterClient:
         )
         for retry in range(self.max_retries + 1):
             number = ledger.sent(key, retry_unknown=allow_unknown)
+            started = monotonic()
             try:
                 response = self._client.request(
                     method="POST",
@@ -579,7 +581,9 @@ class OpenRouterClient:
                     timeout=profile.timeout_secs,
                 )
             except httpx.TransportError as exc:
-                ledger.unknown(key, number, type(exc).__name__)
+                ledger.unknown(
+                    key, number, type(exc).__name__, elapsed_seconds=monotonic() - started
+                )
                 # Delivery may have happened. Only explicit policy allows another paid attempt.
                 if allow_unknown and retry < self.max_retries:
                     self._sleep_before_retry(retry)
@@ -588,10 +592,15 @@ class OpenRouterClient:
                     f"OpenRouter request {key} has unknown delivery; checkpoint preserved"
                 ) from exc
             except BaseException as exc:
-                ledger.unknown(key, number, type(exc).__name__)
+                ledger.unknown(
+                    key, number, type(exc).__name__, elapsed_seconds=monotonic() - started
+                )
                 raise
             # This transaction commits bytes before JSON/probability extraction.
-            ledger.received(key, number, response.content, response.status_code)
+            elapsed_seconds = monotonic() - started
+            ledger.received(
+                key, number, response.content, response.status_code, elapsed_seconds=elapsed_seconds
+            )
             if response.is_error:
                 if self._should_retry_status(response.status_code) and retry < self.max_retries:
                     self._sleep_before_retry(retry)

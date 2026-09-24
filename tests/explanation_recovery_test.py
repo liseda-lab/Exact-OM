@@ -2,6 +2,7 @@
 
 import json
 import shutil
+import sqlite3
 import subprocess
 import sys
 
@@ -217,3 +218,44 @@ def test_classifier_repair_rebuilds_context_and_only_changed_generation_records(
         fact["category"] != "definitions" for packet in calls[3:] for fact in packet["facts"]
     )
     assert json.loads((original / "preparation.json").read_bytes()) == before
+
+
+@pytest.mark.parametrize("measured", [False, True])
+def test_accounting_distinguishes_wire_attempts_replays_and_unmeasured_history(tmp_path, measured):
+    from tools.prepare_explanation_demo import provider_accounting
+
+    ledger = tmp_path / "provider-ledger"
+    ledger.mkdir()
+    connection = sqlite3.connect(ledger / "requests.sqlite3")
+    try:
+        connection.execute("CREATE TABLE attempts(state TEXT, usage TEXT)")
+        connection.executemany(
+            "INSERT INTO attempts VALUES (?,?)",
+            [
+                (
+                    "completed",
+                    json.dumps({"cost": 0.1, "prompt_tokens": 20, "completion_tokens": 4}),
+                ),
+                ("unknown", None),
+            ],
+        )
+        if measured:
+            connection.execute("ALTER TABLE attempts ADD COLUMN elapsed_seconds REAL")
+            connection.execute("UPDATE attempts SET elapsed_seconds=2.5 WHERE state='completed'")
+        connection.commit()
+    finally:
+        connection.close()
+    # Copies of the same saved response are not additional billable requests.
+    for name in ("old-validator", "repaired-validator"):
+        copied = tmp_path / name
+        copied.mkdir()
+        (copied / "response-0.json").write_text("{}")
+    (tmp_path / "repaired-validator" / "revalidation.json").write_text("{}")
+    report = provider_accounting(tmp_path)
+    assert report["wire_attempts"] == 2
+    assert report["returned_cost_usd"] == 0.1
+    assert report["attempts_without_returned_cost"] == 1
+    assert report["validator_replays_without_dispatch"] == 1
+    assert report["provider_latency"]["measured_attempts"] == int(measured)
+    assert report["provider_latency"]["unmeasured_attempts"] == 2 - int(measured)
+    assert report["provider_latency"]["total_seconds"] == (2.5 if measured else None)

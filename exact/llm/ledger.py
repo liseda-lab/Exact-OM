@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import os
 import socket
 import sqlite3
@@ -22,6 +23,11 @@ def request_identity(payload: Mapping[str, Any]) -> tuple[str, str]:
     return hashlib.sha256(encoded.encode()).hexdigest(), encoded
 
 
+def _validate_elapsed(value: float | None) -> None:
+    if value is not None and (not math.isfinite(value) or value < 0):
+        raise ValueError("Elapsed wire time must be finite and nonnegative")
+
+
 class RequestLedger:
     """Persist raw response bytes before parsing and serialize each request's sender."""
 
@@ -30,24 +36,29 @@ class RequestLedger:
         directory.mkdir(parents=True, exist_ok=True)
         self.path = directory / "requests.sqlite3"
         with self._transaction() as db:
-            db.executescript(
-                """
-                CREATE TABLE IF NOT EXISTS requests (
+            # Individual statements retain the transaction lock during schema migration.
+            for statement in (
+                """CREATE TABLE IF NOT EXISTS requests (
                     request_id TEXT PRIMARY KEY, identity TEXT NOT NULL
-                );
-                CREATE TABLE IF NOT EXISTS reservations (
+                )""",
+                """CREATE TABLE IF NOT EXISTS reservations (
                     request_id TEXT NOT NULL, number INTEGER NOT NULL, tokens INTEGER NOT NULL,
                     PRIMARY KEY(request_id, number)
-                );
-                CREATE TABLE IF NOT EXISTS attempts (
+                )""",
+                """CREATE TABLE IF NOT EXISTS attempts (
                     request_id TEXT NOT NULL, number INTEGER NOT NULL, state TEXT NOT NULL,
                     pid INTEGER NOT NULL, host TEXT NOT NULL, status INTEGER,
                     raw BLOB, sha256 TEXT, usage TEXT, error TEXT,
                     started TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    elapsed_seconds REAL,
                     PRIMARY KEY(request_id, number)
-                );
-            """
-            )
+                )""",
+            ):
+                db.execute(statement)
+            columns = {row["name"] for row in db.execute("PRAGMA table_info(attempts)")}
+            if "elapsed_seconds" not in columns:
+                # Prior attempts have no measured duration; never infer it from timestamps.
+                db.execute("ALTER TABLE attempts ADD COLUMN elapsed_seconds REAL")
 
     @contextmanager
     def _transaction(self) -> Iterator[sqlite3.Connection]:
@@ -146,14 +157,23 @@ class RequestLedger:
             )
         return number
 
-    def received(self, key: str, number: int, raw: bytes, status: int) -> None:
+    def received(
+        self,
+        key: str,
+        number: int,
+        raw: bytes,
+        status: int,
+        *,
+        elapsed_seconds: float | None = None,
+    ) -> None:
         """Commit exact response bytes before decoding/parsing; errors remain retry records."""
+        _validate_elapsed(elapsed_seconds)
         state = "completed" if 200 <= status < 300 else "rejected"
         with self._transaction() as db:
             changed = db.execute(
-                "UPDATE attempts SET state=?,raw=?,sha256=?,status=? "
+                "UPDATE attempts SET state=?,raw=?,sha256=?,status=?,elapsed_seconds=? "
                 "WHERE request_id=? AND number=? AND state='sent'",
-                (state, raw, hashlib.sha256(raw).hexdigest(), status, key, number),
+                (state, raw, hashlib.sha256(raw).hexdigest(), status, elapsed_seconds, key, number),
             )
             if changed.rowcount != 1:
                 raise ValueError("Wire attempt is not pending")
@@ -166,13 +186,16 @@ class RequestLedger:
                 (json.dumps(dict(usage), sort_keys=True), key, number),
             )
 
-    def unknown(self, key: str, number: int, error: str) -> None:
+    def unknown(
+        self, key: str, number: int, error: str, *, elapsed_seconds: float | None = None
+    ) -> None:
         """Mark ambiguous transport failure; retries retain this possibly charged attempt."""
+        _validate_elapsed(elapsed_seconds)
         with self._transaction() as db:
             db.execute(
-                "UPDATE attempts SET state='unknown',error=? "
+                "UPDATE attempts SET state='unknown',error=?,elapsed_seconds=? "
                 "WHERE request_id=? AND number=? AND state='sent'",
-                (error, key, number),
+                (error, elapsed_seconds, key, number),
             )
 
     def recover_unknown(self, key: str) -> None:
@@ -217,9 +240,19 @@ class RequestLedger:
                     "completion_tokens": 0,
                     "reported_cost_usd": 0.0,
                     "unpriced_attempts": 0,
+                    "measured_attempts": 0,
+                    "unmeasured_attempts": 0,
+                    "elapsed_seconds_total": None,
                 },
             )
             totals["attempts"] += 1
+            if row["elapsed_seconds"] is None:
+                totals["unmeasured_attempts"] += 1
+            else:
+                totals["measured_attempts"] += 1
+                totals["elapsed_seconds_total"] = (totals["elapsed_seconds_total"] or 0.0) + row[
+                    "elapsed_seconds"
+                ]
             if row["state"] == "completed":
                 totals["completed"] += 1
             if row["state"] in {"unknown", "sent"}:

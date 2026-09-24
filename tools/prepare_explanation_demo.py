@@ -185,6 +185,18 @@ def provider_accounting(root: Path) -> dict:
         return {"wire_attempts": 0, "returned_cost_usd": 0, "status": "not_requested"}
     with closing(sqlite3.connect(path.resolve().as_uri() + "?mode=ro", uri=True)) as db:
         rows = db.execute("SELECT state,usage FROM attempts").fetchall()
+        columns = {row[1] for row in db.execute("PRAGMA table_info(attempts)")}
+        durations = (
+            [
+                row[0]
+                for row in db.execute(
+                    "SELECT elapsed_seconds FROM attempts WHERE elapsed_seconds IS NOT NULL"
+                )
+            ]
+            if "elapsed_seconds" in columns
+            else []
+        )
+    durations.sort()
     usages = [json.loads(usage) for _, usage in rows if usage]
     return {
         "wire_attempts": len(rows),
@@ -197,6 +209,18 @@ def provider_accounting(root: Path) -> dict:
         "prompt_tokens": sum(u.get("prompt_tokens", 0) for u in usages),
         "completion_tokens": sum(u.get("completion_tokens", 0) for u in usages),
         "validator_replays_without_dispatch": len(list(root.glob("*/revalidation.json"))),
+        "provider_latency": {
+            "measured_attempts": len(durations),
+            "unmeasured_attempts": len(rows) - len(durations),
+            "total_seconds": sum(durations) if durations else None,
+            "mean_seconds": sum(durations) / len(durations) if durations else None,
+            "p95_seconds": (
+                durations[min(len(durations) - 1, int(len(durations) * 0.95))]
+                if durations
+                else None
+            ),
+            "scope": "Actual HTTP attempts only; old attempts remain unmeasured. Replay, validation and read API latency are excluded.",
+        },
         "status": "recorded",
         "scope": "All actual wire attempts in this preparation ledger; copied response checkpoints are not charged again.",
     }
