@@ -67,7 +67,8 @@ def measure(context: OntologyContext, name: str) -> dict:
             first_query_seconds = time.perf_counter() - query_started
         definitions = {
             (fact["predicate_iri"], fact["value"].get("lexical_form"))
-            for fact in actual["definitions"]["items"]
+            for category in ("definitions", "alternate_definitions")
+            for fact in actual["categories"][category]["items"]
         }
         parents = {edge["parent"]["iri"] for edge in context.hierarchy(ref)["items"]}
         if expected["definition_status"] == "no_definition_assertion_in_root_document":
@@ -79,7 +80,14 @@ def measure(context: OntologyContext, name: str) -> dict:
         checks.append(
             {
                 "iri": ref["iri"],
-                "definition_count": actual["definitions"]["total_count"],
+                "definition_count": sum(
+                    actual["categories"][category]["total_count"]
+                    for category in ("definitions", "alternate_definitions")
+                ),
+                "definition_category_counts": {
+                    category: actual["categories"][category]["total_count"]
+                    for category in ("definitions", "alternate_definitions")
+                },
                 "parent_count": len(parents),
                 "restriction_count": actual["categories"]["restrictions"]["total_count"],
                 "status": "pass",
