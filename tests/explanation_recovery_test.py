@@ -1,6 +1,9 @@
 """Failure-boundary regressions for grounded text and local import state."""
 
 import json
+import shutil
+import subprocess
+import sys
 
 import pytest
 from fastapi.testclient import TestClient
@@ -146,3 +149,71 @@ def test_validator_repair_reuses_saved_response_without_provider_dispatch(tmp_pa
     assert result["claims"][0]["category"] == "key_fact"
     assert result["manifest"]["response_hash"] == canonical_hash(response)
     assert result["claims"][0]["text"] == packet.facts[0]["value"]["lexical_form"]
+
+
+def test_abrupt_exit_after_response_save_replays_from_relocated_directory(tmp_path):
+    original = tmp_path / "original"
+    program = r"""
+import os, sys
+from pathlib import Path
+import exact_inspect.generation as generation
+from tests.explanation_framework_test import _packet, _provider
+root = Path(sys.argv[1])
+def crash(*args):
+    os._exit(23)
+generation.grounding = crash
+generation.ExplanationJobs(root).generate(
+    _packet(), generation.GenerationProfile(name="test", model="fixture/model"),
+    provider=_provider(_packet(), []),
+)
+"""
+    result = subprocess.run([sys.executable, "-c", program, str(original)], check=False)
+    assert result.returncode == 23
+    saved = list(original.glob("*/response-0.json"))
+    assert len(saved) == 1
+    assert not list(original.glob("*/explanation.json"))
+    response_bytes = saved[0].read_bytes()
+    relocated = tmp_path / "relocated"
+    shutil.copytree(original, relocated)
+    shutil.rmtree(original)
+
+    def forbidden(*args):
+        raise AssertionError("An already saved response must never dispatch again")
+
+    output = ExplanationJobs(relocated).generate(
+        _packet(), GenerationProfile(name="test", model="fixture/model"), provider=forbidden
+    )
+    assert output["manifest"]["status"] == "validated"
+    assert next(relocated.glob("*/response-0.json")).read_bytes() == response_bytes
+    assert output["claims"][0]["text"] == "A supplied definition."
+
+
+def test_classifier_repair_rebuilds_context_and_only_changed_generation_records(
+    prepared, tmp_path, monkeypatch  # noqa: F811
+):
+    from exact_inspect.context_semantics import ANNOTATION_REGISTRY
+    from exact_inspect.preparation import reuse_plan
+
+    lock, _, original, calls = prepared
+    before = json.loads((original / "preparation.json").read_bytes())
+    # A repaired classification removes a previously included definition from
+    # generation. The second entity has no such annotation and must be reusable.
+    monkeypatch.setitem(
+        ANNOTATION_REGISTRY, "http://purl.obolibrary.org/obo/IAO_0000115", ("comments", None)
+    )
+    changed = lock.model_copy(
+        update={"implementations": {**lock.implementations, "context-index": "fixture-repair/1"}}
+    )
+    plan = reuse_plan(lock, changed, cause="Synthetic annotation classifier correction")
+    actions = {row["stage"]: row["action"] for row in plan["stages"]}
+    assert actions["acquire-verify"] == "reuse"
+    assert actions["context-index"] == actions["profiles"] == actions["comparisons"] == "rebuild"
+    repaired = tmp_path / "repaired-context"
+    result = Preparation(changed, repaired, input_root=tmp_path, resume_from=original).run()
+    assert result["outputs"]["acquire-verify"] == before["outputs"]["acquire-verify"]
+    assert result["outputs"]["context-index"] != before["outputs"]["context-index"]
+    assert len(calls) == 5  # Only one changed profile and its comparison are regenerated.
+    assert all(
+        fact["category"] != "definitions" for packet in calls[3:] for fact in packet["facts"]
+    )
+    assert json.loads((original / "preparation.json").read_bytes()) == before
