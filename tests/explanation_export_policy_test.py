@@ -13,7 +13,6 @@ from exact_inspect.context_export import export_policy_context
 from exact_inspect.context_semantics import decode_payload
 from exact_inspect.contracts import DomainError, EntityRef, VisibilityPolicy, file_hash
 
-
 OWL = b"""Ontology(<urn:policy-fixture>
 Declaration(Class(<urn:A>)) Declaration(Class(<urn:B>))
 AnnotationAssertion(Annotation(<http://www.geneontology.org/formats/oboInOwl#hasDbXref> "forbidden-nested-label") <http://www.w3.org/2000/01/rdf-schema#label> <urn:A> "Visible label")

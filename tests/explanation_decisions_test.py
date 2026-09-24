@@ -524,3 +524,24 @@ def test_import_requires_every_consumed_artifact_in_declared_inventory(tmp_path)
         )
     assert error.value.envelope.code == "unverified_run_input"
     assert not (tmp_path / "changed" / "decisions.sqlite").exists()
+
+
+def test_candidate_summary_scores_retain_producing_stage_and_unknown_legacy_scope():
+    from exact_inspect.decisions import _summary_scores
+
+    values = {"cand_sim": 0.7, "S_base": 0.8, "S_final": 0.9, "P_match": 0.9, "old": 0.1}
+    events = [
+        {"stage": "retrieval", "values": {"cand_sim": 0.7}},
+        {"stage": "pair_scoring", "values": {"S_base": 0.8, "S_final": 0.8}},
+        {"stage": "selection", "values": {"P_match": 0.9, "S_final": 0.9}},
+        {"stage": "extraction", "values": {"S_final": 0.9}},
+    ]
+    scores = {score["name"]: score for score in _summary_scores(values, events)}
+    assert {name: score["stage"] for name, score in scores.items()} == {
+        "cand_sim": "retrieval",
+        "S_base": "pair_scoring",
+        "S_final": "selection",
+        "P_match": "selection",
+        "old": "saved_artifact",
+    }
+    assert {name: score["value"] for name, score in scores.items()} == values

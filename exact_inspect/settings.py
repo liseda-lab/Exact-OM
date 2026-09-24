@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 import warnings
 from pathlib import Path
-from typing import Any, ClassVar
+from typing import Any, ClassVar, Literal
 
 try:
     from pydantic import field_validator
@@ -26,6 +26,9 @@ class InspectSettings(BaseSettings):
     )
 
     run_dir: Path | None = None
+    package: Path | None = None
+    profile: Literal["local_app", "public_demo", "study"] | None = None
+    library_dir: Path | None = None
     analysis_dir: Path | None = None
     frontend_dir: Path | None = None
     source_ontology_path: Path | None = None
@@ -76,6 +79,8 @@ class InspectSettings(BaseSettings):
 
     @field_validator(
         "run_dir",
+        "package",
+        "library_dir",
         "analysis_dir",
         "frontend_dir",
         "source_ontology_path",

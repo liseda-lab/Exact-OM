@@ -52,6 +52,45 @@ def _fastapi_components() -> tuple[Any, Any, Any, Any, Any]:
 def create_app(settings: InspectSettings) -> Any:
     """Create an inspection app from explicit settings, with no global run path."""
 
+    if settings.profile == "study":
+        import os
+
+        from .study import create_study_app
+
+        required = (
+            "EXACT_STUDY_DATABASE_URL",
+            "EXACT_STUDY_SIGNING_SECRET",
+            "EXACT_STUDY_RESEARCHER_TOKEN",
+            "EXACT_STUDY_ORIGIN",
+        )
+        if any(not os.environ.get(name) for name in required):
+            raise ValueError(
+                "Study requires database, signing, researcher and origin environment bindings"
+            )
+        return create_study_app(
+            database_url=os.environ[required[0]],
+            signing_secret=os.environ[required[1]],
+            researcher_token=os.environ[required[2]],
+            origin=os.environ[required[3]],
+            assets_dir=(
+                settings.package.parent
+                if settings.package
+                else (
+                    Path(os.environ["EXACT_STUDY_ASSETS_DIR"])
+                    if os.environ.get("EXACT_STUDY_ASSETS_DIR")
+                    else None
+                )
+            ),
+        )
+    if settings.package is not None or settings.profile is not None:
+        from .service import create_prepared_app
+
+        return create_prepared_app(
+            settings.package,
+            profile=settings.profile or "local_app",
+            library_dir=settings.library_dir,
+        )
+
     FastAPI, HTTPException, Query, CORSMiddleware, StaticFiles = _fastapi_components()
     try:
         from fastapi.responses import HTMLResponse

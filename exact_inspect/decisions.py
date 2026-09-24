@@ -64,6 +64,19 @@ def _scores(values, stage):
     ]
 
 
+def _summary_scores(values, events):
+    producing_stage = {}
+    for item in events:
+        if item["stage"] in {"retrieval", "pair_scoring", "llm_signal", "selection"}:
+            for name, value in item.get("values", {}).items():
+                if values.get(name) == value:
+                    producing_stage[name] = item["stage"]
+    scores = _scores(values, "saved_artifact")
+    for score in scores:
+        score["stage"] = producing_stage.get(score["name"], "saved_artifact")
+    return scores
+
+
 def _event(raw, key_map, dependencies):
     return {
         "stage": raw["stage"],
@@ -466,7 +479,7 @@ def import_run(
                 "source": source,
                 "target": target,
                 "values": values,
-                "scores": _scores(values, "selection"),
+                "scores": _summary_scores(values, recorded),
                 "retrieval_channels": (
                     str(values.get("cand_channels") or "").split("|")
                     if values.get("cand_channels")

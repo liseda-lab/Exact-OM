@@ -20,6 +20,9 @@ def _add_server_arguments(parser: argparse.ArgumentParser, *, include_run_dir: b
     if include_run_dir:
         parser.add_argument("--run-dir", type=Path)
     parser.add_argument("--analysis-dir", type=Path)
+    parser.add_argument("--package", type=Path)
+    parser.add_argument("--profile", choices=("local_app", "public_demo", "study"))
+    parser.add_argument("--library-dir", type=Path)
     parser.add_argument("--frontend-dir", type=Path)
     parser.add_argument("--source-ontology", dest="source_ontology_path", type=Path)
     parser.add_argument("--target-ontology", dest="target_ontology_path", type=Path)
@@ -71,6 +74,34 @@ def build_parser() -> argparse.ArgumentParser:
     )
     bundle.add_argument("--dry-run", action="store_true")
     bundle.add_argument("--sbatch-script", type=Path)
+    prepare = commands.add_parser(
+        "prepare", help="Prepare bound artifacts; never launch matching implicitly."
+    )
+    inputs = prepare.add_mutually_exclusive_group(required=True)
+    inputs.add_argument("--plan", type=Path)
+    inputs.add_argument("--lock", type=Path)
+    prepare.add_argument("--output-root", required=True, type=Path)
+    prepare.add_argument("--stage", action="append")
+    prepare.add_argument("--dry-run", action="store_true")
+    prepare.add_argument("--resume", action="store_true")
+    prepare.add_argument("--resume-from", type=Path)
+    prepare.add_argument("--repair-plan", type=Path)
+    prepare.add_argument("--reuse-plan-only", action="store_true")
+    bind = commands.add_parser(
+        "bind-lock", help="Hash a local execution template without starting preparation."
+    )
+    bind.add_argument("--template", required=True, type=Path)
+    bind.add_argument("--output", required=True, type=Path)
+    verify = commands.add_parser(
+        "verify-backend", help="Verify prepared read APIs and record readiness evidence."
+    )
+    verify.add_argument("--package", required=True, type=Path)
+    verify.add_argument("--output", required=True, type=Path)
+    export = commands.add_parser(
+        "export", help="Create an inert portable v1 ZIP from a prepared manifest."
+    )
+    export.add_argument("--package", required=True, type=Path)
+    export.add_argument("--output", required=True, type=Path)
     return parser
 
 
@@ -79,6 +110,9 @@ def _settings_from_args(args: argparse.Namespace) -> InspectSettings:
         key: getattr(args, key, None)
         for key in (
             "run_dir",
+            "package",
+            "profile",
+            "library_dir",
             "analysis_dir",
             "frontend_dir",
             "source_ontology_path",
@@ -213,6 +247,72 @@ def _submit_bundle_job(script: Path, values: dict[str, Any], job: dict[str, Any]
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    if args.command == "bind-lock":
+        import json
+
+        from .artifacts import atomic_json
+        from .preparation import bind_execution_lock, read_lock
+
+        lock = bind_execution_lock(
+            json.loads(args.template.read_bytes()), input_root=args.template.parent
+        )
+        if args.output.exists() and read_lock(args.output) != lock:
+            raise ValueError("Execution locks are immutable; choose a new output path")
+        atomic_json(args.output, lock)
+        return 0
+    if args.command == "prepare":
+        import json
+
+        from .artifacts import atomic_json
+        from .preparation import Preparation, read_lock, reuse_plan, stage_readiness
+
+        path = args.lock or args.plan
+        raw = json.loads(path.read_bytes())
+        if raw.get("schema") == "exact-explain-development-blueprint/1":
+            if not args.dry_run:
+                raise ValueError(
+                    "The design blueprint is not an execution lock; bind actual input hashes first"
+                )
+            print(
+                json.dumps(
+                    {
+                        "status": "design_only",
+                        "missing_bindings": raw["unresolved_bindings"],
+                        "execution_schema": "exact-explain-execution/1",
+                    },
+                    indent=2,
+                )
+            )
+            return 0
+        lock = read_lock(path)
+        if args.repair_plan or args.reuse_plan_only:
+            if args.resume_from is None:
+                raise ValueError("Repair planning requires --resume-from")
+            prior = json.loads((args.resume_from / "preparation.json").read_bytes())
+            old = read_lock(args.resume_from / "locks" / (prior["lock_hash"][7:] + ".json"))
+            plan = reuse_plan(old, lock, cause="Explicit preparation lock revision")
+            atomic_json(args.repair_plan or args.output_root / "reuse-plan.json", plan)
+            if args.reuse_plan_only:
+                print(json.dumps(plan, indent=2))
+                return 0
+        if args.dry_run:
+            print(json.dumps(stage_readiness(lock), indent=2))
+            return 0
+        report = Preparation(
+            lock, args.output_root, input_root=path.parent, resume_from=args.resume_from
+        ).run(args.stage)
+        print(json.dumps(report, indent=2))
+        return 0
+    if args.command == "verify-backend":
+        from .verification import verify_backend
+
+        verify_backend(args.package, args.output)
+        return 0
+    if args.command == "export":
+        from .artifacts import export_archive
+
+        export_archive(args.package, args.output)
+        return 0
     if args.command in {"serve", "open"}:
         settings = _settings_from_args(args)
         _configure_logging(settings.log_level)
