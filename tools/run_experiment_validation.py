@@ -182,7 +182,7 @@ def forecast(rows, *, elapsed, max_seconds, requests, tokens, limits):
 
 
 def compare_validation_replay(
-    baseline_output, replay_output, *, completed_cache=False, local=False
+    baseline_output, replay_output, *, completed_cache=False, local=False, compare_metrics=True
 ):
     """Use declared numerical tolerances; completed cache copies also retain exact bytes."""
     from exact.experiments.replay import (
@@ -204,6 +204,7 @@ def compare_validation_replay(
         replay_output,
         observed_execution=devices[1],
         declared_execution={"kind": "gpu", "device": "0"},
+        compare_metrics=compare_metrics,
     )
     if completed_cache:
         name = "maps_local.tsv" if local else "maps_global.tsv"

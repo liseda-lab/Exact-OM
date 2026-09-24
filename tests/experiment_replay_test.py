@@ -87,6 +87,23 @@ def test_replay_rejects_mapping_or_relation_drift(
     assert persisted["failure"]["code"] == "canonical_mapping_mismatch"
 
 
+def test_inference_only_replay_cannot_implicitly_relax_metric_validation(tmp_path: Path) -> None:
+    baseline = _output(tmp_path / "baseline", ["s\tt\t0.9\t="])
+    replay = _output(tmp_path / "replay", ["s\tt\t0.9\t="])
+    for output in (baseline, replay):
+        (output / "evaluation/evaluation_results.json").unlink()
+        (output / "_inputs").mkdir()
+        (output / "_inputs/job.yaml").write_text("job:\n  run_eval: false\n")
+    with pytest.raises(ReplayValidationError, match="evaluation_results.json"):
+        compare_replay_outputs(baseline, replay, execution_kind="cpu")
+    record = compare_replay_outputs(baseline, replay, execution_kind="cpu", compare_metrics=False)
+    assert record["status"] == "passed" and record["metrics_checked"] is False
+    assert record["metric_deltas"] is None and record["max_metric_delta"] is None
+    assert record["metric_tolerance"] is None
+    assert record["metric_check_reason"] == "evaluation_disabled_in_both_jobs"
+    assert set(record["evaluation_scope"]) == {"baseline_job", "replay_job"}
+
+
 def test_replay_rejects_metric_drift_and_requires_paired_cells(tmp_path: Path) -> None:
     baseline = _output(tmp_path / "baseline", ["s\tt\t0.9\t="], f1=0.8)
     replay = _output(tmp_path / "replay", ["s\tt\t0.9\t="], f1=0.8002)

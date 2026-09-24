@@ -643,3 +643,63 @@ def test_forecast_retains_imported_hosted_measurement_without_new_usage():
     assert estimate["remaining_requests"] == 450
     assert estimate["remaining_tokens"] == 49500
     assert estimate["fits_limits"] is False
+
+
+@pytest.mark.parametrize(
+    "fault, message",
+    [
+        (None, None),
+        ("missing_scope", "disabled evaluation"),
+        ("enabled_scope", "disabled evaluation"),
+        ("implicit_scope", "disabled evaluation"),
+        ("mapping", "canonical IDs"),
+        ("relation", "relation labels"),
+        ("score", "score drift"),
+        ("device", "execution device"),
+        ("cache_roundoff", "mapping bytes"),
+    ],
+)
+def test_inference_only_validation_preserves_replay_guards(tmp_path, fault, message):
+    from tools.run_experiment_validation import compare_validation_replay
+
+    baseline, replay = tmp_path / "baseline", tmp_path / "replay"
+    for output in (baseline, replay):
+        (output / "alignment").mkdir(parents=True)
+        (output / "alignment/maps_global.tsv").write_text(
+            "SrcEntity\tTgtEntity\tScore\tRelation\ns\tt\t0.9\t=\n"
+        )
+        (output / "stats").mkdir()
+        (output / "stats/run_stats.json").write_text(
+            json.dumps({"observed_execution": {"kind": "gpu", "device": "cuda:0"}})
+        )
+        (output / "_inputs").mkdir()
+        (output / "_inputs/job.yaml").write_text("job:\n  run_eval: false\n")
+    if fault == "missing_scope":
+        (baseline / "_inputs/job.yaml").unlink()
+    elif fault in {"enabled_scope", "implicit_scope"}:
+        (replay / "_inputs/job.yaml").write_text(
+            "job:\n  run_eval: true\n" if fault == "enabled_scope" else "job: {}\n"
+        )
+    elif fault == "device":
+        (replay / "stats/run_stats.json").write_text(
+            json.dumps({"observed_execution": {"kind": "gpu", "device": "cuda:1"}})
+        )
+    elif fault in {"mapping", "relation", "score", "cache_roundoff"}:
+        path = replay / "alignment/maps_global.tsv"
+        row = {
+            "mapping": "s\tother\t0.9\t=",
+            "relation": "s\tt\t0.9\t<",
+            "score": "s\tt\t0.91\t=",
+            "cache_roundoff": "s\tt\t0.9000000001\t=",
+        }[fault]
+        path.write_text("SrcEntity\tTgtEntity\tScore\tRelation\n" + row + "\n")
+    if message:
+        with pytest.raises(ValueError, match=message):
+            compare_validation_replay(baseline, replay, completed_cache=True, compare_metrics=False)
+    else:
+        record = compare_validation_replay(
+            baseline, replay, completed_cache=True, compare_metrics=False
+        )
+        assert record["completed_cache_bytes_verified"] is True
+        assert record["metrics_checked"] is False
+        assert record["mapping_count"] == 1

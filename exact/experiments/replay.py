@@ -268,8 +268,30 @@ def compare_replay_outputs(
     execution_kind: str | None = None,
     observed_execution: Any = None,
     declared_execution: Any = None,
+    compare_metrics: bool = True,
 ) -> dict[str, Any]:
-    """Compare one paired E00 cell and return auditable tolerance evidence."""
+    """Compare saved predictions, requiring metrics unless both jobs disabled evaluation."""
+
+    if not isinstance(compare_metrics, bool):
+        raise TypeError("compare_metrics must be a boolean")
+    evaluation_scope: dict[str, Any] = {}
+    if not compare_metrics:
+        from ruamel.yaml.error import YAMLError
+
+        from exact.core.entities.configs.yaml_io import load_yaml_mapping
+
+        for label, output in (("baseline", baseline_output), ("replay", replay_output)):
+            job_path = Path(output) / "_inputs" / "job.yaml"
+            try:
+                job = load_yaml_mapping(job_path).get("job")
+                if not isinstance(job, Mapping) or job.get("run_eval") is not False:
+                    raise ValueError("saved job must explicitly declare run_eval: false")
+            except (OSError, ValueError, YAMLError) as exc:
+                _fail(
+                    "invalid_replay_scope",
+                    f"Inference-only replay requires disabled evaluation for {label}: {exc}",
+                )
+            evaluation_scope[label + "_job"] = file_provenance(job_path)
 
     observed = normalize_execution_device(
         observed_execution if observed_execution is not None else execution_kind,
@@ -321,38 +343,41 @@ def compare_replay_outputs(
             },
         )
 
-    try:
-        baseline_metrics = extract_evaluation_metrics(Path(baseline_output))
-        replay_metrics = extract_evaluation_metrics(Path(replay_output))
-    except (FileNotFoundError, OSError, ValueError) as exc:
-        _fail("invalid_replay_metrics", str(exc))
-    if baseline_metrics.keys() != replay_metrics.keys():
-        _fail(
-            "metric_schema_mismatch",
-            "E00 replay aggregate metric keys changed: "
-            f"{sorted(baseline_metrics)} != {sorted(replay_metrics)}",
-            details={
-                "baseline_keys": sorted(baseline_metrics),
-                "replay_keys": sorted(replay_metrics),
-            },
-        )
-    metric_deltas = {
-        key: abs(float(baseline_metrics[key]) - float(replay_metrics[key]))
-        for key in baseline_metrics
-    }
-    max_metric_delta = max(metric_deltas.values(), default=0.0)
-    if max_metric_delta > METRIC_TOLERANCE:
-        worst_metric = max(metric_deltas, key=lambda key: metric_deltas[key])
-        _fail(
-            "metric_tolerance_exceeded",
-            f"E00 replay metric drift {max_metric_delta} exceeds {METRIC_TOLERANCE} "
-            f"for {worst_metric!r}",
-            details={
-                "max_metric_delta": max_metric_delta,
-                "metric_tolerance": METRIC_TOLERANCE,
-                "metric": worst_metric,
-            },
-        )
+    metric_deltas: dict[str, float] | None = None
+    max_metric_delta: float | None = None
+    if compare_metrics:
+        try:
+            baseline_metrics = extract_evaluation_metrics(Path(baseline_output))
+            replay_metrics = extract_evaluation_metrics(Path(replay_output))
+        except (FileNotFoundError, OSError, ValueError) as exc:
+            _fail("invalid_replay_metrics", str(exc))
+        if baseline_metrics.keys() != replay_metrics.keys():
+            _fail(
+                "metric_schema_mismatch",
+                "E00 replay aggregate metric keys changed: "
+                f"{sorted(baseline_metrics)} != {sorted(replay_metrics)}",
+                details={
+                    "baseline_keys": sorted(baseline_metrics),
+                    "replay_keys": sorted(replay_metrics),
+                },
+            )
+        metric_deltas = {
+            key: abs(float(baseline_metrics[key]) - float(replay_metrics[key]))
+            for key in baseline_metrics
+        }
+        max_metric_delta = max(metric_deltas.values(), default=0.0)
+        if max_metric_delta > METRIC_TOLERANCE:
+            worst_metric = max(metric_deltas, key=lambda key: metric_deltas[key])
+            _fail(
+                "metric_tolerance_exceeded",
+                f"E00 replay metric drift {max_metric_delta} exceeds {METRIC_TOLERANCE} "
+                f"for {worst_metric!r}",
+                details={
+                    "max_metric_delta": max_metric_delta,
+                    "metric_tolerance": METRIC_TOLERANCE,
+                    "metric": worst_metric,
+                },
+            )
     canonical_rows = [
         {"source": source, "target": target, "relation": relation}
         for source, target, relation in baseline_rows
@@ -366,9 +391,14 @@ def compare_replay_outputs(
         "canonical_order": canonical_rows,
         "score_tolerance": score_tolerance,
         "max_score_delta": max_score_delta,
-        "metric_tolerance": METRIC_TOLERANCE,
+        "metrics_checked": compare_metrics,
+        "metric_check_reason": (
+            "compared" if compare_metrics else "evaluation_disabled_in_both_jobs"
+        ),
+        "evaluation_scope": evaluation_scope,
+        "metric_tolerance": METRIC_TOLERANCE if compare_metrics else None,
         "max_metric_delta": max_metric_delta,
-        "metric_deltas": dict(sorted(metric_deltas.items())),
+        "metric_deltas": dict(sorted(metric_deltas.items())) if metric_deltas is not None else None,
         "baseline_alignment": file_provenance(baseline_path),
         "replay_alignment": file_provenance(replay_path),
     }
