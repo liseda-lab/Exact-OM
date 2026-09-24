@@ -1827,7 +1827,12 @@ class SemanticAlignmentRunner(
                         candidate_row["llm_source_choice"] = source_decision["choice"]
                 if gate_diagnostics is not None:
                     candidate_row.update(self._gate_candidate_fields(gate_diagnostics[idx]))
-                from exact.runs.decisions import append_event, candidate_values, event, pair_key
+                from exact.runs.decisions import (
+                    append_event,
+                    candidate_values,
+                    event,
+                    pair_key,
+                )
 
                 initial = getattr(self.dataset, "_candidate_stage_observations", {}).get(
                     pair_key(candidate_row), {}

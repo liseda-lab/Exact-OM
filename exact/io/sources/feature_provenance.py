@@ -11,6 +11,8 @@ from typing import Any
 
 import pyowl_core as owl
 
+from exact.runs.decisions import PROJECTOR_PREDICATE_ALIASES
+
 RDFS = "http://www.w3.org/2000/01/rdf-schema#"
 RDF_TYPE = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type"
 
@@ -210,7 +212,12 @@ class FeatureProvenance:
             )
             references = self.attributes.get(key, [])
         else:
-            for pred in [predicate] if predicate else predicates:
+            lookup_predicate = (
+                PROJECTOR_PREDICATE_ALIASES.get(predicate, predicate)
+                if isinstance(predicate, str)
+                else None
+            )
+            for pred in [lookup_predicate] if lookup_predicate else predicates:
                 references.extend(
                     self.edges.get((item.get("subject_iri"), pred, item.get("object_iri")), [])
                 )
@@ -239,7 +246,14 @@ class FeatureProvenance:
         result["derivation"] = {
             "provider": "exact",
             "version": "feature-provenance/1",
-            "rules": sorted({row["rule"] for row in references if row.get("rule")}),
+            "rules": sorted(
+                {row["rule"] for row in references if row.get("rule")}
+                | (
+                    {"owl2vecstar_subclass_predicate_alias"}
+                    if predicate in PROJECTOR_PREDICATE_ALIASES and references
+                    else set()
+                )
+            ),
             "premises": result["source_axiom_refs"],
             "premises_unavailable": not bool(references),
         }

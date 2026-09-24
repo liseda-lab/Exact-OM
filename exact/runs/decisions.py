@@ -13,6 +13,9 @@ from pathlib import Path
 from typing import Any, Mapping
 
 SCHEMA_VERSION = 1
+PROJECTOR_PREDICATE_ALIASES = {
+    "http://subclassof": "http://www.w3.org/2000/01/rdf-schema#subClassOf",
+}
 STAGES = (
     "retrieval",
     "prefilter",
@@ -87,6 +90,8 @@ def feature_terms(item: Mapping[str, Any]) -> dict[str, Any]:
         )
         if item.get(key) is not None
     }
+    if terms.get("rel_iri") in PROJECTOR_PREDICATE_ALIASES:
+        terms["rel_iri"] = PROJECTOR_PREDICATE_ALIASES[terms["rel_iri"]]
     if "grouped_semantic_features" in item:
         terms["grouped_semantic_features"] = sorted(
             [feature_terms(feature) for feature in item["grouped_semantic_features"]], key=digest
