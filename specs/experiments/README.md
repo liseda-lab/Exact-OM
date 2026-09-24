@@ -2,6 +2,10 @@
 
 **Design revision: 2026-09-10 (E04 benchmark-NIL scope). G0 passed; E05/E26/E06 screens retained their controls. All six E02 cells and final reports completed on 2026-09-20; E02 retained the hard-anchor baseline. The reporting repair reused every scientific output and made zero new model calls. D1 SNOMED preparation completed. FMA reification repair and full native preprocessing passed; step 14234.14 completed in 15m15s with 3.32GiB peak RAM. E09 qualification resumed on liseda-03 at 16:49 UTC on 2026-09-24 as step 14372.1, with conditional automatic continuation into its four hierarchy arms. The main `.venv` now uses the four published PyPI 0.2.1 native packages.**
 See [PREPARATION-STATUS.md](PREPARATION-STATUS.md) for current code, input and operational evidence.
+The user's 2026-09-24 six-day execution target is organized in
+[SIX-DAY-BATCHES.md](SIX-DAY-BATCHES.md), with a
+[machine-readable planning inventory](six-day-batches.yaml). The full remaining scope is
+not yet admitted within 144 hours; E09 remains the only active queue.
 [FIRST-SCREEN.md](FIRST-SCREEN.md) records E05 and E26/E06 history;
 [MECHANISM-SCREEN.md](MECHANISM-SCREEN.md) records E02 admission and monitoring.
 [G0-VALIDATION.md](G0-VALIDATION.md) records the detached validation handoff;
