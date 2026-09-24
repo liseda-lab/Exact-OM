@@ -5,7 +5,7 @@ See [PREPARATION-STATUS.md](PREPARATION-STATUS.md) for current code, input and o
 The user's 2026-09-24 six-day execution target is organized in
 [SIX-DAY-BATCHES.md](SIX-DAY-BATCHES.md), with a
 [machine-readable planning inventory](six-day-batches.yaml). The full remaining scope is
-not yet admitted within 144 hours; E09 remains the only active queue.
+not yet ready for execution. Six days is a soft target; longer budgeted execution is allowed.
 [FIRST-SCREEN.md](FIRST-SCREEN.md) records E05 and E26/E06 history;
 [MECHANISM-SCREEN.md](MECHANISM-SCREEN.md) records E02 admission and monitoring.
 [G0-VALIDATION.md](G0-VALIDATION.md) records the detached validation handoff;

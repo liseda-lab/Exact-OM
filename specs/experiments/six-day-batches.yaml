@@ -3,7 +3,8 @@ kind: planning_inventory_not_campaign_lock
 recorded_on: '2026-09-24'
 status: not_admitted
 target_elapsed_hours: 144
-target_basis: Six days of continuous execution from this planning handoff; not a runtime timeout.
+target_basis: User-confirmed soft goal of six days; longer execution is allowed. Not a runtime timeout
+  or additional admission cap.
 source_inventory: data/experiments-v2/prepared-campaign-10/campaign.lock.yaml
 active_queue: data/experiments-v2/prepared-campaign-11/HANDOFF.md
 audit_directory: data/experiments-v2/six-day-plan-01
@@ -151,10 +152,12 @@ feasibility_gate:
     against fresh outputs.
   - Freeze unique-work forecast with 1.5 safety factor, API attempts/tokens, memory/disk, queue critical
     path and cumulative charges.
-  - Require remaining completion forecast to fit the remaining calendar after reserve as well as the existing
-    budget envelopes.
-  if_failed: Report full-scope revised single-node ETA and exact remaining work. No extra nodes are available.
-    Preserve pending comparisons; no silent caps, control removal or design changes.
+  - Report remaining completion forecast against the soft calendar target; admit against scientific readiness
+    and the existing cumulative resource budget envelopes.
+  if_failed: If only the six-day target is missed, report the revised single-node ETA and continue scientifically
+    ready work within the cumulative budget. Budget or correctness failures still block affected work;
+    preserve pending comparisons without silent scope changes.
+  calendar_target_blocks_admission: false
 unexpanded_work:
 - id: shared_controls_diagnostics
   cells: null
@@ -219,3 +222,4 @@ audit_bindings:
   inventory.json: 25c28067fbe371edec603459f21fad2669e2e8cbde57d2be08f0573f1ce373a9
   cost-audit.json: c1b42d3432ea4cdac554d108de11900c9027852a2d466222dddcf26307284388
   branch-readiness.json: 91ab8afc456b26f9377dbaf03274621fabd55097ae2d95f8b46fd71781607ea7
+target_is_hard_limit: false

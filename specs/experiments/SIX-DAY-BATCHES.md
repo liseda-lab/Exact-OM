@@ -1,6 +1,8 @@
 # Remaining experiment batches: six-day target
 
-**Planning amendment, 2026-09-24. Target: 144 hours of continuous execution.**
+**Planning amendment, 2026-09-24. Soft target: 144 hours of continuous execution.**
+The user explicitly permits longer execution. Missing the six-day target does not block an
+otherwise correct batch that fits the cumulative resource budget.
 This changes dispatch priorities, not scientific scope. It is not an executable campaign
 lock, a measured completion promise, a reset of accumulated costs, or a job time limit.
 The current single-node assumption is liseda-03: one RTX 4090, six allocated CPUs and
@@ -8,7 +10,7 @@ The current single-node assumption is liseda-03: one RTX 4090, six allocated CPU
 
 The full unoptimized declaration cannot currently be admitted within six days. The useful
 next step is to prepare independent work while E09 runs, remove repeated numerical work
-with verified reuse, and make the full-scope feasibility decision within the first 12 hours.
+with verified reuse, and update the full-scope completion forecast within the first 12 hours.
 Implementation gaps are recorded below rather than counted as runnable experiments.
 
 ## Inventory and batches
@@ -29,7 +31,7 @@ additional scope listed after the table. A declaration is not an admitted job.
 | B3 | E16 transfer, E22 label budgets and count policy, E25 oracle/trust replays | 16 | Hours 36–60 |
 | B4 | E04 NIL/pool miss/listwise; E11 properties; E12 instance retrieval/evidence; E13 representation/enrichment; E14 typing; E23 graphs | 37 | Interleave during hours 0–60 |
 | B5 | G4 baseline/core composition on D0 and D1, global and local, up to 1,000 sources | 8 | Hours 60–72 |
-| B6 | Frozen E17 panel and published comparator; complete inference populations and validated submission files | 63 | Hours 72–132, **only if the forecast fits** |
+| B6 | Frozen E17 panel and published comparator; complete inference populations and validated submission files | 63 | Hours 72–132 target; later if needed and budgeted |
 | Reserve | Recovery, output validation and final accounting | — | Hours 132–144 |
 
 Windows are scheduling targets, **not runtime estimates or parallel GPU reservations**.
@@ -140,15 +142,16 @@ Prioritize these output-preserving reductions:
 
 By hour 12, create a measured unique-work forecast, including cold materialization, fitting,
 reporting, retries, memory/disk and all hosted roles. Apply the existing **1.5 safety factor**.
-The remaining critical path must fit the calendar with the recovery reserve and also pass
-the cumulative budget envelopes. Do not count proposed cache savings before parity and
-throughput verification. If that fails, record the realistic full-scope ETA and resource
-shortfall immediately; the remaining rows stay pending rather than being called completed.
+Report how the remaining critical path compares with the target calendar and recovery
+reserve. Admission must pass the cumulative budget envelopes; the six-day calendar is advisory. Do not count proposed cache savings before parity and
+throughput verification. If the target is missed, record the realistic full-scope ETA and
+continue eligible budgeted work. A resource-budget failure still requires a valid amendment;
+unfinished rows remain pending rather than being called completed.
 
 Only the current node is available. If the measured, optimized full scope still exceeds
 144 hours, give the longer single-node ETA and exact unfinished work. Do not resolve this
 by assuming extra GPUs or silently reducing the scientific scope. The six-day target is
-aspirational until that feasibility gate passes.
+aspirational and is not an additional runtime or admission limit.
 
 ## Execution handoff
 
