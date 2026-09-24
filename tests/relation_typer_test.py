@@ -201,13 +201,14 @@ def test_learned_relation_modes_fail_closed_without_fitted_artifact(mode: str) -
         )
 
 
-def test_bridge_reasoner_backend_is_explicitly_deferred() -> None:
+def test_bridge_reasoner_marks_csv_profile_unsupported() -> None:
     source = CsvKgSource.from_path(FIXTURE)
-    with pytest.raises(Exception, match="bridge_reasoner.*deferred"):
-        predict_relations(
-            pd.DataFrame([{"Src": BASE + "heart", "Tgt": BASE + "heart", "Score": 0.9}]),
-            source,
-            source,
-            mode="semantic_entailment",
-            semantic_backend="bridge_reasoner",
-        )
+    result = predict_relations(
+        pd.DataFrame([{"Src": BASE + "heart", "Tgt": BASE + "heart", "Score": 0.9}]),
+        source,
+        source,
+        mode="semantic_entailment",
+        semantic_backend="bridge_reasoner",
+    )
+    assert result.empty
+    assert result.attrs["relation_abstentions"][0]["reason"] == "unsupported_profile"

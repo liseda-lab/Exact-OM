@@ -92,7 +92,16 @@ def typed_reference_frame(path):
     from exact.utils.data import read_table
 
     frame = read_table(Path(path))
-    labels = {"equivalent": "=", "subsumed_by": "<", "subsumes": ">", "=": "=", "<": "<", ">": ">"}
+    labels = {
+        "equivalent": "=",
+        "subsumed_by": "<",
+        "subsumes": ">",
+        "source_subsumed_by_target": "<",
+        "source_subsumes_target": ">",
+        "=": "=",
+        "<": "<",
+        ">": ">",
+    }
     if {"SrcEntity", "TgtEntities", "Relations"} <= set(frame):
         rows = []
         for row in frame.itertuples():

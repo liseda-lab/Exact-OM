@@ -2408,6 +2408,7 @@ def _error_attribution(cell: RunCell) -> Optional[dict[str, Any]]:
 
 
 def _post_run_provenance(cell: RunCell, *, completed: bool = True) -> dict[str, Any]:
+    from exact.experiments.difference_replay import evaluate_difference_replay
     from exact.experiments.nil_evaluation import evaluate_source_labels
 
     dataset_dir = cell.output_dir / "dataset"
@@ -2425,6 +2426,7 @@ def _post_run_provenance(cell: RunCell, *, completed: bool = True) -> dict[str, 
     return {
         "error_attribution": _error_attribution(cell) if evaluate else None,
         "nil_evaluation": evaluate_source_labels(cell) if evaluate else None,
+        "difference_evaluation": evaluate_difference_replay(cell) if evaluate else None,
         "candidate_pool": pool,
         "candidate_pool_fingerprint": (
             pool.get("fingerprint") if isinstance(pool, Mapping) else None
@@ -2983,6 +2985,27 @@ def cell_metrics(output_dir: Path) -> dict[str, float]:
     """Read authoritative evaluator and separately bound posthoc NIL metrics."""
     output_dir = Path(output_dir)
     metrics = extract_evaluation_metrics(output_dir)
+    relation_path = output_dir / "alignment/relation_metrics.json"
+    if relation_path.is_file():
+        typed = json.loads(relation_path.read_text())
+        if (
+            typed.get("schema_version") != 1
+            or typed.get("evaluation_only") is not True
+            or typed.get("reference_role") not in {"train", "valid", "internal_check"}
+        ):
+            raise ValueError("Invalid development relation metric artifact")
+        for name, filename in (
+            ("reference", "relations.reference.tsv"),
+            ("oracle", "relations.oracle.tsv"),
+            ("alignment", "paper.maps_global.tsv"),
+        ):
+            if sha256_file(output_dir / "alignment" / filename) != typed[name + "_sha256"]:
+                raise ValueError("Relation metric input identity changed")
+        for endpoint in ("oracle_pairs", "full_pipeline"):
+            score = float(typed[endpoint]["macro_F1"])
+            if not math.isfinite(score) or not 0 <= score <= 1:
+                raise ValueError("Invalid relation macro F1")
+            metrics[f"relation.{endpoint}.macro_F1"] = score
     path = output_dir / "diagnostics/nil_metrics.json"
     if path.is_file():
         payload = json.loads(path.read_text())
@@ -6412,7 +6435,15 @@ def _materialize_campaign_evidence(
 ):
     """Bind the three bounded development artifact producers before scheduling cells."""
     constants = source.config.frozen_constants
-    if constants.get("label_policy_followup"):
+    if constants.get("selected_analytic_setting"):
+        from exact.experiments.staged_selection import materialize_analytic_selection
+
+        materialize, arguments = materialize_analytic_selection, (suite, manifests, selections)
+    elif constants.get("selected_judge"):
+        from exact.experiments.staged_selection import materialize_selected_judge
+
+        materialize, arguments = materialize_selected_judge, (suite, manifests, selections)
+    elif constants.get("label_policy_followup"):
         from exact.experiments.label_policy import materialize_followup
 
         materialize, arguments = materialize_followup, (suite, manifests)
@@ -6717,9 +6748,21 @@ def run_stage(
             else inherited_selection_overlay(source_selection, config.depends_on)
         )
         if suite.campaign and stage == "screen":
-            source, inherited = _materialize_campaign_evidence(
-                source, suite, all_manifests, selections, inherited, plan_only=plan_only
-            )
+            from exact.experiments.staged_selection import PrerequisiteUnavailable
+
+            try:
+                source, inherited = _materialize_campaign_evidence(
+                    source, suite, all_manifests, selections, inherited, plan_only=plan_only
+                )
+            except PrerequisiteUnavailable as exc:
+                selections[config.experiment_id] = {
+                    **_runtime_deferred_selection(
+                        source, suite, reason_code=exc.code, reason=str(exc)
+                    ),
+                    "status": exc.status,
+                }
+                persist()
+                continue
             config = source.config
             suite = replace(
                 suite,

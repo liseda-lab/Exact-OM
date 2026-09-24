@@ -89,7 +89,8 @@ def fitting_arms():
                 "complete_development_reference",
             ]
         if name == "listwise_none":
-            overlay["llm"]["experiment"] = _judge()
+            # Bind the actual E07 winner instead of substituting a default prompt.
+            overlay["llm"]["experiment"] = {"enabled": True}
             requirements += ["selected_E07_judge", "paired_none_comparison"]
         record = _arm(
             "E04",
@@ -119,7 +120,11 @@ def fitting_arms():
         judge["decision"]["brief_max_tokens"] = 256 if name == "brief_256_binary" else 64
         if name == "retrieved_listwise":
             judge["decision"]["max_evidence_packets"] = 2
-        overlay = {"supervision": _supervision(), "llm": {"experiment": judge}}
+        overlay = {
+            "supervision": _supervision(),
+            "selector": {"runtime_enabled": False},
+            "llm": {"experiment": judge},
+        }
         arms["E07"].append(
             _arm(
                 "E07",
@@ -223,9 +228,7 @@ def fitting_arms():
         overlay = deepcopy(llm_off)
         overlay.update(
             supervision=_supervision(*(["fusion"] if fitted else [])),
-            matching={
-                "fusion": {"enabled": True, "mode": mode, "tau": 0.5, "gamma": 2.0, "beta": 0.8}
-            },
+            matching={"fusion": {"enabled": True, "mode": mode, "beta": 0.8}},
         )
         arms["E19"].append(
             _arm(
@@ -277,7 +280,9 @@ def fitting_arms():
         "student_gold",
         "student_distilled",
     ):
-        judge = _judge()
+        # The verified E07 consumer supplies decision/evidence/integration settings.
+        # Arm overlays carry only the intended intervention.
+        judge = {"enabled": True}
         requirements = [
             "selected_E07_judge",
             "judge_benefit_established",

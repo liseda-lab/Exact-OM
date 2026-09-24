@@ -216,7 +216,9 @@ def test_difference_formulations_and_empty_pool_diagnostics() -> None:
     assert absolute_payload["diff_absolute"] == pytest.approx(0.25)
     assert absolute_payload["score"] == pytest.approx(0.75)
 
-    asymmetric = _scorer(diff={"enabled": True, "formulation": "asymmetric"})
+    asymmetric = _scorer(
+        diff={"enabled": True, "formulation": "asymmetric", "relation_interpretation": "<"}
+    )
     asymmetric.use_context = True
     assert asymmetric._score_difference_channel(src, tgt, support)["score"] == pytest.approx(1.0)
 
@@ -255,6 +257,8 @@ def test_signed_identifier_attributes_can_contribute_below_pivot(
                 "prop": "identifier",
                 "prop_iri": "urn:test:identifier",
                 "identifier_namespace": "test",
+                "identifier_exclusive": True,
+                "annotation_semantics_evidence_id": "fixture:exclusive-test-id",
                 "identifier_normalized": "A1",
                 "value": "A-1",
                 "text": "identifier A-1",
@@ -265,6 +269,8 @@ def test_signed_identifier_attributes_can_contribute_below_pivot(
                 "prop": "code",
                 "prop_iri": "urn:test:identifier",
                 "identifier_namespace": "test",
+                "identifier_exclusive": True,
+                "annotation_semantics_evidence_id": "fixture:exclusive-test-id",
                 "identifier_normalized": "B9",
                 "value": "B-9",
                 "text": "code B-9",

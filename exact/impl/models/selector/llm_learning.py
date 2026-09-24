@@ -163,7 +163,7 @@ def exemplar_prompt(model, plan):
     validate_learning_binding(payload, model, [plan.source_iri])
     profile = source_features(plan.candidate_scores)
     ordered = sorted(
-        payload["examples"],
+        [row for row in payload["examples"] if row["source"] != plan.source_iri],
         key=lambda row: (
             sum((a - b) ** 2 for a, b in zip(row["features"], profile)),
             row["source"],
@@ -183,7 +183,11 @@ def exemplar_prompt(model, plan):
 def validate_learning_binding(payload, model, source_ids):
     if payload.get("schema_version") != 1:
         raise ValueError("Invalid learned LLM artifact schema")
-    if set(str(value) for value in source_ids) & set(payload["training_sources"]):
+    from exact.utils.frozen_inference import frozen_application
+
+    if set(str(value) for value in source_ids) & set(
+        payload["training_sources"]
+    ) and not frozen_application(model._attached_dataset, payload):
         raise ValueError("Learned LLM inference overlaps training sources")
     expected = payload.get("teacher_binding")
     if expected is not None and expected != teacher_identity(model):

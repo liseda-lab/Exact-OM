@@ -154,6 +154,7 @@ class DifferenceIncompatibility(StrictConfigModel):
     property_iri: str = Field(min_length=1)
     source_object: str = Field(min_length=1)
     target_object: str = Field(min_length=1)
+    single_valued: bool = False
     semantic_rule: Literal["disjoint_objects", "exclusive_values"]
     evidence_id: str = Field(min_length=1)
 
@@ -164,6 +165,7 @@ class DifferenceChannelExperimentConfig(StrictConfigModel):
         Field("normalised")
     )
     dump_components: bool = Field(False, description="Persist pivot-reason diagnostics.")
+    controlled_perturbations: bool = False
     incompatibilities: List[DifferenceIncompatibility] = Field(default_factory=list)
     relation_interpretation: Optional[Literal["<", ">"]] = None
 
@@ -367,6 +369,7 @@ class EffectiveTrainingUnitConfig(StrictConfigModel):
 
 class SupervisionConfig(StrictConfigModel):
     transfer_artifact: Optional[Path] = None
+    inference_artifact: Optional[Path] = None
 
     negative_label_policy: Literal["unknown", "complete_reference", "confirmed_negatives"] = (
         "unknown"
@@ -420,6 +423,8 @@ class SupervisionConfig(StrictConfigModel):
             str(key): str(value) for key, value in self.components.items()
         }
         requested = components.get(component, self.mode)
+        if self.inference_artifact is not None:
+            return requested, "immutable_same_pair_inference"
         if requested == "supervised":
             if not training_available:
                 raise ValueError(

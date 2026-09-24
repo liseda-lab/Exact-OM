@@ -36,20 +36,26 @@ def prepare_pool(
         raise ValueError("unknown research role")
     if expose_labels and role == "test":
         raise ValueError("final labels require the evaluation access path after G4")
-    frame = pd.read_csv(path, sep="\t", dtype=str, keep_default_na=False)
+    columns = ["SrcEntity", "TgtCandidates"] + (["TgtEntity"] if expose_labels else [])
+    frame = pd.read_csv(
+        path, sep="\t", dtype=str, keep_default_na=False, usecols=lambda name: name in columns
+    )
     required = {"SrcEntity", "TgtCandidates"}
     if not required.issubset(frame.columns):
         raise ValueError("expected benchmark SrcEntity/TgtCandidates columns")
     if "TgtEntity" not in frame:
         frame["TgtEntity"] = ""
-    rows, labels = [], []
+    rows, labels, queries = [], [], []
     pooled: dict[str, set[str]] = {}
-    for row in frame.itertuples(index=False):
+    for query_id, row in enumerate(frame.itertuples(index=False)):
         candidates = ast.literal_eval(row.TgtCandidates)
         if not isinstance(candidates, (list, tuple)) or not all(
             isinstance(x, str) for x in candidates
         ):
             raise ValueError("candidate pool must contain a list of IRI strings")
+        if not row.SrcEntity or not candidates or len(candidates) != len(set(candidates)):
+            raise ValueError("queries need a source and nonempty unique candidates")
+        queries.append({"qid": query_id, "source": row.SrcEntity, "candidates": list(candidates)})
         pooled.setdefault(row.SrcEntity, set()).update(candidates)
         if expose_labels and row.TgtEntity:
             labels.append((row.SrcEntity, row.TgtEntity, "=", 1.0))
@@ -61,7 +67,16 @@ def prepare_pool(
     )
     universe_path = destination / f"{role}.sources.txt"
     universe_path.write_text("\n".join(sorted(set(frame.SrcEntity))) + "\n")
-    outputs = {"candidates": pool_path, "source_universe": universe_path}
+    query_path = destination / f"{role}.queries.jsonl"
+    query_path.write_text("".join(json.dumps(row) + "\n" for row in queries))
+    public_path = destination / f"{role}.public.queries.tsv"
+    frame[["SrcEntity", "TgtCandidates"]].to_csv(public_path, sep="\t", index=False)
+    outputs = {
+        "candidates": pool_path,
+        "source_universe": universe_path,
+        "queries": query_path,
+        "public_queries": public_path,
+    }
     if expose_labels:
         reference_path = destination / f"{role}.reference.tsv"
         pd.DataFrame(
@@ -69,13 +84,15 @@ def prepare_pool(
         ).to_csv(reference_path, sep="\t", index=False)
         outputs["reference"] = reference_path
     record = {
-        "schema_version": 2,
+        "schema_version": 3,
         "role": role,
         "input_sha256": sha256_file(path),
-        "transformation": "canonical_pool_gold_separation_v1",
+        "transformation": "query_preserving_pool_gold_separation_v2",
         "sources": frame.SrcEntity.nunique(),
         "original_query_rows": len(frame),
-        "query_grouping": "union_candidates_per_source",
+        "query_grouping": "original_rows_preserved_with_positional_qid",
+        "candidate_inventory_grouping": "union_candidates_per_source",
+        "union_score_reuse": "query_independent_components_only",
         "labels_exposed": expose_labels,
         "outputs": {
             name: {"path": str(file.resolve()), "sha256": sha256_file(file)}

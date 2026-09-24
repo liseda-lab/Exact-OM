@@ -66,6 +66,11 @@ def _json_default(value: Any) -> str:
 
 
 class AuditIOMixin:
+    def _write_relation_diagnostics(self, accepted, **kwargs):
+        from exact.experiments.relation_metrics import write_relation_diagnostics
+
+        return write_relation_diagnostics(self, accepted, **kwargs)
+
     def _write_source_decisions(self, predictions, typed: pd.DataFrame) -> Path:
         """Save final decisions and their complete frozen competitors without consulting gold."""
         frame = getattr(self, "_final_candidate_frame", None)
@@ -285,6 +290,9 @@ class AuditIOMixin:
         universe = sorted(
             set(map(str, getattr(self.dataset, "eligible_source_iris", ()) or ())) | set(groups)
         )
+        from exact.experiments.difference_replay import write_difference_replay
+
+        write_difference_replay(self, frame, explanations, emitted, protected, policy)
         destination = self.output_dir / "source_decisions.json"
         previous = json.loads(destination.read_text()) if destination.exists() else {}
         previous_records = {str(row["Src"]): row for row in previous.get("records", [])}

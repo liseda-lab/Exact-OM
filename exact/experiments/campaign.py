@@ -292,9 +292,11 @@ class CampaignStep(StrictConfigModel):
                 raise ValueError("arm data overrides require explicit immutable arm_inputs")
         for path in self.policy_paths:
             parts = path.split(".")
-            if parts[0] not in {"matching", "selector", "candidates", "llm", "supervision"} or any(
-                not part or not part.replace("_", "").isalnum() for part in parts
-            ):
+            if (
+                parts[0] not in {"matching", "selector", "candidates", "llm", "supervision"}
+                and path
+                not in {"dataset.annotation_semantics", "dataset.annotation_provenance_dedup"}
+            ) or any(not part or not part.replace("_", "").isalnum() for part in parts):
                 raise ValueError(f"invalid component policy path: {path}")
         if set(self.readiness) != set(ids):
             raise ValueError("readiness must enumerate every arm exactly once")
@@ -1149,6 +1151,16 @@ def materialize_campaign(path: Path, directory: Path, *, stage: str) -> Any:
                 },
                 **({"donor_transfer": {"producer": "E18"}} if step.id == "E16" else {}),
                 **(
+                    {"selected_analytic_setting": {"producer": "E10-analytic"}}
+                    if step.id == "E10" and "selected_E10_analytic_setting" in step.requires
+                    else {}
+                ),
+                **(
+                    {"selected_judge": {"producer": "E07"}}
+                    if step.id in {"E21", "E04-listwise"}
+                    else {}
+                ),
+                **(
                     {
                         "label_policy_followup": {
                             "producer": "E22",
@@ -1401,6 +1413,27 @@ def dependency_blockers(source: Any, selections: Mapping[str, Any]) -> list[str]
     ]
 
 
+def validate_comparison_cells(cells: Any, source: Any) -> None:
+    """E01 changes extraction alone; scores, selectors and cardinality stay fixed."""
+    from copy import deepcopy
+
+    spec = source.config.frozen_constants.get("campaign_v2", {})
+    if spec.get("family") != "E01":
+        return
+    contracts: dict[tuple[str, int], dict[str, Any]] = {}
+    for cell in cells:
+        value = deepcopy(cell.resolved_config)
+        if value["data"]["execution_mode"] != "global_alignment":
+            raise ValueError("E01 extraction requires global alignment semantics")
+        value["matching"]["extraction"].pop("mode")
+        key = (cell.task_id, cell.seed)
+        previous = contracts.setdefault(key, value)
+        if previous != value:
+            raise ValueError(
+                "E01 arms must share scores, selector, thresholds and cardinality; only extraction mode may differ"
+            )
+
+
 def run_comparison(cells: Any, suite: Any, source: Any, **kwargs: Any) -> list[dict[str, Any]]:
     """Reserve complete comparisons and retain actual cumulative costs on every exit."""
     import time
@@ -1410,6 +1443,7 @@ def run_comparison(cells: Any, suite: Any, source: Any, **kwargs: Any) -> list[d
     from exact.experiments.harness import run_cells
     from exact.llm.ledger import RequestLedger
 
+    validate_comparison_cells(cells, source)
     metadata = suite.campaign
     if metadata.get("reuse_plan_only"):
         return run_cells(cells, suite, **kwargs)

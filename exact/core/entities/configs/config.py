@@ -512,6 +512,13 @@ class DatasetConfig(StrictConfigModel):
     max_attr_items: int = Field(
         12, description="Maximum literal or annotation snippets per entity."
     )
+    annotation_semantics: Dict[str, Dict[str, Any]] = Field(
+        default_factory=dict, description="Pinned per-property annotation and identifier semantics."
+    )
+    annotation_provenance_dedup: bool = Field(
+        False,
+        description="Deduplicate semantically identical annotations before evidence truncation.",
+    )
     pair_adaptive_feature_log_every: int = Field(
         1000, description="Feature-build debug progress interval in unique entities."
     )

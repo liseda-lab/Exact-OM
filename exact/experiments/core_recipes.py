@@ -191,7 +191,14 @@ def core_arms(base):
         add(
             "E08",
             name,
-            channel("attr", **settings),
+            deep_merge(
+                channel("attr", **settings),
+                {
+                    "dataset": {
+                        "annotation_provenance_dedup": bool(settings.get("provenance_dedup"))
+                    }
+                },
+            ),
             role="baseline" if name == "current" else "candidate",
             requires=(
                 ["descriptor_identifier_namespace_and_exclusivity_allowlist"]
@@ -288,7 +295,23 @@ def core_arms(base):
         add(
             "E24",
             name,
-            channel("diff", formulation=formulation, dump_components=True),
+            deep_merge(
+                channel(
+                    "diff",
+                    formulation=formulation,
+                    dump_components=True,
+                    controlled_perturbations=True,
+                ),
+                {
+                    "selector": {"runtime_enabled": False},
+                    "matching": {
+                        "nil": {"mode": "off"},
+                        "calibration": {"mode": "none", "threshold_mode": "fixed"},
+                        "fusion": {"enabled": True, "mode": "analytic_shipped", "artifact": None},
+                        "relation_prediction": "none",
+                    },
+                },
+            ),
             role=(
                 "baseline"
                 if name == "normalised"
@@ -342,7 +365,13 @@ def core_arms(base):
         add(
             "E25",
             name,
-            {"llm": {"experiment": judge}},
+            deep_merge(
+                label_free,
+                {
+                    "selector": {"runtime_enabled": False},
+                    "llm": {"experiment": judge},
+                },
+            ),
             role=(
                 "baseline"
                 if name == "decision_off"

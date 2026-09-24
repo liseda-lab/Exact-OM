@@ -1,3 +1,4 @@
+import ast
 import csv
 import json
 
@@ -33,6 +34,42 @@ def _run(tmp_path, targets, *, sources=("urn:s1",), field="S_final"):
     return layout, trace
 
 
+def _populations(tmp_path, population):
+    from exact.experiments.public_inference import prepare_population
+
+    manifests, records = {}, {}
+    for side, values in (("source", population.read_text().splitlines()), ("target", ["urn:t1"])):
+        ontology = tmp_path / f"{side}.owl"
+        ontology.write_text(
+            "Ontology(" + " ".join(f"Declaration(Class(<{value}>))" for value in values) + ")"
+        )
+        output = population if side == "source" else tmp_path / "targets.txt"
+        # The helper freezes canonical, sorted signature populations.
+        output.unlink(missing_ok=True)
+        records[side] = prepare_population(ontology, output, entity_kinds=["class"])
+        manifests["population_manifest" if side == "source" else "target_population_manifest"] = (
+            output.with_suffix(output.suffix + ".manifest.json")
+        )
+    layout = RunLayout.create(tmp_path / "run")
+    layout.config_path.write_text(
+        "config_version: 2\ndata:\n  source: "
+        + str(tmp_path / "source.owl")
+        + "\n  target: "
+        + str(tmp_path / "target.owl")
+        + "\ndataset:\n  filter_ignored_alignment_classes: false\n"
+    )
+    (layout.root / "stats/run_stats.json").write_text(
+        json.dumps(
+            {
+                "ontology_stack": {
+                    side: {"core": record["ontology_core"]} for side, record in records.items()
+                }
+            }
+        )
+    )
+    return manifests
+
+
 def _pool(tmp_path, targets, track="bioml-local", *, qid=7, source="urn:s1"):
     path = tmp_path / ("pools.jsonl" if track == "diso-ranking" else "pools.tsv")
     if track == "diso-ranking":
@@ -55,8 +92,9 @@ def test_bioml_local_exports_all_saved_scores_without_references(tmp_path):
     export_submission(layout.root, output, "bioml-local", public_candidates=pool)
     with output.open() as stream:
         rows = list(csv.DictReader(stream, delimiter="\t"))
-    assert len(rows) == 100 and list(rows[0]) == ["SrcEntity", "TgtCandidate", "Score"]
-    assert rows[0] == {"SrcEntity": "urn:s1", "TgtCandidate": "urn:t099", "Score": "1"}
+    assert len(rows) == 1 and list(rows[0]) == ["SrcEntity", "TgtCandidates"]
+    assert rows[0]["SrcEntity"] == "urn:s1"
+    assert ast.literal_eval(rows[0]["TgtCandidates"]) == list(reversed(targets))
     original = output.read_bytes()
     export_submission(layout.root, output, "bioml-local", public_candidates=pool)
     assert output.read_bytes() == original
@@ -159,14 +197,19 @@ def test_global_requires_full_population_and_reuses_predictions(tmp_path):
     population = tmp_path / "sources.txt"
     population.write_text("urn:s1\nurn:empty\n")
     output = tmp_path / "out.rdf"
-    kwargs = {"source_universe": population, "source_uri": "urn:source", "target_uri": "urn:target"}
+    kwargs = {
+        "source_universe": population,
+        "source_uri": "urn:source",
+        "target_uri": "urn:target",
+        **_populations(tmp_path, population),
+    }
     export_submission(layout.root, output, "bioml-global", **kwargs)
     frame = read_alignment(output)
     assert frame.to_dict("records") == [
         {"SrcEntity": "urn:s1", "TgtEntity": "urn:t1", "Score": 0.8, "Relation": "="}
     ]
     population.write_text("urn:s1\nurn:empty\nurn:unprocessed\n")
-    with pytest.raises(ValueError, match="full declared source population"):
+    with pytest.raises(ValueError, match="binding changed"):
         export_submission(layout.root, tmp_path / "invalid.rdf", "oaei-kg-global", **kwargs)
 
 
@@ -212,7 +255,7 @@ def test_historical_explanations_export_without_source_trace(tmp_path):
     )
     with output.open() as stream:
         rows = list(csv.DictReader(stream, delimiter="\t"))
-    assert [row["TgtCandidate"] for row in rows] == targets
+    assert ast.literal_eval(rows[0]["TgtCandidates"]) == targets
 
 
 def test_global_uses_final_audit_when_compatibility_output_is_local(tmp_path):
@@ -230,5 +273,75 @@ def test_global_uses_final_audit_when_compatibility_output_is_local(tmp_path):
         source_universe=population,
         source_uri="urn:source",
         target_uri="urn:target",
+        **_populations(tmp_path, population),
     )
     assert read_alignment(output).iloc[0]["Score"] == 0.7
+
+
+def test_biokg_exports_complete_positional_relation_blocks_and_rejects_sparse_scores(tmp_path):
+    targets = [f"urn:t{i:03}" for i in range(50)]
+    layout, _ = _run(tmp_path, targets)
+    pool = _pool(tmp_path, targets, "biokg-typed")
+    with pool.open("a") as stream:
+        csv.writer(stream, delimiter="\t").writerow(["urn:s1", repr(targets)])
+    scores = layout.alignment_dir / "relation_scores.tsv"
+    scores.write_text(
+        "SrcEntity\tTgtEntity\tRelation\tScore\n"
+        + "".join(
+            f"urn:s1\t{target}\t{relation}\t{score}\n"
+            for target in targets
+            for relation, score in (("=", 0.6), ("<", 0.3), (">", 0.1))
+        )
+    )
+    output = tmp_path / "typed.tsv"
+    export_submission(layout.root, output, "biokg-typed", public_candidates=pool)
+    rows = list(csv.DictReader(output.open(), delimiter="\t"))
+    assert len(rows) == 300 and rows[:150] == rows[150:]
+    assert set(row["Relation"] for row in rows) == {
+        "equivalent",
+        "source_subsumed_by_target",
+        "source_subsumes_target",
+    }
+    scores.write_text("\n".join(scores.read_text().splitlines()[:-1]) + "\n")
+    with pytest.raises(ValueError, match="all three relations"):
+        export_submission(
+            layout.root, tmp_path / "invalid.tsv", "biokg-typed", public_candidates=pool
+        )
+
+
+@pytest.mark.parametrize(
+    "mutation", ["same_signature_new_axiom", "filter_policy", "runtime_snapshot"]
+)
+def test_global_requires_run_ontology_and_policy_to_match_population(tmp_path, mutation):
+    layout, _ = _run(tmp_path, ["urn:t1"])
+    layout.mapping_path("global").write_text("SrcEntity\tTgtEntity\tScore\nurn:s1\turn:t1\t0.8\n")
+    population = tmp_path / "sources.txt"
+    population.write_text("urn:s1\n")
+    manifests = _populations(tmp_path, population)
+    if mutation == "same_signature_new_axiom":
+        altered = tmp_path / "other.owl"
+        altered.write_text("Ontology(Declaration(Class(<urn:s1>)) SubClassOf(<urn:s1> <urn:s1>))")
+        layout.config_path.write_text(
+            layout.config_path.read_text().replace(str(tmp_path / "source.owl"), str(altered))
+        )
+    elif mutation == "filter_policy":
+        layout.config_path.write_text(
+            layout.config_path.read_text().replace(
+                "filter_ignored_alignment_classes: false", "filter_ignored_alignment_classes: true"
+            )
+        )
+    else:
+        stats = layout.root / "stats/run_stats.json"
+        value = json.loads(stats.read_text())
+        value["ontology_stack"]["source"]["core"]["fingerprints"]["logical"] = "different"
+        stats.write_text(json.dumps(value))
+    with pytest.raises(ValueError, match="differs from"):
+        export_submission(
+            layout.root,
+            tmp_path / "out.rdf",
+            "bioml-global",
+            source_universe=population,
+            source_uri="urn:source",
+            target_uri="urn:target",
+            **manifests,
+        )

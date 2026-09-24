@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple  # noqa: F401
 
 import torch  # noqa: F401
 
+from exact.experiments.numerical_cache import cached_numerical
 from exact.impl.models.pair_adaptive_channels import PairAdaptiveChannelsMixin
 from exact.impl.models.pair_adaptive_evidence import PairAdaptiveEvidenceMixin
 from exact.impl.models.pair_adaptive_experiments import (
@@ -96,6 +97,7 @@ class PairAdaptiveSemanticScorer(
             enabled=False,
             formulation="normalised",
             dump_components=False,
+            controlled_perturbations=False,
             incompatibilities=[],
             relation_interpretation=None,
         )
@@ -334,6 +336,12 @@ class PairAdaptiveSemanticScorer(
         }:
             raise ValueError(
                 f"unsupported difference formulation: {self.diff_config['formulation']!r}"
+            )
+        if self.diff_config.get("controlled_perturbations") and not self.diff_config.get(
+            "dump_components"
+        ):
+            raise ValueError(
+                "controlled difference perturbations require persisted component diagnostics"
             )
         if self.lex_config["quality"] not in {
             "candidate_margin",
@@ -1449,6 +1457,7 @@ class PairAdaptiveSemanticScorer(
                     "c_y",
                     "diff_pivot_reason",
                     "evidence_states",
+                    "controlled_perturbations",
                 )
             }
         if self.lex_enabled or self.fusion_enabled:
@@ -1502,6 +1511,7 @@ class PairAdaptiveSemanticScorer(
         return diagnostics
 
     @torch.inference_mode()
+    @cached_numerical()
     def forward(
         self,
         src_iris: List[str],
@@ -1713,6 +1723,27 @@ class PairAdaptiveSemanticScorer(
                 tgt_feats.get("object_triples", []),
                 support_mat=sim_payload.get("support_matrix"),
             )
+            if self.diff_enabled and self.diff_config.get("controlled_perturbations"):
+                from exact.experiments.evidence_diagnostics import (
+                    difference_perturbation_inventory,
+                    replay_difference_diagnostics,
+                )
+
+                source_facts = src_feats.get("object_triples", [])
+                target_facts = tgt_feats.get("object_triples", [])
+                matrix = sim_payload.get("support_matrix")
+                if matrix is None and (not source_facts or not target_facts):
+                    matrix = torch.zeros((len(source_facts), len(target_facts)))
+                inventory = difference_perturbation_inventory(
+                    source_facts,
+                    target_facts,
+                    pair_id=json.dumps([src_iri, tgt_iri]),
+                )
+                diff_payload["controlled_perturbations"] = replay_difference_diagnostics(
+                    self,
+                    inventory,
+                    support_matrix=matrix,
+                )
             attr_payload = self._score_attribute_channel(
                 src_feats.get("attributes", []),
                 tgt_feats.get("attributes", []),
@@ -2375,6 +2406,18 @@ class PairAdaptiveSemanticScorer(
                         gate_diagnostics[idx] if self.llm_experiment_enabled else None
                     ),
                 )
+                if self.diff_enabled and self.diff_config.get("controlled_perturbations"):
+                    experiment_diagnostics["difference_replay"] = {
+                        "channels": [
+                            {
+                                "name": name,
+                                **{key: float(tensor[idx]) for key, tensor in fields.items()},
+                            }
+                            for name, fields in result["fusion_channels"].items()
+                        ],
+                        "S_base": float(S_base[idx]),
+                        "U": float(U[idx]),
+                    }
                 kind_source = src_feature_map[src_iris[idx]].get("experiment_evidence")
                 kind_target = tgt_feature_map[tgt_iris[idx]].get("experiment_evidence")
                 if getattr(self, "_anchor_manifest", None):

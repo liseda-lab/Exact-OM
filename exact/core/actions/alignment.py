@@ -335,6 +335,24 @@ def run_alignment(
         task_name=task_name,
     )
 
+    if configs.supervision.inference_artifact is not None:
+        from exact.utils.frozen_inference import validate_inference_config
+
+        validate_inference_config(configs, run_eval=run_eval)
+        if resolved.training_reference is not None or resolved.full_reference is not None:
+            raise ValueError("Frozen inference cannot receive reference arguments")
+        if (
+            any(
+                Path(actual).resolve() != Path(expected).resolve()
+                for actual, expected in (
+                    (resolved.source, configs.data.source),
+                    (resolved.target, configs.data.target),
+                )
+            )
+            or resolved.candidates != configs.data.candidates
+        ):
+            raise ValueError("Frozen inference inputs cannot be overridden")
+
     fingerprint_source: Any = configs
     if resolved.track_provenance is not None:
         fingerprint_provenance = {
@@ -956,6 +974,17 @@ def _run_alignment_session(
     progress.start("Trainer", "constructing trainer and model chain")
     logger.info("Building Trainer and Model...")
 
+    # Cached datasets must not carry admission from a previous deployment run.
+    dataset.frozen_inference_manifest = None
+    if hasattr(dataset, "_frozen_artifact_payloads"):
+        del dataset._frozen_artifact_payloads
+    if configs.supervision.inference_artifact is not None:
+        from exact.utils.frozen_inference import validate_inference_config
+
+        if training_reference_file_path is not None or full_reference_file_path is not None:
+            raise ValueError("Frozen inference cannot receive reference arguments")
+        dataset.frozen_inference_manifest = validate_inference_config(configs, run_eval=run_eval)
+
     training_available = training_reference_file_path is not None
     llm_supervision, _ = configs.supervision.resolve_component(
         "llm",
@@ -1135,6 +1164,7 @@ def _run_alignment_session(
         supervision_config=configs.supervision.model_dump(mode="python"),
     )
     trainer.anchor_config = anchor_config
+    trainer.relation_evaluation_role = configs.data.reference_role
     trainer.relation_config = configs.matching.model_dump(mode="python")
     trainer.relation_artifact = configs.matching.relation_artifact
     progress.finish("Trainer", f"models={len(model_specs)}")

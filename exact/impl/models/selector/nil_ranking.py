@@ -79,7 +79,9 @@ class NilRankingMixin:
                 raise ValueError("Fitted natural NIL requires a training-source artifact")
             artifact = json.loads(Path(path).read_text())
             validate_nil_application(dataset, path, artifact, self.nil_config)
-            records = source_decision_records(df, df.Src.astype(str).unique(), artifact=artifact)
+            records = source_decision_records(
+                df, df.Src.astype(str).unique(), artifact=artifact, dataset=dataset
+            )
             for record in records:
                 indices = df.index[df.Src.astype(str) == record["Src"]]
                 probabilities = df.loc[indices, "P_rank"].astype(float).clip(lower=0)

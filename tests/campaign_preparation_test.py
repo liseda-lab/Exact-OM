@@ -38,12 +38,21 @@ def test_preparation_covers_every_family_without_executing_or_inventing_readines
         ("E13", "E13-enrichment"),
         ("E25", "E07"),
         ("E07", "E25-trust"),
+        ("E10-analytic", "E10"),
+        ("E10", "E19"),
         ("E19", "E18"),
         ("E22", "E22-policy"),
         ("G4", "E17"),
     ]:
         assert order.index(before) < order.index(after)
     by_id = {step.id: step for step in lock.steps}
+    assert len(by_id["E10-analytic"].arms) == 6
+    assert len(by_id["E10"].arms) == 2
+    assert by_id["E10"].selection.decisions[0].baseline == "winner_only"
+    assert "selected_E10_analytic_setting" in by_id["E10"].inherits
+    assert "selected_E10_analytic_setting" in by_id["E19"].inherits
+    assert by_id["E04-listwise"].selection.decisions[0].baseline == "nil_heuristic"
+    assert by_id["E07"].source_cap == by_id["E25"].source_cap == 200
     assert "E13-enrichment" not in by_id["G4"].requires
     assert "E22-policy" not in by_id["G4"].requires
     assert set(by_id["G4"].requires) == {"E00", *lock.composition_sources}

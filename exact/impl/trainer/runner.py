@@ -1216,7 +1216,9 @@ class SemanticAlignmentRunner(
                 if "Src" in candidate_df
                 else pd.DataFrame(columns=["Src", "Tgt", "S_base"])
             )
-            records = source_decision_records(nil_frame, universe, artifact=artifact)
+            records = source_decision_records(
+                nil_frame, universe, artifact=artifact, dataset=self.dataset
+            )
             emitted = {}
             for mapping in predictions:
                 emitted.setdefault(str(mapping.head), []).append(str(mapping.tail))

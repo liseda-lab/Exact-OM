@@ -19,7 +19,7 @@ from exact.utils.fitted_artifacts import freeze_json
 from exact.utils.provenance import sha256_path
 
 NIL_IRI = "https://oaei.ontologymatching.org/2026/diso/NIL"
-TRACKS = ("bioml-local", "bioml-global", "oaei-kg-global", "diso-ranking")
+TRACKS = ("bioml-local", "bioml-global", "oaei-kg-global", "diso-ranking", "biokg-typed")
 
 
 def _iri(value: Any) -> str:
@@ -61,6 +61,7 @@ def _trace(reader: RunReader) -> dict[str, Any] | None:
 
 
 def _pools(path: Path, track: str) -> list[dict[str, Any]]:
+    size: int | None
     if track == "diso-ranking":
         queries = [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
         if any(type(row.get("qid")) is not int or row["qid"] < 0 for row in queries):
@@ -76,8 +77,9 @@ def _pools(path: Path, track: str) -> list[dict[str, Any]]:
                 {"source": row["SrcEntity"], "candidates": ast.literal_eval(row["TgtCandidates"])}
                 for row in table
             ]
-        _unique([row["source"] for row in queries], "Bio-ML query sources")
-        size = 100
+        for index, row in enumerate(queries):
+            row["qid"] = index
+        size = 50 if track == "biokg-typed" else None
     if not queries:
         raise ValueError("Public candidate population is empty")
     for row in queries:
@@ -85,8 +87,14 @@ def _pools(path: Path, track: str) -> list[dict[str, Any]]:
             raise ValueError("DISO export accepts only public pool fields, never answer fields")
         _iri(row["source"])
         candidates = row.get("candidates")
-        if not isinstance(candidates, list) or len(candidates) != size:
-            raise ValueError(f"Every {track} query must contain exactly {size} candidates")
+        if (
+            not isinstance(candidates, list)
+            or not candidates
+            or (size is not None and len(candidates) != size)
+        ):
+            raise ValueError(
+                f"Invalid {track} query candidate count (expected {size or 'original nonempty pool'})"
+            )
         candidates = [_iri(value) for value in candidates]
         _unique(candidates, "public pool candidates")
         if track == "diso-ranking" and NIL_IRI not in candidates:
@@ -123,6 +131,81 @@ def _scores(reader: RunReader, trace: dict[str, Any] | None, field: str, include
     return scores
 
 
+def _relation_scores(reader):
+    path = reader.layout.alignment_dir / "relation_scores.tsv"
+    if not path.is_file():
+        raise ValueError(
+            "BioKG requires all saved candidate/relation scores; sparse mappings cannot be submitted"
+        )
+    frame = read_table(path)
+    scores = {}
+    for row in frame.itertuples():
+        pair = (_iri(row.SrcEntity), _iri(row.TgtEntity))
+        if row.Relation not in {"=", "<", ">"} or row.Relation in scores.setdefault(pair, {}):
+            raise ValueError("Invalid or duplicate saved candidate/relation score")
+        scores[pair][row.Relation] = _number(row.Score)
+    if any(set(row) != {"=", "<", ">"} for row in scores.values()):
+        raise ValueError("BioKG requires scores for all three relations for every candidate")
+    return scores
+
+
+def _coverage(scores, expected):
+    if set(scores) != expected:
+        raise ValueError(
+            f"Candidate population mismatch: missing={len(expected - set(scores))}, extra={len(set(scores) - expected)}"
+        )
+
+
+def _query_run_scores(manifest, public_candidates, queries, track, field):
+    from exact.experiments.public_inference import _verify
+
+    plan = json.loads(manifest.read_text())
+    if (
+        plan.get("kind") != "reference_free_inference"
+        or plan.get("track") != track
+        or plan.get("score_scope") != "original_query"
+        or plan.get("queries") != queries
+        or plan.get("run_eval") is not False
+    ):
+        raise ValueError("Invalid original-query inference manifest")
+    if _verify(plan["public_candidates"]).resolve() != public_candidates.resolve():
+        raise ValueError("Original query input differs from the inference binding")
+    results = [None] * len(queries)
+    for run in plan["runs"]:
+        _verify(run["config"])
+        for binding in run.get("inputs", {}).values():
+            _verify(binding)
+        reader = RunReader.open(Path(run["run_dir"]))
+        if sha256_path(reader.layout.config_path) != run["config"]["sha256"]:
+            # Runtime may normalize YAML; compare the resolved mappings without loading refs.
+            from exact.core.entities.configs.config import ConfigModel
+
+            if ConfigModel.load_config(reader.layout.config_path) != ConfigModel.load_config(
+                Path(run["config"]["path"])
+            ):
+                raise ValueError("Saved run configuration differs from frozen query config")
+        indices = run["query_indices"]
+        selected = [queries[index] for index in indices]
+        _unique([query["source"] for query in selected], "sources in original-query shard")
+        trace = _trace(reader)
+        scores = (
+            _relation_scores(reader)
+            if track == "biokg-typed"
+            else _scores(reader, trace, field, track == "diso-ranking")
+        )
+        _coverage(
+            scores, {(row["source"], target) for row in selected for target in row["candidates"]}
+        )
+        for index in indices:
+            if results[index] is not None:
+                raise ValueError("Duplicate original query assignment")
+            row = queries[index]
+            results[index] = {target: scores[row["source"], target] for target in row["candidates"]}
+    if any(value is None for value in results):
+        raise ValueError("Missing original query run")
+    return results
+
+
 def export_submission(
     run_dir: Path,
     output: Path,
@@ -130,6 +213,9 @@ def export_submission(
     *,
     public_candidates: Path | None = None,
     source_universe: Path | None = None,
+    population_manifest: Path | None = None,
+    target_population_manifest: Path | None = None,
+    query_runs: Path | None = None,
     score_field: str = "S_final",
     source_uri: str | None = None,
     target_uri: str | None = None,
@@ -157,6 +243,17 @@ def export_submission(
             raise ValueError(
                 "Global submissions require full ontology populations, not candidate pools"
             )
+        from exact.experiments.public_inference import (
+            validate_population,
+            validate_run_population,
+        )
+
+        if population_manifest is None:
+            raise ValueError("Global export requires a full native population manifest")
+        source_population_record, source_universe = validate_population(
+            population_manifest, source_universe
+        )
+        inputs["population_manifest"] = sha256_path(population_manifest)
         if (
             source_universe is None
             or trace is None
@@ -171,6 +268,15 @@ def export_submission(
         _unique(population, "public source-universe entries")
         if not population or set(population) != set(trace["source_universe"]):
             raise ValueError("Global run does not cover the full declared source population")
+        if target_population_manifest is None:
+            raise ValueError("Global export requires a target native population manifest")
+        target_population_record, target_population = validate_population(
+            target_population_manifest
+        )
+        validate_run_population(reader, source_population_record, "source")
+        validate_run_population(reader, target_population_record, "target")
+        targets = set(target_population.read_text().splitlines())
+        inputs["target_population_manifest"] = sha256_path(target_population_manifest)
         source_uri, target_uri = _iri(source_uri), _iri(target_uri)
         mapping_path = reader.layout.mapping_path("global")
         if mapping_path.is_file():
@@ -183,6 +289,8 @@ def export_submission(
         population_set = set(population)
         if any(source not in population_set for source, _ in pairs):
             raise ValueError("Global mapping source is outside the declared population")
+        if any(target not in targets for _, target in pairs):
+            raise ValueError("Global mapping target is outside the declared population")
         if "Relation" in frame and not frame["Relation"].eq("=").all():
             raise ValueError("These global submissions require equivalence relations")
         if any(not 0 <= _number(value) <= 1 for value in frame["Score"]):
@@ -202,31 +310,59 @@ def export_submission(
         if public_candidates is None or source_universe is not None:
             raise ValueError("Ranking export requires the original public candidate pool")
         queries = _pools(public_candidates, track)
-        scores = _scores(reader, trace, score_field, track == "diso-ranking")
-        expected = {(row["source"], target) for row in queries for target in row["candidates"]}
-        if set(scores) != expected:
-            raise ValueError(
-                f"Candidate population mismatch: missing={len(expected - set(scores))}, extra={len(set(scores) - expected)}"
+        if query_runs is not None:
+            scores_by_query = _query_run_scores(
+                query_runs, public_candidates, queries, track, score_field
             )
-        if trace is not None and set(trace["source_universe"]) != {
-            row["source"] for row in queries
-        }:
-            raise ValueError("Run and public query source populations differ")
+            inputs["query_runs"] = sha256_path(query_runs)
+        else:
+            by_source: dict[str, set[str]] = {}
+            for query in queries:
+                pool = set(query["candidates"])
+                if query["source"] in by_source and by_source[query["source"]] != pool:
+                    raise ValueError(
+                        "Different original pools share a source; use query_runs to preserve query-dependent scores"
+                    )
+                by_source[query["source"]] = pool
+            scores = (
+                _relation_scores(reader)
+                if track == "biokg-typed"
+                else _scores(reader, trace, score_field, track == "diso-ranking")
+            )
+            expected = {(row["source"], target) for row in queries for target in row["candidates"]}
+            _coverage(scores, expected)
+            if trace is not None and set(trace["source_universe"]) != set(by_source):
+                raise ValueError("Run and public query source populations differ")
+            scores_by_query = [
+                {target: scores[row["source"], target] for target in row["candidates"]}
+                for row in queries
+            ]
         stream = io.StringIO(newline="")
         writer = csv.writer(stream, delimiter="\t", lineterminator="\n")
         if track == "bioml-local":
-            writer.writerow(["SrcEntity", "TgtCandidate", "Score"])
-        for row in queries:
-            ranked = sorted(
-                row["candidates"], key=lambda target: (-scores[row["source"], target], target)
-            )
+            writer.writerow(["SrcEntity", "TgtCandidates"])
+        if track == "biokg-typed":
+            writer.writerow(["SrcEntity", "TgtEntity", "Relation", "Score"])
+        for row, scores in zip(queries, scores_by_query):
+            if track == "biokg-typed":
+                from exact.io.writers.typed_tsv import RELATION_TO_TYPED
+
+                writer.writerows(
+                    (
+                        row["source"],
+                        target,
+                        RELATION_TO_TYPED[relation],
+                        format(scores[target][relation], ".17g"),
+                    )
+                    for target in row["candidates"]
+                    for relation in ("=", "<", ">")
+                )
+                continue
+            ranked = sorted(row["candidates"], key=lambda target: (-scores[target], target))
             if track == "diso-ranking":
                 stream.write(json.dumps({"qid": row["qid"], "ranking": ranked}) + "\n")
             else:
-                writer.writerows(
-                    (row["source"], target, format(scores[row["source"], target], ".17g"))
-                    for target in ranked
-                )
+                writer.writerow([row["source"], repr(ranked)])
         content = stream.getvalue().encode()
         query_count = len(queries)
         inputs["public_candidates"] = sha256_path(public_candidates)

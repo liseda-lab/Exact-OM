@@ -202,7 +202,7 @@ def validate_nil_application(dataset, path, artifact, config):
         raise ValueError("NIL artifact label-semantics mismatch")
 
 
-def source_decision_records(frame, source_universe, *, artifact=None):
+def source_decision_records(frame, source_universe, *, artifact=None, dataset=None):
     """Return one record per frozen source, including sources with no candidates."""
     sources = sorted(set(str(value) for value in source_universe))
     if not sources:
@@ -218,7 +218,11 @@ def source_decision_records(frame, source_universe, *, artifact=None):
             or artifact.get("statuses") != list(statuses)
         ):
             raise ValueError("Invalid NIL feature/schema artifact")
-        if set(sources) & set(artifact["training_sources"]):
+        from exact.utils.frozen_inference import frozen_application
+
+        if set(sources) & set(artifact["training_sources"]) and not frozen_application(
+            dataset, artifact
+        ):
             raise ValueError("NIL inference overlaps training source groups")
         probabilities, contributions, logits = nil_probabilities(
             nil_source_features(frame, sources), artifact["model"]

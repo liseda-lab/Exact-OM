@@ -7,6 +7,8 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple  # noqa: F401
 
 import torch  # noqa: F401
 
+from exact.experiments.numerical_cache import cached_numerical
+from exact.impl.annotation_semantics import deduplicate_annotations
 from exact.impl.models.pair_adaptive_experiments import (
     abbreviation_similarity,
     isub_similarity,
@@ -18,6 +20,7 @@ from exact.utils.formatting import clip01, safe_mean  # noqa: F401
 
 
 class PairAdaptiveChannelsMixin:
+    @cached_numerical(channels=True)
     def _score_label_channel(
         self,
         src_label_lists: List[List[str]],
@@ -305,6 +308,7 @@ class PairAdaptiveChannelsMixin:
                 )
         return result
 
+    @cached_numerical(channels=True)
     def _score_string_channel(
         self,
         src_label_lists: List[List[str]],
@@ -389,6 +393,7 @@ class PairAdaptiveChannelsMixin:
             payloads,
         )
 
+    @cached_numerical(channels=True)
     def _score_hierarchy_family(
         self,
         family: str,
@@ -722,6 +727,7 @@ class PairAdaptiveChannelsMixin:
                             support[src_index, tgt_index] = 0.0
         return support
 
+    @cached_numerical(channels=True)
     def _score_similarity_channel(
         self,
         src_items: Sequence[Dict[str, Any]],
@@ -870,6 +876,8 @@ class PairAdaptiveChannelsMixin:
         src_items: Sequence[Dict[str, Any]],
         tgt_items: Sequence[Dict[str, Any]],
         payload: Dict[str, Any],
+        *,
+        verbalize: bool = True,
     ) -> Dict[str, Any]:
         """Give signed authority only to facts with pinned incompatibility evidence.
 
@@ -909,6 +917,8 @@ class PairAdaptiveChannelsMixin:
                 )
             if rule["semantic_rule"] not in {"disjoint_objects", "exclusive_values"}:
                 raise ValueError("unsupported difference incompatibility semantic rule")
+            if rule["semantic_rule"] == "disjoint_objects" and not rule.get("single_valued"):
+                raise ValueError("disjoint fillers require pinned single-valued property semantics")
             conflicts[
                 (
                     str(rule["property_iri"]),
@@ -978,17 +988,24 @@ class PairAdaptiveChannelsMixin:
                 ),
                 "src_selected": contradictions["source"],
                 "tgt_selected": contradictions["target"],
-                "src_sentences": self._verbalize_object_items(contradictions["source"]),
-                "tgt_sentences": self._verbalize_object_items(contradictions["target"]),
+                "src_sentences": (
+                    self._verbalize_object_items(contradictions["source"]) if verbalize else []
+                ),
+                "tgt_sentences": (
+                    self._verbalize_object_items(contradictions["target"]) if verbalize else []
+                ),
             }
         )
         return payload
 
+    @cached_numerical(channels=True)
     def _score_difference_channel(
         self,
         src_items: Sequence[Dict[str, Any]],
         tgt_items: Sequence[Dict[str, Any]],
         support_mat: Optional[torch.Tensor] = None,
+        *,
+        verbalize: bool = True,
     ) -> Dict[str, Any]:
         payload = {
             "score": self.tau,
@@ -1023,7 +1040,9 @@ class PairAdaptiveChannelsMixin:
         )
         payload["formulation"] = formulation
         if formulation == "missingness_aware":
-            return self._score_missingness_aware_difference(src_items, tgt_items, payload)
+            return self._score_missingness_aware_difference(
+                src_items, tgt_items, payload, verbalize=verbalize
+            )
         if formulation == "off":
             payload["diff_pivot_reason"] = "channel_off"
             return payload
@@ -1096,7 +1115,13 @@ class PairAdaptiveChannelsMixin:
         if formulation == "absolute":
             c_diff = diff_absolute
         elif formulation == "asymmetric":
-            c_diff = self._clip01(c_y)
+            direction = self.diff_config.get("relation_interpretation")
+            if direction not in {"<", ">"}:
+                raise ValueError(
+                    "asymmetric difference requires a declared typed relation (< or >)"
+                )
+            # A narrower source must support the broader target's requirements.
+            c_diff = self._clip01(c_y if direction == "<" else c_x)
         else:
             c_diff = self._clip01(0.5 * (c_x + c_y))
         s_diff = self._clip01(1.0 - c_diff)
@@ -1124,8 +1149,8 @@ class PairAdaptiveChannelsMixin:
                 )
         else:
             pivot_reason = "non_pivot"
-        src_sentences = self._verbalize_object_items(src_selected)
-        tgt_sentences = self._verbalize_object_items(tgt_selected)
+        src_sentences = self._verbalize_object_items(src_selected) if verbalize else []
+        tgt_sentences = self._verbalize_object_items(tgt_selected) if verbalize else []
         total_imp = sum(src_vals) + sum(tgt_vals) or 1.0
         src_selected_rows = [
             self._with_item_id(
@@ -1220,7 +1245,7 @@ class PairAdaptiveChannelsMixin:
 
     def _attribute_property_weight(self, prop_name: str) -> float:
         normalized = prop_name.lower()
-        category_names = {"definition", "identifier", "comment", "other"}
+        category_names = {"definition", "synonym", "identifier", "comment", "other"}
         for key, weight in self.attribute_property_weights.items():
             if key.lower() in category_names:
                 continue
@@ -1247,7 +1272,9 @@ class PairAdaptiveChannelsMixin:
                 ).item()
             ),
         )
-        return self._clip01(self._attribute_property_weight(prop) * info)
+        return self._clip01(
+            self._attribute_property_weight(item.get("annotation_category") or prop) * info
+        )
 
     def _signed_identifier_group(self, item: Dict[str, Any]) -> Optional[str]:
         prop_iri = self._normalize_text(item.get("prop_iri"))
@@ -1258,6 +1285,10 @@ class PairAdaptiveChannelsMixin:
         }
         if not prop_iri or prop_iri not in allowlist:
             return None
+        if item.get("identifier_exclusive") is not True:
+            return None
+        if not item.get("annotation_semantics_evidence_id"):
+            raise ValueError("signed identifier evidence requires pinned exclusivity semantics")
         namespace = self._normalize_text(item.get("identifier_namespace"))
         if not namespace:
             raise ValueError(
@@ -1286,7 +1317,11 @@ class PairAdaptiveChannelsMixin:
                 raise ValueError("signed identifier evidence lacks descriptor-normalized value")
             if group and value:
                 groups.setdefault(group, set()).add(value)
-        comparable = sorted(set(src_groups) & set(tgt_groups))
+        comparable = sorted(
+            group
+            for group in set(src_groups) & set(tgt_groups)
+            if len(src_groups[group]) == len(tgt_groups[group]) == 1
+        )
         if not comparable:
             return 0.0, 0, []
         disagreements = [
@@ -1294,6 +1329,7 @@ class PairAdaptiveChannelsMixin:
         ]
         return self._safe_mean(disagreements), len(comparable), comparable
 
+    @cached_numerical(channels=True)
     def _score_attribute_channel(
         self,
         src_attrs: Sequence[Dict[str, Any]],
@@ -1328,29 +1364,7 @@ class PairAdaptiveChannelsMixin:
         def prepare(items, side):
             records = [self._with_item_id("attribute", side, item) for item in items]
             if dedup:
-                facts = {}
-                for item in records:
-                    # Literal identity, not sentence similarity: languages, datatypes and
-                    # predicates remain distinct, while repeated provenance adds no mass.
-                    key = json.dumps(
-                        [
-                            item.get("prop_iri") or item.get("prop"),
-                            (
-                                item.get("value")
-                                if item.get("value") is not None
-                                else item.get("text")
-                            ),
-                            item.get("datatype"),
-                            item.get("language"),
-                        ],
-                        ensure_ascii=False,
-                    )
-                    if key not in facts:
-                        facts[key] = {**item, "provenance_items": []}
-                    facts[key]["provenance_items"].append(item["item_id"])
-                records = [facts[key] for key in sorted(facts)]
-                for item in records:
-                    item["provenance_items"] = sorted(set(item["provenance_items"]))
+                records = deduplicate_annotations(records)
             return records[: self.max_attr_items]
 
         src_items = prepare(src_attrs, "source")
@@ -1489,6 +1503,12 @@ class PairAdaptiveChannelsMixin:
                         "property_iri": self._normalize_text(item.get("prop_iri")),
                         "datatype": item.get("datatype"),
                         "language": item.get("language"),
+                        "annotation_category": item.get("annotation_category", "unknown"),
+                        "annotation_fact_group": item.get("annotation_fact_group"),
+                        "annotation_semantics_evidence_id": item.get(
+                            "annotation_semantics_evidence_id"
+                        ),
+                        "identifier_exclusive": bool(item.get("identifier_exclusive", False)),
                         "identifier_namespace": self._normalize_text(
                             item.get("identifier_namespace")
                         ),

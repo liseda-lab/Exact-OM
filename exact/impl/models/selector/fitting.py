@@ -280,7 +280,11 @@ class FittedSelectorMixin:
         expected = provenance["application"].get("dataset_signature")
         if not transferred and expected and expected != getattr(dataset, "dataset_signature", None):
             raise ValueError("Fitted selector application dataset mismatch")
-        if set(df.Src.astype(str)) & set(provenance["training_sources"]):
+        from exact.utils.frozen_inference import frozen_application
+
+        if set(df.Src.astype(str)) & set(provenance["training_sources"]) and not frozen_application(
+            dataset, payload
+        ):
             raise ValueError("Reporting sources overlap fitted selector training sources")
         features = self._rank_feature_rows(df, distinctive, reciprocity)
         utilities = {

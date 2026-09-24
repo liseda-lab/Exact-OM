@@ -94,8 +94,9 @@ def _hierarchy_heuristic(
     source: KnowledgeSource,
     target: KnowledgeSource,
     anchors: Any | None,
+    anchor_candidates: Any | None = None,
 ) -> pd.DataFrame:
-    anchor_frame = _anchor_frame(frame, anchors)
+    anchor_frame = _anchor_frame(frame if anchor_candidates is None else anchor_candidates, anchors)
     images: dict[str, list[tuple[str, float]]] = {}
     for row in anchor_frame.itertuples(index=False):
         weight = max(float(row.Score), 1e-12)
@@ -425,10 +426,11 @@ def _semantic_entailment(
     anchor_margin: float,
     relation_threshold: float,
     timeout_seconds: float,
+    anchor_candidates: Any | None = None,
 ) -> pd.DataFrame:
     deadline = time.monotonic() + max(0.001, float(timeout_seconds))
     anchor_rows = _semantic_anchor_rows(
-        frame,
+        frame if anchor_candidates is None else anchor_candidates,
         source,
         target,
         anchors=anchors,
@@ -633,6 +635,7 @@ def predict_relations(
     relation_confidence_threshold: float = 0.5,
     timeout_seconds: float = 60.0,
     artifact: Any | None = None,
+    anchor_candidates: Any | None = None,
 ) -> pd.DataFrame:
     """Type accepted pairs while preserving the shipped all-equivalent default.
 
@@ -650,13 +653,28 @@ def predict_relations(
         frame["relation_confidence"] = 1.0
         return frame
     if normalized_mode == "hierarchy_heuristic":
-        return _hierarchy_heuristic(frame, source, target, anchors)
+        return _hierarchy_heuristic(frame, source, target, anchors, anchor_candidates)
     if normalized_mode == "semantic_entailment":
         backend = str(semantic_backend).strip().lower()
         if backend == "bridge_reasoner":
-            raise WriterOptionsError(
-                "relation semantic backend 'bridge_reasoner' is deferred; "
-                "use graph_closure or provide the optional reasoner bridge"
+            from exact.io.relation_bridge import native_bridge
+
+            if timeout_seconds <= 0:
+                raise WriterOptionsError("relation bridge timeout must be positive")
+            anchor_rows = _semantic_anchor_rows(
+                frame if anchor_candidates is None else anchor_candidates,
+                source,
+                target,
+                anchors=anchors,
+                threshold=equivalence_anchor_threshold,
+                margin=equivalence_anchor_margin,
+            )
+            return native_bridge(
+                frame,
+                source,
+                target,
+                anchor_rows=anchor_rows,
+                timeout_seconds=float(timeout_seconds),
             )
         if backend != "graph_closure":
             raise WriterOptionsError(
@@ -679,6 +697,7 @@ def predict_relations(
             anchor_margin=float(equivalence_anchor_margin),
             relation_threshold=float(relation_confidence_threshold),
             timeout_seconds=float(timeout_seconds),
+            anchor_candidates=anchor_candidates,
         )
     if normalized_mode in {"learned_three_way", "semantic_then_learned"}:
         if artifact is None:
@@ -722,6 +741,7 @@ def predict_relations(
                 equivalence_anchor_margin=equivalence_anchor_margin,
                 relation_confidence_threshold=relation_confidence_threshold,
                 timeout_seconds=timeout_seconds,
+                anchor_candidates=anchor_candidates,
             )
             for index, row in semantic.iterrows():
                 if result.at[index, "Relation"] != row.Relation:

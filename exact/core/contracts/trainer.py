@@ -792,6 +792,22 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
                 ]
             ].to_csv(global_audit_path, sep="\t", index=False)
             paths["alignment_global_audit"] = global_audit_path
+            relation_auditor = getattr(self, "_write_relation_diagnostics", None)
+            if callable(relation_auditor):
+                relation_auditor(
+                    scored,
+                    save_scores="typed-tsv" in formats,
+                    options={
+                        "mode": relation_prediction,
+                        "anchors": relation_anchors,
+                        "semantic_backend": relation_semantic_backend,
+                        "equivalence_anchor_threshold": relation_equivalence_anchor_threshold,
+                        "equivalence_anchor_margin": relation_equivalence_anchor_margin,
+                        "relation_confidence_threshold": relation_confidence_threshold,
+                        "timeout_seconds": relation_reasoning_timeout_seconds,
+                        "artifact": getattr(self, "relation_artifact", None),
+                    },
+                )
         primary: Optional[Path] = None
         for format_name in formats:
             normalized = str(format_name).strip().lower()

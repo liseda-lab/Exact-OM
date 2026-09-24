@@ -11,6 +11,11 @@ import seaborn as sns
 
 from exact.core.entities.kinds import EntityKind
 from exact.core.entities.ontology import OntologyGraph
+from exact.impl.annotation_semantics import (
+    annotate_literal,
+    deduplicate_annotations,
+    validate_annotation_semantics,
+)
 from exact.impl.datasets.contextgraph import ContextDataset
 from exact.impl.graph_controls import shuffle_relations
 from exact.utils.formatting import safe_mean
@@ -33,9 +38,13 @@ class PairAdaptiveContextDataset(ContextDataset):
         max_diff_triples: int = 24,
         max_attr_items: int = 12,
         pair_adaptive_feature_log_every: int = 1000,
+        annotation_semantics: Optional[Dict[str, Dict[str, Any]]] = None,
+        annotation_provenance_dedup: bool = False,
         **kwargs: Any,
     ):
         super().__init__(**kwargs)
+        self.annotation_semantics = validate_annotation_semantics(annotation_semantics or {})
+        self.annotation_provenance_dedup = bool(annotation_provenance_dedup)
         self.projection_include_literals = bool(projection_include_literals)
         self.hierarchical_relation_families = hierarchical_relation_families or {}
         self.hierarchy_max_depth = int(hierarchy_max_depth)
@@ -73,7 +82,9 @@ class PairAdaptiveContextDataset(ContextDataset):
         payload = super()._cache_fingerprint_payload()
         payload.update(
             {
-                "evidence_schema": 4,
+                "evidence_schema": 5,
+                "annotation_semantics": self.annotation_semantics,
+                "annotation_provenance_dedup": self.annotation_provenance_dedup,
                 "projection_include_literals": self.projection_include_literals,
                 "hierarchical_relation_families": self.hierarchical_relation_families,
                 "hierarchy_max_depth": self.hierarchy_max_depth,
@@ -438,10 +449,13 @@ class PairAdaptiveContextDataset(ContextDataset):
             if not value.is_literal or not literal:
                 continue
             prop_label = graph.get_labels(value.property_iri)[0]
-            dedupe_key = (prop_label, literal)
+            dedupe_key = (value.property_iri, literal, value.datatype, value.lang)
             if dedupe_key in seen:
                 original = next(
-                    item for item in items if (item["prop"], item["value"]) == dedupe_key
+                    item
+                    for item in items
+                    if (item["prop_iri"], item["value"], item.get("datatype"), item.get("language"))
+                    == dedupe_key
                 )
                 original.setdefault("grouped_semantic_features", []).append(
                     {
@@ -484,7 +498,7 @@ class PairAdaptiveContextDataset(ContextDataset):
                 if not literal:
                     continue
                 prop_label = graph.get_labels(rel)[0]
-                dedupe_key = (prop_label, literal)
+                dedupe_key = (rel, literal, None, None)
                 if dedupe_key in seen:
                     continue
                 seen.add(dedupe_key)
@@ -498,6 +512,9 @@ class PairAdaptiveContextDataset(ContextDataset):
                         "entity_iri": iri,
                     }
                 )
+        items = [annotate_literal(item, self.annotation_semantics) for item in items]
+        if self.annotation_provenance_dedup:
+            items = deduplicate_annotations(items)
         items.sort(key=lambda item: item["weight"], reverse=True)
         return items[: self.max_attr_items]
 

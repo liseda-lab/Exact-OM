@@ -11,6 +11,7 @@ from exact.experiments.core_recipes import core_arms, core_requirements
 from exact.experiments.feature_recipes import FEATURE_REQUIREMENTS, feature_arms
 from exact.experiments.fitting_recipes import fitting_arms, fitting_requirements
 from exact.experiments.harness import deep_merge
+from exact.impl.annotation_semantics import validate_annotation_semantics
 from exact.utils.provenance import sha256_file
 
 CASE_BY_FAMILY = {
@@ -34,9 +35,14 @@ POLICY_PATHS = {
     "E26": ["matching.fusion.enabled", "matching.fusion.sigma_mode", "matching.channels.lex"],
     "E24": ["matching.channels.diff"],
     "E06": ["matching.channels.strsim"],
-    "E08": ["matching.channels.attr"],
+    "E08": [
+        "matching.channels.attr",
+        "dataset.annotation_semantics",
+        "dataset.annotation_provenance_dedup",
+    ],
     "E09": ["matching.channels.hier"],
     "E10": ["matching.fusion.gamma", "matching.fusion.tau", "selector.accept_training"],
+    "E10-analytic": ["matching.fusion.gamma", "matching.fusion.tau"],
     "E19": [
         "matching.fusion." + key
         for key in ("enabled", "mode", "scope", "artifact", "gamma", "tau", "beta")
@@ -60,6 +66,7 @@ PORTS = {
     "E02": ["E02_anchors"],
     "E25": ["E25_initial"],
     "E07": ["E07_judgment_evidence"],
+    "E10-analytic": ["selected_E10_analytic_setting"],
 }
 
 
@@ -93,7 +100,15 @@ def prepare_campaign(
             selectable = ["string_added"]
         diagnostic = (
             family in {"E00", "E13"}
-            or identifier in {"E25-trust", "E25-oracles", "E25-forced", "E04-pool-miss"}
+            or identifier
+            in {
+                "E25-trust",
+                "E25-oracles",
+                "E25-forced",
+                "E04-pool-miss",
+                "E24-asymmetric",
+                "E14-bridge",
+            }
             or all(arm.get("published_matcher") for arm in arms)
         )
         if not selectable and not diagnostic:
@@ -145,7 +160,11 @@ def prepare_campaign(
                         "id": "bounded_selection",
                         "baseline": baseline,
                         "candidates": selectable,
-                        "metric": "candidate_recall" if retrieval else "F1",
+                        "metric": (
+                            "candidate_recall"
+                            if retrieval
+                            else "relation.full_pipeline.macro_F1" if family == "E14" else "F1"
+                        ),
                         "min_delta": (
                             0.005 if retrieval else 0.0 if family in {"E00", "E13"} else 0.003
                         ),
@@ -167,7 +186,11 @@ def prepare_campaign(
             },
             "design": {
                 "primary_comparison": f"{identifier} bounded sequential comparison",
-                "primary_endpoint": "candidate_recall" if retrieval else "F1",
+                "primary_endpoint": (
+                    "candidate_recall"
+                    if retrieval
+                    else "relation.full_pipeline.macro_F1" if family == "E14" else "F1"
+                ),
                 "independent_unit": "source_group",
                 "power_status": "descriptive",
                 "assumptions": [
@@ -196,6 +219,12 @@ def prepare_campaign(
                     "min_delta": -0.005,
                 }
             )
+        if family == "E14":
+            value["design"]["assumptions"] += [
+                "Primary endpoint is known-reference full-pipeline macro F1 across =,<,>.",
+                "Oracle-pair macro F1 is a separate typing diagnostic; oracle pairs never construct anchors.",
+                "Unlisted predictions are not verified negative labels when the reference is incomplete.",
+            ]
         if identifier == "G4":
             value["execution_modes"] = ["global_alignment", "local_ranking"]
             value["design"]["cost_bound"] = 1.2
@@ -253,6 +282,30 @@ def prepare_campaign(
         if family in {"E05", "E20"}:
             # A survivor-dependent combination is not an executable copy of baseline.
             arms = [arm for arm in arms if arm["id"] != "combined"]
+        if family == "E10":
+            analytic = [arm for arm in arms if arm["id"].startswith("analytic_")]
+            acceptance = [arm for arm in arms if not arm["id"].startswith("analytic_")]
+            acceptance[0]["role"] = "baseline"
+            make_step(
+                "E10-analytic",
+                family,
+                analytic,
+                "D0",
+                entry["budget_group"],
+                list(entry["dependencies"]),
+                policy_paths=POLICY_PATHS["E10-analytic"],
+                inherits=["E26"],
+            )
+            make_step(
+                family,
+                family,
+                acceptance,
+                "D0",
+                entry["budget_group"],
+                [*entry["dependencies"], "selected_E10_analytic_setting"],
+                inherits=["E26", "selected_E10_analytic_setting"],
+            )
+            continue
         if family == "E12":
             labels = next(arm for arm in arms if arm["id"] == "labels")
             multi_view = deepcopy(next(arm for arm in arms if arm["id"] == "multi_view"))
@@ -348,22 +401,178 @@ def prepare_campaign(
                     (
                         identifier,
                         family,
-                        [deepcopy(control), treatment],
+                        [
+                            (
+                                {
+                                    **deepcopy(
+                                        next(arm for arm in arms if arm["id"] == "nil_heuristic")
+                                    ),
+                                    "role": "baseline",
+                                }
+                                if name == "listwise_none"
+                                else deepcopy(control)
+                            ),
+                            treatment,
+                        ],
                         case,
                         "decisions",
                         dependencies,
                     )
                 )
             arms = [arm for arm in arms if arm["id"] not in {"listwise_none", "pool_miss"}]
+        if family == "E08":
+            semantics = validate_annotation_semantics(
+                bindings.get(
+                    "annotation_semantics", base["dataset"].get("annotation_semantics", {})
+                )
+            )
+            allowlist = sorted(
+                prop
+                for prop, rule in semantics.items()
+                if rule.get("identifier_namespace") and rule.get("exclusive_values")
+            )
+            for arm in arms:
+                arm["overlay"]["dataset"]["annotation_semantics"] = deepcopy(semantics)
+            signed = next(arm for arm in arms if arm["id"] == "signed_identifiers")
+            signed["overlay"]["matching"]["channels"]["attr"][
+                "signed_property_allowlist"
+            ] = allowlist
+            control = deepcopy(next(arm for arm in arms if arm["id"] == "provenance_dedup"))
+            control.update(role="baseline", required_control=True)
+            make_step(
+                "E08-identifiers",
+                family,
+                [control, signed],
+                "D0",
+                entry["budget_group"],
+                [*entry["dependencies"], "E08"],
+                phase="late",
+            )
+            steps[-1]["design"]["assumptions"].append(
+                "The provenance_dedup control is identical to E08; reuse requires verified matching identities."
+            )
+            if not allowlist:
+                for roles in steps[-1]["readiness"].values():
+                    for readiness in roles.values():
+                        readiness.update(
+                            status="inapplicable",
+                            reason=(
+                                "No curated property/namespace descriptor establishes exclusive identifier values "
+                                "on this case. Arbitrary xref mismatch is not contradictory; no empirical null inferred."
+                            ),
+                        )
+            arms = [arm for arm in arms if arm["id"] != "signed_identifiers"]
+        if family == "E14":
+            bridge = next(arm for arm in arms if arm["id"] == "bridge_parity")
+            arms = [arm for arm in arms if arm["id"] != "bridge_parity"]
+            bridge_case = bindings.get("e14_bridge_case", "T0")
+            if bridge_case not in cases:
+                raise ValueError("E14 bridge diagnostic requires a bound case")
+            binding = cases[bridge_case]
+            supported = (
+                binding.get("kind", "class") == "class"
+                and binding.get("role") == "development"
+                and all(
+                    Path((binding.get(side) or {}).get("path", "")).suffix.lower()
+                    in {".owl", ".rdf", ".xml", ".owx", ".ofn"}
+                    for side in ("source", "target")
+                )
+            )
+            if bindings.get("e14_bridge_case") and not supported:
+                raise ValueError("E14 bridge diagnostic requires a development OWL class pair")
+            bridge_arms = [bridge]
+            if supported:
+                bridge_control = deepcopy(
+                    next(arm for arm in arms if arm["id"] == "graph_entailment")
+                )
+                bridge_control.update(role="baseline", required_control=True)
+                bridge_arms.insert(0, bridge_control)
+            make_step(
+                "E14-bridge",
+                family,
+                bridge_arms,
+                bridge_case,
+                entry["budget_group"],
+                list(entry["dependencies"]),
+                phase="late",
+                policy_paths=[],
+            )
+            if not supported:
+                for readiness in steps[-1]["readiness"]["bridge_parity"].values():
+                    readiness.update(
+                        status="inapplicable",
+                        reason=(
+                            "The current typed case uses normalized CSV graphs; native OWL bridge consistency "
+                            "requires a separately bound supported OWL class pair. Graph typing is not an OWL consistency proof."
+                        ),
+                    )
+        if family == "E24":
+            asymmetric = next(arm for arm in arms if arm["id"] == "asymmetric")
+            arms = [arm for arm in arms if arm["id"] != "asymmetric"]
+            typed = bindings.get("e24_typed_diagnostic", {})
+            typed_case, interpretation = typed.get("case"), typed.get("relation")
+            if typed and (typed_case not in cases or interpretation not in {"<", ">"}):
+                raise ValueError(
+                    "E24 typed diagnostic requires a bound case and explicit < or > interpretation"
+                )
+            if typed:
+                asymmetric["overlay"]["matching"]["channels"]["diff"][
+                    "relation_interpretation"
+                ] = interpretation
+            make_step(
+                "E24-asymmetric",
+                family,
+                [asymmetric],
+                typed_case or "D1",
+                entry["budget_group"],
+                list(entry["dependencies"]),
+                phase="late",
+                policy_paths=[],
+            )
+            if not typed:
+                for stage in steps[-1]["readiness"]["asymmetric"].values():
+                    stage.update(
+                        status="inapplicable",
+                        reason=(
+                            "Optional typed diagnostic is not bound; D0/D1 equivalence references "
+                            "do not establish a directional relation interpretation. No result inferred."
+                        ),
+                    )
         dependencies = list(entry["dependencies"])
         if family == "E18":
             dependencies += ["E03", "E19"]
         if family == "E26":
             dependencies += ["pool_freeze"]
-        extra = {}
+        extra: dict[str, Any] = {}
+        if family == "E24":
+            extra["additional_cases"] = ["D0"]
+        if family == "E19":
+            dependencies += ["selected_E10_analytic_setting"]
+            extra["inherits"] = ["selected_E10_analytic_setting", "E26"]
+        if family in {"E07", "E21", "E25"}:
+            extra["source_cap"] = 200
         if family in {"E16", "E22"}:
             extra["inherits"] = ["selected_heads"]
         if family == "E23":
+            # Match each learned graph arm to its own hierarchy-removal control.
+            # These class comparisons use a different case from the natural instance pool.
+            rich_case = bindings.get("graph_rich_case", "D1")
+            if rich_case not in cases or cases[rich_case].get("kind", "class") != "class":
+                raise ValueError("E23 rich-case ablation requires a bound class case")
+            if cases[rich_case].get("role") != "development":
+                raise ValueError("E23 rich-case ablation requires development-only inputs")
+            for fraction in (0, 50, 100):
+                paired = [arm for arm in arms if arm["id"].startswith(f"rich_{fraction}_")]
+                paired[0]["role"] = "baseline"
+                make_step(
+                    f"E23-rich-{fraction}",
+                    family,
+                    paired,
+                    rich_case,
+                    entry["budget_group"],
+                    ["E00", "pool_freeze"],
+                )
+            arms = [arm for arm in arms if not arm["id"].startswith("rich_")]
             dependencies += ["instance_pool_freeze"]
             extra["inherits"] = ["instance_pool_freeze"]
         make_step(
@@ -375,6 +584,18 @@ def prepare_campaign(
             dependencies,
             **extra,
         )
+    for step in [item for item in steps if item["family"] == "E23"]:
+        case_binding = cases[step["case"]]
+        if case_binding.get("negative_policy", "positive_unlabelled") != "positive_unlabelled":
+            continue
+        for arm in step["arms"]:
+            if arm["overlay"]["matching"]["channels"]["graph"]["mode"] == "off":
+                continue
+            for readiness in step["readiness"][arm["id"]].values():
+                readiness.update(
+                    status="inapplicable",
+                    reason="This case has positive-unlabelled supervision. The frozen supervised graph recipe requires confirmed negatives; unlisted pairs cannot supply them.",
+                )
     for args in late:
         settings: dict[str, Any] = {"source_cap": 300 if args[0].startswith("E25-") else 200}
         if args[0] == "E25-forced":
@@ -408,6 +629,7 @@ def prepare_campaign(
             "E24",
             "E06",
             "E08",
+            "E08-identifiers",
             "E09",
             "E10",
             "E19",

@@ -18,6 +18,11 @@ def main():
         type=Path,
         help="Full eligible ontology signature, one IRI per line; global export only",
     )
+    parser.add_argument("--population-manifest", type=Path)
+    parser.add_argument("--target-population-manifest", type=Path)
+    parser.add_argument(
+        "--query-runs", type=Path, help="Prepared inference.json for original-query shards"
+    )
     parser.add_argument(
         "--score-field",
         default="S_final",
@@ -33,6 +38,9 @@ def main():
             args.track,
             public_candidates=args.public_candidates,
             source_universe=args.source_universe,
+            population_manifest=args.population_manifest,
+            target_population_manifest=args.target_population_manifest,
+            query_runs=args.query_runs,
             score_field=args.score_field,
             source_uri=args.source_uri,
             target_uri=args.target_uri,

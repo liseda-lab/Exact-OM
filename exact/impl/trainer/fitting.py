@@ -79,6 +79,22 @@ class TrainingPoolMixin:
         self._relation_head_fitted = True
 
     def fit_training_pool(self, *, batch_size=8):
+        from exact.utils.frozen_inference import frozen_application
+
+        if frozen_application(self.dataset):
+            if any(
+                getattr(self, key, None)
+                for key in (
+                    "training_candidates_file_path",
+                    "training_reference_file_path",
+                    "fitting_fusion_config",
+                    "fitting_graph_config",
+                    "fitting_llm_config",
+                )
+            ) or getattr(self, "relation_config", {}).get("relation_training_file"):
+                raise ValueError("Frozen inference cannot fit or read training inputs")
+            self._training_pool_fitted = True
+            return
         if getattr(self.dataset, "transfer_artifact", None) is not None:
             from exact.utils.artifact_transfer import validate_transfer
 
@@ -211,6 +227,12 @@ class TrainingPoolMixin:
         )
         cache_dir = self.output_dir / "fitting" / identity
         frame_path = cache_dir / "training_scores.json"
+        from exact.experiments.numerical_cache import shared_training_scores
+
+        if not frame_path.exists():
+            shared_rows = shared_training_scores(self.model, identity, application, batch_size)
+            if shared_rows is not None:
+                freeze_json(frame_path, {"identity": identity, "rows": shared_rows})
         if frame_path.exists():
             training = pd.DataFrame(json.loads(frame_path.read_text())["rows"])
         else:
@@ -225,7 +247,9 @@ class TrainingPoolMixin:
             records = []
             # Train-only head fitting never requests decision/brief/rationale calls.
             original_llm = getattr(self.model, "use_llm", False)
+            original_scoring_role = getattr(self.model, "_numerical_scoring_role", None)
             self.model.use_llm = False
+            self.model._numerical_scoring_role = "train"
             try:
                 for indices in source_batches(view._df, int(batch_size)):
                     source_ids = list(view._df.iloc[indices].Src.astype(str).unique())
@@ -294,7 +318,12 @@ class TrainingPoolMixin:
                     records.extend(rows)
             finally:
                 self.model.use_llm = original_llm
+                if original_scoring_role is None:
+                    del self.model._numerical_scoring_role
+                else:
+                    self.model._numerical_scoring_role = original_scoring_role
             freeze_json(frame_path, {"identity": identity, "rows": records})
+            shared_training_scores(self.model, identity, application, batch_size, rows=records)
             training = pd.DataFrame(records)
         from exact.impl.models.selector.label_budget import select_label_budget
 
