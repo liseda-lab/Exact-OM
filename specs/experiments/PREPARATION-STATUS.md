@@ -315,3 +315,30 @@ resubmitted at **19:10 UTC** as step **14250.1**, detached in the same tmux sess
 within the user's replacement interactive allocation. Only operational allocation
 and submission bindings changed; standard recovery retains the artifact store and
 shared caches while restarting unfinished cold preparation.
+
+
+## E09 relocation to liseda-03, 2026-09-24
+
+The same qualification/continuation queue resumed at **16:49 UTC** as Slurm step
+**14372.1**, detached in `exact-d1-production-14372`, inside the existing interactive
+allocation. The new node has an RTX 4090 (24 GiB), 125 GiB host RAM and six allocated
+CPUs. Interactive shell step 14372.0 remains active. The original scientific source
+snapshot `75c4d7a`, all four native 0.2.1 fingerprints, and immutable inputs verified.
+Current uncommitted application work is excluded through the existing isolated snapshot.
+
+The previous step 14250.1 was confirmed CANCELLED by Slurm, with a 480-second interval.
+That interval is charged as interrupted, with zero additional hosted requests/tokens;
+original launch files and run metadata are retained in
+`d1-production-probe-01/interrupted-14250-1/`. Only input artifacts were committed;
+there was no scored checkpoint or prepared D1 dataset, so cold preparation restarts.
+The 22 completed E02/E05/E06/E26 cells and decisions are retained without rerunning them.
+
+Qualification now measures the replacement node; the existing measured RAM/VRAM and
+budget checks still gate automatic advancement into the four E09 treatments. GPU-specific
+embedding-cache identities prevent reusing incompatible 5090 vectors. Rationales and
+matching LLM calls remain off, hosted relation templates remain enabled, and private test
+references remain excluded. There is no wall-time deadline; the 56 GiB cooperative RSS
+guard remains in place. The new launcher log is
+`data/experiments-v2/d1-production-probe-01/launcher-14372.log`; `status.json` in that
+directory reports the active qualification phase. Relocation evidence is in
+`data/experiments-v2/d1-relocation-14372/`.

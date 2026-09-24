@@ -1,6 +1,6 @@
 # Exact-OM experiment programme v2
 
-**Design revision: 2026-09-10 (E04 benchmark-NIL scope). G0 passed; E05/E26/E06 screens retained their controls. All six E02 cells and final reports completed on 2026-09-20; E02 retained the hard-anchor baseline. The reporting repair reused every scientific output and made zero new model calls. D1 SNOMED preparation completed. FMA reification repair and full native preprocessing passed; step 14234.14 completed in 15m15s with 3.32GiB peak RAM. E09 production candidate preparation and hierarchy/resource qualification are the next work. The main `.venv` now uses the four published PyPI 0.2.1 native packages.**
+**Design revision: 2026-09-10 (E04 benchmark-NIL scope). G0 passed; E05/E26/E06 screens retained their controls. All six E02 cells and final reports completed on 2026-09-20; E02 retained the hard-anchor baseline. The reporting repair reused every scientific output and made zero new model calls. D1 SNOMED preparation completed. FMA reification repair and full native preprocessing passed; step 14234.14 completed in 15m15s with 3.32GiB peak RAM. E09 qualification resumed on liseda-03 at 16:49 UTC on 2026-09-24 as step 14372.1, with conditional automatic continuation into its four hierarchy arms. The main `.venv` now uses the four published PyPI 0.2.1 native packages.**
 See [PREPARATION-STATUS.md](PREPARATION-STATUS.md) for current code, input and operational evidence.
 [FIRST-SCREEN.md](FIRST-SCREEN.md) records E05 and E26/E06 history;
 [MECHANISM-SCREEN.md](MECHANISM-SCREEN.md) records E02 admission and monitoring.
