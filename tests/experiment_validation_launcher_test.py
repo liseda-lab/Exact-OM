@@ -544,9 +544,10 @@ def test_full_validation_recovery_flow_rejects_changed_or_paid_replay(tmp_path, 
         assert checks["local300-cache"]["completed_cache_bytes_verified"]
     if reboot or fault == "resumed_globals":
         from copy import deepcopy
-        from tools import validation_resume
+
         from exact.experiments.runtime import CellRecovery
         from exact.llm.routing import OpenRouterClient
+        from tools import validation_resume
 
         original_hooks = (harness._run_subprocess, CellRecovery.prepare, OpenRouterClient.__init__)
         saved_count = 9 if reboot else 8

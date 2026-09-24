@@ -185,7 +185,10 @@ def compare_validation_replay(
     baseline_output, replay_output, *, completed_cache=False, local=False
 ):
     """Use declared numerical tolerances; completed cache copies also retain exact bytes."""
-    from exact.experiments.replay import compare_replay_outputs, normalize_execution_device
+    from exact.experiments.replay import (
+        compare_replay_outputs,
+        normalize_execution_device,
+    )
 
     baseline_output, replay_output = Path(baseline_output), Path(replay_output)
     devices = [

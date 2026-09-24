@@ -507,12 +507,12 @@ def hierarchy_metric_rows(record: Mapping[str, Any]) -> list[dict[str, Any]]:
             for bucket in buckets
         }
         for source in sorted(population):
-            selected = edges.get(source, {}).get(family)
-            if selected is None:
+            observed_edges = edges.get(source, {}).get(family)
+            if observed_edges is None:
                 coverage = depth = branching = "unobserved"
             else:
-                coverage = "present" if selected else "absent"
-                depth, branching = _selected_hierarchy_shape(source, selected)
+                coverage = "present" if observed_edges else "absent"
+                depth, branching = _selected_hierarchy_shape(source, observed_edges)
             for dimension, bucket in (
                 ("coverage", coverage),
                 ("depth", depth),

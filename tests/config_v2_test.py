@@ -63,7 +63,10 @@ def test_exhaustive_v1_defaults_migrate_to_identical_v2_fingerprint() -> None:
     assert all(root in V1_TO_V2 for root in ("model", "second_model", "model_chain"))
 
 
-def test_v1_warning_once_and_unknown_key_suggestions(caplog) -> None:
+def test_v1_warning_once_and_unknown_key_suggestions(caplog, monkeypatch) -> None:
+    logger = logging.getLogger("exact.config")
+    monkeypatch.setattr(logger, "handlers", [caplog.handler])
+    monkeypatch.setattr(logger, "propagate", False)
     caplog.set_level(logging.WARNING, logger="exact.config")
     ConfigModel.from_mapping({"seed": 7})
     messages = [record.message for record in caplog.records if "deprecated v1" in record.message]
