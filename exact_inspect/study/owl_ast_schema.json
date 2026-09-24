@@ -1,0 +1,1740 @@
+{
+  "axioms": [
+    "AnnotationAssertion",
+    "AnnotationPropertyDomain",
+    "AnnotationPropertyRange",
+    "AsymmetricObjectProperty",
+    "ClassAssertion",
+    "DataPropertyAssertion",
+    "DataPropertyDomain",
+    "DataPropertyRange",
+    "DatatypeDefinition",
+    "Declaration",
+    "DifferentIndividuals",
+    "DisjointClasses",
+    "DisjointDataProperties",
+    "DisjointObjectProperties",
+    "DisjointUnion",
+    "EquivalentClasses",
+    "EquivalentDataProperties",
+    "EquivalentObjectProperties",
+    "FunctionalDataProperty",
+    "FunctionalObjectProperty",
+    "HasKey",
+    "InverseFunctionalObjectProperty",
+    "InverseObjectProperties",
+    "IrreflexiveObjectProperty",
+    "NegativeDataPropertyAssertion",
+    "NegativeObjectPropertyAssertion",
+    "ObjectPropertyAssertion",
+    "ObjectPropertyDomain",
+    "ObjectPropertyRange",
+    "ReflexiveObjectProperty",
+    "SameIndividual",
+    "SubAnnotationPropertyOf",
+    "SubClassOf",
+    "SubDataPropertyOf",
+    "SubObjectPropertyOf",
+    "SymmetricObjectProperty",
+    "TransitiveObjectProperty"
+  ],
+  "constructors": {
+    "Annotation": {
+      "annotations": {
+        "items": {
+          "nodes": [
+            "Annotation"
+          ]
+        }
+      },
+      "property": {
+        "nodes": [
+          "AnnotationProperty"
+        ]
+      },
+      "value": {
+        "nodes": [
+          "AnonymousIndividual",
+          "IRI",
+          "Literal"
+        ]
+      }
+    },
+    "AnnotationAssertion": {
+      "annotations": {
+        "items": {
+          "nodes": [
+            "Annotation"
+          ]
+        }
+      },
+      "property": {
+        "nodes": [
+          "AnnotationProperty"
+        ]
+      },
+      "subject": {
+        "nodes": [
+          "AnonymousIndividual",
+          "IRI"
+        ]
+      },
+      "value": {
+        "nodes": [
+          "AnonymousIndividual",
+          "IRI",
+          "Literal"
+        ]
+      }
+    },
+    "AnnotationProperty": {
+      "iri": {
+        "nodes": [
+          "IRI"
+        ]
+      },
+      "kind": {
+        "enum": [
+          "class",
+          "datatype",
+          "object_property",
+          "data_property",
+          "annotation_property",
+          "named_individual"
+        ]
+      }
+    },
+    "AnnotationPropertyDomain": {
+      "annotations": {
+        "items": {
+          "nodes": [
+            "Annotation"
+          ]
+        }
+      },
+      "domain": {
+        "nodes": [
+          "IRI"
+        ]
+      },
+      "property": {
+        "nodes": [
+          "AnnotationProperty"
+        ]
+      }
+    },
+    "AnnotationPropertyRange": {
+      "annotations": {
+        "items": {
+          "nodes": [
+            "Annotation"
+          ]
+        }
+      },
+      "property": {
+        "nodes": [
+          "AnnotationProperty"
+        ]
+      },
+      "range": {
+        "nodes": [
+          "IRI"
+        ]
+      }
+    },
+    "AnonymousIndividual": {
+      "document_scope": "bytes",
+      "local_key": "bytes"
+    },
+    "AsymmetricObjectProperty": {
+      "annotations": {
+        "items": {
+          "nodes": [
+            "Annotation"
+          ]
+        }
+      },
+      "property": {
+        "nodes": [
+          "ObjectInverseOf",
+          "ObjectProperty"
+        ]
+      }
+    },
+    "BuiltInAtom": {
+      "arguments": {
+        "items": {
+          "nodes": [
+            "Literal",
+            "Variable"
+          ]
+        }
+      },
+      "predicate": {
+        "nodes": [
+          "IRI"
+        ]
+      }
+    },
+    "Class": {
+      "iri": {
+        "nodes": [
+          "IRI"
+        ]
+      },
+      "kind": {
+        "enum": [
+          "class",
+          "datatype",
+          "object_property",
+          "data_property",
+          "annotation_property",
+          "named_individual"
+        ]
+      }
+    },
+    "ClassAssertion": {
+      "annotations": {
+        "items": {
+          "nodes": [
+            "Annotation"
+          ]
+        }
+      },
+      "class_expression": {
+        "nodes": [
+          "Class",
+          "DataAllValuesFrom",
+          "DataExactCardinality",
+          "DataHasValue",
+          "DataMaxCardinality",
+          "DataMinCardinality",
+          "DataSomeValuesFrom",
+          "ObjectAllValuesFrom",
+          "ObjectComplementOf",
+          "ObjectExactCardinality",
+          "ObjectHasSelf",
+          "ObjectHasValue",
+          "ObjectIntersectionOf",
+          "ObjectMaxCardinality",
+          "ObjectMinCardinality",
+          "ObjectOneOf",
+          "ObjectSomeValuesFrom",
+          "ObjectUnionOf"
+        ]
+      },
+      "individual": {
+        "nodes": [
+          "AnonymousIndividual",
+          "NamedIndividual"
+        ]
+      }
+    },
+    "ClassAtom": {
+      "argument": {
+        "nodes": [
+          "AnonymousIndividual",
+          "NamedIndividual",
+          "Variable"
+        ]
+      },
+      "predicate": {
+        "nodes": [
+          "Class",
+          "DataAllValuesFrom",
+          "DataExactCardinality",
+          "DataHasValue",
+          "DataMaxCardinality",
+          "DataMinCardinality",
+          "DataSomeValuesFrom",
+          "ObjectAllValuesFrom",
+          "ObjectComplementOf",
+          "ObjectExactCardinality",
+          "ObjectHasSelf",
+          "ObjectHasValue",
+          "ObjectIntersectionOf",
+          "ObjectMaxCardinality",
+          "ObjectMinCardinality",
+          "ObjectOneOf",
+          "ObjectSomeValuesFrom",
+          "ObjectUnionOf"
+        ]
+      }
+    },
+    "DataAllValuesFrom": {
+      "filler": {
+        "nodes": [
+          "DataComplementOf",
+          "DataIntersectionOf",
+          "DataOneOf",
+          "DataUnionOf",
+          "Datatype",
+          "DatatypeRestriction"
+        ]
+      },
+      "properties": {
+        "items": {
+          "nodes": [
+            "DataProperty"
+          ]
+        }
+      }
+    },
+    "DataComplementOf": {
+      "operand": {
+        "nodes": [
+          "DataComplementOf",
+          "DataIntersectionOf",
+          "DataOneOf",
+          "DataUnionOf",
+          "Datatype",
+          "DatatypeRestriction"
+        ]
+      }
+    },
+    "DataExactCardinality": {
+      "cardinality": "integer",
+      "filler": {
+        "nodes": [
+          "DataComplementOf",
+          "DataIntersectionOf",
+          "DataOneOf",
+          "DataUnionOf",
+          "Datatype",
+          "DatatypeRestriction"
+        ]
+      },
+      "property": {
+        "nodes": [
+          "DataProperty"
+        ]
+      }
+    },
+    "DataHasValue": {
+      "property": {
+        "nodes": [
+          "DataProperty"
+        ]
+      },
+      "value": {
+        "nodes": [
+          "Literal"
+        ]
+      }
+    },
+    "DataIntersectionOf": {
+      "operands": {
+        "items": {
+          "nodes": [
+            "DataComplementOf",
+            "DataIntersectionOf",
+            "DataOneOf",
+            "DataUnionOf",
+            "Datatype",
+            "DatatypeRestriction"
+          ]
+        }
+      }
+    },
+    "DataMaxCardinality": {
+      "cardinality": "integer",
+      "filler": {
+        "nodes": [
+          "DataComplementOf",
+          "DataIntersectionOf",
+          "DataOneOf",
+          "DataUnionOf",
+          "Datatype",
+          "DatatypeRestriction"
+        ]
+      },
+      "property": {
+        "nodes": [
+          "DataProperty"
+        ]
+      }
+    },
+    "DataMinCardinality": {
+      "cardinality": "integer",
+      "filler": {
+        "nodes": [
+          "DataComplementOf",
+          "DataIntersectionOf",
+          "DataOneOf",
+          "DataUnionOf",
+          "Datatype",
+          "DatatypeRestriction"
+        ]
+      },
+      "property": {
+        "nodes": [
+          "DataProperty"
+        ]
+      }
+    },
+    "DataOneOf": {
+      "values": {
+        "items": {
+          "nodes": [
+            "Literal"
+          ]
+        }
+      }
+    },
+    "DataProperty": {
+      "iri": {
+        "nodes": [
+          "IRI"
+        ]
+      },
+      "kind": {
+        "enum": [
+          "class",
+          "datatype",
+          "object_property",
+          "data_property",
+          "annotation_property",
+          "named_individual"
+        ]
+      }
+    },
+    "DataPropertyAssertion": {
+      "annotations": {
+        "items": {
+          "nodes": [
+            "Annotation"
+          ]
+        }
+      },
+      "property": {
+        "nodes": [
+          "DataProperty"
+        ]
+      },
+      "source": {
+        "nodes": [
+          "AnonymousIndividual",
+          "NamedIndividual"
+        ]
+      },
+      "value": {
+        "nodes": [
+          "Literal"
+        ]
+      }
+    },
+    "DataPropertyAtom": {
+      "predicate": {
+        "nodes": [
+          "DataProperty"
+        ]
+      },
+      "source": {
+        "nodes": [
+          "AnonymousIndividual",
+          "NamedIndividual",
+          "Variable"
+        ]
+      },
+      "target": {
+        "nodes": [
+          "Literal",
+          "Variable"
+        ]
+      }
+    },
+    "DataPropertyDomain": {
+      "annotations": {
+        "items": {
+          "nodes": [
+            "Annotation"
+          ]
+        }
+      },
+      "domain": {
+        "nodes": [
+          "Class",
+          "DataAllValuesFrom",
+          "DataExactCardinality",
+          "DataHasValue",
+          "DataMaxCardinality",
+          "DataMinCardinality",
+          "DataSomeValuesFrom",
+          "ObjectAllValuesFrom",
+          "ObjectComplementOf",
+          "ObjectExactCardinality",
+          "ObjectHasSelf",
+          "ObjectHasValue",
+          "ObjectIntersectionOf",
+          "ObjectMaxCardinality",
+          "ObjectMinCardinality",
+          "ObjectOneOf",
+          "ObjectSomeValuesFrom",
+          "ObjectUnionOf"
+        ]
+      },
+      "property": {
+        "nodes": [
+          "DataProperty"
+        ]
+      }
+    },
+    "DataPropertyRange": {
+      "annotations": {
+        "items": {
+          "nodes": [
+            "Annotation"
+          ]
+        }
+      },
+      "property": {
+        "nodes": [
+          "DataProperty"
+        ]
+      },
+      "range": {
+        "nodes": [
+          "DataComplementOf",
+          "DataIntersectionOf",
+          "DataOneOf",
+          "DataUnionOf",
+          "Datatype",
+          "DatatypeRestriction"
+        ]
+      }
+    },
+    "DataRangeAtom": {
+      "argument": {
+        "nodes": [
+          "Literal",
+          "Variable"
+        ]
+      },
+      "predicate": {
+        "nodes": [
+          "DataComplementOf",
+          "DataIntersectionOf",
+          "DataOneOf",
+          "DataUnionOf",
+          "Datatype",
+          "DatatypeRestriction"
+        ]
+      }
+    },
+    "DataSomeValuesFrom": {
+      "filler": {
+        "nodes": [
+          "DataComplementOf",
+          "DataIntersectionOf",
+          "DataOneOf",
+          "DataUnionOf",
+          "Datatype",
+          "DatatypeRestriction"
+        ]
+      },
+      "properties": {
+        "items": {
+          "nodes": [
+            "DataProperty"
+          ]
+        }
+      }
+    },
+    "DataUnionOf": {
+      "operands": {
+        "items": {
+          "nodes": [
+            "DataComplementOf",
+            "DataIntersectionOf",
+            "DataOneOf",
+            "DataUnionOf",
+            "Datatype",
+            "DatatypeRestriction"
+          ]
+        }
+      }
+    },
+    "Datatype": {
+      "iri": {
+        "nodes": [
+          "IRI"
+        ]
+      },
+      "kind": {
+        "enum": [
+          "class",
+          "datatype",
+          "object_property",
+          "data_property",
+          "annotation_property",
+          "named_individual"
+        ]
+      }
+    },
+    "DatatypeDefinition": {
+      "annotations": {
+        "items": {
+          "nodes": [
+            "Annotation"
+          ]
+        }
+      },
+      "data_range": {
+        "nodes": [
+          "DataComplementOf",
+          "DataIntersectionOf",
+          "DataOneOf",
+          "DataUnionOf",
+          "Datatype",
+          "DatatypeRestriction"
+        ]
+      },
+      "datatype": {
+        "nodes": [
+          "Datatype"
+        ]
+      }
+    },
+    "DatatypeRestriction": {
+      "datatype": {
+        "nodes": [
+          "Datatype"
+        ]
+      },
+      "restrictions": {
+        "items": {
+          "nodes": [
+            "FacetRestriction"
+          ]
+        }
+      }
+    },
+    "Declaration": {
+      "annotations": {
+        "items": {
+          "nodes": [
+            "Annotation"
+          ]
+        }
+      },
+      "entity": {
+        "nodes": [
+          "AnnotationProperty",
+          "Class",
+          "DataProperty",
+          "Datatype",
+          "Entity",
+          "NamedIndividual",
+          "ObjectProperty"
+        ]
+      }
+    },
+    "DifferentIndividuals": {
+      "annotations": {
+        "items": {
+          "nodes": [
+            "Annotation"
+          ]
+        }
+      },
+      "individuals": {
+        "items": {
+          "nodes": [
+            "AnonymousIndividual",
+            "NamedIndividual"
+          ]
+        }
+      }
+    },
+    "DifferentIndividualsAtom": {
+      "first": {
+        "nodes": [
+          "AnonymousIndividual",
+          "NamedIndividual",
+          "Variable"
+        ]
+      },
+      "second": {
+        "nodes": [
+          "AnonymousIndividual",
+          "NamedIndividual",
+          "Variable"
+        ]
+      }
+    },
+    "DisjointClasses": {
+      "annotations": {
+        "items": {
+          "nodes": [
+            "Annotation"
+          ]
+        }
+      },
+      "expressions": {
+        "items": {
+          "nodes": [
+            "Class",
+            "DataAllValuesFrom",
+            "DataExactCardinality",
+            "DataHasValue",
+            "DataMaxCardinality",
+            "DataMinCardinality",
+            "DataSomeValuesFrom",
+            "ObjectAllValuesFrom",
+            "ObjectComplementOf",
+            "ObjectExactCardinality",
+            "ObjectHasSelf",
+            "ObjectHasValue",
+            "ObjectIntersectionOf",
+            "ObjectMaxCardinality",
+            "ObjectMinCardinality",
+            "ObjectOneOf",
+            "ObjectSomeValuesFrom",
+            "ObjectUnionOf"
+          ]
+        }
+      }
+    },
+    "DisjointDataProperties": {
+      "annotations": {
+        "items": {
+          "nodes": [
+            "Annotation"
+          ]
+        }
+      },
+      "properties": {
+        "items": {
+          "nodes": [
+            "DataProperty"
+          ]
+        }
+      }
+    },
+    "DisjointObjectProperties": {
+      "annotations": {
+        "items": {
+          "nodes": [
+            "Annotation"
+          ]
+        }
+      },
+      "properties": {
+        "items": {
+          "nodes": [
+            "ObjectInverseOf",
+            "ObjectProperty"
+          ]
+        }
+      }
+    },
+    "DisjointUnion": {
+      "annotations": {
+        "items": {
+          "nodes": [
+            "Annotation"
+          ]
+        }
+      },
+      "defined_class": {
+        "nodes": [
+          "Class"
+        ]
+      },
+      "expressions": {
+        "items": {
+          "nodes": [
+            "Class",
+            "DataAllValuesFrom",
+            "DataExactCardinality",
+            "DataHasValue",
+            "DataMaxCardinality",
+            "DataMinCardinality",
+            "DataSomeValuesFrom",
+            "ObjectAllValuesFrom",
+            "ObjectComplementOf",
+            "ObjectExactCardinality",
+            "ObjectHasSelf",
+            "ObjectHasValue",
+            "ObjectIntersectionOf",
+            "ObjectMaxCardinality",
+            "ObjectMinCardinality",
+            "ObjectOneOf",
+            "ObjectSomeValuesFrom",
+            "ObjectUnionOf"
+          ]
+        }
+      }
+    },
+    "Entity": {
+      "iri": {
+        "nodes": [
+          "IRI"
+        ]
+      },
+      "kind": {
+        "enum": [
+          "class",
+          "datatype",
+          "object_property",
+          "data_property",
+          "annotation_property",
+          "named_individual"
+        ]
+      }
+    },
+    "EquivalentClasses": {
+      "annotations": {
+        "items": {
+          "nodes": [
+            "Annotation"
+          ]
+        }
+      },
+      "expressions": {
+        "items": {
+          "nodes": [
+            "Class",
+            "DataAllValuesFrom",
+            "DataExactCardinality",
+            "DataHasValue",
+            "DataMaxCardinality",
+            "DataMinCardinality",
+            "DataSomeValuesFrom",
+            "ObjectAllValuesFrom",
+            "ObjectComplementOf",
+            "ObjectExactCardinality",
+            "ObjectHasSelf",
+            "ObjectHasValue",
+            "ObjectIntersectionOf",
+            "ObjectMaxCardinality",
+            "ObjectMinCardinality",
+            "ObjectOneOf",
+            "ObjectSomeValuesFrom",
+            "ObjectUnionOf"
+          ]
+        }
+      }
+    },
+    "EquivalentDataProperties": {
+      "annotations": {
+        "items": {
+          "nodes": [
+            "Annotation"
+          ]
+        }
+      },
+      "properties": {
+        "items": {
+          "nodes": [
+            "DataProperty"
+          ]
+        }
+      }
+    },
+    "EquivalentObjectProperties": {
+      "annotations": {
+        "items": {
+          "nodes": [
+            "Annotation"
+          ]
+        }
+      },
+      "properties": {
+        "items": {
+          "nodes": [
+            "ObjectInverseOf",
+            "ObjectProperty"
+          ]
+        }
+      }
+    },
+    "FacetRestriction": {
+      "facet": {
+        "nodes": [
+          "IRI"
+        ]
+      },
+      "value": {
+        "nodes": [
+          "Literal"
+        ]
+      }
+    },
+    "FunctionalDataProperty": {
+      "annotations": {
+        "items": {
+          "nodes": [
+            "Annotation"
+          ]
+        }
+      },
+      "property": {
+        "nodes": [
+          "DataProperty"
+        ]
+      }
+    },
+    "FunctionalObjectProperty": {
+      "annotations": {
+        "items": {
+          "nodes": [
+            "Annotation"
+          ]
+        }
+      },
+      "property": {
+        "nodes": [
+          "ObjectInverseOf",
+          "ObjectProperty"
+        ]
+      }
+    },
+    "HasKey": {
+      "annotations": {
+        "items": {
+          "nodes": [
+            "Annotation"
+          ]
+        }
+      },
+      "class_expression": {
+        "nodes": [
+          "Class",
+          "DataAllValuesFrom",
+          "DataExactCardinality",
+          "DataHasValue",
+          "DataMaxCardinality",
+          "DataMinCardinality",
+          "DataSomeValuesFrom",
+          "ObjectAllValuesFrom",
+          "ObjectComplementOf",
+          "ObjectExactCardinality",
+          "ObjectHasSelf",
+          "ObjectHasValue",
+          "ObjectIntersectionOf",
+          "ObjectMaxCardinality",
+          "ObjectMinCardinality",
+          "ObjectOneOf",
+          "ObjectSomeValuesFrom",
+          "ObjectUnionOf"
+        ]
+      },
+      "data_properties": {
+        "items": {
+          "nodes": [
+            "DataProperty"
+          ]
+        }
+      },
+      "object_properties": {
+        "items": {
+          "nodes": [
+            "ObjectInverseOf",
+            "ObjectProperty"
+          ]
+        }
+      }
+    },
+    "IRI": {
+      "value": "string"
+    },
+    "InverseFunctionalObjectProperty": {
+      "annotations": {
+        "items": {
+          "nodes": [
+            "Annotation"
+          ]
+        }
+      },
+      "property": {
+        "nodes": [
+          "ObjectInverseOf",
+          "ObjectProperty"
+        ]
+      }
+    },
+    "InverseObjectProperties": {
+      "annotations": {
+        "items": {
+          "nodes": [
+            "Annotation"
+          ]
+        }
+      },
+      "first": {
+        "nodes": [
+          "ObjectInverseOf",
+          "ObjectProperty"
+        ]
+      },
+      "second": {
+        "nodes": [
+          "ObjectInverseOf",
+          "ObjectProperty"
+        ]
+      }
+    },
+    "IrreflexiveObjectProperty": {
+      "annotations": {
+        "items": {
+          "nodes": [
+            "Annotation"
+          ]
+        }
+      },
+      "property": {
+        "nodes": [
+          "ObjectInverseOf",
+          "ObjectProperty"
+        ]
+      }
+    },
+    "Literal": {
+      "datatype": {
+        "nodes": [
+          "Datatype"
+        ]
+      },
+      "language": {
+        "one_of": [
+          "string",
+          "null"
+        ]
+      },
+      "lexical_form": "string"
+    },
+    "NamedIndividual": {
+      "iri": {
+        "nodes": [
+          "IRI"
+        ]
+      },
+      "kind": {
+        "enum": [
+          "class",
+          "datatype",
+          "object_property",
+          "data_property",
+          "annotation_property",
+          "named_individual"
+        ]
+      }
+    },
+    "NegativeDataPropertyAssertion": {
+      "annotations": {
+        "items": {
+          "nodes": [
+            "Annotation"
+          ]
+        }
+      },
+      "property": {
+        "nodes": [
+          "DataProperty"
+        ]
+      },
+      "source": {
+        "nodes": [
+          "AnonymousIndividual",
+          "NamedIndividual"
+        ]
+      },
+      "value": {
+        "nodes": [
+          "Literal"
+        ]
+      }
+    },
+    "NegativeObjectPropertyAssertion": {
+      "annotations": {
+        "items": {
+          "nodes": [
+            "Annotation"
+          ]
+        }
+      },
+      "property": {
+        "nodes": [
+          "ObjectInverseOf",
+          "ObjectProperty"
+        ]
+      },
+      "source": {
+        "nodes": [
+          "AnonymousIndividual",
+          "NamedIndividual"
+        ]
+      },
+      "target": {
+        "nodes": [
+          "AnonymousIndividual",
+          "NamedIndividual"
+        ]
+      }
+    },
+    "ObjectAllValuesFrom": {
+      "filler": {
+        "nodes": [
+          "Class",
+          "DataAllValuesFrom",
+          "DataExactCardinality",
+          "DataHasValue",
+          "DataMaxCardinality",
+          "DataMinCardinality",
+          "DataSomeValuesFrom",
+          "ObjectAllValuesFrom",
+          "ObjectComplementOf",
+          "ObjectExactCardinality",
+          "ObjectHasSelf",
+          "ObjectHasValue",
+          "ObjectIntersectionOf",
+          "ObjectMaxCardinality",
+          "ObjectMinCardinality",
+          "ObjectOneOf",
+          "ObjectSomeValuesFrom",
+          "ObjectUnionOf"
+        ]
+      },
+      "property": {
+        "nodes": [
+          "ObjectInverseOf",
+          "ObjectProperty"
+        ]
+      }
+    },
+    "ObjectComplementOf": {
+      "operand": {
+        "nodes": [
+          "Class",
+          "DataAllValuesFrom",
+          "DataExactCardinality",
+          "DataHasValue",
+          "DataMaxCardinality",
+          "DataMinCardinality",
+          "DataSomeValuesFrom",
+          "ObjectAllValuesFrom",
+          "ObjectComplementOf",
+          "ObjectExactCardinality",
+          "ObjectHasSelf",
+          "ObjectHasValue",
+          "ObjectIntersectionOf",
+          "ObjectMaxCardinality",
+          "ObjectMinCardinality",
+          "ObjectOneOf",
+          "ObjectSomeValuesFrom",
+          "ObjectUnionOf"
+        ]
+      }
+    },
+    "ObjectExactCardinality": {
+      "cardinality": "integer",
+      "filler": {
+        "nodes": [
+          "Class",
+          "DataAllValuesFrom",
+          "DataExactCardinality",
+          "DataHasValue",
+          "DataMaxCardinality",
+          "DataMinCardinality",
+          "DataSomeValuesFrom",
+          "ObjectAllValuesFrom",
+          "ObjectComplementOf",
+          "ObjectExactCardinality",
+          "ObjectHasSelf",
+          "ObjectHasValue",
+          "ObjectIntersectionOf",
+          "ObjectMaxCardinality",
+          "ObjectMinCardinality",
+          "ObjectOneOf",
+          "ObjectSomeValuesFrom",
+          "ObjectUnionOf"
+        ]
+      },
+      "property": {
+        "nodes": [
+          "ObjectInverseOf",
+          "ObjectProperty"
+        ]
+      }
+    },
+    "ObjectHasSelf": {
+      "property": {
+        "nodes": [
+          "ObjectInverseOf",
+          "ObjectProperty"
+        ]
+      }
+    },
+    "ObjectHasValue": {
+      "property": {
+        "nodes": [
+          "ObjectInverseOf",
+          "ObjectProperty"
+        ]
+      },
+      "value": {
+        "nodes": [
+          "AnonymousIndividual",
+          "NamedIndividual"
+        ]
+      }
+    },
+    "ObjectIntersectionOf": {
+      "operands": {
+        "items": {
+          "nodes": [
+            "Class",
+            "DataAllValuesFrom",
+            "DataExactCardinality",
+            "DataHasValue",
+            "DataMaxCardinality",
+            "DataMinCardinality",
+            "DataSomeValuesFrom",
+            "ObjectAllValuesFrom",
+            "ObjectComplementOf",
+            "ObjectExactCardinality",
+            "ObjectHasSelf",
+            "ObjectHasValue",
+            "ObjectIntersectionOf",
+            "ObjectMaxCardinality",
+            "ObjectMinCardinality",
+            "ObjectOneOf",
+            "ObjectSomeValuesFrom",
+            "ObjectUnionOf"
+          ]
+        }
+      }
+    },
+    "ObjectInverseOf": {
+      "property": {
+        "nodes": [
+          "ObjectProperty"
+        ]
+      }
+    },
+    "ObjectMaxCardinality": {
+      "cardinality": "integer",
+      "filler": {
+        "nodes": [
+          "Class",
+          "DataAllValuesFrom",
+          "DataExactCardinality",
+          "DataHasValue",
+          "DataMaxCardinality",
+          "DataMinCardinality",
+          "DataSomeValuesFrom",
+          "ObjectAllValuesFrom",
+          "ObjectComplementOf",
+          "ObjectExactCardinality",
+          "ObjectHasSelf",
+          "ObjectHasValue",
+          "ObjectIntersectionOf",
+          "ObjectMaxCardinality",
+          "ObjectMinCardinality",
+          "ObjectOneOf",
+          "ObjectSomeValuesFrom",
+          "ObjectUnionOf"
+        ]
+      },
+      "property": {
+        "nodes": [
+          "ObjectInverseOf",
+          "ObjectProperty"
+        ]
+      }
+    },
+    "ObjectMinCardinality": {
+      "cardinality": "integer",
+      "filler": {
+        "nodes": [
+          "Class",
+          "DataAllValuesFrom",
+          "DataExactCardinality",
+          "DataHasValue",
+          "DataMaxCardinality",
+          "DataMinCardinality",
+          "DataSomeValuesFrom",
+          "ObjectAllValuesFrom",
+          "ObjectComplementOf",
+          "ObjectExactCardinality",
+          "ObjectHasSelf",
+          "ObjectHasValue",
+          "ObjectIntersectionOf",
+          "ObjectMaxCardinality",
+          "ObjectMinCardinality",
+          "ObjectOneOf",
+          "ObjectSomeValuesFrom",
+          "ObjectUnionOf"
+        ]
+      },
+      "property": {
+        "nodes": [
+          "ObjectInverseOf",
+          "ObjectProperty"
+        ]
+      }
+    },
+    "ObjectOneOf": {
+      "individuals": {
+        "items": {
+          "nodes": [
+            "AnonymousIndividual",
+            "NamedIndividual"
+          ]
+        }
+      }
+    },
+    "ObjectProperty": {
+      "iri": {
+        "nodes": [
+          "IRI"
+        ]
+      },
+      "kind": {
+        "enum": [
+          "class",
+          "datatype",
+          "object_property",
+          "data_property",
+          "annotation_property",
+          "named_individual"
+        ]
+      }
+    },
+    "ObjectPropertyAssertion": {
+      "annotations": {
+        "items": {
+          "nodes": [
+            "Annotation"
+          ]
+        }
+      },
+      "property": {
+        "nodes": [
+          "ObjectInverseOf",
+          "ObjectProperty"
+        ]
+      },
+      "source": {
+        "nodes": [
+          "AnonymousIndividual",
+          "NamedIndividual"
+        ]
+      },
+      "target": {
+        "nodes": [
+          "AnonymousIndividual",
+          "NamedIndividual"
+        ]
+      }
+    },
+    "ObjectPropertyAtom": {
+      "predicate": {
+        "nodes": [
+          "ObjectInverseOf",
+          "ObjectProperty"
+        ]
+      },
+      "source": {
+        "nodes": [
+          "AnonymousIndividual",
+          "NamedIndividual",
+          "Variable"
+        ]
+      },
+      "target": {
+        "nodes": [
+          "AnonymousIndividual",
+          "NamedIndividual",
+          "Variable"
+        ]
+      }
+    },
+    "ObjectPropertyChain": {
+      "properties": {
+        "items": {
+          "nodes": [
+            "ObjectInverseOf",
+            "ObjectProperty"
+          ]
+        }
+      }
+    },
+    "ObjectPropertyDomain": {
+      "annotations": {
+        "items": {
+          "nodes": [
+            "Annotation"
+          ]
+        }
+      },
+      "domain": {
+        "nodes": [
+          "Class",
+          "DataAllValuesFrom",
+          "DataExactCardinality",
+          "DataHasValue",
+          "DataMaxCardinality",
+          "DataMinCardinality",
+          "DataSomeValuesFrom",
+          "ObjectAllValuesFrom",
+          "ObjectComplementOf",
+          "ObjectExactCardinality",
+          "ObjectHasSelf",
+          "ObjectHasValue",
+          "ObjectIntersectionOf",
+          "ObjectMaxCardinality",
+          "ObjectMinCardinality",
+          "ObjectOneOf",
+          "ObjectSomeValuesFrom",
+          "ObjectUnionOf"
+        ]
+      },
+      "property": {
+        "nodes": [
+          "ObjectInverseOf",
+          "ObjectProperty"
+        ]
+      }
+    },
+    "ObjectPropertyRange": {
+      "annotations": {
+        "items": {
+          "nodes": [
+            "Annotation"
+          ]
+        }
+      },
+      "property": {
+        "nodes": [
+          "ObjectInverseOf",
+          "ObjectProperty"
+        ]
+      },
+      "range": {
+        "nodes": [
+          "Class",
+          "DataAllValuesFrom",
+          "DataExactCardinality",
+          "DataHasValue",
+          "DataMaxCardinality",
+          "DataMinCardinality",
+          "DataSomeValuesFrom",
+          "ObjectAllValuesFrom",
+          "ObjectComplementOf",
+          "ObjectExactCardinality",
+          "ObjectHasSelf",
+          "ObjectHasValue",
+          "ObjectIntersectionOf",
+          "ObjectMaxCardinality",
+          "ObjectMinCardinality",
+          "ObjectOneOf",
+          "ObjectSomeValuesFrom",
+          "ObjectUnionOf"
+        ]
+      }
+    },
+    "ObjectSomeValuesFrom": {
+      "filler": {
+        "nodes": [
+          "Class",
+          "DataAllValuesFrom",
+          "DataExactCardinality",
+          "DataHasValue",
+          "DataMaxCardinality",
+          "DataMinCardinality",
+          "DataSomeValuesFrom",
+          "ObjectAllValuesFrom",
+          "ObjectComplementOf",
+          "ObjectExactCardinality",
+          "ObjectHasSelf",
+          "ObjectHasValue",
+          "ObjectIntersectionOf",
+          "ObjectMaxCardinality",
+          "ObjectMinCardinality",
+          "ObjectOneOf",
+          "ObjectSomeValuesFrom",
+          "ObjectUnionOf"
+        ]
+      },
+      "property": {
+        "nodes": [
+          "ObjectInverseOf",
+          "ObjectProperty"
+        ]
+      }
+    },
+    "ObjectUnionOf": {
+      "operands": {
+        "items": {
+          "nodes": [
+            "Class",
+            "DataAllValuesFrom",
+            "DataExactCardinality",
+            "DataHasValue",
+            "DataMaxCardinality",
+            "DataMinCardinality",
+            "DataSomeValuesFrom",
+            "ObjectAllValuesFrom",
+            "ObjectComplementOf",
+            "ObjectExactCardinality",
+            "ObjectHasSelf",
+            "ObjectHasValue",
+            "ObjectIntersectionOf",
+            "ObjectMaxCardinality",
+            "ObjectMinCardinality",
+            "ObjectOneOf",
+            "ObjectSomeValuesFrom",
+            "ObjectUnionOf"
+          ]
+        }
+      }
+    },
+    "ReflexiveObjectProperty": {
+      "annotations": {
+        "items": {
+          "nodes": [
+            "Annotation"
+          ]
+        }
+      },
+      "property": {
+        "nodes": [
+          "ObjectInverseOf",
+          "ObjectProperty"
+        ]
+      }
+    },
+    "SWRLRule": {
+      "annotations": {
+        "items": {
+          "nodes": [
+            "Annotation"
+          ]
+        }
+      },
+      "body": {
+        "items": {
+          "nodes": [
+            "BuiltInAtom",
+            "ClassAtom",
+            "DataPropertyAtom",
+            "DataRangeAtom",
+            "DifferentIndividualsAtom",
+            "ObjectPropertyAtom",
+            "SameIndividualAtom"
+          ]
+        }
+      },
+      "head": {
+        "items": {
+          "nodes": [
+            "BuiltInAtom",
+            "ClassAtom",
+            "DataPropertyAtom",
+            "DataRangeAtom",
+            "DifferentIndividualsAtom",
+            "ObjectPropertyAtom",
+            "SameIndividualAtom"
+          ]
+        }
+      }
+    },
+    "SameIndividual": {
+      "annotations": {
+        "items": {
+          "nodes": [
+            "Annotation"
+          ]
+        }
+      },
+      "individuals": {
+        "items": {
+          "nodes": [
+            "AnonymousIndividual",
+            "NamedIndividual"
+          ]
+        }
+      }
+    },
+    "SameIndividualAtom": {
+      "first": {
+        "nodes": [
+          "AnonymousIndividual",
+          "NamedIndividual",
+          "Variable"
+        ]
+      },
+      "second": {
+        "nodes": [
+          "AnonymousIndividual",
+          "NamedIndividual",
+          "Variable"
+        ]
+      }
+    },
+    "SubAnnotationPropertyOf": {
+      "annotations": {
+        "items": {
+          "nodes": [
+            "Annotation"
+          ]
+        }
+      },
+      "sub_property": {
+        "nodes": [
+          "AnnotationProperty"
+        ]
+      },
+      "super_property": {
+        "nodes": [
+          "AnnotationProperty"
+        ]
+      }
+    },
+    "SubClassOf": {
+      "annotations": {
+        "items": {
+          "nodes": [
+            "Annotation"
+          ]
+        }
+      },
+      "sub_class": {
+        "nodes": [
+          "Class",
+          "DataAllValuesFrom",
+          "DataExactCardinality",
+          "DataHasValue",
+          "DataMaxCardinality",
+          "DataMinCardinality",
+          "DataSomeValuesFrom",
+          "ObjectAllValuesFrom",
+          "ObjectComplementOf",
+          "ObjectExactCardinality",
+          "ObjectHasSelf",
+          "ObjectHasValue",
+          "ObjectIntersectionOf",
+          "ObjectMaxCardinality",
+          "ObjectMinCardinality",
+          "ObjectOneOf",
+          "ObjectSomeValuesFrom",
+          "ObjectUnionOf"
+        ]
+      },
+      "super_class": {
+        "nodes": [
+          "Class",
+          "DataAllValuesFrom",
+          "DataExactCardinality",
+          "DataHasValue",
+          "DataMaxCardinality",
+          "DataMinCardinality",
+          "DataSomeValuesFrom",
+          "ObjectAllValuesFrom",
+          "ObjectComplementOf",
+          "ObjectExactCardinality",
+          "ObjectHasSelf",
+          "ObjectHasValue",
+          "ObjectIntersectionOf",
+          "ObjectMaxCardinality",
+          "ObjectMinCardinality",
+          "ObjectOneOf",
+          "ObjectSomeValuesFrom",
+          "ObjectUnionOf"
+        ]
+      }
+    },
+    "SubDataPropertyOf": {
+      "annotations": {
+        "items": {
+          "nodes": [
+            "Annotation"
+          ]
+        }
+      },
+      "sub_property": {
+        "nodes": [
+          "DataProperty"
+        ]
+      },
+      "super_property": {
+        "nodes": [
+          "DataProperty"
+        ]
+      }
+    },
+    "SubObjectPropertyOf": {
+      "annotations": {
+        "items": {
+          "nodes": [
+            "Annotation"
+          ]
+        }
+      },
+      "sub_property": {
+        "nodes": [
+          "ObjectInverseOf",
+          "ObjectProperty",
+          "ObjectPropertyChain"
+        ]
+      },
+      "super_property": {
+        "nodes": [
+          "ObjectInverseOf",
+          "ObjectProperty"
+        ]
+      }
+    },
+    "SymmetricObjectProperty": {
+      "annotations": {
+        "items": {
+          "nodes": [
+            "Annotation"
+          ]
+        }
+      },
+      "property": {
+        "nodes": [
+          "ObjectInverseOf",
+          "ObjectProperty"
+        ]
+      }
+    },
+    "TransitiveObjectProperty": {
+      "annotations": {
+        "items": {
+          "nodes": [
+            "Annotation"
+          ]
+        }
+      },
+      "property": {
+        "nodes": [
+          "ObjectInverseOf",
+          "ObjectProperty"
+        ]
+      }
+    },
+    "Variable": {
+      "iri": {
+        "nodes": [
+          "IRI"
+        ]
+      }
+    }
+  },
+  "entity_kinds": {
+    "AnnotationProperty": "annotation_property",
+    "Class": "class",
+    "DataProperty": "data_property",
+    "Datatype": "datatype",
+    "NamedIndividual": "named_individual",
+    "ObjectProperty": "object_property"
+  },
+  "model_schema_version": 2,
+  "package_version": "0.2.1",
+  "schema": "exact-study-owl-ast/1",
+  "source": "pyowl-core public MODEL_CONSTRUCTORS and typed entity dataclasses"
+}

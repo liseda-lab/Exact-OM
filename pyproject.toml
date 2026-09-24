@@ -13,6 +13,8 @@ packages = [
 include = [
     { path = "configs/profiles/*.yaml", format = ["sdist", "wheel"] },
     { path = "exact_inspect/static/**/*", format = ["wheel"] },
+    { path = "exact_inspect/study/migrations/*.sql", format = ["sdist", "wheel"] },
+    { path = "exact_inspect/study/owl_ast_schema.json", format = ["sdist", "wheel"] },
     { path = "release/core-compatibility.json", format = ["sdist", "wheel"] },
 ]
 exclude = ["release/evidence/**"]
@@ -41,6 +43,7 @@ httpx = "^0.28.1"
 fastapi = {version = "^0.116.1", optional = true}
 uvicorn = {version = "^0.35.0", extras = ["standard"], optional = true}
 pydantic-settings = {version = "^2.12.0", optional = true}
+psycopg = {version = ">=3.2,<4", extras = ["binary"], optional = true}
 zstandard = "^0.23.0"
 oaei-bioml-eval = {version = ">=0.2.1,<0.3", extras = ["reasoner"], optional = true}
 huggingface-hub = {version = "^0.36.2", optional = true}
@@ -62,6 +65,7 @@ repair = ["python-sat", "pysdd", "torch-geometric", "pyelk-reasoner", "pyhermit"
 bioml-eval = ["oaei-bioml-eval"]
 hf = ["huggingface-hub"]
 viz = ["fastapi", "uvicorn", "pydantic-settings"]
+study = ["fastapi", "uvicorn", "pydantic-settings", "psycopg"]
 docs = ["mkdocs-material", "mkdocstrings", "mkdocs-gen-files", "mkdocs-literate-nav", "linkchecker"]
 reasoning = ["pyelk-reasoner", "pyhermit"]
 

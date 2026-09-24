@@ -1,0 +1,9 @@
+CREATE TABLE IF NOT EXISTS study_schema (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS studies (revision TEXT PRIMARY KEY, payload TEXT NOT NULL, frozen_hash TEXT NOT NULL, allocation_count INTEGER NOT NULL DEFAULT 0, closed INTEGER NOT NULL DEFAULT 0);
+CREATE TABLE IF NOT EXISTS researcher_case_keys (study_revision TEXT PRIMARY KEY REFERENCES studies(revision), payload TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS sessions (id TEXT PRIMARY KEY, study_revision TEXT NOT NULL REFERENCES studies(revision), generation INTEGER NOT NULL, invite_digest TEXT UNIQUE NOT NULL, revoked INTEGER NOT NULL DEFAULT 0, test INTEGER NOT NULL DEFAULT 1, revision INTEGER NOT NULL DEFAULT 0, state TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS mutations (session_id TEXT NOT NULL REFERENCES sessions(id), key TEXT NOT NULL, payload_hash TEXT NOT NULL, result TEXT NOT NULL, PRIMARY KEY (session_id, key));
+CREATE TABLE IF NOT EXISTS history (session_id TEXT NOT NULL REFERENCES sessions(id), revision INTEGER NOT NULL, operation TEXT NOT NULL, payload TEXT NOT NULL, saved_at TEXT NOT NULL, PRIMARY KEY (session_id, revision));
+CREATE TABLE IF NOT EXISTS events (session_id TEXT NOT NULL REFERENCES sessions(id), event_id TEXT NOT NULL, page_id TEXT NOT NULL, sequence INTEGER NOT NULL, payload_hash TEXT NOT NULL, payload TEXT NOT NULL, received_at TEXT NOT NULL, PRIMARY KEY (session_id, event_id), UNIQUE(session_id, page_id, sequence));
+CREATE TABLE IF NOT EXISTS timing_segments (session_id TEXT NOT NULL REFERENCES sessions(id), segment_id TEXT NOT NULL, payload_hash TEXT NOT NULL, payload TEXT NOT NULL, received_at TEXT NOT NULL, PRIMARY KEY (session_id, segment_id));
+CREATE TABLE IF NOT EXISTS study_exports (export_id TEXT PRIMARY KEY, study_revision TEXT NOT NULL REFERENCES studies(revision), payload TEXT NOT NULL, created_at TEXT NOT NULL);

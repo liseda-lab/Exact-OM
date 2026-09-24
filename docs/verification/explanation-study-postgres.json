@@ -1,0 +1,74 @@
+{
+  "artifact_type": "study_recovery_verification",
+  "backup_sha256": "0b7bfa1b49a19ca40a58f4abd32532d995acf353f7395ceb551f019439fb4962",
+  "backup_size_bytes": 22555799,
+  "database": "postgres (PostgreSQL) 16.15",
+  "dependencies": {
+    "fastapi": "0.116.2",
+    "psycopg": "3.3.6",
+    "pydantic": "2.13.4"
+  },
+  "executed_at": "2026-09-24T17:30:59.662357+00:00",
+  "immutable_export_sha256": "9aaab79544b638399544757e12bd915c244190a30a5bd7f120461f528b96b063",
+  "isolated_runtime": {
+    "docker_source_set": "passed",
+    "matching_runtime_imported": false,
+    "owl_parser_imported": false,
+    "qualified_original_roundtrip": "passed",
+    "static_ast_schema_copied": true
+  },
+  "render_blueprint": {
+    "schema_sha256": "57aa0a1ff9c3b2d0fcb91b790b7b285aef6397adb0c92930e6e601054444cfe5",
+    "schema_url": "https://render.com/schema/render.yaml.json",
+    "validation": "passed against official JSON schema; no deployment performed"
+  },
+  "retention": "Private ignored local test artifacts; no production retention claim",
+  "schema_version": 1,
+  "scope_limits": [
+    "Synthetic API and database verification only",
+    "No frontend, participants, recruitment, or full experiments",
+    "No Render deployment, staging redeploy, or managed backup retention claim"
+  ],
+  "source_sha256": {
+    "exact_inspect/context_resources.py": "6969ff0527575ba58ff2b08fa12f9774bec3b86a3cab5a7b82a59438ead52b62",
+    "exact_inspect/context_semantics.py": "5d378f3df65441dbd62095101996bf139f4473483d662f55b1eebb0b172e2300",
+    "exact_inspect/study/api.py": "7c2b0de897dee73b61c2814bb72de08ca45fe53cb7951d6c7f5b31a5a730aa65",
+    "exact_inspect/study/builder.py": "6b181361db4c6647ca287f24e594dfecaa5270a703cc74bd0f4d3d8dede8ffa3",
+    "exact_inspect/study/exports.py": "c68a81bc9be88bb49cb90468e79358e7d8da73245a514945693e7c1682861b9d",
+    "exact_inspect/study/forms.py": "42d55962ef6e65b537ca05a7d8a3bc923b63763cf2ea52994a3e9bc23b2c36e3",
+    "exact_inspect/study/migrations/001_initial.sql": "d22b4e98236f03becbf4b07e6475f70fe5510aa8b22c72f9ebdd21e55298e930",
+    "exact_inspect/study/models.py": "e300ab358b95c134d3f5cba378fdaac35bef1d455252756067eef642b82dff91",
+    "exact_inspect/study/owl_ast.py": "1674d2c9793755ce51e665958bb739d31b8d97975d58bf6b0d28ad122f8e33f9",
+    "exact_inspect/study/owl_ast_schema.json": "03512e095b347d4d98770a763a3d88cca0c5a36b2bcbba9193187d0fe48cfc7f",
+    "exact_inspect/study/resources.py": "d1dde752cd080abafb8672c8942c1036adfc251049f2cb98a13ee3a38994806c",
+    "exact_inspect/study/scoring.py": "3484f993e306af7adf3d9da44fabd1b5f593edd75ee5f730349728a5f99abd46",
+    "exact_inspect/study/store.py": "d817f70219048032b9c0de04ead9aa165702883f523e94a9b17ec8ebb050b986",
+    "tests/explanation_study_resource_test.py": "e77b03a9e26b539f40734ae24f257c652306cd09b4a977c89ada3225bc83aa0d",
+    "tests/explanation_study_test.py": "95b099c39944eee5ad52efb3603d947512c2e5cd69645ce96627ea0ef8b2c03c",
+    "tools/generate_study_ast_schema.py": "189431eda28b2305d7b43548fbcf9dbacd3afe247ec5ad85000869dcfcf59293"
+  },
+  "synthetic_only": true,
+  "test_suite": {
+    "command": "python -m pytest tests/explanation_study_test.py tests/explanation_study_resource_test.py -q",
+    "errors": 0,
+    "failures": 0,
+    "seconds": 52.143,
+    "skipped": 0,
+    "tests": 42
+  },
+  "verified": [
+    "actual_server_restart",
+    "reusable_invitation",
+    "same_assignment_and_submission",
+    "same_acknowledgements_history_and_events",
+    "pg_dump_and_pg_restore_into_separate_database",
+    "same_immutable_export"
+  ],
+  "verified_row_counts": {
+    "events": 2,
+    "history": 6,
+    "mutations": 6,
+    "sessions": 1,
+    "timing_segments": 1
+  }
+}

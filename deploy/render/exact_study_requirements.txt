@@ -1,0 +1,5 @@
+# Study API only: no matcher, model, ontology parser, or frontend build.
+fastapi>=0.116.1,<1
+uvicorn[standard]>=0.35,<1
+pydantic>=2.10.6,<3
+psycopg[binary]>=3.2,<4
