@@ -117,6 +117,43 @@ It exposes no import, study or researcher mutation routes. The isolated study
 application and its durable database use a separate factory, deployment and asset
 universe. See [the study runbook](explanation-study-service.md).
 
+## Lean CPU deployment of prepared packages
+
+The `viz` extra retains Exact's training dependencies because it belongs to the
+full distribution. A prepared package can instead use the dedicated serving image:
+
+```sh
+docker build -f deploy/render/exact_inspect_prepared.Dockerfile -t exact-prepared .
+docker run --rm -p 127.0.0.1:10000:10000 \
+  -v "$PWD/demo-package:/data/package:ro" exact-prepared
+```
+
+This image installs the pinned Python 3.12 dependencies in
+`deploy/render/exact_inspect_prepared_requirements.txt` and copies only
+`exact_inspect/`. It contains no `exact` matcher package, PyTorch, Transformers or
+ontology parser. It runs the prepared CLI/API without a frontend build. The
+mounted package must have `audience: "development_demo"` for its default hosted
+profile. Health is `/api/v1/health`.
+
+For a local import library, create a writable directory and override the CLI
+arguments; the published host port remains loopback-only:
+
+```sh
+mkdir -p local-library
+docker run --rm -p 127.0.0.1:10000:10000 \
+  -v "$PWD/local-library:/data/library" exact-prepared \
+  --profile local_app --library-dir /data/library --host 0.0.0.0 --port 10000
+```
+
+Without Docker, create an isolated Python 3.12 virtual environment, install that
+requirements file, copy the release's `exact_inspect/` directory into a clean
+working directory, and run `python -m exact_inspect.cli serve` there with the same
+package/profile arguments. Copy the directory in full so the structured OWL schema
+and study resource models are present. This serving-only environment cannot run
+preparation, legacy raw-run adaptation or provider generation; those remain offline
+steps in the full Exact environment. The existing Render Dockerfile and `viz`
+extra remain available for the historical viewer.
+
 ## Interpretation and grounding
 
 Original facts preserve exact literals, datatypes, language tags, axiom IDs and
@@ -125,6 +162,8 @@ canonical original representation. Literal asserted edges, structural navigation
 inference and projected matcher features have distinct interpretation fields.
 Unavailable history never becomes a fabricated stage decision or inferred provenance.
 Saved numerical values retain their meaning; calibration is not presumed.
+Alignment eligibility is `null` when no matcher eligibility set was bound, with
+an explicit availability status; declared sets distinguish inclusion and exclusion.
 
 Generated output is admitted only when its citations belong to the frozen fact
 packet and its claims are exact supported excerpts or conservative comparison
@@ -160,6 +199,9 @@ python -m tools.prepare_explanation_demo \
 Only `--generate` enables the bound OpenRouter preparation. Use the normal authorized
 OpenRouter environment/key configuration; never put credentials in a lock or package.
 The command retains a claim audit and prints the package and execution-lock paths.
+`--additional-pairs` accepts at most four explicit public-data coverage pairs without
+scoring them. `--resume-from` reuses the frozen generation ledger when preparing
+in a new directory; a local SSD output directory avoids random network-disk writes.
 Run `verify-backend` in a fresh process to measure serving memory separately from
 preparation. Actual evidence and remaining gate limitations are recorded in the
 implementation status ledger; successful unit tests alone do not admit the frontend.

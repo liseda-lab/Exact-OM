@@ -1,0 +1,17 @@
+# Prepared exploration API, pinned for Python 3.12; no matcher or ontology parser.
+# Install into an isolated environment; copy only exact_inspect/ from the release.
+annotated-types==0.7.0
+anyio==4.14.2
+click==8.4.2
+fastapi==0.116.2
+h11==0.16.0
+idna==3.18
+pydantic==2.13.4
+pydantic-settings==2.14.2
+pydantic_core==2.46.4
+python-dotenv==1.2.2
+PyYAML==6.0.3
+starlette==0.48.0
+typing-inspection==0.4.2
+typing_extensions==4.16.0
+uvicorn==0.35.0
