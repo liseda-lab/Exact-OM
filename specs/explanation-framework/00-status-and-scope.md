@@ -2,6 +2,8 @@
 
 **Observed status at `e81865a`, 2026-09-19. All B/F acceptance gates are pending.** Verify symbols at current HEAD before work; do not assume this inventory is timeless.
 
+Current implementation evidence is maintained in the [status ledger](../../docs/verification/explanation-framework-status.json) and [backend verification report](../../docs/verification/explanation-backend-report.md). The dated inventory below remains the historical baseline.
+
 | Foundation | Implemented and reusable | Required work |
 |---|---|---|
 | Pair records | `exact/impl/models/pair_adaptive_scorer.py`: explanation schema v3, kind/IRI, scores, quality, contributions, selected evidence | Typed versioned inspection adapter; preserve decision stages and original-fact links |

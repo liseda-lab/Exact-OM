@@ -1,0 +1,180 @@
+{
+  "schema": "exact-backend-regression/1",
+  "recorded_at": "2026-09-24T18:22:02.949930+00:00",
+  "implementation_revision": "f4b411760e50da1a58587362cec64cc6f9cec608",
+  "focused_followups": [
+    {
+      "command": ".venv/bin/pytest -q tests/explanation_context_test.py tests/explanation_export_policy_test.py tests/explanation_read_models_test.py tests/explanation_preparation_test.py --tb=short",
+      "passed": 40,
+      "scope": "Eligibility and default checkpoint compatibility, policy preservation, typed reads; agent-verified result"
+    },
+    {
+      "command": ".venv/bin/pytest -q tests/explanation_read_models_test.py tests/explanation_decisions_test.py --tb=short",
+      "passed": 21,
+      "seconds": 53.44,
+      "log": "data/explanation-framework-read-isolation.log",
+      "scope": "Includes fresh-process saved pair API with exact/pandas/torch/pyowl/transformers/OpenAI imports forbidden"
+    },
+    {
+      "command": ".venv/bin/pytest -q tests/explanation_sqlite_safety_test.py tests/explanation_framework_test.py tests/explanation_read_models_test.py --tb=short",
+      "passed": 38,
+      "seconds": 4.16,
+      "log": "data/explanation-framework-metadata-boundary.log",
+      "scope": "Metadata limits and fixed database locators, public API isolation and policy boundaries"
+    },
+    {
+      "command": ".venv/bin/pytest -q tests/explanation_recovery_test.py --tb=short",
+      "passed": 10,
+      "seconds": 3.4,
+      "log": "data/explanation-framework-process-recovery.log",
+      "scope": "Abrupt process exit after durable response-save, copy/replay with dispatch forbidden, classifier repair reusing unchanged records, and accounting with unmeasured historical attempts."
+    },
+    {
+      "command": ".venv/bin/python -m pytest tests/openrouter_ledger_test.py tests/llm_routing_test.py tests/validation_resume_test.py -q",
+      "passed": 107,
+      "warnings": 1,
+      "seconds": 21.58,
+      "log": "data/explanation-framework/matcher/provider-timing-regression.log",
+      "log_sha256": "sha256:c5da85aae94085b3844b227612de3b1a96e4bd03822b77e020edd6b10d1aaf0c",
+      "scope": "Backwards-compatible nullable timing migration, concurrent migration, replay, HTTP rejection/retry and ambiguous failure timing; no live providers."
+    },
+    {
+      "command": ".venv/bin/python -m pytest tests/explanation_handoff_test.py -q",
+      "passed": 17,
+      "seconds": 22.47,
+      "scope": "Content-bound public handoff, failed/stale gate evidence, source-context/policy/resource identity, copied bytes and parser-free publication; agent-verified result."
+    },
+    {
+      "command": ".venv/bin/pytest -q tests/explanation_export_policy_test.py tests/explanation_preparation_test.py tests/explanation_handoff_test.py",
+      "passed": 29,
+      "seconds": 28.87,
+      "log": "data/explanation-framework-portable-provenance.log",
+      "scope": "Derivative provenance survives physical filtering and republishing without copying private notes.",
+      "log_sha256": "sha256:7a08ef193ed19627fba5eab8d93db8d02e7ebb136eba7d4714cd97f4eaf49774"
+    },
+    {
+      "command": ".venv/bin/python -m pytest tests/explanation_read_models_test.py tests/explanation_preparation_test.py tests/explanation_http_runtime_test.py -q",
+      "passed": 16,
+      "seconds": 38.87,
+      "log": "data/explanation-framework/matcher/ontology-metadata-regression.log",
+      "scope": "Lazy bounded ontology capabilities and public metadata across API, preparation and HTTP checks.",
+      "log_sha256": "sha256:739e1a336edd5f9f4c436fe6847022cef11070f8ee8d1ec59f7e5dccf9af1291"
+    },
+    {
+      "command": ".venv/bin/python -m pytest tests/explanation_read_models_test.py -q",
+      "passed": 6,
+      "seconds": 7.82,
+      "log": "data/explanation-framework/matcher/ontology-metadata-final.log",
+      "scope": "Final metadata shape validation and immutable cached metadata; no database reader construction.",
+      "log_sha256": "sha256:e0162c2659929904e497dcf3b1f38a88dd2457fba57684171502cb8e71ba3de9"
+    },
+    {
+      "command": ".venv/bin/pytest -q tests/explanation_context_test.py tests/explanation_export_policy_test.py tests/explanation_sqlite_safety_test.py",
+      "passed": 47,
+      "seconds": 8.97,
+      "scope": "Context/export/SQLite regression after alternate-definition verification-tool correction; agent execution session 82649; no redirected log retained."
+    },
+    {
+      "command": ".venv/bin/python -m pytest tests/explanation_handoff_test.py -q",
+      "passed": 24,
+      "seconds": 32.16,
+      "log": "data/explanation-framework/matcher/handoff-http-regression.log",
+      "log_sha256": "sha256:f03f96388eebf9708a873e3e9f4ab1180b818d78d8ee64f310fdfddbbc891f33",
+      "scope": "Final publication with separate sanitized real-HTTP metadata, package identity, failed resource-gate rejection, private command/path omission and CLI argument coverage."
+    }
+  ],
+  "postgres_receipt": "docs/verification/explanation-study-postgres.json",
+  "architectural_contracts": {
+    "kept": 5,
+    "broken": 0
+  },
+  "priority_docstrings": {
+    "coverage_percent": 82.7,
+    "minimum_percent": 80
+  },
+  "no_frontend_changes": true,
+  "no_live_provider_tests_in_hermetic_suite": true,
+  "no_full_scale_experiments": true,
+  "earlier_clean_suite": {
+    "command": ".venv/bin/pytest -q -m 'not requires_data and not slow and not requires_cuda and not requires_openrouter and not requires_llm' --ignore=tests/align_api_test_suit.py --ignore=tests/tune_api_test.py --ignore=tests/prompt --tb=short --maxfail=5",
+    "passed": 1497,
+    "skipped": 1,
+    "deselected": 9,
+    "warnings": 19,
+    "seconds": 431.85,
+    "log": "data/explanation-framework-regression-final.log",
+    "log_sha256": "21b5f514a1a23acaf612ff0264597fcf90642e299d0a32745afab1fc9823b8ca",
+    "scope": "Full hermetic run before final eligibility/read-import/recovery followups; those have separate focused verification."
+  },
+  "full_suite": {
+    "command": ".venv/bin/pytest -q -m 'not requires_data and not slow and not requires_cuda and not requires_openrouter and not requires_llm' --ignore=tests/align_api_test_suit.py --ignore=tests/tune_api_test.py --ignore=tests/prompt --tb=short --maxfail=5",
+    "passed": 1508,
+    "failed": 1,
+    "skipped": 1,
+    "deselected": 9,
+    "warnings": 19,
+    "seconds": 556.88,
+    "log": "data/explanation-framework-regression-complete.log",
+    "log_sha256": "sha256:19d7a49a40d0a408264e33cfe2ced4057d9771474fe077a9ee71c530f1723ec8",
+    "scope": "Hermetic suite including latest metadata hardening and operational HTTP checks; one existing interruption subprocess reached its unchanged 60-second timeout during network-filesystem contention.",
+    "failed_test": "tests/run_artifacts_acceptance_test.py::test_hard_interruption_resume_and_finalization_match_uninterrupted_run",
+    "recheck": {
+      "command": ".venv/bin/pytest -q tests/run_artifacts_acceptance_test.py::test_hard_interruption_resume_and_finalization_match_uninterrupted_run --tb=short",
+      "status": "passed",
+      "passed": 1,
+      "seconds": 29.66,
+      "log": "data/explanation-framework-regression-timeout-recheck.log",
+      "log_sha256": "sha256:cc6aac8b564f523161a09a551675358e98863c8f108b8936da755fc5ad506b06",
+      "test_changed": false
+    }
+  },
+  "typecheck": {
+    "command": ".venv/bin/mypy exact exact_inspect study_visualizer_runtime",
+    "source_files": 274,
+    "status": "passed"
+  },
+  "status": "passed",
+  "disposition": "The full hermetic suite had one existing subprocess timeout; the unchanged failed test passed its isolated recheck. Subsequent additions have focused passing verification.",
+  "specification_validation": {
+    "command": ".venv/bin/python specs/explanation-framework/protocol/validate_specs.py",
+    "scope": "specification artifacts only; not backend acceptance",
+    "status": "passed",
+    "json_files": 24,
+    "schema_fixtures": 13,
+    "local_links": 86,
+    "study_schedules": 8,
+    "scoring_oracles": 9,
+    "errors": [],
+    "log": "data/explanation-framework-specs-complete.log"
+  },
+  "distribution_build": {
+    "status": "passed",
+    "command": "poetry build --output data/explanation-framework/distributions",
+    "artifacts": [
+      {
+        "path": "data/explanation-framework/distributions/exact_om-2.1.0-py3-none-any.whl",
+        "sha256": "sha256:b47f6daaa13fe5c6c119dfd75acd44c1aa3e4d18f6562900e7b615cb6b627557",
+        "size_bytes": 1639366,
+        "required_files_present": true
+      },
+      {
+        "path": "data/explanation-framework/distributions/exact_om-2.1.0.tar.gz",
+        "sha256": "sha256:822cde1ec60f8aa0d20ef94c5794c11eb7cb156d5acf04840dadaed92f27f489",
+        "size_bytes": 920448,
+        "required_files_present": true
+      }
+    ]
+  },
+  "final_followup_typechecks": {
+    "status": "passed",
+    "commands": [
+      ".venv/bin/mypy exact_inspect/context_export.py exact_inspect/preparation.py tools/publish_explanation_handoff.py"
+    ],
+    "scope": "Final changed runtime, publication, and operational verification modules; Black/isort/flake8 passed for changed source.",
+    "agent_verified_additional_modules": [
+      "exact_inspect/service.py",
+      "tools/validate_context_runtime.py"
+    ],
+    "log": "data/explanation-framework-provenance-mypy.log"
+  }
+}

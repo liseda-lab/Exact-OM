@@ -1,0 +1,316 @@
+{
+  "schema": "exact-backend-operational-evidence/1",
+  "status": "passed",
+  "scope": "Bounded backend verification with full pinned NCIT root and declared DOID derivative root; original-DOID strict admission remains blocked.",
+  "recorded_at": "2026-09-24T19:33:43.255418+00:00",
+  "implementation_revision": "f4b411760e50da1a58587362cec64cc6f9cec608",
+  "package": {
+    "path": "data/explanation-framework/backend-release/package/package.json",
+    "sha256": "sha256:be7692ee44381c67b0e2f040205240d897a0c98e8b77704b973704000224d4ac",
+    "status": "passed",
+    "package_id": "sha256:3007654bfaf24a6fd24fe375aea1f69f99533e67c3d7e9820af735b703d1acd6",
+    "artifact_count": 46,
+    "total_artifact_bytes": 10363924548
+  },
+  "policy_hash": "sha256:0e0902498acb58bcd7ee5e1ccc706edd53cf08c7850e27f5cd9a8023702e80c8",
+  "contexts": {
+    "NCIT": {
+      "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9",
+      "root_sha256": "sha256:1a7182a7327ebc4181f7d6b0f7e81ed04dd258f1a86bd8f560e4a0d61439d58a",
+      "scope": "root",
+      "raw": {
+        "sha256": "sha256:fd1cbbc0cfc90750db24e3bde46755e0d22e8d7c149508b11e68de186bc00b5b",
+        "size_bytes": 24576880640,
+        "completeness": {
+          "axiom_count": 3506377,
+          "domain_completeness": "not_established",
+          "entity_count": 212055,
+          "extraction": "complete",
+          "imports_complete": true,
+          "scope": "root"
+        }
+      },
+      "portable": {
+        "sha256": "sha256:bc1ad13c2eb4d1b00d5ef627b06a80e064b264fd3e5dc4d2a4c5c89f5f0ed738",
+        "size_bytes": 9914359808,
+        "completeness": {
+          "axiom_count": 1798045,
+          "category_counts": {
+            "axioms": 212418,
+            "characteristics": 13,
+            "comments": 3,
+            "definition_citations": 2,
+            "definitions": 174618,
+            "domains": 86,
+            "hierarchy": 209562,
+            "labels": 424405,
+            "ranges": 232,
+            "restrictions": 82924,
+            "synonyms": 693782
+          },
+          "domain_completeness": "not_established",
+          "entity_count": 212055,
+          "extraction": "complete_for_policy",
+          "imports_complete": true,
+          "scope": "root"
+        },
+        "source_derivation": null
+      },
+      "resource": {
+        "path": "data/explanation-framework/context/resources/ncit.ofn.receipt.json",
+        "sha256": "sha256:f8835f4ddf83aa67f3eab6fbc97ff4b2e53f1cfe41b3f8737a10be3cc2b9fe8c",
+        "status": "passed"
+      },
+      "resource_parity": {
+        "path": "data/explanation-framework/context/resources/ncit.context-parity.json",
+        "sha256": "sha256:377c4ee64e93f964cd9ed91509f00c3445beaf60624637a7f0c4ac095d59e8e3",
+        "status": "passed"
+      }
+    },
+    "DOID": {
+      "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500",
+      "root_sha256": "sha256:f552e866a6233add0c02e5fed1ac1b0236c36c7f92247ed8c3a2a522ecc88fbb",
+      "scope": "root",
+      "raw": {
+        "sha256": "sha256:0d74b600700268df3faeaad671ef399b2edd705080929a7d6ba551a4c412cb92",
+        "size_bytes": 1067286528,
+        "completeness": {
+          "axiom_count": 177912,
+          "domain_completeness": "not_established",
+          "entity_count": 16395,
+          "extraction": "complete",
+          "imports_complete": false,
+          "scope": "root"
+        }
+      },
+      "portable": {
+        "sha256": "sha256:d18cc163a3bcc4546029e08e347fe7d896848353fcb03df95cda3bd25660c99a",
+        "size_bytes": 448765952,
+        "completeness": {
+          "axiom_count": 91530,
+          "category_counts": {
+            "axioms": 14790,
+            "characteristics": 20,
+            "comments": 1122,
+            "definitions": 10568,
+            "hierarchy": 17222,
+            "labels": 14768,
+            "restrictions": 10349,
+            "synonyms": 22691
+          },
+          "domain_completeness": "not_established",
+          "entity_count": 16395,
+          "extraction": "complete_for_policy",
+          "imports_complete": false,
+          "scope": "root"
+        },
+        "source_derivation": {
+          "original_source_sha256": "sha256:611355c445537fcf4bae2c519f1b3598af5a8fea793274316e35525b7d05e945",
+          "receipt_hash": "sha256:6a1d35517cee385a8ce5a07f80342b33f8168455aa6370f1534742d192cb76cb",
+          "status": "declared_derivative"
+        }
+      },
+      "resource": {
+        "path": "data/explanation-framework/context/resources/doid.ofn.receipt.json",
+        "sha256": "sha256:9cad3ae40290d9d4aa169022180d6ced0433cb46513180d76c8165810312987d",
+        "status": "passed"
+      },
+      "resource_parity": {
+        "path": "data/explanation-framework/context/resources/doid.context-parity.json",
+        "sha256": "sha256:ae54e0d2481724f1b4cf5e6e5971a5e8ead4c49c73cb98e506423489fb63eda7",
+        "status": "passed"
+      }
+    }
+  },
+  "generation": {
+    "active_outputs": 40,
+    "all_supported": true,
+    "by_task": {
+      "entity_profile": {
+        "outputs": 25,
+        "generation_statuses": {
+          "validated": 22,
+          "failed": 3
+        },
+        "claims": 88,
+        "grounding_statuses": {
+          "validated": 25
+        }
+      },
+      "pair_comparison": {
+        "outputs": 15,
+        "generation_statuses": {
+          "validated": 10,
+          "failed": 5
+        },
+        "claims": 82,
+        "grounding_statuses": {
+          "validated": 15
+        }
+      }
+    },
+    "provider_accounting": {
+      "attempt_states": {
+        "completed": 79
+      },
+      "attempts_without_returned_cost": 0,
+      "completion_tokens": 26629,
+      "prompt_tokens": 457295,
+      "provider_latency": {
+        "mean_seconds": 4.293449417540194,
+        "measured_attempts": 52,
+        "p95_seconds": 6.49298384017311,
+        "scope": "Actual HTTP attempts only; old attempts remain unmeasured. Replay, validation and read API latency are excluded.",
+        "total_seconds": 223.25936971209012,
+        "unmeasured_attempts": 27
+      },
+      "returned_cost_usd": 0.06680205,
+      "scope": "All actual wire attempts in this preparation ledger; copied response checkpoints are not charged again.",
+      "status": "recorded",
+      "validator_replays_without_dispatch": 24,
+      "wire_attempts": 79
+    },
+    "claim_audit": {
+      "path": "data/explanation-framework/prepared-combined/claim-audit.json",
+      "sha256": "sha256:c463a8f24a4ea31964f4153f4e657ed72830f6de184244d21abd51afacfb6dc0",
+      "status": "passed"
+    },
+    "explanation": "Failed generation retains supported factual fallback; generation failure is never relabeled as validated."
+  },
+  "http": {
+    "receipt": {
+      "path": "data/explanation-framework/combined-http-verification/http-runtime.json",
+      "sha256": "sha256:409c0669e4a40eef9e15e1f419825e9ad59e849147e288c036126349dc5b61b6",
+      "status": "passed"
+    },
+    "checks": {
+      "bounded_reads": "passed",
+      "cold_entity_queries": "passed",
+      "cold_service_health": "passed",
+      "no_runtime_imports": "passed",
+      "serving_memory": "passed",
+      "warm_read_p95": "passed"
+    },
+    "measurements": {
+      "cold_entity_queries": [
+        {
+          "bytes": 28536,
+          "error": null,
+          "query": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_17",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "route": "/api/v1/entity-context",
+          "seconds": 0.06719959317706525,
+          "status": 200,
+          "within_response_budget": true
+        },
+        {
+          "bytes": 49307,
+          "error": null,
+          "query": {
+            "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C107377",
+            "kind": "class",
+            "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9"
+          },
+          "route": "/api/v1/entity-context",
+          "seconds": 0.028482045978307724,
+          "status": 200,
+          "within_response_budget": true
+        }
+      ],
+      "cold_health_seconds": 9.469437777996063,
+      "context_p95_seconds": 0.105934401974082,
+      "memory_source": "child /proc/PID/status VmHWM",
+      "pair_p95_seconds": 0.05833479901775718,
+      "peak_rss_bytes": 61534208,
+      "query_count": 100,
+      "readers": 4
+    },
+    "runtime": {
+      "hardware": {
+        "cpu": "AMD Ryzen 5 3600X 6-Core Processor",
+        "logical_cpus": 12,
+        "memory_bytes": 135015358464,
+        "platform": "Linux-6.8.0-139-generic-x86_64-with-glibc2.39"
+      },
+      "packages": {
+        "fastapi": "0.116.2",
+        "httpx": "0.28.1",
+        "pydantic": "2.13.4",
+        "uvicorn": "0.35.0"
+      },
+      "python": "3.12.3"
+    },
+    "scope": "Fresh CLI interpreter and real loopback HTTP, including framework imports, full artifact admission, and import-audit overhead. OS page cache is not flushed; startup health polling adds up to one polling interval. Memory belongs to the child, not the preparing/test process. No matching, ontology parsing, model loading or generation is requested. Network provider calls and GPU allocations are not independently instrumented; import observations are reported separately.",
+    "storage_profile": "local-ssd"
+  },
+  "backend_verifier": {
+    "path": "data/explanation-framework/combined-verification/verification.json",
+    "sha256": "sha256:1e50c1cd2b03cedcec2803bad61726891f7f76dbfce4a1d336bdf5da8b708c8c",
+    "status": "passed",
+    "checks": {
+      "bounded_reads": "passed",
+      "cold_entity_queries": "passed",
+      "cold_service_health": "passed",
+      "package_integrity": "passed",
+      "serving_memory": "passed",
+      "warm_read_p95": "passed"
+    },
+    "measurements": {
+      "cold_entity_seconds": [
+        0.18284082412719727,
+        0.01419577281922102
+      ],
+      "cold_health_seconds": 6.744205899070948,
+      "context_p95_seconds": 0.09954754286445677,
+      "integrity_verification_seconds": 6.185075707966462,
+      "pair_p95_seconds": 0.008665987057611346,
+      "peak_rss_kib": 62272,
+      "query_count": 100,
+      "readers": 4,
+      "warm_p95_seconds": 0.09953121998114511
+    }
+  },
+  "imported_run_audit": {
+    "path": "data/explanation-framework/combined-import-audit.json",
+    "sha256": "sha256:89c38c6d130f69a98d26a519c2c227c7768f2658bd7ab22f1f92c5f2d202cb0d",
+    "status": "passed"
+  },
+  "isolated_runtime_invocation": {
+    "path": "data/explanation-framework/combined-audit-invocation.json",
+    "sha256": "sha256:8be3a77881415136e403a952551601ca2a6590c755e6147357b97eb7fe189ce3",
+    "status": "passed"
+  },
+  "real_study_fixtures": {
+    "path": "data/explanation-framework/combined-verification/real-study-fixtures.json",
+    "sha256": "sha256:b3d9d0adbcad18ccce3c98318bbe985bc7b05d62aa924a0c36e93ed8a3114a86",
+    "status": "passed"
+  },
+  "development_coverage": {
+    "path": "docs/verification/explanation-development-coverage.json",
+    "sha256": "sha256:ff1b47084c1d5ba6d9e7fa55b05110098d09b0229e5be19d61ba120aaec72d75",
+    "status": "passed"
+  },
+  "persistence": {
+    "path": "data/explanation-framework/preparation-persistence.json",
+    "sha256": "sha256:1543a8f28b65ecb11409c224c3ec89f4ef49aa7237c0d87728c69cd52ee46979",
+    "status": "passed"
+  },
+  "portability": {
+    "path": "data/explanation-framework/doid-portability-verification.json",
+    "sha256": "sha256:3b04fb44bf6044302c1dabd5b797439ba9c2fa8a86801b699af81169b19a3317",
+    "status": "passed",
+    "scope": "Full DOID package: archive, HTTP import, selection, restart, demo isolation and isolated runtime; combined package has separate hash-verified persistence and HTTP checks."
+  },
+  "limits": {
+    "original_doid_strict": "blocked_input",
+    "frontend": "not_implemented",
+    "full_campaign": "not_run",
+    "public_deployment": "not_run",
+    "docker_build": "not_run",
+    "physical_64_GiB_node": "not_tested",
+    "os_page_cache_flushed": false
+  }
+}

@@ -1,0 +1,85 @@
+{
+  "artifact_directory": "data/explanation-framework/matcher",
+  "comparison_receipt": "data/explanation-framework/matcher/fidelity-comparison.json",
+  "encoder_snapshot": "sentence-transformers/all-MiniLM-L6-v2@1110a243fdf4706b3f48f1d95db1a4f5529b4d41",
+  "encoder_weight_sha256": "sha256:53aa51172d142c89d9012cce15ae4d6cc0ca6895895114379cacb4fab128d9db",
+  "fidelity": {
+    "baseline_export_report": "sha256:932cf75b27e17760fbff2704af1f2399b4d3c23ac991fbf3ccf34b3f0f405777",
+    "baseline_revision": "2cd156d642ae25c630d1a7de58bf5ccc4cd33510",
+    "baseline_root_scope_support_patch": "sha256:de90a136897700514a87f747e9d9c8ba94f9c39cb98f366477b3a049430775e2",
+    "candidate_count": 12,
+    "checks": {
+      "all_original_numeric_paths_preserved": true,
+      "all_shared_numeric_values_exactly_equal": true,
+      "candidate_order_identical": true,
+      "final_mapping_file_identical": true,
+      "selected_evidence_display_and_order_identical": true
+    },
+    "current_export_report": "sha256:57d3c34f8d6c884a04eeb4ee28b8e98829047ac2cc3caf811296c9642ea89166",
+    "current_mapping": "sha256:1d86ffafc461dd17c3949d3f5ee2dbb1031f3f580fd6ca9d7eaa4dc8f913f6de",
+    "llm_calls": 0,
+    "model_training": "not_run",
+    "purpose": "bounded_observability_fidelity_check",
+    "reference_evaluation": "not_run",
+    "reference_labels_used": false,
+    "schema_version": 1,
+    "shared_numeric_values_checked": 1974,
+    "status": "pass"
+  },
+  "fixture_provenance": "actual_current_and_prechange_matcher_outputs",
+  "hardware_profile": "128 GiB alternate node; CPU-only validation; two threads per matcher",
+  "limitations": [
+    "The first 12 TRAIN pairs selected no restriction-derived evidence; separate declared two-pair restriction coverage is recorded in explanation-restriction-probe.json.",
+    "The initial frozen current run predates projector-alias provenance lookup; object-channel missing origins are retained honestly and can be linked by the exact semantic adapter.",
+    "Baseline used the prechange matcher at the recorded revision with only the same explicit root-only source-loader option transplanted; its support patch hash is recorded.",
+    "Initial default-import attempts stopped before scoring on unresolved DOID ext.owl; final runs explicitly ignored imports and disclose root scope."
+  ],
+  "manifest_publication": {
+    "existing_file_count": 17,
+    "existing_files_unchanged": true,
+    "manifest_path": "current-12-root/run_manifest.json",
+    "manifest_sha256": "sha256:259647a76851cbd35c04e29ea66705010785ac06d8ff53155f29ef9a788c184c",
+    "operation": "append_standard_run_manifest"
+  },
+  "pairs_sha256": "sha256:e295deceb202c0fd6dda78a80b4055b9d08430df3a0301d054abaad55f05087f",
+  "producer_provenance_counts": {
+    "attributes:available": 119,
+    "difference:provenance_unavailable": 72,
+    "hierarchy:available": 55,
+    "similarity:provenance_unavailable": 48
+  },
+  "prohibited_work_not_run": [
+    "training",
+    "candidate_generation",
+    "benchmark_evaluation",
+    "LLM_generation",
+    "full_matching_campaign"
+  ],
+  "resources": {
+    "baseline-12-root": {
+      "exit_status": 0,
+      "peak_rss_kib": 12404620,
+      "wall_time": "11:41.74"
+    },
+    "current-12-root": {
+      "exit_status": 0,
+      "peak_rss_kib": 12404812,
+      "wall_time": "11:47.21"
+    }
+  },
+  "runtime": {
+    "pandas": "2.3.3",
+    "pydantic": "2.13.4",
+    "pyowl-core": "0.2.1",
+    "pyowl2vec-star-projector": "0.2.1",
+    "sentence-transformers": "2.7.0",
+    "torch": "2.7.0+cu128"
+  },
+  "schema_version": "exact-explanation-matcher-verification/1",
+  "scope": "12 public TRAIN pairs, full pinned NCIT and normalized DOID roots; CPU operational validation only",
+  "separate_restriction_probe_receipt": "docs/verification/explanation-restriction-probe.json",
+  "source_sha256": "sha256:1a7182a7327ebc4181f7d6b0f7e81ed04dd258f1a86bd8f560e4a0d61439d58a",
+  "status": "pass",
+  "target_sha256": "sha256:f552e866a6233add0c02e5fed1ac1b0236c36c7f92247ed8c3a2a522ecc88fbb",
+  "validation_tool": "tools/validate_explanation_export.py"
+}

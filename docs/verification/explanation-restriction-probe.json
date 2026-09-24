@@ -1,0 +1,330 @@
+{
+  "artifacts": {
+    "explanations_sha256": "sha256:145a3426e91fabdf92665b7d8907dbc18b0dfde7de303cdd9d01d2fb0893eb05",
+    "probe_script_sha256": "sha256:4d9213ffa93720eb638d7413bb0fb4216fdf915aab3fdc4c255a4aa500ee1671",
+    "report_sha256": "sha256:d56ae7011dbc2e1109a7d5c3f54efcaf9681f28c8bc8e787737be2b1eb184b6b"
+  },
+  "candidate_count": 2,
+  "configuration": {
+    "hierarchical_relation_families": {
+      "is_a": {
+        "iri_aliases": [
+          "http://subclassof",
+          "http://www.w3.org/2000/01/rdf-schema#subClassOf"
+        ]
+      }
+    },
+    "purpose": "Expose genuine existential restrictions in selected object-edge evidence using a separate declared dataset profile; no changes to default scoring or the 12-pair baseline comparison."
+  },
+  "evaluation_run": false,
+  "full_experiment": false,
+  "limitations": [
+    "Two self-pairs test serialization and original-fact linking, not alignment quality.",
+    "One preceding default-profile two-pair attempt completed but selected only hierarchy-derived object evidence; this separately declared profile exercises existential restrictions."
+  ],
+  "llm_run": false,
+  "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500",
+  "original_restriction_links": [
+    {
+      "channel": "similarity",
+      "fact_ids": [
+        "sha256:742f6501cc82c9cb49227c7a51c9fa774bdfd21e460dab8a54fecafe76d5d9bb"
+      ],
+      "feature_subject": "http://purl.obolibrary.org/obo/DOID_0080189",
+      "filler": "http://purl.obolibrary.org/obo/UBERON_0007798",
+      "pair_source": "http://purl.obolibrary.org/obo/DOID_176",
+      "predicate": "http://purl.obolibrary.org/obo/RO_0004026",
+      "side": "source",
+      "source_axiom_refs": [
+        "sha256:05471e636fb879fd2c07a6c209dda3f5c97416cd5c60d32d3cfa9d7f680a8b1a"
+      ]
+    },
+    {
+      "channel": "similarity",
+      "fact_ids": [
+        "sha256:384603ff434dc594846ddbf6cf4b6e52c05faca5ae3ade2810ba7477ce965070"
+      ],
+      "feature_subject": "http://purl.obolibrary.org/obo/DOID_175",
+      "filler": "http://purl.obolibrary.org/obo/UBERON_0007798",
+      "pair_source": "http://purl.obolibrary.org/obo/DOID_176",
+      "predicate": "http://purl.obolibrary.org/obo/RO_0004026",
+      "side": "source",
+      "source_axiom_refs": [
+        "sha256:8582ff6bbb85e76427e8293765ed0b8b10fb56ac17bf5f23751fd608b68bce09"
+      ]
+    },
+    {
+      "channel": "similarity",
+      "fact_ids": [
+        "sha256:742f6501cc82c9cb49227c7a51c9fa774bdfd21e460dab8a54fecafe76d5d9bb"
+      ],
+      "feature_subject": "http://purl.obolibrary.org/obo/DOID_0080189",
+      "filler": "http://purl.obolibrary.org/obo/UBERON_0007798",
+      "pair_source": "http://purl.obolibrary.org/obo/DOID_176",
+      "predicate": "http://purl.obolibrary.org/obo/RO_0004026",
+      "side": "target",
+      "source_axiom_refs": [
+        "sha256:05471e636fb879fd2c07a6c209dda3f5c97416cd5c60d32d3cfa9d7f680a8b1a"
+      ]
+    },
+    {
+      "channel": "similarity",
+      "fact_ids": [
+        "sha256:384603ff434dc594846ddbf6cf4b6e52c05faca5ae3ade2810ba7477ce965070"
+      ],
+      "feature_subject": "http://purl.obolibrary.org/obo/DOID_175",
+      "filler": "http://purl.obolibrary.org/obo/UBERON_0007798",
+      "pair_source": "http://purl.obolibrary.org/obo/DOID_176",
+      "predicate": "http://purl.obolibrary.org/obo/RO_0004026",
+      "side": "target",
+      "source_axiom_refs": [
+        "sha256:8582ff6bbb85e76427e8293765ed0b8b10fb56ac17bf5f23751fd608b68bce09"
+      ]
+    },
+    {
+      "channel": "difference",
+      "fact_ids": [
+        "sha256:742f6501cc82c9cb49227c7a51c9fa774bdfd21e460dab8a54fecafe76d5d9bb"
+      ],
+      "feature_subject": "http://purl.obolibrary.org/obo/DOID_0080189",
+      "filler": "http://purl.obolibrary.org/obo/UBERON_0007798",
+      "pair_source": "http://purl.obolibrary.org/obo/DOID_176",
+      "predicate": "http://purl.obolibrary.org/obo/RO_0004026",
+      "side": "source",
+      "source_axiom_refs": [
+        "sha256:05471e636fb879fd2c07a6c209dda3f5c97416cd5c60d32d3cfa9d7f680a8b1a"
+      ]
+    },
+    {
+      "channel": "difference",
+      "fact_ids": [
+        "sha256:384603ff434dc594846ddbf6cf4b6e52c05faca5ae3ade2810ba7477ce965070"
+      ],
+      "feature_subject": "http://purl.obolibrary.org/obo/DOID_175",
+      "filler": "http://purl.obolibrary.org/obo/UBERON_0007798",
+      "pair_source": "http://purl.obolibrary.org/obo/DOID_176",
+      "predicate": "http://purl.obolibrary.org/obo/RO_0004026",
+      "side": "source",
+      "source_axiom_refs": [
+        "sha256:8582ff6bbb85e76427e8293765ed0b8b10fb56ac17bf5f23751fd608b68bce09"
+      ]
+    },
+    {
+      "channel": "difference",
+      "fact_ids": [
+        "sha256:0c3766b1cc50f614921f7ac58e667ae46c36ab9b5fd32dbddccc4d8804155570"
+      ],
+      "feature_subject": "http://purl.obolibrary.org/obo/DOID_178",
+      "filler": "http://purl.obolibrary.org/obo/UBERON_0007798",
+      "pair_source": "http://purl.obolibrary.org/obo/DOID_176",
+      "predicate": "http://purl.obolibrary.org/obo/RO_0004026",
+      "side": "source",
+      "source_axiom_refs": [
+        "sha256:f5e60ef66a9e3ef0139d34b903c039183a9fddc647fd5b1a885b2df677477192"
+      ]
+    },
+    {
+      "channel": "difference",
+      "fact_ids": [
+        "sha256:742f6501cc82c9cb49227c7a51c9fa774bdfd21e460dab8a54fecafe76d5d9bb"
+      ],
+      "feature_subject": "http://purl.obolibrary.org/obo/DOID_0080189",
+      "filler": "http://purl.obolibrary.org/obo/UBERON_0007798",
+      "pair_source": "http://purl.obolibrary.org/obo/DOID_176",
+      "predicate": "http://purl.obolibrary.org/obo/RO_0004026",
+      "side": "target",
+      "source_axiom_refs": [
+        "sha256:05471e636fb879fd2c07a6c209dda3f5c97416cd5c60d32d3cfa9d7f680a8b1a"
+      ]
+    },
+    {
+      "channel": "difference",
+      "fact_ids": [
+        "sha256:384603ff434dc594846ddbf6cf4b6e52c05faca5ae3ade2810ba7477ce965070"
+      ],
+      "feature_subject": "http://purl.obolibrary.org/obo/DOID_175",
+      "filler": "http://purl.obolibrary.org/obo/UBERON_0007798",
+      "pair_source": "http://purl.obolibrary.org/obo/DOID_176",
+      "predicate": "http://purl.obolibrary.org/obo/RO_0004026",
+      "side": "target",
+      "source_axiom_refs": [
+        "sha256:8582ff6bbb85e76427e8293765ed0b8b10fb56ac17bf5f23751fd608b68bce09"
+      ]
+    },
+    {
+      "channel": "difference",
+      "fact_ids": [
+        "sha256:0c3766b1cc50f614921f7ac58e667ae46c36ab9b5fd32dbddccc4d8804155570"
+      ],
+      "feature_subject": "http://purl.obolibrary.org/obo/DOID_178",
+      "filler": "http://purl.obolibrary.org/obo/UBERON_0007798",
+      "pair_source": "http://purl.obolibrary.org/obo/DOID_176",
+      "predicate": "http://purl.obolibrary.org/obo/RO_0004026",
+      "side": "target",
+      "source_axiom_refs": [
+        "sha256:f5e60ef66a9e3ef0139d34b903c039183a9fddc647fd5b1a885b2df677477192"
+      ]
+    },
+    {
+      "channel": "similarity",
+      "fact_ids": [
+        "sha256:46ee1748d358a640f2acb07864b2bd65e38278b5ddf845a5daf33e1c71be9362"
+      ],
+      "feature_subject": "http://purl.obolibrary.org/obo/DOID_0050156",
+      "filler": "http://purl.obolibrary.org/obo/GENO_0000147",
+      "pair_source": "http://purl.obolibrary.org/obo/DOID_0080422",
+      "predicate": "http://purl.obolibrary.org/obo/IDO_0000664",
+      "side": "source",
+      "source_axiom_refs": [
+        "sha256:b2d81c87027e55a623fcd48fdc72fddabba328b5407de2a95ad80a06421ffb54"
+      ]
+    },
+    {
+      "channel": "similarity",
+      "fact_ids": [
+        "sha256:a2034d312647bace0affa4b7b53d6adfb228c58caad3b4c472d54e3499cb713e"
+      ],
+      "feature_subject": "http://purl.obolibrary.org/obo/DOID_0050331",
+      "filler": "http://purl.obolibrary.org/obo/GENO_0000147",
+      "pair_source": "http://purl.obolibrary.org/obo/DOID_0080422",
+      "predicate": "http://purl.obolibrary.org/obo/IDO_0000664",
+      "side": "source",
+      "source_axiom_refs": [
+        "sha256:1252eb6d95f2aed5f018feb63428c10549a5b559ed28e74cfd6651e8585936c3"
+      ]
+    },
+    {
+      "channel": "similarity",
+      "fact_ids": [
+        "sha256:46ee1748d358a640f2acb07864b2bd65e38278b5ddf845a5daf33e1c71be9362"
+      ],
+      "feature_subject": "http://purl.obolibrary.org/obo/DOID_0050156",
+      "filler": "http://purl.obolibrary.org/obo/GENO_0000147",
+      "pair_source": "http://purl.obolibrary.org/obo/DOID_0080422",
+      "predicate": "http://purl.obolibrary.org/obo/IDO_0000664",
+      "side": "target",
+      "source_axiom_refs": [
+        "sha256:b2d81c87027e55a623fcd48fdc72fddabba328b5407de2a95ad80a06421ffb54"
+      ]
+    },
+    {
+      "channel": "similarity",
+      "fact_ids": [
+        "sha256:a2034d312647bace0affa4b7b53d6adfb228c58caad3b4c472d54e3499cb713e"
+      ],
+      "feature_subject": "http://purl.obolibrary.org/obo/DOID_0050331",
+      "filler": "http://purl.obolibrary.org/obo/GENO_0000147",
+      "pair_source": "http://purl.obolibrary.org/obo/DOID_0080422",
+      "predicate": "http://purl.obolibrary.org/obo/IDO_0000664",
+      "side": "target",
+      "source_axiom_refs": [
+        "sha256:1252eb6d95f2aed5f018feb63428c10549a5b559ed28e74cfd6651e8585936c3"
+      ]
+    },
+    {
+      "channel": "difference",
+      "fact_ids": [
+        "sha256:46ee1748d358a640f2acb07864b2bd65e38278b5ddf845a5daf33e1c71be9362"
+      ],
+      "feature_subject": "http://purl.obolibrary.org/obo/DOID_0050156",
+      "filler": "http://purl.obolibrary.org/obo/GENO_0000147",
+      "pair_source": "http://purl.obolibrary.org/obo/DOID_0080422",
+      "predicate": "http://purl.obolibrary.org/obo/IDO_0000664",
+      "side": "source",
+      "source_axiom_refs": [
+        "sha256:b2d81c87027e55a623fcd48fdc72fddabba328b5407de2a95ad80a06421ffb54"
+      ]
+    },
+    {
+      "channel": "difference",
+      "fact_ids": [
+        "sha256:a2034d312647bace0affa4b7b53d6adfb228c58caad3b4c472d54e3499cb713e"
+      ],
+      "feature_subject": "http://purl.obolibrary.org/obo/DOID_0050331",
+      "filler": "http://purl.obolibrary.org/obo/GENO_0000147",
+      "pair_source": "http://purl.obolibrary.org/obo/DOID_0080422",
+      "predicate": "http://purl.obolibrary.org/obo/IDO_0000664",
+      "side": "source",
+      "source_axiom_refs": [
+        "sha256:1252eb6d95f2aed5f018feb63428c10549a5b559ed28e74cfd6651e8585936c3"
+      ]
+    },
+    {
+      "channel": "difference",
+      "fact_ids": [
+        "sha256:0fd6fba6ca99e7b907df2611a79120d712f15aa83dac49f2aede671594c3f48c"
+      ],
+      "feature_subject": "http://purl.obolibrary.org/obo/DOID_0050429",
+      "filler": "http://purl.obolibrary.org/obo/GENO_0000147",
+      "pair_source": "http://purl.obolibrary.org/obo/DOID_0080422",
+      "predicate": "http://purl.obolibrary.org/obo/IDO_0000664",
+      "side": "source",
+      "source_axiom_refs": [
+        "sha256:1761703c40fd7ab2bd6b3a6c14a8dde64546078d79faaf3e5c46f98e214dbda0"
+      ]
+    },
+    {
+      "channel": "difference",
+      "fact_ids": [
+        "sha256:46ee1748d358a640f2acb07864b2bd65e38278b5ddf845a5daf33e1c71be9362"
+      ],
+      "feature_subject": "http://purl.obolibrary.org/obo/DOID_0050156",
+      "filler": "http://purl.obolibrary.org/obo/GENO_0000147",
+      "pair_source": "http://purl.obolibrary.org/obo/DOID_0080422",
+      "predicate": "http://purl.obolibrary.org/obo/IDO_0000664",
+      "side": "target",
+      "source_axiom_refs": [
+        "sha256:b2d81c87027e55a623fcd48fdc72fddabba328b5407de2a95ad80a06421ffb54"
+      ]
+    },
+    {
+      "channel": "difference",
+      "fact_ids": [
+        "sha256:a2034d312647bace0affa4b7b53d6adfb228c58caad3b4c472d54e3499cb713e"
+      ],
+      "feature_subject": "http://purl.obolibrary.org/obo/DOID_0050331",
+      "filler": "http://purl.obolibrary.org/obo/GENO_0000147",
+      "pair_source": "http://purl.obolibrary.org/obo/DOID_0080422",
+      "predicate": "http://purl.obolibrary.org/obo/IDO_0000664",
+      "side": "target",
+      "source_axiom_refs": [
+        "sha256:1252eb6d95f2aed5f018feb63428c10549a5b559ed28e74cfd6651e8585936c3"
+      ]
+    },
+    {
+      "channel": "difference",
+      "fact_ids": [
+        "sha256:0fd6fba6ca99e7b907df2611a79120d712f15aa83dac49f2aede671594c3f48c"
+      ],
+      "feature_subject": "http://purl.obolibrary.org/obo/DOID_0050429",
+      "filler": "http://purl.obolibrary.org/obo/GENO_0000147",
+      "pair_source": "http://purl.obolibrary.org/obo/DOID_0080422",
+      "predicate": "http://purl.obolibrary.org/obo/IDO_0000664",
+      "side": "target",
+      "source_axiom_refs": [
+        "sha256:1761703c40fd7ab2bd6b3a6c14a8dde64546078d79faaf3e5c46f98e214dbda0"
+      ]
+    }
+  ],
+  "resources": {
+    "peak_rss_kib": 1481276,
+    "wall_seconds": 58.68
+  },
+  "retrieval_run": false,
+  "schema_version": "exact-explanation-restriction-verification/1",
+  "scope": "bounded_restriction_serialization_probe",
+  "selected_evidence_statuses": {
+    "attributes:available": 20,
+    "difference:available": 12,
+    "hierarchy:available": 12,
+    "similarity:available": 8
+  },
+  "selected_restrictions_by_channel": {
+    "difference": 12,
+    "similarity": 8
+  },
+  "status": "pass",
+  "training_run": false,
+  "unique_context_fact_count": 6,
+  "unique_original_restriction_axiom_count": 6
+}

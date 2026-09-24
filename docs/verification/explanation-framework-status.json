@@ -1,0 +1,399 @@
+{
+  "schema_version": "exact-explanation-implementation-status/1",
+  "recorded_at": "2026-09-24T19:33:43.255418+00:00",
+  "inspected_commit": "f4b411760e50da1a58587362cec64cc6f9cec608",
+  "revision_scope": "Implementation committed; this final evidence/status documentation commit follows the inspected revision.",
+  "status": "blocked_input",
+  "frontend_admitted": false,
+  "scope": {
+    "implemented_assignment": "B0-B5 backend only",
+    "frontend": "F1 delegated to a separate expert and not implemented here",
+    "full_matching_campaign": "not_run",
+    "participant_recruitment": "not_run",
+    "public_render_deployment": "not_run",
+    "model_selection_48_pairs": "deferred; separate from the bounded 12-pair operational check"
+  },
+  "work_packages": {
+    "B0": {
+      "owner": "Backend contract/integration owner",
+      "inspected_commit": "f4b411760e50da1a58587362cec64cc6f9cec608",
+      "status": "passed",
+      "implemented_paths": [
+        "exact_inspect/contracts.py",
+        "exact_inspect/models.py",
+        "exact_inspect/preparation.py",
+        "exact_inspect/study/models.py",
+        "specs/explanation-framework/protocol/study.runtime-openapi.json",
+        "specs/explanation-framework/protocol/study-resource.runtime-schema.json"
+      ],
+      "evidence_ids": [
+        "spec_contracts",
+        "regression",
+        "execution_lock",
+        "combined_api"
+      ],
+      "remaining_inputs_or_checks": [],
+      "implementation_status": "complete"
+    },
+    "B1": {
+      "owner": "Exact integration owner",
+      "inspected_commit": "f4b411760e50da1a58587362cec64cc6f9cec608",
+      "status": "passed",
+      "implemented_paths": [
+        "exact/runs/decisions.py",
+        "exact/io/sources/feature_provenance.py",
+        "exact/experiments/reporting.py",
+        "exact_inspect/decisions.py",
+        "exact_inspect/decisions_export.py",
+        "tools/validate_explanation_export.py"
+      ],
+      "evidence_ids": [
+        "matcher_fidelity_12",
+        "restriction_probe_2",
+        "combined_import",
+        "regression"
+      ],
+      "remaining_inputs_or_checks": [],
+      "implementation_status": "complete"
+    },
+    "B2": {
+      "owner": "Ontology context owner",
+      "inspected_commit": "f4b411760e50da1a58587362cec64cc6f9cec608",
+      "status": "blocked_input",
+      "implemented_paths": [
+        "exact_inspect/context.py",
+        "exact_inspect/context_prepare.py",
+        "exact_inspect/context_semantics.py",
+        "exact_inspect/context_export.py",
+        "exact_inspect/context_resources.py",
+        "tools/validate_context_runtime.py"
+      ],
+      "evidence_ids": [
+        "original_doid_strict",
+        "parser_release_check",
+        "ncit_context",
+        "declared_contexts",
+        "coverage",
+        "ncit_resource_parity",
+        "doid_resource_parity"
+      ],
+      "remaining_inputs_or_checks": [
+        "The unmodified pinned DOID fails strict native pyowl-core 0.2.1 mapping. The separately pinned two-declaration derivative passes its own operational checks; it does not satisfy original-source G1.",
+        "Declared DOID root scope retains an unresolved import; complete import closure is not claimed."
+      ],
+      "implementation_status": "complete"
+    },
+    "B3": {
+      "owner": "Prepared service and study service owners",
+      "inspected_commit": "f4b411760e50da1a58587362cec64cc6f9cec608",
+      "status": "passed",
+      "implemented_paths": [
+        "exact_inspect/service.py",
+        "exact_inspect/artifacts.py",
+        "exact_inspect/sqlite_safety.py",
+        "exact_inspect/import_jobs.py",
+        "exact_inspect/client.py",
+        "exact_inspect/study/",
+        "deploy/render/exact_study.Dockerfile",
+        "deploy/render/study.render.yaml"
+      ],
+      "evidence_ids": [
+        "real_generation",
+        "combined_api",
+        "combined_http",
+        "real_study_fixtures",
+        "postgres_42",
+        "regression"
+      ],
+      "remaining_inputs_or_checks": [],
+      "implementation_status": "complete"
+    },
+    "B4": {
+      "owner": "Grounded explanation owner",
+      "inspected_commit": "f4b411760e50da1a58587362cec64cc6f9cec608",
+      "status": "passed",
+      "implemented_paths": [
+        "exact_inspect/generation.py",
+        "exact_inspect/study/builder.py",
+        "exact_inspect/study/resources.py",
+        "exact_inspect/study/owl_ast.py",
+        "exact_inspect/study/owl_ast_schema.json",
+        "tools/prepare_explanation_demo.py"
+      ],
+      "evidence_ids": [
+        "real_generation",
+        "combined_api",
+        "combined_http",
+        "real_study_fixtures",
+        "postgres_42",
+        "regression"
+      ],
+      "remaining_inputs_or_checks": [],
+      "implementation_status": "complete"
+    },
+    "B5": {
+      "owner": "Backend integration/acceptance owner",
+      "inspected_commit": "f4b411760e50da1a58587362cec64cc6f9cec608",
+      "status": "blocked_input",
+      "implemented_paths": [
+        "exact_inspect/verification.py",
+        "tests/explanation_framework_test.py",
+        "tests/explanation_preparation_test.py",
+        "tests/explanation_recovery_test.py",
+        "docs/verification/explanation-backend-report.md"
+      ],
+      "evidence_ids": [
+        "operational",
+        "original_doid_strict"
+      ],
+      "remaining_inputs_or_checks": [
+        "G1 original-source admission must be resolved before G5/F1 admission. Public handoff publication is independent of acceptance."
+      ],
+      "implementation_status": "complete"
+    },
+    "F1": {
+      "owner": "Separate frontend expert",
+      "inspected_commit": "f4b411760e50da1a58587362cec64cc6f9cec608",
+      "status": "planned",
+      "implemented_paths": [],
+      "evidence_ids": [],
+      "remaining_inputs_or_checks": [
+        "B5/G5 backend admission and a working handoff package.",
+        "Implement exploration and complete study frontends under spec08; no frontend implementation is included in this assignment."
+      ]
+    }
+  },
+  "gates": {
+    "G0": {
+      "status": "passed",
+      "evidence_ids": [
+        "spec_contracts",
+        "regression",
+        "execution_lock",
+        "combined_api"
+      ],
+      "remaining": []
+    },
+    "G1": {
+      "status": "blocked_input",
+      "evidence_ids": [
+        "original_doid_strict",
+        "parser_release_check",
+        "ncit_context",
+        "declared_contexts",
+        "coverage",
+        "ncit_resource_parity",
+        "doid_resource_parity"
+      ],
+      "remaining": [
+        "The unmodified pinned DOID fails strict native pyowl-core 0.2.1 mapping. The separately pinned two-declaration derivative passes its own operational checks; it does not satisfy original-source G1.",
+        "Declared DOID root scope retains an unresolved import; complete import closure is not claimed."
+      ],
+      "strict_original_doid_status": "blocked_input",
+      "declared_derivative_status": "passed",
+      "ncit_full_context_status": "passed"
+    },
+    "G2": {
+      "status": "passed",
+      "evidence_ids": [
+        "matcher_fidelity_12",
+        "restriction_probe_2",
+        "combined_import",
+        "regression"
+      ],
+      "remaining": []
+    },
+    "G3": {
+      "status": "passed",
+      "evidence_ids": [
+        "real_generation",
+        "combined_api",
+        "combined_http",
+        "real_study_fixtures",
+        "postgres_42",
+        "regression"
+      ],
+      "remaining": []
+    },
+    "G4": {
+      "status": "passed",
+      "evidence_ids": [
+        "combined_http",
+        "combined_api",
+        "isolated_runtime_invocation",
+        "portability",
+        "persistence",
+        "postgres_42",
+        "regression"
+      ],
+      "remaining": []
+    },
+    "G5": {
+      "status": "blocked_input",
+      "evidence_ids": [
+        "operational",
+        "original_doid_strict"
+      ],
+      "remaining": [
+        "G1 original-source admission must be resolved before G5/F1 admission. Public handoff publication is independent of acceptance."
+      ],
+      "frontend_admitted": false
+    }
+  },
+  "evidence": {
+    "spec_contracts": {
+      "path": "data/explanation-framework-specs-complete.log",
+      "sha256": "sha256:39d41091b73ca3f92a52f92997e42f648109fee450bfd12fb18fd18000de3eda",
+      "status": "passed",
+      "command": ".venv/bin/python specs/explanation-framework/protocol/validate_specs.py",
+      "scope": "Specification validation; runtime acceptance separately measured."
+    },
+    "regression": {
+      "path": "docs/verification/explanation-backend-regression.json",
+      "sha256": "sha256:0c00f0875b7150bd14c476461b42b49d86bc0a9b801e9fdc884100ec45ead522",
+      "status": "passed"
+    },
+    "postgres_42": {
+      "path": "docs/verification/explanation-study-postgres.json",
+      "sha256": "sha256:8035ffec14709a3db75257f6d84a72dcdcb94e3196397d17d2b6bf3f1ac42f4e",
+      "status": "passed"
+    },
+    "matcher_fidelity_12": {
+      "path": "docs/verification/explanation-matcher-fidelity.json",
+      "sha256": "sha256:1a54358753978e0097baa637a19f436f00fffebe3ad5ab409266ec11d0f239c7",
+      "status": "passed"
+    },
+    "restriction_probe_2": {
+      "path": "docs/verification/explanation-restriction-probe.json",
+      "sha256": "sha256:79776b753969a0237b745678ff9f9d1b2558d2566291faf0cd658dbf255360f4",
+      "status": "passed"
+    },
+    "original_doid_strict": {
+      "path": "data/explanation-framework/context/doid-original-native.json",
+      "sha256": "sha256:2420bfbc907706f3017340a32d4a72542031b58ae082d14817a0f6effa473639",
+      "status": "blocked_input"
+    },
+    "parser_release_check": {
+      "path": "data/explanation-framework/context/parser-release-check.json",
+      "sha256": "sha256:2a156af515a1f4be23b0635dd560b0997321eb17aedef9319eac1ebc1ef4c269",
+      "status": "passed",
+      "scope": "Installed and latest published native parser both 0.2.1; no dependency mutation."
+    },
+    "ncit_context": {
+      "path": "data/explanation-framework/context/ncit.final.json",
+      "sha256": "sha256:6a9dd8c032d3530b4a7029f6da709625098d51d24fcc08045a1279a317ed3ae9",
+      "status": "passed"
+    },
+    "declared_contexts": {
+      "path": "data/explanation-framework/context/context-validation.json",
+      "sha256": "sha256:f867c54c632d0ef7e86b59d5a3d0c47380fdb0c83bb2a36075a6bc65dc4d8adb",
+      "status": "passed",
+      "scope": "Declared root inputs only; derivative success does not pass original DOID."
+    },
+    "combined_http": {
+      "path": "data/explanation-framework/combined-http-verification/http-runtime.json",
+      "sha256": "sha256:409c0669e4a40eef9e15e1f419825e9ad59e849147e288c036126349dc5b61b6",
+      "status": "passed"
+    },
+    "combined_api": {
+      "path": "data/explanation-framework/combined-verification/verification.json",
+      "sha256": "sha256:1e50c1cd2b03cedcec2803bad61726891f7f76dbfce4a1d336bdf5da8b708c8c",
+      "status": "passed"
+    },
+    "combined_import": {
+      "path": "data/explanation-framework/combined-import-audit.json",
+      "sha256": "sha256:89c38c6d130f69a98d26a519c2c227c7768f2658bd7ab22f1f92c5f2d202cb0d",
+      "status": "passed"
+    },
+    "isolated_runtime_invocation": {
+      "path": "data/explanation-framework/combined-audit-invocation.json",
+      "sha256": "sha256:8be3a77881415136e403a952551601ca2a6590c755e6147357b97eb7fe189ce3",
+      "status": "passed"
+    },
+    "real_generation": {
+      "path": "data/explanation-framework/prepared-combined/claim-audit.json",
+      "sha256": "sha256:c463a8f24a4ea31964f4153f4e657ed72830f6de184244d21abd51afacfb6dc0",
+      "status": "passed"
+    },
+    "real_study_fixtures": {
+      "path": "data/explanation-framework/combined-verification/real-study-fixtures.json",
+      "sha256": "sha256:b3d9d0adbcad18ccce3c98318bbe985bc7b05d62aa924a0c36e93ed8a3114a86",
+      "status": "passed"
+    },
+    "coverage": {
+      "path": "docs/verification/explanation-development-coverage.json",
+      "sha256": "sha256:ff1b47084c1d5ba6d9e7fa55b05110098d09b0229e5be19d61ba120aaec72d75",
+      "status": "passed"
+    },
+    "operational": {
+      "path": "docs/verification/explanation-backend-operational.json",
+      "sha256": "sha256:5406aa6437431aab39822019c1b2eed902122a011c0140f0756925e85c83e029",
+      "status": "passed"
+    },
+    "portability": {
+      "path": "data/explanation-framework/doid-portability-verification.json",
+      "sha256": "sha256:3b04fb44bf6044302c1dabd5b797439ba9c2fa8a86801b699af81169b19a3317",
+      "status": "passed"
+    },
+    "persistence": {
+      "path": "data/explanation-framework/preparation-persistence.json",
+      "sha256": "sha256:1543a8f28b65ecb11409c224c3ec89f4ef49aa7237c0d87728c69cd52ee46979",
+      "status": "passed"
+    },
+    "execution_lock": {
+      "path": "data/explanation-framework/prepared-combined/execution-47388b7e7a83f4afd4d7a4d649d7faf769a7f84271242211da531f5b604075f1.json",
+      "sha256": "sha256:47388b7e7a83f4afd4d7a4d649d7faf769a7f84271242211da531f5b604075f1",
+      "status": "passed"
+    },
+    "ncit_resource_parity": {
+      "path": "data/explanation-framework/context/resources/ncit.context-parity.json",
+      "sha256": "sha256:377c4ee64e93f964cd9ed91509f00c3445beaf60624637a7f0c4ac095d59e8e3",
+      "status": "passed"
+    },
+    "doid_resource_parity": {
+      "path": "data/explanation-framework/context/resources/doid.context-parity.json",
+      "sha256": "sha256:ae54e0d2481724f1b4cf5e6e5971a5e8ead4c49c73cb98e506423489fb63eda7",
+      "status": "passed"
+    }
+  },
+  "resource_targets": {
+    "hardware_profile": "128 GiB node used; a 64 GiB physical-node result is not claimed",
+    "serving_rss_limit_gib": 4,
+    "cold_health_seconds": 10,
+    "cold_first_entity_seconds": 2,
+    "warm_context_p95_seconds": 0.5,
+    "bounded_pair_seconds": 1,
+    "mixed_queries_minimum": 100,
+    "concurrent_readers": 4,
+    "summary_response_bytes": 2097152,
+    "full_package_results": "docs/verification/explanation-backend-operational.json",
+    "preparation_rss_limits_gib": {
+      "64_GiB_profile": 48,
+      "128_GiB_profile": 96
+    }
+  },
+  "handoff_links": {
+    "backend_guide": "docs/guides/explanation-backend.md",
+    "context_guide": "docs/guides/ontology-context-preparation.md",
+    "study_guide": "docs/guides/explanation-study-service.md",
+    "typed_client": "exact_inspect/client.py",
+    "study_openapi": "specs/explanation-framework/protocol/study.runtime-openapi.json",
+    "study_resource_schema": "specs/explanation-framework/protocol/study-resource.runtime-schema.json",
+    "synthetic_full_client": "tests/explanation_study_test.py::test_complete_synthetic_http_client_flow",
+    "frontend_assignment": "specs/explanation-framework/08-frontend-implementation.md",
+    "package": "data/explanation-framework/backend-release/package/package.json",
+    "handoff": "data/explanation-framework/backend-release/handoff/backend-handoff.json",
+    "operational_evidence": "docs/verification/explanation-backend-operational.json",
+    "durable_preparation": "data/explanation-framework/prepared-combined",
+    "execution_lock": "data/explanation-framework/prepared-combined/execution-47388b7e7a83f4afd4d7a4d649d7faf769a7f84271242211da531f5b604075f1.json"
+  },
+  "deferred": [
+    "48-pair baseline/challenger model-selection exercise",
+    "Full matching/training/evaluation campaigns",
+    "F1 frontend implementation and frontend usability checks",
+    "Public Render deployment and staging redeploy/restore rehearsal",
+    "Participant recruitment, invitations to people and live study launch",
+    "Optional whole-ontology inference, complete KGA and production repair"
+  ],
+  "implementation_status": "complete"
+}
