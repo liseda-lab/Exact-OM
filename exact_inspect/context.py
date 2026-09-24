@@ -14,6 +14,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
+from .artifacts import read_metadata
 from .context_prepare import build_context_package, prepare_context
 from .context_semantics import (
     ANNOTATION_REGISTRY,
@@ -62,7 +63,7 @@ class OntologyContext:
 
     def __init__(self, path: str | Path, *, verified_database_hash: str | None = None):
         self.path = Path(path)
-        self.manifest = json.loads((self.path / "manifest.json").read_text(encoding="utf-8"))
+        self.manifest = read_metadata(self.path / "manifest.json")
         if self.manifest.get("schema") != CONTEXT_SCHEMA:
             raise ValueError("Unsupported ontology context schema")
         filtered = self.manifest.get("policy_filter")

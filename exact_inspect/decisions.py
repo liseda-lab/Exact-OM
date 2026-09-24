@@ -9,6 +9,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Callable
 
+from .artifacts import read_metadata, relative_path
 from .contracts import (
     CONTRACT_VERSION,
     DomainError,
@@ -609,8 +610,10 @@ class DecisionStore:
 
     def __init__(self, directory: Path):
         self.directory = Path(directory)
-        self._manifest = json.loads((self.directory / "decisions.manifest.json").read_text())
-        self.database = self.directory / self._manifest["database"]
+        self._manifest = read_metadata(self.directory / "decisions.manifest.json")
+        if self._manifest.get("database") != "decisions.sqlite":
+            raise DomainError("invalid_manifest", "Unsupported decision database locator", 422)
+        self.database = relative_path(self.directory, self._manifest["database"])
         self._verified_stat = self._database_stat()
         if file_hash(self.database) != self._manifest["database_hash"]:
             raise DomainError("artifact_conflict", "Decision package hash changed.", 409)

@@ -43,6 +43,20 @@ def atomic_json(path: Path, value: Any) -> None:
         Path(temporary).unlink(missing_ok=True)
 
 
+def read_metadata(path: Path) -> dict[str, Any]:
+    """Read an inert metadata object with the same 8 MiB bound at every level."""
+    if path.is_symlink():
+        raise DomainError("invalid_manifest", "Linked manifests are not supported", 422)
+    with path.open("rb") as stream:
+        raw = stream.read(8 * 1024**2 + 1)
+    if len(raw) > 8 * 1024**2:
+        raise DomainError("invalid_manifest", "Manifest exceeds its allowed bound", 413)
+    value = json.loads(raw)
+    if not isinstance(value, dict):
+        raise DomainError("invalid_manifest", "Manifest must be a JSON object", 422)
+    return value
+
+
 def relative_path(root: Path, locator: str) -> Path:
     """Resolve an inert relative locator, refusing traversal and symlink components."""
     pure = PurePosixPath(locator)
@@ -94,9 +108,7 @@ class InspectionBundle(WireModel):
 
 def validate_bundle(path: Path, *, verify_hashes: bool = True) -> InspectionBundle:
     """Validate all references and hashes before making a package visible to readers."""
-    if path.is_symlink() or path.stat().st_size > 8 * 1024 * 1024:
-        raise DomainError("invalid_manifest", "Manifest exceeds its allowed bound", 413)
-    manifest = InspectionBundle.model_validate_json(path.read_bytes())
+    manifest = InspectionBundle.model_validate(read_metadata(path))
     root = path.parent
     seen: set[str] = set()
     for artifact in manifest.artifacts:

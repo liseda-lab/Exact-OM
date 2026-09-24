@@ -119,3 +119,23 @@ def test_cached_admission_rechecks_changed_bytes_and_expected_schema(tmp_path):
     with pytest.raises(DomainError, match="schema"):
         with readonly_connection(path, _TABLES):
             pass
+
+
+@pytest.mark.parametrize("family", ["context", "decisions"])
+def test_nested_manifests_have_a_byte_budget_before_database_access(tmp_path, family):
+    from exact_inspect.context import OntologyContext
+
+    name = "manifest.json" if family == "context" else "decisions.manifest.json"
+    with (tmp_path / name).open("wb") as stream:
+        stream.truncate(8 * 1024**2 + 1)
+    with pytest.raises(DomainError) as error:
+        (OntologyContext if family == "context" else DecisionStore)(tmp_path)
+    assert error.value.envelope.code == "invalid_manifest"
+    assert error.value.status_code == 413
+
+
+@pytest.mark.parametrize("locator", ["../outside.sqlite", "/tmp/outside.sqlite", "other.sqlite"])
+def test_decision_metadata_cannot_redirect_database_reads(tmp_path, locator):
+    (tmp_path / "decisions.manifest.json").write_text(json.dumps({"database": locator}))
+    with pytest.raises(DomainError, match="locator"):
+        DecisionStore(tmp_path)
