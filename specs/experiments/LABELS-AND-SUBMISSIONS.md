@@ -81,9 +81,9 @@ G0's NCIT–DOID operational validation does not train this NIL head.
 | Track/task | Output |
 | --- | --- |
 | Bio-ML global, OAEI-KG | OAEI Alignment RDF with full IRIs, relation and confidence. |
-| Bio-ML local | `SrcEntity,TgtCandidate,Score` TSV, exactly the supplied 100 candidates per query. |
+| Bio-ML local | Positional LIST TSV `SrcEntity,TgtCandidates`, one original query per row, every supplied candidate exactly once. |
 | DISO ranking | JSONL `{qid, ranking}`, every supplied candidate including NIL, original public query IDs. |
-| BioKG active release | Release-defined typed TSV `SrcEntity,TgtEntity,Relation,Score`; preserve official query identities and release rules. |
+| BioKG active release | Positional typed TSV `SrcEntity,TgtEntity,Relation,Score`: 50 candidates × 3 saved relation scores per original query, release order. |
 
 The legacy Exact local TSV is not the official Bio-ML or DISO submission format. Use
 `tools/export_experiment_submission.py` for the supported strict conversions once predictions
@@ -93,3 +93,55 @@ DISO's original query JSONL is required; a flattened TSV cannot recover lost que
 Official format specifications: [Bio-ML global](https://bio-ml.oaei-ml.org/tasks/global/submission-format/),
 [Bio-ML local](https://bio-ml.oaei-ml.org/tasks/local/submission-format/),
 [DISO](https://github.com/city-artificial-intelligence/diso-oaei/blob/main/tasks/ranking/submission-format.md).
+
+
+## Public inference preparation
+
+`tools/prepare_public_inference.py --config FROZEN.yaml --source SOURCE.owl
+--target TARGET.owl --track TRACK --output DIRECTORY` prepares a separate inference
+manifest and configurations; it does not run a model. For local Bio-ML, DISO and
+BioKG, add `--public-candidates ORIGINAL_PUBLIC_POOL`. All references and training
+inputs are removed, as are track discovery and source caps; rationale generation
+is disabled. Supervised recipes require already fitted artifacts: an immutable
+same-pair deployment manifest binds their hashes, feature recipe and public
+population. No fitting or evaluation is allowed. Full global deployment may
+include original training sources; research evaluation keeps its disjoint-source
+guards. Missing heads are rejected instead of refitted. Run each manifest
+entry with `run_alignment(..., run_eval=False)` inside the retained Slurm allocation.
+
+Global preparation enumerates both complete native ontology signatures, respecting
+the frozen entity-kind and alignment-use policy. Existing verified population
+artifacts are reused. Global export additionally requires `--population-manifest`
+and `--target-population-manifest`; it verifies the saved run's ontology hashes,
+closure fingerprints, eligibility policy and complete source coverage. A local
+`test.sources.txt` alone is insufficient.
+
+Local preparation assigns repeated sources to different shards, retaining original
+query IDs, order and complete candidate membership. Every shard contains at most
+one query per source, so pool-dependent scores/normalizers/NIL/listwise decisions
+remain query-specific. Export with `--query-runs DIRECTORY/inference.json` and the
+original public pool; missing/extra scores and changed frozen inputs are errors.
+Source-unioned pair inventories remain available for explicitly query-independent
+computation, and are not silently used for pool-dependent inference.
+
+The current [official Bio-ML validator](https://github.com/liseda-lab/OAEI-Bio-ML/blob/edf33bb157e0acd77ff92bf9406c5718a006d10e/scoring_kit/validate_ranking.py)
+uses positional query matching and the `TgtCandidates` LIST header. It accepts
+repeated sources and verifies the actual pool permutation, including variable
+pool sizes. This corrects the website's older source-grouped/header description.
+All 16,144 original public test queries passed a model-free round-trip through that
+validator; synthetic rankings were discarded, without reading reference answers.
+
+BioKG block export uses saved `alignment/relation_scores.tsv`, including all three
+relation scores for every candidate. The all-equivalent rule and learned three-way
+head write these distributions during inference; semantic abstentions cannot be
+filled with invented zero scores. Sparse accepted mappings are not a complete
+BioKG ranking submission. The older `build_biokg_submission.py` remains a generic
+pair-table concatenator, not this positional block exporter.
+
+E14 records oracle-pair and full-pipeline macro F1 separately. Both use the declared
+three relations; the latter is relative to the known reference and separately
+counts unlisted predictions. Those predictions are never converted into verified
+training negatives. The optional native HermiT diagnostic removes each queried
+bridge and records unsupported profiles/timeouts as unknown. Ontology consistency
+is reported separately from named-class satisfiability, which is not established
+by the consistency check.

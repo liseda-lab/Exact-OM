@@ -3,10 +3,10 @@ kind: planning_inventory_not_campaign_lock
 recorded_on: '2026-09-24'
 status: not_admitted
 target_elapsed_hours: 144
-target_basis: User-confirmed soft goal of six days; longer execution is allowed. Not a runtime timeout
-  or additional admission cap.
-source_inventory: data/experiments-v2/prepared-campaign-10/campaign.lock.yaml
-active_queue: data/experiments-v2/prepared-campaign-11/HANDOFF.md
+target_basis: User-confirmed soft goal of six days; longer execution is allowed. Not a runtime
+  timeout or additional admission cap.
+source_inventory: data/experiments-v2/prepared-campaign-12/campaign.lock.yaml
+active_queue: data/experiments-v2/d1-production-probe-01/status.json
 audit_directory: data/experiments-v2/six-day-plan-01
 resource_assumption:
   node: liseda-03
@@ -21,178 +21,190 @@ resource_assumption:
   additional_nodes: unavailable_user_confirmed_single_node
   node_count: 1
 completed_steps:
-- E00
-- E02
-- E05
-- E06
-- E26
+  - E00
+  - E02
+  - E05
+  - E06
+  - E26
 completed_scientific_cells_excluding_E00: 22
 declared_remaining_cells:
-  development: 116
-  composition: 8
   class_final: 63
-batch_semantics: Groups are dispatch priorities, not dependency barriers or executable declarations. Preserve
-  step/port dependencies and scientific settings. Windows are targets, not forecasts.
+  composition: 8
+  development: 121
+  total: 192
+batch_semantics: Groups are dispatch priorities, not dependency barriers or executable declarations.
+  Preserve step/port dependencies and scientific settings. Windows are targets, not forecasts.
 batches:
-- id: B0
-  name: Finish current hierarchy queue
-  steps:
-  - E09
-  declared_cells: 4
-  target_window_hours:
-  - 0
-  - 12
-  status: qualification_running_conditional_continuation
-  gate: Current immutable D1 qualification, measured admission, four complete hierarchy arms.
-- id: B1
-  name: Early evidence, decisions, retrieval and LLM controls
-  steps:
-  - E01
-  - E03
-  - E08
-  - E10
-  - E20
-  - E24
-  - E25
-  declared_cells: 35
-  target_window_hours:
-  - 0
-  - 30
-  status: preparation_required
-  gate: E20 pool contract; E10 analytic selection before its acceptance fits; signed identifiers and E24
-    diagnostics; per-family measured admission.
-- id: B2
-  name: Selected heads and comparative judgments
-  steps:
-  - E15
-  - E19
-  - E07
-  - E18
-  - E21
-  - E25-forced
-  declared_cells: 24
-  target_window_hours:
-  - 12
-  - 48
-  status: upstream_results_required
-  gate: E03 to E15; E10 to E19; both to E18; E25 to E07; compatible beneficial judge and separate train-only
-    teacher evidence before conditional E21.
-- id: B3
-  name: Transfer, label budgets and response replays
-  steps:
-  - E16
-  - E22
-  - E22-policy
-  - E25-oracles
-  - E25-trust
-  declared_cells: 16
-  target_window_hours:
-  - 36
-  - 60
-  status: upstream_artifacts_required
-  gate: E18 donor/selected heads; E22 artifacts before policy; actual E25-forced responses before no-call
-    replays.
-- id: B4
-  name: Feature-specific branch, interleaved with B1 to B3
-  steps:
-  - E04
-  - E04-pool-miss
-  - E04-listwise
-  - E11
-  - E12-retrieval
-  - E12
-  - E13
-  - E13-enrichment
-  - E14
-  - E23
-  declared_cells: 37
-  target_window_hours:
-  - 0
-  - 60
-  status: mixed_readiness
-  gate: E03 before E04; E07 before optional listwise; E12 retrieval before evidence; E13 parity before
-    enrichment/typing; correct rich-case binding and safe graph labels before E23.
-- id: B5
-  name: Composition, robustness and final freeze
-  steps:
-  - G4
-  declared_cells: 8
-  target_window_hours:
-  - 60
-  - 72
-  status: development_results_required
-  gate: All admitted contributing screens resolved; D0/D1 global and local, up to 1000 sources; freeze
-    complete final scope and costs before reporting inference.
-- id: B6
-  name: Frozen full-population inference and submissions
-  steps:
-  - E17
-  - E17-published
-  declared_cells: 63
-  target_window_hours:
-  - 72
-  - 132
-  status: population_and_cost_not_admitted
-  gate: Reference-free inference path; complete global ontology populations and local public inventories;
-    proven reuse; all mandatory controls; format validation and cumulative budget.
+  - id: B0
+    name: Finish current hierarchy queue
+    steps:
+      - E09
+    declared_cells: 4
+    target_window_hours:
+      - 0
+      - 12
+    status: qualification_running_conditional_continuation
+    gate: Current immutable D1 qualification, measured admission, four complete hierarchy arms.
+  - id: B1
+    name: Early evidence, decisions, retrieval and LLM controls
+    steps:
+      - E01
+      - E03
+      - E08
+      - E08-identifiers
+      - E10-analytic
+      - E20
+      - E24
+      - E24-asymmetric
+      - E25
+    declared_cells: 38
+    target_window_hours:
+      - 0
+      - 30
+    status: implemented_pending_upstream_results_and_measured_admission
+    gate: Retained E05/E20 pool contract; E10-analytic selects constants before B2 fits;
+      E08-identifiers and E24-asymmetric explicitly dispositioned absent curated semantics; E24 core
+      includes D0; qualify updated code/caches and budget each comparison.
+  - id: B2
+    name: Selected heads and comparative judgments
+    steps:
+      - E10
+      - E15
+      - E19
+      - E07
+      - E18
+      - E21
+      - E25-forced
+    declared_cells: 26
+    target_window_hours:
+      - 12
+      - 48
+    status: upstream_results_required
+    gate: E10 analytic winner before E10 acceptance; E03 before E15; E10/E26 before E19; selected
+      heads before transfer; compatible chosen E07 judge and training-only teachers before E21.
+  - id: B3
+    name: Transfer, label budgets and response replays
+    steps:
+      - E16
+      - E22
+      - E22-policy
+      - E25-oracles
+      - E25-trust
+    declared_cells: 16
+    target_window_hours:
+      - 36
+      - 60
+    status: upstream_artifacts_required
+    gate: E18 donor/selected heads; E22 artifacts before policy; actual E25-forced responses before
+      no-call replays.
+  - id: B4
+    name: Feature-specific branch, interleaved with B1 to B3
+    steps:
+      - E04
+      - E04-pool-miss
+      - E04-listwise
+      - E11
+      - E12-retrieval
+      - E12
+      - E13
+      - E13-enrichment
+      - E14
+      - E14-bridge
+      - E23
+      - E23-rich-0
+      - E23-rich-50
+      - E23-rich-100
+    declared_cells: 37
+    target_window_hours:
+      - 0
+      - 60
+    status: implemented_input_and_result_dependencies_with_explicit_inapplicabilities
+    gate: E03 before E04; selected E07 before optional listwise; E12 retrieval before instance
+      evidence; E13 parity before native structural enrichment; E14 bridge needs a separate native
+      OWL case; E23-rich steps use D1 while K0 PU supervision remains inapplicable.
+  - id: B5
+    name: Composition, robustness and final freeze
+    steps:
+      - G4
+    declared_cells: 8
+    target_window_hours:
+      - 60
+      - 72
+    status: development_results_required
+    gate: All admitted contributing screens resolved; D0/D1 global and local, up to 1000 sources;
+      freeze complete final scope and costs before reporting inference.
+  - id: B6
+    name: Frozen full-population inference and submissions
+    steps:
+      - E17
+      - E17-published
+    declared_cells: 63
+    target_window_hours:
+      - 72
+      - 132
+    status: population_and_cost_not_admitted
+    gate: Reference-free inference path; complete global ontology populations and local public
+      inventories; proven reuse; all mandatory controls; format validation and cumulative budget.
 reserve:
   elapsed_window_hours:
-  - 132
-  - 144
+    - 132
+    - 144
   hours: 12
-  purpose: Interruption recovery, export validation and accounting; target calendar reserve, not a reduction
-    of existing protected budget reserves.
+  purpose: Interruption recovery, export validation and accounting; target calendar reserve, not a
+    reduction of existing protected budget reserves.
 feasibility_gate:
   by_elapsed_hour: 12
   current_verdict: unproven_unreused_matrix_exceeds_target
   required:
-  - Reconcile declarations with all required shared controls, diagnostics, final ontology populations,
-    local inventories and selected feature-track submissions.
-  - Measure unique cold preparation, warm scoring and representative fitting; validate proposed reuse
-    against fresh outputs.
-  - Freeze unique-work forecast with 1.5 safety factor, API attempts/tokens, memory/disk, queue critical
-    path and cumulative charges.
-  - Report remaining completion forecast against the soft calendar target; admit against scientific readiness
-    and the existing cumulative resource budget envelopes.
-  if_failed: If only the six-day target is missed, report the revised single-node ETA and continue scientifically
-    ready work within the cumulative budget. Budget or correctness failures still block affected work;
-    preserve pending comparisons without silent scope changes.
+    - Reconcile declarations with all required shared controls, diagnostics, final ontology
+      populations, local inventories and selected feature-track submissions.
+    - Measure unique cold preparation, warm scoring and representative fitting; validate proposed
+      reuse against fresh outputs.
+    - Freeze unique-work forecast with 1.5 safety factor, API attempts/tokens, memory/disk, queue
+      critical path and cumulative charges.
+    - Report remaining completion forecast against the soft calendar target; admit against
+      scientific readiness and the existing cumulative resource budget envelopes.
+  if_failed: If only the six-day target is missed, report the revised single-node ETA and continue
+    scientifically ready work within the cumulative budget. Budget or correctness failures still
+    block affected work; preserve pending comparisons without silent scope changes.
   calendar_target_blocks_admission: false
 unexpanded_work:
-- id: shared_controls_diagnostics
-  cells: null
-  condition: Required by each method even if absent from the prepared lock; deduplicate only by proven
-    numerical identity.
-- id: screen_expansions
-  cells: null
-  condition: At most two justified survivors per family to at most 1000 sources; retain required stochastic
-    replication.
-- id: component_contrasts
-  cells: null
-  condition: 'If claiming individual components: at most four H0 leave-outs and two predeclared 2x2 interactions;
-    count at G4.'
-- id: feature_heldout_panels
-  cells: null
-  condition: Selected P1/K1/T1/N1/R1_case claims require their own held-out controls and populations.
-- id: track_submission_jobs
-  cells: null
-  condition: Bind Bio-ML global/local, OAEI-KG, BioKG typed and DISO public submission populations/recipes;
-    do not equate the 63 class declarations with every requested submission.
-- id: blinded_audit_pack
-  cells: null
-  condition: Required for precision-led claims under incomplete gold; raters and organizer metrics have
-    a separate external schedule.
+  - id: shared_controls_diagnostics
+    cells:
+    condition: Required by each method even if absent from the prepared lock; deduplicate only by
+      proven numerical identity.
+  - id: screen_expansions
+    cells:
+    condition: At most two justified survivors per family to at most 1000 sources; retain required
+      stochastic replication.
+  - id: component_contrasts
+    cells:
+    condition: 'If claiming individual components: at most four H0 leave-outs and two predeclared 2x2
+      interactions; count at G4.'
+  - id: feature_heldout_panels
+    cells:
+    condition: Selected P1/K1/T1/N1/R1_case claims require their own held-out controls and
+      populations.
+  - id: track_submission_jobs
+    cells:
+    condition: Bind Bio-ML global/local, OAEI-KG, BioKG typed and DISO public submission
+      populations/recipes; do not equate the 63 class declarations with every requested submission.
+  - id: blinded_audit_pack
+    cells:
+    condition: Required for precision-led claims under incomplete gold; raters and organizer metrics
+      have a separate external schedule.
 execution_invariants:
-- Use existing runner and checkpoint store, detached srun steps inside retained interactive allocation;
-  do not cancel allocation14372.
-- Keep active E09 source/configuration immutable; qualify a new execution snapshot for any repairs.
-- Rationales remain disabled; ontology loading and projection remain native.
-- Never use private reporting references for optimization; preserve role-separated training and complete
-  final populations.
-- Keep all mandatory controls and stochastic training/prompt seeds. Artifact-identical deterministic copies
-  are reuse, not replication.
-- Carry forward cumulative accounting and protected reserves. A 144-hour goal is neither a budget reset
-  nor a kill timeout.
+  - Use existing runner and checkpoint store, detached srun steps inside retained interactive
+    allocation; do not cancel allocation14372.
+  - Keep active E09 source/configuration immutable; qualify a new execution snapshot for any
+    repairs.
+  - Rationales remain disabled; ontology loading and projection remain native.
+  - Never use private reporting references for optimization; preserve role-separated training and
+    complete final populations.
+  - Keep all mandatory controls and stochastic training/prompt seeds. Artifact-identical
+    deterministic copies are reuse, not replication.
+  - Carry forward cumulative accounting and protected reserves. A 144-hour goal is neither a budget
+    reset nor a kill timeout.
 current_sizing_scenario:
   not_a_measured_full_scale_forecast: true
   native_class_census:
@@ -203,23 +215,38 @@ current_sizing_scenario:
   global_raw_candidates_three_pairs_at_k20: 19678080
   combined_raw_pairs_per_profile_seed: 21246730
   illustrative_seconds_per_pair:
-  - 0.08
-  - 0.168
+    - 0.08
+    - 0.168
   one_pass_hours_before_fitting_setup_safety:
-  - 472
-  - 992
+    - 472
+    - 992
   required_pairs_per_second_for_one_pass_in_60h_with_1_5_safety: 147.55
   unknowns:
-  - Full final eligibility and exact-match prefilter
-  - Final warm/scaled throughput
-  - Distinct model/head/seed work after proven reuse
-  - Fitting and hosted-call costs
-  - Extra feature-track scope
-  public_local_input_gap: Current prepared source unions lose original query membership and fail the strict
-    exporter; repair gold-free preparation/runtime/export contract before final inference.
-source_inventory_sha256: 4fecfe37bbb12d0fac52ea6d1d760e7d85f394f11c5a657969fb0e3b618fa4da
+    - Full final eligibility and exact-match prefilter
+    - Final warm/scaled throughput
+    - Distinct model/head/seed work after proven reuse
+    - Fitting and hosted-call costs
+    - Extra feature-track scope
+  public_local_input_preparation: Implemented native full populations and original-query local
+    sharding/export. Materialize each frozen final recipe and measure complete workloads; old
+    source-unioned research pools are not valid submission inventories.
+source_inventory_sha256: 13ca166dc50197a09cb548b28575fd85449cd6c7f915b7eb86bfef6569cf9263
 audit_bindings:
   inventory.json: 25c28067fbe371edec603459f21fad2669e2e8cbde57d2be08f0573f1ce373a9
   cost-audit.json: c1b42d3432ea4cdac554d108de11900c9027852a2d466222dddcf26307284388
   branch-readiness.json: 91ab8afc456b26f9377dbaf03274621fabd55097ae2d95f8b46fd71781607ea7
 target_is_hard_limit: false
+historical_source_inventory:
+  path: data/experiments-v2/prepared-campaign-10/campaign.lock.yaml
+  sha256: 4fecfe37bbb12d0fac52ea6d1d760e7d85f394f11c5a657969fb0e3b618fa4da
+  declared_remaining_cells:
+    development: 116
+    composition: 8
+    class_final: 63
+    total: 187
+amendment_inventory: data/experiments-v2/prepared-campaign-12/preparation-summary.json
+implementation_handoff: specs/experiments/IMPLEMENTATION-HANDOFF.md
+declaration_amendment:
+  E08_repeated_dedup_control: 1
+  E10_E14_E23_step_splits: 0
+  E24_D0_four_core_arms: 4
