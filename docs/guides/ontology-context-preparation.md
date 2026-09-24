@@ -77,6 +77,20 @@ context, ontology identity and immutable policy; study publication verifies this
 trusted preparation receipt and the complete resource hash without parsing OWL.
 Participant uploads cannot establish their own admission authority.
 
+For a native round-trip check of an operational resource:
+
+```sh
+.venv/bin/python -m tools.verify_context_resource DOID \
+  --context data/explanation-framework/context/doid \
+  --resource resources/doid.ofn --output resources/doid.parity.json
+```
+
+This compares the exported logical axioms against the verified original context,
+then checks every exported annotation predicate and nested qualifier against the
+policy. It parses the Functional Syntax with the installed native runtime. Omitting
+`--context` reparses the pinned original source as an additional independent check.
+The report distinguishes these two sources of expected logical axioms.
+
 Fact and summary reads have byte budgets as well as row limits. Oversized values
 return a typed axiom reference with explicit partial status; the faithful original
 is retained. Inline axiom detail is capped at 2 MiB. Offline/local consumers can use
