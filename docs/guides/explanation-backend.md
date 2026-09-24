@@ -97,6 +97,19 @@ exact-inspect verify-backend --package prepared/stages/STAGE/package.json --outp
 exact-inspect export --package prepared/stages/STAGE/package.json --output development.zip
 ```
 
+Measure fresh CLI startup, artifact admission, child-process memory and actual loopback
+HTTP reads separately from the contract/fixture verifier:
+
+```sh
+python -m tools.verify_explanation_runtime \
+  --package prepared/stages/STAGE/package.json --output verification-http \
+  --profile local_app --hardware-profile detected --storage-profile local-ssd
+```
+
+Use the actual storage profile for the package location. The command starts and stops
+its own local server, writes `verification-http/http-runtime.json`, and exits nonzero
+when a measured check fails. It does not flush the operating-system page cache.
+
 The API includes `/api/v1/ontologies`, `/entities`, `/entity-context`, `/entity-facts`,
 `/hierarchy`, explicit `/axioms/{id}`, run sources/candidates/pair/evidence, prepared
 `/explanations/{id}`, and job status. FastAPI publishes `/openapi.json`.
