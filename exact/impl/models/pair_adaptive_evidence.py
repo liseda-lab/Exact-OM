@@ -60,6 +60,66 @@ class PairAdaptiveEvidenceMixin:
             "attr_nonempty": int(attr_nonempty),
         }
 
+    def _evidence_collection_counts(self, src_feats, tgt_feats, hierarchy, sim, diff, attr):
+        rows = []
+        for side, prefix, feats in (("source", "src", src_feats), ("target", "tgt", tgt_feats)):
+            channels = [
+                (
+                    "hierarchy",
+                    family,
+                    len(feats.get("hierarchy", {}).get(family, [])),
+                    payload,
+                    self.max_hierarchy_triples_per_family,
+                )
+                for family, payload in hierarchy.items()
+            ]
+            channels.extend(
+                [
+                    (
+                        "similarity",
+                        None,
+                        len(feats.get("object_triples", [])),
+                        sim,
+                        self.max_object_triples,
+                    ),
+                    (
+                        "difference",
+                        None,
+                        len(feats.get("object_triples", [])),
+                        diff,
+                        self.max_diff_triples,
+                    ),
+                    (
+                        "attributes",
+                        None,
+                        len(feats.get("attributes", [])),
+                        attr,
+                        self.max_attr_items,
+                    ),
+                ]
+            )
+            for channel, family, available, payload, limit in channels:
+                selected = len(payload.get(prefix + "_selected", []))
+                rows.append(
+                    {
+                        "side": side,
+                        "channel": channel,
+                        "family": family,
+                        "scope": "bounded_entity_feature_cache",
+                        "available_count": available,
+                        "ontology_available_count": None,
+                        "eligible_count": available,
+                        "selected_count": selected,
+                        "selection_limit": limit,
+                        "omission_reason": (
+                            "channel_disabled"
+                            if not self.use_context
+                            else "pair_selection_or_limit" if selected < available else None
+                        ),
+                    }
+                )
+        return rows
+
     def _batch_selected_evidence_stats(
         self,
         pair_payloads: Sequence[Dict[str, Any]],
@@ -148,35 +208,50 @@ class PairAdaptiveEvidenceMixin:
         item: Dict[str, Any],
         family: Optional[str] = None,
     ) -> str:
-        triple = [self._normalize_text(value) for value in list(item.get("triple") or [])[:3]]
-        payload = {
-            "channel": self._normalize_text(channel),
-            "side": self._normalize_text(side),
-            "family": self._normalize_text(family),
-            "triple": triple,
-            "property": self._normalize_text(item.get("property", item.get("prop"))),
-            "value": self._normalize_text(item.get("value")),
-            "text": self._normalize_text(item.get("text")),
-        }
-        payload.update(
+        from exact.runs.decisions import digest, feature_terms
+
+        semantic = feature_terms(item)
+        has_identity = bool(semantic.get("subject_iri") or semantic.get("entity_iri"))
+        if has_identity:
+            return digest(
+                {
+                    "interpretation": item.get("interpretation", "projected"),
+                    "family": family,
+                    "terms": semantic,
+                }
+            )
+        # Legacy compatibility: the alias explicitly carries no semantic identity.
+        return "legacy:" + digest(
             {
-                key: self._normalize_text(item[key])
-                for key in (
-                    "subject_iri",
-                    "object_iri",
-                    "rel_iri",
-                    "property_iri",
-                    "prop_iri",
-                    "datatype",
-                    "language",
-                )
-                if item.get(key) is not None
+                "channel": channel,
+                "side": side,
+                "family": family,
+                "display": {
+                    key: item.get(key) for key in ("triple", "property", "prop", "value", "text")
+                },
             }
         )
-        digest = hashlib.sha1(
-            json.dumps(payload, ensure_ascii=False, sort_keys=True).encode("utf-8")
-        ).hexdigest()[:16]
-        return f"{payload['channel']}-{payload['side']}-{digest}"
+
+    @staticmethod
+    def _semantic_metadata(item):
+        return {
+            key: item[key]
+            for key in (
+                "source_axiom_refs",
+                "grouped_semantic_features",
+                "literal_lexical_form",
+                "literal_terms",
+                "axiom_origins",
+                "derivation",
+                "provenance_status",
+                "interpretation",
+                "entity_kind",
+                "type_closure",
+                "role",
+                "rel_iri",
+            )
+            if key in item
+        }
 
     def _with_item_id(
         self,
@@ -352,7 +427,7 @@ class PairAdaptiveEvidenceMixin:
         ]
         hydrated["attributes"] = attributes
         hydrated["explanation_schema_version"] = max(
-            3,
+            4,
             int(hydrated.get("explanation_schema_version", 0) or 0),
         )
         return hydrated

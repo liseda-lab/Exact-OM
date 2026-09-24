@@ -106,6 +106,11 @@ class RunLayout:
         return self.explanations_dir / "index.json"
 
     @property
+    def candidate_decisions_path(self) -> Path:
+        """Versioned observations from actual candidate stage boundaries."""
+        return self.root / "candidate_decisions.json"
+
+    @property
     def source_decisions_path(self) -> Path:
         """Return the frozen source-level decision audit artifact."""
         return self.root / "source_decisions.json"

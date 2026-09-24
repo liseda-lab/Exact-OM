@@ -83,6 +83,30 @@ class AuditIOMixin:
                 ]
             )
         frame = frame.copy()
+        retrieval_frame = getattr(self.dataset, "dataframe", None)
+        if retrieval_frame is not None and "Src" in retrieval_frame and "Tgt" in retrieval_frame:
+            from exact.runs.decisions import typed_pair
+
+            retrieval = {typed_pair(row): row for row in retrieval_frame.to_dict("records")}
+            candidate_pool = getattr(self.dataset, "_candidates", None)
+            if candidate_pool is not None and "Src" in candidate_pool and "Tgt" in candidate_pool:
+                group_columns = ["Src"] + (["SrcKind"] if "SrcKind" in candidate_pool else [])
+                ranks = {}
+                for _, group in candidate_pool.groupby(group_columns, sort=False, dropna=False):
+                    for rank, row in enumerate(group.to_dict("records"), 1):
+                        ranks[typed_pair(row)] = rank
+                frame["cand_rank"] = [
+                    ranks.get(typed_pair(row)) for row in frame.to_dict("records")
+                ]
+                frame["cand_ordering"] = "saved_candidate_pool_order"
+                frame["cand_rank_provenance"] = "derived_from_saved_artifacts"
+                frame["cand_tie_rule"] = "original_saved_order"
+            for column in retrieval_frame.columns:
+                if str(column).startswith("cand_") and column not in frame:
+                    frame[column] = [
+                        retrieval.get(typed_pair(row), {}).get(column)
+                        for row in frame.to_dict("records")
+                    ]
         for alias, column in (("src_iri", "Src"), ("tgt_iri", "Tgt")):
             if alias not in frame:
                 continue
@@ -307,6 +331,16 @@ class AuditIOMixin:
             stream.flush()
             os.fsync(stream.fileno())
         temporary.replace(destination)
+        from exact.runs.decisions import write_candidate_decisions
+
+        write_candidate_decisions(
+            self.output_dir,
+            frame,
+            typed,
+            policy=policy,
+            pool=getattr(self.dataset, "candidate_pool_manifest", None),
+            initial=getattr(self.dataset, "_candidate_stage_observations", None),
+        )
         return destination
 
     @staticmethod
@@ -614,6 +648,8 @@ class AuditIOMixin:
                 row[key] = value
         if "S_final" not in row:
             return None
+        if isinstance(record.get("candidate_decision"), dict):
+            row["candidate_decision"] = record["candidate_decision"]
         evidence_items = self._selector_evidence_items_for_record(record)
         if evidence_items:
             row["selector_evidence_items"] = evidence_items
@@ -636,6 +672,8 @@ class AuditIOMixin:
         )
         record.setdefault("kind", record["src_kind"])
         record.setdefault("llm_pair_brief", candidate.get("llm_pair_brief", ""))
+        if isinstance(candidate.get("candidate_decision"), dict):
+            record["candidate_decision"] = candidate["candidate_decision"]
 
         prediction = dict(record.get("prediction") or {})
         prediction.setdefault("ground_truth", candidate.get("ground_truth"))

@@ -507,6 +507,7 @@ class PairAdaptiveChannelsMixin:
                 "hierarchy",
                 "source",
                 {
+                    **(item if isinstance(item, dict) else {}),
                     "triple": list(self._hier_item_triple(item)),
                     "specificity": self._hier_item_specificity(item),
                     "subject_iri": self._hier_item_subject_iri(item),
@@ -523,6 +524,7 @@ class PairAdaptiveChannelsMixin:
                 "hierarchy",
                 "target",
                 {
+                    **(item if isinstance(item, dict) else {}),
                     "triple": list(self._hier_item_triple(item)),
                     "specificity": self._hier_item_specificity(item),
                     "subject_iri": self._hier_item_subject_iri(item),
@@ -805,6 +807,7 @@ class PairAdaptiveChannelsMixin:
                     "triple": list(item["triple"]),
                     "support": float(src_support[pos]),
                     "edge_ic": float(item.get("score", 0.0)),
+                    **self._semantic_metadata(item),
                     "subject_iri": self._normalize_text(item.get("subject_iri")),
                     "object_iri": self._normalize_text(item.get("object_iri")),
                     "rel_iri": self._normalize_text(item.get("rel_iri")),
@@ -826,6 +829,7 @@ class PairAdaptiveChannelsMixin:
                     "triple": list(item["triple"]),
                     "support": float(tgt_support[pos]),
                     "edge_ic": float(item.get("score", 0.0)),
+                    **self._semantic_metadata(item),
                     "subject_iri": self._normalize_text(item.get("subject_iri")),
                     "object_iri": self._normalize_text(item.get("object_iri")),
                     "rel_iri": self._normalize_text(item.get("rel_iri")),
@@ -936,6 +940,7 @@ class PairAdaptiveChannelsMixin:
                     "difference",
                     side,
                     {
+                        **self._semantic_metadata(item),
                         "triple": list(item["triple"]),
                         "state": state,
                         "edge_ic": float(item.get("score", 0.0)),
@@ -1129,6 +1134,7 @@ class PairAdaptiveChannelsMixin:
                 {
                     "triple": list(item["triple"]),
                     "edge_ic": float(item.get("score", 0.0)),
+                    **self._semantic_metadata(item),
                     "subject_iri": self._normalize_text(item.get("subject_iri")),
                     "object_iri": self._normalize_text(item.get("object_iri")),
                     "rel_iri": self._normalize_text(item.get("rel_iri")),
@@ -1150,6 +1156,7 @@ class PairAdaptiveChannelsMixin:
                 {
                     "triple": list(item["triple"]),
                     "edge_ic": float(item.get("score", 0.0)),
+                    **self._semantic_metadata(item),
                     "subject_iri": self._normalize_text(item.get("subject_iri")),
                     "object_iri": self._normalize_text(item.get("object_iri")),
                     "rel_iri": self._normalize_text(item.get("rel_iri")),
@@ -1476,6 +1483,7 @@ class PairAdaptiveChannelsMixin:
                 anchor = dict(bank[anchor_idx]) if bank and 0 <= int(anchor_idx) < len(bank) else {}
                 selected.append(
                     {
+                        **self._semantic_metadata(item),
                         "item_id": self._normalize_text(item.get("item_id")),
                         "property": self._normalize_text(item.get("prop")),
                         "property_iri": self._normalize_text(item.get("prop_iri")),

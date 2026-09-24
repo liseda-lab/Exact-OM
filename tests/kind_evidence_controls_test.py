@@ -46,7 +46,11 @@ def test_property_signature_and_usage_are_controlled_without_mutating_cached_evi
     signatures.attach_dataset(dataset)
     features = signatures._experiment_entity_features(SRC + "hasPart", "src")
     relations = {item["rel_iri"] for item in features["object_triples"]}
-    assert {"domain", "range", "http://www.w3.org/2002/07/owl#inverseOf"} <= relations
+    assert {
+        "http://www.w3.org/2000/01/rdf-schema#domain",
+        "http://www.w3.org/2000/01/rdf-schema#range",
+        "http://www.w3.org/2002/07/owl#inverseOf",
+    } <= relations
     inverse = next(
         item for item in features["object_triples"] if item["rel_iri"].endswith("inverseOf")
     )

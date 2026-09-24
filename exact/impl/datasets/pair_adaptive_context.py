@@ -73,7 +73,7 @@ class PairAdaptiveContextDataset(ContextDataset):
         payload = super()._cache_fingerprint_payload()
         payload.update(
             {
-                "evidence_schema": 3,
+                "evidence_schema": 4,
                 "projection_include_literals": self.projection_include_literals,
                 "hierarchical_relation_families": self.hierarchical_relation_families,
                 "hierarchy_max_depth": self.hierarchy_max_depth,
@@ -403,7 +403,21 @@ class PairAdaptiveContextDataset(ContextDataset):
         seen: set[Tuple[str, str, str]] = set()
         for item in triples:
             key = tuple(str(value) for value in item.get("triple", ()))
-            if len(key) != 3 or key in seen:
+            if len(key) != 3:
+                continue
+            if key in seen:
+                original = next(
+                    row
+                    for row in deduplicated
+                    if tuple(str(value) for value in row.get("triple", ())) == key
+                )
+                original.setdefault("grouped_semantic_features", []).append(
+                    {
+                        field: item[field]
+                        for field in ("subject_iri", "object_iri", "rel_iri")
+                        if field in item
+                    }
+                )
                 continue
             seen.add(key)
             deduplicated.append(item)
@@ -426,12 +440,26 @@ class PairAdaptiveContextDataset(ContextDataset):
             prop_label = graph.get_labels(value.property_iri)[0]
             dedupe_key = (prop_label, literal)
             if dedupe_key in seen:
+                original = next(
+                    item for item in items if (item["prop"], item["value"]) == dedupe_key
+                )
+                original.setdefault("grouped_semantic_features", []).append(
+                    {
+                        "entity_iri": iri,
+                        "prop_iri": value.property_iri,
+                        "literal_lexical_form": value.value,
+                        "value": literal,
+                        "datatype": value.datatype,
+                        "language": value.lang,
+                    }
+                )
                 continue
             seen.add(dedupe_key)
             items.append(
                 {
                     "prop": prop_label,
                     "prop_iri": value.property_iri,
+                    "literal_lexical_form": value.value,
                     "datatype": value.datatype,
                     "language": value.lang,
                     "value": literal,
@@ -610,6 +638,27 @@ class PairAdaptiveContextDataset(ContextDataset):
             feats = self._bundle_for_individual(iri, graph, side)
         else:
             raise ValueError(f"Feature extraction is not implemented for {resolved_kind.value!r}")
+        from exact.io.sources.feature_provenance import FeatureProvenance
+
+        if not hasattr(self, "_feature_provenance"):
+            self._feature_provenance = {}
+        if side not in self._feature_provenance:
+            self._feature_provenance[side] = FeatureProvenance(self._source_for_side(side))
+        provenance = self._feature_provenance[side]
+        for family, items in feats.get("hierarchy", {}).items():
+            predicates = (self.hierarchical_relation_families.get(family) or {}).get(
+                "iri_aliases", []
+            )
+            feats["hierarchy"][family] = [
+                provenance.enrich(
+                    item, kind=resolved_kind.value, family=family, predicates=predicates
+                )
+                for item in items
+            ]
+        for channel in ("object_triples", "attributes"):
+            feats[channel] = [
+                provenance.enrich(item, kind=resolved_kind.value) for item in feats.get(channel, [])
+            ]
         self._entity_feature_cache[key] = feats
         return feats
 

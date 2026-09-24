@@ -687,6 +687,17 @@ class CandidateSetSelector(
         if self.replace_final_score:
             df["S_final"] = df["S_select"]
 
+        from exact.runs.decisions import observe_selection
+
+        observe_selection(
+            df,
+            implementation=f"{type(self).__module__}.{type(self).__name__}",
+            config={
+                "strategy": self.strategy,
+                "nil": self._nil_meta,
+                "replace_final_score": self.replace_final_score,
+            },
+        )
         self._sync_results_json(df, results_json)
         elapsed = time.perf_counter() - start
         n_sources = count_source_groups(df)

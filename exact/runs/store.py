@@ -63,13 +63,20 @@ def _target_iri(record: Mapping[str, Any]) -> Optional[str]:
     return None
 
 
-def _pair(record: Mapping[str, Any]) -> Optional[tuple[str, str]]:
+def _pair(record: Mapping[str, Any]) -> Optional[tuple[str, str, str, str]]:
     try:
         source = _source_iri(record)
     except ValueError:
         return None
     target = _target_iri(record)
-    return (source, target) if target is not None else None
+    if target is None:
+        return None
+    return (
+        source,
+        target,
+        str(record.get("SrcKind", record.get("src_kind")) or "class"),
+        str(record.get("TgtKind", record.get("tgt_kind")) or "class"),
+    )
 
 
 def _without_internal_fields(record: Mapping[str, Any]) -> dict[str, Any]:
@@ -100,7 +107,7 @@ class ExplanationStore:
         self.overlays_dir = self.directory / "overlays"
         self.run_id = run_id
         self.shard_reads = 0
-        self._overlay_cache: Optional[dict[tuple[str, str], dict[str, Any]]] = None
+        self._overlay_cache: Optional[dict[tuple[str, str, str, str], dict[str, Any]]] = None
         self.directory.mkdir(parents=True, exist_ok=True)
         self.shards_dir.mkdir(parents=True, exist_ok=True)
         if self.index_path.is_file():
@@ -409,9 +416,9 @@ class ExplanationStore:
                         if isinstance(payload, dict):
                             yield payload
 
-    def _overlay_lookup(self) -> dict[tuple[str, str], dict[str, Any]]:
+    def _overlay_lookup(self) -> dict[tuple[str, str, str, str], dict[str, Any]]:
         if self._overlay_cache is None:
-            lookup: dict[tuple[str, str], dict[str, Any]] = {}
+            lookup: dict[tuple[str, str, str, str], dict[str, Any]] = {}
             for overlay in self._iter_overlay_records():
                 key = _pair(overlay)
                 if key is not None:

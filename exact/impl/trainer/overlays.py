@@ -300,6 +300,12 @@ class OverlaysMixin:
             "confidences": confidences,
             "prediction": prediction,
         }
+        from exact.runs.decisions import payload
+
+        overlay["candidate_decision"] = payload(row)
+        for column in ("SrcKind", "TgtKind"):
+            if column in row and self._row_scalar(row, column) is not None:
+                overlay[column] = str(row[column])
         source_record = (result_record_lookup or {}).get((src, tgt))
         if source_record:
             source_prediction = source_record.get("prediction") or {}

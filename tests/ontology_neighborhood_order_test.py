@@ -131,7 +131,7 @@ def test_tie_order_correctness_change_invalidates_evidence_schema_2(monkeypatch)
         setattr(dataset, name, value)
     current = dataset._cache_fingerprint_payload()
     prior = {**current, "evidence_schema": 2}
-    assert current["evidence_schema"] == 3
+    assert current["evidence_schema"] == 4
     current_fingerprint = dataset.cache_fingerprint
     monkeypatch.setattr(dataset, "_cache_fingerprint_payload", lambda: prior)
     assert dataset.cache_fingerprint != current_fingerprint

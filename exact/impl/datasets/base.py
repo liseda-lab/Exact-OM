@@ -2247,6 +2247,9 @@ class BaseAlignmentDataset(IDataset):
 
         if self.has_cache():
             self.load()
+            from exact.runs.decisions import observe_dataset
+
+            observe_dataset(self, restored=True)
             return self
 
         # Inference set
@@ -2399,6 +2402,9 @@ class BaseAlignmentDataset(IDataset):
 
         self.log("#Processing Done", level="debug")
 
+        from exact.runs.decisions import observe_dataset
+
+        observe_dataset(self)
         return self
 
     def freeze_source_universe(self, iris: Sequence[str], *, cap: Optional[int], seed: int) -> None:

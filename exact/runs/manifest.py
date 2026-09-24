@@ -226,6 +226,7 @@ def refresh_manifest(
         (layout.stats_dir / "llm_calibration.json", "stats", 1, False),
         (layout.explanation_index_path, "explanations", 1, False),
         (layout.source_decisions_path, "source_decisions", 2, True),
+        (layout.candidate_decisions_path, "candidate_decisions", 1, True),
         (layout.full_explanations_path, "explanations_export", 1, False),
     ]
     for path, kind, schema_version, checksum in candidates:

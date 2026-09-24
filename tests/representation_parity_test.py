@@ -8,6 +8,26 @@ dataset = kind_evidence_controls_test.dataset
 SRC = kind_evidence_controls_test.SRC
 
 
+def _scoring_features(value):
+    provenance_fields = {
+        "source_axiom_refs",
+        "axiom_origins",
+        "derivation",
+        "provenance_status",
+        "interpretation",
+        "literal_terms",
+    }
+    if isinstance(value, dict):
+        return {
+            key: _scoring_features(item)
+            for key, item in value.items()
+            if key not in provenance_fields
+        }
+    if isinstance(value, list):
+        return [_scoring_features(item) for item in value]
+    return value
+
+
 def test_real_owl_to_csv_preserves_typed_evidence_and_literal_identity(dataset, tmp_path):
     destination = tmp_path / "matched-source"
     manifest = export_matched_csv(dataset.source, destination)
@@ -34,9 +54,14 @@ def test_real_owl_to_csv_preserves_typed_evidence_and_literal_identity(dataset, 
         EntityKind.INDIVIDUAL,
     ):
         for iri in dataset.source.entities(kind):
-            assert restored.get_entity_features(iri, "src", kind) == dataset.get_entity_features(
-                iri, "src", kind
-            )
+            owl_features = dataset.get_entity_features(iri, "src", kind)
+            csv_features = restored.get_entity_features(iri, "src", kind)
+            # The matched CSV retains scoring terms, but does not carry original
+            # OWL axiom syntax. Its new audit metadata must disclose this loss.
+            assert _scoring_features(csv_features) == _scoring_features(owl_features)
+            for item in csv_features["attributes"]:
+                assert item["provenance_status"] == "provenance_unavailable"
+                assert item["source_axiom_refs"] == []
     assert restored._property_experiment_extras("src") == dataset._property_experiment_extras("src")
     assert evidence_inventory(csv_source)["sha256"] == manifest["source_inventory"]["sha256"]
 

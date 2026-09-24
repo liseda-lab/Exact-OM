@@ -7,7 +7,7 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
-from pyowl_core import IRI, MappingResolver, OntologyView
+from pyowl_core import IRI, ImportPolicy, LoadOptions, MappingResolver, OntologyView
 
 from exact.core.contracts.knowledge import KnowledgeSource
 from exact.core.entities.graph import AnnotationValue, Edge
@@ -130,7 +130,9 @@ def create_source(path: Path, *, options: Mapping[str, Any] | None = None) -> Kn
     """Load an OWL source with optional labels and ABox filtering."""
 
     normalized = dict(options or {})
-    unknown = sorted(set(normalized) - {"include_abox", "label_properties", "imports"})
+    unknown = sorted(
+        set(normalized) - {"include_abox", "label_properties", "imports", "import_policy"}
+    )
     if unknown:
         raise SourceOptionsError(f"Unknown OWL source option(s): {', '.join(unknown)}")
     label_properties = normalized.get("label_properties")
@@ -143,8 +145,15 @@ def create_source(path: Path, *, options: Mapping[str, Any] | None = None) -> Kn
     include_abox = normalized.get("include_abox", True)
     if not isinstance(include_abox, bool):
         raise SourceOptionsError("include_abox must be a boolean")
+    load_options = None
+    if "import_policy" in normalized:
+        try:
+            load_options = LoadOptions(imports=ImportPolicy(normalized["import_policy"]))
+        except (ValueError, TypeError) as exc:
+            raise SourceOptionsError("import_policy must be a supported OWL import policy") from exc
     source = load_ontology(
         Path(path),
+        options=load_options,
         label_properties=label_properties,
         resolver=_import_resolver(normalized.get("imports", {}), Path(path).parent),
     )

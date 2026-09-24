@@ -218,3 +218,23 @@ def test_csv_explicit_inventory_rejects_invalid_declarations(tmp_path, content):
         CsvKgSource.from_path(
             tmp_path, options={"triples_files": ["triples.csv"], "entities_file": "entities.csv"}
         )
+
+
+def test_owl_root_only_policy_is_explicit_and_default_stays_strict(tmp_path):
+    from pyowl_core import ImportPolicy, UnresolvedImportError
+
+    path = tmp_path / "imported.owl"
+    path.write_text(
+        OWL.read_text().replace(
+            '<owl:Ontology rdf:about="http://example.org/mini/src"/>',
+            '<owl:Ontology rdf:about="http://example.org/mini/src">'
+            '<owl:imports rdf:resource="urn:missing-import"/></owl:Ontology>',
+        )
+    )
+    with pytest.raises(UnresolvedImportError):
+        resolve(path)
+    source = resolve(path, options={"import_policy": "ignore"})
+    assert source.owl_snapshot().load_options.imports == ImportPolicy.IGNORE
+    assert source.entities(EntityKind.CLASS)
+    with pytest.raises(SourceOptionsError, match="import_policy"):
+        resolve(path, options={"import_policy": "unrecognized"})

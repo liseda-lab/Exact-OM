@@ -51,6 +51,26 @@ class RunReader:
             return
         yield from self._load_legacy_explanations()
 
+    def source_decisions(self) -> dict[str, Any] | None:
+        """Read an explicitly exported source universe and optional NIL decisions."""
+        path = self.layout.source_decisions_path
+        if not path.is_file():
+            return None
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(payload, dict) or payload.get("schema_version") not in {1, 2}:
+            raise ValueError("Unsupported source decision schema")
+        return payload
+
+    def candidate_decisions(self) -> dict[str, Any] | None:
+        """Read the explicit stage export; old runs have no inferred replacement."""
+        path = self.layout.candidate_decisions_path
+        if not path.is_file():
+            return None
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(payload, dict) or payload.get("schema_version") != 1:
+            raise ValueError("Unsupported candidate decision schema")
+        return payload
+
     def manifest(self) -> dict[str, Any]:
         if self.layout.manifest_path.is_file():
             return dict(RunManifest.open(self.layout).payload)

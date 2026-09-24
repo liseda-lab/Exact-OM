@@ -1749,6 +1749,14 @@ class PairAdaptiveSemanticScorer(
                 {
                     "src_label": src_best_label,
                     "tgt_label": tgt_best_label,
+                    "evidence_counts": self._evidence_collection_counts(
+                        src_feats,
+                        tgt_feats,
+                        hierarchy_payloads,
+                        sim_payload,
+                        diff_payload,
+                        attr_payload,
+                    ),
                     "hierarchy": hierarchy_payloads,
                     "sim": sim_payload,
                     "diff": diff_payload,
@@ -2619,6 +2627,7 @@ class PairAdaptiveSemanticScorer(
                             "source": pair_briefs[idx],
                             "target": "",
                         },
+                        "evidence_counts": payload["evidence_counts"],
                         "triple_attributions": {
                             "hierarchy": {
                                 family: {

@@ -203,6 +203,14 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
                     ),
                     level="info",
                 )
+                from exact.runs.decisions import observe_cardinality
+
+                observe_cardinality(
+                    getattr(self, "_final_candidate_frame", None),
+                    alignment,
+                    filtered,
+                    target_cardinality=target_cardinality,
+                )
                 return filtered
             return alignment
 
@@ -249,6 +257,16 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
                 level="info",
             )
 
+        from exact.runs.decisions import observe_cardinality
+
+        observe_cardinality(
+            getattr(self, "_final_candidate_frame", None),
+            prefiltered_mappings + alignment,
+            final_alignment,
+            source_cardinality=cardinality,
+            target_cardinality=target_cardinality,
+            protected_pairs=protected_pairs,
+        )
         return final_alignment
 
     def save_results(
@@ -732,6 +750,11 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
         formats = ["tsv-global", "tsv-local"] if output_formats is None else list(output_formats)
         if not formats:
             raise ValueError("At least one alignment output format must be configured")
+        self._decision_policy = {
+            **getattr(self, "_decision_policy", {}),
+            "relation_prediction": relation_prediction,
+            "relation_semantic_backend": relation_semantic_backend,
+        }
         decision_inputs = list(preds)
         scored = self._scored_alignment_frame(
             preds,

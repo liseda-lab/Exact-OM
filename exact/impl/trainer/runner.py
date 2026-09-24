@@ -1178,6 +1178,16 @@ class SemanticAlignmentRunner(
                         index=False, name=None
                     )
                 ]
+        if not candidate_df.empty:
+            from exact.runs.decisions import observe_extraction
+
+            observe_extraction(
+                candidate_df,
+                predictions,
+                threshold=state.threshold,
+                config=self._decision_policy,
+                implementation="exact.impl.trainer.runner:" + extraction_mode,
+            )
         self._final_candidate_frame = candidate_df.copy()
         nil_models = [
             model
@@ -1817,6 +1827,50 @@ class SemanticAlignmentRunner(
                         candidate_row["llm_source_choice"] = source_decision["choice"]
                 if gate_diagnostics is not None:
                     candidate_row.update(self._gate_candidate_fields(gate_diagnostics[idx]))
+                from exact.runs.decisions import append_event, candidate_values, event, pair_key
+
+                initial = getattr(self.dataset, "_candidate_stage_observations", {}).get(
+                    pair_key(candidate_row), {}
+                )
+                if initial:
+                    candidate_row["candidate_decision"] = initial["candidate_decision"]
+                candidate_row["candidate_decision"] = append_event(
+                    candidate_row,
+                    event(
+                        "pair_scoring",
+                        reason="scorer_returned",
+                        implementation=f"{type(self.model).__module__}.{type(self.model).__name__}",
+                        values=candidate_values(candidate_row),
+                    ),
+                )
+                if getattr(self.model, "use_llm", None) is False:
+                    candidate_row["candidate_decision"] = append_event(
+                        candidate_row,
+                        event(
+                            "llm_signal",
+                            status="not_run",
+                            outcome="not_applicable",
+                            reason="llm_disabled",
+                            implementation="exact.pipeline",
+                        ),
+                    )
+                elif gate_diagnostics is not None:
+                    invoked = bool(candidate_row.get("llm_gate_invoked"))
+                    candidate_row["candidate_decision"] = append_event(
+                        candidate_row,
+                        event(
+                            "llm_signal",
+                            status="completed" if invoked else "not_run",
+                            outcome=str(candidate_row.get("llm_gate_outcome") or "unknown"),
+                            reason="llm_invoked" if invoked else "llm_gate_skipped",
+                            implementation=f"{type(self.model).__module__}.{type(self.model).__name__}",
+                            values={
+                                key: value
+                                for key, value in candidate_values(candidate_row).items()
+                                if key == "p_llm" or key.startswith("llm_gate_")
+                            },
+                        ),
+                    )
                 self._candidate_rows.append(candidate_row)
 
             processed_examples += len(src_iri)
@@ -2151,6 +2205,22 @@ class SemanticAlignmentRunner(
         """
         current = df
         if len(getattr(self, "models", [])) <= 1:
+            if not current.empty:
+                from exact.runs.decisions import append_event, event
+
+                current["candidate_decision"] = [
+                    append_event(
+                        row,
+                        event(
+                            "selection",
+                            status="not_run",
+                            outcome="not_applicable",
+                            reason="no_additional_selector",
+                            implementation="exact.pipeline",
+                        ),
+                    )
+                    for row in current.to_dict("records")
+                ]
             return current
         checkpoint_every_groups = max(50000, max(1, int(log_every)) * 5000)
 
