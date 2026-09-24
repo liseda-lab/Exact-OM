@@ -67,6 +67,16 @@ required and do not present those external outcomes as completed compute.
 
 ## Work needed before the batches can be admitted
 
+The core runner, native ontology path, checkpoints and most method implementations exist.
+Required correctness work is concentrated in staged selection, case/label bindings,
+feature-specific diagnostics and final population/export handling. E16/E22 and later
+policy comparisons also need genuine upstream fitted artifacts; placeholder artifacts
+cannot make those steps ready. Measure pending fitting recipes before admission.
+
+Cross-cell caching, evidence replay and larger scoring batches are efficiency work.
+They should be prioritized where they save substantial repeated computation, but a
+scientifically ready, budgeted small comparison need not wait for every optimization.
+
 | Preparation task | Required result |
 | --- | --- |
 | Shared numerical work | Verified reuse for common training features, E01 extraction replay and E10 channel-evidence replay; immutable identities include actual evidence, population, model, numerical settings and role. |
@@ -155,10 +165,12 @@ aspirational and is not an additional runtime or admission limit.
 
 ## Execution handoff
 
-Only B0 currently has an active detached job: Slurm step **14372.1**, within the retained
-interactive allocation, tmux `exact-d1-production-14372`. Cold qualification passed and warm
-qualification was running at the planning audit. Its existing queue automatically proceeds to
-the four E09 arms only after admission. This plan does not alter that source snapshot or queue.
+Only B0 currently has an active detached job: Slurm step **14372.2**, within the retained
+interactive allocation, tmux `exact-d1-production-14372-replayfix`. Cold and warm scoring
+completed. A post-scoring check incorrectly required evaluation output from these inference-only
+jobs; the repair retained both completed runs and resumed at the completed-cache replay.
+The queue proceeds to the four E09 arms after the remaining qualification and admission checks.
+Its numerical source snapshot and scientific settings remain unchanged.
 
 Prepare each following batch using the existing campaign runner, verified output ports and
 measured admission. Keep one heavy GPU lane, durable checkpoints and one cumulative budget;

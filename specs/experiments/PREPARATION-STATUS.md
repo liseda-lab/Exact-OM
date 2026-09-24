@@ -342,3 +342,37 @@ guard remains in place. The new launcher log is
 `data/experiments-v2/d1-production-probe-01/launcher-14372.log`; `status.json` in that
 directory reports the active qualification phase. Relocation evidence is in
 `data/experiments-v2/d1-relocation-14372/`.
+
+
+## 2026-09-24: inference-only replay repair and retained-work continuation
+
+D1 cold300 and warm300 both completed all 5,998 scored pairs successfully. Step14372.1
+then failed because the replay validator required `evaluation_results.json`, although both
+jobs explicitly declared `run_eval: false`. This was a post-scoring validation failure.
+
+The repaired comparison requires both saved job declarations to disable evaluation before
+allowing an explicit prediction-only comparison. Mapping IDs, relations, device, numerical
+tolerance and completed-cache byte checks remain enforced. Default E00 comparison still
+requires metrics; skipped metrics are recorded as unchecked. All **50 focused CPU tests
+passed**; source change is `b156b1d`, with receipts under
+`data/experiments-v2/d1-replay-repair-01/`.
+
+Both complete extraction artifacts and original worker measurements were retained. Cold/warm
+maximum canonical mapping score drift was about 1.11e-16, below the 1e-5 GPU tolerance. The recovered warm receipt records its original
+2,336.91-second worker and 2,352.55-second cell duration; its phase allowance conservatively
+uses the original attempt remainder, not the much shorter repair/replay time. The failed
+6,082.21-second attempt, 144 hosted template calls and 18,433 tokens remain charged once.
+Recovery performed no model calls or rescoring. Prior receipts are archived in
+`d1-production-probe-01/validation-failure-14372-1/`.
+
+Continuation was submitted at **18:48 UTC** inside retained allocation14372 as detached
+**step14372.2**, tmux **`exact-d1-production-14372-replayfix`**. It reuses cold/warm receipts,
+then runs completed-cache replay, the two bounded hierarchy prefixes and D0 context before
+the existing conditional E09 continuation. The tested validation module is pinned separately;
+the original isolated extraction snapshot and native package identities remain unchanged.
+Monitor `d1-production-probe-01/status.json` and `launcher-14372-replayfix.log`.
+
+The user clarified that six days is a soft objective: longer execution is allowed. Batch
+admission continues to require scientific readiness and the cumulative resource budget;
+there is no additional six-day hard stop. See [SIX-DAY-BATCHES.md](SIX-DAY-BATCHES.md) for
+required implementation versus recommended efficiency work.
