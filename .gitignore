@@ -6,10 +6,8 @@
 /api_key
 /mapping_example*.json
 
-# Data folder
-
-/data/*
-!/data/*.py
+# Local datasets, experiment outputs, and recoverable scratch archives
+/data/
 
 # Experiments folder
 
