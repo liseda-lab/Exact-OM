@@ -13,7 +13,13 @@ from fastapi import FastAPI, Query, Request
 from fastapi.exceptions import RequestValidationError, ResponseValidationError
 from fastapi.responses import JSONResponse
 
-from .artifacts import BoundedCache, BundleLibrary, relative_path, validate_bundle
+from .artifacts import (
+    BoundedCache,
+    BundleLibrary,
+    read_metadata,
+    relative_path,
+    validate_bundle,
+)
 from .contracts import (
     CONTRACT_VERSION,
     DomainError,
@@ -101,6 +107,78 @@ class PreparedService:
                 self._verify_artifact(artifact)
                 hashes[Path(artifact.path).name] = artifact.sha256
         return hashes
+
+    def ontology_metadata(self, ontology_id: str) -> dict[str, Any]:
+        """Read bounded public manifest metadata without constructing a database reader."""
+        if ontology_id not in self.manifest.ontologies or not self.policy.allows_ontology(
+            ontology_id
+        ):
+            raise DomainError("not_found", "Resource unavailable", 404)
+        locator = self.manifest.ontologies[ontology_id]
+        self._verify_resource_files(locator)
+        key = canonical_hash([self.manifest.package_id, "ontology_metadata", ontology_id])
+        cached = self.cache.get(key)
+        if cached is not None:
+            return dict(cached)
+        metadata = read_metadata(relative_path(self.path.parent, locator + "/manifest.json"))
+        if metadata.get("ontology_version_id") != ontology_id:
+            raise DomainError("invalid_manifest", "Ontology metadata identity does not match", 409)
+        if any(
+            not isinstance(metadata.get(name, {}), dict)
+            for name in ("identity", "capabilities", "completeness")
+        ) or not isinstance(metadata.get("source_derivation") or {}, dict):
+            raise DomainError("invalid_manifest", "Ontology metadata has an invalid shape", 409)
+        derivation = metadata.get("source_derivation")
+        if derivation:
+            # A legacy raw receipt is hash-bound only; paths/notes never become API fields.
+            derivation = (
+                {
+                    name: derivation.get(name)
+                    for name in ("status", "receipt_hash", "original_source_sha256")
+                }
+                if derivation.get("status") == "declared_derivative"
+                else {
+                    "status": "declared_derivative",
+                    "receipt_hash": canonical_hash(derivation),
+                    "original_source_sha256": None,
+                }
+            )
+        result = {
+            "ontology_version_id": ontology_id,
+            "name": metadata.get("name"),
+            "scope": metadata.get("scope"),
+            "capabilities": {
+                name: value
+                for name, value in metadata.get("capabilities", {}).items()
+                if name
+                in {
+                    "provider",
+                    "kinds",
+                    "categories",
+                    "source_spans",
+                    "typed_expressions",
+                    "reasoner_inferred",
+                }
+            },
+            "completeness": {
+                name: value
+                for name, value in metadata.get("completeness", {}).items()
+                if name
+                in {
+                    "scope",
+                    "imports_complete",
+                    "extraction",
+                    "entity_count",
+                    "axiom_count",
+                    "category_counts",
+                    "domain_completeness",
+                }
+            },
+            "source_root_sha256": metadata.get("identity", {}).get("root_sha256"),
+            "source_derivation": derivation or None,
+        }
+        self.cache.put(key, result)
+        return result
 
     def context(self, ontology_id: str):
         """Open only the requested verified context index; no ontology parser is imported."""
@@ -293,16 +371,18 @@ def create_prepared_app(
             raise DomainError("invalid_cursor", "Invalid collection cursor")
         allowed = sorted(k for k in active.manifest.ontologies if active.policy.allows_ontology(k))
         remaining = [k for k in allowed if k > after]
-        items = [{"ontology_version_id": k} for k in remaining[:limit]]
+        items = [active.ontology_metadata(k) for k in remaining[:limit]]
         more = len(remaining) > limit
-        return Page(
-            items=items,
-            returned_count=len(items),
-            total_count=len(allowed),
-            next_cursor=encode_cursor(scope, remaining[limit - 1]) if more else None,
-            truncated=more,
-            scope=scope,
-            status="available" if allowed else "absent_in_scope",
+        return bounded(
+            Page(
+                items=items,
+                returned_count=len(items),
+                total_count=len(allowed),
+                next_cursor=encode_cursor(scope, remaining[limit - 1]) if more else None,
+                truncated=more,
+                scope=scope,
+                status="available" if allowed else "absent_in_scope",
+            )
         )
 
     @app.get("/api/v1/entities", response_model=Page[dict[str, Any]])

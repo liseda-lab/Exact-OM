@@ -117,3 +117,26 @@ def test_original_fact_ids_survive_physical_filtering(context, tmp_path):
         assert detail["original_axiom_digest"]
         assert detail["origins"]
         assert "forbidden-" not in json.dumps(detail)
+
+
+def test_portable_derivative_provenance_preserves_pins_without_private_notes(tmp_path):
+    from exact_inspect.contracts import canonical_hash
+
+    derivation = {
+        "source": {"path": "/private/original.owl", "sha256": "a" * 64},
+        "notes": {"answer_key": "private-adjudication"},
+    }
+    original = build_context_package(
+        core.load_snapshot(OWL), tmp_path / "raw-derived", source_derivation=derivation
+    )
+    policy = VisibilityPolicy()
+    filtered = export_policy_context(original, tmp_path / "derived", policy)
+    assert filtered.manifest["source_derivation"] == {
+        "status": "declared_derivative",
+        "receipt_hash": canonical_hash(derivation),
+        "original_source_sha256": "sha256:" + "a" * 64,
+    }
+    assert b"private" not in (filtered.path / "manifest.json").read_bytes()
+    narrower = VisibilityPolicy(categories=("labels",))
+    second = export_policy_context(filtered, tmp_path / "narrower-derived", narrower)
+    assert second.manifest["source_derivation"] == filtered.manifest["source_derivation"]

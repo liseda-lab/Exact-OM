@@ -87,7 +87,7 @@ class ExecutionLock(WireModel):
             "run-import": "decision-adapter/3",
             "profiles": "grounding-excerpts-and-comparisons/4",
             "comparisons": "grounding-excerpts-and-comparisons/4",
-            "portable-export": "inspection-bundle/2",
+            "portable-export": "inspection-bundle/3",
             "study-export": "study-publication/1",
         }
     )

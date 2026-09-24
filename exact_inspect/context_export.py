@@ -30,7 +30,7 @@ if TYPE_CHECKING:
     from .context import OntologyContext
 
 
-EXPORT_SCHEMA = "exact-policy-context/1"
+EXPORT_SCHEMA = "exact-policy-context/2"
 
 
 def export_policy_context(
@@ -205,6 +205,31 @@ def export_policy_context(
             )
             if key in context.manifest
         }
+        derivation = context.manifest.get("source_derivation")
+        if derivation:
+            # Provenance remains visible without copying arbitrary private repair
+            # notes or source paths into a participant-readable package.
+            if previous:
+                manifest["source_derivation"] = derivation
+            else:
+                source = derivation.get("source", {})
+                original_hash = source.get("sha256") if isinstance(source, dict) else None
+                if isinstance(original_hash, str):
+                    original_hash = original_hash.removeprefix("sha256:")
+                valid_hash = (
+                    isinstance(original_hash, str)
+                    and len(original_hash) == 64
+                    and all(character in "0123456789abcdef" for character in original_hash)
+                )
+                manifest["source_derivation"] = {
+                    "status": "declared_derivative",
+                    "receipt_hash": canonical_hash(derivation),
+                    "original_source_sha256": (
+                        "sha256:" + original_hash
+                        if isinstance(original_hash, str) and valid_hash
+                        else None
+                    ),
+                }
         manifest.update(
             {
                 "preparation_key": identity,

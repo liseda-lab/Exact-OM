@@ -245,9 +245,12 @@ def publish_handoff(
         for source in responses:
             copy_public(source, "verification/fixtures/" + source.name, "prepared_response")
         optional = {}
-        for name, source in (("execution_lock", execution_lock), ("claim_audit", claim_audit)):
-            if source is not None:
-                value = read_metadata(Path(source))
+        for name, optional_source in (
+            ("execution_lock", execution_lock),
+            ("claim_audit", claim_audit),
+        ):
+            if optional_source is not None:
+                value = read_metadata(Path(optional_source))
                 _public_data(value)
                 if (
                     name == "execution_lock"
@@ -262,9 +265,11 @@ def publish_handoff(
                     if gates["G3"]["result"] == "pass" and not value.get("all_supported"):
                         raise ValueError("Claim audit does not support a passed G3")
                 # The full lock may bind private local inputs; only record its hash.
-                optional[name] = _binding(Path(source), str(Path(source).resolve()))
+                optional[name] = _binding(
+                    Path(optional_source), str(Path(optional_source).resolve())
+                )
                 if name == "claim_audit":
-                    copy_public(Path(source), "verification/claim-audit.json", name)
+                    copy_public(Path(optional_source), "verification/claim-audit.json", name)
                     optional[name]["path"] = "verification/claim-audit.json"
 
         artifact_hashes = {artifact.path: artifact.sha256 for artifact in manifest.artifacts}
@@ -282,6 +287,9 @@ def publish_handoff(
             ):
                 raise ValueError("Inner ontology artifacts differ from the package inventory")
             ontologies[identity] = {
+                "name": inner.get("name"),
+                "root_sha256": inner.get("identity", {}).get("root_sha256"),
+                "source_derivation": inner.get("source_derivation"),
                 "manifest_sha256": file_hash(
                     relative_path(package.parent, locator) / "manifest.json"
                 ),

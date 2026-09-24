@@ -181,3 +181,72 @@ with TestClient(create_prepared_app(Path(sys.argv[1]))) as client:
     assert not any(name in sys.modules for name in ("exact", "pandas", "torch", "pyowl_core", "openai"))
 """
     subprocess.run([sys.executable, "-c", code, str(package)], check=True)
+
+
+def test_ontology_listing_reads_verified_metadata_without_constructing_indexes(
+    prepared, monkeypatch  # noqa: F811
+):
+    _, package, _, _ = prepared
+    bundle = validate_bundle(package)
+    ontology_id, locator = next(iter(bundle.ontologies.items()))
+    nested = package.parent / locator / "manifest.json"
+    metadata = json.loads(nested.read_bytes())
+    metadata["source_derivation"] = {
+        "status": "declared_derivative",
+        "receipt_hash": "sha256:" + "a" * 64,
+        "original_source_sha256": "sha256:" + "b" * 64,
+        "path": "/private/source.owl",
+        "private_notes": "not public",
+    }
+    metadata["capabilities"]["private_path"] = "/private/parser-cache"
+    nested.write_text(json.dumps(metadata))
+    package = publish_bundle(
+        package.parent, **bundle.model_dump(exclude={"package_id", "artifacts"})
+    )
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("Ontology listing must not construct an index reader")
+
+    monkeypatch.setattr("exact_inspect.context.OntologyContext", forbidden)
+    monkeypatch.setattr("exact_inspect.decisions.DecisionStore", forbidden)
+    app = create_prepared_app(package)
+    with TestClient(app) as client:
+        for _ in range(2):
+            response = client.get("/api/v1/ontologies")
+            assert response.status_code == 200, response.text
+            item = response.json()["items"][0]
+            assert item["ontology_version_id"] == ontology_id
+            assert item["name"] == metadata["name"]
+            assert item["scope"] == metadata["scope"]
+            assert item["capabilities"]["typed_expressions"] is True
+            assert item["capabilities"]["reasoner_inferred"]["status"] == "not_run"
+            assert item["completeness"] == metadata["completeness"]
+            assert item["source_root_sha256"] == metadata["identity"]["root_sha256"]
+            assert item["source_derivation"] == {
+                key: metadata["source_derivation"][key]
+                for key in ("status", "receipt_hash", "original_source_sha256")
+            }
+            assert "/private/" not in response.text and "parser" not in response.text
+            assert "options" not in response.text and "private_notes" not in response.text
+        assert app.state.service._contexts == app.state.service._runs == {}
+        # Cached summaries still verify the nested manifest's immutable file identity.
+        nested.write_text(nested.read_text() + " ")
+        changed = client.get("/api/v1/ontologies")
+        assert changed.status_code == 409
+        assert changed.json()["code"] == "corrupt_artifact"
+
+
+def test_ontology_listing_enforces_the_shared_response_byte_budget(
+    prepared, monkeypatch  # noqa: F811
+):
+    _, package, _, _ = prepared
+    app = create_prepared_app(package)
+    monkeypatch.setattr(
+        app.state.service,
+        "ontology_metadata",
+        lambda key: {"ontology_version_id": key, "name": "x" * (2 * 1024**2)},
+    )
+    with TestClient(app) as client:
+        response = client.get("/api/v1/ontologies")
+    assert response.status_code == 413
+    assert response.json()["code"] == "response_too_large"
