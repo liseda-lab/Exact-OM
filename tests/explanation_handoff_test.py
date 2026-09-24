@@ -72,6 +72,7 @@ def test_handoff_binds_public_inventory_without_promoting_original_source_gate(
     destination = tmp_path / "handoff"
     result = publish_handoff(package, verification, ledger, destination, repository_root=repository)
     assert result["publication_status"] == "complete"
+    assert "http_runtime" not in result
     assert result["acceptance_status"] == "blocked_input" and not result["frontend_admitted"]
     assert result["gates"]["G1"]["status"] == "blocked_input"
     assert result["gates"]["G1"]["checks"]["strict_original_doid"]["result"] == "fail"
@@ -170,7 +171,7 @@ def ontology_resource(prepared, tmp_path):  # noqa: F811
 
 
 def test_handoff_publishes_ontology_without_importing_parser_or_models(
-    handoff_inputs, ontology_resource, tmp_path
+    handoff_inputs, ontology_resource, http_receipt, tmp_path
 ):
     package, verification, ledger, repository = handoff_inputs
     destination = tmp_path / "parser-free-handoff"
@@ -201,12 +202,15 @@ assert not any(name.split('.')[0] in forbidden for name in sys.modules)
             str(destination),
             "--ontology-resource",
             str(ontology_resource),
+            "--http-verification",
+            str(http_receipt),
         ],
         check=True,
         capture_output=True,
         text=True,
     )
     result = json.loads((destination / "backend-handoff.json").read_text())
+    assert result["http_runtime"]["source_receipt_sha256"] == file_hash(http_receipt)
     identity, resource = next(iter(result["ontology_resources"].items()))
     assert resource["path"] == "resources/" + identity.removeprefix("sha256:") + ".ofn"
     assert file_hash(destination / resource["path"]) == resource["sha256"]
@@ -256,3 +260,158 @@ def test_handoff_rejects_ontology_resource_mismatch(
             ontology_resources=resources,
         )
     assert not destination.exists()
+
+
+@pytest.fixture
+def http_receipt(handoff_inputs, tmp_path):
+    package, _, _, _ = handoff_inputs
+    receipt = {
+        "schema_version": "exact-explain-http-runtime/1",
+        "package_id": json.loads(package.read_text())["package_id"],
+        "status": "passed",
+        "hardware_profile": "alternate-128GiB",
+        "storage_profile": "local-ssd",
+        "scope": "Fresh process with OS page cache not flushed; synthetic test measurements.",
+        "checks": {
+            name: "passed"
+            for name in (
+                "cold_service_health",
+                "cold_entity_queries",
+                "bounded_reads",
+                "warm_read_p95",
+                "serving_memory",
+                "no_runtime_imports",
+            )
+        },
+        "runtime": {
+            "python": "3.12.3",
+            "packages": {"fastapi": "0.116.2", "httpx": "0.28.1"},
+            "hardware": {"logical_cpus": 12, "memory_bytes": 128 * 1024**3},
+            "executable": "/private-runtime/python",
+        },
+        "measurements": {
+            "cold_health_seconds": 9.0,
+            "cold_entity_queries": [
+                {
+                    "seconds": 0.1,
+                    "status": 200,
+                    "bytes": 1000,
+                    "within_response_budget": True,
+                    "query": {"iri": "private-query"},
+                    "error": "private-error",
+                }
+            ],
+            "context_p95_seconds": 0.2,
+            "pair_p95_seconds": 0.3,
+            "peak_rss_bytes": 64 * 1024**2,
+            "memory_source": "child /proc/PID/status VmHWM",
+            "query_count": 100,
+            "readers": 4,
+            "log_path": "/private-log",
+        },
+        "command": ["private-command", "--api-key", "private-secret"],
+        "command_shell": "private-command-shell",
+        "query_plan": [{"query": "private-query-plan"}],
+        "child": {"stdout": "private-child-output"},
+    }
+    path = tmp_path / "private-http-runtime.json"
+    atomic_json(path, receipt)
+    return path
+
+
+def test_handoff_binds_separate_public_http_measurements(handoff_inputs, http_receipt, tmp_path):
+    package, verification, ledger_path, repository = handoff_inputs
+    ledger = json.loads(ledger_path.read_text())
+    ledger["gates"]["G4"] = {"status": "passed", "evidence_ids": ["fixture"]}
+    atomic_json(ledger_path, ledger)
+    destination = tmp_path / "http-handoff"
+    result = publish_handoff(
+        package,
+        verification,
+        ledger_path,
+        destination,
+        repository_root=repository,
+        http_verification=http_receipt,
+    )
+    http = result["http_runtime"]
+    assert http["source_receipt_sha256"] == file_hash(http_receipt)
+    assert http["hardware_profile"] == "alternate-128GiB"
+    assert http["storage_profile"] == "local-ssd"
+    assert "OS page cache not flushed" in http["scope"]
+    assert http["runtime"]["hardware"]["memory_bytes"] == 128 * 1024**3
+    assert http["measurements"]["cold_health_seconds"] == 9.0
+    assert http["measurements"]["cold_entity_queries"] == [
+        {"seconds": 0.1, "status": 200, "bytes": 1000, "within_response_budget": True}
+    ]
+    original = json.loads((verification / "verification.json").read_text())
+    assert result["resource_measurements"] == original["measurements"]
+    assert result["runtime"] == original["runtime"]
+    public = destination / http["receipt"]["path"]
+    assert file_hash(public) == http["receipt"]["sha256"]
+    assert json.loads(public.read_text()) == {
+        key: value for key, value in http.items() if key != "receipt"
+    }
+    assert (
+        next(item for item in result["inventory"] if item["path"] == http["receipt"]["path"])[
+            "role"
+        ]
+        == "http_runtime_verification"
+    )
+    assert "private-" not in public.read_text()
+    assert "private-" not in json.dumps(http)
+
+
+@pytest.mark.parametrize(
+    "violation", ["package", "schema", "missing_check", "failed_check", "status"]
+)
+def test_handoff_rejects_incompatible_http_evidence(
+    handoff_inputs, http_receipt, tmp_path, violation
+):
+    package, verification, ledger_path, repository = handoff_inputs
+    ledger = json.loads(ledger_path.read_text())
+    ledger["gates"]["G4"] = {"status": "passed", "evidence_ids": ["fixture"]}
+    atomic_json(ledger_path, ledger)
+    value = json.loads(http_receipt.read_text())
+    if violation == "package":
+        value["package_id"] = "sha256:" + "0" * 64
+    elif violation == "schema":
+        value["schema_version"] = "unknown"
+    elif violation == "missing_check":
+        value["checks"].pop("cold_service_health")
+    elif violation == "failed_check":
+        value["checks"]["cold_service_health"] = "failed"
+    else:
+        value["status"] = "failed"
+    atomic_json(http_receipt, value)
+    destination = tmp_path / "rejected-http"
+    with pytest.raises(ValueError, match="HTTP verification"):
+        publish_handoff(
+            package,
+            verification,
+            ledger_path,
+            destination,
+            repository_root=repository,
+            http_verification=http_receipt,
+        )
+    assert not destination.exists()
+
+
+def test_handoff_preserves_failed_http_receipt_without_promoting_unrun_gate(
+    handoff_inputs, http_receipt, tmp_path
+):
+    package, verification, ledger, repository = handoff_inputs
+    value = json.loads(http_receipt.read_text())
+    value["status"] = "failed"
+    value["checks"]["cold_service_health"] = "failed"
+    atomic_json(http_receipt, value)
+    result = publish_handoff(
+        package,
+        verification,
+        ledger,
+        tmp_path / "failed-http",
+        repository_root=repository,
+        http_verification=http_receipt,
+    )
+    assert result["http_runtime"]["status"] == "failed"
+    assert result["http_runtime"]["checks"]["cold_service_health"] == "failed"
+    assert result["gates"]["G4"]["result"] == "not_run"

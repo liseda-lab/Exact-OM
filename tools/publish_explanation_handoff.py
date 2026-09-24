@@ -98,6 +98,77 @@ def _result(status: str) -> str:
     return "not_run"
 
 
+def _http_runtime(path: Path, package_id: str, *, require_pass: bool) -> dict[str, Any]:
+    """Admit an HTTP receipt and retain only public measurement metadata."""
+    receipt = read_metadata(path)
+    required_checks = {
+        "cold_service_health",
+        "cold_entity_queries",
+        "bounded_reads",
+        "warm_read_p95",
+        "serving_memory",
+        "no_runtime_imports",
+    }
+    if receipt.get("package_id") != package_id:
+        raise ValueError("HTTP verification belongs to another package")
+    if receipt.get(
+        "schema_version"
+    ) != "exact-explain-http-runtime/1" or not required_checks <= set(receipt.get("checks", {})):
+        raise ValueError("Handoff requires the complete HTTP verification receipt")
+    if require_pass and (
+        _result(receipt.get("status", "not_run")) != "pass"
+        or any(_result(value) != "pass" for value in receipt["checks"].values())
+    ):
+        raise ValueError("HTTP verification does not support a passed G4")
+    public = {
+        key: receipt[key]
+        for key in (
+            "schema_version",
+            "package_id",
+            "status",
+            "hardware_profile",
+            "storage_profile",
+            "scope",
+        )
+    }
+    runtime = receipt["runtime"]
+    public["runtime"] = {
+        "python": runtime["python"],
+        "packages": {
+            key: runtime["packages"][key]
+            for key in ("fastapi", "httpx", "pydantic", "uvicorn")
+            if key in runtime["packages"]
+        },
+        "hardware": {
+            key: runtime["hardware"][key]
+            for key in ("cpu", "logical_cpus", "memory_bytes", "platform")
+            if key in runtime["hardware"]
+        },
+    }
+    measurements = receipt["measurements"]
+    public["measurements"] = {
+        key: measurements[key]
+        for key in (
+            "cold_health_seconds",
+            "context_p95_seconds",
+            "pair_p95_seconds",
+            "peak_rss_bytes",
+            "memory_source",
+            "query_count",
+            "readers",
+        )
+        if key in measurements
+    }
+    public["measurements"]["cold_entity_queries"] = [
+        {key: row[key] for key in ("bytes", "seconds", "status", "within_response_budget")}
+        for row in measurements.get("cold_entity_queries", [])
+    ]
+    public["checks"] = {key: receipt["checks"][key] for key in sorted(required_checks)}
+    public["source_receipt_sha256"] = _binding(path, "")["sha256"]
+    _public_data(public)
+    return public
+
+
 def publish_handoff(
     package: Path,
     verification_dir: Path,
@@ -108,6 +179,7 @@ def publish_handoff(
     execution_lock: Path | None = None,
     claim_audit: Path | None = None,
     ontology_resources: list[Path] | None = None,
+    http_verification: Path | None = None,
 ) -> dict[str, Any]:
     """Publish an immutable artifact, preserving failed, blocked and unrun gates."""
     package, verification_dir, output_dir = map(Path, (package, verification_dir, output_dir))
@@ -194,6 +266,15 @@ def publish_handoff(
         gates[gate]["result"] != "pass" for gate in GATES[:-1]
     ):
         raise ValueError("G5 acceptance requires every prerequisite gate")
+    http_runtime = (
+        _http_runtime(
+            Path(http_verification),
+            manifest.package_id,
+            require_pass=gates["G4"]["result"] == "pass",
+        )
+        if http_verification is not None
+        else None
+    )
     if output_dir.exists():
         raise FileExistsError("Choose a new handoff output directory")
     output_dir.parent.mkdir(parents=True, exist_ok=True)
@@ -244,6 +325,11 @@ def publish_handoff(
             raise ValueError("Prepared API response fixtures are required")
         for source in responses:
             copy_public(source, "verification/fixtures/" + source.name, "prepared_response")
+        if http_runtime is not None:
+            http_locator = "verification/http-runtime.json"
+            atomic_json(staging / http_locator, http_runtime)
+            http_binding = _binding(staging / http_locator, http_locator)
+            inventory.append({**http_binding, "role": "http_runtime_verification"})
         optional = {}
         for name, optional_source in (
             ("execution_lock", execution_lock),
@@ -495,6 +581,8 @@ def publish_handoff(
             "frontend_brief": "reference/specs/explanation-framework/08-frontend-implementation.md",
             "data_policy": "Fixed public reference inventory, prepared API responses and policy-admitted ontology resources only; no provider request ledger, database dump, invitation credential or study publication envelope is copied.",
         }
+        if http_runtime is not None:
+            result["http_runtime"] = {**http_runtime, "receipt": http_binding}
         _public_data(result)
         result["handoff_id"] = canonical_hash(result)
         atomic_json(staging / "backend-handoff.json", result)
@@ -511,6 +599,7 @@ def main() -> None:
     parser.add_argument("--repository-root", type=Path, default=ROOT)
     parser.add_argument("--execution-lock", type=Path)
     parser.add_argument("--claim-audit", type=Path)
+    parser.add_argument("--http-verification", type=Path)
     parser.add_argument("--ontology-resource", action="append", type=Path, default=[])
     args = parser.parse_args()
     result = publish_handoff(
@@ -522,6 +611,7 @@ def main() -> None:
         execution_lock=args.execution_lock,
         claim_audit=args.claim_audit,
         ontology_resources=args.ontology_resource,
+        http_verification=args.http_verification,
     )
     print(
         json.dumps(
