@@ -23,7 +23,9 @@ unresolved error, even if a repair changes the run directory or Slurm step. Diff
 errors remain eligible independently; one blocked experiment does not prevent another
 independent experiment from being repaired. Each Codex intervention has a 30-minute
 bound; scientific runs have no supervisor time limit. A finished intervention is checked
-again after at most one minute. These controls do not bound tokens exactly. The configured Codex model/effort are retained. Each intervention
+again after at most one minute. These controls do not bound tokens exactly. The configured Codex model is retained.
+The supervisor policy overrides reasoning effort to `xhigh` (extra-high), as requested
+on 2026-09-25; both repair and Gmail notification invocations use this override. Each intervention
 saves its prompt, JSON events, final report, exit status and token-usage fields. A needs_user
 result or exhausted retry allowance leaves a visible blocker instead of an endless retry.
 

@@ -127,6 +127,11 @@ def agent_command(policy, directory):
     return [
         policy["codex"],
         "exec",
+        *(
+            ["-c", "model_reasoning_effort=" + json.dumps(policy["model_reasoning_effort"])]
+            if policy.get("model_reasoning_effort") is not None
+            else []
+        ),
         "--approve-for-me",
         "--strict-config",
         "-c",
