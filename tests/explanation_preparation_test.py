@@ -25,15 +25,13 @@ from exact_inspect.verification import verify_backend
 @pytest.fixture
 def prepared(tmp_path, monkeypatch):
     source = tmp_path / "source.ofn"
-    source.write_text(
-        """Ontology(<urn:fixture>
+    source.write_text("""Ontology(<urn:fixture>
 Declaration(Class(<urn:A>)) Declaration(Class(<urn:B>))
 AnnotationAssertion(<http://www.w3.org/2000/01/rdf-schema#label> <urn:A> "A")
 AnnotationAssertion(<http://purl.obolibrary.org/obo/IAO_0000115> <urn:A> "Definition A")
 AnnotationAssertion(<http://www.geneontology.org/formats/oboInOwl#hasDbXref> <urn:A> "forbidden-target")
 SubClassOf(<urn:A> <urn:B>)
-)"""
-    )
+)""")
     binding = OntologyBinding(
         name="tiny",
         root=InputBinding(path=str(source), sha256=file_hash(source), size=source.stat().st_size),
@@ -151,6 +149,51 @@ def test_demo_requires_explicit_development_admission(prepared):
     _, package, _, _ = prepared
     with pytest.raises(ValueError, match="development"):
         create_prepared_app(package, profile="public_demo")
+
+
+def test_frontend_discovery_routes_are_bounded_and_policy_scoped(prepared):
+    _, package, _, _ = prepared
+    client = TestClient(create_prepared_app(package))
+    runs = client.get("/api/v1/runs").json()
+    assert runs["items"] == [] and runs["status"] == "not_exported" and runs["total_count"] == 0
+    ontology = client.get("/api/v1/ontologies").json()["items"][0]["ontology_version_id"]
+
+    labels = client.get(
+        "/api/v1/labels",
+        params=[
+            ("ontology_version_id", ontology),
+            ("iri", "urn:A"),
+            ("iri", "urn:B"),
+            ("iri", "urn:missing"),
+        ],
+    ).json()["items"]
+    by_iri = {(item["entity"] or {}).get("iri", item.get("iri")): item for item in labels}
+    assert by_iri["urn:A"]["preferred_label"]["value"] == "A"
+    assert by_iri["urn:B"]["preferred_label"]["status"] == "absent_in_scope"
+    assert by_iri["urn:missing"]["entity"] is None
+    too_many = [("ontology_version_id", ontology)] + [("iri", f"urn:{n}") for n in range(101)]
+    assert client.get("/api/v1/labels", params=too_many).status_code == 422
+
+    subject = {"ontology_version_id": ontology, "iri": "urn:A", "kind": "class"}
+    profiles = client.get(
+        "/api/v1/explanations", params={**subject, "task": "entity_profile"}
+    ).json()
+    assert [item["entities"] for item in profiles["items"]] == [[subject]]
+    pair = client.get(
+        "/api/v1/explanations",
+        params={**subject, "counterpart_ontology_version_id": ontology, "counterpart_iri": "urn:B"},
+    ).json()["items"]
+    assert [item["task"] for item in pair] == ["pair_comparison"]
+    detail = client.get(f"/api/v1/explanations/{pair[0]['explanation_id']}")
+    assert detail.status_code == 200 and detail.json()["task"] == "pair_comparison"
+    none = client.get("/api/v1/explanations", params={**subject, "iri": "urn:missing"}).json()
+    assert none["items"] == [] and none["status"] == "not_requested"
+    assert (
+        client.get(
+            "/api/v1/explanations", params={**subject, "counterpart_iri": "urn:B"}
+        ).status_code
+        == 422
+    )
 
 
 def test_study_adapter_preserves_originals_and_rejects_forged_comparisons(prepared):

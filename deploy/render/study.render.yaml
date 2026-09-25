@@ -1,4 +1,5 @@
-# Separate, unpublished study service; frontend and final launch are separate work.
+# Separate, unpublished study service with its participant/researcher frontend.
+# Final launch still requires the readiness checklist in the study guide.
 services:
   - type: web
     name: exact-ranking-study

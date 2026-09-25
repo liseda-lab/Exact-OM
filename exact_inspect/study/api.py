@@ -285,8 +285,9 @@ def create_study_app(
     assets_dir=None,
     *,
     allow_test_sqlite=False,
+    frontend_dir=None,
 ):
-    """Create the backend-only hosted profile with secure defaults and no frontend."""
+    """Create the hosted study profile; only participant and researcher pages are served."""
     store = StudyStore(database_url, assets_dir, allow_test_sqlite=allow_test_sqlite)
     app = FastAPI(title="Exact ranking study", version="1.0", docs_url=None, redoc_url=None)
     app.state.study_store = store
@@ -316,9 +317,12 @@ def create_study_app(
         response.headers["Cache-Control"] = "private, no-store"
         response.headers["Referrer-Policy"] = "no-referrer"
         response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["Content-Security-Policy"] = (
-            "default-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'none'"
-        )
+        # Study pages carry a per-document policy (exact inline-script hashes, no
+        # 'unsafe-inline'); everything else keeps the strict API default.
+        if "content-security-policy" not in response.headers:
+            response.headers["Content-Security-Policy"] = (
+                "default-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'none'"
+            )
         return response
 
     @app.exception_handler(RequestValidationError)
@@ -353,7 +357,7 @@ def create_study_app(
         return {
             "status": "ok",
             "profile": "study",
-            "frontend": "separate implementation pending",
+            "frontend": "static" if frontend_dir else "api-only",
         }
 
     @app.get("/api/ready")
@@ -364,15 +368,24 @@ def create_study_app(
             good = False
         return JSONResponse({"ready": good}, status_code=200 if good else 503)
 
+    from ..frontend import mount_frontend
+
+    mount_frontend(
+        app, frontend_dir, profile="study", strict_styles=True, index_redirect="/participate/"
+    )
     return app
 
 
 def app_from_env():
     """Uvicorn factory; secrets remain outside command lines and checked-in config."""
+    configured = os.environ.get("EXACT_STUDY_FRONTEND_DIR")
+    bundled = Path(__file__).resolve().parents[1] / "static"
+    frontend = Path(configured) if configured else bundled
     return create_study_app(
         database_url=os.environ["EXACT_STUDY_DATABASE_URL"],
         signing_secret=os.environ["EXACT_STUDY_SIGNING_SECRET"],
         researcher_token=os.environ["EXACT_STUDY_RESEARCHER_TOKEN"],
         origin=os.environ["EXACT_STUDY_ORIGIN"],
         assets_dir=Path(os.environ["EXACT_STUDY_ASSETS_DIR"]),
+        frontend_dir=frontend if (frontend / "index.html").is_file() else None,
     )

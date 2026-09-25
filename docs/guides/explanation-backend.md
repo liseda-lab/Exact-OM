@@ -2,7 +2,8 @@
 
 The backend separates ontology context, recorded matcher decisions, and generated
 interpretations. `exact-inspect` serves immutable prepared resources on a CPU.
-The exploration and study frontends are a separate implementation assignment.
+The exploration app, public demo, study and researcher pages are one static export in
+`explanations_visualizer/` (see its README); each profile serves only its own pages.
 
 Install the repository with the `viz` extra for exploration, or `study` for the
 PostgreSQL study service. `poetry.lock` includes the optional study dependencies.
@@ -113,6 +114,12 @@ when a measured check fails. It does not flush the operating-system page cache.
 The API includes `/api/v1/ontologies`, `/entities`, `/entity-context`, `/entity-facts`,
 `/hierarchy`, explicit `/axioms/{id}`, run sources/candidates/pair/evidence, prepared
 `/explanations/{id}`, and job status. FastAPI publishes `/openapi.json`.
+Three additive discovery routes serve the frontend: `/runs` (paged saved runs with their
+source/target ontology versions), `/labels?ontology_version_id=&iri=...` (display labels
+for at most 100 IRIs; an undeclared IRI is reported absent or as a possible unresolved
+import, never guessed), and `/explanations?ontology_version_id=&iri=&kind=` with an
+optional `counterpart_*` entity and `task` (paged summaries with grounding status; the
+index is built lazily from explanation metadata and excludes other policies).
 `exact_inspect.client.InspectClient` is the typed backend fixture client.
 Collection cursors bind ontology, policy, query and context revision; stale cursors
 return 409. Summary/list responses are bounded to 2 MiB. Large original axioms remain
@@ -126,7 +133,14 @@ cache is limited to 128 entries and 32 MiB. Uploaded artifacts are never execute
 
 The `public_demo` profile requires a package explicitly marked `development_demo`;
 set `audience: "development_demo"` in its execution template before export.
-It exposes no import, study or researcher mutation routes. The isolated study
+It exposes no import, study or researcher mutation routes.
+
+When a frontend export is found (`--frontend-dir`, `exact_inspect/static` or
+`explanations_visualizer/out`), `local_app` serves `/`, `/browse/` and `/library/`;
+`public_demo` serves `/` and `/browse/`; the study service serves `/participate/` and
+`/admin/`. Every other page and every unknown `/api/` path is a 404. HTML responses carry
+a Content-Security-Policy with the exact SHA-256 of each inline bootstrap script. Without
+an export the service is API-only, as before. The isolated study
 application and its durable database use a separate factory, deployment and asset
 universe. See [the study runbook](explanation-study-service.md).
 

@@ -3,9 +3,15 @@
 The ranking study runs as an isolated FastAPI service with PostgreSQL. It mounts
 only `/api/v1/study`, researcher routes under `/api/v1/admin`, and health/readiness.
 It does not mount exploration, bundle import, matching, generation, or legacy study
-routes. The separate frontend remains unimplemented. All examples and recovery
-checks in this implementation use synthetic sessions; no invitations were sent,
-participants recruited, live study published, or full experiment run.
+routes. It also serves the first-party participant and researcher pages from the
+frontend export: `/participate/` (the `#invite=` fragment is exchanged by POST and
+removed from the address bar) and `/admin/` (the researcher token is kept in the tab's
+memory only). `/` redirects to `/participate/`; exploration pages are 404. Set
+`EXACT_STUDY_FRONTEND_DIR` to override the bundled export in `exact_inspect/static`.
+Study pages forbid inline scripts other than the export's hashed bootstrap and forbid
+inline styles. All examples and recovery checks in this implementation use synthetic
+sessions; no invitations were sent, participants recruited, live study published, or
+full experiment run.
 
 ## Configuration and publication
 
@@ -206,7 +212,8 @@ without implementing frontend presentation or recruiting participants.
 
 `deploy/render/study.render.yaml` describes a separate study service and paid
 managed database, with independent secrets and automatic deployments disabled.
-The API-only Dockerfile has no model or frontend dependency. Supply the prepared
+The Dockerfile builds the frontend in a Node stage and copies only the static export;
+the runtime has no Node, model or exploration dependency. Supply the prepared
 asset image/storage and HTTPS origin before publishing synthetic test content.
 The blueprint is preparation; it has not been deployed or measured on Render.
 
@@ -226,8 +233,8 @@ assignments, histories and immutable export hashes before switching connections.
 Record the retained backup location, schedule, retention and access controls.
 A paid plan declaration does not prove successful recovery.
 
-Remaining launch work includes the separate frontend, keyboard/touch and offline
-queue checks, browser/proxy cache isolation, real adjudicated cases, information
+Remaining launch work includes frontend checks against the real study package
+(keyboard/touch, screen reader, offline queue), browser/proxy cache isolation, real adjudicated cases, information
 policy review, duration pilot, approved consent and analysis arrangements,
 measured Render capacity and staged recovery rehearsal. The implementation does
 not authorize participant contact or a public launch.
