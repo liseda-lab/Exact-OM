@@ -95,7 +95,9 @@ def core_arms(base):
         add(
             "E01",
             mode,
-            {"matching": {"extraction": {"mode": mode}}},
+            controls(
+                {"matching": {"extraction": {"mode": mode}}, "selector": {"runtime_enabled": False}}
+            ),
             role=(
                 "baseline"
                 if mode == "greedy"

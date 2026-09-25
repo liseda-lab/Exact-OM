@@ -46,6 +46,16 @@ def test_preparation_covers_every_family_without_executing_or_inventing_readines
     ]:
         assert order.index(before) < order.index(after)
     by_id = {step.id: step for step in lock.steps}
+    for arm in by_id["E01"].arms:
+        assert arm.overlay["llm"]["experiment"] == {"enabled": True, "gate": {"mode": "off"}}
+        assert arm.overlay["supervision"]["mode"] == "label_free"
+        assert set(arm.overlay["supervision"]["components"].values()) == {"label_free"}
+        assert arm.overlay["selector"]["runtime_enabled"] is False
+    extraction_only = [
+        {key: value for key, value in arm.overlay.items() if key != "matching"}
+        for arm in by_id["E01"].arms
+    ]
+    assert all(item == extraction_only[0] for item in extraction_only)
     assert len(by_id["E10-analytic"].arms) == 6
     assert len(by_id["E10"].arms) == 2
     assert by_id["E10"].selection.decisions[0].baseline == "winner_only"
