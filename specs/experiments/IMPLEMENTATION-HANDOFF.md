@@ -141,6 +141,42 @@ scientific progress is under `data/experiments-v2/mechanism-screen-03/runtime/ex
 `launcher-exit-code` is written when the Slurm step exits. A nonzero exit or blocked status
 requires checking the recorded reason; it is not a completed scientific result.
 
+
+## Automatic next batch
+
+**Slurm step 14372.6**, tmux `exact-next-batch-14372`, was submitted at **01:53 UTC on
+September 25**. Its verified initial state is `waiting_for_verified_E09`. The
+[queue handoff](../../data/experiments-v2/next-batch-01/HANDOFF.md) describes the frozen
+source (`f9fa3bf`), input bindings, measured admission and recovery boundaries.
+
+After E09 completes, the queue inherits its final cumulative ledger and verified caches,
+runs one full 300-source D0 control to qualify the updated source, and admits **five E01
+extraction arms followed by six E10 analytic settings**. The E01 arms share label-free
+scoring with selector and decision gate off; extraction alone varies. The core provisional
+allowance is 9.869 hours plus 0.897 hours for qualification; actual comparison admission
+uses the slower old/new D0 control and the unchanged 1.5 safety factor. No setup-per-pair
+extrapolation or assumed cache speedup is used. E08 and other families retain explicit
+pending-input/measurement dispositions and do not block these 11 cells.
+
+The queue uses one GPU worker at a time, retains budget limits and historical spending,
+and permits cached verbalization responses only. It detects terminal E09 failure and
+records the reason instead of waiting indefinitely. Whole-family admission still precedes
+execution. Neither a forecast nor a queued step establishes a completed scientific result.
+
+```bash
+tail -f data/experiments-v2/next-batch-01/launcher.log
+```
+
+Monitor [queue status](../../data/experiments-v2/next-batch-01/status.json) and
+[submission receipt](../../data/experiments-v2/next-batch-01/submission.json). The top-level
+queue intentionally rejects overwriting an existing runtime; after interruption use the
+saved family campaign/runtime and recorded accounting, as described in its handoff.
+
+The forecast repair passed 30 tests; E01 preparation/campaign checks passed 69 tests.
+The final queue preflight resolved all 11 configurations against the frozen source and
+verified historical imports. Separate mocked checks covered worker budget caps, failed
+preparation, accounting finalization and cooperative signals without running models.
+
 ## Validation and source identity
 
 Implementation commit: `35909e7`. The final combined suite passed **512 tests**

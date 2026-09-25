@@ -7,6 +7,7 @@ target_basis: User-confirmed soft goal of six days; longer execution is allowed.
   timeout or additional admission cap.
 source_inventory: data/experiments-v2/prepared-campaign-12/campaign.lock.yaml
 active_queue: data/experiments-v2/prepared-campaign-13/advance-status.json
+next_queue: data/experiments-v2/next-batch-01/status.json
 audit_directory: data/experiments-v2/six-day-plan-01
 resource_assumption:
   node: liseda-03
@@ -62,8 +63,11 @@ batches:
     target_window_hours:
       - 0
       - 30
-    status: implemented_pending_upstream_results_and_measured_admission
-    gate: Retained E05/E20 pool contract; E10-analytic selects constants before B2 fits;
+    status: E01_and_E10_analytic_queued_other_steps_pending_measurements
+    queued_cells: 11
+    slurm_step: 14372.6
+    gate: E01 five cells and E10-analytic six cells follow verified E09 and a measured new-source
+      D0 parity check. Retained E05/E20 pool contract; E10-analytic selects constants before B2 fits;
       E08-identifiers and E24-asymmetric explicitly dispositioned absent curated semantics; E24 core
       includes D0; qualify updated code/caches and budget each comparison.
   - id: B2
