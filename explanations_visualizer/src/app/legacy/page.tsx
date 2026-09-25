@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
 import StudyGraph from "@/app/components/study/StudyGraph";
+import "./legacy.css";
 import {
   EDGE_COLORS,
   EDGE_TYPE_LABELS,
