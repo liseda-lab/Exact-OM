@@ -200,6 +200,8 @@ def source_identity(code_root, helpers):
         "exact/experiments/preparation.py",
         "exact/experiments/core_recipes.py",
         "exact/experiments/difference_replay.py",
+        # Reviewed selection-schema binding repair; predictions are unchanged.
+        "exact/experiments/harness.py",
     }
     changed = set(
         subprocess.check_output(
