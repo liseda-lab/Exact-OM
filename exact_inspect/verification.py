@@ -6,6 +6,7 @@ import importlib.metadata
 import platform
 import resource
 import statistics
+import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -199,4 +200,6 @@ def _peak_rss_bytes() -> int:
         for line in status.read_text().splitlines():
             if line.startswith("VmHWM:"):
                 return int(line.split()[1]) * 1024
-    return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss * 1024
+    # ru_maxrss is kilobytes on Linux but bytes on macOS.
+    peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    return peak if sys.platform == "darwin" else peak * 1024
