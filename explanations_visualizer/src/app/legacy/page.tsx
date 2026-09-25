@@ -122,11 +122,11 @@ function localDevApiBaseCandidates(): string[] {
 
   const candidates: string[] = [];
   if (discoveredLocalApiBaseUrl !== null) candidates.push(discoveredLocalApiBaseUrl);
-  if (LOCAL_DEV_API_PORTS.includes(port as (typeof LOCAL_DEV_API_PORTS)[number])) candidates.push("");
+  // A served saved run is authoritative, including on custom local ports.
+  candidates.push("");
   LOCAL_DEV_API_PORTS.forEach((candidatePort) => {
     if (port !== candidatePort) candidates.push(`${protocol}//${hostname}:${candidatePort}`);
   });
-  candidates.push("");
   return uniqueApiBases(candidates);
 }
 

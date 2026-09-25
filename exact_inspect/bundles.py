@@ -80,9 +80,17 @@ def _normalise_record(record: Mapping[str, Any]) -> Dict[str, Any]:
 
 
 def _open_mode_mapping_index(reader: RunReader) -> Dict[Tuple[str, str], Dict[str, Any]]:
-    """Index local alignment rows without touching explanation shards."""
+    """Index saved alignment rows without touching explanation shards.
 
-    mapping_rows = reader.mappings("local").to_dict(orient="records")
+    Historical exports retain local mappings, while bounded current runs may
+    export only the selected global alignment. Neither requires recomputation.
+    """
+
+    mapping_rows = (
+        reader.mappings("local")
+        if reader.layout.mapping_path("local").is_file()
+        else reader.mappings("global")
+    ).to_dict(orient="records")
     mapping_by_pair: Dict[Tuple[str, str], Dict[str, Any]] = {}
     for raw in mapping_rows:
         src = safe_text(_first_value(raw, ("SrcEntity", "Src", "src_iri", "source")))

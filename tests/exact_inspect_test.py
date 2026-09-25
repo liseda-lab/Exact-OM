@@ -107,13 +107,18 @@ def test_frontend_resolution_order_and_api_only_fallback(tmp_path: Path) -> None
 
 
 @pytest.mark.parametrize("layout", ["v1", "v2"])
+@pytest.mark.parametrize("mapping_kind", ["local", "global"])
 def test_open_mode_serves_runreader_artifacts(
     tmp_path: Path,
     layout: str,
+    mapping_kind: str,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr("exact_inspect.app.resolve_frontend_dir", lambda _settings: None)
     run_dir = _v1_run(tmp_path / layout) if layout == "v1" else _v2_run(tmp_path / layout)
+    if mapping_kind == "global":
+        run_layout = RunLayout.open(run_dir)
+        run_layout.mapping_path("local").rename(run_layout.mapping_path("global"))
     app = create_app(InspectSettings(run_dir=run_dir, enable_ontology_info=False))
     client = TestClient(app)
 
