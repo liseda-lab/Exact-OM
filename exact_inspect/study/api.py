@@ -12,7 +12,15 @@ import time
 from pathlib import Path
 from typing import Literal
 
-from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request, Response
+from fastapi import (
+    APIRouter,
+    Depends,
+    FastAPI,
+    Header,
+    HTTPException,
+    Request,
+    Response,
+)
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 
@@ -117,6 +125,23 @@ class Authentication:
         except (ValueError, KeyError, TypeError) as exc:
             raise HTTPException(401, "Session unavailable") from exc
 
+    def participant_write(
+        self,
+        request: Request,
+        x_study_session: str | None = Header(
+            default=None,
+            alias="X-Study-Session",
+            description="Expected session ID; a cookie switch returns 409 before mutation.",
+        ),
+    ):
+        """Reject a stale tab's session binding before invoking any participant mutation."""
+        identity = self.participant(request)
+        if x_study_session is not None and x_study_session != identity[0]:
+            raise HTTPException(
+                409, "Study session changed; reopen the original invitation before saving."
+            )
+        return identity
+
     def researcher(self, request: Request):
         supplied = request.headers.get("authorization", "")
         if not hmac.compare_digest(supplied, f"Bearer {self.researcher_token}"):
@@ -163,15 +188,15 @@ def create_study_router(store, *, signing_secret, researcher_token, origin):
         return store.state(*identity)
 
     @router.put("/study/consent", response_model=StudyState)
-    def consent(body: Consent, identity=Depends(auth.participant)):
+    def consent(body: Consent, identity=Depends(auth.participant_write)):
         return store.mutate(*identity, "consent", body)
 
     @router.put("/study/setup", response_model=StudyState)
-    def setup(body: Setup, identity=Depends(auth.participant)):
+    def setup(body: Setup, identity=Depends(auth.participant_write)):
         return store.mutate(*identity, "setup", body)
 
     @router.put("/study/questionnaires/{form_id}", response_model=StudyState)
-    def questionnaire(form_id: str, body: Questionnaire, identity=Depends(auth.participant)):
+    def questionnaire(form_id: str, body: Questionnaire, identity=Depends(auth.participant_write)):
         return store.mutate(*identity, f"questionnaire:{form_id}", body)
 
     @router.get("/study/cases/current", response_model=StudyCase)
@@ -179,35 +204,35 @@ def create_study_router(store, *, signing_secret, researcher_token, origin):
         return store.current_case(*identity)
 
     @router.put("/study/cases/{case_id:path}/draft", response_model=StudyState)
-    def draft(case_id: str, body: Ranking, identity=Depends(auth.participant)):
+    def draft(case_id: str, body: Ranking, identity=Depends(auth.participant_write)):
         return store.mutate(*identity, "draft", body, case_id)
 
     @router.post("/study/cases/{case_id:path}/submit", response_model=StudyState)
-    def submit(case_id: str, body: Ranking, identity=Depends(auth.participant)):
+    def submit(case_id: str, body: Ranking, identity=Depends(auth.participant_write)):
         return store.mutate(*identity, "submit", body, case_id)
 
     @router.put("/study/cases/{case_id:path}/consultation", response_model=StudyState)
-    def consultation(case_id: str, body: Consultation, identity=Depends(auth.participant)):
+    def consultation(case_id: str, body: Consultation, identity=Depends(auth.participant_write)):
         return store.mutate(*identity, "consultation", body, case_id)
 
     @router.post("/study/events", response_model=EventAcknowledgement)
-    def events(body: EventBatch, identity=Depends(auth.participant)):
+    def events(body: EventBatch, identity=Depends(auth.participant_write)):
         return store.events(*identity, body)
 
     @router.post("/study/timing", response_model=TimingAcknowledgement)
-    def timing(body: TimingSegment, identity=Depends(auth.participant)):
+    def timing(body: TimingSegment, identity=Depends(auth.participant_write)):
         return store.timing(*identity, body)
 
     @router.post("/study/pause", response_model=StudyState)
-    def pause(body: Mutation, identity=Depends(auth.participant)):
+    def pause(body: Mutation, identity=Depends(auth.participant_write)):
         return store.mutate(*identity, "pause", body)
 
     @router.post("/study/resume", response_model=StudyState)
-    def resume(body: Resume, identity=Depends(auth.participant)):
+    def resume(body: Resume, identity=Depends(auth.participant_write)):
         return store.mutate(*identity, "resume", body)
 
     @router.post("/study/complete", response_model=StudyState)
-    def complete(body: Mutation, identity=Depends(auth.participant)):
+    def complete(body: Mutation, identity=Depends(auth.participant_write)):
         return store.mutate(*identity, "complete", body)
 
     @router.get("/study/resources/{asset_id:path}")

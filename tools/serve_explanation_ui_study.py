@@ -42,8 +42,85 @@ TUTORIAL = [
 ]
 
 
+PRACTICE_CASES = [
+    {
+        "practice_id": "practice-" + kind,
+        "kind": kind,
+        "title": title,
+        "instructions": instructions,
+        "source": {"label": source_label, "description": source_description},
+        "candidates": [
+            {"candidate_id": f"practice-{kind}-{index}", "label": label, "description": description}
+            for index, (label, description) in enumerate(candidates, 1)
+        ],
+        "synthetic": True,
+    }
+    for kind, title, instructions, source_label, source_description, candidates in (
+        (
+            "simple",
+            "Simple ranking",
+            "Synthetic shapes only. Add candidates, change their order and remove an entry before submitting an unscored practice response.",
+            "Three-sided shape",
+            "A closed shape with three straight sides.",
+            [
+                ("Triangle", "A closed shape with three straight sides."),
+                ("Square", "Four equal straight sides and four right angles."),
+                ("Circle", "A curved boundary with no straight sides."),
+                ("Pentagon", "Five straight sides."),
+                ("Hexagon", "Six straight sides."),
+            ],
+        ),
+        (
+            "complex",
+            "Read the qualifiers",
+            "Synthetic shapes only. Compare every qualifier before making an unscored ranking. There are no matching scores or correctness feedback.",
+            "Regular triangle",
+            "A three-sided shape whose sides and angles are all equal.",
+            [
+                ("Equal-sided triangle", "Three equal sides and three equal angles."),
+                (
+                    "Isosceles triangle",
+                    "At least two equal sides; the third side is not specified.",
+                ),
+                ("Right triangle", "One angle is a right angle."),
+                ("Regular square", "Four equal sides and four equal angles."),
+                ("Unspecified triangle", "Three sides; lengths and angles are not specified."),
+            ],
+        ),
+        (
+            "partial_ranking",
+            "Leave uncertain entries unranked",
+            "Synthetic catalog only. Submit a partial ranking of one to four entries. Leaving an entry unranked differs from choosing None of these.",
+            "Red outlined shape",
+            "A red boundary is specified; the interior is not described.",
+            [
+                ("Red outline", "A red boundary with unspecified interior."),
+                ("Red boundary", "A red boundary; no interior information."),
+                ("Red-filled shape", "The interior is red; its boundary is not described."),
+                ("Blue outline", "The boundary is blue."),
+                ("Unspecified shape", "Neither boundary nor interior is described."),
+            ],
+        ),
+        (
+            "none_of_these",
+            "Use an explicit response",
+            "Synthetic shapes only. Try None of these. Insufficient information is a separate response for cases you cannot judge.",
+            "Curved closed shape",
+            "A closed boundary made entirely of a curve, with no straight sides.",
+            [
+                ("Triangle", "Three straight sides."),
+                ("Square", "Four straight sides."),
+                ("Pentagon", "Five straight sides."),
+                ("Hexagon", "Six straight sides."),
+                ("Open line", "A straight line that is not closed."),
+            ],
+        ),
+    )
+]
+
+
 def publication(fixture: Path, out: Path) -> dict:
-    """Build per-pair explanation resources, ontology downloads and a synthetic study."""
+    """Build complete per-case resources, ontology downloads and synthetic practice."""
     from exact_inspect.context import OntologyContext
     from exact_inspect.context_resources import export_ontology_resource
     from exact_inspect.contracts import EntityRef, VisibilityPolicy
@@ -106,40 +183,6 @@ def publication(fixture: Path, out: Path) -> dict:
         refs, candidates = [], []
         for index, row in enumerate(rows):
             target = EntityRef.model_validate(row["target"])
-            # One resource per source-candidate pair: a per-case resource currently fails
-            # when a case contains an entity and its asserted parent (see the F1 handoff).
-            members = {(e.ontology_version_id, e.iri, e.kind) for e in (source_ref, target)}
-            chosen = [
-                r
-                for r in explanations
-                if all(
-                    (e["ontology_version_id"], e["iri"], e["kind"]) in members
-                    for e in r["entities"]
-                )
-            ]
-            resource = build_explanation_resource(
-                by_id,
-                [source_ref, target],
-                policy=policy,
-                packets=[packets[r["explanation_id"]] for r in chosen],
-                explanations=chosen,
-                evidence={f"c{index + 1}": store.evidence(row["pair_id"])},
-            )
-            asset_id = f"explanation-{number}-c{index + 1}"
-            content = resource.model_dump_json().encode()
-            (out / f"{asset_id}.json").write_bytes(content)
-            refs.append(asset_id)
-            assets.append(
-                {
-                    "asset_id": asset_id,
-                    "path": f"{asset_id}.json",
-                    "sha256": hashlib.sha256(content).hexdigest(),
-                    "size_bytes": len(content),
-                    "kind": "explanation",
-                    "media_type": "application/json",
-                    "policy_hash": policy_hash,
-                }
-            )
             score = next(s for s in row["scores"] if s["name"] == "S_final")
             candidates.append(
                 {
@@ -151,6 +194,41 @@ def publication(fixture: Path, out: Path) -> dict:
                     "display_position": index + 1,
                 }
             )
+        entities = [source_ref, *(EntityRef.model_validate(row["target"]) for row in rows)]
+        members = {(entity.ontology_version_id, entity.iri, entity.kind) for entity in entities}
+        chosen = [
+            result
+            for result in explanations
+            if all(
+                (entity["ontology_version_id"], entity["iri"], entity["kind"]) in members
+                for entity in result["entities"]
+            )
+        ]
+        resource = build_explanation_resource(
+            by_id,
+            entities,
+            policy=policy,
+            packets=[packets[result["explanation_id"]] for result in chosen],
+            explanations=chosen,
+            evidence={
+                f"c{index + 1}": store.evidence(row["pair_id"]) for index, row in enumerate(rows)
+            },
+        )
+        asset_id = f"explanation-{number}"
+        content = resource.model_dump_json().encode()
+        (out / f"{asset_id}.json").write_bytes(content)
+        refs.append(asset_id)
+        assets.append(
+            {
+                "asset_id": asset_id,
+                "path": f"{asset_id}.json",
+                "sha256": hashlib.sha256(content).hexdigest(),
+                "size_bytes": len(content),
+                "kind": "explanation",
+                "media_type": "application/json",
+                "policy_hash": policy_hash,
+            }
+        )
         case_id = f"case-{number}"
         cases.append(
             {
@@ -202,6 +280,7 @@ def publication(fixture: Path, out: Path) -> dict:
         "setup_instructions": "[Setup instructions supplied with the study, including the "
         "Protégé version and the practice class to look up.]",
         "tutorial_steps": TUTORIAL,
+        "practice_cases": PRACTICE_CASES,
         "closes_at": (datetime.now(timezone.utc) + timedelta(days=30)).isoformat(),
         "synthetic": True,
         "policy_hash": policy_hash,

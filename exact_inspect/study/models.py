@@ -148,6 +148,27 @@ class Schedule(StrictModel):
     blocks: Annotated[list[Block], Field(min_length=2, max_length=2)]
 
 
+class PracticeConcept(StrictModel):
+    """Frozen synthetic tutorial text; no scored identity or matcher values."""
+
+    label: Annotated[str, Field(min_length=1, max_length=512)]
+    description: Annotated[str, Field(min_length=1, max_length=4000)]
+
+
+class PracticeCandidate(PracticeConcept):
+    candidate_id: Identifier
+
+
+class PracticeCase(StrictModel):
+    practice_id: Identifier
+    kind: Literal["simple", "complex", "partial_ranking", "none_of_these"]
+    title: Annotated[str, Field(min_length=1, max_length=160)]
+    instructions: Annotated[str, Field(min_length=1, max_length=2000)]
+    source: PracticeConcept
+    candidates: Annotated[list[PracticeCandidate], Field(min_length=5, max_length=5)]
+    synthetic: Literal[True] = True
+
+
 class StudyDefinition(StrictModel):
     contract_version: Literal["exact-study/1.0"] = "exact-study/1.0"
     study_revision: Identifier
@@ -158,6 +179,7 @@ class StudyDefinition(StrictModel):
     instructions: Annotated[str, Field(min_length=1)]
     setup_instructions: Annotated[str, Field(min_length=1)]
     tutorial_steps: Annotated[list[str], Field(min_length=4)]
+    practice_cases: Annotated[list[PracticeCase], Field(max_length=4)] = Field(default_factory=list)
     form_version: Identifier = "exact-study-forms/1"
     closes_at: datetime
     synthetic: bool = True
@@ -206,6 +228,31 @@ class StudyDefinition(StrictModel):
             self.schedules
         ):
             raise ValueError("Duplicate case or schedule ID")
+        if self.practice_cases:
+            if [case.kind for case in self.practice_cases] != [
+                "simple",
+                "complex",
+                "partial_ranking",
+                "none_of_these",
+            ]:
+                raise ValueError(
+                    "Practice must progress through simple, complex, partial ranking and none"
+                )
+            practice_ids = [
+                identity
+                for case in self.practice_cases
+                for identity in (
+                    case.practice_id,
+                    *(candidate.candidate_id for candidate in case.candidates),
+                )
+            ]
+            scored_ids = ids | {
+                candidate.candidate_id for case in self.cases for candidate in case.candidates
+            }
+            if len(set(practice_ids)) != len(practice_ids) or set(practice_ids) & scored_ids:
+                raise ValueError(
+                    "Practice identities must be unique and separate from scored cases"
+                )
         asset_map = {a.asset_id: a for a in self.assets}
         if len(asset_map) != len(self.assets):
             raise ValueError("Duplicate asset ID")
@@ -531,6 +578,7 @@ class StudyState(StrictModel):
     instructions: str
     setup_instructions: str
     tutorial_steps: list[str]
+    practice_cases: list[PracticeCase] = Field(default_factory=list)
     forms: dict
     ontology_resources: list[PublicAsset]
     synthetic: bool

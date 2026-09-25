@@ -6,12 +6,13 @@ structured OWL values retain the public constructor shape without a serving pars
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from typing import Annotated, Any, Literal
 
 from pydantic import Field, StrictInt, model_validator
 
 from ..context_semantics import ANNOTATION_REGISTRY, _category, _iri, _visible_node
-from ..contracts import Score, VisibilityPolicy
+from ..contracts import Score, VisibilityPolicy, canonical_json
 from .models import EntityRef, Identifier, StrictModel
 from .owl_ast import validate_annotation, validate_axiom
 
@@ -174,6 +175,7 @@ class GroundedClaim(StrictModel):
     ] = "key_fact"
     scoped_entities: list[EntityRef] = Field(default_factory=list, max_length=2)
     packet_fact_ids: list[Identifier] = Field(default_factory=list, max_length=100)
+    packet_fact_subjects: list[EntityRef] = Field(default_factory=list, max_length=100)
     reviewer_receipt: Identifier | None = None
     generation_manifest_sha256: Annotated[str, Field(pattern=r"^[a-f0-9]{64}$")]
 
@@ -199,6 +201,33 @@ class EvidenceLink(StrictModel):
     status: Literal["available", "not_exported", "unresolved"]
 
 
+REFERENCED_LABEL_LIMIT = 100
+REFERENCED_LABEL_BYTES = 64 * 1024
+
+
+def referenced_terms(facts: list[OriginalFact]) -> Iterator[tuple[str, str]]:
+    """Yield same-ontology IRIs explicitly present in admitted original facts.
+
+    Structural expressions precede adjacency so property/filler labels are not
+    crowded out by child classes. Literal text is never parsed as an IRI.
+    Callers stop after their bounded selection or required reference set is found.
+    """
+    for fact in sorted(facts, key=lambda item: item.category == "hierarchy"):
+        version = fact.subject.ontology_version_id
+        for iri in (fact.predicate_iri, fact.value.iri, fact.value.datatype):
+            if iri:
+                yield version, iri
+        pending: list[Any] = [fact.value.ast, *fact.qualifiers]
+        while pending:
+            node = pending.pop()
+            if isinstance(node, dict):
+                if node.get("type") == "IRI":
+                    yield version, node["value"]
+                pending.extend(node.values())
+            elif isinstance(node, list):
+                pending.extend(node)
+
+
 class ExplanationResource(StrictModel):
     """Strict allowlist for study panels; arbitrary scorer dictionaries cannot enter."""
 
@@ -207,6 +236,10 @@ class ExplanationResource(StrictModel):
     policy_hash: Annotated[str, Field(pattern=r"^[a-f0-9]{64}$")]
     entities: Annotated[list[EntityRef], Field(min_length=1)]
     facts: list[OriginalFact]
+    referenced_labels: list[OriginalFact] = Field(
+        default_factory=list, max_length=REFERENCED_LABEL_LIMIT
+    )
+    referenced_labels_truncated: bool = False
     entity_profiles: list[GroundedClaim] = Field(default_factory=list)
     pair_comparison: list[GroundedClaim] = Field(default_factory=list)
     hierarchy: list[HierarchyEdge] = Field(default_factory=list)
@@ -219,35 +252,110 @@ class ExplanationResource(StrictModel):
 
     @model_validator(mode="after")
     def grounded_scope(self):
-        facts = {fact.fact_id: fact for fact in self.facts}
-        if len(facts) != len(self.facts):
-            raise ValueError("Duplicate fact identity")
+        facts: dict[str, list[OriginalFact]] = {}
+        contextual_facts = {}
         identities = {(e.ontology_version_id, e.iri, e.kind) for e in self.entities}
-        if any(
-            (f.subject.ontology_version_id, f.subject.iri, f.subject.kind) not in identities
-            for f in self.facts
+        for fact in self.facts:
+            subject = (fact.subject.ontology_version_id, fact.subject.iri, fact.subject.kind)
+            if subject not in identities:
+                raise ValueError("Fact subject is outside the prepared entity universe")
+            key = (fact.fact_id, subject)
+            if key in contextual_facts:
+                raise ValueError("Duplicate fact identity for the same subject")
+            copies = facts.setdefault(fact.fact_id, [])
+            if copies and (
+                copies[0].subject.ontology_version_id != fact.subject.ontology_version_id
+                or copies[0].model_dump(exclude={"subject"}) != fact.model_dump(exclude={"subject"})
+            ):
+                raise ValueError("Shared original fact copies disagree")
+            copies.append(fact)
+            contextual_facts[key] = fact
+        required_labels = {
+            (label.subject.ontology_version_id, label.subject.iri)
+            for label in self.referenced_labels
+        }
+        if required_labels:
+            for reference in referenced_terms(self.facts):
+                required_labels.discard(reference)
+                if not required_labels:
+                    break
+        if required_labels:
+            raise ValueError("Label term is outside the admitted original references")
+        label_keys = set()
+        for label in self.referenced_labels:
+            key = (
+                label.fact_id,
+                label.subject.ontology_version_id,
+                label.subject.iri,
+                label.subject.kind,
+            )
+            if key in label_keys:
+                raise ValueError("Duplicate referenced label")
+            label_keys.add(key)
+            if label.category != "labels" or label.value.term_type != "literal":
+                raise ValueError("Referenced labels must be original literal label facts")
+        if (
+            len(canonical_json([label.model_dump(mode="json") for label in self.referenced_labels]))
+            > REFERENCED_LABEL_BYTES
         ):
-            raise ValueError("Fact subject is outside the prepared entity universe")
+            raise ValueError("Referenced labels exceed the prepared byte budget")
         for claim in self.entity_profiles + self.pair_comparison:
             if not set(claim.fact_ids) <= set(facts):
                 raise ValueError("Claim references an unavailable fact")
+            scope = {(e.ontology_version_id, e.iri, e.kind) for e in claim.scoped_entities}
+            if not scope <= identities:
+                raise ValueError("Claim is outside the prepared entity universe")
             if claim.grounding == "exact_extract" and claim.text not in {
-                facts[fid].value.lexical_form for fid in claim.fact_ids
+                fact.value.lexical_form
+                for fid in claim.fact_ids
+                for fact in facts[fid]
+                if not scope
+                or (fact.subject.ontology_version_id, fact.subject.iri, fact.subject.kind) in scope
             }:
                 raise ValueError("An exact extract must equal a cited original literal")
             if claim.grounding == "semantic_template":
                 from ..contracts import EntityRef as CoreEntity
                 from ..generation import FactPacket, comparison_templates
 
-                if len(claim.scoped_entities) != 2 or any(
-                    (e.ontology_version_id, e.iri, e.kind) not in identities
-                    for e in claim.scoped_entities
-                ):
+                if len(claim.scoped_entities) != 2:
                     raise ValueError("Comparison requires its ordered, permitted entity pair")
                 pair = [CoreEntity.model_validate(e.model_dump()) for e in claim.scoped_entities]
                 if not set(claim.packet_fact_ids) <= set(facts):
                     raise ValueError("Comparison packet refers to unavailable facts")
-                selected = [facts[fid].model_dump() for fid in claim.packet_fact_ids]
+                selected = []
+                if claim.packet_fact_subjects and len(claim.packet_fact_subjects) != len(
+                    claim.packet_fact_ids
+                ):
+                    raise ValueError(
+                        "Comparison packet fact subjects must align with fact identities"
+                    )
+                for index, fid in enumerate(claim.packet_fact_ids):
+                    if claim.packet_fact_subjects:
+                        subject = claim.packet_fact_subjects[index]
+                        key = (fid, (subject.ontology_version_id, subject.iri, subject.kind))
+                        if key not in contextual_facts:
+                            raise ValueError(
+                                "Comparison packet subject has no admitted original fact"
+                            )
+                        selected.append(contextual_facts[key].model_dump())
+                    else:
+                        # Legacy packets remain valid when each original has one
+                        # unambiguous contextual copy in this comparison's scope.
+                        copies = [
+                            fact
+                            for fact in facts[fid]
+                            if (
+                                fact.subject.ontology_version_id,
+                                fact.subject.iri,
+                                fact.subject.kind,
+                            )
+                            in scope
+                        ]
+                        if len(copies) != 1:
+                            raise ValueError(
+                                "Legacy comparison packet has an ambiguous fact subject"
+                            )
+                        selected.append(copies[0].model_dump())
                 packet = FactPacket(
                     task="pair_comparison",
                     entities=pair,
@@ -290,7 +398,9 @@ def validate_explanation_resource(content, study):
             e.ontology_version_id not in allowed_ontologies for e in resource.entities
         ):
             raise ValueError("Explanation entity is outside the allowed ontology universe")
-        for fact in resource.facts:
+        for fact in [*resource.facts, *resource.referenced_labels]:
+            if not policy_model.allows_ontology(fact.subject.ontology_version_id):
+                raise ValueError("Original fact is outside the allowed ontology universe")
             if (
                 _visible_node(fact.qualifiers, policy_model, fact.subject.ontology_version_id)
                 != fact.qualifiers

@@ -10,16 +10,25 @@ from collections.abc import Iterable, Mapping
 from typing import Any
 
 from ..context import OntologyContext
-from ..contracts import EntityRef, Score, VisibilityPolicy, canonical_hash
+from ..contracts import (
+    EntityRef,
+    Score,
+    VisibilityPolicy,
+    canonical_hash,
+    canonical_json,
+)
 from ..generation import ExplanationOutput, FactPacket, comparison_templates, grounding
 from .models import EntityRef as StudyEntity
 from .resources import (
+    REFERENCED_LABEL_BYTES,
+    REFERENCED_LABEL_LIMIT,
     EvidenceLink,
     ExplanationResource,
     GroundedClaim,
     HierarchyEdge,
     OriginalFact,
     OriginalValue,
+    referenced_terms,
 )
 
 
@@ -38,16 +47,18 @@ def build_explanation_resource(
     candidate score. Their complete facts are retained for citation verification.
     Hierarchy remains explicitly bounded; distant nodes are navigation targets.
     """
-    facts: dict[str, OriginalFact] = {}
+    facts: dict[tuple[str, str], OriginalFact] = {}
     edges: dict[str, HierarchyEdge] = {}
     limitations: list[str] = []
     permitted = {canonical_hash(entity) for entity in entities}
     if len(permitted) != len(entities):
         raise ValueError("Duplicate study entity")
 
-    def admit(raw: dict[str, Any]) -> None:
+    def original_record(raw: dict[str, Any], *, reference_label: bool = False) -> OriginalFact:
         entity = EntityRef.model_validate(raw["subject"])
-        if canonical_hash(entity) not in permitted or not policy.allows_fact(raw):
+        if (
+            not reference_label and canonical_hash(entity) not in permitted
+        ) or not policy.allows_fact(raw):
             raise ValueError("Fact is outside the frozen study policy or entity universe")
         context = contexts[entity.ontology_version_id]
         original = context.axiom(raw["axiom_ref"], policy=policy)
@@ -80,9 +91,12 @@ def build_explanation_resource(
             premises=raw.get("premise_ids", []),
             derivation=raw.get("derivation_id"),
         )
-        # One original axiom can occur in the context of several referenced terms.
-        # Keep one authoritative original record instead of inventing new axiom IDs.
-        facts.setdefault(fact.fact_id, fact)
+        return fact
+
+    def admit(raw: dict[str, Any]) -> None:
+        fact = original_record(raw)
+        # A shared original keeps its axiom identity and every typed focal subject.
+        facts.setdefault((fact.fact_id, canonical_hash(fact.subject)), fact)
 
     packet_map = {}
     for packet in packets:
@@ -108,7 +122,7 @@ def build_explanation_resource(
                 )
         page = context.hierarchy(entity, policy=policy, limit=20)
         for edge in page["items"]:
-            if edge["axiom_id"] in facts:
+            if (edge["axiom_id"], canonical_hash(entity)) in facts:
                 edges[edge["id"]] = HierarchyEdge(
                     child=edge["child"],
                     parent=edge["parent"],
@@ -195,12 +209,15 @@ def build_explanation_resource(
                     fact_ids=claim.fact_ids,
                     category=claim.category,
                     grounding="semantic_template" if is_template else "exact_extract",
-                    scoped_entities=(
-                        [StudyEntity.model_validate(e.model_dump()) for e in packet.entities]
+                    scoped_entities=[
+                        StudyEntity.model_validate(e.model_dump()) for e in packet.entities
+                    ],
+                    packet_fact_ids=[f["fact_id"] for f in packet.facts] if is_template else [],
+                    packet_fact_subjects=(
+                        [StudyEntity.model_validate(f["subject"]) for f in packet.facts]
                         if is_template
                         else []
                     ),
-                    packet_fact_ids=[f["fact_id"] for f in packet.facts] if is_template else [],
                     generation_manifest_sha256=canonical_hash(manifest).removeprefix("sha256:"),
                 )
             )
@@ -209,10 +226,50 @@ def build_explanation_resource(
             limitations.append(
                 "Generated interpretation is unavailable; original fact excerpts are shown."
             )
+    referenced_labels: list[OriginalFact] = []
+    labels_truncated = False
+    label_bytes = 2  # JSON array brackets; each subsequent item adds one comma.
+    if "labels" in policy.categories:
+        seen_iris = {(e.ontology_version_id, e.iri) for e in entities}
+        references: list[tuple[str, str]] = []
+        for key in referenced_terms(list(facts.values())):
+            if key in seen_iris:
+                continue
+            seen_iris.add(key)
+            if len(references) == REFERENCED_LABEL_LIMIT:
+                labels_truncated = True
+                break
+            references.append(key)
+        for version, iri in references[:REFERENCED_LABEL_LIMIT]:
+            if len(iri) > 2048:
+                labels_truncated = True
+                continue
+            context = contexts[version]
+            for row in context.labels([iri], policy=policy):
+                label = row["preferred_label"]
+                if label["status"] == "partial":
+                    labels_truncated = True
+                if label["status"] != "available":
+                    continue
+                raw = context.fact(label["fact_id"], row["entity"], policy=policy)
+                fact = original_record(raw, reference_label=True)
+                added_bytes = len(canonical_json(fact)) + bool(referenced_labels)
+                if (
+                    len(referenced_labels) >= REFERENCED_LABEL_LIMIT
+                    or label_bytes + added_bytes > REFERENCED_LABEL_BYTES
+                ):
+                    labels_truncated = True
+                    continue
+                referenced_labels.append(fact)
+                label_bytes += added_bytes
+    if labels_truncated:
+        limitations.append("Referenced term labels are bounded to the prepared view.")
     return ExplanationResource(
         policy_hash=policy.policy_hash.removeprefix("sha256:"),
         entities=[StudyEntity.model_validate(e.model_dump()) for e in entities],
         facts=list(facts.values()),
+        referenced_labels=referenced_labels,
+        referenced_labels_truncated=labels_truncated,
         entity_profiles=profiles,
         pair_comparison=comparisons,
         hierarchy=list(edges.values()),

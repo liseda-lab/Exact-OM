@@ -139,6 +139,9 @@ class StudyStore:
     def publish(self, publication: Publish):
         """Verify and freeze participant packages; store keys in a separate table."""
         study = publication.definition.model_dump(mode="json")
+        # Preserve canonical bytes/idempotent publication for pre-practice definitions.
+        if not study["practice_cases"]:
+            study.pop("practice_cases")
         keys = {k.case_id: k.model_dump(mode="json") for k in publication.case_keys}
         if len(keys) != len(publication.case_keys) or set(keys) != {
             c["case_id"] for c in study["cases"]
@@ -470,6 +473,7 @@ class StudyStore:
             "instructions": study["instructions"],
             "setup_instructions": study["setup_instructions"],
             "tutorial_steps": study["tutorial_steps"],
+            "practice_cases": study.get("practice_cases", []),
             "forms": study["questionnaires"],
             "ontology_resources": [
                 {

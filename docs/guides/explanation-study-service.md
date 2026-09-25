@@ -45,6 +45,17 @@ separate field in the researcher publication envelope and persists in the
 `researcher_case_keys` table, never a participant package or participant response.
 Protect database access and the admin credential accordingly.
 
+
+Optional `practice_cases` freezes four synthetic control exercises in order: `simple`,
+`complex`, `partial_ranking`, `none_of_these`. Each supplies a title/instructions,
+a source label/description and exactly five candidate labels/descriptions. Practice
+IDs are unique and separate from scored case/candidate IDs; scores and answer-key
+fields are rejected. The same frozen content is returned in `StudyState` for both
+conditions. Existing definitions omit it and retain their original publication hash.
+Practice uses the existing tutorial/setup acknowledgement, not scored ranking or
+adjudication endpoints. Owner-supplied setup instructions still identify the separate
+ontology class to inspect in Protégé.
+
 A case has exactly five distinct candidates in contiguous initial positions.
 Publication verifies the adjudicated IDs, all original ranks, natural-top-five
 order, constructed-set provenance, resource bytes/hashes, case uniqueness,
@@ -56,7 +67,20 @@ regenerate it with `tools/generate_study_ast_schema.py` when intentionally upgra
 pyowl-core. Admission validates exact constructor fields/types, predicate categories,
 nested annotation visibility and strict original-document byte spans. Literal and IRI
 facts preserve their permitted `qualifiers`, including definition citations and synonym
-term/source metadata; expression qualifiers remain in the complete axiom AST. Unadmitted raw
+term/source metadata; expression qualifiers remain in the complete axiom AST.
+A shared axiom retains its original `fact_id` for each typed focal `subject`; clients
+must preserve those contextual copies when grouping facts. Claims carry their
+`scoped_entities`; template `packet_fact_subjects` aligns with `packet_fact_ids` to
+reconstruct the exact prepared comparison. Conflicting copies are rejected.
+
+`referenced_labels` contains only original literal labels for terms explicitly
+referenced by the admitted facts, including properties and restriction fillers.
+These records remain outside focal entities and cannot become claim/evidence facts.
+Preparation limits lookup to 100 referenced IRIs and output to 100 records/64 KiB;
+`referenced_labels_truncated` and a limitation explain omitted labels when bounded.
+Original label provenance and permitted qualifiers survive; withheld categories,
+nested mappings and unrelated neighbor definitions are never added. Legacy resources
+without these fields remain readable. Unadmitted raw
 syntax is rejected; faithful structured expressions remain available without loading
 an OWL parser in the study service. Every publication, even
 a synthetic one, supplies its full immutable `VisibilityPolicy`. Ontology assets

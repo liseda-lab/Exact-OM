@@ -873,6 +873,123 @@
         "title": "Mutation",
         "type": "object"
       },
+      "PracticeCandidate": {
+        "additionalProperties": false,
+        "properties": {
+          "candidate_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.:/-]+$",
+            "title": "Candidate Id",
+            "type": "string"
+          },
+          "description": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Description",
+            "type": "string"
+          },
+          "label": {
+            "maxLength": 512,
+            "minLength": 1,
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "label",
+          "description",
+          "candidate_id"
+        ],
+        "title": "PracticeCandidate",
+        "type": "object"
+      },
+      "PracticeCase": {
+        "additionalProperties": false,
+        "properties": {
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/PracticeCandidate"
+            },
+            "maxItems": 5,
+            "minItems": 5,
+            "title": "Candidates",
+            "type": "array"
+          },
+          "instructions": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Instructions",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "simple",
+              "complex",
+              "partial_ranking",
+              "none_of_these"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "practice_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.:/-]+$",
+            "title": "Practice Id",
+            "type": "string"
+          },
+          "source": {
+            "$ref": "#/components/schemas/PracticeConcept"
+          },
+          "synthetic": {
+            "const": true,
+            "default": true,
+            "title": "Synthetic",
+            "type": "boolean"
+          },
+          "title": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "practice_id",
+          "kind",
+          "title",
+          "instructions",
+          "source",
+          "candidates"
+        ],
+        "title": "PracticeCase",
+        "type": "object"
+      },
+      "PracticeConcept": {
+        "additionalProperties": false,
+        "description": "Frozen synthetic tutorial text; no scored identity or matcher values.",
+        "properties": {
+          "description": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Description",
+            "type": "string"
+          },
+          "label": {
+            "maxLength": 512,
+            "minLength": 1,
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "label",
+          "description"
+        ],
+        "title": "PracticeConcept",
+        "type": "object"
+      },
       "PublicAsset": {
         "additionalProperties": false,
         "description": "Verified download metadata without private filesystem or receipt paths.",
@@ -1599,6 +1716,14 @@
             "title": "Policy Hash",
             "type": "string"
           },
+          "practice_cases": {
+            "items": {
+              "$ref": "#/components/schemas/PracticeCase"
+            },
+            "maxItems": 4,
+            "title": "Practice Cases",
+            "type": "array"
+          },
           "schedules": {
             "items": {
               "$ref": "#/components/schemas/Schedule"
@@ -1784,6 +1909,13 @@
               "$ref": "#/components/schemas/PublicAsset"
             },
             "title": "Ontology Resources",
+            "type": "array"
+          },
+          "practice_cases": {
+            "items": {
+              "$ref": "#/components/schemas/PracticeCase"
+            },
+            "title": "Practice Cases",
             "type": "array"
           },
           "questionnaires": {
@@ -2497,6 +2629,24 @@
               "title": "Case Id",
               "type": "string"
             }
+          },
+          {
+            "description": "Expected session ID; a cookie switch returns 409 before mutation.",
+            "in": "header",
+            "name": "X-Study-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Expected session ID; a cookie switch returns 409 before mutation.",
+              "title": "X-Study-Session"
+            }
           }
         ],
         "requestBody": {
@@ -2545,6 +2695,24 @@
             "schema": {
               "title": "Case Id",
               "type": "string"
+            }
+          },
+          {
+            "description": "Expected session ID; a cookie switch returns 409 before mutation.",
+            "in": "header",
+            "name": "X-Study-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Expected session ID; a cookie switch returns 409 before mutation.",
+              "title": "X-Study-Session"
             }
           }
         ],
@@ -2595,6 +2763,24 @@
               "title": "Case Id",
               "type": "string"
             }
+          },
+          {
+            "description": "Expected session ID; a cookie switch returns 409 before mutation.",
+            "in": "header",
+            "name": "X-Study-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Expected session ID; a cookie switch returns 409 before mutation.",
+              "title": "X-Study-Session"
+            }
           }
         ],
         "requestBody": {
@@ -2635,6 +2821,26 @@
     "/api/v1/study/complete": {
       "post": {
         "operationId": "complete_api_v1_study_complete_post",
+        "parameters": [
+          {
+            "description": "Expected session ID; a cookie switch returns 409 before mutation.",
+            "in": "header",
+            "name": "X-Study-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Expected session ID; a cookie switch returns 409 before mutation.",
+              "title": "X-Study-Session"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -2673,6 +2879,26 @@
     "/api/v1/study/consent": {
       "put": {
         "operationId": "consent_api_v1_study_consent_put",
+        "parameters": [
+          {
+            "description": "Expected session ID; a cookie switch returns 409 before mutation.",
+            "in": "header",
+            "name": "X-Study-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Expected session ID; a cookie switch returns 409 before mutation.",
+              "title": "X-Study-Session"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -2711,6 +2937,26 @@
     "/api/v1/study/events": {
       "post": {
         "operationId": "events_api_v1_study_events_post",
+        "parameters": [
+          {
+            "description": "Expected session ID; a cookie switch returns 409 before mutation.",
+            "in": "header",
+            "name": "X-Study-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Expected session ID; a cookie switch returns 409 before mutation.",
+              "title": "X-Study-Session"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -2749,6 +2995,26 @@
     "/api/v1/study/pause": {
       "post": {
         "operationId": "pause_api_v1_study_pause_post",
+        "parameters": [
+          {
+            "description": "Expected session ID; a cookie switch returns 409 before mutation.",
+            "in": "header",
+            "name": "X-Study-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Expected session ID; a cookie switch returns 409 before mutation.",
+              "title": "X-Study-Session"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -2795,6 +3061,24 @@
             "schema": {
               "title": "Form Id",
               "type": "string"
+            }
+          },
+          {
+            "description": "Expected session ID; a cookie switch returns 409 before mutation.",
+            "in": "header",
+            "name": "X-Study-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Expected session ID; a cookie switch returns 409 before mutation.",
+              "title": "X-Study-Session"
             }
           }
         ],
@@ -2873,6 +3157,26 @@
     "/api/v1/study/resume": {
       "post": {
         "operationId": "resume_api_v1_study_resume_post",
+        "parameters": [
+          {
+            "description": "Expected session ID; a cookie switch returns 409 before mutation.",
+            "in": "header",
+            "name": "X-Study-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Expected session ID; a cookie switch returns 409 before mutation.",
+              "title": "X-Study-Session"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -2949,6 +3253,26 @@
     "/api/v1/study/setup": {
       "put": {
         "operationId": "setup_api_v1_study_setup_put",
+        "parameters": [
+          {
+            "description": "Expected session ID; a cookie switch returns 409 before mutation.",
+            "in": "header",
+            "name": "X-Study-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Expected session ID; a cookie switch returns 409 before mutation.",
+              "title": "X-Study-Session"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -3005,6 +3329,26 @@
     "/api/v1/study/timing": {
       "post": {
         "operationId": "timing_api_v1_study_timing_post",
+        "parameters": [
+          {
+            "description": "Expected session ID; a cookie switch returns 409 before mutation.",
+            "in": "header",
+            "name": "X-Study-Session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Expected session ID; a cookie switch returns 409 before mutation.",
+              "title": "X-Study-Session"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {

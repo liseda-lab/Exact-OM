@@ -1251,7 +1251,8 @@ def test_publication_rejects_explanation_resources_from_another_case(service, tm
     changed = frozen.model_copy(deep=True)
     asset = next(asset for asset in changed.definition.assets if asset.asset_id == "context")
     asset.sha256, asset.size_bytes = hashlib.sha256(content).hexdigest(), len(content)
-    with pytest.raises(StudyError, match="case scope"):
+    rejection = "policy or provenance admission" if violation == "claim" else "case scope"
+    with pytest.raises(StudyError, match=rejection):
         store.publish(changed)
 
 
@@ -1348,3 +1349,127 @@ def test_study_openapi_has_strict_participant_outputs(service):
     assert schema["components"]["schemas"]["RankingResponse"]["properties"]["workflow_state"][
         "enum"
     ] == ["draft", "submitted"]
+
+
+def test_cookie_switch_rejects_stale_session_write_at_equal_revision(service):
+    app, store, frozen = service
+    client = TestClient(app, base_url=ORIGIN, headers={"Origin": ORIGIN})
+    first_secret, second_secret = invite(store, frozen), invite(store, frozen)
+    first = client.post("/api/v1/study/session", json={"secret": first_secret}).json()
+    second = client.post(
+        "/api/v1/study/session",
+        json={"secret": second_secret},
+        headers={"X-Study-Session": first["session_id"]},
+    ).json()
+    first_identity = store.exchange(first_secret)[:2]
+    second_identity = store.exchange(second_secret)[:2]
+    assert first["session_id"] != second["session_id"]
+    assert first["revision"] == second["revision"] == 0
+    body = {
+        "idempotency_key": uuid4().hex,
+        "expected_revision": first["revision"],
+        "information_version": frozen.definition.information_version,
+        "accepted": True,
+    }
+    stale = client.put(
+        "/api/v1/study/consent", json=body, headers={"X-Study-Session": first["session_id"]}
+    )
+    assert stale.status_code == 409
+    assert stale.json() == {
+        "detail": "Study session changed; reopen the original invitation before saving."
+    }
+    assert first["session_id"] not in stale.text and second["session_id"] not in stale.text
+    assert store.state(*first_identity)["revision"] == 0
+    assert store.state(*second_identity)["revision"] == 0
+    accepted = client.put(
+        "/api/v1/study/consent", json=body, headers={"X-Study-Session": second["session_id"]}
+    )
+    assert accepted.status_code == 200, accepted.text
+    assert accepted.json()["session_id"] == second["session_id"]
+    assert accepted.json()["revision"] == 1
+    # The rejected write did not consume its idempotency key, and old clients can retry it.
+    assert client.put("/api/v1/study/consent", json=body).json() == accepted.json()
+    assert store.state(*first_identity)["revision"] == 0
+    client.cookies.clear()
+    unauthenticated = client.put(
+        "/api/v1/study/consent", json=body, headers={"X-Study-Session": second["session_id"]}
+    )
+    assert unauthenticated.status_code == 401  # The binding never substitutes for authentication.
+
+
+def test_every_participant_write_checks_session_binding_before_store_work(service, monkeypatch):
+    app, store, frozen = service
+    client = TestClient(app, base_url=ORIGIN, headers={"Origin": ORIGIN})
+    current = client.post("/api/v1/study/session", json={"secret": invite(store, frozen)}).json()
+    mutation = {"idempotency_key": uuid4().hex, "expected_revision": current["revision"]}
+    ranking = {**mutation, "presentation_id": "presentation", "response_type": "none_of_these"}
+    event = {
+        "event_id": uuid4().hex,
+        "page_instance_id": "page",
+        "sequence": 0,
+        "case_id": "case-0",
+        "presentation_id": "presentation",
+        "type": "case_ready",
+        "client_monotonic_ms": 0,
+        "build_version": frozen.definition.software_version,
+    }
+    requests = [
+        ("PUT", "consent", {**mutation, "information_version": "version", "accepted": True}),
+        (
+            "PUT",
+            "setup",
+            {
+                **mutation,
+                "protege_installed": True,
+                "source_opened": True,
+                "target_opened": True,
+                "practice_source_located": True,
+                "practice_definition_parents_inspected": True,
+            },
+        ),
+        ("PUT", "questionnaires/background", {**mutation, "form_version": "v1", "answers": {}}),
+        ("PUT", "cases/case-0/draft", ranking),
+        ("POST", "cases/case-0/submit", ranking),
+        ("PUT", "cases/case-0/consultation", {**mutation, "consulted_external_ontologies": False}),
+        ("POST", "events", {"events": [event]}),
+        (
+            "POST",
+            "timing",
+            {
+                "segment_id": uuid4().hex,
+                "page_instance_id": "page",
+                "stage": "setup",
+                "monotonic_start_ms": 0,
+                "monotonic_end_ms": 100,
+            },
+        ),
+        ("POST", "pause", mutation),
+        ("POST", "resume", mutation),
+        ("POST", "complete", mutation),
+    ]
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("A mismatched session reached participant store work")
+
+    for operation in ("mutate", "events", "timing"):
+        monkeypatch.setattr(store, operation, forbidden)
+    for method, route, body in requests:
+        response = client.request(
+            method,
+            "/api/v1/study/" + route,
+            json=body,
+            headers={"X-Study-Session": "another-tab-session"},
+        )
+        assert response.status_code == 409, (route, response.text)
+        assert response.json()["detail"].startswith("Study session changed;")
+    # Reads intentionally report the cookie's actual session so the UI can detect the switch.
+    state = client.get("/api/v1/study/state", headers={"X-Study-Session": "another-tab-session"})
+    assert state.status_code == 200 and state.json()["session_id"] == current["session_id"]
+    schema = app.openapi()
+    for method, route, _ in requests:
+        path = "/api/v1/study/" + route.replace("case-0", "{case_id}").replace(
+            "questionnaires/background", "questionnaires/{form_id}"
+        )
+        parameters = schema["paths"][path][method.lower()]["parameters"]
+        header = next(p for p in parameters if p["name"].lower() == "x-study-session")
+        assert header["in"] == "header" and header["required"] is False
