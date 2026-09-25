@@ -7,7 +7,7 @@
   "frontend_admitted": false,
   "scope": {
     "implemented_assignment": "B0-B5 backend only",
-    "frontend": "F1 delegated to a separate expert and not implemented here",
+    "frontend": "F1 implemented to fixture_ready at the user's request; real-package, accessibility and usability checks remain",
     "full_matching_campaign": "not_run",
     "participant_recruitment": "not_run",
     "public_render_deployment": "not_run",
@@ -152,14 +152,25 @@
       "implementation_status": "complete"
     },
     "F1": {
-      "owner": "Separate frontend expert",
-      "inspected_commit": "f4b411760e50da1a58587362cec64cc6f9cec608",
-      "status": "planned",
-      "implemented_paths": [],
+      "owner": "Frontend implementation assignment (started at the user's request while G1/G5 remain blocked_input)",
+      "inspected_commit": "69dc9d630cbcd21164af3df58e29afb2d55f138b",
+      "status": "fixture_ready",
+      "implemented_paths": [
+        "explanations_visualizer/src",
+        "exact_inspect/frontend.py",
+        "exact_inspect/service.py",
+        "exact_inspect/context.py",
+        "exact_inspect/study/api.py",
+        "tools/build_explanation_ui_fixture.py",
+        "tests/explanation_frontend_serving_test.py"
+      ],
       "evidence_ids": [],
       "remaining_inputs_or_checks": [
-        "B5/G5 backend admission and a working handoff package.",
-        "Implement exploration and complete study frontends under spec08; no frontend implementation is included in this assignment."
+        "Exercised only against the synthetic UI fixture package (real NCIT/DOID excerpts, synthetic run and offline exact-excerpt text) and a local synthetic SQLite study; rerun against the real backend-release package and the PostgreSQL study service.",
+        "Screen-reader and keyboard-only audit, both themes, and the full viewport matrix in spec08 with real data.",
+        "Formative usability iterations and the duration pilot (spec07/11); no usability or benefit claim is made.",
+        "Docker image builds for the prepared and study services with the bundled frontend, and the Render staging redeploy/restore rehearsal.",
+        "Backend follow-ups found during F1: study explanation resources omit labels for referenced properties/fillers; per-case resources fail when a case contains an entity and its asserted parent (shared axiom stored under one subject); ontology display names are null in prepared contexts."
       ]
     }
   },
@@ -381,6 +392,8 @@
     "study_resource_schema": "specs/explanation-framework/protocol/study-resource.runtime-schema.json",
     "synthetic_full_client": "tests/explanation_study_test.py::test_complete_synthetic_http_client_flow",
     "frontend_assignment": "specs/explanation-framework/08-frontend-implementation.md",
+    "frontend_handoff": "docs/verification/explanation-frontend-handoff.md",
+    "frontend_readme": "explanations_visualizer/README.md",
     "package": "data/explanation-framework/backend-release/package/package.json",
     "handoff": "data/explanation-framework/backend-release/handoff/backend-handoff.json",
     "operational_evidence": "docs/verification/explanation-backend-operational.json",
@@ -390,7 +403,7 @@
   "deferred": [
     "48-pair baseline/challenger model-selection exercise",
     "Full matching/training/evaluation campaigns",
-    "F1 frontend implementation and frontend usability checks",
+    "F1 frontend real-package verification and usability checks",
     "Public Render deployment and staging redeploy/restore rehearsal",
     "Participant recruitment, invitations to people and live study launch",
     "Optional whole-ontology inference, complete KGA and production repair"
