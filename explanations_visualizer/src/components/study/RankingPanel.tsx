@@ -4,7 +4,7 @@
 // order stays visible and never changes; the answer starts empty. Partial rankings, explicit
 // "None of these" and "Insufficient information" are first-class; nothing auto-submits.
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { IconArrowDown, IconArrowUp, IconCheck, IconUndo } from "@/components/common/Icons";
 import type { EventType, ResponseType } from "@/study/types";
@@ -28,6 +28,9 @@ export function RankingPanel({
   value,
   onChange,
   locked,
+  disabled = false,
+  resetKey,
+  practice = false,
   inspecting,
   onInspect,
   rowExtra,
@@ -40,6 +43,9 @@ export function RankingPanel({
   value: RankingValue;
   onChange: (next: RankingValue, event: EventType, element?: string) => void;
   locked: boolean;
+  disabled?: boolean;
+  resetKey?: string | number;
+  practice?: boolean;
   inspecting?: string | null;
   onInspect?: (id: string) => void;
   rowExtra?: (candidate: RankingCandidate) => React.ReactNode;
@@ -51,16 +57,18 @@ export function RankingPanel({
   const history = useRef<RankingValue[]>([]);
   const [, force] = useState(0);
   const [drag, setDrag] = useState<number | null>(null);
+  const controlsLocked = locked || disabled || submitting;
+  useEffect(() => { history.current = []; force((n) => n + 1); }, [resetKey]);
   const byId = Object.fromEntries(candidates.map((candidate) => [candidate.id, candidate]));
 
   const apply = useCallback(
     (next: RankingValue, event: EventType, element?: string) => {
-      if (locked) return;
+      if (controlsLocked) return;
       history.current = [...history.current, value].slice(-50);
       force((n) => n + 1);
       onChange(next, event, element);
     },
-    [locked, onChange, value],
+    [controlsLocked, onChange, value],
   );
 
   const add = (id: string) => apply({ responseType: "ranked_candidates", ranked: [...value.ranked.filter((item) => item !== id), id] }, "rank_add", id);
@@ -85,6 +93,7 @@ export function RankingPanel({
     );
   const explicit = (type: "none_of_these" | "insufficient_evidence") => apply({ responseType: value.responseType === type ? null : type, ranked: [] }, "response_type_change", type);
   const undo = () => {
+    if (controlsLocked) return;
     const previous = history.current.pop();
     if (!previous) return;
     force((n) => n + 1);
@@ -92,7 +101,7 @@ export function RankingPanel({
   };
 
   const n = value.ranked.length;
-  const canSubmit = !locked && ((value.responseType === "ranked_candidates" && n > 0) || value.responseType === "none_of_these" || value.responseType === "insufficient_evidence");
+  const canSubmit = !controlsLocked && ((value.responseType === "ranked_candidates" && n > 0) || value.responseType === "none_of_these" || value.responseType === "insufficient_evidence");
   const answerNote =
     value.responseType === "ranked_candidates"
       ? `${n} of ${candidates.length} ranked · the rest stay unranked`
@@ -115,7 +124,7 @@ export function RankingPanel({
       <section className="card ranking-initial" aria-labelledby="initial-h">
         <div className="ranking-head">
           <h2 id="initial-h">Initial order</h2>
-          <span className="meta">The system&apos;s suggestion</span>
+          <span className="meta">{practice ? "Illustrative practice order" : "The system’s suggestion"}</span>
         </div>
         <ol className="initial-list">
           {[...candidates]
@@ -131,7 +140,7 @@ export function RankingPanel({
                   <span className="initial-text">
                     <span className="initial-label">{candidate.label}</span>
                     <span className="meta">
-                      <span className="iri">{candidate.identifier}</span> · matching score {candidate.score}
+                      <span className="iri">{candidate.identifier}</span> · {practice ? "illustrative score" : "matching score"} {candidate.score}
                     </span>
                   </span>
                   <span className="initial-actions">
@@ -146,7 +155,7 @@ export function RankingPanel({
                         Your #{rank + 1}
                       </span>
                     ) : (
-                      <button type="button" className="btn btn-sm add-btn" disabled={locked} onClick={() => add(candidate.id)} aria-label={`Add ${candidate.label} as rank ${n + 1}`}>
+                      <button type="button" className="btn btn-sm add-btn" disabled={controlsLocked} onClick={() => add(candidate.id)} aria-label={`Add ${candidate.label} as rank ${n + 1}`}>
                         Add as #{n + 1}
                       </button>
                     )}
@@ -155,7 +164,7 @@ export function RankingPanel({
               );
             })}
         </ol>
-        {candidates[0] && <p className="meta">Matching scores: {candidates[0].scoreMeaning}</p>}
+        {candidates[0] && <p className="meta">{candidates[0].scoreMeaning}</p>}
       </section>
 
       <section className="card ranking-answer" aria-labelledby="answer-h">
@@ -165,10 +174,10 @@ export function RankingPanel({
             {answerNote}
           </span>
           <span className="ranking-head-spacer" />
-          <button type="button" className="btn btn-sm" onClick={undo} disabled={locked || history.current.length === 0}>
+          <button type="button" className="btn btn-sm" onClick={undo} disabled={controlsLocked || history.current.length === 0}>
             <IconUndo /> Undo
           </button>
-          <button type="button" className="btn btn-sm" onClick={keepInitial} disabled={locked}>
+          <button type="button" className="btn btn-sm" onClick={keepInitial} disabled={controlsLocked}>
             Keep initial order
           </button>
         </div>
@@ -183,7 +192,7 @@ export function RankingPanel({
                 <li
                   key={id}
                   className={drag === index ? "answer-row dragging" : "answer-row"}
-                  draggable={!locked}
+                  draggable={!controlsLocked}
                   onDragStart={(event) => {
                     setDrag(index);
                     event.dataTransfer.effectAllowed = "move";
@@ -204,13 +213,13 @@ export function RankingPanel({
                     </span>
                   </span>
                   <span className="initial-actions">
-                    <button type="button" className="icon-btn" aria-label={`Move ${candidate?.label} up`} disabled={locked || index === 0} onClick={() => move(index, index - 1)}>
+                    <button type="button" className="icon-btn" aria-label={`Move ${candidate?.label} up`} disabled={controlsLocked || index === 0} onClick={() => move(index, index - 1)}>
                       <IconArrowUp />
                     </button>
-                    <button type="button" className="icon-btn" aria-label={`Move ${candidate?.label} down`} disabled={locked || index === n - 1} onClick={() => move(index, index + 1)}>
+                    <button type="button" className="icon-btn" aria-label={`Move ${candidate?.label} down`} disabled={controlsLocked || index === n - 1} onClick={() => move(index, index + 1)}>
                       <IconArrowDown />
                     </button>
-                    <button type="button" className="btn btn-sm" aria-label={`Remove ${candidate?.label}`} disabled={locked} onClick={() => remove(index)}>
+                    <button type="button" className="btn btn-sm" aria-label={`Remove ${candidate?.label}`} disabled={controlsLocked} onClick={() => remove(index)}>
                       Remove
                     </button>
                   </span>
@@ -226,7 +235,7 @@ export function RankingPanel({
               ["insufficient_evidence", "Insufficient information", "I cannot judge from what is available"],
             ] as const
           ).map(([type, title, note]) => (
-            <button key={type} type="button" role="radio" aria-checked={value.responseType === type} className={value.responseType === type ? "explicit-option on" : "explicit-option"} onClick={() => explicit(type)} disabled={locked}>
+            <button key={type} type="button" role="radio" aria-checked={value.responseType === type} className={value.responseType === type ? "explicit-option on" : "explicit-option"} onClick={() => explicit(type)} disabled={controlsLocked}>
               <span className="explicit-title">{title}</span>
               <span className="meta">{note}</span>
             </button>
@@ -237,7 +246,7 @@ export function RankingPanel({
             <button type="button" className="btn btn-primary btn-large" disabled={!canSubmit || submitting} onClick={onSubmit}>
               {submitting ? "Submitting…" : submitLabel}
             </button>
-            <span className="meta">{submitNote}</span>
+            <span className="meta">{practice ? "Practice only: this answer is not sent or scored. You can change it and try again." : submitNote}</span>
           </div>
         )}
         {locked && (

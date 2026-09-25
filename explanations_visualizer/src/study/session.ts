@@ -1,14 +1,9 @@
 "use client";
 
-// Participant session: the server is the only authority for stage, answers and revision.
-// Mutations run one at a time, each with an idempotency key and the revision it expects.
-// A lost acknowledgement is retried with the same key (the server replays it); a stale
-// revision is a visible conflict, never a silent overwrite. Only the latest unsent draft
-// is kept locally, so a reload can resend it.
-
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { ApiError, getJson, sendJson } from "@/lib/api";
+import { ApiError, getJson, request } from "@/lib/api";
+import { MutationQueue, type Mutation } from "@/study/mutationQueue";
 import type { StudyState } from "@/study/types";
 
 export type SaveStatus =
@@ -18,52 +13,18 @@ export type SaveStatus =
   | { kind: "offline"; pending: number }
   | { kind: "conflict"; message: string; at: number }
   | { kind: "error"; message: string };
-
 export type Phase = "booting" | "no_link" | "link_unusable" | "rate_limited" | "ready" | "unreachable";
-
-interface Mutation {
-  method: "PUT" | "POST";
-  path: string;
-  body: Record<string, unknown>;
-  /** Mutations with the same coalesce key replace each other while still unsent. */
-  coalesce?: string;
-  persist?: boolean;
-}
-
-interface Entry extends Mutation {
-  key: string;
-  expected: number | null;
-  resolve: (state: StudyState) => void;
-  reject: (error: unknown) => void;
-}
-
-const PENDING_KEY = "exact.study.pending";
 
 export function uuid(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
   return `${Date.now().toString(16)}-${Math.random().toString(16).slice(2)}`;
 }
-
-function storePending(sessionId: string, entry: Entry | null) {
+function read(key: string) { try { return window.sessionStorage.getItem(key); } catch { return null; } }
+function write(key: string, value: string | null) {
   try {
-    if (!entry) window.localStorage.removeItem(`${PENDING_KEY}.${sessionId}`);
-    else
-      window.localStorage.setItem(
-        `${PENDING_KEY}.${sessionId}`,
-        JSON.stringify({ method: entry.method, path: entry.path, body: entry.body, key: entry.key, expected: entry.expected, coalesce: entry.coalesce }),
-      );
-  } catch {
-    /* browser storage is only a convenience; server-acknowledged data is the guarantee */
-  }
-}
-
-function readPending(sessionId: string): (Mutation & { key: string; expected: number | null }) | null {
-  try {
-    const raw = window.localStorage.getItem(`${PENDING_KEY}.${sessionId}`);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
+    if (value === null) window.sessionStorage.removeItem(key);
+    else window.sessionStorage.setItem(key, value);
+  } catch { /* Only server-acknowledged data survives browser/storage loss. */ }
 }
 
 export function useStudySession() {
@@ -71,193 +32,146 @@ export function useStudySession() {
   const [state, setStateRaw] = useState<StudyState | null>(null);
   const [save, setSave] = useState<SaveStatus>({ kind: "idle" });
   const [online, setOnline] = useState(true);
+  const [recovery, setRecovery] = useState<string | null>(null);
   const stateRef = useRef<StudyState | null>(null);
-  const queue = useRef<Entry[]>([]);
-  const running = useRef(false);
-  const wake = useRef<(() => void) | null>(null);
+  const queue = useRef<MutationQueue | null>(null);
+  const pendingInvite = useRef<string | null>(null);
+  const bootGeneration = useRef(0);
   const [bootNonce, setBootNonce] = useState(0);
-
-  // A link pasted into a tab already on this page only changes the fragment: exchange it too.
-  useEffect(() => {
-    const onHash = () => {
-      if (new URLSearchParams(window.location.hash.replace(/^#/, "")).get("invite")) {
-        setPhase("booting");
-        setBootNonce((value) => value + 1);
-      }
-    };
-    window.addEventListener("hashchange", onHash);
-    return () => window.removeEventListener("hashchange", onHash);
-  }, []);
 
   const setState = useCallback((next: StudyState) => {
     const current = stateRef.current;
-    if (current && current.session_id === next.session_id && next.revision < current.revision) return;
+    if (current && (current.session_id !== next.session_id || next.revision < current.revision)) return;
     stateRef.current = next;
+    queue.current?.observe(next);
     setStateRaw(next);
   }, []);
 
   const refresh = useCallback(async () => {
     const next = await getJson<StudyState>("/api/v1/study/state");
-    stateRef.current = next;
-    setStateRaw(next);
+    if (stateRef.current && stateRef.current.session_id !== next.session_id) throw new Error("The active private link changed. Reopen this session's original link.");
+    setState(next);
     return next;
+  }, [setState]);
+
+  useEffect(() => {
+    const onHash = () => {
+      if (!new URLSearchParams(window.location.hash.replace(/^#/, "")).get("invite")) return;
+      queue.current?.stop();
+      setPhase("booting");
+      setBootNonce((value) => value + 1);
+    };
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
   }, []);
 
-  const pump = useCallback(async () => {
-    if (running.current) return;
-    running.current = true;
-    try {
-      while (queue.current.length) {
-        const entry = queue.current[0];
-        if (entry.expected === null) entry.expected = stateRef.current?.revision ?? 0;
-        if (entry.persist && stateRef.current) storePending(stateRef.current.session_id, entry);
-        setSave({ kind: "saving" });
-        let delay = 1500;
-        for (;;) {
-          try {
-            const next = await sendJson<StudyState>(entry.method, entry.path, { ...entry.body, idempotency_key: entry.key, expected_revision: entry.expected });
-            queue.current.shift();
-            if (entry.persist && stateRef.current) storePending(stateRef.current.session_id, null);
-            setState(next);
-            setOnline(true);
-            setSave({ kind: "saved", at: Date.now() });
-            entry.resolve(next);
-            break;
-          } catch (error) {
-            const transient = error instanceof ApiError && (error.status === 0 || error.status >= 500 || error.status === 429);
-            if (transient) {
-              setOnline(false);
-              setSave({ kind: "offline", pending: queue.current.length });
-              await new Promise<void>((resolve) => {
-                const timer = window.setTimeout(resolve, delay);
-                wake.current = () => {
-                  window.clearTimeout(timer);
-                  resolve();
-                };
-              });
-              wake.current = null;
-              delay = Math.min(30000, delay * 2);
-              continue;
-            }
-            queue.current.shift();
-            if (entry.persist && stateRef.current) storePending(stateRef.current.session_id, null);
-            if (error instanceof ApiError && error.status === 409) {
-              // Load the authoritative state first so screens can re-sync to it.
-              try {
-                await refresh();
-              } catch {
-                /* the banner still explains what happened */
-              }
-              setSave({ kind: "conflict", message: "Your study changed in another tab or on another device. The latest saved version is shown.", at: Date.now() });
-            } else if (error instanceof ApiError && error.status === 401) {
-              setPhase("no_link");
-            } else {
-              setSave({ kind: "error", message: error instanceof ApiError ? error.message : "The change could not be saved." });
-            }
-            entry.reject(error);
-            // Later entries were built on the rejected revision; let callers rebuild them.
-            const dropped = queue.current.splice(0);
-            dropped.forEach((item) => item.reject(error));
-            break;
-          }
-        }
-      }
-    } finally {
-      running.current = false;
-    }
-  }, [refresh, setState]);
-
-  const mutate = useCallback(
-    (mutation: Mutation): Promise<StudyState> =>
-      new Promise((resolve, reject) => {
-        if (mutation.coalesce) {
-          // Replace an unsent (not in-flight) entry for the same thing, e.g. a draft ranking.
-          const index = queue.current.findIndex((entry, position) => position > 0 && entry.coalesce === mutation.coalesce);
-          if (index > 0) {
-            const old = queue.current[index];
-            queue.current[index] = {
-              ...mutation,
-              key: uuid(),
-              expected: null,
-              resolve: (next) => {
-                old.resolve(next);
-                resolve(next);
-              },
-              reject: (error) => {
-                old.reject(error);
-                reject(error);
-              },
-            };
-            return;
-          }
-        }
-        queue.current.push({ ...mutation, key: uuid(), expected: null, resolve, reject });
-        void pump();
-      }),
-    [pump],
-  );
-
-  // Boot: exchange a fragment invitation for a session cookie, or resume with the cookie.
   useEffect(() => {
-    let cancelled = false;
+    const generation = ++bootGeneration.current;
+    const controller = new AbortController();
+    queue.current?.stop();
+    queue.current = null;
+    stateRef.current = null;
+    setStateRaw(null);
+    setRecovery(null);
+    setSave({ kind: "idle" });
+    const secret = new URLSearchParams(window.location.hash.replace(/^#/, "")).get("invite");
+    if (secret) {
+      pendingInvite.current = secret;
+      window.history.replaceState(null, "", window.location.pathname);
+    }
+    const invite = pendingInvite.current;
     (async () => {
-      const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
-      const secret = hash.get("invite");
       try {
-        if (secret) {
-          // Remove the bearer secret from the address bar and history before anything else.
-          window.history.replaceState(null, "", window.location.pathname);
-          const next = await sendJson<StudyState>("POST", "/api/v1/study/session", { secret });
-          if (cancelled) return;
-          stateRef.current = next;
-          setStateRaw(next);
-        } else {
-          await refresh();
-        }
-        if (cancelled) return;
+        const next = invite
+          ? await request<StudyState>("/api/v1/study/session", { method: "POST", signal: controller.signal, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ secret: invite }) })
+          : await getJson<StudyState>("/api/v1/study/state", undefined, controller.signal);
+        if (controller.signal.aborted || generation !== bootGeneration.current) return;
+        pendingInvite.current = null;
+        setState(next);
         setPhase("ready");
-        // Resend a draft that never reached the server (same key: safe to replay).
-        const pending = stateRef.current ? readPending(stateRef.current.session_id) : null;
-        if (pending) {
-          queue.current.push({
-            ...pending,
-            resolve: () => undefined,
-            reject: () => undefined,
-          });
-          void pump();
-        }
+        const key = `exact.study.outbox.${next.session_id}`;
+        const recoveryKey = `${key}.recovery`;
+        setRecovery(read(recoveryKey));
+        const outbox = new MutationQueue({
+          state: next,
+          snapshot: read(key),
+          key: uuid,
+          save: (snapshot) => write(key, snapshot),
+          recover: (snapshot) => {
+            const previous = read(recoveryKey);
+            let attempts: unknown[] = [];
+            let discarded = 0;
+            try {
+              const saved = previous ? JSON.parse(previous) : null;
+              attempts = saved?.attempts ?? (saved ? [saved] : []);
+              discarded = saved?.discarded_attempts ?? 0;
+            } catch { /* Ignore an unreadable older recovery archive. */ }
+            try { attempts.push(JSON.parse(snapshot)); } catch { attempts.push({ unreadable_snapshot: true }); }
+            while (attempts.length > 8 || (attempts.length > 1 && JSON.stringify(attempts).length > 1024 * 1024)) { attempts.shift(); discarded += 1; }
+            const archive = JSON.stringify({ attempts, discarded_attempts: discarded });
+            write(recoveryKey, archive);
+            setRecovery(archive);
+          },
+          send: (entry, signal) => request<StudyState>(entry.path, {
+            method: entry.method, signal,
+            headers: { "Content-Type": "application/json", Accept: "application/json", "X-Study-Session": next.session_id },
+            body: JSON.stringify({ ...entry.body, idempotency_key: entry.key, expected_revision: entry.expected }),
+          }),
+          update: (value) => setState(value as StudyState),
+          status: (kind, pending) => {
+            setOnline(kind !== "offline");
+            setSave(kind === "offline" ? { kind, pending } : kind === "saved" ? { kind, at: Date.now() } : { kind });
+          },
+          retryable: (error) => error instanceof ApiError && (error.status === 0 || error.status >= 500 || error.status === 429),
+          failed: async (error) => {
+            if (error instanceof ApiError && error.status === 409) {
+              let restored = false;
+              try { await refresh(); restored = true; } catch { /* Recovery remains available. */ }
+              setSave({ kind: "conflict", message: restored ? "Your study changed in another tab or device. The latest saved version is shown. Unsaved changes are available below for recovery." : "Your study changed in another tab or device. The latest version could not be loaded. Reconnect and reload; unsaved changes are available below for recovery.", at: Date.now() });
+            } else if (error instanceof ApiError && error.status === 401) setPhase("no_link");
+            else setSave({ kind: "error", message: error instanceof Error ? error.message : "The change could not be saved." });
+          },
+        });
+        queue.current = outbox;
+        void outbox.start();
       } catch (error) {
-        if (cancelled) return;
-        if (secret && error instanceof ApiError && error.status === 401) setPhase("link_unusable");
-        else if (error instanceof ApiError && error.status === 401) setPhase("no_link");
+        if (controller.signal.aborted || generation !== bootGeneration.current) return;
+        if (error instanceof ApiError && error.status === 401) setPhase(invite ? "link_unusable" : "no_link");
         else if (error instanceof ApiError && error.status === 429) setPhase("rate_limited");
-        else if (error instanceof ApiError && error.status > 0) setPhase(secret ? "link_unusable" : "no_link");
+        else if (error instanceof ApiError && error.status > 0 && error.status < 500) setPhase(invite ? "link_unusable" : "no_link");
         else setPhase("unreachable");
       }
     })();
-    return () => {
-      cancelled = true;
-    };
-  }, [pump, refresh, bootNonce]);
+    return () => { controller.abort(); queue.current?.stop(); };
+  }, [bootNonce, refresh, setState]);
+
+  const mutate = useCallback((mutation: Mutation): Promise<StudyState> => {
+    if (!queue.current) return Promise.reject(new Error("Open the study session before saving."));
+    return queue.current.enqueue(mutation).catch((error) => {
+      if (error instanceof Error && /limit|Too many changes/.test(error.message)) setSave({ kind: "error", message: error.message });
+      throw error;
+    }) as Promise<StudyState>;
+  }, []);
 
   useEffect(() => {
-    const up = () => {
-      setOnline(true);
-      wake.current?.();
-    };
+    const up = () => { setOnline(true); queue.current?.retry(); };
     const down = () => setOnline(false);
     window.addEventListener("online", up);
     window.addEventListener("offline", down);
-    return () => {
-      window.removeEventListener("online", up);
-      window.removeEventListener("offline", down);
-    };
+    return () => { window.removeEventListener("online", up); window.removeEventListener("offline", down); };
   }, []);
 
-  const retryNow = useCallback(() => wake.current?.(), []);
+  const retryNow = useCallback(() => queue.current?.retry(), []);
   const clearNotice = useCallback(() => setSave({ kind: "idle" }), []);
-
-  return { phase, state, save, online, mutate, refresh, retryNow, clearNotice, pendingCount: () => queue.current.length };
+  const downloadRecovery = useCallback(() => {
+    if (!recovery) return;
+    const url = URL.createObjectURL(new Blob([recovery], { type: "application/json" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "unsaved-study-changes.json";
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }, [recovery]);
+  return { phase, state, save, online, mutate, refresh, retryNow, clearNotice, pendingCount: () => queue.current?.size ?? 0, hasRecovery: recovery !== null, downloadRecovery };
 }
-
 export type StudySession = ReturnType<typeof useStudySession>;

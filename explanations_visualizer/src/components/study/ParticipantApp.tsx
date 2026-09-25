@@ -3,7 +3,7 @@
 // First-party participant application. The page GET does nothing server-side; the private
 // link is exchanged by POST for an HttpOnly session cookie and removed from the address bar.
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Skeleton } from "@/components/common/ErrorNote";
 import { CaseView } from "@/components/study/CaseView";
@@ -36,32 +36,47 @@ function markSeen(sessionId: string) {
 
 /** Saves that can move the participant to another step; timing must be closed first. */
 function changesStage(path: string, body: Record<string, unknown>): boolean {
-  if (/\/(consent|setup|submit|consultation|pause|complete)$/.test(path)) return true;
+  if (/\/(consent|submit|consultation|pause|complete)$/.test(path)) return true;
+  if (path.endsWith("/setup")) return ["protege_installed", "source_opened", "target_opened", "practice_source_located", "practice_definition_parents_inspected"].every((field) => body[field] === true);
   return path.includes("/questionnaires/") && body.submitted === true;
 }
 
 export function ParticipantApp() {
   const rawSession = useStudySession();
   const state = rawSession.state;
-  const telemetry = useTelemetry(state);
+  const telemetry = useTelemetry(rawSession.phase === "ready" ? state : null);
+  const transitioning = useRef(false);
   const session = useMemo(
     () => ({
       ...rawSession,
       mutate: async (mutation: Parameters<typeof rawSession.mutate>[0]) => {
-        if (changesStage(mutation.path, mutation.body)) await telemetry.flushTiming();
-        return rawSession.mutate(mutation);
+        const transition = changesStage(mutation.path, mutation.body);
+        if (transition && transitioning.current) throw new Error("A step is already being saved.");
+        if (transition) transitioning.current = true;
+        try {
+          if (transition) await telemetry.flushTiming();
+          const next = await rawSession.mutate(mutation);
+          if (transition && next.stage === rawSession.state?.stage) telemetry.resumeTiming();
+          return next;
+        } catch (error) {
+          if (transition) telemetry.resumeTiming();
+          throw error;
+        } finally {
+          if (transition) transitioning.current = false;
+        }
       },
     }),
     [rawSession, telemetry],
   );
-  const [gapAsked, setGapAsked] = useState(false);
+  const [gapAsked, setGapAsked] = useState<string | null>(null);
   const [needsGapAnswer, setNeedsGapAnswer] = useState(false);
   const [caseMeta, setCaseMeta] = useState<{ condition: string; sourceLabel: string } | null>(null);
 
   // On return to an in-progress case after the page was closed, ask what happened.
   useEffect(() => {
-    if (!state || gapAsked) return;
-    setGapAsked(true);
+    if (!state || gapAsked === state.session_id) return;
+    setGapAsked(state.session_id);
+    setNeedsGapAnswer(false);
     if (state.stage === "case" || state.stage === "consultation") {
       const seen = lastSeen(state.session_id);
       if (seen === null || Date.now() - seen > 120_000) setNeedsGapAnswer(true);
@@ -108,7 +123,6 @@ export function ParticipantApp() {
 
   const pause = useCallback(async () => {
     telemetry.emit("pause");
-    await telemetry.flushTiming();
     await session.mutate({ method: "POST", path: "/api/v1/study/pause", body: {} }).catch(() => undefined);
   }, [session, telemetry]);
 
@@ -169,7 +183,7 @@ export function ParticipantApp() {
         body = <WelcomeStage state={state} session={session} />;
         break;
       case "setup":
-        body = <SetupStage state={state} session={session} />;
+        body = <SetupStage key={state.session_id} state={state} session={session} />;
         break;
       case "background":
         body = (
@@ -187,7 +201,7 @@ export function ParticipantApp() {
         body = <PracticeStage state={state} session={session} />;
         break;
       case "case":
-        body = <CaseView key={`${state.current_case_id}|${state.current_presentation_id}`} state={state} session={session} telemetry={telemetry} />;
+        body = <CaseView key={`${state.session_id}|${state.current_case_id}|${state.current_presentation_id}`} state={state} session={session} telemetry={telemetry} timingEnabled={!needsGapAnswer} />;
         break;
       case "consultation":
         body = <ConsultationStage state={state} session={session} sourceLabel={caseMeta?.sourceLabel ?? null} />;

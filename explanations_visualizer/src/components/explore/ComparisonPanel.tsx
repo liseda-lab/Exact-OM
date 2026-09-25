@@ -55,7 +55,7 @@ export function ComparisonPanel({
                     <div key={group.key} className={items.length ? `comparison-group tone-${group.tone}` : "comparison-group"}>
                       <h3>
                         {group.icon}
-                        {group.title}
+                        <span>{group.title}</span>
                       </h3>
                       {items.length ? (
                         <ul>

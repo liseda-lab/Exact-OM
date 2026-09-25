@@ -3,7 +3,7 @@
 // Independent hierarchy browser for one ontology. It never depends on the match graph:
 // every step is a bounded query by entity, with the hierarchy basis stated explicitly.
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { ErrorNote, Skeleton } from "@/components/common/ErrorNote";
 import { IconChevronDown, IconChevronUp, SideMarker } from "@/components/common/Icons";
@@ -41,11 +41,11 @@ function ParentBranch({
   kind: EntityKind;
   basis: Basis;
   depth: number;
-  onFocus: (iri: string) => void;
+  onFocus: (iri: string, kind: EntityKind) => void;
   side: "source" | "target";
 }) {
   const [open, setOpen] = useState(false);
-  const state = useAsync(open ? `parents|${ontology}|${iri}|${basis}` : null, (signal) => fetchHierarchy(ontology, iri, kind, "parents", basis, null, signal));
+  const state = useAsync(open ? `parents|${ontology}|${kind}|${iri}|${basis}` : null, (signal) => fetchHierarchy(ontology, iri, kind, "parents", basis, null, signal));
   const parents = (state.data?.items ?? []).filter((edge) => edge.child.iri === iri);
   const label = useLabels(ontology, [iri, ...parents.map((edge) => edge.parent.iri)]);
   return (
@@ -54,7 +54,7 @@ function ParentBranch({
         <button type="button" className="tree-toggle" aria-expanded={open} aria-label={`${open ? "Hide" : "Show"} parents of ${label(iri)?.value ?? curie(iri)}`} onClick={() => setOpen((value) => !value)} disabled={depth > 12}>
           {open ? <IconChevronDown /> : <IconChevronUp />}
         </button>
-        <button type="button" className={`tree-label tree-${side}`} onClick={() => onFocus(iri)}>
+        <button type="button" className={`tree-label tree-${side}`} onClick={() => onFocus(iri, kind)}>
           {label(iri)?.value ?? <span className="muted">{curie(iri)}</span>}
         </button>
         <span className="iri">{curie(iri)}</span>
@@ -67,7 +67,7 @@ function ParentBranch({
           {parents.length > 0 && (
             <ul>
               {parents.map((edge) => (
-                <ParentBranch key={edge.id} ontology={ontology} iri={edge.parent.iri} kind={kind} basis={basis} depth={depth + 1} onFocus={onFocus} side={side} />
+                <ParentBranch key={edge.id} ontology={ontology} iri={edge.parent.iri} kind={edge.parent.kind} basis={basis} depth={depth + 1} onFocus={onFocus} side={side} />
               ))}
             </ul>
           )}
@@ -90,6 +90,7 @@ export function HierarchyBrowser({
   focusIri,
   kind = "class",
   pinnedIri,
+  pinnedKind = "class",
   onFocus,
   reasonerStatus,
   entityCount,
@@ -102,33 +103,40 @@ export function HierarchyBrowser({
   focusIri: string | null;
   kind?: EntityKind;
   pinnedIri?: string | null;
-  onFocus: (iri: string) => void;
+  pinnedKind?: EntityKind;
+  onFocus: (iri: string, kind: EntityKind) => void;
   reasonerStatus?: string;
   entityCount?: number;
   scopeNote?: React.ReactNode;
-  onOpenContext?: (iri: string) => void;
+  onOpenContext?: (iri: string, kind: EntityKind) => void;
 }) {
   const [basis, setBasis] = useState<Basis>("literal_asserted");
   const [childPages, setChildPages] = useState<HierarchyEdge[]>([]);
   const [childCursor, setChildCursor] = useState<string | null>(null);
   const [childMoreError, setChildMoreError] = useState<unknown>(null);
 
-  const parents = useAsync(focusIri ? `p|${ontology}|${focusIri}|${basis}` : null, (signal) => fetchHierarchy(ontology, focusIri!, kind, "parents", basis, null, signal));
-  const children = useAsync(focusIri ? `c|${ontology}|${focusIri}|${basis}` : null, (signal) => fetchHierarchy(ontology, focusIri!, kind, "children", basis, null, signal));
+  const parents = useAsync(focusIri ? `p|${ontology}|${kind}|${focusIri}|${basis}` : null, (signal) => fetchHierarchy(ontology, focusIri!, kind, "parents", basis, null, signal));
+  const children = useAsync(focusIri ? `c|${ontology}|${kind}|${focusIri}|${basis}` : null, (signal) => fetchHierarchy(ontology, focusIri!, kind, "children", basis, null, signal));
   useEffect(() => {
     setChildPages(children.data?.items ?? []);
     setChildCursor(children.data?.next_cursor ?? null);
     setChildMoreError(null);
   }, [children.data]);
 
+  const moreController = useRef<AbortController | null>(null);
+  useEffect(() => () => moreController.current?.abort(), [ontology, focusIri, kind, basis]);
   const loadMoreChildren = useCallback(async () => {
     if (!focusIri || !childCursor) return;
+    moreController.current?.abort();
+    const controller = new AbortController();
+    moreController.current = controller;
     try {
-      const page = await fetchHierarchy(ontology, focusIri, kind, "children", basis, childCursor);
+      const page = await fetchHierarchy(ontology, focusIri, kind, "children", basis, childCursor, controller.signal);
+      if (controller.signal.aborted) return;
       setChildPages((list) => [...list, ...page.items]);
       setChildCursor(page.next_cursor);
     } catch (error) {
-      setChildMoreError(error);
+      if (!controller.signal.aborted) setChildMoreError(error);
     }
   }, [basis, childCursor, focusIri, kind, ontology]);
 
@@ -144,7 +152,7 @@ export function HierarchyBrowser({
           <h2>{/^(Source|Target) ontology$/.test(ontologyLabel) ? ontologyLabel : `${side === "source" ? "Source" : "Target"} ontology · ${ontologyLabel}`}</h2>
           {entityCount != null && <span className="meta">{entityCount.toLocaleString()} entities</span>}
         </div>
-        <EntitySearch ontology={ontology} label={`Search the ${side} ontology`} placeholder="Search by label, synonym prefix or full IRI" onChoose={(item) => onFocus(item.entity.iri)} />
+        <EntitySearch ontology={ontology} label={`Search the ${side} ontology`} placeholder="Search by label, synonym prefix or full IRI" onChoose={(item) => onFocus(item.entity.iri, item.entity.kind)} />
         <div className="basis-group" role="radiogroup" aria-label="Hierarchy basis">
           {BASES.map((option) => {
             const disabled = option.value === "reasoner_inferred" && !reasonerAvailable;
@@ -185,7 +193,7 @@ export function HierarchyBrowser({
             {parentEdges.length > 0 && (
               <ul className="tree">
                 {parentEdges.map((edge) => (
-                  <ParentBranch key={edge.id} ontology={ontology} iri={edge.parent.iri} kind={kind} basis={basis} depth={0} onFocus={onFocus} side={side} />
+                  <ParentBranch key={edge.id} ontology={ontology} iri={edge.parent.iri} kind={edge.parent.kind} basis={basis} depth={0} onFocus={onFocus} side={side} />
                 ))}
               </ul>
             )}
@@ -197,12 +205,12 @@ export function HierarchyBrowser({
             <span className="iri">{focusIri}</span>
             <div className="focus-actions">
               {onOpenContext && (
-                <button type="button" className="btn btn-sm" onClick={() => onOpenContext(focusIri)}>
+                <button type="button" className="btn btn-sm" onClick={() => onOpenContext(focusIri, kind)}>
                   Open full context
                 </button>
               )}
-              {pinnedIri && pinnedIri !== focusIri && (
-                <button type="button" className="btn btn-sm" onClick={() => onFocus(pinnedIri)}>
+              {pinnedIri && (pinnedIri !== focusIri || pinnedKind !== kind) && (
+                <button type="button" className="btn btn-sm" onClick={() => onFocus(pinnedIri, pinnedKind)}>
                   Return to {label(pinnedIri)?.value ?? curie(pinnedIri)}
                 </button>
               )}
@@ -225,12 +233,12 @@ export function HierarchyBrowser({
               <ul className="child-list">
                 {childPages.map((edge) => (
                   <li key={edge.id}>
-                    <button type="button" className={`tree-label tree-${side}`} onClick={() => onFocus(edge.child.iri)}>
+                    <button type="button" className={`tree-label tree-${side}`} onClick={() => onFocus(edge.child.iri, edge.child.kind)}>
                       {label(edge.child.iri)?.value ?? <span className="muted">{curie(edge.child.iri)}</span>}
                     </button>
                     <span className="iri">{curie(edge.child.iri)}</span>
                     {edgeNote(edge) && <span className="meta">· {edgeNote(edge)}</span>}
-                    {pinnedIri === edge.child.iri && <span className="pill">compared entity</span>}
+                    {pinnedIri === edge.child.iri && pinnedKind === edge.child.kind && <span className="pill">compared entity</span>}
                   </li>
                 ))}
               </ul>

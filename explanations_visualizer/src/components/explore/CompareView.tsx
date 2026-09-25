@@ -77,6 +77,8 @@ export function CompareView() {
   const sourceIri = params.get("source");
   const pairId = params.get("pair");
   const tab = (params.get("details") as Tab | null) ?? null;
+  const [focusedTab, setFocusedTab] = useState<Tab>(tab ?? "hierarchy");
+  useEffect(() => setFocusedTab(tab ?? "hierarchy"), [tab]);
 
   // Sources: first page, then explicit "load more".
   const [extraSources, setExtraSources] = useState<SourceSummary[]>([]);
@@ -107,18 +109,20 @@ export function CompareView() {
   }, [sourceIri, allSources, setParams]);
 
   const sourceKind = source?.entity.kind ?? "class";
-  const candidates = useAsync<{ items: Candidate[]; truncated: boolean }>(runId && sourceIri ? `cands|${runId}|${sourceKind}|${sourceIri}` : null, async (signal) => {
+  const candidates = useAsync<{ items: Candidate[]; truncated: boolean; total: number | null }>(runId && sourceIri ? `cands|${runId}|${sourceKind}|${sourceIri}` : null, async (signal) => {
     const items: Candidate[] = [];
     let cursor: string | null = null;
     let truncated = false;
+    let total: number | null = null;
     for (let guard = 0; guard < 5; guard += 1) {
       const page: Page<Candidate> = await getJson<Page<Candidate>>(`/api/v1/runs/${encodeURIComponent(runId!)}/candidates`, { source: sourceIri!, source_kind: sourceKind, limit: 100, cursor }, signal);
       items.push(...page.items);
+      total = page.total_count;
       cursor = page.next_cursor;
       truncated = Boolean(page.next_cursor);
       if (!cursor) break;
     }
-    return { items, truncated };
+    return { items, truncated, total };
   });
   const { ordered, basis } = useMemo(() => orderCandidates(candidates.data?.items ?? []), [candidates.data]);
   const candidate = ordered.find((item) => item.pair_id === pairId) ?? null;
@@ -202,6 +206,7 @@ export function CompareView() {
           selectedPair={candidate?.pair_id ?? null}
           onSelect={(item) => setParams({ pair: item.pair_id })}
           truncated={Boolean(candidates.data?.truncated)}
+          total={candidates.data?.total ?? null}
         />
         {!narrow && candidate && state.health?.package_id && <ReviewPanel packageId={state.health.package_id} pairId={candidate.pair_id} />}
       </aside>
@@ -287,6 +292,18 @@ export function CompareView() {
                     id={`tab-${item.key}`}
                     aria-selected={tab === item.key}
                     aria-controls="details-panel"
+                    tabIndex={focusedTab === item.key ? 0 : -1}
+                    onFocus={() => setFocusedTab(item.key)}
+                    onKeyDown={(event) => {
+                      const index = TABS.findIndex((entry) => entry.key === item.key);
+                      const nextIndex = event.key === "ArrowRight" ? (index + 1) % TABS.length
+                        : event.key === "ArrowLeft" ? (index + TABS.length - 1) % TABS.length
+                        : event.key === "Home" ? 0 : event.key === "End" ? TABS.length - 1 : null;
+                      if (nextIndex === null) return;
+                      event.preventDefault();
+                      // Manual activation: moving focus does not load a panel or change its URL.
+                      document.getElementById(`tab-${TABS[nextIndex].key}`)?.focus();
+                    }}
                     className={tab === item.key ? "tab on" : "tab"}
                     onClick={() => setParams({ details: tab === item.key ? null : item.key }, "replace")}
                   >
@@ -294,7 +311,7 @@ export function CompareView() {
                   </button>
                 ))}
               </div>
-              <div id="details-panel" role="tabpanel" aria-labelledby={tab ? `tab-${tab}` : undefined} className="details-panel">
+              <div id="details-panel" role="tabpanel" aria-labelledby={tab ? `tab-${tab}` : undefined} tabIndex={tab ? 0 : undefined} className="details-panel">
                 {!tab && <p className="meta">Optional details stay closed until you open one. They never change the comparison above.</p>}
                 {tab === "hierarchy" && (
                   <div className="mini-hierarchy">

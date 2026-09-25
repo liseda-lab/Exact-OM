@@ -84,7 +84,7 @@ export interface RunSummary {
   source_ontology_version_id: string;
   target_ontology_version_id: string;
   status: string | null;
-  counts: Record<string, number>;
+  counts: Record<string, number | string>;
 }
 
 export interface PreferredLabel {

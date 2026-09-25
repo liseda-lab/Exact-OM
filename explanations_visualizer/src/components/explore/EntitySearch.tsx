@@ -32,21 +32,20 @@ export function EntitySearch({
   const controller = useRef<AbortController | null>(null);
 
   useEffect(() => {
+    controller.current?.abort();
+    const current = new AbortController();
+    controller.current = current;
     const query = term.trim();
-    if (!query) {
-      setResults([]);
-      setTotal(null);
-      setCursor(null);
-      setError(null);
-      return;
-    }
+    setResults([]);
+    setTotal(null);
+    setCursor(null);
+    setError(null);
+    setLoading(Boolean(query));
+    if (!query) return () => current.abort();
     const timer = window.setTimeout(async () => {
-      controller.current?.abort();
-      const current = new AbortController();
-      controller.current = current;
-      setLoading(true);
       try {
         const page = await getJson<Page<SearchItem>>("/api/v1/entities", { ontology_version_id: ontology, term: query, limit: 20 }, current.signal);
+        if (current.signal.aborted) return;
         setResults(page.items);
         setTotal(page.total_count);
         setCursor(page.next_cursor);
@@ -54,22 +53,27 @@ export function EntitySearch({
         setActive(0);
         setOpen(true);
       } catch (err) {
-        if ((err as Error)?.name !== "AbortError") setError(describeError(err));
+        if (!current.signal.aborted && (err as Error)?.name !== "AbortError") setError(describeError(err));
       } finally {
         if (!current.signal.aborted) setLoading(false);
       }
     }, 250);
-    return () => window.clearTimeout(timer);
+    return () => { window.clearTimeout(timer); current.abort(); };
   }, [term, ontology]);
 
   const loadMore = async () => {
-    if (!cursor) return;
+    const current = controller.current;
+    if (!cursor || !current || current.signal.aborted || loading) return;
+    setLoading(true);
     try {
-      const page = await getJson<Page<SearchItem>>("/api/v1/entities", { ontology_version_id: ontology, term: term.trim(), limit: 20, cursor });
+      const page = await getJson<Page<SearchItem>>("/api/v1/entities", { ontology_version_id: ontology, term: term.trim(), limit: 20, cursor }, current.signal);
+      if (current.signal.aborted) return;
       setResults((list) => [...list, ...page.items]);
       setCursor(page.next_cursor);
     } catch (err) {
-      setError(describeError(err));
+      if (!current.signal.aborted) setError(describeError(err));
+    } finally {
+      if (!current.signal.aborted) setLoading(false);
     }
   };
 
@@ -149,7 +153,7 @@ export function EntitySearch({
                 {results.length} of {total ?? "?"} matches
               </span>
               {cursor && (
-                <button type="button" className="btn btn-sm" onMouseDown={(event) => event.preventDefault()} onClick={loadMore}>
+                <button type="button" className="btn btn-sm" disabled={loading} onMouseDown={(event) => event.preventDefault()} onClick={loadMore}>
                   Load more
                 </button>
               )}

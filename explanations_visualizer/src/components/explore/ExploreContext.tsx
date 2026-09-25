@@ -72,7 +72,7 @@ export function ExploreProvider({ children }: { children: React.ReactNode }) {
       try {
         const [ontologies, runs] = await Promise.all([
           allPages<OntologyMeta>("/api/v1/ontologies"),
-          allPages<RunSummary>("/api/v1/runs").catch(() => [] as RunSummary[]),
+          allPages<RunSummary>("/api/v1/runs"),
         ]);
         if (cancelled) return;
         setState({

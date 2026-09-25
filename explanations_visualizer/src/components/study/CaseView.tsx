@@ -13,6 +13,7 @@ import { ResourceDownloads } from "@/components/study/Stages";
 import { ExplanationPanels, indexResources, StudyEntityCard, useStudyLabelSource, type Component, type ResourceIndex } from "@/components/study/StudyExplanation";
 import { describeError, getJson } from "@/lib/api";
 import { curie } from "@/lib/iri";
+import { useNarrow } from "@/lib/useMedia";
 import { LabelSourceContext } from "@/lib/labelSource";
 import type { StudySession } from "@/study/session";
 import type { Telemetry } from "@/study/telemetry";
@@ -48,7 +49,7 @@ function CopyButton({ text, label, onCopied }: { text: string; label: string; on
   );
 }
 
-export function CaseView({ state, session, telemetry }: { state: StudyState; session: StudySession; telemetry: Telemetry }) {
+export function CaseView({ state, session, telemetry, timingEnabled = true }: { state: StudyState; session: StudySession; telemetry: Telemetry; timingEnabled?: boolean }) {
   const caseKey = `${state.current_case_id}|${state.current_presentation_id}`;
   const [studyCase, setStudyCase] = useState<StudyCase | null>(null);
   const [caseError, setCaseError] = useState<unknown>(null);
@@ -59,8 +60,11 @@ export function CaseView({ state, session, telemetry }: { state: StudyState; ses
   const [submitting, setSubmitting] = useState(false);
   const [showInstructions, setShowInstructions] = useState(true);
   const [phoneAnyway, setPhoneAnyway] = useState(false);
+  const narrow = useNarrow(43.75);
+  const [reload, setReload] = useState(0);
+  const [contentReady, setContentReady] = useState(false);
+  const edited = useRef(false);
   const loadStarted = useRef(performance.now());
-  const draftTimer = useRef<number | null>(null);
 
   // Load the server-assigned case, then any condition-permitted explanation resources.
   useEffect(() => {
@@ -70,6 +74,7 @@ export function CaseView({ state, session, telemetry }: { state: StudyState; ses
     setResources(null);
     setCaseError(null);
     setResourceError(null);
+    setContentReady(false);
     (async () => {
       try {
         const current = await getJson<StudyCase>("/api/v1/study/cases/current");
@@ -84,12 +89,13 @@ export function CaseView({ state, session, telemetry }: { state: StudyState; ses
             if (!cancelled) setResources(indexResources(loaded));
           } catch (error) {
             if (!cancelled) {
-              setResources(indexResources([]));
-              setResourceError(`The prepared explanations could not be loaded: ${describeError(error)} You can still rank the candidates.`);
+              setResourceError(`The prepared explanations could not be loaded: ${describeError(error)} Reconnect and retry before answering this case.`);
             }
+            return;
           }
         }
-        if (!cancelled) telemetry.markCaseReady(performance.now() - loadStarted.current);
+        if (!cancelled && (current.condition !== "explanation" || current.explanation_refs.length === 0)) setResources(indexResources([]));
+        if (!cancelled) setContentReady(true);
       } catch (error) {
         if (!cancelled) setCaseError(error);
       }
@@ -99,13 +105,23 @@ export function CaseView({ state, session, telemetry }: { state: StudyState; ses
     };
     // The case identity is the only trigger; restoring from state happens once per case.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [caseKey]);
+  }, [caseKey, reload]);
+
+  useEffect(() => {
+    if (contentReady && !submitting && timingEnabled && (!narrow || phoneAnyway)) telemetry.markCaseReady(performance.now() - loadStarted.current);
+  }, [contentReady, narrow, phoneAnyway, submitting, timingEnabled, telemetry.markCaseReady]);
+  useEffect(() => {
+    if (edited.current || !studyCase) return;
+    const saved = state.ranking;
+    if (saved?.presentation_id === studyCase.presentation_id) setValue({ responseType: saved.response_type, ranked: saved.ranked_candidate_ids });
+  }, [state.ranking, studyCase]);
 
   // After a conflict the server's saved draft replaces what was on screen.
   const handledConflict = useRef(0);
   useEffect(() => {
     if (session.save.kind !== "conflict" || session.save.at === handledConflict.current || !studyCase) return;
     handledConflict.current = session.save.at;
+    edited.current = false;
     const saved = state.ranking && state.ranking.presentation_id === studyCase.presentation_id ? state.ranking : null;
     setValue(saved ? { responseType: saved.response_type, ranked: saved.ranked_candidate_ids } : { responseType: null, ranked: [] });
   }, [session.save, state.ranking, studyCase]);
@@ -115,28 +131,21 @@ export function CaseView({ state, session, telemetry }: { state: StudyState; ses
   const saveDraft = useCallback(
     (next: RankingValue) => {
       if (!studyCase || !state.current_case_id) return;
-      if (draftTimer.current) window.clearTimeout(draftTimer.current);
-      draftTimer.current = window.setTimeout(() => {
-        void session
-          .mutate({
-            method: "PUT",
-            path: `/api/v1/study/cases/${encodeURIComponent(state.current_case_id!)}/draft`,
-            body: { presentation_id: studyCase.presentation_id, response_type: next.responseType, ranked_candidate_ids: next.responseType === "ranked_candidates" ? next.ranked : [] },
-            coalesce: `draft:${state.current_case_id}`,
-            persist: true,
-          })
-          .catch(() => undefined);
-      }, 500);
+      void session.mutate({
+        method: "PUT",
+        path: `/api/v1/study/cases/${encodeURIComponent(state.current_case_id)}/draft`,
+        body: { presentation_id: studyCase.presentation_id, response_type: next.responseType, ranked_candidate_ids: next.responseType === "ranked_candidates" ? next.ranked : [] },
+        coalesce: `draft:${state.current_case_id}`,
+        debounceMs: 500,
+      }).catch(() => undefined);
     },
     [session, state.current_case_id, studyCase],
   );
 
   const submit = async () => {
     if (!studyCase || !state.current_case_id) return;
-    if (draftTimer.current) window.clearTimeout(draftTimer.current);
     setSubmitting(true);
     telemetry.emit("submit");
-    await telemetry.flushTiming();
     try {
       await session.mutate({
         method: "POST",
@@ -223,10 +232,13 @@ export function CaseView({ state, session, telemetry }: { state: StudyState; ses
                   </div>
                 </article>
               )}
+              {resourceError && <p className="note note-bad" role="alert">{resourceError} <button type="button" className="btn btn-sm" onClick={() => setReload((value) => value + 1)}>Retry explanations</button></p>}
               <RankingPanel
                 candidates={rankingCandidates}
                 value={value}
-                locked={locked || submitting}
+                locked={locked}
+                disabled={!contentReady}
+                resetKey={handledConflict.current}
                 inspecting={explanation ? inspected?.candidate_id : null}
                 onInspect={
                   explanation
@@ -245,6 +257,7 @@ export function CaseView({ state, session, telemetry }: { state: StudyState; ses
                       }
                 }
                 onChange={(next, event, element) => {
+                  edited.current = true;
                   setValue(next);
                   telemetry.emit(event, { component: "ranking", element });
                   saveDraft(next);

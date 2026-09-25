@@ -1896,3 +1896,11 @@
 .parent-list li {
   max-width: 100%;
 }
+
+/* Keep long headings readable at 200% text on narrow screens. */
+.comparison-group h3 span,
+.source-item-label,
+.candidate-label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}

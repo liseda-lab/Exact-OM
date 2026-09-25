@@ -12,8 +12,8 @@ export interface AsyncState<T> {
 }
 
 /**
- * Load data for a key; previous data stays visible while a new key loads so the layout
- * never collapses, and stale responses from an older key are ignored.
+ * Load data for a key, retaining data only when reloading that same key.
+ * A changed key must never expose data or errors from the previous selection.
  */
 export function useAsync<T>(key: string | null, loader: (signal: AbortSignal) => Promise<T>): AsyncState<T> {
   const [state, setState] = useState<{ key: string | null; data: T | undefined; error: unknown; loading: boolean }>({
@@ -46,5 +46,7 @@ export function useAsync<T>(key: string | null, loader: (signal: AbortSignal) =>
   }, [key, nonce]);
 
   const reload = useCallback(() => setNonce((value) => value + 1), []);
-  return { data: state.data, error: state.error, loading: state.loading, reload };
+  return state.key === key
+    ? { data: state.data, error: state.error, loading: state.loading, reload }
+    : { data: undefined, error: undefined, loading: Boolean(key), reload };
 }

@@ -14,20 +14,8 @@ import { ApiError } from "@/lib/api";
 import { shortHash } from "@/lib/iri";
 import { formatBytes } from "@/lib/zipManifest";
 import type { StudySession } from "@/study/session";
+import { FALLBACK_PRACTICE, practiceActionComplete } from "@/study/practice";
 import type { SetupReceipt, StudyState } from "@/study/types";
-
-function useDebounced(callback: () => void, delay: number, deps: unknown[]) {
-  const first = useRef(true);
-  useEffect(() => {
-    if (first.current) {
-      first.current = false;
-      return;
-    }
-    const timer = window.setTimeout(callback, delay);
-    return () => window.clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, deps);
-}
 
 export function WelcomeStage({ state, session }: { state: StudyState; session: StudySession }) {
   const [confirmDecline, setConfirmDecline] = useState(false);
@@ -77,7 +65,7 @@ export function WelcomeStage({ state, session }: { state: StudyState; session: S
           <h2 id="consent-h">Information and consent</h2>
           <span className="meta">Version {state.information_version}</span>
         </div>
-        <div className="consent-text prose" tabIndex={0} aria-label="Participant information and consent text">
+        <div className="consent-text prose" role="region" tabIndex={0} aria-label="Participant information and consent text">
           <Paragraphs text={state.information_text} />
           <Paragraphs text={state.consent_text} />
         </div>
@@ -169,20 +157,23 @@ export function ResourceDownloads({ state, compact = false }: { state: StudyStat
 
 export function SetupStage({ state, session }: { state: StudyState; session: StudySession }) {
   const [draft, setDraft] = useState<SetupReceipt>(() => setupDraft(state));
+  const edited = useRef(false);
+  useEffect(() => { if (!edited.current) setDraft(setupDraft(state)); }, [state.setup]);
   const [busy, setBusy] = useState(false);
   const ready = SETUP_CHECKS.every((check) => draft[check.key] === true);
   const remaining = SETUP_CHECKS.filter((check) => !draft[check.key]).length;
   const send = (receipt: SetupReceipt) =>
-    session.mutate({ method: "PUT", path: "/api/v1/study/setup", body: { ...receipt, protege_version: receipt.protege_version || null }, coalesce: "setup" });
-  // Save partial progress; the complete confirmation is sent only by Continue.
-  useDebounced(
-    () => {
-      if (!ready) void send(draft).catch(() => undefined);
-    },
-    800,
-    [draft],
-  );
-  const toggle = (key: keyof SetupReceipt) => setDraft((current) => ({ ...current, [key]: !current[key] }));
+    session.mutate({ method: "PUT", path: "/api/v1/study/setup", body: { ...receipt, protege_version: receipt.protege_version || null }, coalesce: "setup", debounceMs: 500 });
+  // Enqueue immediately; the outbox coalesces before sending and survives a reload.
+  const updateDraft = (next: SetupReceipt) => {
+    edited.current = true;
+    setDraft(next);
+    if (!SETUP_CHECKS.every((check) => next[check.key] === true)) void send(next).catch(() => undefined);
+  };
+  useEffect(() => {
+    if (session.save.kind === "conflict") { edited.current = false; setDraft(setupDraft(state)); }
+  }, [session.save, state]);
+  const toggle = (key: keyof SetupReceipt) => updateDraft({ ...draft, [key]: !draft[key] });
   return (
     <div className="study-page">
       <div className="study-intro">
@@ -205,7 +196,7 @@ export function SetupStage({ state, session }: { state: StudyState; session: Stu
           <label htmlFor="protege-version">
             Protégé version, if you know it <span className="meta">Optional</span>
           </label>
-          <input id="protege-version" className="input" maxLength={80} placeholder="for example 5.6" value={draft.protege_version ?? ""} onChange={(event) => setDraft((current) => ({ ...current, protege_version: event.target.value }))} />
+          <input id="protege-version" className="input" maxLength={80} placeholder="for example 5.6" value={draft.protege_version ?? ""} onChange={(event) => updateDraft({ ...draft, protege_version: event.target.value })} />
         </div>
       </section>
       <section className="study-card">
@@ -283,31 +274,25 @@ export function FormStage({
   const questions = state.forms[formId];
   const saved = state.questionnaires[formId]?.answers ?? {};
   const [answers, setAnswers] = useState<Answers>(saved);
+  const edited = useRef(false);
+  useEffect(() => { if (!edited.current) setAnswers(state.questionnaires[formId]?.answers ?? {}); }, [state.questionnaires, formId]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
-  const touched = useRef(false);
   const handledConflict = useRef(0);
   useEffect(() => {
     if (session.save.kind !== "conflict" || session.save.at === handledConflict.current) return;
     handledConflict.current = session.save.at;
-    touched.current = false;
+    edited.current = false;
     setAnswers(state.questionnaires[formId]?.answers ?? {});
   }, [session.save, state.questionnaires, formId]);
-  const save = (submitted: boolean) =>
+  const save = (submitted: boolean, value: Answers = answers) =>
     session.mutate({
       method: "PUT",
       path: `/api/v1/study/questionnaires/${formId}`,
-      body: { form_version: state.forms.version, answers: pruneHidden(questions, answers), submitted },
-      coalesce: `form:${formId}`,
-      persist: !submitted,
+      body: { form_version: state.forms.version, answers: pruneHidden(questions, value), submitted },
+      coalesce: submitted ? undefined : `form:${formId}`,
+      debounceMs: submitted ? 0 : 900,
     });
-  useDebounced(
-    () => {
-      if (touched.current) void save(false).catch(() => undefined);
-    },
-    900,
-    [answers],
-  );
   const submit = async () => {
     const missing = missingRequired(questions, answers);
     if (missing.length) {
@@ -317,8 +302,8 @@ export function FormStage({
     }
     setBusy(true);
     try {
-      await save(true);
-      if (onSubmitted) await onSubmitted();
+      if (!state.questionnaires[formId]?.submitted) await save(true);
+        if (onSubmitted) await onSubmitted();
     } catch (error) {
       const field = serverFieldError(error);
       if (field) setErrors({ [field.field]: field.message });
@@ -336,10 +321,13 @@ export function FormStage({
       <QuestionnaireForm
         questions={questions}
         answers={answers}
+        disabled={busy || state.questionnaires[formId]?.submitted}
         errors={errors}
         onChange={(next, changed) => {
-          touched.current = true;
-          setAnswers(pruneHidden(questions, next));
+          edited.current = true;
+          const visible = pruneHidden(questions, next);
+          setAnswers(visible);
+          void save(false, visible).catch(() => undefined);
           setErrors((current) => {
             const rest = { ...current };
             delete rest[changed];
@@ -362,20 +350,18 @@ export function FormStage({
   );
 }
 
-const SANDBOX = ["A", "B", "C", "D", "E"].map((letter, index) => ({
-  id: `practice-${letter}`,
-  position: index + 1,
-  label: `Placeholder candidate ${letter}`,
-  identifier: `practice:${letter}`,
-  score: "—",
-  scoreMeaning: "Practice placeholders have no scores and no correct answer.",
-}));
-
 export function PracticeStage({ state, session }: { state: StudyState; session: StudySession }) {
   const steps = state.tutorial_steps;
   const [done, setDone] = useState<Set<number>>(() => new Set(state.setup?.completed_tutorial_steps ?? []));
   const [sandbox, setSandbox] = useState<RankingValue>({ responseType: null, ranked: [] });
-  const [tried, setTried] = useState(false);
+  const cases = state.practice_cases?.length ? state.practice_cases : FALLBACK_PRACTICE;
+  const [practiceIndex, setPracticeIndex] = useState(0);
+  const [finished, setFinished] = useState<Set<string>>(() => new Set());
+  const [feedback, setFeedback] = useState<string | null>(null);
+  const current = cases[practiceIndex];
+  const [inspecting, setInspecting] = useState<string | null>(null);
+  const inspected = current.candidates.find((candidate) => candidate.candidate_id === inspecting) ?? current.candidates[0];
+  const allPractised = cases.every((item) => finished.has(item.practice_id));
   const [busy, setBusy] = useState(false);
   const all = useMemo(() => steps.every((_, index) => done.has(index)), [steps, done]);
   const start = async () => {
@@ -406,7 +392,8 @@ export function PracticeStage({ state, session }: { state: StudyState; session: 
       <div className="study-intro">
         <span className="pill pill-warn">Not scored</span>
         <h1>How the study works</h1>
-        <p className="lead">Read each step, then try the ranking controls below. Nothing on this page is scored.</p>
+        <p className="lead">Read each step, then practise from simple definitions to qualified descriptions, partial rankings and an explicit none answer. Nothing on this page is scored.</p>
+        <p className="note">All practice concepts are synthetic. They are separate from the study’s ontology files and scored cases. {state.practice_cases?.length ? "These examples are frozen with this study revision." : "This older study publication uses the interface’s built-in controls tutorial; owner-specific practice content has not been supplied."}</p>
       </div>
       <ol className="tutorial-steps">
         {steps.map((text, index) => (
@@ -438,30 +425,48 @@ export function PracticeStage({ state, session }: { state: StudyState; session: 
         ))}
       </ol>
       <section className="study-card" aria-labelledby="sandbox-h">
-        <h2 id="sandbox-h">Try the controls</h2>
-        <p className="muted">
-          These placeholder candidates only demonstrate the controls: add candidates in the order you prefer, move or remove them, undo, keep the initial order, or choose None of these or Insufficient
-          information. Scored cases have real concepts and some have no equivalent candidate at all.
-        </p>
+        <h2 id="sandbox-h">{current.title}</h2>
+        <p>{current.instructions}</p>
+        <p className="meta">Practice {practiceIndex + 1} of {cases.length}. No matcher was run. Definitions below are authored examples, not generated explanations or clinical guidance.</p>
+        <article className="entity-card entity-card-source compact">
+          <h3>Practice source: {current.source.label}</h3>
+          <p>{current.source.description}</p>
+        </article>
+        <article className="entity-card entity-card-target compact" aria-live="polite">
+          <h3>Practice candidate: {inspected.label}</h3>
+          <p>{inspected.description}</p>
+        </article>
         <RankingPanel
-          candidates={SANDBOX}
+          key={current.practice_id}
+          practice
+          candidates={current.candidates.map((candidate, index) => ({ id: candidate.candidate_id, position: index + 1, label: candidate.label, identifier: `practice:${candidate.candidate_id}`, score: "—", scoreMeaning: "No matcher scores exist for these synthetic practice concepts. In scored cases, a matching score is a suggestion and never a probability of correctness." }))}
           value={sandbox}
-          onChange={(next) => {
-            setSandbox(next);
-            setTried(true);
-          }}
+          inspecting={inspected.candidate_id}
+          onInspect={setInspecting}
+          onChange={(next) => { setSandbox(next); setFeedback(null); }}
           locked={false}
-          onSubmit={() => setTried(true)}
+          onSubmit={() => {
+            if (!practiceActionComplete(current.kind, sandbox)) {
+              setFeedback(current.kind === "partial_ranking" ? "For this controls lesson, leave at least one candidate unranked and rank at least one." : current.kind === "none_of_these" ? "For this lesson, explicitly choose None of these. Insufficient information remains a distinct valid response in the study." : "For this lesson, add at least one candidate to practise ranking.");
+              return;
+            }
+            setFinished((previous) => new Set([...previous, current.practice_id]));
+            setFeedback("Controls practice completed. This checks the response action only, not correctness. Nothing was submitted as a study answer.");
+          }}
           submitting={false}
-          submitLabel="Check (practice only)"
+          submitLabel="Check practice action"
         />
-        {tried && <p className="note note-info">In scored cases, “Submit answer” saves your answer permanently. Here nothing was sent.</p>}
+        {feedback && <p className="note note-info" role="status">{feedback}</p>}
+        <div className="study-actions">
+          <button type="button" className="btn" disabled={practiceIndex === 0} onClick={() => { setPracticeIndex((index) => index - 1); setSandbox({ responseType: null, ranked: [] }); setInspecting(null); setFeedback(null); }}>Previous practice</button>
+          <button type="button" className="btn" disabled={!finished.has(current.practice_id) || practiceIndex === cases.length - 1} onClick={() => { setPracticeIndex((index) => index + 1); setSandbox({ responseType: null, ranked: [] }); setInspecting(null); setFeedback(null); }}>Next practice</button>
+        </div>
       </section>
       <div className="study-actions">
-        <button type="button" className="btn btn-primary btn-large" disabled={!all || busy || !state.setup} onClick={start}>
+        <button type="button" className="btn btn-primary btn-large" disabled={!all || !allPractised || busy || !state.setup} onClick={start}>
           Start the scored cases
         </button>
-        <span className="muted">{all ? "Your cases will be assigned when you start." : `Confirm all ${steps.length} steps to continue.`}</span>
+        <span className="muted">{all && allPractised ? "Your cases will be assigned when you start." : `Confirm all ${steps.length} tutorial steps and complete all ${cases.length} practice actions to continue.`}</span>
       </div>
     </div>
   );

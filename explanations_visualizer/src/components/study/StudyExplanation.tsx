@@ -41,6 +41,13 @@ export function indexResources(resources: ExplanationResource[]): ResourceIndex 
   const bySubject = new Map<string, OriginalFact[]>();
   const labels = new Map<string, string>();
   for (const resource of resources) {
+    // Referenced terms provide labels only; they do not expand the focal case's facts.
+    for (const fact of resource.referenced_labels ?? []) {
+      if (fact.category === "labels" && fact.value.term_type === "literal" && fact.value.lexical_form) {
+        const key = `${fact.subject.ontology_version_id}|${fact.subject.iri}`;
+        if (!labels.has(key)) labels.set(key, fact.value.lexical_form);
+      }
+    }
     for (const fact of resource.facts) {
       // One original axiom (e.g. SubClassOf(child, parent)) is a fact about several
       // entities; resources may record it under different subjects. Keep each subject's copy.
@@ -106,6 +113,7 @@ function factAst(fact: OriginalFact): OwlNode | null {
 }
 
 function claimSubjects(claim: GroundedClaim, index: ResourceIndex): Set<string> {
+  if (claim.scoped_entities?.length) return new Set(claim.scoped_entities.map(entityKey));
   return new Set(claim.fact_ids.map((id) => index.facts.get(id)).filter(Boolean).map((fact) => entityKey(fact!.subject)));
 }
 

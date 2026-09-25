@@ -4,7 +4,7 @@
 // is held in memory for this tab only and sent as a bearer header; it is never stored.
 // This page never sends invitations to anyone: links are shown once for you to distribute.
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { Dialog } from "@/components/common/Dialog";
 import { IconCopy, IconDownload, IconWarning } from "@/components/common/Icons";
@@ -33,6 +33,7 @@ async function adminRequest<T>(token: string, method: "GET" | "POST", path: stri
       headers: { Authorization: `Bearer ${token}`, ...(body !== undefined ? { "Content-Type": "application/json" } : {}) },
       body: body !== undefined ? JSON.stringify(body) : undefined,
       credentials: "omit",
+      cache: "no-store",
     });
   } catch {
     throw new ApiError(0, "network_unreachable", "The study service could not be reached", true);
@@ -82,18 +83,38 @@ export function AdminApp() {
   const [message, setMessage] = useState<{ tone: "ok" | "bad"; text: string } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [confirmClose, setConfirmClose] = useState(false);
+  const authGeneration = useRef(0);
+  const inFlight = useRef(false);
+  const signOut = () => {
+    authGeneration.current += 1;
+    inFlight.current = false;
+    setToken("");
+    setTokenInput("");
+    setLinks([]);
+    setReissued(null);
+    setSessionId("");
+    setProgress(null);
+    setConfirmClose(false);
+    setBusy(null);
+    setMessage(null);
+  };
 
   const run = async <T,>(label: string, action: () => Promise<T>): Promise<T | undefined> => {
+    if (inFlight.current) return undefined;
+    inFlight.current = true;
+    const generation = authGeneration.current;
     setBusy(label);
     setMessage(null);
     try {
-      return await action();
+      const result = await action();
+      return generation === authGeneration.current ? result : undefined;
     } catch (error) {
+      if (generation !== authGeneration.current) return undefined;
+      if (error instanceof ApiError && error.status === 401) signOut();
       setMessage({ tone: "bad", text: error instanceof ApiError ? error.message : "The action failed." });
-      if (error instanceof ApiError && error.status === 401) setToken("");
       return undefined;
     } finally {
-      setBusy(null);
+      if (generation === authGeneration.current) { inFlight.current = false; setBusy(null); }
     }
   };
   const rev = encodeURIComponent(revision.trim());
@@ -140,7 +161,7 @@ export function AdminApp() {
         <span className="study-header-spacer" />
         <TextSizeControl compact />
         <ThemeControl />
-        <button type="button" className="btn btn-sm" onClick={() => setToken("")}>
+        <button type="button" className="btn btn-sm" onClick={signOut}>
           Sign out
         </button>
       </header>
@@ -157,7 +178,11 @@ export function AdminApp() {
               id="revision"
               className="input mono"
               value={revision}
+              disabled={busy !== null}
               onChange={(event) => {
+                setProgress(null);
+                setLinks([]);
+                setReissued(null);
                 setRevision(event.target.value);
                 writeStored("exact.admin.revision", event.target.value);
               }}
@@ -168,6 +193,7 @@ export function AdminApp() {
             Publish a study revision…
             <input
               type="file"
+              disabled={busy !== null}
               accept="application/json,.json"
               className="sr-only"
               onChange={async (event) => {
@@ -184,6 +210,9 @@ export function AdminApp() {
                 const result = await run("publish", () => adminRequest<Record<string, unknown>>(token, "POST", "/api/v1/admin/studies", publication));
                 if (result) {
                   const published = publication.definition?.study_revision ?? "";
+                  setProgress(null);
+                  setLinks([]);
+                  setReissued(null);
                   setRevision(published);
                   writeStored("exact.admin.revision", published);
                   setMessage({ tone: "ok", text: `Published and frozen: ${published}. Every case, resource and key was validated.` });
@@ -298,7 +327,7 @@ export function AdminApp() {
               <h2 id="session-h">Replace or revoke one link</h2>
               <div className="field">
                 <label htmlFor="session-id">Session ID</label>
-                <input id="session-id" className="input mono" value={sessionId} onChange={(event) => setSessionId(event.target.value)} placeholder="From the issuance list" />
+                <input id="session-id" className="input mono" value={sessionId} disabled={busy !== null} onChange={(event) => { setReissued(null); setSessionId(event.target.value); }} placeholder="From the issuance list" />
               </div>
               <div className="admin-inline">
                 <button
@@ -307,7 +336,7 @@ export function AdminApp() {
                   disabled={!sessionId.trim() || busy !== null}
                   onClick={async () => {
                     const result = await run("reissue", () => adminRequest<{ invitation?: string }>(token, "POST", `/api/v1/admin/invitations/${encodeURIComponent(sessionId.trim())}/reissue`));
-                    if (result?.data.invitation) setReissued(`${window.location.origin}${result.data.invitation}`);
+                    if (result?.data.invitation) { setLinks((current) => current.filter((link) => link.session_id !== sessionId.trim())); setReissued(`${window.location.origin}${result.data.invitation}`); }
                   }}
                 >
                   Issue a replacement link
@@ -318,7 +347,7 @@ export function AdminApp() {
                   disabled={!sessionId.trim() || busy !== null}
                   onClick={async () => {
                     const result = await run("revoke", () => adminRequest(token, "POST", `/api/v1/admin/invitations/${encodeURIComponent(sessionId.trim())}/revoke`));
-                    if (result) setMessage({ tone: "ok", text: "Link revoked. The old link and any browser signed in with it no longer work." });
+                    if (result) { setReissued(null); setLinks((current) => current.filter((link) => link.session_id !== sessionId.trim())); setMessage({ tone: "ok", text: "Link revoked. The old link and any browser signed in with it no longer work." }); }
                   }}
                 >
                   Revoke

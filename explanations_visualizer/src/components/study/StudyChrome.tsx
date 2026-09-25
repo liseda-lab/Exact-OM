@@ -94,6 +94,12 @@ export function StudyHeader({
           </ol>
         </nav>
       )}
+      {session.hasRecovery && (
+        <div className="study-banner banner-warn" role="status">
+          <span>Unsaved changes from an earlier conflict remain in this tab. Download them to review alongside the server’s saved answer.</span>
+          <button type="button" className="btn btn-sm" onClick={session.downloadRecovery}>Download unsaved changes</button>
+        </div>
+      )}
       {session.save.kind === "conflict" && (
         <div className="study-banner banner-warn" role="alert">
           <IconWarning />

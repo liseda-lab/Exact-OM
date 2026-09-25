@@ -129,6 +129,7 @@ export function CandidateList({
   selectedPair,
   onSelect,
   truncated,
+  total,
 }: {
   candidates: Candidate[];
   basis: OrderBasis;
@@ -138,6 +139,7 @@ export function CandidateList({
   selectedPair: string | null;
   onSelect: (candidate: Candidate) => void;
   truncated: boolean;
+  total: number | null;
 }) {
   const ontology = candidates[0]?.target.ontology_version_id;
   const label = useLabels(ontology, candidates.map((candidate) => candidate.target.iri));
@@ -153,6 +155,7 @@ export function CandidateList({
         <span className="meta">{candidates.length ? `${candidates.length}${truncated ? "+" : ""}` : ""}</span>
       </div>
       {candidates.length > 0 && <p className="meta rail-sub">{orderDescription(basis)}</p>}
+      {truncated && <p className="note note-warn">Showing a loaded subset: {candidates.length}{total === null ? "" : ` of ${total}`} candidates. Positions refer to this subset; additional candidates may rank higher.</p>}
       {error ? <ErrorNote error={error} onRetry={onRetry} what="Candidates" /> : null}
       {loading && !candidates.length ? <Skeleton lines={4} title={false} /> : null}
       {!loading && !error && candidates.length === 0 && <p className="note">Exact saved no candidates for this source.</p>}
@@ -173,7 +176,7 @@ export function CandidateList({
                   setOpen(false);
                 }}
               >
-                <span className="position-badge" aria-label={`Position ${index + 1}`}>
+                <span className="position-badge" aria-label={`${truncated ? "Loaded position" : "Position"} ${index + 1}`}>
                   {index + 1}
                 </span>
                 <span className="candidate-text">

@@ -62,6 +62,16 @@ export interface PublicAsset {
   media_type: string;
 }
 
+export interface PracticeCase {
+  practice_id: string;
+  kind: "simple" | "complex" | "partial_ranking" | "none_of_these";
+  title: string;
+  instructions: string;
+  synthetic: true;
+  source: { label: string; description: string };
+  candidates: { candidate_id: string; label: string; description: string }[];
+}
+
 export interface StudyState {
   artifact_type: "study_state";
   study_revision: string;
@@ -84,6 +94,7 @@ export interface StudyState {
   instructions: string;
   setup_instructions: string;
   tutorial_steps: string[];
+  practice_cases?: PracticeCase[];
   forms: Forms;
   ontology_resources: PublicAsset[];
   synthetic: boolean;
@@ -136,6 +147,7 @@ export interface GroundedClaim {
   category: string;
   grounding: "exact_extract" | "semantic_template";
   scoped_entities: EntityRef[];
+  packet_fact_subjects?: EntityRef[];
 }
 
 export interface StudyHierarchyEdge {
@@ -159,6 +171,8 @@ export interface ExplanationResource {
   artifact_type: "study_explanation";
   entities: EntityRef[];
   facts: OriginalFact[];
+  referenced_labels?: OriginalFact[];
+  referenced_labels_truncated?: boolean;
   entity_profiles: GroundedClaim[];
   pair_comparison: GroundedClaim[];
   hierarchy: StudyHierarchyEdge[];
