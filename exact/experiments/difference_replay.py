@@ -101,14 +101,17 @@ def _extract(rows, scores, policy, protected):
         )
         for row in rows
     ]
-    mode = policy.get("extraction", {}).get("mode", "greedy")
+    extraction = policy.get("extraction", {})
+    mode = extraction.get("mode", "greedy")
+    anchor_conflict_policy = extraction.get("anchor_conflict_policy", "error")
     threshold = policy["threshold"]
-    if mode != "greedy":
+    if mode != "greedy" or anchor_conflict_policy == "compete":
         return {
             (str(item.head), str(item.tail))
             for item in extract_global_alignment(
                 mappings,
                 mode=mode,
+                anchor_conflict_policy=anchor_conflict_policy,
                 threshold=threshold,
                 protected_pairs=protected,
                 source_cardinality=policy.get("source_cardinality"),

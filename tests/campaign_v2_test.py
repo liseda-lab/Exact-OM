@@ -696,6 +696,23 @@ def test_component_exports_retain_fusion_ranker_and_judge_without_shared_control
     }
     controls = harness.deep_merge(label_free, {"llm": {"experiment": {"gate": {"mode": "off"}}}})
     specifications = {
+        "E01": (
+            {
+                "matching": {
+                    "extraction": {"mode": "threshold", "anchor_conflict_policy": "compete"},
+                    "cardinality": None,
+                    "target_cardinality": None,
+                }
+            },
+            {
+                "matching": {
+                    "extraction": {"mode": "greedy"},
+                    "cardinality": 1,
+                    "target_cardinality": 1,
+                }
+            },
+            ["matching.extraction", "matching.cardinality", "matching.target_cardinality"],
+        ),
         "E19": (
             {"matching": {"fusion": {"enabled": True, "mode": "analytic_shipped"}}},
             {
@@ -760,6 +777,21 @@ def test_component_exports_retain_fusion_ranker_and_judge_without_shared_control
             for arm, score in (("baseline", 0.5), ("replay", 0.7))
         ]
         selections[name] = harness.select_experiment(chosen_source, records)
+        if name == "E01":
+            records[1]["metrics"]["F1"] = 0.4
+            rejected = harness.select_experiment(chosen_source, records)
+            assert rejected["status"] == "screened_out"
+            policy = harness.selected_experiment_overlays(
+                {"experiments": {name: rejected}}, [name]
+            )[name]
+            composed_baseline = harness.deep_merge(
+                {"matching": {"cardinality": 1, "target_cardinality": 1}}, policy
+            )
+            assert composed_baseline["matching"]["cardinality"] is None
+            assert composed_baseline["matching"]["target_cardinality"] is None
+            assert composed_baseline["matching"]["extraction"]["mode"] == "threshold"
+            assert policy["matching"]["extraction"]["anchor_conflict_policy"] == "compete"
+            assert set(policy) == {"matching"}
         if name == "E19":
             records[1]["metrics"]["F1"] = 0.4
             rejected = harness.select_experiment(chosen_source, records)
@@ -775,6 +807,12 @@ def test_component_exports_retain_fusion_ranker_and_judge_without_shared_control
         {"experiments": selections}, list(specifications)
     ).values():
         composed = harness.deep_merge(composed, overlay)
+    assert composed["matching"]["cardinality"] == 1
+    assert composed["matching"]["target_cardinality"] == 1
+    assert composed["matching"]["extraction"] == {
+        "mode": "greedy",
+        "anchor_conflict_policy": "compete",
+    }
     assert composed["matching"]["fusion"] == {
         "sigma_mode": "energy",
         "enabled": True,

@@ -15,6 +15,7 @@ class ExtractionConfig(StrictConfigModel):
     """Post-selector global extraction used by E01."""
 
     mode: Literal[
+        "threshold",
         "greedy",
         "mutual_best",
         "assignment",
@@ -23,6 +24,10 @@ class ExtractionConfig(StrictConfigModel):
         "assignment_legacy",
     ] = Field(
         "greedy", description="Global extraction strategy; greedy preserves shipped behavior."
+    )
+    anchor_conflict_policy: Literal["error", "compete"] = Field(
+        "error",
+        description="Reject conflicting exact anchors or retain them as scored competitors.",
     )
     assignment_component_cap: int = Field(
         500,

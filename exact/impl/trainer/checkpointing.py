@@ -89,8 +89,12 @@ class CheckpointingMixin:
                 {"mode": "greedy", "assignment_component_cap": 500},
             )
         )
+        # Default anchor policy predates the explicit setting: retain all old
+        # extraction identities; only the opt-in competitor policy changes them.
+        if extraction.get("anchor_conflict_policy") == "error":
+            extraction.pop("anchor_conflict_policy")
         # Preserve legacy/default checkpoint identity byte-for-byte. Only an
-        # experimental non-greedy extractor changes reusable inference output.
+        # experimental extractor changes reusable inference output.
         if extraction != {"mode": "greedy", "assignment_component_cap": 500}:
             payload["trainer"] = {"extraction": extraction}
         return payload

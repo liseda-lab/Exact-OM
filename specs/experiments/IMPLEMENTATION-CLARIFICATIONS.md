@@ -185,6 +185,21 @@ measure controlled 1%/5% anchor-noise propagation on development data.
 
 ## 8. Assignment and NIL
 
+**E01 amendment approved 2026-09-25:** Treat one-to-one matching as a research treatment,
+not a universal correctness constraint. The initial screen has six arms: unrestricted
+threshold baseline, one-to-one greedy control, mutual-best, stable marriage, accepted-utility
+assignment, and nonselectable legacy assignment. All use the same frozen scores/pool,
+threshold 0.7, label-free supervision, disabled selector and LLM decision gate. All use
+`matching.extraction.anchor_conflict_policy=compete`: collision-free lexical anchors retain
+protection; lexical matches sharing a source or target compete at unchanged scores, using
+identical ambiguity classification for every arm. E02 owns rescoring; this amendment does
+not introduce any. Record ambiguity and suppressed mappings, compare precision/recall, and
+export source and target cardinalities with the selected extraction policy. Eligibility
+follows the declared task scope without a new namespace exclusion. Rerun all six extraction
+and evaluation treatments in a new immutable attempt, preserving valid upstream evidence
+and cumulative costs. Use public development labels only; private/test outcomes do not
+choose policies. Existing strict hard-anchor controls keep their explicit conflict errors.
+
 Primary E01 assignment first makes scores below threshold infeasible, assigns utility
 score-threshold to eligible edges, and permits a private zero-utility unmatched target per
 source. It optimizes this declared accepted-edge objective. Exact hard anchors are preassigned

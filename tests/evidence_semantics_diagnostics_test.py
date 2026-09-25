@@ -123,6 +123,163 @@ def test_production_dataset_deduplicates_before_cap_and_changes_cache_identity(t
     assert dataset.annotation_provenance_dedup
 
 
+@pytest.mark.parametrize(
+    "language,datatype",
+    [("en", None), (None, "urn:datatype"), (None, None)],
+)
+@pytest.mark.parametrize("side", ["src", "tgt"])
+def test_projected_literal_copy_does_not_add_mass_or_displace_native_attribute(
+    tmp_path, language, datatype, side
+):
+    dataset = PairAdaptiveContextDataset(
+        output_path=tmp_path,
+        cache_ok=False,
+        verbaliser_name=None,
+        projection_include_literals=True,
+        max_attr_items=2,
+    )
+    native = [
+        Attribute("urn:definition", "a longer native definition", language, datatype),
+        Attribute("urn:other", "retained", None),
+    ]
+    setattr(
+        dataset,
+        "_source" if side == "src" else "_target",
+        SimpleNamespace(attributes=lambda iri: native),
+    )
+    graph = SimpleNamespace(
+        get_labels=lambda iri: ["a longer native definition" if iri == "_:literal" else iri],
+        get_raw_neighborhood=lambda iri, hops: [(iri, "urn:definition", "_:literal")],
+        _looks_like_literal_or_blank=lambda iri: iri.startswith("_:"),
+    )
+    values = dataset._annotation_bundle("urn:entity", graph, side)
+    assert [(row["prop_iri"], row["value"]) for row in values] == [
+        ("urn:definition", "a longer native definition"),
+        ("urn:other", "retained"),
+    ]
+    assert values[0]["language"] == language
+    assert values[0]["datatype"] == datatype
+
+
+def test_projection_fallback_preserves_native_literal_and_property_identity(tmp_path):
+    dataset = PairAdaptiveContextDataset(
+        output_path=tmp_path,
+        cache_ok=False,
+        verbaliser_name=None,
+        projection_include_literals=True,
+        max_attr_items=20,
+    )
+    native = [
+        Attribute("urn:one", "shared", "en"),
+        Attribute("urn:one", "shared", "pt"),
+        Attribute("urn:one", "shared", None, "urn:type:one"),
+        Attribute("urn:one", "shared", None, "urn:type:two"),
+        Attribute("urn:two", "shared", "en"),
+    ]
+    dataset._source = SimpleNamespace(attributes=lambda iri: native)
+    labels = {"_:shared": "shared", "_:new": "new"}
+    graph = SimpleNamespace(
+        # Equal display labels never establish property identity.
+        get_labels=lambda iri: [labels.get(iri, "same property label")],
+        get_raw_neighborhood=lambda iri, hops: [
+            (iri, "urn:one", "_:shared"),
+            (iri, "urn:two", "_:shared"),
+            (iri, "urn:three", "_:shared"),
+            (iri, "urn:one", "_:new"),
+            (iri, "urn:one", "_:new"),
+        ],
+        _looks_like_literal_or_blank=lambda iri: iri.startswith("_:"),
+    )
+    values = dataset._annotation_bundle("urn:entity", graph, "src")
+    expected = {(row.property_iri, row.value, row.lang, row.datatype) for row in native}
+    expected.update({("urn:three", "shared", None, None), ("urn:one", "new", None, None)})
+    assert len(values) == len(expected)
+    assert {
+        (row["prop_iri"], row["value"], row.get("language"), row.get("datatype")) for row in values
+    } == expected
+
+
+@pytest.mark.parametrize("predicate", ["comment", "label"])
+@pytest.mark.parametrize("side", ["src", "tgt"])
+@pytest.mark.parametrize("incoming", [False, True])
+def test_projector_rdfs_alias_does_not_displace_native_evidence(
+    tmp_path, predicate, side, incoming
+):
+    full = "http://www.w3.org/2000/01/rdf-schema#" + predicate
+    alias = "rdfs:" + predicate
+    value = "OMIM mapping confirmed by DO. [SN]."
+    dataset = PairAdaptiveContextDataset(
+        output_path=tmp_path,
+        cache_ok=False,
+        verbaliser_name=None,
+        projection_include_literals=True,
+        max_attr_items=2,
+    )
+    setattr(
+        dataset,
+        "_source" if side == "src" else "_target",
+        SimpleNamespace(
+            attributes=lambda iri: [
+                Attribute(full, value, "en"),
+                Attribute("urn:xref", "retained", None),
+            ]
+        ),
+    )
+    edge = ("_:copy", alias, "urn:entity") if incoming else ("urn:entity", alias, "_:copy")
+    graph = SimpleNamespace(
+        get_labels=lambda iri: [value if iri == "_:copy" else iri],
+        get_raw_neighborhood=lambda iri, hops: [edge],
+        _looks_like_literal_or_blank=lambda iri: iri.startswith("_:"),
+    )
+    rows = dataset._annotation_bundle("urn:entity", graph, side)
+    assert [(row["prop_iri"], row["value"]) for row in rows] == [
+        (full, value),
+        ("urn:xref", "retained"),
+    ]
+    assert rows[0]["language"] == "en"
+
+
+@pytest.mark.parametrize("predicate", ["comment", "label"])
+def test_projector_rdfs_alias_coalesces_only_known_projected_copies(tmp_path, predicate):
+    full = "http://www.w3.org/2000/01/rdf-schema#" + predicate
+    alias = "rdfs:" + predicate
+    dataset = PairAdaptiveContextDataset(
+        output_path=tmp_path,
+        cache_ok=False,
+        verbaliser_name=None,
+        projection_include_literals=True,
+        max_attr_items=20,
+    )
+    native = [
+        Attribute(full, "shared", "en"),
+        Attribute(full, "shared", "pt"),
+        Attribute(full, "shared", None, "urn:datatype"),
+    ]
+    dataset._source = SimpleNamespace(attributes=lambda iri: native)
+    labels = {"_:copy": "shared", "_:novel": "novel"}
+    graph = SimpleNamespace(
+        get_labels=lambda iri: [labels.get(iri, "same display label")],
+        get_raw_neighborhood=lambda iri, hops: [
+            (iri, alias, "_:copy"),
+            (iri, alias, "_:novel"),
+            (iri, full, "_:novel"),
+            (iri, "urn:distinct", "_:copy"),
+        ],
+        _looks_like_literal_or_blank=lambda iri: iri.startswith("_:"),
+    )
+    rows = dataset._annotation_bundle("urn:entity", graph, "src")
+    # Full native terms survive. Only declared projector spellings share identity;
+    # a new projected value and an unrelated same-label property remain evidence.
+    assert len(rows) == 5
+    assert {
+        (row["prop_iri"], row["value"], row.get("language"), row.get("datatype")) for row in rows
+    } == {
+        *((row.property_iri, row.value, row.lang, row.datatype) for row in native),
+        (alias, "novel", None, None),
+        ("urn:distinct", "shared", None, None),
+    }
+
+
 def fact(obj, score=0.2):
     return {
         "triple": ["entity", "role", obj],

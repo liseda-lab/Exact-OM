@@ -51,7 +51,7 @@ POLICY_PATHS = {
     "E03": ["matching.calibration", "supervision.components.calibration"],
     "E15": ["selector", "supervision.components.rerank", "supervision.components.accept"],
     "E18": ["selector", "supervision.components.rerank", "supervision.components.accept"],
-    "E01": ["matching.extraction"],
+    "E01": ["matching.extraction", "matching.cardinality", "matching.target_cardinality"],
     "E02": ["matching.anchor_rescoring"],
     "E25": ["llm.experiment.gate"],
     "E07": ["llm.experiment.decision", "llm.experiment.fusion_weight"],

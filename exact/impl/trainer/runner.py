@@ -120,11 +120,13 @@ class SemanticAlignmentRunner(
         self.training_candidates_file_path = training_candidates_file_path
         self._extraction_config = {
             "mode": "greedy",
+            "anchor_conflict_policy": "error",
             "assignment_component_cap": 500,
             **dict(extraction_config or {}),
         }
         extraction_mode = str(self._extraction_config["mode"]).strip().lower()
         if extraction_mode not in {
+            "threshold",
             "greedy",
             "mutual_best",
             "assignment",
@@ -133,6 +135,8 @@ class SemanticAlignmentRunner(
             "stable_marriage",
         }:
             raise ValueError(f"Unknown global extraction mode: {extraction_mode!r}")
+        if self._extraction_config["anchor_conflict_policy"] not in {"error", "compete"}:
+            raise ValueError("Unknown extraction anchor conflict policy")
         self._extraction_config["mode"] = extraction_mode
         self._extraction_includes_prefilter = False
         self._extraction_diagnostics: Dict[str, Any] = {}
@@ -1116,7 +1120,10 @@ class SemanticAlignmentRunner(
             "extraction": dict(self._extraction_config),
         }
         extraction_mode = str(self._extraction_config.get("mode", "greedy"))
-        if extraction_mode == "greedy":
+        anchor_conflict_policy = self._extraction_config.get("anchor_conflict_policy", "error")
+        self._extraction_includes_prefilter = False
+        self._extraction_diagnostics = {}
+        if extraction_mode == "greedy" and anchor_conflict_policy == "error":
             # Preserve the shipped threshold-then-source-greedy path byte for byte.
             predictions = EntityMapping.read_table_mappings(
                 score_frame,
@@ -1128,7 +1135,9 @@ class SemanticAlignmentRunner(
                 raise ValueError(
                     "non-greedy global extraction cannot be used for local candidate ranking"
                 )
-            if state.cardinality not in {None, 1} or state.target_cardinality not in {None, 1}:
+            if extraction_mode not in {"greedy", "threshold"} and (
+                state.cardinality != 1 or state.target_cardinality != 1
+            ):
                 raise ValueError(
                     f"matching.extraction.mode={extraction_mode!r} requires one-to-one "
                     "source and target cardinality"
@@ -1159,6 +1168,7 @@ class SemanticAlignmentRunner(
             extraction = extract_global_alignment(
                 [*prefiltered_mappings, *scored_mappings],
                 mode=extraction_mode,
+                anchor_conflict_policy=anchor_conflict_policy,
                 threshold=state.threshold,
                 protected_pairs=protected_pairs,
                 source_cardinality=state.cardinality,
@@ -1169,7 +1179,9 @@ class SemanticAlignmentRunner(
             )
             predictions = extraction.mappings
             self._extraction_diagnostics = dict(extraction.diagnostics)
-            self._extraction_includes_prefilter = bool(prefiltered_mappings)
+            # Extraction has handled the whole graph, including an empty exact
+            # set. Never reinsert rejected anchors or apply a second cardinality.
+            self._extraction_includes_prefilter = True
             if not candidate_df.empty:
                 selected_pairs = {(str(mapping.head), str(mapping.tail)) for mapping in predictions}
                 candidate_df["extraction_selected"] = [

@@ -46,7 +46,33 @@ def test_preparation_covers_every_family_without_executing_or_inventing_readines
     ]:
         assert order.index(before) < order.index(after)
     by_id = {step.id: step for step in lock.steps}
-    for arm in by_id["E01"].arms:
+    e01 = by_id["E01"]
+    assert len(e01.arms) == 6
+    assert e01.selection.decisions[0].baseline == "threshold_unrestricted"
+    assert set(e01.selection.decisions[0].candidates) == {
+        "greedy",
+        "mutual_best",
+        "stable_marriage",
+        "assignment_accepted_utility",
+    }
+    assert e01.selection.decisions[0].required_controls == ["threshold_unrestricted", "greedy"]
+    assert e01.policy_paths == [
+        "matching.extraction",
+        "matching.cardinality",
+        "matching.target_cardinality",
+    ]
+    for arm in e01.arms:
+        unrestricted = arm.id == "threshold_unrestricted"
+        matching = arm.overlay["matching"]
+        assert matching["threshold"] == 0.7
+        assert matching["cardinality"] == (None if unrestricted else 1)
+        assert matching["target_cardinality"] == (None if unrestricted else 1)
+        assert matching["extraction"] == {
+            "mode": "threshold" if unrestricted else arm.id,
+            "anchor_conflict_policy": "compete",
+        }
+        if arm.id == "assignment_legacy":
+            assert arm.role == "diagnostic" and not arm.deployable
         assert arm.overlay["llm"]["experiment"] == {"enabled": True, "gate": {"mode": "off"}}
         assert arm.overlay["supervision"]["mode"] == "label_free"
         assert set(arm.overlay["supervision"]["components"].values()) == {"label_free"}

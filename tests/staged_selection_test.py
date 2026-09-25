@@ -231,3 +231,63 @@ def test_e01_rejects_scorer_or_cardinality_changes_and_local_semantics(bound):
     cells[1].resolved_config["data"]["execution_mode"] = "local_ranking"
     with pytest.raises(ValueError, match="global alignment"):
         validate_comparison_cells(cells, source)
+
+
+@pytest.fixture
+def amended_e01(bound):
+    from exact.experiments.core_recipes import core_arms
+
+    base, _ = bound
+    arms = [SimpleNamespace(**arm) for arm in core_arms(base)["E01"]]
+    source = SimpleNamespace(
+        config=SimpleNamespace(arms=arms, frozen_constants={"campaign_v2": {"family": "E01"}})
+    )
+    cells = [
+        SimpleNamespace(
+            resolved_config=harness.deep_merge(base, arm.overlay),
+            arm_id=arm.id,
+            task_id="same",
+            seed=17,
+        )
+        for arm in arms
+    ]
+    return cells, source
+
+
+def test_e01_allows_only_declared_unrestricted_baseline(amended_e01):
+    cells, source = amended_e01
+    original = deepcopy(cells[0].resolved_config)
+    validate_comparison_cells(cells, source)
+    assert cells[0].resolved_config == original
+    # Merely using threshold mode cannot opt an undeclared/legacy comparison into the amendment.
+    source.config.arms = source.config.arms[1:]
+    with pytest.raises(ValueError, match="only extraction mode"):
+        validate_comparison_cells(cells, source)
+
+
+@pytest.mark.parametrize(
+    "arm,path,value",
+    [
+        ("threshold_unrestricted", "matching.cardinality", 1),
+        ("threshold_unrestricted", "matching.target_cardinality", 1),
+        ("threshold_unrestricted", "matching.extraction.mode", "greedy"),
+        ("greedy", "matching.cardinality", None),
+        ("mutual_best", "matching.target_cardinality", 2),
+        ("stable_marriage", "matching.extraction.anchor_conflict_policy", "error"),
+        ("assignment_accepted_utility", "matching.threshold", 0.8),
+        ("greedy", "selector.runtime_enabled", True),
+        ("greedy", "llm.experiment.gate.mode", "all"),
+        ("assignment_legacy", "matching.fusion.gamma", 0.123),
+    ],
+)
+def test_e01_amendment_rejects_undeclared_scoring_and_extraction_drift(
+    amended_e01, arm, path, value
+):
+    cells, source = amended_e01
+    mapping = next(cell.resolved_config for cell in cells if cell.arm_id == arm)
+    parts = path.split(".")
+    for part in parts[:-1]:
+        mapping = mapping[part]
+    mapping[parts[-1]] = value
+    with pytest.raises(ValueError, match="E01"):
+        validate_comparison_cells(cells, source)

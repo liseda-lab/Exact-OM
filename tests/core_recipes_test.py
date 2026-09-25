@@ -8,7 +8,7 @@ def test_bounded_core_arms_preserve_model_pins_and_are_strict():
     base = ConfigModel.load_config("exact/default_config.yaml").model_dump(mode="python")
     limits = {
         "E00": 2,
-        "E01": 5,
+        "E01": 6,
         "E03": 5,
         "E05": 6,
         "E06": 4,
