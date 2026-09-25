@@ -2545,8 +2545,39 @@ class BaseAlignmentDataset(IDataset):
             },
         }
         pool_frame = self._candidates
-        if pool_frame is None and self._df is not None and "cand_sim" in self._df.columns:
+        # Exact-prefilter rows have no retrieval scores. Summarize the effective
+        # candidate population identically on fresh builds and prepared-cache hits.
+        if self._df is not None and "cand_sim" in self._df.columns:
             pool_frame = self._df[self._df["cand_sim"].notna()].reset_index(drop=True)
+            if self._df_save_path.is_file():
+                # CSV parsing can change the last bit of a float. Use the durable
+                # retrieval metadata for this manifest only; never change _df.
+                metadata_columns = {
+                    "Src",
+                    "Tgt",
+                    "SrcKind",
+                    "TgtKind",
+                    "cand_sim",
+                    "cand_sim_semantic",
+                    "cand_sim_lexical",
+                    "cand_sim_retrieval",
+                    "cand_sim_cross_encoder",
+                    "cand_channels",
+                }
+                saved = pd.read_csv(
+                    self._df_save_path,
+                    usecols=lambda column: column in metadata_columns,
+                )
+                saved = restrict(saved)
+                saved = saved[saved["cand_sim"].notna()].reset_index(drop=True)
+                keys = [key for key in ("Src", "Tgt", "SrcKind", "TgtKind") if key in pool_frame]
+                if not set(keys).issubset(saved.columns) or not saved[keys].equals(
+                    pool_frame[keys]
+                ):
+                    raise ValueError(
+                        "Saved candidate metadata changed effective pair identities or order"
+                    )
+                pool_frame = saved
         if pool_frame is not None:
             self._refresh_candidate_pool_manifest(
                 origin="sampled",
