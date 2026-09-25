@@ -82,7 +82,7 @@ class PairAdaptiveContextDataset(ContextDataset):
         payload = super()._cache_fingerprint_payload()
         payload.update(
             {
-                "evidence_schema": 5,
+                "evidence_schema": 6,
                 "annotation_semantics": self.annotation_semantics,
                 "annotation_provenance_dedup": self.annotation_provenance_dedup,
                 "projection_include_literals": self.projection_include_literals,
@@ -484,6 +484,10 @@ class PairAdaptiveContextDataset(ContextDataset):
             )
 
         if self.projection_include_literals:
+            # Projection drops literal language/datatype. A projected copy adds no
+            # evidence when the native annotation already supplies its property/value;
+            # keep distinct native terms, and use projection only for missing values.
+            native_literals = {(item["prop_iri"], item["value"]) for item in items}
             for src, rel, dst in graph.get_raw_neighborhood(iri, self.n_hops):
                 if self._relation_family(graph, rel) is not None:
                     continue
@@ -499,7 +503,7 @@ class PairAdaptiveContextDataset(ContextDataset):
                     continue
                 prop_label = graph.get_labels(rel)[0]
                 dedupe_key = (rel, literal, None, None)
-                if dedupe_key in seen:
+                if (rel, literal) in native_literals or dedupe_key in seen:
                     continue
                 seen.add(dedupe_key)
                 items.append(
