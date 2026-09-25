@@ -198,3 +198,21 @@ The [validation receipt](../../data/experiments-v2/implementation-validation-202
 binds the committed numerical code, test log and prospective lock. It is an implementation
 qualification record, not measured full-scale batch admission. Remaining runtime work is
 materialization, fitting, measured resource admission and the declared experiments.
+
+
+## E01 cardinality amendment queued — 2026-09-25
+
+The approved amendment adds an unrestricted threshold baseline alongside five
+explicit one-to-one comparisons, with legacy assignment diagnostic only.
+Collision-free lexical exact anchors remain protected; conflicting anchors retain
+their scores and compete consistently. Threshold, sample, ontology scope and saved
+pair scores are unchanged. Selected policies carry their cardinality settings.
+
+Slurm step **14372.13** was verified live at 11:57 UTC, waiting for E10 step
+**14372.12** to finish and close its cumulative ledger. The six E01 arms then replay
+frozen scores without ontology/model calls or new experimental hosted tokens;
+rationales remain off. Frozen implementation commit: `bef200d`; merge: `5f3d3bf`.
+Focused regression/integration checks and actual-artifact preflight passed.
+The [E01 handoff](../../data/experiments-v2/e01-cardinality-01/HANDOFF.md) records
+submission, validation, accounting, monitoring and recovery details. The supervisor
+registry includes the queued step. No amended E01 scientific completion is claimed.
