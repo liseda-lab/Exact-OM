@@ -155,6 +155,7 @@ def deliver(policy, directory, message, *, timeout=180, alert_id=None):
         evidence = delivery_evidence(prior_attempt / "events.jsonl", message)
         if len(evidence["receipts"]) == 1:
             result = {**previous, "status": "sent", **evidence, "directory": str(directory)}
+            result.pop("error", None)
             write(state_path, result)
             return result
         if previous.get("status") in {"sending", "ambiguous", "sent"}:

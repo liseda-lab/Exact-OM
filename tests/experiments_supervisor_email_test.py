@@ -163,8 +163,11 @@ def test_saved_success_receipt_recovers_interrupted_notifier(mailer, tmp_path, m
     state_path = Path(first["directory"]) / "delivery.json"
     state = json.loads(state_path.read_text())
     state["status"] = "sending"
+    state["error"] = "Stale uncertain-delivery warning"
     state_path.write_text(json.dumps(state))
-    assert mailer.deliver(_policy(), tmp_path, message)["status"] == "sent"
+    recovered = mailer.deliver(_policy(), tmp_path, message)
+    assert recovered["status"] == "sent"
+    assert "error" not in recovered
     assert len(calls) == 1
 
 
