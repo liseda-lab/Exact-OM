@@ -1,16 +1,23 @@
 # Batch implementation handoff
 
-**2026-09-24. Implementation amendment; subsequent batches are not yet admitted.**
+**2026-09-25. E09 resubmitted; subsequent batches require measured admission.**
 Six days is a soft target on liseda-03 only. Continue to use detached Slurm steps inside
 allocation 14372; retain the interactive shell. The current E09 continuation uses its own
 frozen source and configuration. Prospective changes do not mutate that running experiment.
 
-At handoff, the active continuation is **Slurm step 14372.3**, tmux
-`exact-d1-production-14372-prefixfix`. Cold300, warm300, completed-replay and ancestor-prefix
-are retained; sibling-prefix is continuing. The [operational repair](../../data/experiments-v2/d1-prefix-repair-01/repair.json)
-separates verified checkpoint blobs from later timing files, retaining historical costs and
-numerical snapshot `75c4d7a`. Monitor the [live status](../../data/experiments-v2/d1-production-probe-01/status.json);
-these notes are a handoff snapshot, not a promise that the job remains running indefinitely.
+The complete D1 qualification and D0 control passed on September 24. Its continuation
+stopped before starting E09 because the forecast extrapolated fixed loading time per pair
+and then charged loading again. The [forecast repair](../../data/experiments-v2/e09-forecast-repair-01/repair.json)
+uses authenticated stage timings: setup once per arm, the slowest observed scoring rate,
+and output/evaluation costs, retaining the 1.5 safety factor. E09's allowance is now
+**9.896 hours**, previously 52.125 hours; budget limits and cumulative costs are unchanged.
+This is a conservative forecast, not a deadline or measured four-arm result.
+
+E09 was resubmitted at **01:41 UTC on September 25**, Slurm step **14372.5**, tmux
+`exact-e09-14372-forecastfix`. The qualification is reused, with numerical snapshot
+`75c4d7a` unchanged. The [new preparation](../../data/experiments-v2/prepared-campaign-13/)
+passed its admission-only preflight before submission; the failed attempt is preserved.
+These notes record submission state; consult the live files below for subsequent progress.
 
 ## Reviewable preparation
 
@@ -30,9 +37,10 @@ remain visible. Expanded screens and selected feature-track submissions are stil
 The 22 completed E05/E06/E26/E02 cells and G0 evidence are preserved as historical receipts.
 They are not claims that changed code has identical predictions. Verify historical decision
 imports during admission; do not rerun completed science just because this inventory is new.
-Existing cumulative accounting remains at
-`data/experiments-v2/mechanism-screen-02/runtime/exact-om-focused-v2/budget.json`.
-No budget is reset or increased by this preparation.
+E09 imports the completed qualification's cumulative accounting from
+`data/experiments-v2/mechanism-screen-02/runtime/exact-om-focused-v2/budget.json` into
+`data/experiments-v2/mechanism-screen-03/runtime/exact-om-focused-v2/budget.json`.
+Later work must inherit the latest completed account; no budget is reset or increased.
 
 ## Implemented behavior
 
@@ -120,19 +128,18 @@ This validates the interface, not prediction quality.
 
 ## Current monitoring
 
-At the implementation handoff, Slurm step **14372.3** is running the **D0-current-control**
-qualification. Cold300, warm300, completed replay, ancestor prefix and sibling prefix have
-passed. Its launcher advances to the four E09 arms once qualification and admission pass.
-The interactive allocation remains intact.
+The E09 launcher owns the four comparison arms: current, ancestor IC, sibling context and
+hierarchy removed. All six qualification phases have passed. The interactive allocation
+remains intact and each experimental submission uses a numeric Slurm step within it.
 
 ```bash
-tail -f data/experiments-v2/d1-production-probe-01/launcher-14372-prefixfix.log
+tail -f data/experiments-v2/prepared-campaign-13/launcher.log
 ```
 
-Structured status is in `data/experiments-v2/d1-production-probe-01/status.json`; inspect
-its `status`, `phase` and `worker_pid` fields. The detached session is
-`exact-d1-production-14372-prefixfix`. Implementation work stops after final validation;
-subsequent experiment monitoring belongs to the user.
+Structured launcher status is in `data/experiments-v2/prepared-campaign-13/advance-status.json`;
+scientific progress is under `data/experiments-v2/mechanism-screen-03/runtime/exact-om-focused-v2/screen`.
+`launcher-exit-code` is written when the Slurm step exits. A nonzero exit or blocked status
+requires checking the recorded reason; it is not a completed scientific result.
 
 ## Validation and source identity
 

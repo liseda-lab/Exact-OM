@@ -1,12 +1,12 @@
 schema_version: 1
 kind: planning_inventory_not_campaign_lock
-recorded_on: '2026-09-24'
+recorded_on: '2026-09-25'
 status: not_admitted
 target_elapsed_hours: 144
 target_basis: User-confirmed soft goal of six days; longer execution is allowed. Not a runtime
   timeout or additional admission cap.
 source_inventory: data/experiments-v2/prepared-campaign-12/campaign.lock.yaml
-active_queue: data/experiments-v2/d1-production-probe-01/status.json
+active_queue: data/experiments-v2/prepared-campaign-13/advance-status.json
 audit_directory: data/experiments-v2/six-day-plan-01
 resource_assumption:
   node: liseda-03
@@ -43,8 +43,9 @@ batches:
     target_window_hours:
       - 0
       - 12
-    status: qualification_running_conditional_continuation
-    gate: Current immutable D1 qualification, measured admission, four complete hierarchy arms.
+    status: qualification_passed_comparison_submitted
+    gate: Passed immutable D1 qualification and D0 control; corrected stage-based 9.896-hour
+      forecast admitted without changing budget limits; four hierarchy arms submitted in step 14372.5.
   - id: B1
     name: Early evidence, decisions, retrieval and LLM controls
     steps:
