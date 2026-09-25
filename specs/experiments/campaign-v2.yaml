@@ -291,21 +291,23 @@ experiments:
   spec: E01-global-extraction.md
   focused_case: D0
   budget_group: decisions
-  initial_treatment_cap: 5
+  initial_treatment_cap: 6
   dependencies:
   - E00
   - pool_freeze
   treatments:
-  - 'greedy: threshold-first current control'
-  - 'mutual_best: reciprocal top candidate among eligible edges'
-  - 'stable_marriage: source-proposing, canonical ties'
-  - 'assignment_accepted_utility: eligible edges with utility score-threshold and zero unmatched utility'
-  - 'assignment_legacy: raw-score optimization followed by threshold, diagnostic only'
+  - 'threshold_unrestricted: baseline; threshold 0.7 with no source or target cardinality limit'
+  - 'greedy: threshold-first one-to-one control, selectable'
+  - 'mutual_best: reciprocal top candidate among eligible edges, one-to-one'
+  - 'stable_marriage: source-proposing, canonical ties, one-to-one'
+  - 'assignment_accepted_utility: eligible-edge score-threshold utility and zero unmatched utility, one-to-one'
+  - 'assignment_legacy: raw-score optimization followed by threshold, one-to-one diagnostic only'
   readiness: implementation_required
-  already_implemented: Greedy, mutual-best, stable marriage, component assignment, protected-match checks,
-    and component-cap fallback primitives exist.
-  remaining_implementation: True global frozen-pool execution and threshold-aware accepted-edge assignment;
-    current assignment applies threshold after optimization.
+  already_implemented: Frozen-pool global extraction, threshold-aware accepted-edge assignment and
+    component-cap fallback; all six arms use the common compete lexical-anchor conflict policy.
+  remaining_implementation: Validate and run the approved 2026-09-25 six-arm amendment under a new
+    immutable declaration; preserve validated upstream scores and cumulative costs. Export both
+    cardinalities with extraction selection. Runtime readiness requires recorded test and binding evidence.
   checkpoint_boundaries: Decisions, per-component extraction, evaluation.
 - id: E02
   spec: E02-anchor-rescoring.md

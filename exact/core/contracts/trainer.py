@@ -178,8 +178,8 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
         Apply prefiltering to the dataset based on the features.
         """
         if getattr(self, "_extraction_includes_prefilter", False):
-            # Non-greedy E01 extraction already preassigned exact mappings and
-            # enforced both cardinalities over the combined graph.
+            # Global extraction already resolved exact anchors and the declared
+            # cardinalities (including unrestricted threshold output).
             return alignment
 
         selector_target_conflict_enabled = getattr(self, "_selector_target_conflict_enabled", None)

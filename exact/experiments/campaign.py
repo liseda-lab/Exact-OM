@@ -1414,23 +1414,50 @@ def dependency_blockers(source: Any, selections: Mapping[str, Any]) -> list[str]
 
 
 def validate_comparison_cells(cells: Any, source: Any) -> None:
-    """E01 changes extraction alone; scores, selectors and cardinality stay fixed."""
+    """Keep E01 pair evidence fixed, permitting only its declared extraction treatments."""
     from copy import deepcopy
 
     spec = source.config.frozen_constants.get("campaign_v2", {})
     if spec.get("family") != "E01":
         return
+    declared = {arm.id: arm for arm in getattr(source.config, "arms", [])}
+    amended = "threshold_unrestricted" in declared
+    constrained = {
+        "greedy",
+        "mutual_best",
+        "stable_marriage",
+        "assignment_accepted_utility",
+        "assignment_legacy",
+    }
     contracts: dict[tuple[str, int], dict[str, Any]] = {}
     for cell in cells:
         value = deepcopy(cell.resolved_config)
         if value["data"]["execution_mode"] != "global_alignment":
             raise ValueError("E01 extraction requires global alignment semantics")
-        value["matching"]["extraction"].pop("mode")
+        matching = value["matching"]
+        mode = matching["extraction"].pop("mode")
+        if amended:
+            unrestricted = cell.arm_id == "threshold_unrestricted"
+            expected_cardinality = None if unrestricted else 1
+            if (
+                cell.arm_id not in declared
+                or (not unrestricted and cell.arm_id not in constrained)
+                or mode != ("threshold" if unrestricted else cell.arm_id)
+                or matching["cardinality"] != expected_cardinality
+                or matching["target_cardinality"] != expected_cardinality
+                or matching["extraction"].get("anchor_conflict_policy") != "compete"
+            ):
+                raise ValueError(
+                    "E01 amended extraction/cardinality/anchor policy differs from its declared arm"
+                )
+            # Cardinality is part of the named extraction treatment, never a scorer change.
+            matching["cardinality"] = matching["target_cardinality"] = 1
         key = (cell.task_id, cell.seed)
         previous = contracts.setdefault(key, value)
         if previous != value:
             raise ValueError(
-                "E01 arms must share scores, selector, thresholds and cardinality; only extraction mode may differ"
+                "E01 arms must share scores, selector, thresholds and anchor policy; "
+                "only extraction mode and declared unrestricted cardinality may differ"
             )
 
 

@@ -165,6 +165,12 @@ class AuditIOMixin:
         threshold = policy.get("threshold", getattr(self, "_last_effective_threshold", None))
         policy.setdefault("threshold", threshold)
         policy["extraction_diagnostics"] = dict(getattr(self, "_extraction_diagnostics", {}))
+        lexical_exact_pairs = set(protected)
+        extraction_diagnostics = policy["extraction_diagnostics"]
+        if extraction_diagnostics.get("anchor_conflict_policy") == "compete":
+            protected -= {
+                tuple(pair) for pair in extraction_diagnostics.get("conflicting_anchor_pairs", [])
+            }
         policy["anchor_inventory"] = getattr(self.model, "_anchor_manifest", None)
         llm_config = getattr(self.model, "llm_experiment_config", {})
         if llm_config:
@@ -292,7 +298,7 @@ class AuditIOMixin:
         )
         from exact.experiments.difference_replay import write_difference_replay
 
-        write_difference_replay(self, frame, explanations, emitted, protected, policy)
+        write_difference_replay(self, frame, explanations, emitted, lexical_exact_pairs, policy)
         destination = self.output_dir / "source_decisions.json"
         previous = json.loads(destination.read_text()) if destination.exists() else {}
         previous_records = {str(row["Src"]): row for row in previous.get("records", [])}

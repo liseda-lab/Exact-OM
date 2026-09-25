@@ -86,6 +86,7 @@ def core_arms(base):
             ],
         )
     for mode in (
+        "threshold",
         "greedy",
         "mutual_best",
         "stable_marriage",
@@ -94,14 +95,26 @@ def core_arms(base):
     ):
         add(
             "E01",
-            mode,
+            "threshold_unrestricted" if mode == "threshold" else mode,
             controls(
-                {"matching": {"extraction": {"mode": mode}}, "selector": {"runtime_enabled": False}}
+                {
+                    "matching": {
+                        "threshold": 0.7,
+                        "cardinality": None if mode == "threshold" else 1,
+                        "target_cardinality": None if mode == "threshold" else 1,
+                        "extraction": {"mode": mode, "anchor_conflict_policy": "compete"},
+                    },
+                    "selector": {"runtime_enabled": False},
+                }
             ),
             role=(
                 "baseline"
-                if mode == "greedy"
-                else "diagnostic" if mode == "assignment_legacy" else "candidate"
+                if mode == "threshold"
+                else (
+                    "control"
+                    if mode == "greedy"
+                    else "diagnostic" if mode == "assignment_legacy" else "candidate"
+                )
             ),
             requires=["frozen_global_scores", "declared_cardinality"],
         )

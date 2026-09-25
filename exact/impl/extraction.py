@@ -89,11 +89,11 @@ def _preassign_exact(
     return protected, residual
 
 
-def _validate_protected_exact_constraints(
+def _protected_exact_conflicts(
     mappings: Sequence[EntityMapping],
     protected_pairs: Set[Pair],
-) -> None:
-    """Reject contradictory exact-match hard constraints before extraction.
+) -> Tuple[Dict[Node, Tuple[Node, ...]], Dict[Node, Tuple[Node, ...]], Set[Pair]]:
+    """Identify lexical anchors sharing a typed source or target.
 
     E01 treats protected exact matches as pre-assigned one-to-one edges. Letting
     two protected edges occupy the same typed source or target would make the
@@ -124,9 +124,20 @@ def _validate_protected_exact_constraints(
         for target, sources in sources_by_target.items()
         if len(sources) > 1
     }
+    conflicting_pairs = {
+        (str(mapping.head), str(mapping.tail))
+        for mapping in present
+        if _source_node(mapping) in source_conflicts or _target_node(mapping) in target_conflicts
+    }
+    return source_conflicts, target_conflicts, conflicting_pairs
+
+
+def _validate_protected_exact_constraints(
+    source_conflicts: Mapping[Node, Tuple[Node, ...]],
+    target_conflicts: Mapping[Node, Tuple[Node, ...]],
+) -> None:
     if not source_conflicts and not target_conflicts:
         return
-
     details: List[str] = []
     for source, targets in sorted(source_conflicts.items()):
         details.append(f"source {source!r} -> {list(targets)!r}")
@@ -346,17 +357,21 @@ def extract_global_alignment(
     source_cardinality: Optional[int] = 1,
     target_cardinality: Optional[int] = 1,
     assignment_component_cap: int = 500,
+    anchor_conflict_policy: str = "error",
 ) -> ExtractionResult:
     """Extract a global alignment while preserving protected exact pairs.
 
     All primary strategies operate on threshold-eligible edges. Assignment
     maximizes accepted utility (score minus threshold), with zero unmatched
     utility. Only ``assignment_legacy`` optimizes raw scores before thresholding.
-    ``assignment`` aliases ``assignment_accepted_utility``.
+    ``assignment`` aliases ``assignment_accepted_utility``. With ``compete``,
+    conflicting lexical anchors retain their scores but lose hard protection.
+    ``threshold`` permits unrestricted cardinality without reserving vertices.
     """
 
     normalized_mode = str(mode or "greedy").strip().lower()
     if normalized_mode not in {
+        "threshold",
         "greedy",
         "mutual_best",
         "stable_marriage",
@@ -369,14 +384,40 @@ def extract_global_alignment(
         raise ValueError("extraction threshold must be finite")
     if any(not math.isfinite(float(mapping.score)) for mapping in mappings):
         raise ValueError("extraction scores must be finite")
-    if normalized_mode != "greedy" and (source_cardinality != 1 or target_cardinality != 1):
+    if anchor_conflict_policy not in {"error", "compete"}:
+        raise ValueError(f"Unknown anchor conflict policy: {anchor_conflict_policy!r}")
+    if normalized_mode == "threshold" and (
+        source_cardinality is not None or target_cardinality is not None
+    ):
+        raise ValueError("threshold extraction requires unrestricted source and target cardinality")
+    if normalized_mode not in {"greedy", "threshold"} and (
+        source_cardinality != 1 or target_cardinality != 1
+    ):
         raise ValueError("non-greedy extraction requires declared one-to-one cardinality")
     if assignment_component_cap < 1:
         raise ValueError("assignment_component_cap must be at least one")
 
     protected_set = {(str(source), str(target)) for source, target in (protected_pairs or set())}
-    _validate_protected_exact_constraints(mappings, protected_set)
-    protected, residual = _preassign_exact(list(mappings), protected_set)
+    source_conflicts, target_conflicts, conflicting_pairs = _protected_exact_conflicts(
+        mappings, protected_set
+    )
+    if anchor_conflict_policy == "error":
+        _validate_protected_exact_constraints(source_conflicts, target_conflicts)
+    else:
+        protected_set -= conflicting_pairs
+    if normalized_mode == "threshold":
+        protected = _deduplicate(
+            mapping
+            for mapping in mappings
+            if (str(mapping.head), str(mapping.tail)) in protected_set
+        )
+        residual = [
+            mapping
+            for mapping in _deduplicate(mappings)
+            if (str(mapping.head), str(mapping.tail)) not in protected_set
+        ]
+    else:
+        protected, residual = _preassign_exact(list(mappings), protected_set)
     threshold_removed = 0
     component_count = 0
     fallback_components = 0
@@ -397,7 +438,9 @@ def extract_global_alignment(
             )
         return selected
 
-    if normalized_mode == "greedy":
+    if normalized_mode == "threshold":
+        selected = residual
+    elif normalized_mode == "greedy":
         selected = greedy(residual)
     elif normalized_mode == "mutual_best":
         selected = _mutual_best(residual)
@@ -428,6 +471,30 @@ def extract_global_alignment(
     output = _deduplicate([*protected, *selected])
     diagnostics: Dict[str, object] = {
         "mode": normalized_mode,
+        "anchor_conflict_policy": anchor_conflict_policy,
+        "source_cardinality": source_cardinality,
+        "target_cardinality": target_cardinality,
+        "anchor_source_conflicts": [
+            {"source": list(source), "targets": [list(target) for target in targets]}
+            for source, targets in sorted(source_conflicts.items())
+        ],
+        "anchor_target_conflicts": [
+            {"target": list(target), "sources": [list(source) for source in sources]}
+            for target, sources in sorted(target_conflicts.items())
+        ],
+        "conflicting_anchor_pairs": [list(pair) for pair in sorted(conflicting_pairs)],
+        "selected_conflicting_anchor_pairs": [
+            list(pair)
+            for pair in sorted(
+                conflicting_pairs & {(str(mapping.head), str(mapping.tail)) for mapping in output}
+            )
+        ],
+        "suppressed_conflicting_anchor_pairs": [
+            list(pair)
+            for pair in sorted(
+                conflicting_pairs - {(str(mapping.head), str(mapping.tail)) for mapping in output}
+            )
+        ],
         "input_mappings": len(mappings),
         "deduplicated_mappings": len(_deduplicate(mappings)),
         "protected_mappings": len(protected),

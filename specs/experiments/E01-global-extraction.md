@@ -1,6 +1,6 @@
 # E01 — Threshold-aware global extraction
 
-**v2 specification, 2026-09-09. Implementation still required.**
+**v2 specification, amended with user approval 2026-09-25.**
 This file replaces the v1 matrix for this family. [RUN-PLAN](RUN-PLAN.md),
 [shared clarifications](IMPLEMENTATION-CLARIFICATIONS.md), and
 [checkpoint recovery](CHECKPOINT-RECOVERY.md) are binding. A passing helper test does not
@@ -10,11 +10,13 @@ establish an executable experiment or a performance result.
 
 Inspected baseline: 655f599e714e13d592f702f326ca5a36f6b50b2f.
 
-**Already implemented:** Greedy, mutual-best, stable marriage, component assignment, protected-match checks, and component-cap fallback primitives exist.
+**Implemented contract:** Frozen-pool global execution, unrestricted threshold extraction,
+greedy, mutual-best, stable marriage, accepted-utility assignment, and legacy assignment.
+The amended screen gives all methods the same explicit lexical-anchor conflict policy.
 
-**Agent must implement:** True global frozen-pool execution and threshold-aware accepted-edge assignment; current assignment applies threshold after optimization.
-
-**Inputs/bindings to resolve:** Resolve the primary class reference and declared cardinality; the user confirms the broader OAEI tasks are available.
+**Inputs/bindings to resolve:** Pin the primary class reference and output entity eligibility.
+One-to-one matching is an experimental restriction, not a universal ontology-alignment
+correctness requirement; the user confirms the broader OAEI tasks are available.
 The user confirms the OAEI/BioKG data are available. Resolve paths, revisions and capabilities;
 do not perpetuate an old unavailable flag without checking the supplied data.
 
@@ -30,23 +32,57 @@ Start with 300 development source groups (all eligible if fewer), seed 17, excep
 
 ## Question, treatments, and implementation contract
 
-Hold scores/selector fixed. Compare the five strategies with source/target cardinality declared from the task contract. Use a selector on/off interaction only for the selected strategy at G4; do not multiply the initial grid. Record changed sources, target collisions, dummy matches, and cap fallbacks.
+Hold candidate pools, source population, pair scores, threshold **0.7**, label-free
+supervision, and disabled selector/LLM decision gate fixed. Compare unrestricted extraction
+with one-to-one extraction. Use a selector on/off interaction only for the selected strategy
+at G4; do not multiply the initial grid. Record changed sources, target collisions, dummy
+matches, cap fallbacks, ambiguous lexical anchors, and mappings suppressed by cardinality.
 
-At most **5 distinct treatment configurations/cells as specified below** before any explicitly declared source expansion. This is a bounded sequential design, not a Cartesian product. Shared deterministic controls are computed once.
+At most **6 distinct treatment configurations/cells as specified below** before any explicitly
+declared source expansion. This is a bounded sequential design, not a Cartesian product.
+Shared deterministic scoring inputs are computed once.
 
-- greedy: threshold-first current control.
-- mutual_best: reciprocal top candidate among eligible edges.
-- stable_marriage: source-proposing, canonical ties.
-- assignment_accepted_utility: eligible edges with utility score-threshold and zero unmatched utility.
-- assignment_legacy: raw-score optimization followed by threshold, diagnostic only.
+- threshold_unrestricted: baseline; keep eligible edges at or above threshold, with no source or
+  target cardinality limit (`matching.cardinality=null`, `target_cardinality=null`).
+  As in every arm, collision-free protected anchors are retained even below threshold;
+  ambiguous anchors lose protection and must meet the threshold.
+- greedy: threshold-first one-to-one control, eligible for selection.
+- mutual_best: reciprocal top candidate among eligible edges, one-to-one.
+- stable_marriage: source-proposing, canonical ties, one-to-one.
+- assignment_accepted_utility: eligible edges with utility score-threshold and zero unmatched
+  utility, one-to-one.
+- assignment_legacy: raw-score optimization followed by threshold, one-to-one diagnostic only;
+  it cannot be selected for deployment.
 
-All generative roles use OpenRouter. Local non-generative encoders/heads use the single RTX 5090.
+All six use `matching.extraction.anchor_conflict_policy=compete`. Collision-free lexical
+anchors remain protected; lexical anchors sharing a source or target compete at their existing
+scores. Their ambiguity is identified identically across all arms, independently of the arm's
+cardinality. No lexical match is promoted to verified equivalence. This is an extraction-only
+rule: E02 continues to own rescoring and alternative anchor trust policies.
+
+The threshold baseline is retained unless a selectable constrained method satisfies the frozen
+quality, recall, and cost criteria. Publish both cardinalities with the extraction policy so
+later composition cannot silently restore one-to-one matching. Compare precision gain and
+recall loss from imposing cardinality; one-to-one compliance alone is not a correctness result.
+Output entity eligibility follows the existing declared task scope. Imports may supply context;
+there is no new namespace filter and no exclusion chosen to remove a collision.
+
+All generative roles use OpenRouter. Local non-generative encoders/heads use the allocated single GPU.
 Separate target-label-free, in-pair supervised and transferred results. A named diagnostic may
 use development reference information only under its explicit oracle/diagnostic role.
 
 ## Validation and selection
 
 Primary outcome/guard: **Global F1; local pair scores must be unchanged.**
+
+- RQ1: Does a one-to-one method improve global F1 over unrestricted threshold extraction,
+  and what precision/recall tradeoff does that restriction introduce?
+- RQ2: Among the constrained methods, does threshold-aware assignment improve over greedy,
+  mutual-best or stable marriage? Legacy assignment remains diagnostic.
+
+The screen is descriptive, with the existing 0.003 F1 practical-effect threshold for selecting
+a constrained method over the unrestricted baseline. A failure to pass retains unrestricted
+extraction; it does not establish that all true ontology alignments have unrestricted multiplicity.
 Use the family rule plus RUN-PLAN's frozen selection, practical-effect, reconstruction and cost
 criteria. A screen chooses what to evaluate next; it does not establish a reporting-set claim.
 Report all controls, negative results, corrections/harms where relevant, and inapplicable or
@@ -63,7 +99,14 @@ No individual experiment uses final outcomes to qualify its component for E17.
 - The 0.90/0.69/0.69 graph at threshold 0.70 retains 0.90 under primary assignment.
 - All strategies enforce declared cardinality and deterministic ties.
 - Non-greedy global arms work with frozen candidate files and reject local-ranking semantics.
-- Hard anchor conflicts are explicit; soft-anchor behavior is owned by E02.
+- The shared `compete` rule resolves ambiguous lexical protection without changing scores;
+  strict hard-anchor controls outside this amendment still reject conflicting constraints.
+- All six arms, including the historical greedy control, are rerun for extraction/evaluation.
+  The prior five-arm attempt is retained as superseded evidence. Reuse upstream scores only
+  when the scorer, pool, source population and ontology scope are unchanged and validated.
+  Create a new immutable declaration; never rewrite the failed attempt or its signatures.
+- Selection uses public development references only. Private/reporting references cannot
+  guide cardinality, anchor handling, output eligibility, or threshold choices.
 
 Durable boundaries: **Decisions, per-component extraction, evaluation.**
 All changed inputs/semantics invalidate their consuming descendants; preserve valid upstream
