@@ -300,3 +300,39 @@ def test_changed_instructions_do_not_charge_or_start_an_attempt(
         cli.check(tmp_path, policy, state, act=True)
     assert state["incidents"]["failure"]["attempts"] == 0
     assert state["agent_runs"] == []
+
+
+@pytest.mark.parametrize("explicit_null", [False, True])
+def test_distinct_incidents_have_no_default_daily_limit(cli, controller, explicit_null):
+    policy, state = controller
+    policy.pop("max_agent_runs_per_day")
+    if explicit_null:
+        policy["max_agent_runs_per_day"] = None
+    state["agent_runs"] = [{"started_epoch": 100}] * 100
+    state["incidents"]["new-error"] = {"attempts": 0, "observations": 1}
+    assert cli.eligible(state, {"id": "new-error", "kind": "run_failed"}, policy, 101) == (
+        True,
+        "eligible",
+    )
+    state["incidents"]["new-error"]["attempts"] = 2
+    assert cli.eligible(state, {"id": "new-error", "kind": "run_failed"}, policy, 101) == (
+        False,
+        "incident_attempt_limit",
+    )
+
+
+@pytest.mark.parametrize("limit", [None, 3])
+def test_policy_accepts_optional_daily_limit(cli, controller, limit):
+    policy, _ = controller
+    policy.update(interval_seconds=300, max_agent_runs_per_day=limit)
+    cli.validate_policy(policy)
+    policy.pop("max_agent_runs_per_day")
+    cli.validate_policy(policy)
+
+
+@pytest.mark.parametrize("limit", [0, -1, True, "unlimited"])
+def test_policy_rejects_invalid_daily_limit(cli, controller, limit):
+    policy, _ = controller
+    policy.update(interval_seconds=300, max_agent_runs_per_day=limit)
+    with pytest.raises(ValueError, match="Daily repair limit"):
+        cli.validate_policy(policy)

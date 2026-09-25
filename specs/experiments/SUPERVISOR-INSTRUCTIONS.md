@@ -1,4 +1,4 @@
-# Hourly experiment intervention
+# Experiment intervention
 
 The user authorizes unattended status checks, minimal correctness-preserving fixes, tests,
 commits, checkpoint recovery and submission of the next eligible predeclared experiments.
@@ -62,7 +62,8 @@ as a blocker when no allowed approach can complete the action.
 
 Check the supervisor's `PAUSE` and `STOP` files and applicable experiment STOP files before
 mutations/submissions. Never clear a user's pause/STOP or resume an intentional interruption.
-Do not send external messages. Write the report and handoff locally.
+Write the report and handoff locally. The supervisor sends configured intervention alerts
+to the user; do not send additional external messages from a repair agent.
 
 Before returning, update only `<supervisor_directory>/registry.json` with the actual new
 launches: id, full numeric step_id, absolute status_path, exit_path, completion_path and
@@ -77,3 +78,8 @@ Record the latest authoritative budget path, source commits, changed files, test
 checkpoint/reuse decisions and exact continuation in a local handoff. Return the requested
 JSON result. Use outcome=needs_user for an unresolved decision/permission/resource blocker,
 no_change for a false alarm, repaired/submitted only after verifying the resulting state.
+For needs_user, state the exact decision or action required in summary and give the handoff
+path; these fields are included in the configured notification. Continue independent eligible
+work when one family needs a scientific decision. There is no daily repair limit, but repeated
+attempts at the same unresolved error are bounded across replacement runs. Do not change
+supervisor retry state or limits to escape that bound.

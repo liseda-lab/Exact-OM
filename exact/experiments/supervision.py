@@ -46,11 +46,14 @@ def _stable(value: Any) -> Any:
     return value
 
 
-def _incident(run_id: str | None, kind: str, reason: str, detail: Any = None) -> dict:
-    identity = json.dumps([run_id, kind, _stable(detail)], sort_keys=True)
+def _incident(
+    run_id: str | None, kind: str, reason: str, detail: Any = None, *, scope: str | None = None
+) -> dict:
+    identity = json.dumps([scope or run_id, kind, _stable(detail)], sort_keys=True)
     return {
         "id": hashlib.sha256(identity.encode()).hexdigest()[:24],
         "kind": kind,
+        "scope_run_id": scope or run_id,
         "focus_run_id": run_id,
         "run_ids": [run_id] if run_id else [],
         "reason": reason,
@@ -68,6 +71,22 @@ def _registry(runs: Sequence[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
         if not isinstance(run.get("step_id"), str) or not run["step_id"]:
             raise ValueError(f"Missing step_id for {run['id']}")
     by_id = {run["id"]: run for run in runs}
+    predecessors = {}
+    for run in runs:
+        successor = run.get("superseded_by")
+        if successor is not None:
+            if not isinstance(successor, str) or successor not in by_id:
+                raise ValueError(f"Invalid superseded_by for {run['id']}")
+            if successor in predecessors:
+                raise ValueError("Recovery runs must have a single predecessor")
+            predecessors[successor] = run["id"]
+    for name in ids:
+        seen = set()
+        while name in predecessors:
+            if name in seen:
+                raise ValueError("Run recoveries contain a cycle")
+            seen.add(name)
+            name = predecessors[name]
 
     def visit(name: str, path: set[str]) -> None:
         if name in path:
@@ -77,7 +96,97 @@ def _registry(runs: Sequence[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
 
     for name in ids:
         visit(str(name), set())
+    dependencies = _effective_dependencies(runs)
+
+    def visit_current(name: str, path: set[str]) -> None:
+        if name in path:
+            raise ValueError("Recovered run dependencies contain a cycle")
+        for parent in dependencies[name]:
+            visit_current(parent, path | {name})
+
+    for name in dependencies:
+        visit_current(name, set())
     return [run for run in runs if run.get("enabled", True)]
+
+
+def _effective_dependencies(runs: Sequence[Mapping[str, Any]]) -> dict[str, list[str]]:
+    """A waiting child follows the current recovery of its declared prerequisite."""
+    by_id = {run["id"]: run for run in runs}
+    enabled = {run["id"] for run in runs if run.get("enabled", True)}
+    result = {}
+    for name in enabled:
+        parents = []
+        for parent in by_id[name].get("depends_on", []):
+            while by_id[parent].get("superseded_by"):
+                parent = by_id[parent]["superseded_by"]
+            if parent in enabled:
+                parents.append(parent)
+        result[name] = parents
+    return result
+
+
+def _recovery_identities(
+    runs: Sequence[Mapping[str, Any]]
+) -> dict[str, tuple[str, dict[str, str]]]:
+    """Keep retries of one failure together without merging unrelated campaigns.
+
+    Only explicitly registered recovery links and paths are aliases. Do not erase
+    arbitrary path names or numbers: they can identify genuinely different errors.
+    Disabled ancestors remain relevant to the retry identity.
+    """
+    by_id = {run["id"]: run for run in runs}
+    previous = {run["superseded_by"]: run["id"] for run in runs if run.get("superseded_by")}
+    result = {}
+    for name in by_id:
+        root = name
+        while root in previous:
+            root = previous[root]
+        member = root
+        aliases = {}
+        while member:
+            run = by_id[member]
+            aliases[member] = "<run>"
+            aliases[run["step_id"]] = "<step>"
+            for field in ("status_path", "completion_path", "exit_path"):
+                if run.get(field):
+                    path = Path(run[field])
+                    # A filesystem root is not a reliable run identity.
+                    if path.is_absolute() and path.parent != Path("/"):
+                        aliases[str(path.parent)] = "<run-root>"
+            member = run.get("superseded_by")
+        result[name] = (root, aliases)
+    return result
+
+
+def _recovery_detail(value: Any, aliases: Mapping[str, str]) -> Any:
+    if isinstance(value, dict):
+        return {key: _recovery_detail(item, aliases) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_recovery_detail(item, aliases) for item in value]
+    if isinstance(value, str) and aliases:
+        # Longest first ensures a root path containing a run ID is replaced as a
+        # whole; boundaries avoid changing similarly named dataset paths or IDs.
+        pattern = (
+            r"(?<![\w.-])("
+            + "|".join(re.escape(alias) for alias in sorted(aliases, key=len, reverse=True))
+            + r")(?![\w.-])"
+        )
+        return re.sub(pattern, lambda match: aliases[match.group()], value)
+    return value
+
+
+def inspection_incident(runs: Sequence[Mapping[str, Any]], finding: Mapping[str, Any]) -> dict:
+    """Identify unreadable evidence by its error and registered recovery lineage."""
+    _registry(runs)
+    name = finding["run_id"]
+    scope, aliases = _recovery_identities(runs)[name]
+    return _incident(
+        name,
+        "inspect_evidence",
+        finding["reason"],
+        _recovery_detail(finding.get("errors", []), aliases),
+        scope=scope,
+    )
 
 
 def _read(path: str | Path | None, *, json_object: bool) -> Any:
@@ -130,6 +239,12 @@ def assess_runs(
 ) -> dict:
     """Pure health assessment with stable incident IDs and upstream deduplication."""
     enabled = _registry(runs)
+    identities = _recovery_identities(runs)
+
+    def failure(name: str, kind: str, reason: str, detail: Any = None) -> dict:
+        scope, aliases = identities[name]
+        return _incident(name, kind, reason, _recovery_detail(detail, aliases), scope=scope)
+
     findings = {}
     incidents = {}
     for run in enabled:
@@ -153,16 +268,22 @@ def assess_runs(
         incident = None
         if phase in _FAILED or phase.startswith("blocked_"):
             reason = f"{name} reports {phase}"
-            incident = _incident(name, "run_failed", reason, state.get("error", phase))
+            incident = failure(
+                name,
+                "run_failed",
+                reason,
+                state.get("error")
+                or {key: state[key] for key in ("status", "reason", "message") if key in state},
+            )
         elif exit_code is not None and exit_code != 0:
             reason = f"{name} launcher exited with code {exit_code}"
-            incident = _incident(name, "launcher_failed", reason, exit_code)
+            incident = failure(name, "launcher_failed", reason, exit_code)
         elif completion is not None and (
             completion.get("status") in _FAILED
             or (isinstance(completion.get("exit_code"), int) and completion["exit_code"] != 0)
         ):
             reason = f"{name} completion receipt reports failure"
-            incident = _incident(
+            incident = failure(
                 name,
                 "completion_failed",
                 reason,
@@ -186,7 +307,7 @@ def assess_runs(
             )
         elif not alive:
             reason = f"{name} has no live Slurm step and no successful completion receipt"
-            incident = _incident(name, "step_missing", reason)
+            incident = failure(name, "step_missing", reason)
         elif phase.startswith("waiting") or scheduler in {"PENDING", "SUSPENDED", "CONFIGURING"}:
             finding["status"] = "waiting"
             reason = "Live step is waiting for its dependency or scheduler"
@@ -198,12 +319,10 @@ def assess_runs(
         finding["reason"] = reason
         findings[name] = finding
 
-    by_id = {run["id"]: run for run in enabled}
+    dependencies = _effective_dependencies(runs)
 
     def upstream_incident(name: str) -> str | None:
-        for parent in by_id[name].get("depends_on", []):
-            if parent not in by_id:
-                continue
+        for parent in dependencies[name]:
             root = upstream_incident(parent)
             if root or parent in incidents:
                 return root or parent

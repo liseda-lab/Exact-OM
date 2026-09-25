@@ -15,7 +15,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from exact.experiments.supervision import inspect_runs  # noqa: E402
+from exact.experiments.notifications import notify_intervention  # noqa: E402
+from exact.experiments.supervision import inspect_runs, inspection_incident  # noqa: E402
 
 RESULT_SCHEMA = {
     "type": "object",
@@ -105,14 +106,15 @@ def slurm_steps(allocation):
 
 
 def eligible(state, incident, policy, now):
-    """Limit repeated diagnosis and total allowance use; no limit on scientific job duration."""
+    """Bound retries of one unresolved error; a daily cap is optional."""
     record = state["incidents"][incident["id"]]
     if record.get("needs_user"):
         return False, "requires_user"
     if record.get("attempts", 0) >= policy["max_attempts_per_incident"]:
         return False, "incident_attempt_limit"
     recent = [run for run in state["agent_runs"] if now - run["started_epoch"] < 86400]
-    if len(recent) >= policy["max_agent_runs_per_day"]:
+    daily_limit = policy.get("max_agent_runs_per_day")
+    if daily_limit is not None and len(recent) >= daily_limit:
         return False, "daily_agent_limit"
     if incident["kind"] in {"step_missing", "inspect_evidence"} and (
         record["observations"] < 2 or now - record.get("first_seen_epoch", now) < 60
@@ -221,6 +223,22 @@ def run_agent(policy, directory, prompt, stop_requested):
     return report
 
 
+def notify_blocker(directory, policy, incident, action, *, result=None, report=None):
+    """Persist and deliver one actionable blocker without exposing raw event logs."""
+    result = result or {}
+    summary = result.get("summary") or incident.get("reason") or action
+    if report and report.get("interrupted"):
+        summary = "Repair was interrupted; inspect its saved work before resuming. " + summary
+    return notify_intervention(
+        directory,
+        incident,
+        action,
+        summary,
+        config=policy.get("notifications", {}),
+        handoff=result.get("handoff", ""),
+    )
+
+
 def check(directory, policy, state, *, act=False, stop_requested=lambda: False):
     registry = read(directory / "registry.json")
     steps = slurm_steps(policy["allocation"])
@@ -231,16 +249,7 @@ def check(directory, policy, state, *, act=False, stop_requested=lambda: False):
     # Persistent unreadable evidence merits diagnosis, never a blind resubmission.
     for finding in observation["findings"]:
         if finding.get("retryable") and finding.get("errors"):
-            ident = hashlib.sha256(("evidence:" + finding["run_id"]).encode()).hexdigest()[:20]
-            observation["incidents"].append(
-                {
-                    "id": ident,
-                    "kind": "inspect_evidence",
-                    "focus_run_id": finding["run_id"],
-                    "run_ids": [finding["run_id"]],
-                    "reason": finding["reason"],
-                }
-            )
+            observation["incidents"].append(inspection_incident(registry["runs"], finding))
     active = {item["id"] for item in observation["incidents"]}
     for key, record in state["incidents"].items():
         if key not in active:
@@ -267,6 +276,11 @@ def check(directory, policy, state, *, act=False, stop_requested=lambda: False):
             allowed, reason = eligible(state, incident, policy, now)
             current.update(incident=incident, action=reason)
             if not allowed:
+                if reason in {"requires_user", "incident_attempt_limit", "daily_agent_limit"}:
+                    record = state["incidents"][incident["id"]]
+                    current["notification"] = notify_blocker(
+                        directory, policy, incident, reason, result=record.get("last_result")
+                    )
                 continue
             if stop_requested():
                 break
@@ -314,18 +328,51 @@ def check(directory, policy, state, *, act=False, stop_requested=lambda: False):
             entry.update(status=report["status"], finished_at=timestamp())
             result = report.get("result")
             result = result if isinstance(result, dict) else {}
+            record = state["incidents"][incident["id"]]
+            record["last_result"] = result
             if report.get("interrupted") or result.get("outcome") == "needs_user":
-                state["incidents"][incident["id"]]["needs_user"] = True
+                record["needs_user"] = True
+                write(directory / "state.json", state)
+                current["notification"] = notify_blocker(
+                    directory, policy, incident, "requires_user", result=result, report=report
+                )
+            elif attempt >= policy["max_attempts_per_incident"] and (
+                report["status"] != "complete" or result.get("outcome") == "no_change"
+            ):
+                current["notification"] = notify_blocker(
+                    directory,
+                    policy,
+                    incident,
+                    "incident_attempt_limit",
+                    result=result,
+                    report=report,
+                )
             write(directory / "state.json", state)
             current.update(
                 status="intervention_finished",
                 outcome=result.get("outcome"),
                 report=str(run / "report.json"),
             )
-            break  # One invocation per hourly check; successful jobs are monitored next hour.
+            break  # At most one intervention at a time; recheck its outcome promptly.
     write(directory / "status.json", current)
     print(json.dumps(current, sort_keys=True), flush=True)
     return current
+
+
+def validate_policy(policy):
+    """Validate repair bounds while allowing unlimited distinct incidents."""
+    if (
+        policy["interval_seconds"] < 60
+        or min(policy["max_attempts_per_incident"], policy["agent_timeout_seconds"]) < 1
+    ):
+        raise ValueError(
+            "Positive retry/time limits and an interval of at least one minute required"
+        )
+    daily_limit = policy.get("max_agent_runs_per_day")
+    if daily_limit is not None and (
+        isinstance(daily_limit, bool) or not isinstance(daily_limit, int) or daily_limit < 1
+    ):
+        raise ValueError("Daily repair limit must be null, omitted, or a positive integer")
 
 
 def main():
@@ -335,16 +382,7 @@ def main():
     args = parser.parse_args()
     directory = args.directory.resolve()
     policy = read(directory / "policy.json")
-    if (
-        policy["interval_seconds"] < 60
-        or min(
-            policy["max_attempts_per_incident"],
-            policy["max_agent_runs_per_day"],
-            policy["agent_timeout_seconds"],
-        )
-        < 1
-    ):
-        raise ValueError("Positive limits and an interval of at least one minute required")
+    validate_policy(policy)
     lock = (directory / "supervisor.lock").open("a")
     fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
     stopped = False
@@ -375,20 +413,35 @@ def main():
     while not stopping():
         tick = time.monotonic()
         try:
-            check(directory, policy, state, act=not args.once, stop_requested=stopping)
+            current = check(directory, policy, state, act=not args.once, stop_requested=stopping)
         except Exception as exc:
             failure = {
                 "status": "check_error",
                 "checked_at": timestamp(),
                 "error": type(exc).__name__ + ": " + str(exc),
             }
+            if not args.once and not (directory / "PAUSE").exists():
+                incident = {
+                    "id": hashlib.sha256(failure["error"].encode()).hexdigest()[:24],
+                    "kind": "supervisor_error",
+                    "reason": failure["error"],
+                    "run_ids": [],
+                }
+                failure["notification"] = notify_blocker(
+                    directory, policy, incident, "supervisor_error"
+                )
+            current = failure
             write(directory / "status.json", failure)
             print(json.dumps(failure), flush=True)
             if args.once:
                 return 1
         if args.once:
             return 0
-        deadline = tick + policy["interval_seconds"]
+        interval = policy["interval_seconds"]
+        if current.get("status") == "intervention_finished":
+            deadline = time.monotonic() + min(60, interval)
+        else:
+            deadline = tick + interval
         while not stopping() and time.monotonic() < deadline:
             time.sleep(min(5, max(0, deadline - time.monotonic())))
     write(directory / "status.json", {"status": "stopped", "recorded_at": timestamp()})
