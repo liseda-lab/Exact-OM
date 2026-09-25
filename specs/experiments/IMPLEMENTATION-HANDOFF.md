@@ -216,3 +216,30 @@ Focused regression/integration checks and actual-artifact preflight passed.
 The [E01 handoff](../../data/experiments-v2/e01-cardinality-01/HANDOFF.md) records
 submission, validation, accounting, monitoring and recovery details. The supervisor
 registry includes the queued step. No amended E01 scientific completion is claimed.
+
+
+## E10/E01 completed and supervision updated — 2026-09-25
+
+E10's six saved cells were finalized by step **14372.14** after repairing imported
+selection bindings across schema defaults (`bf61182`). The signed scientific
+selection remained `screened_out`; no predictions were recomputed. E01 restarted
+as step **14372.15**, completed all six amended variants at **20:06 UTC**, and selected
+`mutual_best` on its declared development sample. These are development decisions,
+not final-track performance or submission claims.
+
+The [E10 recovery](../../data/experiments-v2/e10-finalization-01/HANDOFF.md) and
+[E01 handoff](../../data/experiments-v2/e01-cardinality-02/HANDOFF.md) retain frozen
+sources, exact artifact validation, cumulative budgets and completion evidence.
+
+The updated supervisor has **no daily repair limit**, checks every five minutes,
+and bounds repeated unresolved errors across replacement launches. It can continue
+independent work when another family needs a decision. Email intervention alerts use
+the connected Gmail account; the one-time delivery test has a verified Gmail receipt.
+The user should give decisions in Codex, because email replies are not monitored.
+See [supervision](SUPERVISION.md) and the runtime deployment receipt for its current
+step, source, registry, configuration and preserved intervention history.
+
+Validation: 176 finalization regression tests, 14 E01 queue/report checks, and
+96 combined supervisor/notification tests passed. The final Gmail parser and receipt
+recovery check passed 13 focused tests after testing real delivery. Counts overlap;
+no unique total is implied. Lint/format checks passed for the supervisor changes.

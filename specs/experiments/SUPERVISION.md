@@ -37,7 +37,7 @@ From the repository, inspect or pause using:
 
 ```bash
 cat data/experiments-v2/hourly-supervisor-01/status.json
-tail -f data/experiments-v2/hourly-supervisor-01/launcher.log
+tail -f data/experiments-v2/hourly-supervisor-01/launcher-02.log
 touch data/experiments-v2/hourly-supervisor-01/PAUSE
 ```
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Hourly Slurm health checks; invoke Codex only for a confirmed actionable incident."""
+"""Periodic Slurm health checks; invoke Codex only for a confirmed actionable incident."""
 from __future__ import annotations
 
 import argparse
