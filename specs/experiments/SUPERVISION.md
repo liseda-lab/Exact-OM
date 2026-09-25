@@ -35,11 +35,11 @@ interventions. Automatic approval review remains enabled; rejected actions are r
 No changes are made to system cron, global authentication, cluster configuration or running
 experiment snapshots.
 
+The current launcher log is recorded in `deployment.json` under `launcher_log`.
 From the repository, inspect or pause using:
 
 ```bash
 cat data/experiments-v2/hourly-supervisor-01/status.json
-tail -f data/experiments-v2/hourly-supervisor-01/launcher-02.log
 touch data/experiments-v2/hourly-supervisor-01/PAUSE
 ```
 
