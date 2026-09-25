@@ -153,7 +153,7 @@
     },
     "F1": {
       "owner": "Frontend implementation assignment (started at the user's request while G1/G5 remain blocked_input)",
-      "inspected_commit": "69dc9d630cbcd21164af3df58e29afb2d55f138b",
+      "inspected_commit": "6606a7287c9274c1c715f0d9a487a8340dd9fae3",
       "status": "fixture_ready",
       "implemented_paths": [
         "explanations_visualizer/src",
@@ -162,16 +162,20 @@
         "exact_inspect/context.py",
         "exact_inspect/study/api.py",
         "tools/build_explanation_ui_fixture.py",
-        "tests/explanation_frontend_serving_test.py"
+        "tests/explanation_frontend_serving_test.py",
+        "explanations_visualizer/e2e",
+        "tools/serve_explanation_ui_e2e.py"
       ],
-      "evidence_ids": [],
+      "evidence_ids": [
+        "frontend_e2e"
+      ],
       "remaining_inputs_or_checks": [
-        "Exercised only against the synthetic UI fixture package (real NCIT/DOID excerpts, synthetic run and offline exact-excerpt text) and a local synthetic SQLite study; rerun against the real backend-release package and the PostgreSQL study service.",
-        "Screen-reader and keyboard-only audit, both themes, and the full viewport matrix in spec08 with real data.",
-        "Formative usability iterations and the duration pilot (spec07/11); no usability or benefit claim is made.",
-        "Docker image builds for the prepared and study services with the bundled frontend, and the Render staging redeploy/restore rehearsal.",
-        "Backend follow-ups found during F1: study explanation resources omit labels for referenced properties/fillers; per-case resources fail when a case contains an entity and its asserted parent (shared axiom stored under one subject); ontology display names are null in prepared contexts."
-      ]
+        "Docker image execution and Render staging/redeploy/restore were not run: inaccessible Docker socket and passwordless sudo unavailable.",
+        "Manual screen-reader/usability work and unresolved clipped-content contrast checks.",
+        "Original pinned DOID strict-native parser admission remains blocked; derivative operational success does not pass G1/G5.",
+        "Study-owner content/readiness, duration pilot, recruitment and frozen evaluation remain separate; no full-scale experiments were run."
+      ],
+      "implementation_status": "complete"
     }
   },
   "gates": {
@@ -365,6 +369,12 @@
       "path": "data/explanation-framework/context/resources/doid.context-parity.json",
       "sha256": "sha256:ae54e0d2481724f1b4cf5e6e5971a5e8ead4c49c73cb98e506423489fb63eda7",
       "status": "passed"
+    },
+    "frontend_e2e": {
+      "path": "docs/verification/explanation-frontend-e2e.json",
+      "sha256": "sha256:d61bfe265f4a60442fdcedbad9dae0441e6aa6ca7237fd26de1337bc5603d84e",
+      "status": "passed",
+      "scope": "Bounded operational/browser verification under user authorization; no formal F1/G5 or live-study admission."
     }
   },
   "resource_targets": {
@@ -398,12 +408,13 @@
     "handoff": "data/explanation-framework/backend-release/handoff/backend-handoff.json",
     "operational_evidence": "docs/verification/explanation-backend-operational.json",
     "durable_preparation": "data/explanation-framework/prepared-combined",
-    "execution_lock": "data/explanation-framework/prepared-combined/execution-47388b7e7a83f4afd4d7a4d649d7faf769a7f84271242211da531f5b604075f1.json"
+    "execution_lock": "data/explanation-framework/prepared-combined/execution-47388b7e7a83f4afd4d7a4d649d7faf769a7f84271242211da531f5b604075f1.json",
+    "frontend_verification": "docs/verification/explanation-frontend-e2e.md"
   },
   "deferred": [
     "48-pair baseline/challenger model-selection exercise",
     "Full matching/training/evaluation campaigns",
-    "F1 frontend real-package verification and usability checks",
+    "F1 manual accessibility/usability checks and formal admission",
     "Public Render deployment and staging redeploy/restore rehearsal",
     "Participant recruitment, invitations to people and live study launch",
     "Optional whole-ontology inference, complete KGA and production repair"

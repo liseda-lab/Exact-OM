@@ -1,0 +1,164 @@
+{
+  "schema": "exact-frontend-integration-verification/1",
+  "date": "2026-09-25",
+  "status": "passed_bounded_verification",
+  "implementation_commit": "6606a7287c9274c1c715f0d9a487a8340dd9fae3",
+  "scope": {
+    "exploration": "Retained full NCIT/DOID filtered package, 12 saved pairs and 40 prepared outputs.",
+    "study": "Synthetic three-case/five-candidate excerpt fixture, four frozen synthetic practices, test invitations, actual HTTPS and PostgreSQL; self-reported setup is synthetic.",
+    "provider_dispatches": 0,
+    "full_scale_experiments": false,
+    "deployment": false,
+    "live_participants": false
+  },
+  "runtime": {
+    "python": "3.12.3",
+    "node": "24.15.0",
+    "npm": "11.12.1",
+    "next": "15.5.26",
+    "playwright": "1.63.0",
+    "chromium": "147.0.7727.15",
+    "axe_core": "4.13.0",
+    "postgresql": "16.15",
+    "database_encoding": "UTF8"
+  },
+  "package": {
+    "package_id": "sha256:3007654bfaf24a6fd24fe375aea1f69f99533e67c3d7e9820af735b703d1acd6",
+    "path": "data/explanation-framework/backend-release/package/package.json",
+    "sha256": "sha256:be7692ee44381c67b0e2f040205240d897a0c98e8b77704b973704000224d4ac"
+  },
+  "checks": {
+    "browser": {
+      "passed": 38,
+      "failed": 0,
+      "skipped": 0,
+      "duration_seconds": 55.187,
+      "command": "npm --prefix explanations_visualizer run test:e2e",
+      "profiles": [
+        "real local_app",
+        "synthetic local_app",
+        "synthetic public_demo",
+        "synthetic PostgreSQL/HTTPS study",
+        "actual saved-run legacy"
+      ],
+      "evidence": {
+        "path": "data/explanation-framework/frontend-e2e/browser-results.json",
+        "sha256": "sha256:55b994b41f74a000eec5765d012139a11e30a51ec752f844576821306aaf02b0"
+      }
+    },
+    "consent_followup": {
+      "passed": 4,
+      "failed": 0,
+      "scope": "After the full suite, one consent role=region attribute and its assertion were added; rebuilt output passed four focused welcome audits, with zero axe violations or incompletes.",
+      "evidence": {
+        "path": "data/explanation-framework/frontend-e2e/consent-accessibility-followup.log",
+        "sha256": "sha256:e9d83ab1a5eee54005d5d89b077783b1216d0834b3a8c66fc2ba9da2960580ec"
+      }
+    },
+    "unit": {
+      "passed": 15,
+      "failed": 0,
+      "command": "npm --prefix explanations_visualizer run test:unit",
+      "evidence": {
+        "path": "data/explanation-framework/frontend-e2e/unit-tests.log",
+        "sha256": "sha256:eb7444c8044f7cfb78e7d873aa9346c07bb3a6d4ec5d9acd8bf23ccf8b1e8c49"
+      }
+    },
+    "backend_postgresql": {
+      "passed": 236,
+      "failed": 0,
+      "skipped": 1,
+      "skip_reason": "Do not restart the PostgreSQL cluster shared with active browser tests. Separate prior recovery evidence remains historical.",
+      "evidence": {
+        "path": "data/explanation-framework/frontend-e2e/backend-postgresql-regression.json",
+        "sha256": "sha256:4e9db111e2d42d3a496a4c33bd714dd3c4ae59357cb9913717e8e8f755786125"
+      }
+    },
+    "legacy_backend": {
+      "passed": 12,
+      "failed": 0,
+      "command": ".venv/bin/pytest -q tests/exact_inspect_test.py --tb=short",
+      "scope": "Includes two new global-only mapping cases after the broader backend run."
+    },
+    "accessibility": {
+      "axe_cases": 20,
+      "keyboard_cases": 2,
+      "reported_violations": 0,
+      "horizontal_overflow_cases": 0,
+      "scope": "Latest welcome cases include the consent-region correction; clipped-content contrast incompletes remain for manual review. No conformance claim.",
+      "evidence": {
+        "path": "data/explanation-framework/frontend-e2e/accessibility-verification.json",
+        "sha256": "sha256:287e51b29eb08763df770c99dcd4c291cd49906193c5d4a2cf982d916406da57"
+      }
+    },
+    "study_timing": {
+      "status": "passed",
+      "assertions": [
+        "Three completed cases each have positive exported observed_segment_seconds",
+        "At least four case timing segments across pause/resume and reload",
+        "No failed timing response in full browser journey"
+      ],
+      "scope": "Observed client intervals; not a claim of exact participant activity."
+    },
+    "study_resource": {
+      "status": "passed",
+      "shared_context_facts": 58,
+      "distinct_original_axioms": 56,
+      "referenced_labels": 44,
+      "evidence": {
+        "path": "data/explanation-framework/frontend-e2e/real-study/shared-parent-resource.json",
+        "sha256": "sha256:c2e074c9072dcb62f57cb9b5f4da13bda2bcc814ac20b0e604fa0cc44db5b50e"
+      }
+    },
+    "isolated_study_runtime": {
+      "status": "passed",
+      "scope": "Exact Dockerfile source COPY set and minimal runtime dependencies, explicit SQLite test adapter. Docker was not built.",
+      "evidence": {
+        "path": "data/explanation-framework/frontend-e2e/isolated-study-runtime.json",
+        "sha256": "sha256:324379f259eccb2adbc5eeef15e91f437d5c3d11d7533f1b87800e7dae56ea64"
+      }
+    },
+    "build": {
+      "status": "passed",
+      "evidence": {
+        "path": "data/explanation-framework/frontend-e2e/build.log",
+        "sha256": "sha256:2d784c42c14f6f59b6fa991b5d4acec6987cf0ab18454058fc2f9cf15cc50450"
+      }
+    },
+    "typecheck": {
+      "status": "passed",
+      "evidence": {
+        "path": "data/explanation-framework/frontend-e2e/typecheck.log",
+        "sha256": "sha256:1a3a07fae012463041a79312ea7d07106d63acf0df43289a4d84aa22275de447"
+      }
+    },
+    "dependency_audit": {
+      "known_vulnerabilities": 0,
+      "evidence": {
+        "path": "data/explanation-framework/frontend-e2e/npm-audit.json",
+        "sha256": "sha256:0bc989e1add55d0ec9ca2101391fdc5bc0269061ef81cc28f4a75da8bb73cdb6"
+      }
+    },
+    "specification": {
+      "status": "passed",
+      "evidence": {
+        "path": "data/explanation-framework/frontend-e2e/spec-validation.log",
+        "sha256": "sha256:39d41091b73ca3f92a52f92997e42f648109fee450bfd12fb18fd18000de3eda"
+      }
+    }
+  },
+  "static_export": {
+    "file_count": 61,
+    "inventory_sha256": "sha256:353b19028a17cf5b7de8ea6c2d4db3f0cfbe036a9974e723ec0394269b406e38",
+    "package_lock": {
+      "path": "explanations_visualizer/package-lock.json",
+      "sha256": "sha256:41a798e905007b679dd559faed1950294afbea62cf475827aeb8031e11a7159c"
+    }
+  },
+  "remaining": [
+    "Docker image execution and Render staging/redeploy/restore were not run: inaccessible Docker socket and passwordless sudo unavailable.",
+    "Manual screen-reader/usability work and unresolved clipped-content contrast checks.",
+    "Original pinned DOID strict-native parser admission remains blocked; derivative operational success does not pass G1/G5.",
+    "Study-owner content/readiness, duration pilot, recruitment and frozen evaluation remain separate; no full-scale experiments were run."
+  ]
+}

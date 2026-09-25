@@ -19,7 +19,8 @@ Everything reads the backend contracts in `exact_inspect` (`/api/v1/...` and
 Missing, filtered, unexported, unsupported and failed states are shown with their reason.
 
 What was built, how it was verified and the known backend issues are in the
-[F1 handoff](../docs/verification/explanation-frontend-handoff.md).
+[F1 handoff](../docs/verification/explanation-frontend-handoff.md) and its
+[real-package/PostgreSQL verification](../docs/verification/explanation-frontend-e2e.md).
 
 ## Design decisions
 
@@ -92,3 +93,11 @@ The prepared and study Dockerfiles in `deploy/render` build the export in a Node
   keyboard-only use of the candidate list, ranking controls, comboboxes and dialogs.
 - Study: link exchange, reload with and without the cookie, a second tab (conflict), offline edits,
   pause/resume, revoked link, baseline requests for explanation resources (must be 403).
+
+## Verification
+
+Use `npm run typecheck`, `npm run test:unit` (Node.js 24), and `npm run test:e2e`.
+The browser suite targets running prepared/study services; see the integration verification
+guide above for URLs, the synthetic HTTPS/PostgreSQL harness, and optional test inputs.
+Production uses the static `out/` export served by `exact-inspect`; `next start` is not
+compatible with this export mode.

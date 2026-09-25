@@ -1,5 +1,7 @@
 # Explanation framework frontend (F1) handoff
 
+> Follow-up: [real-package and PostgreSQL browser verification](explanation-frontend-e2e.md) records subsequent fixes and checks. The findings below describe the original handoff.
+
 **Date:** 2026-09-25. **Branch:** `dev`, on top of `69dc9d6`. **Status:** `fixture_ready`, not a
 passed gate. The whole frontend from [spec 08](../../specs/explanation-framework/08-frontend-implementation.md)
 and specs 10–13 is implemented and was exercised end to end in a browser. That testing used a
