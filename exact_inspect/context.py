@@ -295,6 +295,59 @@ class OntologyContext:
             "language_fallback": language is not None and row["language"] != language,
         }
 
+    def labels(
+        self, iris: list[str], *, language: str | None = None, policy: Any = None
+    ) -> list[dict[str, Any]]:
+        """Resolve display labels for many IRIs at once; identities stay typed and distinct.
+
+        An IRI without a declared entity in this snapshot is reported as absent (or as a
+        possible unresolved import), never guessed from another ontology.
+        """
+        policy = self._effective_policy(policy)
+        if not 1 <= len(iris) <= 100 or any(not isinstance(i, str) or not i for i in iris):
+            raise ValueError("Request between 1 and 100 IRIs")
+        if any(len(i) > 2048 for i in iris):
+            raise ValueError("IRI exceeds 2048 characters")
+        wanted = list(dict.fromkeys(iris))
+        if (
+            policy is not None
+            and policy.ontology_ids
+            and self.ontology_version_id not in policy.ontology_ids
+        ):
+            raise KeyError("Unknown ontology")
+        marks = ",".join("?" for _ in wanted)
+        with self._connection() as connection:
+            declared = connection.execute(
+                f"SELECT iri,kind FROM entities WHERE iri IN ({marks}) ORDER BY iri,kind", wanted
+            ).fetchall()
+        unresolved = [
+            item
+            for item in self.manifest["identity"].get("imports", [])
+            if item.get("status") != "resolved"
+        ]
+        found: dict[str, list[dict[str, Any]]] = {}
+        for row in declared:
+            ref = _ref(self.ontology_version_id, row["iri"], row["kind"])
+            found.setdefault(row["iri"], []).append(
+                {"entity": ref, "preferred_label": self._label(ref, language, policy)}
+            )
+        items = []
+        for iri in wanted:
+            if iri in found:
+                items.extend(found[iri])
+            else:
+                items.append(
+                    {
+                        "iri": iri,
+                        "entity": None,
+                        "preferred_label": {
+                            "status": "unresolved_import" if unresolved else "absent_in_scope",
+                            "value": None,
+                        },
+                    }
+                )
+        return items
+
     def facts(
         self,
         entity: Any,

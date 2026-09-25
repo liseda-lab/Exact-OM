@@ -65,6 +65,7 @@ class PreparedService:
         self.cache = BoundedCache()
         self._contexts: dict[str, Any] = {}
         self._runs: dict[str, Any] = {}
+        self._explanation_index: list[dict[str, Any]] | None = None
         self._lock = threading.Lock()
         self._verified_files: dict[str, tuple[int, ...]] = {}
         # Verify immutable bytes once at startup; opening the first index is then cheap.
@@ -215,6 +216,36 @@ class PreparedService:
                 self._runs[run_id] = store
             return self._runs[run_id]
 
+    def explanation_index(self) -> list[dict[str, Any]]:
+        """Discovery summaries for prepared explanations, built lazily once per package.
+
+        Only identity, task, entities and statuses are retained; text stays on disk and is
+        read through ``resource`` on demand. Resources under another policy are omitted.
+        """
+        if self._explanation_index is not None:
+            return self._explanation_index
+        rows = []
+        for explanation_id, locator in sorted(self.manifest.explanations.items()):
+            artifact = next((a for a in self.manifest.artifacts if a.path == locator), None)
+            if artifact is None or artifact.size > 2 * 1024**2:
+                continue
+            self._verify_artifact(artifact)
+            data = json.loads(relative_path(self.path.parent, locator).read_bytes())
+            manifest = data.get("manifest") or {}
+            if manifest.get("visibility_policy_hash") != self.policy.policy_hash:
+                continue
+            rows.append(
+                {
+                    "explanation_id": explanation_id,
+                    "task": data.get("task"),
+                    "entities": data.get("entities") or [],
+                    "grounding_status": data.get("grounding_status"),
+                    "generation_status": manifest.get("status"),
+                }
+            )
+        self._explanation_index = rows
+        return rows
+
     def resource(self, resource_id: str, family: str) -> dict[str, Any]:
         """Return checksum-verified prepared JSON with mandatory matching policy identity."""
         resources = getattr(self.manifest, family)
@@ -253,6 +284,7 @@ def create_prepared_app(
     *,
     profile: Literal["local_app", "public_demo"] = "local_app",
     library_dir: Path | None = None,
+    frontend_dir: Path | None = None,
 ) -> FastAPI:
     """Serve an immutable package with explicit deployment boundaries and inert local imports."""
     if profile not in {"local_app", "public_demo"}:
@@ -383,6 +415,74 @@ def create_prepared_app(
                 scope=scope,
                 status="available" if allowed else "absent_in_scope",
             )
+        )
+
+    @app.get("/api/v1/runs", response_model=Page[dict[str, Any]])
+    def runs(limit: int = Query(20, ge=1, le=100), cursor: str | None = None):
+        """List saved runs whose ontologies the policy permits; no pair data is loaded."""
+        active = service()
+        scope = Scope(
+            ontology_version_id="package",
+            context_revision=active.manifest.package_id,
+            basis="run_selected",
+            visibility_policy_hash=active.policy.policy_hash,
+            filter_id="runs:id",
+        )
+        after = decode_cursor(cursor, scope)
+        if after is None:
+            after = ""
+        if not isinstance(after, str):
+            raise DomainError("invalid_cursor", "Invalid collection cursor")
+        visible = []
+        for run_id in sorted(active.manifest.runs):
+            try:
+                manifest = active.run(run_id).manifest()
+            except DomainError as exc:
+                if exc.status_code == 404:
+                    continue
+                raise
+            visible.append(
+                {
+                    "run_id": run_id,
+                    "revision": manifest.get("revision"),
+                    "source_ontology_version_id": manifest["source_ontology_version_id"],
+                    "target_ontology_version_id": manifest["target_ontology_version_id"],
+                    "status": manifest.get("status"),
+                    "counts": manifest.get("counts") or {},
+                }
+            )
+        remaining = [r for r in visible if r["run_id"] > after]
+        more = len(remaining) > limit
+        return bounded(
+            Page(
+                items=remaining[:limit],
+                returned_count=min(limit, len(remaining)),
+                total_count=len(visible),
+                next_cursor=encode_cursor(scope, remaining[limit - 1]["run_id"]) if more else None,
+                truncated=more,
+                scope=scope,
+                status="available" if visible else "not_exported",
+                reason=None if visible else "This package contains no saved run",
+            ).model_dump()
+        )
+
+    @app.get("/api/v1/labels")
+    def labels(
+        ontology_version_id: str,
+        iri: list[str] = Query(..., min_length=1, max_length=100),
+        language: str | None = None,
+    ):
+        """Batch display labels for typed entities in one ontology version."""
+        active = service()
+        items = active.context(ontology_version_id).labels(
+            iri, language=language, policy=active.policy
+        )
+        return bounded(
+            {
+                "ontology_version_id": ontology_version_id,
+                "items": items,
+                "returned_count": len(items),
+            }
         )
 
     @app.get("/api/v1/entities", response_model=Page[dict[str, Any]])
@@ -570,6 +670,69 @@ def create_prepared_app(
             ).model_dump()
         )
 
+    @app.get("/api/v1/explanations", response_model=Page[dict[str, Any]])
+    def explanation_list(
+        ontology_version_id: str,
+        iri: str,
+        kind: EntityKind = "class",
+        task: Literal["entity_profile", "pair_comparison"] | None = None,
+        counterpart_ontology_version_id: str | None = None,
+        counterpart_iri: str | None = None,
+        counterpart_kind: EntityKind = "class",
+        limit: int = Query(20, ge=1, le=100),
+        cursor: str | None = None,
+    ):
+        """Discover prepared explanations about an entity or an ordered/unordered entity pair."""
+        active = service()
+        subject = {"ontology_version_id": ontology_version_id, "iri": iri, "kind": kind}
+        wanted = [subject]
+        if counterpart_iri is not None:
+            if counterpart_ontology_version_id is None:
+                raise DomainError("invalid_query", "Counterpart requires its ontology version")
+            wanted.append(
+                {
+                    "ontology_version_id": counterpart_ontology_version_id,
+                    "iri": counterpart_iri,
+                    "kind": counterpart_kind,
+                }
+            )
+        if any(not active.policy.allows_ontology(e["ontology_version_id"]) for e in wanted):
+            raise DomainError("not_found", "Resource unavailable", 404)
+        scope = Scope(
+            ontology_version_id=ontology_version_id,
+            context_revision=active.manifest.package_id,
+            basis="prepared_explanations",
+            visibility_policy_hash=active.policy.policy_hash,
+            filter_id=canonical_hash([wanted, task]),
+        )
+        after = decode_cursor(cursor, scope)
+        if after is None:
+            after = ""
+        if not isinstance(after, str):
+            raise DomainError("invalid_cursor", "Invalid collection cursor")
+        matches = [
+            row
+            for row in active.explanation_index()
+            if (task is None or row["task"] == task)
+            and all(entity in row["entities"] for entity in wanted)
+        ]
+        remaining = [r for r in matches if r["explanation_id"] > after]
+        more = len(remaining) > limit
+        return bounded(
+            Page(
+                items=remaining[:limit],
+                returned_count=min(limit, len(remaining)),
+                total_count=len(matches),
+                next_cursor=(
+                    encode_cursor(scope, remaining[limit - 1]["explanation_id"]) if more else None
+                ),
+                truncated=more,
+                scope=scope,
+                status="available" if matches else "not_requested",
+                reason=None if matches else "No explanation was prepared for this selection",
+            ).model_dump()
+        )
+
     @app.get("/api/v1/explanations/{explanation_id}", response_model=GeneratedExplanationResponse)
     def explanation(explanation_id: str):
         return bounded(service().resource(explanation_id, "explanations"))
@@ -665,4 +828,7 @@ def create_prepared_app(
             )
             return {"package_id": active.manifest.package_id, "status": "available"}
 
+    from .frontend import mount_frontend
+
+    mount_frontend(app, frontend_dir, profile=profile)
     return app

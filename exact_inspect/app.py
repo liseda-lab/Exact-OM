@@ -81,6 +81,7 @@ def create_app(settings: InspectSettings) -> Any:
                     else None
                 )
             ),
+            frontend_dir=resolve_frontend_dir(settings),
         )
     if settings.package is not None or settings.profile is not None:
         from .service import create_prepared_app
@@ -89,6 +90,7 @@ def create_app(settings: InspectSettings) -> Any:
             settings.package,
             profile=settings.profile or "local_app",
             library_dir=settings.library_dir,
+            frontend_dir=resolve_frontend_dir(settings),
         )
 
     FastAPI, HTTPException, Query, CORSMiddleware, StaticFiles = _fastapi_components()
