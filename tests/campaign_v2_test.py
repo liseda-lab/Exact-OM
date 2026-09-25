@@ -9,6 +9,7 @@ import pytest
 import yaml
 
 from exact.core.entities.configs.config import ConfigModel
+from exact.core.entities.configs.yaml_io import load_yaml_mapping
 from exact.experiments.campaign import (
     CampaignLock,
     CampaignStep,
@@ -32,14 +33,22 @@ def _step(**updates) -> dict:
         "family": "E00",
         "case": "D0",
         "budget_group": "foundation",
-        "arms": [{"id": "baseline", "role": "baseline"}, {"id": "replay", "role": "candidate"}],
+        "arms": [
+            {"id": "baseline", "role": "baseline"},
+            {"id": "replay", "role": "candidate"},
+        ],
         "readiness": {
             arm: {"screen": {"status": "implementing", "reason": "fixture validation pending"}}
             for arm in ("baseline", "replay")
         },
         "selection": {
             "decisions": [
-                {"id": "replay", "baseline": "baseline", "candidates": ["replay"], "metric": "F1"}
+                {
+                    "id": "replay",
+                    "baseline": "baseline",
+                    "candidates": ["replay"],
+                    "metric": "F1",
+                }
             ]
         },
         "design": {
@@ -380,7 +389,8 @@ def _ready_suite(tmp_path, *, composition=False, plan_only=False):
     path = _lock(tmp_path)
     raw = yaml.safe_load(path.read_text())
     raw["cases"]["D0"]["references"]["valid"] = _binding(
-        tmp_path / "valid.tsv", "SrcEntity\tTgtEntity\nsource:1\ttarget:1\nsource:2\ttarget:2\n"
+        tmp_path / "valid.tsv",
+        "SrcEntity\tTgtEntity\nsource:1\ttarget:1\nsource:2\ttarget:2\n",
     )
     raw["cases"]["D0"]["source_universe"] = _binding(
         tmp_path / "sources.txt", "source:1\nsource:2\n"
@@ -691,7 +701,11 @@ def test_component_exports_retain_fusion_ranker_and_judge_without_shared_control
     label_free = {
         "supervision": {
             "mode": "label_free",
-            "components": {"fusion": "label_free", "rerank": "label_free", "accept": "label_free"},
+            "components": {
+                "fusion": "label_free",
+                "rerank": "label_free",
+                "accept": "label_free",
+            },
         }
     }
     controls = harness.deep_merge(label_free, {"llm": {"experiment": {"gate": {"mode": "off"}}}})
@@ -717,7 +731,11 @@ def test_component_exports_retain_fusion_ranker_and_judge_without_shared_control
             {"matching": {"fusion": {"enabled": True, "mode": "analytic_shipped"}}},
             {
                 "matching": {
-                    "fusion": {"enabled": True, "mode": "supervised", "artifact": "fusion.json"}
+                    "fusion": {
+                        "enabled": True,
+                        "mode": "supervised",
+                        "artifact": "fusion.json",
+                    }
                 },
                 "supervision": {"components": {"fusion": "supervised"}},
             },
@@ -868,10 +886,12 @@ def test_e13_bound_views_change_graphs_without_changing_sources_or_gold(tmp_path
         arm_inputs={
             "replay": {
                 "source": _binding(
-                    tmp_path / "source.csv", "SrcEntity,Relation,TgtEntity\nsource:1,label,one\n"
+                    tmp_path / "source.csv",
+                    "SrcEntity,Relation,TgtEntity\nsource:1,label,one\n",
                 ),
                 "target": _binding(
-                    tmp_path / "target.csv", "SrcEntity,Relation,TgtEntity\ntarget:1,label,one\n"
+                    tmp_path / "target.csv",
+                    "SrcEntity,Relation,TgtEntity\ntarget:1,label,one\n",
                 ),
             }
         },
@@ -1218,7 +1238,8 @@ def test_external_selection_preserves_completed_policy_without_new_cells(tmp_pat
 
 
 @pytest.mark.parametrize(
-    "change", ["selection", "signature", "cell", "missing_cell", "artifacts", "case", "step"]
+    "change",
+    ["selection", "signature", "cell", "missing_cell", "artifacts", "case", "step", "base"],
 )
 def test_external_selection_rejects_changed_decisions_cells_or_scope(tmp_path, change):
     import json
@@ -1246,6 +1267,12 @@ def test_external_selection_rejects_changed_decisions_cells_or_scope(tmp_path, c
         record["cells"].pop()
     elif change == "case":
         raw["cases"]["D0"]["source"] = _binding(tmp_path / "new-source.owl", "different ontology")
+    elif change == "base":
+        base = load_yaml_mapping(Path(raw["base_config"]))
+        base.setdefault("matching", {})["threshold"] = 0.4
+        changed = tmp_path / "changed-base.yaml"
+        changed.write_text(yaml.safe_dump(base))
+        raw["base_config"] = str(changed)
     else:
         raw["steps"][0]["arms"][1]["overlay"]["matching"]["threshold"] = 0.4
     raw["steps"][0]["external_selection"] = _binding(
@@ -1271,13 +1298,37 @@ def test_campaign_identity_retains_legacy_serialization_without_external_selecti
     assert campaign_identity(lock, tmp_path) == campaign_identity(old_schema, tmp_path)
 
 
-def test_external_selection_stage_does_not_launch_completed_e05_cells(tmp_path, monkeypatch):
+@pytest.mark.parametrize("legacy_defaults", [False, True])
+def test_external_selection_stage_does_not_launch_completed_e05_cells(
+    tmp_path, monkeypatch, legacy_defaults
+):
     import json
     from dataclasses import replace
 
     from exact.experiments import harness
 
-    path, _, _ = _external_selection_fixture(tmp_path)
+    path, raw, record = _external_selection_fixture(tmp_path)
+    historical = json.loads(Path(record["selection"]["path"]).read_text())
+    historical_result = historical["experiments"]["E05"]
+    if legacy_defaults:
+        from exact.experiments.campaign import digest
+
+        base = load_yaml_mapping(tmp_path / "prior-declarations/base.config.yaml")
+        base["dataset"].pop("annotation_provenance_dedup")
+        base["dataset"].pop("annotation_semantics")
+        base["matching"]["channels"]["diff"].pop("controlled_perturbations")
+        base["supervision"].pop("inference_artifact")
+        historical_result["base_config_hash"] = harness.hash_payload(base)
+        # Model the same compatible schema growth inside retrieval settings.
+        base["candidates"].pop("encoder_revision")
+        historical_result["candidate_pool_design_hash"] = harness._candidate_design_hash(base)
+        historical.pop("selection_hash")
+        historical["selection_hash"] = digest(historical)
+        record["selection"] = _binding(Path(record["selection"]["path"]), json.dumps(historical))
+        raw["steps"][0]["external_selection"] = _binding(
+            tmp_path / "prior-selection.json", json.dumps(record)
+        )
+        path.write_text(yaml.safe_dump(raw))
     suite = materialize_campaign(path, tmp_path / "historical-declarations", stage="screen")
     root = tmp_path / "new-results" / suite.suite_id
     suite = replace(
@@ -1311,7 +1362,25 @@ def test_external_selection_stage_does_not_launch_completed_e05_cells(tmp_path, 
     )
     selected = json.loads(result.read_text())["experiments"]["E05"]
     assert selected["status"] == "screened_out" and selected["new_cells"] == 0
+    for key in ("design_hash", "base_config_hash", "candidate_pool_design_hash"):
+        assert selected[f"historical_{key}"] == historical_result[key]
+    assert selected["current_code_prediction_compatibility"] is False
+    if legacy_defaults:
+        assert selected["base_config_hash"] != selected["historical_base_config_hash"]
+        assert (
+            selected["candidate_pool_design_hash"]
+            != selected["historical_candidate_pool_design_hash"]
+        )
+    harness.load_and_validate_selection(result, suite)
     assert json.loads((root / "screen/current-result-set.json").read_text())["cells"] == []
+
+    # Importing historical evidence must not relax post-screen configuration checks.
+    base_path = suite.sources[0].base_config_path
+    changed_base = load_yaml_mapping(base_path)
+    changed_base["matching"]["threshold"] = 0.4
+    base_path.write_text(yaml.safe_dump(changed_base))
+    with pytest.raises(ValueError, match="base config changed after screening"):
+        harness.load_and_validate_selection(result, suite)
 
 
 @pytest.mark.parametrize("alias", ["tau", "gamma", "beta", "tau_LLM"])

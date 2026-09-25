@@ -3297,7 +3297,10 @@ def _e02_retrieval_identity(record: Mapping[str, Any]) -> dict[str, str]:
         )
         if artifact is not None
     }
-    for name, artifact in (("encoder_finetune", "encoder"), ("cross_encoder", "cross_encoder")):
+    for name, artifact in (
+        ("encoder_finetune", "encoder"),
+        ("cross_encoder", "cross_encoder"),
+    ):
         if isinstance(config.get(name), Mapping) and artifact in artifacts:
             config[name] = {**config[name], "artifact": artifacts[artifact]["sha256"]}
     basis = {
@@ -6430,6 +6433,34 @@ def _runtime_deferred_selection(
     }
 
 
+def _bind_external_selection(
+    source: ExperimentSource,
+    suite: LoadedSuite,
+    historical: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Bind an already verified historical decision to the current declaration.
+
+    ``external_selection_result`` verifies the unchanged raw base, scientific scope,
+    and historical evidence first. Schema defaults may expand the current base, so
+    keep historical hashes as provenance rather than current prediction identities.
+    """
+    base = ConfigModel.from_mapping(_base_mapping(source), warn_v1=False).model_dump(
+        mode="json", by_alias=True
+    )
+    return {
+        **historical,
+        "historical_design_hash": historical["design_hash"],
+        "historical_base_config_hash": historical["base_config_hash"],
+        "historical_candidate_pool_design_hash": historical["candidate_pool_design_hash"],
+        "experiment_config_hash": source.raw_hash(),
+        "design_hash": experiment_design_hash(
+            source, baseline_manifest_hash=suite.baseline_manifest_hash
+        ),
+        "base_config_hash": hash_payload(base),
+        "candidate_pool_design_hash": _candidate_design_hash(base),
+    }
+
+
 def _materialize_campaign_evidence(
     source, suite, manifests, selections, inherited, *, plan_only=False
 ):
@@ -6639,7 +6670,11 @@ def run_stage(
                 if states and states <= terminal:
                     selections[config.experiment_id]["status"] = next(
                         value
-                        for value in ("deferred_budget", "blocked_input_resolution", "inapplicable")
+                        for value in (
+                            "deferred_budget",
+                            "blocked_input_resolution",
+                            "inapplicable",
+                        )
                         if value in states
                     )
             persist()
@@ -6718,14 +6753,9 @@ def run_stage(
                 historical = external_selection_result(
                     campaign_lock, step, Path(suite.campaign["lock_path"]).resolve().parent
                 )
-                selections[config.experiment_id] = {
-                    **historical,
-                    "historical_design_hash": historical["design_hash"],
-                    "design_hash": experiment_design_hash(
-                        source, baseline_manifest_hash=suite.baseline_manifest_hash
-                    ),
-                    "experiment_config_hash": source.raw_hash(),
-                }
+                selections[config.experiment_id] = _bind_external_selection(
+                    source, suite, historical
+                )
                 persist()
                 continue
             source = compose_development(source, campaign_lock, selections)
