@@ -20,6 +20,13 @@ from exact.impl.datasets.contextgraph import ContextDataset
 from exact.impl.graph_controls import shuffle_relations
 from exact.utils.formatting import safe_mean
 
+# The native projector emits these accepted RDFS annotation predicates as QNames.
+# Reconcile only its declared spellings; display labels never imply identity.
+_PROJECTED_ANNOTATION_IRIS = {
+    "rdfs:comment": "http://www.w3.org/2000/01/rdf-schema#comment",
+    "rdfs:label": "http://www.w3.org/2000/01/rdf-schema#label",
+}
+
 
 class PairAdaptiveContextDataset(ContextDataset):
     """
@@ -82,7 +89,7 @@ class PairAdaptiveContextDataset(ContextDataset):
         payload = super()._cache_fingerprint_payload()
         payload.update(
             {
-                "evidence_schema": 6,
+                "evidence_schema": 7,
                 "annotation_semantics": self.annotation_semantics,
                 "annotation_provenance_dedup": self.annotation_provenance_dedup,
                 "projection_include_literals": self.projection_include_literals,
@@ -502,8 +509,9 @@ class PairAdaptiveContextDataset(ContextDataset):
                 if not literal:
                     continue
                 prop_label = graph.get_labels(rel)[0]
-                dedupe_key = (rel, literal, None, None)
-                if (rel, literal) in native_literals or dedupe_key in seen:
+                property_iri = _PROJECTED_ANNOTATION_IRIS.get(rel, rel)
+                dedupe_key = (property_iri, literal, None, None)
+                if (property_iri, literal) in native_literals or dedupe_key in seen:
                     continue
                 seen.add(dedupe_key)
                 items.append(
