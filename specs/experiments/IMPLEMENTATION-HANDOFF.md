@@ -177,6 +177,16 @@ The final queue preflight resolved all 11 configurations against the frozen sour
 verified historical imports. Separate mocked checks covered worker budget caps, failed
 preparation, accounting finalization and cooperative signals without running models.
 
+## Hourly supervision
+
+The [hourly supervisor](SUPERVISION.md) checks the registered experiment steps without model
+calls when healthy. Confirmed failures and a completed queue needing its next batch can invoke
+Codex using the current ChatGPT subscription login, preserving allocation, experiment budgets,
+frozen sources and compatible checkpoints. Monitor
+`data/experiments-v2/hourly-supervisor-01/status.json`; its deployment receipt records the
+actual Slurm step. Pause supervision before manual experiment repairs and verify no repair
+agent is active. The supervisor is local to this node and does not survive allocation loss.
+
 ## Validation and source identity
 
 Implementation commit: `35909e7`. The final combined suite passed **512 tests**
