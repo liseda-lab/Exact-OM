@@ -10,6 +10,8 @@ Implement equivalent typed routes under `/api/v1/` with generated OpenAPI and a 
 |---|---|
 | `GET /health` | Service/package/schema readiness; public form excludes filesystem paths/secrets |
 | `GET /ontologies` | Paged allowed ontology versions/capabilities |
+| `GET /labels` | Typed batch display labels for 1–100 IRIs in one ontology; explicit absent/unresolved states |
+| `GET /runs` | Paged policy-allowed saved-run identities, revisions, ontology bindings and counts |
 | `GET /entities` | Search by ontology version, kind, term, language; paged stable results |
 | `GET /entity-context` | Independent entity identity/context summary; no run or candidate required |
 | `GET /entity-facts` | Category/basis-filtered facts and references with counts and paging |
@@ -19,6 +21,7 @@ Implement equivalent typed routes under `/api/v1/` with generated OpenAPI and a 
 | `GET /runs/{id}/candidates` | One source's paged candidate summaries; no graphs/rationale bulk expansion |
 | `GET /runs/{id}/pair` | Requested pair's decision trace and linked evidence summary |
 | `GET /runs/{id}/pair-evidence` | Bounded evidence graph/list representation for that pair |
+| `GET /explanations` | Paged prepared profile/comparison summaries by typed entity, optional counterpart and task |
 | `GET /explanations/{id}` | Prepared profile/comparison, generation and grounding status |
 | `GET /jobs/{id}` | Read-only generation/preparation status; policy-appropriate metadata |
 | Local-only `/bundles/import` and import-job/library routes | Explicit validated upload/import and bundle selection; absent in demo/study profiles |
@@ -29,6 +32,20 @@ Study mode exposes only routes/resources allowed by its pack and session; do not
 ## Bounds and defaults
 
 Initial defaults: ordinary fact/candidate/search page 20, maximum 100; hierarchy child page 50, maximum 200; ancestor subgraph budget 500 nodes, maximum 1,000. Evidence graph default at most 150 nodes/300 edges, with omitted counts/reasons and a complete fact-list route. These are display/query bounds, not ontology extraction limits. Never silently erase edges to existing nodes or same-label entities.
+
+Discovery responses use `Page[RunSummary]`, `LabelsResponse` and
+`Page[ExplanationSummary]` in runtime OpenAPI and `InspectClient`. Label lookup
+preserves punning as separate typed results; undeclared IRIs retain the requested
+IRI with `entity: null`. A counterpart filter requires both its ontology version
+and IRI. Explanation discovery returns `not_requested` for an empty selection;
+an empty run inventory returns `not_exported`.
+
+Candidate pages use stable ascending `pair_id` keyset order. This is a transport
+order, independent from recorded `ordinal_ranks` and scores. Consumers that sort a
+bounded subset must retain the returned total/cursor and disclose incomplete
+coverage; the first page cannot be presented as the highest-ranked candidates.
+Follow the cursor to retrieve the complete recorded candidate set. No matcher
+rank, tie rule or score is recomputed for pagination.
 
 Return summaries first, load pair detail and axiom expressions on demand. Oversized expressions are lossless references available through detail/streamed artifact access, not malformed truncated ASTs. Apply response-size and query-work budgets with explicit limits/errors. All pagination/counts bind the visibility policy; invalid or stale cursors fail clearly.
 

@@ -92,7 +92,10 @@ def test_local_import_handle_can_be_cancelled_before_upload(tmp_path):
 
 
 @pytest.mark.parametrize("fenced", [False, True])
-def test_validator_repair_reuses_saved_response_without_provider_dispatch(tmp_path, fenced):
+@pytest.mark.parametrize("revision", [2, 3, 4])
+def test_validator_repair_reuses_saved_response_without_provider_dispatch(
+    tmp_path, fenced, revision
+):
     from exact_inspect.artifacts import atomic_json
     from exact_inspect.contracts import canonical_hash
     from exact_inspect.generation import PROFILE_PROMPT, ExplanationOutput
@@ -104,7 +107,7 @@ def test_validator_repair_reuses_saved_response_without_provider_dispatch(tmp_pa
         "profile": profile.model_dump(),
         "prompt": PROFILE_PROMPT,
         "schema": ExplanationOutput.model_json_schema(),
-        "implementation": "grounding-excerpts-and-comparisons/2",
+        "implementation": f"grounding-excerpts-and-comparisons/{revision}",
         "max_repairs": 2,
     }
     prior = tmp_path / canonical_hash(identity)[7:]
@@ -149,6 +152,9 @@ def test_validator_repair_reuses_saved_response_without_provider_dispatch(tmp_pa
     }
     assert result["claims"][0]["category"] == "key_fact"
     assert result["manifest"]["response_hash"] == canonical_hash(response)
+    assert result["fixture_provenance"] == "prepared response with deterministic extract grounding"
+    assert "actual provider" not in result["fixture_provenance"]
+    assert json.loads((prior / "request.json").read_bytes()) == identity
     assert result["claims"][0]["text"] == packet.facts[0]["value"]["lexical_form"]
 
 

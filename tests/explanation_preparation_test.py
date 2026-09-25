@@ -25,13 +25,15 @@ from exact_inspect.verification import verify_backend
 @pytest.fixture
 def prepared(tmp_path, monkeypatch):
     source = tmp_path / "source.ofn"
-    source.write_text("""Ontology(<urn:fixture>
+    source.write_text(
+        """Ontology(<urn:fixture>
 Declaration(Class(<urn:A>)) Declaration(Class(<urn:B>))
 AnnotationAssertion(<http://www.w3.org/2000/01/rdf-schema#label> <urn:A> "A")
 AnnotationAssertion(<http://purl.obolibrary.org/obo/IAO_0000115> <urn:A> "Definition A")
 AnnotationAssertion(<http://www.geneontology.org/formats/oboInOwl#hasDbXref> <urn:A> "forbidden-target")
 SubClassOf(<urn:A> <urn:B>)
-)""")
+)"""
+    )
     binding = OntologyBinding(
         name="tiny",
         root=InputBinding(path=str(source), sha256=file_hash(source), size=source.stat().st_size),
@@ -76,7 +78,9 @@ def test_prepare_profiles_comparison_portable_reads_and_no_runtime_work(prepared
     assert len(calls) == 3
     assert all("forbidden-target" not in json.dumps(p) for p in calls)
     client = TestClient(create_prepared_app(package))
-    ontology = client.get("/api/v1/ontologies").json()["items"][0]["ontology_version_id"]
+    ontology_item = client.get("/api/v1/ontologies").json()["items"][0]
+    assert ontology_item["name"] == "tiny"
+    ontology = ontology_item["ontology_version_id"]
     params = {"ontology_version_id": ontology, "iri": "urn:A", "kind": "class"}
     summary = client.get("/api/v1/entity-context", params=params)
     assert summary.status_code == 200, summary.text
@@ -188,12 +192,8 @@ def test_frontend_discovery_routes_are_bounded_and_policy_scoped(prepared):
     assert detail.status_code == 200 and detail.json()["task"] == "pair_comparison"
     none = client.get("/api/v1/explanations", params={**subject, "iri": "urn:missing"}).json()
     assert none["items"] == [] and none["status"] == "not_requested"
-    assert (
-        client.get(
-            "/api/v1/explanations", params={**subject, "counterpart_iri": "urn:B"}
-        ).status_code
-        == 422
-    )
+    for partial in ({"counterpart_iri": "urn:B"}, {"counterpart_ontology_version_id": ontology}):
+        assert client.get("/api/v1/explanations", params={**subject, **partial}).status_code == 422
 
 
 def test_study_adapter_preserves_originals_and_rejects_forged_comparisons(prepared):
@@ -289,6 +289,14 @@ def test_verified_context_reuse_never_reparses_and_checks_binding(prepared, tmp_
         ["context-index"]
     )
     assert "context-index" in report["outputs"]
+    reused_manifest = (
+        tmp_path
+        / "reuse-context"
+        / report["outputs"]["context-index"]
+        / "ontology-0"
+        / "manifest.json"
+    )
+    assert reused_manifest.read_bytes() == context_manifest.read_bytes()
     wrong_scope = bound.model_copy(
         update={"ontologies": [bound.ontologies[0].model_copy(update={"scope": "closure"})]}
     )
@@ -326,3 +334,28 @@ def test_prepared_api_rejects_wrong_cursor_key_types_and_streams_filtered_axioms
     assert response.status_code == 200
     assert response.json()["axiom_id"] == fact["axiom_ref"]
     assert "forbidden-target" not in response.text
+
+
+def test_named_context_revision_preserves_legacy_preparation_keys(prepared, tmp_path):
+    from exact_inspect.preparation import stage_identity
+
+    lock, _, root, _ = prepared
+    assert lock.implementations["context-index"] == "context/3"
+    report = json.loads((root / "preparation.json").read_bytes())
+    current = json.loads(
+        (root / report["outputs"]["context-index"] / "ontology-0" / "manifest.json").read_bytes()
+    )
+    legacy = lock.model_copy(
+        update={"implementations": {**lock.implementations, "context-index": "context/2"}}
+    )
+    assert stage_identity(legacy, "context-index") != stage_identity(lock, "context-index")
+    old_root = tmp_path / "legacy"
+    old_report = Preparation(legacy, old_root, input_root=tmp_path).run(["context-index"])
+    old = json.loads(
+        (
+            old_root / old_report["outputs"]["context-index"] / "ontology-0" / "manifest.json"
+        ).read_bytes()
+    )
+    assert old["name"] is None and current["name"] == "tiny"
+    assert old["ontology_version_id"] == current["ontology_version_id"]
+    assert old["preparation_key"] != current["preparation_key"]

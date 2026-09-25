@@ -47,6 +47,12 @@ A verified context can be reused with `prepared_context: {"path": "context/manif
 on an ontology binding. Preparation checks source hash, scope, resolved imports,
 parser version, derivative provenance and the full index checksum before copying it.
 Ontology contents and parser policies are never inferred from filenames.
+New execution locks use context preparation revision `context/3`: each ontology
+binding's `name` becomes its display name and is included in the preparation key.
+The ontology content/version identity is unchanged. Explicit `context/2` locks
+keep the former unnamed behavior, and a hash-bound `prepared_context` is copied
+unchanged, including its recorded name. Existing packages are never relabeled.
+
 
 The remaining lock fields are described by
 `exact_inspect.preparation.ExecutionLock.model_json_schema()`:
@@ -120,7 +126,22 @@ for at most 100 IRIs; an undeclared IRI is reported absent or as a possible unre
 import, never guessed), and `/explanations?ontology_version_id=&iri=&kind=` with an
 optional `counterpart_*` entity and `task` (paged summaries with grounding status; the
 index is built lazily from explanation metadata and excludes other policies).
-`exact_inspect.client.InspectClient` is the typed backend fixture client.
+`exact_inspect.client.InspectClient` exposes `ontologies()`, `runs()`,
+`labels(ontology_version_id, iris)`, and `explanations(entity, counterpart=...)`.
+The discovery response models appear in runtime OpenAPI as `RunSummary`,
+`LabelsResponse`, and `ExplanationSummary`; both counterpart IRI and ontology
+version are required together.
+
+Candidate pages have stable ascending `pair_id` order, independent from saved
+ranks and scores. Follow `next_cursor` for complete coverage before claiming a
+global rank order. A frontend that caps loading at 500 candidates must disclose
+that cap and the total count when more remain.
+
+New generation jobs use implementation revision `/5`, with provenance worded as
+“prepared response with deterministic extract grounding.” This includes offline
+adapters honestly; the manifest retains the returned provider/model values.
+Compatible saved `/4`, `/3`, and `/2` responses are revalidated without dispatch.
+Existing saved outputs and their provenance remain immutable.
 Collection cursors bind ontology, policy, query and context revision; stale cursors
 return 409. Summary/list responses are bounded to 2 MiB. Large original axioms remain
 available through explicit context streaming or the prepared ontology resource.

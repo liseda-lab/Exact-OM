@@ -83,10 +83,10 @@ class ExecutionLock(WireModel):
     comparison_prompt: str | None = None
     implementations: dict[str, str] = Field(
         default_factory=lambda: {
-            "context-index": "context/2",
+            "context-index": "context/3",
             "run-import": "decision-adapter/3",
-            "profiles": "grounding-excerpts-and-comparisons/4",
-            "comparisons": "grounding-excerpts-and-comparisons/4",
+            "profiles": "grounding-excerpts-and-comparisons/5",
+            "comparisons": "grounding-excerpts-and-comparisons/5",
             "portable-export": "inspection-bundle/3",
             "study-export": "study-publication/1",
         }
@@ -509,6 +509,12 @@ class Preparation:
                     scope=ontology.scope,
                     expected_hash=ontology.root.sha256,
                     source_derivation=ontology.source_derivation,
+                    # Old locks retain their exact preparation identity and output.
+                    ontology_name=(
+                        None
+                        if self.lock.implementations.get("context-index") == "context/2"
+                        else ontology.name
+                    ),
                 )
                 context_locators[ontology.name] = locator
             atomic_json(destination / "contexts.json", context_locators)

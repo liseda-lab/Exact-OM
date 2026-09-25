@@ -375,7 +375,7 @@ class ExplanationJobs:
             "profile": profile.model_dump(),
             "prompt": prompt,
             "schema": ExplanationOutput.model_json_schema(),
-            "implementation": "grounding-excerpts-and-comparisons/4",
+            "implementation": "grounding-excerpts-and-comparisons/5",
             "max_repairs": max_repairs,
         }
         key = canonical_hash(identity)
@@ -417,7 +417,7 @@ class ExplanationJobs:
             prior_identity = {}
             prior = self.root
             can_replay = False
-            for revision in (3, 2):
+            for revision in (4, 3, 2):
                 candidate_identity = {
                     **identity,
                     "implementation": f"grounding-excerpts-and-comparisons/{revision}",
@@ -454,7 +454,7 @@ class ExplanationJobs:
                         directory / "revalidation.json",
                         {
                             "source_request": canonical_hash(prior_identity),
-                            "repair": "validator-only source-category normalization",
+                            "repair": "response revalidation and provenance metadata revision",
                             "new_provider_dispatch_required": False,
                         },
                     )
@@ -567,7 +567,7 @@ class ExplanationJobs:
                 "fixture_provenance": (
                     "prepared from bound ontology facts; original-excerpt fallback"
                     if status != "validated"
-                    else "actual provider response with deterministic extract grounding"
+                    else "prepared response with deterministic extract grounding"
                 ),
                 "manifest": {
                     "ontology_context_hashes": packet.context_hashes,

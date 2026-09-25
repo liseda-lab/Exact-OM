@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 from urllib.parse import quote
 
 import httpx
@@ -12,10 +12,13 @@ from .models import (
     AxiomResponse,
     Candidate,
     EntityContextResponse,
+    ExplanationSummary,
     Fact,
     GeneratedExplanationResponse,
     HierarchyPage,
+    LabelsResponse,
     PairResponse,
+    RunSummary,
     SelectedEvidence,
 )
 from .service import Health
@@ -41,6 +44,52 @@ class InspectClient:
     def health(self) -> Health:
         """Read readiness; this never triggers preparation."""
         return Health.model_validate(self._get("health"))
+
+    def ontologies(self, *, limit: int = 20, cursor: str | None = None) -> Page[dict[str, Any]]:
+        """Discover allowed ontology versions, display names and capabilities."""
+        return Page[dict[str, Any]].model_validate(
+            self._get("ontologies", limit=limit, cursor=cursor)
+        )
+
+    def runs(self, *, limit: int = 20, cursor: str | None = None) -> Page[RunSummary]:
+        """Discover saved runs and their bound source and target ontology versions."""
+        return Page[RunSummary].model_validate(self._get("runs", limit=limit, cursor=cursor))
+
+    def labels(
+        self, ontology_version_id: str, iris: list[str], *, language: str | None = None
+    ) -> LabelsResponse:
+        """Resolve 1–100 IRIs without collapsing their distinct typed entities."""
+        return LabelsResponse.model_validate(
+            self._get(
+                "labels", ontology_version_id=ontology_version_id, iri=iris, language=language
+            )
+        )
+
+    def explanations(
+        self,
+        entity: EntityRef,
+        *,
+        task: Literal["entity_profile", "pair_comparison"] | None = None,
+        counterpart: EntityRef | None = None,
+        limit: int = 20,
+        cursor: str | None = None,
+    ) -> Page[ExplanationSummary]:
+        """Discover prepared profiles/comparisons by typed entity and optional counterpart."""
+        other = (
+            {"counterpart_" + key: value for key, value in counterpart.model_dump().items()}
+            if counterpart is not None
+            else {}
+        )
+        return Page[ExplanationSummary].model_validate(
+            self._get(
+                "explanations",
+                **entity.model_dump(),
+                **other,
+                task=task,
+                limit=limit,
+                cursor=cursor,
+            )
+        )
 
     def entities(
         self,

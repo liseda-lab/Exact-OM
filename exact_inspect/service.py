@@ -38,10 +38,13 @@ from .models import (
     AxiomResponse,
     Candidate,
     EntityContextResponse,
+    ExplanationSummary,
     Fact,
     GeneratedExplanationResponse,
     HierarchyPage,
+    LabelsResponse,
     PairResponse,
+    RunSummary,
     SelectedEvidence,
 )
 
@@ -417,7 +420,7 @@ def create_prepared_app(
             )
         )
 
-    @app.get("/api/v1/runs", response_model=Page[dict[str, Any]])
+    @app.get("/api/v1/runs", response_model=Page[RunSummary])
     def runs(limit: int = Query(20, ge=1, le=100), cursor: str | None = None):
         """List saved runs whose ontologies the policy permits; no pair data is loaded."""
         active = service()
@@ -466,7 +469,7 @@ def create_prepared_app(
             ).model_dump()
         )
 
-    @app.get("/api/v1/labels")
+    @app.get("/api/v1/labels", response_model=LabelsResponse)
     def labels(
         ontology_version_id: str,
         iri: list[str] = Query(..., min_length=1, max_length=100),
@@ -670,7 +673,7 @@ def create_prepared_app(
             ).model_dump()
         )
 
-    @app.get("/api/v1/explanations", response_model=Page[dict[str, Any]])
+    @app.get("/api/v1/explanations", response_model=Page[ExplanationSummary])
     def explanation_list(
         ontology_version_id: str,
         iri: str,
@@ -686,9 +689,9 @@ def create_prepared_app(
         active = service()
         subject = {"ontology_version_id": ontology_version_id, "iri": iri, "kind": kind}
         wanted = [subject]
-        if counterpart_iri is not None:
-            if counterpart_ontology_version_id is None:
-                raise DomainError("invalid_query", "Counterpart requires its ontology version")
+        if (counterpart_iri is None) != (counterpart_ontology_version_id is None):
+            raise DomainError("invalid_query", "Counterpart requires both IRI and ontology version")
+        if counterpart_iri is not None and counterpart_ontology_version_id is not None:
             wanted.append(
                 {
                     "ontology_version_id": counterpart_ontology_version_id,

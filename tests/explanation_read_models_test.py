@@ -14,7 +14,12 @@ from exact_inspect.client import InspectClient
 from exact_inspect.context import OntologyContext
 from exact_inspect.contracts import EntityRef
 from exact_inspect.decisions import DecisionStore, import_run
-from exact_inspect.models import AxiomResponse, Candidate, SelectedEvidence
+from exact_inspect.models import (
+    AxiomResponse,
+    Candidate,
+    LabelsResponse,
+    SelectedEvidence,
+)
 from exact_inspect.service import create_prepared_app
 from tests.explanation_preparation_test import prepared  # noqa: F401,F811
 
@@ -111,6 +116,28 @@ def test_typed_fixture_client_covers_fact_hierarchy_candidate_evidence_and_text_
 
     client = InspectClient("http://testserver", transport=httpx.MockTransport(request))
     try:
+        assert client.ontologies().items[0]["name"] == "tiny"
+        runs = client.runs()
+        assert runs.items[0].run_id == "fixture-run"
+        assert runs.items[0].source_ontology_version_id == entity.ontology_version_id
+        labels = client.labels(entity.ontology_version_id, [entity.iri, "urn:B", "urn:missing"])
+        assert labels.returned_count == 3
+        assert labels.items[0].entity == entity and labels.items[0].preferred_label.value == "A"
+        assert labels.items[1].preferred_label.status == "absent_in_scope"
+        assert labels.items[2].entity is None and labels.items[2].iri == "urn:missing"
+        first = client.explanations(entity, limit=1)
+        assert first.next_cursor
+        second = client.explanations(entity, limit=1, cursor=first.next_cursor)
+        assert not second.next_cursor
+        assert first.items[0].explanation_id != second.items[0].explanation_id
+        assert {first.items[0].task, second.items[0].task} == {"entity_profile", "pair_comparison"}
+        counterpart = entity.model_copy(update={"iri": "urn:B"})
+        comparisons = client.explanations(entity, counterpart=counterpart)
+        assert len(comparisons.items) == 1 and comparisons.items[0].task == "pair_comparison"
+        assert client.explanations(entity, task="entity_profile").items[0].entities == [entity]
+        with pytest.raises(httpx.HTTPStatusError) as stale:
+            client.explanations(entity, task="entity_profile", cursor=first.next_cursor)
+        assert stale.value.response.status_code == 409
         facts = client.facts(entity, category="definitions")
         assert facts.items[0].value.lexical_form == "Definition A"
         assert client.hierarchy(entity).items[0]["parent"]["iri"] == "urn:B"
@@ -127,6 +154,9 @@ def test_typed_fixture_client_covers_fact_hierarchy_candidate_evidence_and_text_
         assert "ground_truth" not in json.dumps(wire)
         schema = api.get("/openapi.json").json()
         for route, expected in (
+            ("/api/v1/runs", "RunSummary"),
+            ("/api/v1/labels", "LabelsResponse"),
+            ("/api/v1/explanations", "ExplanationSummary"),
             ("/api/v1/runs/{run_id}/candidates", "Candidate"),
             ("/api/v1/runs/{run_id}/pair-evidence", "SelectedEvidence"),
             ("/api/v1/axioms/{axiom_id}", "AxiomResponse"),
@@ -250,3 +280,48 @@ def test_ontology_listing_enforces_the_shared_response_byte_budget(
         response = client.get("/api/v1/ontologies")
     assert response.status_code == 413
     assert response.json()["code"] == "response_too_large"
+
+
+def test_label_contract_rejects_lost_or_cross_ontology_identities(read_package):
+    api, _, _, entity, _ = read_package
+    value = api.get(
+        "/api/v1/labels",
+        params={"ontology_version_id": entity.ontology_version_id, "iri": "urn:missing"},
+    ).json()
+    bad = copy.deepcopy(value)
+    bad["items"][0].pop("iri")
+    with pytest.raises(ValidationError, match="requested IRI"):
+        LabelsResponse.model_validate(bad)
+    bad = copy.deepcopy(value)
+    bad["items"][0]["entity"] = entity.model_copy(
+        update={"ontology_version_id": "another-ontology", "iri": "urn:missing"}
+    ).model_dump()
+    with pytest.raises(ValidationError, match="another ontology"):
+        LabelsResponse.model_validate(bad)
+    bad = copy.deepcopy(value)
+    bad["returned_count"] = 0
+    with pytest.raises(ValidationError, match="count"):
+        LabelsResponse.model_validate(bad)
+
+
+def test_run_discovery_preserves_filtered_count_scope(read_package):
+    from exact_inspect.decisions_export import export_policy_run
+
+    _, store, context, _, _ = read_package
+    package = store.directory.parent / "package.json"
+    manifest = validate_bundle(package)
+    export_policy_run(
+        store,
+        package.parent / "filtered-decisions",
+        contexts={context.ontology_version_id: context},
+        policy=manifest.policy,
+    )
+    metadata = manifest.model_dump(exclude={"package_id", "artifacts"})
+    metadata["runs"] = {"fixture-run": "filtered-decisions"}
+    package = publish_bundle(package.parent, **metadata)
+    with TestClient(create_prepared_app(package)) as api:
+        response = api.get("/api/v1/runs")
+    assert response.status_code == 200, response.text
+    run = response.json()["items"][0]
+    assert run["counts"]["pairs"] == 1
+    assert run["counts"]["scope"] == "prepared_visibility_policy"

@@ -189,6 +189,75 @@ class GeneratedExplanationResponse(ResourceModel):
     fixture_provenance: str
 
 
+class RunSummary(WireModel):
+    """Saved run discovery metadata; pair records and graphs remain unloaded."""
+
+    run_id: str
+    revision: str | None
+    source_ontology_version_id: str
+    target_ontology_version_id: str
+    status: Availability | None
+    counts: dict[str, int | str]
+
+
+class PreferredLabel(WireModel):
+    """Policy-visible display label or an explicit scoped absence."""
+
+    status: Availability
+    value: str | None
+    language: str | None = None
+    fact_id: str | None = None
+    requested_language: str | None = None
+    language_fallback: bool | None = None
+
+
+class LabelLookup(WireModel):
+    """One typed label result; undeclared IRIs retain their requested identity."""
+
+    entity: EntityRef | None
+    iri: str | None = None
+    preferred_label: PreferredLabel
+
+    @model_validator(mode="after")
+    def check_identity(self):
+        if self.entity is None and not self.iri:
+            raise ValueError("An undeclared label result must retain its requested IRI")
+        if self.entity is not None and self.iri not in (None, self.entity.iri):
+            raise ValueError("Label result IRI differs from its typed entity")
+        return self
+
+
+class LabelsResponse(WireModel):
+    """Bounded batch lookup; punning may produce multiple typed results per IRI."""
+
+    ontology_version_id: str
+    items: list[LabelLookup]
+    returned_count: int = Field(ge=0)
+
+    @model_validator(mode="after")
+    def check_results(self):
+        if self.returned_count != len(self.items):
+            raise ValueError("Label result count differs from its items")
+        if any(
+            item.entity is not None and item.entity.ontology_version_id != self.ontology_version_id
+            for item in self.items
+        ):
+            raise ValueError("Label result belongs to another ontology version")
+        return self
+
+
+class ExplanationSummary(WireModel):
+    """Prepared text discovery without exposing or loading its claims into the response."""
+
+    explanation_id: str
+    task: Literal["entity_profile", "pair_comparison"]
+    entities: list[EntityRef]
+    grounding_status: Literal["validated", "unverified", "rejected"]
+    generation_status: Literal[
+        "pending", "dispatched", "response_saved", "validated", "failed", "ambiguous"
+    ]
+
+
 class OrdinalRanks(WireModel):
     """Ordinals are separate from scores and retain their ordering/tie provenance."""
 
