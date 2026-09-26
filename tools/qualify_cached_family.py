@@ -178,9 +178,19 @@ def run_worker(args):
 
 
 def run_probe(
-    *, code_root, script, config, name, directory, shared, campaign, forecast_seconds, prefix=False
+    *,
+    code_root,
+    script,
+    config,
+    name,
+    directory,
+    shared,
+    campaign,
+    forecast_seconds,
+    prefix=False,
+    case_id="D0",
 ):
-    """One matched 300-source D0 probe; use prefix=False for family admission."""
+    """One matched development-case probe; use prefix=False for family admission."""
     import psutil
 
     from exact.core.entities.configs.yaml_io import load_yaml_mapping
@@ -190,6 +200,8 @@ def run_probe(
     from exact.experiments.schema import ArmConfig, ResourceConfig, TaskConfig
 
     script, directory, shared, code_root = map(Path, (script, directory, shared, code_root))
+    if case_id not in {"D0", "D1"}:
+        raise ValueError("Qualification requires a declared development case")
     check_controls(script, directory)
     metadata = recovery_metadata(script, directory, prefix=prefix)
     model = dict(load_yaml_mapping(config))
@@ -201,6 +213,8 @@ def run_probe(
         for item in row["bindings"]:
             if binding(item["path"]) != item:
                 raise ValueError("Retained qualification evidence changed")
+        if row.get("case_id", "D0") != case_id:
+            raise ValueError("Qualification case changed")
         if row.get("config") != binding(config):
             raise ValueError("Qualification configuration changed")
         accounting = json.loads((shared / "budget.json").read_text())["work"].get(
@@ -246,7 +260,7 @@ def run_probe(
         from exact.core.entities.configs.config import ConfigModel
 
         task = TaskConfig.model_validate(
-            _case_task(campaign.cases["D0"], "D0", "global_alignment", "valid", script.parent)
+            _case_task(campaign.cases[case_id], case_id, "global_alignment", "valid", script.parent)
         )
         label, modes = harness.resolve_supervision(
             ConfigModel.model_validate(model),
@@ -255,11 +269,11 @@ def run_probe(
         )
         cell = harness.RunCell(
             "next-batch-qualification",
-            "QUAL-D0",
+            "QUAL-" + case_id,
             "screen",
             name,
             "baseline",
-            "D0-global_alignment",
+            case_id + "-global_alignment",
             "development",
             "valid",
             "known_incomplete",
@@ -274,7 +288,7 @@ def run_probe(
             None,
             label,
             modes,
-            campaign.cases["D0"].negative_policy,
+            campaign.cases[case_id].negative_policy,
             recovery=metadata,
             generate_rationales=False,
         )
@@ -393,6 +407,7 @@ def run_probe(
             row = {
                 "status": "passed",
                 "name": name,
+                "case_id": case_id,
                 "execution_status": result["status"],
                 "prefix": prefix,
                 "processed_pairs": checkpoint["cursor"]["next_pair"],
