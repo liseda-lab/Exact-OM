@@ -16,7 +16,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from exact.experiments.notifications import notify_intervention  # noqa: E402
-from exact.experiments.supervision import inspect_runs, inspection_incident  # noqa: E402
+from exact.experiments.supervision import (  # noqa: E402
+    inspect_runs,
+    inspection_incident,
+    pending_batches,
+)
 
 RESULT_SCHEMA = {
     "type": "object",
@@ -157,6 +161,7 @@ def run_agent(policy, directory, prompt, stop_requested):
     write(directory / "schema.json", RESULT_SCHEMA)
     (directory / "prompt.md").write_text(prompt)
     started = time.monotonic()
+    last_observation = started
     with (directory / "events.jsonl").open("w") as events, (directory / "stderr.log").open(
         "w"
     ) as errors:
@@ -173,6 +178,9 @@ def run_agent(policy, directory, prompt, stop_requested):
             process.stdin.close()
             interrupted = False
             while process.poll() is None:
+                if time.monotonic() - last_observation >= policy.get("interval_seconds", 300):
+                    refresh_progress(policy, directory.parent.parent)
+                    last_observation = time.monotonic()
                 if stop_requested() or time.monotonic() - started > policy["agent_timeout_seconds"]:
                     interrupted = True
                     # Signal only the CLI, never the retained allocation or detached experiments.
@@ -228,6 +236,21 @@ def run_agent(policy, directory, prompt, stop_requested):
     return report
 
 
+def refresh_progress(policy, directory):
+    """Observe during an intervention without authenticating or starting a model."""
+    try:
+        registry = read(directory / "registry.json")
+        health = inspect_runs(registry["runs"], step_states=slurm_steps(policy["allocation"]))
+        write(directory / "health.json", health)
+        status = read(directory / "status.json")
+        write(directory / "status.json", {**status, "checked_at": timestamp()})
+    except Exception as exc:
+        write(
+            directory / "observation-error.json",
+            {"error": type(exc).__name__ + ": " + str(exc), "checked_at": timestamp()},
+        )
+
+
 def notify_blocker(directory, policy, incident, action, *, result=None, report=None):
     """Persist and deliver one actionable blocker without exposing raw event logs."""
     result = result or {}
@@ -250,6 +273,10 @@ def check(directory, policy, state, *, act=False, stop_requested=lambda: False):
     if not any(key.startswith(policy["allocation"] + ".") for key in steps):
         raise ValueError("Retained allocation is unavailable; do not create or cancel allocations")
     observation = inspect_runs(registry["runs"], step_states=steps)
+    if "pending_batches" in registry:
+        observation["incidents"] = [
+            item for item in observation["incidents"] if item["kind"] != "next_batch"
+        ] + pending_batches(registry, observation)
     now = time.time()
     # Persistent unreadable evidence merits diagnosis, never a blind resubmission.
     for finding in observation["findings"]:

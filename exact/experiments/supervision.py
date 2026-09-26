@@ -231,6 +231,49 @@ def inspect_runs(
     return assess_runs(runs, observations, step_states=step_states)
 
 
+def pending_batches(registry: Mapping[str, Any], health: Mapping[str, Any]) -> list[dict]:
+    """Identify explicitly registered batches whose prerequisites and capacity are ready.
+
+    This opt-in registry extension leaves older supervisors' all-completed rule
+    unchanged. Failed unrelated runs are not prerequisites. Recovery descendants
+    retain the prerequisite identity, including disabled ancestors.
+    """
+    runs = registry["runs"]
+    _registry(runs)
+    by_id = {run["id"]: run for run in runs}
+    findings = {row["run_id"]: row for row in health["findings"]}
+    used: dict[str, float] = {}
+    for name, row in findings.items():
+        if row.get("scheduler_state") in _ACTIVE:
+            for key, value in by_id[name].get("resources", {}).items():
+                used[key] = used.get(key, 0) + value
+    result = []
+    for batch in registry.get("pending_batches", []):
+        if batch.get("needs_user"):
+            continue
+        parents: list[str | None] = []
+        for name in batch.get("depends_on", []):
+            if name not in by_id:
+                parents.append(None)
+                continue
+            while by_id[name].get("superseded_by"):
+                name = by_id[name]["superseded_by"]
+            parents.append(findings.get(name, {}).get("status"))
+        if any(status != "complete" for status in parents):
+            continue
+        if any(
+            used.get(key, 0) + value > registry["capacity"].get(key, 0)
+            for key, value in batch.get("resources", {}).items()
+        ):
+            continue
+        incident = _incident(
+            None, "next_batch", "Prepare eligible batch " + batch["id"], batch["id"]
+        )
+        incident["batch_id"] = batch["id"]
+        result.append(incident)
+    return result
+
+
 def assess_runs(
     runs: Sequence[Mapping[str, Any]],
     observations: Mapping[str, Mapping[str, Any]],

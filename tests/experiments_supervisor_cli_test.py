@@ -224,6 +224,32 @@ def test_interrupted_child_records_exit_and_usage(cli, controller, tmp_path, mon
     assert report["usage"] == [{"input_tokens": 9}]
 
 
+def test_long_intervention_keeps_five_minute_observations(cli, controller, tmp_path, monkeypatch):
+    policy, _ = controller
+    policy.update(interval_seconds=300, agent_timeout_seconds=3600)
+    _fake_child(cli, monkeypatch, tmp_path, result=json.dumps(_result()), running=True)
+    clock = iter([0, 301, 301])
+    monkeypatch.setattr(cli.time, "monotonic", lambda: next(clock))
+    observed = []
+    monkeypatch.setattr(cli, "refresh_progress", lambda p, d: observed.append(d))
+    cli.run_agent(policy, tmp_path, "Authorized task", lambda: True)
+    assert observed == [tmp_path.parent.parent]
+
+
+def test_intervention_observation_cannot_invoke_model(cli, controller, tmp_path, monkeypatch):
+    policy, _ = controller
+    cli.write(tmp_path / "status.json", {"status": "repairing", "intervention": "saved"})
+    monkeypatch.setattr(
+        cli, "run_agent", lambda *a: pytest.fail("Observation must remain deterministic")
+    )
+    monkeypatch.setattr(
+        cli, "authenticate", lambda *a: pytest.fail("No model preflight on observation")
+    )
+    cli.refresh_progress(policy, tmp_path)
+    assert cli.read(tmp_path / "status.json")["status"] == "repairing"
+    assert (tmp_path / "health.json").exists()
+
+
 @pytest.mark.parametrize("invalid_result", [["invalid result"], "text", 42])
 def test_invalid_child_result_cannot_break_controller_accounting(
     cli, controller, tmp_path, monkeypatch, invalid_result

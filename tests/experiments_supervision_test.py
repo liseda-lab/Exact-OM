@@ -324,3 +324,34 @@ def test_unreadable_evidence_identity_survives_recovery_and_distinguishes_errors
     assert after["scope_run_id"] == "E10-original"
     finding["errors"] = ["status: ValueError: metadata exceeds 1 MiB"]
     assert inspection_incident(runs, finding)["id"] != before["id"]
+
+
+def test_independent_batches_advance_past_failed_runs_with_capacity():
+    from exact.experiments.supervision import pending_batches
+
+    registry = {
+        "runs": [
+            {"id": "failed", "step_id": "1.1"},
+            {"id": "old", "step_id": "1.2", "enabled": False, "superseded_by": "recovered"},
+            {"id": "recovered", "step_id": "1.3"},
+        ],
+        "capacity": {"gpus": 2},
+        "pending_batches": [
+            {"id": "blocked-child", "depends_on": ["failed"]},
+            {"id": "independent", "depends_on": ["old"], "resources": {"gpus": 1}},
+        ],
+    }
+    health = assess_runs(
+        registry["runs"],
+        {
+            "failed": {"status": {"status": "failed", "error": "unchanged"}},
+            "recovered": {"completion": {"status": "complete"}},
+        },
+        step_states={},
+    )
+    assert [i["batch_id"] for i in pending_batches(registry, health)] == ["independent"]
+    registry["capacity"]["gpus"] = 0
+    assert pending_batches(registry, health) == []
+    registry["capacity"]["gpus"] = 2
+    registry["pending_batches"][1]["needs_user"] = True
+    assert pending_batches(registry, health) == []
