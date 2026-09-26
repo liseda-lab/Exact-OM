@@ -1,0 +1,88 @@
+{
+  "schema": "exact-repair/batch-plan/v1",
+  "scope": "XR-2 conformance smoke followed by the exploratory pilot; no confirmatory or benchmark results claimed",
+  "protocols": {"smoke": "smoke.json", "pilot": "pilot.json"},
+  "scheduling": {
+    "allocation": "existing interactive allocation only",
+    "max_gpus": 2,
+    "max_cpus_for_experiments": 14,
+    "max_memory_mb_for_experiments": 118000,
+    "gpu_lanes": ["rtx5090", "rtx2080ti"],
+    "parallel_unit": "independent frozen model seeds/arms or case shards; never change a matched arm's scientific limits",
+    "supervisor_interval_seconds": 300,
+    "max_unsuccessful_repairs_per_error": 2,
+    "max_repairs_per_day": null
+  },
+  "budget_accounting": {
+    "smoke_cumulative_worker_seconds": 3600,
+    "pilot_cumulative_worker_seconds": 86400,
+    "limits_source": "resources.campaign_deadline_seconds in the resolved protocol",
+    "rule": "Sum allocated worker elapsed time, including failures and replacements. This is conservative under concurrency. Also retain actual CPU, allocated CPU/GPU/memory time, stage ledgers, and intervention token usage. Never replenish or raise a limit on resume.",
+    "unsettled_attempt": "Charge its outstanding reservation unless authoritative Slurm accounting justifies a recorded reconciliation.",
+    "external_experiment_api_usd": 0,
+    "codex_authentication": "existing ChatGPT login; token usage recorded separately, no API fallback or invented dollar estimate"
+  },
+  "batches": [
+    {
+      "id": "B00-smoke-prerequisites", "phase": "smoke", "depends_on": [],
+      "studies": ["XR-E00"],
+      "work": ["Current component/reference/protocol conformance", "HGT and matched R-GCN forward/backward on both GPUs", "Complete generated smoke population with every clean-parent split and case outcome; label train/development only"],
+      "outputs": ["qualification logs and GPU receipt", "preparation.json", "corpus-budget.json", "label-budget.json", "completion.json"],
+      "gate": "Conformance passes; every requested case is accounted for. A usable complete development subset is required before model selection."
+    },
+    {
+      "id": "B01-smoke-models", "phase": "smoke", "depends_on": ["B00-smoke-prerequisites"],
+      "studies": ["XR-E04"],
+      "axes": {"encoders": ["hgt", "rgcn", "none"], "pairwise": [false, true], "seeds": [13]},
+      "work": ["Train on the same saved teacher caches; use two GPU lanes", "Select checkpoints using decoded development regret only"],
+      "outputs": ["training-state.pt", "model.pt", "report.json", "training-budget.json"],
+      "gate": "Versioned checkpoints, optimizer/RNG recovery, and explicit unavailable arms; no silent alternative selection criterion."
+    },
+    {
+      "id": "B02-smoke-studies", "phase": "smoke", "depends_on": ["B01-smoke-models"],
+      "studies": ["XR-E01", "XR-E02", "XR-E03", "XR-E05", "XR-E07", "XR-E08", "XR-E09"],
+      "work": ["Freeze common inventories, objectives, policies, profiles and candidate coverage", "Run action, exact/greedy, generation, pending/deadline, perturbation and simulated-preference controls", "Safety/optimality replay and all-scheduled reporting"],
+      "controls": ["no_repair", "score_greedy", "exact_deletion", "directional", "rich_mapping", "ontology_edits", "uniform", "confidence", "symbolic", "hgt", "rgcn", "none"],
+      "proposal_controls": ["bounded_enumeration", "uniform_constrained", "rejection", "conditioned_product", "conditioned_mixture"],
+      "gate": "Contract conformance, not smoke model quality, determines progression. Preserve every unavailable/unknown outcome."
+    },
+    {
+      "id": "B03-pilot-generated", "phase": "pilot", "depends_on": ["B02-smoke-studies"],
+      "studies": ["XR-E00", "XR-E04"],
+      "work": ["Prepare the complete pilot generated population from unchanged pilot.json", "Retain mixed-family composition holdout, sibling grouping, partial teachers, and complete development coverage counts"],
+      "gate": "Freeze preparation and split hashes before training; label all permitted cases within the original stage limits."
+    },
+    {
+      "id": "B03-real-inputs", "phase": "pilot", "depends_on": ["B00-smoke-prerequisites"],
+      "studies": ["XR-E00", "XR-E06"],
+      "work": ["Audit available local input/release/import and provisional matcher-capture provenance", "Prepare real-structure training/adaptation and held-out schedules as separate artifacts"],
+      "requirements": ["Conference 2025 ra1, all 21 pairs and declared matcher strata", "ekaw whole-ontology test holdout", "Bio-ML 2024 selected and 2026 whole releases kept separate", "Pinned Bio-ML 2026 revision from pilot.json", "Explicit local clean/observed alignment supervision and permitted probes for adaptation"],
+      "gate": "Missing licensed inputs or supervision are unavailable, never fabricated or inferred from hidden test labels. Request a decision by Gmail only when needed; generated work remains eligible."
+    },
+    {
+      "id": "B04-pilot-models", "phase": "pilot", "depends_on": ["B03-pilot-generated"],
+      "studies": ["XR-E04"],
+      "axes": {"encoders": ["hgt", "rgcn", "none"], "pairwise": [false, true], "seeds": [13, 37, 73]},
+      "work": ["Freeze the 18 generated-only configurations before training", "Schedule equal scientific limits across matched configurations, within the remaining cumulative pilot budget"],
+      "gate": "Freeze selected models before any held-out evaluation. Insufficient budget is recorded; changing it requires user approval."
+    },
+    {
+      "id": "B05-generated-studies", "phase": "pilot", "depends_on": ["B04-pilot-models"],
+      "studies": ["XR-E01", "XR-E02", "XR-E03", "XR-E05", "XR-E07", "XR-E08", "XR-E09"],
+      "work": ["Run matched finite-pool baselines, unary/pairwise scoring and proposal controls", "Apply unchanged protocol candidate caps, size/deadline sweeps, score-noise and feature-dropout axes", "Record retrieval, compilation, sampling, solver and verifier omissions separately", "Evaluate default, declared simulated and nonnegative learned preference profiles using training-side simulated choices only"],
+      "gate": "Fixed test population and external query basis; no held-out feedback into model selection or revised budgets."
+    },
+    {
+      "id": "B06-real-transfer", "phase": "pilot", "depends_on": ["B03-real-inputs", "B04-pilot-models"],
+      "studies": ["XR-E06", "XR-E07", "XR-E08"],
+      "work": ["Generated-only transfer versus separate training-side adaptation", "Hold out ontology pairs and ekaw; report Bio-ML shared-ontology overlap", "Run identical matcher captures and verification scope across compared arms"],
+      "gate": "Use actual qualified reasoning capabilities, preserve unresolved/unsupported cases and partial-reference semantics."
+    },
+    {
+      "id": "B07-report", "phase": "pilot", "depends_on": ["B05-generated-studies", "B06-real-transfer"],
+      "studies": ["XR-E00", "XR-E01", "XR-E02", "XR-E03", "XR-E04", "XR-E05", "XR-E06", "XR-E07", "XR-E08", "XR-E09"],
+      "work": ["Build paired grouped estimates, Holm adjustments, per-pair tables, verification/coverage tables and all-scheduled status records", "Publish cumulative costs and all unavailable or budget-deferred work alongside successful runs"],
+      "gate": "Reporting may finalize available independent cohorts while marking blocked cohorts unavailable; never mark unperformed studies complete."
+    }
+  ]
+}

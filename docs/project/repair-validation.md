@@ -1,5 +1,33 @@
 # Exact-Repair implementation validation
 
+## 26 September 2026: published-stack and recovery qualification
+
+The current installed stack passed 309 combined repair, finite-reference,
+supervisor and notification tests. A subsequent focused run passed 88 tests after
+the final budget, STOP-file and type-check fixes; these counts overlap. The six
+changed runtime modules pass targeted mypy, formatting, lint and diff checks.
+Strict pilot/smoke protocol validation passes with the original hashes and counts.
+
+The environment uses pyowl-core/pyhermit/pyelk-reasoner 0.2.1, PySAT 1.8.dev24,
+PySDD 1.0.6, torch-geometric 2.6.1 and Torch 2.7.0+cu128. Actual HGT and matched
+R-GCN forward/backward paths passed on the RTX 5090 and RTX 2080 Ti. A Slurm probe
+confirmed both GPUs are accessible in allocation 14387 while retaining its
+interactive step.
+
+Recovery checks cover exact optimizer/RNG continuation after an interrupted epoch,
+changed-input/setting/split rejection, no study-budget replenishment, lost-work
+reservations, and failed-worker completion/cost records. A real preparation CLI
+fixture generated all 96 smoke cases and labelled an explicit one-case-per-split
+conformance subset; resumption reused identical labels and preserved 18.863 seconds
+of accumulated label work. Its partial development teacher remains partial.
+
+The review found missing durable training/preparation checkpoints and reset study
+budgets, now addressed in the repair runners. The shared supervisor adds only
+continued observations during intervention and optional independent-batch admission.
+The [batch plan and launch documentation](repair-campaign.md) record the handoff.
+These are implementation-conformance results, not a full smoke campaign, trained
+model-quality result, or completed Conference/Bio-ML benchmark.
+
 Validation date: 19 September 2026. These are component-conformance and small integration results, not benchmark or model-quality claims. The initial implementation was `37db8f5`; `e033026` adds direct grammar, retrieval and supervised runtime paths; the following training/study commit completes the protocol tools described below.
 
 ## Published ontology stack and historical evidence

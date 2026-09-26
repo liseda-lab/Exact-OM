@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Any, Callable, Sequence
 
 from .api import write_artifact
+from .checkpointing import CumulativeBudget
 from .evaluation import outcome_metrics
 from .kernel import materialize, repair, verify_assignment
 from .records import (
@@ -576,7 +577,6 @@ def run_study(
         raise ValueError("max_attempts must be a positive integer")
     if not math.isfinite(campaign_seconds) or campaign_seconds <= 0:
         raise ValueError("campaign_seconds must be positive and finite")
-    deadline = time.monotonic() + campaign_seconds
     root = Path(directory)
     root.mkdir(parents=True, exist_ok=True)
     splits = grouped_splits(cases, seed=seed)
@@ -602,125 +602,136 @@ def run_study(
             )
     else:
         write_artifact(plan_path, {"hash": plan_hash, "plan": plan})
-    rows = []
-    for case in cases:
-        for arm in arms:
-            job = canonical_hash((case.case_id, arm.arm_id))
-            destination, state_path = (
-                root / "outcomes" / f"{job}.json",
-                root / "state" / f"{job}.json",
-            )
-            if destination.exists():
-                value = read_record(json.loads(destination.read_text()))
-                if (
-                    not isinstance(value, StudyOutcomeV2)
-                    or value.case_hash != case.content_hash
-                    or value.arm_hash != arm.content_hash
-                ):
-                    raise ValueError("resumed outcome does not belong to the frozen schedule")
-                outcome = value
-            else:
-                state = (
-                    json.loads(state_path.read_text()) if state_path.exists() else {"attempts": 0}
+    with CumulativeBudget(root / "budget.json", plan_hash, campaign_seconds) as budget:
+        rows = []
+        for case in cases:
+            for arm in arms:
+                job = canonical_hash((case.case_id, arm.arm_id))
+                destination, state_path = (
+                    root / "outcomes" / f"{job}.json",
+                    root / "state" / f"{job}.json",
                 )
-                if state_path.exists() and state.get("plan_hash") != plan_hash:
-                    raise ValueError("interrupted state belongs to a different frozen plan")
-                attempts = state["attempts"]
-                if type(attempts) is not int or attempts < 0:
-                    raise ValueError("invalid interrupted-attempt counter")
-                if attempts >= max_attempts:
-                    outcome = StudyOutcomeV2(
-                        case.case_id,
-                        arm.arm_id,
-                        case.content_hash,
-                        arm.content_hash,
-                        "failed",
-                        splits[case.case_id],
-                        detail="interrupted attempt limit exhausted",
-                    )
+                if destination.exists():
+                    value = read_record(json.loads(destination.read_text()))
+                    if (
+                        not isinstance(value, StudyOutcomeV2)
+                        or value.case_hash != case.content_hash
+                        or value.arm_hash != arm.content_hash
+                    ):
+                        raise ValueError("resumed outcome does not belong to the frozen schedule")
+                    outcome = value
                 else:
-                    write_artifact(
-                        state_path,
-                        {"plan_hash": plan_hash, "attempts": attempts + 1, "status": "running"},
+                    state = (
+                        json.loads(state_path.read_text())
+                        if state_path.exists()
+                        else {"attempts": 0}
                     )
-                    remaining = deadline - time.monotonic()
-                    if remaining <= 0:
+                    if state_path.exists() and state.get("plan_hash") != plan_hash:
+                        raise ValueError("interrupted state belongs to a different frozen plan")
+                    attempts = state["attempts"]
+                    if type(attempts) is not int or attempts < 0:
+                        raise ValueError("invalid interrupted-attempt counter")
+                    if attempts >= max_attempts:
                         outcome = StudyOutcomeV2(
                             case.case_id,
                             arm.arm_id,
                             case.content_hash,
                             arm.content_hash,
-                            "timeout",
+                            "failed",
                             splits[case.case_id],
-                            detail="campaign deadline exhausted",
+                            detail="interrupted attempt limit exhausted",
                         )
                     else:
-                        outcome = evaluate_case(
-                            case,
-                            arm,
-                            split=splits[case.case_id],
-                            verifier=verifier,
-                            seconds=remaining,
+                        write_artifact(
+                            state_path,
+                            {"plan_hash": plan_hash, "attempts": attempts + 1, "status": "running"},
                         )
-                outcome = dataclasses.replace(
-                    outcome,
-                    resources=outcome.resources
-                    + (
-                        ("attempt", float(min(attempts + 1, max_attempts))),
-                        ("interrupted_attempts", float(attempts)),
-                    ),
-                )
-                write_artifact(destination, outcome.to_dict())
-                write_artifact(
-                    state_path,
+                        remaining = budget.remaining
+                        if remaining <= 0:
+                            outcome = StudyOutcomeV2(
+                                case.case_id,
+                                arm.arm_id,
+                                case.content_hash,
+                                arm.content_hash,
+                                "timeout",
+                                splits[case.case_id],
+                                detail="campaign deadline exhausted",
+                            )
+                        else:
+                            reserved = budget.begin(
+                                min(remaining, case.problem.budgets.total_seconds)
+                                if case.problem is not None
+                                else remaining
+                            )
+                            try:
+                                outcome = evaluate_case(
+                                    case,
+                                    arm,
+                                    split=splits[case.case_id],
+                                    verifier=verifier,
+                                    seconds=reserved,
+                                )
+                            finally:
+                                budget.finish()
+                    outcome = dataclasses.replace(
+                        outcome,
+                        resources=outcome.resources
+                        + (
+                            ("attempt", float(min(attempts + 1, max_attempts))),
+                            ("interrupted_attempts", float(attempts)),
+                        ),
+                    )
+                    write_artifact(destination, outcome.to_dict())
+                    write_artifact(
+                        state_path,
+                        {
+                            "plan_hash": plan_hash,
+                            "attempts": min(attempts + 1, max_attempts),
+                            "status": outcome.status,
+                        },
+                    )
+                rows.append(
                     {
-                        "plan_hash": plan_hash,
-                        "attempts": min(attempts + 1, max_attempts),
+                        "case_id": case.case_id,
+                        "arm_id": arm.arm_id,
+                        "cohort": case.cohort,
+                        "source_version": case.source_version,
+                        "group_id": case.group_id,
                         "status": outcome.status,
+                        "logical_status": (
+                            outcome.result.logical_status if outcome.result else "UNKNOWN"
+                        ),
+                        "search_status": (
+                            outcome.result.search_status if outcome.result else "UNRESOLVED"
+                        ),
+                        "verification_scope": (
+                            outcome.result.verification_scope if outcome.result else "unavailable"
+                        ),
+                        "artifact": str(destination.relative_to(root)),
+                        "artifact_hash": outcome.content_hash,
+                        "external_value": outcome.external_value,
+                        "exact_external_regret": outcome.exact_external_regret,
+                        "metrics": json.loads(canonical_json(dict(outcome.metrics))),
+                        "resources": dict(outcome.resources),
+                    }
+                )
+                write_artifact(
+                    root / "results.json",
+                    {
+                        "schema": STUDY_SCHEMA,
+                        "plan_hash": plan_hash,
+                        "scheduled": len(cases) * len(arms),
+                        "recorded": len(rows),
+                        "rows": rows,
+                        "evidence_scope": "frozen-case measurements; not an unperformed benchmark",
                     },
                 )
-            rows.append(
-                {
-                    "case_id": case.case_id,
-                    "arm_id": arm.arm_id,
-                    "cohort": case.cohort,
-                    "source_version": case.source_version,
-                    "group_id": case.group_id,
-                    "status": outcome.status,
-                    "logical_status": (
-                        outcome.result.logical_status if outcome.result else "UNKNOWN"
-                    ),
-                    "search_status": (
-                        outcome.result.search_status if outcome.result else "UNRESOLVED"
-                    ),
-                    "verification_scope": (
-                        outcome.result.verification_scope if outcome.result else "unavailable"
-                    ),
-                    "artifact": str(destination.relative_to(root)),
-                    "artifact_hash": outcome.content_hash,
-                    "external_value": outcome.external_value,
-                    "exact_external_regret": outcome.exact_external_regret,
-                    "metrics": json.loads(canonical_json(dict(outcome.metrics))),
-                    "resources": dict(outcome.resources),
-                }
-            )
-            write_artifact(
-                root / "results.json",
-                {
-                    "schema": STUDY_SCHEMA,
-                    "plan_hash": plan_hash,
-                    "scheduled": len(cases) * len(arms),
-                    "recorded": len(rows),
-                    "rows": rows,
-                    "evidence_scope": "frozen-case measurements; not an unperformed benchmark",
-                },
-            )
-    return {
-        "plan_hash": plan_hash,
-        "scheduled": len(cases) * len(arms),
-        "recorded": len(rows),
-        "rows": rows,
-    }
+        return {
+            "plan_hash": plan_hash,
+            "scheduled": len(cases) * len(arms),
+            "recorded": len(rows),
+            "rows": rows,
+        }
 
 
 def load_schedule(path: str | Path) -> tuple[tuple[StudyCaseV2, ...], tuple[StudyArmV2, ...], int]:

@@ -6,7 +6,9 @@ import argparse
 import copy
 import json
 import math
+import os
 import random
+import tempfile
 import time
 from pathlib import Path
 from typing import Any, Mapping, Sequence, cast
@@ -36,6 +38,23 @@ DEFAULT_PROFILE = (
     ("ontology_edit", 0.02),
     ("human_authored_ontology_edit", 0.03),
 )
+
+
+def save_training_state(path: Path, state: dict) -> None:
+    """Atomically publish a tensors-and-primitives checkpoint, including optimizer/RNG."""
+    import torch
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary = tempfile.mkstemp(prefix=".training-", dir=path.parent)
+    try:
+        with os.fdopen(descriptor, "wb") as stream:
+            torch.save(state, stream)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
 
 
 def _assignment_label(
@@ -352,12 +371,18 @@ def train_cases(
     pair_factor_limit_per_object: int = 16,
     development_draws_per_object: int = 32,
     candidate_cap: int = 64,
+    checkpoint_path: Path | None = None,
 ) -> tuple[Any, dict[str, Any]]:
     """Train joint benefits/proposals and select on periodic decoded development regret.
 
     Cases without complete finite distributions still contribute masked benefit
     regression/ranking. No test case can enter optimization or checkpoint selection.
     """
+    # Bind all scientific options and teacher/split identities. Remaining wall
+    # time is supplied by the persistent stage budget, not checkpoint identity.
+    identity_options = dict(locals())
+    for key in ("checkpoint_path", "deadline_seconds", "warm_start_weights"):
+        identity_options.pop(key)
     import torch
 
     from exact.repair.grammar import mapping_grammar
@@ -507,10 +532,74 @@ def train_cases(
             raise ValueError("Warm-start weights have incompatible model keys")
         adaptation_new_parameters = list(loaded.missing_keys)
     warm_start_hash = model_digest(model) if warm_start_weights is not None else None
+    implementation = canonical_hash(
+        [
+            (path.name, path.read_bytes().hex())
+            for path in sorted(
+                (Path(__file__).resolve().parents[2] / "exact" / "repair").glob("*.py")
+            )
+        ]
+        + [("train.py", Path(__file__).read_bytes().hex())]
+    )
+    resume_identity = canonical_hash((identity_options, warm_start_hash, implementation))
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
     history: list[dict[str, Any]] = []
     best_criterion, best_state, best_epoch = None, None, None
     stale_evaluations = 0
+    next_epoch, next_offset, saved_loss, saved_optimized = 0, 0, 0.0, 0
+    stopped_early = False
+    if checkpoint_path is not None and checkpoint_path.exists():
+        saved = torch.load(checkpoint_path, weights_only=True, map_location=device)
+        if (
+            saved.get("schema") != "exact-repair/training-state/v2"
+            or saved.get("identity") != resume_identity
+        ):
+            raise ValueError("Training checkpoint is incompatible with settings, inputs or splits")
+        model.load_state_dict(saved["model"])
+        optimizer.load_state_dict(saved["optimizer"])
+        torch.set_rng_state(saved["cpu_rng"].cpu())
+        if device == "cuda":
+            torch.cuda.set_rng_state_all([state.cpu() for state in saved["cuda_rng"]])
+        random.setstate(saved["python_rng"])
+        next_epoch, next_offset = saved["next_epoch"], saved["next_offset"]
+        saved_loss, saved_optimized = saved["train_loss"], saved["optimized"]
+        history = saved["history"]
+        best_criterion, best_state, best_epoch = (
+            saved["best_criterion"],
+            saved["best_state"],
+            saved["best_epoch"],
+        )
+        stale_evaluations, stopped_early = saved["stale_evaluations"], saved["stopped_early"]
+        proposal_coverage = saved["proposal_coverage"]
+        failed_compilations = set(saved["failed_compilations"])
+
+    def checkpoint(epoch, offset=0, loss=0.0, optimized=0):
+        if checkpoint_path is not None:
+            save_training_state(
+                checkpoint_path,
+                dict(
+                    schema="exact-repair/training-state/v2",
+                    identity=resume_identity,
+                    model=model.state_dict(),
+                    optimizer=optimizer.state_dict(),
+                    cpu_rng=torch.get_rng_state(),
+                    cuda_rng=torch.cuda.get_rng_state_all() if device == "cuda" else [],
+                    python_rng=random.getstate(),
+                    next_epoch=epoch,
+                    next_offset=offset,
+                    train_loss=loss,
+                    optimized=optimized,
+                    history=history,
+                    best_criterion=best_criterion,
+                    best_state=best_state,
+                    best_epoch=best_epoch,
+                    stale_evaluations=stale_evaluations,
+                    stopped_early=stopped_early,
+                    proposal_coverage=proposal_coverage,
+                    failed_compilations=sorted(failed_compilations),
+                ),
+            )
+
     if not any(
         cache.complete and any(label.usable for label in cache.labels) for _, cache in development
     ):
@@ -590,14 +679,15 @@ def train_cases(
                 loss = loss + loss_weights[2] * -(weights[positive] * probabilities[positive]).sum()
         return loss
 
-    for epoch in range(epochs):
-        if time.monotonic() - started >= deadline_seconds:
+    for epoch in range(next_epoch, epochs):
+        if stopped_early or time.monotonic() - started >= deadline_seconds:
             break
         model.train()
-        train_loss, optimized = 0.0, 0
+        train_loss, optimized = (saved_loss, saved_optimized) if epoch == next_epoch else (0.0, 0)
         order = list(training)
         random.Random(seed + epoch).shuffle(order)
-        for offset in range(0, len(order), batch_cases):
+        offset_start = next_offset if epoch == next_epoch else 0
+        for offset in range(offset_start, len(order), batch_cases):
             if time.monotonic() - started >= deadline_seconds:
                 break
             batch = order[offset : offset + batch_cases]
@@ -610,6 +700,7 @@ def train_cases(
             optimizer.step()
             train_loss += float(loss.detach()) * len(batch)
             optimized += len(batch)
+            checkpoint(epoch, offset + len(batch), train_loss, optimized)
         model.eval()
         with torch.no_grad():
             dev_loss = sum(float(case_loss(case, cache)) for case, cache in development) / len(
@@ -737,6 +828,8 @@ def train_cases(
             else:
                 stale_evaluations += 1
         history.append(row)
+        stopped_early = stale_evaluations >= patience
+        checkpoint(epoch + 1)
         if stale_evaluations >= patience:
             break
     if best_state is None:
@@ -931,6 +1024,8 @@ def main() -> int:
     )
     parser.add_argument("--pairwise", action="store_true")
     args = parser.parse_args()
+    from exact.repair.checkpointing import CumulativeBudget
+
     protocol = load_protocol(args.protocol)
     seed = args.seed if args.seed is not None else protocol["training"]["seeds"][0]
     if seed not in protocol["training"]["seeds"]:
@@ -940,7 +1035,15 @@ def main() -> int:
     config = _protocol_arguments(protocol)
     profile = _protocol_profile(protocol)
     caches: dict[str, TeacherCache]
-    if args.real_manifest:
+    resume_preparation = args.output / "preparation.json"
+    if resume_preparation.exists():
+        cases, caches, preparation = load_preparation(resume_preparation)
+        if (
+            preparation.get("protocol_hash") != canonical_hash(protocol)
+            or preparation.get("case_limit") != args.case_limit
+        ):
+            raise ValueError("Preparation checkpoint protocol or case selection changed")
+    elif args.real_manifest:
         cases, preparation = prepare_real_manifest(
             args.real_manifest,
             deadline_seconds=protocol["resources"]["stage_deadline_seconds"]["corpus"],
@@ -949,8 +1052,22 @@ def main() -> int:
         caches = {}
     elif args.prepared:
         cases, caches, preparation = load_preparation(args.prepared)
+        if preparation.get("protocol_hash") != canonical_hash(protocol):
+            raise ValueError("Prepared teacher data belongs to a different protocol")
     else:
-        cases = generated_from_protocol(protocol)
+        with CumulativeBudget(
+            args.output / "corpus-budget.json",
+            canonical_hash(protocol),
+            protocol["resources"]["stage_deadline_seconds"]["corpus"],
+        ) as corpus_budget:
+            generated = bounded_call(
+                generated_from_protocol, protocol, timeout=corpus_budget.begin()
+            )
+            if generated.status != "complete":
+                raise RuntimeError(
+                    "Corpus preparation " + generated.status + ": " + generated.detail
+                )
+            cases = generated.value
         caches = {}
         preparation = {"requested": len(cases), "produced": len(cases), "origin": "generated"}
     # Keep every omitted/test/unknown case in the denominator and evaluator store.
@@ -961,62 +1078,76 @@ def main() -> int:
         if args.case_limit is None or counts[case.split] < args.case_limit:
             selected.append(case)
             counts[case.split] += 1
-    label_started = time.monotonic()
-    label_rows = []
-    for case in selected:
-        if case.case_id in caches:
-            label_rows.append(
-                {
-                    "case_id": case.case_id,
-                    "status": "cached",
-                    "coverage": caches[case.case_id].coverage,
-                }
-            )
-            continue
-        remaining = protocol["resources"]["stage_deadline_seconds"]["label"] - (
-            time.monotonic() - label_started
-        )
-        if remaining <= 0:
-            label_rows.append({"case_id": case.case_id, "status": "label_stage_deadline"})
-            continue
-        if len(case.probes) > protocol["teacher"]["max_queries"]:
-            label_rows.append({"case_id": case.case_id, "status": "query_cap"})
-            continue
-        try:
-            cache = label_case(
-                case,
-                max_assignments=protocol["teacher"]["max_assignments"],
-                deadline_seconds=min(protocol["teacher"]["case_deadline_seconds"], remaining),
-                call_seconds=protocol["resources"]["verification_call_seconds"],
-                profile=profile,
-                desired_family_weight=protocol["teacher"]["desired_family_weight"],
-                false_positive_weight=protocol["teacher"]["false_positive_weight"],
-            )
-        except ValueError as error:
-            label_rows.append(
-                {"case_id": case.case_id, "status": "unverified_parent", "detail": str(error)}
-            )
-            continue
-        caches[case.case_id] = cache
-        label_rows.append(
-            {
-                "case_id": case.case_id,
-                "status": "complete" if cache.complete else "partial",
-                "coverage": cache.coverage,
-            }
-        )
     preparation.update(
         protocol_hash=canonical_hash(protocol),
         protocol=protocol,
         seed=seed,
         case_limit=args.case_limit,
         selected_counts=counts,
-        labelled_cases=len(caches),
-        label_rows=label_rows,
-        label_seconds=time.monotonic() - label_started,
     )
     args.output.mkdir(parents=True, exist_ok=True)
-    save_preparation(args.output / "preparation.json", cases, preparation, caches)
+    save_preparation(resume_preparation, cases, preparation, caches)
+    rows = {row["case_id"]: row for row in preparation.get("label_rows", [])}
+    identity = canonical_hash(
+        (protocol, [(c.case_id, c.problem.content_hash) for c in cases], args.case_limit)
+    )
+    with CumulativeBudget(
+        args.output / "label-budget.json",
+        identity,
+        protocol["resources"]["stage_deadline_seconds"]["label"],
+    ) as label_budget:
+        # Imported preparation has already paid for its labels. Keep that cost
+        # when moving compatible work into a replacement or training directory.
+        label_budget.state["spent_seconds"] = max(
+            label_budget.state["spent_seconds"], preparation.get("label_seconds", 0.0)
+        )
+        label_budget._save()
+        for case in selected:
+            if case.case_id in rows:
+                continue
+            if case.case_id in caches:
+                row = dict(
+                    case_id=case.case_id, status="cached", coverage=caches[case.case_id].coverage
+                )
+            elif label_budget.remaining <= 0:
+                row = dict(case_id=case.case_id, status="label_stage_deadline")
+            elif len(case.probes) > protocol["teacher"]["max_queries"]:
+                row = dict(case_id=case.case_id, status="query_cap")
+            else:
+                reserved = label_budget.begin(protocol["teacher"]["case_deadline_seconds"])
+                try:
+                    cache = label_case(
+                        case,
+                        max_assignments=protocol["teacher"]["max_assignments"],
+                        deadline_seconds=reserved,
+                        call_seconds=protocol["resources"]["verification_call_seconds"],
+                        profile=profile,
+                        desired_family_weight=protocol["teacher"]["desired_family_weight"],
+                        false_positive_weight=protocol["teacher"]["false_positive_weight"],
+                    )
+                    caches[case.case_id] = cache
+                    row = dict(
+                        case_id=case.case_id,
+                        status="complete" if cache.complete else "partial",
+                        coverage=cache.coverage,
+                    )
+                except ValueError as error:
+                    row = dict(case_id=case.case_id, status="unverified_parent", detail=str(error))
+                finally:
+                    label_budget.finish()
+            rows[case.case_id] = row
+            preparation.update(
+                label_rows=list(rows.values()),
+                labelled_cases=len(caches),
+                label_seconds=label_budget.state["spent_seconds"],
+            )
+            save_preparation(resume_preparation, cases, preparation, caches)
+        preparation.update(
+            label_rows=list(rows.values()),
+            labelled_cases=len(caches),
+            label_seconds=label_budget.state["spent_seconds"],
+        )
+        save_preparation(resume_preparation, cases, preparation, caches)
     if args.prepare_only:
         print(json.dumps({key: value for key, value in preparation.items() if key != "protocol"}))
         return 0
@@ -1069,15 +1200,24 @@ def main() -> int:
         arm=arm,
         warm_start_weights=warm["state_dict"] if warm else None,
         warm_start_metadata=warm["metadata"] if warm else None,
+        checkpoint_path=args.output / "training-state.pt",
     )
-    outcome = bounded_call(
-        _train_payload,
-        labelled_train,
-        labelled_dev,
-        options,
-        timeout=config["deadline_seconds"],
-        memory_mb=protocol["resources"]["memory_mb"],
-    )
+    with CumulativeBudget(
+        args.output / "training-budget.json",
+        canonical_hash((identity, seed, options["encoder"], options["pairwise"], arm)),
+        config["deadline_seconds"],
+    ) as training_budget:
+        remaining = training_budget.begin()
+        # Leave time for portable checkpoint transport/cleanup inside the stage cap.
+        options["deadline_seconds"] = max(0.001, remaining - min(5.0, remaining / 10))
+        outcome = bounded_call(
+            _train_payload,
+            labelled_train,
+            labelled_dev,
+            options,
+            timeout=remaining,
+            memory_mb=protocol["resources"]["memory_mb"],
+        )
     if outcome.status != "complete":
         report = {
             "schema": "exact-repair/training/v2",
@@ -1131,7 +1271,7 @@ def main() -> int:
         training_provenance=training_provenance,
         report_hash=canonical_hash(report),
     )
-    torch.save(checkpoint, args.output / "model.pt")
+    save_training_state(args.output / "model.pt", checkpoint)
     print(json.dumps(report))
     return 0
 
