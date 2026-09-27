@@ -30,8 +30,17 @@ saves its prompt, JSON events, final report, exit status and token-usage fields.
 result or exhausted retry allowance leaves a visible blocker instead of an endless retry.
 
 The deployment receipt binds the supervisor source, instructions, policy and successful
-permission smoke. Changes to the user Codex configuration require review before further
-interventions. Automatic approval review remains enabled; rejected actions are reported.
+permission smoke. Policies without `codex_config_semantic_sha256` retain the strict whole-file
+`codex_config_sha256` check. After reviewing the current Codex configuration, deployments may
+record `config_fingerprint(policy)` from `tools/supervise_experiments.py` as the semantic pin.
+This hashes parsed TOML with sorted keys, excluding only `notice` and `tui`; it substitutes
+the supervisor's explicit `model_reasoning_effort` override when present. Formatting,
+presentation settings and globally changed effort that the supervisor overrides therefore
+do not stop interventions. All other settings, including model, providers, projects,
+plugins and unknown keys, remain bound and require review when changed. The raw fingerprint
+can remain in the deployment receipt for audit; it is not an additional guard when the
+semantic pin is present. Never refresh either pin automatically after a mismatch.
+Automatic approval review remains enabled; rejected actions are reported.
 No changes are made to system cron, global authentication, cluster configuration or running
 experiment snapshots.
 

@@ -11,6 +11,7 @@ import signal
 import subprocess
 import sys
 import time
+import tomllib
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -63,6 +64,18 @@ def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def config_fingerprint(policy):
+    """Bind reviewed settings while allowing presentation changes and CLI-overridden effort."""
+    with Path(policy["codex_config"]).open("rb") as stream:
+        config = tomllib.load(stream)
+    for key in ("notice", "tui"):
+        config.pop(key, None)
+    if policy.get("model_reasoning_effort") is not None:
+        config["model_reasoning_effort"] = policy["model_reasoning_effort"]
+    canonical = json.dumps(config, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode()).hexdigest()
+
+
 def environment():
     result = {key: value for key, value in os.environ.items() if key not in API_OVERRIDES}
     # Monitoring/repair commands do not inherit experimental role, STOP or cache paths.
@@ -75,7 +88,11 @@ def environment():
 def authenticate(policy):
     """Preserve subscription authentication and the reviewed user configuration."""
     config = Path(policy["codex_config"])
-    if digest(config) != policy["codex_config_sha256"]:
+    if "codex_config_semantic_sha256" in policy:
+        actual, expected = config_fingerprint(policy), policy["codex_config_semantic_sha256"]
+    else:
+        actual, expected = digest(config), policy["codex_config_sha256"]
+    if actual != expected:
         raise ValueError("Codex configuration changed; review authentication/model before resuming")
     result = subprocess.run(
         [

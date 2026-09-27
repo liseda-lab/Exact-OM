@@ -362,3 +362,100 @@ def test_policy_rejects_invalid_daily_limit(cli, controller, limit):
     policy.update(interval_seconds=300, max_agent_runs_per_day=limit)
     with pytest.raises(ValueError, match="Daily repair limit"):
         cli.validate_policy(policy)
+
+
+@pytest.fixture
+def authentication_policy(cli, tmp_path, monkeypatch):
+    config = tmp_path / "config.toml"
+    config.write_text('model = "gpt-6-astra"\nmodel_reasoning_effort = "max"\n')
+    policy = {
+        "codex": "/example/codex",
+        "codex_config": str(config),
+        "codex_config_sha256": cli.digest(config),
+        "model_reasoning_effort": "xhigh",
+    }
+    calls = []
+
+    def login(command, **kwargs):
+        calls.append(command)
+        return cli.subprocess.CompletedProcess(command, 0, "Logged in using ChatGPT", "")
+
+    monkeypatch.setattr(cli.subprocess, "run", login)
+    return policy, config, calls
+
+
+def test_semantic_config_accepts_only_inert_or_overridden_changes(cli, authentication_policy):
+    policy, config, calls = authentication_policy
+    policy["codex_config_semantic_sha256"] = cli.config_fingerprint(policy)
+    config.write_text(
+        '# Reordered and reformatted by the CLI\n'
+        'model_reasoning_effort="xhigh"\nmodel="gpt-6-astra"\n'
+        '[tui]\nnotifications=false\n[notice]\nhide_model_warning=true\n'
+    )
+    cli.authenticate(policy)
+    assert calls == [[
+        "/example/codex", "-c", 'forced_login_method="chatgpt"',
+        "-c", 'model_provider="openai"', "login", "status",
+    ]]
+
+
+@pytest.mark.parametrize("change", [
+    'model = "different-model"\n',
+    'model_provider = "another-provider"\n',
+    'forced_login_method = "api"\n',
+    'approval_policy = "never"\n',
+    'sandbox_mode = "danger-full-access"\n',
+    'personality = "friendly"\n',
+    'sqlite_home = "/different/history"\n',
+    'unknown_future_setting = true\n',
+    '[projects."/repo"]\ntrust_level = "trusted"\n',
+    '[model_providers.custom]\nbase_url = "https://example.test"\n',
+    '[plugins.example]\nenabled = true\n',
+    '[memories]\nenabled = true\n',
+])
+def test_semantic_config_rejects_other_changes_before_login(cli, authentication_policy, change):
+    policy, config, calls = authentication_policy
+    policy["codex_config_semantic_sha256"] = cli.config_fingerprint(policy)
+    original = config.read_text()
+    config.write_text(change if change.startswith('model =') else original + change)
+    with pytest.raises(ValueError, match="Codex configuration changed"):
+        cli.authenticate(policy)
+    assert calls == []
+
+
+def test_semantic_config_retains_inherited_effort(cli, authentication_policy):
+    policy, config, calls = authentication_policy
+    policy.pop("model_reasoning_effort")
+    policy["codex_config_semantic_sha256"] = cli.config_fingerprint(policy)
+    config.write_text(config.read_text().replace('"max"', '"xhigh"'))
+    with pytest.raises(ValueError, match="Codex configuration changed"):
+        cli.authenticate(policy)
+    assert calls == []
+
+
+def test_semantic_config_binds_effective_effort_override(cli, authentication_policy):
+    policy, _, calls = authentication_policy
+    policy["codex_config_semantic_sha256"] = cli.config_fingerprint(policy)
+    policy["model_reasoning_effort"] = "low"
+    with pytest.raises(ValueError, match="Codex configuration changed"):
+        cli.authenticate(policy)
+    assert calls == []
+
+
+def test_legacy_config_pin_still_requires_exact_file(cli, authentication_policy):
+    policy, config, calls = authentication_policy
+    cli.authenticate(policy)
+    calls.clear()
+    config.write_text(config.read_text() + "# Harmless but not explicitly migrated\n")
+    with pytest.raises(ValueError, match="Codex configuration changed"):
+        cli.authenticate(policy)
+    assert calls == []
+
+
+def test_semantic_config_still_requires_chatgpt_login(cli, authentication_policy, monkeypatch):
+    policy, _, _ = authentication_policy
+    policy["codex_config_semantic_sha256"] = cli.config_fingerprint(policy)
+    monkeypatch.setattr(cli.subprocess, "run", lambda *a, **k:
+                        cli.subprocess.CompletedProcess(a[0], 0, "Logged in using API key", ""))
+    with pytest.raises(ValueError, match="API fallback is disabled"):
+        cli.authenticate(policy)
