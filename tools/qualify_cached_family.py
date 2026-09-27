@@ -200,8 +200,18 @@ def run_probe(
     from exact.experiments.schema import ArmConfig, ResourceConfig, TaskConfig
 
     script, directory, shared, code_root = map(Path, (script, directory, shared, code_root))
-    if case_id not in {"D0", "D1"}:
+    if case_id not in {"D0", "D1", "D0_E03"}:
         raise ValueError("Qualification requires a declared development case")
+    if case_id == "D0_E03":
+        original, bounded = campaign.cases["D0"], campaign.cases[case_id]
+        for field in ("source", "target", "source_universe", "kind", "role", "task"):
+            if getattr(original, field) != getattr(bounded, field):
+                raise ValueError("Bounded training alias changed the D0 development population")
+        if (
+            bounded.role != "development"
+            or bounded.references["valid"] != original.references["valid"]
+        ):
+            raise ValueError("Bounded training alias changed D0 development references")
     check_controls(script, directory)
     metadata = recovery_metadata(script, directory, prefix=prefix)
     model = dict(load_yaml_mapping(config))
