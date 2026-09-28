@@ -1226,7 +1226,10 @@ def test_external_selection_preserves_completed_policy_without_new_cells(tmp_pat
 
     path, _, _ = _external_selection_fixture(tmp_path)
     lock, _ = load_campaign(path)
-    result = external_selection_result(lock, lock.steps[0], tmp_path)
+    producers = []
+    result = external_selection_result(lock, lock.steps[0], tmp_path, producer_manifests=producers)
+    assert len(producers) == len(lock.steps[0].arms)
+    assert all(row["experiment_id"] == "E05" for row in producers)
     assert result["status"] == "screened_out"
     assert result["selected_overlay"] == {}
     assert result["new_cells"] == 0
@@ -1239,7 +1242,17 @@ def test_external_selection_preserves_completed_policy_without_new_cells(tmp_pat
 
 @pytest.mark.parametrize(
     "change",
-    ["selection", "signature", "cell", "missing_cell", "artifacts", "case", "step", "base"],
+    [
+        "selection",
+        "signature",
+        "cell",
+        "missing_cell",
+        "artifacts",
+        "case",
+        "step",
+        "base",
+        "evidence",
+    ],
 )
 def test_external_selection_rejects_changed_decisions_cells_or_scope(tmp_path, change):
     import json
@@ -1247,7 +1260,9 @@ def test_external_selection_rejects_changed_decisions_cells_or_scope(tmp_path, c
     from exact.experiments.campaign import external_selection_result
 
     path, raw, record = _external_selection_fixture(tmp_path)
-    if change == "selection":
+    if change == "evidence":
+        Path(record["evidence"][0]["path"]).write_text("tampered")
+    elif change == "selection":
         Path(record["selection"]["path"]).write_text("tampered")
     elif change in {"signature", "cell", "artifacts"}:
         target = (
@@ -1280,8 +1295,10 @@ def test_external_selection_rejects_changed_decisions_cells_or_scope(tmp_path, c
     )
     path.write_text(yaml.safe_dump(raw))
     lock, _ = load_campaign(path)
+    producers = []
     with pytest.raises(ValueError):
-        external_selection_result(lock, lock.steps[0], tmp_path)
+        external_selection_result(lock, lock.steps[0], tmp_path, producer_manifests=producers)
+    assert producers == []
 
 
 def test_campaign_identity_retains_legacy_serialization_without_external_selection(tmp_path):

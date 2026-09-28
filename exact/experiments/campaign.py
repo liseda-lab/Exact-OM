@@ -627,7 +627,13 @@ def external_acceptance_selection(lock: CampaignLock, step: CampaignStep, root: 
     }
 
 
-def external_selection_result(lock: CampaignLock, step: CampaignStep, root: Path) -> dict:
+def external_selection_result(
+    lock: CampaignLock,
+    step: CampaignStep,
+    root: Path,
+    *,
+    producer_manifests: Optional[list[dict[str, Any]]] = None,
+) -> dict:
     """Carry a verified historical decision forward without reusing prediction identities."""
     if step.external_selection is None:
         raise ValueError("external selection binding missing")
@@ -702,6 +708,7 @@ def external_selection_result(lock: CampaignLock, step: CampaignStep, root: Path
     if step.additional_cases:
         raise ValueError("external selection currently supports a single development case")
     observed = set()
+    verified_manifests = []
     for item in record["cells"]:
         manifest = json.loads(binding(item).read_text())
         key = (manifest.get("arm_id"), manifest.get("execution_mode"), manifest.get("seed"))
@@ -722,12 +729,17 @@ def external_selection_result(lock: CampaignLock, step: CampaignStep, root: Path
         ):
             raise ValueError("external selection cell is incomplete or mismatched")
         observed.add(key)
+        verified_manifests.append(manifest)
     if observed != expected:
         raise ValueError("external selection is missing completed cells")
     if not record.get("evidence"):
         raise ValueError("external selection requires immutable supporting evidence")
     for item in record["evidence"]:
         binding(item)
+    # Publish only after the entire historical comparison and evidence pass.
+    # These are producer inputs, never new cells or current prediction identities.
+    if producer_manifests is not None:
+        producer_manifests.extend(verified_manifests)
     return {
         **result,
         "external_selection": step.external_selection.model_dump(mode="json"),

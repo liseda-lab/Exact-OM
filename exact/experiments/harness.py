@@ -6462,10 +6462,11 @@ def _bind_external_selection(
 
 
 def _materialize_campaign_evidence(
-    source, suite, manifests, selections, inherited, *, plan_only=False
+    source, suite, manifests, selections, inherited, *, plan_only=False, external_manifests=()
 ):
     """Bind the three bounded development artifact producers before scheduling cells."""
     constants = source.config.frozen_constants
+    manifests = [*external_manifests, *manifests]
     if constants.get("selected_analytic_setting"):
         from exact.experiments.staged_selection import materialize_analytic_selection
 
@@ -6490,8 +6491,12 @@ def _materialize_campaign_evidence(
         materialize, arguments = materialize_oracles, (suite, manifests, selections)
     else:
         return source, inherited
-    if plan_only:
-        # No completed producer has been restored by a plan-only traversal.
+    if plan_only and not (
+        constants.get("selected_analytic_setting")
+        and any(item.get("experiment_id") == "E10-analytic" for item in external_manifests)
+    ):
+        # Planning may consume fully verified historical analytic outputs. Other
+        # producers still require execution/resume to restore their artifacts.
         raise ValueError(
             f"{source.config.experiment_id}: artifact-dependent plan requires completed producer outputs; inspect or resume those producers first"
         )
@@ -6618,6 +6623,7 @@ def run_stage(
         )
 
     all_manifests: list[dict[str, Any]] = []
+    external_manifests: list[dict[str, Any]] = []
     all_cells: list[RunCell] = []
     selections: dict[str, Any] = (
         dict(_jsonable(downstream_parent.get("experiments") or {}))
@@ -6751,7 +6757,10 @@ def run_stage(
                 continue
             if step.external_selection is not None:
                 historical = external_selection_result(
-                    campaign_lock, step, Path(suite.campaign["lock_path"]).resolve().parent
+                    campaign_lock,
+                    step,
+                    Path(suite.campaign["lock_path"]).resolve().parent,
+                    producer_manifests=external_manifests,
                 )
                 selections[config.experiment_id] = _bind_external_selection(
                     source, suite, historical
@@ -6782,7 +6791,13 @@ def run_stage(
 
             try:
                 source, inherited = _materialize_campaign_evidence(
-                    source, suite, all_manifests, selections, inherited, plan_only=plan_only
+                    source,
+                    suite,
+                    all_manifests,
+                    selections,
+                    inherited,
+                    plan_only=plan_only,
+                    external_manifests=external_manifests,
                 )
             except PrerequisiteUnavailable as exc:
                 selections[config.experiment_id] = {

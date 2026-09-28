@@ -44,9 +44,15 @@ def _completed_cell(producer, arm, manifests):
     ):
         raise PrerequisiteUnavailable(f"{producer}/{arm} is not a completed development cell")
     path = Path(item["fingerprint_payload"]["output_dir"]) / "_inputs/resolved.config.yaml"
-    config = ConfigModel.load_config(path)
-    if config.fingerprint() != item.get("resolved_config_hash"):
+    from exact.core.entities.configs.yaml_io import load_yaml_mapping
+    from exact.experiments.harness import hash_payload
+
+    # The manifest binds the producer's serialized configuration. New schema
+    # defaults are not historical bytes or proof of prediction compatibility.
+    raw = load_yaml_mapping(path)
+    if hash_payload(raw) != item.get("resolved_config_hash"):
         raise ValueError(f"{producer}/{arm}: completed resolved configuration changed")
+    config = ConfigModel.from_mapping(raw, warn_v1=False)
     if config.data.reference_role != "valid":
         raise ValueError("Selected recipes must use development references")
     return item, config, path
