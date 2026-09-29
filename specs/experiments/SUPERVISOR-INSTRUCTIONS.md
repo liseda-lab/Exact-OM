@@ -80,7 +80,11 @@ Before returning, update only `<supervisor_directory>/registry.json` with the ac
 launches: id, full numeric step_id, absolute status_path, exit_path, completion_path and
 upstream depends_on IDs and accurate resource requirements. Remove a submitted pending batch
 from pending_batches; preserve its dependency links through the registered run. Never invent
-resource capacity or exceed the one-heavy-GPU-worker constraint. Preserve old entries with enabled=false and a superseded_by/reason;
+resource capacity or exceed the one-heavy-GPU-worker constraint. A preparation_only row is
+limited to small metadata/recipe work: no scientific worker, ontology loading, fitting or API
+calls. Remove it after recording its handoff and ready successors; never create a fictional
+Slurm run for preparation. Keep pending successors for every unresolved branch because this
+registry mode replaces the generic all-completed continuation rule. Preserve old entries with enabled=false and a superseded_by/reason;
 register each replacement and retain valid dependency links. Update pause_paths to include
 new runtime STOP files. A submission must have a verified live Slurm step and actual files;
 never register a planned or invented PID/step. Do not edit policy.json, state.json, supervisor

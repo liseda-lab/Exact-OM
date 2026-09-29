@@ -1,0 +1,585 @@
+schema_version: 1
+kind: planning_snapshot_not_campaign_lock
+recorded_at: '2026-09-29T18:28:17.277127+00:00'
+source_inventory:
+  path: data/experiments-v2/prepared-campaign-12/campaign.lock.yaml
+  sha256: 13ca166dc50197a09cb548b28575fd85449cd6c7f915b7eb86bfef6569cf9263
+source_dispositions: data/experiments-v2/e19-qualification-01/dispositions.json
+target_hours: 168
+target_is_execution_limit: false
+completed_scientific_cells: 59
+remaining_declared_cells:
+  development: 85
+  composition: 8
+  class_final: 63
+  total: 156
+accounting_note: E01 includes approved sixth arm. E03 primary four complete; its optional fifth remains.
+  Qualification/retries are historical cost, not extra scientific cells. Counts are not time percentages.
+  Preserve cumulative charges; forecasts advisory.
+completed_cells_by_step:
+  E01: 6
+  E02: 6
+  E03: 4
+  E05: 4
+  E06: 4
+  E08: 3
+  E09: 4
+  E10-analytic: 6
+  E10: 2
+  E15: 4
+  E24: 8
+  E26: 8
+work:
+- step: E03
+  remaining_cells: 1
+  cases:
+  - D0
+  after:
+  - E00
+  - pool_freeze
+  - E05
+  binding_group: diagnostic
+  state: pending_binding_or_dependency
+  remaining_forecast_hours: null
+  execution_alias: E03-fp-only
+  remaining_arms:
+  - fp_only
+- step: E04
+  remaining_cells: 3
+  cases:
+  - N0
+  after:
+  - E00
+  - pool_freeze
+  - E03
+  - E05
+  binding_group: nil
+  state: pending_binding_or_dependency
+  remaining_forecast_hours: null
+- step: E07
+  remaining_cells: 6
+  cases:
+  - D0
+  after:
+  - E00
+  - pool_freeze
+  - E25
+  - E05
+  binding_group: hosted
+  state: pending_binding_or_dependency
+  remaining_forecast_hours: null
+- step: E08-identifiers
+  remaining_cells: 2
+  cases:
+  - D0
+  after:
+  - E00
+  - pool_freeze
+  - E08
+  - E05
+  binding_group: optional_inputs
+  state: pending_binding_or_dependency
+  remaining_forecast_hours: null
+- step: E11
+  remaining_cells: 4
+  cases:
+  - P0
+  after:
+  - E00
+  binding_group: feature
+  state: pending_binding_or_dependency
+  remaining_forecast_hours: null
+- step: E12-retrieval
+  remaining_cells: 2
+  cases:
+  - K0
+  after:
+  - E00
+  binding_group: feature
+  state: pending_binding_or_dependency
+  remaining_forecast_hours: null
+- step: E12
+  remaining_cells: 4
+  cases:
+  - K0
+  after:
+  - E00
+  - E12-retrieval
+  binding_group: feature
+  state: pending_binding_or_dependency
+  remaining_forecast_hours: null
+- step: E13
+  remaining_cells: 2
+  cases:
+  - R0_case
+  after:
+  - E00
+  binding_group: feature
+  state: pending_binding_or_dependency
+  remaining_forecast_hours: null
+- step: E14-bridge
+  remaining_cells: 1
+  cases:
+  - T0
+  after:
+  - E00
+  - E13
+  binding_group: feature
+  state: pending_binding_or_dependency
+  remaining_forecast_hours: null
+- step: E14
+  remaining_cells: 5
+  cases:
+  - T0
+  after:
+  - E00
+  - E13
+  binding_group: feature
+  state: pending_binding_or_dependency
+  remaining_forecast_hours: null
+- step: E16
+  remaining_cells: 3
+  cases:
+  - D1
+  after:
+  - E00
+  - pool_freeze
+  - E15
+  - E18
+  - E05
+  binding_group: selected_heads
+  state: pending_binding_or_dependency
+  remaining_forecast_hours: null
+- step: E18
+  remaining_cells: 5
+  cases:
+  - D0
+  after:
+  - E00
+  - pool_freeze
+  - E15
+  - E03
+  - E19
+  - E05
+  binding_group: selected_heads
+  state: pending_binding_or_dependency
+  remaining_forecast_hours: null
+- step: E19
+  remaining_cells: 3
+  cases:
+  - D0
+  after:
+  - E00
+  - pool_freeze
+  - E26
+  - E10
+  - E10-analytic
+  - E05
+  binding_group: selected_heads
+  state: in_progress_preserve_outputs
+  remaining_forecast_hours: null
+- step: E20
+  remaining_cells: 3
+  cases:
+  - D0
+  after:
+  - E00
+  - E05
+  binding_group: retrieval_training
+  state: pending_binding_or_dependency
+  remaining_forecast_hours: null
+- step: E21
+  remaining_cells: 5
+  cases:
+  - D0
+  after:
+  - E00
+  - E07
+  - E25
+  binding_group: hosted
+  state: pending_binding_or_dependency
+  remaining_forecast_hours: null
+- step: E22
+  remaining_cells: 5
+  cases:
+  - D0
+  after:
+  - E00
+  - E18
+  binding_group: selected_heads
+  state: pending_binding_or_dependency
+  remaining_forecast_hours: null
+- step: E23-rich-0
+  remaining_cells: 2
+  cases:
+  - D1
+  after:
+  - E00
+  - pool_freeze
+  - E05
+  binding_group: feature
+  state: pending_binding_or_dependency
+  remaining_forecast_hours: null
+- step: E23-rich-50
+  remaining_cells: 2
+  cases:
+  - D1
+  after:
+  - E00
+  - pool_freeze
+  - E05
+  binding_group: feature
+  state: pending_binding_or_dependency
+  remaining_forecast_hours: null
+- step: E23-rich-100
+  remaining_cells: 2
+  cases:
+  - D1
+  after:
+  - E00
+  - pool_freeze
+  - E05
+  binding_group: feature
+  state: pending_binding_or_dependency
+  remaining_forecast_hours: null
+- step: E23
+  remaining_cells: 4
+  cases:
+  - K0
+  after:
+  - E00
+  - E12
+  - E13
+  - E02
+  - E12-retrieval
+  binding_group: feature
+  state: pending_binding_or_dependency
+  remaining_forecast_hours: null
+- step: E24-asymmetric
+  remaining_cells: 1
+  cases:
+  - D1
+  after:
+  - E00
+  - pool_freeze
+  - E05
+  binding_group: optional_inputs
+  state: pending_binding_or_dependency
+  remaining_forecast_hours: null
+- step: E25
+  remaining_cells: 5
+  cases:
+  - D0
+  after:
+  - E00
+  - pool_freeze
+  - E05
+  binding_group: hosted
+  state: pending_binding_or_dependency
+  remaining_forecast_hours: null
+- step: E04-pool-miss
+  remaining_cells: 2
+  cases:
+  - D0
+  after:
+  - E00
+  - pool_freeze
+  - E03
+  - E05
+  binding_group: nil
+  state: pending_binding_or_dependency
+  remaining_forecast_hours: null
+- step: E04-listwise
+  remaining_cells: 2
+  cases:
+  - N0
+  after:
+  - E04
+  - E07
+  binding_group: nil
+  state: pending_binding_or_dependency
+  remaining_forecast_hours: null
+- step: E13-enrichment
+  remaining_cells: 2
+  cases:
+  - R0_enrichment
+  after:
+  - E00
+  - E13
+  binding_group: feature
+  state: pending_binding_or_dependency
+  remaining_forecast_hours: null
+- step: E25-forced
+  remaining_cells: 1
+  cases:
+  - D0
+  after:
+  - E25
+  - E07
+  - E05
+  binding_group: hosted
+  state: pending_binding_or_dependency
+  remaining_forecast_hours: null
+- step: E25-oracles
+  remaining_cells: 3
+  cases:
+  - D0
+  after:
+  - E25-forced
+  binding_group: hosted
+  state: pending_binding_or_dependency
+  remaining_forecast_hours: null
+- step: E25-trust
+  remaining_cells: 3
+  cases:
+  - D0
+  after:
+  - E25-forced
+  binding_group: hosted
+  state: pending_binding_or_dependency
+  remaining_forecast_hours: null
+- step: E22-policy
+  remaining_cells: 2
+  cases:
+  - D1
+  after:
+  - E22
+  - E18
+  - pool_freeze
+  - E05
+  binding_group: selected_heads
+  state: pending_binding_or_dependency
+  remaining_forecast_hours: null
+- step: G4
+  remaining_cells: 8
+  cases:
+  - D0
+  - D1
+  after:
+  - E00
+  - E05
+  - pool_freeze
+  - E26
+  - E24
+  - E06
+  - E08
+  - E08-identifiers
+  - E09
+  - E10
+  - E19
+  - E03
+  - E15
+  - E18
+  - E01
+  - E02
+  - E25
+  - E07
+  binding_group: freeze_and_final
+  state: pending_binding_or_dependency
+  remaining_forecast_hours: null
+- step: E17
+  remaining_cells: 54
+  cases:
+  - H0
+  - H1
+  - H2
+  after:
+  - G4
+  binding_group: freeze_and_final
+  state: pending_binding_or_dependency
+  remaining_forecast_hours: null
+- step: E17-published
+  remaining_cells: 9
+  cases:
+  - H0
+  - H1
+  - H2
+  after:
+  - G4
+  binding_group: freeze_and_final
+  state: pending_binding_or_dependency
+  remaining_forecast_hours: null
+binding_groups:
+  selected_heads:
+    steps:
+    - E19
+    - E18
+    - E16
+    - E22
+    - E22-policy
+    work: Reuse compatible pre-fit evidence; E19 selects fusion, E18 selects heads, then transfer and
+      label budgets retain distinct fits/folds. E22-policy follows E22. No duplicate full qualification.
+  retrieval_training:
+    steps:
+    - E20
+    work: Bind declared contrastive and cross-encoder recipes and training roles. Existing label-free
+      E05 pool contract remains usable by independent families; do not require a new supervised pool for
+      those comparisons.
+  hosted:
+    steps:
+    - E25
+    - E07
+    - E21
+    - E25-forced
+    - E25-oracles
+    - E25-trust
+    work: Bind new decision roles and their existing request/token authorization outside historical cache-only
+      queues. E25 initial precedes E07; actual forced responses precede oracle/trust replays. E21 additionally
+      requires a compatible useful judge and training-only teachers.
+  nil:
+    steps:
+    - E04
+    - E04-pool-miss
+    - E04-listwise
+    work: Bind historical 2024 Bio-LLM N0 ontologies and benchmark-pool labels, distinct from natural
+      NIL. E04-pool-miss uses D0; listwise requires E07. Never inherit D0 trained heads implicitly.
+  feature:
+    steps:
+    - E11
+    - E12-retrieval
+    - E12
+    - E13
+    - E13-enrichment
+    - E14
+    - E14-bridge
+    - E23
+    - E23-rich-0
+    - E23-rich-50
+    - E23-rich-100
+    work: P0/R0_case use cmt-confOf; K0 starwars-swg is positive-unlabelled; T0/R0_enrichment use the
+      pinned BioKG NCIT-DOID release. E12 freezes its pool before instance evidence, E13 parity precedes
+      typing/enrichment. Enrichment needs materialized native closure; optional bridge needs its separate
+      OWL case. Rich graph controls use D1; no negative-requiring K0 fit.
+  optional_inputs:
+    steps:
+    - E08-identifiers
+    - E24-asymmetric
+    work: Retain explicit optional dispositions until curated namespace exclusivity or typed directionality
+      exists. Missing input is not a negative experimental result.
+  diagnostic:
+    steps:
+    - E03
+    work: Four primary arms are complete. Only separately declared fp_only diagnostic remains in this
+      inventory; D1 robustness/expansions are additional scope.
+  freeze_and_final:
+    steps:
+    - G4
+    - E17
+    - E17-published
+    work: Resolve contributing comparisons and required controls; freeze complete recipes before reference-free
+      final inference. Preserve complete global populations and original local-query membership, published
+      comparator and actual stochastic replication. Size unique shared computation using real sustained
+      throughput; historical per-pair extrapolation is not a current ETA.
+development_case_bindings:
+  N0:
+    task: biollm-2024-ncit-doid
+    role: development
+    negative_policy: confirmed_only
+    evaluation_label_semantics: benchmark_pool
+    source:
+      path: /home/pgcotovio/Exact-OM/data/experiments-v2/biollm-nil/originals/ncit-doid/ncit.owl
+      sha256: 379a37f47c0c8e7c30397769358cca955140d16b2797a1cc75da4b1fc2b354eb
+    target:
+      path: /home/pgcotovio/Exact-OM/data/experiments-v2/biollm-nil/originals/ncit-doid/doid.owl
+      sha256: 76f41cce3616ad1a9ba6353f469e96bde7addba5d43e541651a3ab703f9ba2bc
+  P0:
+    task: cmt-confOf
+    role: development
+    negative_policy: positive_unlabelled
+    evaluation_label_semantics: natural
+    source:
+      path: /home/pgcotovio/Exact-OM/data/experiments-v2/property-case/P0/cmt.owl
+      sha256: 8bf45a9de7faf24bfee5a9d90cd95f744964f90bb0ad64ad80ec4335f6f5c1db
+    target:
+      path: /home/pgcotovio/Exact-OM/data/experiments-v2/property-case/P0/confOf.owl
+      sha256: e869c4e75c65c5fd26523a4e73b99a3b1916823a35708798e87c549a63242625
+  K0:
+    task: starwars-swg
+    role: development
+    negative_policy: positive_unlabelled
+    evaluation_label_semantics: natural
+    source:
+      path: /home/pgcotovio/Exact-OM/data/experiments-v2/oaei_kg/oaei_kg/starwars-swg/source.xml
+      sha256: 074387f6ce3189175fe2e20fab84d6e72cec44ce1352fb20c7368c5382d379a2
+    target:
+      path: /home/pgcotovio/Exact-OM/data/experiments-v2/oaei_kg/oaei_kg/starwars-swg/target.xml
+      sha256: 0d1168de85d699087845a9167da0f04a01acbd767149b6a9e45773e77314b4c9
+  R0_case:
+    task: cmt-confOf
+    role: development
+    negative_policy: positive_unlabelled
+    evaluation_label_semantics: natural
+    source:
+      path: /home/pgcotovio/Exact-OM/data/experiments-v2/property-case/P0/cmt.owl
+      sha256: 8bf45a9de7faf24bfee5a9d90cd95f744964f90bb0ad64ad80ec4335f6f5c1db
+    target:
+      path: /home/pgcotovio/Exact-OM/data/experiments-v2/property-case/P0/confOf.owl
+      sha256: e869c4e75c65c5fd26523a4e73b99a3b1916823a35708798e87c549a63242625
+  R0_enrichment:
+    task: biokg-ncit-doid
+    role: development
+    negative_policy: positive_unlabelled
+    evaluation_label_semantics: natural
+    source:
+      path: /home/pgcotovio/Exact-OM/data/experiments-v2/biokg-release/v0.2.0-rc3-bbb08d188e48/views/NCIT
+      sha256: 847a46714fc5a1d5a2b2b05d35a8e07c1d91dec6e6b223bfae6fad73ac450fd1
+    target:
+      path: /home/pgcotovio/Exact-OM/data/experiments-v2/biokg-release/v0.2.0-rc3-bbb08d188e48/views/DOID
+      sha256: 5a301622f59e2e71da7275fc2f08fd17b4201216049910a8db99c3c41e23950b
+  T0:
+    task: biokg-ncit-doid
+    role: development
+    negative_policy: positive_unlabelled
+    evaluation_label_semantics: natural
+    source:
+      path: /home/pgcotovio/Exact-OM/data/experiments-v2/biokg-release/v0.2.0-rc3-bbb08d188e48/views/NCIT
+      sha256: 847a46714fc5a1d5a2b2b05d35a8e07c1d91dec6e6b223bfae6fad73ac450fd1
+    target:
+      path: /home/pgcotovio/Exact-OM/data/experiments-v2/biokg-release/v0.2.0-rc3-bbb08d188e48/views/DOID
+      sha256: 5a301622f59e2e71da7275fc2f08fd17b4201216049910a8db99c3c41e23950b
+observed_whole_arm_timings:
+- path: data/experiments-v2/e03-qualification-01/qualification/D0_E03--distribution_threshold/measurement.json
+  arm: D0_E03--distribution_threshold
+  wall_hours: 0.3264
+- path: data/experiments-v2/e03-qualification-01/qualification/D0_E03--isotonic/measurement.json
+  arm: D0_E03--isotonic
+  wall_hours: 4.468
+- path: data/experiments-v2/e03-qualification-01/qualification/D0_E03--none/measurement.json
+  arm: D0_E03--none
+  wall_hours: 0.3452
+- path: data/experiments-v2/e03-qualification-01/qualification/D0_E03--platt/measurement.json
+  arm: D0_E03--platt
+  wall_hours: 7.0209
+- path: data/experiments-v2/e15-qualification-01/qualification/D0_E03--analytic_fixed/measurement.json
+  arm: D0_E03--analytic_fixed
+  wall_hours: 0.3334
+- path: data/experiments-v2/e15-qualification-01/qualification/D0_E03--current_supervised/measurement.json
+  arm: D0_E03--current_supervised
+  wall_hours: 4.3149
+- path: data/experiments-v2/e15-qualification-01/qualification/D0_E03--distribution_margin/measurement.json
+  arm: D0_E03--distribution_margin
+  wall_hours: 0.335
+- path: data/experiments-v2/e15-qualification-01/qualification/D0_E03--reciprocal_consensus/measurement.json
+  arm: D0_E03--reciprocal_consensus
+  wall_hours: 0.3367
+- path: data/experiments-v2/e10-acceptance-01/qualification/D0_E03--winner_only/measurement.json
+  arm: D0_E03--winner_only
+  wall_hours: 4.4368
+- path: data/experiments-v2/e10-acceptance-01/qualification/D0_E03--winner_runnerup/measurement.json
+  arm: D0_E03--winner_runnerup
+  wall_hours: 2.8671
+- path: data/experiments-v2/e19-qualification-01/qualification/D0_E03--analytic_shipped/measurement.json
+  arm: D0_E03--analytic_shipped
+  wall_hours: 0.3282
+forecast_note: These old timings include cold setup and fit; they are provenance for sizing, not a remaining
+  ETA. Reuse and optimized throughput must be validated. No invented duration for unmeasured work.
+unexpanded_scope:
+- required shared controls and diagnostics
+- justified at-most-1000-source survivor expansions and required replication
+- conditional component contrasts
+- selected feature held-out panels
+- OAEI-KG/BioKG/DISO and Bio-ML submission exports
+- blinded audit preparation; human/organizer schedule external
+dependency_resolution_note: The existing label-free pool_freeze contract is already usable; do not confuse
+  that port with completion of the separate supervised E20 experiment. Producer dependencies in this snapshot
+  do not grant run admission.
