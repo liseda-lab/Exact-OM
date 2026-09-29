@@ -203,3 +203,20 @@ def test_migrated_attempt_costs_are_complete_unique_and_closed():
             continuation_work(state, "/new/continue.py", "arm", [old])
     with pytest.raises(ValueError, match="closed original accounting"):
         continuation_work(state, "/new/continue.py", "different_arm", [old])
+
+
+@pytest.mark.parametrize("step", ["14372.39", "14372.40"])
+def test_recovery_resolves_current_supervisor_after_redeployment(tmp_path, step):
+    from tools.recover_e19_precision import current_supervisor_step
+
+    (tmp_path / "supervisor-step-id").write_text(step + "\n")
+    assert current_supervisor_step({"supervisor": str(tmp_path), "supervisor_step": "14372.37"}) == step
+
+
+@pytest.mark.parametrize("step", ["14373.39", "14372.extern", "14372.0.1", ""])
+def test_recovery_rejects_invalid_supervisor_receipt(tmp_path, step):
+    from tools.recover_e19_precision import current_supervisor_step
+
+    (tmp_path / "supervisor-step-id").write_text(step)
+    with pytest.raises(ValueError, match="numeric retained-allocation"):
+        current_supervisor_step({"supervisor": str(tmp_path)})

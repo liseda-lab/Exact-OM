@@ -253,6 +253,16 @@ def register_recovery_lineage(recipe, prepared):
     raise RuntimeError("Dispatcher has not verified this step; retain reservation and receipts")
 
 
+def current_supervisor_step(recipe):
+    """Resolve the current supervisor after a redeploy, never a stale prepared step."""
+    path = Path(recipe["supervisor"]) / "supervisor-step-id"
+    step = path.read_text().strip()
+    allocation, separator, number = step.partition(".")
+    if allocation != "14372" or separator != "." or not number.isdigit():
+        raise ValueError("Supervisor receipt must name a numeric retained-allocation step")
+    return step
+
+
 def run(recipe_path):
     recipe = read(recipe_path)
     root, parent, code = map(Path, (recipe["root"], recipe["parent_root"], recipe["code_root"]))
@@ -266,7 +276,7 @@ def run(recipe_path):
     args = SimpleNamespace(
         root=root,
         code_root=code,
-        supervisor_step=recipe["supervisor_step"],
+        supervisor_step=current_supervisor_step(recipe),
         accounting_policy=verify(recipe["accounting_policy"]),
         accounting_policy_sha256=recipe["accounting_policy"]["sha256"],
     )
