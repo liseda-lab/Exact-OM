@@ -234,3 +234,27 @@ def test_partial_or_cached_work_cannot_be_a_whole_arm_measurement(processed, tot
         {"return_code": 0},
         1,
     )
+
+
+def test_optional_shared_cache_root_preserves_current_request_account(tmp_path, monkeypatch):
+    monkeypatch.delenv("EXACT_EMBEDDING_CACHE_DIR", raising=False)
+    monkeypatch.delenv("EXACT_NUMERICAL_CACHE_ROOT", raising=False)
+    shared = tmp_path / "current-runtime"
+    common = tmp_path / "common-cache"
+    env = {
+        "EXACT_DATASET_CACHE_DIR": "/old/datasets/reference-scope",
+        "EXACT_EXPERIMENT_SHARED_CACHE_ROOT": str(common),
+    }
+    result = qualification.cached_worker_env(
+        env,
+        shared,
+        {"attempts": 100, "billable_tokens": 1000},
+        tmp_path / "code",
+        tmp_path / "STOP",
+    )
+    assert result["EXACT_EMBEDDING_CACHE_DIR"] == str(common / "embeddings")
+    assert result["EXACT_NUMERICAL_CACHE_ROOT"] == str(common)
+    assert result["EXACT_DATASET_CACHE_DIR"] == str(common / "datasets/reference-scope")
+    assert result["EXACT_OPENROUTER_LEDGER_DIR"] == str(shared / "openrouter")
+    assert result["EXACT_OPENROUTER_REQUEST_CAP"] == "100"
+    assert result["EXACT_OPENROUTER_TOKEN_CAP"] == "1000"

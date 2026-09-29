@@ -8,6 +8,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import socket
 import subprocess
 import sys
 from pathlib import Path
@@ -36,6 +37,23 @@ def check_owner(args):
     unexpected = set(map(str.strip, steps)) - {"14372.0", "14372.extern", own, args.supervisor_step}
     if unexpected:
         raise ValueError("Another numerical worker remains live: " + repr(sorted(unexpected)))
+    # Slurm workers are children of slurmd, not of the submitting srun process.
+    # Accept only the local launcher PID reported for this exact live step.
+    fields = dict(
+        part.split("=", 1)
+        for part in subprocess.check_output(
+            ["scontrol", "show", "step", own, "-o"], text=True
+        ).split()
+        if "=" in part
+    )
+    if fields.get("StepId") != own or fields.get("UserId") != str(os.getuid()):
+        raise ValueError("Cannot verify the current Slurm step owner")
+    host, separator, pid = fields.get("SrunHost:Pid", "").rpartition(":")
+    launcher = (
+        int(pid)
+        if separator and pid.isdigit() and host.split(".")[0] == socket.gethostname().split(".")[0]
+        else None
+    )
     import psutil
 
     process = psutil.Process()
@@ -49,6 +67,12 @@ def check_owner(args):
                 arg == root or arg.startswith(root + "/") for arg in (item.info["cmdline"] or [])
             )
         ):
+            if (
+                item.info["name"] == "srun"
+                and item.pid == launcher
+                and item.uids().real == os.getuid()
+            ):
+                continue
             raise ValueError("A previous E19 owner/descendant remains: " + str(item.pid))
 
 

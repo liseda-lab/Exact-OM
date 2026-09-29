@@ -159,11 +159,16 @@ def cached_worker_env(env, shared, initial, code_root, stop):
         "EXACT_OPENROUTER_REQUEST_CAP": str(initial["attempts"]),
         "EXACT_OPENROUTER_TOKEN_CAP": str(initial["billable_tokens"]),
         "EXACT_OPENROUTER_RETRY_UNKNOWN": "0",
-        "EXACT_EMBEDDING_CACHE_DIR": str(shared / "embeddings"),
         "EXACT_EXPERIMENT_STOP_FILE": str(stop),
     }
+    cache_root = Path(worker_env.get("EXACT_EXPERIMENT_SHARED_CACHE_ROOT", str(shared)))
+    if "EXACT_EXPERIMENT_SHARED_CACHE_ROOT" in worker_env:
+        worker_env.setdefault("EXACT_EMBEDDING_CACHE_DIR", str(cache_root / "embeddings"))
+        worker_env.setdefault("EXACT_NUMERICAL_CACHE_ROOT", str(cache_root))
+    else:
+        worker_env["EXACT_EMBEDDING_CACHE_DIR"] = str(shared / "embeddings")
     scope = Path(worker_env["EXACT_DATASET_CACHE_DIR"]).name
-    worker_env["EXACT_DATASET_CACHE_DIR"] = str(shared / "datasets" / scope)
+    worker_env["EXACT_DATASET_CACHE_DIR"] = str(cache_root / "datasets" / scope)
     return worker_env
 
 
