@@ -496,3 +496,78 @@ def test_restrict_sources_filters_all_in_memory_frames_without_rewriting_pool_ma
     assert dataset.candidate_pool_manifest["origin"] == "sampled"
     assert dataset.candidate_pool_manifest["retrieval_config"]["source_sample"]["cap"] == 2
     assert dataset._candidate_pool_manifest_path.read_bytes() == persisted_before
+
+
+def test_sample_manifest_matches_fresh_and_cached_exact_prefilter_populations(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    raw = pd.DataFrame(
+        [("s1", "t1", "class", "class", 0.9), ("s1", "t2", "class", "class", 0.8)],
+        columns=["Src", "Tgt", "SrcKind", "TgtKind", "cand_sim"],
+    )
+    processed = raw.copy()
+    processed.loc[0, "cand_sim"] = np.nan
+    populations = []
+    for cached in (False, True):
+        dataset = _dataset(tmp_path, monkeypatch, name=f"prefilter-cap-{cached}")
+        dataset._candidates = raw.copy()
+        dataset._candidate_pool_sizes = {"class": {"source_entities": 1}}
+        dataset._refresh_candidate_pool_manifest(origin="generated")
+        persisted = dataset._candidate_pool_manifest_path.read_bytes()
+        dataset._df = processed.copy()
+        if cached:
+            dataset._candidates = None
+        dataset.restrict_sources(cap=1, seed=17)
+        pool = dataset.candidate_pool_manifest
+        populations.append((pool["gold_free_summary"], pool["per_kind"]))
+        assert pool["gold_free_summary"]["candidate_pairs"] == 1
+        assert dataset._candidate_pool_manifest_path.read_bytes() == persisted
+        pd.testing.assert_frame_equal(dataset.dataframe, processed)
+    assert populations[0] == populations[1]
+
+
+def test_sample_manifest_uses_durable_float_metadata_without_changing_scoring_frame(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # pandas' default parser changes this serialized float by one binary step.
+    original = pd.DataFrame(
+        [("s1", "t1", "class", "class", 0.30661001056432724)],
+        columns=["Src", "Tgt", "SrcKind", "TgtKind", "cand_sim"],
+    )
+    pools = []
+    for cached in (False, True):
+        dataset = _dataset(tmp_path, monkeypatch, name=f"float-cap-{cached}")
+        original.to_csv(dataset._df_save_path, index=False)
+        restored = pd.read_csv(dataset._df_save_path)
+        assert restored.cand_sim.iloc[0].hex() != original.cand_sim.iloc[0].hex()
+        dataset._df = restored.copy() if cached else original.copy()
+        before = dataset._df.copy()
+        dataset._candidates = None if cached else original.copy()
+        dataset._candidate_pool_sizes = {"class": {"source_entities": 1}}
+        dataset.restrict_sources(cap=1, seed=17)
+        pools.append(dataset.candidate_pool_manifest["per_kind"])
+        pd.testing.assert_frame_equal(dataset.dataframe, before)
+    assert pools[0] == pools[1]
+
+
+@pytest.mark.parametrize("mutation", ["identity", "order"])
+def test_sample_manifest_rejects_stale_durable_candidate_identity_or_order(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    mutation: str,
+) -> None:
+    dataset = _dataset(tmp_path, monkeypatch, name=f"stale-cap-{mutation}")
+    dataset._df = pd.DataFrame(
+        [("s1", "t1", "class", "class", 0.9), ("s1", "t2", "class", "class", 0.8)],
+        columns=["Src", "Tgt", "SrcKind", "TgtKind", "cand_sim"],
+    )
+    saved = dataset._df.copy()
+    if mutation == "identity":
+        saved.loc[0, "Tgt"] = "changed"
+    else:
+        saved = saved.iloc[::-1]
+    saved.to_csv(dataset._df_save_path, index=False)
+    with pytest.raises(ValueError, match="identities or order"):
+        dataset.restrict_sources(cap=1, seed=17)

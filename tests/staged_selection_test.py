@@ -291,3 +291,86 @@ def test_e01_amendment_rejects_undeclared_scoring_and_extraction_drift(
     mapping[parts[-1]] = value
     with pytest.raises(ValueError, match="E01"):
         validate_comparison_cells(cells, source)
+
+
+@pytest.mark.parametrize("plan_only", [False, True])
+def test_historical_analytic_inputs_bind_without_becoming_current_cells(tmp_path, bound, plan_only):
+    base, suite = bound
+    arms = fitting_arms()["E10"]
+    historical = [
+        complete(tmp_path, "E10-analytic", arm["id"], harness.deep_merge(base, arm["overlay"]))
+        for arm in arms[:6]
+    ]
+    consumer = declaration(tmp_path, "E10", arms[6:], base)
+    consumer.config.frozen_constants["selected_analytic_setting"] = {"producer": "E10-analytic"}
+    selections = selected("E10-analytic", "analytic_g2_t05", status="screened_out")
+    current = []
+    result, inherited = harness._materialize_campaign_evidence(
+        consumer,
+        suite,
+        current,
+        selections,
+        {},
+        plan_only=plan_only,
+        external_manifests=historical,
+    )
+    assert current == [] and inherited == {}
+    assert len(result.config.arms) == 2
+    assert all(arm.overlay["matching"]["fusion"]["gamma"] == 2 for arm in result.config.arms)
+    assert all(arm.overlay["matching"]["fusion"]["tau"] == 0.5 for arm in result.config.arms)
+    with pytest.raises(PrerequisiteUnavailable, match="completed development cell"):
+        harness._materialize_campaign_evidence(
+            consumer,
+            suite,
+            [],
+            selections,
+            {},
+            plan_only=plan_only,
+            external_manifests=historical[:-1],
+        )
+    with pytest.raises(PrerequisiteUnavailable, match="completed development selection"):
+        harness._materialize_campaign_evidence(
+            consumer,
+            suite,
+            [],
+            {},
+            {},
+            plan_only=plan_only,
+            external_manifests=historical,
+        )
+    config_path = (
+        Path(historical[0]["fingerprint_payload"]["output_dir"]) / "_inputs/resolved.config.yaml"
+    )
+    value = ConfigModel.load_config(config_path).model_dump(mode="json", by_alias=True)
+    value["matching"]["threshold"] = 0.123
+    config_path.write_text(dump_yaml_document(value))
+    with pytest.raises(ValueError, match="resolved configuration changed"):
+        harness._materialize_campaign_evidence(
+            consumer,
+            suite,
+            [],
+            selections,
+            {},
+            plan_only=plan_only,
+            external_manifests=historical,
+        )
+
+
+def test_historical_config_is_verified_before_new_schema_defaults(tmp_path, bound):
+    from exact.core.entities.configs.yaml_io import load_yaml_mapping
+    from exact.experiments.staged_selection import _completed_cell
+
+    base, _ = bound
+    item = complete(tmp_path, "E10-analytic", "analytic_g2_t05", base)
+    path = Path(item["fingerprint_payload"]["output_dir"]) / "_inputs/resolved.config.yaml"
+    raw = load_yaml_mapping(path)
+    raw["matching"]["extraction"].pop("anchor_conflict_policy")
+    item["resolved_config_hash"] = harness.hash_payload(raw)
+    path.write_text(dump_yaml_document(raw))
+    _, config, _ = _completed_cell("E10-analytic", "analytic_g2_t05", [item])
+    assert config.matching.extraction.anchor_conflict_policy == "error"
+    assert config.fingerprint() != item["resolved_config_hash"]
+    raw["matching"]["fusion"]["gamma"] = 3
+    path.write_text(dump_yaml_document(raw))
+    with pytest.raises(ValueError, match="resolved configuration changed"):
+        _completed_cell("E10-analytic", "analytic_g2_t05", [item])
