@@ -24,7 +24,12 @@ def interval_seconds(intervals: list[list[float]]) -> float:
 
 
 class BudgetLedger:
-    """Admit whole work units while protecting final and repair allocations."""
+    """Track time forecasts and enforce declared hosted spending limits.
+
+    The 2026-09-29 amendment makes node-hour and family envelopes advisory.
+    Historical limits and actual charges remain intact; an underestimated
+    duration must never prevent checkpoint continuation.
+    """
 
     def __init__(self, path: Path, limits: Mapping[str, Any]):
         self.path = Path(path)
@@ -62,8 +67,9 @@ class BudgetLedger:
         requests: int = 0,
         tokens: int = 0,
         projected_usd: float = 0,
+        forecast_known: bool = True,
     ) -> None:
-        """Reserve a conservative complete-unit forecast before scheduling it."""
+        """Record a forecast before scheduling; time overruns are warnings only."""
         if (
             not math.isfinite(seconds)
             or seconds < 0
@@ -90,15 +96,14 @@ class BudgetLedger:
                 for item in items
                 if item["group"] == group and item["status"] == "reserved"
             )
+            warnings = []
             if group_seconds + seconds > self.limits["envelopes_hours"][group] * 3600:
-                raise ValueError(
-                    f"deferred_budget: {group} complete-unit forecast exceeds allowance"
-                )
+                warnings.append(f"{group} forecast exceeds historical time envelope")
             node_seconds = interval_seconds(state["intervals"]) + sum(
                 item["seconds"] for item in items if item["status"] == "reserved"
             )
             if node_seconds + seconds > self.limits.get("node_hours_cap", math.inf) * 3600:
-                raise ValueError("deferred_budget: complete-unit forecast exceeds node-hour cap")
+                warnings.append("forecast exceeds historical node-hour envelope")
             for field, amount in (("requests", requests), ("tokens", tokens)):
                 reserve = self.limits.get(f"final_{field}_reserved", 0) if group != "final" else 0
                 spent = sum(
@@ -114,7 +119,11 @@ class BudgetLedger:
                 "tokens": tokens,
                 "projected_usd": projected_usd,
                 "actual_usd": None,
+                "forecast_seconds": seconds,
+                "forecast_known": forecast_known,
+                "time_warnings": warnings,
             }
+            state["time_policy"] = "advisory_2026-09-29"
 
     def finish(
         self,
@@ -150,11 +159,29 @@ class BudgetLedger:
                 tokens=tokens,
                 actual_usd=actual_usd,
             )
+            if item.get("forecast_known", True) and elapsed > item.get("forecast_seconds", elapsed):
+                item.setdefault("time_warnings", []).append("actual duration exceeds forecast")
             state["intervals"].append([start, end])
             state["node_seconds"] = interval_seconds(state["intervals"])
             state["elapsed_seconds"] = max(x[1] for x in state["intervals"]) - min(
                 x[0] for x in state["intervals"]
             )
+
+    def record_allocation(self, allocation: str, *, start: float, end: float) -> None:
+        """Track scheduler-confirmed retained time, separately from active work."""
+        interval_seconds([[start, end]])
+        if not allocation:
+            raise ValueError("allocation identity is required")
+        with self._transaction() as state:
+            allocations = state.setdefault("allocations", {})
+            previous = allocations.get(allocation)
+            if previous and (previous["start"] != start or end < previous["end"]):
+                raise ValueError("allocation observation cannot rewrite prior accounting")
+            allocations[allocation] = {"start": start, "end": end}
+            state["allocation_seconds"] = interval_seconds(
+                [[row["start"], row["end"]] for row in allocations.values()]
+            )
+            state["time_policy"] = "advisory_2026-09-29"
 
     def snapshot(self) -> dict[str, Any]:
         """Return the consistent retained account, including incomplete reservations."""

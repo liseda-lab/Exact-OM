@@ -343,6 +343,7 @@ class CellRecovery:
     def environment(self) -> dict[str, str]:
         limits = self.metadata.get("budget_limits", {})
         reserve_final = self.metadata.get("stage") != "confirm"
+        shared = Path(os.environ.get("EXACT_EXPERIMENT_SHARED_CACHE_ROOT", str(self.store.root)))
         budget = {
             f"EXACT_OPENROUTER_{unit.upper()}_CAP": str(
                 limits[f"{unit}s_cap"]
@@ -360,8 +361,16 @@ class CellRecovery:
             "EXACT_EXPERIMENT_MODE": "1",
             "EXACT_EXPERIMENT_RUNTIME": str(self.cell.output_dir / "recovery-runtime.json"),
             "EXACT_OPENROUTER_LEDGER_DIR": str(self.store.root / "openrouter"),
-            "EXACT_EMBEDDING_CACHE_DIR": str(self.store.root / "embeddings"),
-            "EXACT_DATASET_CACHE_DIR": str(self.store.root / "datasets" / self.dataset_cache_scope),
+            "EXACT_EMBEDDING_CACHE_DIR": os.environ.get(
+                "EXACT_EMBEDDING_CACHE_DIR", str(shared / "embeddings")
+            ),
+            "EXACT_DATASET_CACHE_DIR": str(shared / "datasets" / self.dataset_cache_scope),
+            "EXACT_NUMERICAL_CACHE_ROOT": os.environ.get("EXACT_NUMERICAL_CACHE_ROOT", str(shared)),
+            **{
+                name: os.environ[name]
+                for name in ("EXACT_DATASET_CACHE_LOCAL_DIR",)
+                if name in os.environ
+            },
             "EXACT_EXPERIMENT_ROLE": self.cell.split_role,
             "EXACT_EXPERIMENT_STOP_FILE": str(self.store.root / "STOP"),
         }

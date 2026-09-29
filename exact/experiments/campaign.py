@@ -774,7 +774,7 @@ def campaign_plan(path: Path, *, stage: str, verify_inputs: bool = True) -> dict
     if lock.profile == "extended_21d":
         for key, extra in blueprint["budget_envelopes_extended_extra_hours"].items():
             envelopes[key] += extra
-    rows, blockers = [], []
+    rows, blockers, time_warnings = [], [], []
     seconds = dict.fromkeys(ENVELOPES, 0.0)
     requests = tokens = 0
     lookup = {step.id: step for step in lock.steps}
@@ -853,7 +853,9 @@ def campaign_plan(path: Path, *, stage: str, verify_inputs: bool = True) -> dict
                 and step.external_selection is None
                 and status not in TERMINAL
             ):
-                issues.append("measured cold/warm resource forecast missing")
+                time_warnings.append(
+                    f"{step.id}: runtime forecast pending; record actual scientific work"
+                )
             if stage == "confirm" and lock.final_selection is None:
                 issues.append("G4 frozen final selection missing")
             rows.append(
@@ -874,7 +876,7 @@ def campaign_plan(path: Path, *, stage: str, verify_inputs: bool = True) -> dict
             )
     for group, amount in seconds.items():
         if amount > envelopes[group] * 3600:
-            blockers.append(f"{group} forecast exceeds {envelopes[group]} hours")
+            time_warnings.append(f"{group} forecast exceeds historical {envelopes[group]} hours")
     if (
         requests + (lock.final_requests_reserved if stage == "screen" else 0)
         > limits["llm_request_planning_cap"]
@@ -894,6 +896,8 @@ def campaign_plan(path: Path, *, stage: str, verify_inputs: bool = True) -> dict
         "order": dependency_order(lock.steps),
         "rows": rows,
         "budget_errors": blockers,
+        "time_warnings": sorted(set(time_warnings)),
+        "time_policy": "advisory_2026-09-29",
         "forecast_hours": {key: value / 3600 for key, value in seconds.items()},
         "envelopes_hours": envelopes,
         "requests": requests,
@@ -1487,7 +1491,7 @@ def run_comparison(cells: Any, suite: Any, source: Any, **kwargs: Any) -> list[d
     if metadata.get("reuse_plan_only"):
         return run_cells(cells, suite, **kwargs)
     spec = source.config.frozen_constants["campaign_v2"]
-    estimate = WorkEstimate.model_validate(spec["estimate"])
+    estimate = WorkEstimate.model_validate(spec["estimate"]) if spec.get("estimate") else None
     root = Path(metadata["root"])
     account = BudgetLedger(root / "budget.json", metadata["budget_limits"])
     requests = RequestLedger(root / "openrouter")
@@ -1510,10 +1514,11 @@ def run_comparison(cells: Any, suite: Any, source: Any, **kwargs: Any) -> list[d
     account.admit(
         work_id,
         group=spec["budget_group"],
-        seconds=estimate.seconds(),
-        requests=estimate.requests,
-        tokens=estimate.tokens,
-        projected_usd=estimate.projected_usd,
+        seconds=estimate.seconds() if estimate else 0,
+        requests=estimate.requests if estimate else 0,
+        tokens=estimate.tokens if estimate else 0,
+        projected_usd=estimate.projected_usd if estimate else 0,
+        forecast_known=estimate is not None,
     )
     before, start, status = usage(), time.time(), "failed"
     try:
@@ -1531,7 +1536,7 @@ def run_comparison(cells: Any, suite: Any, source: Any, **kwargs: Any) -> list[d
         # Unknown delivery retains the reserved token exposure instead of becoming zero cost.
         tokens = int(delta["prompt_tokens"] + delta["completion_tokens"])
         if delta["unknown"]:
-            tokens = max(tokens, estimate.tokens)
+            tokens = max(tokens, estimate.tokens if estimate else 0)
         account.finish(
             work_id,
             start=start,

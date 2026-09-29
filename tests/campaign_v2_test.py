@@ -119,9 +119,8 @@ def test_screen_plan_is_read_only_and_retains_unimplemented_arms(tmp_path):
     assert set(tmp_path.iterdir()) == before
     assert len(plan["rows"]) == 2
     assert all(row["status"] == "implementing" for row in plan["rows"])
-    assert all(
-        "measured cold/warm resource forecast missing" in row["issues"] for row in plan["rows"]
-    )
+    assert any("runtime forecast pending" in warning for warning in plan["time_warnings"])
+    assert all("forecast missing" not in str(row["issues"]) for row in plan["rows"])
     assert plan["final_hours_reserved"] == 54
     assert plan["recovery_reserve_hours"] == 60
 
