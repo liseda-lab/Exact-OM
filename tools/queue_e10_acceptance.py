@@ -10,7 +10,18 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-from tools.qualify_cached_family import binding, run_probe, run_worker, usage
+from tools.measured_once import (
+    promote_measured_cells,
+    require_reuse_only,
+    reused_comparison_forecast,
+)
+from tools.qualify_cached_family import (
+    binding,
+    memory_limit_bytes,
+    run_probe,
+    run_worker,
+    usage,
+)
 from tools.resume_cached_batch import (
     account_inventory,
     campaign_limits,
@@ -549,6 +560,7 @@ def run(args, h):
         },
     )
     proof = family_forecast(rows, measurement, h)
+    proof = reused_comparison_forecast(proof)
     h.freeze(wave / "forecast.json", proof)
     with tempfile.TemporaryDirectory(prefix="e10_acceptance-admission-") as tmp:
         from exact.experiments.budget import BudgetLedger
@@ -568,7 +580,7 @@ def run(args, h):
     ).splitlines()
     if (
         len(free) != 1
-        or proof["estimate"]["peak_ram_gb"] > 56
+        or proof["estimate"]["peak_ram_gb"] > memory_limit_bytes() / 1024**3
         or proof["estimate"]["peak_vram_gb"] > float(free[0]) / 1024
     ):
         raise ValueError("Measured family memory does not fit this node")
@@ -588,6 +600,9 @@ def run(args, h):
     destination = wave / "runtime/exact-om-focused-v2"
     h.copy_state(current, destination)
     current = destination
+    promote_measured_cells(
+        campaign, current, rows, FAMILY, read(h.verify(receipt["source_selection"])), args.code_root
+    )
     cached = usage(current / "openrouter")
     os.environ.update(
         EXACT_OPENROUTER_REQUEST_CAP=str(cached["attempts"]),
@@ -619,7 +634,8 @@ def run(args, h):
     )
     h.check_pause()
     with account_inventory(h, current, FAMILY, "channels", proof["inventory_seconds"]):
-        h.guarded_execute(campaign, wave, args.code_root)
+        with require_reuse_only():
+            h.guarded_execute(campaign, wave, args.code_root)
     if usage(current / "openrouter") != cached:
         raise ValueError("Comparison incurred incremental hosted usage")
     manifests = sorted(

@@ -1,4 +1,4 @@
-"""Matched cached-only family qualification through the existing recovery harness."""
+"""Execute measured, resumable cached cells once for their scientific comparison."""
 
 from __future__ import annotations
 
@@ -18,6 +18,65 @@ def binding(path):
 
     path = Path(path).resolve()
     return {"path": str(path), "sha256": sha256_file(path)}
+
+
+def memory_limit_bytes():
+    """Respect the actual allocation/cgroup with headroom for the host."""
+    import psutil
+
+    caps = [psutil.virtual_memory().total]
+    cpus = int(os.environ.get("SLURM_CPUS_PER_TASK", "0")) or os.cpu_count() or 1
+    for field, multiplier in (("SLURM_MEM_PER_NODE", 1), ("SLURM_MEM_PER_CPU", cpus)):
+        value = os.environ.get(field, "")
+        if value.isdigit() and int(value) > 0:
+            caps.append(int(value) * multiplier * 1024**2)
+    try:
+        group = next(
+            line.split(":", 2)[2]
+            for line in Path("/proc/self/cgroup").read_text().splitlines()
+            if line.startswith("0::")
+        )
+        directory = Path("/sys/fs/cgroup") / group.lstrip("/")
+        while directory.is_relative_to("/sys/fs/cgroup"):
+            path = directory / "memory.max"
+            value = path.read_text().strip() if path.is_file() else "max"
+            if value.isdigit():
+                caps.append(int(value))
+            directory = directory.parent
+    except (OSError, StopIteration):
+        pass
+    capacity = min(caps)
+    return max(1, int(capacity - max(2 * 1024**3, capacity * 0.10)))
+
+
+def preserve_training_progress(directory, identity):
+    """Seal complete training shards before recovery archives a stopped attempt."""
+    from exact.experiments.recovery import ArtifactStore
+    from exact.experiments.runtime import _files
+
+    directory = Path(directory)
+    store = ArtifactStore(directory)
+    previous = store.latest_checkpoint(identity["artifact_id"])
+    if previous is not None:
+        return previous
+    output = directory / "run"
+    runtime = json.loads((output / "recovery-runtime.json").read_text())
+    if runtime["identity"] != identity:
+        raise ValueError("Stopped training numerical identity changed")
+    paths = _files(output, ("fitting", "dataset"))
+    if not any(name.startswith("fitting/") for name in paths):
+        return None
+    for path in paths.values():
+        if path.suffix == ".json":
+            json.loads(path.read_text())
+    population = json.loads((output / "dataset/candidate_pool_sample_manifest.json").read_text())
+    return store.checkpoint(
+        identity,
+        completed_ids=[],
+        cursor={"next_pair": 0, "dataset_rows": population["gold_free_summary"]["candidate_pairs"]},
+        outputs=paths,
+        state={"boundary": "stopped_training_shards", "inference_pairs_complete": 0},
+    )
 
 
 def usage(directory):
@@ -189,6 +248,7 @@ def run_probe(
     forecast_seconds,
     prefix=False,
     case_id="D0",
+    resume=False,
 ):
     """One matched development-case probe; use prefix=False for family admission."""
     import psutil
@@ -246,10 +306,20 @@ def run_probe(
             prefix=prefix,
         )
         return row
-    if (directory / "run").exists() or (directory / "recovery").exists():
+    continuing = (directory / "run").exists() or (directory / "recovery").exists()
+    if continuing and not resume:
         raise ValueError(
             "Unfinished qualification needs recorded recovery; resumed time is not a whole-arm measurement"
         )
+    previous_work = []
+    if continuing:
+        state = json.loads((shared / "budget.json").read_text())
+        prefix_id = "qualification/" + script.parent.name + "/" + name + "/"
+        previous_work = [key for key in state["work"] if key.startswith(prefix_id)]
+        if not previous_work or any(
+            state["work"][key]["status"] not in {"failed", "interrupted"} for key in previous_work
+        ):
+            raise ValueError("Checkpoint continuation requires closed original accounting")
     work_id = "qualification/" + script.parent.name + "/" + name + "/" + os.environ["SLURM_STEP_ID"]
     expected_config = binding(config)
     stop = directory / "STOP"
@@ -307,7 +377,17 @@ def run_probe(
         planned_cell = replace(cell, recovery={**cell.recovery, "reuse_plan_only": True})
         check_controls(script, directory)
         harness.execute_cell(planned_cell, suite, workdir=code_root, resume=True)
+        if continuing:
+            from exact.experiments.runtime import CellRecovery
+
+            expected = CellRecovery(
+                planned_cell,
+                harness._provenance_payload(planned_cell, suite, workdir=code_root),
+                code_root,
+            )
+            preserve_training_progress(directory, expected.identities["extraction"])
         calls = []
+        rss_limit = memory_limit_bytes()
 
         def launch(command, *, cwd, stdout_path, stderr_path, env=None):
             wrapper = load_yaml_mapping(Path(command[-1]))["job"]
@@ -351,8 +431,10 @@ def run_probe(
                             )
                         except (psutil.NoSuchProcess, psutil.AccessDenied):
                             pass
-                        if peak > 56 * 1024**3:
-                            preserve_stop(stop, "Cooperative 56 GiB process-tree RSS guard")
+                        if peak > rss_limit:
+                            preserve_stop(
+                                stop, f"Cooperative process-tree RSS guard ({rss_limit} bytes)"
+                            )
                         try:
                             check_controls(script, directory)
                         except (RuntimeError, OSError, ValueError, KeyError) as error:
@@ -374,6 +456,24 @@ def run_probe(
             return child.returncode, time.monotonic() - begin, peak // 1024
 
         original = harness._run_subprocess
+        original_measurement = harness._execution_measurement
+
+        def measured_attempts(cell, recovery, **values):
+            measurement = original_measurement(cell, recovery, **values)
+            if continuing and values["complete"] and "extraction" not in recovery.reuse:
+                measurement.update(
+                    status="measured",
+                    reason="Cumulative interrupted execution; includes restart overhead",
+                    wall_seconds=values["elapsed"]
+                    + sum(state["work"][key]["seconds"] for key in previous_work),
+                    measurement_scope="cumulative_attempts",
+                    accounting_work_ids=[*previous_work, work_id],
+                )
+                harness._atomic_json(
+                    cell.output_dir / "stats/execution_measurement.json", measurement
+                )
+            return measurement
+
         old_handlers = {sig: signal.getsignal(sig) for sig in (signal.SIGINT, signal.SIGTERM)}
 
         def requested_stop(signum, _frame):
@@ -382,6 +482,7 @@ def run_probe(
         for sig in old_handlers:
             signal.signal(sig, requested_stop)
         harness._run_subprocess = launch
+        harness._execution_measurement = measured_attempts
         try:
             check_controls(script, directory)
             result = harness.execute_cell(cell, suite, workdir=code_root, resume=True)
@@ -435,9 +536,17 @@ def run_probe(
                 "budget_work_id": work_id,
                 "config": expected_config,
             }
+            if continuing:
+                row["budget_work_ids"] = [*previous_work, work_id]
+                row["wall_seconds"] += sum(state["work"][key]["seconds"] for key in previous_work)
+                row["timing_scope"] = (
+                    "Sum of recorded execution attempts; includes interruption overhead"
+                )
+                row["checkpoint_continued"] = True
             outcome["status"] = "complete"
         finally:
             harness._run_subprocess = original
+            harness._execution_measurement = original_measurement
             for sig, handler in old_handlers.items():
                 signal.signal(sig, handler)
 
