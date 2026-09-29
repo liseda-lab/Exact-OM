@@ -6455,6 +6455,10 @@ def _bind_external_selection(
     return {
         **historical,
         "historical_design_hash": historical["design_hash"],
+        "historical_resolved_arms_hash": historical["resolved_arms_hash"],
+        "resolved_arms_hash": hash_payload(
+            {arm.id: arm.overlay for arm in _component_arms(source.config)}
+        ),
         "historical_base_config_hash": historical["base_config_hash"],
         "historical_candidate_pool_design_hash": historical["candidate_pool_design_hash"],
         "experiment_config_hash": source.raw_hash(),

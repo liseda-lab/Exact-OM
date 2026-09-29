@@ -1326,6 +1326,21 @@ def test_external_selection_stage_does_not_launch_completed_e05_cells(
     path, raw, record = _external_selection_fixture(tmp_path)
     historical = json.loads(Path(record["selection"]["path"]).read_text())
     historical_result = historical["experiments"]["E05"]
+    # Artifact-dependent producers resolve overlays during their original run.
+    # Importing that verified decision must preserve its hash as provenance,
+    # while validating the new declaration against its own unmaterialized arms.
+    from exact.experiments.campaign import digest
+
+    historical_result["resolved_arms_hash"] = harness.hash_payload(
+        {"baseline": {"matching": {"fusion": {"gamma": 2.0, "tau": 0.5}}}}
+    )
+    historical.pop("selection_hash")
+    historical["selection_hash"] = digest(historical)
+    record["selection"] = _binding(Path(record["selection"]["path"]), json.dumps(historical))
+    raw["steps"][0]["external_selection"] = _binding(
+        tmp_path / "prior-selection.json", json.dumps(record)
+    )
+    path.write_text(yaml.safe_dump(raw))
     if legacy_defaults:
         from exact.experiments.campaign import digest
 
@@ -1378,8 +1393,18 @@ def test_external_selection_stage_does_not_launch_completed_e05_cells(
     )
     selected = json.loads(result.read_text())["experiments"]["E05"]
     assert selected["status"] == "screened_out" and selected["new_cells"] == 0
-    for key in ("design_hash", "base_config_hash", "candidate_pool_design_hash"):
+    for key in (
+        "design_hash",
+        "resolved_arms_hash",
+        "base_config_hash",
+        "candidate_pool_design_hash",
+    ):
         assert selected[f"historical_{key}"] == historical_result[key]
+    assert selected["resolved_arms_hash"] != historical_result["resolved_arms_hash"]
+    assert selected["decisions"] == historical_result["decisions"]
+    assert selected.get("published_policy_overlay") == historical_result.get(
+        "published_policy_overlay"
+    )
     assert selected["current_code_prediction_compatibility"] is False
     if legacy_defaults:
         assert selected["base_config_hash"] != selected["historical_base_config_hash"]

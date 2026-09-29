@@ -260,6 +260,10 @@ def prepare_lock(recipe, root, registry, *, completed=True):
     for run in registry["runs"]:
         if not run.get("enabled", True) or not Path(run["completion_path"]).is_file():
             continue
+        # Failed independent branches remain registered for recovery. They do not
+        # provide importable evidence and must not block an unrelated ready cell.
+        if read(run["completion_path"]).get("status") != "complete":
+            continue
         receipt = completed_run(run)
         if not receipt.get("selection"):
             continue

@@ -134,3 +134,17 @@ def test_prepared_case_rejects_changes_to_scientific_bindings(tmp_path, change):
     recipe["group"] = prepared_batch.binding(group_path)
     with pytest.raises(ValueError, match="Prepared (case|development binding) differs"):
         prepared_batch.prepare_lock(recipe, tmp_path / "new", {"runs": []})
+
+
+@pytest.mark.parametrize("required", [False, True])
+def test_failed_independent_history_is_not_a_dependency(tmp_path, required):
+    recipe, _, _ = _fixture(tmp_path)
+    completion = tmp_path / "failed-completion.json"
+    completion.write_text(json.dumps({"status": "failed", "exit_code": 1}))
+    registry = {"runs": [{"id": "failed", "completion_path": str(completion)}]}
+    recipe["depends_on"] = ["failed"] if required else []
+    if required:
+        with pytest.raises(ValueError, match="Required comparison is incomplete"):
+            prepared_batch.prepare_lock(recipe, tmp_path / "new", registry)
+    else:
+        CampaignLock.model_validate(prepared_batch.prepare_lock(recipe, tmp_path / "new", registry))
