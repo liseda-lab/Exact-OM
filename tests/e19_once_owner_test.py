@@ -44,6 +44,7 @@ def test_only_actual_local_current_step_launcher_is_allowed(
         pid=pid,
         info={"name": kind, "cmdline": [kind, str(tmp_path / "worker.sh")]},
         uids=lambda: SimpleNamespace(real=uid),
+        parents=lambda: [],
     )
     monkeypatch.setattr(psutil, "process_iter", lambda *_: [item])
     args = SimpleNamespace(root=tmp_path, supervisor_step="14372.28")
@@ -52,3 +53,32 @@ def test_only_actual_local_current_step_launcher_is_allowed(
     else:
         with pytest.raises(ValueError):
             once.check_owner(args)
+
+
+@pytest.mark.parametrize(
+    "kind,parent_kind,parent_uid,expected",
+    [
+        ("srun", "srun", 1001, True),
+        ("python", "srun", 1001, False),
+        ("srun", "python", 1001, False),
+        ("srun", "srun", 1002, False),
+    ],
+)
+def test_only_same_user_srun_helper_chain_is_accepted(kind, parent_kind, parent_uid, expected):
+    launcher = SimpleNamespace(
+        pid=101, name=lambda: parent_kind, uids=lambda: SimpleNamespace(real=parent_uid)
+    )
+    process = SimpleNamespace(
+        pid=102,
+        info={"name": kind},
+        uids=lambda: SimpleNamespace(real=1001),
+        parents=lambda: [launcher],
+    )
+    assert once.current_srun_process(process, 101, 1001) is expected
+
+
+def test_orphan_or_unrelated_srun_is_rejected():
+    process = SimpleNamespace(
+        pid=102, info={"name": "srun"}, uids=lambda: SimpleNamespace(real=1001), parents=lambda: []
+    )
+    assert once.current_srun_process(process, 101, 1001) is False

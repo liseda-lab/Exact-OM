@@ -22,6 +22,20 @@ def module_file(name, path):
     return module
 
 
+def current_srun_process(process, launcher, uid):
+    """Accept the verified launcher and its same-user srun helper chain only."""
+    if launcher is None or process.info["name"] != "srun" or process.uids().real != uid:
+        return False
+    if process.pid == launcher:
+        return True
+    for parent in process.parents():
+        if parent.name() != "srun" or parent.uids().real != uid:
+            return False
+        if parent.pid == launcher:
+            return True
+    return False
+
+
 def check_owner(args):
     """Allow only the retained shell, the explicitly bound supervisor and this step."""
     prefix = "14372."
@@ -59,7 +73,7 @@ def check_owner(args):
     process = psutil.Process()
     own_tree = {process.pid, *(parent.pid for parent in process.parents())}
     root = str(args.root.resolve())
-    for item in psutil.process_iter(["pid", "name", "cmdline"]):
+    for item in psutil.process_iter(["pid", "ppid", "name", "cmdline"]):
         if (
             item.pid not in own_tree
             and (item.info["name"] or "").startswith(("python", "srun"))
@@ -67,13 +81,16 @@ def check_owner(args):
                 arg == root or arg.startswith(root + "/") for arg in (item.info["cmdline"] or [])
             )
         ):
-            if (
-                item.info["name"] == "srun"
-                and item.pid == launcher
-                and item.uids().real == os.getuid()
-            ):
+            try:
+                if current_srun_process(item, launcher, os.getuid()):
+                    continue
+            except psutil.NoSuchProcess:
                 continue
-            raise ValueError("A previous E19 owner/descendant remains: " + str(item.pid))
+            raise ValueError(
+                "A previous E19 owner/descendant remains: "
+                f"pid={item.pid} role={item.info['name']} parent_pid={item.info.get('ppid')} "
+                f"current_step={own} verified_launcher_pid={launcher}"
+            )
 
 
 def run(args):
