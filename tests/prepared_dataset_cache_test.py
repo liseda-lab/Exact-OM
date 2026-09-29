@@ -82,3 +82,58 @@ def test_legacy_dataset_without_raw_pool_is_not_published(prepared):
     directory, fingerprint = prepared
     (directory / "candidate_recall.tsv").unlink()
     assert prepared_cache.publish(directory, fingerprint) is None
+
+
+def test_local_staging_reuses_verified_bytes_without_rehashing_nas(prepared, tmp_path, monkeypatch):
+    directory, fingerprint = prepared
+    published = prepared_cache.publish(directory, fingerprint)
+    monkeypatch.setenv("EXACT_DATASET_CACHE_LOCAL_DIR", str(tmp_path / "nvme"))
+    assert prepared_cache.restore(tmp_path / "first", fingerprint)
+    staged = next(path for path in (tmp_path / "nvme/prepared-datasets").iterdir() if path.is_dir())
+    assert (staged / "dataset.csv").read_bytes() == (directory / "dataset.csv").read_bytes()
+    prepared_cache._VERIFIED.clear()  # A new worker shares only the staged receipt.
+    hashed = []
+    original = prepared_cache.sha256_file
+
+    def track(path):
+        hashed.append(path)
+        return original(path)
+
+    monkeypatch.setattr(prepared_cache, "sha256_file", track)
+    assert prepared_cache.restore(tmp_path / "second", fingerprint)
+    assert hashed and all(path.parent != published for path in hashed)
+    (published / "dataset.csv").write_text("damaged NAS file")
+    with pytest.raises(ValueError, match="has changed"):
+        prepared_cache.restore(tmp_path / "corrupt", fingerprint)
+
+
+def test_local_staging_rejects_changed_hot_copy_and_can_bypass_full_scratch(
+    prepared, tmp_path, monkeypatch
+):
+    directory, fingerprint = prepared
+    prepared_cache.publish(directory, fingerprint)
+    monkeypatch.setenv("EXACT_DATASET_CACHE_LOCAL_DIR", str(tmp_path / "nvme"))
+    monkeypatch.setenv("EXACT_DATASET_CACHE_LOCAL_MAX_BYTES", "0")
+    assert prepared_cache.restore(tmp_path / "uncached", fingerprint)
+    assert not any(path.is_dir() for path in (tmp_path / "nvme/prepared-datasets").iterdir())
+    monkeypatch.setenv("EXACT_DATASET_CACHE_LOCAL_MAX_BYTES", str(1024**2))
+    assert prepared_cache.restore(tmp_path / "first", fingerprint)
+    staged = next(path for path in (tmp_path / "nvme/prepared-datasets").iterdir() if path.is_dir())
+    (staged / "dataset.csv").write_text("corrupt hot cache")
+    with pytest.raises(ValueError, match="has changed"):
+        prepared_cache.restore(tmp_path / "corrupt", fingerprint)
+
+
+def test_local_staging_does_not_reuse_a_republished_different_manifest(
+    prepared, tmp_path, monkeypatch
+):
+    directory, fingerprint = prepared
+    published = prepared_cache.publish(directory, fingerprint)
+    monkeypatch.setenv("EXACT_DATASET_CACHE_LOCAL_DIR", str(tmp_path / "nvme"))
+    assert prepared_cache.restore(tmp_path / "first", fingerprint)
+    (published / "dataset.csv").write_text("Src,Tgt,Label\ns,different,=\n")
+    manifest = json.loads((published / "manifest.json").read_text())
+    manifest["files"]["dataset.csv"] = sha256_file(published / "dataset.csv")
+    (published / "manifest.json").write_text(json.dumps(manifest))
+    with pytest.raises(ValueError, match="publication changed"):
+        prepared_cache.restore(tmp_path / "second", fingerprint)

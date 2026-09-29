@@ -80,23 +80,32 @@ def _scope(model, *, channels=False):
     parameters.pop("selector", None)
     parameters.pop("supervision", None)
     parameters.get("matching", {}).pop("extraction", None)
+    parameters.get("matching", {}).pop("calibration", None)
+    # Selectors consume scorer output; their parameters cannot change raw scores.
+    parameters["pipeline"] = [
+        component
+        for component in parameters.get("pipeline", [])
+        if component.get("name") != "CandidateSetSelector"
+    ]
     state = deepcopy(model.runtime_fingerprint_payload())
     state["effective_scalars"] = {
         name: getattr(model, name, None)
         for name in ("tau", "gamma", "beta", "threshold", "use_lexical", "use_context", "use_llm")
     }
     if channels:
-        # tau affects neutral channels and signed identifiers and MUST remain.
-        for mapping in (
-            state["effective_scalars"],
-            parameters.get("matching", {}).get("fusion", {}),
-            state.get("pair_adaptive_channels", {}).get("experiments", {}).get("fusion", {}),
-            state.get("pair_adaptive_channels", {})
-            .get("experiments", {})
-            .get("fusion_effective", {}),
-        ):
-            mapping.pop("gamma", None)
-            mapping.pop("beta", None)
+        # A fusion fit consumes these channels; it does not create their evidence.
+        # tau still affects neutral channels and signed identifiers and MUST remain.
+        for name in ("gamma", "beta", "threshold"):
+            state["effective_scalars"].pop(name, None)
+        fusion = parameters.get("matching", {}).get("fusion", {})
+        parameters.get("matching", {})["fusion"] = {"tau": fusion.get("tau")}
+        experiments = state.get("pair_adaptive_channels", {}).get("experiments", {})
+        for name in ("fusion", "fusion_effective", "fusion_artifact"):
+            experiments.pop(name, None)
+        for component in parameters.get("pipeline", []):
+            if component.get("name") == "PairAdaptiveSemanticScorer":
+                component.get("params", {}).pop("gamma", None)
+                component.get("params", {}).pop("beta", None)
     hardware = {
         "device": str(getattr(model, "device", "cpu")),
         "gpu": (
@@ -118,11 +127,13 @@ def _scope(model, *, channels=False):
         "_gate_artifact",
         "_exemplar_artifact",
     ):
+        if channels and name == "_fusion_artifact":
+            continue
         artifact = getattr(model, name, None)
         if artifact is not None:
             artifacts[name] = getattr(artifact, "provenance", artifact)
     scope = {
-        "version": 2,
+        "version": 3,
         "parameters": parameters,
         "state": state,
         "inputs": identity["inputs"],
@@ -136,7 +147,7 @@ def _scope(model, *, channels=False):
         "artifacts": artifacts,
         "dataset": getattr(getattr(model, "_attached_dataset", None), "cache_fingerprint", None),
     }
-    result = Path(record["root"]), fingerprint(scope)
+    result = Path(os.environ.get("EXACT_NUMERICAL_CACHE_ROOT", record["root"])), fingerprint(scope)
     if channels and batch_scopes is not None:
         batch_scopes[batch_key] = result
     return result

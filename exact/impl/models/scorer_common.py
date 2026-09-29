@@ -36,6 +36,46 @@ class LabelPairPooling(str, Enum):
     MEAN = "mean"
 
 
+class _DeviceEmbeddingRows:
+    """Bound repeated host transfers without changing encoder batches or precision."""
+
+    def __init__(self, device, limit):
+        self.device = torch.device(device)
+        self.limit = max(0, int(limit))
+        self.rows = OrderedDict()
+        self.bytes = 0
+
+    def stack(self, keys, values):
+        outputs = []
+        missing = {}
+        for key, value in zip(keys, values):
+            entry = self.rows.get(key)
+            if entry is not None and entry[0] is value:
+                self.rows.move_to_end(key)
+                outputs.append(entry[1])
+            else:
+                if entry is not None:
+                    self.bytes -= entry[1].numel() * entry[1].element_size()
+                    del self.rows[key]
+                missing.setdefault(key, (value, []))[1].append(len(outputs))
+                outputs.append(None)
+        if missing:
+            transferred = torch.stack([value for value, _ in missing.values()]).to(self.device)
+            for (key, (value, indices)), row in zip(missing.items(), transferred):
+                size = row.numel() * row.element_size()
+                if size <= self.limit:
+                    while self.rows and self.bytes + size > self.limit:
+                        _, (_, evicted) = self.rows.popitem(last=False)
+                        self.bytes -= evicted.numel() * evicted.element_size()
+                    # A row view would retain the whole transferred batch allocation.
+                    row = row.clone()
+                    self.rows[key] = (value, row)
+                    self.bytes += size
+                for index in indices:
+                    outputs[index] = row
+        return torch.stack(outputs)
+
+
 class ScorerCommonMixin:
     def _ensure_local_llm(self) -> None:
         if not self.use_llm:
@@ -245,9 +285,10 @@ class ScorerCommonMixin:
             key = text or ""
             cached = cache.get(key)
             if cached is None:
-                key_to_indices.setdefault(key, []).append(idx)
-                if key not in missing_keys:
+                if key not in key_to_indices:
                     missing_keys.append(key)
+                    key_to_indices[key] = []
+                key_to_indices[key].append(idx)
             else:
                 outputs[idx] = cached
 
@@ -271,8 +312,22 @@ class ScorerCommonMixin:
                 for idx in key_to_indices[key]:
                     outputs[idx] = tensor
 
-        stacked = torch.stack(outputs, dim=0).to(self.device)
-        return stacked
+        if torch.device(self.device).type != "cpu":
+            resident = getattr(self, "_device_embedding_rows", None)
+            if resident is None or resident.device != torch.device(self.device):
+                resident = self._device_embedding_rows = _DeviceEmbeddingRows(
+                    self.device,
+                    os.getenv("EXACT_DEVICE_EMBEDDING_MAX_BYTES", str(64 * 1024**2)),
+                )
+            if resident.limit:
+                try:
+                    return resident.stack([(id(cache), text or "") for text in texts], outputs)
+                except torch.cuda.OutOfMemoryError:
+                    # Resident acceleration must not turn a fitting batch into OOM.
+                    resident.rows.clear()
+                    resident.bytes = 0
+                    resident.limit = 0
+        return torch.stack(outputs, dim=0).to(self.device)
 
     @staticmethod
     def _summary_key(label: str, context: str) -> str:

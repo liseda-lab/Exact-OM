@@ -267,6 +267,22 @@ class TrainingPoolMixin:
                             src_contexts=batch.get("src_contexts"),
                             tgt_contexts=batch.get("tgt_contexts"),
                         )
+                    # Transfer each result vector once, rather than synchronizing
+                    # the GPU separately for every scalar in every training pair.
+                    score_columns = {
+                        key: values.detach().cpu().tolist()
+                        for key, values in output.items()
+                        if isinstance(values, torch.Tensor)
+                        and values.ndim == 1
+                        and len(values) == len(indices)
+                    }
+                    fusion_columns = {
+                        name: {
+                            field: values.detach().cpu().tolist()
+                            for field, values in channel.items()
+                        }
+                        for name, channel in output.get("fusion_channels", {}).items()
+                    }
                     rows = []
                     for offset, index in enumerate(indices):
                         row = {
@@ -275,13 +291,9 @@ class TrainingPoolMixin:
                             "SrcKind": str(batch.get("src_kind", ["class"] * len(indices))[offset]),
                             "TgtKind": str(batch.get("tgt_kind", ["class"] * len(indices))[offset]),
                         }
-                        for key, values in output.items():
-                            if (
-                                isinstance(values, torch.Tensor)
-                                and values.ndim == 1
-                                and len(values) == len(indices)
-                            ):
-                                row[key] = float(values[offset].detach().cpu())
+                        row.update(
+                            {key: float(values[offset]) for key, values in score_columns.items()}
+                        )
                         row["src_label_text"] = " | ".join(batch["src_labels"][offset])
                         row["tgt_label_text"] = " | ".join(batch["tgt_labels"][offset])
                         row["llm_evidence_packet"] = output.get(
@@ -294,10 +306,9 @@ class TrainingPoolMixin:
                             row["confirmed_label"] = None if pd.isna(label) else float(label)
                         row["fusion_channels"] = {
                             name: {
-                                field: float(values[offset].detach().cpu())
-                                for field, values in channel.items()
+                                field: float(values[offset]) for field, values in channel.items()
                             }
-                            for name, channel in output.get("fusion_channels", {}).items()
+                            for name, channel in fusion_columns.items()
                         }
                         explanations = output.get("explanations", [])
                         if offset < len(explanations):

@@ -216,3 +216,53 @@ def test_payload_limit_is_shared_by_independent_writers(tmp_path):
     assert second.stats()["entries"] == 1
     assert second.stats()["payload_bytes"] <= second.limit
     assert second.skipped == 1
+
+
+def test_shared_root_reuses_outputs_across_run_roots_but_not_changed_training_roles(
+    tmp_path, monkeypatch
+):
+    shared = tmp_path / "hot-cache"
+    monkeypatch.setenv("EXACT_NUMERICAL_CACHE_ROOT", str(shared))
+    first_root, second_root = tmp_path / "first", tmp_path / "second"
+    first_root.mkdir()
+    second_root.mkdir()
+    runtime(first_root, monkeypatch)
+    expected = Probe().forward(torch.tensor([0.2]))
+    runtime(second_root, monkeypatch)
+    replay = Probe()
+    actual = replay.forward(torch.tensor([0.2]))
+    assert replay.forward_calls == replay.channel_calls == 0
+    assert torch.equal(expected["score"], actual["score"])
+    assert (shared / "numerical-cache/evidence.sqlite").is_file()
+    assert not (second_root / "numerical-cache").exists()
+    replay._numerical_scoring_role = "train"
+    replay.forward(torch.tensor([0.2]))
+    assert replay.forward_calls == replay.channel_calls == 1
+
+
+def test_fitted_fusion_reuses_raw_channels_only_and_calibration_reuses_scores(
+    tmp_path, monkeypatch
+):
+    identity = runtime(tmp_path, monkeypatch)
+    first = Probe()
+    first._fusion_artifact = SimpleNamespace(provenance={"fit": "first"})
+    first.forward(torch.tensor([0.2]))
+    identity["parameters"]["matching"]["fusion"].update(
+        mode="learned_global", artifact="different-fit.json"
+    )
+    identity["parameters"]["matching"]["calibration"] = {"mode": "platt"}
+    identity["parameters"]["pipeline"] = [
+        {"name": "CandidateSetSelector", "params": {"calibration": {"mode": "platt"}}}
+    ]
+    runtime(tmp_path, monkeypatch, **identity)
+    variant = Probe(gamma=3)
+    variant._fusion_artifact = SimpleNamespace(provenance={"fit": "second"})
+    result = variant.forward(torch.tensor([0.2]))
+    assert variant.forward_calls == 1 and variant.channel_calls == 0
+    assert torch.equal(result["score"], torch.tensor([0.7]) ** 3)
+    identity["parameters"]["matching"]["calibration"]["mode"] = "isotonic"
+    runtime(tmp_path, monkeypatch, **identity)
+    replay = Probe(gamma=3)
+    replay._fusion_artifact = SimpleNamespace(provenance={"fit": "second"})
+    replay.forward(torch.tensor([0.2]))
+    assert replay.forward_calls == replay.channel_calls == 0

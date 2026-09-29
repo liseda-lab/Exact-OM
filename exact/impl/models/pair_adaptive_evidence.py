@@ -612,6 +612,66 @@ class PairAdaptiveEvidenceMixin:
         trimmed = self._trim_items_to_budget(sentences, budget_tokens)
         return self._join_context(list(trimmed))
 
+    def _prefetch_evidence_embeddings(self, feature_maps, label_lists):
+        """Encode bounded distinct pool texts before pair-specific evidence selection.
+
+        Pair-selected combined contexts still use the ordinary on-demand path.
+        No candidate, evidence order, native projection or selection rule changes.
+        """
+        if os.getenv("EXACT_EVIDENCE_PREFETCH", "1") == "0":
+            return
+        limit = max(0, int(os.getenv("EXACT_EVIDENCE_PREFETCH_MAX_TEXTS", "2048")))
+        batch_size = max(1, int(os.getenv("EXACT_EVIDENCE_PREFETCH_BATCH_SIZE", "64")))
+        labels, contexts = {}, {}
+        families = set(self.hierarchical_relation_families) | {"is_a"}
+
+        def collect(destination, text):
+            if len(destination) < limit:
+                destination.setdefault(text or "", None)
+
+        if self.use_lexical and getattr(self, "lex_model", None) is not None:
+            for group in label_lists:
+                for label in group:
+                    collect(labels, label)
+            if self.use_context:
+                for features in feature_maps:
+                    for family, items in features.get("hierarchy", {}).items():
+                        if family in families:
+                            for item in items:
+                                collect(labels, self._hier_item_triple(item)[2])
+                    for item in features.get("object_triples", []):
+                        collect(labels, str(item["triple"][1]))
+                        collect(labels, str(item["triple"][2]))
+        needs_attribute_bank = any(features.get("attributes") for features in feature_maps)
+        if self.use_context and getattr(self, "ctx_model", None) is not None:
+            for features in feature_maps:
+                if needs_attribute_bank or self.lex_config.get("quality") == "encoder_agreement":
+                    for label in features.get("labels", []):
+                        collect(contexts, self._normalize_text(label))
+                for item in features.get("attributes", [])[: self.max_attr_items]:
+                    collect(contexts, self._normalize_text(item.get("text")))
+                if needs_attribute_bank:
+                    for family, items in features.get("hierarchy", {}).items():
+                        if family in families:
+                            for sentence in self._verbalize_hierarchy_items(family, items):
+                                collect(contexts, self._normalize_text(sentence))
+        for texts, encode in (
+            (labels, self.encode_labels_batch),
+            (contexts, self.encode_contexts_batch),
+        ):
+            values = list(texts)
+            start, width = 0, batch_size
+            while start < len(values):
+                try:
+                    encode(values[start : start + width])
+                except torch.cuda.OutOfMemoryError:
+                    # Prefetch is optional: reduce only its batch, never the pool.
+                    if width == 1:
+                        break
+                    width = max(1, width // 2)
+                else:
+                    start += width
+
     def _encode_label_matrix(self, left: Sequence[str], right: Sequence[str]) -> torch.Tensor:
         if not left or not right:
             return torch.zeros((len(left), len(right)), device=self.device)

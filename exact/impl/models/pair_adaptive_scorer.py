@@ -1580,6 +1580,10 @@ class PairAdaptiveSemanticScorer(
             for iri, labels in zip(tgt_iris, tgt_label_lists)
         ]
 
+        self._prefetch_evidence_embeddings(
+            list(src_feature_map.values()) + list(tgt_feature_map.values()),
+            src_label_lists + tgt_label_lists,
+        )
         s_label, q_label, best_pairs, label_quality_payloads = self._score_label_channel(
             src_label_lists, tgt_label_lists
         )
