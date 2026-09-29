@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import math
+import os
+import uuid
 from ast import literal_eval
 from collections import defaultdict, deque
 from pathlib import Path
@@ -17,8 +20,10 @@ from exact.core.entities.mappings import EntityMapping, ReferenceMapping
 from exact.io.sources import infer_format
 from exact.io.sources import resolve as resolve_source
 from exact.io.sources.datalog import read_facts
+from exact.ontology.versions import ontology_execution_identity
 from exact.runs.reader import RunReader
 from exact.utils.data import read_table
+from exact.utils.fitted_artifacts import fingerprint, freeze_json
 from exact.utils.provenance import sha256_file
 
 from .paper_metrics import PRFMetrics, SourceConfusion, recompute_global_prf
@@ -154,6 +159,81 @@ def _datalog_fact_count(source: Any) -> int:
     return sum(len(read_facts(Path(origin) / str(relative))) for relative in files)
 
 
+def _source_inventory(path: Path, *, source_format, options, cache_root=None):
+    """Reuse native counts only; task/reference metadata never enters this cache."""
+    path = Path(path).resolve()
+    options = dict(options or {})
+    cache_path, identity = None, None
+    # Other registry/plugin backends keep their existing uncached behavior.
+    selected_format = infer_format(path, options) if source_format == "auto" else source_format
+    if cache_root is not None and selected_format == "owl":
+        imports = {}
+        for iri, binding in (options.get("imports") or {}).items():
+            imported = Path(binding["path"]).expanduser()
+            imported = imported if imported.is_absolute() else path.parent / imported
+            observed = sha256_file(imported)
+            if observed != binding["sha256"]:
+                raise ValueError(f"OWL import checksum mismatch: {iri}")
+            imports[iri] = {"path": str(imported.resolve()), "sha256": observed}
+        exact_root = Path(__file__).parents[1]
+        code_paths = [
+            Path(__file__),
+            exact_root / "io/sources/__init__.py",
+            exact_root / "io/sources/owl.py",
+            *sorted((exact_root / "ontology").glob("*.py")),
+        ]
+        identity = {
+            "schema_version": 1,
+            "path": str(path),
+            "sha256": sha256_file(path),
+            "imports": imports,
+            "input_format": source_format,
+            "options": _jsonable(options),
+            "native": ontology_execution_identity(),
+            "code": {str(code.relative_to(exact_root)): sha256_file(code) for code in code_paths},
+        }
+        cache_path = Path(cache_root) / (fingerprint(identity) + ".json")
+        try:
+            saved = json.loads(cache_path.read_text())
+            value = saved["value"]
+            if (
+                saved["identity"] == identity
+                and saved["sha256"] == fingerprint(value)
+                and set(value["entities"]) == {kind.value for kind in MATCHABLE_ENTITY_KINDS}
+                and all(type(count) is int and count >= 0 for count in value["entities"].values())
+                and type(value["datalog_facts"]) is int
+                and value["datalog_facts"] >= 0
+            ):
+                return value
+        except (OSError, ValueError, KeyError, TypeError):
+            pass
+    source = resolve_source(path, format=source_format, options=options)
+    value = {
+        "entities": {kind.value: len(source.entities(kind)) for kind in MATCHABLE_ENTITY_KINDS},
+        "datalog_facts": _datalog_fact_count(source),
+    }
+    if cache_path is not None:
+        if sha256_file(path) != identity["sha256"] or any(
+            sha256_file(Path(binding["path"])) != binding["sha256"]
+            for binding in identity["imports"].values()
+        ):
+            raise ValueError("Ontology inputs changed during inventory inspection")
+        temporary = cache_path.with_name(f".{cache_path.name}-{uuid.uuid4().hex}")
+        try:
+            freeze_json(
+                temporary, {"identity": identity, "sha256": fingerprint(value), "value": value}
+            )
+            os.replace(temporary, cache_path)
+        except OSError:
+            pass  # Cache storage cannot block native inspection.
+        finally:
+            try:
+                temporary.unlink(missing_ok=True)
+            except OSError:
+                pass
+    return value
+
+
 def inspect_dataset_task(
     config: ConfigModel,
     *,
@@ -165,6 +245,7 @@ def inspect_dataset_task(
     reference_completeness: str,
     capabilities: Sequence[str],
     split_availability: Sequence[str] = (),
+    cache_root: Optional[Path] = None,
 ) -> dict[str, Any]:
     """Materialize and inspect one declared task without constructing matcher models."""
 
@@ -172,20 +253,19 @@ def inspect_dataset_task(
     training_reference = getattr(resolved, "training_reference", None)
     source_format = infer_format(resolved.source, config.io.source_options)
     target_format = infer_format(resolved.target, config.io.target_options)
-    source = resolve_source(
+    source = _source_inventory(
         resolved.source,
-        format=config.io.input_format,
+        source_format=config.io.input_format,
         options=config.io.source_options,
+        cache_root=cache_root,
     )
-    target = resolve_source(
+    target = _source_inventory(
         resolved.target,
-        format=config.io.input_format,
+        source_format=config.io.input_format,
         options=config.io.target_options,
+        cache_root=cache_root,
     )
-    entity_counts = {
-        "source": {kind.value: len(source.entities(kind)) for kind in MATCHABLE_ENTITY_KINDS},
-        "target": {kind.value: len(target.entities(kind)) for kind in MATCHABLE_ENTITY_KINDS},
-    }
+    entity_counts = {"source": source["entities"], "target": target["entities"]}
     selected_kinds = [str(kind) for kind in config.matching.entity_kinds]
     expected_sources = sum(entity_counts["source"].get(kind, 0) for kind in selected_kinds)
     hierarchy_families = {
@@ -239,8 +319,8 @@ def inspect_dataset_task(
         "candidate_pool": _candidate_inventory(resolved.candidates, expected_sources),
         "hierarchy_predicates": hierarchy_families,
         "datalog_fact_count": {
-            "source": _datalog_fact_count(source),
-            "target": _datalog_fact_count(target),
+            "source": source["datalog_facts"],
+            "target": target["datalog_facts"],
         },
     }
 

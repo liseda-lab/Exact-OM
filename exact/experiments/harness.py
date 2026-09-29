@@ -1175,6 +1175,11 @@ def build_dataset_inventory(
                     reference_completeness=task.reference_completeness,
                     capabilities=task.capabilities,
                     split_availability=roles.get(str(resolved.data.track), ()),
+                    cache_root=Path(
+                        os.environ.get(
+                            "EXACT_INVENTORY_CACHE_DIR", str(Path(output_root) / "inventory-cache")
+                        )
+                    ),
                 )
                 cache[cache_key] = dict(row)
             materialized = dict(_jsonable(row))
