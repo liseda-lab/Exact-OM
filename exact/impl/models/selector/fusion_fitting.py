@@ -12,21 +12,30 @@ from .fitting import fingerprint, freeze_json, safe_training_labels
 
 
 def fusion_scores(
-    channels, names, parameters, *, mode, strsim_placement="off", return_components=False
+    channels,
+    names,
+    parameters,
+    *,
+    mode,
+    strsim_placement="off",
+    return_components=False,
+    lexical_margin_dtype=None,
 ):
     scores, qualities, active = channels
     tau, gamma, weights = parameters
 
-    def authority(score, quality, mask, weight):
+    def authority(score, quality, mask, weight, *, margin_dtype=None):
         if mode == "learned_global":
             return quality * mask * weight
         margin = (score - tau).abs()
-        return (
-            quality
-            * mask
-            * torch.where(margin > 0, margin.clamp_min(1e-8).pow(gamma), 0.0)
-            * weight
-        )
+        if margin_dtype is not None:
+            # Validation replay only: the shipped lexical tensor can remain FP16
+            # through subtraction/pow before FP32 quality promotes its authority.
+            margin = (score.to(margin_dtype) - tau.to(margin_dtype)).abs()
+            powered = margin.pow(gamma.to(margin_dtype)).to(quality.dtype)
+        else:
+            powered = torch.where(margin > 0, margin.clamp_min(1e-8).pow(gamma), 0.0)
+        return quality * mask * powered * weight
 
     def combine(indices):
         idx = torch.tensor(indices)
@@ -63,7 +72,13 @@ def fusion_scores(
     struct_score, struct_quality, struct_active, struct_mass = combine(structural)
     if mode == "analytic_fitted":
         lex_weight = weights[names.index("label" if strsim_placement == "off" else "lex")]
-        lex_mass = authority(lex_score, lex_quality, lex_active, lex_weight)
+        lex_mass = authority(
+            lex_score,
+            lex_quality,
+            lex_active,
+            lex_weight,
+            margin_dtype=lexical_margin_dtype if strsim_placement == "off" else None,
+        )
         struct_mass = authority(
             struct_score, struct_quality, struct_active, weights[names.index("struct")]
         )
@@ -90,8 +105,47 @@ def fusion_scores(
     return score
 
 
+def validate_neutral_fusion(
+    channels, names, expected, *, strsim_placement="off", fp16_lexical=False
+):
+    """Verify raw training evidence against the declared producer arithmetic.
+
+    Fitting remains float64. Shipped FP16 lexical scores square their margin in
+    FP16, then combine with FP32 quality/structure. Missing-label batches promote
+    the lexical stack to FP32. Legacy rows did not retain tensor dtypes, so only
+    an explicitly bound FP16 producer permits either of those two replay paths.
+    The tolerance is unchanged; this is not an allowance for arbitrary drift.
+    """
+    parameters = (torch.tensor(0.5), torch.tensor(2.0), torch.ones(len(names)))
+    neutral = fusion_scores(
+        channels, names, parameters, mode="analytic_fitted", strsim_placement=strsim_placement
+    )
+    matches = torch.isclose(neutral, expected, atol=2e-6, rtol=2e-6)
+    if fp16_lexical and strsim_placement == "off" and not matches.all():
+        mixed = fusion_scores(
+            tuple(channel.float() for channel in channels),
+            names,
+            parameters,
+            mode="analytic_fitted",
+            strsim_placement=strsim_placement,
+            lexical_margin_dtype=torch.float16,
+        ).to(expected.dtype)
+        matches |= torch.isclose(mixed, expected, atol=2e-6, rtol=2e-6)
+    if not matches.all():
+        raise ValueError("Neutral fitted fusion does not replay the shipped training scores")
+
+
 def fit_fusion_artifact(
-    frame, reference_pairs, path, *, mode, application, seed=17, strsim_placement="off", epochs=80
+    frame,
+    reference_pairs,
+    path,
+    *,
+    mode,
+    application,
+    seed=17,
+    strsim_placement="off",
+    epochs=80,
+    neutral_fp16_lexical=False,
 ):
     application = {
         "entity_kinds": sorted(set(frame.SrcKind.astype(str))) if "SrcKind" in frame else ["class"],
@@ -120,17 +174,13 @@ def fit_fusion_artifact(
     if folds < 2:
         raise ValueError("Grouped fusion fitting needs at least two training sources")
     if mode == "analytic_fitted":
-        neutral = fusion_scores(
+        validate_neutral_fusion(
             channels,
             names,
-            (torch.tensor(0.5), torch.tensor(2.0), torch.ones(len(names))),
-            mode=mode,
+            torch.tensor(frame.S_base.tolist(), dtype=torch.float64),
             strsim_placement=strsim_placement,
+            fp16_lexical=neutral_fp16_lexical,
         )
-        if not torch.allclose(
-            neutral, torch.tensor(frame.S_base.tolist(), dtype=torch.float64), atol=2e-6, rtol=2e-6
-        ):
-            raise ValueError("Neutral fitted fusion does not replay the shipped training scores")
 
     def fit(indices, regularization):
         with torch.enable_grad():

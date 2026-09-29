@@ -214,6 +214,21 @@ def run_worker(args):
         OpenRouterClient._generation = original
 
 
+def continuation_work(state, script, name, previous_work_ids=()):
+    """Retain explicit migrated and same-root attempts without duplicating costs."""
+    prefix = "qualification/" + Path(script).parent.name + "/" + name + "/"
+    keys = list(
+        dict.fromkeys([*previous_work_ids, *[k for k in state["work"] if k.startswith(prefix)]])
+    )
+    if not keys or any(
+        ("/" + name + "/") not in key
+        or state["work"].get(key, {}).get("status") not in {"failed", "interrupted"}
+        for key in keys
+    ):
+        raise ValueError("Checkpoint continuation requires closed original accounting")
+    return keys
+
+
 def run_probe(
     *,
     code_root,
@@ -227,6 +242,7 @@ def run_probe(
     prefix=False,
     case_id="D0",
     resume=False,
+    previous_work_ids=(),
 ):
     """One matched development-case probe; use prefix=False for family admission."""
     import psutil
@@ -284,7 +300,9 @@ def run_probe(
             prefix=prefix,
         )
         return row
-    continuing = (directory / "run").exists() or (directory / "recovery").exists()
+    continuing = (
+        (directory / "run").exists() or (directory / "recovery").exists() or bool(previous_work_ids)
+    )
     if continuing and not resume:
         raise ValueError(
             "Unfinished qualification needs recorded recovery; resumed time is not a whole-arm measurement"
@@ -292,12 +310,7 @@ def run_probe(
     previous_work = []
     if continuing:
         state = json.loads((shared / "budget.json").read_text())
-        prefix_id = "qualification/" + script.parent.name + "/" + name + "/"
-        previous_work = [key for key in state["work"] if key.startswith(prefix_id)]
-        if not previous_work or any(
-            state["work"][key]["status"] not in {"failed", "interrupted"} for key in previous_work
-        ):
-            raise ValueError("Checkpoint continuation requires closed original accounting")
+        previous_work = continuation_work(state, script, name, previous_work_ids)
     work_id = "qualification/" + script.parent.name + "/" + name + "/" + os.environ["SLURM_STEP_ID"]
     expected_config = binding(config)
     stop = directory / "STOP"

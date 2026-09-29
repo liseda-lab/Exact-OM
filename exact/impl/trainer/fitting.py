@@ -402,6 +402,7 @@ class TrainingPoolMixin:
                 application=application,
                 seed=seed,
                 strsim_placement=placement,
+                neutral_fp16_lexical=bool(getattr(self.model, "fp16", False)),
             )
             self.model.fusion_config = {**fusion_config, "artifact": str(artifact)}
             self.model._fusion_artifact = JsonExperimentArtifact.load(
