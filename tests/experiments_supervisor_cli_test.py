@@ -617,3 +617,87 @@ def test_reserved_prepared_launch_suppresses_generic_empty_queue_continuation(
     monkeypatch.setattr(cli, 'inspect_runs', lambda *a, **k: _observation('next_batch'))
     cli.check(tmp_path, policy, state)
     assert not cli.read(tmp_path / 'health.json')['incidents']
+
+
+@pytest.mark.parametrize('stopped,reason', [(False, 'timeout'), (True, 'stop_requested')])
+def test_agent_reports_timeout_separately_from_stop_and_persists_deadline(
+    cli, controller, tmp_path, monkeypatch, stopped, reason
+):
+    policy, _ = controller
+    _fake_child(cli, monkeypatch, tmp_path, result=json.dumps(_result()), running=True)
+    clock = iter([0, 61])
+    monkeypatch.setattr(cli.time, 'monotonic', lambda: next(clock))
+    (tmp_path / 'HANDOFF.md').write_text('Prepared work; not submitted.')
+    report = cli.run_agent(policy, tmp_path, 'Authorized repair', lambda: stopped)
+    assert report['interruption_reason'] == reason
+    assert report['interrupted'] and report['status'] == 'failed'
+    assert report['handoff'] == str(tmp_path / 'HANDOFF.md')
+    prompt = (tmp_path / 'prompt.md').read_text()
+    assert report['deadline_at'] in prompt
+    assert 'Begin final handoff and result by:' in prompt
+    assert str(tmp_path / 'HANDOFF.md') in prompt
+    assert 'Distinguish saved preparation from queued/submitted work' in prompt
+
+
+def test_timeout_uses_remaining_attempt_for_saved_work_reconciliation(cli, controller, tmp_path, monkeypatch):
+    policy, state = controller
+    monkeypatch.setattr(cli, 'inspect_runs', lambda *a, **k: _observation())
+    prompts = []
+
+    def repair(policy, directory, prompt, stopped):
+        prompts.append(prompt)
+        if len(prompts) == 1:
+            (directory / 'HANDOFF.md').write_text('Committed repair; descriptor not queued.')
+            return {'status': 'failed', 'interrupted': True, 'interruption_reason': 'timeout', 'result': None}
+        assert str(tmp_path / 'interventions/failure-1') in prompt
+        assert 'reconcile its saved HANDOFF.md' in prompt
+        assert '"interruption_reason": "timeout"' in prompt
+        return {'status': 'complete', 'result': _result()}
+
+    monkeypatch.setattr(cli, 'run_agent', repair)
+    cli.check(tmp_path, policy, state, act=True)
+    assert state['incidents']['failure']['attempts'] == 1
+    assert not state['incidents']['failure'].get('needs_user')
+    cli.check(tmp_path, policy, state, act=True)
+    assert len(prompts) == 2
+    assert state['incidents']['failure']['attempts'] == 2
+
+
+def test_repeated_timeouts_escalate_at_existing_attempt_limit(cli, controller, tmp_path, monkeypatch):
+    policy, state = controller
+    monkeypatch.setattr(cli, 'inspect_runs', lambda *a, **k: _observation())
+    calls = []
+    monkeypatch.setattr(cli, 'run_agent', lambda *args: calls.append(args) or {
+        'status': 'failed', 'interrupted': True, 'interruption_reason': 'timeout', 'result': None,
+    })
+    cli.check(tmp_path, policy, state, act=True)
+    result = cli.check(tmp_path, policy, state, act=True)
+    assert result['notification']['outcome'] == 'incident_attempt_limit'
+    assert cli.check(tmp_path, policy, state, act=True)['action'] == 'incident_attempt_limit'
+    assert len(calls) == state['incidents']['failure']['attempts'] == 2
+
+
+@pytest.mark.parametrize('reason', ['stop_requested', None])
+def test_user_stop_and_unknown_interruption_still_require_intervention(
+    cli, controller, tmp_path, monkeypatch, reason
+):
+    policy, state = controller
+    monkeypatch.setattr(cli, 'inspect_runs', lambda *a, **k: _observation())
+    calls = []
+    monkeypatch.setattr(cli, 'run_agent', lambda *args: calls.append(args) or {
+        'status': 'failed', 'interrupted': True, 'interruption_reason': reason, 'result': None,
+    })
+    cli.check(tmp_path, policy, state, act=True)
+    assert cli.check(tmp_path, policy, state, act=True)['action'] == 'requires_user'
+    assert len(calls) == 1
+
+
+def test_explicit_decision_remains_blocking_even_if_repair_timed_out(cli, controller, tmp_path, monkeypatch):
+    policy, state = controller
+    monkeypatch.setattr(cli, 'inspect_runs', lambda *a, **k: _observation())
+    monkeypatch.setattr(cli, 'run_agent', lambda *args: {
+        'status': 'failed', 'interrupted': True, 'interruption_reason': 'timeout',
+        'result': _result('needs_user'),
+    })
+    cli.check(tmp_path, policy, state, act=True)
+    assert state['incidents']['failure']['needs_user'] is True
