@@ -84,7 +84,10 @@ resource capacity or exceed the one-heavy-GPU-worker constraint. A preparation_o
 limited to small metadata/recipe work: no scientific worker, ontology loading, fitting or API
 calls. Remove it after recording its handoff and ready successors; never create a fictional
 Slurm run for preparation. Keep pending successors for every unresolved branch because this
-registry mode replaces the generic all-completed continuation rule. Preserve old entries with enabled=false and a superseded_by/reason;
+registry mode replaces the generic all-completed continuation rule. Set remaining_work_status
+explicitly to pending while scope remains, complete only when finished, or needs_user/deferred
+with a concrete handoff. Pending scope permits the controller to recover an accidentally empty
+queue; terminal/deferred scope does not trigger repeated planning. Preserve old entries with enabled=false and a superseded_by/reason;
 register each replacement and retain valid dependency links. Update pause_paths to include
 new runtime STOP files. A submission must have a verified live Slurm step and actual files;
 never register a planned or invented PID/step. Do not edit policy.json, state.json, supervisor
@@ -100,3 +103,13 @@ path; these fields are included in the configured notification. Continue indepen
 work when one family needs a scientific decision. There is no daily repair limit, but repeated
 attempts at the same unresolved error are bounded across replacement runs. Do not change
 supervisor retry state or limits to escape that bound.
+
+
+For notification_delivery_uncertain, inspect only the named outbox message and its saved
+adapter transcript/receipt. A completed Gmail send receipt with matching arguments establishes
+delivery; agent prose does not. Reconcile the corresponding outbox record only from verified
+receipt evidence and preserve its history. If there is no proof, report needs_user with the
+exact delivery journal and decision required. Never reset ambiguous-send guards, invent success,
+or blindly send another copy. This incident may repair notification evidence, not policy or
+supervisor retry state. The controller queues one separate escalation and suppresses recursive
+mail-about-mail incidents; experiments and independent eligible work continue.

@@ -123,11 +123,12 @@ def _attempt(alert: dict[str, Any], config: Mapping[str, Any]) -> dict[str, Any]
         ambiguous = isinstance(exc, subprocess.CalledProcessError) and exc.returncode == 3
         alert.update(
             delivery="ambiguous" if ambiguous else "failed",
+            needs_attention=ambiguous,
             error=f"Notification delivery failed ({type(exc).__name__})",
             next_attempt_epoch=time.time() + min(3600, 60 * 2 ** min(alert["attempts"] - 1, 6)),
         )
     else:
-        alert.update(delivery="sent", delivered_at=now)
+        alert.update(delivery="sent", delivered_at=now, needs_attention=False)
         alert.pop("error", None)
         alert.pop("next_attempt_epoch", None)
     alert["updated_at"] = now
@@ -168,6 +169,7 @@ def notify_intervention(
         "updated_at": now,
         "delivery": "pending" if configured else "not_configured",
         "attempts": 0,
+        "notification_incident": incident.get("kind") == "notification_delivery_uncertain",
     }
     try:
         if path.exists():
@@ -208,7 +210,8 @@ def flush_notifications(directory: str | Path, config: Mapping[str, Any]) -> dic
                     "next_attempt_epoch", 0
                 ):
                     if delivery == "sending" and config.get("transport") != "command":
-                        alert.update(delivery="ambiguous", error="Delivery interrupted; inspect transport")
+                        alert.update(delivery="ambiguous", needs_attention=True,
+                                     error="Delivery interrupted; inspect transport")
                         _write(path, alert)
                     else:
                         alert = _attempt(alert, config)
@@ -220,3 +223,28 @@ def flush_notifications(directory: str | Path, config: Mapping[str, Any]) -> dic
     result = {"status": "checked", "counts": counts, "checked_at": datetime.now(timezone.utc).isoformat()}
     _write(directory / "notification-status.json", result)
     return result
+
+
+def notification_incidents(directory: str | Path) -> list[dict[str, Any]]:
+    """Make uncertain delivery actionable without recursively reporting mail-about-mail.
+
+    The repair agent can inspect saved send receipts. It cannot silently assume
+    delivery or blindly retry. Failures of the escalation email remain visible in
+    the outbox but never spawn an unbounded chain of notification incidents.
+    """
+    incidents = []
+    for path in sorted((Path(directory) / "alerts").glob("*.json")):
+        try:
+            alert = json.loads(path.read_text())
+        except (OSError, ValueError):
+            continue
+        if alert.get("delivery") != "ambiguous" or alert.get("notification_incident"):
+            continue
+        identity = hashlib.sha256(("notification:" + alert["id"]).encode()).hexdigest()[:24]
+        incidents.append({
+            "id": identity, "kind": "notification_delivery_uncertain", "run_ids": [],
+            "alert_path": str(path),
+            "reason": "Email delivery is uncertain. Inspect the saved Gmail receipt for alert "
+                      + alert["id"] + "; do not assume delivery or resend blindly.",
+        })
+    return incidents

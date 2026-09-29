@@ -162,3 +162,24 @@ def test_recovery_requires_healthy_successor_and_notifies_once(monitor, tmp_path
     assert state["incidents"]["failure"]["recovered"]
     outcomes = [json.loads(p.read_text())["outcome"] for p in (tmp_path / "alerts").glob("*.json")]
     assert sorted(outcomes) == ["problem_detected", "recovered"]
+
+
+def test_uncertain_mail_is_diagnosed_by_bounded_repair(monitor, tmp_path, monkeypatch):
+    cli, policy, state, observation = monitor
+    alert = notifications.notify_intervention(
+        tmp_path, {"id": "prior", "reason": "decision", "run_ids": []},
+        "requires_user", "Decide", config=policy["notifications"], defer=True,
+    )
+    alert["delivery"] = "ambiguous"
+    cli.write(Path(alert["path"]), alert)
+    observation.update(status="healthy", incidents=[])
+    prompts = []
+    def repair(_policy, _directory, prompt, _stop):
+        prompts.append(prompt)
+        return _result("needs_user")
+    monkeypatch.setattr(cli, "run_agent", repair)
+    status = cli.check(tmp_path, policy, state, act=True)
+    assert status["outcome"] == "needs_user"
+    assert "notification_delivery_uncertain" in prompts[0]
+    assert alert["path"] in prompts[0]
+    assert len(state["agent_runs"]) == 1

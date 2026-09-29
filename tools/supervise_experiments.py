@@ -17,7 +17,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from exact.experiments.notifications import flush_notifications, notify_intervention  # noqa: E402
+from exact.experiments.notifications import (  # noqa: E402
+    flush_notifications,
+    notification_incidents,
+    notify_intervention,
+)
 from exact.experiments.supervision import (  # noqa: E402
     inspect_runs,
     inspection_incident,
@@ -334,9 +338,16 @@ def check(directory, policy, state, *, act=False, stop_requested=lambda: False):
         raise ValueError("Retained allocation is unavailable; do not create or cancel allocations")
     observation = inspect_runs(registry["runs"], step_states=steps)
     if "pending_batches" in registry:
+        # Explicit unfinished scope permits recovery from an accidentally empty
+        # queue. Terminal/deferred scope must not trigger endless planning turns.
+        fallback = not registry["pending_batches"] and registry.get("remaining_work_status") == "pending"
         observation["incidents"] = [
-            item for item in observation["incidents"] if item["kind"] != "next_batch"
+            item for item in observation["incidents"] if item["kind"] != "next_batch" or fallback
         ] + pending_batches(registry, observation)
+    mail_incidents = notification_incidents(directory)
+    if mail_incidents:
+        observation["incidents"].extend(mail_incidents)
+        observation["status"] = "needs_attention"
     now = time.time()
     # Persistent unreadable evidence merits diagnosis, never a blind resubmission.
     for finding in observation["findings"]:

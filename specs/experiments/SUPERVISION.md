@@ -124,3 +124,15 @@ registered run and every pending batch. The controller offers ready independent 
 dependencies are complete and capacity is available. Repair agents remove submitted batches
 from the pending list and register their real numeric Slurm steps. One heavy GPU lane is
 retained; CPU preparation and hosted work may overlap within actual capacity.
+
+
+Uncertain delivery is itself an actionable `notification_delivery_uncertain` incident, subject
+to the same two-attempt repair bound. Its outbox entry sets `needs_attention`. The repair may
+reconcile actual saved Gmail tool evidence, or request the missing decision; it may not invent
+delivery or blindly resend. Its separate escalation email is deduplicated, and failures of
+that escalation remain visible without recursively generating more mail incidents.
+
+With `pending_batches`, record `remaining_work_status: pending` while unfinished scope remains.
+If the list is accidentally empty and all registered runs complete, normal continuation is
+then restored. Explicit `complete`, `deferred` or `needs_user` dispositions suppress that
+fallback, preventing an endless series of planning interventions after terminal scope.

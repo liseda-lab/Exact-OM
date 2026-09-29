@@ -194,3 +194,23 @@ def test_existing_message_is_immutable_while_queued(tmp_path):
         tmp_path, INCIDENT, "needs_user", "Changed", config=COMMAND, defer=True
     )
     assert first == second
+
+
+def test_ambiguous_send_creates_one_repair_incident_without_recursive_alerts(tmp_path):
+    alert = notifications.notify_intervention(
+        tmp_path, INCIDENT, "requires_user", "Decide", config=COMMAND, defer=True
+    )
+    alert.update(delivery="ambiguous", needs_attention=True)
+    notifications._write(notifications.Path(alert["path"]), alert)
+    incident, = notifications.notification_incidents(tmp_path)
+    assert incident["kind"] == "notification_delivery_uncertain"
+    assert incident["alert_path"] == alert["path"]
+    escalation = notifications.notify_intervention(
+        tmp_path, incident, "requires_user", "Inspect delivery", config=COMMAND, defer=True
+    )
+    escalation.update(delivery="ambiguous")
+    notifications._write(notifications.Path(escalation["path"]), escalation)
+    assert notifications.notification_incidents(tmp_path) == [incident]
+    alert.update(delivery="sent", needs_attention=False)
+    notifications._write(notifications.Path(alert["path"]), alert)
+    assert notifications.notification_incidents(tmp_path) == []

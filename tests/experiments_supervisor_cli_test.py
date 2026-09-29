@@ -472,3 +472,19 @@ def test_semantic_config_still_requires_chatgpt_login(cli, authentication_policy
                         cli.subprocess.CompletedProcess(a[0], 0, "Logged in using API key", ""))
     with pytest.raises(ValueError, match="API fallback is disabled"):
         cli.authenticate(policy)
+
+
+@pytest.mark.parametrize("remaining", ["pending", "complete", "deferred", "needs_user", None])
+def test_empty_pending_queue_only_falls_back_for_explicit_unfinished_scope(
+    cli, controller, tmp_path, monkeypatch, remaining
+):
+    policy, state = controller
+    cli.write(tmp_path / "registry.json", {
+        "runs": [], "pending_batches": [], "capacity": {}, "remaining_work_status": remaining
+    })
+    observation = {"status": "complete", "findings": [], "incidents": [
+        {"id": "next", "kind": "next_batch", "run_ids": [], "reason": "All complete"}
+    ]}
+    monkeypatch.setattr(cli, "inspect_runs", lambda *a, **k: observation)
+    cli.check(tmp_path, policy, state)
+    assert bool(cli.read(tmp_path / "health.json")["incidents"]) == (remaining == "pending")
