@@ -68,6 +68,8 @@ def config_fingerprint(policy):
     """Bind reviewed settings while allowing presentation changes and CLI-overridden effort."""
     with Path(policy["codex_config"]).open("rb") as stream:
         config = tomllib.load(stream)
+    if config.get("service_tier") == "default":
+        config.pop("service_tier")
     for key in ("notice", "tui"):
         config.pop(key, None)
     if policy.get("model_reasoning_effort") is not None:

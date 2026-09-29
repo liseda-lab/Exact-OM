@@ -402,6 +402,7 @@ def test_semantic_config_accepts_only_inert_or_overridden_changes(cli, authentic
 @pytest.mark.parametrize("change", [
     'model = "different-model"\n',
     'model_provider = "another-provider"\n',
+    'service_tier = "priority"\n',
     'forced_login_method = "api"\n',
     'approval_policy = "never"\n',
     'sandbox_mode = "danger-full-access"\n',
@@ -421,6 +422,18 @@ def test_semantic_config_rejects_other_changes_before_login(cli, authentication_
     with pytest.raises(ValueError, match="Codex configuration changed"):
         cli.authenticate(policy)
     assert calls == []
+
+
+@pytest.mark.parametrize("explicit_first", [False, True])
+def test_semantic_config_accepts_explicit_default_tier(cli, authentication_policy, explicit_first):
+    policy, config, calls = authentication_policy
+    original = config.read_text()
+    explicit = original + 'service_tier = "default"\n'
+    config.write_text(explicit if explicit_first else original)
+    policy["codex_config_semantic_sha256"] = cli.config_fingerprint(policy)
+    config.write_text(original if explicit_first else explicit)
+    cli.authenticate(policy)
+    assert len(calls) == 1
 
 
 def test_semantic_config_retains_inherited_effort(cli, authentication_policy):

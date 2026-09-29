@@ -33,8 +33,9 @@ The deployment receipt binds the supervisor source, instructions, policy and suc
 permission smoke. Policies without `codex_config_semantic_sha256` retain the strict whole-file
 `codex_config_sha256` check. After reviewing the current Codex configuration, deployments may
 record `config_fingerprint(policy)` from `tools/supervise_experiments.py` as the semantic pin.
-This hashes parsed TOML with sorted keys, excluding only `notice` and `tui`; it substitutes
-the supervisor's explicit `model_reasoning_effort` override when present. Formatting,
+This hashes parsed TOML with sorted keys, excluding `notice` and `tui`; it treats an explicit
+`service_tier = "default"` as equivalent to an omitted tier and substitutes the supervisor's
+explicit `model_reasoning_effort` override when present. Non-default service tiers remain bound. Formatting,
 presentation settings and globally changed effort that the supervisor overrides therefore
 do not stop interventions. All other settings, including model, providers, projects,
 plugins and unknown keys, remain bound and require review when changed. The raw fingerprint
