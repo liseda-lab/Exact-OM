@@ -11,7 +11,7 @@ from tools.prepared_batch import binding, write
 
 
 @pytest.mark.parametrize(
-    "damage", [None, "bytes", "role", "config", "seed", "duplicate", "missing"]
+    "damage", [None, "bytes", "role", "config", "seed", "duplicate", "missing", "working_bytes"]
 )
 def test_saved_cells_require_complete_identical_verified_outputs(tmp_path, monkeypatch, damage):
     cell = SimpleNamespace(
@@ -42,6 +42,7 @@ def test_saved_cells_require_complete_identical_verified_outputs(tmp_path, monke
             parents=list(identities.values())[-1:],
         )
         store.publish(identity, {stage + ".txt": b"verified"})
+        (tmp_path / (stage + ".txt")).write_bytes(b"verified")
         identities[stage] = identity["artifact_id"]
     report = dict(
         experiment_id="E20",
@@ -87,6 +88,8 @@ def test_saved_cells_require_complete_identical_verified_outputs(tmp_path, monke
     if damage == "bytes":
         blob = next((tmp_path / "artifacts/blobs").iterdir())
         blob.write_bytes(b"corrupt")
+    if damage == "working_bytes":
+        (tmp_path / "extraction.txt").write_bytes(b"corrupt")
     if damage == "duplicate":
         recipe["manifests"] *= 2
     if damage == "missing":

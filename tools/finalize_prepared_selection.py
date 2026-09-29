@@ -124,8 +124,14 @@ def verify_cells(recipe, suite, experiments, *, checksums=True):
         }:
             raise ValueError("Saved artifact lineage differs")
         if checksums:
-            for artifact in artifacts.values():
-                store.verify(artifact)
+            for stage, artifact in artifacts.items():
+                checked = store.verify(artifact)
+                # Downstream consumers open the original run paths. Verify those
+                # exposed bytes as well as the immutable content-addressed store.
+                if stage != "inputs":
+                    for name, output in checked["outputs"].items():
+                        if binding(path.parent / name)["sha256"] != output["sha256"]:
+                            raise ValueError("Saved working output differs: " + name)
     return manifests
 
 
