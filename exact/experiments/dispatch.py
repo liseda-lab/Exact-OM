@@ -283,6 +283,48 @@ def dispatch_ready(directory, allocation, steps, *, supervisor_step=None):
         return blocked or {"status": "no_ready_launch"}
 
 
+def pending_recoveries(registry, observation, allocation, steps, state):
+    """Recognize a reviewed queued replacement without claiming scientific recovery."""
+    runs = {row["id"]: row for row in registry["runs"]}
+    batches = {row["id"]: row for row in registry.get("pending_batches", [])}
+    findings = {row["run_id"]: row for row in observation["findings"]}
+    waiting = {}
+    for name, run in runs.items():
+        identifier = run.get("pending_recovery")
+        batch = batches.get(identifier) if isinstance(identifier, str) else None
+        if (not batch or batch["id"] in runs or not batch.get("enabled", True) or batch.get("needs_user")
+                or not batch.get("launch") or run["step_id"] in steps
+                or state.get(batch["id"], {}).get("status") in {"failed", "resolved"}):
+            continue
+        try:
+            _validate(batch, allocation)
+            resources = batch["resources"]
+            if not isinstance(resources, dict) or not resources or any(
+                not isinstance(value, (int, float)) or isinstance(value, bool)
+                or not 0 <= value <= registry["capacity"].get(key, 0)
+                for key, value in resources.items()
+            ):
+                continue
+            parents = batch.get("depends_on", [])
+            if not isinstance(parents, list):
+                continue
+            valid = True
+            for parent in parents:
+                seen = set()
+                while parent in runs and runs[parent].get("superseded_by") and parent not in seen:
+                    seen.add(parent)
+                    parent = runs[parent]["superseded_by"]
+                if parent == name or findings.get(parent, {}).get("status") not in {"healthy", "waiting", "complete"}:
+                    valid = False
+                    break
+            if valid:
+                waiting[name] = batch["id"]
+        except (OSError, ValueError, KeyError, TypeError):
+            # A broken/missing descriptor leaves the original failure actionable.
+            continue
+    return waiting
+
+
 def dispatch_incidents(directory):
     path = Path(directory) / "dispatch-state.json"
     state = _read(path) if path.exists() else {}

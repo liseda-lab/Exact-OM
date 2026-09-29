@@ -17,7 +17,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from exact.experiments.dispatch import dispatch_ready, dispatch_incidents  # noqa: E402
+from exact.experiments.dispatch import dispatch_ready, dispatch_incidents, pending_recoveries  # noqa: E402
 from exact.experiments.notifications import (  # noqa: E402
     flush_notifications,
     notification_incidents,
@@ -380,14 +380,26 @@ def check(directory, policy, state, *, act=False, stop_requested=lambda: False):
     if not any(key.startswith(policy["allocation"] + ".") for key in steps):
         raise ValueError("Retained allocation is unavailable; do not create or cancel allocations")
     observation = inspect_runs(registry["runs"], step_states=steps)
+    dispatch_path = directory / "dispatch-state.json"
+    dispatch_state = read(dispatch_path) if dispatch_path.exists() else {}
+    recoveries = pending_recoveries(registry, observation, policy["allocation"], steps, dispatch_state)
+    suppressed = set()
+    for incident in observation["incidents"]:
+        focus = incident.get("focus_run_id") or next(iter(incident.get("run_ids", [])), None)
+        if focus in recoveries and incident["kind"] in {"run_failed", "launcher_failed", "step_missing"}:
+            suppressed.add(incident["id"])
+            for finding in observation["findings"]:
+                if finding["run_id"] in incident["run_ids"]:
+                    finding.update(status="waiting", pending_recovery=recoveries[focus],
+                                   reason="Waiting for prepared recovery " + recoveries[focus])
+                    finding.pop("incident_id", None)
+    observation["incidents"] = [item for item in observation["incidents"] if item["id"] not in suppressed]
     if "pending_batches" in registry:
         # Explicit unfinished scope permits recovery from an accidentally empty
         # queue. Terminal/deferred scope must not trigger endless planning turns.
         fallback = not registry["pending_batches"] and registry.get("remaining_work_status") == "pending"
         batches = {row["id"]: row for row in registry["pending_batches"]}
         ready = pending_batches(registry, observation)
-        dispatch_path = directory / "dispatch-state.json"
-        dispatch_state = read(dispatch_path) if dispatch_path.exists() else {}
         prepared_priority = (
             any(batches[item["batch_id"]].get("launch") for item in ready)
             or any(row["status"] in {"reserved", "starting", "failed"}
@@ -418,6 +430,8 @@ def check(directory, policy, state, *, act=False, stop_requested=lambda: False):
     if mail_incidents:
         observation["incidents"].extend(mail_incidents)
         observation["status"] = "needs_attention"
+    if suppressed and not observation["incidents"]:
+        observation["status"] = "waiting"
     now = time.time()
     # Persistent unreadable evidence merits diagnosis, never a blind resubmission.
     for finding in observation["findings"]:

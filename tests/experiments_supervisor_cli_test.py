@@ -701,3 +701,90 @@ def test_explicit_decision_remains_blocking_even_if_repair_timed_out(cli, contro
     })
     cli.check(tmp_path, policy, state, act=True)
     assert state['incidents']['failure']['needs_user'] is True
+
+
+@pytest.fixture
+def queued_recovery(cli, controller, tmp_path, monkeypatch):
+    import hashlib
+
+    policy, state = controller
+    worker = tmp_path / 'reviewed-worker.sh'
+    worker.write_text('#!/bin/bash\nexit 0\n')
+    cli.write(tmp_path / 'old-status.json', {'status': 'blocked', 'error': 'saved error'})
+    cli.write(tmp_path / 'busy-status.json', {'status': 'running'})
+    failed = {'id': 'failed', 'step_id': '14372.34', 'pending_recovery': 'recovery',
+              'status_path': str(tmp_path / 'old-status.json')}
+    busy = {'id': 'busy', 'step_id': '14372.38', 'status_path': str(tmp_path / 'busy-status.json'),
+            'resources': {'gpus': 1, 'cpus': 6}}
+    batch = {'id': 'recovery', 'resources': {'gpus': 1, 'cpus': 6}, 'depends_on': ['busy'], 'launch': {
+        'run': {'id': 'recovery', 'status_path': str(tmp_path / 'new-status.json'),
+                'completion_path': str(tmp_path / 'new-complete.json'), 'exit_path': str(tmp_path / 'exit')},
+        'argv': ['/usr/bin/srun', '--jobid=14372', '/bin/bash', str(worker)],
+        'nonce': 'reviewed-recovery-001', 'tmux_socket': str(tmp_path / 'socket'),
+        'step_path': str(tmp_path / 'step.json'), 'launcher_log': str(tmp_path / 'launcher.log'),
+        'bindings': [{'path': str(worker), 'sha256': hashlib.sha256(worker.read_bytes()).hexdigest()}],
+    }}
+    registry = {'runs': [failed, busy], 'pending_batches': [batch], 'capacity': {'gpus': 1, 'cpus': 6}}
+    cli.write(tmp_path / 'registry.json', registry)
+    monkeypatch.setattr(cli, 'slurm_steps', lambda _: {'14372.0': 'RUNNING', '14372.38': 'RUNNING'})
+    return policy, state, registry, batch
+
+
+def test_verified_queued_recovery_waits_without_repair_or_false_recovery_alert(
+    cli, queued_recovery, tmp_path, monkeypatch
+):
+    policy, state, registry, _ = queued_recovery
+    incidents = cli.inspect_runs(registry['runs'], step_states={'14372.38': 'RUNNING'})['incidents']
+    incident = incidents[0]
+    state['incidents'][incident['id']] = {'attempts': 1, 'observations': 1, 'alerted': True, 'incident': incident}
+    monkeypatch.setattr(cli, 'run_agent', lambda *a: pytest.fail('Verified replacement is already queued'))
+    monkeypatch.setattr(cli, 'notify_blocker', lambda *a, **k: pytest.fail('Waiting is neither failure nor recovery'))
+    result = cli.check(tmp_path, policy, state, act=True)
+    assert result['status'] == 'waiting'
+    health = cli.read(tmp_path / 'health.json')
+    assert not health['incidents']
+    failed = next(row for row in health['findings'] if row['run_id'] == 'failed')
+    assert failed['status'] == 'waiting' and failed['pending_recovery'] == 'recovery'
+    assert failed['phase'] == 'blocked'  # Original terminal evidence is preserved.
+    assert state['incidents'][incident['id']]['attempts'] == 1
+    assert not state['incidents'][incident['id']].get('recovered')
+
+
+@pytest.mark.parametrize('invalid', [
+    'missing', 'hash', 'run_id', 'allocation', 'dependency', 'self_dependency',
+    'disabled', 'decision', 'capacity', 'dispatch_failed', 'live_old_worker', 'malformed_pointer',
+])
+def test_unverified_queued_recovery_leaves_original_failure_actionable(
+    cli, queued_recovery, tmp_path, monkeypatch, invalid
+):
+    policy, state, registry, batch = queued_recovery
+    if invalid == 'missing':
+        registry['pending_batches'] = []
+    elif invalid == 'hash':
+        batch['launch']['bindings'][0]['sha256'] = 'wrong'
+    elif invalid == 'run_id':
+        batch['launch']['run']['id'] = 'unrelated'
+    elif invalid == 'allocation':
+        batch['launch']['argv'][1] = '--jobid=99999'
+    elif invalid == 'dependency':
+        batch['depends_on'] = ['missing-parent']
+    elif invalid == 'self_dependency':
+        batch['depends_on'] = ['failed']
+    elif invalid == 'disabled':
+        batch['enabled'] = False
+    elif invalid == 'decision':
+        batch['needs_user'] = True
+    elif invalid == 'capacity':
+        batch['resources']['gpus'] = 2
+    elif invalid == 'dispatch_failed':
+        cli.write(tmp_path / 'dispatch-state.json', {
+            'recovery': {'status': 'failed', 'descriptor_sha256': 'bound', 'error': 'launch failure'},
+        })
+    elif invalid == 'live_old_worker':
+        monkeypatch.setattr(cli, 'slurm_steps', lambda _: {'14372.0': 'RUNNING', '14372.34': 'RUNNING'})
+    else:
+        registry['runs'][0]['pending_recovery'] = {'malformed': True}
+    cli.write(tmp_path / 'registry.json', registry)
+    cli.check(tmp_path, policy, state)
+    incidents = cli.read(tmp_path / 'health.json')['incidents']
+    assert any(row['kind'] == 'run_failed' and row['focus_run_id'] == 'failed' for row in incidents)
