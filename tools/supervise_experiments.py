@@ -10,13 +10,14 @@ import os
 import signal
 import subprocess
 import sys
+import threading
 import time
 import tomllib
 from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from exact.experiments.notifications import notify_intervention  # noqa: E402
+from exact.experiments.notifications import flush_notifications, notify_intervention  # noqa: E402
 from exact.experiments.supervision import (  # noqa: E402
     inspect_runs,
     inspection_incident,
@@ -96,6 +97,11 @@ def authenticate(policy):
         actual, expected = digest(config), policy["codex_config_sha256"]
     if actual != expected:
         raise ValueError("Codex configuration changed; review authentication/model before resuming")
+    authenticate_login(policy)
+
+
+def authenticate_login(policy):
+    """Check subscription/provider independently of experiment configuration pins."""
     result = subprocess.run(
         [
             policy["codex"],
@@ -150,6 +156,7 @@ def agent_command(policy, directory):
     return [
         policy["codex"],
         "exec",
+        *(["--model", policy["model"]] if policy.get("model") else []),
         *(
             ["-c", "model_reasoning_effort=" + json.dumps(policy["model_reasoning_effort"])]
             if policy.get("model_reasoning_effort") is not None
@@ -283,7 +290,41 @@ def notify_blocker(directory, policy, incident, action, *, result=None, report=N
         summary,
         config=policy.get("notifications", {}),
         handoff=result.get("handoff", ""),
+        defer=True,
     )
+
+
+def observed_recovery(incident, registry, observation):
+    """Only a healthy live/completed successor establishes recovery, never absence alone."""
+    runs = {run["id"]: run for run in registry["runs"]}
+    findings = {row["run_id"]: row for row in observation["findings"]}
+    names = incident.get("run_ids", [])
+    if not names:
+        return False
+    for name in names:
+        seen = set()
+        while name in runs and runs[name].get("superseded_by") and name not in seen:
+            seen.add(name)
+            name = runs[name]["superseded_by"]
+        if findings.get(name, {}).get("status") not in {"healthy", "complete"}:
+            return False
+    return True
+
+
+def notification_worker(directory, policy, stop_event):
+    """Mail may use a model; it must never hold up monitoring or scientific repair."""
+    while not stop_event.is_set():
+        try:
+            flush_notifications(directory, policy.get("notifications", {}))
+        except Exception as exc:
+            try:
+                write(directory / "notification-status.json", {
+                    "status": "failed", "checked_at": timestamp(),
+                    "error": "Notification worker failed (" + type(exc).__name__ + ")",
+                })
+            except OSError:
+                pass
+        stop_event.wait(15)
 
 
 def check(directory, policy, state, *, act=False, stop_requested=lambda: False):
@@ -309,7 +350,7 @@ def check(directory, policy, state, *, act=False, stop_requested=lambda: False):
         record = state["incidents"].setdefault(incident["id"], {"attempts": 0, "observations": 0})
         if not record["observations"]:
             record["first_seen_epoch"] = now
-        record.update(observations=record["observations"] + 1, last_seen=timestamp())
+        record.update(observations=record["observations"] + 1, last_seen=timestamp(), incident=incident)
     state["last_check"] = timestamp()
     write(directory / "state.json", state)
     write(directory / "health.json", observation)
@@ -323,6 +364,22 @@ def check(directory, policy, state, *, act=False, stop_requested=lambda: False):
     if paused_by:
         current.update(status="paused", paused_by=paused_by)
     elif act:
+        for key, record in state["incidents"].items():
+            if (key not in active and record.get("alerted") and not record.get("recovered")
+                    and observed_recovery(record.get("incident", {}), registry, observation)):
+                notify_blocker(directory, policy, record["incident"], "recovered", result={
+                    "summary": "The affected experiment or its registered recovery is now healthy or complete."
+                })
+                record["recovered"] = timestamp()
+        for incident in observation["incidents"]:
+            record = state["incidents"][incident["id"]]
+            confirmed = incident["kind"] not in {"step_missing", "inspect_evidence"} or (
+                record["observations"] >= 2 and now - record.get("first_seen_epoch", now) >= 60
+            )
+            if incident["kind"] != "next_batch" and confirmed:
+                notify_blocker(directory, policy, incident, "problem_detected")
+                record["alerted"] = True
+        write(directory / "state.json", state)
         for incident in observation["incidents"]:
             allowed, reason = eligible(state, incident, policy, now)
             current.update(incident=incident, action=reason)
@@ -455,16 +512,30 @@ def main():
             or not os.environ.get("SLURM_STEP_ID", "").isdigit()
         ):
             raise ValueError("Run inside a numeric Slurm step in the retained allocation")
-        authenticate(policy)
+        # Authentication/configuration preflight belongs to repair invocation. A
+        # mismatch must leave deterministic monitoring and email delivery alive.
         # An interrupted repair is never restarted immediately with no inspection.
         for entry in state["agent_runs"]:
             if entry["status"] == "running":
                 entry.update(status="interrupted", finished_at=timestamp())
                 state["incidents"][entry["incident"]]["needs_user"] = True
+    mail_stop = threading.Event()
+    if not args.once:
+        threading.Thread(
+            target=notification_worker, args=(directory, policy, mail_stop), daemon=True,
+            name="supervisor-notifications",
+        ).start()
     while not stopping():
         tick = time.monotonic()
         try:
             current = check(directory, policy, state, act=not args.once, stop_requested=stopping)
+            prior_error = state.get("supervisor_error")
+            if prior_error and not args.once and current.get("status") != "paused":
+                notify_blocker(directory, policy, prior_error, "recovered", result={
+                    "summary": "Deterministic supervisor checks are succeeding again; repair authentication is checked when needed."
+                })
+                state.pop("supervisor_error", None)
+                write(state_path, state)
         except Exception as exc:
             failure = {
                 "status": "check_error",
@@ -478,6 +549,8 @@ def main():
                     "reason": failure["error"],
                     "run_ids": [],
                 }
+                state["supervisor_error"] = incident
+                write(state_path, state)
                 failure["notification"] = notify_blocker(
                     directory, policy, incident, "supervisor_error"
                 )
@@ -495,6 +568,7 @@ def main():
             deadline = tick + interval
         while not stopping() and time.monotonic() < deadline:
             time.sleep(min(5, max(0, deadline - time.monotonic())))
+    mail_stop.set()
     write(directory / "status.json", {"status": "stopped", "recorded_at": timestamp()})
     return 0
 

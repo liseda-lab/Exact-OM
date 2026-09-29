@@ -18,7 +18,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from supervise_experiments import (  # noqa: E402
     agent_command,
-    authenticate,
+    authenticate_login,
     environment,
     read,
     timestamp,
@@ -164,7 +164,11 @@ def deliver(policy, directory, message, *, timeout=180, alert_id=None):
             return result
         # Configuration/authentication failures occur before sending and are safe to retry.
         try:
-            authenticate(policy)
+            mail_policy = dict(policy)
+            mail_policy["model"] = policy.get("notifications", {}).get("model", policy.get("model"))
+            if not mail_policy["model"]:
+                raise ValueError("Notification model must be explicitly reviewed in policy")
+            authenticate_login(policy)
         except Exception as exc:
             result = {
                 "status": "failed",
@@ -201,7 +205,7 @@ def deliver(policy, directory, message, *, timeout=180, alert_id=None):
             "directory": str(directory),
         }
         write(state_path, result)
-        command = agent_command(policy, attempt_directory)
+        command = agent_command(mail_policy, attempt_directory)
         command.insert(2, "--ephemeral")
         interrupted, code = False, None
         try:
@@ -233,6 +237,9 @@ def deliver(policy, directory, message, *, timeout=180, alert_id=None):
         evidence = delivery_evidence(attempt_directory / "events.jsonl", message)
         if len(evidence["receipts"]) == 1:
             status = "sent"
+        elif evidence["completed"] and not evidence["attempted"]:
+            # A completed transcript with no Gmail call proves there was no send.
+            status = "failed"
         else:
             status = "ambiguous"
         result.update(
@@ -243,7 +250,11 @@ def deliver(policy, directory, message, *, timeout=180, alert_id=None):
             **evidence,
         )
         if status != "sent":
-            result["error"] = "No verified Gmail send receipt; inspect saved evidence before retry"
+            result["error"] = (
+                "Gmail was unavailable; no send attempted, safe to retry"
+                if status == "failed"
+                else "No verified Gmail send receipt; inspect saved evidence before retry"
+            )
         write(state_path, result)
         return result
 

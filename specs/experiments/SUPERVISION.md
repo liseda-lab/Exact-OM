@@ -67,20 +67,37 @@ no intervention is still active. Interventions interrupted by supervisor shutdow
 for review on restart. Resume experiments from their saved runtime and preserve accounting.
 
 
-Interventions that need a scientific decision, exhaust their same-error attempts, or are
-interrupted produce a persistent alert in `alerts/`. Configured email delivery sends one
-message per incident and blocking outcome; failed deliveries are retried and their status
-remains visible. The email contains the affected run, reason, repair summary and handoff
-path, rather than raw logs or credentials. Delivery is best effort and depends on the
-configured mail transport; a local alert alone is not an email confirmation.
+Confirmed failures produce an immediate persistent detection alert in `alerts/`, before
+repair starts. Required approvals/decisions, exhausted same-error attempts and interrupted
+repairs produce separate actionable alerts. A recovery alert requires an observed healthy
+or completed run (including its registered successor), rather than the repair agent's claim.
+Routine queue advancement does not send failure mail.
+
+A separate delivery thread drains the durable outbox while checks and repairs continue;
+mail cannot delay scientific recovery. Failed deliveries retry after 1, 2, 4, 8, 16, 32,
+then 60 minutes, including after the original incident disappears. Messages are immutable
+and deduplicated by incident/outcome. `notification-status.json` gives delivery counts;
+each alert gives attempts, next retry and current delivery state. Pending/failed mail survives
+supervisor restart. Ambiguous sends require inspection, not blind resending. The email gives
+the affected run, reason, repair summary and handoff, rather than raw logs or credentials.
+A local alert alone is not an email confirmation.
 
 The optional `notifications` policy supports a reviewed command receiving an RFC 822
 message on stdin, local sendmail, or SMTP with SSL/STARTTLS. The Gmail command adapter
 uses the existing connected account through a separate, bounded Codex invocation only
-when an intervention alert needs delivery. It requires a successful Gmail tool receipt,
-retains delivery evidence and token usage, and refuses to resend an uncertain delivery
-until it has been inspected. These rare notification invocations use subscription
-allowance; normal health checks still use no model calls. SMTP credentials are read from
+when an alert needs delivery. Its authentication preflight is independent of experiment
+configuration and instruction fingerprints: a guard failure must not prevent its own email.
+It still strips API overrides, forces ChatGPT login and the OpenAI provider, and requires an
+explicitly reviewed `notifications.model` (or top-level `model`) plus the configured effort.
+It does not alter global Codex settings. Monitoring and the outbox remain alive when repair
+preflight fails; unavailable login or Gmail can still prevent delivery.
+
+The adapter requires a successful Gmail MCP tool receipt with the exact recipient/body,
+retains evidence and usage, and refuses to resend an uncertain delivery until inspected.
+A completed transcript proving no send was attempted can retry; prose claiming success is
+never delivery evidence. Recovered receipts prevent duplicate mail after an interrupted
+notifier. Notification invocations use subscription allowance; normal health checks still
+use no model calls. SMTP credentials are read from
 a named environment variable, never stored in policy. The deployment handoff records
 whether transport has been verified. `max_agent_runs_per_day` may be omitted or null;
 only an explicitly configured positive integer adds a rolling daily cap.
@@ -92,3 +109,18 @@ clear a blocker. The user can change these policies; automatic repair agents can
 
 Email replies are not automatically treated as experiment instructions. Give the required
 decision in the Codex conversation so it can be applied and recorded before resuming.
+
+
+Runtime forecasting is advisory. The supervisor must not stop healthy work or reject the
+next eligible comparison merely because a wall-time estimate, group allowance or week target
+is exceeded. External spending authorization and actual RAM/GPU/disk/allocation limits remain
+meaningful controls. Preserve cumulative costs, checkpoint at genuine blockers and request
+only the missing decision. Scientific sample sizes, epochs, seeds and evaluation roles are
+not automatically reduced to meet the target. Complete qualification-then-repeat workflows
+are prohibited; the actual run supplies both measured usage and scientific evidence.
+
+When a registry opts into `pending_batches` and `capacity`, include resources for every live
+registered run and every pending batch. The controller offers ready independent work when its
+dependencies are complete and capacity is available. Repair agents remove submitted batches
+from the pending list and register their real numeric Slurm steps. One heavy GPU lane is
+retained; CPU preparation and hosted work may overlap within actual capacity.

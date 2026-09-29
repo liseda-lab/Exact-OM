@@ -15,7 +15,7 @@ def mailer(monkeypatch):
     spec = importlib.util.spec_from_file_location("supervisor_email_adapter", path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    monkeypatch.setattr(module, "authenticate", lambda _: None)
+    monkeypatch.setattr(module, "authenticate_login", lambda _: None)
     return module
 
 
@@ -29,7 +29,7 @@ def _mail(recipient="owner@example.org"):
 
 
 def _policy():
-    return {"codex": "/example/codex", "repository": "/example/repo"}
+    return {"codex": "/example/codex", "repository": "/example/repo", "model": "gpt-6-astra"}
 
 
 def _event(arguments, *, message_id="gmail-message-id", error=False):
@@ -148,11 +148,11 @@ def test_configuration_failure_before_send_can_be_retried(mailer, tmp_path, monk
     def failed(_):
         raise ValueError("private config error")
 
-    monkeypatch.setattr(mailer, "authenticate", failed)
+    monkeypatch.setattr(mailer, "authenticate_login", failed)
     first = mailer.deliver(_policy(), tmp_path, message)
     assert first["status"] == "failed" and calls == []
     assert "private config" not in first["error"]
-    monkeypatch.setattr(mailer, "authenticate", lambda _: None)
+    monkeypatch.setattr(mailer, "authenticate_login", lambda _: None)
     assert mailer.deliver(_policy(), tmp_path, message)["status"] == "sent"
 
 
@@ -198,3 +198,28 @@ def test_real_cli_dotted_tool_name_and_structured_content_receipt(mailer, tmp_pa
     assert mailer.delivery_evidence(path, message)["receipts"] == [
         {"tool_call_id": "tool-1", "message_id": "1a0da2c7915d93b8"}
     ]
+
+
+def test_completed_without_send_is_retryable(mailer, tmp_path, monkeypatch):
+    message = mailer.parse_message(_mail().as_bytes(), "owner@example.org")
+    calls = _child(mailer, monkeypatch, [{"type": "turn.completed", "usage": {}}])
+    assert mailer.deliver(_policy(), tmp_path, message)["status"] == "failed"
+    assert mailer.deliver(_policy(), tmp_path, message)["status"] == "failed"
+    assert len(calls) == 2
+
+
+def test_email_does_not_read_experiment_config_or_instruction_pins(mailer, tmp_path, monkeypatch):
+    # The authentication function used by mail only verifies the forced login/provider.
+    import supervise_experiments
+    monkeypatch.setattr(mailer, "authenticate_login", supervise_experiments.authenticate_login)
+    logins = []
+    def login(command, **kwargs):
+        logins.append(command)
+        return subprocess.CompletedProcess(command, 0, "Logged in using ChatGPT", "")
+    monkeypatch.setattr(mailer.subprocess, "run", login)
+    message = mailer.parse_message(_mail().as_bytes(), "owner@example.org")
+    calls = _child(mailer, monkeypatch, [_event(message)])
+    policy = _policy() | {"codex_config": "/missing/config", "instructions": "/missing/instructions"}
+    assert mailer.deliver(policy, tmp_path, message)["status"] == "sent"
+    assert 'model_provider="openai"' in logins[0]
+    assert calls[0][0][calls[0][0].index("--model") + 1] == "gpt-6-astra"

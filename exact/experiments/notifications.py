@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import fcntl
 import hashlib
 import json
 import os
@@ -9,6 +10,7 @@ import shutil
 import smtplib
 import ssl
 import subprocess
+import time
 from datetime import datetime, timezone
 from email.message import EmailMessage
 from pathlib import Path
@@ -28,18 +30,22 @@ def _message(alert: Mapping[str, Any], config: Mapping[str, Any]) -> EmailMessag
         raise ValueError("Notification sender and recipient must be configured")
     message = EmailMessage()
     message["To"], message["From"] = recipient, sender
-    message["Subject"] = f"[Exact-OM] Intervention needed: {alert['outcome']}"
+    label = {
+        "problem_detected": "Problem detected; automatic repair pending",
+        "recovered": "Experiment recovered",
+    }.get(alert["outcome"], "Action required: " + alert["outcome"])
+    message["Subject"] = "[Exact-OM] " + label
     # Reuse Message-ID after an uncertain delivery; local dedup cannot guarantee exactly-once SMTP.
     message["Message-ID"] = f"<exact-om-{alert['id']}@supervisor.local>"
     message.set_content(
-        "Exact-OM needs your intervention.\n\n"
+        f"Exact-OM: {label}.\n\n"
         f"Outcome: {alert['outcome']}\n"
         f"Runs: {', '.join(alert['run_ids']) or 'supervisor'}\n"
         f"Reason: {alert['reason']}\n\n"
         f"{alert['summary']}\n\n"
         f"Handoff: {alert['handoff'] or 'See supervisor status and health receipts.'}\n"
         f"Alert: {alert['path']}\n"
-        "Give the required decision in the Codex conversation; email replies are not monitored.\n"
+        "If a decision is required, reply in the Codex conversation; email replies are not monitored.\n"
         "Other eligible experiments remain under supervision.\n"
     )
     return message
@@ -104,6 +110,31 @@ def _deliver(message: EmailMessage, config: Mapping[str, Any]) -> None:
         raise ValueError("Unknown notification transport")
 
 
+def _attempt(alert: dict[str, Any], config: Mapping[str, Any]) -> dict[str, Any]:
+    now = datetime.now(timezone.utc).isoformat()
+    alert.update(delivery="sending", attempts=alert["attempts"] + 1, last_attempt_at=now)
+    path = Path(alert["path"])
+    _write(path, alert)
+    try:
+        _deliver(_message(alert, config), config)
+    except Exception as exc:
+        # Command exit 3 is the Gmail adapter's uncertain-send result. Its journal
+        # must be inspected rather than risking a duplicate notification.
+        ambiguous = isinstance(exc, subprocess.CalledProcessError) and exc.returncode == 3
+        alert.update(
+            delivery="ambiguous" if ambiguous else "failed",
+            error=f"Notification delivery failed ({type(exc).__name__})",
+            next_attempt_epoch=time.time() + min(3600, 60 * 2 ** min(alert["attempts"] - 1, 6)),
+        )
+    else:
+        alert.update(delivery="sent", delivered_at=now)
+        alert.pop("error", None)
+        alert.pop("next_attempt_epoch", None)
+    alert["updated_at"] = now
+    _write(path, alert)
+    return alert
+
+
 def notify_intervention(
     directory: str | Path,
     incident: Mapping[str, Any],
@@ -112,19 +143,18 @@ def notify_intervention(
     *,
     config: Mapping[str, Any] | None = None,
     handoff: str = "",
+    defer: bool = False,
 ) -> dict[str, Any]:
-    """Persist an alert, and send once per incident/outcome; failed deliveries retry.
+    """Persist one immutable message per incident/outcome; the monitor queues only.
 
-    Call only for an intervention outcome, under the supervisor's existing lock.
-    ``config`` supports recipient, sender and transport (sendmail, command or smtp).
-    Command transport receives an RFC 822 message on stdin and uses a reviewed argv
-    list, without a shell. SMTP passwords come only from ``password_env``. An absent
-    config keeps a visible local alert that can be delivered after configuration.
-    Returned delivery status must be surfaced in the supervisor status receipt.
+    Deferred delivery is drained independently, including after the incident has
+    disappeared. Existing bodies stay unchanged for safe Gmail deduplication.
+    Synchronous delivery remains available for explicit transport checks.
     """
     ident = hashlib.sha256(json.dumps([incident["id"], outcome]).encode()).hexdigest()[:24]
     path = Path(directory) / "alerts" / f"{ident}.json"
     now = datetime.now(timezone.utc).isoformat()
+    configured = bool(config and config.get("enabled", True))
     alert: dict[str, Any] = {
         "id": ident,
         "incident_id": incident["id"],
@@ -136,34 +166,57 @@ def notify_intervention(
         "path": str(path),
         "created_at": now,
         "updated_at": now,
-        "delivery": "not_configured",
+        "delivery": "pending" if configured else "not_configured",
         "attempts": 0,
     }
     try:
         if path.exists():
-            previous: dict[str, Any] = json.loads(path.read_text())
-            alert.update(
-                {key: previous[key] for key in ("created_at", "attempts") if key in previous}
-            )
-            if previous.get("delivery") == "sent":
-                return previous
-        _write(path, alert)  # Preserve the actionable message even if delivery fails.
-        if not config or not config.get("enabled", True):
-            return alert
-        alert.update(attempts=alert["attempts"] + 1, last_attempt_at=now)
-        try:
-            _deliver(_message(alert, config), config)
-        except Exception as exc:
-            # SMTP/command exceptions can contain credentials, response bodies or argv.
-            alert.update(
-                delivery="failed", error=f"Notification delivery failed ({type(exc).__name__})"
-            )
+            alert = json.loads(path.read_text())
+            if defer or alert.get("delivery") in {"sent", "ambiguous", "sending"}:
+                return alert
         else:
-            alert.update(delivery="sent", delivered_at=now)
-        _write(path, alert)
+            _write(path, alert)
+        if configured and not defer:
+            return _attempt(alert, config)
     except Exception as exc:
-        # Notification filesystem trouble must not stop repair or monitoring.
         alert.update(
             delivery="failed", error=f"Notification persistence failed ({type(exc).__name__})"
         )
     return alert
+
+
+def flush_notifications(directory: str | Path, config: Mapping[str, Any]) -> dict[str, Any]:
+    """Drain the durable outbox with bounded backoff, independently of repairs.
+
+    One delivery lock spans restarts. The Gmail adapter has an additional durable
+    receipt journal, allowing recovery when its caller died after an actual send.
+    """
+    directory = Path(directory)
+    counts: dict[str, int] = {}
+    if not config or not config.get("enabled", True):
+        return {"status": "not_configured", "counts": counts}
+    with (directory / "notification-worker.lock").open("a") as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            return {"status": "another_delivery_worker", "counts": counts}
+        for path in sorted((directory / "alerts").glob("*.json")):
+            try:
+                alert = json.loads(path.read_text())
+                delivery = alert.get("delivery")
+                if delivery not in {"sent", "ambiguous"} and time.time() >= alert.get(
+                    "next_attempt_epoch", 0
+                ):
+                    if delivery == "sending" and config.get("transport") != "command":
+                        alert.update(delivery="ambiguous", error="Delivery interrupted; inspect transport")
+                        _write(path, alert)
+                    else:
+                        alert = _attempt(alert, config)
+                delivery = alert.get("delivery", "unknown")
+                counts[delivery] = counts.get(delivery, 0) + 1
+            except (OSError, ValueError, KeyError, TypeError):
+                # One corrupt/unavailable alert cannot block the rest of the outbox.
+                counts["unreadable"] = counts.get("unreadable", 0) + 1
+    result = {"status": "checked", "counts": counts, "checked_at": datetime.now(timezone.utc).isoformat()}
+    _write(directory / "notification-status.json", result)
+    return result

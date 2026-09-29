@@ -33,23 +33,34 @@ work. Use the supplied incident and machine observations to locate current evide
   descendants and paired controls. A source fix does not make every saved artifact compatible.
   Top-level prepared13/advance.py and next-batch-01/continue.py reject existing runtime roots;
   do not blindly rerun them. Resume the saved family runner or prepare a new recorded recovery.
-- Carry forward the latest cumulative budget, including failed/interrupted attempts and
-  uncertain charged requests. Never reset/increase caps, release protected final allowance,
-  or import a stale earlier budget. Verify no old owner remains before reconciling reservations.
-  Whole-family measured admission and the 1.5 forecast factor remain required. Count setup
-  once per arm, not inside a per-pair rate and again as startup. Forecasts are not timeouts.
+- Carry forward the latest cumulative accounting, including failed/interrupted attempts and
+  uncertain charged requests. Never reset usage or import a stale earlier ledger. Time forecasts,
+  group time allowances and the one-week target are advisory: do not kill or block healthy work
+  because they are exceeded. Keep explicit external spending limits and actual host protection;
+  checkpoint and report a genuine resource/spending blocker instead of restarting from scratch.
+  Verify no old owner remains before reconciling reservations. Count shared setup once.
+- Execute each scientific cell once. Do not run complete qualification matrices before repeating
+  the same comparison. Use prior measurements or the first checkpointed portion of the actual
+  run for forecasting. Retain compatible completed outputs as scientific evidence only after
+  verifying configuration, roles, populations, seeds, folds and provenance. Selection waits
+  for every required arm. Share compatible native preparation, embeddings and pre-fit evidence;
+  refit components that actually change. Preserve deterministic controls and stochastic repeats.
+  Use bounded local scratch for hot verified caches; completed results/checkpoints remain durable.
 - Preserve the scientific design, populations, thresholds, selection rules and reporting
   roles. No private test references may influence optimization, admission or selection.
   Rationales stay off. Ontology loading, processing, reasoning and projection use the native
   packages, never Python/JVM fallbacks. Do not invent negatives or fitted artifacts.
-- All experimental generative calls use OpenRouter under their own declared ledger and
-  role controls. The current next-batch-01 queue permits cached responses only: do not remove
-  its zero-incremental-request guard. Codex itself uses the existing ChatGPT login; do not
-  alter its authentication, provider, model, policy, or any supervisor limits.
+- All experimental generative calls use OpenRouter under their declared accounting and role
+  controls. Preserve historical cache-only queues; prepare separate properly bound roles for
+  new authorized hosted comparisons rather than reusing a cached-only template. Replay identical
+  requests once where scientifically compatible. Codex itself uses the existing ChatGPT login;
+  do not alter its authentication, provider, model, policy, or supervisor limits.
 - On full queue completion, inspect the predeclared remaining batches and prepare/measure
-  the next eligible complete comparison using the existing runner. Optional unavailable
+  the next eligible complete comparison using the existing runner, without disposable full trials.
+  Prepare independent CPU/API work ahead of the GPU lane, respecting registered capacity and
+  genuine spending controls. Optional unavailable
   families must not block independent eligible work. A new scientific decision, unresolved
-  data ownership, missing resources, or insufficient genuine budget requires a recorded
+  data ownership, missing resources, or insufficient authorized external spending requires a recorded
   blocker, not a silent design change or fabricated readiness.
 
 ## Permissions, pauses and reporting
@@ -62,12 +73,14 @@ as a blocker when no allowed approach can complete the action.
 
 Check the supervisor's `PAUSE` and `STOP` files and applicable experiment STOP files before
 mutations/submissions. Never clear a user's pause/STOP or resume an intentional interruption.
-Write the report and handoff locally. The supervisor sends configured intervention alerts
-to the user; do not send additional external messages from a repair agent.
+Write the report and handoff locally. The supervisor queues detection, approval-needed and verified-recovery alerts independently
+of repair through its durable outbox. Do not send additional external messages from a repair agent.
 
 Before returning, update only `<supervisor_directory>/registry.json` with the actual new
 launches: id, full numeric step_id, absolute status_path, exit_path, completion_path and
-upstream depends_on IDs. Preserve old entries with enabled=false and a superseded_by/reason;
+upstream depends_on IDs and accurate resource requirements. Remove a submitted pending batch
+from pending_batches; preserve its dependency links through the registered run. Never invent
+resource capacity or exceed the one-heavy-GPU-worker constraint. Preserve old entries with enabled=false and a superseded_by/reason;
 register each replacement and retain valid dependency links. Update pause_paths to include
 new runtime STOP files. A submission must have a verified live Slurm step and actual files;
 never register a planned or invented PID/step. Do not edit policy.json, state.json, supervisor

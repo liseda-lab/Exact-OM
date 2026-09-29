@@ -149,3 +149,48 @@ def test_sendmail_absence_is_visible_and_retryable(tmp_path, monkeypatch):
     )
     assert result["delivery"] == "failed"
     assert result["error"] == "Notification delivery failed (FileNotFoundError)"
+
+
+def test_pending_delivery_survives_incident_resolution_and_uses_backoff(tmp_path, monkeypatch):
+    clock = [1000.0]
+    monkeypatch.setattr(notifications.time, "time", lambda: clock[0])
+    attempts = []
+    def fail(*args, **kwargs):
+        attempts.append(1)
+        raise subprocess.CalledProcessError(2, ["mail"])
+    monkeypatch.setattr(notifications.subprocess, "run", fail)
+    alert = notifications.notify_intervention(
+        tmp_path, INCIDENT, "problem_detected", "Automatic repair pending", config=COMMAND, defer=True
+    )
+    assert alert["delivery"] == "pending" and not attempts
+    notifications.flush_notifications(tmp_path, COMMAND)
+    notifications.flush_notifications(tmp_path, COMMAND)
+    assert len(attempts) == 1
+    clock[0] += 61
+    monkeypatch.setattr(notifications.subprocess, "run", lambda *a, **k: attempts.append(1))
+    notifications.flush_notifications(tmp_path, COMMAND)
+    assert json.loads(open(alert["path"]).read())["delivery"] == "sent"
+    assert len(attempts) == 2
+
+
+def test_ambiguous_delivery_does_not_retry_automatically(tmp_path, monkeypatch):
+    def uncertain(*args, **kwargs):
+        raise subprocess.CalledProcessError(3, ["mail"])
+    monkeypatch.setattr(notifications.subprocess, "run", uncertain)
+    alert = notifications.notify_intervention(
+        tmp_path, INCIDENT, "needs_user", "Decide", config=COMMAND, defer=True
+    )
+    assert notifications.flush_notifications(tmp_path, COMMAND)["counts"] == {"ambiguous": 1}
+    monkeypatch.setattr(notifications.subprocess, "run", lambda *a, **k: pytest.fail("Ambiguous send"))
+    notifications.flush_notifications(tmp_path, COMMAND)
+    assert json.loads(open(alert["path"]).read())["attempts"] == 1
+
+
+def test_existing_message_is_immutable_while_queued(tmp_path):
+    first = notifications.notify_intervention(
+        tmp_path, INCIDENT, "needs_user", "Original", config=COMMAND, defer=True
+    )
+    second = notifications.notify_intervention(
+        tmp_path, INCIDENT, "needs_user", "Changed", config=COMMAND, defer=True
+    )
+    assert first == second
