@@ -1497,19 +1497,30 @@ def run_comparison(cells: Any, suite: Any, source: Any, **kwargs: Any) -> list[d
     requests = RequestLedger(root / "openrouter")
 
     def usage() -> dict[str, float]:
-        roles = requests.summary()["roles"].values()
-        return {
-            field: sum(role[field] for role in roles)
-            for field in (
-                "attempts",
-                "prompt_tokens",
-                "completion_tokens",
-                "reported_cost_usd",
-                "unpriced_attempts",
-                "unknown",
-            )
-        }
+        # One consistent wire-ledger snapshot, including retained exposure for
+        # timeouts, HTTP errors and successful responses without usage fields.
+        with requests._transaction() as db:
+            rows = db.execute(
+                "SELECT a.state,a.usage,r.tokens FROM attempts a LEFT JOIN reservations r "
+                "USING(request_id,number)"
+            ).fetchall()
+        totals = dict(attempts=len(rows), billable_tokens=0, reported_cost_usd=0.0,
+                      unpriced_attempts=0, unknown=0)
+        for row in rows:
+            actual = json.loads(row["usage"] or "{}")
+            known = int(actual.get("prompt_tokens") or 0) + int(actual.get("completion_tokens") or 0)
+            if all(actual.get(field) is not None for field in ("prompt_tokens", "completion_tokens")):
+                totals["billable_tokens"] += known
+            elif row["tokens"] is not None:
+                totals["billable_tokens"] += max(known, int(row["tokens"]))
+            else:
+                raise ValueError("Unresolved hosted usage lacks a retained token reservation")
+            totals["unknown"] += row["state"] in {"unknown", "sent"}
+            totals["unpriced_attempts"] += actual.get("cost") is None
+            totals["reported_cost_usd"] += float(actual.get("cost") or 0)
+        return totals
 
+    before = usage()  # Reject unresolved historical exposure before admitting new work.
     work_id = f"{metadata['stage']}/{source.config.experiment_id}/{uuid.uuid4().hex}"
     account.admit(
         work_id,
@@ -1520,7 +1531,7 @@ def run_comparison(cells: Any, suite: Any, source: Any, **kwargs: Any) -> list[d
         projected_usd=estimate.projected_usd if estimate else 0,
         forecast_known=estimate is not None,
     )
-    before, start, status = usage(), time.time(), "failed"
+    start, status = time.time(), "failed"
     try:
         manifests = run_cells(cells, suite, **kwargs)
         states = {item.get("status") for item in manifests}
@@ -1533,10 +1544,8 @@ def run_comparison(cells: Any, suite: Any, source: Any, **kwargs: Any) -> list[d
     finally:
         after = usage()
         delta = {key: after[key] - before[key] for key in before}
-        # Unknown delivery retains the reserved token exposure instead of becoming zero cost.
-        tokens = int(delta["prompt_tokens"] + delta["completion_tokens"])
-        if delta["unknown"]:
-            tokens = max(tokens, estimate.tokens if estimate else 0)
+        # Actual usage replaces a reservation only when both token counts exist.
+        tokens = int(delta["billable_tokens"])
         account.finish(
             work_id,
             start=start,
@@ -1544,7 +1553,8 @@ def run_comparison(cells: Any, suite: Any, source: Any, **kwargs: Any) -> list[d
             status=status,
             requests=int(delta["attempts"]),
             tokens=tokens,
-            actual_usd=None if delta["unpriced_attempts"] else delta["reported_cost_usd"],
+            actual_usd=(None if delta["unpriced_attempts"] or delta["unknown"]
+                        else delta["reported_cost_usd"]),
         )
 
 

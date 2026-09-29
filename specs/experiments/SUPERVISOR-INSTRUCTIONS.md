@@ -53,7 +53,11 @@ work. Use the supplied incident and machine observations to locate current evide
 - All experimental generative calls use OpenRouter under their declared accounting and role
   controls. Preserve historical cache-only queues; prepare separate properly bound roles for
   new authorized hosted comparisons rather than reusing a cached-only template. Replay identical
-  requests once where scientifically compatible. Codex itself uses the existing ChatGPT login;
+  requests once where scientifically compatible. Keep exactly one spending lane for new hosted
+  calls until all branches share one authoritative atomic request/accounting ledger. Copied
+  per-root ledgers do not enforce a global cap. Cached-only GPU work and small offline CPU
+  preparation may overlap with that lane when resource capacity permits.
+  Codex itself uses the existing ChatGPT login;
   do not alter its authentication, provider, model, policy, or supervisor limits.
 - On full queue completion, inspect the predeclared remaining batches and prepare/measure
   the next eligible complete comparison using the existing runner, without disposable full trials.
