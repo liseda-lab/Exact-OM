@@ -1,5 +1,11 @@
 # Single-node run plan
 
+**Operational amendment, 2026-09-29:** [RUN-ONCE-EXECUTION.md](RUN-ONCE-EXECUTION.md)
+supersedes time caps, full qualification repeats and the old dispatch dates below.
+Runtime figures are advisory forecasts; they neither terminate work nor prevent admission.
+Scientific controls, populations, gates and API spending protection remain in force.
+The current remaining inventory is [remaining-work.yaml](remaining-work.yaml).
+
 **Normative v2 plan, 2026-09-09. All times below are execution caps, not measured predictions.**
 The goal is useful, interpretable evidence in 14–21 days of continuous single-node operation.
 Every applicable family gets a small, case-appropriate initial comparison. Broad search

@@ -368,7 +368,11 @@ class CellRecovery:
             "EXACT_NUMERICAL_CACHE_ROOT": os.environ.get("EXACT_NUMERICAL_CACHE_ROOT", str(shared)),
             **{
                 name: os.environ[name]
-                for name in ("EXACT_DATASET_CACHE_LOCAL_DIR",)
+                for name in (
+                    "EXACT_DATASET_CACHE_LOCAL_DIR",
+                    "EXACT_ENCODER_COMPATIBLE_SOURCE",
+                    "EXACT_ENCODER_COMPATIBLE_SOURCE_SHA256",
+                )
                 if name in os.environ
             },
             "EXACT_EXPERIMENT_ROLE": self.cell.split_role,
@@ -559,6 +563,44 @@ def runtime_checkpoint(runner: Any, checkpoint_path: Path, processed: int) -> No
         raise KeyboardInterrupt("Experiment stopped after committed checkpoint")
 
 
+def _compatible_encoder_source(scorer: Any) -> str | None:
+    """Permit a bound cache migration only when encoder/pooling code is identical.
+
+    This applies to immutable embedding rows only, never predictions or fits.
+    Model, tokenizer, precision, role and hardware remain in both identities.
+    """
+    path = os.getenv("EXACT_ENCODER_COMPATIBLE_SOURCE")
+    expected = os.getenv("EXACT_ENCODER_COMPATIBLE_SOURCE_SHA256")
+    if not path and not expected:
+        return None
+    if not path or not expected or sha256_file(Path(path)) != expected:
+        raise ValueError("Encoder compatibility source differs from its reviewed binding")
+    import ast
+    import textwrap
+
+    tree = ast.parse(Path(path).read_text())
+    classes = {node.name: node for node in tree.body if isinstance(node, ast.ClassDef)}
+    methods = {
+        node.name: node
+        for node in classes["ScorerCommonMixin"].body
+        if isinstance(node, ast.FunctionDef)
+    }
+    for name in ("_encode_texts", "_pool"):
+        current = ast.parse(textwrap.dedent(inspect.getsource(getattr(scorer, name)))).body[0]
+        if ast.dump(methods[name], include_attributes=False) != ast.dump(
+            current, include_attributes=False
+        ):
+            raise ValueError(f"Encoder compatibility changes numerical method {name}")
+    from exact.impl.models.scorer_common import PoolingMethod
+
+    current_enum = ast.parse(textwrap.dedent(inspect.getsource(PoolingMethod))).body[0]
+    if ast.dump(classes["PoolingMethod"], include_attributes=False) != ast.dump(
+        current_enum, include_attributes=False
+    ):
+        raise ValueError("Encoder compatibility changes pooling semantics")
+    return expected
+
+
 def cached_encoder_rows(
     scorer: Any,
     tokenizer: Any,
@@ -588,58 +630,59 @@ def cached_encoder_rows(
         return compute(texts)
     cached = getattr(scorer, "_stage_encoder_keys", {})
     local_key = (id(model), id(tokenizer), max_len)
-    identity = cached.get(local_key)
-    if identity is None:
+    identities = cached.get(local_key)
+    if identities is None:
         if not hasattr(tokenizer, "get_vocab"):
             return compute(texts)
-        identity = _hash(
-            {
-                "schema": 1,
-                "revision": revision,
-                "model_config": {
-                    key: value
-                    for key, value in config.to_dict().items()
-                    if key not in {"_name_or_path", "name_or_path"}
-                },
-                "tokenizer_vocab": tokenizer.get_vocab(),
-                "tokenizer_backend": (
-                    tokenizer.backend_tokenizer.to_str()
-                    if hasattr(tokenizer, "backend_tokenizer")
-                    else None
-                ),
-                "encode_code": inspect.getsource(scorer._encode_texts),
-                "pool_code": inspect.getsource(scorer._pool),
-                "tokenizer_config": {
-                    key: value
-                    for key, value in getattr(tokenizer, "init_kwargs", {}).items()
-                    if key not in {"name_or_path", "cache_dir"}
-                },
-                "special_tokens": getattr(tokenizer, "special_tokens_map", {}),
-                "padding_side": getattr(tokenizer, "padding_side", None),
-                "truncation_side": getattr(tokenizer, "truncation_side", None),
-                "max_len": max_len,
-                "pooling": scorer.pooling_method.value,
-                "fp16": scorer.fp16,
-                "stored_dtype": str(scorer._cache_tensor_dtype),
-                "device": scorer.device_type,
-                "hardware": (
-                    torch.cuda.get_device_name(scorer.device)
-                    if scorer.device_type == "cuda"
-                    else "cpu"
-                ),
-                "cuda": torch.version.cuda,
-                "cudnn": torch.backends.cudnn.version(),
-                "torch": torch.__version__,
-                "transformers": __import__("transformers").__version__,
-                "tokenizers": __import__("tokenizers").__version__,
-                "role": os.getenv("EXACT_EXPERIMENT_ROLE", "unspecified"),
-                "implementation": sha256_file(
-                    Path(__file__).parents[1] / "impl/models/scorer_common.py"
-                ),
-            }
-        )
-        cached[local_key] = identity
+        payload = {
+            "schema": 1,
+            "revision": revision,
+            "model_config": {
+                key: value
+                for key, value in config.to_dict().items()
+                if key not in {"_name_or_path", "name_or_path"}
+            },
+            "tokenizer_vocab": tokenizer.get_vocab(),
+            "tokenizer_backend": (
+                tokenizer.backend_tokenizer.to_str()
+                if hasattr(tokenizer, "backend_tokenizer")
+                else None
+            ),
+            "encode_code": inspect.getsource(scorer._encode_texts),
+            "pool_code": inspect.getsource(scorer._pool),
+            "tokenizer_config": {
+                key: value
+                for key, value in getattr(tokenizer, "init_kwargs", {}).items()
+                if key not in {"name_or_path", "cache_dir"}
+            },
+            "special_tokens": getattr(tokenizer, "special_tokens_map", {}),
+            "padding_side": getattr(tokenizer, "padding_side", None),
+            "truncation_side": getattr(tokenizer, "truncation_side", None),
+            "max_len": max_len,
+            "pooling": scorer.pooling_method.value,
+            "fp16": scorer.fp16,
+            "stored_dtype": str(scorer._cache_tensor_dtype),
+            "device": scorer.device_type,
+            "hardware": (
+                torch.cuda.get_device_name(scorer.device) if scorer.device_type == "cuda" else "cpu"
+            ),
+            "cuda": torch.version.cuda,
+            "cudnn": torch.backends.cudnn.version(),
+            "torch": torch.__version__,
+            "transformers": __import__("transformers").__version__,
+            "tokenizers": __import__("tokenizers").__version__,
+            "role": os.getenv("EXACT_EXPERIMENT_ROLE", "unspecified"),
+            "implementation": sha256_file(
+                Path(__file__).parents[1] / "impl/models/scorer_common.py"
+            ),
+        }
+        identity = _hash(payload)
+        previous = _compatible_encoder_source(scorer)
+        legacy = _hash({**payload, "implementation": previous}) if previous else None
+        identities = (identity, legacy)
+        cached[local_key] = identities
         scorer._stage_encoder_keys = cached
+    identity, legacy = identities
     path = Path(directory)
     path.mkdir(parents=True, exist_ok=True)
     db = sqlite3.connect(path / "vectors.sqlite3", timeout=30)
@@ -653,6 +696,22 @@ def cached_encoder_rows(
             db.execute("SELECT shape,raw,sha256 FROM vectors WHERE key=?", (key,)).fetchone()
             for key in keys
         ]
+        if legacy and legacy != identity:
+            for index, row in enumerate(rows):
+                if row is not None:
+                    continue
+                prior = db.execute(
+                    "SELECT shape,raw,sha256 FROM vectors WHERE key=?",
+                    (_hash([legacy, texts[index]]),),
+                ).fetchone()
+                if prior is not None:
+                    if hashlib.sha256(prior[1]).hexdigest() != prior[2]:
+                        raise ValueError("Corrupted compatible embedding vector")
+                    db.execute(
+                        "INSERT OR IGNORE INTO vectors VALUES (?,?,?,?)", (keys[index], *prior)
+                    )
+                    rows[index] = prior
+            db.commit()
         # The caller computes the requested missing text batch. Avoid batch-dependent cache IDs.
         if any(row is None for row in rows):
             missing = [index for index, row in enumerate(rows) if row is None]

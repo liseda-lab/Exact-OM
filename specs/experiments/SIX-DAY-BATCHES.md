@@ -1,5 +1,11 @@
 # Remaining experiment batches: six-day target
 
+**Operational amendment, 2026-09-29:** [RUN-ONCE-EXECUTION.md](RUN-ONCE-EXECUTION.md)
+supersedes time caps, full qualification repeats and the old dispatch dates below.
+Runtime figures are advisory forecasts; they neither terminate work nor prevent admission.
+Scientific controls, populations, gates and API spending protection remain in force.
+The current remaining inventory is [remaining-work.yaml](remaining-work.yaml).
+
 **Planning amendment, 2026-09-24. Soft target: 144 hours of continuous execution.**
 The user explicitly permits longer execution. Missing the six-day target does not block an
 otherwise correct batch that fits the cumulative resource budget.

@@ -53,8 +53,8 @@ def prepare_pool(
             isinstance(x, str) for x in candidates
         ):
             raise ValueError("candidate pool must contain a list of IRI strings")
-        if not row.SrcEntity or not candidates or len(candidates) != len(set(candidates)):
-            raise ValueError("queries need a source and nonempty unique candidates")
+        if not row.SrcEntity or len(candidates) != len(set(candidates)):
+            raise ValueError("queries need a source and unique candidates")
         queries.append({"qid": query_id, "source": row.SrcEntity, "candidates": list(candidates)})
         pooled.setdefault(row.SrcEntity, set()).update(candidates)
         if expose_labels and row.TgtEntity:
