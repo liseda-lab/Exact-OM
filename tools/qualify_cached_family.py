@@ -12,41 +12,14 @@ import time
 from contextlib import contextmanager
 from pathlib import Path
 
+from tools.experiment_resources import memory_limit_bytes
+
 
 def binding(path):
     from exact.utils.provenance import sha256_file
 
     path = Path(path).resolve()
     return {"path": str(path), "sha256": sha256_file(path)}
-
-
-def memory_limit_bytes():
-    """Respect the actual allocation/cgroup with headroom for the host."""
-    import psutil
-
-    caps = [psutil.virtual_memory().total]
-    cpus = int(os.environ.get("SLURM_CPUS_PER_TASK", "0")) or os.cpu_count() or 1
-    for field, multiplier in (("SLURM_MEM_PER_NODE", 1), ("SLURM_MEM_PER_CPU", cpus)):
-        value = os.environ.get(field, "")
-        if value.isdigit() and int(value) > 0:
-            caps.append(int(value) * multiplier * 1024**2)
-    try:
-        group = next(
-            line.split(":", 2)[2]
-            for line in Path("/proc/self/cgroup").read_text().splitlines()
-            if line.startswith("0::")
-        )
-        directory = Path("/sys/fs/cgroup") / group.lstrip("/")
-        while directory.is_relative_to("/sys/fs/cgroup"):
-            path = directory / "memory.max"
-            value = path.read_text().strip() if path.is_file() else "max"
-            if value.isdigit():
-                caps.append(int(value))
-            directory = directory.parent
-    except (OSError, StopIteration):
-        pass
-    capacity = min(caps)
-    return max(1, int(capacity - max(2 * 1024**3, capacity * 0.10)))
 
 
 def preserve_training_progress(directory, identity):

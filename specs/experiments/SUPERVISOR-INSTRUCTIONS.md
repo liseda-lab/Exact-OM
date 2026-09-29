@@ -80,6 +80,34 @@ mutations/submissions. Never clear a user's pause/STOP or resume an intentional 
 Write the report and handoff locally. The supervisor queues detection, approval-needed and verified-recovery alerts independently
 of repair through its durable outbox. Do not send additional external messages from a repair agent.
 
+Reviewed `pending_batches[].launch` descriptors are submitted automatically by the 15-second
+queue poll after dependencies and capacity are ready; never launch these manually or invoke a
+model for their routine handoff. Ready prepared launches and unresolved dispatch reservations
+have priority over unprepared scientific submissions; independent `preparation_only` CPU
+metadata work may continue. Before any model-driven scientific submission, re-read dispatch
+reservations and ready launch descriptors under the registry lock as well as checking live
+Slurm capacity. If that lane is reserved, finish the preparation/handoff without submitting.
+Hold an exclusive `flock` on
+`<supervisor_directory>/registry.json.lock`, re-read the registry inside that lock, then make
+one atomic update. All registry writers must use this lock; never hold it during preparation,
+model work or waiting for a job. Preserve newly registered runs added while preparing a batch.
+A descriptor binds exact argv and file hashes, a unique dispatch nonce and real receipt paths;
+its pending ID becomes the registered run ID so future dependency links remain valid.
+Launches use the explicitly bound `tmux_socket` and an already running, same-user tmux
+server in this allocation's `step_extern` cgroup. The client always uses `tmux -N` to forbid
+creating a server inside the supervisor step: `setsid` alone cannot survive Slurm cgroup
+cleanup. Keep the allocation's detached launcher/keeper session alive when replacing the
+supervisor. Do not kill the tmux server or move processes outside Slurm. Generated launcher
+wrappers contain only the reviewed quoted argv and output/exit receipts; their hashes and
+session names are recorded in `dispatch-state.json`. No model is used for this submission.
+A `dispatch_failed` incident requires inspecting `dispatch-state.json`, the launcher log and
+actual Slurm steps. Never repeat an uncertain spawn or discard its reservation. A late verified
+receipt is reconciled automatically. If replacement is necessary, first prove the original
+worker is absent/terminated, then mark that dispatch record `resolved` with the evidence under
+the same registry lock and prepare a new descriptor/ID, updating pending dependants explicitly.
+This reconciliation must not reset supervisor incident attempts or bypass an unresolved retry
+limit. Worker exit receipts and completed checkpoints remain authoritative.
+
 Before returning, update only `<supervisor_directory>/registry.json` with the actual new
 launches: id, full numeric step_id, absolute status_path, exit_path, completion_path and
 upstream depends_on IDs and accurate resource requirements. Remove a submitted pending batch

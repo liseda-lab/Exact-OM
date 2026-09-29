@@ -102,6 +102,9 @@ def run(args):
     from tools.resume_cached_batch import account_inventory, load_helpers, read
 
     queue = module_file("retained_e19_queue", args.code_root / "tools/queue_e19.py")
+    resources = module_file(
+        "tools.experiment_resources", Path(__file__).with_name("experiment_resources.py")
+    )
     qualification = module_file(
         "run_once_qualification", Path(__file__).with_name("qualify_cached_family.py")
     )
@@ -167,6 +170,7 @@ def run(args):
             qualification.binding(Path(__file__)),
             qualification.binding(Path(qualification.__file__)),
             qualification.binding(Path(once.__file__)),
+            qualification.binding(Path(resources.__file__)),
         ],
         "accounting_policy": (
             qualification.binding(args.accounting_policy) if args.accounting_policy else None
@@ -277,7 +281,7 @@ def run(args):
         proof["inventory_seconds"],
     ):
         with once.require_reuse_only():
-            h.guarded_execute(campaign, wave, args.code_root)
+            resources.guarded_execute(campaign, wave, args.code_root, check_pause=h.check_pause)
     if qualification.usage(current / "openrouter") != cached:
         raise ValueError("Result finalization incurred hosted usage")
     manifests = sorted(

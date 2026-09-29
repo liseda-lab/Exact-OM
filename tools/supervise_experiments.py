@@ -17,6 +17,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from exact.experiments.dispatch import dispatch_ready, dispatch_incidents  # noqa: E402
 from exact.experiments.notifications import (  # noqa: E402
     flush_notifications,
     notification_incidents,
@@ -331,6 +332,28 @@ def notification_worker(directory, policy, stop_event):
         stop_event.wait(15)
 
 
+def dispatch_worker(directory, policy, stop_event):
+    """Lightweight prepared handoffs continue even while a repair model is busy."""
+    while not stop_event.is_set():
+        try:
+            result = dispatch_ready(
+                directory, policy["allocation"], slurm_steps(policy["allocation"]),
+                supervisor_step=os.environ.get("SLURM_STEP_ID"),
+            )
+            write(directory / "dispatch-status.json", {**result, "checked_at": timestamp()})
+        except Exception as exc:
+            # Keep polling after transient storage/scheduler errors; the normal
+            # full check reports unavailable infrastructure and invokes repair.
+            try:
+                write(directory / "dispatch-status.json", {
+                    "status": "dispatch_error", "checked_at": timestamp(),
+                    "error": type(exc).__name__ + ": " + str(exc),
+                })
+            except OSError:
+                pass
+        stop_event.wait(15)
+
+
 def check(directory, policy, state, *, act=False, stop_requested=lambda: False):
     registry = read(directory / "registry.json")
     steps = slurm_steps(policy["allocation"])
@@ -341,9 +364,36 @@ def check(directory, policy, state, *, act=False, stop_requested=lambda: False):
         # Explicit unfinished scope permits recovery from an accidentally empty
         # queue. Terminal/deferred scope must not trigger endless planning turns.
         fallback = not registry["pending_batches"] and registry.get("remaining_work_status") == "pending"
+        batches = {row["id"]: row for row in registry["pending_batches"]}
+        ready = pending_batches(registry, observation)
+        dispatch_path = directory / "dispatch-state.json"
+        dispatch_state = read(dispatch_path) if dispatch_path.exists() else {}
+        prepared_priority = (
+            any(batches[item["batch_id"]].get("launch") for item in ready)
+            or any(row["status"] in {"reserved", "starting", "failed"}
+                   for row in dispatch_state.values())
+        )
+        # The fast dispatcher owns the next science slot before its step appears
+        # in the registry. Do not concurrently ask a model to fill that same slot.
+        # Metadata-only preparation and actual failure repair remain independent.
         observation["incidents"] = [
-            item for item in observation["incidents"] if item["kind"] != "next_batch" or fallback
-        ] + pending_batches(registry, observation)
+            item for item in observation["incidents"]
+            if item["kind"] != "next_batch" or (fallback and not prepared_priority)
+        ] + [item for item in ready
+             if not batches[item["batch_id"]].get("launch")
+             and (not prepared_priority or (
+                 batches[item["batch_id"]].get("preparation_only") is True
+                 and batches[item["batch_id"]].get("resources", {}).get("gpus", 0) == 0
+             ))]
+        if registry["pending_batches"] and not observation["incidents"]:
+            observation["status"] = (
+                "healthy" if any(row["status"] == "healthy" for row in observation["findings"])
+                else "waiting"
+            )
+    dispatch_failures = dispatch_incidents(directory)
+    if dispatch_failures:
+        observation["incidents"].extend(dispatch_failures)
+        observation["status"] = "needs_attention"
     mail_incidents = notification_incidents(directory)
     if mail_incidents:
         observation["incidents"].extend(mail_incidents)
@@ -535,6 +585,10 @@ def main():
         threading.Thread(
             target=notification_worker, args=(directory, policy, mail_stop), daemon=True,
             name="supervisor-notifications",
+        ).start()
+        threading.Thread(
+            target=dispatch_worker, args=(directory, policy, mail_stop), daemon=True,
+            name="supervisor-dispatch",
         ).start()
     while not stopping():
         tick = time.monotonic()

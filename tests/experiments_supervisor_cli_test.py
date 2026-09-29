@@ -488,3 +488,132 @@ def test_empty_pending_queue_only_falls_back_for_explicit_unfinished_scope(
     monkeypatch.setattr(cli, "inspect_runs", lambda *a, **k: observation)
     cli.check(tmp_path, policy, state)
     assert bool(cli.read(tmp_path / "health.json")["incidents"]) == (remaining == "pending")
+
+
+def test_prepared_batch_handoff_never_invokes_model(cli, controller, tmp_path, monkeypatch):
+    policy, state = controller
+    cli.write(tmp_path / 'registry.json', {
+        'runs': [], 'pending_batches': [{'id': 'prepared', 'launch': {'reviewed': True}}],
+        'capacity': {},
+    })
+    monkeypatch.setattr(cli, 'authenticate', lambda *a: pytest.fail('Prepared dispatch needs no model'))
+    monkeypatch.setattr(cli, 'run_agent', lambda *a: pytest.fail('Prepared dispatch needs no model'))
+    result = cli.check(tmp_path, policy, state, act=True)
+    assert not state['agent_runs']
+    assert result['status'] != 'repairing'
+
+
+def test_dispatch_poll_is_independent_and_retries_errors(cli, controller, tmp_path, monkeypatch):
+    policy, _ = controller
+    calls = []
+
+    class Stop:
+        def is_set(self):
+            return len(calls) == 2
+
+        def wait(self, seconds):
+            assert seconds == 15
+
+    def dispatch(*args, **kwargs):
+        calls.append(args)
+        if len(calls) == 1:
+            raise OSError('temporary storage failure')
+        return {'status': 'registered', 'step_id': '14372.36'}
+
+    monkeypatch.setattr(cli, 'dispatch_ready', dispatch)
+    monkeypatch.setattr(cli, 'authenticate', lambda *a: pytest.fail('Dispatch cannot invoke a model'))
+    cli.dispatch_worker(tmp_path, policy, Stop())
+    assert len(calls) == 2
+    assert cli.read(tmp_path / 'dispatch-status.json')['status'] == 'registered'
+
+
+def test_ready_prepared_launch_defers_unprepared_science_but_allows_metadata(
+    cli, controller, tmp_path, monkeypatch
+):
+    policy, state = controller
+    cli.write(tmp_path / 'registry.json', {
+        'runs': [], 'capacity': {'gpus': 1, 'cpus': 6},
+        'pending_batches': [
+            {'id': 'unprepared-science', 'resources': {'gpus': 1}},
+            {'id': 'prepared-science', 'resources': {'gpus': 1}, 'launch': {'reviewed': True}},
+            {'id': 'metadata', 'preparation_only': True, 'resources': {'gpus': 0, 'cpus': 1}},
+        ],
+    })
+    prompts = []
+    monkeypatch.setattr(cli, 'run_agent', lambda p, d, prompt, stop: (
+        prompts.append(prompt) or {'status': 'complete', 'result': _result('no_change')}
+    ))
+    cli.check(tmp_path, policy, state, act=True)
+    health = cli.read(tmp_path / 'health.json')
+    assert [item['batch_id'] for item in health['incidents']] == ['metadata']
+    assert len(prompts) == 1
+    assert state['agent_runs'][0]['incident'] == health['incidents'][0]['id']
+
+
+@pytest.mark.parametrize('reservation,suppressed', [
+    ('reserved', True), ('starting', True), ('failed', True),
+    ('registered', False), ('resolved', False),
+])
+def test_unregistered_prepared_reservation_holds_science_admission(
+    cli, controller, tmp_path, reservation, suppressed
+):
+    policy, state = controller
+    cli.write(tmp_path / 'registry.json', {
+        'runs': [], 'capacity': {'gpus': 1},
+        'pending_batches': [{'id': 'unprepared-science', 'resources': {'gpus': 1}}],
+    })
+    cli.write(tmp_path / 'dispatch-state.json', {
+        'already-reserved': {'status': reservation, 'descriptor_sha256': 'bound', 'error': 'launch fault'},
+    })
+    cli.check(tmp_path, policy, state)
+    incidents = cli.read(tmp_path / 'health.json')['incidents']
+    assert any(item['kind'] == 'next_batch' for item in incidents) is not suppressed
+    if reservation == 'failed':
+        assert any(item['kind'] == 'dispatch_failed' for item in incidents)
+
+
+def test_prepared_priority_preserves_real_failure_repair(cli, controller, tmp_path, monkeypatch):
+    policy, state = controller
+    cli.write(tmp_path / 'registry.json', {
+        'runs': [], 'capacity': {'gpus': 1},
+        'pending_batches': [
+            {'id': 'unprepared-science', 'resources': {'gpus': 1}},
+            {'id': 'prepared-science', 'resources': {'gpus': 1}, 'launch': {'reviewed': True}},
+        ],
+    })
+    monkeypatch.setattr(cli, 'inspect_runs', lambda *a, **k: _observation())
+    called = []
+    monkeypatch.setattr(cli, 'run_agent', lambda *args: (
+        called.append(args) or {'status': 'complete', 'result': _result()}
+    ))
+    cli.check(tmp_path, policy, state, act=True)
+    assert len(called) == 1
+    assert state['agent_runs'][0]['incident'] == 'failure'
+    assert cli.read(tmp_path / 'health.json')['incidents'][0]['kind'] == 'run_failed'
+
+
+def test_unready_prepared_descriptor_does_not_starve_independent_science(cli, controller, tmp_path):
+    policy, state = controller
+    cli.write(tmp_path / 'registry.json', {
+        'runs': [], 'capacity': {'gpus': 1},
+        'pending_batches': [
+            {'id': 'unprepared-science', 'resources': {'gpus': 1}},
+            {'id': 'prepared-science', 'depends_on': ['missing-parent'],
+             'resources': {'gpus': 1}, 'launch': {'reviewed': True}},
+        ],
+    })
+    cli.check(tmp_path, policy, state)
+    assert [item['batch_id'] for item in cli.read(tmp_path / 'health.json')['incidents']] == ['unprepared-science']
+
+
+def test_reserved_prepared_launch_suppresses_generic_empty_queue_continuation(
+    cli, controller, tmp_path, monkeypatch
+):
+    policy, state = controller
+    cli.write(tmp_path / 'registry.json', {
+        'runs': [], 'capacity': {}, 'pending_batches': [], 'remaining_work_status': 'pending',
+    })
+    cli.write(tmp_path / 'dispatch-state.json', {'reserved': {'status': 'starting'}})
+    monkeypatch.setattr(cli, 'inspect_runs', lambda *a, **k: _observation('next_batch'))
+    cli.check(tmp_path, policy, state)
+    assert not cli.read(tmp_path / 'health.json')['incidents']

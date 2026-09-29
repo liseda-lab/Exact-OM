@@ -84,3 +84,29 @@ repair continue. Uncertain delivery becomes an actionable reconciliation inciden
 than a blind resend loop. Config drift cannot disable deterministic health checks or
 outbox processing. Email still depends on the node, supervisor, Codex and Gmail being
 available; local status/receipts retain undelivered evidence across restarts.
+
+## Prepared handoffs
+
+`tools/prepared_batch.py` prepares immutable development recipes from reviewed binding
+packages. The worker verifies completed dependencies, imports their original selections,
+retains declared policy inheritance and bounded training populations, and executes the
+whole scientific comparison once. It copies only the small hosted request ledger and the
+latest cumulative accounting; large numerical/native caches remain shared. Resume keeps
+its own advanced account and checkpoints. A divergent lineage or unfinished reservation
+requires reconciliation rather than a reset. Time forecasts remain advisory.
+
+The supervisor checks prepared launch descriptors every 15 seconds without a model call.
+Health and repair checks remain every 300 seconds. Descriptors bind the worker, recipe,
+source, inputs, environment and a unique launch nonce. The dispatcher reserves ownership
+under `registry.json.lock` before launching and registers only a verified numeric Slurm
+step or matching terminal receipt. A controller restart reconciles the existing launch.
+Science launchers belong to an existing tmux server in the allocation's extern cgroup;
+replacing the supervisor step cannot terminate them. Keep a dedicated idle tmux session
+in that server for the allocation's lifetime.
+
+Pending recipes bind upstream results at dispatch, not before those results exist. They
+retain one heavy GPU/hosted spending lane; native enrichment still requires its actual
+materialized inputs, optional scientific decisions stay explicit, and G4/final work needs
+the verified frozen selection. An input-blocked branch does not stop independent ready
+work. Cold encoder prefetch remains off. This removes routine model-mediated handoffs;
+it does not promise zero scheduler or verification overhead.

@@ -274,11 +274,11 @@ class CampaignStep(StrictConfigModel):
         ):
             raise ValueError("external acceptance is only an initial E00 operational result")
         if self.external_selection is not None and (
-            self.phase != "initial"
+            self.phase not in {"initial", "expansion", "sentinel", "late"}
             or self.external_acceptance is not None
             or self.estimate is not None
         ):
-            raise ValueError("external selection is only a completed initial development screen")
+            raise ValueError("external selection is only a completed development screen")
         ids = [arm.id for arm in self.arms]
         if not ids or len(ids) != len(set(ids)):
             raise ValueError("step arms must be nonempty and unique")
@@ -699,20 +699,26 @@ def external_selection_result(
         raise ValueError("external selection must be a finished development decision")
     result_set = json.loads(binding(record["result_set"]).read_text())
     rows = {row["cell_id"]: row for row in result_set["cells"]}
+    if len(rows) != len(result_set["cells"]):
+        raise ValueError("external selection result set contains duplicate cells")
     expected = {
-        (arm.id, mode, seed)
+        (arm.id, f"{case_id}-{mode}", mode, seed)
         for arm in step.arms
+        for case_id in [step.case, *step.additional_cases]
         for mode in step.execution_modes
         for seed in step.seeds
     }
-    if step.additional_cases:
-        raise ValueError("external selection currently supports a single development case")
     observed = set()
     verified_manifests = []
     for item in record["cells"]:
         manifest = json.loads(binding(item).read_text())
-        key = (manifest.get("arm_id"), manifest.get("execution_mode"), manifest.get("seed"))
-        cell_id = f"{step.id}/screen/{key[0]}/{step.case}-{key[1]}/seed-{key[2]}"
+        mode = manifest.get("execution_mode")
+        task_id = manifest.get("task_id")
+        if task_id is None and not step.additional_cases:
+            # Older single-case receipts were unambiguous without a task ID.
+            task_id = f"{step.case}-{mode}"
+        key = (manifest.get("arm_id"), task_id, mode, manifest.get("seed"))
+        cell_id = f"{step.id}/screen/{key[0]}/{task_id}/seed-{key[3]}"
         if (
             key not in expected
             or key in observed

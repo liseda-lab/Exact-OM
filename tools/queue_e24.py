@@ -10,6 +10,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 
+from tools.experiment_resources import guarded_execute
 from tools.measured_once import (
     promote_measured_cells,
     require_reuse_only,
@@ -481,7 +482,7 @@ def run(args, h):
     h.check_pause()
     with account_inventory(h, current, FAMILY, "channels", proof["inventory_seconds"]):
         with require_reuse_only():
-            h.guarded_execute(campaign, wave, args.code_root)
+            guarded_execute(campaign, wave, args.code_root, check_pause=h.check_pause)
     if usage(current / "openrouter") != cached:
         raise ValueError("Comparison incurred incremental hosted usage")
     manifests = sorted(
