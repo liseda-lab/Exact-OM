@@ -322,10 +322,16 @@ def prepare_lock(recipe, root, registry, *, completed=True):
     return lock
 
 
-def copy_account(source, state, destination):
+def copy_account(source, state, destination, *, request_ledger=None):
     destination.mkdir(parents=True, exist_ok=True)
-    write(destination / "budget.json", state, immutable=True)
-    old = source.parent / "openrouter/requests.sqlite3"
+    budget = destination / "budget.json"
+    if budget.exists() and read(budget) != state:
+        raise ValueError("Immutable prepared artifact changed: " + str(budget))
+    old = (
+        verified(request_ledger)
+        if request_ledger is not None
+        else source.parent / "openrouter/requests.sqlite3"
+    )
     new = destination / "openrouter/requests.sqlite3"
     if not new.exists():
         new.parent.mkdir(parents=True, exist_ok=True)
@@ -337,6 +343,9 @@ def copy_account(source, state, destination):
             if after.execute("PRAGMA quick_check").fetchone() != ("ok",):
                 raise ValueError("Hosted ledger copy failed integrity verification")
         os.replace(temporary, new)
+    # Publish the account only after its request history is durable. A failed
+    # cache transfer must not become the newest authoritative budget.
+    write(budget, state, immutable=True)
     # Large embeddings/native preparation stay in the shared durable cache.
     write(
         destination / "account-import.json",

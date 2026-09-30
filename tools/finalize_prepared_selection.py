@@ -156,7 +156,10 @@ def register_lineage(recipe):
                 parent.update(
                     enabled=False,
                     superseded_by=recipe["run_id"],
-                    reason="Selection metadata repair; all three completed E20 arms and cumulative costs retained without numerical reruns.",
+                    reason=recipe.get(
+                        "lineage_reason",
+                        "Selection metadata repair; all three completed E20 arms and cumulative costs retained without numerical reruns.",
+                    ),
                 )
                 parent.pop("pending_recovery", None)
                 registry["remaining_work_status"] = "pending"
