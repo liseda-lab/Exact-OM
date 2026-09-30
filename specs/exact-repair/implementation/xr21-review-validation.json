@@ -175,7 +175,7 @@
   "artifact_sha256": {
     "specs/exact-repair/implementation/evidence/xr21-review-black.log": "2061e38bb79fe6f368d85c98e6b3f09e09d2f665dc5ac6d1fd79a3aa0eb8af75",
     "specs/exact-repair/implementation/evidence/xr21-review-flake8.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "specs/exact-repair/implementation/evidence/xr21-review-import-linter.log": "c4f3f2db05b1fe8991054934b799f50b5160dec4cb695e33d590f1cfd851be27",
+    "specs/exact-repair/implementation/evidence/xr21-review-import-linter.log": "a9e1d50ef25e585061967373046d457a71b9dff8816249134ff07b76dd7048b1",
     "specs/exact-repair/implementation/evidence/xr21-review-isort.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "specs/exact-repair/implementation/evidence/xr21-review-mypy-repository.log": "06977ee1b02daa50e9716c14153dc2e7eed7dae7d542d5a88ee5f8970bbd75bc",
     "specs/exact-repair/implementation/evidence/xr21-review-mypy.log": "4561eccc219f5beefb55c5dabd7075f7748f0c104468fc2f0b62799c9e3c9e91",
@@ -198,5 +198,8 @@
     "shared_supervisor": "untouched",
     "other_experiments": "untouched"
   },
-  "content_sha256": "382c44987330dd1f4b67130d47970556ea5b72b3b7312ff47db42fbf5c04213c"
+  "artifact_normalization": {
+    "specs/exact-repair/implementation/evidence/xr21-review-import-linter.log": "Removed trailing whitespace and extra final blank lines from the captured report; diagnostic text unchanged."
+  },
+  "content_sha256": "b98a2f917951363101b595ae9cc1a8ecb82258f260198cc5f439fa79e81fadbb"
 }
