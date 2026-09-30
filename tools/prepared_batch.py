@@ -369,6 +369,146 @@ def hosted_caps(state, ledger):
     return {**result, "EXACT_OPENROUTER_RETRY_UNKNOWN": "0"}
 
 
+def import_controls(recipe, registry, campaign, runtime, workdir):
+    """Import exact completed paired baselines, without inventing target results."""
+    requests = recipe.get("reuse_controls", [])
+    if not requests:
+        return []
+    from dataclasses import replace
+
+    from exact.core.entities.configs.yaml_io import load_yaml_mapping
+    from exact.experiments import harness
+    from exact.experiments.campaign import (
+        external_selection_result,
+        load_campaign,
+        materialize_campaign,
+    )
+    from exact.experiments.recovery import ArtifactStore
+    from exact.experiments.runtime import CellRecovery
+
+    lock, _ = load_campaign(campaign)
+    suite = materialize_campaign(campaign, runtime / "declarations/screen", stage="screen")
+    source = next(s for s in suite.sources if s.config.experiment_id == recipe["scientific_step"])
+    experiments = {}
+    for identifier in source.config.depends_on:
+        step = next(s for s in lock.steps if s.id == identifier)
+        if step.external_selection is None:
+            raise ValueError("Reused control requires a bound historical selection: " + identifier)
+        historical = external_selection_result(lock, step, campaign.parent)
+        producer = next(s for s in suite.sources if s.config.experiment_id == identifier)
+        experiments[identifier] = harness._bind_external_selection(producer, suite, historical)
+    cells = harness.build_cells(
+        suite,
+        source,
+        stage="screen",
+        output_root=runtime.parent,
+        inherited_overlay=harness.inherited_selection_overlay(
+            {"experiments": experiments}, source.config.depends_on
+        ),
+    )
+    imports, seen = [], set()
+    for request in requests:
+        if request["run_id"] not in recipe["depends_on"]:
+            raise ValueError("Reused control must be an explicit completed dependency")
+        run = resolve_run(registry, request["run_id"])
+        complete = completed_run(run)
+        selection = verified(complete["selection"])
+        previous = selection.parent.parent
+        old_campaign = source_campaign(complete)
+        old_step = next(
+            s
+            for s in load_yaml_mapping(old_campaign)["steps"]
+            if s["id"] == request["scientific_step"]
+        )
+        arms = [a for a in old_step["arms"] if a["id"] == request["arm_id"]]
+        targets = [c for c in cells if c.arm_id == request["arm_id"]]
+        if (
+            len(arms) != 1
+            or arms[0]["role"] != "baseline"
+            or not targets
+            or any(c.arm_role != "baseline" for c in targets)
+        ):
+            raise ValueError("Only matching declared baseline arms may be reused")
+        decision = read(selection).get("experiments", {}).get(request["scientific_step"], {})
+        if decision.get("status") not in {"selected", "screened_out", "complete"}:
+            raise ValueError("Reused control has no completed scientific decision")
+        saved = {}
+        for item in complete.get("manifests", []):
+            path = verified(item)
+            report = read(path)
+            if (report.get("experiment_id"), report.get("arm_id")) != (
+                request["scientific_step"],
+                request["arm_id"],
+            ):
+                continue
+            key = (report["task_id"], report["seed"])
+            if key in saved:
+                raise ValueError("Duplicate source control cell")
+            saved[key] = (path, report)
+        if set(saved) != {(c.task_id, c.seed) for c in targets}:
+            raise ValueError("Reused control must contain every matching task and seed")
+        for cell in targets:
+            if cell.cell_id in seen:
+                raise ValueError("Duplicate target control cell")
+            seen.add(cell.cell_id)
+            path, report = saved[(cell.task_id, cell.seed)]
+            required = dict(
+                stage="screen",
+                status="complete",
+                return_code=0,
+                extraction_complete=True,
+                generate_rationales=False,
+                arm_role="baseline",
+                split_role=cell.split_role,
+                reference_role=cell.reference_role,
+                source_cap=cell.source_cap,
+                execution_mode=cell.resolved_config["data"]["execution_mode"],
+            )
+            if any(report.get(key) != value for key, value in required.items()):
+                raise ValueError("Saved control completion, role or population differs")
+            candidate = replace(
+                cell,
+                recovery={
+                    "root": str(runtime),
+                    "resume_from": str(previous),
+                    "reuse_plan_only": True,
+                },
+            )
+            recovery = CellRecovery(
+                candidate, harness._provenance_payload(candidate, suite, workdir=workdir), workdir
+            )
+            artifacts = report.get("recovery", {}).get("artifacts", {})
+            if (
+                set(artifacts) != {"inputs", "extraction", "evaluation"}
+                or artifacts != {k: v["artifact_id"] for k, v in recovery.identities.items()}
+                or recovery.reuse != set(artifacts)
+            ):
+                raise ValueError("Saved control numerical identity or verified artifacts differ")
+            imports.append(
+                dict(
+                    cell=cell.cell_id,
+                    source_run=run["id"],
+                    completion=binding(run["completion_path"]),
+                    campaign=binding(old_campaign),
+                    selection=binding(selection),
+                    source_manifest=binding(path),
+                    source_root=str(previous),
+                    artifacts=artifacts,
+                )
+            )
+    # Validate every requested control before importing any numerical artifact.
+    store = ArtifactStore(runtime)
+    for record in imports:
+        for artifact in record["artifacts"].values():
+            store.import_artifact(Path(record["source_root"]), artifact)
+    write(
+        runtime / "control-imports.json",
+        {"cells": imports, "numerical_executions": 0},
+        immutable=True,
+    )
+    return imports
+
+
 def run_recipe(path):
     from types import SimpleNamespace
 
@@ -456,6 +596,7 @@ def run_recipe(path):
         relevant = [row for row in plan["rows"] if row["step"] == recipe["scientific_step"]]
         if plan["budget_errors"] or not relevant or any(row["issues"] for row in relevant):
             raise ValueError("Prepared complete comparison failed admission: " + repr(relevant))
+        import_controls(recipe, registry, campaign, runtime, code)
         from exact.experiments.budget import BudgetLedger
 
         ledger = BudgetLedger(runtime / "budget.json", state["limits"])
