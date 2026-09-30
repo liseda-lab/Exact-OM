@@ -978,10 +978,11 @@ def _case_task(case: CaseBinding, case_id: str, mode: str, role: str, root: Path
         "reference_completeness": case.reference_completeness,
         "capabilities": case.capabilities,
         "overlay": deep_merge(
-            case.overlay,
+            # The case kind supplies a default; an explicit multi-kind population
+            # must survive task materialization for every paired representation.
+            deep_merge({"matching": {"entity_kinds": [case.kind]}}, case.overlay),
             {
                 "data": data,
-                "matching": {"entity_kinds": [case.kind]},
                 "supervision": {
                     "negative_label_policy": {
                         "complete_reference": "complete_reference",

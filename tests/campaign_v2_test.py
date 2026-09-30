@@ -868,7 +868,21 @@ def test_local_reference_binding_preserves_shared_training_gold(tmp_path):
     assert local["refs"]["train"] == global_["refs"]["train"] == str(tmp_path / "train.tsv")
 
 
-def test_e13_bound_views_change_graphs_without_changing_sources_or_gold(tmp_path):
+@pytest.mark.parametrize(
+    ("kind", "explicit_kinds", "expected_kinds"),
+    [
+        ("class", None, ["class"]),
+        ("individual", None, ["individual"]),
+        (
+            "object_property",
+            ["object_property", "data_property"],
+            ["object_property", "data_property"],
+        ),
+    ],
+)
+def test_e13_bound_views_change_graphs_without_changing_sources_or_gold(
+    tmp_path, kind, explicit_kinds, expected_kinds
+):
     from exact.experiments.harness import build_cells
 
     path = _lock(tmp_path)
@@ -878,6 +892,9 @@ def test_e13_bound_views_change_graphs_without_changing_sources_or_gold(tmp_path
     blueprint["experiments"][0]["id"] = "E13"
     raw["blueprint"] = _binding(bp_path, yaml.safe_dump(blueprint))
     raw["cases"]["D0"]["capabilities"] = ["normalized_evidence"]
+    raw["cases"]["D0"]["kind"] = kind
+    if explicit_kinds is not None:
+        raw["cases"]["D0"]["overlay"] = {"matching": {"entity_kinds": explicit_kinds}}
     step = raw["steps"][0]
     step.update(
         id="E13",
@@ -901,6 +918,8 @@ def test_e13_bound_views_change_graphs_without_changing_sources_or_gold(tmp_path
     source.config.implementation.status = "ready"
     cells = build_cells(suite, source, stage="screen", output_root=tmp_path / "results")
     assert len(cells) == 2
+    for cell in cells:
+        assert cell.resolved_config["matching"]["entity_kinds"] == expected_kinds
     first, second = [cell.resolved_config["data"] for cell in cells]
     assert {first["source"], second["source"]} == {
         str(tmp_path / "source.owl"),
