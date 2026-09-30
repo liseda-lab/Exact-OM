@@ -280,12 +280,12 @@ work:
 - step: E04-pool-miss
   remaining_cells: 2
   cases:
-  - D0
+  - N0
   after:
   - E00
   - pool_freeze
-  - E03
   - E05
+  - E04
   binding_group: nil
   state: pending_binding_or_dependency
   remaining_forecast_hours: null
@@ -432,7 +432,9 @@ binding_groups:
     - E04-pool-miss
     - E04-listwise
     work: Bind historical 2024 Bio-LLM N0 ontologies and benchmark-pool labels, distinct from natural
-      NIL. E04-pool-miss uses D0; listwise requires E07. Never inherit D0 trained heads implicitly.
+      NIL. E04-pool-miss removes only public N0 validation positives, with hash-bound complete labels
+      for the original benchmark pool; reuse main E04 nil_off only on verified identical identities.
+      Listwise requires E07. Never inherit D0 trained heads implicitly.
   feature:
     steps:
     - E11

@@ -351,7 +351,7 @@ experiments:
   checkpoint_boundaries: OOF folds, calibrator fit, calibrated decisions, evaluation.
 - id: E04
   spec: E04-nil-abstention.md
-  focused_case: 'N0: legacy Bio-LLM NCIT-DOID benchmark NIL; D0 pool-miss diagnostic'
+  focused_case: 'N0: legacy Bio-LLM NCIT-DOID benchmark NIL; separate N0 benchmark-pool gold-removal diagnostic'
   budget_group: decisions
   initial_treatment_cap: 5
   dependencies:
@@ -362,7 +362,7 @@ experiments:
   - 'nil_off: current acceptance control'
   - 'nil_heuristic: joint-scale label-free abstention'
   - 'nil_fitted: calibrated joint candidate/NIL head'
-  - 'pool_miss: remove gold from development pools, diagnostic only'
+  - 'pool_miss: remove public N0 validation positives from the original benchmark pools, diagnostic only'
   - 'listwise_none: conditional paired integration with the E07 winner'
   readiness: implementation_required
   already_implemented: Joint candidate/NIL probability primitives exist; full NIL writer/evaluator and fitted

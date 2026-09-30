@@ -59,6 +59,14 @@ Unlisted ontology pairs remain unknown. The fitted artifact and evaluation repor
 exclude an ontology-wide NIL claim. Supervised D0/D1 artifacts can overlap these historical
 source IRIs and must not be reused; a frozen fitting recipe is distinct from learned weights.
 
+The 2026-09-30 amendment moves only `E04-pool-miss` to the N0 validation population. Its
+synthetic treatment removes the known public positives after verifying the original pool's
+complete candidate-label inventory against its bound reference. Remaining candidates retain
+their confirmed benchmark labels; removed-positive sources are benchmark pool misses, not
+ontology NIL. The unchanged main E04 `nil_off` control is reused only with identical verified
+numerical/evaluation identities. No private references, D0-trained heads or extra labels enter
+this diagnostic; the main E04 design and N1 reporting remain unchanged.
+
 This public historical research split is not a blind official Bio-LLM result. It provides a
 small biomedical rejection experiment, separate from the current-track submission populations.
 G0's NCIT–DOID operational validation does not train this NIL head.

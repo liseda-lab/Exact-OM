@@ -99,7 +99,18 @@ def test_preparation_covers_every_family_without_executing_or_inventing_readines
     assert any(
         guard.metric == "nil.non_nil_MRR" for guard in by_id["E04"].selection.decisions[0].guards
     )
-    assert by_id["E04-pool-miss"].case == "D0"
+    pool_miss = by_id["E04-pool-miss"]
+    assert pool_miss.case == "N0"
+    assert pool_miss.source_cap == by_id["E04"].source_cap == 300
+    assert pool_miss.seeds == by_id["E04"].seeds == [17]
+    assert pool_miss.execution_modes == by_id["E04"].execution_modes == ["global_alignment"]
+    assert pool_miss.requires == ["E00", "pool_freeze", "E05_initial", "E04"]
+    assert pool_miss.inherits == by_id["E04"].inherits == ["E05_initial"]
+    assert all(
+        record.status == "blocked_input_resolution"
+        for roles in pool_miss.readiness.values()
+        for record in roles.values()
+    )
     assert by_id["E17"].source_cap is None
     assert by_id["E17"].seeds == [17, 29, 43]
     for identifier in ["E00", "E13", "E25-trust", "E04-pool-miss"]:
@@ -423,3 +434,116 @@ def test_prepared_design_survives_workspace_blueprint_revision(tmp_path):
     lock.blueprint.verify(path.parent).write_text("changed frozen design\n")
     with pytest.raises(ValueError, match="materialized input changed"):
         load_campaign(path)
+
+
+def _public_n0_cases():
+    # Planning binds metadata only: deliberately absent files must never be opened.
+    cases = _cases()
+
+    def binding(name):
+        return {"path": "public-N0/" + name, "sha256": "a" * 64}
+
+    cases["N0"].update(
+        source_universe=binding("valid.sources.txt"),
+        references={"valid": binding("valid.reference.tsv")},
+        frozen_global_candidates={"valid": binding("valid.candidates.tsv")},
+        evaluation_source_labels=binding("valid.source_labels.tsv"),
+        evaluation_candidate_labels=binding("valid.confirmed_candidates.tsv"),
+        evaluation_label_semantics="benchmark_pool",
+        reference_completeness="known_incomplete",
+        negative_policy="confirmed_only",
+        overlay={"matching": {"nil": {"label_semantics": "benchmark_pool"}}},
+    )
+    return cases
+
+
+def test_pool_miss_binds_public_n0_gold_removal_without_changing_main_control(tmp_path):
+    from copy import deepcopy
+
+    from exact.core.entities.configs.config import ConfigModel
+    from exact.experiments.fitting_recipes import fitting_requirements
+    from exact.experiments.harness import deep_merge
+
+    root = Path(__file__).resolve().parents[1]
+    cases = _public_n0_cases()
+    original = deepcopy(cases)
+    path = prepare_campaign(
+        root / "specs/experiments/campaign-v2.yaml",
+        root / "exact/default_config.yaml",
+        {"cases": cases},
+        tmp_path / "prepared",
+    )
+    lock, _ = load_campaign(path)
+    steps = {step.id: step for step in lock.steps}
+    main, diagnostic = steps["E04"], steps["E04-pool-miss"]
+    assert [arm.id for arm in main.arms] == ["nil_off", "nil_heuristic", "nil_fitted"]
+    assert diagnostic.arms[0] == main.arms[0]
+    assert diagnostic.selection.decisions == []
+    treatment = diagnostic.arms[1]
+    assert treatment.role == "diagnostic" and not treatment.deployable
+    expected = deepcopy(main.arms[0].overlay)
+    expected["matching"]["nil"].update(
+        pool_miss_development_reference=str(path.parent / "public-N0/valid.reference.tsv"),
+        pool_miss_candidate_labels={
+            "path": str(path.parent / "public-N0/valid.confirmed_candidates.tsv"),
+            "sha256": "a" * 64,
+        },
+    )
+    assert treatment.overlay == expected
+    resolved = ConfigModel.from_mapping(
+        deep_merge({"config_version": 2, **cases["N0"]["overlay"]}, treatment.overlay)
+    )
+    assert resolved.matching.nil.label_semantics == "benchmark_pool"
+    assert resolved.matching.nil.mode == "off"
+    assert resolved.matching.nil.pool_miss_candidate_labels is not None
+    assert diagnostic.design.primary_endpoint == "nil.nil_aware.F1"
+    assert any("identities match exactly" in text for text in diagnostic.design.assumptions)
+    assert all(
+        record.status == "implementing"
+        for roles in diagnostic.readiness.values()
+        for record in roles.values()
+    )
+    requirements = fitting_requirements()["E04/pool_miss"]
+    assert "complete_N0_benchmark_candidate_labels" in requirements
+    assert "paired_unchanged_N0_development_pool" in requirements
+    assert "complete_development_reference" not in requirements
+    assert cases == original
+    assert lock.cases["N0"].negative_policy == "confirmed_only"
+    assert lock.cases["N0"].reference_completeness == "known_incomplete"
+    assert not (path.parent / "public-N0").exists()
+
+
+@pytest.mark.parametrize("override", [{"case": "D0"}, {"source_cap": 200}, {"inherits": ["E03"]}])
+def test_pool_miss_rejects_old_or_unpaired_overrides(tmp_path, override):
+    root = Path(__file__).resolve().parents[1]
+    with pytest.raises(ValueError, match="paired N0 control contract"):
+        prepare_campaign(
+            root / "specs/experiments/campaign-v2.yaml",
+            root / "exact/default_config.yaml",
+            {"cases": _public_n0_cases(), "steps": {"E04-pool-miss": override}},
+            tmp_path / "prepared",
+        )
+
+
+def test_pool_miss_rejects_inherited_fitted_heads(tmp_path):
+    root = Path(__file__).resolve().parents[1]
+    cases = _public_n0_cases()
+    cases["N0"]["overlay"]["matching"]["fusion"] = {"artifact": "D0-trained.json"}
+    with pytest.raises(ValueError, match="cannot import fitted heads"):
+        prepare_campaign(
+            root / "specs/experiments/campaign-v2.yaml",
+            root / "exact/default_config.yaml",
+            {"cases": cases},
+            tmp_path / "prepared",
+        )
+
+
+def test_pool_miss_rejects_drift_from_main_control_settings(tmp_path):
+    root = Path(__file__).resolve().parents[1]
+    with pytest.raises(ValueError, match="paired N0 control contract"):
+        prepare_campaign(
+            root / "specs/experiments/campaign-v2.yaml",
+            root / "exact/default_config.yaml",
+            {"cases": _public_n0_cases(), "steps": {"E04": {"source_cap": 200}}},
+            tmp_path / "prepared",
+        )

@@ -87,7 +87,17 @@ def prepare_campaign(
         raise ValueError("Every declared family must have bounded implemented recipes")
     cases = deepcopy(bindings["cases"])
     overrides = deepcopy(bindings.get("steps", {}))
-    steps = []
+    steps: list[dict[str, Any]] = []
+
+    def has_fitted_artifact(value: Any) -> bool:
+        if isinstance(value, dict):
+            return any(
+                (key in {"artifact", "artifacts"} or key.endswith("_artifact"))
+                and bool(item)
+                or has_fitted_artifact(item)
+                for key, item in value.items()
+            )
+        return isinstance(value, list) and any(has_fitted_artifact(item) for item in value)
 
     def make_step(identifier, family, arms, case, group, requires, **settings):
         baseline = next((arm["id"] for arm in arms if arm["role"] == "baseline"), arms[0]["id"])
@@ -271,6 +281,81 @@ def prepare_campaign(
                 "G1 publishes separate label-free and supervised retrieval policies; this comparison inherits the label-free E05 pool."
             )
         value = deep_merge(value, overrides.pop(identifier, {}))
+        if identifier == "E04-pool-miss":
+            main = next(step for step in steps if step["id"] == "E04")
+            if (
+                value["case"] != "N0"
+                or value["source_cap"] != 300
+                or value["seeds"] != [17]
+                or value["execution_modes"] != ["global_alignment"]
+                or value["inherits"] != ["E05_initial"]
+                or value["requires"] != ["E00", "pool_freeze", "E05_initial", "E04"]
+                or main["case"] != "N0"
+                or main.get("source_cap", 300) != value["source_cap"]
+                or main.get("seeds", [17]) != value["seeds"]
+                or main.get("execution_modes", ["global_alignment"]) != value["execution_modes"]
+                or main.get("inherits", []) != value["inherits"]
+            ):
+                raise ValueError("E04-pool-miss must retain its paired N0 control contract")
+            control, treatment = value["arms"]
+            main_control = next(arm for arm in main["arms"] if arm["id"] == "nil_off")
+            if control != main_control:
+                raise ValueError("E04-pool-miss must retain its paired N0 main nil_off control")
+            if (control["id"], treatment["id"]) != ("nil_off", "pool_miss") or control[
+                "overlay"
+            ] != treatment["overlay"]:
+                raise ValueError("E04-pool-miss may change only the benchmark gold-removal inputs")
+            case_binding = cases["N0"]
+            if has_fitted_artifact(
+                deep_merge(deep_merge(base, case_binding.get("overlay", {})), control["overlay"])
+            ):
+                raise ValueError("The paired N0 nil_off control cannot import fitted heads")
+            reference = case_binding.get("references", {}).get("valid")
+            labels = case_binding.get("evaluation_candidate_labels")
+            bound = (
+                reference
+                and labels
+                and case_binding.get("evaluation_source_labels")
+                and case_binding.get("source_universe")
+                and case_binding.get("frozen_global_candidates", {}).get("valid")
+                and case_binding.get("evaluation_label_semantics") == "benchmark_pool"
+                and case_binding.get("reference_completeness") == "known_incomplete"
+                and case_binding.get("negative_policy") == "confirmed_only"
+            )
+            if bound:
+
+                def locate(binding: dict[str, Any]) -> str:
+                    return str((destination / Path(binding["path"])).resolve())
+
+                treatment["overlay"] = deep_merge(
+                    control["overlay"],
+                    {
+                        "matching": {
+                            "nil": {
+                                "pool_miss_development_reference": locate(reference),
+                                "pool_miss_candidate_labels": {**labels, "path": locate(labels)},
+                            }
+                        }
+                    },
+                )
+            else:
+                for roles in value["readiness"].values():
+                    for record in roles.values():
+                        record.update(
+                            status="blocked_input_resolution",
+                            missing=["N0 public benchmark-pool development bindings"],
+                            reason="Gold removal needs the original N0 validation pool, source universe, reference, and source/candidate labels under benchmark_pool semantics.",
+                        )
+            value["design"][
+                "primary_comparison"
+            ] = "Paired N0 unchanged pool versus removal of its public benchmark positives"
+            value["design"]["primary_endpoint"] = "nil.nil_aware.F1"
+            value["design"]["assumptions"] += [
+                "Development-only benchmark-pool diagnostic; no ontology-wide NIL or absent-pair negative claim.",
+                "Reuse the completed main E04 nil_off control only when its numerical and evaluation identities match exactly.",
+                "Same N0 source universe, original pool, seed 17, source cap 300, scorer and acceptance settings; only gold removal differs.",
+                "E05_initial supplies a label-free retrieval policy only; no D0-trained heads or E03 calibration is inherited.",
+            ]
         steps.append(value)
 
     late = []
@@ -393,10 +478,12 @@ def prepare_campaign(
         if family == "E04":
             control = next(arm for arm in arms if arm["role"] == "baseline")
             for name, identifier, case, dependencies in (
-                ("pool_miss", "E04-pool-miss", "D0", ["E00", "pool_freeze", "E03"]),
+                ("pool_miss", "E04-pool-miss", "N0", ["E00", "pool_freeze", "E05_initial", "E04"]),
                 ("listwise_none", "E04-listwise", "N0", ["E04", "E07_judgment_evidence"]),
             ):
                 treatment = next(arm for arm in arms if arm["id"] == name)
+                if name == "pool_miss":
+                    treatment["overlay"] = deepcopy(control["overlay"])
                 late.append(
                     (
                         identifier,
@@ -598,6 +685,13 @@ def prepare_campaign(
                 )
     for args in late:
         settings: dict[str, Any] = {"source_cap": 300 if args[0].startswith("E25-") else 200}
+        if args[0] == "E04-pool-miss":
+            settings.update(
+                source_cap=300,
+                seeds=[17],
+                execution_modes=["global_alignment"],
+                inherits=["E05_initial"],
+            )
         if args[0] == "E25-forced":
             settings["inherits"] = ["E07_judgment_evidence", "E05_initial"]
         make_step(*args, phase="late", **settings)

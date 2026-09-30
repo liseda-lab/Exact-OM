@@ -86,7 +86,8 @@ def fitting_arms():
         if name == "pool_miss":
             requirements += [
                 "bound_pool_miss_development_reference",
-                "complete_development_reference",
+                "complete_N0_benchmark_candidate_labels",
+                "paired_unchanged_N0_development_pool",
             ]
         if name == "listwise_none":
             # Bind the actual E07 winner instead of substituting a default prompt.
