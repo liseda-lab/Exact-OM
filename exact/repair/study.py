@@ -387,6 +387,11 @@ def _greedy(
             )
             assert baseline_evidence is not None
             if problem.policy.exceptions and candidate_report.authorizes:
+                baseline_limits: dict[str, Any] = (
+                    {"memory_mb": problem.budgets.memory_mb}
+                    if problem.budgets.memory_mb is not None
+                    else {}
+                )
                 outcome = bounded_call(
                     _baseline_with_exceptions,
                     problem,
@@ -394,11 +399,7 @@ def _greedy(
                     candidate_report,
                     baseline_evidence,
                     timeout=min(remaining, problem.budgets.verification_seconds),
-                    **(
-                        {"memory_mb": problem.budgets.memory_mb}
-                        if problem.budgets.memory_mb is not None
-                        else {}
-                    ),
+                    **baseline_limits,
                 )
             else:
                 outcome = CallResult("complete", candidate_report)
