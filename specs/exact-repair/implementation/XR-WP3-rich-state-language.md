@@ -1,11 +1,9 @@
-# XR-WP3 — actions and constrained candidate generation
+# XR-WP3 — actions and ontology-informed circuits
 
-1. Implement every eligible action in [06](../06-first-experiment-implementation.md) as a complete replacement bundle, including ontology edits. Use the standard semantic names and preserve historical aliases only at an explicit migration boundary.
+**Target:** XR-2.1, 30 September 2026. Requirements, not completed work.
 
-2. Implement the finite grammar and exact Boolean encoding in [10](../10-constrained-generation.md), with deterministic canonicalisation and occurrence/side/constructor typing.
-
-3. Compile with an existing suitable circuit library. Condition a mixture of product distributions with component posterior proportional to mixture weight times component normaliser.
-
-4. Preserve elementary alternatives and declared action-family coverage under budgets. Grammar validity does not authorise logical acceptance; incompatible-background candidates may become useful with ontology edits.
-
-5. Acceptance: every example materialises correctly; tiny exhaustive support/probability checks; zero normaliser and compile deadline handling; exact encoding multiplicity; deterministic inventory hashes and reported retrieval/sampling omissions.
+1. Preserve every eligible complete replacement in [06](../06-first-experiment-implementation.md). Elementary alternatives are always constructed; this does not make their selection deterministic.
+2. Complete MIG-02–07 and the CG requirements in [10](../10-constrained-generation.md): end-to-end omission controls, endpoint menus, native ownership/GC, small family circuits, probability-preserving composition, immutable caches and explicit coverage expansion.
+3. Add proved immutable-context semantic exclusions. Editable support becomes a conditional global cut; no detector silence or syntactic validity establishes OWL feasibility.
+4. Verify exact support, normalisers, fixed-bit weights, branch posterior, encoding multiplicity, gradients and family failure behaviour on enumerable grammars. Cross-process cache hits must preserve identity and probabilities.
+5. Deliver G1 evidence and the circuit/semantic-decoder comparison under the same language, constraints and budgets. Replace the SDD approach only when measured tradeoffs justify the declared alternative; do not begin by building another compiler library.

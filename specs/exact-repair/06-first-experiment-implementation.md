@@ -1,12 +1,14 @@
-# XR-2 repair actions and research implementation
+# XR-2.1 repair actions and research implementation
 
-This file replaces the XR-P1 MLP-only/Conference-only first-delivery assumptions. All action families below belong to the research language. Smaller menus are ablations, not unannounced delivery restrictions.
+Revision: **XR-2.1 — 30 September 2026**. Requirements describe the target research implementation. The inspected runtime baseline is `b4c1ed0d5e12c45974bdcb4d230fb2ab6c6deb04`; writing this specification does not implement or qualify that target. [12](12-implementation-migration.md) tracks implementation gates, and [13](13-semantic-fidelity-supervision.md) defines semantic supervision. Historical executable protocol JSON remains unchanged.
+
+**CG-A001 — Scope.** This file replaces the XR-P1 MLP-only/Conference-only first-delivery assumptions. All action families below belong to the research language. Smaller menus are named ablations or declared expansion stages, not unannounced delivery restrictions. The generated-only pilot is evidence about its captured finite cases and incomplete campaign, not about completed Conference/Bio-ML transfer.
 
 ## 1. Complete replacement semantics
 
-A candidate contains all axioms that remain for its object. The original object is removed before its candidate is emitted. Keep and delete are explicit. EquivalentClass(S,T) is normalised to its two subsumptions.
+**CG-A002 — Replacement unit.** A candidate contains all axioms that remain for its object. The original object is removed before its candidate is emitted. Keep and delete are explicit. EquivalentClass(S,T) is normalised to its two subsumptions.
 
-Relative to fixed B, Γ weakens α when B ∪ {α} entails every member of Γ. Strict weakening additionally requires B ∪ Γ not to entail α. Any generalisation premise used in that claim must remain fixed or be represented as a candidate dependence.
+**CG-A003 — Semantic classification.** Relative to immutable background B, Γ weakens α when B ∪ {α} entails every member of Γ. Strict weakening additionally requires B ∪ Γ not to entail α. For an original bundle Δ, weakening means B ∪ Δ entails every member of Γ; strict weakening additionally means that at least one member of Δ is not entailed by B ∪ Γ. Any generalisation premise used in that claim must remain fixed or be represented as a candidate dependence. An unknown entailment check supports neither weakening nor strictness. Record intrinsic template guarantees separately from qualified background-dependent proofs. Do not derive a useful weakening claim from an inconsistent background by vacuous entailment. Feasibility and preservation of intended meaning remain distinct requirements.
 
 ### Mapping actions
 
@@ -45,6 +47,8 @@ Arbitrary negation/cardinality/role-chain revision is outside the initial genera
 
 ## 2. Required worked fixtures
 
+**CG-A004 — Fixture preservation.** Keep these fixtures as exact semantic conformance cases, including each complete emitted bundle and its activated expressions. They are not sufficient evidence of large-scale repair quality.
+
 **Overlapping roles:** AuthorReviewer ⊑ Author_s and Reviewer_s; Author_t disjoint Reviewer_t; equivalences on both roles. Test deletion, retaining Author_t ⊑ Author_s, removing target disjointness, and removing a source superclass conjunct. Verify the entire monitored signature.
 
 **Accepted papers:** Rejected_s ⊑ Paper_s; Accepted_t and Rejected_t subclasses of Paper_t and disjoint. Paper_s ≡ Accepted_t and Rejected_s ≡ Rejected_t make Rejected_s unsatisfiable. Endpoint revision to Paper_t resolves it.
@@ -62,6 +66,7 @@ For the overlap fixture, the original alignment contains Author_s ≡ Author_t a
 Treat each fixture as a standalone asserted theory containing exactly its stated axioms, all mentioned named classes monitored, no ABox facts and no source exceptions. Verify that the source ontologies are coherent individually. Unless the fixture explicitly combines edits, replace only the tested object and keep the other objects. Check all named classes, not only the displayed witness.
 
 Required expected outcomes:
+
 - Original overlap, accepted-paper, participant, range and domain inputs violate coherence.
 - Each stated weakening/deletion alternative can restore coherence with the stated other choices.
 - The no-invited-exception paper case admits both the specialised bundle and complex equivalence.
@@ -73,30 +78,83 @@ A missing decision record is not a negative OWL assertion. A coherent outcome is
 
 ## 3. Candidate construction and costs
 
-Elementary alternatives are supplied deterministically. Retrieve finite class/property menus from observed definitions, matcher alternatives and explanation neighbourhoods. Generate new intersections/existentials using [10](10-constrained-generation.md); do not restrict the study to copying existing restrictions.
+**CG-A005 — Shared construction contract.** Preparation, supervised training, development, inference and replay must share a captured construction contract: original bundle/occurrence, relation and kinds, eligible actions, typed observed menus, endpoint alternatives, grammar bounds, immutable background, qualified proof constraints, canonicalization, cost-profile identity and candidate budget. A phase-specific limit is explicit metadata. No phase may silently depend on teacher-injected candidates that inference cannot construct. This contract and its probability semantics are detailed in [10](10-constrained-generation.md), CG-005–CG-025 and CG-034–CG-037.
 
-Reject malformed/ill-typed syntax. Do not permanently filter using editable axioms without dependencies. Baseline-impossible or redundant expressions can become meaningful after another edit. Unsupported verification is a scope/unknown issue, not evidence that an expression is logically false.
+**CG-A006 — Deterministic elementary candidates.** Build applicable keep/delete/retained-direction states and all declared enabled endpoint alternatives independently of draws and circuit compilation. Their presence does not force their selection or imply they are safe. Locked/ineligible objects retain only permitted choices. A directional input does not acquire a reverse subsumption through a convenience fallback. An inapplicable action is recorded as such; absence of a retrieved endpoint is a coverage result. Materialize newly retrieved endpoint alternatives as actual complete replacement candidates on every construction path, with side/type validation, original relation orientation, provenance and costs. Merely placing their symbols in the graph or expression menu is insufficient.
 
-Freeze candidates after deduplication and budget selection. Retain keep/delete/directional controls and one available representative per enabled action family before global rank filling. If the cap cannot fit mandatory entries, report an invalid budget; never silently remove a family. An empty retrieved family remains a measured retrieval failure.
+**CG-A007 — Rich proposals.** Retrieve finite class/property menus from observed definitions, typed matcher alternatives and explanation neighborhoods; retain evidence origin and truncation. Generate new intersections/existentials using [10](10-constrained-generation.md), rather than limiting the study to copying existing restrictions. Preserve independent specialisation, necessary-condition and complex-equivalence templates, explicit retained directions, and both source/target mirrors. Apply bounds to canonical generated arguments and attached active expressions. Endpoint substitution is a finite typed action, not invented vocabulary. Non-class mappings keep their explicitly supported typed controls.
 
-Cost features include deletion, change to original relation, expression size, endpoint change, ontology edit, and human-authored ontology edit. Keep has zero edit cost. Reusing one axiom in several candidates is not a logical incompatibility. Simple additive costs count decisions; any distinct-content penalty needs its own encoding.
+**CG-A008 — Semantic filtering scope.** Reject malformed or ill-typed syntax. Permanently reject a context-dependent action only when the encoded exclusion has qualified immutable support and is relevant to the policy. An expression proved empty relative to immutable B may be excluded when its use activates a satisfiability obligation. Do not permanently filter using an editable range, disjointness or hierarchy premise; removing that premise may make the action admissible. Such dependencies belong in conditional presence/activation cuts in the global loop. A missing assertion, unsupported reasoner fragment, failure to derive a contradiction or timeout is not a positive semantic certificate. See CG-012–CG-017 for the exact guarantee and the `hasDecision` range/disjointness example.
 
-## 4. Small implementation boundary
+**CG-A009 — Pool admission and budget.** Normalize complete bundles and active expressions, deduplicate identical content, merge provenance and validate metadata before selection. Freeze candidates after deterministic controls, sampled candidates and budget selection have been reconciled. Retain every applicable mandatory elementary entry and an available representative per enabled action family before global rank filling. If the cap cannot fit mandatory entries, return `invalid_budget`; never silently remove a family. An empty retrieved/proved-admissible family has an explicit reason. No representative is fabricated to make a coverage table look complete. Generation failures may leave a usable reduced pool, but that is an identified partial-generation result, not completion of the intended language.
 
-Suggested files, split only when useful:
-~~~text
-exact/repair/kernel.py      records, policy, orchestration, bounds, replay
-exact/repair/maxsat.py      one qualified weighted MaxSAT adapter
-exact/repair/owl.py         shared-snapshot diagnosis/verification adapters
-exact/repair/candidates.py  grammar, templates, canonicalisation, finite menus
-exact/repair/model.py       standard HGT/R-GCN layers, readouts, candidate/value heads
-exact/repair/circuit.py     existing compiler/WMC integration, mixture conditioning
-tools/repair/              corpus, symbolic teacher, training and study runners
-~~~
-Reuse existing infrastructure. Do not implement a new OWL calculus, SAT solver, graph framework or knowledge compiler. Graph and circuit dependencies are justified by the research comparisons, not by generic extensibility.
+**CG-A010 — Freeze boundaries.** Recompute all utility factors on the final inventory and retain its content hash before the master starts. Proposal probabilities are not interchangeable with semantic utility. A change in effective coverage, expansion or changed evidence creates a new epoch and inventory/solve identity with a newly frozen objective; old certificates and upper bounds retain their original scope. Preserve a previously verified incumbent only with its original theory/proof identity and revalidate as required by the changed input. A candidate removed by a pool cap is a coverage omission, not a logical impossibility.
 
-Sequence: records/compiler and finite conformance → reasoning/master loop → all actions and symbolic teacher → graph/value model → constrained proposals → matched comparisons and real-data transfer. The resulting prototype covers the full methodology; internal milestones are not substitutes for it.
+**CG-A011 — Cost contract.** Cost features include deletion, change to original relation, expression size, endpoint change, ontology edit, and human-authored ontology edit. Keep has zero edit cost. Count each explicit edit penalty once, separately from predicted semantic benefit. Record the exact profile and any semantic-priority conditioning as separate inputs. Reusing one axiom in several candidates is not a logical incompatibility. Simple additive costs count decisions; a distinct-content penalty needs an explicit encoding and a named objective variant. Duplicate fixed copies affect logical presence even when an editable occurrence is removed. Human-authored provenance is an observed attribute, not automatic evidence that an axiom is correct.
 
-## 5. Acceptance
+## 4. Runtime baseline and target implementation boundaries
 
-Check exact emitted OWL axioms for every template and side; independent necessary conditions; ontology occurrence patches; non-vacuity after joint selection; no stale originals/closure; signed pair encoding; sound presence/activation cuts; unknown scheduling and global bounds; circuit distribution/canonicalisation; no hidden labels; typed teacher rewards; and all scoped replay paths. Actual backend capability checks remain necessary.
+**CG-A012 — Baseline facts versus requirements.** At the inspected commit, candidate/template construction, SDD WMC, neural inventory scoring, bounded generation workers and selected pilot results already exist. This specification does not describe all of them as unimplemented. The following target gaps require separate evidence before being closed:
+
+| Inspected baseline observation | XR-2.1 target / acceptance evidence |
+|---|---|
+| Grammar compiler uses one right-linear vtree, disables automatic collection/minimization, and limits allocated manager nodes before final collection | Audited native reference ownership; controlled collection; allocation/live/dead/reachable and element counts; measured vtree alternatives; unchanged accepted support/probabilities |
+| Generation has local caches within spawned workers | Verified immutable exact-artifact reuse across workers; optional separately qualified alpha-renamed schema reuse |
+| Current grammar combines template alternatives and union slot vocabulary | Small applicable per-template/family SDDs with CG-019 branch-mass correction; no silent distribution change |
+| Retrieved endpoint alternatives exist in retrieval records, while `mapping_grammar` does not pass newly retrieved alternatives to its elementary `mapping_candidates` call | Shared explicit endpoint materialization through preparation, training and inference; final-pool fixture assertions |
+| Missing-candidate corpus control removes one candidate before subsequent generation can recreate it | Evaluator-only final-inventory omission and verified absence, separate from a missing-symbol experiment |
+| Proposal compilation failure can skip proposal loss while value training continues; checkpoint criterion prioritizes cached decoded coverage/regret | Explicit actual proposal-supervision coverage and generated-pool eligibility/quality selection; cached inventory metrics kept separate |
+
+The pilot's 79/90 development generation failures motivate these gaps; they do not prove the repaired design succeeds. Use the exact archived case/language/budget evidence in [12](12-implementation-migration.md), without treating historical losses as current implementation measurements.
+
+**CG-A013 — Responsibility boundaries.** Retain existing modules where practical; names below describe responsibilities, not an instruction to reorganize files solely for aesthetics:
+
+| Existing area | Target responsibility |
+|---|---|
+| `exact/repair/records.py`, `api.py` | Validated shared input, immutable/editable occurrence partition, complete policy and captured evidence |
+| `candidates.py`, `grammar.py` | Complete action bundles, canonical expressions, typed finite menus, explicit template families and independent syntax acceptance |
+| `retrieval.py` | Bounded observed menus, typed endpoint alternatives, explanations/provenance and omission accounting |
+| `compilation.py`, `circuit.py` | Qualified SDD construction/transport, reference ownership, immutable cache, exact branch/component normalization and sampling |
+| `pipeline.py` | Shared construction contract, family/round statuses, deterministic controls, final inventory/objective freeze |
+| `model.py`, `learning.py` | Observable graph encoding and proposal/value/interaction supervision, distinct semantic/risk/cost roles from [13](13-semantic-fidelity-supervision.md) |
+| `kernel.py`, `maxsat.py` | Exact selection over the declared inventory, justified cuts, pending unknowns and valid bounds |
+| `owl.py` and qualified detector adapters | Sound proof-supported rejection and complete qualified acceptance with explicit fragment/query boundaries |
+| `tools/repair/` | Frozen corpus/teacher provenance, failure-inclusive training/evaluation, matched comparisons and replay |
+
+Reuse existing shared-core, solver and graph infrastructure. Do not replace a mature SAT solver, graph framework or knowledge compiler with an unqualified local reimplementation. A bounded sound detector may implement or adapt a specified known inference fragment with replayable supports and soundness qualification; it is not a replacement for a complete OWL verifier or a claim to implement a new complete OWL calculus. Follow [12](12-implementation-migration.md) for staged changes and the repository's shared-core dependency constraints.
+
+## 5. Required integration fixtures
+
+**CG-A014 — Contextual semantic boundary.** Add the exact immutable-range example from [10](10-constrained-generation.md), CG-016. Test the following independently:
+
+- Grammar-valid `EXISTS hasDecision.Rejected` is provably empty when the range and Accepted/Rejected disjointness are immutable.
+- Its use as an activated subclass expression is rejected under the non-vacuity policy, while a merely vacuous inclusion is not mislabeled an OWL inconsistency by itself.
+- Making either premise editable prevents an unconditional local ban; replacing/removing the relevant support can make that activated expression satisfiable.
+- An immutable duplicate support axiom keeps the proof applicable even after its editable copy is removed.
+- An unsupported or timed-out detector supplies no fabricated safe/unsafe conclusion; final global verification remains mandatory.
+
+**CG-A015 — Endpoint and language coverage.** Provide a case whose observed matcher alternatives retrieve a useful typed endpoint absent from the initial candidate list. Verify its identical complete bundle, orientation and costs in preparation, training, generated development and inference. Add wrong-side/wrong-kind alternatives, locked objects, `=`/`<`/`>` relations, and a cap below mandatory controls. Test newly composed restrictions absent from asserted syntax, independent necessary-condition bundles, every ontology-action premise and source/target mirror. An endpoint outside the captured observed signature is reported as an omission, not silently introduced.
+
+**CG-A016 — Omission and aliases.** Remove a designated candidate after the entire generator and duplicate merger, ensure no elementary, representative or sampled path recreates its exact bundle/activation, and then run selection. Keep the intervention out of model inputs. Test multiple template encodings of that same candidate. Separately test removing a required symbol/constructor from the captured language and verify actual unreachability. Report whether another syntactically different repair remains semantically equivalent; a single omitted candidate is not automatically a no-solution fixture.
+
+**CG-A017 — Failure propagation.** Inject family-level timeout, allocated-node cap, RSS cap, empty support, zero probability, numeric failure, corrupt cache, invalid binding and cancellation. Check that deterministic controls remain auditable, partial families stay in denominators, and no partially frozen objective is exposed. A reduced-pool solve reports its own inventory scope. If a mandatory candidate cannot be constructed or the cap is invalid, return the corresponding construction error rather than pretending to have a complete fallback.
+
+**CG-A018 — Joint selection.** Include two candidates individually passing every local contextual filter whose joint theory is incoherent. Check complete verification, sound presence/activation feedback and exact-pool bounds. Also include a verified feasible but semantically undesirable repair: coherence is not intended meaning. The no-invited-exception/Invited_t paper contrast must preserve the difference between a specialised inclusion, independent necessary conditions and complete complex equivalence.
+
+## 6. Delivery gates and acceptance
+
+**CG-A019 — Ordered gates.** Complete and record the following before treating the target as validated:
+
+1. Validate records, policy and complete action bundles; qualify deterministic endpoint/omission controls and the exact worked fixtures.
+2. Establish independent tiny-language syntax/probability oracles and qualified contextual proof fixtures before optimizing circuit construction.
+3. Audit compiler ownership/resource supervision and compare vtrees; then split families while preserving support, fixed-bit mass, mixture posteriors and duplicate likelihoods.
+4. Add exact immutable cross-worker caching; introduce schema reuse only after explicit binding/isomorphism qualification.
+5. Share construction across training/development/inference and freeze generated pools for verified supervision; expose skipped proposal losses and generation eligibility.
+6. Re-run exposed pilot cases as engineering regression only; freeze revised choices before new held-out generated structures and real-data transfer.
+7. Compare circuit/semantic-decoder arms under matched language and semantic conditions, including all compilation, proof/lookahead, verification and failed-attempt cost. Retain or replace circuits on measured evidence.
+
+These are dependencies, not permission to omit the full research language. No gate authorizes editing a historical protocol or changing test labels to match a new implementation. New experiments require new versioned captures under [02](02-experimental-protocol.md) and [08](08-experiment-matrix-and-handoff.md); this specification creates no executable experiment configuration.
+
+**CG-A020 — Acceptance record.** Each implemented requirement must link its code revision, configuration/input hashes, qualified backend/library versions, conformance result and any remaining limitation. Check exact emitted OWL axioms for every template and side; independent necessary conditions; ontology occurrence patches and duplicate fixed copies; non-vacuity after joint selection; no stale originals/closure; signed pair encoding; sound presence/activation cuts; unknown scheduling and valid global bounds; circuit distribution/canonicalization; endpoint and omission invariants; no hidden labels; typed semantic teacher rewards; and scoped replay paths. Actual backend capability checks remain necessary.
+
+**CG-A021 — Honest outcome reporting.** Report separately construction/generation completion, circuit/contextual guarantee scope, useful coverage, verified feasibility, semantic benefit, edit cost, optimization status and total resource cost. The target may improve scoring without improving generation, or generate admissible candidates without finding the intended repair. Such distinctions remain visible in model selection and final tables. Production-readiness, Conference/Bio-ML benefit and superiority over semantic decoders require their own completed evidence.

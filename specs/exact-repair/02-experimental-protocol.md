@@ -1,63 +1,86 @@
-# XR-2 common experimental protocol
+# XR-2.1 common experimental protocol
 
-Every XR-E study inherits these rules. Implementation conformance and research evidence are separate.
+**Revision:** 30 September 2026. Every XR-E study inherits these requirements. Conformance, exploratory measurement and confirmatory evaluation are separate stages.
 
-## Cohorts and progression
+## Cohorts and evidence
 
-1. Generated clean theories, controlled corruption and typed intended consequences.
-2. Controlled corruptions of training-side real ontology structure.
-3. Actual held-out Conference matcher outputs.
-4. Bio-ML scale/domain transfer, with 2024 selected-content and 2026 whole-ontology cohorts separated.
+1. Small generated theories with complete finite inventories and fully decided teacher outcomes.
+2. Larger generated theories with structured interacting conflicts, newly generated candidates and verified sampled plans.
+3. Controlled corruptions on training-side Conference structure, then held-out actual matcher outputs.
+4. Bio-ML transfer/scale with the 2024 selected-content and 2026 whole-ontology releases kept separate.
 
-The main research programme includes Conference and Bio-ML; lack of licensed inputs or qualified reasoning is reported as unavailable/unknown, not silently replaced. The Complex-track Conference references are optional supplementary expression evidence, not preferred-repair labels. See [11](11-benchmark-evidence.md).
+The first archived pilot is generated-only and has informed this redesign. It is now regression/exploratory evidence for XR-2.1; obtain fresh held-out parents for confirmatory tests. Conference/Bio-ML statistics in [11](11-benchmark-evidence.md) do not supply gold repair plans. References are partial correspondences, not exhaustive negatives or intended ontology patches.
 
-Captured alignments and evidence are identical across repair arms; do not rematch per arm. Fix ontology/import releases, alignment interpretation and entity-kind handling. Reference absence remains unspecified unless an independently justified negative is provided.
+Capture each original matcher alignment once, with relation interpretation, score provenance and optional evidence. Supply identical snapshots and captures across matched repair arms. Do not rerun matching differently for each repair method. Report raw matcher output and any upstream repair separately.
+
+## Dataset construction and difficulty
+
+Store clean parent, corruption operator and latent intent in the teacher-only partition. Deployment data contains only the presented ontologies, provisional alignment, available descriptions/evidence and bounded diagnostics. Generate structurally coherent controls as well as contradictions; random opaque names cannot support semantic interpretation by an LLM.
+
+Explicitly vary: number of editable objects; support cardinality; distinct conflicts per mapping; overlap among supports; incidence-graph cycles; hub mappings; chain length; restriction type; ontology-edit eligibility; newly introduced candidate conflicts; pairwise and higher-order semantic complementarity. A graph cycle by itself is not an OWL contradiction. Every declared conflict family needs an actual symbolic witness and every coherent control needs completed verification at its stated scope.
+
+First measure Conference's discovered support distribution under a frozen extraction budget. Use training-side measurements to shape generated difficulty, while keeping separately defined harder extrapolation cases. No fixed conflict-per-mapping number may be inferred from ontology sizes or unsatisfiable-class counts. Unextracted supports make measured incidence a lower bound; report truncation.
 
 ## Splits and leakage
 
-- Generated train/development/test splits group by clean structural parent before renaming, score generation or corruption.
-- Keep every corruption, orientation, explanation variant and matcher output of a Conference pair in one fold.
-- Report pair holdout separately from whole-ontology holdout; familiar ontologies in new pairs are not unseen ontologies.
-- Keep matcher transfer separate from ontology transfer.
-- Training-side real structure and permitted reference supervision can be used in an adaptation arm. Test labels cannot select checkpoints, budgets, profiles or costs.
-- Bio-ML public training/validation material may supervise declared training arms, with a separate development split if official validation is reported as evaluation. Hidden test labels are not accessed.
-- Inference can read the presented test ontology/evidence. It cannot fit on hidden labels or post-repair explanations as if available before the decision.
+- Split generated structural parents before names, scores, corruption variants or samples. All derived plans, LLM comparisons and teacher records inherit the parent split.
+- Keep pair orientations, matcher outputs, corruptions and extracted neighbourhoods of each Conference pair together.
+- Report pair holdout separately from whole-ontology holdout. The historical ekaw holdout (six incident test pairs, fifteen remaining pairs) is a named comparison, not six independent unseen domains.
+- Keep ontology transfer and matcher transfer as distinct factors. If an ontology has appeared in training, do not describe a new pairing as an unseen ontology.
+- Training-side real structure/reference labels may support a declared adaptation arm. Freeze development-only model selection, evidence budgets, calibration and costs before final test.
+- Official Bio-ML training/validation and any licensed sources retain their specified split identities. Shared NCIT/SNOMED content prevents a claim of independent ontology transfer unless the design explicitly resolves it.
+- Querying the presented test input at inference is allowed within the common budget. Future verification outcomes cannot be retrospective graph features for the decision that generated them.
+- LLM annotation of held-out cases belongs to independent evaluation only. It cannot become model fitting, prompt tuning or checkpoint feedback.
 
-Generated-only transfer remains a control, not the only allowed training regime. Once a test cohort informs redesign it is exploratory/regression data for that redesign.
+## Required controls
 
-## Required comparisons
+| Comparison | Must be matched | Intended difference |
+|---|---|---|
+| No repair, score greedy, exact fixed-cost deletion | Input/policy, initial diagnostics and accounting | Selection and repair capacity |
+| Symbolic rich-action system versus learned system | Action language, retrieval evidence, final verifier, proved cuts, budgets | Candidate prioritisation and/or calibrated semantic estimates |
+| Fixed-pool unary versus pairwise value | Frozen candidates, costs, teacher outcomes, pair selector | Interaction benefit model |
+| No risk versus plan-risk scheduling | Frozen objective, same master/cuts/shortlist sizes | Verification order; report first incumbent separately from optimum |
+| Grammar-only versus ontology-informed circuits | Menus, language bounds and sampling budget | Encoded semantic constraints |
+| Ontology-informed circuit versus semantic grammar decoder | Exactly the same supported semantic conditions and menus | Compilation/conditioning versus incremental decoding |
+| Exhaustive versus sampled supervision | Training split and evaluation, declared labelling budget | Coverage/target approximation; not an implied exact distribution |
+| Symbolic versus symbolic plus LLM fidelity | Hard facts, costs, comparison/evaluation protocol | Weak semantic supervision |
+| HGT versus R-GCN/no-graph | Readouts, target definitions and comparable parameter/search budgets | Backbone and graph information |
 
-No repair; score-based greedy deletion; exact fixed-cost deletion; directional weakening; richer mapping actions; selected ontology edits; deterministic symbolic scoring; HGT; R-GCN with the same readouts; no-graph control. Compare unary/pairwise benefit models and independent/correlated constrained proposal distributions.
+Use both fixed-inventory and generated-pool evaluations. The former isolates value/selection, the latter tests the full candidate pipeline. A supplied finite inventory result cannot establish candidate-generation performance. The existing “symbolic” retained-axiom reward is a historical baseline, not the strongest symbolic semantics baseline.
 
-Keep inventory, policy, resource limits and external evaluation objective fixed unless they are the intended contrast. Action ablations filter a common inventory without silent regeneration/refilling. Generator comparisons count retrieval, compilation, duplicate samples and verification as part of cost.
+Action ablations filter a common pool without regeneration, or explicitly run a separately named language-generation comparison. Report candidate identities in both. Non-complex alternatives remain guaranteed wherever eligible across all generators. If a shared symbolic candidate inventory is expensive to construct, count that construction cost rather than giving it free to one arm.
 
-An exhaustive teacher is a controlled-case upper reference, not an expert oracle available on real inputs. Third-party repair systems are comparisons only when their output semantics and verification policy are compatible.
+## Metrics and accounting
 
-## Outcomes
+Report all scheduled cases, requested/started/completed attempts and unique reused case results. Deduplicate reused artefacts in scientific denominators while retaining operational attempts and their cost. A finished process does not mean logical success.
 
-Report every scheduled case and separate:
-- logical status/scope, remaining witnessed violations, unknown and unsupported obligations;
-- typed desired/unwanted consequence outcomes and non-vacuity;
-- reference mapping measures with the evaluated entity kinds and partial reference interpretation;
-- edits by family/provenance, changed consequences and profile sensitivity;
-- vocabulary retrieval coverage, useful proposal coverage, value/selection errors and reasoner failures;
-- objective and absolute integer gap, exact external regret only with a complete applicable teacher cache;
-- total time, time to verified incumbent, search/verification/circuit/model costs, memory and bounded-stop behaviour.
+| Area | Required measurements |
+|---|---|
+| Logical | Four baseline reports; verified feasible/infeasible/unknown; complete scope and unsupported obligations; witnessed residual violations; source exception counts |
+| Semantic | Independent typed consequence vector with masks; calibrated benefit and edit cost separately; held-out fidelity comparisons with ties/abstentions and evaluator identity; no self-score as ground truth |
+| Generation | Retrieval coverage, grammar representability, requested/effective family coverage, compile failures, duplicate draws, useful verified candidates, full versus reduced pool |
+| Search | Integer objective, incumbent, valid upper bound/gap, master solves, permanent cuts, deferred/unknown plans, completed proof of pool optimality |
+| Verification work | Diagnostic passes, candidate passes, individual logical queries, reasoner initialisations, support extraction work, cache hits, wall time and memory |
+| Whole pipeline | Input/preparation, retrieval/graph, circuit construction, sampling, neural scoring, solver, reasoning, serialisation/startup and cleanup time; peak memory; label/training cost separately |
 
-One unsatisfiable class is not one explanation. Report discovered support counts with extraction budgets, not an invented average conflicts-per-mapping. Coherence and reference F1 do not establish the semantic acceptability of an ontology patch.
+Primary efficiency endpoints are time/queries to first verified repair and time/queries to a predeclared matched quality. Also report time to a proved optimum in the frozen objective. A method returning a low-quality feasible repair quickly is not automatically better. Risk scheduling can reduce work to an incumbent while increasing work to certify an optimum.
 
-## Statistical and budget rules
+For circuit comparisons report cold compilation and warm reuse separately, with number of reuses required to amortise compilation. Node allocation, live/root-reachable nodes and SDD elements are different metrics. Include failed compilation cases in coverage and wall-time denominators.
 
-Use clean structural groups and ontology pairs as grouped units; mappings, candidates, repeated corruptions and model seeds are nested observations. Conference pairs share ontologies; three Bio-ML pairs do not supply thousands of independent repair settings.
+Use identical accounting of O_s/O_t/union/T_0 diagnostics across controls. If the report shows shared amortised preprocessing, also show the end-to-end cost when it is not precomputed. Cache policy, hardware and concurrency are fixed or stratified. LLM token/call cost, detector cost and sampling retries are included in the relevant training/inference totals.
 
-Publish paired effects, per-pair results, uncertainty intervals and all failures. Report verified-subset quality alongside coverage and an all-scheduled-case status table; never drop unknowns or impute them as coherent. Multiple comparisons and sample-size rationale are fixed before confirmatory evaluation. Pilot numerical thresholds are exploratory.
+## Statistics and decisions
 
-Freeze the external query basis independently of model predictions. A pilot may select parameters using development data; it cannot redefine success after observing held-out results. Record any later amendment.
+Treat clean structural parents and ontology pairs as grouping units; mappings, plan samples, seeds and repeated corruptions are nested observations. Pairs sharing ontologies are dependent: show per-pair outcomes and sensitivity to ontology-level grouping. Three biomedical pairs are three pair contexts, not thousands of independent repairs.
 
-Bound all stages, worker calls, memory where enforceable and cleanup. Persist partial results and unresolved jobs with their denominator. Finite retries are allowed within remaining budgets; retry-until-success is not.
+Report paired effects and grouped uncertainty intervals, failure/unknown coverage and per-family/per-pair results. Verified-subset quality must appear beside all-scheduled-case status tables. Never silently remove unknowns or code them as coherent. Exact regret requires a complete, applicable exhaustive teacher; otherwise name the best observed comparator and its limits.
 
-## Reproducibility
+Freeze hypotheses, split hashes, metrics, stopping objective, budget grid, selection rule and multiple-comparison policy in the new run manifest. Exploratory pilots may choose settings from development data. Later changes require a dated amendment and fresh confirmatory holdout where appropriate. Do not promise significance or a sample size before a grouped power/precision analysis is possible.
 
-Record source/dirty-patch hashes; ontology/import/capture hashes; schema/compiler/model/backend versions; grammar/menus/circuit/inventory/objective/policy/profile hashes; seeds/splits; hardware; cold/warm cache policy; verification/cut/replay records; and pending failures. Separate public file measurements, organiser-reported statistics, and newly measured experimental outcomes.
+## Failures and reproducibility
 
-Any falsely authorised feasible result invalidates that arm's logical-validity claim. Finite tests do not prove universal reasoner soundness, and a negative experiment need not block reporting a correct implementation.
+All expensive calls have finite deadlines, enforceable memory limits where supported, retry ceilings and cleanup grace. Unknowns retain their bound and query masks. A compile failure may allow elementary repairs, but must remain a generation failure for that family. An interrupted teacher cannot invent a scalar label by renormalising the remaining answered probes.
+
+Persist code/dirty-patch hashes, input/import/capture hashes, feature/schema/compiler/backend/model identities, menus and language bounds, frozen objective/policy/calibration, sampling context/seeds, split ancestors, evidence cutoff, support cuts, pending plans, LLM annotation provenance and stage resources. Published external statistics, archived pilot rows and newly measured results remain separately labelled.
+
+Any falsely authorised feasible output invalidates that arm's logical-validity claim until fixed and rerun. Lack of complete biomedical verification is a result to report, not a reason to silently weaken policy. Tests demonstrate specific conformance properties, not universal reasoner soundness.

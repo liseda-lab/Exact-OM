@@ -1,59 +1,59 @@
 # Exact-Repair specification suite
 
-**Suite:** XR-2, 19 September 2026. **Status:** research design; implementation and benchmark results are not claimed.
+**Current target:** XR-2.1, 30 September 2026. **Implementation reviewed:** `b4c1ed0d5e12c45974bdcb4d230fb2ab6c6deb04`. **Status:** revision requirements, not a claim that the revised system is implemented or evaluated.
 
-This revision incorporates the decisions in *Exact-Repair: Learning to Repair Ontology Alignments* (19 September 2026). It replaces XR-1/XR-P1 as the current specification. The previous methodology report remains an implementation reference; older proposals are historical context. No trusted/provisional mapping partition is required.
+The repository contains a first XR-2 implementation and generated-data pilot results. This revision defines the changes needed after reviewing that implementation and pilot. It supersedes conflicting XR-2 design prose; it does not relabel archived experiments, rewrite their configuration, or assert that the new method outperforms the old one. [12](12-implementation-migration.md) connects each required change to the implementation and a regression test. [11](11-benchmark-evidence.md) separates the preliminary experiment evidence from published benchmark statistics.
 
-Repair uses the [published native stack](../native-stack.md), including the shared core
-and available optional reasoners, in both standalone and sequential execution. Matching
-artifacts remain optional; available matching evidence follows the full input contract below.
+## Scope and decisions
 
-## Scope
+Exact-Repair consumes shared ontology snapshots, a provisional alignment from any matcher, and whatever scores, explanations, decompositions and alternatives that matcher supplies. There is no mandatory trusted mapping subset. It returns a repaired alignment, explicit patches for eligible ontology-axiom occurrences, and separate verification and optimisation records.
 
-Input is two ontologies with resolved imports, a provisional alignment from any matcher, scores, and optional explanations, decompositions, alternative candidates, and other evidence. Output is a repaired alignment, an explicit patch for selected ontology axioms, and separate verification and optimisation records. The prototype studies mapping deletion, directional weakening, complex correspondences, endpoint revision, and selective ontology-axiom revision.
+The method keeps HGT, probabilistic circuits, weighted MaxSAT and symbolic verification. Elementary alternatives are constructed directly; learned circuits generate bounded complex replacements. The value model estimates retained semantic benefit and action interactions. A separate plan-risk model orders expensive checks. MaxSAT still constructs the repair plan. Only symbolic evidence can make an exclusion logically binding or authorise acceptance. Reinforcement learning is outside the main method.
 
-The main learned model is heterogeneous graph attention with shared proposal and candidate-value heads. A bounded probabilistic circuit generates expression/template choices. Weighted MaxSAT selects complete replacements jointly. A verifier accepts, rejects with evidence, or reports unknown. Generated cases provide symbolic supervision; controlled real-structure cases and held-out Conference/Bio-ML inputs test transfer and scale.
+The changes are: reliable small circuits with proof-supported ontology-context constraints; shared train/inference graph and interaction construction; supervised training on verified sampled repairs containing newly generated candidates; separate semantic-value and conflict-risk supervision; reusable proof-support cuts; and reasoning selected by supported constructs and queries before estimated cost. LLMs provide weak labels for preservation of intended meaning. User-personalisation remains an optional later study.
 
-## Reading order and ownership
+## Reading order and contract ownership
 
-| Contract | Owns |
+| Document | Owns |
 |---|---|
-| [00 Research contract](00-research-contract.md) | Research questions, definitions and claim boundaries |
-| [01 Architecture and records](01-architecture-and-contracts.md) | Inputs, outputs, graph/model interfaces and result fields |
-| [06 Actions and implementation](06-first-experiment-implementation.md) | Complete replacement semantics, action registry and implementation sequence |
-| [09 Graph and neural model](09-graph-and-neural-model.md) | Graph construction, attention, proposal/value heads and interactions |
-| [10 Constrained generation](10-constrained-generation.md) | Grammar, Boolean encoding, circuit and proposal distribution |
-| [04 Selection and verification](04-minimal-exact-kernel.md) | Fixed optimisation, cuts, pending assignments, bounds and proofs |
-| [03 Reasoning scope](03-module-soundness.md) | Initial diagnosis, backend support, modules and cache validity |
-| [07 Data and training](07-corpus-and-training.md) | Generated problems, typed symbolic teacher, losses and preferences |
-| [02 Evaluation protocol](02-experimental-protocol.md) | Splits, baselines, metrics and failure accounting |
-| [08 Experiment matrix](08-experiment-matrix-and-handoff.md) | XR-E studies, development defaults and handoff |
-| [11 Benchmark evidence](11-benchmark-evidence.md) | Conference/Bio-ML editions, measured/published statistics and limitations |
-| [05 Decision audit](05-design-audit.md) | Superseded assumptions and remaining research risks |
+| [00 Research contract](00-research-contract.md) | Problem, research questions, objective and claim boundaries |
+| [01 Architecture and records](01-architecture-and-contracts.md) | End-to-end interfaces, identities, status and migration |
+| [06 Actions](06-first-experiment-implementation.md) | Complete replacement semantics and concrete examples |
+| [09 Graph and neural model](09-graph-and-neural-model.md) | Graph inputs, attention, proposal/value/risk outputs |
+| [10 Constrained generation](10-constrained-generation.md) | Grammar, semantic constraints, circuit compilation and sampling |
+| [03 Reasoning](03-module-soundness.md) | Baselines, detector, complete acceptance and cache validity |
+| [04 Exact kernel](04-minimal-exact-kernel.md) | Frozen optimisation, cuts, scheduling, bounds and termination |
+| [07 Training](07-corpus-and-training.md) | Generated data, symbolic teacher, sampled supervision and losses |
+| [13 Semantic fidelity](13-semantic-fidelity-supervision.md) | LLM annotation, calibration and independent evaluation |
+| [02 Evaluation](02-experimental-protocol.md) | Fair controls, grouped splits, metrics and accounting |
+| [08 Studies and handoff](08-experiment-matrix-and-handoff.md) | Comparisons, dependency gates and run preparation |
+| [11 Evidence](11-benchmark-evidence.md) | Pilot and benchmark evidence, denominators and limits |
+| [05 Design audit](05-design-audit.md) | Decisions and remaining research risks |
+| [12 Implementation migration](12-implementation-migration.md) | Audited code gaps and executable acceptance requirements |
 
-[Implementation work packages](implementation/XR-WP1-formal-kernel.md) and [experiment studies](experiments/README.md) refer to these contracts rather than defining conflicting alternatives. [Pilot settings](protocol/pilot.json) and [smoke settings](protocol/smoke.json) are exploratory starting values, not measured optima or a powered evaluation design. This is one methodology with controls, not a new production default.
+[Work packages](implementation/XR-WP1-formal-kernel.md) and [study sheets](experiments/README.md) are implementation handoffs to these contracts. Where they disagree, the owning contract above governs; record and fix the discrepancy before running the affected study. All new experimental choices must be frozen in a new run manifest as described in [protocol/README.md](protocol/README.md).
 
 ## Invariants
 
-1. A candidate emits a complete replacement axiom set. Remove the original object's axioms before adding the selected replacement; preserve duplicate origins.
-2. Ontology axioms are editable only when explicitly eligible. Human authorship increases default edit cost; it is not an automatic hard lock or evidence of truth.
-3. Soft evidence, logical feasibility, proposal probability, predicted benefit and edit preference are separate quantities.
-4. Only complete supported verification of every active policy obligation authorises a verified repair. Zero conflicts from incomplete reasoning does not.
-5. Unknown assignments remain pending and retain their contribution to the upper bound. Scheduling exclusions are not logical cuts.
-6. Exactness is relative to a frozen finite inventory, integer objective and policy. Generation coverage, verification scope and search status are reported separately.
-7. Typed probes prevent semantic credit from vacuous inclusions without incorrectly rejecting desired disjointness.
-8. No reference answers, corruption traces, future explanations or test-derived fitting statistics enter deployment features.
-9. Existing Exact-OM outputs remain unchanged when repair is disabled. Do not revise unrelated WP-* or matching E* specifications.
-10. Reuse shared pyowl-core snapshots and the existing optional adapter architecture. Qualify actual input/result capabilities; neither a package name nor a second parser establishes correctness.
+1. Every selected candidate is a complete replacement bundle. Materialise from asserted axioms, removing the selected original occurrences while preserving any duplicate origins.
+2. Ontology edits require explicit eligibility. Human authorship increases default cost; it is neither a hard lock nor proof of correctness.
+3. Logical feasibility, semantic fidelity, proposal probability, predicted risk and edit cost are different quantities.
+4. Circuit guarantees cover exactly the encoded constraints. Local admissibility and an incomplete detector's silence do not establish global feasibility.
+5. Complete supported verification of all active obligations is required for a verified repair. Unknown is not false, negative training data or permission to accept.
+6. All untested and unknown alternatives remain represented in the global upper bound. Scheduling blocks are separate from proved cuts.
+7. Optimality is relative to a frozen finite inventory, integer objective and policy. Candidate coverage and verification scope remain explicit.
+8. No clean parent, corruption trace, reference answer, future explanation or held-out feedback enters deployment features.
+9. Reuse the [native shared stack](../native-stack.md); do not add a second OWL representation or a Java requirement to production. Repair remains opt-in.
+10. A stronger ontology edit cost expresses caution. Neither learned confidence nor a solver proof establishes an author's intention.
 
-## Vocabulary migration
+## Versions and preserved evidence
 
-Use **axiom weakening by subclass-expression specialisation**, **adding a necessary condition**, **complex correspondence**, and **complex equivalence correspondence**. The old labels “guard” and “qualification” are historical aliases, not new public action names. Backend *capability qualification* remains a different, standard engineering term.
+The current runtime and archived results use version-2 records. XR-2.1 requires new record fields and changed feature/label identities; the migration in [01](01-architecture-and-contracts.md) uses an explicit version-3 boundary. It is not implemented by this specification update.
 
-XR-2 uses version-2 records. Do not silently load XR-P1 settings or checkpoints: mapping-only objects, mandatory all-off fallback, old feature layouts, losses, action IDs, splits and result fields changed. The old settings are not converted by substituting words. The preserved pre-update snapshot and repository history support explicit migration.
+`protocol/pilot.json`, `smoke.json`, `schema.json` and `batches.json` are preserved XR-2 campaign artefacts. Their numerical settings are historical exploratory values, not an XR-2.1 configuration. Likewise, the existing supervisor instructions describe an operational workflow; they do not authorise jobs, notifications or external model calls merely because an agent reads them.
 
-## Verification and completion
+The old labels “guard” and “qualification” are historical aliases. Use **subclass-expression specialisation**, **necessary condition**, **complex correspondence**, and **axiom weakening** where the weakening condition is actually proved.
 
-Run the finite reference tests and static protocol checks described in [reference/README.md](reference/README.md). These validate narrow specification properties, not installed OWL/MaxSAT backends, trained models or throughput. Work-package acceptance requires the real component evidence listed there.
+## Validation scope
 
-The research implementation includes all specified action families, HGT and its controls, circuit generation and its controls, symbolic supervision, joint search, and generated-to-real evaluation. Product UI, default enablement and a human-subject study are separate. Lack of licensed data or complete biomedical verification remains visible; it does not justify silently changing the research question.
+The finite model and static legacy-protocol checks in [reference](reference/README.md) remain useful narrow checks. Passing them does not validate the new circuit implementation, risk model, detector or live OWL backends. XR-2.1 completion requires the concrete gates in [12](12-implementation-migration.md), with actual evidence. This commit changes specifications only.

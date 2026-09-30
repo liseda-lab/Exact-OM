@@ -1,80 +1,100 @@
-# XR-2 architecture and shared records
+# XR-2.1 architecture and shared records
 
-**Schema namespace:** exact-repair/*/v2. **Status:** implementation specification, not installed capability.
+**Revision:** 30 September 2026. Baseline runtime uses `exact-repair/*/v2`; the additions below are planned version-3 contracts. No new runtime capability is asserted by this document.
 
-## Placement and data flow
-
-Any matcher adapter supplies shared ontology snapshots, a provisional alignment, score provenance and optional supporting evidence. Exact-OM's decomposition and explanations are useful inputs, not required truth labels.
+## Architecture
 
 ~~~text
-snapshots + provisional alignment + soft evidence
- -> bounded baseline diagnosis
- -> typed graph + retrieved vocabulary
- -> HGT node embeddings + per-object attention
- -> proposal heads -> constrained circuit -> complete replacement candidates
- -> candidate syntax encoder + candidate attention -> benefit coefficients
- -> explicit preference costs -> frozen weighted MaxSAT problem
- -> reconstruct selected theory -> policy verification
-       feasible: retain verified incumbent
-       infeasible: add a sound exclusion and repeat
-       unknown: retain pending assignment; continue within budget
- -> repaired alignment + ontology patch + verification/search records
+shared ontology snapshots + provisional alignment + available evidence
+  → validated input, edit occurrences and frozen policy
+  → four baseline reports + bounded sound conflict detection
+  → observable typed graph and retrieved finite vocabulary
+  → HGT node embeddings
+       object-conditioned attention → proposal logits
+       logits + grammar/context circuits → complete candidates
+  → candidate syntax encoder + candidate-conditioned attention
+       unary benefit + sparse pair benefit; explicit edit costs
+  → frozen finite inventory and integer objective
+  → MaxSAT produces a bounded high-utility shortlist
+       sound detector filters proved violations and supplies reusable cuts
+       plan-risk head orders remaining expensive verification calls
+  → complete supported policy verification
+       feasible: retain incumbent
+       infeasible: add proved support cut or exact-assignment exclusion
+       unknown: retain pending plan and its upper-bound contribution
+  → repeat within the frozen epoch, or start a declared new proposal epoch
+  → alignment + ontology patch + logical report + search bound + coverage
 ~~~
 
-The encoder supplies node memory to both readouts. No conflict node owns separately trained heads. No single pooled ontology vector is the only input to all decisions. See [09](09-graph-and-neural-model.md) and [10](10-constrained-generation.md).
+The shared HGT returns a matrix of node embeddings, not a single decision vector. Shared heads query this matrix for each revision object, completed candidate or selected plan. Conflict nodes represent detected supports; they do not own separate trained heads. [09](09-graph-and-neural-model.md) defines neighbourhoods, readouts and tensors.
 
-An optional outer graph/proposal refresh starts a new frozen optimisation round. Logical evidence may be reused only when its dependencies and current axiom-presence conditions remain valid.
+The LLM annotator reuses the existing OpenRouter profiles/client/request ledger in `exact/llm/routing.py` and `exact/llm/ledger.py`; [13](13-semantic-fidelity-supervision.md) defines the narrow annotation adapter. The symbolic teacher and LLM annotator are **training-time** components. Their future labels never feed an earlier inference graph. A frozen model estimates benefit during inference. The hard verifier is still run before acceptance, irrespective of how high the model scores a repair.
 
-## Records
+## Stage interfaces and ownership
 
-All records have a schema version, canonical serialization and content hash. Scores are finite and accompanied by missingness/matcher identity; scores are not assumed calibrated.
+| Interface | Inputs | Outputs and invariants |
+|---|---|---|
+| prepare | Shared snapshots/imports, mapping semantics, evidence, eligibility | Occurrence manifest; elementary candidates; validated complete policy; no new parser |
+| diagnose | O_s, O_t, their union and T_0; capability and budget | Per-query statuses, available proof supports, immutable exception evidence; streaming failures |
+| retrieve/build_graph | Observed input and evidence available by this decision time | Typed graph, context omission masks, finite vocabulary/endpoint menus; no teacher answers |
+| generate | Object context, menus, template grammar, immutable proof constraints, fixed logits | Canonical candidate bundles, encoding mass/provenance, per-family coverage and failures |
+| score | Frozen pool, shared graph, explicit pair selector and calibrated benefit model | Unary/pair coefficients and structural costs; all recomputed after a pool change |
+| select | Frozen objective, policy, logical cuts and scheduling ledger | Exact master proposal/bound, bounded shortlist; risk changes ordering only |
+| verify | Reconstructed asserted selected theory, policy and qualified route | Completed obligation events and final complete/incomplete report bound to exact hashes |
+| refine | Available new proofs and a provisional plan, remaining generation budget | Optional proposal-context update; changed pool/graph/model starts a new epoch |
+| train | Verified exhaustive or sampled plan records and separately sourced semantic labels | Versioned proposal/benefit/risk parameters, target and calibration metadata |
 
-| Record | Required content |
+One routine constructs explanation-aware interaction pairs in training, development and inference. One routine materialises endpoint alternatives on both prepared and direct paths. Existing elementary candidates cannot disappear because a circuit or worker fails. A reduced generation pool remains explicitly partial.
+
+## Record boundary
+
+All new persisted records have a canonical serialisation, schema version and content hash. Use `exact-repair/*/v3` for the changed contracts; Python class names may follow repository conventions. Do not write changed semantics under a v2 envelope. Implementation must add strict readers and explicit migration tests before writing v3 results.
+
+| Record | Required fields beyond the existing semantic content |
 |---|---|
-| RepairInputV2 | Snapshot/import identities; original complete alignment; typed evidence; policy; budgets; matcher identity |
-| RevisionObjectV2 | Stable ID; kind mapping or ontology_axiom; original canonical axiom set; source/import provenance; human/generated/unknown authorship; eligibility/locks; candidate IDs |
-| ReplacementCandidateV2 | Object/candidate IDs; complete canonical emitted axioms; action tags; selected directions/endpoints; expression ASTs; activated queries; provenance; compiler/version; structural cost features |
-| BaselineReportV2 | Separate O_s, O_t, O_s∪O_t and T_0 checks; witnesses/support; proof scope; completeness per obligation; unknown causes; fixed exception set with evidence |
-| GraphInputV2 | Node/edge types, role labels, feature provenance, retrieved menus, missing/omitted context and diagnosis revision |
-| ProposalRecordV2 | Canonical encoding, template, grammar/menu/constraint hashes, circuit size, mixture parameters or reproducible reference, sampling seed and likelihood |
-| ObjectiveV2 | Frozen unary/pair coefficients, semantic scale, explicit profile costs, integer quantisation, objective hash and pair set |
-| VerificationReportV2 | Assignment/theory/policy hashes; obligation-by-obligation verdicts; input/query support; backend versions; explanations; resources |
-| RepairResultV2 | Selected replacements; alignment; ontology patch; verification scope; logical/search/coverage status; incumbent value, bound/gap; pending assignments and failure events |
+| RepairInputV3 | Source/target/import content identities; full original alignment and relation interpretation; original and candidate public signatures; occurrence manifest; eligibility/locks; evidence provenance; budgets and declared generation universe |
+| RevisionObjectV3 | Stable object and occurrence IDs, kind, original canonical axioms, import/all-emitter provenance, authorship human/generated/unknown, allowed action families |
+| ReplacementCandidateV3 | Complete emitted axioms, expression ASTs, selected directions/endpoints, active obligations, action tags, structural costs, generation/source identity; semantic identity independent of scores |
+| PolicyV3 | Monitored public signature, strict/source-exception policy and proof IDs, required/prohibited queries, activation definitions, eligibility and policy hash |
+| BaselineReportV3 | Separate four theories, obligation masks and verdicts, support scope, exception evidence, reuse/accounting metadata |
+| GraphInputV3 | Node/edge schema and feature version, masks for absent/zero/unavailable/truncated data, pair-selection identity, evidence cutoff, menus and omissions |
+| ProposalRecordV3 | Grammar/menu/template/constraint hashes, circuit/artifact identity, original encoding and canonical bundle, posterior/mass information, seed/context, exact versus approximate likelihood scope, per-family completion status |
+| GenerationReportV3 | Requested/effective language bounds; expansion history; elementary and generated counts; retrieval/grammar/compile/sampling misses; duplicates; resource/circuit telemetry and cache status |
+| ObjectiveV3 | Frozen pool, pair set, raw calibrated unary/pair benefits, explicit costs, signed integer coefficients/scale, target-basis/calibration IDs, model and epoch hashes |
+| ProofSupportV3 | Violation/obligation type; sufficient asserted support; occurrence origins; activation dependencies; backend/rule proof scope; parent theory/policy; proof/replay identity and completeness |
+| VerificationEventV3 | Query identity, completed verdict, optional proof support, theory/policy/backend/capability hashes, monotonic receipt index, work/resource counters |
+| VerificationReportV3 | All requested and completed/unknown obligation statuses, full input support, route and versions, final logical status, completed event IDs and resources |
+| SearchLedgerV3 | Durable logical exclusions, temporary enumeration/scheduling exclusions, untested/unknown/retry plans, exact utilities, bound provenance, incumbent and epoch identity |
+| PlanSampleV3 | Input/epoch/pool/assignment identities, sampler and sampling stratum, evidence-at-decision, verification masks, symbolic semantic vector, source/LLM label provenance, runtime/censoring, split parent |
+| RepairResultV3 | Alignment and exact ontology patch or null; selected plan and replay records; logical/search/generation statuses; incumbent value, upper bound/gap; unresolved alternatives/failures; total resource accounting |
 
-Candidate identity excludes learned utility, but includes activation and restrictions that affect feasibility. Deduplication by canonical emitted axioms alone is insufficient when activations differ. An axiom identity maps to all emitting candidates and to any fixed occurrence.
+A proved support may be sufficient without being subset-minimal. A free-text explanation or LLM rationale is not a ProofSupport record. Proof hashes establish identity; correctness requires the qualified proof or replay procedure.
 
-Ontology patches identify the exact original axiom occurrence/import and replacement. They are applied in the repair view, not written into upstream ontology files. Shared imports and duplicate axioms are tracked: editing one occurrence does not remove another occurrence. A request to suppress a semantic axiom across imports must explicitly enumerate its affected occurrences.
+## Identity and dependencies
 
-Property correspondences remain in the logical input. Class-expression templates apply only to class mappings. The initial non-class repair menu is keep/delete where eligible; unsupported richer property/individual revisions are identified, not coerced or silently dropped. Legal OWL punning uses (IRI, entity kind), not IRI alone.
+Candidate identity includes object, canonical emitted axioms and activation obligations. Multiple derivations of the same candidate are provenance entries with probability mass combined; they are not extra solver choices. An emitted axiom maps to every selected-candidate emitter and any fixed occurrence. Ontology patches identify exact affected occurrences, including imports; no upstream file is edited implicitly.
 
-## Result status is factored
+A compilation cache key covers the full grammar structure, variable mapping/order, templates, bounds, immutable semantic constraint proofs and compiler format/version. Neural logits are not part of structural compilation identity. Alpha-renaming reuse requires a reversible structure-preserving mapping; equal menu sizes are insufficient. A verification cache additionally covers materialised theory, active policy/query set, backend capabilities/version and relevant import/patch dependencies.
 
-- logical_status: VERIFIED_FEASIBLE, VERIFIED_INFEASIBLE, UNKNOWN, INVALID_INPUT, ERROR.
-- verification_scope: full_owl, complete_supported_fragment, or partial_detection, plus exact ontology/query support metadata.
-- search_status: OPTIMAL_IN_POOL, INCUMBENT_WITH_GAP, NO_FEASIBLE_IN_POOL, UNRESOLVED, ERROR.
-- candidate_coverage: sampled, bounded_enumerated, or other precisely declared search universe.
-- model_status: checkpoint/version, calibrated uncertainty if actually established, missing evidence and applicable distribution shift.
+A neural neighbourhood is not a sound reasoning module. Logical-module and incremental-session reuse require the preservation conditions in [03](03-module-soundness.md), including deletions and replacements.
 
-VERIFIED_INFEASIBLE describes a checked assignment or fixed-policy impossibility, not every candidate. NO_FEASIBLE_IN_POOL requires an exhausted exact master with only sound exclusions and no unresolved pending assignment. A partial detector cannot authorise VERIFIED_FEASIBLE for the full policy. A finite-pool bound does not upgrade logical scope.
+Non-class mappings remain in the logical theory. The initial non-class action menu is keep/delete if eligible; richer property/individual revisions require their own explicitly supported grammar. Use (IRI, entity kind) identity for legal OWL punning. Unsupported inputs are recorded and preserved for complete verification, not coerced into class mappings.
 
-With no verified incumbent, assignment/output alignment is absent and LB/gap are null. Diagnostic candidates can be retained but are non-authorising. With an incumbent, LB is its frozen utility and the bound includes pending alternatives. Zero gap supports an optimum only with the requisite verification and objective evidence.
+## Status and failure contracts
 
-## Reasoning interface
+- `logical_status`: VERIFIED_FEASIBLE, VERIFIED_INFEASIBLE, UNKNOWN, INVALID_INPUT, ERROR.
+- `verification_scope`: full supported input/query semantics, complete_supported_fragment, or partial_detection, with exact capability details; a broad string alone is insufficient.
+- `search_status`: OPTIMAL_IN_POOL, INCUMBENT_WITH_GAP, NO_FEASIBLE_IN_POOL, UNRESOLVED, ERROR.
+- `generation_status`: COMPLETE_DECLARED_ENUMERATION, SAMPLED, PARTIAL_RESOURCE_LIMIT, INVALID_LANGUAGE, ERROR, plus each family status and coverage.
 
-The existing hierarchy-only reasoner interface is not a repair verifier. Add a narrow adapter with inspect_support, diagnose_baselines, check_assignment and optional explain operations. Each returns explicit supported constructs/queries and result completeness.
+A partial pool may yield an OPTIMAL_IN_POOL repair; this never claims an optimum in the requested larger language. VERIFIED_INFEASIBLE normally describes one checked assignment. NO_FEASIBLE_IN_POOL needs complete exhaustion with no unknown or untested alternative. An incomplete detector cannot label a full policy VERIFIED_FEASIBLE.
 
-Use the shared pyowl-core representation and existing optional backend architecture. Reuse qualified pyELK/pyHermiT or other compatible adapters; do not invent capability or require a second OWL model/path reparse. A qualified LogMap-style sound incomplete detector is an optional fast path. HermiT/ELK names in the methodology describe reasoning options, not a guarantee about installed wrappers.
+No incumbent means output alignment/patch and lower bound/gap are null; diagnostic candidate plans are non-authorising. With an incumbent, the lower bound is its exact frozen objective. All deferred and unknown plans still contribute to the upper bound. A finite fallback upper cap is valid but may be loose. A failure after a completed contradiction preserves that negative evidence; a partially completed positive pass cannot authorise acceptance.
 
-## Evidence and replay
+## Replay and migration
 
-Persist input/import identities, eligibility, policy/exception evidence, canonical inventory, graph/proposal provenance, model/profile versions, frozen integer objective, accepted cuts, pending assignments and complete incumbent reports. Soft explanations are never merged into asserted axioms.
+Safety replay reconstructs the asserted theory and checks the complete recorded policy without the neural model or solver. Optimality replay also validates objective, logical cuts and all unresolved-bound accounting. Same-adapter replay checks reproducibility, not independent reasoner correctness.
 
-Safety replay reconstructs T_R and checks its full recorded policy without the neural model or optimiser. Optimality replay additionally validates exclusions, pending alternatives, and the exact master bound. Same-adapter replay establishes reproducibility, not independent verification. Artifact hashes establish integrity, not logical truth.
+A v2 reader remains available for archival reporting; it must label absent v3 data as unavailable. A v2 model cannot be resumed as v3 after adding risk heads, feature masks, pair selection or target definitions without an explicit training migration. Old labels can be reused only if their full input/policy/query identities and statuses remain valid. In particular, do not invent missing proof supports, semantic judgements, exact generation likelihoods or query completeness.
 
-The parent process holds the last completed verified incumbent and valid bound. No unbudgeted verification begins after a deadline. Caches include ontology patches and all semantic dependencies; editing an axiom invalidates inferences whose support used it.
-
-## Repository integration
-
-Use lazy optional imports under exact.repair. Keep product repair disabled by default. Reuse snapshots, workers, canonical serialization, storage and configuration infrastructure. Prefer a small number of functional modules over generic solver/model/plugin frameworks. [06](06-first-experiment-implementation.md) gives the proposed layout.
-
-Version-1 readers must reject the new object and status schema rather than interpret ontology edits as mappings. Explicit legacy conversion may reconstruct a restricted v2 problem, but cannot invent exception proofs, circuit likelihoods, complete labels, or verification coverage.
+Keep immutable original artefacts and produce separately hashed migration outputs. Runtime repair stays disabled by default, and unrelated matching/frontend contracts remain unchanged. New record and experiment loaders must reject unsupported schema versions clearly.

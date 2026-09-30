@@ -1,6 +1,6 @@
-# XR-2 executable specification checks
+# XR-2 finite reference checks within the XR-2.1 suite
 
-The standard-library finite model is an executable check of selected contracts, not the Exact-Repair implementation.
+The unchanged standard-library finite model is an executable check of selected XR-2 contracts, not the Exact-Repair implementation. XR-2.1 retains these invariants but adds requirements not implemented by this model: deferred shortlists, streaming backend events, semantic circuit constraints, sampled training and LLM labels. The legacy protocol validator still validates the preserved v2 pilot/smoke files only. New conformance obligations are listed in [12](../12-implementation-migration.md).
 
 From the specifications directory:
 ~~~text

@@ -1,54 +1,43 @@
-# XR-2 experiment matrix and implementation handoff
+# XR-2.1 experiment matrix and handoff
 
-The primary research questions are defined in [00](00-research-contract.md). This file assigns concrete comparisons to them without prescribing a different methodology for each implementation stage.
+**Revision:** 30 September 2026. Studies test the questions in [00](00-research-contract.md) and obey [02](02-experimental-protocol.md). Study filenames remain stable for links; XR-E09 now concerns semantic fidelity, with personal preference fitting optional.
 
-| Study | Question addressed | Main comparison |
+| Study | Main question and comparison | Required evidence |
 |---|---|---|
-| XR-E00 | Measurement prerequisites | Snapshot, capability, split, budget and replay conformance |
-| XR-E01 | RQ5: verification limits | Complete versus sound incomplete verification; cut and bound correctness |
-| XR-E02 | RQ1/RQ4: actions and ontology edits | Deletion, directional weakening, complex correspondences, eligible ontology edits |
-| XR-E03 | RQ1/RQ2/RQ5: joint choice | Greedy, exact unary, exact pairwise and exhaustive small-case reference |
-| XR-E04 | RQ2: learned decisions | Symbolic/score controls, HGT, matched R-GCN; teacher and profile variants |
-| XR-E05 | RQ3: constrained generation | Bounded enumeration, uniform constrained sampling, learned circuit proposals |
-| XR-E06 | RQ2/RQ5: transfer and scale | Generated-only, training-side real adaptation, held-out Conference and Bio-ML |
-| XR-E07 | RQ5: scale and deadlines | Candidate/circuit/solver/verification budgets and pending alternatives |
-| XR-E08 | RQ2/RQ5: reliability | Evidence shifts, missing candidates, import changes and verifier failures |
-| XR-E09 | RQ4: preferences and inspection | Default/simulated/learned profiles and interpretable patch alternatives |
+| XR-E00 | Measurement and input correctness | Versioned records; materialisation, split, capability, budget and replay checks |
+| XR-E01 | RQ5: reasoning and reusable exclusions | Detector plus complete verifier; assignment versus support cuts; routing and shared baselines |
+| XR-E02 | RQ1: richer actions and ontology edits | Common-pool action ablations and full generation-language comparison; independent meaning measures |
+| XR-E03 | RQ2/RQ5: interactions and verification order | Unary/pair values, counterfactual training, plan-risk shortlist scheduling, exact small-case truth |
+| XR-E04 | RQ2: learned generation/value | Exact small teachers versus sampled plan training with new candidates; HGT/R-GCN controls |
+| XR-E05 | RQ3: circuit benefit | Grammar-only circuits, ontology-informed circuits, matched semantic decoder; cold/warm cost |
+| XR-E06 | RQ1/RQ2/RQ5: real transfer | Generated-only versus training-side adaptation; fresh Conference and separate Bio-ML cohorts |
+| XR-E07 | RQ5: scale and bounded return | Candidate, circuit, graph, solver and reasoner budgets; first verified and matched-quality endpoints |
+| XR-E08 | RQ2/RQ5: robustness | Missing candidate controls enforced end-to-end; evidence/import shift, process/backend failure |
+| XR-E09 | RQ4: LLM weak semantic fidelity | Symbolic teacher versus grounded AI comparisons; independent held-out judgements and bias controls |
 
-See [experiments](experiments/README.md) for each study's dataset, controls, outputs and acceptance.
+The [individual study sheets](experiments/README.md) specify the corresponding controls and interpretation. No full factorial over every optional idea is required; staged ablations isolate the cause of any gain before combining components.
 
-## Dependency order
+## Dependency gates
 
-1. Establish the shared-core revision representation, typed policy and replay records.
-2. Qualify the verifier; implement the bounded finite-pool optimisation loop with no learned component.
-3. Implement all eligible action families as complete bundles and reproduce the worked examples.
-4. Generate controlled cases and typed teacher labels; make exhaustive small cases the reference.
-5. Add the heterogeneous graph, shared heads and constrained circuit proposals. Compare unary and pairwise benefit.
-6. Pretrain and adapt only on training/development groups; freeze artefacts before held-out evaluation.
-7. Evaluate Conference and Bio-ML under their actual supported verification scopes. Record unresolved cases.
+1. **G0 — Reproducible baseline and correctness.** Preserve archived evidence; implement record/feature migration, shared interactions, missing-control enforcement, endpoint materialisation, public signature validation, fair baseline accounting and startup supervision.
+2. **G1 — Reliable candidate language.** Repair SDD ownership/resource accounting; compile small families; pass exact support/probability tests; implement persistent cache and declared partial coverage. Test semantic constraints using immutable proofs. Evaluate the matched decoder before deciding the default.
+3. **G2 — Reasoning and exact search.** Qualify detector rules and support provenance; connect presence cuts; stream completed failures; implement full-scope backend routing and shortlist ledger with valid bounds.
+4. **G3 — Supervised generation and interactions.** Collect verified sampled repairs with new candidates, counterfactual contrasts and higher-order infeasibility examples. Train value/proposal/risk separately; select checkpoints on generated-pool development performance.
+5. **G4 — Grounded semantic fidelity.** Freeze label rubric, evidence packets, anchors and independent evaluation. Add LLM weak labels only after feasible-plan generation and symbolic facts are reliable.
+6. **G5 — Real-case evaluation.** Freeze fresh held-out inputs and settings; run Conference then distinct Bio-ML scale cohorts under declared support. Preserve unresolved cases and all costs.
 
-This order is a debugging dependency, not a claim that early versions implement the full research design.
+G0–G2 are prerequisites for attributing fewer verifier calls to learning. G3 may initially use only symbolic semantics; G4 does not block correctness. Real training-side diagnosis can proceed before G5 to measure structural coverage without accessing test labels.
 
-## Deliverables
+## New run manifest
 
-A run contains the asserted input/import hashes, exact provisional alignment and evidence, editable occurrence manifest, policy, capability report, four-part initial diagnosis, candidate bundles/activations and coverage, circuit and model hashes, objective coefficients, teacher provenance where applicable, selected patch, verification reports, logical cuts, pending assignments, bounds and stage resource use.
+Before launching XR-2.1, create a separately versioned executable configuration and strict loader as required in [protocol/README.md](protocol/README.md). Historical pilot/smoke/batch files are not overwritten. The manifest must resolve every stage budget, sampling/expansion limit, loss weight, shortlist size, feature/target identity, backend route and stopping criterion. Values are chosen on development data and logged, not presented as known optimal settings.
 
-Return a repaired alignment and an ontology patch separately. A simple Alignment API file cannot express every complex correspondence; publish the normative OWL axiom bundle and mark any lossy projection. Do not silently replace complex output by a simple equivalence.
+Each run exports asserted inputs, exact provisional alignment and evidence cutoff, editable occurrences and policy, four-part diagnosis, effective grammar/candidate inventory, circuit/model/objective identities, supports, pending/deferred ledger, teacher/LLM provenance where applicable, final verified patch and stage resources.
 
-## Settings and migration
+A simple alignment file cannot represent all complex correspondences. Publish normative OWL axiom bundles and an explicit ontology patch; label any simple-mapping projection as lossy. Do not substitute simple equivalence for a complex output.
 
-The versioned [pilot](protocol/pilot.json) is a bounded exploratory configuration covering the complete design. The [smoke](protocol/smoke.json) reduces counts and budgets for conformance; it cannot substantiate generalisation or model-quality claims.
+## Acceptance and completion
 
-XR-1/XR-P1 caches, action names and checkpoints are incompatible unless explicitly migrated with a preserved semantic mapping. Existing result files are not silently relabelled. Research runs are opt-in and do not enable production repair.
+[12](12-implementation-migration.md) lists code-level changes and tests. A substantive study starts only after its dependency gates pass using real adapters, not just the finite reference model. Training completion, process completion, verification success and a research result are different statuses.
 
-## Acceptance before a substantive experiment
-
-- All action and typed teacher fixtures pass.
-- The finite executable reference agrees with exhaustive enumeration, including unknown candidates, pair terms, nonmonotone policies and duplicate axiom origins.
-- The actual solver and OWL backend pass their separate conformance suites.
-- Circuit probabilities on tiny instances match enumerated normalised probabilities.
-- All controls share candidate inventories, readout capacity, evaluation scope and budget where a matched comparison requires it.
-- No held-out group supplies teacher labels, model selection, vocabulary answers or preference feedback.
-- Every displayed result separates logical status, search status, verification scope and candidate coverage.
-
-The reference checks included with these specs validate contracts only; they do not constitute an implementation of the research system.
+This design update does not resume a paused campaign, authorise API expenditure or enable production repair. Implementation, run submission and LLM annotation are separate subsequent work. No missing resource justifies silently reducing the question or claiming a new model was tested.
