@@ -1,5 +1,6 @@
 """Saved-result finalization rejects missing arms and corrupted durable evidence."""
 
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -7,11 +8,12 @@ import pytest
 from exact.experiments import harness
 from exact.experiments.recovery import ArtifactStore, stage_identity
 from tools import finalize_prepared_selection as finalize
-from tools.prepared_batch import binding, write
+from tools.prepared_batch import binding, read, write
 
 
 @pytest.mark.parametrize(
-    "damage", [None, "bytes", "role", "config", "seed", "duplicate", "missing", "working_bytes"]
+    "damage",
+    [None, "bytes", "role", "config", "seed", "duplicate", "missing", "working_bytes", "multiple"],
 )
 def test_saved_cells_require_complete_identical_verified_outputs(tmp_path, monkeypatch, damage):
     cell = SimpleNamespace(
@@ -85,6 +87,26 @@ def test_saved_cells_require_complete_identical_verified_outputs(tmp_path, monke
         manifests=[binding(path)],
         result_set=binding(result_set),
     )
+    if damage == "multiple":
+        cells = [cell]
+        rows = [
+            {"cell_id": "E20/screen/control/D0-global_alignment/seed-17", "artifacts": identities}
+        ]
+        for arm in ("contrastive", "cross_encoder"):
+            other = SimpleNamespace(**{**vars(cell), "arm_id": arm})
+            cells.append(other)
+            other_path = tmp_path / (arm + ".json")
+            write(other_path, {**report, "arm_id": arm})
+            recipe["manifests"].append(binding(other_path))
+            rows.append(
+                {
+                    "cell_id": f"E20/screen/{arm}/D0-global_alignment/seed-17",
+                    "artifacts": identities,
+                }
+            )
+        write(result_set, {"cells": rows})
+        recipe["result_set"] = binding(result_set)
+        monkeypatch.setattr(harness, "build_cells", lambda *a, **kw: cells)
     if damage == "bytes":
         blob = next((tmp_path / "artifacts/blobs").iterdir())
         blob.write_bytes(b"corrupt")
@@ -94,8 +116,40 @@ def test_saved_cells_require_complete_identical_verified_outputs(tmp_path, monke
         recipe["manifests"] *= 2
     if damage == "missing":
         recipe["manifests"] = []
-    if damage:
+    if damage and damage != "multiple":
         with pytest.raises(ValueError):
             finalize.verify_cells(recipe, suite, {})
     else:
-        assert finalize.verify_cells(recipe, suite, {}) == [path]
+        assert finalize.verify_cells(recipe, suite, {}) == [
+            Path(item["path"]) for item in recipe["manifests"]
+        ]
+
+
+@pytest.mark.parametrize("changed", [False, True])
+def test_failed_interval_keeps_original_owner_across_recovery(tmp_path, changed):
+    from exact.experiments.budget import BudgetLedger
+
+    ledger = BudgetLedger(
+        tmp_path / "budget.json",
+        {
+            "node_hours_cap": 336,
+            "envelopes_hours": {"reserve": 60},
+            "requests_cap": 50000,
+            "tokens_cap": 32000000,
+        },
+    )
+    recipe = {
+        "parent_run_id": "recovery-01",
+        "failed_finalization_interval": {"run_id": "original", "start": 10, "end": 20},
+    }
+    finalize.charge_failed_finalization(recipe, ledger, {"work": {}})
+    state = read(ledger.path)
+    recipe["parent_run_id"] = "recovery-02"
+    if changed:
+        recipe["failed_finalization_interval"]["end"] = 21
+        with pytest.raises(ValueError, match="charge differs"):
+            finalize.charge_failed_finalization(recipe, ledger, state)
+    else:
+        finalize.charge_failed_finalization(recipe, ledger, state)
+        assert read(ledger.path) == state
+        assert list(state["work"]) == ["failed-finalization/original"]

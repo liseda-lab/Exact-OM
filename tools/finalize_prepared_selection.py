@@ -129,9 +129,9 @@ def verify_cells(recipe, suite, experiments, *, checksums=True):
                 # Downstream consumers open the original run paths. Verify those
                 # exposed bytes as well as the immutable content-addressed store.
                 if stage != "inputs":
-                    for name, output in checked["outputs"].items():
-                        if binding(path.parent / name)["sha256"] != output["sha256"]:
-                            raise ValueError("Saved working output differs: " + name)
+                    for output_name, output in checked["outputs"].items():
+                        if binding(path.parent / output_name)["sha256"] != output["sha256"]:
+                            raise ValueError("Saved working output differs: " + output_name)
     return manifests
 
 
@@ -167,6 +167,21 @@ def register_lineage(recipe):
                 return registry
         time.sleep(1)
     raise ValueError("Dispatcher has not registered the live recovery; retain reservation")
+
+
+def charge_failed_finalization(recipe, ledger, state):
+    """Retain the failed interval's owner across multiple metadata recoveries."""
+    tail = recipe["failed_finalization_interval"]
+    tail_key = "failed-finalization/" + tail.get("run_id", recipe["parent_run_id"])
+    expected = dict(
+        start=tail["start"], end=tail["end"], status="failed", requests=0, tokens=0, actual_usd=0
+    )
+    if tail_key in state["work"]:
+        if any(state["work"][tail_key].get(key) != value for key, value in expected.items()):
+            raise ValueError("Retained failed finalization charge differs: " + tail_key)
+        return
+    ledger.admit(tail_key, group="reserve", seconds=0, forecast_known=False)
+    ledger.finish(tail_key, **expected)
 
 
 def run(recipe_path):
@@ -214,19 +229,7 @@ def run(recipe_path):
             raise ValueError("Latest ledger loses completed/failed parent charges")
         copy_account(account, state, runtime)
         ledger = BudgetLedger(runtime / "budget.json", state["limits"])
-        tail = recipe["failed_finalization_interval"]
-        tail_key = "failed-finalization/" + recipe["parent_run_id"]
-        if tail_key not in state["work"]:
-            ledger.admit(tail_key, group="reserve", seconds=0, forecast_known=False)
-            ledger.finish(
-                tail_key,
-                start=tail["start"],
-                end=tail["end"],
-                status="failed",
-                requests=0,
-                tokens=0,
-                actual_usd=0,
-            )
+        charge_failed_finalization(recipe, ledger, state)
         started = time.time()
         work = "selection-finalization/" + recipe["run_id"]
         ledger.admit(work, group="reserve", seconds=0, forecast_known=False)
