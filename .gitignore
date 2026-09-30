@@ -8,10 +8,13 @@
 
 # Local datasets, experiment outputs, and recoverable scratch archives
 /data/
+/exports/
 
-# Experiments folder
+# Local agent worktrees
+/.worktrees/
 
-/exp/*
+# Experiments folder or local archive symlink
+/exp
 
 # Paper folder
 
