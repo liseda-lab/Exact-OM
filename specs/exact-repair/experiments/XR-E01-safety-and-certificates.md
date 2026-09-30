@@ -1,21 +1,21 @@
-# XR-E01 — Verification and replay
+# XR-E01 — Reasoning, proof supports and replay
 
-Research question: RQ5.
+**Target:** XR-2.1, 30 September 2026. **Question:** RQ5. Requirements for new runs; archived XR-2 results remain separate.
 
 ## Data
 
-Exhaustive small generated cases; unsupported-construct, import, ontology-edit and unknown-verifier stress fixtures; held-out real outputs.
+Small exhaustive OWL cases, restriction-essential witnesses, imports/duplicate emitters, source/union conflicts, expressive unsupported queries and held-out real outputs.
 
-## Comparison
+## Comparisons
 
-Compare complete verification, sound incomplete detection followed by verification, and module acceleration only after qualification. Compare assignment cuts with justified axiom-presence cuts.
+Complete verifier alone; sound restriction-aware detector followed by qualified verification; assignment versus presence-support cuts. Compare capability-first routes on their actually supported scope. Test modules/incremental reuse only after preservation qualification.
 
 ## Measurements
 
-Measure acceptance correctness, detected violations, supported scope, explanation coverage, proof/replay coverage, unresolved fraction and time to verified incumbent.
+False acceptance/rejection in fully decided fixtures; completed query coverage; support coverage/size; cut reuse; backend setup/query/wall costs; first verified repair and unresolved fraction.
 
-## Interpretation and acceptance
+## Acceptance and interpretation
 
-Require zero false verified-feasible results in conformance cases. Include conditional non-vacuity, duplicate origins, positive hard queries, pending bounds and no initial feasible repair. A fast zero-conflict result is not a coherence certificate.
+Include whole active-expression satisfiability, ontology edits that remove a conflict premise, positive required non-entailment, inconsistent source exceptions and early failure followed by timeout. Full-OWL feasibility cannot follow from a detector finding zero conflicts. A sufficient support need not be minimal, but every cut must replay under the selected assignment.
 
-Shared controls, split rules, resources and status reporting are defined in [02](../02-experimental-protocol.md).
+Shared splits, resources, failure accounting and statistics follow [02](../02-experimental-protocol.md). Dependency gates are in [08](../08-experiment-matrix-and-handoff.md); code changes and tests are in [12](../12-implementation-migration.md). Resolve every numerical setting in a new [run manifest](../protocol/README.md) before execution.

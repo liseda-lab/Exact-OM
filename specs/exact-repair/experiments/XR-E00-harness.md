@@ -1,21 +1,21 @@
-# XR-E00 — Harness and reproducibility
+# XR-E00 — Harness, identities and accounting
 
-Research question: Prerequisite.
+**Target:** XR-2.1, 30 September 2026. **Question:** Prerequisite. Requirements for new runs; archived XR-2 results remain separate.
 
 ## Data
 
-All generated fixtures and small captured Conference/biomedical examples.
+All semantic/regression fixtures, preserved pilot artefacts and small captured real inputs. Real input availability is explicit.
 
-## Comparison
+## Comparisons
 
-Compare materialisation, policy, capability and objective records against independent fixtures before any model comparison.
+Materialisation and v3 loaders versus independent tiny fixtures; prepared versus direct candidate paths; identical baseline reports and pair selection across arms. Compare clean execution with injected startup, cache, process and late-query failures.
 
 ## Measurements
 
-Record split ancestry, hashes, stage budgets, requested/produced cases, process cleanup and all result statuses.
+Input/split/schema hashes; requested and effective language; baseline and per-query costs; unique case results versus attempts/reuse; all failure statuses and deadline/cleanup behaviour.
 
-## Interpretation and acceptance
+## Acceptance and interpretation
 
-Reject leaking splits, unsupported acceptance, silent action truncation, mismatched objective/pool hashes and unbounded retries. This is conformance, not an effectiveness experiment.
+Pass MIG-01–03, MIG-11, MIG-13–15 and schema migration before attributing experimental gains. No second parser, secrets in artefacts, silent legacy checkpoint loading or partial positive acceptance. The reference tests are necessary narrow checks, not enough to qualify live backends.
 
-Shared controls, split rules, resources and status reporting are defined in [02](../02-experimental-protocol.md).
+Shared splits, resources, failure accounting and statistics follow [02](../02-experimental-protocol.md). Dependency gates are in [08](../08-experiment-matrix-and-handoff.md); code changes and tests are in [12](../12-implementation-migration.md). Resolve every numerical setting in a new [run manifest](../protocol/README.md) before execution.

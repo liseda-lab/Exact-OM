@@ -1,6 +1,6 @@
-# Primary references used by XR-2
+# Primary references used by XR-2.1
 
-These sources motivate components; the combined method and its empirical advantages remain a research proposal.
+These sources motivate components; the revised combination and its empirical advantages remain a research proposal. References are not proof that the repository implements the cited method. The source-bound pilot and external report evidence are described in [11](11-benchmark-evidence.md).
 
 - W3C, [OWL 2 Primer](https://www.w3.org/TR/owl2-primer/), [Direct Semantics](https://www.w3.org/TR/owl2-direct-semantics/) and [Profiles](https://www.w3.org/TR/owl2-profiles/): axiom and expression semantics, consistency, profiles and query scope.
 - Baader et al. (2018), [Gentle Repair of Description Logic Ontologies through Axiom Weakening](https://arxiv.org/abs/1808.00248): principled weakening. Not every endpoint substitution or added necessary condition is a weakening.
@@ -18,3 +18,13 @@ These sources motivate components; the combined method and its empirical advanta
 - [OAEI Conference 2025](https://oaei.ontologymatching.org/2025/conference/index.html) and [evaluation](https://oaei.ontologymatching.org/2025/results/conference/index.html): real alignment and logical evaluation evidence.
 
 The shared-core Java-free architecture remains a repository constraint. Citations to Java reasoners describe optional qualified comparison adapters, not a requirement to add a Java dependency to production Exact-OM.
+
+
+## Sources added for the implementation revision
+
+- PySDD, [SddManager](https://pysdd.readthedocs.io/en/latest/classes/SddManager.html), [Vtree](https://pysdd.readthedocs.io/en/latest/classes/Vtree.html) and [formula construction example](https://pysdd.readthedocs.io/en/latest/examples/build_formula.html): public native ownership, collection, allocation and variable-tree interfaces. Pin actual installed library/API versions in compiler tests; the documentation version label is not a runtime version guarantee.
+- Goodman (1999), [Semiring Parsing](https://aclanthology.org/J99-4004/): background for a possible bounded-grammar sum-product alternative. This is a fallback research comparison, not the first implementation or a proof that arbitrary semantic constraints admit a compact chart.
+- Zheng et al. (2023), [Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena](https://arxiv.org/abs/2306.05685): motivates controls for position, presentation and judge biases. Its chat-evaluation findings do not validate OWL repair judgements; XR-E09 must test those directly.
+- Lee et al. (2023), [RLAIF: Scaling Reinforcement Learning from Human Feedback with AI Feedback](https://arxiv.org/abs/2309.00267): precedent for treating AI feedback as supervision. XR-2.1 uses supervised semantic-fidelity learning and keeps MaxSAT; it does not adopt an RL training objective from this citation.
+
+The existing OpenRouter implementation (`exact/llm/routing.py`, `exact/llm/ledger.py`) is the integration source of truth. Reuse its public client, profile, request identity and accounting contracts; provider/model availability is resolved for each future run rather than inferred from a paper or a historical model name.

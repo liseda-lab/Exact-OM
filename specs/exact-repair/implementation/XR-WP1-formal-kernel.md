@@ -1,11 +1,9 @@
-# XR-WP1 — revision semantics and verification policy
+# XR-WP1 — revision semantics and reasoning
 
-1. Implement the matcher-independent records and shared-core OWL representation in [01](../01-architecture-and-contracts.md). There is no mandatory trusted mapping subset.
+**Target:** XR-2.1, 30 September 2026. Requirements, not completed work.
 
-2. Represent mapping objects and exact ontology-axiom occurrences, import provenance, explicit edit eligibility, complete replacement bundles and active-expression obligations. Keep/delete are alternatives where policy permits, not assumptions about feasibility.
-
-3. Implement bounded diagnosis of each source, their union and the original alignment theory. Exceptions require proved pre-existing unsatisfiability. Record unknowns and preserve query scope.
-
-4. Qualify sound conflict detection separately from complete acceptance. Check consistency, the frozen monitored signature, hard queries and non-vacuity. Modules remain disabled until their exact preservation conditions are established.
-
-5. Acceptance: semantic action fixtures, stale-closure/duplicate-import cases, typed query results, unsupported-profile rejection and replay of materialised patches. No production parser or OWL model duplication.
+1. Implement the explicit v3 boundary and shared-core input/policy records in [01](../01-architecture-and-contracts.md). Preserve v2 readers for archived evidence; reject invented migration proofs. All mappings are provisional unless explicitly locked.
+2. Complete MIG-03, MIG-11, MIG-13–15 in [12](../12-implementation-migration.md): endpoint materialisation, fair four-baseline reports, streamed failure events, public signature validation and supervised startup.
+3. Implement qualified restriction-aware detection and complete acceptance routing in [03](../03-module-soundness.md). Sufficient proof supports include imports, duplicate emitters and activation conditions. Unsupported axioms stay in the full theory.
+4. Test shared imports, new public classes, source-only exceptions, union-only conflicts, existential class satisfiability, positive hard queries, stale cache and late timeouts. No parser or ontology model duplication.
+5. Deliver capability/proof/replay evidence for G0/G2. A backend name or successful import is not qualification; unknown must remain explicit.

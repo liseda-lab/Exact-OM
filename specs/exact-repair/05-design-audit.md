@@ -1,42 +1,44 @@
-# XR-2 design audit and remaining research risks
+# XR-2.1 design audit and remaining risks
 
-This audit records the active resolution of issues found in the earlier proposal. It supersedes XR-1/XR-P1 assumptions where they differ. Formal definitions are in [00](00-research-contract.md), [04](04-minimal-exact-kernel.md) and [10](10-constrained-generation.md).
+**Revision:** 30 September 2026. The first implementation was reviewed at `b4c1ed0d5e12c45974bdcb4d230fb2ab6c6deb04`. [12](12-implementation-migration.md) owns the code-level checklist; [11](11-benchmark-evidence.md) owns numerical evidence. This document records the methodological decisions.
 
-| Issue | Required resolution | Evidence to collect |
+| Issue | Resolution | What still needs evidence |
 |---|---|---|
-| Mandatory trusted mappings and fixed ontologies | All mappings provisional; explicit locks optional; eligible ontology axiom occurrences become revision objects | Mapping-only and ontology-edit comparisons |
-| Coherence treated as semantic correctness | Separate hard feasibility, desired/unwanted consequences and edit preferences | Independent semantic probes, preserved named-class satisfiability |
-| Full classification blocks initial search | Bounded initial diagnostics; sound partial conflicts can start search | Time to first conflict and first verified repair, pending fraction |
-| Partial reasoner used to accept expressive inputs | Acceptance requires a complete supported verification scope | Capability checks and counterexamples outside the supported fragment |
-| Circuit interpreted as OWL verification | Circuit guarantees only its encoded bounded grammar constraints | Grammar conformance plus independent final OWL verification |
-| Guard/qualification vocabulary hides semantics | Use subclass-expression specialisation, necessary conditions and complex equivalence | Complete emitted bundles in every example |
-| Context emptiness makes weakening vacuous | Check the whole selected subclass expression | Satisfiable E but unsatisfiable S intersection E fixture |
-| Desired disjointness scored with an impossible antecedent test | Require both operands individually satisfiable | Typed teacher tests |
-| Per-state best-completion labels counted repeatedly | Train benefit on complete repairs; compare unary/pairwise models | Redundant/complementary consequence fixture |
-| Proposal and value heads conflated | Per-object generator produces expression assignments; completed-candidate head scores benefit | Node/readout/head ablations |
-| Confidence treated as correctness probability | Treat matcher scores as fallible features unless calibrated | Score-shift and misleading-evidence tests |
-| Generic graph pooling loses the repair target | Target-conditioned readouts over entities, evidence and conflicts | HGT versus R-GCN with matched readouts |
-| Ontology deletion leaves stale inferred facts | Materialise from the revised asserted theory | Removal invalidates classification/explanation caches |
-| Duplicate axiom emitters invalidate cuts | Axiom presence is the OR of all origins, including ontology objects | Duplicate-origin regression |
-| Query failure treated as a monotone clash | Default to complete-assignment cuts for hard positive-query failures | Nonmonotone feasibility fixture |
-| All-off assumed feasible | Initial incumbent is optional and must be verified | Required-entailment and background-conflict fixtures |
-| Timeout treated as infeasibility | Pending alternatives stay in global upper bounds | Unknown high-value assignment fixture |
-| Finite space interpreted as fast completion | Finite complete search is conditional; bounded execution can remain unresolved | Deadline and crash injection |
-| Source-local modules assumed complete | Require the precise preservation condition; modules off by default | Missing cross-signature witness fixture |
-| Generated-only labels mistaken for empirical meaning | Generated pretraining, real-structure adaptation, held-out real evaluation | Grouped splits and independent probes |
-| Many mappings mistaken for many repair cases | Case/pair/ontology are distinct sampling units | Per-pair tables and cluster-level uncertainty |
-| Optimal objective implies confident ontology correction | Higher edit costs encode preferences only; objective certainty is not author intent | Sensitivity, alternatives and provenance in explanations |
+| Grammar-valid circuits presented as globally safe | Encode specific proved contextual conditions; retain complete global verification | Benefit beyond a decoder with the same constraints |
+| Large monolithic circuit and misleading size cap | Small family/template circuits; correct native node lifetime and size telemetry | Coverage and cold/warm performance under matched budgets |
+| Local bans invalidate joint ontology edits | Permanent bans depend only on immutable background; editable supports become conditional global cuts | Counterexample fixtures and cut replay |
+| Low generation coverage hidden by fixed-pool scores | Select/report generated-pool development quality and all failures | New candidate coverage on fresh families and real inputs |
+| Missing-candidate control regenerated the answer | Separate evaluator-only removal from the final generated pool from a named vocabulary/grammar omission; verify the intended omission after every producer | End-to-end omitted-term/bundle identity tests |
+| Different pair construction during training and inference | One evidence-aware selector, including candidate-induced links | Identical frozen pair sets and transfer effects |
+| Risk of misusing infeasible plans as semantic-value negatives | Separate conflict-risk learning; feasible labelled plans supervise meaning | Calibration and reduced calls to matched quality |
+| Three-way conflict labelled as three pair conflicts | Plan-level risk plus proved support hyperedges | Higher-order fixtures with feasible constituent pairs |
+| Independent proposal likelihood called joint reasoning | Explicit proposal context; supervised coordinated samples; frozen final objective | Whether conditional refinement improves coverage |
+| Exact teachers too expensive for new candidates | Exact small universes plus verified sampled plan rankings | Coverage, selection bias and unknown-label rates |
+| User proxy becomes the main LLM story | LLM weak labels for intended-meaning preservation; personal profiles optional | Independent judges, anchors, evidence and abstention |
+| LLM consistency judgement overrides logic | Hard facts/verifier remain authoritative; AI rationale is soft evidence | False-label audit and independent held-out agreement |
+| MaxSAT replaced by RL to reduce verification | Keep MaxSAT, prove reusable cuts and learn shortlist order first | Incremental benefit before considering RL complexity |
+| Only complete-assignment cuts used | Connect sufficient axiom supports, duplicate origins and activation conditions | Cut generalisation without lost feasible plans |
+| Backend chosen from ontology size alone | Qualify full constructs and query support first, then measured cost | Qualified native adapters and unknown-rate/cost tradeoff |
+| Late timeout erases an earlier proved violation | Stream completed hash-bound events; positive acceptance still all-or-nothing | Timeout/crash injection and replay |
+| Greedy and exact arms pay different baselines | Share or consistently charge four diagnostic theories | End-to-end and amortised timings |
+| New public candidate classes omitted from coherence | Validate complete frozen signature on every loading/preparation path | New-class and direct-record regression cases |
+| Worker timeout starts after expensive serialisation | Supervise startup/preparation and cleanup end-to-end | Slow pickle/startup and worker death fixtures |
 
-## Remaining risks to investigate
+## Decisions preserved from XR-2
 
-1. **Identifiability.** Different intentions can be compatible with identical observed evidence. The model must not be evaluated as if missing information were recoverable. Report ambiguity and useful alternatives.
-2. **Expressiveness.** The bounded grammar may omit the required repair. Separate retrieval failure, grammar failure, sampling failure and optimisation failure.
-3. **Teacher bias.** Generated corruption operators and query weights can teach shortcuts. Counterbalance evidence/provenance and hold out structural families.
-4. **Approximation of semantic benefit.** Unary/pairwise factors cannot represent arbitrary higher-order consequences. Measure ranking/regret, rather than asserting faithful value decomposition.
-5. **Circuit size.** Decomposability permits efficient inference after compilation; compilation can still be exponential. Record both construction and inference cost.
-6. **Large-ontology verification.** Bio-ML may remain unresolved under the available complete backend. A fast detector improves diagnosis but cannot eliminate this limitation.
-7. **Optional ontology edits.** They widen the solution space and introduce attribution risk. Freeze eligibility, compare with mapping-only repair, preserve imports and return exact patches.
-8. **User preferences.** Sparse feedback may identify only some cost tradeoffs. Use regularisation and report held-out preference prediction when real feedback exists.
-9. **Practical implementation size.** Reuse the shared OWL representation, reasoner interface, an existing circuit compiler and MaxSAT solver. Small orchestration code does not make the underlying problem polynomial.
+There is no mandatory trusted mapping subset. Revision objects replace complete asserted bundles. Eligibility is explicit for ontology edits. Axiom provenance and all duplicate emitters remain part of patch semantics. Full active-expression satisfiability prevents vacuous “repairs”. Typed semantic probes treat disjointness differently from existential/subsumption consequences. Unknown alternatives remain in bounds; there is no assumed all-delete feasible fallback. Coherence, objective optimality and semantic correctness remain separate claims.
 
-These are research questions and engineering constraints, not reported experimental findings.
+## Unresolved research risks
+
+1. **Intent is not identifiable from logic alone.** Two coherent repairs can express different plausible meanings. Evidence-poor cases need abstention and alternatives, not an invented true label. AI labels remain a proxy without independent expert validation.
+2. **Bounded coverage.** Retrieval, grammar, compilation and sampling can each miss the useful action. More candidates may also make selection and verification harder. Expose each source of loss.
+3. **Compilation cost.** Efficient operations on a compiled circuit do not imply cheap compilation. Semantic constraints may simplify or enlarge it. No theoretical guarantee makes circuits universally preferable to decoding.
+4. **Approximate utility.** Sparse unary/pair factors cannot capture arbitrary plan-level meaning. A flexible risk head addresses feasibility ordering, not this representation limit. Diagnose higher-order regret before adding more solver factors.
+5. **Selection bias.** On-policy sampled repairs overrepresent existing proposals and easy-to-verify plans. Retain diversity strata, counterfactuals and unknown masks; evaluate on a separately frozen distribution.
+6. **Reasoning limits.** Supported fast fragments may leave expressive biomedical cases unresolved. Detector completeness, accepted proof scope and final policy cannot be inferred from a backend name.
+7. **Ontology-edit risk.** Increased cost encodes caution, not epistemic certainty. Return exact occurrence patches, provenance and alternatives; prevent a model from treating ontology deletion as a cheap shortcut.
+8. **Semantic scale and cost confounding.** Unanchored pair preferences identify rankings only, while MaxSAT needs a scale relative to explicit costs. Fix calibration anchors and separate cost from meaning labels.
+9. **Small real sample.** Shared ontologies and few independent pairs limit strong transfer claims. Model seeds and thousands of mappings do not create independent domains.
+10. **Implementation size.** Prefer existing shared-core APIs, PySDD and PySAT; reuse the qualified restriction-aware detector if its code/proof contract is available. Avoid a new solver, generic agent framework, bespoke OWL parser or RL environment in this revision.
+
+An unsuccessful comparison is a legitimate outcome. The circuit, risk or LLM component is retained as the default only if its declared experiment supports the relevant benefit without weakening the logical contract.

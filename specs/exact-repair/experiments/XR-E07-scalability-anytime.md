@@ -1,21 +1,21 @@
-# XR-E07 — Scale, bounds and bounded execution
+# XR-E07 — Scale, compilation and bounded execution
 
-Research question: RQ5.
+**Target:** XR-2.1, 30 September 2026. **Question:** RQ3, RQ5. Requirements for new runs; archived XR-2 results remain separate.
 
 ## Data
 
-Generated size sweeps and held-out Conference/Bio-ML, including expressive large theories.
+Generated sweeps independently varying support incidence, mapping count, grammar/menu bounds and candidate pool size; Conference and large expressive biomedical inputs.
 
-## Comparison
+## Comparisons
 
-Vary graph/retrieval size, grammar depth, circuit size, pool cap, pair factors, reasoner strategy and total deadlines. Compare measured complete scope, not backend names alone.
+Declared expansion/budget schedules, graph limits, small circuit families, cold/warm compiler reuse, sparse pair density, detector/complete routes and risk shortlist sizes. Keep stopping objective and semantic quality target comparable.
 
 ## Measurements
 
-Report time to first detection, first verified incumbent, utility versus time, valid gap, pending/unknown counts, component time/memory, compilation failures and termination status.
+Time to detection/first verified/matched quality/proved optimum; total pipeline time and memory; all bound components; pending/deferred counts; stage interruptions and cleanup; verification query/setup costs.
 
-## Interpretation and acceptance
+## Acceptance and interpretation
 
-Enforce external deadlines on blocking calls and cleanup. A bounded return can be unresolved. No complete-success or polynomial-time claim follows from a finite candidate space.
+All stages, including input transfer and process startup, count toward the advertised deadline. Finite search does not promise a successful result by a deadline. A compile failure retains elementary controls but lowers generation coverage. Complete-backend UNKNOWN remains visible; no unbudgeted final verifier or silent unsupported-axiom removal.
 
-Shared controls, split rules, resources and status reporting are defined in [02](../02-experimental-protocol.md).
+Shared splits, resources, failure accounting and statistics follow [02](../02-experimental-protocol.md). Dependency gates are in [08](../08-experiment-matrix-and-handoff.md); code changes and tests are in [12](../12-implementation-migration.md). Resolve every numerical setting in a new [run manifest](../protocol/README.md) before execution.

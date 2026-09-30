@@ -1,21 +1,21 @@
-# XR-E03 — Global selection and interactions
+# XR-E03 — Action interactions and verification order
 
-Research question: RQ1/RQ2/RQ5.
+**Target:** XR-2.1, 30 September 2026. **Question:** RQ2, RQ5. Requirements for new runs; archived XR-2 results remain separate.
 
 ## Data
 
-Small fully enumerated cases plus hub/overlap and complementary/redundant consequence families.
+Fully enumerated small plans plus support-overlap, hub, cyclic-incidence and candidate-induced conflict families. Include three-way contradictions with every pair feasible and higher-order semantic effects.
 
-## Comparison
+## Comparisons
 
-Compare greedy verified selection, exact unary MaxSAT and exact bounded-pairwise MaxSAT. On small cases use exhaustive enumeration as truth. Give controls the same pool and costs.
+Greedy, exact unary and sparse-pair MaxSAT on common pools. Add quartet supervision to whole-plan value/ranking. Cross no-risk versus plan-risk shortlist scheduling with full-assignment versus proved support cuts. The primary ordering ablation uses the same shortlist size/window/construction budget; shortlist size one is a separately named serial-master baseline.
 
 ## Measurements
 
-Measure decoded teacher utility/regret, feasibility, solver time, cut counts, lower/upper bounds, gap and pending assignments.
+Teacher/independent semantic utility and cost separately; risk calibration on a representative decided validation set; first verified and matched-quality time/queries; solver time; cut types; all untested/unknown bounds and certified optimum time.
 
-## Interpretation and acceptance
+## Acceptance and interpretation
 
-Validate pair encoding and quantisation. Distinguish optimality of a learned surrogate from optimality of teacher semantics. Never report zero gap after dropping a higher-scored unknown assignment.
+Risk never changes the frozen semantic objective or produces clauses. A three-way negative is not three pair negatives. Report gains from cuts separately from gains from learning. A lower-value early incumbent may require more work to prove optimality; preserve every deferred high-value plan in the bound.
 
-Shared controls, split rules, resources and status reporting are defined in [02](../02-experimental-protocol.md).
+Shared splits, resources, failure accounting and statistics follow [02](../02-experimental-protocol.md). Dependency gates are in [08](../08-experiment-matrix-and-handoff.md); code changes and tests are in [12](../12-implementation-migration.md). Resolve every numerical setting in a new [run manifest](../protocol/README.md) before execution.

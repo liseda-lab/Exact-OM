@@ -1,6 +1,6 @@
-# XR-2 benchmark evidence and statistical scope
+# XR-2.1 benchmark and preliminary experiment evidence
 
-These are public dataset/result counts used for planning. They are not results produced by Exact-Repair and do not establish a training set of preferred repairs. Snapshot and hash every downloaded artefact in a run; do not mix annual releases.
+The first sections preserve the previously collected public dataset/result counts used for planning. They are not Exact-Repair results or preferred-repair labels. The final sections separately record the generated-data pilot and the supplied restriction-aware repair report; none is merged into a single benchmark result. Snapshot and hash every downloaded artefact in a run; do not mix annual releases.
 
 ## Conference 2025
 
@@ -88,3 +88,44 @@ Sources: [current task description](https://bio-ml.oaei-ml.org/tasks/), [immutab
 - Controlled corruptions on real structure are training data with simulated intent. Untouched held-out matcher outputs are the real repair evaluation.
 - Reference alignments offer correspondence supervision. Absence from a reference is not a negative, and reference correspondences can themselves cause incoherence.
 - Pre-register explanation-count definitions, mapping incidence, baseline unsatisfiability, new unsatisfiability, verification coverage and failure status. Do not infer conflict frequency from syntax or unsatisfiable-class totals.
+
+
+## First Exact-Repair pilot: archived evidence
+
+Source: `exact-repair-first-tests-20260929.tar.gz` in the repository checkout (large user-supplied archive, not added by this specification revision). The export manifest names `tables/results.json` and the detailed CSV tables. Export time: 29 September 2026 at 22:44:12 UTC; result cutoff: 28 September 2026 at 12:34:33 UTC. The campaign was paused. No new experimental jobs were run for this review.
+
+For audit binding, SHA-256 of the inspected export manifest is `5e04b8eda05c6680e1a22c4852b844e8cdf44197496a9d86e9daf4240fbf8514`; inspected `tables/results.json` is `41a4f17a0537bdd0d54d78f4cafccb39934a23e86a3e2f5cdf85538bda062c7d`. These identify selected exported evidence, not a complete independently reproduced training run. Current code inspection is separately bound to revision `b4c1ed0d5e12c45974bdcb4d230fb2ab6c6deb04`.
+
+| Quantity | Observed scope |
+|---|---|
+| Generated corpus | 576 cases, 192 structural parents, 16 families; executed grouping 360 train / 90 development / 126 test |
+| Test composition | 84 corrupted cases and 42 coherent controls; siblings grouped by parent |
+| Completed learned models | Four of eighteen planned: HGT/R-GCN, unary/pairwise, seed 13; later training incomplete |
+| Direct development generation | 11 of 90 cases completed for each selected checkpoint; 66 hit the allocated-SDD-node limit and 13 the compile deadline |
+| Successful generation coverage | Same eleven cases, three families and five parents; this is narrow structural coverage |
+| Real-data evidence | No completed Conference, Bio-ML or production-matcher evaluation and no real-user feedback in this export |
+
+On the same 63 test cases from 21 parents and seed 13, the completed fixed-pool shard reports:
+
+| Arm | Mean symbolic semantic benefit |
+|---|---:|
+| Uniform unary | 1.06138 |
+| Historical symbolic unary | 1.05608 |
+| HGT unary | 1.19048 |
+| HGT pairwise | 1.23810 |
+
+These benefits exclude edit cost. They are not percentages, accuracy, an exhaustive semantic optimum or evidence of successful generation. The historical symbolic comparator rewards retained original axioms; it is not a rich symbolic semantic evaluator with the revised detector/cuts. The apparent pairwise gain motivates controlled experiments, not a concluded causal advantage.
+
+The 2,016 preference evaluations are 126 cases × four models × four cost settings. The learned setting changed four HGT-pairwise, fourteen HGT-unary, five R-GCN-pairwise and zero R-GCN-unary outputs. Doubling the ontology-edit cost changed zero of 504 outputs; doubling the mapping cost changed one of 504. These are simulated-cost sensitivities, not user satisfaction or learned domain semantics. The revised primary LLM study addresses retained meaning instead.
+
+The generated corpus varies some depths, branches and overlap, but this does not establish coverage of real high-degree supports or circular conflict incidence. Measure support cardinality and incidence explicitly. The missing-candidate control also needs the correction in MIG-02 before its effect is interpreted. A completed scale-run process is not evidence that every logical check completed.
+
+Consequences for XR-2.1: make candidate generation a primary development criterion; repair compiler lifetime/resource accounting; train with verified samples containing genuinely generated candidates; use a stronger symbolic comparator; enforce missing-candidate interventions; and obtain new held-out evidence. Historical pilot test cases may be retained as regression cases, not reused as untouched confirmatory test data after guiding the redesign.
+
+## Supplied restriction-aware LogMap report
+
+The supplied `repair_report_draft_25_sep.pdf` is separate external draft evidence, not an Exact-Repair experiment. SHA-256: `93d995547dbd819d21676debaedd32cadb87f4d3c153a373a6f860339f746358`. It was supplied from the user's Downloads directory and is not redistributed in this specification commit.
+
+The draft reports 22 witness pairs, nineteen requiring restriction-aware treatment, with its v5 method reaching the reported minimum loss on those nineteen. It also reports a Conference sweep over sixteen ontologies and 240 ordered pairs; the shared consistent/classified cohort has 229 pairs. Reported residual unsatisfiable-class/incoherent-pair totals are 58/3 for stock conservative, 320/13 for stock liberal, 25/9 for v4 and 3/3 for v5. These are the report's results, not independently reproduced measurements here; ordered reversals and shared ontologies are dependent observations.
+
+This motivates reuse or adaptation of a restriction-aware sound detector with sufficient supports. It does not establish complete OWL verification, eliminate the residual cases or qualify a new adapter automatically. Implementation must inspect the actual code, rules, normalisation and unsupported constructs, then pass [03](03-module-soundness.md). A sufficient proof support is useful even without a minimal justification; an unexplained detection can only support the conclusion its qualified backend actually establishes.

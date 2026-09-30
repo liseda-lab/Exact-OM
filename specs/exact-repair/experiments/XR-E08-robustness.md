@@ -1,21 +1,21 @@
-# XR-E08 — Evidence and infrastructure robustness
+# XR-E08 — Evidence, omission and infrastructure robustness
 
-Research question: RQ2/RQ5.
+**Target:** XR-2.1, 30 September 2026. **Question:** RQ2, RQ5. Requirements for new runs; archived XR-2 results remain separate.
 
 ## Data
 
-Grouped generated perturbations and permissible real evidence perturbations.
+Grouped evidence perturbations, dedicated final-candidate removal and vocabulary/grammar omission controls, import changes, candidate vocabulary expansion and backend/worker failures.
 
-## Comparison
+## Comparisons
 
-Vary score noise/calibration, missing labels/descriptions, misleading explanations, provenance quality, absent useful terms, import duplication and changed import content. Inject solver/verifier/circuit failure.
+Score noise/missingness, misleading text/explanations, provenance uncertainty, pair-selector budget truncation and selected-term absence. Compare cached/fresh execution under changed semantic dependencies.
 
 ## Measurements
 
-Measure paired degradation, uncertainty/unknown coverage, semantic damage, calibration where labels support it, cache invalidation and bound correctness.
+Paired quality/coverage degradation; retrieval versus grammar versus sampling versus value error; final candidate identities after every producer; masked feature states; support/cache invalidation; valid bounds and retained proof events.
 
-## Interpretation and acceptance
+## Acceptance and interpretation
 
-Keep soft evidence out of logical assertions. Cached proofs must not survive changed dependencies. Failures cannot turn into safe labels or permanent conflict cuts.
+Candidate-removal identities belong to the evaluator and do not become ordinary generator features. A separate missing-symbol intervention changes the declared menu. Assert final exclusion even when deterministic generation or fallback runs. A stale cache or unknown delivery cannot produce a new trusted logical/semantic label.
 
-Shared controls, split rules, resources and status reporting are defined in [02](../02-experimental-protocol.md).
+Shared splits, resources, failure accounting and statistics follow [02](../02-experimental-protocol.md). Dependency gates are in [08](../08-experiment-matrix-and-handoff.md); code changes and tests are in [12](../12-implementation-migration.md). Resolve every numerical setting in a new [run manifest](../protocol/README.md) before execution.

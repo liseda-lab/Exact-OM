@@ -77,9 +77,11 @@ from required work. Follow its own B0–B5 backend gates, then F1 full implement
 specialized frontend agent; the historical overhaul waves below are not its execution plan.
 See [the agent handoff](explanation-framework/AGENT-HANDOFF.md). All new runtime gates are pending.
 
-**Separate suite**: [`specs/exact-repair/`](exact-repair/) — proposed Exact-Repair post-processor
-(XR-1); it has independent gates and promotion rules, and no work package in this suite depends on
-it.
+**Separate suite**: [Exact-Repair](exact-repair/README.md) — XR-2.1 revision requirements
+(30 September 2026) following the first XR-2 implementation and generated-data pilot. The
+[repair migration checklist](exact-repair/12-implementation-migration.md) separates current code
+from required changes. It has independent gates; no matching work package in this suite depends
+on it. Archived pilot settings remain unchanged.
 
 ```mermaid
 graph LR
