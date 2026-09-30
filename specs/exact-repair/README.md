@@ -1,8 +1,8 @@
 # Exact-Repair specification suite
 
-**Current target:** XR-2.1, 30 September 2026. **Implementation reviewed:** `b4c1ed0d5e12c45974bdcb4d230fb2ab6c6deb04`. **Status:** revision requirements, not a claim that the revised system is implemented or evaluated.
+**Current target:** XR-2.1, 30 September 2026. **Latest implementation reviewed:** `6f6a3e0038dbd5898126a34b28dee1faa06ef2f3`. **Status:** implementation present; corrective requirements remain open in [14 Implementation review](14-implementation-review.md). Experimental benefit and full conformance are not established by this status.
 
-The repository contains a first XR-2 implementation and generated-data pilot results. This revision defines the changes needed after reviewing that implementation and pilot. It supersedes conflicting XR-2 design prose; it does not relabel archived experiments, rewrite their configuration, or assert that the new method outperforms the old one. [12](12-implementation-migration.md) connects each required change to the implementation and a regression test. [11](11-benchmark-evidence.md) separates the preliminary experiment evidence from published benchmark statistics.
+The repository contains the original XR-2 implementation and generated-data pilot results, followed by an XR-2.1 implementation. The methodology contracts supersede conflicting XR-2 design prose; they do not relabel archived experiments, rewrite their configuration, or assert that the new method outperforms the old one. [12](12-implementation-migration.md) records the original migration requirements against `b4c1ed0`; [14](14-implementation-review.md) reviews the subsequent implementation and defines the outstanding fixes, regression tests and artifact compatibility rules. [11](11-benchmark-evidence.md) separates preliminary experiment evidence from published benchmark statistics.
 
 ## Scope and decisions
 
@@ -29,7 +29,8 @@ The changes are: reliable small circuits with proof-supported ontology-context c
 | [08 Studies and handoff](08-experiment-matrix-and-handoff.md) | Comparisons, dependency gates and run preparation |
 | [11 Evidence](11-benchmark-evidence.md) | Pilot and benchmark evidence, denominators and limits |
 | [05 Design audit](05-design-audit.md) | Decisions and remaining research risks |
-| [12 Implementation migration](12-implementation-migration.md) | Audited code gaps and executable acceptance requirements |
+| [12 Implementation migration](12-implementation-migration.md) | Original XR-2 to XR-2.1 migration and acceptance requirements |
+| [14 Implementation review](14-implementation-review.md) | Review of the XR-2.1 implementation, corrective requirements and regression gates |
 
 [Work packages](implementation/XR-WP1-formal-kernel.md) and [study sheets](experiments/README.md) are implementation handoffs to these contracts. Where they disagree, the owning contract above governs; record and fix the discrepancy before running the affected study. All new experimental choices must be frozen in a new run manifest as described in [protocol/README.md](protocol/README.md).
 
@@ -48,7 +49,7 @@ The changes are: reliable small circuits with proof-supported ontology-context c
 
 ## Versions and preserved evidence
 
-The current runtime and archived results use version-2 records. XR-2.1 requires new record fields and changed feature/label identities; the migration in [01](01-architecture-and-contracts.md) uses an explicit version-3 boundary. It is not implemented by this specification update.
+Archived XR-2 results use version-2 records. The reviewed XR-2.1 implementation adds version-3 records and explicit legacy paths following [01](01-architecture-and-contracts.md). The remaining corrections must preserve historical evidence and update affected semantic identities as specified in [14](14-implementation-review.md). Earlier documents retain their original audited revision in their headers; use document 14 for the current implementation findings.
 
 `protocol/pilot.json`, `smoke.json`, `schema.json` and `batches.json` are preserved XR-2 campaign artefacts. Their numerical settings are historical exploratory values, not an XR-2.1 configuration. Likewise, the existing supervisor instructions describe an operational workflow; they do not authorise jobs, notifications or external model calls merely because an agent reads them.
 
@@ -56,4 +57,4 @@ The old labels “guard” and “qualification” are historical aliases. Use *
 
 ## Validation scope
 
-The finite model and static legacy-protocol checks in [reference](reference/README.md) remain useful narrow checks. Passing them does not validate the new circuit implementation, risk model, detector or live OWL backends. XR-2.1 completion requires the concrete gates in [12](12-implementation-migration.md), with actual evidence. This commit changes specifications only.
+The finite model and static legacy-protocol checks in [reference](reference/README.md) remain useful narrow checks. The implementation also has a source-bound [Linux validation record](implementation/xr21-validation.json); document [14](14-implementation-review.md) distinguishes that recorded evidence from the subsequent review, local checks and unresolved defects. XR-2.1 completion requires the applicable gates in [12](12-implementation-migration.md) and the new regressions in [14](14-implementation-review.md), with actual evidence. These review-specification changes do not implement the fixes or launch experiments.

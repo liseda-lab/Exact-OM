@@ -2,6 +2,8 @@
 
 **Reviewed revision:** `b4c1ed0d5e12c45974bdcb4d230fb2ab6c6deb04`, 29 September 2026. **Specification date:** 30 September 2026. This is a work list, not a record of completed fixes. Line references below describe that reviewed revision and may move during implementation; function/module identity is authoritative.
 
+**Post-implementation follow-up:** an XR-2.1 implementation now exists at `6f6a3e0038dbd5898126a34b28dee1faa06ef2f3`. [14 Implementation review](14-implementation-review.md) records the remaining defects and gaps against that implementation, with required fixes, regression tests and compatibility rules. The findings below remain the historical migration baseline; do not assume every item is still absent or already closed.
+
 ## Preserve what already works
 
 The implementation already contains complete replacement bundles, a shared-core OWL representation, HGT/R-GCN model controls, a conditioned SDD generator, unary and pairwise value heads, exact PySAT selection and hash-bound verification reports. Unknown plans remain pending rather than becoming false logical exclusions. Retain these foundations. No false-optimality defect was established for the current frozen-pool contract by the review; the revision extends coverage, cuts, training and operational reliability without discarding that contract.
