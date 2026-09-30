@@ -1,0 +1,35 @@
+........................................................................ [ 14%]
+........................................................................ [ 29%]
+........................................................................ [ 44%]
+........................................................................ [ 59%]
+........................................................................ [ 74%]
+........................................................................ [ 89%]
+...................................................                      [100%]
+=============================== warnings summary ===============================
+tests/repair_api_test.py: 1 warning
+tests/repair_checkpointing_test.py: 2 warnings
+tests/repair_cli_resume_v3_test.py: 24 warnings
+tests/repair_compilation_test.py: 1 warning
+tests/repair_generation_v3_test.py: 116 warnings
+tests/repair_kernel_test.py: 4 warnings
+tests/repair_learning_test.py: 15 warnings
+tests/repair_learning_v3_test.py: 13 warnings
+tests/repair_pipeline_completion_test.py: 5 warnings
+tests/repair_review2_architecture_test.py: 24 warnings
+tests/repair_review2_generation_test.py: 4 warnings
+tests/repair_review2_verification_test.py: 37 warnings
+tests/repair_review_exception_resume_test.py: 32 warnings
+tests/repair_review_generation_test.py: 18 warnings
+tests/repair_review_learning_test.py: 8 warnings
+tests/repair_review_transport_test.py: 24 warnings
+tests/repair_semantic_fidelity_test.py: 1 warning
+tests/repair_supervision_test.py: 3 warnings
+tests/repair_training_completion_test.py: 10 warnings
+tests/repair_v3_kernel_test.py: 13 warnings
+tests/repair_v3_resources_test.py: 2 warnings
+  /home/pgcotovio/Exact-OM/.worktrees/xr21-review2-corrections-20260930/exact/repair/workers.py:485: DeprecationWarning: This process (pid=3206020) is multi-threaded, use of fork() may lead to deadlocks in the child.
+    pid = os.fork()
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+------------ generated xml file: /tmp/xr21-review2-pytest-final.xml ------------
+483 passed, 357 warnings in 473.70s (0:07:53)

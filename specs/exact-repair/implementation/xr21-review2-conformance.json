@@ -1,0 +1,249 @@
+{
+  "schema": "exact-repair/second-review-conformance/v1",
+  "requirements_source": "User corrective review: eight issues, 2026-09-30",
+  "parent_specification": "specs/exact-repair/14-implementation-review.md",
+  "reviewed_commit": "f4d2f8aa7696a9f6bf9fb53b227fd45882a1bfbc",
+  "implementation_revision": "exact-repair/review-corrections/v2",
+  "implementation_commit": "9b725108932412f28b553d180ef989a865ffd5be",
+  "protocol": "specs/exact-repair/protocol/xr21-review2-conformance.json",
+  "protocol_schema": "specs/exact-repair/protocol/schema-v3.3.json",
+  "validation": "specs/exact-repair/implementation/xr21-review2-validation.json",
+  "requirements": [
+    {
+      "id": "R2-01",
+      "title": "Protocol-authoritative architecture",
+      "requirement": "Derive model construction and training-data preparation from the declared protocol; reject conflicting CLI or warm-start architecture before preparation; record the actual trained constructor configuration.",
+      "implementation": [
+        "tools/repair/train.py",
+        "exact/repair/model.py"
+      ],
+      "acceptance_tests": [
+        "tests/repair_review2_architecture_test.py::test_protocol_architecture_reaches_entrypoint_model_preparation_and_warm_start",
+        "tests/repair_review2_architecture_test.py::test_conflicting_cli_architecture_is_rejected_before_preparation",
+        "tests/repair_review2_architecture_test.py::test_conflicting_warm_architecture_is_rejected_before_preparation",
+        "tests/repair_review2_architecture_test.py::test_unsupported_unary_architecture_cannot_be_silently_enabled"
+      ],
+      "behavior": "V3 constructor settings come from the protocol. Both --pairwise/--no-pairwise and encoder conflicts reject. Warm starts compare every constructor field, model schema and support readout revision. Unsupported disabled unary architecture rejects explicitly.",
+      "reuse_policy": "A checkpoint with an incompatible or missing constructor declaration cannot silently warm-start; amend the protocol explicitly or use compatible weights. Historical v2 behavior remains under its original contract.",
+      "qualified_test_cases": [
+        "tests.repair_review2_architecture_test::test_conflicting_cli_architecture_is_rejected_before_preparation[False-override1]",
+        "tests.repair_review2_architecture_test::test_conflicting_cli_architecture_is_rejected_before_preparation[True-override0]",
+        "tests.repair_review2_architecture_test::test_conflicting_cli_architecture_is_rejected_before_preparation[True-override2]",
+        "tests.repair_review2_architecture_test::test_conflicting_warm_architecture_is_rejected_before_preparation[dropout-0.5]",
+        "tests.repair_review2_architecture_test::test_conflicting_warm_architecture_is_rejected_before_preparation[encoder-none]",
+        "tests.repair_review2_architecture_test::test_conflicting_warm_architecture_is_rejected_before_preparation[feature_dim-64]",
+        "tests.repair_review2_architecture_test::test_conflicting_warm_architecture_is_rejected_before_preparation[heads-4]",
+        "tests.repair_review2_architecture_test::test_conflicting_warm_architecture_is_rejected_before_preparation[hidden_dim-16]",
+        "tests.repair_review2_architecture_test::test_conflicting_warm_architecture_is_rejected_before_preparation[layers-2]",
+        "tests.repair_review2_architecture_test::test_conflicting_warm_architecture_is_rejected_before_preparation[pair_factor_bound-2]",
+        "tests.repair_review2_architecture_test::test_conflicting_warm_architecture_is_rejected_before_preparation[pairwise-False]",
+        "tests.repair_review2_architecture_test::test_conflicting_warm_architecture_is_rejected_before_preparation[plan_risk-True]",
+        "tests.repair_review2_architecture_test::test_conflicting_warm_architecture_is_rejected_before_preparation[revision-v2]",
+        "tests.repair_review2_architecture_test::test_conflicting_warm_architecture_is_rejected_before_preparation[support_enabled-True]",
+        "tests.repair_review2_architecture_test::test_conflicting_warm_architecture_is_rejected_before_preparation[support_readout_identity-None]",
+        "tests.repair_review2_architecture_test::test_protocol_architecture_reaches_entrypoint_model_preparation_and_warm_start[False]",
+        "tests.repair_review2_architecture_test::test_protocol_architecture_reaches_entrypoint_model_preparation_and_warm_start[True]",
+        "tests.repair_review2_architecture_test::test_unsupported_unary_architecture_cannot_be_silently_enabled"
+      ]
+    },
+    {
+      "id": "R2-02",
+      "title": "Obligation-conditioned optional support supervision",
+      "requirement": "Provide obligation type and expected truth to the support readout so required and prohibited versions of the same entailment can carry opposite violation labels.",
+      "implementation": [
+        "exact/repair/model.py",
+        "exact/repair/learning.py"
+      ],
+      "acceptance_tests": [
+        "tests/repair_review2_architecture_test.py::test_required_and_prohibited_supports_expose_distinct_obligation_inputs"
+      ],
+      "behavior": "The readout receives a fixed obligation-kind vector and expected-truth bit. Native HermiT target extraction for asserted A subclass B produces required=false/prohibited=true violation labels and different head inputs. Disabling support bypasses the head and loss.",
+      "reuse_policy": "Target records retain their original meaning; support head architecture is versioned obligation-conditioned-violation/v2. Old head weights are incompatible and not silently retained or dropped.",
+      "qualified_test_cases": [
+        "tests.repair_review2_architecture_test::test_required_and_prohibited_supports_expose_distinct_obligation_inputs"
+      ]
+    },
+    {
+      "id": "R2-03",
+      "title": "Consistent LLM aggregate supervision",
+      "requirement": "Handle tied votes explicitly and prevent majority preference from disagreeing with median numeric scores before supervision admission.",
+      "implementation": [
+        "exact/repair/semantic_fidelity.py"
+      ],
+      "acceptance_tests": [
+        "tests/repair_review2_labels_test.py::test_review2_aggregate_votes_and_numeric_labels_agree",
+        "tests/repair_review_semantic_test.py"
+      ],
+      "behavior": "No unique vote winner means abstention. A unique A/B/tie vote winner must agree with numeric medians under the frozen 1e-6 tie tolerance. Contradictions abstain with no numeric training targets. Tests include the exact three-observation majority-A/median-B example, equal votes, consistent eligible labels, unique observations and provenance.",
+      "reuse_policy": "Aggregation and fidelity/mixed training identities advance to v3.3. Original paid observations remain historical and can be reaggregated under their original provenance; old aggregate labels cannot masquerade as the new revision.",
+      "qualified_test_cases": [
+        "tests.repair_review2_labels_test::test_review2_aggregate_votes_and_numeric_labels_agree[observations0-abstain-scores0-tied_vote_counts]",
+        "tests.repair_review2_labels_test::test_review2_aggregate_votes_and_numeric_labels_agree[observations1-abstain-scores1-preference_numeric_conflict]",
+        "tests.repair_review2_labels_test::test_review2_aggregate_votes_and_numeric_labels_agree[observations2-A-scores2-None]",
+        "tests.repair_review2_labels_test::test_review2_aggregate_votes_and_numeric_labels_agree[observations3-tie-scores3-None]",
+        "tests.repair_review2_labels_test::test_review2_aggregate_votes_and_numeric_labels_agree[observations4-abstain-scores4-preference_numeric_conflict]",
+        "tests.repair_review_semantic_test::test_correction_is_a_chargeable_response_but_only_one_scheduled_vote",
+        "tests.repair_review_semantic_test::test_distinct_scheduled_identical_judgments_keep_both_provenances",
+        "tests.repair_review_semantic_test::test_frozen_schedule_and_receipts_reject_forged_or_unscheduled_votes",
+        "tests.repair_review_semantic_test::test_replayed_and_reparsed_response_never_supplies_missing_quorum",
+        "tests.repair_review_semantic_test::test_swaps_dissent_and_abstention_obey_frozen_denominator",
+        "tests.repair_review_semantic_test::test_training_and_evaluation_reference_validated_aggregate_and_unique_observations",
+        "tests.repair_review_semantic_test::test_training_deduplicates_identical_aggregates_and_rejects_overlapping_receipts"
+      ]
+    },
+    {
+      "id": "R2-04",
+      "title": "Complete collector supervision identity",
+      "requirement": "Bind all label dependencies inside the reusable collector API and reject incompatible resume before loading or reusing labels.",
+      "implementation": [
+        "exact/repair/learning.py",
+        "tools/repair/train.py"
+      ],
+      "acceptance_tests": [
+        "tests/repair_review2_labels_test.py::test_review2_collector_rejects_changed_label_dependencies_before_reuse",
+        "tests/repair_review2_labels_test.py::test_review2_collector_binds_case_and_round_provenance",
+        "tests/repair_review2_labels_test.py::test_review2_collector_valid_resume_preserves_source_identity_and_costs",
+        "tests/repair_review2_labels_test.py::test_review2_collector_requires_complete_label_identity",
+        "tests/repair_review2_labels_test.py::test_review2_collector_rejects_legacy_state_without_provenance",
+        "tests/repair_review2_labels_test.py::test_review2_collector_binds_candidate_map_and_checks_saved_descriptor"
+      ],
+      "behavior": "Collection state v3.2 binds input, patch, policy, query, inventory, backend, profile, semantic_target and every additional supplied hash, plus case/parent/split/model/round, candidate counts/IDs and sampler. Valid JSON resume retains original labels, attempts, costs, elapsed work and provenance.",
+      "reuse_policy": "Legacy partial collection state lacking complete dependency evidence rejects. Qualified raw observations may be separately reused only with matching dependencies; neither saved costs nor parent splits are reset.",
+      "qualified_test_cases": [
+        "tests.repair_review2_labels_test::test_review2_collector_binds_candidate_map_and_checks_saved_descriptor",
+        "tests.repair_review2_labels_test::test_review2_collector_binds_case_and_round_provenance[case_id]",
+        "tests.repair_review2_labels_test::test_review2_collector_binds_case_and_round_provenance[model_hash]",
+        "tests.repair_review2_labels_test::test_review2_collector_binds_case_and_round_provenance[parent_group_id]",
+        "tests.repair_review2_labels_test::test_review2_collector_binds_case_and_round_provenance[round_id]",
+        "tests.repair_review2_labels_test::test_review2_collector_rejects_changed_label_dependencies_before_reuse[annotation_aggregate]",
+        "tests.repair_review2_labels_test::test_review2_collector_rejects_changed_label_dependencies_before_reuse[backend]",
+        "tests.repair_review2_labels_test::test_review2_collector_rejects_changed_label_dependencies_before_reuse[input]",
+        "tests.repair_review2_labels_test::test_review2_collector_rejects_changed_label_dependencies_before_reuse[inventory]",
+        "tests.repair_review2_labels_test::test_review2_collector_rejects_changed_label_dependencies_before_reuse[patch]",
+        "tests.repair_review2_labels_test::test_review2_collector_rejects_changed_label_dependencies_before_reuse[policy]",
+        "tests.repair_review2_labels_test::test_review2_collector_rejects_changed_label_dependencies_before_reuse[profile]",
+        "tests.repair_review2_labels_test::test_review2_collector_rejects_changed_label_dependencies_before_reuse[query]",
+        "tests.repair_review2_labels_test::test_review2_collector_rejects_changed_label_dependencies_before_reuse[semantic_target]",
+        "tests.repair_review2_labels_test::test_review2_collector_rejects_legacy_state_without_provenance",
+        "tests.repair_review2_labels_test::test_review2_collector_requires_complete_label_identity[backend]",
+        "tests.repair_review2_labels_test::test_review2_collector_requires_complete_label_identity[policy]",
+        "tests.repair_review2_labels_test::test_review2_collector_requires_complete_label_identity[profile]",
+        "tests.repair_review2_labels_test::test_review2_collector_requires_complete_label_identity[semantic_target]",
+        "tests.repair_review2_labels_test::test_review2_collector_valid_resume_preserves_source_identity_and_costs"
+      ]
+    },
+    {
+      "id": "R2-05",
+      "title": "Exact compact report composition",
+      "requirement": "Compose qualified source-exception obligations consistently in the kernel and baseline controls, preserving exact coverage and proof identity.",
+      "implementation": [
+        "exact/repair/records.py",
+        "exact/repair/kernel.py",
+        "exact/repair/study.py"
+      ],
+      "acceptance_tests": [
+        "tests/repair_review2_verification_test.py::test_review2_05_kernel_preserves_compact_baseline_and_exception_proof",
+        "tests/repair_review2_verification_test.py::test_review2_05_greedy_reuses_compact_baseline",
+        "tests/repair_review2_verification_test.py::test_review2_05_missing_compact_coverage_does_not_become_complete",
+        "tests/repair_review2_verification_test.py::test_review2_05_composed_report_reuse_is_idempotent",
+        "tests/repair_review2_verification_test.py::test_review2_05_greedy_rejects_invalid_exception_proof_as_pending"
+      ],
+      "behavior": "One composition function verifies base coverage, updates union counts/hash, retains qualified source-proof and check hashes, and keeps inline compact evidence bounded. Matching repeated composition is idempotent. A native fixture with more than 128 obligations plus a proved source exception authorizes equally in raw/compact forms without another candidate check. Greedy proof validation remains within its deadline.",
+      "reuse_policy": "Incomplete coverage is never repaired into feasibility by adding exceptions. Existing independently qualified source proofs remain reusable. Mismatched proof composition is unknown.",
+      "qualified_test_cases": [
+        "tests.repair_review2_verification_test::test_review2_05_composed_report_reuse_is_idempotent[False]",
+        "tests.repair_review2_verification_test::test_review2_05_composed_report_reuse_is_idempotent[True]",
+        "tests.repair_review2_verification_test::test_review2_05_greedy_rejects_invalid_exception_proof_as_pending",
+        "tests.repair_review2_verification_test::test_review2_05_greedy_reuses_compact_baseline",
+        "tests.repair_review2_verification_test::test_review2_05_kernel_preserves_compact_baseline_and_exception_proof",
+        "tests.repair_review2_verification_test::test_review2_05_missing_compact_coverage_does_not_become_complete"
+      ]
+    },
+    {
+      "id": "R2-06",
+      "title": "Independent negative journal recovery",
+      "requirement": "Keep a qualified committed conflict when later completion recovery fails or stalls; retain complete evidence requirements for positive acceptance.",
+      "implementation": [
+        "exact/repair/kernel.py",
+        "exact/repair/workers.py"
+      ],
+      "acceptance_tests": [
+        "tests/repair_review2_verification_test.py::test_review2_06_corrupt_completion_keeps_qualified_conflict_on_resume",
+        "tests/repair_review2_verification_test.py::test_review2_06_negative_replay_does_not_wait_for_completion",
+        "tests/repair_review2_verification_test.py::test_review2_06_unqualified_events_never_become_solver_constraints",
+        "tests/repair_review2_verification_test.py::test_review2_06_qualified_prefix_survives_later_corrupt_batch",
+        "tests/repair_review_transport_test.py::test_rev02_replay_rejects_tampered_committed_result"
+      ],
+      "behavior": "Each committed batch checksum/count and chain prefix is checked before yielding events. Replay returns immediately after a context-bound qualified conflict, without requiring the final completion. Invalid policy/assignment/proof/checksum events do not become cuts. Positive replay still scans complete valid evidence and validates the final digest/report.",
+      "reuse_policy": "The journal format is unchanged. A corrupt later record cannot erase an earlier independently validated conflict or authorize feasibility; existing time/resource ledgers remain charged.",
+      "qualified_test_cases": [
+        "tests.repair_review2_verification_test::test_review2_06_corrupt_completion_keeps_qualified_conflict_on_resume",
+        "tests.repair_review2_verification_test::test_review2_06_negative_replay_does_not_wait_for_completion",
+        "tests.repair_review2_verification_test::test_review2_06_qualified_prefix_survives_later_corrupt_batch",
+        "tests.repair_review2_verification_test::test_review2_06_unqualified_events_never_become_solver_constraints[assignment]",
+        "tests.repair_review2_verification_test::test_review2_06_unqualified_events_never_become_solver_constraints[checksum]",
+        "tests.repair_review2_verification_test::test_review2_06_unqualified_events_never_become_solver_constraints[policy]",
+        "tests.repair_review2_verification_test::test_review2_06_unqualified_events_never_become_solver_constraints[proof]",
+        "tests.repair_review_transport_test::test_rev02_replay_rejects_tampered_committed_result"
+      ]
+    },
+    {
+      "id": "R2-07",
+      "title": "Exhaustive family emptiness",
+      "requirement": "Use completed exhaustive enumeration to establish both representatives and empty families, while preserving genuine incomplete-enumeration resource status.",
+      "implementation": [
+        "exact/repair/grammar.py",
+        "exact/repair/pipeline.py"
+      ],
+      "acceptance_tests": [
+        "tests/repair_review2_generation_test.py::test_completed_enumeration_is_authoritative_for_family_coverage",
+        "tests/repair_review2_generation_test.py::test_incomplete_enumeration_is_not_reported_as_complete"
+      ],
+      "behavior": "Completed enumeration supplies authoritative per-template representatives and empty-family coverage, including merged template provenance. Typed OWL S subclass T / menu A,B / immutable S disjoint A,B / depth and constructor limit one succeeds with COMPLETE_DECLARED_ENUMERATION. Actual expression/deadline exhaustion remains incomplete.",
+      "reuse_policy": "Protected generation identity advances to protected-generation/review-2. Previously retained sound candidates remain logically valid, but completion receipts must be regenerated under the corrected identity.",
+      "qualified_test_cases": [
+        "tests.repair_review2_generation_test::test_completed_enumeration_is_authoritative_for_family_coverage[False]",
+        "tests.repair_review2_generation_test::test_completed_enumeration_is_authoritative_for_family_coverage[True]",
+        "tests.repair_review2_generation_test::test_incomplete_enumeration_is_not_reported_as_complete[options0-ValueError]",
+        "tests.repair_review2_generation_test::test_incomplete_enumeration_is_not_reported_as_complete[options1-TimeoutError]"
+      ]
+    },
+    {
+      "id": "R2-08",
+      "title": "Consistent finite compiler resource enforcement",
+      "requirement": "Enforce finite encoding resource limits on cold compilation and warm admission, explicitly reject unsupported controls, and report accurate failure/measurement receipts.",
+      "implementation": [
+        "exact/repair/circuit.py",
+        "exact/repair/compilation.py"
+      ],
+      "acceptance_tests": [
+        "tests/repair_review2_generation_test.py::test_finite_live_node_limit_is_enforced_on_cold_and_warm",
+        "tests/repair_review2_generation_test.py::test_finite_compiler_rejects_unsupported_vtree_instead_of_recording_it",
+        "tests/repair_review2_generation_test.py::test_finite_structural_limits_cannot_be_bypassed_by_cache",
+        "tests/repair_review2_generation_test.py::test_supported_finite_controls_have_matching_cold_warm_receipts",
+        "tests/repair_review2_generation_test.py::test_finite_supervised_limit_failure_has_no_usable_circuit"
+      ],
+      "behavior": "Finite SDD construction retains active roots, checks allocated/live/reachable/element/time budgets and preserves native peak telemetry. Three choices with live-node limit one fail cold and warm. Cache admission resource failures cannot fall through to a new over-budget success. Balanced/right layouts and collection controls are implemented; unsupported finite grouped/unknown layouts reject.",
+      "reuse_policy": "Source-bound compiler identities invalidate affected caches. finite-resource-contract/review-2 and compiler-resource-contract/review-2 distinguish enforcement receipts. Failed calls do not return a usable circuit or publish an over-budget artifact.",
+      "qualified_test_cases": [
+        "tests.repair_review2_generation_test::test_finite_compiler_rejects_unsupported_vtree_instead_of_recording_it[grouped]",
+        "tests.repair_review2_generation_test::test_finite_compiler_rejects_unsupported_vtree_instead_of_recording_it[unsupported]",
+        "tests.repair_review2_generation_test::test_finite_live_node_limit_is_enforced_on_cold_and_warm[False]",
+        "tests.repair_review2_generation_test::test_finite_live_node_limit_is_enforced_on_cold_and_warm[True]",
+        "tests.repair_review2_generation_test::test_finite_structural_limits_cannot_be_bypassed_by_cache[False-max_elements]",
+        "tests.repair_review2_generation_test::test_finite_structural_limits_cannot_be_bypassed_by_cache[False-max_live_nodes]",
+        "tests.repair_review2_generation_test::test_finite_structural_limits_cannot_be_bypassed_by_cache[False-max_nodes]",
+        "tests.repair_review2_generation_test::test_finite_structural_limits_cannot_be_bypassed_by_cache[False-max_reachable_nodes]",
+        "tests.repair_review2_generation_test::test_finite_structural_limits_cannot_be_bypassed_by_cache[True-max_elements]",
+        "tests.repair_review2_generation_test::test_finite_structural_limits_cannot_be_bypassed_by_cache[True-max_live_nodes]",
+        "tests.repair_review2_generation_test::test_finite_structural_limits_cannot_be_bypassed_by_cache[True-max_nodes]",
+        "tests.repair_review2_generation_test::test_finite_structural_limits_cannot_be_bypassed_by_cache[True-max_reachable_nodes]",
+        "tests.repair_review2_generation_test::test_finite_supervised_limit_failure_has_no_usable_circuit",
+        "tests.repair_review2_generation_test::test_supported_finite_controls_have_matching_cold_warm_receipts[False-balanced]",
+        "tests.repair_review2_generation_test::test_supported_finite_controls_have_matching_cold_warm_receipts[False-right]",
+        "tests.repair_review2_generation_test::test_supported_finite_controls_have_matching_cold_warm_receipts[True-balanced]",
+        "tests.repair_review2_generation_test::test_supported_finite_controls_have_matching_cold_warm_receipts[True-right]"
+      ]
+    }
+  ]
+}

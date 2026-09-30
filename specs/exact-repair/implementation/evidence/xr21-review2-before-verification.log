@@ -1,0 +1,32 @@
+FF.FF....                                                                [100%]
+=================================== FAILURES ===================================
+____ test_review2_05_kernel_preserves_compact_baseline_and_exception_proof _____
+tests/repair_review2_verification_test.py:57: in test_review2_05_kernel_preserves_compact_baseline_and_exception_proof
+    assert support["source_exception_proof_hashes"] == tuple(p.content_hash for p in artifact.exception_proofs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   KeyError: 'source_exception_proof_hashes'
+________________ test_review2_05_greedy_reuses_compact_baseline ________________
+tests/repair_review2_verification_test.py:70: in test_review2_05_greedy_reuses_compact_baseline
+    assert result.assignment == () and result.verification.authorizes
+E   AssertionError: assert (None == ())
+E    +  where None = RepairResultV3(input_hash='dabb137c3b8cb3aa62f444b8deb1046d34f39772240a8253286af488ccf5d47f', objective_hash='dec36935...one, ledger=None, generation_status='COMPLETE_DECLARED_ENUMERATION', optimization_bypassed=False, resource_counters=()).assignment
+____ test_review2_06_corrupt_completion_keeps_qualified_conflict_on_resume _____
+tests/repair_review2_verification_test.py:125: in test_review2_06_corrupt_completion_keeps_qualified_conflict_on_resume
+    assert result.assignment is None and not result.pending
+E   AssertionError: assert (None is None and not (PendingAssignmentV2(assignment=(), value=0, report=VerificationReportV2(assignment_hash='4f53cda18c2baa0c0354bb5f9a3e...erdict='unknown', complete=False, detail='interrupted'),), backend='', detail='interrupted', support=()), attempts=1),))
+E    +  where None = RepairResultV3(input_hash='ddb9eca716283f12209da55ab5d19c8feadd72a8287b815dc5f73c4a9be63114', objective_hash='dec36935...atus='COMPLETE_DECLARED_ENUMERATION', optimization_bypassed=False, resource_counters=(('verification_cache_hits', 0),)).assignment
+E    +  and   (PendingAssignmentV2(assignment=(), value=0, report=VerificationReportV2(assignment_hash='4f53cda18c2baa0c0354bb5f9a3e...erdict='unknown', complete=False, detail='interrupted'),), backend='', detail='interrupted', support=()), attempts=1),) = RepairResultV3(input_hash='ddb9eca716283f12209da55ab5d19c8feadd72a8287b815dc5f73c4a9be63114', objective_hash='dec36935...atus='COMPLETE_DECLARED_ENUMERATION', optimization_bypassed=False, resource_counters=(('verification_cache_hits', 0),)).pending
+_________ test_review2_06_negative_replay_does_not_wait_for_completion _________
+tests/repair_review2_verification_test.py:141: in test_review2_06_negative_replay_does_not_wait_for_completion
+    assert result.status=="complete",result.detail
+E   AssertionError: stage deadline exhausted
+E   assert 'timeout' == 'complete'
+E
+E     - complete
+E     + timeout
+=========================== short test summary info ============================
+FAILED tests/repair_review2_verification_test.py::test_review2_05_kernel_preserves_compact_baseline_and_exception_proof
+FAILED tests/repair_review2_verification_test.py::test_review2_05_greedy_reuses_compact_baseline
+FAILED tests/repair_review2_verification_test.py::test_review2_06_corrupt_completion_keeps_qualified_conflict_on_resume
+FAILED tests/repair_review2_verification_test.py::test_review2_06_negative_replay_does_not_wait_for_completion
+4 failed, 5 passed in 7.82s

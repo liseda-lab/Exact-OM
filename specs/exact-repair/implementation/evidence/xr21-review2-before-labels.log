@@ -1,0 +1,130 @@
+FFFFFFFF.FFFFFFFFFFFFF                                                   [100%]
+=================================== FAILURES ===================================
+_ test_review2_aggregate_votes_and_numeric_labels_agree[observations0-abstain-scores0-tied_vote_counts] _
+tests/repair_review2_labels_test.py:62: in test_review2_aggregate_votes_and_numeric_labels_agree
+    assert result["decision"] == decision
+E   AssertionError: assert 'A' == 'abstain'
+E
+E     - abstain
+E     + A
+_ test_review2_aggregate_votes_and_numeric_labels_agree[observations1-abstain-scores1-preference_numeric_conflict] _
+tests/repair_review2_labels_test.py:62: in test_review2_aggregate_votes_and_numeric_labels_agree
+    assert result["decision"] == decision
+E   AssertionError: assert 'A' == 'abstain'
+E
+E     - abstain
+E     + A
+_ test_review2_aggregate_votes_and_numeric_labels_agree[observations2-A-scores2-None] _
+tests/repair_review2_labels_test.py:63: in test_review2_aggregate_votes_and_numeric_labels_agree
+    assert result["abstention_reason"] == reason
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   KeyError: 'abstention_reason'
+_ test_review2_aggregate_votes_and_numeric_labels_agree[observations3-tie-scores3-None] _
+tests/repair_review2_labels_test.py:63: in test_review2_aggregate_votes_and_numeric_labels_agree
+    assert result["abstention_reason"] == reason
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   KeyError: 'abstention_reason'
+_ test_review2_collector_rejects_changed_label_dependencies_before_reuse[input] _
+tests/repair_review2_labels_test.py:120: in test_review2_collector_rejects_changed_label_dependencies_before_reuse
+    with pytest.raises(ValueError, match="collection.*(dependencies|identity)"):
+E   Failed: DID NOT RAISE <class 'ValueError'>
+_ test_review2_collector_rejects_changed_label_dependencies_before_reuse[patch] _
+tests/repair_review2_labels_test.py:120: in test_review2_collector_rejects_changed_label_dependencies_before_reuse
+    with pytest.raises(ValueError, match="collection.*(dependencies|identity)"):
+E   Failed: DID NOT RAISE <class 'ValueError'>
+_ test_review2_collector_rejects_changed_label_dependencies_before_reuse[policy] _
+tests/repair_review2_labels_test.py:120: in test_review2_collector_rejects_changed_label_dependencies_before_reuse
+    with pytest.raises(ValueError, match="collection.*(dependencies|identity)"):
+E   Failed: DID NOT RAISE <class 'ValueError'>
+_ test_review2_collector_rejects_changed_label_dependencies_before_reuse[query] _
+tests/repair_review2_labels_test.py:120: in test_review2_collector_rejects_changed_label_dependencies_before_reuse
+    with pytest.raises(ValueError, match="collection.*(dependencies|identity)"):
+E   Failed: DID NOT RAISE <class 'ValueError'>
+_ test_review2_collector_rejects_changed_label_dependencies_before_reuse[backend] _
+tests/repair_review2_labels_test.py:120: in test_review2_collector_rejects_changed_label_dependencies_before_reuse
+    with pytest.raises(ValueError, match="collection.*(dependencies|identity)"):
+E   Failed: DID NOT RAISE <class 'ValueError'>
+_ test_review2_collector_rejects_changed_label_dependencies_before_reuse[profile] _
+tests/repair_review2_labels_test.py:120: in test_review2_collector_rejects_changed_label_dependencies_before_reuse
+    with pytest.raises(ValueError, match="collection.*(dependencies|identity)"):
+E   Failed: DID NOT RAISE <class 'ValueError'>
+_ test_review2_collector_rejects_changed_label_dependencies_before_reuse[semantic_target] _
+tests/repair_review2_labels_test.py:120: in test_review2_collector_rejects_changed_label_dependencies_before_reuse
+    with pytest.raises(ValueError, match="collection.*(dependencies|identity)"):
+E   Failed: DID NOT RAISE <class 'ValueError'>
+_ test_review2_collector_rejects_changed_label_dependencies_before_reuse[annotation_aggregate] _
+tests/repair_review2_labels_test.py:120: in test_review2_collector_rejects_changed_label_dependencies_before_reuse
+    with pytest.raises(ValueError, match="collection.*(dependencies|identity)"):
+E   Failed: DID NOT RAISE <class 'ValueError'>
+_______ test_review2_collector_binds_case_and_round_provenance[case_id] ________
+tests/repair_review2_labels_test.py:130: in test_review2_collector_binds_case_and_round_provenance
+    with pytest.raises(ValueError, match="collection.*(dependencies|identity)"):
+E   Failed: DID NOT RAISE <class 'ValueError'>
+___ test_review2_collector_binds_case_and_round_provenance[parent_group_id] ____
+tests/repair_review2_labels_test.py:130: in test_review2_collector_binds_case_and_round_provenance
+    with pytest.raises(ValueError, match="collection.*(dependencies|identity)"):
+E   Failed: DID NOT RAISE <class 'ValueError'>
+_______ test_review2_collector_binds_case_and_round_provenance[round_id] _______
+tests/repair_review2_labels_test.py:130: in test_review2_collector_binds_case_and_round_provenance
+    with pytest.raises(ValueError, match="collection.*(dependencies|identity)"):
+E   Failed: DID NOT RAISE <class 'ValueError'>
+___ test_review2_collector_valid_resume_preserves_source_identity_and_costs ____
+tests/repair_review2_labels_test.py:145: in test_review2_collector_valid_resume_preserves_source_identity_and_costs
+    assert resumed.collection_identity == baseline.collection_identity == state["collection_identity"]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   AttributeError: 'SampledRepairRound' object has no attribute 'collection_identity'
+_______ test_review2_collector_requires_complete_label_identity[policy] ________
+tests/repair_review2_labels_test.py:157: in test_review2_collector_requires_complete_label_identity
+    collect_sampled_repairs((3, 3), lambda a: None, **options)
+exact/repair/learning.py:1091: in collect_sampled_repairs
+    if label.assignment != assignment:
+       ^^^^^^^^^^^^^^^^
+E   AttributeError: 'NoneType' object has no attribute 'assignment'
+___ test_review2_collector_requires_complete_label_identity[semantic_target] ___
+tests/repair_review2_labels_test.py:157: in test_review2_collector_requires_complete_label_identity
+    collect_sampled_repairs((3, 3), lambda a: None, **options)
+exact/repair/learning.py:1091: in collect_sampled_repairs
+    if label.assignment != assignment:
+       ^^^^^^^^^^^^^^^^
+E   AttributeError: 'NoneType' object has no attribute 'assignment'
+_______ test_review2_collector_requires_complete_label_identity[backend] _______
+tests/repair_review2_labels_test.py:157: in test_review2_collector_requires_complete_label_identity
+    collect_sampled_repairs((3, 3), lambda a: None, **options)
+exact/repair/learning.py:1091: in collect_sampled_repairs
+    if label.assignment != assignment:
+       ^^^^^^^^^^^^^^^^
+E   AttributeError: 'NoneType' object has no attribute 'assignment'
+_______ test_review2_collector_requires_complete_label_identity[profile] _______
+tests/repair_review2_labels_test.py:157: in test_review2_collector_requires_complete_label_identity
+    collect_sampled_repairs((3, 3), lambda a: None, **options)
+exact/repair/learning.py:1091: in collect_sampled_repairs
+    if label.assignment != assignment:
+       ^^^^^^^^^^^^^^^^
+E   AttributeError: 'NoneType' object has no attribute 'assignment'
+________ test_review2_collector_rejects_legacy_state_without_provenance ________
+tests/repair_review2_labels_test.py:164: in test_review2_collector_rejects_legacy_state_without_provenance
+    with pytest.raises(ValueError, match="collection.*(dependencies|identity|schema)"):
+E   Failed: DID NOT RAISE <class 'ValueError'>
+=========================== short test summary info ============================
+FAILED tests/repair_review2_labels_test.py::test_review2_aggregate_votes_and_numeric_labels_agree[observations0-abstain-scores0-tied_vote_counts]
+FAILED tests/repair_review2_labels_test.py::test_review2_aggregate_votes_and_numeric_labels_agree[observations1-abstain-scores1-preference_numeric_conflict]
+FAILED tests/repair_review2_labels_test.py::test_review2_aggregate_votes_and_numeric_labels_agree[observations2-A-scores2-None]
+FAILED tests/repair_review2_labels_test.py::test_review2_aggregate_votes_and_numeric_labels_agree[observations3-tie-scores3-None]
+FAILED tests/repair_review2_labels_test.py::test_review2_collector_rejects_changed_label_dependencies_before_reuse[input]
+FAILED tests/repair_review2_labels_test.py::test_review2_collector_rejects_changed_label_dependencies_before_reuse[patch]
+FAILED tests/repair_review2_labels_test.py::test_review2_collector_rejects_changed_label_dependencies_before_reuse[policy]
+FAILED tests/repair_review2_labels_test.py::test_review2_collector_rejects_changed_label_dependencies_before_reuse[query]
+FAILED tests/repair_review2_labels_test.py::test_review2_collector_rejects_changed_label_dependencies_before_reuse[backend]
+FAILED tests/repair_review2_labels_test.py::test_review2_collector_rejects_changed_label_dependencies_before_reuse[profile]
+FAILED tests/repair_review2_labels_test.py::test_review2_collector_rejects_changed_label_dependencies_before_reuse[semantic_target]
+FAILED tests/repair_review2_labels_test.py::test_review2_collector_rejects_changed_label_dependencies_before_reuse[annotation_aggregate]
+FAILED tests/repair_review2_labels_test.py::test_review2_collector_binds_case_and_round_provenance[case_id]
+FAILED tests/repair_review2_labels_test.py::test_review2_collector_binds_case_and_round_provenance[parent_group_id]
+FAILED tests/repair_review2_labels_test.py::test_review2_collector_binds_case_and_round_provenance[round_id]
+FAILED tests/repair_review2_labels_test.py::test_review2_collector_valid_resume_preserves_source_identity_and_costs
+FAILED tests/repair_review2_labels_test.py::test_review2_collector_requires_complete_label_identity[policy]
+FAILED tests/repair_review2_labels_test.py::test_review2_collector_requires_complete_label_identity[semantic_target]
+FAILED tests/repair_review2_labels_test.py::test_review2_collector_requires_complete_label_identity[backend]
+FAILED tests/repair_review2_labels_test.py::test_review2_collector_requires_complete_label_identity[profile]
+FAILED tests/repair_review2_labels_test.py::test_review2_collector_rejects_legacy_state_without_provenance
+21 failed, 1 passed in 1.72s

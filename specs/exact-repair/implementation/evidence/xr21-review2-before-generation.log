@@ -1,0 +1,43 @@
+FF..FFF                                                                  [100%]
+=================================== FAILURES ===================================
+____ test_completed_enumeration_is_authoritative_for_family_coverage[False] ____
+tests/repair_review2_generation_test.py:47: in test_completed_enumeration_is_authoritative_for_family_coverage
+    assert report["generation_status"] == "COMPLETE_DECLARED_ENUMERATION"
+E   AssertionError: assert 'PARTIAL_RESOURCE_LIMIT' == 'COMPLETE_DEC...D_ENUMERATION'
+E
+E     - COMPLETE_DECLARED_ENUMERATION
+E     + PARTIAL_RESOURCE_LIMIT
+____ test_completed_enumeration_is_authoritative_for_family_coverage[True] _____
+tests/repair_review2_generation_test.py:47: in test_completed_enumeration_is_authoritative_for_family_coverage
+    assert report["generation_status"] == "COMPLETE_DECLARED_ENUMERATION"
+E   AssertionError: assert 'PARTIAL_RESOURCE_LIMIT' == 'COMPLETE_DEC...D_ENUMERATION'
+E
+E     - COMPLETE_DECLARED_ENUMERATION
+E     + PARTIAL_RESOURCE_LIMIT
+_______ test_finite_live_node_limit_is_enforced_on_cold_and_warm[False] ________
+tests/repair_review2_generation_test.py:94: in test_finite_live_node_limit_is_enforced_on_cold_and_warm
+    with pytest.raises((ValueError, RuntimeError), match="live node"):
+E   Failed: DID NOT RAISE any of (<class 'ValueError'>, <class 'RuntimeError'>)
+________ test_finite_live_node_limit_is_enforced_on_cold_and_warm[True] ________
+tests/repair_review2_generation_test.py:94: in test_finite_live_node_limit_is_enforced_on_cold_and_warm
+    with pytest.raises((ValueError, RuntimeError), match="live node"):
+E   Failed: DID NOT RAISE any of (<class 'ValueError'>, <class 'RuntimeError'>)
+____ test_finite_compiler_rejects_unsupported_vtree_instead_of_recording_it ____
+tests/repair_review2_generation_test.py:102: in test_finite_compiler_rejects_unsupported_vtree_instead_of_recording_it
+    with pytest.raises(ValueError, match="vtree"):
+E   Failed: DID NOT RAISE <class 'ValueError'>
+=============================== warnings summary ===============================
+tests/repair_review2_generation_test.py::test_completed_enumeration_is_authoritative_for_family_coverage[False]
+tests/repair_review2_generation_test.py::test_completed_enumeration_is_authoritative_for_family_coverage[True]
+tests/repair_review2_generation_test.py::test_incomplete_enumeration_is_not_reported_as_complete[options0-ValueError]
+  /home/pgcotovio/Exact-OM/.worktrees/xr21-review2-corrections-20260930/exact/repair/workers.py:477: DeprecationWarning: This process (pid=3190320) is multi-threaded, use of fork() may lead to deadlocks in the child.
+    pid = os.fork()
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/repair_review2_generation_test.py::test_completed_enumeration_is_authoritative_for_family_coverage[False]
+FAILED tests/repair_review2_generation_test.py::test_completed_enumeration_is_authoritative_for_family_coverage[True]
+FAILED tests/repair_review2_generation_test.py::test_finite_live_node_limit_is_enforced_on_cold_and_warm[False]
+FAILED tests/repair_review2_generation_test.py::test_finite_live_node_limit_is_enforced_on_cold_and_warm[True]
+FAILED tests/repair_review2_generation_test.py::test_finite_compiler_rejects_unsupported_vtree_instead_of_recording_it
+5 failed, 2 passed, 3 warnings in 6.32s

@@ -1,0 +1,7 @@
+Base model commit: f4d2f8aa; native HermiT target extraction, real HGT readout
+Targets: [False, True] ; head inputs identical: True
+Traceback (most recent call last):
+  File "/tmp/xr21-review2-before-support.py", line 34, in <module>
+    assert not torch.equal(*inputs), 'Required and prohibited targets receive identical head inputs'
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: Required and prohibited targets receive identical head inputs
