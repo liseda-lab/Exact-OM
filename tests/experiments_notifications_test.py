@@ -160,7 +160,7 @@ def test_pending_delivery_survives_incident_resolution_and_uses_backoff(tmp_path
         raise subprocess.CalledProcessError(2, ["mail"])
     monkeypatch.setattr(notifications.subprocess, "run", fail)
     alert = notifications.notify_intervention(
-        tmp_path, INCIDENT, "problem_detected", "Automatic repair pending", config=COMMAND, defer=True
+        tmp_path, INCIDENT, "needs_user", "Choose a policy", config=COMMAND, defer=True
     )
     assert alert["delivery"] == "pending" and not attempts
     notifications.flush_notifications(tmp_path, COMMAND)
@@ -214,3 +214,66 @@ def test_ambiguous_send_creates_one_repair_incident_without_recursive_alerts(tmp
     alert.update(delivery="sent", needs_attention=False)
     notifications._write(notifications.Path(alert["path"]), alert)
     assert notifications.notification_incidents(tmp_path) == []
+
+
+@pytest.mark.parametrize("outcome", [
+    "problem_detected", "recovered", "repair_failed", "no_change", "daily_agent_limit",
+    "supervisor_error", "unknown_information",
+])
+@pytest.mark.parametrize("defer", [False, True])
+def test_only_action_required_outcomes_enter_delivery_queue(tmp_path, monkeypatch, outcome, defer):
+    monkeypatch.setattr(notifications, "_deliver", lambda *args: pytest.fail("Informational email"))
+    alert = notifications.notify_intervention(
+        tmp_path, INCIDENT, outcome, "Automatic checks continue", config=COMMAND, defer=defer
+    )
+    assert alert["delivery"] == "suppressed" and alert["attempts"] == 0
+    assert notifications.flush_notifications(tmp_path, COMMAND)["counts"] == {"suppressed": 1}
+
+
+@pytest.mark.parametrize("outcome", [
+    "needs_user", "requires_user", "approval_needed", "incident_attempt_limit",
+    "supervisor_unavailable",
+])
+def test_action_required_outcomes_deliver_once(tmp_path, monkeypatch, outcome):
+    sent = []
+    monkeypatch.setattr(notifications, "_deliver", lambda *args: sent.append(args))
+    notifications.notify_intervention(
+        tmp_path, INCIDENT, outcome, "Human action required", config=COMMAND, defer=True
+    )
+    for _ in range(2):
+        assert notifications.flush_notifications(tmp_path, COMMAND)["counts"] == {"sent": 1}
+    assert len(sent) == 1
+
+
+@pytest.mark.parametrize("delivery", ["pending", "not_configured", "failed", "sending", "sent", "ambiguous"])
+@pytest.mark.parametrize("entrypoint", ["notify", "flush"])
+def test_old_informational_alerts_never_send_and_preserve_delivery_evidence(
+    tmp_path, monkeypatch, delivery, entrypoint
+):
+    monkeypatch.setattr(notifications, "_deliver", lambda *args: pytest.fail("Old informational email"))
+    alert = notifications.notify_intervention(
+        tmp_path, INCIDENT, "recovered", "Old immutable body", config=COMMAND, defer=True
+    )
+    alert.update(delivery=delivery, attempts=2, last_attempt_at="prior-attempt", next_attempt_epoch=1e20)
+    if delivery == "sent":
+        alert["delivered_at"] = "prior-delivery"
+    if delivery == "ambiguous":
+        alert["needs_attention"] = True
+    notifications._write(notifications.Path(alert["path"]), alert)
+    before = notifications.Path(alert["path"]).read_bytes()
+    if entrypoint == "notify":
+        notifications.notify_intervention(
+            tmp_path, INCIDENT, "recovered", "Changed body", config=COMMAND
+        )
+    else:
+        notifications.flush_notifications(tmp_path, COMMAND)
+    after = json.loads(notifications.Path(alert["path"]).read_text())
+    assert after["summary"] == "Old immutable body"
+    assert after["attempts"] == 2 and after["last_attempt_at"] == "prior-attempt"
+    if delivery in {"sent", "ambiguous"}:
+        assert notifications.Path(alert["path"]).read_bytes() == before
+    elif delivery == "sending":
+        assert after["delivery"] == "ambiguous" and after["needs_attention"]
+        assert len(notifications.notification_incidents(tmp_path)) == 1
+    else:
+        assert after["delivery"] == "suppressed" and after["suppressed_delivery"] == delivery

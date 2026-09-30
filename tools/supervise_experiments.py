@@ -319,6 +319,24 @@ def notify_blocker(directory, policy, incident, action, *, result=None, report=N
     )
 
 
+def record_supervisor_error(state, error, now):
+    """Escalate a persistent same-cause outage, not a transient failed check."""
+    identity = hashlib.sha256(error.encode()).hexdigest()[:24]
+    previous = state.get("supervisor_error") or {}
+    if previous.get("id") != identity:
+        previous = {}
+    incident = {
+        "id": identity, "kind": "supervisor_error", "reason": error, "run_ids": [],
+        "first_seen_epoch": previous.get("first_seen_epoch", now),
+        "observations": previous.get("observations", 0) + 1,
+    }
+    state["supervisor_error"] = incident
+    requires_user = (
+        incident["observations"] >= 3 and now - incident["first_seen_epoch"] >= 900
+    )
+    return incident, requires_user
+
+
 def observed_recovery(incident, registry, observation):
     """Only a healthy live/completed successor establishes recovery, never absence alone."""
     runs = {run["id"]: run for run in registry["runs"]}
@@ -653,17 +671,20 @@ def main():
                 "error": type(exc).__name__ + ": " + str(exc),
             }
             if not args.once and not (directory / "PAUSE").exists():
-                incident = {
-                    "id": hashlib.sha256(failure["error"].encode()).hexdigest()[:24],
-                    "kind": "supervisor_error",
-                    "reason": failure["error"],
-                    "run_ids": [],
-                }
-                state["supervisor_error"] = incident
-                write(state_path, state)
-                failure["notification"] = notify_blocker(
-                    directory, policy, incident, "supervisor_error"
+                incident, requires_user = record_supervisor_error(
+                    state, failure["error"], time.time()
                 )
+                write(state_path, state)
+                if requires_user:
+                    failure["notification"] = notify_blocker(
+                        directory, policy, incident, "supervisor_unavailable", result={
+                            "summary": "Supervisor checks have failed with the same error for at least "
+                            "15 minutes and three checks. Inspect the saved error, restore the affected "
+                            "authentication, configuration, scheduler or filesystem access, and verify "
+                            "that checks succeed again. Automatic checks continue; do not duplicate workers.",
+                            "handoff": str(directory / "status.json"),
+                        }
+                    )
             current = failure
             write(directory / "status.json", failure)
             print(json.dumps(failure), flush=True)

@@ -17,6 +17,32 @@ from pathlib import Path
 from typing import Any, Mapping
 
 
+_ACTION_REQUIRED_OUTCOMES = {
+    "needs_user", "requires_user", "approval_needed", "incident_attempt_limit",
+    "supervisor_unavailable",
+}
+
+
+def _suppress_non_actionable(alert: dict[str, Any]) -> bool:
+    """Filter new and legacy outbox entries without hiding delivery uncertainty."""
+    if alert.get("outcome") in _ACTION_REQUIRED_OUTCOMES:
+        return False
+    previous = alert.get("delivery")
+    if previous not in {"sent", "ambiguous", "suppressed"}:
+        alert.update(
+            delivery="suppressed", suppressed_delivery=previous,
+            suppression_reason="action_required_only",
+            updated_at=datetime.now(timezone.utc).isoformat(),
+        )
+        if previous == "sending":
+            # Even command replay could send an old informational message. Keep
+            # the uncertain attempt visible for receipt inspection, never retry it.
+            alert.update(delivery="ambiguous", needs_attention=True,
+                         error="Delivery interrupted; inspect transport receipt before resolving")
+        _write(Path(alert["path"]), alert)
+    return True
+
+
 def _write(path: Path, value: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(".tmp")
@@ -148,8 +174,10 @@ def notify_intervention(
 ) -> dict[str, Any]:
     """Persist one immutable message per incident/outcome; the monitor queues only.
 
-    Deferred delivery is drained independently, including after the incident has
-    disappeared. Existing bodies stay unchanged for safe Gmail deduplication.
+    Only outcomes requiring human action enter the delivery queue; other events
+    retain a suppressed local receipt. Deferred delivery is drained independently,
+    including after the incident has disappeared. Existing bodies stay unchanged
+    for safe Gmail deduplication.
     Synchronous delivery remains available for explicit transport checks.
     """
     ident = hashlib.sha256(json.dumps([incident["id"], outcome]).encode()).hexdigest()[:24]
@@ -174,9 +202,13 @@ def notify_intervention(
     try:
         if path.exists():
             alert = json.loads(path.read_text())
+            if _suppress_non_actionable(alert):
+                return alert
             if defer or alert.get("delivery") in {"sent", "ambiguous", "sending"}:
                 return alert
         else:
+            if _suppress_non_actionable(alert):
+                return alert
             _write(path, alert)
         if configured and not defer:
             return _attempt(alert, config)
@@ -206,8 +238,10 @@ def flush_notifications(directory: str | Path, config: Mapping[str, Any]) -> dic
             try:
                 alert = json.loads(path.read_text())
                 delivery = alert.get("delivery")
-                if delivery not in {"sent", "ambiguous"} and time.time() >= alert.get(
-                    "next_attempt_epoch", 0
+                if (
+                    not _suppress_non_actionable(alert)
+                    and delivery not in {"sent", "ambiguous"}
+                    and time.time() >= alert.get("next_attempt_epoch", 0)
                 ):
                     if delivery == "sending" and config.get("transport") != "command":
                         alert.update(delivery="ambiguous", needs_attention=True,

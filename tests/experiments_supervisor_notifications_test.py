@@ -74,7 +74,7 @@ def test_decision_alert_is_immediate_and_not_resent(monitor, tmp_path, monkeypat
     assert state["incidents"]["failure"]["needs_user"]
     cli.check(tmp_path, policy, state, act=True)
     notifications.flush_notifications(tmp_path, policy["notifications"])
-    assert len(sent) == 2 and len(state["agent_runs"]) == 1
+    assert len(sent) == 1 and len(state["agent_runs"]) == 1
 
 
 def test_last_failed_attempt_notifies_in_same_check(monitor, tmp_path, monkeypatch):
@@ -104,11 +104,11 @@ def test_delivery_failure_retries_without_another_agent(monitor, tmp_path, monke
     monkeypatch.setattr(notifications.subprocess, "run", timeout)
     first = cli.check(tmp_path, policy, state, act=True)
     assert first["notification"]["delivery"] == "pending"
-    assert notifications.flush_notifications(tmp_path, policy["notifications"])["counts"] == {"failed": 2}
+    assert notifications.flush_notifications(tmp_path, policy["notifications"])["counts"] == {"failed": 1, "suppressed": 1}
     monkeypatch.setattr(notifications.subprocess, "run", lambda *args, **kwargs: None)
     original_time = notifications.time.time()
     monkeypatch.setattr(notifications.time, "time", lambda: original_time + 61)
-    assert notifications.flush_notifications(tmp_path, policy["notifications"])["counts"] == {"sent": 2}
+    assert notifications.flush_notifications(tmp_path, policy["notifications"])["counts"] == {"sent": 1, "suppressed": 1}
     second = cli.check(tmp_path, policy, state, act=True)
     assert second["notification"]["delivery"] == "sent"
     assert second["notification"]["attempts"] == 2
@@ -146,7 +146,7 @@ def test_read_only_check_does_not_send_or_repair(monitor, tmp_path, monkeypatch)
     assert not (tmp_path / "alerts").exists()
 
 
-def test_recovery_requires_healthy_successor_and_notifies_once(monitor, tmp_path, monkeypatch):
+def test_recovery_requires_healthy_successor_without_email(monitor, tmp_path, monkeypatch):
     cli, policy, state, observation = monitor
     monkeypatch.setattr(cli, "run_agent", lambda *args: _result("repaired"))
     cli.check(tmp_path, policy, state, act=True)
@@ -160,8 +160,9 @@ def test_recovery_requires_healthy_successor_and_notifies_once(monitor, tmp_path
     for _ in range(2):
         cli.check(tmp_path, policy, state, act=True)
     assert state["incidents"]["failure"]["recovered"]
-    outcomes = [json.loads(p.read_text())["outcome"] for p in (tmp_path / "alerts").glob("*.json")]
-    assert sorted(outcomes) == ["problem_detected", "recovered"]
+    alerts = [json.loads(p.read_text()) for p in (tmp_path / "alerts").glob("*.json")]
+    assert sorted(alert["outcome"] for alert in alerts) == ["problem_detected", "recovered"]
+    assert all(alert["delivery"] == "suppressed" and alert["attempts"] == 0 for alert in alerts)
 
 
 def test_uncertain_mail_is_diagnosed_by_bounded_repair(monitor, tmp_path, monkeypatch):
@@ -183,3 +184,75 @@ def test_uncertain_mail_is_diagnosed_by_bounded_repair(monitor, tmp_path, monkey
     assert "notification_delivery_uncertain" in prompts[0]
     assert alert["path"] in prompts[0]
     assert len(state["agent_runs"]) == 1
+
+
+def test_failed_repair_is_local_until_same_incident_attempts_are_exhausted(monitor, tmp_path, monkeypatch):
+    cli, policy, state, _ = monitor
+    monkeypatch.setattr(cli, "run_agent", lambda *args: {"status": "failed"})
+    sent = []
+    monkeypatch.setattr(notifications, "_deliver", lambda *args: sent.append(args))
+    cli.check(tmp_path, policy, state, act=True)
+    assert notifications.flush_notifications(tmp_path, policy["notifications"])["counts"] == {"suppressed": 1}
+    assert not sent and state["incidents"]["failure"]["attempts"] == 1
+    cli.check(tmp_path, policy, state, act=True)
+    assert notifications.flush_notifications(tmp_path, policy["notifications"])["counts"] == {"suppressed": 1, "sent": 1}
+    assert len(sent) == 1 and state["incidents"]["failure"]["attempts"] == 2
+
+
+def test_supervisor_outage_requires_three_checks_and_fifteen_minutes(monitor):
+    cli, _, state, _ = monitor
+    error = "RuntimeError: Unable to query Slurm steps"
+    incident, requires_user = cli.record_supervisor_error(state, error, 1000)
+    assert not requires_user and incident["observations"] == 1
+    _, requires_user = cli.record_supervisor_error(state, error, 1899)
+    assert not requires_user
+    _, requires_user = cli.record_supervisor_error(state, error, 1899)
+    assert not requires_user
+    incident, requires_user = cli.record_supervisor_error(state, error, 1900)
+    assert requires_user and incident["first_seen_epoch"] == 1000
+    # A distinct transient error does not inherit the previous outage window.
+    incident, requires_user = cli.record_supervisor_error(state, "OSError: temporary NAS error", 2000)
+    assert not requires_user and incident["observations"] == 1
+    assert incident["first_seen_epoch"] == 2000
+    # A slow second check is still insufficient on its own.
+    _, requires_user = cli.record_supervisor_error(state, "OSError: temporary NAS error", 4000)
+    assert not requires_user
+
+
+def test_monitor_loop_queues_only_persistent_outage_and_resets_after_recovery(
+    monitor, tmp_path, monkeypatch
+):
+    cli, policy, _, _ = monitor
+    policy["interval_seconds"] = 450
+    cli.write(tmp_path / "policy.json", policy)
+    monkeypatch.setattr(cli.sys, "argv", ["supervisor", "--directory", str(tmp_path)])
+    monkeypatch.setenv("SLURM_JOB_ID", policy["allocation"])
+    monkeypatch.setenv("SLURM_STEP_ID", "1")
+    monkeypatch.setattr(cli.signal, "signal", lambda *args: None)
+    monkeypatch.setattr(cli.threading.Thread, "start", lambda self: None)
+    monkeypatch.setattr(notifications, "_deliver", lambda *args: pytest.fail("Live mail"))
+    clock = [1000.0]
+    monkeypatch.setattr(cli.time, "time", lambda: clock[0])
+    monkeypatch.setattr(cli.time, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(cli.time, "sleep", lambda seconds: clock.__setitem__(0, clock[0] + seconds))
+    checks = []
+
+    def observe(*args, **kwargs):
+        checks.append(clock[0])
+        if len(checks) == 4:
+            return {"status": "healthy"}
+        if len(checks) == 5:
+            (tmp_path / "STOP").touch()
+        raise RuntimeError("controller temporarily unavailable")
+
+    monkeypatch.setattr(cli, "check", observe)
+    assert cli.main() == 0
+    alerts = [json.loads(path.read_text()) for path in (tmp_path / "alerts").glob("*.json")]
+    actionable, = [alert for alert in alerts if alert["delivery"] == "pending"]
+    assert actionable["outcome"] == "supervisor_unavailable"
+    assert actionable["handoff"] == str(tmp_path / "status.json")
+    assert "Inspect the saved error" in actionable["summary"]
+    assert all(alert["outcome"] != "supervisor_error" for alert in alerts)
+    state = cli.read(tmp_path / "state.json")
+    assert state["supervisor_error"]["observations"] == 1
+    assert checks == [1000, 1450, 1900, 2350, 2800]
