@@ -204,8 +204,9 @@ def test_supervisor_outage_requires_three_checks_and_fifteen_minutes(monitor):
     error = "RuntimeError: Unable to query Slurm steps"
     incident, requires_user = cli.record_supervisor_error(state, error, 1000)
     assert not requires_user and incident["observations"] == 1
-    _, requires_user = cli.record_supervisor_error(state, error, 1899)
-    assert not requires_user
+    identity = incident["id"]
+    incident, requires_user = cli.record_supervisor_error(state, error, 1899)
+    assert not requires_user and incident["id"] == identity
     _, requires_user = cli.record_supervisor_error(state, error, 1899)
     assert not requires_user
     incident, requires_user = cli.record_supervisor_error(state, error, 1900)
@@ -240,19 +241,45 @@ def test_monitor_loop_queues_only_persistent_outage_and_resets_after_recovery(
     def observe(*args, **kwargs):
         checks.append(clock[0])
         if len(checks) == 4:
+            first_path, = (tmp_path / "alerts").glob("*.json")
+            first = cli.read(first_path)
+            first.update(delivery="sent", delivered_at="prior-delivery")
+            cli.write(first_path, first)
             return {"status": "healthy"}
-        if len(checks) == 5:
+        if len(checks) == 7:
             (tmp_path / "STOP").touch()
         raise RuntimeError("controller temporarily unavailable")
 
     monkeypatch.setattr(cli, "check", observe)
     assert cli.main() == 0
     alerts = [json.loads(path.read_text()) for path in (tmp_path / "alerts").glob("*.json")]
-    actionable, = [alert for alert in alerts if alert["delivery"] == "pending"]
-    assert actionable["outcome"] == "supervisor_unavailable"
-    assert actionable["handoff"] == str(tmp_path / "status.json")
-    assert "Inspect the saved error" in actionable["summary"]
+    actionable = [alert for alert in alerts if alert["outcome"] == "supervisor_unavailable"]
+    assert sorted(alert["delivery"] for alert in actionable) == ["pending", "sent"]
+    assert len({alert["incident_id"] for alert in actionable}) == 2
+    for alert in actionable:
+        assert alert["outcome"] == "supervisor_unavailable"
+        assert alert["handoff"] == str(tmp_path / "status.json")
+        assert "Inspect the saved error" in alert["summary"]
     assert all(alert["outcome"] != "supervisor_error" for alert in alerts)
     state = cli.read(tmp_path / "state.json")
-    assert state["supervisor_error"]["observations"] == 1
-    assert checks == [1000, 1450, 1900, 2350, 2800]
+    assert state["supervisor_error"]["observations"] == 3
+    assert state["supervisor_error"]["first_seen_epoch"] == 2800
+    assert checks == [1000, 1450, 1900, 2350, 2800, 3250, 3700]
+
+
+def test_ongoing_legacy_outage_keeps_delivery_identity_until_healthy_reset(monitor):
+    cli, _, state, _ = monitor
+    error = "RuntimeError: controller unavailable"
+    legacy_id = cli.hashlib.sha256(error.encode()).hexdigest()[:24]
+    state["supervisor_error"] = {
+        "id": legacy_id, "reason": error, "first_seen_epoch": 1000, "observations": 3,
+    }
+    ongoing, requires_user = cli.record_supervisor_error(state, error, 2000)
+    assert requires_user and ongoing["id"] == legacy_id
+    assert ongoing["error_fingerprint"] == legacy_id and ongoing["observations"] == 4
+    state.pop("supervisor_error")  # The existing main-loop healthy transition.
+    new, requires_user = cli.record_supervisor_error(state, error, 3000)
+    assert not requires_user and new["id"] != legacy_id
+    assert new["error_fingerprint"] == legacy_id and new["observations"] == 1
+    repeated, _ = cli.record_supervisor_error(state, error, 3500)
+    assert repeated["id"] == new["id"]

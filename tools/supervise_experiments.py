@@ -321,13 +321,19 @@ def notify_blocker(directory, policy, incident, action, *, result=None, report=N
 
 def record_supervisor_error(state, error, now):
     """Escalate a persistent same-cause outage, not a transient failed check."""
-    identity = hashlib.sha256(error.encode()).hexdigest()[:24]
+    fingerprint = hashlib.sha256(error.encode()).hexdigest()[:24]
     previous = state.get("supervisor_error") or {}
-    if previous.get("id") != identity:
+    if previous.get("error_fingerprint", previous.get("id")) != fingerprint:
         previous = {}
+    first_seen = previous.get("first_seen_epoch", now)
+    # Retain an ongoing legacy episode's ID so its already sent alert stays
+    # deduplicated. After a healthy reset, the same error is a new outage.
+    identity = previous.get("id") or hashlib.sha256(
+        json.dumps([fingerprint, first_seen]).encode()
+    ).hexdigest()[:24]
     incident = {
         "id": identity, "kind": "supervisor_error", "reason": error, "run_ids": [],
-        "first_seen_epoch": previous.get("first_seen_epoch", now),
+        "error_fingerprint": fingerprint, "first_seen_epoch": first_seen,
         "observations": previous.get("observations", 0) + 1,
     }
     state["supervisor_error"] = incident
