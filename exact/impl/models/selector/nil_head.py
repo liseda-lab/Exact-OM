@@ -8,6 +8,8 @@ from pathlib import Path
 
 import torch
 
+from exact.utils.provenance import sha256_file
+
 from .fitting import fingerprint, freeze_json
 from .llm_learning import source_features
 
@@ -270,21 +272,61 @@ def source_decision_records(frame, source_universe, *, artifact=None, dataset=No
     return records
 
 
-def remove_development_positives(frame, reference_pairs, *, role, negative_label_policy):
-    if role not in {"development", "diagnostic"} or negative_label_policy != "complete_reference":
+def restrict_benchmark_exact_matches(dataset):
+    """Exact label matches may not expand an explicitly supplied benchmark pool."""
+    exact = getattr(dataset, "_exact_matches", None)
+    if exact is None or exact.empty:
+        return
+    pool = set(zip(dataset.candidates.Src.astype(str), dataset.candidates.Tgt.astype(str)))
+    keep = [(str(row.Src), str(row.Tgt)) in pool for row in exact.itertuples()]
+    dataset._exact_matches = exact.loc[keep].copy()
+    dataset._active_candidate_config["benchmark_pool_exact_scope"] = {
+        "version": 1,
+        "excluded_exact_pairs": len(keep) - sum(keep),
+    }
+    dataset._refresh_candidate_pool_manifest(origin="provided_benchmark_pool")
+
+
+def remove_development_positives(
+    frame,
+    reference_pairs,
+    *,
+    role,
+    negative_label_policy,
+    label_semantics="unknown",
+    candidate_labels=None,
+):
+    if role not in {"development", "diagnostic"}:
+        raise ValueError("Gold-removal diagnostics require a declared development role")
+    reference = {(str(source), str(target)) for source, target in reference_pairs}
+    before = list(zip(frame.Src.astype(str), frame.Tgt.astype(str)))
+    benchmark = label_semantics == "benchmark_pool"
+    if benchmark:
+        if candidate_labels is None:
+            raise ValueError("Benchmark pool-miss requires complete candidate labels")
+        confirmed = benchmark_candidate_labels(candidate_labels)
+        if len(before) != len(set(before)) or set(before) != set(confirmed):
+            raise ValueError("Benchmark pool-miss requires exact original candidate-label coverage")
+        if {pair for pair, value in confirmed.items() if value == 1} != reference:
+            raise ValueError("Benchmark pool-miss positives differ from the development reference")
+        if not reference:
+            raise ValueError("Benchmark pool-miss must remove at least one confirmed positive")
+    elif negative_label_policy != "complete_reference" or candidate_labels is not None:
         raise ValueError(
             "Gold-removal diagnostics require a declared development role and complete reference"
         )
-    reference = {(str(source), str(target)) for source, target in reference_pairs}
-    before = list(zip(frame.Src.astype(str), frame.Tgt.astype(str)))
     keep = [pair not in reference for pair in before]
     return frame.loc[keep].copy(), {
         "role": "diagnostic",
         "source_universe": sorted(set(frame.Src.astype(str))),
         "removed_pairs": sorted(set(before) & reference),
         "input_pool_sha256": fingerprint(before),
+        "retained_pool_sha256": fingerprint([pair for pair in before if pair not in reference]),
         "ontology_nil_claim": False,
-        "absence_semantics": "synthetic_pool_miss",
+        "absence_semantics": (
+            "synthetic_benchmark_pool_miss" if benchmark else "synthetic_pool_miss"
+        ),
+        "label_semantics": label_semantics,
     }
 
 
@@ -341,7 +383,15 @@ def nil_metrics(
     }
 
 
-def prepare_pool_miss_diagnostic(dataset, reference_path, *, negative_label_policy, seed):
+def prepare_pool_miss_diagnostic(
+    dataset,
+    reference_path,
+    *,
+    negative_label_policy,
+    seed,
+    label_semantics="unknown",
+    candidate_labels=None,
+):
     """Named development-only intervention; preserve the frozen source population."""
     from exact.utils.data import read_table
 
@@ -350,12 +400,29 @@ def prepare_pool_miss_diagnostic(dataset, reference_path, *, negative_label_poli
         (str(source), str(target))
         for source, target in table.iloc[:, :2].itertuples(index=False, name=None)
     }
+    confirmed = None
+    if candidate_labels is not None:
+        path = Path(candidate_labels["path"])
+        if sha256_file(path) != candidate_labels["sha256"]:
+            raise ValueError("Benchmark pool-miss candidate labels changed after binding")
+        confirmed = read_table(path)
     frame, manifest = remove_development_positives(
         dataset.candidates,
         reference,
         role="development",
         negative_label_policy=negative_label_policy,
+        label_semantics=label_semantics,
+        candidate_labels=confirmed,
     )
+    if candidate_labels is not None:
+        manifest["candidate_labels"] = {
+            "path": str(Path(candidate_labels["path"]).resolve()),
+            "sha256": candidate_labels["sha256"],
+        }
+        if hasattr(dataset, "eligible_source_iris") and set(dataset.eligible_source_iris) != set(
+            manifest["source_universe"]
+        ):
+            raise ValueError("Benchmark pool-miss must retain the complete source universe")
     if not hasattr(dataset, "eligible_source_iris"):
         dataset.freeze_source_universe(manifest["source_universe"], cap=None, seed=seed)
     dataset._candidates = frame

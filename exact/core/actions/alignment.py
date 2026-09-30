@@ -662,6 +662,12 @@ def _run_alignment_session(
         configs.data.reference_role or ""
     ).lower() in {"final", "reporting", "test"}:
         raise ValueError("Diagnostic anchor corruption cannot run on a reporting/final role")
+    nil_diagnostic_labels = configs.matching.nil.pool_miss_candidate_labels
+    if nil_diagnostic_labels is not None:
+        if configs.data.reference_role != "valid" or candidates_file_path is None:
+            raise ValueError("Benchmark pool-miss requires a provided development validation pool")
+        if file_provenance(nil_diagnostic_labels.path)["sha256"] != nil_diagnostic_labels.sha256:
+            raise ValueError("Benchmark pool-miss candidate labels changed after binding")
     if configs.dataset_params.filter_exact_matches:
         progress_tasks.append(ProgressTask("Prefilter", "Exact prefilter", estimate_seconds=30.0))
     progress_tasks.extend(
@@ -774,6 +780,13 @@ def _run_alignment_session(
                 output_dir=output_dir_path,
                 device=device,
             )
+        benchmark_pool = (
+            configs.matching.nil.label_semantics == "benchmark_pool"
+            and candidates_file_path is not None
+        )
+        if benchmark_pool:
+            # Policy changes must not restore a dataset that expanded supplied pools.
+            dataset._candidate_generation_params["benchmark_pool_scope_version"] = 1
         nil_diagnostic_reference = configs.matching.nil.pool_miss_development_reference
         if nil_diagnostic_reference is not None:
             dataset._candidate_generation_params["nil_pool_miss_diagnostic"] = {
@@ -782,6 +795,12 @@ def _run_alignment_session(
                     Path(nil_diagnostic_reference).read_bytes()
                 ).hexdigest(),
                 "negative_label_policy": configs.supervision.negative_label_policy,
+                "label_semantics": configs.matching.nil.label_semantics,
+                "candidate_labels": (
+                    nil_diagnostic_labels.model_dump(mode="json")
+                    if nil_diagnostic_labels is not None
+                    else None
+                ),
             }
         with timing_session.stage("Dataset.CacheCheck"):
             dataset_loaded_from_cache = dataset.has_cache()
@@ -841,11 +860,23 @@ def _run_alignment_session(
                     device=device,
                     **configs.candidates.model_dump(mode="python"),
                 )
+            if benchmark_pool:
+                from exact.impl.models.selector.nil_head import (
+                    restrict_benchmark_exact_matches,
+                )
+
+                restrict_benchmark_exact_matches(dataset)
             if nil_diagnostic_reference is not None:
                 dataset.prepare_pool_miss_diagnostic(
                     nil_diagnostic_reference,
                     negative_label_policy=configs.supervision.negative_label_policy,
                     seed=configs.seed,
+                    label_semantics=configs.matching.nil.label_semantics,
+                    candidate_labels=(
+                        nil_diagnostic_labels.model_dump(mode="python")
+                        if nil_diagnostic_labels is not None
+                        else None
+                    ),
                 )
             with timing_session.stage("Dataset.Process"):
                 dataset.process()

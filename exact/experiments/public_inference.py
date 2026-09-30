@@ -173,6 +173,7 @@ def _inference_config(config: Path, source: Path, target: Path) -> dict[str, Any
     )
     resolved["run"].update(source_cap=None, experiment_audit=True)
     resolved["matching"]["nil"]["pool_miss_development_reference"] = None
+    resolved["matching"]["nil"]["pool_miss_candidate_labels"] = None
     resolved["matching"]["nil"]["training_source_labels"] = None
     resolved["matching"]["relation_training_file"] = None
     for name in ("encoder_finetune", "cross_encoder"):

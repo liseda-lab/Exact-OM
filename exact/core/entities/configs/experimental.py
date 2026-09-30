@@ -84,6 +84,13 @@ class ScoreCalibrationConfig(StrictConfigModel):
     )
 
 
+class PoolMissCandidateLabels(StrictConfigModel):
+    """Pinned public annotations for a development-only candidate intervention."""
+
+    path: Path
+    sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
 class NilConfig(StrictConfigModel):
     """NIL/abstention controls from E04."""
 
@@ -93,10 +100,23 @@ class NilConfig(StrictConfigModel):
     artifact: Optional[Path] = None
     training_source_labels: Optional[Path] = None
     pool_miss_development_reference: Optional[Path] = None
+    pool_miss_candidate_labels: Optional[PoolMissCandidateLabels] = None
     label_semantics: Literal["unknown", "natural", "benchmark_pool"] = "unknown"
     ranking_scale: Literal["joint_accept_probability"] = Field(
         "joint_accept_probability", description="Common scale for real candidates and NIL."
     )
+
+    @model_validator(mode="after")
+    def valid_pool_miss_binding(self) -> "NilConfig":
+        benchmark = self.label_semantics == "benchmark_pool"
+        if self.pool_miss_candidate_labels is not None and (
+            self.pool_miss_development_reference is None or not benchmark
+        ):
+            raise ValueError("Pool-miss candidate labels require a benchmark_pool intervention")
+        if benchmark and self.pool_miss_development_reference is not None:
+            if self.pool_miss_candidate_labels is None:
+                raise ValueError("Benchmark pool-miss requires pinned complete candidate labels")
+        return self
 
 
 class FusionExperimentConfig(StrictConfigModel):

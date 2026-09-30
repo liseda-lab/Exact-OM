@@ -161,11 +161,8 @@ def evaluate_source_labels(cell: Any) -> dict[str, Any] | None:
         training_pool = data.get("train_candidates")
         if training_pool and candidate_path.resolve() == (root / training_pool).resolve():
             raise ValueError("NIL evaluation cannot consume training candidate labels")
-        confirmed = {
-            pair: value
-            for pair, value in benchmark_candidate_labels(read_table(candidate_path)).items()
-            if pair[0] in universe
-        }
+        all_confirmed = benchmark_candidate_labels(read_table(candidate_path))
+        confirmed = {pair: value for pair, value in all_confirmed.items() if pair[0] in universe}
         confirmed_positives = {pair for pair, value in confirmed.items() if value == 1}
         if reference & set(confirmed) != confirmed_positives:
             raise ValueError(
@@ -186,6 +183,30 @@ def evaluate_source_labels(cell: Any) -> dict[str, Any] | None:
     )
     if synthetic and cell.split_role != "development":
         raise ValueError("Synthetic pool-miss interventions are development-only")
+    synthetic_benchmark = benchmark and synthetic
+    if synthetic_benchmark:
+        intervention = cell.resolved_config.get("matching", {}).get("nil", {})
+        removal = Path(intervention["pool_miss_development_reference"])
+        removal_binding = intervention.get("pool_miss_candidate_labels")
+        if (
+            cell.reference_role != "valid"
+            or intervention.get("label_semantics") != "benchmark_pool"
+            or removal_binding != candidate_binding
+            or reference_path is None
+            or removal.resolve() != reference_path.resolve()
+        ):
+            raise ValueError(
+                "Benchmark pool-miss must bind the same validation reference and labels"
+            )
+        if universe != {source for source, _ in all_confirmed} or not set(labels.Status) <= {
+            "in_pool",
+            "benchmark_nil",
+        }:
+            raise ValueError("Benchmark pool-miss requires the complete annotated source universe")
+        if reference != {pair for pair, value in confirmed.items() if value == 1}:
+            raise ValueError("Benchmark pool-miss positives differ from the development reference")
+        if not reference or pool != {pair for pair, value in confirmed.items() if value == 0}:
+            raise ValueError("Benchmark pool-miss must retain exactly the confirmed negative pool")
     unresolved_pool_status = []
     complete_reference = (
         not benchmark and getattr(cell, "reference_completeness", "unknown") == "complete"
@@ -207,7 +228,11 @@ def evaluate_source_labels(cell: Any) -> dict[str, Any] | None:
                 actual = (
                     "in_pool"
                     if observed_in_pool
-                    else "pool_miss" if complete_reference or empty_pool else "mapped"
+                    else (
+                        "pool_miss"
+                        if complete_reference or synthetic_benchmark or empty_pool
+                        else "mapped"
+                    )
                 )
                 labels.at[index, "Status"] = actual
                 if actual == "mapped":
@@ -223,6 +248,8 @@ def evaluate_source_labels(cell: Any) -> dict[str, Any] | None:
         for row in records
         for target in row.get("emitted_targets", [])
     }
+    if synthetic_benchmark and not emitted <= pool:
+        raise ValueError("Benchmark pool-miss emitted targets outside the retained pool")
     for row in records:
         row.setdefault("absence_semantics", "unknown")
     metrics = nil_metrics(records, labels, reference, emitted, nil_status=nil_status)
@@ -243,6 +270,17 @@ def evaluate_source_labels(cell: Any) -> dict[str, Any] | None:
         }
         if benchmark:
             metrics["benchmark_nil"] = dict(metrics["nil_aware"])
+    if synthetic_benchmark:
+        missed = set(labels.loc[labels.Status == "pool_miss", "Src"])
+        emitted_sources = {source for source, _ in emitted}
+        metrics["synthetic_benchmark_pool_miss"] = {
+            "sources": len(missed),
+            "abstained_sources": len(missed - emitted_sources),
+            "emitted_sources": len(missed & emitted_sources),
+            "removed_positive_pairs": len(reference),
+            "remaining_pairs": len(pool),
+            "ontology_nil_claim": False,
+        }
     non_nil = known - gold_nil
     reciprocal_ranks = {
         str(row["Src"]): _reciprocal_rank(
@@ -284,6 +322,7 @@ def evaluate_source_labels(cell: Any) -> dict[str, Any] | None:
         "source_universe": sorted(universe),
         "outside_universe_source_labels": outside,
         "synthetic_pool_miss_diagnostic": synthetic,
+        "evaluated_source_status_counts": labels.Status.value_counts().to_dict(),
         "pool_status_unresolved_sources": sorted(unresolved_pool_status),
         "non_nil_reciprocal_ranks": reciprocal_ranks,
         "ranking_stage": "joint_candidate_ranking_before_global_acceptance",

@@ -110,6 +110,7 @@ def _check_config(config):
     if (
         llm.gate.mode in {"oracle_perfect", "oracle_replay", "forced_sample"}
         or config.matching.nil.pool_miss_development_reference is not None
+        or config.matching.nil.pool_miss_candidate_labels is not None
     ):
         raise ValueError("Diagnostic oracle/population interventions cannot be deployed")
     required = {
