@@ -17,7 +17,13 @@ from typing import Any, Mapping, Sequence, cast
 import pyowl_core as owl
 
 from exact.repair.candidates import make_candidate
-from exact.repair.learning import ProbeOutcome, RepairLabel, TeacherCache, TeacherProbe
+from exact.repair.learning import (
+    ProbeOutcome,
+    RepairLabel,
+    SupportTarget,
+    TeacherCache,
+    TeacherProbe,
+)
 from exact.repair.records import (
     RepairInputV2,
     RevisionObjectV2,
@@ -177,6 +183,20 @@ def cache_from_dict(value: Mapping[str, Any]) -> TeacherCache:
                 row["benefit"],
                 row["cost"],
                 tuple(ProbeOutcome(**probe) for probe in row["semantic_vector"]),
+                tuple(
+                    SupportTarget(
+                        **{
+                            **target,
+                            "assignment": tuple(target["assignment"]),
+                            "occurrence_ids": tuple(
+                                tuple(pair) for pair in target["occurrence_ids"]
+                            ),
+                            "asserted_axioms": tuple(target["asserted_axioms"]),
+                            "activation": tuple(target["activation"]),
+                        }
+                    )
+                    for target in row.get("support_targets", ())
+                ),
             )
             for row in value["labels"]
         ),

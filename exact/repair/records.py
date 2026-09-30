@@ -1010,6 +1010,13 @@ class GenerationReportV3(_PayloadRecordV3):
             "probability_semantics",
         }
         optional = {
+            "representative_max_checks",
+            "preparation_identity",
+            "support_admission",
+            "support_omissions",
+            "generation_identity",
+            "language_hash",
+            "protected_family_reports",
             "final_candidate_removals",
             "omitted_generation_symbols",
             "enabled_actions",
@@ -1042,6 +1049,27 @@ class GenerationReportV3(_PayloadRecordV3):
             "previous_pool_hash",
         }
         self._validate_fields(required, required | optional)
+        if "representative_max_checks" in self and (
+            type(self["representative_max_checks"]) is not int
+            or self["representative_max_checks"] < 0
+        ):
+            raise ValueError("representative traversal cap must be a nonnegative integer")
+        for name in ("generation_identity", "language_hash"):
+            if name in self:
+                self._hash_field(name)
+        for family in self.get("protected_family_reports", ()):
+            if family.get("status") not in {
+                "retained",
+                "empty_language",
+                "search_exhausted",
+                "compile_timeout",
+                "compile_node_limit",
+                "compile_memory_limit",
+                "worker_error",
+                "removed_by_intervention",
+                "candidate_cap",
+            }:
+                raise ValueError("invalid protected-family coverage status")
         if self["schema"] != "exact-repair/generation-report/v3":
             raise ValueError("unsupported generation payload schema")
         if not isinstance(self["object_id"], str) or not self["object_id"]:
@@ -1156,3 +1184,129 @@ class GenerationReportV3(_PayloadRecordV3):
                 raise ValueError("sample does not bind to its generation receipt")
         if len({sample["candidate_id"] for sample in samples}) != self["unique_draws"]:
             raise ValueError("unique draw count differs from sampled canonical bundles")
+
+
+@dataclasses.dataclass(frozen=True)
+class CompactVerificationReportV3(VerificationReportV3):
+    """Bounded final coverage receipt; full query events stay in a durable journal."""
+
+    coverage_hash: str = ""
+    coverage_count: int = 0
+    passed_count: int = 0
+    failed_count: int = 0
+    unknown_count: int = 0
+    exact_coverage: bool = False
+    transport_identity: str = "durable-event-stream/r1"
+
+    def __post_init__(self):
+        super().__post_init__()
+        counts = (self.coverage_count, self.passed_count, self.failed_count, self.unknown_count)
+        if any(type(x) is not int or x < 0 for x in counts) or sum(counts[1:]) != counts[0]:
+            raise ValueError("invalid compact coverage counts")
+        if len(self.coverage_hash) != 64:
+            raise ValueError("compact coverage requires a canonical query identity")
+
+    @property
+    def authorizes(self) -> bool:
+        return (
+            self.verdict == "VERIFIED_FEASIBLE"
+            and self.scope in {"full_owl", "complete_supported_fragment"}
+            and self.exact_coverage
+            and self.coverage_count > 0
+            and self.passed_count == self.coverage_count
+            and all(q.complete and q.verdict == "pass" for q in self.obligations)
+        )
+
+
+def compact_verification_report(report: Any) -> Any:
+    """Validate and reduce complete coverage without a final event-sized message."""
+    if (
+        not isinstance(report, VerificationReportV3)
+        or isinstance(report, CompactVerificationReportV3)
+        or max(len(report.obligations), len(report.events)) <= 128
+    ):
+        return report
+    names = tuple(q.name for q in report.obligations)
+    expected = tuple(report.expected_obligations)
+    passed = sum(q.complete and q.verdict == "pass" for q in report.obligations)
+    failed = sum(q.complete and q.verdict == "fail" for q in report.obligations)
+    values = {f.name: getattr(report, f.name) for f in dataclasses.fields(VerificationReportV3)}
+    bounded_support: list[tuple[str, Any]] = []
+    for key, value in report.support:
+        if isinstance(value, (tuple, list)) and len(value) > 128:
+            bounded_support.extend(
+                ((key + "_hash", canonical_hash(value)), (key + "_count", len(value)))
+            )
+        else:
+            bounded_support.append((key, value))
+    values.update(
+        support=tuple(bounded_support),
+        proofs=report.proofs[:1],
+        obligations=tuple(q for q in report.obligations if q.verdict != "pass")[:32],
+        expected_obligations=(),
+        events=tuple(e for e in report.events if e.obligation.verdict == "fail")[:1],
+        coverage_hash=canonical_hash(tuple(sorted(expected))),
+        coverage_count=len(names),
+        passed_count=passed,
+        failed_count=failed,
+        unknown_count=len(names) - passed - failed,
+        exact_coverage=(
+            len(set(names)) == len(names) == len(expected) == len(set(expected))
+            and set(names) == set(expected)
+        ),
+    )
+    return CompactVerificationReportV3(**values)
+
+
+@dataclasses.dataclass(frozen=True)
+class RecoverySearchLedgerV3(SearchLedgerV3):
+    """Corrective recovery identity retaining exception proofs and event journals."""
+
+    recovery_identity: str = "verification-recovery/r2"
+    baseline_artifact: BaselineReportV3 | None = None
+    baseline_qualification_hash: str = ""
+    event_journals: tuple[tuple[tuple[int, ...], str], ...] = ()
+    persistence_reservation_seconds: float = 0.0
+
+
+@dataclasses.dataclass(frozen=True)
+class SourceExceptionProofV3(Record):
+    """Complete source-only receipt resolving immutable premises by input hash."""
+
+    schema_version: ClassVar[str] = SCHEMA_V3
+    side: str
+    asserted_source_hash: str
+    documents: tuple[tuple[str, str, str], ...]
+    policy_hash: str
+    exceptions: tuple[Any, ...]
+    theory_hash: str
+    qualification_hash: str
+    report: Mapping[str, Any]
+    evidence_revision: str = "source-exception-evidence/v3.1"
+
+    def __post_init__(self):
+        super().__post_init__()
+        if (
+            self.side not in {"source", "target"}
+            or self.evidence_revision != "source-exception-evidence/v3.1"
+        ):
+            raise ValueError("Invalid source-exception evidence identity")
+        if any(
+            len(value) != 64
+            for value in (
+                self.asserted_source_hash,
+                self.policy_hash,
+                self.theory_hash,
+                self.qualification_hash,
+            )
+        ):
+            raise ValueError("Source-exception evidence requires canonical dependency hashes")
+
+
+@dataclasses.dataclass(frozen=True)
+class QualifiedBaselineReportV3(BaselineReportV3):
+    """Corrective baseline artifact; historical v3 bare checks stay readable."""
+
+    exception_proofs: tuple[SourceExceptionProofV3, ...] = ()
+    qualification_hash: str = ""
+    evidence_revision: str = "source-exception-evidence/v3.1"

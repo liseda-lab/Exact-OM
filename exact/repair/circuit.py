@@ -498,6 +498,7 @@ class CompiledFamily:
     fixed: tuple[tuple[int, bool], ...]
     status: str = "resolved"
     detail: str = ""
+    failure_telemetry: tuple = ()
 
 
 @dataclass(frozen=True)
@@ -519,7 +520,7 @@ class FactoredCircuit:
     @property
     def telemetry(self) -> tuple:
         return tuple(
-            (f.name, f.status, f.detail, f.circuit.telemetry if f.circuit else ())
+            (f.name, f.status, f.detail, f.circuit.telemetry if f.circuit else f.failure_telemetry)
             for f in self.families
         )
 

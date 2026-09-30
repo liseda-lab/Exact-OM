@@ -163,9 +163,7 @@ def test_sample_collection_retains_unknowns_split_and_new_inventory_identity():
         round.cache.labels
     )
     assert round.inventory_hash == "new" and round.requested == 6
-    assert all(
-        prob is None for _, stratum, prob in round.selections if stratum != "uniform_control"
-    )
+    assert all(prob is None for _, stratum, prob in round.selections if stratum != "uniform")
     with pytest.raises(ValueError, match="training-only"):
         collect_sampled_repairs(
             (2,),
@@ -323,15 +321,15 @@ def test_conditional_joint_distinguishes_equal_marginal_teachers():
     assert grad_a < 0 and grad_b > 0
 
 
-def test_generated_development_uses_independent_exact_plan_fidelity_label(monkeypatch):
+def test_generated_development_uses_independent_exact_plan_fidelity_label(tmp_path, monkeypatch):
     import tools.repair.train as train
     from exact.repair.pipeline import FrozenNeuralRound
     from exact.repair.records import ObjectiveV3, canonical_hash
     from exact.repair.workers import CallResult
-    from tests.repair_semantic_fidelity_test import _offline_lookup_fixture
+    from tests.repair_review_semantic_test import qualified_offline_fixture
     from tools.repair.corpus import GeneratedCase
 
-    observed, packet, comparison = _offline_lookup_fixture("development")
+    observed, packet, comparison = qualified_offline_fixture(tmp_path, monkeypatch, "development")
     case = GeneratedCase(
         observed.case_id,
         observed.structural_parent,

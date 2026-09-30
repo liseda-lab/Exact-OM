@@ -173,6 +173,182 @@ def evaluate_teacher(
 
 
 @dataclass(frozen=True)
+class SemanticTargetSpec:
+    """Frozen scalar meaning; costs and feasibility are deliberately separate."""
+
+    query_basis_hash: str
+    desired_family_weight: float = 1.0
+    false_positive_weight: float = 1.0
+    aggregation: str = "weighted-family-means/v1"
+    schema: str = "exact-repair/semantic-target/v3.1"
+
+    def __post_init__(self):
+        if any(
+            not math.isfinite(v) or v < 0
+            for v in (self.desired_family_weight, self.false_positive_weight)
+        ):
+            raise ValueError("Semantic weights must be finite and nonnegative")
+        if (
+            self.aggregation != "weighted-family-means/v1"
+            or self.schema != "exact-repair/semantic-target/v3.1"
+        ):
+            raise ValueError("Unsupported semantic target convention")
+
+    @property
+    def content_hash(self) -> str:
+        from .records import canonical_hash
+
+        return canonical_hash(self)
+
+    def evaluate(self, oracle: TeacherOracle, probes: Sequence[TeacherProbe]) -> TeacherResult:
+        from .records import canonical_hash
+
+        if canonical_hash(tuple(probes)) != self.query_basis_hash:
+            raise ValueError("Semantic target query basis mismatch")
+        return evaluate_teacher(
+            oracle,
+            probes,
+            desired_weights={p.family: self.desired_family_weight for p in probes},
+            unwanted_weights={p.family: self.false_positive_weight for p in probes},
+        )
+
+
+@dataclass(frozen=True)
+class SupportTarget:
+    """Qualified witness-violation label; proof contents remain evaluator-only."""
+
+    assignment: tuple[int, ...]
+    witness: str
+    obligation_kind: str
+    violated: bool | None
+    theory_hash: str
+    policy_hash: str
+    backend_hash: str
+    occurrence_ids: tuple[tuple[str, str], ...]
+    asserted_axioms: tuple[str, ...]
+    activation: tuple[str, ...]
+    proof_json: str | None = None
+    available_before_decision: bool = False
+    schema: str = "qualified-witness-violation/v1"
+
+    def __post_init__(self):
+        if self.schema != "qualified-witness-violation/v1" or self.available_before_decision:
+            raise ValueError("Support labels require the evaluator-only auxiliary schema")
+        if self.violated is not None and type(self.violated) is not bool:
+            raise ValueError("Support targets use qualified Boolean/unknown outcomes")
+        if (
+            not self.policy_hash
+            or not self.theory_hash
+            or len(self.assignment) != len(self.occurrence_ids)
+        ):
+            raise ValueError(
+                "Support labels require complete assignment and policy/theory provenance"
+            )
+
+    @property
+    def eligible(self) -> bool:
+        return (
+            self.violated is not None
+            and bool(self.backend_hash)
+            and (self.violated is False or self.proof_json is not None)
+        )
+
+
+def support_targets(
+    problem: Any,
+    assignment: tuple[int, ...],
+    report: Any,
+    axioms: tuple[Any, ...],
+    active: tuple[Any, ...],
+) -> tuple[SupportTarget, ...]:
+    """Positive qualified sufficient proof or independently decided negative witness.
+
+    No absent explanation is a negative label. Unknown whole verification remains
+    masked. Targets identify the witness, not retention of a known Boolean support.
+    """
+    import hashlib
+
+    from .detection import detect_violations, validate_proof
+    from .records import canonical_hash, canonical_json
+
+    if (
+        report.logical_status == "UNKNOWN"
+        or not report.support.input_supported
+        or not report.support.complete_imports
+    ):
+        return ()
+    proofs = {
+        (proof.kind, hashlib.sha256(proof.query.canonical_bytes()).hexdigest()): proof
+        for proof in detect_violations(axioms, active, problem.policy)
+        if proof.query is not None and validate_proof(proof, axioms, active, problem.policy)
+    }
+    queries = [
+        ("class_satisfiability", value if not isinstance(value, str) else owl.Class(owl.IRI(value)))
+        for value in problem.policy.monitored_classes
+    ]
+    queries += [("active_satisfiability", value) for value in active]
+    queries += [("required_entailment", value) for value in problem.policy.required]
+    queries += [("prohibited_entailment", value) for value in problem.policy.prohibited]
+    lookup = {
+        (kind, hashlib.sha256(value.canonical_bytes()).hexdigest()): value
+        for kind, value in queries
+    }
+    targets = []
+    for result in report.obligations:
+        key = result.kind, result.query_id
+        if key not in lookup or not result.complete or type(result.satisfied) is not bool:
+            continue
+        proof = proofs.get(key)
+        violated = result.satisfied is False
+        if violated and proof is None:
+            continue
+        targets.append(
+            SupportTarget(
+                assignment,
+                lookup[key].canonical_bytes().hex(),
+                result.kind,
+                violated,
+                canonical_hash(
+                    (
+                        tuple(sorted(set(axioms), key=canonical_hash)),
+                        tuple(sorted(set(active), key=canonical_hash)),
+                    )
+                ),
+                problem.policy.content_hash,
+                canonical_hash(report.support),
+                tuple(
+                    (obj.object_id, obj.candidates[choice].candidate_id)
+                    for obj, choice in zip(problem.objects, assignment)
+                ),
+                tuple(
+                    axiom.canonical_bytes().hex()
+                    for axiom in (proof.asserted_support if proof else axioms)
+                ),
+                tuple(value.canonical_bytes().hex() for value in active),
+                canonical_json(proof) if proof else None,
+            )
+        )
+    return tuple(targets)
+
+
+def support_loss(logits: Any, targets: Sequence[SupportTarget]) -> dict[str, Any]:
+    import torch.nn.functional as functional
+
+    if len(logits) != len(targets):
+        raise ValueError("Support readouts require matching witness labels")
+    indices = [i for i, target in enumerate(targets) if target.eligible]
+    loss = (
+        functional.binary_cross_entropy_with_logits(
+            logits[indices],
+            logits.new_tensor([float(cast(bool, targets[i].violated)) for i in indices]),
+        )
+        if indices
+        else logits.sum() * 0
+    )
+    return dict(loss=loss, eligible=len(indices), available=len(targets))
+
+
+@dataclass(frozen=True)
 class RepairLabel:
     """One whole-repair label; unknown policy or query decisions stay masked."""
 
@@ -181,6 +357,7 @@ class RepairLabel:
     benefit: float | None
     cost: float
     semantic_vector: tuple[ProbeOutcome, ...] = ()
+    support_targets: tuple[SupportTarget, ...] = ()
 
     def __post_init__(self) -> None:
         if self.feasible is not None and type(self.feasible) is not bool:
@@ -670,7 +847,10 @@ class SampledRepairRound:
     duplicates: int
     stop_reason: str
     assignment_maps: tuple[tuple[str, tuple[tuple[str, str], ...]], ...] = ()
-    schema: str = "exact-repair/sampled-round/v3"
+    schema: str = "exact-repair/sampled-round/v3.1"
+    attempts: tuple[Mapping[str, Any], ...] = ()
+    strata: tuple[tuple[str, tuple[tuple[str, int], ...]], ...] = ()
+    sampler_settings: tuple[tuple[str, Any], ...] = ()
 
 
 def collect_sampled_repairs(
@@ -686,17 +866,22 @@ def collect_sampled_repairs(
     max_assignments: int,
     deadline_seconds: float,
     seed: int = 0,
-    proposed: Sequence[tuple[tuple[int, ...], str]] = (),
+    proposed: Sequence[
+        tuple[tuple[int, ...], str] | tuple[tuple[int, ...], str, float | None]
+    ] = (),
     object_candidate_ids: Sequence[tuple[str, Sequence[str]]] = (),
-    exploration_fraction: float = 0.5,
+    exploration_fraction: float | None = None,
     counterfactual_attempts: int | None = None,
     quartet_attempts: int = 0,
+    plan_quotas: Mapping[str, int] | None = None,
+    resume_state: Mapping[str, Any] | None = None,
+    progress: Callable | None = None,
 ) -> SampledRepairRound:
     """Freeze sampler, acquire independent controls plus declared model alternatives.
 
-    First draws come from uniform controls and single-object counterfactuals;
-    optimizer/learned proposals have unknown propensity. Training splits only.
-    No rejection-resampling removes unknown or infeasible strata.
+    Every stratum shares one finite interleaved schedule; quartet budgets count
+    assignment attempts in groups of four. Probabilities describe draws, never
+    deduplicated inclusion. No rejection-resampling removes unknown outcomes.
     """
     from .records import canonical_hash
 
@@ -718,67 +903,232 @@ def collect_sampled_repairs(
         )
     ):
         raise ValueError("Candidate identity map does not match sample inventory")
+    names = ("utility", "proposal", "diversity", "quartet", "uniform")
+    sources: dict[str, list[tuple[tuple[int, ...], float | None]]] = {name: [] for name in names}
+    for entry in proposed:
+        assignment, origin = entry[0], entry[1]
+        stratum = "proposal" if origin == "proposal" else "utility"
+        sources[stratum].append((tuple(assignment), entry[2] if len(entry) == 3 else None))
+    if plan_quotas is None:
+        fraction = 0.5 if exploration_fraction is None else exploration_fraction
+        if not 0 <= fraction <= 1 or quartet_attempts < 0 or quartet_attempts % 4:
+            raise ValueError("Invalid legacy collection declaration")
+        quotas = {
+            "uniform": int(max_assignments * fraction),
+            "utility": len(sources["utility"]),
+            "proposal": len(sources["proposal"]),
+            "quartet": quartet_attempts,
+            "diversity": counterfactual_attempts or 0,
+        }
+        remaining = max_assignments - sum(quotas.values())
+        if remaining < 0:
+            raise ValueError("Legacy fractions/quotas exceed the finite plan attempt budget")
+        quotas["diversity"] += remaining
+        adapter = "legacy-resolved-quotas/v1"
+    else:
+        quotas = dict(plan_quotas)
+        if set(quotas) != set(names) or any(type(v) is not int or v < 0 for v in quotas.values()):
+            raise ValueError("Declare all nonnegative complete-plan stratum quotas")
+        if sum(quotas.values()) != max_assignments or quotas["quartet"] % 4:
+            raise ValueError(
+                "Plan quotas must fill budget; quartet units are four assignment attempts"
+            )
+        if exploration_fraction is not None and not math.isclose(
+            exploration_fraction * max_assignments, quotas["uniform"]
+        ):
+            raise ValueError("Uniform fraction contradicts explicit plan quotas")
+        if counterfactual_attempts is not None and counterfactual_attempts != quotas["diversity"]:
+            raise ValueError("Diversity alias contradicts explicit quota")
+        if quartet_attempts and quartet_attempts != quotas["quartet"]:
+            raise ValueError("Quartet alias contradicts explicit quota")
+        adapter = "explicit-quotas/v1"
     rng = random.Random(seed)
-    scheduled = list(proposed)
-    if not 0 <= exploration_fraction <= 1 or quartet_attempts < 0:
-        raise ValueError("Invalid sampling stratum budget")
-    random_count = int(max_assignments * exploration_fraction)
-    random_rows = [
-        (tuple(rng.randrange(n) for n in counts), "uniform_control") for _ in range(random_count)
+    sources["uniform"] = [
+        (tuple(rng.randrange(n) for n in counts), 1 / math.prod(counts))
+        for _ in range(quotas["uniform"])
     ]
-    base = proposed[0][0] if proposed else tuple(0 for _ in counts)
-    counterfactuals = []
+    base = sources["utility"][0][0] if sources["utility"] else tuple(0 for _ in counts)
+    sources["diversity"] = []
     for i, n in enumerate(counts):
         for choice in range(n):
             if choice != base[i]:
-                changed = list(base)
-                changed[i] = choice
-                counterfactuals.append((tuple(changed), "counterfactual"))
-    if counterfactual_attempts is not None:
-        counterfactuals = counterfactuals[:counterfactual_attempts]
-    quartets: list[tuple[tuple[int, ...], str]] = []
+                candidate_row = list(base)
+                candidate_row[i] = choice
+                sources["diversity"].append((tuple(candidate_row), None))
+    rng.shuffle(sources["diversity"])
     for i, j in itertools.combinations(range(len(counts)), 2):
-        if len(quartets) >= quartet_attempts:
+        for left in range(counts[i]):
+            if left == base[i]:
+                continue
+            for right in range(counts[j]):
+                if right == base[j]:
+                    continue
+                if len(sources["quartet"]) >= quotas["quartet"]:
+                    break
+                for a, b in ((base[i], base[j]), (left, base[j]), (base[i], right), (left, right)):
+                    candidate_row = list(base)
+                    candidate_row[i], candidate_row[j] = a, b
+                    sources["quartet"].append((tuple(candidate_row), None))
+            if len(sources["quartet"]) >= quotas["quartet"]:
+                break
+        if len(sources["quartet"]) >= quotas["quartet"]:
             break
-        if counts[i] > 1 and counts[j] > 1:
-            for left, right in ((0, 0), (1, 0), (0, 1), (1, 1)):
-                row = list(base)
-                row[i], row[j] = left, right
-                quartets.append((tuple(row), "counterfactual_quartet"))
-    scheduled = random_rows + scheduled + quartets[:quartet_attempts] + counterfactuals
-    scheduled = scheduled[:max_assignments]
-    started, labels, selections, seen, duplicates = time.monotonic(), [], [], set(), 0
+    # Resolve every slot before calling a verifier. A finite source exhaustion is
+    # an unavailable slot, never an implicit transfer to another stratum.
+    schedule: list[dict[str, Any]] = []
+    positions = dict.fromkeys(names, 0)
+    while any(positions[name] < quotas[name] for name in names):
+        for name in names:
+            width = 4 if name == "quartet" else 1
+            for _ in range(min(width, quotas[name] - positions[name])):
+                index = positions[name]
+                positions[name] += 1
+                slot_assignment, probability = (
+                    sources[name][index] if index < len(sources[name]) else (None, None)
+                )
+                schedule.append(
+                    dict(
+                        assignment=slot_assignment,
+                        stratum=name,
+                        probability=probability,
+                        quartet_id=(f"quartet:{index//4}" if name == "quartet" else None),
+                    )
+                )
+    settings = dict(
+        version="exact-repair/attempt-schedule/v1",
+        adapter=adapter,
+        quotas=tuple(sorted(quotas.items())),
+        seed=seed,
+        inventory=hashes["inventory"],
+        model=model_hash,
+        order="round_robin_atomic_quartets",
+        deduplication="inventory_assignment_all_origins",
+        proposal_sources=tuple(proposed),
+        quartet_unit="assignment_attempts",
+        exploration_fraction=exploration_fraction,
+        counterfactual_attempts=counterfactual_attempts,
+        quartet_attempts=quartet_attempts,
+    )
+    sampler_hash = canonical_hash((settings, counts, schedule))
+    started = time.monotonic()
+    previous_elapsed = float((resume_state or {}).get("elapsed_seconds", 0.0))
+    labels: list[RepairLabel] = []
+    selections = []
+    seen: dict[tuple[int, ...], int] = {}
+    attempts = []
+    counters = {
+        name: dict(
+            requested=quotas[name],
+            scheduled=quotas[name],
+            attempted=0,
+            duplicated=0,
+            verified=0,
+            unknown=0,
+            unavailable=0,
+            unvisited=0,
+        )
+        for name in names
+    }
+    if resume_state is not None:
+        if resume_state.get("sampler_hash") != sampler_hash:
+            raise ValueError("Partial collection sampler identity changed")
+        labels = [
+            RepairLabel(
+                tuple(row["assignment"]),
+                row["feasible"],
+                row["benefit"],
+                row["cost"],
+                tuple(ProbeOutcome(**value) for value in row["semantic_vector"]),
+                tuple(
+                    SupportTarget(
+                        **{
+                            **value,
+                            "assignment": tuple(value["assignment"]),
+                            "occurrence_ids": tuple(
+                                tuple(pair) for pair in value["occurrence_ids"]
+                            ),
+                            "asserted_axioms": tuple(value["asserted_axioms"]),
+                            "activation": tuple(value["activation"]),
+                        }
+                    )
+                    for value in row.get("support_targets", ())
+                ),
+            )
+            for row in resume_state["labels"]
+        ]
+        attempts = [dict(row) for row in resume_state["attempts"]]
+        counters = {name: dict(values) for name, values in resume_state["counters"].items()}
+        seen = {label.assignment: index for index, label in enumerate(labels)}
+        selections = [
+            (tuple(row["assignment"]), row["stratum"], row["probability"])
+            for row in attempts
+            if row.get("assignment") is not None and "label_index" in row
+        ]
     reason = "scheduled_complete"
-    for assignment, stratum in scheduled:
-        if len(assignment) != len(counts) or any(
-            type(c) is not int or not 0 <= c < n for c, n in zip(assignment, counts)
-        ):
-            raise ValueError("Sampler supplied invalid assignment")
-        if assignment in seen:
-            duplicates += 1
-            continue
+    start_position = len(attempts)
+    for position, slot in enumerate(schedule[start_position:], start=start_position):
+        assignment, name = slot["assignment"], slot["stratum"]
+        row = dict(slot, order=position)
         if time.monotonic() - started >= deadline_seconds:
             reason = "deadline"
-            break
-        seen.add(assignment)
-        label = label_assignment(assignment)
-        if label.assignment != assignment:
-            raise ValueError("Verifier labeled a different assignment")
-        labels.append(label)
-        selections.append(
-            (assignment, stratum, 1.0 / math.prod(counts) if stratum == "uniform_control" else None)
-        )
+            row["status"] = "unvisited"
+            counters[name]["unvisited"] += 1
+        elif assignment is None:
+            row["status"] = "unavailable"
+            counters[name]["unavailable"] += 1
+        else:
+            if len(assignment) != len(counts) or any(
+                type(c) is not int or not 0 <= c < n for c, n in zip(assignment, counts)
+            ):
+                raise ValueError("Sampler supplied invalid assignment")
+            counters[name]["attempted"] += 1
+            selections.append((assignment, name, slot["probability"]))
+            if assignment in seen:
+                row["status"] = "duplicated"
+                counters[name]["duplicated"] += 1
+            else:
+                label = label_assignment(assignment)
+                if label.assignment != assignment:
+                    raise ValueError("Verifier labeled a different assignment")
+                seen[assignment] = len(labels)
+                labels.append(label)
+                row["status"] = (
+                    "unknown"
+                    if label.feasible is None or (label.feasible and label.benefit is None)
+                    else "verified"
+                )
+                counters[name][row["status"]] += 1
+            row["label_index"] = seen[assignment]
+        attempts.append(row)
+        if progress is not None and row["status"] != "unvisited":
+            from dataclasses import asdict
+
+            progress(
+                dict(
+                    sampler_hash=sampler_hash,
+                    labels=[asdict(label) for label in labels],
+                    attempts=attempts,
+                    counters=counters,
+                    elapsed_seconds=previous_elapsed + time.monotonic() - started,
+                )
+            )
+    for row in attempts:
+        if row["quartet_id"] is not None:
+            group = [other for other in attempts if other["quartet_id"] == row["quartet_id"]]
+            row["quartet_complete"] = len(group) == 4 and all(
+                "label_index" in other and labels[other["label_index"]].usable for other in group
+            )
     cache = TeacherCache(
         counts,
         tuple(labels),
         False,
         "sample_conditioned:" + reason,
         tuple(sorted(hashes.items())),
-        time.monotonic() - started,
+        previous_elapsed + time.monotonic() - started,
         "exact-repair/teacher-cache/v3",
     )
     maps = []
-    for assignment, _, _ in selections:
+    for assignment in seen:
         mapping = tuple(
             sorted(
                 (name, ids[choice]) for (name, ids), choice in zip(object_candidate_ids, assignment)
@@ -792,14 +1142,17 @@ def collect_sampled_repairs(
         split,
         hashes["inventory"],
         model_hash,
-        canonical_hash((counts, max_assignments, seed, proposed)),
+        sampler_hash,
         round_id,
         cache,
         tuple(selections),
-        len(scheduled),
-        duplicates,
+        max_assignments,
+        sum(v["duplicated"] for v in counters.values()),
         reason,
         tuple(maps),
+        attempts=tuple(attempts),
+        strata=tuple((name, tuple(sorted(counts_.items()))) for name, counts_ in counters.items()),
+        sampler_settings=tuple(sorted(settings.items())),
     )
 
 

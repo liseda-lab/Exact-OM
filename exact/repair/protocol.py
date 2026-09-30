@@ -24,13 +24,14 @@ class StrictSection(BaseModel):
 
 
 class Identity(StrictSection):
+    implementation_revision: Literal["exact-repair/review-corrections/v1"]
     research_revision: Literal["XR-2.1"]
     record_schema: Literal["exact-repair/records/v3"]
     feature_schema: Literal["exact-repair/observable-features/v3"]
     label_schema: Literal[
         "exact-repair/teacher-cache/v3",
-        "exact-repair/semantic-fidelity-comparison/v3",
-        "exact-repair/mixed-targets/v3",
+        "exact-repair/fidelity-training/v3.2",
+        "exact-repair/mixed-targets/v3.2",
     ]
     code_hash: Text
     dirty_hash: Text
@@ -156,10 +157,16 @@ class Model(StrictSection):
     unary_benefit: bool
     pair_benefit: bool
     plan_risk: bool
+    preparation_schema: Literal["exact-repair/effective-preparation/v3.1"]
+    support_admission_policy: Literal["atomic-complete-support/v3.1"]
+    support_enabled: bool = False
+    support_target: Literal["qualified_witness_violation/v1"] = "qualified_witness_violation/v1"
     cost_predictor: Literal[False]
 
 
 class Teacher(StrictSection):
+    target_schema: Literal["exact-repair/semantic-target/v3.1"]
+    aggregation: Literal["weighted-family-means/v1"]
     consequence_manifest: Text
     typed_nonvacuity: Literal[True]
     temperature: PositiveAmount
@@ -172,6 +179,9 @@ class Teacher(StrictSection):
 
 
 class Collection(StrictSection):
+    schedule_version: Literal["exact-repair/attempt-schedule/v1"]
+    plan_quotas: dict[Literal["utility", "proposal", "diversity", "quartet", "uniform"], Count]
+    quartet_budget_unit: Literal["assignment_attempts"]
     rounds: Count
     cases_per_round: Count
     plan_attempts_per_case: Count
@@ -197,6 +207,7 @@ class Losses(StrictSection):
     proposal_weight: Amount
     interaction_loss_weight: Amount
     risk_loss_weight: Amount
+    support_loss_weight: Amount = 0.2
     sampled_proposal_loss_weight: Amount
     masks: Literal["complete_same_basis_per_loss"]
     normalization: Literal["eligible_terms"]
@@ -231,6 +242,7 @@ class LLMLabels(StrictSection):
     cache_policy: Literal["dependency_bound_raw_revalidation"]
     independent_evaluator: bool
     annotation_manifest: str | None
+    aggregation_revision: Literal["exact-repair/semantic-fidelity-aggregate/v3.2"]
 
 
 class Objective(StrictSection):
@@ -290,6 +302,7 @@ class Resources(StrictSection):
 
 
 class Training(StrictSection):
+    recovery_revision: Literal["exact-phase-resume/v3.1"]
     revision: Literal["v3"]
     optimizer: Literal["adamw"]
     dtype: Literal["float32"]
@@ -358,27 +371,37 @@ class RepairProtocolV3(StrictSection):
     def cross_fields(self):
         target_schema = {
             "symbolic": "exact-repair/teacher-cache/v3",
-            "ai_weak": "exact-repair/semantic-fidelity-comparison/v3",
-            "mixed": "exact-repair/mixed-targets/v3",
+            "ai_weak": "exact-repair/fidelity-training/v3.2",
+            "mixed": "exact-repair/mixed-targets/v3.2",
         }[self.losses.target_basis]
         if self.identity.label_schema != target_schema:
             raise ValueError("Declared label schema does not match the target basis")
         if self.model.hidden_width % self.model.attention_heads or self.model.dropout >= 1:
             raise ValueError("Invalid graph width/heads/dropout")
-        if (
-            sum(
-                (
-                    self.collection.utility_attempts,
-                    self.collection.diversity_attempts,
-                    self.collection.quartet_attempts,
-                    self.collection.proposal_attempts,
-                )
-            )
-            > self.collection.plan_attempts_per_case
+        collection = self.collection
+        if set(collection.plan_quotas) != {
+            "utility",
+            "proposal",
+            "diversity",
+            "quartet",
+            "uniform",
+        }:
+            raise ValueError("Explicit quotas must cover every complete-plan stratum")
+        if sum(collection.plan_quotas.values()) != collection.plan_attempts_per_case:
+            raise ValueError("Complete-plan quotas must exactly equal the plan-attempt budget")
+        if collection.plan_quotas["quartet"] % 4:
+            raise ValueError("Quartet allocation counts complete four-assignment groups")
+        for name in ("utility", "proposal", "diversity", "quartet"):
+            if getattr(collection, name + "_attempts") != collection.plan_quotas[name]:
+                raise ValueError("Legacy attempt declarations contradict explicit plan quotas")
+        denominator = collection.plan_attempts_per_case
+        for field, stratum in (
+            ("generator_fraction", "proposal"),
+            ("exploration_fraction", "uniform"),
         ):
-            raise ValueError("Collection strata exceed plan-attempt budget")
-        if self.collection.generator_fraction + self.collection.exploration_fraction > 1:
-            raise ValueError("Collection mixture mass exceeds one")
+            expected = collection.plan_quotas[stratum] / denominator if denominator else 0.0
+            if abs(getattr(collection, field) - expected) > 1e-12:
+                raise ValueError("Legacy fractions contradict explicit plan quotas")
         r = self.resources
         if (
             max(
@@ -411,6 +434,14 @@ class RepairProtocolV3(StrictSection):
             if stage.candidate_cap < 2 * stage.endpoints_per_side + 2:
                 raise ValueError(
                     "Candidate cap cannot reserve declared equivalence elementary alternatives"
+                )
+        for previous, current in zip(self.generation.stages, self.generation.stages[1:]):
+            if any(
+                getattr(current, field) < getattr(previous, field)
+                for field in GenerationStage.model_fields
+            ):
+                raise ValueError(
+                    "Progressive stages must preserve nested language and resource bounds"
                 )
         if self.training.generation_stage >= len(self.generation.stages):
             raise ValueError("Selected training generation stage is unavailable")
@@ -532,7 +563,12 @@ def training_projection_v3(protocol: RepairProtocolV3) -> dict[str, Any]:
         "proposal_loss_weight": loss["proposal_weight"],
         **{
             k: loss[k]
-            for k in ("interaction_loss_weight", "risk_loss_weight", "sampled_proposal_loss_weight")
+            for k in (
+                "interaction_loss_weight",
+                "risk_loss_weight",
+                "support_loss_weight",
+                "sampled_proposal_loss_weight",
+            )
         },
     }
     result["teacher"] = {

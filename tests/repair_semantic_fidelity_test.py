@@ -256,13 +256,9 @@ def test_order_swaps_aggregation_and_dissent():
     b = validate_comparison(
         json.dumps(judgment(p, swapped=True, decision="B", a=0.25, b=0.75)), p, swapped=True
     )
-    out = aggregate_comparisons([a, b], quorum=2)
-    assert out["decision"] == "A" and out["scheduled"] == 2
-    assert out["overall_score_a"] == 0.75
-    assert "no human validation" in out["claim_scope"]
-    dissent = validate_comparison(json.dumps(judgment(p, decision="B", a=0.25, b=0.75)), p)
-    assert aggregate_comparisons([a, dissent], quorum=2)["decision"] == "abstain"
-    assert aggregate_comparisons([a], quorum=2)["decision"] == "abstain"
+    # Raw parser fixtures remain readable, but cannot claim independent votes.
+    with pytest.raises(ValueError, match="frozen annotation schedule"):
+        aggregate_comparisons([a, b], quorum=2)
 
 
 def test_completed_raw_replays_after_restart_and_parser_revision(tmp_path, monkeypatch):
@@ -651,8 +647,12 @@ def _offline_lookup_fixture(split="train"):
 
 
 def test_offline_lookup_matches_exact_plan_and_keeps_absence_unknown():
+    from functools import partial
+
     from exact.repair.semantic_fidelity import offline_plan_label
 
+    # This historical diagnostic exercises identity matching, not quorum qualification.
+    offline_plan_label = partial(offline_plan_label, require_aggregate=False)
     case, p, c = _offline_lookup_fixture()
     label = offline_plan_label(case, (0,), (), [(p, c)])
     assert label.usable and label.benefit == 0.75 and label.cost >= 0
@@ -668,10 +668,13 @@ def test_offline_lookup_matches_exact_plan_and_keeps_absence_unknown():
 
 
 def test_offline_evaluator_lookup_rejects_leakage_model_overlap_and_changed_query_basis():
+    from functools import partial
     from types import SimpleNamespace
 
     from exact.repair.semantic_fidelity import offline_plan_label
 
+    # This historical diagnostic exercises identity matching, not quorum qualification.
+    offline_plan_label = partial(offline_plan_label, require_aggregate=False)
     case, p, c = _offline_lookup_fixture("development")
     assert offline_plan_label(case, (0,), (), [(p, c)], role="evaluator").benefit == 0.75
     with pytest.raises(ValueError, match="case split"):

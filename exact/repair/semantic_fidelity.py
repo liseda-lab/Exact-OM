@@ -8,6 +8,7 @@ Raw wire bytes live in RequestLedger; validation and aggregation are separate.
 from __future__ import annotations
 
 import dataclasses
+import hashlib
 import json
 import math
 import os
@@ -18,7 +19,7 @@ from typing import Any, ClassVar, Mapping, Sequence
 
 from exact.llm.ledger import RequestLedger, request_identity
 from exact.llm.routing import LLMProfile, LLMRouter, OpenRouterClient, extract_chat_text
-from exact.repair.records import Record, canonical_hash
+from exact.repair.records import Record, canonical_hash, canonical_json
 from exact.repair.workers import bounded_call, emit_event
 
 TEACHER = "repair_semantic_teacher"
@@ -27,6 +28,8 @@ ROLES = (TEACHER, EVALUATOR)
 CRITERIA = ("meaning_retention", "assertion_fidelity", "collateral_fidelity")
 PARSER_VERSION = "semantic-fidelity-validator/v3.1"
 PROMPT_VERSION = "semantic-fidelity-prompt/v3.1"
+AGGREGATION_REVISION = "exact-repair/semantic-fidelity-aggregate/v3.2"
+FIDELITY_TRAINING_SCHEMA = "exact-repair/fidelity-training/v3.2"
 PROMPT = """Compare the complete effects of two verified feasible repairs using only the
 frozen evidence below. The provisional alignment may be wrong. Judge supported
 meaning retention, assertion fidelity (directions, endpoints, quantifiers and
@@ -576,6 +579,7 @@ def offline_plan_label(
     ],
     *,
     role: str = "teacher",
+    require_aggregate: bool = True,
 ) -> Any:
     """Exact frozen-plan lookup, with no interpolation or model-generated target.
 
@@ -605,6 +609,8 @@ def offline_plan_label(
     query_hash = canonical_hash(consequence_basis_from_probes(case.probes))
     scores, bases = [], set()
     for packet, comparison in comparisons_with_packets:
+        if require_aggregate and not isinstance(comparison, ValidatedFidelityAggregateV3):
+            raise ValueError("Offline training requires a validated aggregation revision")
         if (
             packet.case_id != case.case_id
             or comparison.case_id != case.case_id
@@ -667,73 +673,521 @@ def offline_plan_label(
     return RepairLabel(assignment, True, float(scores[0]), cost)
 
 
+def _canonical_request_key(parameters: Mapping[str, Any]) -> str:
+    return request_identity(json.loads(canonical_json(parameters)))[0]
+
+
+@dataclasses.dataclass(frozen=True)
+class AnnotationScheduleV3(Record):
+    """Frozen vote slots, distinct from chargeable corrections or parser views."""
+
+    schema_version: ClassVar[str] = "exact-repair/records/v3"
+    packet: SemanticEvidencePacketV3
+    slots: tuple[Mapping[str, Any], ...]
+    parser_versions: tuple[str, ...]
+    quorum: int
+    max_disagreement: float = 0.0
+    revision: str = AGGREGATION_REVISION
+    correction_rule: str = "latest_correction_then_declared_parser"
+
+    def __post_init__(self):
+        super().__post_init__()
+        if (
+            self.revision != AGGREGATION_REVISION
+            or self.correction_rule != "latest_correction_then_declared_parser"
+        ):
+            raise ValueError("Unsupported annotation aggregation revision/rule")
+        if type(self.quorum) is not int or self.quorum < 1:
+            raise ValueError("Annotation quorum must be a positive integer")
+        if not math.isfinite(self.max_disagreement) or not 0 <= self.max_disagreement <= 1:
+            raise ValueError("Invalid annotation disagreement threshold")
+        if (
+            not self.parser_versions
+            or len(set(self.parser_versions)) != len(self.parser_versions)
+            or any(not p for p in self.parser_versions)
+        ):
+            raise ValueError("Declare unique parser revisions in supersession order")
+        if len({slot["slot_id"] for slot in self.slots}) != len(self.slots):
+            raise ValueError("Duplicate scheduled annotation slot")
+        roles = set()
+        for slot in self.slots:
+            _keys(
+                slot,
+                {"slot_id", "parameters", "correction_cap", "annotation_policy"},
+                "annotation slot",
+            )
+            parameters = slot["parameters"]
+            if _canonical_request_key(parameters) != slot["slot_id"]:
+                raise ValueError("Noncanonical annotation slot identity")
+            context = _parameter_context(parameters)
+            if (
+                canonical_hash(context["packet"])
+                != canonical_hash(self.packet.judge_payload(swapped=context["swapped"]))
+                or context["correction"] != 0
+                or context["correction_errors"]
+                or type(context["repetition"]) is not int
+                or context["repetition"] < 0
+                or type(context["swapped"]) is not bool
+                or type(slot["correction_cap"]) is not int
+                or not 0 <= slot["correction_cap"] <= 1
+            ):
+                raise ValueError("Annotation slot does not match the frozen packet/presentation")
+            policy = slot["annotation_policy"]
+            _keys(
+                policy,
+                {
+                    "run_id",
+                    "run_hash",
+                    "role",
+                    "teacher_model",
+                    "independent_evaluator",
+                    "evaluation_use",
+                    "evidence_manifest_hash",
+                    "split_manifest_hash",
+                },
+                "annotation slot policy",
+            )
+            if policy["role"] != parameters["role"] or policy["run_id"] != context["run_id"]:
+                raise ValueError("Annotation schedule role/run policy mismatch")
+            roles.add(parameters["role"])
+        if len(roles) > 1:
+            raise ValueError("Teacher and evaluator judgments cannot share an aggregate")
+
+
+def _parameter_context(parameters: Mapping[str, Any]) -> dict[str, Any]:
+    _keys(
+        parameters,
+        {
+            "role",
+            "model",
+            "revision",
+            "api_base",
+            "provider",
+            "messages",
+            "max_tokens",
+            "temperature",
+        },
+        "annotation parameters",
+    )
+    messages = parameters["messages"]
+    if (
+        parameters["role"] not in ROLES
+        or not parameters["model"]
+        or parameters["temperature"] != 0.0
+        or type(parameters["max_tokens"]) is not int
+        or parameters["max_tokens"] < 1
+        or parameters["provider"].get("allow_fallbacks") is not False
+        or len(messages) != 2
+        or messages[0] != {"role": "system", "content": PROMPT}
+        or messages[1].get("role") != "user"
+    ):
+        raise ValueError("Invalid frozen annotation request parameters")
+    context = _strict_json(messages[1]["content"])
+    if not isinstance(context, dict):
+        raise ValueError("Annotation context must be an object")
+    _keys(
+        context,
+        {
+            "packet",
+            "run_id",
+            "lineage_id",
+            "prompt_version",
+            "prompt_hash",
+            "repetition",
+            "swapped",
+            "correction",
+            "correction_errors",
+        },
+        "annotation context",
+    )
+    if context["prompt_version"] != PROMPT_VERSION or context["prompt_hash"] != canonical_hash(
+        PROMPT
+    ):
+        raise ValueError("Annotation request prompt identity mismatch")
+    return context
+
+
+def _receipt_response(receipt: Mapping[str, Any], parameters: Mapping[str, Any]) -> dict[str, Any]:
+    """Validate exported RequestLedger bytes, not an identity asserted by the judge."""
+    _keys(
+        receipt,
+        {"request_id", "attempt", "identity", "raw_response", "sha256"},
+        "durable annotation receipt",
+    )
+    identity = receipt["identity"]
+    if (
+        _canonical_request_key(identity) != receipt["request_id"]
+        or type(receipt["attempt"]) is not int
+        or receipt["attempt"] < 1
+        or hashlib.sha256(receipt["raw_response"].encode()).hexdigest() != receipt["sha256"]
+    ):
+        raise ValueError("Durable annotation request/response integrity mismatch")
+    payload = identity.get("payload", {})
+    expected = {
+        name: parameters[name]
+        for name in ("model", "messages", "max_tokens", "temperature", "provider")
+    }
+    if (
+        identity.get("role") != parameters["role"]
+        or identity.get("revision") != parameters["revision"]
+        or identity.get("endpoint") != parameters["api_base"] + "/chat/completions"
+        or canonical_hash(payload) != canonical_hash(expected)
+    ):
+        raise ValueError("Durable request differs from declared annotation parameters")
+    response = _strict_json(receipt["raw_response"])
+    if not isinstance(response, dict):
+        raise ValueError("Durable annotation response must be an object")
+    if response.get("model") != parameters["model"] or (
+        parameters["provider"].get("only")
+        and response.get("provider") not in parameters["provider"]["only"]
+    ):
+        raise ValueError("Durable response has an unexpected model/provider")
+    choice = (response.get("choices") or [{}])[0]
+    if choice.get("finish_reason") != "stop" or (choice.get("message") or {}).get("refusal"):
+        raise ValueError("Durable annotation response is refused or incomplete")
+    return response
+
+
+def _validated_observation(
+    comparison: SemanticFidelityComparisonV3, schedule: AnnotationScheduleV3
+) -> tuple[str, int, int, dict[str, Any]]:
+    metadata = comparison.annotator
+    parameters = metadata.get("request_parameters")
+    receipt = metadata.get("wire_receipt")
+    if not isinstance(parameters, Mapping) or not isinstance(receipt, Mapping):
+        raise ValueError("Aggregation requires durable canonical request/response provenance")
+    context = _parameter_context(parameters)
+    if metadata.get("parameters_hash") != _canonical_request_key(parameters):
+        raise ValueError("Annotation parameters_hash differs from its canonical request")
+    base_context = {**context, "correction": 0, "correction_errors": []}
+    base_parameters = {
+        **parameters,
+        "messages": [
+            parameters["messages"][0],
+            {
+                "role": "user",
+                "content": json.dumps(
+                    base_context, sort_keys=True, separators=(",", ":"), allow_nan=False
+                ),
+            },
+        ],
+    }
+    slot_id = _canonical_request_key(base_parameters)
+    slots = {slot["slot_id"]: slot for slot in schedule.slots}
+    if slot_id not in slots or canonical_hash(slots[slot_id]["parameters"]) != canonical_hash(
+        base_parameters
+    ):
+        raise ValueError("Annotation observation is outside the frozen schedule")
+    if any(
+        metadata.get(key) != value for key, value in slots[slot_id]["annotation_policy"].items()
+    ):
+        raise ValueError("Annotation metadata differs from the frozen role/split policy")
+    correction = context["correction"]
+    if type(correction) is not int or not 0 <= correction <= slots[slot_id]["correction_cap"]:
+        raise ValueError("Undeclared annotation correction")
+    parser = metadata.get("parser_version")
+    if parser not in schedule.parser_versions:
+        raise ValueError("Parser revision is outside the frozen aggregation schedule")
+    if (
+        metadata.get("role") != parameters["role"]
+        or metadata.get("actual_model") != parameters["model"]
+    ):
+        raise ValueError("Annotator provenance contradicts the durable request")
+    if canonical_hash(context["packet"]) != canonical_hash(
+        schedule.packet.judge_payload(swapped=context["swapped"])
+    ):
+        raise ValueError("Annotation response has incompatible packet dependencies")
+    if correction:
+        prior = metadata.get("correction_parent")
+        if not isinstance(prior, Mapping):
+            raise ValueError("Correction lacks the durable preceding parser failure")
+        preceding = _receipt_response(prior, base_parameters)
+        try:
+            validate_comparison(
+                extract_chat_text(preceding), schedule.packet, swapped=context["swapped"]
+            )
+        except ValueError as error:
+            if context["correction_errors"] != [str(error)]:
+                raise ValueError("Correction does not quote the original parser failure") from error
+        else:
+            raise ValueError("A valid judgment cannot acquire an extra correction vote")
+    elif context["correction_errors"]:
+        raise ValueError("Initial annotation has undeclared correction instructions")
+    response = _receipt_response(receipt, parameters)
+    expected_presentation = {key: context[key] for key in ("swapped", "repetition", "correction")}
+    if dict(comparison.presentation) != expected_presentation:
+        raise ValueError("Parsed presentation differs from its durable request")
+    parsed = validate_comparison(
+        extract_chat_text(response),
+        schedule.packet,
+        swapped=context["swapped"],
+        annotator=metadata,
+        presentation=expected_presentation,
+    )
+    if parsed != comparison:
+        raise ValueError("Parsed comparison differs from its retained wire response")
+    observation = {
+        "slot_id": slot_id,
+        "request_id": receipt["request_id"],
+        "attempt": receipt["attempt"],
+        "response_sha256": receipt["sha256"],
+        "parameters_hash": metadata["parameters_hash"],
+        "parser_version": parser,
+        "comparison_id": comparison.comparison_id,
+    }
+    return slot_id, correction, schedule.parser_versions.index(parser), observation
+
+
 def aggregate_comparisons(
     comparisons: Sequence[SemanticFidelityComparisonV3],
     *,
-    quorum: int,
-    max_disagreement: float = 0.0,
+    quorum: int | None = None,
+    max_disagreement: float | None = None,
     scheduled_count: int | None = None,
+    schedule: AnnotationScheduleV3 | None = None,
 ) -> dict[str, Any]:
-    """All scheduled judgments stay in the denominator; dissent is never discarded."""
-    scheduled = len(comparisons) if scheduled_count is None else scheduled_count
-    if type(scheduled) is not int or scheduled < len(comparisons):
-        raise ValueError("Scheduled denominator cannot omit observed judgments")
-    if quorum < 1 or not 0 <= max_disagreement <= 1:
-        raise ValueError("Invalid aggregation policy")
+    """Count one authoritative observation per declared slot, retaining all omissions."""
+    if schedule is None:
+        raise ValueError("A frozen annotation schedule and durable provenance are required")
+    scheduled = len(schedule.slots)
     if (
-        comparisons
-        and len(
-            {
-                (
-                    c.packet_hash,
-                    c.policy_hash,
-                    c.query_basis_hash,
-                    c.rubric_version,
-                    tuple(sorted((c.plan_a_id, c.plan_b_id))),
-                )
-                for c in comparisons
-            }
-        )
-        != 1
+        (quorum is not None and quorum != schedule.quorum)
+        or (max_disagreement is not None and max_disagreement != schedule.max_disagreement)
+        or (scheduled_count is not None and scheduled_count != scheduled)
     ):
-        raise ValueError("Incompatible judgment dependencies")
-    decided = [c for c in comparisons if c.global_target_eligible]
-    origin = comparisons[0].plan_a_id if comparisons else None
+        raise ValueError("Aggregation settings differ from the frozen schedule")
+    authoritative: dict[
+        str, tuple[tuple[int, int], SemanticFidelityComparisonV3, dict[str, Any]]
+    ] = {}
+    audit = []
+    receipts: dict[tuple[str, int], str] = {}
+    for comparison in comparisons:
+        slot, correction, parser, observation = _validated_observation(comparison, schedule)
+        wire_key = (observation["request_id"], observation["attempt"])
+        if wire_key in receipts and receipts[wire_key] != observation["response_sha256"]:
+            raise ValueError("One durable attempt has conflicting responses")
+        receipts[wire_key] = observation["response_sha256"]
+        rank = (correction, parser)
+        previous = authoritative.get(slot)
+        if previous is None:
+            authoritative[slot] = (rank, comparison, observation)
+        elif rank > previous[0]:
+            audit.append({"reason": "superseded", **previous[2]})
+            authoritative[slot] = (rank, comparison, observation)
+        elif rank == previous[0] and comparison != previous[1]:
+            raise ValueError("Conflicting parsed observations for the same scheduled attempt")
+        else:
+            audit.append(
+                {"reason": "duplicate" if rank == previous[0] else "superseded", **observation}
+            )
+    ordered = [
+        authoritative[slot["slot_id"]]
+        for slot in schedule.slots
+        if slot["slot_id"] in authoritative
+    ]
+    decided = [row for row in ordered if row[1].global_target_eligible]
+    origin = schedule.packet.plan_a.plan_id
     votes = [
         (
             c.decision
             if c.plan_a_id == origin or c.decision == "tie"
             else ("B" if c.decision == "A" else "A")
         )
-        for c in decided
+        for _, c, _ in decided
     ]
     counts = {v: votes.count(v) for v in ("A", "B", "tie")}
     winner = max(counts, key=lambda vote: counts[vote])
     dissent = (len(votes) - counts[winner]) / len(votes) if votes else 1.0
-    outcome = winner if len(decided) >= quorum and dissent <= max_disagreement else "abstain"
-    aligned_scores_a: list[float] = []
-    aligned_scores_b: list[float] = []
-    for comparison in decided:
-        score_a, score_b = comparison.overall_score_a, comparison.overall_score_b
-        assert score_a is not None and score_b is not None
-        aligned_scores_a.append(score_a if comparison.plan_a_id == origin else score_b)
-        aligned_scores_b.append(score_b if comparison.plan_a_id == origin else score_a)
+    outcome = (
+        winner
+        if len(decided) >= schedule.quorum and dissent <= schedule.max_disagreement
+        else "abstain"
+    )
+    scores_a, scores_b = [], []
+    for _, comparison, _ in decided:
+        a, b = comparison.overall_score_a, comparison.overall_score_b
+        assert a is not None and b is not None
+        scores_a.append(a if comparison.plan_a_id == origin else b)
+        scores_b.append(b if comparison.plan_a_id == origin else a)
     return {
-        "schema": "exact-repair/semantic-fidelity-aggregate/v3",
+        "schema": AGGREGATION_REVISION,
+        "schedule_hash": schedule.content_hash,
         "scheduled": scheduled,
+        "observed": len(ordered),
         "eligible": len(decided),
-        "invalid_or_missing": scheduled - len(comparisons),
+        "missing": scheduled - len(ordered),
+        "invalid_or_abstained": len(ordered) - len(decided),
+        "invalid_or_missing": scheduled - len(decided),
         "votes": counts,
         "decision": outcome,
         "disagreement": dissent,
-        "quorum": quorum,
-        "max_disagreement": max_disagreement,
+        "quorum": schedule.quorum,
+        "max_disagreement": schedule.max_disagreement,
         "numeric_rule": "median",
-        "overall_score_a": (statistics.median(aligned_scores_a) if outcome != "abstain" else None),
-        "overall_score_b": (statistics.median(aligned_scores_b) if outcome != "abstain" else None),
-        "input_ids": [c.comparison_id for c in comparisons],
-        "claim_scope": "AI-labeled semantic-fidelity proxy; no human validation",
+        "overall_score_a": statistics.median(scores_a) if outcome != "abstain" else None,
+        "overall_score_b": statistics.median(scores_b) if outcome != "abstain" else None,
+        "input_ids": [c.comparison_id for _, c, _ in ordered],
+        "unique_observations": [observation for _, _, observation in ordered],
+        "audit": audit,
+        "claim_scope": "AI-labeled semantic-fidelity proxy; model repetitions are not independent human experts; no human validation",
     }
+
+
+@dataclasses.dataclass(frozen=True)
+class ValidatedFidelityAggregateV3(Record):
+    """Portable revalidated aggregate; training never treats parsed copies as raters."""
+
+    schema_version: ClassVar[str] = "exact-repair/records/v3"
+    schedule: AnnotationScheduleV3
+    observations: tuple[SemanticFidelityComparisonV3, ...]
+    result: Mapping[str, Any]
+
+    def __post_init__(self):
+        super().__post_init__()
+        if canonical_hash(self.result) != canonical_hash(
+            aggregate_comparisons(self.observations, schedule=self.schedule)
+        ):
+            raise ValueError("Aggregate receipt does not reproduce from its unique observations")
+
+    @property
+    def packet_hash(self):
+        return self.schedule.packet.content_hash
+
+    @property
+    def case_id(self):
+        return self.schedule.packet.case_id
+
+    @property
+    def parent_group_id(self):
+        return self.schedule.packet.parent_group_id
+
+    @property
+    def split(self):
+        return self.schedule.packet.split
+
+    @property
+    def policy_hash(self):
+        return self.schedule.packet.plan_a.policy_hash
+
+    @property
+    def query_basis_hash(self):
+        return self.schedule.packet.plan_a.query_basis_hash
+
+    @property
+    def rubric_version(self):
+        return self.schedule.packet.rubric_version
+
+    @property
+    def criterion_weights(self):
+        return self.schedule.packet.criterion_weights
+
+    @property
+    def plan_a_id(self):
+        return self.schedule.packet.plan_a.plan_id
+
+    @property
+    def plan_b_id(self):
+        return self.schedule.packet.plan_b.plan_id
+
+    @property
+    def decision(self):
+        return self.result["decision"]
+
+    @property
+    def overall_score_a(self):
+        return self.result["overall_score_a"]
+
+    @property
+    def overall_score_b(self):
+        return self.result["overall_score_b"]
+
+    @property
+    def global_target_eligible(self):
+        return self.decision != "abstain"
+
+    @property
+    def comparison_id(self):
+        return self.content_hash
+
+    @property
+    def annotator(self):
+        if not self.observations:
+            return {}
+        values = [c.annotator for c in self.observations]
+        return {
+            **dict(values[0]),
+            "aggregation_revision": AGGREGATION_REVISION,
+            "aggregation_hash": self.content_hash,
+            "independent_evaluator": all(
+                v.get("independent_evaluator") is True
+                and v.get("actual_model") != v.get("teacher_model")
+                for v in values
+            ),
+            "unique_observations": self.result["unique_observations"],
+        }
+
+
+def validate_fidelity_training_records(
+    records: Mapping[str, Sequence[tuple[SemanticEvidencePacketV3, ValidatedFidelityAggregateV3]]],
+    expected_split: str,
+) -> dict[str, list[tuple[SemanticEvidencePacketV3, ValidatedFidelityAggregateV3]]]:
+    """One training term per aggregate, with no wire observation reused as another term."""
+    result: dict[str, list[tuple[SemanticEvidencePacketV3, ValidatedFidelityAggregateV3]]] = {}
+    seen: set[str] = set()
+    observations: dict[tuple[str, int, str], str] = {}
+    for case_id, rows in records.items():
+        for packet, aggregate in rows:
+            if not isinstance(packet, SemanticEvidencePacketV3) or not isinstance(
+                aggregate, ValidatedFidelityAggregateV3
+            ):
+                raise ValueError("Offline targets require validated aggregate records")
+            if (
+                aggregate.packet_hash != packet.content_hash
+                or packet.split != expected_split
+                or case_id != packet.case_id
+            ):
+                raise ValueError("Offline aggregate packet/split/case dependency mismatch")
+            identity = aggregate.content_hash
+            if identity in seen:
+                continue
+            for observation in aggregate.result["unique_observations"]:
+                key = (
+                    observation["request_id"],
+                    observation["attempt"],
+                    observation["response_sha256"],
+                )
+                if key in observations and observations[key] != identity:
+                    raise ValueError("Distinct training aggregates reuse one durable observation")
+                observations[key] = identity
+            seen.add(identity)
+            result.setdefault(case_id, []).append((packet, aggregate))
+    return result
+
+
+def read_fidelity_training_artifact(
+    path: Path, expected_split: str
+) -> dict[str, list[tuple[SemanticEvidencePacketV3, ValidatedFidelityAggregateV3]]]:
+    from exact.repair.records import read_record
+
+    artifact = _strict_json(Path(path).read_text())
+    _keys(artifact, {"schema", "aggregation_revision", "comparisons"}, "offline aggregate artifact")
+    if (
+        artifact["schema"] != FIDELITY_TRAINING_SCHEMA
+        or artifact["aggregation_revision"] != AGGREGATION_REVISION
+    ):
+        raise ValueError(
+            "Offline targets require the corrected unique-observation aggregation revision"
+        )
+    result: dict[str, list[tuple[SemanticEvidencePacketV3, ValidatedFidelityAggregateV3]]] = {}
+    for row in artifact["comparisons"]:
+        _keys(row, {"packet", "comparison"}, "offline aggregate row")
+        packet, aggregate = read_record(row["packet"]), read_record(row["comparison"])
+        if not isinstance(packet, SemanticEvidencePacketV3) or not isinstance(
+            aggregate, ValidatedFidelityAggregateV3
+        ):
+            raise ValueError("Offline targets require validated aggregate records")
+        result.setdefault(packet.case_id, []).append((packet, aggregate))
+    return validate_fidelity_training_records(result, expected_split)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -989,6 +1443,117 @@ class SemanticAnnotationAdapter:
             f"Annotation worker {outcome.status}: {outcome.detail}; reservation retained"
         )
 
+    def _parameters(self, packet, role, repetition, swapped, correction=0, correction_errors=()):
+        profile = self.profiles[role]
+        context = {
+            "packet": packet.judge_payload(swapped=swapped),
+            "run_id": self.run.run_id,
+            "lineage_id": self.run.lineage_id,
+            "prompt_version": self.run.prompt_version,
+            "prompt_hash": canonical_hash(PROMPT),
+            "repetition": repetition,
+            "swapped": swapped,
+            "correction": correction,
+            "correction_errors": list(correction_errors),
+        }
+        content = json.dumps(context, sort_keys=True, separators=(",", ":"), allow_nan=False)
+        messages = [{"role": "system", "content": PROMPT}, {"role": "user", "content": content}]
+        identity = {
+            "role": role,
+            "model": profile.model,
+            "revision": profile.revision,
+            "api_base": profile.api_base,
+            "provider": profile.provider,
+            "messages": messages,
+            "max_tokens": self.run.max_output_tokens,
+            "temperature": 0.0,
+        }
+        return identity
+
+    def _annotation_policy(self, role):
+        return {
+            "run_id": self.run.run_id,
+            "run_hash": canonical_hash(self.run),
+            "role": role,
+            "teacher_model": self.profiles[TEACHER].model,
+            "independent_evaluator": self.run.independent_evaluator,
+            "evaluation_use": (
+                "development_selection"
+                if self.run.evaluator_split == "development"
+                else "held_out_test"
+            ),
+            "evidence_manifest_hash": self.run.evidence_manifest_hash,
+            "split_manifest_hash": self.run.split_manifest_hash,
+        }
+
+    def schedule(
+        self,
+        packet: SemanticEvidencePacketV3,
+        *,
+        role: str,
+        quorum: int,
+        max_disagreement: float = 0.0,
+        repetitions: Sequence[int] | None = None,
+        presentation_orders: Sequence[bool] = (False,),
+        parser_versions: Sequence[str] = (PARSER_VERSION,),
+    ) -> AnnotationScheduleV3:
+        """Freeze a finite schedule without dispatching or looking at judge outputs."""
+        if role not in self.profiles or packet.content_hash not in self.run.packet_hashes:
+            raise ValueError("Annotation schedule is outside the declared run")
+        repeats = tuple(range(self.run.repetitions)) if repetitions is None else tuple(repetitions)
+        if len(set(repeats)) != len(repeats) or any(
+            type(v) is not int or not 0 <= v < self.run.repetitions for v in repeats
+        ):
+            raise ValueError("Invalid scheduled repetitions")
+        if len(set(presentation_orders)) != len(presentation_orders) or any(
+            type(v) is not bool for v in presentation_orders
+        ):
+            raise ValueError("Invalid scheduled presentation orders")
+        slots = []
+        for repetition in repeats:
+            for swapped in presentation_orders:
+                parameters = self._parameters(packet, role, repetition, swapped)
+                slots.append(
+                    {
+                        "slot_id": _canonical_request_key(parameters),
+                        "parameters": parameters,
+                        "correction_cap": self.run.correction_cap,
+                        "annotation_policy": self._annotation_policy(role),
+                    }
+                )
+        return AnnotationScheduleV3(
+            packet, tuple(slots), tuple(parser_versions), quorum, max_disagreement
+        )
+
+    def _wire_receipt(self, parameters: Mapping[str, Any]) -> dict[str, Any]:
+        """Export an integrity-checked completed row from the existing wire ledger."""
+        with self.ledger._transaction() as db:
+            rows = db.execute(
+                "SELECT r.request_id,r.identity,a.number,a.raw,a.sha256 FROM requests r "
+                "JOIN attempts a USING(request_id) WHERE a.state='completed'"
+            ).fetchall()
+        matches = []
+        for row in rows:
+            identity = json.loads(row["identity"])
+            if (
+                identity.get("role") != parameters["role"]
+                or identity.get("payload", {}).get("messages") != parameters["messages"]
+                or identity.get("payload", {}).get("model") != parameters["model"]
+            ):
+                continue
+            receipt = {
+                "request_id": row["request_id"],
+                "attempt": row["number"],
+                "identity": identity,
+                "raw_response": bytes(row["raw"]).decode("utf-8"),
+                "sha256": row["sha256"],
+            }
+            _receipt_response(receipt, parameters)
+            matches.append(receipt)
+        if len(matches) != 1:
+            raise ValueError("Expected one completed durable wire attempt for this annotation")
+        return matches[0]
+
     def annotate(
         self,
         packet: SemanticEvidencePacketV3,
@@ -1027,31 +1592,15 @@ class SemanticAnnotationAdapter:
         if os.getenv("EXACT_OPENROUTER_RETRY_UNKNOWN") == "1":
             raise ValueError("Unknown annotation delivery cannot be retried implicitly")
         profile = self.profiles[role]
-        context = {
-            "packet": packet.judge_payload(swapped=swapped),
-            "run_id": self.run.run_id,
-            "lineage_id": self.run.lineage_id,
-            "prompt_version": self.run.prompt_version,
-            "prompt_hash": canonical_hash(PROMPT),
-            "repetition": repetition,
-            "swapped": swapped,
-            "correction": correction,
-            "correction_errors": list(correction_errors),
-        }
-        content = json.dumps(context, sort_keys=True, separators=(",", ":"), allow_nan=False)
-        if len(content.encode()) > min(self.run.max_input_bytes, packet.coverage["byte_budget"]):
+        identity = self._parameters(
+            packet, role, repetition, swapped, correction, correction_errors
+        )
+        messages = identity["messages"]
+        context = _strict_json(messages[1]["content"])
+        if len(messages[1]["content"].encode()) > min(
+            self.run.max_input_bytes, packet.coverage["byte_budget"]
+        ):
             raise ValueError("Evidence cannot fit the frozen input budget; no silent truncation")
-        messages = [{"role": "system", "content": PROMPT}, {"role": "user", "content": content}]
-        identity = {
-            "role": role,
-            "model": profile.model,
-            "revision": profile.revision,
-            "api_base": profile.api_base,
-            "provider": profile.provider,
-            "messages": messages,
-            "max_tokens": self.run.max_output_tokens,
-            "temperature": 0.0,
-        }
         key, _ = request_identity(identity)
         if correction:
             # Corrections can expose only the preceding validator's actual error,
@@ -1110,6 +1659,7 @@ class SemanticAnnotationAdapter:
             ):
                 raise ValueError("Refusal, truncation, or unsupported response completion")
             metadata = {
+                **self._annotation_policy(role),
                 "run_id": self.run.run_id,
                 "role": role,
                 "requested_model": profile.model,
@@ -1118,6 +1668,8 @@ class SemanticAnnotationAdapter:
                 "revision": profile.revision,
                 "prompt_hash": canonical_hash(PROMPT),
                 "parameters_hash": key,
+                "request_parameters": identity,
+                "wire_receipt": self._wire_receipt(identity),
                 "parser_version": parser_version,
                 "independent_evaluator": self.run.independent_evaluator,
                 "teacher_model": self.profiles[TEACHER].model,
@@ -1129,6 +1681,10 @@ class SemanticAnnotationAdapter:
                 "evidence_manifest_hash": self.run.evidence_manifest_hash,
                 "split_manifest_hash": self.run.split_manifest_hash,
             }
+            if correction:
+                metadata["correction_parent"] = self._wire_receipt(
+                    {**identity, "messages": prior_messages}
+                )
             comparison = validate_comparison(
                 raw,
                 packet,

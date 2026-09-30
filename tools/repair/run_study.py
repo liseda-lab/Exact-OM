@@ -26,6 +26,11 @@ def main(argv: list[str] | None = None) -> int:
         help="declare matched model/profile controls, preserving unavailable arms",
     )
     parser.add_argument("--campaign-seconds", type=float, default=3600.0)
+    parser.add_argument(
+        "--compiler-cache-policy",
+        choices=("same_frozen_cache_state_per_arm", "cold_required", "warm_required"),
+        default="same_frozen_cache_state_per_arm",
+    )
     args = parser.parse_args(argv)
     started = time.monotonic()
     cases, arms, seed = load_schedule(args.schedule)
@@ -50,6 +55,7 @@ def main(argv: list[str] | None = None) -> int:
         seed=seed,
         max_attempts=args.max_attempts,
         campaign_seconds=args.campaign_seconds,
+        compiler_cache_policy=args.compiler_cache_policy,
     )
     print(
         json.dumps(

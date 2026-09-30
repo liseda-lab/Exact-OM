@@ -18,6 +18,7 @@ from .graph import (
     feature_vector,
     structural_arguments,
     structural_id,
+    validate_admitted_supports,
 )
 
 
@@ -60,6 +61,7 @@ class RepairModel(nn.Module):
         pairwise: bool = False,
         revision: str = "v2",
         plan_risk: bool = True,
+        support_enabled: bool = False,
         pair_factor_bound: float = 1.0,
     ) -> None:
         super().__init__()
@@ -67,6 +69,7 @@ class RepairModel(nn.Module):
             raise ValueError("Unknown repair model revision")
         self.revision = revision
         self.plan_risk_enabled = revision == "v3" and plan_risk
+        self.support_enabled = revision == "v3" and support_enabled
         if not math.isfinite(pair_factor_bound) or pair_factor_bound < 0:
             raise ValueError("Pair factor bound must be finite and nonnegative")
         self.pair_factor_bound = pair_factor_bound
@@ -88,6 +91,7 @@ class RepairModel(nn.Module):
             "pairwise": pairwise,
             "revision": revision,
             "plan_risk": plan_risk,
+            "support_enabled": support_enabled,
             "pair_factor_bound": pair_factor_bound,
         }
         self.input_projection = nn.ModuleDict(
@@ -137,6 +141,7 @@ class RepairModel(nn.Module):
         """Contextualise the observed graph using the chosen standard encoder."""
         if self.revision == "v3" and graph.feature_schema != "exact-repair/observable-features/v3":
             raise ValueError("V3 model requires the versioned v3 observable feature view")
+        validate_admitted_supports(graph)
         device = self.empty_bundle.device
         grouped: dict[str, list[GraphNode]] = {kind: [] for kind in self.metadata[0]}
         for node in graph.nodes:
@@ -424,6 +429,28 @@ class RepairModel(nn.Module):
         background = torch.stack(contexts).sum(0) if contexts else self.empty_bundle
         return cast(Tensor, self.plan_context_head(torch.cat((selected, background))))
 
+    def support_violation_logit(
+        self, objects: Iterable[Any], memory: GraphMemory, assignment: tuple[int, ...], witness: Any
+    ) -> Tensor:
+        """Predict a declared witness under the whole plan, without proof-label input."""
+        if not self.support_enabled:
+            raise ValueError("Support auxiliary is disabled")
+        objects = tuple(objects)
+        if len(objects) != len(assignment) or any(
+            type(choice) is not int or not 0 <= choice < len(obj.candidates)
+            for obj, choice in zip(objects, assignment)
+        ):
+            raise ValueError("Support readout needs a valid complete plan")
+        selected = [
+            self.candidate_value(
+                obj.candidates[choice], memory, self.object_context(obj.object_id, memory)
+            )[1]
+            for obj, choice in zip(objects, assignment)
+        ]
+        pooled = torch.stack(selected).sum(0) if selected else self.empty_bundle
+        query = self.encode_structure(witness, memory)
+        return cast(Tensor, self.support_head(torch.cat((pooled, query))).squeeze(-1))
+
     def plan_risk_logit(
         self,
         objects: Iterable[Any],
@@ -439,6 +466,11 @@ class RepairModel(nn.Module):
         """
         if self.revision != "v3":
             raise ValueError("Whole-plan risk requires the v3 model")
+        if not self.plan_risk_enabled:
+            raise ValueError("Whole-plan risk is disabled")
+        supports = tuple(supports)
+        if supports != memory.graph.admitted_supports:
+            raise ValueError("Risk supports must match the completed graph admission")
         objects = tuple(objects)
         if len(objects) != len(assignment):
             raise ValueError("Risk requires one selected candidate per object")

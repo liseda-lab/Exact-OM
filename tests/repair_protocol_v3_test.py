@@ -8,7 +8,7 @@ import pytest
 from exact.repair.protocol import RepairProtocolV3, load_protocol_v3
 
 ROOT = Path(__file__).resolve().parents[1]
-SAMPLE = ROOT / "specs/exact-repair/protocol/xr21-local-conformance.json"
+SAMPLE = ROOT / "specs/exact-repair/protocol/xr21-review-conformance.json"
 
 
 def test_manifest_is_complete_static_and_historical_inputs_stay_separate():
@@ -21,7 +21,7 @@ def test_manifest_is_complete_static_and_historical_inputs_stay_separate():
     with pytest.raises(ValueError, match="explicitly declare v3"):
         load_protocol_v3(ROOT / "specs/exact-repair/protocol/pilot.json")
     assert (
-        json.loads((SAMPLE.parent / "schema-v3.json").read_text())
+        json.loads((SAMPLE.parent / "schema-v3.2.json").read_text())
         == RepairProtocolV3.model_json_schema()
     )
 

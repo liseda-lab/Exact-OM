@@ -243,6 +243,10 @@ class ObservableGraph:
     omitted_supports: tuple[str, ...] = ()
     omitted_evidence: tuple[str, ...] = ()
     feature_schema: str = "exact-repair/observable-features/v2"
+    admitted_supports: tuple[GraphExplanation, ...] = ()
+    support_omissions: tuple[tuple[str, str], ...] = ()
+    admission_policy: str = "atomic-complete-support/v3.1"
+    preparation_identity: str = ""
 
     @property
     def metadata(self) -> tuple[tuple[str, ...], tuple[tuple[str, str, str], ...]]:
@@ -292,6 +296,29 @@ class ObservableGraph:
             dst for src in tuple(selected & explanations) for dst in adjacency.get(src, ())
         )
         return tuple(sorted(selected))
+
+
+def validate_admitted_supports(graph: ObservableGraph) -> None:
+    """Reject a replay whose purported admitted support cannot fit its memory."""
+    nodes = {node.node_id for node in graph.nodes}
+    ids = set()
+    for support in graph.admitted_supports:
+        if support.explanation_id in ids or not support.available_before_decision:
+            raise ValueError("Invalid admitted support identity/availability")
+        ids.add(support.explanation_id)
+        if f"explanation:{support.explanation_id}" not in nodes:
+            raise ValueError("Admitted support is absent from graph memory")
+        if not set(support.support_object_ids) <= dict(graph.object_nodes).keys():
+            raise ValueError("Admitted support names unavailable objects")
+        structures = (
+            *support.support_axioms,
+            *((support.witness,) if support.witness is not None else ()),
+        )
+        for value in structures:
+            if structural_id(value) not in nodes or any(
+                structural_id(entity) not in nodes for entity in owl.signature(value)
+            ):
+                raise ValueError("Admitted support structure is not encodable by graph memory")
 
 
 def _features(
@@ -418,6 +445,8 @@ def build_observable_graph(
     object_nodes: dict[str, str] = {}
     omitted_nodes: list[str] = []
     omitted_supports: list[str] = []
+    admitted_supports: list[GraphExplanation] = []
+    support_omissions: list[tuple[str, str]] = []
     transaction_nodes: list[str] | None = None
     transaction_edges: list[tuple[str, str, str]] | None = None
 
@@ -555,6 +584,7 @@ def build_observable_graph(
             omitted_nodes.extend(transaction_nodes)
             if support:
                 omitted_supports.append(label)
+                support_omissions.append((label, "graph_budget"))
             for key in transaction_nodes:
                 del nodes[key]
             edges.difference_update(transaction_edges)
@@ -569,6 +599,7 @@ def build_observable_graph(
             raise ValueError("Post-decision explanations cannot be model input")
         if max_explanations is not None and len(seen_explanations) > max_explanations:
             omitted_supports.append(explanation.explanation_id)
+            support_omissions.append((explanation.explanation_id, "explanation_cap"))
             continue
 
         def add_explanation() -> None:
@@ -600,6 +631,8 @@ def build_observable_graph(
                 connect(node_id, "witness", add_structure(explanation.witness))
 
         try_include(add_explanation, explanation.explanation_id, support=True)
+        if f"explanation:{explanation.explanation_id}" in nodes:
+            admitted_supports.append(explanation)
     for axiom in sorted(fixed_axioms, key=structural_id):
 
         def add_fixed() -> None:
@@ -630,7 +663,100 @@ def build_observable_graph(
         tuple(str(item) for item in evidence.get("evidence_omissions", ()))
         + tuple(sorted(set(omitted_text))),
         feature_schema,
+        tuple(admitted_supports),
+        tuple(support_omissions),
     )
+
+
+@dataclass(frozen=True)
+class EffectivePreparation:
+    """One resolved observable-preparation request, shared by every neural path."""
+
+    max_graph_nodes: int | None = None
+    max_graph_edges: int | None = None
+    max_explanations: int | None = None
+    max_text_tokens: int | None = None
+    pair_factor_limit_per_object: int = 16
+    pair_max_pairs: int | None = 128
+    pair_max_factors: int | None = 65536
+    retrieval_config: Any = None
+    revision: str = "v3"
+    schema: str = "exact-repair/effective-preparation/v3.1"
+
+    def __post_init__(self) -> None:
+        from .retrieval import RetrievalConfig
+
+        if self.retrieval_config is None:
+            object.__setattr__(self, "retrieval_config", RetrievalConfig())
+        if (
+            self.revision not in {"v2", "v3"}
+            or self.schema != "exact-repair/effective-preparation/v3.1"
+        ):
+            raise ValueError("Unknown effective preparation revision")
+        for name, minimum in (
+            ("max_graph_nodes", 1),
+            ("max_graph_edges", 1),
+            ("max_explanations", 0),
+            ("max_text_tokens", 1),
+            ("pair_factor_limit_per_object", 0),
+            ("pair_max_pairs", 0),
+            ("pair_max_factors", 0),
+        ):
+            limit = getattr(self, name)
+            if limit is not None and (type(limit) is not int or limit < minimum):
+                raise ValueError(f"{name} must be an integer >= {minimum}")
+
+    @property
+    def content_hash(self) -> str:
+        from .records import canonical_hash
+
+        return canonical_hash(self)
+
+    def freeze_options(self) -> dict[str, Any]:
+        return {
+            key: getattr(self, key)
+            for key in (
+                "max_graph_nodes",
+                "max_graph_edges",
+                "max_explanations",
+                "max_text_tokens",
+                "pair_factor_limit_per_object",
+                "pair_max_pairs",
+                "pair_max_factors",
+                "retrieval_config",
+            )
+        }
+
+    def graph(
+        self, problem: Any, retrieval: Any, *, retrieved_symbols: Iterable[Any] = ()
+    ) -> ObservableGraph:
+        from dataclasses import replace
+
+        graph = build_observable_graph(
+            problem.objects,
+            fixed_axioms=problem.fixed_axioms,
+            source_axioms=problem.source_axioms,
+            target_axioms=problem.target_axioms,
+            evidence=retrieval.graph_evidence(problem.evidence),
+            retrieved_symbols=tuple(retrieved_symbols) + tuple(retrieval.symbols),
+            explanations=retrieval.explanations,
+            max_nodes=self.max_graph_nodes,
+            max_edges=self.max_graph_edges,
+            max_explanations=self.max_explanations,
+            max_text_tokens=self.max_text_tokens,
+            feature_schema=f"exact-repair/observable-features/{self.revision}",
+        )
+        return replace(graph, preparation_identity=self.content_hash)
+
+    def pairs(self, problem: Any, graph: ObservableGraph, *, enabled: bool = True) -> Any:
+        return select_interaction_pairs(
+            problem,
+            graph=graph,
+            explanations=graph.admitted_supports,
+            per_object_limit=self.pair_factor_limit_per_object if enabled else 0,
+            max_pairs=self.pair_max_pairs,
+            max_factors=self.pair_max_factors,
+        )
 
 
 def feature_vector(node: GraphNode, dimension: int = 128) -> list[float]:

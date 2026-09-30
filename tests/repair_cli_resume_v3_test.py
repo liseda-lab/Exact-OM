@@ -34,18 +34,20 @@ def learned_round(tmp_path):
 
 def test_strict_risk_json_roundtrip_and_snapshot_failures(learned_round, tmp_path):
     _, _, frozen = learned_round
-    risk = dataclasses.replace(
-        frozen.risk_scorer,
-        supports=(
-            GraphExplanation(
-                "e",
-                ("m",),
-                frozen.problem.fixed_axioms,
-                frozen.problem.policy.monitored_classes[0],
-                support_status="sufficient",
+    with pytest.raises(ValueError, match="graph admission"):
+        dataclasses.replace(
+            frozen.risk_scorer,
+            supports=(
+                GraphExplanation(
+                    "e",
+                    ("m",),
+                    frozen.problem.fixed_axioms,
+                    frozen.problem.policy.monitored_classes[0],
+                    support_status="sufficient",
+                ),
             ),
-        ),
-    )
+        )
+    risk = frozen.risk_scorer
 
     def restore(payload, **changes):
         return FrozenPlanRisk.from_dict(
@@ -61,7 +63,7 @@ def test_strict_risk_json_roundtrip_and_snapshot_failures(learned_round, tmp_pat
     assert restored.risk_identity == risk.risk_identity
     assert restored((0,)) == risk((0,))
     changed = copy.deepcopy(payload)
-    changed["record"]["supports"][0]["explanation_id"] = "tampered"
+    changed["record"]["checkpoint_bytes"] += 1
     with pytest.raises(ValueError, match="content hash"):
         restore(changed)
     changed = copy.deepcopy(payload)

@@ -1,0 +1,380 @@
+{
+  "circuit": {
+    "aggregate_seconds": 60.0,
+    "allocated_node_limit": 4000000,
+    "cache_directory": "artifacts/xr21/compiler-cache",
+    "cache_reuse": "integrity_checked_immutable",
+    "cache_version": "compiler-artifact/v3",
+    "call_seconds": 20.0,
+    "components": 4,
+    "distribution_identity": "canonical-family-mass/v3",
+    "element_limit": 8000000,
+    "gc_policy": "protected_roots",
+    "gc_version": "sdd-lifetime/v3",
+    "live_node_limit": 1000000,
+    "partition": "family_template",
+    "proof_dependencies": "UNFROZEN",
+    "reachable_node_limit": 1000000,
+    "rss_mb": 8192,
+    "semantic_constraints": "proved_immutable_context",
+    "vtree": "balanced"
+  },
+  "collection": {
+    "cases_per_round": 8,
+    "deduplication": "canonical_assignment_with_origins",
+    "diversity_attempts": 32,
+    "diversity_rule": "canonical_assignment_stratified",
+    "exploration_fraction": 0.0,
+    "generator_fraction": 0.25,
+    "plan_attempts_per_case": 128,
+    "plan_quotas": {
+      "diversity": 32,
+      "proposal": 32,
+      "quartet": 32,
+      "uniform": 0,
+      "utility": 32
+    },
+    "proposal_attempts": 32,
+    "quartet_attempts": 32,
+    "quartet_budget_unit": "assignment_attempts",
+    "quartet_context": "same_background_all_four_feasible",
+    "retries": 1,
+    "rounds": 3,
+    "schedule_version": "exact-repair/attempt-schedule/v1",
+    "utility_attempts": 32
+  },
+  "corpus": {
+    "clean_controls_per_group": 1,
+    "composition_holdout": "mixed",
+    "corruptions_per_group": 1,
+    "evidence": {
+      "counterbalance_provenance": true,
+      "latent_corruption_features": false,
+      "misleading_label_fraction": 0.1,
+      "noise_std": 0.1,
+      "simulator": "label_jaccard_plus_noise_v2"
+    },
+    "families": [
+      "directional_strengthening",
+      "interaction_complementary"
+    ],
+    "generated_objects": [
+      4
+    ],
+    "groups_per_family": {
+      "development": 1,
+      "test": 1,
+      "train": 1
+    },
+    "split_seed": 20260930,
+    "split_unit": "clean_structural_parent"
+  },
+  "evaluation": {
+    "accounting": "four_baseline_full_preprocess_search_query_costs",
+    "all_scheduled_case_denominator": true,
+    "cache_policy": "same_frozen_cache_state_per_arm",
+    "checkpoint_rule": "development_generated_pool",
+    "cohorts": [
+      "generated"
+    ],
+    "development_manifest": "UNFROZEN",
+    "fresh_confirmatory_parents": false,
+    "grouping": "parent_and_ontology_pair",
+    "independent_judge": "disabled_initial_symbolic_conformance",
+    "interval_method": "parent_cluster_bootstrap",
+    "metrics": [
+      "scheduled_coverage",
+      "generated_pool_verified_quality_effort",
+      "fixed_pool_regret_diagnostic",
+      "resource_cost"
+    ],
+    "test_manifest": "UNFROZEN",
+    "train_manifest": "UNFROZEN"
+  },
+  "generation": {
+    "constructors": [
+      "intersection",
+      "existential"
+    ],
+    "elementary_guarantee": "reserve_before_complex",
+    "grammar_version": "bounded-grammar/v3",
+    "max_total_draws_per_object": 256,
+    "omission_manifest": "none",
+    "omission_mode": "none",
+    "stages": [
+      {
+        "candidate_cap": 64,
+        "classes_per_side": 8,
+        "draws_per_object": 32,
+        "endpoints_per_side": 8,
+        "max_constructors": 1,
+        "max_depth": 1,
+        "properties_per_side": 4
+      },
+      {
+        "candidate_cap": 64,
+        "classes_per_side": 16,
+        "draws_per_object": 32,
+        "endpoints_per_side": 16,
+        "max_constructors": 2,
+        "max_depth": 2,
+        "properties_per_side": 8
+      },
+      {
+        "candidate_cap": 128,
+        "classes_per_side": 32,
+        "draws_per_object": 32,
+        "endpoints_per_side": 32,
+        "max_constructors": 3,
+        "max_depth": 3,
+        "properties_per_side": 16
+      }
+    ],
+    "templates": [
+      "mapping_replacement",
+      "ontology_replacement"
+    ],
+    "tie_rule": "canonical_candidate_id"
+  },
+  "identity": {
+    "automatic_campaign_resumption": false,
+    "code_hash": "UNFROZEN",
+    "dirty_hash": "UNFROZEN",
+    "execution_authorized": false,
+    "feature_schema": "exact-repair/observable-features/v3",
+    "implementation_revision": "exact-repair/review-corrections/v1",
+    "label_schema": "exact-repair/teacher-cache/v3",
+    "parent_run_id": null,
+    "purpose": "smoke",
+    "record_schema": "exact-repair/records/v3",
+    "research_revision": "XR-2.1",
+    "run_id": "xr21-review-local-conformance"
+  },
+  "input": {
+    "alignment_manifest": "UNFROZEN",
+    "availability_manifest": "UNFROZEN",
+    "defer_production_matcher": true,
+    "evidence_cutoff": "before_parent_split",
+    "evidence_manifest": "UNFROZEN",
+    "import_manifest": "UNFROZEN",
+    "licensing_manifest": "UNFROZEN",
+    "matcher_source": "generated_only",
+    "ontology_manifest": "UNFROZEN",
+    "relation_interpretation": "typed_owl_direction",
+    "split_parent_manifest": "UNFROZEN"
+  },
+  "llm_labels": {
+    "abstention_policy": "mask_global_targets_keep_denominator",
+    "aggregate_budget": {
+      "calls": 0,
+      "cost_usd": 0.0,
+      "tokens": 0,
+      "wall_seconds": 0.0
+    },
+    "aggregation_revision": "exact-repair/semantic-fidelity-aggregate/v3.2",
+    "annotation_manifest": null,
+    "cache_policy": "dependency_bound_raw_revalidation",
+    "criterion_applicability": "fixed_per_case",
+    "enabled": false,
+    "evaluator_budget": {
+      "calls": 0,
+      "cost_usd": 0.0,
+      "tokens": 0,
+      "wall_seconds": 0.0
+    },
+    "evaluator_profile": null,
+    "evaluator_role": "repair_semantic_evaluator",
+    "evidence_schema": "exact-repair/records/v3",
+    "execution_authorized": false,
+    "independent_evaluator": true,
+    "ledger_directory": "artifacts/xr21/llm-ledger",
+    "model_manifest": "disabled",
+    "prompt_version": "semantic-fidelity-prompt/v3.1",
+    "rubric_version": "semantic-fidelity/v3",
+    "teacher_budget": {
+      "calls": 0,
+      "cost_usd": 0.0,
+      "tokens": 0,
+      "wall_seconds": 0.0
+    },
+    "teacher_profile": null,
+    "teacher_role": "repair_semantic_teacher",
+    "tie_policy": "separate_tie_loss"
+  },
+  "losses": {
+    "anchors": "complete_symbolic_query_basis",
+    "benefit_weight": 1.0,
+    "interaction_loss_weight": 0.2,
+    "masks": "complete_same_basis_per_loss",
+    "mixture_symbolic_weight": 0.5,
+    "normalization": "eligible_terms",
+    "proposal_weight": 1.0,
+    "ranking_weight": 0.2,
+    "risk_loss_weight": 1.0,
+    "sampled_proposal_loss_weight": 1.0,
+    "sampled_target_approximation": "sample_conditioned_ranking_imitation",
+    "scale_alignment": "symbolic_query_family_scale",
+    "support_loss_weight": 0.2,
+    "target_basis": "symbolic"
+  },
+  "model": {
+    "attention_heads": 4,
+    "backbone": "hgt",
+    "context_hops": 2,
+    "cost_predictor": false,
+    "dropout": 0.1,
+    "feature_masks": "explicit_missingness/v3",
+    "hidden_width": 128,
+    "layers": 3,
+    "max_candidate_factors": 65536,
+    "max_edges": 32768,
+    "max_nodes": 4096,
+    "max_object_pairs": 128,
+    "max_pair_neighbors": 16,
+    "max_supports": 64,
+    "max_text_tokens": 128,
+    "pair_benefit": true,
+    "pair_selector": "exact-repair/interaction-selection/v3",
+    "plan_risk": true,
+    "preparation_schema": "exact-repair/effective-preparation/v3.1",
+    "proposal_context": "independent",
+    "readout": "target_candidate_attention",
+    "support_admission_policy": "atomic-complete-support/v3.1",
+    "support_enabled": false,
+    "support_target": "qualified_witness_violation/v1",
+    "unary_benefit": true
+  },
+  "objective": {
+    "calibration_identity": "symbolic-development-only",
+    "edit_weights": {
+      "human_ontology_edit": 1.0,
+      "mapping_deletion": 1.0,
+      "ontology_edit": 1.0
+    },
+    "frozen_epoch_rule": "invalidate_on_pool_or_coefficient_change",
+    "integer_scale": 1000,
+    "pair_factor_bound": 1.0,
+    "rounding": "half_even"
+  },
+  "policy": {
+    "activated_obligations": true,
+    "authorship_manifest": "UNFROZEN",
+    "eligibility_manifest": "UNFROZEN",
+    "hard_query_manifest": "UNFROZEN",
+    "private_signature_manifest": "UNFROZEN",
+    "public_signature_manifest": "UNFROZEN",
+    "source_exception_mode": "none",
+    "source_proof_manifest": "none"
+  },
+  "reasoning": {
+    "capability_matrix": "qualified-supported-subset/v3",
+    "detector_rules": "restriction-aware-sufficient-support/v3",
+    "query_coverage": "all_required",
+    "routing": "capability_before_cost",
+    "session_cache_policy": "immutable_dependencies",
+    "support_budget": 64,
+    "unknown_causes": [
+      "unsupported",
+      "timeout",
+      "backend_failure",
+      "incomplete_query_coverage"
+    ]
+  },
+  "resources": {
+    "allocated_gpus": 0,
+    "campaign_cost_usd": 0.0,
+    "campaign_cpu_seconds": 3600.0,
+    "campaign_gpu_hours": 0.0,
+    "campaign_wall_seconds": 3600.0,
+    "case_cpu_seconds": 300.0,
+    "case_rss_mb": 8192,
+    "case_wall_seconds": 300.0,
+    "cleanup_grace_seconds": 2.0,
+    "concurrency": 1,
+    "diagnosis_seconds": 20.0,
+    "generation_seconds": 60.0,
+    "stage_cpu_seconds": {
+      "corpus": 600.0,
+      "label": 900.0,
+      "train": 1800.0
+    },
+    "stage_rss_mb": {
+      "corpus": 8192,
+      "label": 8192,
+      "train": 8192
+    },
+    "stage_wall_seconds": {
+      "corpus": 600.0,
+      "label": 900.0,
+      "train": 1800.0
+    },
+    "startup_seconds": 5.0,
+    "supervise_startup_and_transfer": true,
+    "verification_seconds": 30.0
+  },
+  "schema": "exact-repair/protocol/v3",
+  "selection": {
+    "construction_seconds": 10.0,
+    "exact_upper_bounds": true,
+    "matched_utility_first_control": true,
+    "max_candidate_checks": 100,
+    "max_master_solves": 100,
+    "pending_ledger": "unknown_and_untested_retain_upper_bounds",
+    "retry_budget": 1,
+    "risk_ordering": true,
+    "shortlist_size": 8,
+    "stopping": "optimality",
+    "support_cuts": "proved_presence_only",
+    "tie_rule": "canonical_assignment_id",
+    "utility_window": 250
+  },
+  "teacher": {
+    "aggregation": "weighted-family-means/v1",
+    "consequence_manifest": "UNFROZEN",
+    "deadline_seconds": 300.0,
+    "eligibility": "complete_exact_or_explicit_sampled",
+    "enumeration_ceiling": 4096,
+    "family_weights": {
+      "desired": 1.0,
+      "unwanted": 1.0
+    },
+    "max_queries": 128,
+    "per_query_masks": true,
+    "target_schema": "exact-repair/semantic-target/v3.1",
+    "temperature": 1.0,
+    "typed_nonvacuity": true
+  },
+  "training": {
+    "active_round_every_epochs": 1,
+    "batch_size": 8,
+    "benefit_loss": "anchored_value_rank_quartet_risk",
+    "checkpoint_criterion": "generated_pool_verified_quality_effort",
+    "device": "cpu",
+    "dtype": "float32",
+    "evaluate_every": 5,
+    "generation_stage": 0,
+    "gradient_clip": 1.0,
+    "learning_rate": 0.001,
+    "max_epochs": 100,
+    "max_repair_pairs_per_case": 128,
+    "min_dev_improvement": 0.0,
+    "minimum_generated_coverage": 1.0,
+    "missing_label_fallback": "stop",
+    "optimizer": "adamw",
+    "patience": 10,
+    "proposal_loss": "exact_and_sample_conditioned",
+    "quality_uncertainty_z": 1.96,
+    "ranking_temperature": 1.0,
+    "recovery_revision": "exact-phase-resume/v3.1",
+    "revision": "v3",
+    "sampled_assignments": 32,
+    "seeds": [
+      13,
+      37,
+      73
+    ],
+    "smooth_l1_beta": 1.0,
+    "threads": 1,
+    "weight_decay": 0.0001
+  }
+}

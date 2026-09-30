@@ -605,6 +605,129 @@ def evaluate_case(
     )
 
 
+def compiler_accounting(
+    problem: RepairInputV2 | None, *, policy: str = "same_frozen_cache_state_per_arm"
+) -> dict[str, Any]:
+    """Export exact compiler receipts and charge their observed preparation once.
+
+    These pools were prepared before matched selection. Their costs are a shared
+    preparation ledger, not repeated execution inside each arm's selection budget.
+    Cold-required/warm-required comparisons reject incompatible measured states;
+    historical rows without receipts remain explicitly unavailable.
+    """
+    if policy not in {"same_frozen_cache_state_per_arm", "cold_required", "warm_required"}:
+        raise ValueError("unknown compiler comparison cache policy")
+    receipts, unavailable = [], []
+    if problem is None:
+        unavailable.append(dict(object_id=None, family=None, status="input_unavailable"))
+    for report in problem.proposal_provenance if problem is not None else ():
+        if not hasattr(report, "get"):
+            continue
+        telemetry = report.get("compiler_telemetry", ())
+        if not telemetry and report.get("compilation_seconds", 0) > 0:
+            unavailable.append(
+                dict(
+                    object_id=report.get("object_id"),
+                    family="unknown",
+                    status="historical_measurements_unavailable",
+                )
+            )
+        families = (
+            telemetry
+            if telemetry and len(telemetry[0]) == 4
+            else (("monolithic", "resolved", "", telemetry),)
+        )
+        for family, status, detail, rows in families:
+            receipt = dict(rows).get("measurement_receipt") if rows else None
+            if receipt is not None:
+                receipt = json.loads(canonical_json(receipt))
+                receipts.append(
+                    dict(
+                        object_id=report.get("object_id"),
+                        family=family,
+                        receipt_hash=canonical_hash(receipt),
+                        receipt=receipt,
+                    )
+                )
+            elif rows or status not in {"resolved", "empty_language"}:
+                unavailable.append(
+                    dict(
+                        object_id=report.get("object_id"),
+                        family=family,
+                        status=status,
+                        detail=detail,
+                    )
+                )
+    # A frozen preparation can be referenced by several arms without duplicating cost.
+    unique = {row["receipt_hash"]: row for row in receipts}
+    expected = {"cold_compile"} if policy == "cold_required" else {"warm_load", "memory_reuse"}
+    if (
+        problem is not None
+        and policy != "same_frozen_cache_state_per_arm"
+        and (
+            unavailable
+            or not unique
+            or any(row["receipt"]["cache_mode"] not in expected for row in unique.values())
+        )
+    ):
+        raise ValueError(
+            "compiler receipts do not establish the declared cold/warm comparison policy"
+        )
+    wall, cpu = [], []
+    for row in unique.values():
+        receipt = row["receipt"]
+        supervised = receipt.get("supervised_call")
+        if supervised is not None:
+            wall.append(supervised["wall_seconds"])
+            cpu.append(dict(supervised["resources"]).get("cpu_seconds"))
+        else:
+            total = receipt.get("total") or {}
+            wall.append(total.get("wall_seconds"))
+            cpu.append(total.get("cpu_seconds"))
+    complete = not unavailable and all(value is not None for value in wall)
+    populations: dict[str, dict[str, Any]] = {}
+    for row in unique.values():
+        receipt = row["receipt"]
+        cold = receipt.get("cold_receipt")
+        if cold is not None:
+            identity = canonical_hash(cold)
+            population = populations.setdefault(
+                identity, dict(cold_receipt=cold, already_charged=False)
+            )
+            population["already_charged"] |= receipt["cache_mode"] == "cold_compile"
+    # An originating cold body receipt is deliberately not called a measured
+    # end-to-end population duration: startup/publication overhead is unavailable
+    # unless its original per-call record was also supplied to the comparison.
+    population_accounting = tuple(
+        dict(
+            identity=identity,
+            **value,
+            measured_phase_wall_seconds=sum(
+                phase["wall_seconds"] for phase in value["cold_receipt"]["phases"]
+            ),
+            measured_phase_cpu_seconds=sum(
+                phase["cpu_seconds"] for phase in value["cold_receipt"]["phases"]
+            ),
+            additional_total_seconds=None if not value["already_charged"] else 0.0,
+            policy="originating population disclosed separately; never substitute warm time for cold work",
+        )
+        for identity, value in sorted(populations.items())
+    )
+    return dict(
+        schema="exact-repair/compiler-accounting/review-1",
+        policy=policy,
+        charge_scope="shared frozen preparation, once per receipt; separate from selection execution",
+        shared_charge_key=canonical_hash(tuple(sorted(unique))),
+        cache_population=population_accounting,
+        receipts=tuple(unique[key] for key in sorted(unique)),
+        unavailable=tuple(unavailable),
+        charged_wall_seconds=sum(wall) if complete else None,
+        charged_cpu_seconds=(
+            sum(cpu) if complete and all(value is not None for value in cpu) else None
+        ),
+    )
+
+
 def runtime_manifest() -> dict[str, Any]:
     """Identify code, dependencies and resource measurement scope without importing ML."""
     versions = {}
@@ -664,6 +787,7 @@ def run_study(
     verifier: Verifier = verify_assignment,
     max_attempts: int = 2,
     campaign_seconds: float = 3600.0,
+    compiler_cache_policy: str = "same_frozen_cache_state_per_arm",
 ) -> dict[str, Any]:
     """Persist a fixed schedule, resume completed outcomes, and cap interrupted retries."""
     if len({case.case_id for case in cases}) != len(cases) or len(
@@ -677,8 +801,14 @@ def run_study(
     root = Path(directory)
     root.mkdir(parents=True, exist_ok=True)
     splits = grouped_splits(cases, seed=seed)
+    compiler_costs = {
+        case.case_id: compiler_accounting(case.problem, policy=compiler_cache_policy)
+        for case in cases
+    }
     plan = {
         "schema": STUDY_SCHEMA,
+        "compiler_cache_policy": compiler_cache_policy,
+        "shared_compiler_preparation": compiler_costs,
         "seed": seed,
         "max_attempts": max_attempts,
         "campaign_seconds": campaign_seconds,
@@ -836,6 +966,7 @@ def run_study(
                         "exact_external_regret": outcome.exact_external_regret,
                         "metrics": json.loads(canonical_json(dict(outcome.metrics))),
                         "resources": dict(outcome.resources),
+                        "compiler_preparation": compiler_costs[case.case_id],
                     }
                 )
                 write_artifact(

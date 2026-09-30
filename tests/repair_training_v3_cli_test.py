@@ -16,7 +16,9 @@ from tools.repair.prepare import load_preparation
 
 def test_v3_cli_accounts_shared_campaign_and_stage_cpu_and_preserves_resume(tmp_path, monkeypatch):
     pytest.importorskip("torch")
-    template = Path(__file__).parents[1] / "specs/exact-repair/protocol/xr21-local-conformance.json"
+    template = (
+        Path(__file__).parents[1] / "specs/exact-repair/protocol/xr21-review-conformance.json"
+    )
     protocol = json.loads(template.read_text().replace('"UNFROZEN"', '"conformance-fixture"'))
     protocol["identity"]["execution_authorized"] = True
     protocol["corpus"].update(

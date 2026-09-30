@@ -48,7 +48,9 @@ def test_public_circuit_serialization_preserves_probabilities_order_and_cache():
     pytest.importorskip("pysdd")
     encoding = ProposalEncoding((("x", ("a", "b")),), ((True, False), (False, True)), ("a", "b"))
     circuit = compile_bounded(encoding, seconds=5, variable_order=[2, 1])
-    assert compile_bounded(encoding, seconds=5, variable_order=(2, 1)) is circuit
+    warm = compile_bounded(encoding, seconds=5, variable_order=(2, 1))
+    assert warm.root is circuit.root and warm.cache_key == circuit.cache_key
+    assert dict(warm.telemetry)["measurement_receipt"]["cache_mode"] == "memory_reuse"
     distribution = ConditionedMixture(circuit, torch.zeros((1, 2)))
     assert float(distribution.log_probability((True, False)).exp()) == pytest.approx(0.5)
     with pytest.raises(TimeoutError):

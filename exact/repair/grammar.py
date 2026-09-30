@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 from functools import lru_cache
-from time import perf_counter
+from time import perf_counter, process_time
 from typing import Any, Iterable, Sequence, cast
 
 import pyowl_core as owl
@@ -118,48 +118,8 @@ class GrammarEncoding:
         return deduplicate_candidates(t.fixed for t in self.templates if t.fixed is not None)
 
     def representatives(self) -> tuple[ReplacementCandidateV2, ...]:
-        """Deterministic family coverage in O(templates × observed classes).
-
-        Try named leaves and the fixed original subclasses. This supplies controls
-        and a bounded seed per applicable template without enumerating expressions.
-        """
-        arguments = list(self.classes)
-        for axiom in normalise_axioms(self.revision.original_axioms):
-            if isinstance(axiom, owl.SubClassOf):
-                try:
-                    arguments.append(canonical_expression(axiom.sub_class))
-                except ValueError:
-                    pass
-        candidates = list(self.elementary_candidates)
-        for template in self.templates:
-            if template.fixed is not None:
-                continue
-            for expression in arguments:
-                try:
-                    self.assignment(template, expression)
-                except ValueError:
-                    continue
-                symbols = tuple(owl.walk(expression))
-                if template.class_menu is not None and any(
-                    isinstance(n, owl.Class) and str(n.iri.value) not in template.class_menu
-                    for n in symbols
-                ):
-                    continue
-                if template.property_menu is not None and any(
-                    isinstance(n, owl.ObjectProperty)
-                    and str(n.iri.value) not in template.property_menu
-                    for n in symbols
-                ):
-                    continue
-                candidate = self.emit(template, expression)
-                if all(
-                    expression_size(e)[0] <= self.max_depth
-                    and expression_size(e)[1] <= self.max_constructors
-                    for e in (expression, *candidate.active_expressions)
-                ):
-                    candidates.append(candidate)
-                    break
-        return deduplicate_candidates(candidates)
+        """Compatibility view of bounded, fully admissible protected controls."""
+        return protected_representatives(self)[0]
 
     def retained_choices(self, template: GrammarTemplate) -> dict[str, str]:
         """Explicit retained-direction selectors determined by each complete template."""
@@ -388,6 +348,133 @@ class GrammarEncoding:
                     except ValueError:
                         pass
         return tuple(sorted(bits for bits in result if self.accepts(bits)))
+
+
+def _first_model(root: Any, width: int, max_steps: int) -> tuple[bool, ...] | None:
+    """Deterministic satisfying assignment of a decomposable compiler DAG."""
+    satisfiable: dict[int, bool] = {}
+    stack = [(root, False)]
+    steps = 0
+    while stack:
+        node, expanded = stack.pop()
+        steps += 1
+        if steps > max_steps:
+            raise TimeoutError("protected representative DAG traversal budget exhausted")
+        if node.id in satisfiable:
+            continue
+        if node.is_false():
+            satisfiable[node.id] = False
+        elif node.is_true() or node.is_literal():
+            satisfiable[node.id] = True
+        elif expanded:
+            satisfiable[node.id] = any(
+                satisfiable[a.id] and satisfiable[b.id] for a, b in node.elements()
+            )
+        else:
+            stack.append((node, True))
+            stack.extend(
+                (child, False)
+                for pair in node.elements()
+                for child in pair
+                if child.id not in satisfiable
+            )
+    if not satisfiable[root.id]:
+        return None
+    values = [False] * width
+    pending = [root]
+    while pending:
+        node = pending.pop()
+        steps += 1
+        if steps > max_steps:
+            raise TimeoutError("protected representative DAG traversal budget exhausted")
+        if node.is_literal():
+            values[abs(node.literal) - 1] = node.literal > 0
+        elif not node.is_true():
+            pending.extend(
+                next((a, b) for a, b in node.elements() if satisfiable[a.id] and satisfiable[b.id])
+            )
+    return tuple(values)
+
+
+def protected_representatives(
+    encoding: GrammarEncoding, circuit: Any = None, *, max_checks: int = 100000
+) -> tuple[tuple[ReplacementCandidateV2, ...], tuple[dict[str, Any], ...]]:
+    """Protect one fully admissible bundle per template; report unresolved coverage.
+
+    Completed family DAGs prove empty support or yield one satisfying assignment.
+    Without a completed circuit, the bounded named/original-expression traversal
+    may establish a representative, but exhaustion never claims logical emptiness.
+    """
+    if type(max_checks) is not int or max_checks < 0:
+        raise ValueError("representative search budget must be a nonnegative integer")
+    families = {f.name: f for f in getattr(circuit, "families", ())}
+    arguments = list(encoding.classes)
+    for axiom in normalise_axioms(encoding.revision.original_axioms):
+        if isinstance(axiom, owl.SubClassOf):
+            try:
+                arguments.append(canonical_expression(axiom.sub_class))
+            except ValueError:
+                pass
+    candidates, reports = [], []
+    for template in encoding.templates:
+        candidate = template.fixed
+        status, detail = "retained", "deterministic elementary alternative"
+        family = families.get(template.name)
+        if candidate is None:
+            status, detail = (
+                "search_exhausted",
+                "bounded fallback did not establish admissible coverage",
+            )
+            if family is not None and family.status == "empty_language":
+                status, detail = "empty_language", "completed family proved empty support"
+            elif family is not None and family.circuit is not None:
+                try:
+                    local = _first_model(
+                        family.circuit.root, family.circuit.encoding.variable_count, max_checks
+                    )
+                    if local is None:
+                        status, detail = "empty_language", "completed family proved empty support"
+                    else:
+                        full = dict(family.fixed)
+                        full.update(zip(family.indices, local))
+                        bits = tuple(full[i] for i in range(encoding.variable_count))
+                        if not encoding.accepts(bits):
+                            raise ValueError(
+                                "compiled protected representative violates its declared language"
+                            )
+                        candidate = encoding.decode(bits)
+                        status, detail = (
+                            "retained",
+                            "deterministic satisfying assignment from completed family",
+                        )
+                except TimeoutError as error:
+                    detail = str(error)
+            else:
+                for expression in arguments[:max_checks]:
+                    try:
+                        bits = encoding.assignment(template, expression)
+                        if encoding.accepts(bits):
+                            candidate = encoding.decode(bits)
+                            status, detail = "retained", "bounded admissible expression traversal"
+                            break
+                    except ValueError:
+                        continue
+                if candidate is None and family is not None:
+                    status, detail = family.status, family.detail
+            if candidate is not None:
+                status = "retained"
+        if candidate is not None:
+            candidates.append(candidate)
+        reports.append(
+            dict(
+                template=template.name,
+                action=template.action,
+                status=status,
+                candidate_id=candidate.candidate_id if candidate is not None else None,
+                detail=detail,
+            )
+        )
+    return deduplicate_candidates(candidates), tuple(reports)
 
 
 def mapping_grammar(
@@ -629,6 +716,7 @@ def _compile_grammar(
     from .circuit import CompiledCircuit
 
     started = perf_counter()
+    cpu_started = process_time()
     tree = Vtree(
         var_count=encoding.variable_count,
         var_order=list(order),
@@ -707,12 +795,34 @@ def _compile_grammar(
         values = (selected,) if name == "template" else ("false", "true")
         literals[name] = {value: true if value == selected else false for value in values}
     telemetry = []
+    phase_measurements = []
+    measurement_start = (started, cpu_started)
     checks = 0
     peak_allocated = 0
 
-    def measure(phase):
+    def measure(phase, root_node=None):
         import resource
+        import sys
 
+        rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        phase_measurements.append(
+            dict(
+                phase=phase,
+                wall_seconds=perf_counter() - measurement_start[0],
+                cpu_seconds=process_time() - measurement_start[1],
+                elapsed_scope="since native manager construction",
+                manager_allocated_nodes=manager.count(),
+                manager_live_nodes=manager.live_count(),
+                manager_dead_nodes=manager.dead_count(),
+                manager_elements=manager.size(),
+                root_reachable_nodes=root_node.count() if root_node is not None else None,
+                peak_process_rss_bytes=(
+                    int(rss * 1024)
+                    if sys.platform.startswith("linux")
+                    else int(rss) if sys.platform == "darwin" else None
+                ),
+            )
+        )
         telemetry.append(
             (
                 phase,
@@ -1008,10 +1118,10 @@ def _compile_grammar(
     compare.cache_clear()
     fits.cache_clear()
     compare_constant.cache_clear()
-    measure("root_protected")
+    measure("root_protected", root)
     if collect:
         manager.garbage_collect()
-    measure("complete")
+    measure("complete", root)
     if max_reachable_nodes is not None and root.count() > max_reachable_nodes:
         raise CircuitBudgetExceeded("grammar compilation exceeds its root reachable node limit")
     if max_elements is not None and root.size() > max_elements:
@@ -1041,6 +1151,7 @@ def _compile_grammar(
             ("peak_allocated", peak_allocated),
             ("root_elements", root.size()),
             ("phases", tuple(telemetry)),
+            ("phase_measurements", tuple(phase_measurements)),
         ),
     )
 
@@ -1202,7 +1313,18 @@ def compile_families(
                     )
                 )
             )
-            families.append(CompiledFamily(template.name, None, indices, fixed, status, str(exc)))
+            failure = getattr(exc, "measurement_receipt", None)
+            families.append(
+                CompiledFamily(
+                    template.name,
+                    None,
+                    indices,
+                    fixed,
+                    status,
+                    str(exc),
+                    (("measurement_receipt", failure),) if failure is not None else (),
+                )
+            )
     return FactoredCircuit(
         encoding,
         tuple(families),

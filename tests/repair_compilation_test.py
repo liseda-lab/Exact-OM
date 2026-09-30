@@ -25,7 +25,9 @@ def test_immutable_compiler_transport_preserves_mass_gradients_and_sample_order(
     native = compile_encoding(encoding)
     transported = compile_bounded(encoding, seconds=10)
     before_hits = compilation_cache_info()["hits"]
-    assert compile_bounded(encoding, seconds=10) is transported
+    warm = compile_bounded(encoding, seconds=10)
+    assert warm.root is transported.root and warm.cache_key == transported.cache_key
+    assert dict(warm.telemetry)["measurement_receipt"]["cache_mode"] == "memory_reuse"
     assert compilation_cache_info()["hits"] == before_hits + 1
     assert isinstance(transported.manager, CircuitArtifact)
     assert isinstance(transported.root, EvaluationNode)

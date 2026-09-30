@@ -8,12 +8,14 @@ import math
 import os
 import tempfile
 import time
+import uuid
 from pathlib import Path
 from typing import Any, Callable, cast
 
 from .maxsat import PresenceCut, solve_master
 from .records import (
     BaselineReportV3,
+    CompactVerificationReportV3,
     DeferredAssignmentV3,
     ObjectiveV2,
     ObjectiveV3,
@@ -21,11 +23,14 @@ from .records import (
     PendingAssignmentV2,
     PolicyV2,
     ProofSupportV3,
+    QualifiedBaselineReportV3,
+    RecoverySearchLedgerV3,
     RepairInputV2,
     RepairInputV3,
     RepairResultV2,
     RepairResultV3,
     SearchLedgerV3,
+    SourceExceptionProofV3,
     VerificationEventV3,
     VerificationReportV2,
     VerificationReportV3,
@@ -33,7 +38,15 @@ from .records import (
     freeze_public_policy,
     read_record,
 )
-from .workers import bounded_call, emit_event
+from .workers import (
+    SUPERVISION_GRACE_SECONDS,
+    CallResult,
+    bounded_call,
+    committed_events,
+    committed_result,
+    emit_event,
+    emit_events,
+)
 
 _NATIVE_BOUNDED_CALL = bounded_call
 
@@ -98,6 +111,8 @@ def verify_theory(
     theory_hash = canonical_hash((axioms, active))
     expected = expected_queries(active, policy)
     events: list[VerificationEventV3] = []
+    buffer: list[VerificationEventV3] = []
+    sequence = 0
     proofs = detect_violations(axioms, active, policy)
     for proof in proofs:
         name = f"{proof.kind}:{'consistency' if proof.kind == 'consistency' else _query_id(proof.query)}"
@@ -134,6 +149,7 @@ def verify_theory(
         )
 
     def completed(query: Any, support: Any) -> None:
+        nonlocal sequence
         obligation = ObligationV2(
             f"{query.kind}:{query.query_id}",
             "pass" if query.verdict == query.expected else "fail",
@@ -144,14 +160,19 @@ def verify_theory(
             assignment_hash,
             theory_hash,
             policy.content_hash,
-            len(events),
+            sequence,
             obligation,
             f"{support.reasoner}/{support.package_version}:{support.backend}",
             canonical_hash(dataclasses.asdict(support)),
             capability=tuple(sorted(dataclasses.asdict(support).items())),
         )
-        emit_event(event)
-        events.append(event)
+        sequence += 1
+        if len(events) < 128 or event.obligation.verdict == "fail":
+            events.append(event)
+        buffer.append(event)
+        if len(buffer) >= 128 or event.obligation.verdict == "fail":
+            emit_events(buffer)
+            buffer.clear()
 
     # Inert public declarations give disappeared classes qualified fresh-entity semantics.
     declarations = tuple(
@@ -168,6 +189,7 @@ def verify_theory(
         exceptions=policy.exceptions,
         on_complete=completed,
     )
+    emit_events(buffer)
     obligations = tuple(
         ObligationV2(
             f"{q.kind}:{q.query_id}",
@@ -232,59 +254,168 @@ def source_exception_evidence(
     return side, canonical_hash(tuple(sorted(set(axioms), key=canonical_hash)))
 
 
-def _verify_exceptions(problem: RepairInputV2) -> tuple[ObligationV2, ...]:
-    """Reprove frozen exception obligations, also during independent safety replay."""
-    if not problem.policy.exceptions:
-        return ()
-    from .owl import OwlVerifier, snapshot_from_axioms
-
-    evidence = problem.policy.exception_evidence
+def _exception_groups(problem: RepairInputV2) -> dict[str, tuple[Any, ...]]:
     groups: dict[str, list[Any]] = {"source": [], "target": []}
     sources = {"source": problem.source_axioms, "target": problem.target_axioms}
-    for expression, (side, digest) in zip(problem.policy.exceptions, evidence):
+    for expression, (side, digest) in zip(
+        problem.policy.exceptions, problem.policy.exception_evidence
+    ):
         if side not in sources or (side, digest) != source_exception_evidence(
             sources[side], side=side
         ):
-            return (
-                ObligationV2(
-                    "source_exception_evidence",
-                    "unknown",
-                    False,
-                    "exception premises do not match a frozen source theory",
-                ),
-            )
+            raise ValueError("exception premises do not match a frozen source theory")
         groups[side].append(expression)
+    return {
+        side: tuple(sorted(set(values), key=canonical_hash))
+        for side, values in groups.items()
+        if values
+    }
+
+
+def _exception_checks(
+    problem: RepairInputV2, proofs: tuple[SourceExceptionProofV3, ...]
+) -> tuple[ObligationV2, ...]:
+    """Validate every source/report dependency; never infer proof from a bare pass."""
+    from importlib.metadata import version
+
+    from .owl import _query_id, snapshot_from_axioms
+
+    groups = _exception_groups(problem)
+    if {proof.side for proof in proofs} != set(groups) or len(proofs) != len(groups):
+        raise ValueError("source-exception evidence has missing or duplicate source reports")
     checks = []
-    for side, expressions in groups.items():
-        if not expressions:
-            continue
-        report = OwlVerifier().check_theory(snapshot_from_axioms(sources[side]), expressions)
-        consistent = report.obligations[0].complete and report.obligations[0].verdict is True
+    for proof in proofs:
+        axioms = problem.source_axioms if proof.side == "source" else problem.target_axioms
+        documents = problem.source_documents if proof.side == "source" else problem.target_documents
+        if (
+            proof.asserted_source_hash
+            != canonical_hash(tuple(sorted(set(axioms), key=canonical_hash)))
+            or proof.documents != documents
+            or proof.policy_hash != problem.policy.content_hash
+            or proof.exceptions != groups[proof.side]
+            or proof.qualification_hash != _baseline_qualification()
+            or proof.theory_hash != snapshot_from_axioms(axioms).logical_fingerprint.hex
+            or proof.report.get("theory_hash") != proof.theory_hash
+        ):
+            raise ValueError("source-exception source/import/policy/query/qualification mismatch")
+        support = proof.report.get("support", {})
+        reasoner = support.get("reasoner")
+        supported = (
+            reasoner in {"elk", "hermit"}
+            and support.get("input_supported") is True
+            and support.get("complete_imports") is True
+            and support.get("implementation_version") not in {None, "", "unknown"}
+            and support.get("package_version")
+            == version("pyhermit" if reasoner == "hermit" else "pyelk-reasoner")
+            and str(support.get("package_version")).startswith("0.2.")
+        )
+        obligations = proof.report.get("obligations", ())
+        expected = {
+            ("consistency", "consistency"),
+            *(("class_satisfiability", _query_id(q)) for q in proof.exceptions),
+        }
+        indexed = {(row.get("kind"), row.get("query_id")): row for row in obligations}
+        if len(indexed) != len(obligations) or set(indexed) != expected:
+            raise ValueError("source-exception receipt does not cover exactly the declared queries")
+        coverage = {
+            (kind, query): complete for kind, query, complete in support.get("query_support", ())
+        }
+        if set(coverage) != expected or any(
+            coverage[key] != indexed[key].get("complete") for key in expected
+        ):
+            raise ValueError("source-exception backend coverage differs from query results")
+        consistency = indexed[("consistency", "consistency")]
+        consistent = (
+            supported and consistency.get("complete") is True and consistency.get("verdict") is True
+        )
         if not consistent:
             checks.append(
                 ObligationV2(
-                    f"source_exception:{side}:consistency",
+                    f"source_exception:{proof.side}:consistency",
                     "unknown",
                     False,
-                    "source consistency is required before an incoherence exception",
+                    "completed supported source consistency is required before an exception",
                 )
             )
-        for result in report.obligations:
-            if result.kind != "class_satisfiability":
-                continue
+        for expression in proof.exceptions:
+            query = _query_id(expression)
+            row = indexed[("class_satisfiability", query)]
+            complete = consistent and row.get("complete") is True
             checks.append(
                 ObligationV2(
-                    f"source_exception:{side}:{result.query_id}",
+                    f"source_exception:{proof.side}:{query}",
                     (
                         "unknown"
-                        if not result.complete
-                        else "pass" if result.verdict is False else "fail"
+                        if not complete
+                        else "pass" if row.get("verdict") is False else "fail"
                     ),
-                    result.complete,
-                    result.reason or "",
+                    complete,
+                    row.get("reason") or "",
                 )
             )
     return tuple(checks)
+
+
+def _verify_exception_artifact(problem: RepairInputV2) -> QualifiedBaselineReportV3:
+    from .owl import OwlVerifier, snapshot_from_axioms
+
+    started = time.monotonic()
+    proofs = []
+    try:
+        groups = _exception_groups(problem)
+        for side, expressions in groups.items():
+            axioms = problem.source_axioms if side == "source" else problem.target_axioms
+            documents = problem.source_documents if side == "source" else problem.target_documents
+            snapshot = snapshot_from_axioms(axioms)
+            report = OwlVerifier().check_theory(snapshot, expressions)
+            proofs.append(
+                SourceExceptionProofV3(
+                    side,
+                    canonical_hash(tuple(sorted(set(axioms), key=canonical_hash))),
+                    documents,
+                    problem.policy.content_hash,
+                    expressions,
+                    snapshot.logical_fingerprint.hex,
+                    _baseline_qualification(),
+                    report.to_dict(),
+                )
+            )
+        checks = _exception_checks(problem, tuple(proofs))
+    except (ValueError, LookupError) as error:
+        checks = (ObligationV2("source_exception_evidence", "unknown", False, str(error)),)
+    return QualifiedBaselineReportV3(
+        baseline_identity(problem),
+        (),
+        time.monotonic() - started,
+        int(bool(problem.policy.exceptions)),
+        exception_checks=checks,
+        exception_proofs=tuple(proofs),
+        qualification_hash=_baseline_qualification(),
+    )
+
+
+def _verify_exceptions(problem: RepairInputV2) -> tuple[ObligationV2, ...]:
+    """Independently reprove exceptions; durable acquisition keeps the full artifact."""
+    return _verify_exception_artifact(problem).exception_checks if problem.policy.exceptions else ()
+
+
+def _validated_baseline_exceptions(
+    problem: RepairInputV2, artifact: BaselineReportV3
+) -> tuple[ObligationV2, ...]:
+    if artifact.identity != baseline_identity(problem):
+        raise ValueError("shared baseline does not match this input/policy")
+    if not problem.policy.exceptions:
+        return ()
+    if (
+        not isinstance(artifact, QualifiedBaselineReportV3)
+        or artifact.qualification_hash != _baseline_qualification()
+        or artifact.evidence_revision != "source-exception-evidence/v3.1"
+    ):
+        raise ValueError("missing or incompatible qualified source-exception artifact")
+    checks = _exception_checks(problem, artifact.exception_proofs)
+    if checks != artifact.exception_checks:
+        raise ValueError("source-exception checks disagree with their complete proof receipt")
+    return checks
 
 
 def _unknown(
@@ -319,7 +450,12 @@ def _valid_report(problem: RepairInputV2, assignment: tuple[int, ...], report: A
                 problem.policy.exceptions, problem.policy.exception_evidence
             )
         )
-        if set(report.expected_obligations) != expected:
+        if isinstance(report, CompactVerificationReportV3):
+            if report.coverage_hash != canonical_hash(
+                tuple(sorted(expected))
+            ) or report.coverage_count != len(expected):
+                return False
+        elif set(report.expected_obligations) != expected:
             return False
     if (
         isinstance(problem, RepairInputV3)
@@ -328,6 +464,18 @@ def _valid_report(problem: RepairInputV2, assignment: tuple[int, ...], report: A
     ):
         return False
     return True
+
+
+def _baseline_qualification() -> str:
+    from importlib.metadata import PackageNotFoundError, version
+
+    versions = []
+    for package in ("pyowl-core", "pyelk-reasoner", "pyhermit"):
+        try:
+            versions.append((package, version(package)))
+        except PackageNotFoundError:
+            versions.append((package, "unavailable"))
+    return canonical_hash(("source-exception-qualification/r2", tuple(versions)))
 
 
 def baseline_identity(problem: RepairInputV2) -> str:
@@ -352,19 +500,22 @@ def collect_baselines(problem: RepairInputV2) -> BaselineReportV3:
     reports, failures = [], []
     checks = 0
     exception_checks: tuple[ObligationV2, ...] = ()
+    exception_proofs: tuple[SourceExceptionProofV3, ...] = ()
     if problem.policy.exceptions and checks < problem.budgets.max_checks:
         checks += 1
         outcome = bounded_call(
-            _verify_exceptions,
+            _verify_exception_artifact,
             problem,
             timeout=min(problem.budgets.total_seconds, problem.budgets.verification_seconds),
             **_memory_options(problem.budgets.memory_mb),
         )
-        exception_checks = (
-            outcome.value
-            if outcome.status == "complete"
-            else (ObligationV2("source_exception", "unknown", False, outcome.detail),)
-        )
+        if outcome.status == "complete" and isinstance(outcome.value, QualifiedBaselineReportV3):
+            exception_checks, exception_proofs = (
+                outcome.value.exception_checks,
+                outcome.value.exception_proofs,
+            )
+        else:
+            exception_checks = (ObligationV2("source_exception", "unknown", False, outcome.detail),)
     theories = (
         ("source", problem.source_axioms),
         ("target", problem.target_axioms),
@@ -411,13 +562,15 @@ def collect_baselines(problem: RepairInputV2) -> BaselineReportV3:
             reports.append((name, outcome.value))
         else:
             failures.append(f"baseline {name}: {outcome.status}: {outcome.detail}")
-    return BaselineReportV3(
+    return QualifiedBaselineReportV3(
         baseline_identity(problem),
         tuple(reports),
         time.monotonic() - started,
         checks,
         tuple(failures),
         exception_checks=exception_checks,
+        exception_proofs=exception_proofs,
+        qualification_hash=_baseline_qualification(),
     )
 
 
@@ -444,9 +597,73 @@ def _atomic_record(path: Path, record: Any) -> None:
             stream.flush()
             os.fsync(stream.fileno())
         os.replace(temporary, path)
+        directory = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
+        try:
+            os.fsync(directory)
+        finally:
+            os.close(directory)
     finally:
         if os.path.exists(temporary):
             os.unlink(temporary)
+
+
+def _read_search_ledger(
+    path: Path,
+    problem: RepairInputV2,
+    objective: ObjectiveV2,
+    shortlist_size: int,
+    utility_window: int,
+    risk_identity: str,
+    shortlist_seconds: float | None,
+) -> tuple[SearchLedgerV3, tuple[ObligationV2, ...] | None]:
+    """Read, decode and qualify recovery evidence inside a supervised process."""
+    saved = read_record(json.loads(path.read_text()))
+    if not isinstance(saved, SearchLedgerV3) or (
+        saved.input_hash,
+        saved.objective_hash,
+        saved.policy_hash,
+        saved.shortlist_size,
+        saved.utility_window,
+        saved.risk_identity,
+        saved.shortlist_seconds,
+    ) != (
+        problem.content_hash,
+        objective.content_hash,
+        problem.policy.content_hash,
+        shortlist_size,
+        utility_window,
+        risk_identity,
+        shortlist_seconds,
+    ):
+        raise ValueError("ledger epoch or scheduling identity mismatch")
+    entries: tuple[PendingAssignmentV2 | DeferredAssignmentV3, ...] = (
+        *saved.pending,
+        *saved.deferred,
+    )
+    for entry in entries:
+        if entry.value != objective.score(entry.assignment):
+            raise ValueError("ledger utility mismatch")
+    for assignment, report in saved.feasible:
+        if not _valid_report(problem, assignment, report) or not report.authorizes:
+            raise ValueError("invalid ledger incumbent")
+    for assignment, report in saved.logical_exclusions:
+        if (
+            not _valid_report(problem, assignment, report)
+            or report.verdict != "VERIFIED_INFEASIBLE"
+            or not any(q.complete and q.verdict == "fail" for q in report.obligations)
+        ):
+            raise ValueError("invalid ledger logical exclusion")
+    restored_exceptions = None
+    if (
+        isinstance(saved, RecoverySearchLedgerV3)
+        and saved.baseline_artifact is not None
+        and saved.baseline_qualification_hash == _baseline_qualification()
+    ):
+        try:
+            restored_exceptions = _validated_baseline_exceptions(problem, saved.baseline_artifact)
+        except ValueError:
+            pass  # Old/incompatible receipts require the explicit budgeted recovery path.
+    return saved, restored_exceptions
 
 
 def _rank_shortlist(
@@ -457,6 +674,118 @@ def _rank_shortlist(
     if any(not math.isfinite(v) for v in values):
         raise ValueError("risk scores must be finite")
     return values
+
+
+@dataclasses.dataclass
+class _VerificationStream:
+    """One killable validator with immutable indexes and bounded backend attempts."""
+
+    problem: RepairInputV2
+    assignment: tuple[int, ...]
+    require_complete_stream: bool = True
+
+    def _initialize(self) -> None:
+        if hasattr(self, "expected"):
+            return
+        self.axioms, self.active = materialize(self.problem, self.assignment)
+        self.theory_hash = canonical_hash((self.axioms, self.active))
+        self.assignment_hash = canonical_hash(self.assignment)
+        self.policy_hash = self.problem.policy.content_hash
+        self.expected = set(expected_queries(self.active, self.problem.policy))
+        self.sequence = 0
+        self.observed: dict[tuple[str, str], str] = {}
+        self.passed: set[str] = set()
+        self.failure: VerificationEventV3 | None = None
+
+    def __call__(self, event: Any) -> bool:
+        self._initialize()
+        if (
+            not isinstance(event, VerificationEventV3)
+            or event.sequence != self.sequence
+            or not event.obligation.complete
+            or event.obligation.verdict not in {"pass", "fail"}
+            or event.assignment_hash != self.assignment_hash
+            or event.theory_hash != self.theory_hash
+            or event.policy_hash != self.policy_hash
+            or event.obligation.name not in self.expected
+        ):
+            return False
+        if event.proof is not None:
+            from .detection import validate_proof
+
+            if event.obligation.verdict != "fail" or not validate_proof(
+                event.proof, self.axioms, self.active, self.problem.policy
+            ):
+                return False
+            attempt = "detector"
+        else:
+            capability = dict(event.capability)
+            attempt = str(capability.get("reasoner", ""))
+            if not (
+                capability.get("input_supported") is True
+                and capability.get("complete_imports") is True
+                and attempt in {"elk", "hermit"}
+                and str(capability.get("package_version", "")).startswith("0.2.")
+                and canonical_hash(capability) == event.capability_hash
+                and event.backend
+                == f"{attempt}/{capability['package_version']}:{capability.get('backend')}"
+            ):
+                return False
+        key = (attempt, event.obligation.name)
+        if key in self.observed:
+            return False  # one completed result per frozen obligation/backend route
+        self.observed[key] = event.obligation.verdict
+        self.sequence += 1
+        if event.obligation.verdict == "fail" and self.failure is None:
+            self.failure = event
+        if event.obligation.verdict == "pass":
+            self.passed.add(event.obligation.name)
+        return True
+
+    def finish(self, report: Any) -> VerificationReportV2:
+        self._initialize()
+        if self.failure is not None:
+            detail = "qualified completed failure retained"
+            if getattr(report, "authorizes", False):
+                detail += "; integrity discrepancy: positive final report contradicts failure"
+            return _event_failure_report(self.failure, detail)
+        if not _valid_report(self.problem, self.assignment, report):
+            return _unknown(
+                self.problem, self.assignment, "final verification identity/coverage mismatch"
+            )
+        if report.authorizes and self.require_complete_stream and self.passed != self.expected:
+            return _unknown(
+                self.problem,
+                self.assignment,
+                "final report lacks committed complete event coverage",
+            )
+        return cast(VerificationReportV2, report)
+
+
+def _event_failure_report(event: VerificationEventV3, detail: str) -> VerificationReportV3:
+    return VerificationReportV3(
+        event.assignment_hash,
+        event.theory_hash,
+        event.policy_hash,
+        "VERIFIED_INFEASIBLE",
+        "partial_detection",
+        (event.obligation,),
+        backend=event.backend,
+        detail=detail,
+        events=(event,),
+        proofs=(event.proof,) if event.proof else (),
+    )
+
+
+def _replay_journal(problem: RepairInputV2, assignment: tuple[int, ...], directory: str):
+    validator = _VerificationStream(problem, assignment)
+    receipt = committed_events(directory)
+    for event in receipt:
+        if not validator(event):
+            raise ValueError("invalid committed verification event")
+    validator._initialize()
+    report = committed_result(directory)
+    return validator.failure, validator.finish(report) if report is not None else None
 
 
 def repair(
@@ -522,15 +851,19 @@ def repair(
     deferred: dict[tuple[int, ...], DeferredAssignmentV3] = {}
     feasible: dict[tuple[int, ...], VerificationReportV2] = {}
     events: list[VerificationEventV3] = []
+    event_journals: list[tuple[tuple[int, ...], str]] = []
+    retained_baseline = baseline_evidence
+    restored_exception_checks = None
     verification_cache: dict[str, VerificationReportV2] = {}
     validated_proofs: set[str] = set()
     proof_deadline = float("inf")
     cache_hits = 0
+    persistence_failure = ""
     failures: list[str] = []
     baseline: list[tuple[str, VerificationReportV2]] = []
     solves = checks = revision = 0
     work_empty = False
-    timings = {"baseline": 0.0, "verification": 0.0, "master": 0.0, "risk": 0.0}
+    timings = {"baseline": 0.0, "verification": 0.0, "master": 0.0, "risk": 0.0, "persistence": 0.0}
     exceptions: tuple[ObligationV2, ...] = ()
     path = Path(ledger_path) if ledger_path is not None else None
 
@@ -539,8 +872,8 @@ def repair(
             stage, max(0.0, budgets.total_seconds - prior_elapsed - (time.monotonic() - started))
         )
 
-    def snapshot() -> SearchLedgerV3:
-        return SearchLedgerV3(
+    def snapshot() -> RecoverySearchLedgerV3:
+        return RecoverySearchLedgerV3(
             problem.content_hash,
             objective.content_hash,
             problem.policy.content_hash,
@@ -563,13 +896,47 @@ def repair(
             tuple(baseline),
             tuple(events),
             shortlist_seconds=shortlist_seconds,
+            baseline_artifact=retained_baseline,
+            baseline_qualification_hash=_baseline_qualification(),
+            event_journals=tuple(event_journals),
         )
 
-    def persist() -> None:
-        nonlocal revision
+    def persist() -> bool:
+        nonlocal revision, persistence_failure
         revision += 1
-        if path is not None:
-            _atomic_record(path, snapshot())
+        if path is None:
+            return True
+        if persistence_failure:
+            return False
+        allowance = remaining(budgets.verification_seconds)
+        if allowance <= 0:
+            persistence_failure = (
+                "ledger persistence: total budget exhausted; last committed state retained"
+            )
+            failures.append(persistence_failure)
+            return False
+        before = time.monotonic()
+        # The write itself can be interrupted after publication. Its durable
+        # receipt reserves the bounded operation, including cleanup; a later
+        # successful publication reconciles earlier reservations to elapsed work.
+        record = snapshot()
+        persistence_reservation = allowance + SUPERVISION_GRACE_SECONDS
+        record = dataclasses.replace(
+            record,
+            elapsed_seconds=max(
+                record.elapsed_seconds, prior_elapsed + before - started + persistence_reservation
+            ),
+            persistence_reservation_seconds=persistence_reservation,
+        )
+        result = bounded_call(
+            _atomic_record, path, record, timeout=allowance, **_memory_options(budgets.memory_mb)
+        )
+        timings["persistence"] += time.monotonic() - before
+        if result.status != "complete":
+            persistence_failure = f"ledger persistence: {result.status}: {result.detail}; last committed state retained"
+            failures.append(persistence_failure)
+            return False
+        return True
 
     def refresh_bound() -> None:
         nonlocal upper
@@ -699,15 +1066,15 @@ def repair(
     def stage_call(stage: str, function: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
         nonlocal reserved_until
         before = time.monotonic()
-        reserved_until = before + max(0.0, float(kwargs.get("timeout", 0.0)))
-        persist()  # a lost process is charged this operation's full reservation
+        allowance = max(0.0, float(kwargs.get("timeout", 0.0)))
+        reserved_until = before + allowance + SUPERVISION_GRACE_SECONDS
         try:
-            return bounded_call(
-                function,
-                *args,
-                **kwargs,
-                **_memory_options(budgets.memory_mb),
+            if not persist():
+                return CallResult("persistence_error", detail=persistence_failure)
+            kwargs["timeout"] = min(
+                remaining(allowance), max(0.0, allowance - (time.monotonic() - before))
             )
+            return bounded_call(function, *args, **kwargs, **_memory_options(budgets.memory_mb))
         finally:
             timings[stage] += time.monotonic() - before
             reserved_until = 0.0
@@ -745,13 +1112,13 @@ def repair(
             )
         persist()
         event_offset = len(events)
-
-        def receive(event: Any) -> bool:
-            if not event_valid(event, assignment) or event.sequence != len(events) - event_offset:
-                return False
-            events.append(dataclasses.replace(event, receipt_index=len(events)))
-            persist()  # durable before worker acknowledgement
-            return True
+        directory = str(
+            (path.parent / (path.name + ".events") if path else Path(tempfile.gettempdir()))
+            / ("verification-" + uuid.uuid4().hex)
+        )
+        event_journals.append((assignment, directory))
+        persist()
+        sink = _VerificationStream(problem, assignment, verifier is verify_assignment)
 
         function: Callable[..., VerificationReportV2] = verifier
         args: tuple[Any, ...] = (problem, assignment)
@@ -764,10 +1131,22 @@ def repair(
             function,
             *args,
             timeout=allowance,
-            **({"event_handler": receive} if bounded_call is _NATIVE_BOUNDED_CALL else {}),
+            **(
+                {"event_handler": sink, "event_directory": directory}
+                if bounded_call is _NATIVE_BOUNDED_CALL
+                else {}
+            ),
         )
         proof_deadline = float("inf")
-        if outcome.status == "complete" and _valid_report(problem, assignment, outcome.value):
+        if outcome.event_failure is not None:
+            events.append(dataclasses.replace(outcome.event_failure, receipt_index=len(events)))
+            persist()
+        validated = (
+            isinstance(outcome.value, VerificationReportV2)
+            if bounded_call is _NATIVE_BOUNDED_CALL
+            else _valid_report(problem, assignment, outcome.value)
+        )
+        if outcome.status == "complete" and validated:
             report = cast(VerificationReportV2, outcome.value)
             if isinstance(report, VerificationReportV3) and bounded_call is _NATIVE_BOUNDED_CALL:
                 report = dataclasses.replace(report, events=tuple(events[event_offset:]))
@@ -775,7 +1154,7 @@ def repair(
                 verification_cache[theory_key] = report
             return report
         completed = (
-            [event for event in events[event_offset:] if event_valid(event, assignment)]
+            events[event_offset:]
             if bounded_call is _NATIVE_BOUNDED_CALL
             else [event for event in outcome.events if event_valid(event, assignment)]
         )
@@ -798,27 +1177,25 @@ def repair(
         return _unknown(problem, assignment, detail)
 
     if resume:
-        if path is None or not path.exists():
+        if path is None:
             raise ValueError("resume requires an existing search ledger")
-        saved = read_record(json.loads(path.read_text()))
-        if not isinstance(saved, SearchLedgerV3) or (
-            saved.input_hash,
-            saved.objective_hash,
-            saved.policy_hash,
-            saved.shortlist_size,
-            saved.utility_window,
-            saved.risk_identity,
-            saved.shortlist_seconds,
-        ) != (
-            problem.content_hash,
-            objective.content_hash,
-            problem.policy.content_hash,
+        restored_ledger = bounded_call(
+            _read_search_ledger,
+            path,
+            problem,
+            objective,
             shortlist_size,
             utility_window,
             risk_identity,
             shortlist_seconds,
-        ):
-            raise ValueError("ledger epoch or scheduling identity mismatch")
+            timeout=remaining(budgets.verification_seconds),
+            **_memory_options(budgets.memory_mb),
+        )
+        if restored_ledger.status != "complete":
+            raise ValueError(
+                "search ledger recovery: " + restored_ledger.status + ": " + restored_ledger.detail
+            )
+        saved, restored_exception_checks = restored_ledger.value
         prior_elapsed, solves, checks, revision = (
             saved.elapsed_seconds,
             saved.solves,
@@ -832,28 +1209,16 @@ def repair(
             list(saved.baseline),
             list(saved.events),
         )
+        if isinstance(saved, RecoverySearchLedgerV3):
+            event_journals = list(saved.event_journals)
+            if retained_baseline is None:
+                retained_baseline = saved.baseline_artifact
         pending = {p.assignment: p for p in saved.pending}
         deferred = {p.assignment: p for p in saved.deferred}
-        entries: tuple[PendingAssignmentV2 | DeferredAssignmentV3, ...] = (
-            *saved.pending,
-            *saved.deferred,
-        )
-        for entry in entries:
-            if entry.value != objective.score(entry.assignment):
-                raise ValueError("ledger utility mismatch")
         for assignment, report in saved.feasible:
-            if not _valid_report(problem, assignment, report) or not report.authorizes:
-                raise ValueError("invalid ledger incumbent")
             feasible[assignment] = report
             if lower is None or objective.score(assignment) > lower:
                 incumbent, incumbent_report, lower = assignment, report, objective.score(assignment)
-        for assignment, report in cuts:
-            if (
-                not _valid_report(problem, assignment, report)
-                or report.verdict != "VERIFIED_INFEASIBLE"
-                or not any(q.complete and q.verdict == "fail" for q in report.obligations)
-            ):
-                raise ValueError("invalid ledger logical exclusion")
         # A stored scalar is not a solver certificate. Rebuild conservative bounds
         # on restart; this may lose tightness, never unresolved alternatives.
         upper = objective.upper_cap
@@ -884,34 +1249,52 @@ def repair(
                     accept_report(assignment, report)
                     break
 
-    if baseline_evidence is not None:
-        exceptions = baseline_evidence.exception_checks
-    elif (
-        verifier is verify_assignment
-        and problem.policy.exceptions
-        and not diagnose
-        and remaining(1) > 0
-        and checks < budgets.max_checks
-    ):
-        checks += 1
-        outcome = stage_call(
-            "baseline", _verify_exceptions, problem, timeout=remaining(budgets.verification_seconds)
-        )
-        exceptions = (
-            outcome.value
-            if outcome.status == "complete"
-            else (ObligationV2("source_exception", "unknown", False, outcome.detail),)
-        )
-    elif problem.policy.exceptions:
-        exceptions = (
-            ObligationV2("source_exception", "unknown", False, "exception budget exhausted"),
-        )
+    if resume:
+        for assignment, directory in event_journals:
+            if assignment in feasible or any(a == assignment for a, _ in cuts):
+                continue
+            if remaining(budgets.verification_seconds) <= 0:
+                break
+            restored = stage_call(
+                "verification",
+                _replay_journal,
+                problem,
+                assignment,
+                directory,
+                timeout=remaining(budgets.verification_seconds),
+            )
+            if restored.status != "complete":
+                failures.append(f"event replay: {restored.status}: {restored.detail}")
+                continue
+            failure, completed_report = restored.value
+            if failure is not None:
+                events.append(dataclasses.replace(failure, receipt_index=len(events)))
+                accept_report(
+                    assignment, _event_failure_report(failure, "replayed committed failure")
+                )
+            elif completed_report is not None:
+                accept_report(assignment, completed_report)
 
-    if baseline_evidence is not None:
-        if baseline_evidence.identity != baseline_identity(problem):
-            raise ValueError("shared baseline does not match this input/policy")
-        baseline = list(baseline_evidence.reports)
-    elif diagnose and verifier is verify_assignment and not resume and remaining(1) > 0:
+    # REV-10: restore the complete immutable baseline receipt, not its projected booleans.
+    if baseline_evidence is None and resume and isinstance(saved, RecoverySearchLedgerV3):
+        if (
+            saved.baseline_artifact is not None
+            and saved.baseline_qualification_hash == _baseline_qualification()
+        ):
+            baseline_evidence = saved.baseline_artifact
+        elif problem.policy.exceptions:
+            failures.append(
+                "source exception evidence missing or qualification changed; revalidation required"
+            )
+    if baseline_evidence is not None and baseline_evidence.identity != baseline_identity(problem):
+        raise ValueError("shared baseline does not match this input/policy")
+    if (
+        baseline_evidence is None
+        and diagnose
+        and verifier is verify_assignment
+        and not resume
+        and remaining(1) > 0
+    ):
         remaining_problem = dataclasses.replace(
             problem,
             budgets=dataclasses.replace(
@@ -920,11 +1303,103 @@ def repair(
                 max_checks=max(0, budgets.max_checks - checks),
             ),
         )
-        captured = collect_baselines(remaining_problem)
-        baseline, checks = list(captured.reports), checks + captured.checks
-        exceptions = captured.exception_checks
-        timings["baseline"] += captured.elapsed_seconds
-        failures.extend(captured.failures)
+        capture = stage_call(
+            "baseline",
+            collect_baselines,
+            remaining_problem,
+            timeout=remaining(budgets.total_seconds),
+        )
+        if capture.status == "complete" and isinstance(capture.value, BaselineReportV3):
+            baseline_evidence = capture.value
+            checks += baseline_evidence.checks
+            failures.extend(baseline_evidence.failures)
+        else:
+            failures.append("baseline acquisition: " + capture.status + ": " + capture.detail)
+    qualified = not problem.policy.exceptions
+    if baseline_evidence is not None:
+        retained_baseline = baseline_evidence
+        baseline = list(baseline_evidence.reports)
+        if (
+            resume
+            and restored_exception_checks is not None
+            and isinstance(saved, RecoverySearchLedgerV3)
+            and baseline_evidence == saved.baseline_artifact
+        ):
+            exceptions = restored_exception_checks
+            qualified = True
+        elif problem.policy.exceptions and remaining(1) > 0:
+            validation = stage_call(
+                "baseline",
+                _validated_baseline_exceptions,
+                problem,
+                baseline_evidence,
+                timeout=remaining(budgets.verification_seconds),
+            )
+            if validation.status == "complete":
+                exceptions = validation.value
+                qualified = True
+            else:
+                failures.append("source exception receipt unavailable: " + validation.detail)
+    if (
+        not qualified
+        and verifier is verify_assignment
+        and remaining(1) > 0
+        and checks < budgets.max_checks
+    ):
+        checks += 1
+        acquisition = stage_call(
+            "baseline",
+            _verify_exception_artifact,
+            problem,
+            timeout=remaining(budgets.verification_seconds),
+        )
+        if acquisition.status == "complete" and isinstance(
+            acquisition.value, QualifiedBaselineReportV3
+        ):
+            fresh = acquisition.value
+            retained_baseline = dataclasses.replace(
+                fresh,
+                reports=tuple(baseline),
+                elapsed_seconds=fresh.elapsed_seconds
+                + (baseline_evidence.elapsed_seconds if baseline_evidence else 0.0),
+                checks=fresh.checks + (baseline_evidence.checks if baseline_evidence else 0),
+            )
+            exceptions = fresh.exception_checks
+            qualified = True
+        else:
+            exceptions = (
+                ObligationV2(
+                    "source_exception",
+                    "unknown",
+                    False,
+                    "source exception revalidation "
+                    + acquisition.status
+                    + ": "
+                    + acquisition.detail,
+                ),
+            )
+    elif not qualified:
+        exceptions = (
+            ObligationV2(
+                "source_exception",
+                "unknown",
+                False,
+                "qualified source exception evidence unavailable; revalidation resource budget exhausted",
+            ),
+        )
+    if problem.policy.exceptions and (
+        not qualified or any(not q.complete or q.verdict != "pass" for q in exceptions)
+    ):
+        # Old scalar pass records cannot keep an incumbent authorized without its source proof.
+        for assignment in feasible:
+            pending[assignment] = PendingAssignmentV2(
+                assignment,
+                objective.score(assignment),
+                _unknown(problem, assignment, "source exception evidence unavailable on resume"),
+            )
+        feasible.clear()
+        incumbent = incumbent_report = lower = None
+    persist()  # proof acquisition is durable before any candidate verification begins.
 
     original = tuple(
         next(
@@ -965,7 +1440,9 @@ def repair(
             accept_report(original, report)
             bypass = report.authorizes and preserve_verified_input
 
-    while not bypass and remaining(1) > 0 and checks < budgets.max_checks:
+    while (
+        not bypass and not persistence_failure and remaining(1) > 0 and checks < budgets.max_checks
+    ):
         refresh_bound()
         if lower is not None and upper == lower:
             break
@@ -1122,8 +1599,6 @@ def repair(
     if result.assignment is None:
         values["ontology_patch"] = None
     final_ledger = snapshot()
-    if path is not None:
-        _atomic_record(path, final_ledger)
     values["elapsed_seconds"] = final_ledger.elapsed_seconds
     return RepairResultV3(
         **values,

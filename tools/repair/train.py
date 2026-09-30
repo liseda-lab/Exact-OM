@@ -16,14 +16,11 @@ from typing import Any, Mapping, Sequence, cast
 
 import pyowl_core as owl
 
-from exact.repair.graph import (
-    FEATURE_SCHEMA_V3,
-    build_observable_graph,
-    select_interaction_pairs,
-)
+from exact.repair.graph import FEATURE_SCHEMA_V3, EffectivePreparation
 from exact.repair.learning import (
     OwlTeacherOracle,
     RepairLabel,
+    SemanticTargetSpec,
     TeacherCache,
     benefit_losses,
     collect_sampled_repairs,
@@ -36,6 +33,8 @@ from exact.repair.learning import (
     interaction_loss,
     risk_loss,
     sample_conditioned_marginals,
+    support_loss,
+    support_targets,
     teacher_marginals,
 )
 from exact.repair.records import (
@@ -67,6 +66,11 @@ def save_training_state(path: Path, state: dict) -> None:
             stream.flush()
             os.fsync(stream.fileno())
         os.replace(temporary, path)
+        directory = os.open(path.parent, os.O_RDONLY)
+        try:
+            os.fsync(directory)
+        finally:
+            os.close(directory)
     finally:
         if os.path.exists(temporary):
             os.unlink(temporary)
@@ -164,7 +168,10 @@ def _freeze_training_model(problem, model, *, seconds: float, **options):
             },
         )
         return bounded_freeze_checkpoint(
-            problem, path, seconds=max(0.001, seconds - (time.monotonic() - started)), **options
+            problem,
+            str(path),
+            seconds=max(0.001, seconds - (time.monotonic() - started)),
+            **options,
         )
 
 
@@ -174,6 +181,7 @@ def _assignment_label(
     profile: tuple,
     desired_family_weight: float = 1.0,
     false_positive_weight: float = 1.0,
+    semantic_target: SemanticTargetSpec | None = None,
 ) -> RepairLabel:
     from exact.repair.kernel import materialize
     from exact.repair.owl import OwlVerifier, snapshot_from_axioms
@@ -192,16 +200,15 @@ def _assignment_label(
         candidate_cost(obj, obj.candidates[choice], profile)
         for obj, choice in zip(case.problem.objects, assignment)
     )
+    auxiliary = support_targets(case.problem, assignment, report, axioms, active)
     if report.logical_status != "VERIFIED_FEASIBLE":
         feasible = False if report.logical_status == "VERIFIED_INFEASIBLE" else None
-        return RepairLabel(assignment, feasible, None, cost)
-    semantic = evaluate_teacher(
-        OwlTeacherOracle(verifier, snapshot, case.probes),
-        case.probes,
-        desired_weights={probe.family: desired_family_weight for probe in case.probes},
-        unwanted_weights={probe.family: false_positive_weight for probe in case.probes},
+        return RepairLabel(assignment, feasible, None, cost, support_targets=auxiliary)
+    target = semantic_target or SemanticTargetSpec(
+        canonical_hash(case.probes), desired_family_weight, false_positive_weight
     )
-    return RepairLabel(assignment, True, semantic.benefit, cost, semantic.outcomes)
+    semantic = target.evaluate(OwlTeacherOracle(verifier, snapshot, case.probes), case.probes)
+    return RepairLabel(assignment, True, semantic.benefit, cost, semantic.outcomes, auxiliary)
 
 
 def _verify_intended(case: GeneratedCase) -> bool:
@@ -242,6 +249,9 @@ def label_case(
         raise ValueError("Ambiguous observations have no single supervised target")
     if max_assignments < 1 or deadline_seconds <= 0 or call_seconds <= 0:
         raise ValueError("Teacher caps and deadlines must be positive")
+    semantic_target = SemanticTargetSpec(
+        canonical_hash(case.probes), desired_family_weight, false_positive_weight
+    )
     started = time.monotonic()
     intended = bounded_call(_verify_intended, case, timeout=min(call_seconds, deadline_seconds))
     if intended.status != "complete" or intended.value is not True:
@@ -258,6 +268,7 @@ def label_case(
             profile,
             desired_family_weight,
             false_positive_weight,
+            semantic_target,
             timeout=min(call_seconds, max(0.0, remaining)),
         )
         if result.status == "complete":
@@ -276,6 +287,7 @@ def label_case(
             "backend": canonical_hash(("pyhermit", version("pyhermit"), "python")),
             "profile": canonical_hash(profile),
             "teacher_weights": canonical_hash((desired_family_weight, false_positive_weight)),
+            "semantic_target": semantic_target.content_hash,
         },
         max_assignments=max_assignments,
         deadline_seconds=max(0.001, deadline_seconds - (time.monotonic() - started)),
@@ -364,6 +376,7 @@ def generated_development(
     selection_options: Mapping[str, Any] | None = None,
     fidelity_evaluator_labels: Sequence[tuple[Any, Any]] = (),
     case_cpu_seconds: float | None = None,
+    semantic_target: SemanticTargetSpec | None = None,
     target_basis: str = "symbolic",
     mixture_symbolic_weight: float = 0.5,
     **options,
@@ -377,6 +390,7 @@ def generated_development(
 
     if seconds <= 0:
         return {"status": "generation_deadline", "useful_candidate_coverage": None}
+    semantic_target = semantic_target or SemanticTargetSpec(canonical_hash(case.probes))
     started = time.monotonic()
     frozen = _freeze_training_model(
         case.problem,
@@ -464,6 +478,8 @@ def generated_development(
                     generated_case,
                     result.assignment,
                     options.get("profile", DEFAULT_PROFILE),
+                    semantic_target=semantic_target
+                    or SemanticTargetSpec(canonical_hash(case.probes)),
                     timeout=remaining,
                 )
                 if labeled.status == "complete":
@@ -518,6 +534,8 @@ def generated_development(
     return {
         "status": "generated",
         "parent_group_id": case.structural_parent,
+        "semantic_target_hash": semantic_target.content_hash,
+        "fidelity_aggregate_hash": canonical_hash(tuple(fidelity_evaluator_labels)),
         "useful_candidate_coverage": useful,
         "teacher_optimal_repair_available": optimum_present,
         "candidate_counts": [len(obj.candidates) for obj in generated.problem.objects],
@@ -597,24 +615,35 @@ def train_cases(
     collection_cases_per_round: int | None = None,
     collection_options: Mapping[str, Any] | None = None,
     plan_risk: bool = True,
+    support_enabled: bool = False,
+    support_loss_weight: float = 0.2,
+    support_target: str = "qualified_witness_violation/v1",
     selection_options: Mapping[str, Any] | None = None,
     circuit_limits: Mapping[str, Any] | None = None,
     compiler_cache_directory: str | None = None,
     vtree_type: str = "balanced",
     proposal_context: str = "independent",
     pair_factor_bound: float = 1.0,
+    desired_family_weight: float = 1.0,
+    false_positive_weight: float = 1.0,
     target_basis: str = "symbolic",
     fidelity_development_labels: Mapping[str, Sequence[tuple[Any, Any]]] | None = None,
     mixture_symbolic_weight: float = 0.5,
     case_cpu_seconds: float | None = None,
+    total_training_seconds: float | None = None,
 ) -> tuple[Any, dict[str, Any]]:
     """Train masked full-plan tasks and select v3 checkpoints on generated repair quality.
 
     Cases without complete finite distributions still contribute masked benefit
     regression/ranking. No test case can enter optimization or checkpoint selection.
     """
-    # Bind all scientific options and teacher/split identities. Remaining wall
-    # time is supplied by the persistent stage budget, not checkpoint identity.
+    # An invocation may use a smaller slice of the predeclared total. The CLI
+    # also enforces its durable wall/CPU ledger independently of this checkpoint.
+    total_training_seconds = (
+        deadline_seconds if total_training_seconds is None else total_training_seconds
+    )
+    if not math.isfinite(total_training_seconds) or total_training_seconds <= 0:
+        raise ValueError("Cumulative training allowance must be finite and positive")
     identity_options = dict(locals())
     for key in ("checkpoint_path", "deadline_seconds", "warm_start_weights"):
         identity_options.pop(key)
@@ -641,6 +670,29 @@ def train_cases(
         )
     if proposal_context not in {"independent", "selected_other_actions"}:
         raise ValueError("Unknown proposal context convention")
+    if (
+        support_target != "qualified_witness_violation/v1"
+        or support_loss_weight < 0
+        or not math.isfinite(support_loss_weight)
+    ):
+        raise ValueError("Invalid qualified support auxiliary declaration")
+    if target_basis != "symbolic":
+        from exact.repair.semantic_fidelity import (
+            ValidatedFidelityAggregateV3,
+            validate_fidelity_training_records,
+        )
+
+        fidelity_labels = validate_fidelity_training_records(fidelity_labels or {}, "train")
+        fidelity_development_labels = validate_fidelity_training_records(
+            fidelity_development_labels or {}, "development"
+        )
+        if any(
+            not isinstance(comparison, ValidatedFidelityAggregateV3)
+            for source in (fidelity_labels, fidelity_development_labels)
+            for rows in (source or {}).values()
+            for _, comparison in rows
+        ):
+            raise ValueError("Weak supervision requires unique-observation validated aggregates")
     if max_collection_rounds < 0 or (
         collection_cases_per_round is not None and collection_cases_per_round < 1
     ):
@@ -698,6 +750,12 @@ def train_cases(
         raise ValueError("Training provenance must match the separately declared arm")
     if arm == "training_side_adaptation" and warm_start_weights is None:
         raise ValueError("Adaptation requires pretrained model weights only")
+    semantic_targets = {
+        case.case_id: SemanticTargetSpec(
+            canonical_hash(case.probes), desired_family_weight, false_positive_weight
+        )
+        for case, _ in [*training, *development]
+    }
     for case, cache in [*training, *development]:
         expected = {
             "input": case.problem.content_hash,
@@ -706,10 +764,26 @@ def train_cases(
             "inventory": canonical_hash(tuple(obj.candidates for obj in case.problem.objects)),
             "profile": canonical_hash(profile),
         }
+        if revision == "v3":
+            expected["semantic_target"] = semantic_targets[case.case_id].content_hash
         if any(dict(cache.hashes).get(key) != digest for key, digest in expected.items()):
             raise ValueError("Teacher cache dependencies/profile do not match this training case")
         if cache.candidate_counts != tuple(len(obj.candidates) for obj in case.problem.objects):
             raise ValueError("Teacher cache candidate counts do not match")
+    from exact.repair.retrieval import RetrievalConfig
+
+    preparation = EffectivePreparation(
+        max_graph_nodes,
+        max_graph_edges,
+        max_explanations,
+        max_text_tokens,
+        pair_factor_limit_per_object,
+        pair_max_pairs,
+        pair_max_factors,
+        retrieval_config or RetrievalConfig(),
+        revision,
+    )
+    retrieval_config = preparation.retrieval_config
     torch.manual_seed(seed)
     all_cases = [*training, *development]
     retrievals = {
@@ -717,22 +791,7 @@ def train_cases(
         for case, _ in all_cases
     }
     graphs = {
-        case.case_id: build_observable_graph(
-            case.problem.objects,
-            fixed_axioms=case.problem.fixed_axioms,
-            source_axioms=case.problem.source_axioms,
-            target_axioms=case.problem.target_axioms,
-            evidence=retrievals[case.case_id].graph_evidence(case.problem.evidence),
-            retrieved_symbols=retrievals[case.case_id].symbols,
-            explanations=retrievals[case.case_id].explanations,
-            max_nodes=max_graph_nodes,
-            max_edges=max_graph_edges,
-            max_explanations=max_explanations,
-            max_text_tokens=max_text_tokens,
-            feature_schema=(
-                FEATURE_SCHEMA_V3 if revision == "v3" else "exact-repair/observable-features/v2"
-            ),
-        )
+        case.case_id: preparation.graph(case.problem, retrievals[case.case_id])
         for case, _ in all_cases
     }
     grammars = {}
@@ -760,19 +819,12 @@ def train_cases(
                         case.problem.policy,
                     )
     pair_reports = {
-        case.case_id: select_interaction_pairs(
-            case.problem,
-            graph=graphs[case.case_id],
-            explanations=retrievals[case.case_id].explanations,
-            per_object_limit=pair_factor_limit_per_object if pairwise else 0,
-            max_pairs=pair_max_pairs,
-            max_factors=pair_max_factors,
-        )
+        case.case_id: preparation.pairs(case.problem, graphs[case.case_id], enabled=pairwise)
         for case, _ in all_cases
     }
     interaction_pairs = {key: report.pairs for key, report in pair_reports.items()}
     proposal_coverage: dict[str, dict[str, Any]] = {}
-    loss_eligibility: dict[str, dict[str, int]] = {}
+    loss_eligibility: dict[str, dict[str, Any]] = {}
     acquisition_reports: list[dict] = []
     sampled_training: dict[str, tuple[GeneratedCase, TeacherCache]] = {}
     acquisition_epoch = -1
@@ -793,6 +845,7 @@ def train_cases(
         pairwise=pairwise,
         revision=revision,
         plan_risk=plan_risk,
+        support_enabled=support_enabled,
         pair_factor_bound=pair_factor_bound,
     ).to(device)
     adaptation_new_parameters = []
@@ -831,13 +884,23 @@ def train_cases(
     stale_evaluations = 0
     next_epoch, next_offset, saved_loss, saved_optimized = 0, 0, 0.0, 0
     stopped_early = False
+    current_phase = "acquisition"
+    epoch_order: tuple[str, ...] = ()
+    development_progress: dict[str, Any] = {}
+    interrupted = False
+    pending_acquisition: dict[str, Any] = {}
+    previous_elapsed = 0.0
+    execution_count = 1
     if checkpoint_path is not None and checkpoint_path.exists():
         saved = torch.load(checkpoint_path, weights_only=True, map_location=device)
         if (
             saved.get("schema") != f"exact-repair/training-state/{revision}"
             or saved.get("identity") != resume_identity
+            or (revision == "v3" and saved.get("recovery_revision") != "exact-phase-resume/v3.1")
         ):
             raise ValueError("Training checkpoint is incompatible with settings, inputs or splits")
+        previous_elapsed = float(saved.get("elapsed_seconds", 0.0))
+        execution_count = int(saved.get("execution_count", 0)) + 1
         model.load_state_dict(saved["model"])
         optimizer.load_state_dict(saved["optimizer"])
         torch.set_rng_state(saved["cpu_rng"].cpu())
@@ -845,6 +908,10 @@ def train_cases(
             torch.cuda.set_rng_state_all([state.cpu() for state in saved["cuda_rng"]])
         random.setstate(saved["python_rng"])
         next_epoch, next_offset = saved["next_epoch"], saved["next_offset"]
+        current_phase = saved.get("phase", "acquisition")
+        epoch_order = tuple(saved.get("epoch_order", ()))
+        development_progress = saved.get("development_progress", {})
+        pending_acquisition = saved.get("pending_acquisition", {})
         saved_loss, saved_optimized = saved["train_loss"], saved["optimized"]
         history = saved["history"]
         best_criterion, best_state, best_epoch = (
@@ -854,6 +921,7 @@ def train_cases(
         )
         stale_evaluations, stopped_early = saved["stale_evaluations"], saved["stopped_early"]
         proposal_coverage = saved["proposal_coverage"]
+        loss_eligibility = saved.get("loss_eligibility", {})
         failed_compilations = set(saved["failed_compilations"])
         acquisition_epoch = saved.get("acquisition_epoch", -1)
         acquisition_completed = {tuple(row) for row in saved.get("acquisition_completed", [])}
@@ -869,28 +937,8 @@ def train_cases(
                 key = case.case_id
                 retrieval = retrieve_vocabulary(case.problem, config=retrieval_config)
                 retrievals[key] = retrieval
-                graphs[key] = build_observable_graph(
-                    case.problem.objects,
-                    fixed_axioms=case.problem.fixed_axioms,
-                    source_axioms=case.problem.source_axioms,
-                    target_axioms=case.problem.target_axioms,
-                    evidence=retrieval.graph_evidence(case.problem.evidence),
-                    retrieved_symbols=retrieval.symbols,
-                    explanations=retrieval.explanations,
-                    max_nodes=max_graph_nodes,
-                    max_edges=max_graph_edges,
-                    max_explanations=max_explanations,
-                    max_text_tokens=max_text_tokens,
-                    feature_schema=FEATURE_SCHEMA_V3,
-                )
-                pair_reports[key] = select_interaction_pairs(
-                    case.problem,
-                    graph=graphs[key],
-                    explanations=retrieval.explanations,
-                    per_object_limit=pair_factor_limit_per_object if pairwise else 0,
-                    max_pairs=pair_max_pairs,
-                    max_factors=pair_max_factors,
-                )
+                graphs[key] = preparation.graph(case.problem, retrieval)
+                pair_reports[key] = preparation.pairs(case.problem, graphs[key], enabled=pairwise)
                 interaction_pairs[key] = pair_reports[key].pairs
                 for obj in case.problem.objects:
                     menu = retrieval.for_object(obj.object_id)
@@ -912,6 +960,13 @@ def train_cases(
                         case.problem.policy,
                     )
 
+    def remaining_training_seconds() -> float:
+        elapsed = time.monotonic() - started
+        return max(
+            0.0,
+            min(deadline_seconds - elapsed, total_training_seconds - previous_elapsed - elapsed),
+        )
+
     def checkpoint(epoch, offset=0, loss=0.0, optimized=0):
         if checkpoint_path is not None:
             from dataclasses import asdict
@@ -930,6 +985,14 @@ def train_cases(
                     python_rng=random.getstate(),
                     next_epoch=epoch,
                     next_offset=offset,
+                    recovery_revision="exact-phase-resume/v3.1",
+                    elapsed_seconds=previous_elapsed + time.monotonic() - started,
+                    total_training_seconds=total_training_seconds,
+                    execution_count=execution_count,
+                    phase=current_phase,
+                    epoch_order=epoch_order,
+                    development_progress=development_progress,
+                    pending_acquisition=pending_acquisition,
                     train_loss=loss,
                     optimized=optimized,
                     history=history,
@@ -939,6 +1002,7 @@ def train_cases(
                     stale_evaluations=stale_evaluations,
                     stopped_early=stopped_early,
                     proposal_coverage=proposal_coverage,
+                    loss_eligibility=loss_eligibility,
                     failed_compilations=sorted(failed_compilations),
                     acquisition_epoch=acquisition_epoch,
                     acquisition_completed=sorted(acquisition_completed),
@@ -1014,27 +1078,86 @@ def train_cases(
             quartets = interaction_loss(
                 predictions, cache.labels, max_quartets=max_repair_pairs_per_case
             )
-            risks = torch.stack(
-                [
-                    model.plan_risk_logit(
-                        case.problem.objects,
-                        memory,
-                        label.assignment,
-                        supports=retrievals[case.case_id].explanations,
-                    )
-                    for label in cache.labels
-                ]
-            )
-            risk = (
-                risk_loss(risks, cache.labels)
-                if plan_risk
-                else {"loss": risks.sum() * 0, "eligible": 0, "unknown": 0}
-            )
+            risk: dict[str, Any] = {"loss": predictions.sum() * 0, "eligible": 0, "unknown": 0}
+            if plan_risk:
+                risks = torch.stack(
+                    [
+                        model.plan_risk_logit(
+                            case.problem.objects,
+                            memory,
+                            label.assignment,
+                            supports=graph.admitted_supports,
+                        )
+                        for label in cache.labels
+                    ]
+                )
+                risk = risk_loss(risks, cache.labels)
             loss = (
                 loss + interaction_loss_weight * quartets["loss"] + risk_loss_weight * risk["loss"]
             )
             eligibility.update(
-                quartet=quartets["eligible"], risk=risk["eligible"], risk_unknown=risk["unknown"]
+                quartet=quartets["eligible"],
+                risk=risk["eligible"],
+                risk_unknown=risk["unknown"],
+                risk_loss=float(risk["loss"].detach()),
+            )
+        auxiliary = [target for label in cache.labels for target in label.support_targets]
+        eligible_auxiliary = [target for target in auxiliary if target.eligible]
+        eligibility.update(
+            support_available=len(auxiliary),
+            support_eligible=len(eligible_auxiliary),
+            support_optimized=0,
+            support_loss=0.0,
+            support_unavailable_inputs=0,
+        )
+        if support_enabled and eligible_auxiliary:
+            from exact.repair.graph import structural_id
+            from exact.repair.kernel import materialize
+
+            selected_targets, support_logits = [], []
+            qualified_assignments = {}
+            for label in cache.labels:
+                axioms, active = materialize(case.problem, label.assignment)
+                qualified_assignments[label.assignment] = (
+                    canonical_hash(
+                        (
+                            tuple(sorted(set(axioms), key=canonical_hash)),
+                            tuple(sorted(set(active), key=canonical_hash)),
+                        )
+                    ),
+                    tuple(
+                        (obj.object_id, obj.candidates[choice].candidate_id)
+                        for obj, choice in zip(case.problem.objects, label.assignment)
+                    ),
+                    tuple(value.canonical_bytes().hex() for value in active),
+                )
+            for target in eligible_auxiliary:
+                if (
+                    target.policy_hash != case.problem.policy.content_hash
+                    or qualified_assignments.get(target.assignment)
+                    != (target.theory_hash, target.occurrence_ids, target.activation)
+                ):
+                    raise ValueError("Support label dependencies changed")
+                witness = owl.decode_canonical(bytes.fromhex(target.witness))
+                # Missing query vocabulary is an explicit unavailable auxiliary,
+                # never an unbudgeted insertion of post-decision proof contents.
+                if any(
+                    structural_id(symbol) not in memory.rows for symbol in owl.signature(witness)
+                ):
+                    continue
+                selected_targets.append(target)
+                support_logits.append(
+                    model.support_violation_logit(
+                        case.problem.objects, memory, target.assignment, witness
+                    )
+                )
+            if support_logits:
+                terms = support_loss(torch.stack(support_logits), selected_targets)
+                loss = loss + support_loss_weight * terms["loss"]
+                eligibility["support_optimized"] = terms["eligible"]
+                eligibility["support_loss"] = float(terms["loss"].detach())
+            eligibility["support_unavailable_inputs"] = len(eligible_auxiliary) - len(
+                selected_targets
             )
         fidelity_terms = []
         for packet, comparison in (
@@ -1086,7 +1209,7 @@ def train_cases(
                 key = (index, prefix)
                 obj = case.problem.objects[index]
                 if key not in distributions:
-                    remaining = deadline_seconds - (time.monotonic() - started)
+                    remaining = remaining_training_seconds()
                     if remaining <= 0:
                         raise TimeoutError("conditional proposal training deadline")
                     partial = (
@@ -1108,7 +1231,7 @@ def train_cases(
                         max_depth=max_depth,
                         max_constructors=max_constructors,
                         selected_context=context,
-                        circuit_limits=circuit_limits,
+                        circuit_limits=dict(circuit_limits) if circuit_limits is not None else None,
                         compiler_cache_directory=compiler_cache_directory,
                         vtree_type=vtree_type,
                     )
@@ -1140,11 +1263,11 @@ def train_cases(
                 if cache.complete
                 else sample_conditioned_marginals(cache, proposal_temperature)
             )
-            for obj, target in zip(case.problem.objects, marginals):
+            for obj, marginal_target in zip(case.problem.objects, marginals):
                 key = case.case_id + ":" + obj.object_id
                 if key in failed_compilations:
                     continue
-                remaining = deadline_seconds - (time.monotonic() - started)
+                remaining = remaining_training_seconds()
                 if remaining <= 0:
                     proposal_coverage[key] = {"status": "training_deadline"}
                     continue
@@ -1160,7 +1283,7 @@ def train_cases(
                         max_circuit_nodes=max_circuit_nodes,
                         max_depth=max_depth,
                         max_constructors=max_constructors,
-                        circuit_limits=circuit_limits,
+                        circuit_limits=dict(circuit_limits) if circuit_limits is not None else None,
                         compiler_cache_directory=compiler_cache_directory,
                         vtree_type=vtree_type,
                     )
@@ -1186,7 +1309,7 @@ def train_cases(
                 )
                 coverage = covered_proposal_loss(
                     probabilities,
-                    target,
+                    marginal_target,
                     target_kind="exact" if cache.complete else "sample_conditioned",
                     elementary=tuple(
                         all(
@@ -1202,11 +1325,22 @@ def train_cases(
                 loss = loss + weight * coverage["loss"] / max(1, len(case.problem.objects))
         return loss
 
+    checkpoint(next_epoch, next_offset, saved_loss, saved_optimized)
     for epoch in range(next_epoch, epochs):
-        if stopped_early or time.monotonic() - started >= deadline_seconds:
+        if stopped_early:
+            break
+        if remaining_training_seconds() <= 0:
+            interrupted = True
+            checkpoint(
+                epoch,
+                next_offset if epoch == next_epoch else 0,
+                saved_loss if epoch == next_epoch else 0.0,
+                saved_optimized if epoch == next_epoch else 0,
+            )
             break
         if (
             revision == "v3"
+            and current_phase == "acquisition"
             and sampled_assignments
             and epoch % active_round_every_epochs == 0
             and acquisition_epoch != epoch
@@ -1223,44 +1357,68 @@ def train_cases(
             for case, _ in scheduled_cases:
                 if (epoch, case.case_id) in acquisition_completed:
                     continue
-                remaining = deadline_seconds - (time.monotonic() - started)
+                remaining = remaining_training_seconds()
                 if remaining <= 0:
                     break
-                with torch.no_grad():
-                    frozen = _freeze_training_model(
-                        case.problem,
-                        model,
-                        seconds=min(decode_seconds, remaining),
-                        cpu_seconds=case_cpu_seconds,
-                        draws_per_object=min(
-                            development_draws_per_object,
-                            (collection_options or {}).get(
-                                "proposal_attempts", development_draws_per_object
-                            ),
+                continuing = (
+                    pending_acquisition.get("case_id") == case.case_id
+                    and pending_acquisition.get("epoch") == epoch
+                )
+                if continuing:
+                    from types import SimpleNamespace
+
+                    from exact.repair.records import read_record
+                    from exact.repair.workers import CallResult
+                    from tools.repair.prepare import case_from_dict
+
+                    if pending_acquisition["model_hash"] != round_hash:
+                        raise ValueError("Partial acquisition model changed")
+                    restored_case = case_from_dict(pending_acquisition["case"])
+                    frozen = CallResult(
+                        "complete",
+                        SimpleNamespace(
+                            problem=restored_case.problem,
+                            objective=read_record(pending_acquisition["objective"]),
+                            proposal_reports=pending_acquisition["reports"],
                         ),
-                        candidate_cap=candidate_cap,
-                        mixtures=mixtures,
-                        seed=seed + epoch,
-                        profile=profile,
-                        max_depth=max_depth,
-                        max_constructors=max_constructors,
-                        compile_seconds=compile_seconds,
-                        max_circuit_nodes=max_circuit_nodes,
-                        retrieval_config=retrieval_config,
-                        proposal_arm=proposal_arm,
-                        pair_factor_limit_per_object=pair_factor_limit_per_object,
-                        pair_max_pairs=pair_max_pairs,
-                        pair_max_factors=pair_max_factors,
-                        final_candidate_removals=dict(case.final_candidate_removals),
-                        selected_other_assignment=(
-                            tuple(0 for _ in case.problem.objects)
-                            if proposal_context == "selected_other_actions"
-                            else None
-                        ),
-                        circuit_limits=circuit_limits,
-                        compiler_cache_directory=compiler_cache_directory,
-                        vtree_type=vtree_type,
                     )
+                else:
+                    with torch.no_grad():
+                        frozen = _freeze_training_model(
+                            case.problem,
+                            model,
+                            seconds=min(decode_seconds, remaining),
+                            cpu_seconds=case_cpu_seconds,
+                            max_graph_nodes=max_graph_nodes,
+                            max_graph_edges=max_graph_edges,
+                            max_explanations=max_explanations,
+                            max_text_tokens=max_text_tokens,
+                            draws_per_object=development_draws_per_object,
+                            candidate_cap=candidate_cap,
+                            mixtures=mixtures,
+                            seed=seed + epoch,
+                            profile=profile,
+                            max_depth=max_depth,
+                            max_constructors=max_constructors,
+                            compile_seconds=compile_seconds,
+                            max_circuit_nodes=max_circuit_nodes,
+                            retrieval_config=retrieval_config,
+                            proposal_arm=proposal_arm,
+                            pair_factor_limit_per_object=pair_factor_limit_per_object,
+                            pair_max_pairs=pair_max_pairs,
+                            pair_max_factors=pair_max_factors,
+                            final_candidate_removals=dict(case.final_candidate_removals),
+                            selected_other_assignment=(
+                                tuple(0 for _ in case.problem.objects)
+                                if proposal_context == "selected_other_actions"
+                                else None
+                            ),
+                            circuit_limits=(
+                                dict(circuit_limits) if circuit_limits is not None else None
+                            ),
+                            compiler_cache_directory=compiler_cache_directory,
+                            vtree_type=vtree_type,
+                        )
                 if frozen.status != "complete":
                     acquisition_reports.append(
                         {
@@ -1276,8 +1434,24 @@ def train_cases(
                 generated = replace(
                     case, case_id=case.case_id + f":active-{epoch}", problem=frozen.value.problem
                 )
+                if not continuing:
+                    from tools.repair.prepare import case_to_dict
+
+                    pending_acquisition = dict(
+                        case_id=case.case_id,
+                        epoch=epoch,
+                        model_hash=round_hash,
+                        case=case_to_dict(generated),
+                        objective=frozen.value.objective.to_dict(),
+                        reports=json.loads(
+                            canonical_json(
+                                tuple(dict(row) for row in frozen.value.proposal_reports)
+                            )
+                        ),
+                    )
+                    checkpoint(epoch)
                 acquire_started = time.monotonic()
-                acquire_budget = min(decode_seconds, deadline_seconds - (acquire_started - started))
+                acquire_budget = min(decode_seconds, remaining_training_seconds())
                 if acquire_budget <= 0:
                     break
 
@@ -1290,6 +1464,7 @@ def train_cases(
                         generated,
                         assignment,
                         profile,
+                        semantic_target=semantic_targets[case.case_id],
                         timeout=min(left, decode_seconds),
                     )
                     return (
@@ -1298,34 +1473,70 @@ def train_cases(
                         else RepairLabel(assignment, None, None, 0.0)
                     )
 
-                from exact.repair.maxsat import solve_master
+                if "proposed" in pending_acquisition:
+                    proposed = pending_acquisition["proposed"]
+                else:
+                    from exact.repair.maxsat import solve_master
+                    from exact.repair.workers import CallResult
 
-                proposal = bounded_call(
-                    solve_master, frozen.value.objective, (), timeout=max(0.001, acquire_budget / 4)
-                )
-                proposed = []
-                utility_cap = min(
-                    (collection_options or {}).get("utility_attempts", 1), sampled_assignments
-                )
-                if (
-                    utility_cap
-                    and proposal.status == "complete"
-                    and proposal.value.assignment is not None
-                ):
-                    proposed.append((proposal.value.assignment, "maxsat_initial"))
-                for attempt in range(1, utility_cap):
-                    left = acquire_budget - (time.monotonic() - acquire_started)
-                    if left <= 0:
-                        break
-                    alternate = bounded_call(
-                        solve_master,
-                        frozen.value.objective,
-                        tuple(row[0] for row in proposed),
-                        timeout=max(0.001, left / 2),
+                    utility_cap = (
+                        (collection_options or {})
+                        .get("plan_quotas", {})
+                        .get("utility", (collection_options or {}).get("utility_attempts", 1))
                     )
-                    if alternate.status != "complete" or alternate.value.assignment is None:
-                        break
-                    proposed.append((alternate.value.assignment, "maxsat_diverse"))
+                    proposal = (
+                        bounded_call(
+                            solve_master,
+                            frozen.value.objective,
+                            (),
+                            timeout=max(0.001, acquire_budget / 4),
+                        )
+                        if utility_cap
+                        else CallResult("unavailable", detail="No utility quota")
+                    )
+                    proposed = []
+                    if proposal.status == "complete" and proposal.value.assignment is not None:
+                        proposed.append((proposal.value.assignment, "maxsat_initial"))
+                    for attempt in range(1, utility_cap):
+                        left = acquire_budget - (time.monotonic() - acquire_started)
+                        if left <= 0:
+                            break
+                        alternate = bounded_call(
+                            solve_master,
+                            frozen.value.objective,
+                            tuple(row[0] for row in proposed),
+                            timeout=max(0.001, left / 2),
+                        )
+                        if alternate.status != "complete" or alternate.value.assignment is None:
+                            break
+                        proposed.append((alternate.value.assignment, "maxsat_diverse"))
+                    # Product of the frozen per-object proposal draw streams. Missing,
+                    # filtered or exhausted draws leave unavailable schedule slots.
+                    proposal_quota = (
+                        (collection_options or {}).get("plan_quotas", {}).get("proposal", 0)
+                    )
+                    proposal_reports = frozen.value.proposal_reports
+                    for draw in range(proposal_quota):
+                        choices, probability = [], 1.0
+                        for obj, report in zip(generated.problem.objects, proposal_reports):
+                            samples = report.get("samples", ())
+                            if draw >= len(samples):
+                                break
+                            sample = samples[draw]
+                            ids = [candidate.candidate_id for candidate in obj.candidates]
+                            if sample["candidate_id"] not in ids:
+                                break
+                            choices.append(ids.index(sample["candidate_id"]))
+                            probability *= math.exp(sample["log_probability"])
+                        if len(choices) == len(generated.problem.objects):
+                            proposed.append((tuple(choices), "proposal", probability))
+                    pending_acquisition["proposed"] = proposed
+                    checkpoint(epoch)
+
+                def save_collection(state):
+                    pending_acquisition["collection_state"] = copy.deepcopy(state)
+                    checkpoint(epoch)
+
                 acquired = collect_sampled_repairs(
                     tuple(len(obj.candidates) for obj in generated.problem.objects),
                     acquire_label,
@@ -1340,15 +1551,16 @@ def train_cases(
                         "policy": generated.problem.policy.content_hash,
                         "query": canonical_hash(case.probes),
                         "profile": canonical_hash(profile),
+                        "semantic_target": semantic_targets[case.case_id].content_hash,
                     },
                     model_hash=round_hash,
                     round_id=str(epoch),
-                    max_assignments=min(
-                        sampled_assignments,
-                        (collection_options or {}).get(
-                            "plan_attempts_per_case", sampled_assignments
-                        ),
+                    max_assignments=(collection_options or {}).get(
+                        "plan_attempts_per_case", sampled_assignments
                     ),
+                    plan_quotas=(collection_options or {}).get("plan_quotas"),
+                    resume_state=pending_acquisition.get("collection_state"),
+                    progress=save_collection,
                     deadline_seconds=max(
                         0.001, acquire_budget - (time.monotonic() - acquire_started)
                     ),
@@ -1358,39 +1570,29 @@ def train_cases(
                         (obj.object_id, tuple(c.candidate_id for c in obj.candidates))
                         for obj in generated.problem.objects
                     ),
-                    exploration_fraction=(collection_options or {}).get(
-                        "exploration_fraction", 0.5
-                    ),
+                    exploration_fraction=(collection_options or {}).get("exploration_fraction"),
                     counterfactual_attempts=(collection_options or {}).get("diversity_attempts"),
                     quartet_attempts=(collection_options or {}).get("quartet_attempts", 0),
                 )
+                if acquired.stop_reason == "deadline":
+                    checkpoint(epoch)
+                    break
+                pending_acquisition = {}
                 acquisition_reports.append(json.loads(canonical_json(acquired)))
+                if not acquired.cache.labels:
+                    # Unavailable slots remain in the acquisition denominator;
+                    # no assignment exists to add to the optimizer's inputs.
+                    acquisition_completed.add((epoch, case.case_id))
+                    checkpoint(epoch)
+                    continue
                 sampled_training[case.case_id] = (generated, acquired.cache)
                 retrievals[generated.case_id] = retrieve_vocabulary(
                     generated.problem, config=retrieval_config
                 )
                 retrieval = retrievals[generated.case_id]
-                graphs[generated.case_id] = build_observable_graph(
-                    generated.problem.objects,
-                    fixed_axioms=generated.problem.fixed_axioms,
-                    source_axioms=generated.problem.source_axioms,
-                    target_axioms=generated.problem.target_axioms,
-                    evidence=retrieval.graph_evidence(generated.problem.evidence),
-                    retrieved_symbols=retrieval.symbols,
-                    explanations=retrieval.explanations,
-                    max_nodes=max_graph_nodes,
-                    max_edges=max_graph_edges,
-                    max_explanations=max_explanations,
-                    max_text_tokens=max_text_tokens,
-                    feature_schema=FEATURE_SCHEMA_V3,
-                )
-                pair_reports[generated.case_id] = select_interaction_pairs(
-                    generated.problem,
-                    graph=graphs[generated.case_id],
-                    explanations=retrieval.explanations,
-                    per_object_limit=pair_factor_limit_per_object if pairwise else 0,
-                    max_pairs=pair_max_pairs,
-                    max_factors=pair_max_factors,
+                graphs[generated.case_id] = preparation.graph(generated.problem, retrieval)
+                pair_reports[generated.case_id] = preparation.pairs(
+                    generated.problem, graphs[generated.case_id], enabled=pairwise
                 )
                 interaction_pairs[generated.case_id] = pair_reports[generated.case_id].pairs
                 for obj in generated.problem.objects:
@@ -1414,6 +1616,12 @@ def train_cases(
                     )
                 acquisition_completed.add((epoch, case.case_id))
                 checkpoint(epoch)
+            if any(
+                (epoch, case.case_id) not in acquisition_completed for case, _ in scheduled_cases
+            ):
+                interrupted = True
+                checkpoint(epoch)
+                break
             acquisition_epoch = epoch
             checkpoint(
                 epoch,
@@ -1425,9 +1633,18 @@ def train_cases(
         train_loss, optimized = (saved_loss, saved_optimized) if epoch == next_epoch else (0.0, 0)
         order = [*training, *sampled_training.values()]
         random.Random(seed + epoch).shuffle(order)
-        offset_start = next_offset if epoch == next_epoch else 0
+        requested_order = tuple(case.case_id for case, _ in order)
+        if epoch_order and epoch_order != requested_order:
+            raise ValueError("Partial epoch order changed; exact resume is incompatible")
+        epoch_order = requested_order
+        if current_phase == "acquisition":
+            current_phase = "train"
+        offset_start = (
+            (next_offset if epoch == next_epoch else 0) if current_phase == "train" else len(order)
+        )
+        processed = offset_start
         for offset in range(offset_start, len(order), batch_cases):
-            if time.monotonic() - started >= deadline_seconds:
+            if remaining_training_seconds() <= 0:
                 break
             batch = order[offset : offset + batch_cases]
             optimizer.zero_grad(set_to_none=True)
@@ -1439,12 +1656,32 @@ def train_cases(
             optimizer.step()
             train_loss += float(loss.detach()) * len(batch)
             optimized += len(batch)
-            checkpoint(epoch, offset + len(batch), train_loss, optimized)
+            processed = offset + len(batch)
+            checkpoint(epoch, processed, train_loss, optimized)
+        if processed < len(order):
+            interrupted = True
+            checkpoint(epoch, processed, train_loss, optimized)
+            break
         model.eval()
+        if current_phase == "train":
+            current_phase = "development_loss"
+        if development_progress.get("epoch") != epoch:
+            development_progress = dict(epoch=epoch, losses={}, decoded={}, generated={})
+        checkpoint(epoch, len(order), train_loss, optimized)
         with torch.no_grad():
-            dev_loss = sum(float(case_loss(case, cache)) for case, cache in development) / len(
-                development
-            )
+            for case, cache in development:
+                if case.case_id in development_progress["losses"]:
+                    continue
+                if remaining_training_seconds() <= 0:
+                    interrupted = True
+                    break
+                development_progress["losses"][case.case_id] = float(case_loss(case, cache))
+                checkpoint(epoch, len(order), train_loss, optimized)
+        if interrupted:
+            break
+        dev_loss = sum(development_progress["losses"].values()) / len(development)
+        current_phase = "development_selection"
+        checkpoint(epoch, len(order), train_loss, optimized)
         row: dict[str, Any] = {
             "epoch": epoch + 1,
             "train_loss": train_loss / max(1, optimized),
@@ -1455,17 +1692,16 @@ def train_cases(
         # Evaluate on the first epoch and periodically, so a short bounded run can
         # always produce a reviewable decoded checkpoint.
         if epoch == 0 or (epoch + 1) % development_decode_every_epochs == 0 or epoch + 1 == epochs:
-            decoded: dict[str, dict[str, Any]] = {}
-            generated: dict[str, dict[str, Any]] = {}
+            decoded: dict[str, dict[str, Any]] = development_progress["decoded"]
+            generated_reports: dict[str, dict[str, Any]] = development_progress["generated"]
             with torch.no_grad():
                 for case, cache in development:
-                    remaining = deadline_seconds - (time.monotonic() - started)
-                    if remaining <= 0:
-                        decoded[case.case_id] = {
-                            "status": "training_deadline",
-                            "exact_regret": None,
-                        }
+                    if case.case_id in generated_reports:
                         continue
+                    remaining = remaining_training_seconds()
+                    if remaining <= 0:
+                        interrupted = True
+                        break
                     memory = model.encode(graphs[case.case_id])
                     unary, pairs = model.score_inventory(
                         case.problem.objects,
@@ -1479,14 +1715,19 @@ def train_cases(
                         profile=profile,
                         scale=quantization_scale,
                     )
-                    decoded[case.case_id] = decoded_development(
-                        objective,
-                        cache,
-                        max_checks=decode_max_checks,
-                        deadline_seconds=min(decode_seconds, remaining),
-                    )
-                    remaining = deadline_seconds - (time.monotonic() - started)
-                    generated[case.case_id] = generated_development(
+                    if case.case_id not in decoded:
+                        decoded[case.case_id] = decoded_development(
+                            objective,
+                            cache,
+                            max_checks=decode_max_checks,
+                            deadline_seconds=min(decode_seconds, remaining),
+                        )
+                        checkpoint(epoch, len(order), train_loss, optimized)
+                    remaining = remaining_training_seconds()
+                    if remaining <= 0:
+                        interrupted = True
+                        break
+                    generated_reports[case.case_id] = generated_development(
                         model,
                         case,
                         cache,
@@ -1494,6 +1735,7 @@ def train_cases(
                         temperature=proposal_temperature,
                         selection_options=selection_options,
                         case_cpu_seconds=case_cpu_seconds,
+                        semantic_target=semantic_targets[case.case_id],
                         target_basis=target_basis,
                         mixture_symbolic_weight=mixture_symbolic_weight,
                         fidelity_evaluator_labels=(fidelity_development_labels or {}).get(
@@ -1504,7 +1746,7 @@ def train_cases(
                             if proposal_context == "selected_other_actions"
                             else None
                         ),
-                        circuit_limits=circuit_limits,
+                        circuit_limits=dict(circuit_limits) if circuit_limits is not None else None,
                         compiler_cache_directory=compiler_cache_directory,
                         vtree_type=vtree_type,
                         graph=graphs[case.case_id],
@@ -1529,6 +1771,11 @@ def train_cases(
                         retrieval_config=retrieval_config,
                     )
 
+                    checkpoint(epoch, len(order), train_loss, optimized)
+            if interrupted:
+                checkpoint(epoch, len(order), train_loss, optimized)
+                break
+
             complete_ids = [
                 case.case_id
                 for case, cache in development
@@ -1541,7 +1788,7 @@ def train_cases(
             ]
             coverage = len(regrets) / max(1, len(complete_ids))
             useful_coverage = sum(
-                generated.get(key, {}).get("useful_candidate_coverage") or 0.0
+                generated_reports.get(key, {}).get("useful_candidate_coverage") or 0.0
                 for key in complete_ids
             ) / max(1, len(complete_ids))
             legacy_criterion = (
@@ -1552,7 +1799,7 @@ def train_cases(
             )
             criterion = (
                 generated_checkpoint_criterion(
-                    [generated.get(case.case_id, {}) for case, _ in development],
+                    [generated_reports.get(case.case_id, {}) for case, _ in development],
                     minimum_coverage=minimum_generated_coverage,
                     uncertainty_z=quality_uncertainty_z,
                     fallback=missing_label_fallback,
@@ -1562,7 +1809,7 @@ def train_cases(
             )
             row.update(
                 decoded=decoded,
-                generated=generated,
+                generated=generated_reports,
                 useful_candidate_coverage=useful_coverage,
                 decoded_complete_coverage=coverage,
                 decoded_mean_regret=sum(regrets) / len(regrets) if regrets else None,
@@ -1589,10 +1836,17 @@ def train_cases(
                 stale_evaluations += 1
         history.append(row)
         stopped_early = stale_evaluations >= patience
+        current_phase = "acquisition"
+        epoch_order = ()
+        development_progress = {}
         checkpoint(epoch + 1)
         if stale_evaluations >= patience:
             break
     if best_state is None:
+        if interrupted:
+            raise TimeoutError(
+                "Training interrupted; exact phase checkpoint retained for compatible resume"
+            )
         last = history[-1].get("generated", {}) if history else {}
         raise ValueError(
             "No eligible development checkpoint; generated validation: "
@@ -1603,13 +1857,22 @@ def train_cases(
     model.eval()
     return model, {
         "schema": f"exact-repair/training/{revision}",
+        "status": "interrupted" if interrupted else "complete",
+        "resumable": interrupted,
+        "recovery_revision": "exact-phase-resume/v3.1",
         "encoder": encoder,
         "feature_schema": (
             FEATURE_SCHEMA_V3 if revision == "v3" else "exact-repair/observable-features/v2"
         ),
         "factor_gauge": "keep_reference_zero/v3" if revision == "v3" else "unrestricted/v2",
+        "support_enabled": support_enabled,
+        "support_target": support_target,
+        "support_loss_weight": support_loss_weight,
         "risk_calibration": "uncalibrated" if revision == "v3" else "absent",
         "semantic_target": target_basis,
+        "semantic_target_specs": {
+            key: json.loads(canonical_json(value)) for key, value in semantic_targets.items()
+        },
         "mixture_symbolic_weight": mixture_symbolic_weight if target_basis == "mixed" else None,
         "seed": seed,
         "epochs": epochs,
@@ -1637,11 +1900,15 @@ def train_cases(
         "selection_fallback": missing_label_fallback,
         "loss_eligibility": loss_eligibility,
         "acquisition_rounds": acquisition_reports,
+        "effective_preparation": json.loads(canonical_json(preparation)),
+        "preparation_identity": preparation.content_hash,
         "pair_selection": {
             key: json.loads(canonical_json(value)) for key, value in pair_reports.items()
         },
         "selected_epoch": best_epoch,
-        "elapsed_seconds": time.monotonic() - started,
+        "elapsed_seconds": previous_elapsed + time.monotonic() - started,
+        "execution_count": execution_count,
+        "total_training_seconds": total_training_seconds,
         "adaptation_new_parameters": adaptation_new_parameters,
         "proposal_coverage": proposal_coverage,
         "proposal_arm": proposal_arm,
@@ -1735,11 +2002,18 @@ def _protocol_arguments(protocol: Mapping[str, Any]) -> dict[str, Any]:
             {
                 "case_cpu_seconds": protocol["resources"]["case_cpu_seconds"],
                 "target_basis": protocol["losses"]["target_basis"],
+                "desired_family_weight": protocol["teacher"]["desired_family_weight"],
+                "false_positive_weight": protocol["teacher"]["false_positive_weight"],
                 "mixture_symbolic_weight": protocol["losses"].get("mixture_symbolic_weight", 0.5),
                 "max_collection_rounds": protocol["collection"]["rounds"],
                 "collection_cases_per_round": protocol["collection"]["cases_per_round"],
                 "collection_options": protocol["collection"],
                 "plan_risk": protocol["model"]["plan_risk"],
+                "support_enabled": protocol["model"].get("support_enabled", False),
+                "support_target": protocol["model"].get(
+                    "support_target", "qualified_witness_violation/v1"
+                ),
+                "support_loss_weight": protocol["losses"].get("support_loss_weight", 0.2),
                 "selection_options": protocol["selection"],
                 "proposal_context": protocol["model"]["proposal_context"],
                 "pair_factor_bound": protocol["objective"]["pair_factor_bound"],
@@ -1807,6 +2081,7 @@ def _protocol_arguments(protocol: Mapping[str, Any]) -> dict[str, Any]:
         "patience": training["patience"],
         "min_dev_improvement": training["min_dev_improvement"],
         "deadline_seconds": protocol["resources"]["stage_deadline_seconds"]["train"],
+        "total_training_seconds": protocol["resources"]["stage_deadline_seconds"]["train"],
         "device": training["device"],
         "threads": training["threads"],
         "quantization_scale": protocol["solver"]["quantization_scale"],
@@ -1925,7 +2200,7 @@ def main() -> int:
     profile = _protocol_profile(protocol)
     from contextlib import nullcontext
 
-    campaign_context = nullcontext(None)
+    campaign_context: Any = nullcontext(None)
     if config["revision"] == "v3":
         import torch
 
@@ -2182,29 +2457,10 @@ def main() -> int:
             ):
                 config[config_key] = architecture[key]
 
-        def read_fidelity_file(path, expected_split):
-            if path is None:
-                return {}
-            from exact.repair.records import read_record
-            from exact.repair.semantic_fidelity import (
-                SemanticEvidencePacketV3,
-                SemanticFidelityComparisonV3,
-            )
+        from exact.repair.semantic_fidelity import read_fidelity_training_artifact
 
-            artifact = json.loads(path.read_text())
-            if artifact.get("schema") != "exact-repair/fidelity-training/v3":
-                raise ValueError("Expected an explicit v3 offline fidelity artifact")
-            records = {}
-            for row in artifact["comparisons"]:
-                packet, comparison = read_record(row["packet"]), read_record(row["comparison"])
-                if not isinstance(packet, SemanticEvidencePacketV3) or not isinstance(
-                    comparison, SemanticFidelityComparisonV3
-                ):
-                    raise ValueError("Invalid offline fidelity record kinds")
-                if packet.split != expected_split or comparison.split != expected_split:
-                    raise ValueError("Offline fidelity artifact crosses its declared split")
-                records.setdefault(packet.case_id, []).append((packet, comparison))
-            return records
+        def read_fidelity_file(path, expected_split):
+            return {} if path is None else read_fidelity_training_artifact(path, expected_split)
 
         fidelity_labels = read_fidelity_file(args.fidelity_labels, "train")
         fidelity_development_labels = read_fidelity_file(

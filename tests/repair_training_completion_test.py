@@ -38,6 +38,11 @@ def cache_for(case, *, unknown=False):
         "profile": canonical_hash(DEFAULT_PROFILE),
     }
 
+    if case.schema_revision == "v3":
+        from exact.repair.learning import SemanticTargetSpec
+
+        hashes["semantic_target"] = SemanticTargetSpec(canonical_hash(case.probes)).content_hash
+
     def label(assignment):
         cost = sum(
             candidate_cost(obj, obj.candidates[choice], DEFAULT_PROFILE)

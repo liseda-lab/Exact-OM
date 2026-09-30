@@ -12,7 +12,7 @@ from exact.repair.protocol import load_protocol_v3
 from exact.repair.workers import bounded_call
 
 SAMPLE = (
-    Path(__file__).resolve().parents[1] / "specs/exact-repair/protocol/xr21-local-conformance.json"
+    Path(__file__).resolve().parents[1] / "specs/exact-repair/protocol/xr21-review-conformance.json"
 )
 
 

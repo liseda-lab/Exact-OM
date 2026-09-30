@@ -16,12 +16,13 @@ from typing import Any, Iterable
 import pyowl_core as owl
 
 from .graph import (
+    EffectivePreparation,
     GraphExplanation,
     GraphNode,
     ObservableGraph,
-    build_observable_graph,
     feature_vector,
     structural_id,
+    validate_admitted_supports,
 )
 from .records import (
     FrozenMapping,
@@ -96,6 +97,9 @@ class FrozenPlanRisk:
             not isinstance(support, GraphExplanation) for support in self.supports
         ):
             raise ValueError("risk descriptor requires frozen graph explanations")
+        validate_admitted_supports(self.graph)
+        if self.supports != self.graph.admitted_supports:
+            raise ValueError("risk supports do not match graph admission")
         if self.graph_hash != canonical_hash(self.graph) or self.pool_hash != canonical_hash(
             self.objects
         ):
@@ -104,7 +108,16 @@ class FrozenPlanRisk:
     @property
     def risk_identity(self) -> str:
         """Keep the existing ledger scheduling identity stable across JSON replay."""
-        return canonical_hash((self.model_hash, self.graph_hash, self.pool_hash))
+        return canonical_hash(
+            (
+                "admitted-plan-risk/v3.1",
+                self.model_hash,
+                self.graph_hash,
+                self.pool_hash,
+                self.graph.admission_policy,
+                self.supports,
+            )
+        )
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize only explicit owned dataclasses and canonical shared OWL values."""
@@ -475,6 +488,7 @@ def freeze_neural_round(
     vtree_type: str = "balanced",
     contextual_filtering: bool = True,
     max_context_checks: int = 128,
+    representative_max_checks: int = 100000,
     omitted_generation_symbols: tuple[str, ...] = (),
     enabled_actions: tuple[str, ...] | None = None,
     preserved_candidates: Any = None,
@@ -608,20 +622,32 @@ def freeze_neural_round(
         raise ValueError("final removal identities must be nonempty canonical candidate IDs")
     menus = {menu.object_id: menu for menu in retrieval.menus}
     retrieved_symbols = tuple(retrieved_symbols) + retrieval.symbols
-    graph = graph or build_observable_graph(
-        problem.objects,
-        fixed_axioms=problem.fixed_axioms,
-        source_axioms=problem.source_axioms,
-        target_axioms=problem.target_axioms,
-        evidence=retrieval.graph_evidence(problem.evidence),
-        retrieved_symbols=retrieved_symbols,
-        explanations=retrieval.explanations,
-        max_nodes=max_graph_nodes,
-        max_edges=max_graph_edges,
-        max_explanations=max_explanations,
-        max_text_tokens=max_text_tokens,
-        feature_schema=f"exact-repair/observable-features/{getattr(model, 'revision', 'v2')}",
+    from .retrieval import RetrievalConfig
+
+    preparation = EffectivePreparation(
+        max_graph_nodes,
+        max_graph_edges,
+        max_explanations,
+        max_text_tokens,
+        pair_factor_limit_per_object,
+        pair_max_pairs,
+        pair_max_factors,
+        retrieval_config or RetrievalConfig(),
+        getattr(model, "revision", "v2"),
     )
+    if (
+        graph is not None
+        and getattr(model, "revision", "v2") == "v3"
+        and not graph.preparation_identity
+    ):
+        raise ValueError("Rebuild unqualified graph with EffectivePreparation before v3 freezing")
+    if (
+        graph is not None
+        and graph.preparation_identity
+        and graph.preparation_identity != preparation.content_hash
+    ):
+        raise ValueError("Supplied graph uses incompatible effective preparation settings")
+    graph = graph or preparation.graph(problem, retrieval, retrieved_symbols=retrieved_symbols)
     graph_seconds = monotonic() - started
     prior_training = model.training
     model.eval()
@@ -686,12 +712,12 @@ def freeze_neural_round(
                     )
                     enumerated = len(sampled_candidates)
                     setup_seconds = monotonic() - before
-                    controls = tuple(
-                        c
-                        for c in encoding.representatives()
-                        if {"keep", "delete", "retain_subsumption", "replace_endpoint"}
-                        & set(c.action_tags)
-                        or encoding.candidate_assignments(c)
+                    from .grammar import protected_representatives
+
+                    controls, protected_reports = protected_representatives(
+                        encoding,
+                        getattr(distribution, "circuit", None),
+                        max_checks=representative_max_checks,
                     )
                     context = model.object_context(obj.object_id, memory)
                     ranked = {
@@ -743,31 +769,41 @@ def freeze_neural_round(
                     sampled_candidates = tuple(
                         distribution.candidate(s.assignment) for s in samples
                     )
-                    controls = tuple(
-                        c
-                        for c in encoding.representatives()
-                        if {"keep", "delete", "retain_subsumption", "replace_endpoint"}
-                        & set(c.action_tags)
-                        or encoding.candidate_assignments(c)
+                    from .grammar import protected_representatives
+
+                    controls, protected_reports = protected_representatives(
+                        encoding,
+                        getattr(distribution, "circuit", None),
+                        max_checks=representative_max_checks,
                     )
                     ranked = {
                         c.candidate_id: max(-1e30, float(distribution.candidate_log_probability(c)))
                         for c in deduplicate_candidates((*controls, *sampled_candidates))
                     }
-                elementary = {"keep", "delete", "retain_subsumption", "replace_endpoint"}
-                mandatory = {c.candidate_id for c in controls if elementary & set(c.action_tags)}
-                for family in sorted({t for c in controls for t in c.action_tags}):
-                    members = [c for c in controls if family in c.action_tags]
-                    if not any(c.candidate_id in mandatory for c in members):
-                        mandatory.add(
-                            max(
-                                members, key=lambda c: (ranked[c.candidate_id], c.candidate_id)
-                            ).candidate_id
-                        )
-                offered = deduplicate_candidates(
-                    (*sampled_candidates, *(c for c in controls if c.candidate_id in mandatory))
-                )
+                mandatory = {c.candidate_id for c in controls}
+                offered = deduplicate_candidates((*sampled_candidates, *controls))
                 removed = removals.get(obj.object_id, frozenset())
+                preserved = tuple((preserved_candidates or {}).get(obj.object_id, ()))
+                if any(c.object_id != obj.object_id for c in preserved):
+                    raise ValueError("preserved expansion candidate belongs to another object")
+                original_symbols = {
+                    str(e.iri.value) for ax in obj.original_axioms for e in owl.signature(ax)
+                }
+                for candidate in preserved:
+                    if candidate.candidate_id in removed:
+                        continue
+                    symbols = {
+                        str(e.iri.value)
+                        for ax in (*candidate.axioms, *candidate.active_expressions)
+                        for e in owl.signature(ax)
+                    }
+                    if (symbols - original_symbols) & omitted or not encoding.candidate_assignments(
+                        candidate
+                    ):
+                        raise ValueError(
+                            "preserved candidate violates the effective nested generation language"
+                        )
+                offered = deduplicate_candidates((*offered, *preserved))
                 if any("keep" in c.action_tags and c.candidate_id in removed for c in offered):
                     raise ValueError(
                         "evaluator removal cannot remove the unchanged mandatory state"
@@ -777,24 +813,51 @@ def freeze_neural_round(
                 )
                 offered = tuple(c for c in offered if c.candidate_id not in removed)
                 mandatory.difference_update(removed)
-                preserved = tuple((preserved_candidates or {}).get(obj.object_id, ()))
-                if any(c.object_id != obj.object_id for c in preserved):
-                    raise ValueError("preserved expansion candidate belongs to another object")
-                offered = deduplicate_candidates(
-                    (*offered, *(c for c in preserved if c.candidate_id not in removed))
-                )
                 preserved_ids = {c.candidate_id for c in preserved} - removed
                 selected = budget_candidates(
-                    offered, candidate_cap, scores=ranked, mandatory_ids=preserved_ids
+                    offered, candidate_cap, scores=ranked, mandatory_ids=mandatory | preserved_ids
                 )
-                if any(c.candidate_id in removed for c in selected):
-                    raise AssertionError("final candidate removal failed after generation")
+                if any(
+                    c.candidate_id in removed or not encoding.candidate_assignments(c)
+                    for c in selected
+                ):
+                    raise AssertionError("frozen candidate pool violates its effective declaration")
+                retained_ids = {c.candidate_id for c in selected}
+                protected_reports = tuple(
+                    (
+                        {
+                            **row,
+                            "status": "removed_by_intervention",
+                            "detail": "predeclared final-pool intervention",
+                        }
+                        if row["candidate_id"] in removed
+                        else row
+                    )
+                    for row in protected_reports
+                )
+                if any(
+                    row["status"] == "retained" and row["candidate_id"] not in retained_ids
+                    for row in protected_reports
+                ):
+                    raise AssertionError("protected family representative was evicted")
                 objects.append(replace(obj, candidates=selected))
                 sampled_ids = {s.candidate_id for s in samples}
                 reports.append(
                     {
                         "schema": "exact-repair/generation-report/v3",
                         "object_id": obj.object_id,
+                        "generation_identity": canonical_hash(
+                            (
+                                "protected-generation/review-1",
+                                encoding.content_hash,
+                                representative_max_checks,
+                                tuple(sorted(removed)),
+                                tuple(sorted(omitted)),
+                            )
+                        ),
+                        "language_hash": encoding.content_hash,
+                        "protected_family_reports": protected_reports,
+                        "representative_max_checks": representative_max_checks,
                         "generation_status": (
                             "ERROR"
                             if any(
@@ -805,11 +868,22 @@ def freeze_neural_round(
                             )
                             else (
                                 "PARTIAL_RESOURCE_LIMIT"
-                                if distribution is not None
-                                and not getattr(
-                                    distribution.circuit if proposal_arm != "rejection" else None,
-                                    "complete",
-                                    True,
+                                if any(
+                                    row["status"]
+                                    not in {"retained", "empty_language", "removed_by_intervention"}
+                                    for row in protected_reports
+                                )
+                                or (
+                                    distribution is not None
+                                    and not getattr(
+                                        (
+                                            distribution.circuit
+                                            if proposal_arm != "rejection"
+                                            else None
+                                        ),
+                                        "complete",
+                                        True,
+                                    )
                                 )
                                 else (
                                     "SAMPLED"
@@ -965,17 +1039,8 @@ def freeze_neural_round(
             )
             selection = None
             if interaction_pairs is None:
-                from .graph import select_interaction_pairs
-
                 if model.pair_head is not None:
-                    selection = select_interaction_pairs(
-                        frozen_problem,
-                        graph=graph,
-                        explanations=retrieval.explanations,
-                        per_object_limit=pair_factor_limit_per_object,
-                        max_pairs=pair_max_pairs,
-                        max_factors=pair_max_factors,
-                    )
+                    selection = preparation.pairs(frozen_problem, graph)
                     interaction_pairs = selection.pairs
                 else:
                     interaction_pairs = ()
@@ -992,6 +1057,9 @@ def freeze_neural_round(
                         "pair_selection_hash": pair_hash,
                         "graph_hash": graph_hash,
                         "model_hash": model_hash,
+                        "preparation_identity": preparation.content_hash,
+                        "support_admission": graph.admission_policy,
+                        "support_omissions": graph.support_omissions,
                         "pair_selection_omissions": selection.omissions if selection else (),
                     }
                 )
@@ -1031,7 +1099,7 @@ def freeze_neural_round(
                     size,
                     graph,
                     frozen_problem.objects,
-                    retrieval.explanations,
+                    graph.admitted_supports,
                     model_hash,
                     graph_hash,
                     pool_hash,
@@ -1221,7 +1289,14 @@ def freeze_progressive_rounds(
     stages = tuple(dict(options) for options in schedule)
     if not stages or len(stages) > 32:
         raise ValueError("progressive coverage requires one to 32 declared stages")
+    from .candidates import MAPPING_ACTIONS, ONTOLOGY_ACTIONS
+    from .retrieval import retrieve_vocabulary
+
+    default_actions = set().union(
+        *(MAPPING_ACTIONS if obj.kind == "mapping" else ONTOLOGY_ACTIONS for obj in problem.objects)
+    )
     prior_limits = None
+    prior_language = None
     for options in stages:
         effective = {
             "max_depth": 2,
@@ -1237,6 +1312,52 @@ def freeze_progressive_rounds(
         )
         if prior_limits is not None and any(new < old for new, old in zip(limits, prior_limits)):
             raise ValueError("progressive coverage bounds must be nondecreasing")
+        config = effective.get("retrieval_config")
+        retrieved = retrieve_vocabulary(
+            problem, **({"config": config} if config is not None else {})
+        )
+        vocabulary = {
+            (menu.object_id, field): {canonical_hash(entity) for entity in getattr(menu, field)}
+            for menu in retrieved.menus
+            for field in (
+                "source_classes",
+                "target_classes",
+                "source_properties",
+                "target_properties",
+                "endpoint_alternatives",
+            )
+        }
+        actions = effective.get("enabled_actions")
+        removals = effective.get("final_candidate_removals") or {}
+        language: dict[str, Any] = dict(
+            actions=default_actions if actions is None else set(actions) | {"keep"},
+            omitted=set(effective.get("omitted_generation_symbols", ())),
+            removed={(obj, candidate) for obj, ids in removals.items() for candidate in ids},
+            context=canonical_hash(
+                (
+                    effective.get("contextual_filtering", True),
+                    effective.get("max_context_checks", 128),
+                    problem.fixed_axioms,
+                    problem.policy,
+                )
+            ),
+            vocabulary=vocabulary,
+        )
+        if prior_language is not None:
+            if (
+                not prior_language["actions"] <= language["actions"]
+                or not language["omitted"] <= prior_language["omitted"]
+                or not language["removed"] <= prior_language["removed"]
+                or language["context"] != prior_language["context"]
+                or any(
+                    not symbols <= language["vocabulary"].get(key, set())
+                    for key, symbols in prior_language["vocabulary"].items()
+                )
+            ):
+                raise ValueError(
+                    "progressive schedule must use nested actions/vocabulary/filters and unchanged context"
+                )
+        prior_language = language
         prior_limits = limits
     previous: dict[str, tuple[ReplacementCandidateV2, ...]] = {}
     rounds: list[FrozenNeuralRound] = []
@@ -1296,13 +1417,7 @@ def repair_neural_round(
     if frozen.risk_scorer is not None:
         risk_options = {
             "risk_order": frozen.risk_scorer,
-            "risk_identity": canonical_hash(
-                (
-                    frozen.risk_scorer.model_hash,
-                    frozen.risk_scorer.graph_hash,
-                    frozen.risk_scorer.pool_hash,
-                )
-            ),
+            "risk_identity": frozen.risk_scorer.risk_identity,
         }
     return repair(
         frozen.problem,
