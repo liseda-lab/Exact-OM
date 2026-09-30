@@ -1,0 +1,39 @@
+
+╔══╗─────────▶╔╗ ╔╗      ╔╗◀───┐
+╚╣╠╝◀─────┐  ╔╝╚╗║║────▶╔╝╚╗   │
+ ║║   ╔══╦══╦╩╗╔╝║║  ╔╦═╩╗╔╝╔═╦══╗
+ ║║╔══╣╔╗║╔╗║╔╣║ ║║ ╔╬╣╔╗║║ ║│║╔═╝
+╔╣╠╣║║║╚╝║╚╝║║║╚╗║╚═╝║║║║║╚╗║═╣║
+╚══╩╩╩╣╔═╩══╩╝╚═╝╚═══╩╩╝╚╩═╩╩═╩╝
+  └──▶║║                    ▲ 
+      ╚╝────────────────────┘
+
+
+---------
+Contracts
+---------
+
+Analyzed 346 files, 2292 dependencies.
+--------------------------------------
+
+Core does not depend on implementation or outer layers BROKEN
+Ontology does not depend on implementation or delivery KEPT
+Implementation does not depend on analysis or delivery KEPT
+Library and analysis subsystems do not depend on delivery KEPT
+rdflib is isolated in IO sources KEPT
+
+Contracts: 4 kept, 1 broken.
+
+
+----------------
+Broken contracts
+----------------
+
+Core does not depend on implementation or outer layers
+------------------------------------------------------
+
+exact.core is not allowed to import exact.impl:
+
+-   exact.core.actions.alignment -> exact.impl.models.selector.nil_head (l.864)
+
+

@@ -1,0 +1,849 @@
+{
+  "schema": "exact-repair/review-conformance-map/v1",
+  "status": "passed_local_conformance",
+  "corrective_spec": "specs/exact-repair/14-implementation-review.md",
+  "spec_commit": "3c669f8dfa5bfe559163babe89a056b7922f4692",
+  "reviewed_implementation_commit": "6f6a3e0038dbd5898126a34b28dee1faa06ef2f3",
+  "corrective_implementation_revision": "exact-repair/review-corrections/v1",
+  "protocol": "specs/exact-repair/protocol/xr21-review-conformance.json",
+  "protocol_schema": "specs/exact-repair/protocol/schema-v3.2.json",
+  "final_validation": "specs/exact-repair/implementation/xr21-review-validation.json",
+  "test_evidence": {
+    "log": "specs/exact-repair/implementation/evidence/xr21-review-pytest.log",
+    "junit": "specs/exact-repair/implementation/evidence/xr21-review-pytest.xml"
+  },
+  "interpretation": [
+    "Every mapped acceptance regression executed successfully in the source-bound validation receipt; fixture and empirical limits remain as stated per case.",
+    "The final validation receipt must bind commands, source digests, environment, outcomes and implementation commit. Historical validation is not evidence of passing these corrective cases.",
+    "Parameterized node IDs name the test function; the final JUnit records the actual parameter executions.",
+    "Partial coverage is recorded explicitly and must not be silently promoted to closed acceptance."
+  ],
+  "requirements": [
+    {
+      "id": "REV-01",
+      "implementation": [
+        "exact/repair/workers.py",
+        "exact/repair/kernel.py",
+        "exact/repair/records.py"
+      ],
+      "changed_component_identities": [
+        "durable-event-stream/r1",
+        "CompactVerificationReportV3"
+      ],
+      "historical_reuse_and_invalidation": "Keep independently qualified completed failures and proofs. Old incomplete positive streams are not feasibility evidence. New completion receipts require exact expected-query coverage and a matching durable stream.",
+      "acceptance_cases": [
+        {
+          "id": "REV-01-T1",
+          "tests": [
+            "tests/repair_review_transport_test.py::test_rev01_large_event_count_uses_bounded_durable_stream"
+          ],
+          "coverage": "passed_local_conformance",
+          "evidence_scope": "10,001 small events, durable incremental journal and measured bounded frame buffering."
+        },
+        {
+          "id": "REV-01-T2",
+          "tests": [
+            "tests/repair_review_transport_test.py::test_rev01_real_producer_large_coverage_and_compact_final_report",
+            "tests/repair_owl_test.py::test_full_signature_catches_witness_outside_mapping_endpoints",
+            "tests/repair_owl_test.py::test_required_prohibited_consequences_use_owl_entailment"
+          ],
+          "coverage": "passed_local_conformance",
+          "evidence_scope": "Actual kernel producer with 10,002 obligations and a controlled complete adapter; compact final payload and final query-support projection. Separate small native ELK/HermiT fixtures establish native coverage, not large-ontology throughput."
+        },
+        {
+          "id": "REV-01-T3",
+          "tests": [
+            "tests/repair_review_transport_test.py::test_rev01_invalid_coverage_never_manufactures_acceptance"
+          ],
+          "coverage": "passed_local_conformance",
+          "evidence_scope": "Missing, duplicate, malformed, out-of-order and conflicting events cannot authorize a plan; conflict retains a qualified negative."
+        },
+        {
+          "id": "REV-01-T4",
+          "tests": [
+            "tests/repair_review_transport_test.py::test_rev01_committed_failure_survives_hang_and_broken_frame",
+            "tests/repair_v3_kernel_test.py::test_streamed_failure_survives_later_timeout_and_is_durable"
+          ],
+          "coverage": "passed_local_conformance",
+          "evidence_scope": "Acknowledged failure retained through worker hang, invalid transport and durable search recovery."
+        }
+      ],
+      "status": "resolved_local_conformance"
+    },
+    {
+      "id": "REV-02",
+      "implementation": [
+        "exact/repair/workers.py",
+        "exact/repair/kernel.py",
+        "exact/repair/records.py"
+      ],
+      "changed_component_identities": [
+        "durable-event-stream/r1",
+        "verification-recovery/r2"
+      ],
+      "historical_reuse_and_invalidation": "Validated SQLite transactions and integrity-checked bounded completion receipts remain reusable. Uncommitted rows are excluded. Conservative stage/persistence reservations, including cleanup grace, are retained after interruption; loading a ledger does not replenish the budget.",
+      "acceptance_cases": [
+        {
+          "id": "REV-02-T1",
+          "tests": [
+            "tests/repair_review_transport_test.py::test_rev02_blocked_validation_keeps_deadline_responsive",
+            "tests/repair_review_transport_test.py::test_rev02_stalled_persistence_is_killable_and_uncommitted_rows_are_invisible",
+            "tests/repair_review_transport_test.py::test_rev02_search_ledger_write_cannot_bypass_deadline"
+          ],
+          "coverage": "passed_local_conformance",
+          "evidence_scope": "Separate injected callback, event-storage and search-ledger stalls; Linux deadline tests allow documented cleanup and scheduler tolerance."
+        },
+        {
+          "id": "REV-02-T2",
+          "tests": [
+            "tests/repair_review_transport_test.py::test_rev02_resource_monitor_runs_during_blocked_callback",
+            "tests/repair_review_transport_test.py::test_rev02_cpu_budget_includes_event_validator_work"
+          ],
+          "coverage": "passed_local_conformance",
+          "evidence_scope": "Actual busy callback CPU monitoring plus barrier-controlled sampled RSS threshold while callback blocks; RSS is sampled, not an OS-enforced memory ceiling."
+        },
+        {
+          "id": "REV-02-T3",
+          "tests": [
+            "tests/repair_review_transport_test.py::test_rev02_stalled_persistence_is_killable_and_uncommitted_rows_are_invisible",
+            "tests/repair_review_transport_test.py::test_rev02_replay_rejects_tampered_committed_result"
+          ],
+          "coverage": "passed_local_conformance",
+          "evidence_scope": "Killed transaction exposes only the committed prefix; corrupted final receipt rejected during supervised replay."
+        },
+        {
+          "id": "REV-02-T4",
+          "tests": [
+            "tests/repair_review_transport_test.py::test_rev01_committed_failure_survives_hang_and_broken_frame",
+            "tests/repair_review_transport_test.py::test_rev02_durable_completed_report_recovers_without_reverification",
+            "tests/repair_review_exception_resume_test.py::test_intact_exception_backed_incumbent_survives_exhausted_budget"
+          ],
+          "coverage": "passed_local_conformance",
+          "evidence_scope": "Durable failure, completed incumbent and intact source-exception-backed incumbent survive recovery without a replacement verification charge."
+        }
+      ],
+      "status": "resolved_local_conformance"
+    },
+    {
+      "id": "REV-03",
+      "implementation": [
+        "exact/repair/graph.py",
+        "exact/repair/model.py",
+        "exact/repair/pipeline.py",
+        "tools/repair/train.py"
+      ],
+      "changed_component_identities": [
+        "atomic-complete-support/v3.1",
+        "admitted-plan-risk/v3.1"
+      ],
+      "historical_reuse_and_invalidation": "Invalidate affected risk scores/descriptors and graph-dependent neural contexts. Independently qualified feasibility proofs and unchanged primary objective factors need not be discarded solely because risk scheduling inputs changed.",
+      "acceptance_cases": [
+        {
+          "id": "REV-03-T1",
+          "tests": [
+            "tests/repair_review_learning_test.py::test_hgt_risk_uses_complete_admitted_support_projection_and_omissions",
+            "tests/repair_review_learning_test.py::test_frozen_hgt_risk_replay_preserves_admitted_projection",
+            "tests/repair_review_learning_test.py::test_enabled_hgt_training_preserves_truncated_support_projection"
+          ],
+          "coverage": "passed_local_conformance",
+          "evidence_scope": "Actual enabled HGT optimizer/risk training and direct HGT readout cover explanation, node and edge truncation; separately frozen HGT descriptor replay checks the same graph-admitted support projection."
+        },
+        {
+          "id": "REV-03-T2",
+          "tests": [
+            "tests/repair_review_learning_test.py::test_hgt_risk_uses_complete_admitted_support_projection_and_omissions",
+            "tests/repair_review_learning_test.py::test_frozen_hgt_risk_replay_preserves_admitted_projection"
+          ],
+          "coverage": "passed_local_conformance",
+          "evidence_scope": "Fixed graph/admission projection isolates excluded records; admitted support remains observable and out-of-projection support is rejected."
+        },
+        {
+          "id": "REV-03-T3",
+          "tests": [
+            "tests/repair_review_learning_test.py::test_disabled_auxiliaries_skip_readouts_and_keep_label_coverage"
+          ],
+          "coverage": "passed_local_conformance",
+          "evidence_scope": "Raising risk stub proves disabled training bypasses risk readout and loss."
+        },
+        {
+          "id": "REV-03-T4",
+          "tests": [
+            "tests/repair_review_learning_test.py::test_frozen_hgt_risk_replay_preserves_admitted_projection"
+          ],
+          "coverage": "passed_local_conformance",
+          "evidence_scope": "Serialized frozen HGT risk reproduces its score/identity and rejects incompatible admitted supports."
+        },
+        {
+          "id": "REV-03-T5",
+          "tests": [
+            "tests/repair_v3_kernel_test.py::test_risk_keeps_higher_untested_plan_in_upper_bound"
+          ],
+          "coverage": "passed_local_conformance",
+          "evidence_scope": "Controlled exact-kernel fixture proves risk ordering leaves unverified higher-utility alternatives in the upper bound."
+        }
+      ],
+      "status": "resolved_local_conformance"
+    },
+    {
+      "id": "REV-04",
+      "implementation": [
+        "exact/repair/graph.py",
+        "exact/repair/pipeline.py",
+        "tools/repair/train.py"
+      ],
+      "changed_component_identities": [
+        "exact-repair/effective-preparation/v3.1"
+      ],
+      "historical_reuse_and_invalidation": "Rebuild preparation-dependent graph, interaction and risk artifacts when effective limits or retrieval identities change. Reuse semantic/query evidence only under its separate theory/policy/query bindings.",
+      "acceptance_cases": [
+        {
+          "id": "REV-04-T1",
+          "tests": [
+            "tests/repair_review_learning_test.py::test_effective_preparation_resolves_nondefault_limits_and_identity",
+            "tests/repair_review_learning_test.py::test_acquisition_resume_retains_preparation_target_and_committed_labels",
+            "tests/repair_review_protocol_test.py::test_nonunit_target_weights_and_nondefault_preparation_project_exactly",
+            "tests/repair_review_learning_test.py::test_v3_freeze_requires_qualified_effective_preparation_for_supplied_graph"
+          ],
+          "coverage": "passed_local_conformance",
+          "evidence_scope": "Nondefault node, edge, explanation and text settings resolve explicitly; actual training/acquisition/resume flow is exercised with an instrumented frozen-generator boundary. New v3 execution rejects a supplied graph with missing or mismatched effective-preparation identity; historical v2 behavior stays explicit."
+        },
+        {
+          "id": "REV-04-T2",
+          "tests": [
+            "tests/repair_review_learning_test.py::test_effective_preparation_resolves_nondefault_limits_and_identity",
+            "tests/repair_generation_v3_test.py::test_direct_and_prepared_retrieved_endpoints_materialize_same_ids"
+          ],
+          "coverage": "passed_local_conformance",
+          "evidence_scope": "Equivalent resolved graph requests have matching graph/support/pair identities; direct/prepared generation has matching endpoint candidates."
+        },
+        {
+          "id": "REV-04-T3",
+          "tests": [
+            "tests/repair_review_learning_test.py::test_acquisition_resume_retains_preparation_target_and_committed_labels",
+            "tests/repair_review_learning_test.py::test_effective_preparation_resolves_nondefault_limits_and_identity"
+          ],
+          "coverage": "passed_local_conformance",
+          "evidence_scope": "Changing text limit changes preparation identity and rejects exact acquisition/training continuation."
+        }
+      ],
+      "status": "resolved_local_conformance"
+    },
+    {
+      "id": "REV-05",
+      "implementation": [
+        "exact/repair/learning.py",
+        "tools/repair/train.py",
+        "exact/repair/protocol.py"
+      ],
+      "changed_component_identities": [
+        "exact-repair/semantic-target/v3.1",
+        "weighted-family-means/v1"
+      ],
+      "historical_reuse_and_invalidation": "Reweight complete retained semantic query outcomes only when theory, policy and query basis still match; retain unknown masks and actual historical default-weight labels. Mixed-scale trained models require renewed training/selection qualification, not silent exact continuation.",
+      "acceptance_cases": [
+        {
+          "id": "REV-05-T1",
+          "tests": [
+            "tests/repair_review_learning_test.py::test_nonunit_target_reuses_native_semantic_vector_without_changing_costs",
+            "tests/repair_review_learning_test.py::test_acquisition_resume_retains_preparation_target_and_committed_labels",
+            "tests/repair_review_learning_test.py::test_weighted_original_acquisition_and_generated_development_share_target"
+          ],
+          "coverage": "passed_local_conformance",
+          "evidence_scope": "Native OWL teacher and acquisition vectors/masks/scalars agree with distinct nonunit desired/unwanted weights and both outcome types. Actual generated-development evaluation consumes the same target; generation/search return boundaries are controlled."
+        },
+        {
+          "id": "REV-05-T2",
+          "tests": [
+            "tests/repair_review_learning_test.py::test_nonunit_target_reuses_native_semantic_vector_without_changing_costs"
+          ],
+          "coverage": "passed_local_conformance",
+          "evidence_scope": "Independent weighted sum of within-family means matches native semantic target evaluation."
+        },
+        {
+          "id": "REV-05-T3",
+          "tests": [
+            "tests/repair_review_learning_test.py::test_nonunit_target_reuses_native_semantic_vector_without_changing_costs",
+            "tests/repair_review_learning_test.py::test_acquisition_resume_retains_preparation_target_and_committed_labels",
+            "tests/repair_review_protocol_test.py::test_nonunit_target_weights_and_nondefault_preparation_project_exactly"
+          ],
+          "coverage": "passed_local_conformance",
+          "evidence_scope": "Changing unwanted weight changes target identity; changing desired weight invalidates training/resume dependencies and protocol identity."
+        },
+        {
+          "id": "REV-05-T4",
+          "tests": [
+            "tests/repair_review_learning_test.py::test_nonunit_target_reuses_native_semantic_vector_without_changing_costs",
+            "tests/repair_learning_test.py::test_feasible_anchor_unknown_mask_and_nonadditive_interaction",
+            "tests/repair_learning_test.py::test_shared_model_candidate_sensitivity_gradients_and_cost_independence"
+          ],
+          "coverage": "passed_local_conformance",
+          "evidence_scope": "Native target reweighting preserves cost; separate objective/teacher fixtures verify subtraction once and neural cost independence."
+        },
+        {
+          "id": "REV-05-T5",
+          "tests": [
+            "tests/repair_learning_v3_test.py::test_generated_checkpoint_ignores_better_cached_regret_and_preserves_denominator",
+            "tests/repair_review_learning_test.py::test_acquisition_resume_retains_preparation_target_and_committed_labels",
+            "tests/repair_review_learning_test.py::test_weighted_original_acquisition_and_generated_development_share_target"
+          ],
+          "coverage": "passed_local_conformance",
+          "evidence_scope": "Actual generated-development labeling and checkpoint criterion use configured nonunit weights; changing desired weight changes target identity, decoded utility and selection criterion. The selected assignment is fixed at a controlled search boundary."
+        }
+      ],
+      "status": "resolved_local_conformance"
+    },
+    {
+      "id": "REV-06",
+      "implementation": [
+        "exact/repair/learning.py",
+        "tools/repair/train.py",
+        "exact/repair/protocol.py"
+      ],
+      "changed_component_identities": [
+        "exact-repair/attempt-schedule/v1",
+        "exact-repair/sampled-round/v3.1"
+      ],
+      "historical_reuse_and_invalidation": "Reuse qualified complete-assignment labels under semantic dependencies; invalidate prior sampler-compliance and derived weighting claims. Preserve actual historical attempt origins; never invent missing origins or inclusion probabilities.",
+      "acceptance_cases": [
+        {
+          "id": "REV-06-T1",
+          "tests": [
+            "tests/repair_review_learning_test.py::test_complete_plan_quotas_preserve_every_origin_and_finite_denominator",
+            "tests/repair_review_protocol_test.py::test_contradictory_fraction_quota_and_quartet_declarations_reject"
+          ],
+          "coverage": "passed_local_conformance",
+          "evidence_scope": "Four explicit strata of 32 total 128 assignment attempts; conflicting prepended uniform fractions and incomplete quartet allocations reject."
+        },
+        {
+          "id": "REV-06-T2",
+          "tests": [
+            "tests/repair_review_learning_test.py::test_complete_plan_quotas_preserve_every_origin_and_finite_denominator",
+            "tests/repair_review_protocol_test.py::test_contradictory_fraction_quota_and_quartet_declarations_reject"
+          ],
+          "coverage": "passed_local_conformance",
+          "evidence_scope": "Changed effective quota/fraction alters sampler hash; contradictory exploration/proposal/quartet declarations reject."
+        },
+        {
+          "id": "REV-06-T3",
+          "tests": [
+            "tests/repair_review_learning_test.py::test_complete_plan_quotas_preserve_every_origin_and_finite_denominator",
+            "tests/repair_review_learning_test.py::test_collection_committed_attempts_resume_without_reverification"
+          ],
+          "coverage": "passed_local_conformance",
+          "evidence_scope": "Repeated complete assignments retain all scheduled origins but one qualified label; restart does not relabel committed assignments."
+        },
+        {
+          "id": "REV-06-T4",
+          "tests": [
+            "tests/repair_review_learning_test.py::test_complete_plan_quotas_preserve_every_origin_and_finite_denominator",
+            "tests/repair_learning_v3_test.py::test_sample_collection_retains_unknowns_split_and_new_inventory_identity",
+            "tests/repair_learning_v3_test.py::test_sample_proposal_mass_masks_are_explicit",
+            "tests/repair_review_learning_test.py::test_sampler_deadline_retains_unvisited_denominators_and_masks_partial_quartets",
+            "tests/repair_review_learning_test.py::test_unavailable_complete_plan_proposals_keep_denominator_without_empty_training"
+          ],
+          "coverage": "passed_local_conformance",
+          "evidence_scope": "Unavailable sources, finite-pool exhaustion, unknowns and missing proposal mass keep honest counts. Controlled clock expiry leaves 8 scheduled, 2 attempted and 6 unvisited slots with incomplete quartet explicitly masked."
+        },
+        {
+          "id": "REV-06-T5",
+          "tests": [
+            "tests/repair_review_learning_test.py::test_collection_committed_attempts_resume_without_reverification",
+            "tests/repair_review_learning_test.py::test_complete_plan_quotas_preserve_every_origin_and_finite_denominator"
+          ],
+          "coverage": "passed_local_conformance",
+          "evidence_scope": "Same frozen seed/config reproduces attempt order/hash including interrupted collection and duplicate origins."
+        },
+        {
+          "id": "REV-06-T6",
+          "tests": [
+            "tests/repair_learning_v3_test.py::test_quartet_masks_and_higher_order_risk_do_not_make_pair_negatives",
+            "tests/repair_review_learning_test.py::test_native_three_action_witness_targets_train_support_head_without_proof_leakage"
+          ],
+          "coverage": "passed_local_conformance",
+          "evidence_scope": "Higher-order failure stays a plan-risk/support target; feasible pair controls do not become invented pairwise semantic negatives."
+        }
+      ],
+      "status": "resolved_local_conformance"
+    },
+    {
+      "id": "REV-07",
+      "implementation": [
+        "exact/repair/grammar.py",
+        "exact/repair/pipeline.py"
+      ],
+      "changed_component_identities": [
+        "protected-generation/review-1"
+      ],
+      "historical_reuse_and_invalidation": "Regenerate affected candidate pools and their scores under the corrected generation identity. Deduplication retains family-origin provenance without duplicating candidate alternatives or probability mass.",
+      "acceptance_cases": [
+        {
+          "id": "REV-07-T1",
+          "tests": [
+            "tests/repair_review_generation_test.py::test_review07_first_forbidden_expression_does_not_close_family",
+            "tests/repair_review_generation_test.py::test_review07_zero_draw_pool_protection_caps_and_final_intervention"
+          ],
+          "coverage": "passed_local_conformance",
+          "evidence_scope": "Disjoint(A,S) fixture protects admissible B in both deterministic representative lookup and zero-draw frozen pool."
+        },
+        {
+          "id": "REV-07-T2",
+          "tests": [
+            "tests/repair_review_generation_test.py::test_review07_empty_resource_limited_and_editable_are_distinct"
+          ],
+          "coverage": "passed_local_conformance",
+          "evidence_scope": "Completed family circuit distinguishes a proved empty language when every argument is banned."
+        },
+        {
+          "id": "REV-07-T3",
+          "tests": [
+            "tests/repair_review_generation_test.py::test_review07_empty_resource_limited_and_editable_are_distinct",
+            "tests/repair_review_generation_test.py::test_review07_zero_draw_pool_protection_caps_and_final_intervention"
+          ],
+          "coverage": "passed_local_conformance",
+          "evidence_scope": "Compile timeout and bounded representative search exhaustion remain distinct from logical emptiness and are reported as partial coverage."
+        },
+        {
+          "id": "REV-07-T4",
+          "tests": [
+            "tests/repair_review_generation_test.py::test_review07_empty_resource_limited_and_editable_are_distinct",
+            "tests/repair_generation_v3_test.py::test_immutable_range_disjointness_filters_active_expressions_only"
+          ],
+          "coverage": "passed_local_conformance",
+          "evidence_scope": "Removing the immutable premise allows representatives; editable supports cannot establish immutable contextual bans."
+        },
+        {
+          "id": "REV-07-T5",
+          "tests": [
+            "tests/repair_review_generation_test.py::test_review07_family_aliases_share_one_candidate_and_keep_origins",
+            "tests/repair_review_generation_test.py::test_review07_zero_draw_pool_protection_caps_and_final_intervention",
+            "tests/repair_generation_v3_test.py::test_family_reduction_preserves_mass_aliases_and_gradients"
+          ],
+          "coverage": "passed_local_conformance",
+          "evidence_scope": "Alias origins share a canonical candidate; impossible mandatory candidate caps reject explicitly; final interventions report removed coverage; probability/gradient equivalence retained."
+        }
+      ],
+      "status": "resolved_local_conformance"
+    },
+    {
+      "id": "REV-08",
+      "implementation": [
+        "exact/repair/pipeline.py",
+        "exact/repair/protocol.py"
+      ],
+      "changed_component_identities": [
+        "protected-generation/review-1",
+        "GenerationReportV3.language_hash"
+      ],
+      "historical_reuse_and_invalidation": "Regenerate narrowed pools and re-evaluate omission studies. Progressive stages must be nested under unchanged context; changed pool/objective identities reject old bounds. Reuse proof supports only via semantic identities, never obsolete candidate indices.",
+      "acceptance_cases": [
+        {
+          "id": "REV-08-T1",
+          "tests": [
+            "tests/repair_review_generation_test.py::test_review08_reject_nonnested_schedule_before_first_stage",
+            "tests/repair_review_generation_test.py::test_review07_zero_draw_pool_protection_caps_and_final_intervention"
+          ],
+          "coverage": "passed_local_conformance",
+          "evidence_scope": "Omitted-C and narrowed action schedules reject before generation; independently supplied incompatible preserved candidates reject."
+        },
+        {
+          "id": "REV-08-T2",
+          "tests": [
+            "tests/repair_generation_v3_test.py::test_vocabulary_grammar_controls_and_progressive_epochs"
+          ],
+          "coverage": "passed_local_conformance",
+          "evidence_scope": "Valid nested stage expansion preserves prior canonical candidates and records previous pool identity."
+        },
+        {
+          "id": "REV-08-T3",
+          "tests": [
+            "tests/repair_review_generation_test.py::test_review08_reject_nonnested_schedule_before_first_stage",
+            "tests/repair_review_protocol_test.py::test_progressive_language_cannot_shrink_while_preserving_old_pool"
+          ],
+          "coverage": "passed_local_conformance",
+          "evidence_scope": "Action, omission, context/filter changes and typed retrieval narrowing are checked before execution."
+        },
+        {
+          "id": "REV-08-T4",
+          "tests": [
+            "tests/repair_review_generation_test.py::test_review07_zero_draw_pool_protection_caps_and_final_intervention",
+            "tests/repair_generation_v3_test.py::test_final_bundle_removal_survives_every_producer",
+            "tests/repair_generation_v3_test.py::test_vocabulary_grammar_controls_and_progressive_epochs"
+          ],
+          "coverage": "passed_local_conformance",
+          "evidence_scope": "Final-bundle interventions and missing-symbol controls remain distinct; preservation cannot reinsert removed candidates."
+        },
+        {
+          "id": "REV-08-T5",
+          "tests": [
+            "tests/repair_v3_kernel_test.py::test_restart_keeps_costs_bounds_and_pending_and_rejects_changed_epoch",
+            "tests/repair_generation_v3_test.py::test_vocabulary_grammar_controls_and_progressive_epochs"
+          ],
+          "coverage": "passed_local_conformance",
+          "evidence_scope": "Progressive rounds get distinct input identities; exact-kernel restart rejects changed objectives/schedules and rebuilds conservative scalar bounds."
+        }
+      ],
+      "status": "resolved_local_conformance"
+    },
+    {
+      "id": "REV-09",
+      "implementation": [
+        "tools/repair/train.py",
+        "exact/repair/learning.py"
+      ],
+      "changed_component_identities": [
+        "exact-phase-resume/v3.1"
+      ],
+      "historical_reuse_and_invalidation": "Exact continuation requires committed phase, optimizer/RNG, data, target and preparation identity. A legacy ambiguous minibatch boundary cannot claim exact continuation: recover a proven boundary or declare a separately selected warm start. Preserve cumulative resource limits.",
+      "acceptance_cases": [
+        {
+          "id": "REV-09-T1",
+          "tests": [
+            "tests/repair_review_learning_test.py::test_deadline_after_one_update_does_not_advance_epoch",
+            "tests/repair_review_learning_test.py::test_exact_partial_phase_resume_matches_uninterrupted_model"
+          ],
+          "coverage": "passed_local_conformance",
+          "evidence_scope": "Three scheduled training cases interrupted after one update retain epoch zero, offset one and exact continuation."
+        },
+        {
+          "id": "REV-09-T2",
+          "tests": [
+            "tests/repair_review_learning_test.py::test_exact_partial_phase_resume_matches_uninterrupted_model"
+          ],
+          "coverage": "passed_local_conformance",
+          "evidence_scope": "Parameterized durable boundaries cover post-final-update development loss, development selection start and midway selection; incomplete work does not become a completed epoch."
+        },
+        {
+          "id": "REV-09-T3",
+          "tests": [
+            "tests/repair_review_learning_test.py::test_exact_partial_phase_resume_matches_uninterrupted_model",
+            "tests/repair_review_learning_test.py::test_collection_committed_attempts_resume_without_reverification",
+            "tests/repair_review_learning_test.py::test_weighted_original_acquisition_and_generated_development_share_target"
+          ],
+          "coverage": "passed_local_conformance",
+          "evidence_scope": "Actual optimizer/dropout resumes to identical model, optimizer, CPU/Python/CUDA RNG state, best selection state, minibatch order/cursors and history; development responses are controlled. Separate native target parity verifies semantic evaluation paths, not empirical selection quality."
+        },
+        {
+          "id": "REV-09-T4",
+          "tests": [
+            "tests/repair_review_learning_test.py::test_acquisition_resume_retains_preparation_target_and_committed_labels",
+            "tests/repair_checkpointing_test.py::test_training_recovers_exact_optimizer_rng_and_rejects_changed_split"
+          ],
+          "coverage": "passed_local_conformance",
+          "evidence_scope": "Corrective training rejects changed target/preparation; retained v2 regression independently verifies held-out split rejection and changed run identity."
+        },
+        {
+          "id": "REV-09-T5",
+          "tests": [
+            "tests/repair_review_learning_test.py::test_deadline_after_one_update_does_not_advance_epoch",
+            "tests/repair_checkpointing_test.py::test_cumulative_budget_never_resets_and_charges_lost_work",
+            "tests/repair_v3_resources_test.py::test_cpu_gpu_replacement_charges_retained_reservations_once"
+          ],
+          "coverage": "passed_local_conformance",
+          "evidence_scope": "Exhausted cumulative training allowance stays exhausted; loading or increasing a saved total does not create more authorized budget; interrupted wall/CPU/GPU reservations survive replacement."
+        }
+      ],
+      "status": "resolved_local_conformance"
+    },
+    {
+      "id": "REV-10",
+      "implementation": [
+        "exact/repair/kernel.py",
+        "exact/repair/records.py"
+      ],
+      "changed_component_identities": [
+        "source-exception-evidence/v3.1",
+        "source-exception-qualification/r2",
+        "verification-recovery/r2",
+        "QualifiedBaselineReportV3"
+      ],
+      "historical_reuse_and_invalidation": "Retain qualified source consistency/unsatisfiability reports through a source hash resolving immutable input premises and source/import/policy/query/backend bindings. Missing or incompatible legacy proof receipts need explicitly budgeted revalidation; unknown is not an exception.",
+      "acceptance_cases": [
+        {
+          "id": "REV-10-T1",
+          "tests": [
+            "tests/repair_review_exception_resume_test.py::test_native_standalone_resume_restores_exception_proofs_and_gets_new_incumbent"
+          ],
+          "coverage": "passed_local_conformance",
+          "evidence_scope": "Native source-proof acquisition interrupted after durable publication; default standalone resume needs no external baseline and obtains a new feasible candidate."
+        },
+        {
+          "id": "REV-10-T2",
+          "tests": [
+            "tests/repair_review_exception_resume_test.py::test_qualified_artifact_rejects_changed_source_import_policy_query_and_backend"
+          ],
+          "coverage": "passed_local_conformance",
+          "evidence_scope": "Mutated source, import document, policy, exception-query and qualification identities reject reuse."
+        },
+        {
+          "id": "REV-10-T3",
+          "tests": [
+            "tests/repair_review_exception_resume_test.py::test_qualified_artifact_rejects_changed_source_import_policy_query_and_backend",
+            "tests/repair_review_exception_resume_test.py::test_exception_class_failure_needs_a_complete_consistent_original_source",
+            "tests/repair_review_exception_resume_test.py::test_legacy_standalone_receipt_revalidates_and_exhausted_budget_stays_exhausted"
+          ],
+          "coverage": "passed_local_conformance",
+          "evidence_scope": "Missing/corrupt evidence and inconsistent/unsupported source reports cannot silently exempt a monitored class; explicit legacy revalidation retains real unknown causes."
+        },
+        {
+          "id": "REV-10-T4",
+          "tests": [
+            "tests/repair_review_exception_resume_test.py::test_shared_and_standalone_exception_projections_agree",
+            "tests/repair_review_exception_resume_test.py::test_recursive_record_reader_preserves_nested_corrective_receipts"
+          ],
+          "coverage": "passed_local_conformance",
+          "evidence_scope": "Shared and standalone native exception projections agree; nested qualified records round-trip without copying unverified scalar checks."
+        },
+        {
+          "id": "REV-10-T5",
+          "tests": [
+            "tests/repair_review_exception_resume_test.py::test_exhausted_recovery_preserves_pending_deferred_counts_and_bounds",
+            "tests/repair_review_exception_resume_test.py::test_intact_exception_backed_incumbent_survives_exhausted_budget"
+          ],
+          "coverage": "passed_local_conformance",
+          "evidence_scope": "Spent counters, unresolved assignments, conservative bounds and intact qualified incumbent survive exhausted-budget recovery; no new campaign allocation is inferred."
+        }
+      ],
+      "status": "resolved_local_conformance"
+    },
+    {
+      "id": "REV-11",
+      "implementation": [
+        "exact/repair/semantic_fidelity.py",
+        "tools/repair/train.py",
+        "exact/repair/protocol.py"
+      ],
+      "changed_component_identities": [
+        "exact-repair/semantic-fidelity-aggregate/v3.2",
+        "exact-repair/fidelity-training/v3.2",
+        "ValidatedFidelityAggregateV3"
+      ],
+      "historical_reuse_and_invalidation": "Keep raw durable responses and paid request history. Recompute false-quorum aggregates without duplicate calls; requalify labels/selection/metrics that depended on them. Missing scheduled judgments stay missing. Raw legacy comparisons remain readable but cannot qualify new aggregate targets alone.",
+      "acceptance_cases": [
+        {
+          "id": "REV-11-T1",
+          "tests": [
+            "tests/repair_review_semantic_test.py::test_replayed_and_reparsed_response_never_supplies_missing_quorum"
+          ],
+          "coverage": "passed_local_conformance",
+          "evidence_scope": "Replayed [c,c] supplies one authoritative scheduled observation, so quorum two fails."
+        },
+        {
+          "id": "REV-11-T2",
+          "tests": [
+            "tests/repair_review_semantic_test.py::test_replayed_and_reparsed_response_never_supplies_missing_quorum"
+          ],
+          "coverage": "passed_local_conformance",
+          "evidence_scope": "Parser revisions of one canonical durable response do not multiply votes."
+        },
+        {
+          "id": "REV-11-T3",
+          "tests": [
+            "tests/repair_review_semantic_test.py::test_distinct_scheduled_identical_judgments_keep_both_provenances"
+          ],
+          "coverage": "passed_local_conformance",
+          "evidence_scope": "Distinct genuinely scheduled requests count separately even with identical content and preserve both request/response provenances."
+        },
+        {
+          "id": "REV-11-T4",
+          "tests": [
+            "tests/repair_review_semantic_test.py::test_swaps_dissent_and_abstention_obey_frozen_denominator",
+            "tests/repair_review_semantic_test.py::test_correction_is_a_chargeable_response_but_only_one_scheduled_vote",
+            "tests/repair_review_semantic_test.py::test_frozen_schedule_and_receipts_reject_forged_or_unscheduled_votes"
+          ],
+          "coverage": "passed_local_conformance",
+          "evidence_scope": "Presentation swaps, disagreement, abstention, invalid outputs and correction lineage respect the frozen schedule; forged/unscheduled observations reject."
+        },
+        {
+          "id": "REV-11-T5",
+          "tests": [
+            "tests/repair_review_semantic_test.py::test_replayed_and_reparsed_response_never_supplies_missing_quorum",
+            "tests/openrouter_ledger_test.py::test_completed_requests_replay_after_relocation_without_credentials"
+          ],
+          "coverage": "passed_local_conformance",
+          "evidence_scope": "Mock request ledger replay performs no additional transport call; aggregation itself performs no live calls."
+        },
+        {
+          "id": "REV-11-T6",
+          "tests": [
+            "tests/repair_review_semantic_test.py::test_training_and_evaluation_reference_validated_aggregate_and_unique_observations",
+            "tests/repair_review_semantic_test.py::test_training_deduplicates_identical_aggregates_and_rejects_overlapping_receipts"
+          ],
+          "coverage": "passed_local_conformance",
+          "evidence_scope": "Serialized training/evaluation inputs reference the authoritative aggregation revision and exact unique observations; overlapping aggregate weights reject."
+        }
+      ],
+      "status": "resolved_local_conformance"
+    },
+    {
+      "id": "REV-12",
+      "implementation": [
+        "exact/repair/learning.py",
+        "exact/repair/model.py",
+        "tools/repair/train.py",
+        "exact/repair/protocol.py"
+      ],
+      "changed_component_identities": [
+        "qualified-witness-violation/v1"
+      ],
+      "historical_reuse_and_invalidation": "Historical unused support-head weights remain untrained. Enabled support capability needs corrected labels/loss and renewed training before scientific claims; support-disabled remains a valid arm. Shared encoder updates can change predictions but qualified symbolic supports alone authorize hard cuts.",
+      "acceptance_cases": [
+        {
+          "id": "REV-12-T1",
+          "tests": [
+            "tests/repair_review_learning_test.py::test_native_three_action_witness_targets_train_support_head_without_proof_leakage",
+            "tests/repair_learning_v3_test.py::test_quartet_masks_and_higher_order_risk_do_not_make_pair_negatives"
+          ],
+          "coverage": "passed_local_conformance",
+          "evidence_scope": "Native verified three-action conflict yields one higher-order target; verified feasible pair controls do not create pairwise incompatibilities."
+        },
+        {
+          "id": "REV-12-T2",
+          "tests": [
+            "tests/repair_review_learning_test.py::test_native_three_action_witness_targets_train_support_head_without_proof_leakage",
+            "tests/repair_review_learning_test.py::test_disabled_auxiliaries_skip_readouts_and_keep_label_coverage"
+          ],
+          "coverage": "passed_local_conformance",
+          "evidence_scope": "Eligible native labels backpropagate into support_head; actual enabled HGT training reports optimized support terms separately."
+        },
+        {
+          "id": "REV-12-T3",
+          "tests": [
+            "tests/repair_review_learning_test.py::test_native_three_action_witness_targets_train_support_head_without_proof_leakage"
+          ],
+          "coverage": "passed_local_conformance",
+          "evidence_scope": "Unknown target has zero gradient; negative witness controls are independently verified, not inferred merely from removed proof premises."
+        },
+        {
+          "id": "REV-12-T4",
+          "tests": [
+            "tests/repair_review_learning_test.py::test_disabled_auxiliaries_skip_readouts_and_keep_label_coverage",
+            "tests/repair_review_protocol_test.py::test_corrective_protocol_freezes_every_effective_identity_and_explicit_auxiliary"
+          ],
+          "coverage": "passed_local_conformance",
+          "evidence_scope": "Disabled support readout is a raising stub, loss terms stay zero, availability counts remain and protocol explicitly disables the claim."
+        },
+        {
+          "id": "REV-12-T5",
+          "tests": [
+            "tests/repair_review_learning_test.py::test_native_three_action_witness_targets_train_support_head_without_proof_leakage",
+            "tests/repair_learning_v3_test.py::test_v3_feature_states_identifier_mask_and_future_evidence_rejection"
+          ],
+          "coverage": "passed_local_conformance",
+          "evidence_scope": "Qualified proof is evaluator-only supervision; same-decision graph hash does not change and future-evidence features reject."
+        }
+      ],
+      "status": "resolved_local_conformance"
+    },
+    {
+      "id": "REV-13",
+      "implementation": [
+        "exact/repair/compilation.py"
+      ],
+      "changed_component_identities": [
+        "exact-repair/compiler-artifact/v3",
+        "exact-repair/compiler-measurements/review-1"
+      ],
+      "historical_reuse_and_invalidation": "Valid matching immutable compiled structures remain reusable; race protection alone does not alter probabilities. Historical cold timing cannot be reconstructed, and incompatible artifact format/source identity recompiles with new measured receipts.",
+      "acceptance_cases": [
+        {
+          "id": "REV-13-T1",
+          "tests": [
+            "tests/repair_review_generation_test.py::test_review13_entry_disappears_between_enumeration_and_metadata"
+          ],
+          "coverage": "passed_local_conformance",
+          "evidence_scope": "Deterministic enumeration/stat interleaving deletes an old entry; successful current circuit remains usable."
+        },
+        {
+          "id": "REV-13-T2",
+          "tests": [
+            "tests/repair_review_generation_test.py::test_review13_independent_writers_publish_and_evict_concurrently"
+          ],
+          "coverage": "passed_local_conformance",
+          "evidence_scope": "Two spawned independent identities synchronize publication, evict under a short maintenance lock and retain valid circuits/capacity."
+        },
+        {
+          "id": "REV-13-T3",
+          "tests": [
+            "tests/repair_generation_v3_test.py::test_persistent_artifact_cross_process_and_corruption"
+          ],
+          "coverage": "passed_local_conformance",
+          "evidence_scope": "Separate-process immutable artifact checksum corruption rejects cache reuse and recompiles."
+        },
+        {
+          "id": "REV-13-T4",
+          "tests": [
+            "tests/repair_review_generation_test.py::test_review13_independent_writers_publish_and_evict_concurrently",
+            "tests/repair_review_generation_test.py::test_review13_metadata_scan_deadline_returns_explicit_resource_status",
+            "tests/repair_generation_v3_test.py::test_owned_collection_and_vtrees_keep_identical_support"
+          ],
+          "coverage": "passed_local_conformance",
+          "evidence_scope": "Concurrent publication enforces capacity; metadata-scan deadline produces explicit maintenance_timeout; equivalent compiler layouts retain semantic support."
+        }
+      ],
+      "status": "resolved_local_conformance"
+    },
+    {
+      "id": "REV-14",
+      "implementation": [
+        "exact/repair/compilation.py",
+        "exact/repair/circuit.py",
+        "exact/repair/grammar.py",
+        "exact/repair/study.py",
+        "tools/repair/run_study.py"
+      ],
+      "changed_component_identities": [
+        "exact-repair/compiler-measurements/review-1",
+        "exact-repair/cold-compiler-receipt/review-1",
+        "exact-repair/compiler-accounting/review-1"
+      ],
+      "historical_reuse_and_invalidation": "Compatible structural artifacts may remain cached, but new performance comparisons require new measured receipts. Warm-load or in-memory lookup time is never substituted for originating cold compilation; unavailable historical totals stay null.",
+      "acceptance_cases": [
+        {
+          "id": "REV-14-T1",
+          "tests": [
+            "tests/repair_review_generation_test.py::test_review14_cold_and_warm_receipts_are_complete",
+            "tests/repair_review_generation_test.py::test_review14_separate_worker_receipts_export_and_cache_policy"
+          ],
+          "coverage": "passed_local_conformance",
+          "evidence_scope": "Cold compile and separate-worker warm load have the same structural identity and distinct measured phase receipts."
+        },
+        {
+          "id": "REV-14-T2",
+          "tests": [
+            "tests/repair_review_generation_test.py::test_review14_cold_and_warm_receipts_are_complete",
+            "tests/repair_review_generation_test.py::test_review14_separate_worker_receipts_export_and_cache_policy"
+          ],
+          "coverage": "passed_local_conformance",
+          "evidence_scope": "Warm receipt retains original cold seconds/limits and current admission seconds/limits."
+        },
+        {
+          "id": "REV-14-T3",
+          "tests": [
+            "tests/repair_review_generation_test.py::test_review14_separate_worker_receipts_export_and_cache_policy"
+          ],
+          "coverage": "passed_local_conformance",
+          "evidence_scope": "Unsupported minimization/peak allocated metrics are null; phase CPU/process-lifetime RSS measurements have explicit scopes."
+        },
+        {
+          "id": "REV-14-T4",
+          "tests": [
+            "tests/repair_review_generation_test.py::test_review14_separate_worker_receipts_export_and_cache_policy"
+          ],
+          "coverage": "passed_local_conformance",
+          "evidence_scope": "Study plan/results retain exact receipts, charge shared preparation once and reject mismatched cold-required/warm-required policy."
+        }
+      ],
+      "status": "resolved_local_conformance"
+    }
+  ],
+  "qualification_limits": [
+    "Local deterministic conformance fixtures do not establish biomedical-scale throughput, memory sufficiency or neural superiority.",
+    "The >10,000-obligation fixture exercises the real verification producer using a controlled complete adapter. Native reasoner coverage is demonstrated separately on small OWL fixtures.",
+    "CPU and aggregate process-tree RSS are sampled Linux measurements; process cleanup has a bounded grace and explicitly reported incomplete cleanup.",
+    "Semantic-fidelity tests use mock transports and durable local records; no live judge calibration or new paid annotation is claimed.",
+    "Support supervision capability and gradients are tested. Improvement over whole-plan risk with identical symbolic cuts requires a separately designed future experiment.",
+    "No research campaign, production matcher input, supervisor restart, notification or external model call is authorized or performed by this corrective implementation."
+  ],
+  "historical_artifacts_policy": "Keep prior protocols, xr21-validation.json, old result rows, campaign ledgers and raw paid responses immutable; corrected execution uses explicit new identities and dependency-specific reuse.",
+  "implementation_commit": "66c819553debc482e1856f58e04ba4b456777694"
+}
