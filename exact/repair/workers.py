@@ -402,6 +402,11 @@ def _coordinate(
             else:
                 raise ValueError("invalid worker envelope")
     except BaseException as error:
+        detail = (
+            f"worker exited or closed transport without a result (exit={process.exitcode})"
+            if isinstance(error, EOFError)
+            else f"{type(error).__name__}: {error}"
+        )
         try:
             control.send_bytes(
                 pickle.dumps(
@@ -409,7 +414,7 @@ def _coordinate(
                         "result",
                         CallResult(
                             "error",
-                            detail=f"{type(error).__name__}: {error}",
+                            detail=detail,
                             events=receipt if receipt.event_count else (),
                             event_failure=failure,
                         ),

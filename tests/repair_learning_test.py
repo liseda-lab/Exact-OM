@@ -287,8 +287,14 @@ def test_actual_matcher_handoff_global_features_through_neural_freeze():
     assert not any("reference_alignment" in key for n in graph.nodes for key, _ in n.features)
     torch.manual_seed(13)
     model = RepairModel(graph.metadata, hidden_dim=16, heads=2, layers=1, dropout=0)
+    # Include endpoint controls and every protected admissible action family.
     frozen = freeze_neural_round(
-        problem, model, graph=graph, draws_per_object=2, candidate_cap=8, profile=(("delete", 0.1),)
+        problem,
+        model,
+        graph=graph,
+        draws_per_object=2,
+        candidate_cap=16,
+        profile=(("delete", 0.1),),
     )
     assert model.training
     assert frozen.graph_hash and frozen.model_hash
