@@ -282,3 +282,146 @@ def test_launcher_exit_becomes_failure_without_repeating_submission(tmp_path, qu
     tick(tmp_path)
     assert 'Launcher exited' in dispatch.dispatch_incidents(tmp_path)[0]['reason']
     assert len(queue[2]) == 1
+
+
+@pytest.fixture
+def recovery_chain(queue):
+    import copy
+
+    registry, recovery, calls = queue
+    recovery['depends_on'] = ['main']
+    main = copy.deepcopy(recovery)
+    main.update(id='main', depends_on=['complete'])
+    main['launch']['run']['id'] = 'main'
+    main['launch']['nonce'] = 'test-main-nonce-001'
+    registry['pending_batches'].append(main)
+    registry['runs'] = [
+        {'id': 'failed', 'step_id': '14372.33', 'pending_recovery': recovery['id']},
+        {'id': 'complete', 'step_id': '14372.34'},
+    ]
+    observation = {'findings': [
+        {'run_id': 'failed', 'status': 'needs_attention'},
+        {'run_id': 'complete', 'status': 'complete'},
+    ]}
+    return registry, observation, main, calls
+
+
+def waiting_recoveries(registry, observation, state=None, steps=None):
+    return dispatch.pending_recoveries(
+        registry, observation, '14372', steps or {'14372.0': 'RUNNING'}, state or {}
+    )
+
+
+def test_reviewed_queued_dependencies_wait_without_mutating_or_launching(recovery_chain):
+    import copy
+
+    registry, observation, _, calls = recovery_chain
+    before = copy.deepcopy((registry, observation))
+    assert waiting_recoveries(registry, observation) == {'failed': 'E18'}
+    assert (registry, observation) == before
+    assert not calls
+    assert dispatch.pending_batches(registry, observation)[0]['batch_id'] == 'main'
+    assert not any(x['batch_id'] == 'E18' for x in dispatch.pending_batches(registry, observation))
+
+
+@pytest.mark.parametrize('damage', [
+    'missing', 'disabled', 'needs_user', 'hash', 'allocation', 'resources', 'empty_resources',
+    'parents_type', 'parent_type', 'self_cycle', 'queue_cycle', 'original_cycle',
+    'failed_dependency', 'missing_finding', 'dispatch_failed', 'dispatch_resolved',
+    'dispatch_registered', 'dispatch_nonce', 'dispatch_hash', 'dispatch_resources',
+])
+def test_invalid_queued_ancestor_leaves_original_failure_actionable(recovery_chain, damage):
+    registry, observation, main, calls = recovery_chain
+    state = {}
+    if damage == 'missing':
+        registry['pending_batches'].remove(main)
+    elif damage == 'disabled':
+        main['enabled'] = False
+    elif damage == 'needs_user':
+        main['needs_user'] = True
+    elif damage == 'hash':
+        main['launch']['bindings'][0]['sha256'] = 'wrong'
+    elif damage == 'allocation':
+        main['launch']['argv'][1] = '--jobid=99999'
+    elif damage == 'resources':
+        main['resources']['gpus'] = 2
+    elif damage == 'empty_resources':
+        main['resources'] = {}
+    elif damage == 'parents_type':
+        main['depends_on'] = 'complete'
+    elif damage == 'parent_type':
+        main['depends_on'] = [{}]
+    elif damage == 'self_cycle':
+        main['depends_on'] = ['main']
+    elif damage == 'queue_cycle':
+        main['depends_on'] = ['E18']
+    elif damage == 'original_cycle':
+        main['depends_on'] = ['failed']
+    elif damage == 'failed_dependency':
+        observation['findings'][1]['status'] = 'needs_attention'
+    elif damage == 'missing_finding':
+        observation['findings'].pop()
+    else:
+        record = {'status': 'starting', 'nonce': main['launch']['nonce'],
+                  'descriptor_sha256': dispatch._identity(main), 'resources': main['resources']}
+        if damage in {'dispatch_failed', 'dispatch_resolved', 'dispatch_registered'}:
+            record['status'] = damage.removeprefix('dispatch_')
+        elif damage == 'dispatch_nonce':
+            record['nonce'] = 'different-nonce'
+        elif damage == 'dispatch_hash':
+            record['descriptor_sha256'] = 'changed'
+        else:
+            record['resources'] = {'gpus': 0}
+        state['main'] = record
+    assert waiting_recoveries(registry, observation, state) == {}
+    assert not calls
+
+
+@pytest.mark.parametrize('status', ['healthy', 'waiting', 'complete'])
+def test_registered_parent_states_remain_valid(recovery_chain, status):
+    registry, observation, _, _ = recovery_chain
+    observation['findings'][1]['status'] = status
+    assert waiting_recoveries(registry, observation) == {'failed': 'E18'}
+
+
+@pytest.mark.parametrize('status', ['reserved', 'starting'])
+def test_matching_inflight_queued_ancestor_remains_waiting(recovery_chain, status):
+    registry, observation, main, _ = recovery_chain
+    state = {'main': {'status': status, 'nonce': main['launch']['nonce'],
+                     'descriptor_sha256': dispatch._identity(main), 'resources': main['resources']}}
+    assert waiting_recoveries(registry, observation, state) == {'failed': 'E18'}
+
+
+@pytest.mark.parametrize('invalid', [None, 'cycle', 'live', 'broken'])
+def test_failed_parent_requires_verified_replacement_chain(recovery_chain, invalid):
+    import copy
+
+    registry, observation, main, _ = recovery_chain
+    parent = registry['runs'][1]
+    parent['pending_recovery'] = 'parent-repair'
+    observation['findings'][1]['status'] = 'needs_attention'
+    repair = copy.deepcopy(main)
+    repair.update(id='parent-repair', depends_on=[])
+    repair['launch']['run']['id'] = 'parent-repair'
+    repair['launch']['nonce'] = 'test-parent-repair-001'
+    registry['pending_batches'].append(repair)
+    steps = {'14372.0': 'RUNNING'}
+    if invalid == 'cycle':
+        repair['depends_on'] = ['main']
+    elif invalid == 'live':
+        steps[parent['step_id']] = 'RUNNING'
+    elif invalid == 'broken':
+        repair['needs_user'] = True
+    result = waiting_recoveries(registry, observation, steps=steps)
+    assert result == ({} if invalid else {'failed': 'E18', 'complete': 'parent-repair'})
+
+
+@pytest.mark.parametrize('cycle', [False, True])
+def test_registered_supersession_chains_are_checked(recovery_chain, cycle):
+    registry, observation, _, _ = recovery_chain
+    registry['runs'][1]['superseded_by'] = 'successor'
+    registry['runs'].append({'id': 'successor', 'step_id': '14372.35'})
+    observation['findings'].append({'run_id': 'successor', 'status': 'complete'})
+    if cycle:
+        registry['runs'][-1]['superseded_by'] = 'complete'
+    assert waiting_recoveries(registry, observation) == ({} if cycle else {'failed': 'E18'})

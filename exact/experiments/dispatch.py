@@ -284,43 +284,61 @@ def dispatch_ready(directory, allocation, steps, *, supervisor_step=None):
 
 
 def pending_recoveries(registry, observation, allocation, steps, state):
-    """Recognize a reviewed queued replacement without claiming scientific recovery."""
+    """Recognize verified queued recovery chains without claiming science is ready."""
     runs = {row["id"]: row for row in registry["runs"]}
     batches = {row["id"]: row for row in registry.get("pending_batches", [])}
     findings = {row["run_id"]: row for row in observation["findings"]}
+
+    def replacement(run, seen):
+        identifier = run.get("pending_recovery")
+        return (
+            isinstance(identifier, str) and identifier in batches and identifier not in runs
+            and run["step_id"] not in steps and viable(identifier, seen)
+        )
+
+    def viable(identifier, seen):
+        if not isinstance(identifier, str) or identifier in seen:
+            return False
+        seen = seen | {identifier}
+        if identifier in runs:
+            run = runs[identifier]
+            successor = run.get("superseded_by")
+            if successor:
+                return successor in runs and viable(successor, seen)
+            status = findings.get(identifier, {}).get("status")
+            if status in {"healthy", "waiting", "complete"}:
+                return True
+            return status in {"needs_attention", "failed"} and replacement(run, seen)
+        batch = batches.get(identifier)
+        if (not batch or not batch.get("enabled", True) or batch.get("needs_user")
+                or not batch.get("launch")):
+            return False
+        launch = _validate(batch, allocation)
+        resources = batch["resources"]
+        if not isinstance(resources, dict) or not resources or any(
+            not isinstance(value, (int, float)) or isinstance(value, bool)
+            or not 0 <= value <= registry["capacity"].get(key, 0)
+            for key, value in resources.items()
+        ):
+            return False
+        record = state.get(identifier)
+        if record is not None and (
+            record.get("status") not in {"reserved", "starting"}
+            or record.get("nonce") != launch["nonce"]
+            or record.get("descriptor_sha256") != _identity(batch)
+            or record.get("resources") != resources
+        ):
+            return False
+        parents = batch.get("depends_on", [])
+        return isinstance(parents, list) and all(viable(parent, seen) for parent in parents)
+
     waiting = {}
     for name, run in runs.items():
-        identifier = run.get("pending_recovery")
-        batch = batches.get(identifier) if isinstance(identifier, str) else None
-        if (not batch or batch["id"] in runs or not batch.get("enabled", True) or batch.get("needs_user")
-                or not batch.get("launch") or run["step_id"] in steps
-                or state.get(batch["id"], {}).get("status") in {"failed", "resolved"}):
-            continue
         try:
-            _validate(batch, allocation)
-            resources = batch["resources"]
-            if not isinstance(resources, dict) or not resources or any(
-                not isinstance(value, (int, float)) or isinstance(value, bool)
-                or not 0 <= value <= registry["capacity"].get(key, 0)
-                for key, value in resources.items()
-            ):
-                continue
-            parents = batch.get("depends_on", [])
-            if not isinstance(parents, list):
-                continue
-            valid = True
-            for parent in parents:
-                seen = set()
-                while parent in runs and runs[parent].get("superseded_by") and parent not in seen:
-                    seen.add(parent)
-                    parent = runs[parent]["superseded_by"]
-                if parent == name or findings.get(parent, {}).get("status") not in {"healthy", "waiting", "complete"}:
-                    valid = False
-                    break
-            if valid:
-                waiting[name] = batch["id"]
-        except (OSError, ValueError, KeyError, TypeError):
-            # A broken/missing descriptor leaves the original failure actionable.
+            if replacement(run, {name}):
+                waiting[name] = run["pending_recovery"]
+        except (OSError, ValueError, KeyError, TypeError, RecursionError):
+            # Broken/cyclic chains leave the original failure actionable.
             continue
     return waiting
 

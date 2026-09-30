@@ -788,3 +788,32 @@ def test_unverified_queued_recovery_leaves_original_failure_actionable(
     cli.check(tmp_path, policy, state)
     incidents = cli.read(tmp_path / 'health.json')['incidents']
     assert any(row['kind'] == 'run_failed' and row['focus_run_id'] == 'failed' for row in incidents)
+
+
+def test_queued_recovery_chain_does_not_spawn_a_second_repair(
+    cli, queued_recovery, tmp_path, monkeypatch
+):
+    import copy
+
+    policy, state, registry, recovery = queued_recovery
+    parent = copy.deepcopy(recovery)
+    parent.update(id='queued-main', depends_on=['busy'])
+    parent['launch']['run']['id'] = 'queued-main'
+    parent['launch']['nonce'] = 'reviewed-queued-main-001'
+    registry['pending_batches'].append(parent)
+    recovery['depends_on'] = ['queued-main']
+    cli.write(tmp_path / 'registry.json', registry)
+    incident = cli.inspect_runs(registry['runs'], step_states={'14372.38': 'RUNNING'})['incidents'][0]
+    state['incidents'][incident['id']] = {
+        'attempts': 1, 'observations': 1, 'alerted': True, 'incident': incident,
+    }
+    monkeypatch.setattr(cli, 'run_agent', lambda *a: pytest.fail('Queued recovery chain owns repair'))
+    monkeypatch.setattr(cli, 'notify_blocker', lambda *a, **k: pytest.fail('Still waiting'))
+    assert cli.check(tmp_path, policy, state, act=True)['status'] == 'waiting'
+    health = cli.read(tmp_path / 'health.json')
+    assert not health['incidents']
+    assert state['incidents'][incident['id']]['attempts'] == 1
+    assert not state['incidents'][incident['id']].get('recovered')
+    assert cli.read(tmp_path / 'registry.json') == registry
+    assert not (tmp_path / 'dispatch-state.json').exists()
+    assert not Path(recovery['launch']['step_path']).exists()
