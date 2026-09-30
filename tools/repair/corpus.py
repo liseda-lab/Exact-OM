@@ -37,6 +37,8 @@ FAMILIES = (
     "mixed",
 )
 
+XR21_FAMILIES = ("conflicts_higher_order", "conflicts_overlap", "coherent_cycle")
+
 # Protocol names identify held-out templates even when they share a construction.
 MECHANISMS = {
     "directional_strengthening": "papers",
@@ -75,6 +77,8 @@ class GeneratedCase:
     intended_active: tuple[Any, ...] = ()
     variation: tuple[tuple[str, Any], ...] = ()
     ambiguity_group: str = ""
+    final_candidate_removals: tuple[tuple[str, tuple[str, ...]], ...] = ()
+    schema_revision: str = "v2"
 
 
 def generate_corpus(
@@ -91,17 +95,20 @@ def generate_corpus(
     score_noise: float = 0.1,
     feature_dropout: float = 0.0,
     misleading_label_fraction: float = 0.25,
+    revision: str = "v3",
 ) -> tuple[GeneratedCase, ...]:
     """Generate grouped siblings with connected core, evidence and composition variation.
 
     ``split_counts`` assigns exact parent counts before any corruption; otherwise
     stable hash splits are used. Template/composition holdouts always take priority.
     """
+    if revision not in {"v2", "v3"}:
+        raise ValueError("Unknown generated corpus revision")
     families = tuple(families)
     if (
         parents_per_family < 1
         or siblings_per_parent < 1
-        or not set(families) <= set(FAMILIES) | set(MECHANISMS)
+        or not set(families) <= set(FAMILIES) | set(MECHANISMS) | set(XR21_FAMILIES)
     ):
         raise ValueError("Positive counts and known structural families are required")
     if score_noise < 0 or not 0 <= feature_dropout <= 1 or not 0 <= misleading_label_fraction <= 1:
@@ -150,6 +157,11 @@ def generate_corpus(
         if coherent_controls:
             controls.append(coherent_control(case))
         if missing_candidate_controls:
+            if (
+                "keep"
+                in case.problem.objects[0].candidates[case.intended_assignment[0]].action_tags
+            ):
+                continue
             objects = list(case.problem.objects)
             obj, choice = objects[0], case.intended_assignment[0]
             objects[0] = replace(
@@ -159,7 +171,12 @@ def generate_corpus(
                 replace(
                     case,
                     case_id=case.case_id + ":missing-candidate",
-                    control="missing_candidate",
+                    control="final_pool_omission" if revision == "v3" else "missing_candidate",
+                    final_candidate_removals=(
+                        ((obj.object_id, (obj.candidates[choice].candidate_id,)),)
+                        if revision == "v3"
+                        else ()
+                    ),
                     problem=replace(case.problem, objects=tuple(objects)),
                     intended_assignment=tuple(-1 for _ in objects),
                 )
@@ -176,6 +193,13 @@ def generate_corpus(
                     intended_assignment=(),
                 )
             )
+    if revision == "v3":
+        from exact.repair.records import promote_input_v3
+
+        return tuple(
+            replace(case, problem=promote_input_v3(case.problem), schema_revision="v3")
+            for case in cases + tuple(controls)
+        )
     return cases + tuple(controls)
 
 
@@ -554,6 +578,28 @@ def _case(
             )
         if mechanism != "filler":
             probes.append(TeacherProbe("witness", asserted, "typing"))
+    elif mechanism in {"conflicts_higher_order", "conflicts_overlap", "coherent_cycle"}:
+        # Every complete path is a witnessed support; its proper edge subsets
+        # remain coherent. Overlap shares actual editable edges, not metadata.
+        length = 3 + (depth - 1) % 3
+        chain = [cls(f"Node{i}_s") for i in range(length + 1)]
+        for left, right in zip(chain, chain[1:]):
+            add_object((sub(left, right),), ())
+            intended[-1] = 0
+        if mechanism == "coherent_cycle":
+            add_object((sub(chain[-1], chain[0]),), ())
+            intended[-1] = 0
+            probes.append(TeacherProbe("cycle_reachability", sub(chain[0], chain[-1]), "path"))
+        else:
+            fixed.append(disjoint(chain[0], chain[-1]))
+            intended[-1] = 1
+            probes.append(TeacherProbe("retained_prefix", sub(chain[0], chain[-2]), "path"))
+            if mechanism == "conflicts_overlap":
+                for branch in range(1 + (depth - 1) % 3):
+                    endpoint = cls(f"Branch{branch}_s")
+                    add_object((sub(chain[-2], endpoint),), ())
+                    intended[-1] = 1
+                    fixed.append(disjoint(chain[0], endpoint))
     else:
         a, b, c, d, e = map(cls, "ABCDE")
         fixed.extend((sub(c, a), disjoint(a, b), owl.Declaration(d), owl.Declaration(e)))
@@ -704,6 +750,22 @@ def _case(
             ("score_noise", score_noise),
             ("feature_dropout", feature_dropout),
             ("misleading_label_fraction", misleading_label_fraction),
+            (
+                "witness_support_sizes",
+                (
+                    tuple(
+                        [3 + (depth - 1) % 3]
+                        * (2 + (depth - 1) % 3 if mechanism == "conflicts_overlap" else 1)
+                    )
+                    if mechanism in {"conflicts_higher_order", "conflicts_overlap"}
+                    else ()
+                ),
+            ),
+            (
+                "support_incidence_max",
+                2 + (depth - 1) % 3 if mechanism == "conflicts_overlap" else 1,
+            ),
+            ("coherent_cycle", mechanism == "coherent_cycle"),
         ),
     )
 

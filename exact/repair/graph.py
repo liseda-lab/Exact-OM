@@ -12,7 +12,108 @@ from typing import Any
 
 import pyowl_core as owl
 
-from .records import FrozenMapping
+from .records import FrozenMapping, canonical_hash
+
+FEATURE_SCHEMA_V3 = "exact-repair/observable-features/v3"
+_STATES = frozenset(
+    {
+        "observed",
+        "missing",
+        "truncated",
+        "unsupported",
+        "timeout",
+        "error",
+        "not_applicable",
+        "unvisited",
+    }
+)
+_IDENTIFIERS = frozenset(
+    {
+        "iri",
+        "uri",
+        "path",
+        "file",
+        "hash",
+        "id",
+        "candidate_id",
+        "object_id",
+        "source_id",
+        "parent_id",
+        "seed",
+        "namespace",
+        "content_hash",
+        "document_id",
+        "srcentity",
+        "tgtentity",
+    }
+)
+_FEATURE_KEYS = frozenset(
+    {
+        "score",
+        "confidence",
+        "scores",
+        "channels",
+        "lexical",
+        "structural",
+        "semantic",
+        "matcher",
+        "matcher_identity",
+        "source_text",
+        "target_text",
+        "description",
+        "label",
+        "labels",
+        "definition",
+        "definitions",
+        "text",
+        "provenance",
+        "authorship",
+        "mapping",
+        "observed",
+        "value",
+        "values",
+        "status",
+        "score_missing",
+        "relation",
+        "evidence_kind",
+        "kind",
+        "source",
+        "target",
+        "reliability",
+        "availability",
+        "available_before_decision",
+        "truncated",
+        "missing",
+        "unsupported",
+        "omitted",
+        "evidence_omissions",
+        "calibration",
+        "calibration_status",
+        "license",
+        "access_status",
+        "origin",
+        "observed_at",
+        "local_name",
+        "annotations",
+        "property",
+        "sides",
+        "Kind",
+        "SrcKind",
+        "TgtKind",
+        "Source",
+        "eligible",
+        "locked",
+        "matching_features",
+        "decomposition",
+        "attributes",
+        "embedding",
+        "explanations",
+        "Src",
+        "Tgt",
+        "Relation",
+        "Score",
+    }
+)
 
 # Reject evaluator-only input at the boundary, including inside matcher channels.
 _FORBIDDEN = frozenset(
@@ -41,6 +142,17 @@ _FORBIDDEN = frozenset(
         "future_explanation",
         "test_statistics",
         "oracle",
+        "intended_assignment",
+        "intended_action",
+        "assignment_label",
+        "semantic_label",
+        "comparison_label",
+        "rationale",
+        "label_confidence",
+        "parent_group_id",
+        "structural_parent",
+        "generation_seed",
+        "semantic_preference",
     }
 )
 
@@ -53,6 +165,8 @@ def validate_observable_evidence(value: Any) -> None:
                 raise TypeError("Evidence keys must be strings")
             if key.lower().replace("-", "_") in _FORBIDDEN:
                 raise ValueError(f"Evaluator-only feature is forbidden: {key}")
+            if key == "available_before_decision" and item is not True:
+                raise ValueError("Evidence must be available before the decision")
             validate_observable_evidence(item)
     elif isinstance(value, (list, tuple)):
         for item in value:
@@ -102,6 +216,20 @@ class GraphExplanation:
     support_axioms: tuple[Any, ...] = ()
     witness: Any | None = None
     available_before_decision: bool = True
+    support_status: str = "unknown"
+    obligation_kind: str = "unspecified"
+    theory_hash: str = ""
+    policy_hash: str = ""
+
+    def __post_init__(self):
+        if self.support_status not in {
+            "sufficient",
+            "minimal",
+            "partial",
+            "unavailable",
+            "unknown",
+        }:
+            raise ValueError("Unknown explanation support status")
 
 
 @dataclass(frozen=True)
@@ -114,6 +242,7 @@ class ObservableGraph:
     omitted_nodes: tuple[str, ...] = ()
     omitted_supports: tuple[str, ...] = ()
     omitted_evidence: tuple[str, ...] = ()
+    feature_schema: str = "exact-repair/observable-features/v2"
 
     @property
     def metadata(self) -> tuple[tuple[str, ...], tuple[tuple[str, str, str], ...]]:
@@ -171,11 +300,26 @@ def _features(
     *,
     max_text_tokens: int | None = None,
     omitted_text: list[str] | None = None,
+    typed: bool = False,
 ) -> dict[str, float]:
     """Flatten arbitrary observed channels; text uses tokens, never IRI-specific weights."""
     result: dict[str, float] = {}
     if isinstance(value, Mapping):
+        if typed and "status" in value:
+            if value["status"] not in _STATES:
+                raise ValueError("Unknown evidence channel status")
+            result[f"{prefix}/state:{value['status']}"] = 1.0
+            if value["status"] != "observed":
+                return result
         for key, item in sorted(value.items()):
+            if typed and (
+                key.lower() in _IDENTIFIERS
+                or key.endswith(("_hash", "_id", "_path"))
+                or key in {"status", "Src", "Tgt"}
+            ):
+                continue
+            if typed and key not in _FEATURE_KEYS:
+                raise ValueError(f"Unregistered v3 inference feature channel: {key}")
             if key in {"omitted", "evidence_omissions"}:
                 continue
             result.update(
@@ -184,6 +328,7 @@ def _features(
                     f"{prefix}/{key}",
                     max_text_tokens=max_text_tokens,
                     omitted_text=omitted_text,
+                    typed=typed,
                 )
             )
     elif isinstance(value, (list, tuple)):
@@ -194,20 +339,37 @@ def _features(
                     f"{prefix}/{index}",
                     max_text_tokens=max_text_tokens,
                     omitted_text=omitted_text,
+                    typed=typed,
                 )
             )
     elif isinstance(value, (int, float)):
         result[prefix] = float(value)
+        if typed:
+            result[f"{prefix}/state:observed"] = 1.0
     elif isinstance(value, str):
+        if (
+            typed
+            and prefix.endswith("/local_name")
+            and re.fullmatch(
+                r"(?:[A-Za-z]|[A-Za-z]*[0-9][\w-]*|[0-9a-fA-F]{16,}|(?:Node|Core|Noise)[\w-]*)",
+                value,
+            )
+        ):
+            result[f"{prefix}/state:missing"] = 1.0
+            return result
+        if typed and ("://" in value or value.startswith(("urn:", "/"))):
+            return result
         for index, match in enumerate(re.finditer(r"[\w]+", value.lower())):
             if max_text_tokens is not None and index >= max_text_tokens:
                 if omitted_text is not None:
                     omitted_text.append(f"text_tokens:{prefix}")
+                if typed:
+                    result[f"{prefix}/state:truncated"] = 1.0
                 break
             key = f"{prefix}/token:{match.group(0)}"
             result[key] = result.get(key, 0.0) + 1.0
     elif value is None:
-        result[f"{prefix}/missing"] = 1.0
+        result[f"{prefix}/state:missing" if typed else f"{prefix}/missing"] = 1.0
     return result
 
 
@@ -224,6 +386,7 @@ def build_observable_graph(
     max_edges: int | None = None,
     max_explanations: int | None = None,
     max_text_tokens: int | None = None,
+    feature_schema: str = "exact-repair/observable-features/v2",
 ) -> ObservableGraph:
     """Build syntax, occurrence, diagnosis and evidence nodes before encoding a round.
 
@@ -232,6 +395,9 @@ def build_observable_graph(
     omitted context is recorded; callers still verify against the full theory.
     """
     evidence = evidence or {}
+    if feature_schema not in {FEATURE_SCHEMA_V3, "exact-repair/observable-features/v2"}:
+        raise ValueError("Unknown observable feature schema")
+    typed = feature_schema == FEATURE_SCHEMA_V3
     validate_observable_evidence(evidence)
     for name, limit, minimum in (
         ("max_nodes", max_nodes, 1),
@@ -299,7 +465,11 @@ def build_observable_graph(
             node_id,
             "evidence",
             _features(
-                payload, "observed", max_text_tokens=max_text_tokens, omitted_text=omitted_text
+                payload,
+                "observed",
+                max_text_tokens=max_text_tokens,
+                omitted_text=omitted_text,
+                typed=typed,
             ),
         )
         connect(node_id, "supports", owner)
@@ -338,6 +508,11 @@ def build_observable_graph(
                 connect(node_id, role, add_structure(endpoint))
         if payload is not None:
             add_evidence(node_id, payload)
+        if typed:
+            for candidate in obj.candidates:
+                for expression in (*candidate.axioms, *candidate.active_expressions):
+                    for entity in owl.signature(expression):
+                        add_structure(entity)
     for symbol in retrieved_symbols:
         add_structure(symbol)
     for owner, payload in evidence.items():
@@ -350,9 +525,10 @@ def build_observable_graph(
                 "evidence",
                 _features(
                     payload,
-                    f"observed/{owner}",
+                    "observed/global" if typed else f"observed/{owner}",
                     max_text_tokens=max_text_tokens,
                     omitted_text=omitted_text,
+                    typed=typed,
                 ),
             )
             for object_node in object_nodes.values():
@@ -403,7 +579,15 @@ def build_observable_graph(
                 {
                     "explanation_missing": float(
                         not explanation.support_object_ids and not explanation.support_axioms
-                    )
+                    ),
+                    **(
+                        {
+                            f"support_status:{explanation.support_status}": 1.0,
+                            f"obligation_kind:{explanation.obligation_kind}": 1.0,
+                        }
+                        if typed
+                        else {}
+                    ),
                 },
             )
             for object_id in explanation.support_object_ids:
@@ -424,6 +608,17 @@ def build_observable_graph(
             connect(occurrence, "asserts", add_structure(axiom))
 
         try_include(add_fixed, structural_id(axiom))
+    if typed:
+        coverage = {
+            "context_nodes_truncated": float(bool(omitted_nodes)),
+            "context_supports_truncated": float(bool(omitted_supports)),
+            "text_truncated": float(bool(omitted_text)),
+        }
+        for node_id in object_nodes.values():
+            node = nodes[node_id]
+            nodes[node_id] = GraphNode(
+                node.node_id, node.kind, tuple(sorted((*node.features, *coverage.items())))
+            )
     # Every node has a typed self relation, including isolated retrieved vocabulary.
     edges.update((node.node_id, "self", node.node_id) for node in nodes.values())
     return ObservableGraph(
@@ -434,6 +629,7 @@ def build_observable_graph(
         tuple(omitted_supports),
         tuple(str(item) for item in evidence.get("evidence_omissions", ()))
         + tuple(sorted(set(omitted_text))),
+        feature_schema,
     )
 
 
@@ -449,63 +645,171 @@ def feature_vector(node: GraphNode, dimension: int = 128) -> list[float]:
     return result
 
 
+@dataclass(frozen=True)
+class InteractionSelection:
+    """Replayable sparse semantic pair index; hyperedges remain graph records."""
+
+    pairs: tuple[tuple[int, int], ...]
+    reasons: tuple[tuple[int, int, tuple[str, ...]], ...]
+    omissions: tuple[tuple[str, int], ...]
+    considered_channels: tuple[str, ...]
+    input_hash: str
+    candidate_factors: int
+    schema: str = "exact-repair/interaction-selection/v3"
+
+    @property
+    def content_hash(self) -> str:
+        return canonical_hash(self)
+
+
+def select_interaction_pairs(
+    problem: Any,
+    *,
+    graph: ObservableGraph | None = None,
+    per_object_limit: int = 16,
+    explanations: Iterable[GraphExplanation] = (),
+    max_pairs: int | None = None,
+    max_factors: int | None = None,
+    visible_queries: Iterable[Any] = (),
+) -> InteractionSelection:
+    """Select explanation-first pairs from the same final inventory on every path.
+
+    Index signatures once, then stream support links. Caps are applied before
+    candidate matrices exist. Omitted links retain their channel and count.
+    """
+    from collections import defaultdict
+
+    for name, value in (
+        ("per_object_limit", per_object_limit),
+        ("max_pairs", max_pairs),
+        ("max_factors", max_factors),
+    ):
+        if value is not None and (type(value) is not int or value < 0):
+            raise ValueError(f"{name} must be a nonnegative integer")
+    objects = problem.objects
+    explanations = tuple(sorted(explanations, key=lambda e: e.explanation_id))
+    visible_queries = tuple(sorted(visible_queries, key=structural_id))
+    object_index = {obj.object_id: index for index, obj in enumerate(objects)}
+    original, candidate = defaultdict(set), defaultdict(set)
+    for index, obj in enumerate(objects):
+        for axiom in obj.original_axioms:
+            for entity in owl.signature(axiom):
+                original[entity].add(index)
+        for action in obj.candidates:
+            for axiom in (*action.axioms, *action.active_expressions):
+                for entity in owl.signature(axiom):
+                    candidate[entity].add(index)
+    selected: dict[tuple[int, int], set[str]] = {}
+    omitted: dict[str, int] = defaultdict(int)
+    degrees = [0] * len(objects)
+    factor_count = 0
+    channels = (
+        "explanation",
+        "original_signature",
+        "fixed_axiom",
+        "visible_query",
+        "candidate_signature",
+    )
+
+    def include(indices: Iterable[int], channel: str) -> None:
+        nonlocal factor_count
+        indices = sorted(set(indices))
+        for offset, first in enumerate(indices):
+            rest = indices[offset + 1 :]
+            known = {second for (left, second) in selected if left == first}
+            for second in known.intersection(rest):
+                selected[first, second].add(channel)
+            if degrees[first] >= per_object_limit or (
+                max_pairs is not None and len(selected) >= max_pairs
+            ):
+                omitted[channel] += len(rest) - len(known.intersection(rest))
+                continue
+            for position, second in enumerate(rest):
+                pair = first, second
+                if pair in selected:
+                    continue
+                if degrees[first] >= per_object_limit or (
+                    max_pairs is not None and len(selected) >= max_pairs
+                ):
+                    omitted[channel] += (
+                        len(rest) - position - len(known.intersection(rest[position:]))
+                    )
+                    break
+                factors = len(objects[first].candidates) * len(objects[second].candidates)
+                if degrees[second] >= per_object_limit or (
+                    max_factors is not None and factor_count + factors > max_factors
+                ):
+                    omitted[channel] += 1
+                    continue
+                selected[pair] = {channel}
+                degrees[first] += 1
+                degrees[second] += 1
+                factor_count += factors
+
+    for explanation in explanations:
+        if not explanation.available_before_decision:
+            raise ValueError("Post-decision explanations cannot select interactions")
+        if (
+            graph is not None
+            and f"explanation:{explanation.explanation_id}" not in graph.explanation_ids
+        ):
+            omitted["unadmitted_explanation"] += 1
+            continue
+        if not set(explanation.support_object_ids) <= object_index.keys():
+            raise ValueError("Unknown explanation support object")
+        indices = {object_index[key] for key in explanation.support_object_ids}
+        for axiom in explanation.support_axioms:
+            indices.update(i for entity in owl.signature(axiom) for i in candidate.get(entity, ()))
+        include(indices, "explanation")
+    for entity in sorted(original, key=structural_id):
+        include(original[entity], "original_signature")
+    for axiom in sorted(problem.fixed_axioms, key=structural_id):
+        include(
+            (i for entity in owl.signature(axiom) for i in original.get(entity, ())), "fixed_axiom"
+        )
+    for query in visible_queries:
+        include(
+            (i for entity in owl.signature(query) for i in candidate.get(entity, ())),
+            "visible_query",
+        )
+    for entity in sorted(candidate, key=structural_id):
+        include(candidate[entity], "candidate_signature")
+    return InteractionSelection(
+        tuple(sorted(selected)),
+        tuple((i, j, tuple(sorted(selected[i, j]))) for i, j in sorted(selected)),
+        tuple(sorted(omitted.items())),
+        channels,
+        canonical_hash(
+            (
+                problem.objects,
+                problem.fixed_axioms,
+                graph,
+                explanations,
+                visible_queries,
+                per_object_limit,
+                max_pairs,
+                max_factors,
+            )
+        ),
+        factor_count,
+    )
+
+
 def observable_interaction_pairs(
     problem: Any,
     *,
     per_object_limit: int = 16,
     explanations: Iterable[GraphExplanation] = (),
+    graph: ObservableGraph | None = None,
+    max_pairs: int | None = None,
+    max_factors: int | None = None,
 ) -> tuple[tuple[int, int], ...]:
-    """Select deterministic bounded interactions from observed support hyperedges.
-
-    Visit shared entities, asserted ontology supports and diagnosis supports in a
-    fixed order. Saturated objects are removed before expanding each support, so
-    a hub never creates its unbounded quadratic pair inventory first.
-    """
-    from collections import defaultdict
-
-    if type(per_object_limit) is not int or per_object_limit < 0:
-        raise ValueError("Pair-factor degree limit must be a nonnegative integer")
-    if per_object_limit == 0:
-        return ()
-    objects = problem.objects
-    entity_objects: dict[Any, set[int]] = defaultdict(set)
-    object_index = {obj.object_id: index for index, obj in enumerate(objects)}
-    for index, obj in enumerate(objects):
-        for axiom in obj.original_axioms:
-            for entity in owl.signature(axiom):
-                entity_objects[entity].add(index)
-    degrees = [0] * len(objects)
-    pairs: set[tuple[int, int]] = set()
-
-    def include(indices: Iterable[int]) -> None:
-        active = sorted(set(i for i in indices if degrees[i] < per_object_limit))
-        for position, first in enumerate(active):
-            if degrees[first] >= per_object_limit:
-                continue
-            for offset in range(position + 1, len(active)):
-                second = active[offset]
-                if degrees[first] >= per_object_limit:
-                    break
-                if degrees[second] < per_object_limit and (first, second) not in pairs:
-                    pairs.add((first, second))
-                    degrees[first] += 1
-                    degrees[second] += 1
-
-    for entity in sorted(entity_objects, key=structural_id):
-        include(entity_objects[entity])
-    for axiom in sorted(problem.fixed_axioms, key=structural_id):
-        include(
-            index for entity in owl.signature(axiom) for index in entity_objects.get(entity, ())
-        )
-    for explanation in sorted(explanations, key=lambda e: e.explanation_id):
-        if not explanation.available_before_decision:
-            raise ValueError("Post-decision explanations cannot select interactions")
-        indices = {
-            object_index[key] for key in explanation.support_object_ids if key in object_index
-        }
-        for axiom in explanation.support_axioms:
-            indices.update(
-                index for entity in owl.signature(axiom) for index in entity_objects.get(entity, ())
-            )
-        include(indices)
-    return tuple(sorted(pairs))
+    """Compatibility projection of the shared, report-producing v3 selector."""
+    return select_interaction_pairs(
+        problem,
+        graph=graph,
+        per_object_limit=per_object_limit,
+        explanations=explanations,
+        max_pairs=max_pairs,
+        max_factors=max_factors,
+    ).pairs

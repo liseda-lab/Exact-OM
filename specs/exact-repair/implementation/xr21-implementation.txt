@@ -1,0 +1,91 @@
+XR-2.1 implementation, 30 September 2026
+
+This change implements the revised repair runtime and offline training/annotation
+interfaces. Repair remains opt-in. It does not restart the XR-2 campaign, change
+its supervisor, rewrite historical results, or authorize external annotation.
+
+Public entry points
+
+* prepare_repair(...) creates a validated RepairInputV3. Direct v3 constructors
+  and readers reject a policy that omits original, candidate or query classes.
+* promote_input_v3(old_input) explicitly creates a new execution epoch and records
+  the previous input hash. read_record still reads v2 archives unchanged.
+* bounded_freeze_neural_round(...) supervises CPU model input, retrieval,
+  compilation and output transport. Accelerator models use an immutable model
+  artifact through bounded_freeze_checkpoint(...); never fork a CUDA serializer.
+* repair_neural_round(frozen, shortlist_size=..., utility_window=...,
+  shortlist_seconds=...) uses the frozen semantic objective and separate risk
+  scorer. A singleton shortlist avoids an unnecessary risk-model call.
+* repair(..., ledger_path=..., resume=True) restores the same input/objective and
+  scheduling identities. It retains used calls, claimed retries and conservative
+  time reservations. Rebuilding solver state starts with a conservative bound;
+  a copied scalar in a checkpoint is not treated as an optimality certificate.
+  CLI run bundles also save the risk descriptor and exact shortlist settings;
+  --resume-search rejects missing/changed models or scheduling settings.
+* python -m exact.repair.protocol <v3.json> validates configuration only.
+  xr21-local-conformance.json is a non-executing template with UNFROZEN inputs.
+* tools.repair.train accepts explicit v3 protocols and offline fidelity labels.
+  Old model/optimizer checkpoints are not silently resumed as v3. A declared
+  weights-only warm start is a separate run, with a new optimizer and new heads.
+  Selected v3 model outputs use atomic, content-addressed checkpoint files; worker
+  transport carries a small descriptor with byte count and integrity hash.
+* semantic_plan_from_verification constructs complete, identity-bound annotation
+  plans from the actual input/assignment/verification. The annotation adapter
+  uses existing named OpenRouter profiles and RequestLedger; teacher and held-out
+  evaluator are separate roles. No provider call is made by importing or testing
+  these modules. Missing independent labels cannot silently become symbolic labels.
+
+Implementation boundaries
+
+The detector is sound and incomplete: named inclusions, conjunction, disjointness,
+existential restrictions, domain/range and universal constraints on separate
+existential witnesses. Unsupported axioms remain in the selected theory. Missing
+imports, unsupported complete queries and timed-out reasoning remain UNKNOWN.
+Only whole-policy complete checks accept a repair. Native ELK admission is a
+conservative whole-input/query gate plus strict compilation and complete query
+results; expressive input goes to qualified pyHermiT, never a filtered EL view.
+
+Proof support cuts use all candidate emitters and fixed occurrences. Required
+entailment failures keep exact-assignment exclusions. Deferred and unknown plans
+retain their utility in the upper bound; risk never changes semantic utility or
+provides a logical cut. Completed failures are acknowledged and persisted before
+later worker interruption can erase them. Partial passing events cannot accept.
+
+Compiled family artifacts are immutable, checksummed and implementation-bound.
+A family timeout leaves elementary alternatives available and reports partial
+coverage. Monolithic/factored probability and gradient tests qualify tiny finite
+cases; they do not establish biomedical-scale compiler performance.
+
+Resource scope
+
+Worker startup, input serialization, native work and bounded transport are
+supervised. The initial broker only launches a clean spawned process. Return
+frames admit owned data classes and shared OWL values rather than arbitrary user
+reducers. Linux RSS sampling covers the worker tree, can double-count shared
+pages and overshoot between samples, and excludes parent-owned inputs and device
+memory as separate accounting domains. Cleanup has a bounded 0.2-second grace;
+uncertain cleanup is an explicit operational result. Model/risk artifacts and
+compiler caches need to stay available while their frozen records are in use.
+CPU enforcement samples process-tree usage, including waited-for descendants, and
+records completed worker CPU usage. Sampling can overshoot the cap; it is not a
+cgroup scheduler quota. CPU reservations survive lost workers and replacement
+processes. Stage CPU ceilings sum within the campaign ceiling. A shared campaign
+ledger charges allocated GPU wall time across all stages, including preprocessing;
+this is allocated device time, not GPU utilization. Invalid/mismatched resource
+policies cannot replenish saved budgets. Parent manifest/checkpoint/report handling
+is included in campaign wall/GPU accounting; per-worker CPU/RSS counters describe
+the supervised scientific stages, not all memory and CPU owned by the coordinator.
+
+Tests and research gates
+
+xr21-conformance.json maps MIG-01..15 and EXT-01..08 to source and tests.
+xr21-semantic-conformance.json separates structural annotation checks from actual
+semantic validity. The final validation record identifies the tested source,
+commands, environment and results.
+
+Local conformance is not a new experiment result. Before another research run,
+freeze fresh parent splits, input/import/query manifests, a runnable v3 protocol,
+code and budgets; measure generated-pool development coverage and calibration.
+The exposed pilot parents are not untouched confirmatory data. Live provider,
+human/domain, held-out semantic and large real-input performance gates remain
+unrun. Production matcher data remains deferred until the user releases it.

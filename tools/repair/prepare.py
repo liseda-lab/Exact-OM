@@ -101,7 +101,13 @@ def case_to_dict(case: GeneratedCase) -> dict[str, Any]:
         "variation": case.variation,
         "ambiguity_group": case.ambiguity_group,
     }
-    return {"schema": "exact-repair/teacher-case/v2", "hash": canonical_hash(value), "case": value}
+    if case.schema_revision == "v3":
+        value.update(final_candidate_removals=case.final_candidate_removals, schema_revision="v3")
+    return {
+        "schema": f"exact-repair/teacher-case/{case.schema_revision}",
+        "hash": canonical_hash(value),
+        "case": value,
+    }
 
 
 def _probe(value: Mapping[str, Any]) -> TeacherProbe:
@@ -126,9 +132,10 @@ def _probe(value: Mapping[str, Any]) -> TeacherProbe:
 def case_from_dict(payload: Mapping[str, Any]) -> GeneratedCase:
     """Reject stale/corrupt evaluator artifacts and use authoritative core decoding."""
     value = payload.get("case")
-    if payload.get("schema") != "exact-repair/teacher-case/v2" or canonical_hash(
-        value
-    ) != payload.get("hash"):
+    if payload.get("schema") not in {
+        "exact-repair/teacher-case/v2",
+        "exact-repair/teacher-case/v3",
+    } or canonical_hash(value) != payload.get("hash"):
         raise ValueError("Teacher case schema or content hash mismatch")
     if not isinstance(value, Mapping):
         raise ValueError("Teacher case must be an object")
@@ -149,8 +156,13 @@ def case_from_dict(payload: Mapping[str, Any]) -> GeneratedCase:
         value["control"],
         tuple(owl.decode_canonical(bytes.fromhex(item)) for item in value["intended_theory"]),
         tuple(owl.decode_canonical(bytes.fromhex(item)) for item in value["intended_active"]),
-        tuple(tuple(item) for item in value["variation"]),
+        tuple(
+            (item[0], tuple(item[1]) if isinstance(item[1], list) else item[1])
+            for item in value["variation"]
+        ),
         value["ambiguity_group"],
+        tuple((key, tuple(ids)) for key, ids in value.get("final_candidate_removals", ())),
+        value.get("schema_revision", "v2"),
     )
 
 
@@ -172,6 +184,7 @@ def cache_from_dict(value: Mapping[str, Any]) -> TeacherCache:
         value["stop_reason"],
         tuple(tuple(pair) for pair in value["hashes"]),
         value["elapsed_seconds"],
+        value.get("schema", "exact-repair/teacher-cache/v2"),
     )
 
 
@@ -182,8 +195,11 @@ def save_preparation(
     caches: Mapping[str, TeacherCache] | None = None,
 ) -> None:
     """Write a reproducible local training manifest atomically."""
+    revision = "v3" if any(case.schema_revision == "v3" for case in cases) else "v2"
+    if revision == "v3" and any(case.schema_revision != "v3" for case in cases):
+        raise ValueError("A preparation manifest cannot silently mix v2 and v3 cases")
     payload = {
-        "schema": "exact-repair/training-preparation/v2",
+        "schema": f"exact-repair/training-preparation/{revision}",
         "report": dict(report),
         "cases": [case_to_dict(case) for case in cases],
         "caches": {key: asdict(value) for key, value in (caches or {}).items()},
@@ -200,7 +216,10 @@ def load_preparation(
     identity = value.pop("hash", None)
     if canonical_hash(value) != identity:
         raise ValueError("Training preparation content hash mismatch")
-    if value.get("schema") != "exact-repair/training-preparation/v2":
+    if value.get("schema") not in {
+        "exact-repair/training-preparation/v2",
+        "exact-repair/training-preparation/v3",
+    }:
         raise ValueError("Unsupported preparation manifest")
     cases = tuple(case_from_dict(case) for case in value["cases"])
     if len({case.case_id for case in cases}) != len(cases):
@@ -234,6 +253,7 @@ def generated_from_protocol(
         raise ValueError("Generated splits must group clean structural parents")
     holdout = protocol["experiments"]["composition_holdout"]
     cases = generate_corpus(
+        revision="v3" if protocol.get("schema", "").endswith("/v3") else "v2",
         split_counts=data["groups_per_family"],
         siblings_per_parent=data["corruptions_per_group"],
         seed=data["split_seed"] if seed is None else seed,

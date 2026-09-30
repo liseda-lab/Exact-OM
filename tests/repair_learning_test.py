@@ -331,6 +331,7 @@ def test_generated_controls_keep_parents_and_verify_intended_theories():
         siblings_per_parent=1,
         coherent_controls=True,
         missing_candidate_controls=True,
+        revision="v2",
     )
     assert len(cases) == 3 * len(FAMILIES)
     groups = {}

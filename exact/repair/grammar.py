@@ -8,7 +8,7 @@ images, so callers sum their probabilities rather than discard probability mass.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from functools import lru_cache
 from time import perf_counter
 from typing import Any, Iterable, Sequence, cast
@@ -61,6 +61,11 @@ class GrammarEncoding:
     max_depth: int
     max_constructors: int
     constraint_identity: str = ""
+    eliminate_fixed_fields: bool = False
+    forbidden_assignments: tuple[tuple[bool, ...], ...] = ()
+    context_proofs: tuple[Any, ...] = ()
+    contextual_checks: int = 0
+    contextual_truncated: bool = False
 
     @property
     def slot_count(self) -> int:
@@ -84,7 +89,21 @@ class GrammarEncoding:
                     (f"{prefix}:property", ("unused", *properties)),
                 )
             )
+        if self.eliminate_fixed_fields:
+            fields = [
+                (name, values)
+                for name, values in fields
+                if name != "template" and not name.startswith("retained:")
+            ]
         return tuple(fields)
+
+    @property
+    def fixed_choices(self) -> dict[str, str]:
+        if not self.eliminate_fixed_fields:
+            return {}
+        if len(self.templates) != 1:
+            raise ValueError("fixed field elimination requires one template")
+        return {"template": self.templates[0].name, **self.retained_choices(self.templates[0])}
 
     @property
     def variable_count(self) -> int:
@@ -161,7 +180,7 @@ class GrammarEncoding:
     def choices(self, assignment: Sequence[bool]) -> dict[str, str]:
         if len(assignment) != self.variable_count or any(type(v) is not bool for v in assignment):
             raise ValueError("proposal assignment must be a Boolean vector of the circuit width")
-        selected = {}
+        selected = dict(self.fixed_choices)
         offset = 0
         for name, categories in self.fields:
             row = assignment[offset : offset + len(categories)]
@@ -219,6 +238,8 @@ class GrammarEncoding:
     def accepts(self, assignment: Sequence[bool]) -> bool:
         """Validate canonical typed slots independently of compilation or enumeration."""
         try:
+            if tuple(assignment) in self.forbidden_assignments:
+                return False
             choices = self.choices(assignment)
             template = next(t for t in self.templates if t.name == choices["template"])
             if template.fixed is not None:
@@ -544,6 +565,11 @@ def compile_grammar(
     variable_order: Sequence[int] | None = None,
     max_nodes: int = 100000,
     max_seconds: float | None = None,
+    vtree_type: str = "balanced",
+    collect: bool = True,
+    max_live_nodes: int | None = None,
+    max_reachable_nodes: int | None = None,
+    max_elements: int | None = None,
 ) -> Any:
     """Compile typed-slot constraints with PySDD, without enumerating expressions.
 
@@ -566,7 +592,23 @@ def compile_grammar(
     )
     if sorted(order) != list(range(1, encoding.variable_count + 1)):
         raise ValueError("variable order must be a permutation of all Boolean variables")
-    return _compile_grammar(encoding, order, max_nodes, max_seconds, version("pysdd"))
+    if vtree_type not in {"right", "balanced", "grouped"}:
+        raise ValueError("vtree_type must be right, balanced, or grouped")
+    for limit in (max_live_nodes, max_reachable_nodes, max_elements):
+        if limit is not None and (type(limit) is not int or limit < 1):
+            raise ValueError("circuit structural limits must be positive integers")
+    return _compile_grammar(
+        encoding,
+        order,
+        max_nodes,
+        max_seconds,
+        version("pysdd"),
+        vtree_type,
+        collect,
+        max_live_nodes,
+        max_reachable_nodes,
+        max_elements,
+    )
 
 
 @lru_cache(maxsize=16)
@@ -576,28 +618,128 @@ def _compile_grammar(
     max_nodes: int,
     max_seconds: float | None,
     compiler_version: str,
+    vtree_type: str,
+    collect: bool,
+    max_live_nodes: int | None,
+    max_reachable_nodes: int | None,
+    max_elements: int | None,
 ) -> Any:
     from pysdd.sdd import SddManager, Vtree
 
     from .circuit import CompiledCircuit
 
     started = perf_counter()
+    tree = Vtree(
+        var_count=encoding.variable_count,
+        var_order=list(order),
+        vtree_type="balanced" if vtree_type == "grouped" else vtree_type,
+    )
+    if vtree_type == "grouped":
+        # A balanced tree over fields, each field itself right-linear. Serialize
+        # the complete topology through the public Vtree format, not just order.
+        import tempfile
+        from pathlib import Path
+
+        rows: list[str] = []
+        cursor = iter(order)
+
+        def vtree_leaf(variable):
+            identifier = len(rows)
+            rows.append(f"L {identifier} {variable}")
+            return identifier
+
+        def branch(left, right):
+            identifier = len(rows)
+            rows.append(f"I {identifier} {left} {right}")
+            return identifier
+
+        def combine(nodes, balanced):
+            if len(nodes) == 1:
+                return nodes[0]
+            split = len(nodes) // 2 if balanced else 1
+            return branch(combine(nodes[:split], balanced), combine(nodes[split:], balanced))
+
+        fields = [
+            combine([vtree_leaf(next(cursor)) for _ in values], False)
+            for _, values in encoding.fields
+        ]
+        combine(fields, True)
+        with tempfile.TemporaryDirectory(prefix="exact-vtree-") as directory:
+            path = Path(directory) / "grouped.vtree"
+            path.write_text(f"vtree {len(rows)}\n" + "\n".join(rows) + "\n")
+            tree = Vtree(filename=str(path).encode())
     manager = SddManager(
-        vtree=Vtree(var_count=encoding.variable_count, var_order=list(order), vtree_type="right"),
+        vtree=tree,
         auto_gc_and_minimize=False,
     )
-    true, false = manager.true(), manager.false()
+
+    class Owned:
+        """One native reference per live Python wrapper, including memo entries."""
+
+        __slots__ = ("node",)
+
+        def __init__(self, node):
+            self.node = node
+            node.ref()
+
+        def __del__(self):
+            self.node.deref()
+
+        def __and__(self, other):
+            return Owned(self.node & other.node)
+
+        def __or__(self, other):
+            return Owned(self.node | other.node)
+
+        def __invert__(self):
+            return Owned(~self.node)
+
+    true, false = Owned(manager.true()), Owned(manager.false())
     literals = {}
     offset = 1
     for name, categories in encoding.fields:
-        literals[name] = {value: manager.literal(offset + i) for i, value in enumerate(categories)}
+        literals[name] = {
+            value: Owned(manager.literal(offset + i)) for i, value in enumerate(categories)
+        }
         offset += len(categories)
 
+    for name, selected in encoding.fixed_choices.items():
+        values = (selected,) if name == "template" else ("false", "true")
+        literals[name] = {value: true if value == selected else false for value in values}
+    telemetry = []
+    checks = 0
+    peak_allocated = 0
+
+    def measure(phase):
+        import resource
+
+        telemetry.append(
+            (
+                phase,
+                manager.count(),
+                manager.live_count(),
+                manager.dead_count(),
+                manager.size(),
+                resource.getrusage(resource.RUSAGE_SELF).ru_maxrss,
+            )
+        )
+
     def check() -> None:
+        nonlocal checks, peak_allocated
+        checks += 1
+        peak_allocated = max(peak_allocated, manager.count())
+        if collect and (checks % 128 == 0 or manager.count() > max_nodes):
+            measure("before_gc")
+            manager.garbage_collect()
+            measure("after_gc")
         if manager.count() > max_nodes:
             raise CircuitBudgetExceeded(
                 f"grammar compilation exceeds {max_nodes} allocated SDD nodes"
             )
+        if max_live_nodes is not None and manager.live_count() > max_live_nodes:
+            raise CircuitBudgetExceeded("grammar compilation exceeds its live node limit")
+        if max_elements is not None and manager.live_size() > max_elements:
+            raise CircuitBudgetExceeded("grammar compilation exceeds its live element limit")
         if max_seconds is not None and perf_counter() - started > max_seconds:
             raise CircuitBudgetExceeded("grammar compilation exceeds its wall time limit")
 
@@ -849,12 +991,289 @@ def _compile_grammar(
             literals[name][value] for name, value in encoding.retained_choices(template).items()
         )
         constraints.append(~literals["template"][template.name] | valid)
-    root = conjunction(constraints)
-    root.ref()
-    manager.garbage_collect()
+    flat_literals = [literals[name][value] for name, values in encoding.fields for value in values]
+    for assignment in encoding.forbidden_assignments:
+        if len(assignment) != encoding.variable_count:
+            raise ValueError("context constraint binding width mismatch")
+        constraints.append(
+            ~conjunction(
+                literal if bit else ~literal for literal, bit in zip(flat_literals, assignment)
+            )
+        )
+    owned_root = conjunction(constraints)
+    root = owned_root.node
+    root.ref()  # Transfer one reference to the returned native circuit.
+    constraints.clear()
+    category_compare.cache_clear()
+    compare.cache_clear()
+    fits.cache_clear()
+    compare_constant.cache_clear()
+    measure("root_protected")
+    if collect:
+        manager.garbage_collect()
+    measure("complete")
+    if max_reachable_nodes is not None and root.count() > max_reachable_nodes:
+        raise CircuitBudgetExceeded("grammar compilation exceeds its root reachable node limit")
+    if max_elements is not None and root.size() > max_elements:
+        raise CircuitBudgetExceeded("grammar compilation exceeds its reachable element limit")
     key = canonical_hash(
-        (encoding.content_hash, order, "pysdd", compiler_version, "typed-slots-v1")
+        (
+            encoding.content_hash,
+            order,
+            "pysdd",
+            compiler_version,
+            "typed-slots-v3",
+            vtree_type,
+            collect,
+        )
     )
     return CompiledCircuit(
-        encoding, manager, root, str(key), compiler_version, perf_counter() - started, root.count()
+        encoding,
+        manager,
+        root,
+        str(key),
+        compiler_version,
+        perf_counter() - started,
+        root.count(),
+        (
+            ("vtree", vtree_type),
+            ("collect", collect),
+            ("peak_allocated", peak_allocated),
+            ("root_elements", root.size()),
+            ("phases", tuple(telemetry)),
+        ),
+    )
+
+
+def compile_families(
+    encoding: GrammarEncoding,
+    *,
+    seconds: float = 20.0,
+    max_nodes: int = 100000,
+    vtree_type: str = "balanced",
+    cache_directory: str | None = None,
+    circuit_limits: dict[str, Any] | None = None,
+) -> Any:
+    """Compile disjoint template languages, eliminating fixed fields/menu bits.
+
+    One aggregate deadline covers every family, including failed attempts. Fixed
+    elementary branches need no native compilation and survive complex failures.
+    """
+    from time import monotonic
+
+    from .circuit import CompiledFamily, FactoredCircuit
+    from .compilation import compile_bounded
+
+    limits = dict(circuit_limits or {})
+    allowed = {
+        "allocated_node_limit",
+        "live_node_limit",
+        "reachable_node_limit",
+        "element_limit",
+        "rss_mb",
+        "call_seconds",
+        "aggregate_seconds",
+    }
+    if set(limits) - allowed:
+        raise ValueError(
+            "unsupported declared circuit limits: " + str(sorted(set(limits) - allowed))
+        )
+    import math
+
+    if any(
+        not isinstance(value, (float, int))
+        or isinstance(value, bool)
+        or not math.isfinite(value)
+        or value <= 0
+        for value in limits.values()
+    ):
+        raise ValueError("declared circuit limits must be positive numbers")
+    if any(
+        type(limits[key]) is not int
+        for key in (
+            "allocated_node_limit",
+            "live_node_limit",
+            "reachable_node_limit",
+            "element_limit",
+        )
+        if key in limits
+    ):
+        raise ValueError("circuit node and element limits must be integers")
+    seconds = limits.get("aggregate_seconds", seconds)
+    max_nodes = min(max_nodes, limits.get("allocated_node_limit", max_nodes))
+    started = monotonic()
+    columns = {
+        (field, value): index
+        for index, (field, value) in enumerate(
+            (field, value) for field, values in encoding.fields for value in values
+        )
+    }
+    families = []
+    for template in encoding.templates:
+        if template.fixed is not None:
+            families.append(
+                CompiledFamily(
+                    template.name, None, (), tuple(enumerate(encoding.assignment(template)))
+                )
+            )
+            continue
+        reduced = replace(
+            encoding,
+            templates=(template,),
+            eliminate_fixed_fields=True,
+            classes=tuple(
+                c
+                for c in encoding.classes
+                if template.class_menu is None or str(c.iri.value) in template.class_menu
+            ),
+            properties=tuple(
+                p
+                for p in encoding.properties
+                if template.property_menu is None or str(p.iri.value) in template.property_menu
+            ),
+        )
+        indices = tuple(
+            columns[field, value] for field, values in reduced.fields for value in values
+        )
+        retained = encoding.retained_choices(template)
+        fixed = tuple(
+            (index, value == (template.name if field == "template" else retained.get(field)))
+            for (field, value), index in columns.items()
+            if index not in set(indices)
+        )
+        reduced = replace(
+            reduced,
+            forbidden_assignments=tuple(
+                tuple(bits[index] for index in indices)
+                for bits in encoding.forbidden_assignments
+                if all(bits[index] == value for index, value in fixed)
+            ),
+        )
+        if not reduced.classes:
+            families.append(
+                CompiledFamily(
+                    template.name,
+                    None,
+                    indices,
+                    fixed,
+                    "empty_language",
+                    "typed expression grammar has no named leaf",
+                )
+            )
+            continue
+        remaining = seconds - (monotonic() - started)
+        if remaining <= 0:
+            families.append(
+                CompiledFamily(
+                    template.name,
+                    None,
+                    indices,
+                    fixed,
+                    "compile_timeout",
+                    "aggregate family deadline",
+                )
+            )
+            continue
+        try:
+            circuit = compile_bounded(
+                reduced,
+                seconds=min(remaining, limits.get("call_seconds", remaining)),
+                max_nodes=max_nodes,
+                vtree_type=vtree_type,
+                cache_directory=cache_directory,
+                memory_mb=limits.get("rss_mb"),
+                max_live_nodes=limits.get("live_node_limit"),
+                max_reachable_nodes=limits.get("reachable_node_limit"),
+                max_elements=limits.get("element_limit"),
+            )
+            status = "empty_language" if circuit.root.is_false() else "resolved"
+            families.append(CompiledFamily(template.name, circuit, indices, fixed, status))
+        except (TimeoutError, RuntimeError, CircuitBudgetExceeded) as exc:
+            status = (
+                "compile_timeout"
+                if isinstance(exc, TimeoutError)
+                else (
+                    "compile_memory_limit"
+                    if "memory_limit" in str(exc)
+                    else (
+                        "compile_node_limit"
+                        if any(word in str(exc) for word in ("node", "element"))
+                        else "worker_error"
+                    )
+                )
+            )
+            families.append(CompiledFamily(template.name, None, indices, fixed, status, str(exc)))
+    return FactoredCircuit(
+        encoding,
+        tuple(families),
+        canonical_hash(
+            (
+                "family-reference-v3",
+                encoding,
+                tuple(
+                    (f.name, f.status, f.circuit.cache_key if f.circuit else None) for f in families
+                ),
+            )
+        ),
+        monotonic() - started,
+    )
+
+
+def with_immutable_context(
+    encoding: GrammarEncoding, fixed_axioms: Iterable[Any], policy: Any, *, max_checks: int = 128
+) -> GrammarEncoding:
+    """Compile bounded, replayed active-unsatisfiability proofs from immutable B.
+
+    Named and one-existential arguments are a declared incomplete filtering scope.
+    Detector silence, exhaustion and supports involving editable assertions add
+    no ban. Every excluded encoding retains its complete qualified proof identity.
+    """
+    from .detection import detect_violations, validate_proof
+    from .records import ProofSupportV3
+
+    if type(max_checks) is not int or max_checks < 0:
+        raise ValueError("context proof budget must be a nonnegative integer")
+    fixed = tuple(sorted(set(fixed_axioms), key=canonical_hash))
+    arguments = list(encoding.classes)
+    if encoding.max_depth and encoding.max_constructors:
+        arguments.extend(
+            owl.ObjectSomeValuesFrom(p, c) for p in encoding.properties for c in encoding.classes
+        )
+    denied = set(encoding.forbidden_assignments)
+    proofs: dict[str, ProofSupportV3] = {}
+    checks, truncated = 0, False
+    visited = set()
+    for template in encoding.templates:
+        if template.fixed is not None:
+            continue
+        for expression in arguments:
+            bits = encoding.assignment(template, expression)
+            if not encoding.accepts(bits):
+                continue
+            candidate = encoding.emit(template, expression)
+            if not candidate.active_expressions or candidate.candidate_id in visited:
+                continue
+            visited.add(candidate.candidate_id)
+            if checks >= max_checks:
+                truncated = True
+                continue
+            checks += 1
+            derived = detect_violations(fixed, candidate.active_expressions, policy)
+            qualified = tuple(
+                p
+                for p in derived
+                if p.kind == "active_satisfiability"
+                and p.activation_expression in candidate.active_expressions
+                and set(p.asserted_support) <= set(fixed)
+                and validate_proof(p, fixed, candidate.active_expressions, policy)
+            )
+            if qualified:
+                denied.update(encoding.candidate_assignments(candidate))
+                proofs.update((p.content_hash, p) for p in qualified)
+    return replace(
+        encoding,
+        forbidden_assignments=tuple(sorted(denied)),
+        context_proofs=tuple(proofs[key] for key in sorted(proofs)),
+        contextual_checks=checks,
+        contextual_truncated=truncated,
     )

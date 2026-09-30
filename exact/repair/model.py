@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import math
 from dataclasses import dataclass, field, fields
 from typing import Any, Iterable, Mapping, cast
 
@@ -57,8 +58,18 @@ class RepairModel(nn.Module):
         dropout: float = 0.1,
         encoder: str = "hgt",
         pairwise: bool = False,
+        revision: str = "v2",
+        plan_risk: bool = True,
+        pair_factor_bound: float = 1.0,
     ) -> None:
         super().__init__()
+        if revision not in {"v2", "v3"}:
+            raise ValueError("Unknown repair model revision")
+        self.revision = revision
+        self.plan_risk_enabled = revision == "v3" and plan_risk
+        if not math.isfinite(pair_factor_bound) or pair_factor_bound < 0:
+            raise ValueError("Pair factor bound must be finite and nonnegative")
+        self.pair_factor_bound = pair_factor_bound
         if encoder not in {"hgt", "rgcn", "none"}:
             raise ValueError("encoder must be hgt, rgcn, or none")
         if hidden_dim < 1 or heads < 1 or hidden_dim % heads or layers < 0:
@@ -75,6 +86,9 @@ class RepairModel(nn.Module):
             "dropout": dropout,
             "encoder": encoder,
             "pairwise": pairwise,
+            "revision": revision,
+            "plan_risk": plan_risk,
+            "pair_factor_bound": pair_factor_bound,
         }
         self.input_projection = nn.ModuleDict(
             {kind: nn.Linear(feature_dim, hidden_dim) for kind in self.metadata[0]}
@@ -113,9 +127,16 @@ class RepairModel(nn.Module):
         self.entity_projection = nn.Linear(hidden_dim, hidden_dim)
         self.proposal_context = _mlp(2 * hidden_dim, hidden_dim, hidden_dim)
         self.profile_projection = nn.Linear(feature_dim, hidden_dim)
+        if revision == "v3":
+            self.candidate_context_head = _mlp(3 * hidden_dim, hidden_dim, hidden_dim)
+            self.risk_head = _mlp(3 * hidden_dim, 1, hidden_dim)
+            self.support_head = _mlp(2 * hidden_dim, 1, hidden_dim)
+            self.plan_context_head = _mlp(2 * hidden_dim, hidden_dim, hidden_dim)
 
     def encode(self, graph: ObservableGraph) -> GraphMemory:
         """Contextualise the observed graph using the chosen standard encoder."""
+        if self.revision == "v3" and graph.feature_schema != "exact-repair/observable-features/v3":
+            raise ValueError("V3 model requires the versioned v3 observable feature view")
         device = self.empty_bundle.device
         grouped: dict[str, list[GraphNode]] = {kind: [] for kind in self.metadata[0]}
         for node in graph.nodes:
@@ -269,7 +290,9 @@ class RepairModel(nn.Module):
                 structural_id(node) for node in owl.walk(axiom) if isinstance(node, owl.Entity)
             )
         attended = self._attend(query, memory, ids, self.candidate_attention)
-        return self.value_head(torch.cat((context, emitted, attended))).squeeze(-1), emitted
+        combined = torch.cat((context, emitted, attended))
+        embedding = self.candidate_context_head(combined) if self.revision == "v3" else emitted
+        return self.value_head(combined).squeeze(-1), embedding
 
     def interaction(self, first: Tensor, second: Tensor, joint_context: Tensor) -> Tensor:
         """Predict one symmetric, frozen pair coefficient for an observable pair set."""
@@ -287,6 +310,7 @@ class RepairModel(nn.Module):
         *,
         mixtures: int = 1,
         profile_features: Tensor | None = None,
+        selected_context: Tensor | None = None,
     ) -> tuple[Tensor, Tensor]:
         """Compute all mixture and Boolean-choice logits before circuit conditioning.
 
@@ -295,6 +319,10 @@ class RepairModel(nn.Module):
         """
         if mixtures < 1 or mixtures > 256:
             raise ValueError("mixtures must be in [1,256]")
+        if selected_context is not None:
+            if self.revision != "v3":
+                raise ValueError("Conditional proposals require the v3 context schema")
+            context = context + selected_context
         if profile_features is not None:
             context = context + self.profile_projection(profile_features)
         queries = torch.stack(
@@ -328,6 +356,19 @@ class RepairModel(nn.Module):
             ]
             unary.append(torch.stack([value for value, _ in values]))
             embeddings.append([embedding for _, embedding in values])
+        references = [
+            next(
+                (
+                    i
+                    for i, candidate in enumerate(obj.candidates)
+                    if "keep" in candidate.action_tags
+                ),
+                0,
+            )
+            for obj in objects
+        ]
+        if self.revision == "v3":
+            unary = [row - row[ref] for row, ref in zip(unary, references)]
         pairs = {}
         seen = set()
         for i, j in interaction_pairs:
@@ -338,7 +379,98 @@ class RepairModel(nn.Module):
             for a, first in enumerate(embeddings[i]):
                 for b, second in enumerate(embeddings[j]):
                     pairs[i, a, j, b] = self.interaction(first, second, context)
+            if self.revision == "v3":
+                raw = dict(pairs)
+                for a in range(len(embeddings[i])):
+                    for b in range(len(embeddings[j])):
+                        pairs[i, a, j, b] = (
+                            raw[i, a, j, b]
+                            - raw[i, a, j, references[j]]
+                            - raw[i, references[i], j, b]
+                            + raw[i, references[i], j, references[j]]
+                        )
+                        pairs[i, a, j, b] = pairs[i, a, j, b].clamp(
+                            -self.pair_factor_bound, self.pair_factor_bound
+                        )
         return tuple(unary), pairs
+
+    def plan_context(
+        self,
+        objects: Iterable[Any],
+        memory: GraphMemory,
+        assignment: tuple[int | None, ...],
+        *,
+        target_object_id: str | None = None,
+    ) -> Tensor:
+        """Frozen selected-other-actions input; unassigned objects retain a typed mask."""
+        if self.revision != "v3":
+            raise ValueError("Plan conditioning requires v3")
+        objects = tuple(objects)
+        if len(objects) != len(assignment):
+            raise ValueError("Partial assignment must bind every object")
+        parts, contexts = [], []
+        for obj, choice in zip(objects, assignment):
+            if obj.object_id == target_object_id:
+                continue
+            context = self.object_context(obj.object_id, memory)
+            contexts.append(context)
+            if choice is None:
+                parts.append(self._role("unassigned") + context)
+            elif type(choice) is int and 0 <= choice < len(obj.candidates):
+                parts.append(self.candidate_value(obj.candidates[choice], memory, context)[1])
+            else:
+                raise ValueError("Invalid partial assignment choice")
+        selected = torch.stack(parts).sum(0) if parts else self.empty_bundle
+        background = torch.stack(contexts).sum(0) if contexts else self.empty_bundle
+        return cast(Tensor, self.plan_context_head(torch.cat((selected, background))))
+
+    def plan_risk_logit(
+        self,
+        objects: Iterable[Any],
+        memory: GraphMemory,
+        assignment: tuple[int, ...],
+        *,
+        supports: Iterable[Any] = (),
+    ) -> Tensor:
+        """Whole-policy failure score, independent from semantic factors and hard cuts.
+
+        Supports are pre-decision GraphExplanation hyperedges. They are aggregated
+        whole, including the typed witness, rather than creating pair negatives.
+        """
+        if self.revision != "v3":
+            raise ValueError("Whole-plan risk requires the v3 model")
+        objects = tuple(objects)
+        if len(objects) != len(assignment):
+            raise ValueError("Risk requires one selected candidate per object")
+        selected, contexts = {}, []
+        for obj, choice in zip(objects, assignment):
+            if type(choice) is not int or not 0 <= choice < len(obj.candidates):
+                raise ValueError("Invalid selected candidate")
+            context = self.object_context(obj.object_id, memory)
+            contexts.append(context)
+            selected[obj.object_id] = self.candidate_value(obj.candidates[choice], memory, context)[
+                1
+            ]
+        hyperedges = []
+        for support in supports:
+            if not support.available_before_decision:
+                raise ValueError("Post-decision supports are labels, not risk input")
+            if not set(support.support_object_ids) <= selected.keys():
+                raise ValueError("Unknown support literal")
+            parts = [selected[key] for key in sorted(set(support.support_object_ids))]
+            parts += [self.encode_structure(a, memory) for a in support.support_axioms]
+            if support.witness is not None:
+                parts.append(self.encode_structure(support.witness, memory))
+            aggregate = torch.stack(parts).sum(0) if parts else self.empty_bundle
+            hyperedges.append(
+                self.composition(torch.cat((self._role("support_hyperedge"), aggregate)))
+            )
+        pooled = torch.stack(list(selected.values())).sum(0) if selected else self.empty_bundle
+        context = torch.stack(contexts).mean(0) if contexts else self.empty_bundle
+        supports_pooled = torch.stack(hyperedges).sum(0) if hyperedges else self.empty_bundle
+        return cast(
+            Tensor, self.risk_head(torch.cat((pooled, context, supports_pooled))).squeeze(-1)
+        )
 
 
 def repair_benefits(

@@ -105,7 +105,8 @@ class RetrievalResult:
             ):
                 row[name] = [str(entity.iri.value) for entity in getattr(menu, name)]
             row["endpoint_alternatives"] = [
-                [side, str(entity.iri.value)] for side, entity in menu.endpoint_alternatives
+                [side, str(entity.iri.value), str(entity.kind.value)]
+                for side, entity in menu.endpoint_alternatives
             ]
             menus.append(row)
         return FrozenMapping(
@@ -175,7 +176,17 @@ def _restore_capture(captured: Mapping[str, Any]) -> RetrievalResult:
                 row["object_id"],
                 **values,
                 endpoint_alternatives=tuple(
-                    (side, owl.Class(owl.IRI(iri))) for side, iri in row["endpoint_alternatives"]
+                    (
+                        item[0],
+                        {
+                            "class": owl.Class,
+                            "object_property": owl.ObjectProperty,
+                            "data_property": owl.DataProperty,
+                            "named_individual": owl.NamedIndividual,
+                            "individual": owl.NamedIndividual,
+                        }[item[2] if len(item) == 3 else "class"](owl.IRI(item[1])),
+                    )
+                    for item in row["endpoint_alternatives"]
                 ),
             )
         )

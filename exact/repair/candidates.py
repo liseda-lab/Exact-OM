@@ -451,6 +451,10 @@ def mapping_candidates(
 
     emit((), "delete")
     if entity_kind != "class":
+        if tuple(endpoint_alternatives):
+            raise ValueError(
+                "non-class endpoint replacement is outside the declared initial grammar"
+            )
         return deduplicate_candidates(result)
     if relation == "=":
         for axiom in original:
@@ -462,7 +466,7 @@ def mapping_candidates(
             )
     for side, replacement in endpoint_alternatives:
         if side not in {"source", "target"} or not isinstance(replacement, owl.Class):
-            raise ValueError("endpoint alternatives must be ('source'|'target', named class)")
+            raise ValueError("endpoint alternatives must match the declared entity kind and side")
         emit(
             originals(
                 replacement if side == "source" else source,
@@ -496,6 +500,74 @@ def mapping_candidates(
             # on a directional original without inventing the missing direction.
             emit((inclusion, *retained, necessary), "composite", (specialised,), **roles)
     return deduplicate_candidates(result)
+
+
+def materialize_retrieved_endpoints(problem: Any, retrieval: Any) -> Any:
+    """Construct the same typed elementary endpoints on API and direct paths."""
+    objects = []
+    constructors = {
+        owl.Class: "class",
+        owl.ObjectProperty: "object_property",
+        owl.DataProperty: "data_property",
+        owl.NamedIndividual: "individual",
+    }
+    for obj in problem.objects:
+        alternatives = retrieval.for_object(obj.object_id).endpoint_alternatives
+        if obj.kind != "mapping" or not alternatives:
+            objects.append(obj)
+            continue
+        kind = constructors.get(type(obj.source_entity))
+        if kind is None or type(obj.source_entity) is not type(obj.target_entity):
+            raise ValueError("retrieved endpoints require explicit, identically typed endpoints")
+        relation = next(
+            (
+                relation
+                for relation in ("=", "<", ">")
+                if not (kind == "individual" and relation != "=")
+                and mapping_candidates(
+                    obj.object_id,
+                    obj.source_entity,
+                    obj.target_entity,
+                    relation,
+                    entity_kind=kind,
+                    enabled_actions=("keep",),
+                )[0].axioms
+                == normalise_axioms(obj.original_axioms)
+            ),
+            None,
+        )
+        if relation is None:
+            raise ValueError("cannot infer complete original relation for endpoint retrieval")
+        additions = mapping_candidates(
+            obj.object_id,
+            obj.source_entity,
+            obj.target_entity,
+            relation,
+            entity_kind=kind,
+            eligible=obj.eligible,
+            locked=obj.locked,
+            endpoint_alternatives=alternatives,
+            enabled_actions=("keep", "replace_endpoint"),
+        )
+        additions = tuple(
+            (
+                replace(
+                    c,
+                    provenance=tuple(
+                        sorted(set(c.provenance) | {("retrieval", "observed_endpoint_alternative")})
+                    ),
+                )
+                if "replace_endpoint" in c.action_tags
+                else c
+            )
+            for c in additions
+        )
+        objects.append(
+            replace(obj, candidates=deduplicate_candidates((*obj.candidates, *additions)))
+        )
+    from .records import replace_inventory
+
+    return replace_inventory(problem, tuple(objects))
 
 
 def ontology_candidates(
@@ -660,6 +732,7 @@ def budget_candidates(
     *,
     scores: Mapping[str, float] | None = None,
     enabled_actions: Iterable[str] | None = None,
+    mandatory_ids: Iterable[str] = (),
 ) -> tuple[ReplacementCandidateV2, ...]:
     """Freeze a ranked pool after retaining all controls and one available family member."""
     import math
@@ -678,6 +751,10 @@ def budget_candidates(
         for c in unique
         if {"keep", "delete", "retain_subsumption", "replace_endpoint"} & set(c.action_tags)
     }
+    required = set(mandatory_ids)
+    if required - {c.candidate_id for c in unique}:
+        raise ValueError("mandatory candidate IDs are absent from the offered inventory")
+    mandatory.update(required)
     families = (
         set(enabled_actions)
         if enabled_actions is not None

@@ -1,0 +1,26 @@
+........................................................................ [ 21%]
+........................................................................ [ 43%]
+........................................................................ [ 65%]
+........................................................................ [ 87%]
+..........................................                               [100%]
+=============================== warnings summary ===============================
+tests/repair_api_test.py: 1 warning
+tests/repair_checkpointing_test.py: 2 warnings
+tests/repair_cli_resume_v3_test.py: 24 warnings
+tests/repair_compilation_test.py: 1 warning
+tests/repair_generation_v3_test.py: 116 warnings
+tests/repair_kernel_test.py: 4 warnings
+tests/repair_learning_test.py: 15 warnings
+tests/repair_learning_v3_test.py: 13 warnings
+tests/repair_pipeline_completion_test.py: 5 warnings
+tests/repair_semantic_fidelity_test.py: 1 warning
+tests/repair_supervision_test.py: 3 warnings
+tests/repair_training_completion_test.py: 10 warnings
+tests/repair_v3_kernel_test.py: 5 warnings
+tests/repair_v3_resources_test.py: 2 warnings
+  /home/pgcotovio/Exact-OM/.worktrees/xr21-implementation-20260930/exact/repair/workers.py:200: DeprecationWarning: This process (pid=3089417) is multi-threaded, use of fork() may lead to deadlocks in the child.
+    pid = os.fork()
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+- generated xml file: /home/pgcotovio/Exact-OM/.worktrees/xr21-implementation-20260930/specs/exact-repair/implementation/evidence/xr21-pytest.xml -
+330 passed, 202 warnings in 318.91s (0:05:18)

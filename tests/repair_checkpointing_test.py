@@ -52,6 +52,7 @@ def test_training_recovers_exact_optimizer_rng_and_rejects_changed_split(tmp_pat
         train, "generated_development", lambda *a, **k: {"useful_candidate_coverage": 1.0}
     )
     options = dict(
+        revision="v2",
         epochs=2,
         hidden_dim=8,
         heads=2,
@@ -93,6 +94,15 @@ def test_study_resume_cannot_replenish_campaign_budget(tmp_path, monkeypatch):
     from tests.repair_study_test import frozen_case
 
     monkeypatch.setattr(study, "runtime_manifest", lambda: {"fixture": "v1"})
+    from exact.repair.kernel import baseline_identity
+    from exact.repair.records import BaselineReportV3
+
+    # This fixture isolates the interrupted campaign budget, not four-theory diagnosis.
+    monkeypatch.setattr(
+        study,
+        "collect_baselines",
+        lambda problem: BaselineReportV3(baseline_identity(problem), (), 0.0, 0),
+    )
     case = frozen_case()
     arms = (study.StudyArmV2("deletion", "deletion"),)
     # Persist the immutable schedule but interrupt just before evaluation.

@@ -150,6 +150,7 @@ def test_training_selects_periodic_decoded_checkpoint_and_masks_partial_train_ca
     _, report = train_cases(
         [(train, cache_for(train, unknown=True))],
         [(dev, cache_for(dev))],
+        revision="v2",
         epochs=1,
         hidden_dim=8,
         heads=2,

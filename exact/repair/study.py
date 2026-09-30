@@ -23,22 +23,35 @@ from typing import Any, Callable, Sequence
 from .api import write_artifact
 from .checkpointing import CumulativeBudget
 from .evaluation import outcome_metrics
-from .kernel import materialize, repair, verify_assignment
+from .kernel import (
+    _valid_report,
+    _verify_with_exceptions,
+    baseline_identity,
+    collect_baselines,
+    materialize,
+    repair,
+    verify_assignment,
+)
 from .records import (
+    SCHEMA_V3,
+    BaselineReportV3,
     ObjectiveV2,
+    ObjectiveV3,
     ObligationV2,
     PendingAssignmentV2,
     Record,
     RepairInputV2,
     RepairResultV2,
+    RepairResultV3,
     VerificationReportV2,
+    VerificationReportV3,
     canonical_hash,
     canonical_json,
     read_record,
 )
 from .workers import bounded_call
 
-STUDY_SCHEMA = "exact-repair/study/v2"
+STUDY_SCHEMA = "exact-repair/study/v3"
 COHORTS = frozenset(
     {"generated", "real_structure", "conference_2025", "bioml_2024_selected", "bioml_2026_whole"}
 )
@@ -174,6 +187,14 @@ class StudyOutcomeV2(Record):
     metrics: tuple[tuple[str, Any], ...] = ()
 
 
+@dataclasses.dataclass(frozen=True)
+class StudyOutcomeV3(StudyOutcomeV2):
+    """New outcomes explicitly identify common diagnosis and XR-2.1 accounting."""
+
+    schema_version = SCHEMA_V3
+    baseline_hash: str = ""
+
+
 def grouped_splits(cases: Sequence[StudyCaseV2], *, seed: int = 0) -> dict[str, str]:
     """Assign whole declared clean-parent/pair groups before any sibling is evaluated.
 
@@ -278,6 +299,16 @@ def filter_inventory(
         benefit=rows(original_objective.benefit),
         costs=rows(original_objective.costs),
     )
+    if isinstance(objective, ObjectiveV3):
+        objective = dataclasses.replace(
+            objective,
+            pool_hash=canonical_hash(tuple(objects)),
+            raw_pairs=tuple(
+                (i, remap[i][a], j, remap[j][b], w)
+                for i, a, j, b, w in objective.raw_pairs
+                if arm.pairwise and a in remap[i] and b in remap[j]
+            ),
+        )
     return dataclasses.replace(problem, objects=tuple(objects)), objective, tuple(indices)
 
 
@@ -295,7 +326,11 @@ def _captured_scores(case: StudyCaseV2) -> dict[str, float]:
 
 
 def _greedy(
-    problem: RepairInputV2, objective: ObjectiveV2, scores: dict[str, float], verifier: Verifier
+    problem: RepairInputV2,
+    objective: ObjectiveV2,
+    scores: dict[str, float],
+    verifier: Verifier,
+    baseline_evidence: BaselineReportV3 | None = None,
 ) -> RepairResultV2:
     """Delete in captured-score order, requiring full authorization at every stop."""
     started = time.monotonic()
@@ -321,7 +356,8 @@ def _greedy(
             if obj.object_id not in scores:
                 raise LookupError(f"captured mapping score unavailable: {obj.object_id}")
             edits.append((scores[obj.object_id], obj.object_id, i, deletion))
-    pending, exclusions, failures, baselines = [], [], [], []
+    pending, exclusions, failures = [], [], []
+    baselines = list(baseline_evidence.reports) if baseline_evidence is not None else []
     selected = None
     report = None
     checks = 0
@@ -333,29 +369,60 @@ def _greedy(
             failures.append("greedy verification budget exhausted")
             break
         current = tuple(assignment)
-        checks += 1
-        outcome = bounded_call(
-            verifier,
-            problem,
-            current,
-            timeout=min(remaining, problem.budgets.verification_seconds),
-            **(
+        existing = dict(baselines).get("alignment") if step is None else None
+        if existing is not None and existing.theory_hash == canonical_hash(
+            materialize(problem, current)
+        ):
+            from .workers import CallResult
+
+            candidate_report = dataclasses.replace(
+                existing, assignment_hash=canonical_hash(current)
+            )
+            assert baseline_evidence is not None
+            if baseline_evidence.exception_checks and candidate_report.authorizes:
+                if isinstance(candidate_report, VerificationReportV3):
+                    candidate_report = dataclasses.replace(
+                        candidate_report,
+                        obligations=baseline_evidence.exception_checks
+                        + candidate_report.obligations,
+                        expected_obligations=tuple(
+                            q.name for q in baseline_evidence.exception_checks
+                        )
+                        + candidate_report.expected_obligations,
+                    )
+                else:
+                    candidate_report = dataclasses.replace(
+                        candidate_report,
+                        obligations=baseline_evidence.exception_checks
+                        + candidate_report.obligations,
+                    )
+            outcome = CallResult("complete", candidate_report)
+        else:
+            checks += 1
+            function: Callable[..., VerificationReportV2] = verifier
+            args: tuple[Any, ...] = (problem, current)
+            if verifier is verify_assignment and baseline_evidence is not None:
+                function, args = _verify_with_exceptions, (
+                    problem,
+                    current,
+                    baseline_evidence.exception_checks,
+                )
+            worker_limits: dict[str, Any] = (
                 {"memory_mb": problem.budgets.memory_mb}
                 if problem.budgets.memory_mb is not None
                 else {}
-            ),
-        )
+            )
+            outcome = bounded_call(
+                function,
+                *args,
+                timeout=min(remaining, problem.budgets.verification_seconds),
+                **worker_limits,
+            )
         candidate_report = outcome.value
-        if (
-            outcome.status != "complete"
-            or not isinstance(candidate_report, VerificationReportV2)
-            or candidate_report.assignment_hash != canonical_hash(current)
-            or candidate_report.theory_hash != canonical_hash(materialize(problem, current))
-            or candidate_report.policy_hash != problem.policy.content_hash
-        ):
+        if outcome.status != "complete" or not _valid_report(problem, current, candidate_report):
             detail = outcome.detail or "verification returned an unrelated or malformed report"
             failures.append(detail)
-            candidate_report = VerificationReportV2(
+            candidate_report = VerificationReportV3(
                 canonical_hash(current),
                 canonical_hash(materialize(problem, current)),
                 problem.policy.content_hash,
@@ -364,7 +431,7 @@ def _greedy(
                 (ObligationV2("verification", "unknown", False, detail),),
                 detail=detail,
             )
-        if step is None:
+        if step is None and not any(name == "alignment" for name, _ in baselines):
             baselines.append(("alignment", candidate_report))
         if candidate_report.authorizes:
             selected, report = current, candidate_report
@@ -386,7 +453,7 @@ def _greedy(
         if selected is None
         else "OPTIMAL_IN_POOL" if value == objective.upper_cap else "INCUMBENT_WITH_GAP"
     )
-    return RepairResultV2(
+    return RepairResultV3(
         input_hash=problem.content_hash,
         objective_hash=objective.content_hash,
         logical_status="UNKNOWN" if selected is None else "VERIFIED_FEASIBLE",
@@ -414,6 +481,12 @@ def _greedy(
         failures=tuple(failures),
         checks=checks,
         baseline=tuple(baselines),
+        model_status=problem.model_status,
+        elapsed_seconds=time.monotonic() - started,
+        generation_status={
+            "bounded_enumerated": "COMPLETE_DECLARED_ENUMERATION",
+            "sampled": "SAMPLED",
+        }.get(problem.candidate_coverage, "PARTIAL_RESOURCE_LIMIT"),
     )
 
 
@@ -431,7 +504,8 @@ def evaluate_case(
     split: str,
     verifier: Verifier = verify_assignment,
     seconds: float | None = None,
-) -> StudyOutcomeV2:
+    baseline_evidence: BaselineReportV3 | None = None,
+) -> StudyOutcomeV3:
     """Produce a status for every scheduled arm, preserving unknowns and failures."""
     started = time.monotonic()
     cpu_before, _ = _usage()
@@ -445,7 +519,14 @@ def evaluate_case(
             status, detail = case.availability, case.detail
         else:
             stage_started = time.monotonic()
+            if baseline_evidence is None and verifier is verify_assignment:
+                assert case.problem is not None
+                baseline_evidence = collect_baselines(case.problem)
             problem, objective, indices = filter_inventory(case, arm)
+            if baseline_evidence is not None and baseline_evidence.identity != baseline_identity(
+                problem
+            ):
+                raise ValueError("shared baseline input/policy mismatch")
             preparation_seconds = time.monotonic() - stage_started
             remaining = (
                 problem.budgets.total_seconds
@@ -459,9 +540,16 @@ def evaluate_case(
             )
             stage_started = time.monotonic()
             result = (
-                _greedy(problem, objective, _captured_scores(case), verifier)
+                _greedy(problem, objective, _captured_scores(case), verifier, baseline_evidence)
                 if arm.selector == "score_greedy"
-                else repair(problem, objective, verifier=verifier, preserve_verified_input=False)
+                else repair(
+                    problem,
+                    objective,
+                    verifier=verifier,
+                    preserve_verified_input=False,
+                    diagnose=False,
+                    baseline_evidence=baseline_evidence,
+                )
             )
             selection_seconds = time.monotonic() - stage_started
             if result.assignment is not None:
@@ -479,7 +567,7 @@ def evaluate_case(
     except Exception as exc:
         status, detail = "failed", f"{type(exc).__name__}: {exc}"
     cpu_after, peak_rss = _usage()
-    return StudyOutcomeV2(
+    return StudyOutcomeV3(
         case.case_id,
         arm.arm_id,
         case.content_hash,
@@ -496,6 +584,14 @@ def evaluate_case(
             ("elapsed_seconds", time.monotonic() - started),
             ("cpu_seconds", cpu_after - cpu_before),
             ("preparation_seconds", preparation_seconds),
+            (
+                "shared_baseline_seconds",
+                baseline_evidence.elapsed_seconds if baseline_evidence else 0.0,
+            ),
+            (
+                "shared_baseline_checks",
+                float(baseline_evidence.checks) if baseline_evidence else 0.0,
+            ),
             ("selection_seconds", selection_seconds),
             ("parent_process_high_water_rss_kib", peak_rss),
         ),
@@ -505,6 +601,7 @@ def evaluate_case(
             if problem is not None and result is not None
             else ()
         ),
+        baseline_hash=baseline_evidence.content_hash if baseline_evidence else "",
     )
 
 
@@ -605,6 +702,31 @@ def run_study(
     with CumulativeBudget(root / "budget.json", plan_hash, campaign_seconds) as budget:
         rows = []
         for case in cases:
+            baseline_evidence: BaselineReportV3 | None = None
+            if case.problem is not None and verifier is verify_assignment:
+                baseline_path = root / "baselines" / f"{baseline_identity(case.problem)}.json"
+                if baseline_path.exists():
+                    baseline_record = read_record(json.loads(baseline_path.read_text()))
+                    if not isinstance(
+                        baseline_record, BaselineReportV3
+                    ) or baseline_record.identity != baseline_identity(case.problem):
+                        raise ValueError("invalid shared baseline artifact")
+                    baseline_evidence = baseline_record
+                elif budget.remaining > 0:
+                    reserved = budget.begin(
+                        min(budget.remaining, case.problem.budgets.total_seconds)
+                    )
+                    try:
+                        bounded_problem = dataclasses.replace(
+                            case.problem,
+                            budgets=dataclasses.replace(
+                                case.problem.budgets, total_seconds=reserved
+                            ),
+                        )
+                        baseline_evidence = collect_baselines(bounded_problem)
+                        write_artifact(baseline_path, baseline_evidence.to_dict())
+                    finally:
+                        budget.finish()
             for arm in arms:
                 job = canonical_hash((case.case_id, arm.arm_id))
                 destination, state_path = (
@@ -614,7 +736,7 @@ def run_study(
                 if destination.exists():
                     value = read_record(json.loads(destination.read_text()))
                     if (
-                        not isinstance(value, StudyOutcomeV2)
+                        not isinstance(value, StudyOutcomeV3)
                         or value.case_hash != case.content_hash
                         or value.arm_hash != arm.content_hash
                     ):
@@ -632,7 +754,7 @@ def run_study(
                     if type(attempts) is not int or attempts < 0:
                         raise ValueError("invalid interrupted-attempt counter")
                     if attempts >= max_attempts:
-                        outcome = StudyOutcomeV2(
+                        outcome = StudyOutcomeV3(
                             case.case_id,
                             arm.arm_id,
                             case.content_hash,
@@ -648,7 +770,7 @@ def run_study(
                         )
                         remaining = budget.remaining
                         if remaining <= 0:
-                            outcome = StudyOutcomeV2(
+                            outcome = StudyOutcomeV3(
                                 case.case_id,
                                 arm.arm_id,
                                 case.content_hash,
@@ -670,6 +792,7 @@ def run_study(
                                     split=splits[case.case_id],
                                     verifier=verifier,
                                     seconds=reserved,
+                                    baseline_evidence=baseline_evidence,
                                 )
                             finally:
                                 budget.finish()

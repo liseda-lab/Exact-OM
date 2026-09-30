@@ -200,6 +200,7 @@ class CompiledCircuit:
     compiler_version: str
     compilation_seconds: float
     node_count: int
+    telemetry: tuple[tuple[str, Any], ...] = ()
 
 
 def compile_encoding(
@@ -262,6 +263,8 @@ class ProposalSample:
 class ConditionedMixture:
     """Stable differentiable WMC and exact ancestral sampling on a compiled SDD."""
 
+    circuit: CompiledCircuit | FactoredCircuit
+
     def __init__(self, circuit: CompiledCircuit, literal_logits: Any, component_logits: Any = None):
         import torch
         import torch.nn.functional as functional
@@ -316,6 +319,7 @@ class ConditionedMixture:
             return False
         if not self._grammar:
             return key in self._candidate_by_assignment
+        assert isinstance(self.circuit, CompiledCircuit)
         values: dict[int, bool] = {}
         pending = [(self.circuit.root, False)]
         while pending:
@@ -420,6 +424,7 @@ class ConditionedMixture:
         if type(count) is not int or count < 0:
             raise ValueError("sample count must be a nonnegative integer")
         generator = torch.Generator(device=self.literal_logits.device).manual_seed(seed)
+        assert isinstance(self.circuit, CompiledCircuit)
         samples = []
         candidate_masses: dict[str, float] = {}
         with torch.no_grad():
@@ -481,3 +486,184 @@ class ConditionedMixture:
                     ProposalSample(candidate_id, key, component, candidate_masses[candidate_id])
                 )
         return tuple(samples)
+
+
+@dataclass(frozen=True)
+class CompiledFamily:
+    """One disjoint template with an explicit map to the reference Boolean space."""
+
+    name: str
+    circuit: CompiledCircuit | None
+    indices: tuple[int, ...]
+    fixed: tuple[tuple[int, bool], ...]
+    status: str = "resolved"
+    detail: str = ""
+
+
+@dataclass(frozen=True)
+class FactoredCircuit:
+    encoding: Any
+    families: tuple[CompiledFamily, ...]
+    cache_key: str
+    compilation_seconds: float
+    compiler_version: str = "family-reference-v3"
+
+    @property
+    def node_count(self) -> int:
+        return sum(f.circuit.node_count for f in self.families if f.circuit is not None)
+
+    @property
+    def complete(self) -> bool:
+        return all(f.status in {"resolved", "empty_language"} for f in self.families)
+
+    @property
+    def telemetry(self) -> tuple:
+        return tuple(
+            (f.name, f.status, f.detail, f.circuit.telemetry if f.circuit else ())
+            for f in self.families
+        )
+
+
+class FactoredConditionedMixture(ConditionedMixture):
+    """CG-019 exactly: choose component/family using fixed-bit mass times WMC.
+
+    The full reference logits remain the likelihood parameterization. Failed
+    families explicitly define a reduced support; their missing mass is unknown.
+    """
+
+    def __init__(self, circuit: FactoredCircuit, literal_logits: Any, component_logits: Any = None):
+        import torch
+        import torch.nn.functional as functional
+
+        if literal_logits.ndim != 2 or literal_logits.shape[1] != circuit.encoding.variable_count:
+            raise ValueError("literal logits must have shape (components, reference variables)")
+        if not literal_logits.is_floating_point() or torch.isnan(literal_logits).any():
+            raise ValueError("literal logits must be floating point without NaN")
+        count = literal_logits.shape[0]
+        component_logits = (
+            literal_logits.new_zeros(count) if component_logits is None else component_logits
+        )
+        if (
+            count < 1
+            or component_logits.shape != (count,)
+            or component_logits.device != literal_logits.device
+            or not torch.isfinite(component_logits).all()
+        ):
+            raise ValueError("invalid family mixture components")
+        self.circuit = circuit
+        self.literal_logits = literal_logits
+        self.log_positive = functional.logsigmoid(literal_logits)
+        self.log_negative = functional.logsigmoid(-literal_logits)
+        self.log_mixture = torch.log_softmax(component_logits, 0)
+        self._grammar = True
+        self._candidate_by_assignment = {}
+        self._families = []
+        masses = []
+        for family in circuit.families:
+            if family.status != "resolved":
+                continue
+            fixed = literal_logits.new_zeros(count)
+            for index, value in family.fixed:
+                fixed = fixed + (self.log_positive if value else self.log_negative)[:, index]
+            local = None
+            if family.circuit is not None:
+                try:
+                    local = ConditionedMixture(
+                        family.circuit, literal_logits[:, family.indices], component_logits
+                    )
+                except EmptyProposalSpace:
+                    continue
+                fixed = fixed + local.component_log_normalizers
+            self._families.append((family, local))
+            masses.append(fixed)
+        if not masses:
+            raise EmptyProposalSpace("no completed family has nonzero mass")
+        self.family_component_log_normalizers = torch.stack(masses)
+        self.component_log_normalizers = torch.logsumexp(self.family_component_log_normalizers, 0)
+        self.log_normalizer = torch.logsumexp(self.log_mixture + self.component_log_normalizers, 0)
+        if torch.isneginf(self.log_normalizer):
+            raise EmptyProposalSpace("completed families have zero probability")
+        if not torch.isfinite(self.log_normalizer):
+            raise FloatingPointError("nonfinite family proposal normalizer")
+        self.component_posterior = torch.softmax(
+            self.log_mixture + self.component_log_normalizers, 0
+        )
+        self.family_component_posterior = torch.softmax(
+            (self.family_component_log_normalizers + self.log_mixture).flatten(), 0
+        ).reshape(len(masses), count)
+
+    def accepts(self, assignment: Sequence[bool]) -> bool:
+        bits = tuple(assignment)
+        if len(bits) != self.circuit.encoding.variable_count or any(
+            type(b) is not bool for b in bits
+        ):
+            return False
+        for family, local in self._families:
+            if all(bits[index] == value for index, value in family.fixed):
+                if local is None or local.accepts(tuple(bits[i] for i in family.indices)):
+                    return True
+        return False
+
+    def sample(self, count: int = 1, *, seed: int = 0) -> tuple[ProposalSample, ...]:
+        import torch
+
+        if type(count) is not int or count < 0:
+            raise ValueError("sample count must be a nonnegative integer")
+        generator = torch.Generator(device=self.literal_logits.device).manual_seed(seed)
+        result = []
+        cached = {}
+        with torch.no_grad():
+            for _ in range(count):
+                index = int(
+                    torch.multinomial(
+                        self.family_component_posterior.flatten(), 1, generator=generator
+                    )
+                )
+                family_index, component = divmod(index, self.literal_logits.shape[0])
+                family, local = self._families[family_index]
+                bits = dict(family.fixed)
+                if local is not None:
+                    assert family.circuit is not None
+                    assignment = {}
+                    pending = [family.circuit.root]
+                    while pending:
+                        node = pending.pop()
+                        if node.is_false():
+                            raise RuntimeError("sampled zero-mass family branch")
+                        if node.is_literal():
+                            assignment[abs(node.literal) - 1] = node.literal > 0
+                        elif not node.is_true():
+                            elements = node.elements()
+                            weights = torch.stack(
+                                [
+                                    local._values[p.id][component] + local._values[s.id][component]
+                                    for p, s in elements
+                                ]
+                            )
+                            selected = int(
+                                torch.multinomial(torch.softmax(weights, 0), 1, generator=generator)
+                            )
+                            pending.extend(reversed(elements[selected]))
+                    for local_index, full_index in enumerate(family.indices):
+                        if local_index not in assignment:
+                            assignment[local_index] = bool(
+                                torch.rand(
+                                    (), device=self.literal_logits.device, generator=generator
+                                )
+                                < self.literal_logits[component, full_index].sigmoid()
+                            )
+                        bits[full_index] = assignment[local_index]
+                full = tuple(bits[i] for i in range(self.circuit.encoding.variable_count))
+                if not self.accepts(full) or not self.circuit.encoding.accepts(full):
+                    raise RuntimeError("family binding produced an invalid full encoding")
+                candidate = self.candidate(full)
+                if candidate.candidate_id not in cached:
+                    cached[candidate.candidate_id] = float(
+                        self.candidate_log_probability(candidate)
+                    )
+                result.append(
+                    ProposalSample(
+                        candidate.candidate_id, full, component, cached[candidate.candidate_id]
+                    )
+                )
+        return tuple(result)

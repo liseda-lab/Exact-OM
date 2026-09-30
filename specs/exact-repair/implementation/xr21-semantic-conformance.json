@@ -1,0 +1,162 @@
+{
+  "schema": "exact-repair/implementation-evidence/v3",
+  "scope": "local structural conformance with mocked transport; no semantic-validity, calibration, live provider or research-result claim",
+  "implementation": [
+    "exact/repair/semantic_fidelity.py",
+    "exact/repair/protocol.py"
+  ],
+  "validation_command": "python -m pytest tests/repair_semantic_fidelity_test.py tests/repair_protocol_v3_test.py tests/openrouter_ledger_test.py -q",
+  "coverage": [
+    {
+      "requirements": [
+        "SF-T01",
+        "SF-T02",
+        "SF-T05",
+        "SF-T13"
+      ],
+      "test": "test_supported_one_way_rich_content_not_input_preservation_or_cost",
+      "claim": "Frozen cost-blind projection and fixture preference; actual model behavior is not measured"
+    },
+    {
+      "requirements": [
+        "SF-T03",
+        "SF-T05"
+      ],
+      "test": "test_opaque_evidence_abstains_and_embedded_instructions_are_quoted_data",
+      "claim": "Explicit abstention fixture and quoted-evidence prompt boundary"
+    },
+    {
+      "requirements": [
+        "SF-T04",
+        "SF-T22"
+      ],
+      "test": "test_strict_full_validation_rejects_fabrication",
+      "claim": "Exact dependency/schema, evidence ID, quote-span and structured entailment-claim validation"
+    },
+    {
+      "requirements": [
+        "SF-T06",
+        "SF-T07",
+        "SF-T08",
+        "SF-T09",
+        "SF-T10"
+      ],
+      "test": "test_unknowns_keep_complete_denominator_and_tie_is_not_abstention",
+      "claim": "Complete fixed-denominator scalar and explicit per-loss masks; ordinal-only output cannot become anchored utility"
+    },
+    {
+      "requirements": [
+        "SF-T14",
+        "SF-T18",
+        "SF-T20"
+      ],
+      "test": "test_manifest_denies_unplanned_packet_or_changed_parent_split_before_send",
+      "claim": "Request admitted only within frozen packet hashes and parent split membership"
+    },
+    {
+      "requirements": [
+        "SF-T15",
+        "SF-T21",
+        "SF-T24"
+      ],
+      "test": "test_no_authorization_unknown_role_or_bad_split_causes_no_network",
+      "claim": "Explicit configured profiles, distinct model identities and role/split separation"
+    },
+    {
+      "requirements": [
+        "SF-T16",
+        "SF-T17"
+      ],
+      "test": "test_order_swaps_aggregation_and_dissent",
+      "claim": "Quorum/dissent, swap normalization, scheduled denominator and AI-proxy claim scope; study-wide no-incumbent denominator belongs to evaluation"
+    },
+    {
+      "requirements": [
+        "SF-T19"
+      ],
+      "test": "test_one_correction_uses_actual_error_and_cannot_elicit_desired_answer",
+      "claim": "At most one declared correction, exact retained parser error, own reservation and unchanged evidence"
+    },
+    {
+      "requirements": [
+        "SF-T20",
+        "SF-T23"
+      ],
+      "test": "test_completed_raw_replays_after_restart_and_parser_revision",
+      "claim": "Raw wire reuse without new calls; separate parser/aggregation label identity"
+    },
+    {
+      "requirements": [
+        "SF-T23"
+      ],
+      "test": "test_concurrent_claims_do_not_duplicate_wire_requests",
+      "claim": "Existing SQLite sender claims serialize concurrent paid attempts"
+    },
+    {
+      "requirements": [
+        "SF-T23",
+        "SF-T24"
+      ],
+      "test": "test_unknown_delivery_keeps_reservation_and_no_retry",
+      "claim": "Possibly charged delivery remains reserved and does not auto-retry"
+    },
+    {
+      "requirements": [
+        "SF-T24"
+      ],
+      "test": "test_all_caps_stop_before_transmission",
+      "claim": "Finite teacher/evaluator and lineage aggregate call/token/cost/time reservations"
+    },
+    {
+      "requirements": [
+        "EXT-07"
+      ],
+      "test": "tests/repair_protocol_v3_test.py",
+      "claim": "Strict separate v3 schema/inheritance, historical rejection, frozen trainer projection and parent grouping"
+    },
+    {
+      "requirements": [
+        "SF-T04",
+        "SF-T06",
+        "SF-T10"
+      ],
+      "test": "test_verified_plan_builder_binds_actual_complete_content_and_query_masks",
+      "claim": "Plans derive from actual materialized complete-policy v3 verification and shared OWL rendering; external consequence basis and missing outcomes remain explicit"
+    },
+    {
+      "requirements": [
+        "SF-T23",
+        "SF-T24"
+      ],
+      "test": "test_total_annotation_deadline_kills_sender_and_preserves_charge",
+      "claim": "Hard total wall deadline via existing supervised workers; only acknowledged terminated sender attempts are marked unknown, retaining all reservations"
+    },
+    {
+      "requirements": [
+        "SF-T14",
+        "SF-T15",
+        "SF-T20"
+      ],
+      "test": "test_offline_evaluator_lookup_rejects_leakage_model_overlap_and_changed_query_basis",
+      "claim": "Exact plan lookup separates teacher, development-selection and held-out-test use; no nearest-plan label transfer or self-model evaluation"
+    }
+  ],
+  "cross_module_requirements": {
+    "SF-T11": "learning.interaction_loss: all four same-basis plans must be feasible and complete",
+    "SF-T12": "kernel/detection proof support hyperedges; semantic labels expose no solver-cut interface"
+  },
+  "study_gates": {
+    "development_calibration": "not_run",
+    "live_provider_qualification": "not_run",
+    "human_domain_validation": "not_run",
+    "held_out_semantic_evaluation": "not_run",
+    "experiment_execution": "paused; local conformance manifest has execution_authorized=false"
+  },
+  "limits": [
+    "Structural validation cannot establish semantic interpretations are correct; free-text rationales remain weak evidence.",
+    "Textual evidence instructions are isolated and prompted as data; real model compliance requires later measured calibration.",
+    "No fallback model change or unknown-delivery retry occurs automatically.",
+    "Cost/time reservations are conservative upper allocations; observed provider usage is separately retained without invented prices.",
+    "Training projection freezes one explicitly selected generation stage, not a claim that unreached expansion stages were searched."
+  ]
+}

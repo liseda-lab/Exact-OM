@@ -208,8 +208,11 @@ class TeacherCache:
     stop_reason: str
     hashes: tuple[tuple[str, str], ...]
     elapsed_seconds: float
+    schema: str = "exact-repair/teacher-cache/v2"
 
     def __post_init__(self) -> None:
+        if self.schema not in {"exact-repair/teacher-cache/v2", "exact-repair/teacher-cache/v3"}:
+            raise ValueError("Unknown teacher-cache schema")
         if any(type(count) is not int or count < 1 for count in self.candidate_counts):
             raise ValueError("Teacher cache inventories must be nonempty")
         seen = set()
@@ -507,3 +510,415 @@ class OwlTeacherOracle:
     def satisfiable(self, expression: Any) -> bool | None:
         """Read the batch's whole-expression non-vacuity result."""
         return self._outcomes.get(("active_satisfiability", self._key(expression)))
+
+
+def interaction_loss(
+    predictions: Any, labels: Sequence[RepairLabel], *, max_quartets: int = 64, beta: float = 1.0
+) -> dict[str, Any]:
+    """Feasible, complete counterfactual differences on identical backgrounds."""
+    import torch
+    import torch.nn.functional as functional
+
+    if len(predictions) != len(labels) or max_quartets < 0:
+        raise ValueError("Invalid quartet predictions or budget")
+    lookup = {label.assignment: i for i, label in enumerate(labels) if label.usable}
+    seen: set[tuple[int, int, int, int]] = set()
+    contrasts: list[Any] = []
+    targets: list[float] = []
+    for base, i00 in sorted(lookup.items()):
+        if len(contrasts) >= max_quartets:
+            break
+        for i, j in itertools.combinations(range(len(base)), 2):
+            # Only the two changed positions differ; no invented infeasible benefit.
+            for other, i11 in sorted(lookup.items()):
+                if not (base[i] < other[i] and base[j] < other[j]):
+                    continue
+                if any(base[k] != other[k] for k in range(len(base)) if k not in {i, j}):
+                    continue
+                a10, a01 = list(base), list(base)
+                a10[i], a01[j] = other[i], other[j]
+                if tuple(a10) not in lookup or tuple(a01) not in lookup:
+                    continue
+                indices = i00, lookup[tuple(a10)], lookup[tuple(a01)], i11
+                if indices in seen or len(contrasts) >= max_quartets:
+                    continue
+                seen.add(indices)
+                b00, b10, b01, b11 = indices
+                contrasts.append(
+                    predictions[b11] - predictions[b10] - predictions[b01] + predictions[b00]
+                )
+                targets.append(
+                    cast(float, labels[b11].benefit)
+                    - cast(float, labels[b10].benefit)
+                    - cast(float, labels[b01].benefit)
+                    + cast(float, labels[b00].benefit)
+                )
+    loss = (
+        functional.smooth_l1_loss(
+            torch.stack(contrasts), predictions.new_tensor(targets), beta=beta
+        )
+        if contrasts
+        else predictions.sum() * 0
+    )
+    return {"loss": loss, "eligible": len(contrasts), "targets": tuple(targets)}
+
+
+def risk_loss(logits: Any, labels: Sequence[RepairLabel]) -> dict[str, Any]:
+    """Only decided whole-policy labels supervise failure probability."""
+    import torch.nn.functional as functional
+
+    if logits.ndim != 1 or len(logits) != len(labels):
+        raise ValueError("Risk requires one logit per complete assignment")
+    known = [i for i, label in enumerate(labels) if label.feasible is not None]
+    target = logits.new_tensor([float(labels[i].feasible is False) for i in known])
+    return {
+        "loss": (
+            functional.binary_cross_entropy_with_logits(logits[known], target)
+            if known
+            else logits.sum() * 0
+        ),
+        "eligible": len(known),
+        "unknown": len(labels) - len(known),
+    }
+
+
+def sample_conditioned_marginals(
+    cache: TeacherCache, temperature: float = 1.0
+) -> tuple[tuple[float, ...], ...]:
+    """Empirical unique-plan utility distribution, never an exhaustive teacher claim."""
+    if temperature <= 0 or not math.isfinite(temperature):
+        raise ValueError("Temperature must be positive")
+    usable = [label for label in cache.labels if label.usable]
+    if not usable:
+        raise ValueError("Sample contains no eligible feasible semantic targets")
+    utilities = [(cast(float, label.benefit) - label.cost) / temperature for label in usable]
+    weights = [math.exp(value - max(utilities)) for value in utilities]
+    total = sum(weights)
+    rows = [[0.0] * size for size in cache.candidate_counts]
+    for label, weight in zip(usable, weights):
+        for i, choice in enumerate(label.assignment):
+            rows[i][choice] += weight / total
+    return tuple(tuple(row) for row in rows)
+
+
+def covered_proposal_loss(
+    log_probabilities: Any,
+    target: Sequence[float],
+    *,
+    target_kind: str,
+    reachable_subset: bool = False,
+    elementary: Sequence[bool] | None = None,
+) -> dict[str, Any]:
+    """Account unreachable target mass before any explicitly projected objective."""
+    import torch
+
+    if target_kind not in {"exact", "sample_conditioned"}:
+        raise ValueError("Declare exact or sample_conditioned target provenance")
+    weights = log_probabilities.new_tensor(target)
+    if weights.shape != log_probabilities.shape or not torch.isclose(
+        weights.sum(), weights.new_tensor(1.0)
+    ):
+        raise ValueError("Target must be a normalized inventory distribution")
+    positive = weights > 0
+    missing = positive & ~torch.isfinite(log_probabilities)
+    missing_mass = float(weights[missing].sum())
+    selected = positive & ~missing
+    status = "supervised"
+    if missing_mass and not reachable_subset:
+        status, selected = "unreachable_target_excluded", torch.zeros_like(positive)
+    elif missing_mass:
+        status = "reachable_subset_projected"
+        weights = weights / weights[selected].sum() if selected.any() else weights
+    loss = -(weights[selected] * log_probabilities[selected]).sum()
+    if not selected.any():
+        loss = torch.where(torch.isfinite(log_probabilities), log_probabilities, 0.0).sum() * 0
+    partitions = {}
+    if elementary is not None:
+        if len(elementary) != len(target):
+            raise ValueError("Target partition must match candidate inventory")
+        for name, flag in (("elementary", True), ("complex", False)):
+            mask = weights.new_tensor([value == flag for value in elementary], dtype=torch.bool)
+            partitions[name] = {
+                "target_mass": float(log_probabilities.new_tensor(target)[mask].sum()),
+                "missing_mass": float(log_probabilities.new_tensor(target)[mask & missing].sum()),
+            }
+    return {
+        "loss": loss,
+        "status": status,
+        "target_kind": target_kind,
+        "missing_target_mass": missing_mass,
+        "partitions": partitions,
+        "renormalized": bool(missing_mass and reachable_subset),
+        "eligible": int(selected.any()),
+    }
+
+
+@dataclass(frozen=True)
+class SampledRepairRound:
+    """A bounded supervised acquisition ledger; every scheduled row is retained."""
+
+    case_id: str
+    parent_group_id: str
+    split: str
+    inventory_hash: str
+    model_hash: str
+    sampler_hash: str
+    round_id: str
+    cache: TeacherCache
+    selections: tuple[tuple[tuple[int, ...], str, float | None], ...]
+    requested: int
+    duplicates: int
+    stop_reason: str
+    assignment_maps: tuple[tuple[str, tuple[tuple[str, str], ...]], ...] = ()
+    schema: str = "exact-repair/sampled-round/v3"
+
+
+def collect_sampled_repairs(
+    candidate_counts: Sequence[int],
+    label_assignment: Callable,
+    *,
+    case_id: str,
+    parent_group_id: str,
+    split: str,
+    hashes: Mapping[str, str],
+    model_hash: str,
+    round_id: str,
+    max_assignments: int,
+    deadline_seconds: float,
+    seed: int = 0,
+    proposed: Sequence[tuple[tuple[int, ...], str]] = (),
+    object_candidate_ids: Sequence[tuple[str, Sequence[str]]] = (),
+    exploration_fraction: float = 0.5,
+    counterfactual_attempts: int | None = None,
+    quartet_attempts: int = 0,
+) -> SampledRepairRound:
+    """Freeze sampler, acquire independent controls plus declared model alternatives.
+
+    First draws come from uniform controls and single-object counterfactuals;
+    optimizer/learned proposals have unknown propensity. Training splits only.
+    No rejection-resampling removes unknown or infeasible strata.
+    """
+    from .records import canonical_hash
+
+    if split != "train":
+        raise ValueError("Active supervised acquisition is training-only")
+    counts = tuple(candidate_counts)
+    if (
+        any(type(n) is not int or n < 1 for n in counts)
+        or max_assignments < 0
+        or deadline_seconds <= 0
+    ):
+        raise ValueError("Invalid sample inventory/budgets")
+    if object_candidate_ids and (
+        len(object_candidate_ids) != len(counts)
+        or len({row[0] for row in object_candidate_ids}) != len(counts)
+        or any(
+            len(ids) != count or len(set(ids)) != count
+            for (_, ids), count in zip(object_candidate_ids, counts)
+        )
+    ):
+        raise ValueError("Candidate identity map does not match sample inventory")
+    rng = random.Random(seed)
+    scheduled = list(proposed)
+    if not 0 <= exploration_fraction <= 1 or quartet_attempts < 0:
+        raise ValueError("Invalid sampling stratum budget")
+    random_count = int(max_assignments * exploration_fraction)
+    random_rows = [
+        (tuple(rng.randrange(n) for n in counts), "uniform_control") for _ in range(random_count)
+    ]
+    base = proposed[0][0] if proposed else tuple(0 for _ in counts)
+    counterfactuals = []
+    for i, n in enumerate(counts):
+        for choice in range(n):
+            if choice != base[i]:
+                changed = list(base)
+                changed[i] = choice
+                counterfactuals.append((tuple(changed), "counterfactual"))
+    if counterfactual_attempts is not None:
+        counterfactuals = counterfactuals[:counterfactual_attempts]
+    quartets: list[tuple[tuple[int, ...], str]] = []
+    for i, j in itertools.combinations(range(len(counts)), 2):
+        if len(quartets) >= quartet_attempts:
+            break
+        if counts[i] > 1 and counts[j] > 1:
+            for left, right in ((0, 0), (1, 0), (0, 1), (1, 1)):
+                row = list(base)
+                row[i], row[j] = left, right
+                quartets.append((tuple(row), "counterfactual_quartet"))
+    scheduled = random_rows + scheduled + quartets[:quartet_attempts] + counterfactuals
+    scheduled = scheduled[:max_assignments]
+    started, labels, selections, seen, duplicates = time.monotonic(), [], [], set(), 0
+    reason = "scheduled_complete"
+    for assignment, stratum in scheduled:
+        if len(assignment) != len(counts) or any(
+            type(c) is not int or not 0 <= c < n for c, n in zip(assignment, counts)
+        ):
+            raise ValueError("Sampler supplied invalid assignment")
+        if assignment in seen:
+            duplicates += 1
+            continue
+        if time.monotonic() - started >= deadline_seconds:
+            reason = "deadline"
+            break
+        seen.add(assignment)
+        label = label_assignment(assignment)
+        if label.assignment != assignment:
+            raise ValueError("Verifier labeled a different assignment")
+        labels.append(label)
+        selections.append(
+            (assignment, stratum, 1.0 / math.prod(counts) if stratum == "uniform_control" else None)
+        )
+    cache = TeacherCache(
+        counts,
+        tuple(labels),
+        False,
+        "sample_conditioned:" + reason,
+        tuple(sorted(hashes.items())),
+        time.monotonic() - started,
+        "exact-repair/teacher-cache/v3",
+    )
+    maps = []
+    for assignment, _, _ in selections:
+        mapping = tuple(
+            sorted(
+                (name, ids[choice]) for (name, ids), choice in zip(object_candidate_ids, assignment)
+            )
+        )
+        if mapping:
+            maps.append((canonical_hash((case_id, hashes["inventory"], mapping)), mapping))
+    return SampledRepairRound(
+        case_id,
+        parent_group_id,
+        split,
+        hashes["inventory"],
+        model_hash,
+        canonical_hash((counts, max_assignments, seed, proposed)),
+        round_id,
+        cache,
+        tuple(selections),
+        len(scheduled),
+        duplicates,
+        reason,
+        tuple(maps),
+    )
+
+
+def generated_checkpoint_criterion(
+    reports: Sequence[Mapping[str, Any]],
+    *,
+    minimum_coverage: float = 1.0,
+    uncertainty_z: float = 1.96,
+    fallback: str = "stop",
+) -> tuple | None:
+    """Coverage gate, external quality lower confidence bound, then verifier effort.
+
+    The schedule denominator includes failed generation and missing labels. Cache
+    regret and the model's own value never enter selection.
+    """
+    if (
+        not reports
+        or not 0 <= minimum_coverage <= 1
+        or uncertainty_z < 0
+        or fallback not in {"stop", "exploratory"}
+    ):
+        raise ValueError("Invalid generated checkpoint selection declaration")
+    known = [
+        r["decoded"]
+        for r in reports
+        if r.get("decoded", {}).get("status") == "verified"
+        and r["decoded"].get("selected_utility") is not None
+    ]
+    coverage = len(known) / len(reports)
+    if coverage < minimum_coverage and fallback == "stop":
+        return None
+    if not known:
+        return None
+    groups: dict[str, list[float]] = {}
+    for index, report in enumerate(reports):
+        row = report.get("decoded", {})
+        if row.get("status") == "verified" and row.get("selected_utility") is not None:
+            groups.setdefault(report.get("parent_group_id", str(index)), []).append(
+                float(row["selected_utility"])
+            )
+    values = [sum(group) / len(group) for group in groups.values()]
+    mean = sum(values) / len(values)
+    variance = sum((v - mean) ** 2 for v in values) / max(1, len(values) - 1)
+    lower_bound = mean - uncertainty_z * math.sqrt(variance / len(values))
+    effort = sum(float(row.get("checks", 0)) for row in known) / len(known)
+    return (-coverage, -lower_bound, effort)
+
+
+def fidelity_comparison_losses(
+    prediction_a: Any,
+    prediction_b: Any,
+    comparison: Any,
+    *,
+    temperature: float = 1.0,
+    beta: float = 1.0,
+) -> dict[str, Any]:
+    """Validated weak semantic labels supervise complete plans; abstentions mask all."""
+    import torch.nn.functional as functional
+
+    if temperature <= 0 or beta <= 0:
+        raise ValueError("Positive fidelity loss scales required")
+    zero = (prediction_a + prediction_b) * 0
+    if not comparison.global_target_eligible:
+        return {"value": zero, "rank": zero, "tie": zero, "eligible": 0, "provenance": "llm_weak"}
+    difference = prediction_a - prediction_b
+    target = difference.new_tensor(comparison.overall_score_a - comparison.overall_score_b)
+    value = functional.smooth_l1_loss(difference, target, beta=beta)
+    ranking = (
+        functional.softplus((-1 if comparison.decision == "A" else 1) * difference / temperature)
+        if comparison.decision in {"A", "B"}
+        else zero
+    )
+    tie = (
+        functional.smooth_l1_loss(difference, difference.new_zeros(()), beta=beta)
+        if comparison.decision == "tie"
+        else zero
+    )
+    return {"value": value, "rank": ranking, "tie": tie, "eligible": 1, "provenance": "llm_weak"}
+
+
+def conditional_proposal_loss(
+    cache: TeacherCache, log_probability: Callable, *, temperature: float = 1.0
+) -> dict[str, Any]:
+    """Ordered complete-plan likelihood with frozen prefix per circuit invocation.
+
+    The callable consumes (object index, earlier choices, current choice). It
+    must return a normalized circuit log probability with immutable logits.
+    """
+    import torch
+
+    if temperature <= 0:
+        raise ValueError("Conditional proposal temperature must be positive")
+    labels = [row for row in cache.labels if row.usable]
+    if not labels:
+        raise ValueError("No usable conditional proposal target")
+    utilities = [(cast(float, row.benefit) - row.cost) / temperature for row in labels]
+    weights = [math.exp(value - max(utilities)) for value in utilities]
+    total = sum(weights)
+    terms, missing_mass = [], 0.0
+    for row, weight in zip(labels, weights):
+        probabilities = [
+            log_probability(i, row.assignment[:i], choice)
+            for i, choice in enumerate(row.assignment)
+        ]
+        log_joint = torch.stack(probabilities).sum()
+        if not bool(torch.isfinite(log_joint)):
+            missing_mass += weight / total
+        terms.append((weight / total, log_joint))
+    if missing_mass:
+        loss = sum(torch.where(torch.isfinite(value), value, 0.0) * 0 for _, value in terms)
+    else:
+        loss = -sum(weight * value for weight, value in terms)
+    return {
+        "loss": loss,
+        "missing_target_mass": missing_mass,
+        "status": "unreachable_target_excluded" if missing_mass else "supervised",
+        "target_kind": (
+            "exact_conditional_joint" if cache.complete else "sample_conditioned_conditional_joint"
+        ),
+        "eligible": 0 if missing_mass else len(labels),
+        "order": "canonical_inventory_object_order",
+    }

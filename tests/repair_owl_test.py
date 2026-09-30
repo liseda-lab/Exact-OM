@@ -363,3 +363,21 @@ def test_timeout_and_backend_unavailability_stay_unknown(monkeypatch):
     report = OwlVerifier().check_theory(snapshot)
     assert report.logical_status == "UNKNOWN"
     assert report.support.issues[0].startswith("backend_unavailable:")
+
+
+def test_auto_fallback_preserves_generator_public_signature(monkeypatch):
+    """A failed fast route cannot consume obligations before expressive fallback."""
+    a = cls("fallback-public-class")
+    snapshot = snapshot_from_axioms((owl.SubClassOf(a, owl.OWL_NOTHING),))
+    original = OwlVerifier._open
+
+    def fail_fast(self, theory):
+        if self.reasoner == "elk":
+            raise TimeoutError("force expressive fallback after signature consumption")
+        return original(self, theory)
+
+    monkeypatch.setattr(OwlVerifier, "_open", fail_fast)
+    report = OwlVerifier("auto").check_theory(snapshot, (item for item in (a,)))
+    assert report.logical_status == "VERIFIED_INFEASIBLE"
+    assert report.unsatisfiable_classes == (a.iri.value,)
+    assert report.support.reasoner == "hermit"

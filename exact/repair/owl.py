@@ -13,7 +13,7 @@ from dataclasses import asdict, dataclass, replace
 from functools import lru_cache
 from importlib import import_module
 from math import isfinite
-from typing import Any
+from typing import Any, Callable
 
 import pyowl_core as owl
 
@@ -195,7 +195,7 @@ class OwlVerifier:
         timeout_seconds: float | None = None,
         workers: int = 1,
     ) -> None:
-        if reasoner not in {"hermit", "elk"}:
+        if reasoner not in {"auto", "hermit", "elk"}:
             raise ValueError("repair requires the qualified 'hermit' or 'elk' backend")
         if timeout_seconds is not None and (not isfinite(timeout_seconds) or timeout_seconds <= 0):
             raise ValueError("timeout_seconds must be finite and positive")
@@ -280,6 +280,7 @@ class OwlVerifier:
         prohibited: Iterable[owl.AxiomNode] = (),
         activated: Iterable[owl.ClassExpression] = (),
         exceptions: Iterable[str | owl.Class] = (),
+        on_complete: Callable[[ObligationResult, SupportReport], None] | None = None,
     ) -> CheckReport:
         """Check consistency and every frozen policy query on one current theory.
 
@@ -288,6 +289,33 @@ class OwlVerifier:
         Only selected candidates supply ``activated`` antecedent expressions.
         """
         snapshot = owl.coerce_snapshot(snapshot)
+        monitored_classes = None if monitored_classes is None else tuple(monitored_classes)
+        required, prohibited = tuple(required), tuple(prohibited)
+        activated, exceptions = tuple(activated), tuple(exceptions)
+        if self.reasoner == "auto":
+            # Conservative whole-input/query capability gate, followed by each
+            # backend's strict compiler/profile validation and complete results.
+            routes = qualified_routes(snapshot, (*required, *prohibited), activated)
+            last = None
+            for route in routes:
+                last = OwlVerifier(
+                    route,
+                    backend=self.backend,
+                    timeout_seconds=self.timeout_seconds,
+                    workers=self.workers,
+                ).check_theory(
+                    snapshot,
+                    monitored_classes,
+                    required=required,
+                    prohibited=prohibited,
+                    activated=activated,
+                    exceptions=exceptions,
+                    on_complete=on_complete,
+                )
+                if last.logical_status != "UNKNOWN":
+                    return last
+            assert last is not None
+            return last
         monitored = named_classes(snapshot) if monitored_classes is None else monitored_classes
         exempt = {_class(value) for value in exceptions}
         classes = sorted(
@@ -362,6 +390,8 @@ class OwlVerifier:
                 except Exception as error:
                     result = replace(result, reason=_failure(error))
                 obligations.append(result)
+                if on_complete is not None and result.complete:
+                    on_complete(result, support)
             support = replace(support, diagnostics=tuple(sorted(reasoner.diagnostics().items())))
         except Exception as error:
             failure = _failure(error)
@@ -459,7 +489,10 @@ class OwlVerifier:
         evidence = tuple(
             (item.class_iri, side, report.theory_hash, item.query_id)
             for side, report in (("source", source_report), ("target", target_report))
-            if allow_source_exceptions and report.support.input_supported
+            if allow_source_exceptions
+            and report.support.input_supported
+            and report.obligations[0].complete
+            and report.obligations[0].verdict is True
             for item in report.obligations
             if item.kind == "class_satisfiability"
             and item.complete
@@ -475,3 +508,32 @@ class OwlVerifier:
             exceptions,
             evidence,
         )
+
+
+def qualified_routes(
+    snapshot: owl.OntologyView, queries: tuple[Any, ...] = (), expressions: tuple[Any, ...] = ()
+) -> tuple[str, ...]:
+    """Conservative EL route admission; unsupported constructs route expressively.
+
+    This whitelist is only an admission gate. Strict native compilation and
+    per-query complete-result checks remain necessary; it is not a profile proof.
+    Expressive input is never filtered to make an EL check succeed.
+    """
+    allowed = {
+        "IRI",
+        "Class",
+        "ObjectProperty",
+        "SubClassOf",
+        "EquivalentClasses",
+        "DisjointClasses",
+        "ObjectIntersectionOf",
+        "ObjectSomeValuesFrom",
+        "ObjectPropertyDomain",
+        "ObjectPropertyRange",
+        "Declaration",
+    }
+    nodes = (*snapshot.iter_axioms(), *queries, *expressions)
+    eligible = snapshot.is_complete and all(
+        type(node).__name__ in allowed for item in nodes for node in owl.walk(item)
+    )
+    return ("elk", "hermit") if eligible else ("hermit",)

@@ -1,0 +1,912 @@
+{
+  "schema": "exact-repair/backend-local-conformance/v3",
+  "scope": "Tiny actual native checks; per-input strict qualification is still required. This is not a whole-OWL completeness claim.",
+  "detector_scope": "Sound incomplete asserted-support Horn detector; named inclusions, conjunction, disjointness, existential witnesses, domain/range and universal restrictions. Unsupported input remains for final verification.",
+  "runtime_acceptance": "A complete import closure, strict complete compilation and every expected obligation completed are required for acceptance.",
+  "fixtures": [
+    {
+      "fixture": "named_el",
+      "axioms": [
+        "3d011e020505636c617373011401021175726e3a787232313a6d61747269783a41011e020505636c617373011401021175726e3a787232313a6d61747269783a420600"
+      ],
+      "admitted_routes": [
+        "elk",
+        "hermit"
+      ],
+      "report": {
+        "logical_status": "VERIFIED_FEASIBLE",
+        "verification_scope": "complete_supported_fragment",
+        "theory_hash": "d47c9d8a9e0b6d36aa6e80545dce658b8a052a8598bd12df09ad55f90419e0ce",
+        "obligations": [
+          {
+            "kind": "consistency",
+            "query_id": "consistency",
+            "verdict": true,
+            "expected": true,
+            "complete": true,
+            "reason": null,
+            "class_iri": null
+          },
+          {
+            "kind": "class_satisfiability",
+            "query_id": "afd1ce2bb1ab11461b30655f73073a6b5c6a28b4a2843a44b738773b04a6688e",
+            "verdict": true,
+            "expected": true,
+            "complete": true,
+            "reason": null,
+            "class_iri": "urn:xr21:matrix:A"
+          },
+          {
+            "kind": "class_satisfiability",
+            "query_id": "972ec0115adffe5a5f8b0137191ef47df7f7f139241587d092b363fa63c0a63d",
+            "verdict": true,
+            "expected": true,
+            "complete": true,
+            "reason": null,
+            "class_iri": "urn:xr21:matrix:B"
+          },
+          {
+            "kind": "required_entailment",
+            "query_id": "acd1d0e92d83dc227883e4aa3832d6cc60388c6a0293d1e3913067ab7ba23260",
+            "verdict": true,
+            "expected": true,
+            "complete": true,
+            "reason": null,
+            "class_iri": null
+          }
+        ],
+        "support": {
+          "reasoner": "elk",
+          "package_version": "0.2.1",
+          "backend": "rust",
+          "implementation_version": "0.2.1",
+          "input_supported": true,
+          "complete_imports": true,
+          "constructs": [
+            "Class",
+            "Declaration",
+            "IRI",
+            "SubClassOf"
+          ],
+          "query_families": [
+            "class_satisfiability",
+            "consistency",
+            "required_entailment"
+          ],
+          "issues": [],
+          "diagnostics": [
+            [
+              "base_flattening_bytes",
+              0
+            ],
+            [
+              "base_rule_preparations",
+              1
+            ],
+            [
+              "cached_class_queries",
+              0
+            ],
+            [
+              "cached_entailment_queries",
+              1
+            ],
+            [
+              "class_query_base_preparations",
+              0
+            ],
+            [
+              "class_query_cache_bytes",
+              4784
+            ],
+            [
+              "class_query_cache_evictions",
+              0
+            ],
+            [
+              "class_query_cache_hits",
+              0
+            ],
+            [
+              "class_query_cache_limit_bytes",
+              67108864
+            ],
+            [
+              "class_query_programs_prepared",
+              0
+            ],
+            [
+              "class_query_taxonomy_index_builds",
+              0
+            ],
+            [
+              "class_query_taxonomy_neighbor_visits",
+              0
+            ],
+            [
+              "class_query_taxonomy_traversals",
+              0
+            ],
+            [
+              "class_taxonomy_cached",
+              false
+            ],
+            [
+              "compiler_cache_schema_version",
+              1
+            ],
+            [
+              "compiler_digest",
+              "d9079c134c04daf64ae37bfff3c8e38bba81c318aeeeb34cf85933b385e6d743"
+            ],
+            [
+              "compiler_disjoint_groups_count",
+              0
+            ],
+            [
+              "compiler_entities_count",
+              6
+            ],
+            [
+              "compiler_equivalent_class_axioms_count",
+              0
+            ],
+            [
+              "compiler_expression_occurrences_count",
+              4
+            ],
+            [
+              "compiler_expressions_count",
+              4
+            ],
+            [
+              "compiler_feature_counts_count",
+              79
+            ],
+            [
+              "compiler_property_chains_count",
+              2
+            ],
+            [
+              "compiler_property_occurrences_count",
+              2
+            ],
+            [
+              "compiler_property_ranges_count",
+              0
+            ],
+            [
+              "compiler_source_fingerprint",
+              "a1a0c9bc808f29186c05c03321edd9c7328ff337486af261bcb821eac8bc5e05"
+            ],
+            [
+              "compiler_source_fingerprint_count",
+              1
+            ],
+            [
+              "compiler_subclass_axioms_count",
+              1
+            ],
+            [
+              "compiler_subproperty_axioms_count",
+              0
+            ],
+            [
+              "conclusion_candidates",
+              11
+            ],
+            [
+              "conclusions_inserted",
+              11
+            ],
+            [
+              "consumer_compile_seconds",
+              0.000535094877704978
+            ],
+            [
+              "context_count",
+              3
+            ],
+            [
+              "contexts_created",
+              3
+            ],
+            [
+              "duplicate_candidates",
+              0
+            ],
+            [
+              "effective_workers",
+              1
+            ],
+            [
+              "encoded_buffer_bytes",
+              366
+            ],
+            [
+              "encoded_buffer_count",
+              22
+            ],
+            [
+              "encoded_compiler_gil_released",
+              true
+            ],
+            [
+              "encoded_compiler_seconds",
+              0.000134215
+            ],
+            [
+              "encoded_detached_buffer_count",
+              22
+            ],
+            [
+              "encoded_indexed_buffer_count",
+              0
+            ],
+            [
+              "encoded_native_boundary_seconds",
+              0.000343832
+            ],
+            [
+              "encoded_posting_bytes",
+              0
+            ],
+            [
+              "encoded_private_ir_bytes",
+              0
+            ],
+            [
+              "encoded_referenced_view_count",
+              1
+            ],
+            [
+              "encoded_segment_count",
+              3
+            ],
+            [
+              "encoded_session_build_seconds",
+              4.0076e-05
+            ],
+            [
+              "encoded_staging_copy_bytes",
+              0
+            ],
+            [
+              "encoded_validation_seconds",
+              0.000169121
+            ],
+            [
+              "encoded_view_publication_seconds",
+              0.001822378020733595
+            ],
+            [
+              "encoded_zero_copy_buffers",
+              22
+            ],
+            [
+              "implementation_version",
+              "0.2.1"
+            ],
+            [
+              "inconsistent_ontology",
+              false
+            ],
+            [
+              "ingestion_path",
+              "encoded-native"
+            ],
+            [
+              "ir_schema_version",
+              1
+            ],
+            [
+              "materialized_scalar_rows",
+              0
+            ],
+            [
+              "native_abi_version",
+              "abi3-py310"
+            ],
+            [
+              "object_property_taxonomy_cached",
+              false
+            ],
+            [
+              "parser_calls",
+              0
+            ],
+            [
+              "per_row_ffi_calls",
+              0
+            ],
+            [
+              "product_candidates",
+              8
+            ],
+            [
+              "realization_cached",
+              false
+            ],
+            [
+              "resolver_calls",
+              0
+            ],
+            [
+              "rule_dispatches",
+              11
+            ],
+            [
+              "scalar_axiom_materializations",
+              0
+            ],
+            [
+              "scalar_term_materializations",
+              0
+            ],
+            [
+              "stage",
+              "consistency"
+            ],
+            [
+              "structural_copy_bytes",
+              0
+            ],
+            [
+              "wire_decoder_calls",
+              0
+            ],
+            [
+              "wire_encoder_calls",
+              0
+            ]
+          ],
+          "query_support": [
+            [
+              "consistency",
+              "consistency",
+              true
+            ],
+            [
+              "class_satisfiability",
+              "afd1ce2bb1ab11461b30655f73073a6b5c6a28b4a2843a44b738773b04a6688e",
+              true
+            ],
+            [
+              "class_satisfiability",
+              "972ec0115adffe5a5f8b0137191ef47df7f7f139241587d092b363fa63c0a63d",
+              true
+            ],
+            [
+              "required_entailment",
+              "acd1d0e92d83dc227883e4aa3832d6cc60388c6a0293d1e3913067ab7ba23260",
+              true
+            ]
+          ]
+        },
+        "schema_version": "exact-repair/owl-check/v2"
+      }
+    },
+    {
+      "fixture": "existential_range_conflict",
+      "axioms": [
+        "3d011e020505636c617373011401021175726e3a787232313a6d61747269783a41014b22012802050f6f626a6563745f70726f7065727479011401021175726e3a787232313a6d61747269783a72011e020505636c617373011401021175726e3a787232313a6d61747269783a420600",
+        "4b012802050f6f626a6563745f70726f7065727479011401021175726e3a787232313a6d61747269783a72012120011e020505636c617373011401021175726e3a787232313a6d61747269783a420600"
+      ],
+      "admitted_routes": [
+        "hermit"
+      ],
+      "report": {
+        "logical_status": "VERIFIED_INFEASIBLE",
+        "verification_scope": "complete_supported_fragment",
+        "theory_hash": "914d81b29a4e379ef801755ecf2cfe79c8c60c955737892153276098723c7d3c",
+        "obligations": [
+          {
+            "kind": "consistency",
+            "query_id": "consistency",
+            "verdict": true,
+            "expected": true,
+            "complete": true,
+            "reason": null,
+            "class_iri": null
+          },
+          {
+            "kind": "class_satisfiability",
+            "query_id": "afd1ce2bb1ab11461b30655f73073a6b5c6a28b4a2843a44b738773b04a6688e",
+            "verdict": false,
+            "expected": true,
+            "complete": true,
+            "reason": null,
+            "class_iri": "urn:xr21:matrix:A"
+          },
+          {
+            "kind": "class_satisfiability",
+            "query_id": "972ec0115adffe5a5f8b0137191ef47df7f7f139241587d092b363fa63c0a63d",
+            "verdict": true,
+            "expected": true,
+            "complete": true,
+            "reason": null,
+            "class_iri": "urn:xr21:matrix:B"
+          }
+        ],
+        "support": {
+          "reasoner": "hermit",
+          "package_version": "0.2.1",
+          "backend": "native",
+          "implementation_version": "0.2.1",
+          "input_supported": true,
+          "complete_imports": true,
+          "constructs": [
+            "Class",
+            "Declaration",
+            "IRI",
+            "ObjectComplementOf",
+            "ObjectProperty",
+            "ObjectPropertyRange",
+            "ObjectSomeValuesFrom",
+            "SubClassOf"
+          ],
+          "query_families": [
+            "class_satisfiability",
+            "consistency"
+          ],
+          "issues": [],
+          "diagnostics": [
+            [
+              "base_flattening_bytes",
+              0
+            ],
+            [
+              "compiler_cache_schema_version",
+              1
+            ],
+            [
+              "compiler_digest",
+              "751566911c877abaa60bd49f14ec35bba37e1a7d272170825487f05bded7fb46"
+            ],
+            [
+              "consumer_compile_seconds",
+              0.00559395388700068
+            ],
+            [
+              "encoded_buffer_bytes",
+              655
+            ],
+            [
+              "encoded_buffer_count",
+              22
+            ],
+            [
+              "encoded_compiler_gil_released",
+              true
+            ],
+            [
+              "encoded_detached_buffer_count",
+              22
+            ],
+            [
+              "encoded_indexed_buffer_count",
+              0
+            ],
+            [
+              "encoded_posting_bytes",
+              0
+            ],
+            [
+              "encoded_private_ir_bytes",
+              0
+            ],
+            [
+              "encoded_referenced_view_count",
+              1
+            ],
+            [
+              "encoded_segment_count",
+              3
+            ],
+            [
+              "encoded_staging_copy_bytes",
+              0
+            ],
+            [
+              "encoded_zero_copy_buffers",
+              22
+            ],
+            [
+              "implementation_version",
+              "0.2.1"
+            ],
+            [
+              "ingestion_path",
+              "encoded-native"
+            ],
+            [
+              "ir_schema_version",
+              1
+            ],
+            [
+              "materialized_scalar_rows",
+              0
+            ],
+            [
+              "native_abi_version",
+              1
+            ],
+            [
+              "native_core_receipt_validated",
+              false
+            ],
+            [
+              "native_metadata_domain_copies",
+              0
+            ],
+            [
+              "native_metadata_validation",
+              true
+            ],
+            [
+              "native_pipeline_required",
+              false
+            ],
+            [
+              "native_query_delta_loads",
+              4
+            ],
+            [
+              "native_query_fallback_rebuilds",
+              0
+            ],
+            [
+              "native_query_full_program_loads",
+              0
+            ],
+            [
+              "native_query_local_rule_plans",
+              4
+            ],
+            [
+              "native_query_peak_local_records",
+              4
+            ],
+            [
+              "native_result_publications",
+              1
+            ],
+            [
+              "native_result_validation",
+              true
+            ],
+            [
+              "native_symbol_index",
+              true
+            ],
+            [
+              "native_symbol_index_bytes",
+              2825
+            ],
+            [
+              "parser_calls",
+              0
+            ],
+            [
+              "per_row_ffi_calls",
+              0
+            ],
+            [
+              "python_symbol_validation_rows",
+              0
+            ],
+            [
+              "resolver_calls",
+              0
+            ],
+            [
+              "scalar_axiom_materializations",
+              0
+            ],
+            [
+              "scalar_term_materializations",
+              0
+            ],
+            [
+              "structural_copy_bytes",
+              0
+            ],
+            [
+              "wire_decoder_calls",
+              0
+            ],
+            [
+              "wire_encoder_calls",
+              0
+            ]
+          ],
+          "query_support": [
+            [
+              "consistency",
+              "consistency",
+              true
+            ],
+            [
+              "class_satisfiability",
+              "afd1ce2bb1ab11461b30655f73073a6b5c6a28b4a2843a44b738773b04a6688e",
+              true
+            ],
+            [
+              "class_satisfiability",
+              "972ec0115adffe5a5f8b0137191ef47df7f7f139241587d092b363fa63c0a63d",
+              true
+            ]
+          ]
+        },
+        "schema_version": "exact-repair/owl-check/v2"
+      }
+    },
+    {
+      "fixture": "expressive_universal",
+      "axioms": [
+        "3d011e020505636c617373011401021175726e3a787232313a6d61747269783a41014b23012802050f6f626a6563745f70726f7065727479011401021175726e3a787232313a6d61747269783a72011e020505636c617373011401021175726e3a787232313a6d61747269783a420600"
+      ],
+      "admitted_routes": [
+        "hermit"
+      ],
+      "report": {
+        "logical_status": "VERIFIED_FEASIBLE",
+        "verification_scope": "complete_supported_fragment",
+        "theory_hash": "1092fb003f67ab28ffc2608ee99095bf39d847c5f03dfa8ea7cfeb81d62c7315",
+        "obligations": [
+          {
+            "kind": "consistency",
+            "query_id": "consistency",
+            "verdict": true,
+            "expected": true,
+            "complete": true,
+            "reason": null,
+            "class_iri": null
+          },
+          {
+            "kind": "class_satisfiability",
+            "query_id": "afd1ce2bb1ab11461b30655f73073a6b5c6a28b4a2843a44b738773b04a6688e",
+            "verdict": true,
+            "expected": true,
+            "complete": true,
+            "reason": null,
+            "class_iri": "urn:xr21:matrix:A"
+          },
+          {
+            "kind": "class_satisfiability",
+            "query_id": "972ec0115adffe5a5f8b0137191ef47df7f7f139241587d092b363fa63c0a63d",
+            "verdict": true,
+            "expected": true,
+            "complete": true,
+            "reason": null,
+            "class_iri": "urn:xr21:matrix:B"
+          },
+          {
+            "kind": "active_satisfiability",
+            "query_id": "aafab0ddae6178914c1e09c04447e94d4c3511ce209afc53b1dc67f6e9d6cbb4",
+            "verdict": true,
+            "expected": true,
+            "complete": true,
+            "reason": null,
+            "class_iri": null
+          }
+        ],
+        "support": {
+          "reasoner": "hermit",
+          "package_version": "0.2.1",
+          "backend": "native",
+          "implementation_version": "0.2.1",
+          "input_supported": true,
+          "complete_imports": true,
+          "constructs": [
+            "Class",
+            "Declaration",
+            "IRI",
+            "ObjectAllValuesFrom",
+            "ObjectProperty",
+            "SubClassOf"
+          ],
+          "query_families": [
+            "active_satisfiability",
+            "class_satisfiability",
+            "consistency"
+          ],
+          "issues": [],
+          "diagnostics": [
+            [
+              "base_flattening_bytes",
+              0
+            ],
+            [
+              "compiler_cache_schema_version",
+              1
+            ],
+            [
+              "compiler_digest",
+              "35ede8b3191658ac5be180e2e28f54123021c984c8857e29ad8cb1b7655ee2fa"
+            ],
+            [
+              "consumer_compile_seconds",
+              0.00273752398788929
+            ],
+            [
+              "encoded_buffer_bytes",
+              562
+            ],
+            [
+              "encoded_buffer_count",
+              22
+            ],
+            [
+              "encoded_compiler_gil_released",
+              true
+            ],
+            [
+              "encoded_detached_buffer_count",
+              22
+            ],
+            [
+              "encoded_indexed_buffer_count",
+              0
+            ],
+            [
+              "encoded_posting_bytes",
+              0
+            ],
+            [
+              "encoded_private_ir_bytes",
+              0
+            ],
+            [
+              "encoded_referenced_view_count",
+              1
+            ],
+            [
+              "encoded_segment_count",
+              3
+            ],
+            [
+              "encoded_staging_copy_bytes",
+              0
+            ],
+            [
+              "encoded_zero_copy_buffers",
+              22
+            ],
+            [
+              "implementation_version",
+              "0.2.1"
+            ],
+            [
+              "ingestion_path",
+              "encoded-native"
+            ],
+            [
+              "ir_schema_version",
+              1
+            ],
+            [
+              "materialized_scalar_rows",
+              0
+            ],
+            [
+              "native_abi_version",
+              1
+            ],
+            [
+              "native_core_receipt_validated",
+              false
+            ],
+            [
+              "native_metadata_domain_copies",
+              0
+            ],
+            [
+              "native_metadata_validation",
+              true
+            ],
+            [
+              "native_pipeline_required",
+              false
+            ],
+            [
+              "native_query_delta_loads",
+              5
+            ],
+            [
+              "native_query_fallback_rebuilds",
+              0
+            ],
+            [
+              "native_query_full_program_loads",
+              0
+            ],
+            [
+              "native_query_local_rule_plans",
+              8
+            ],
+            [
+              "native_query_peak_local_records",
+              6
+            ],
+            [
+              "native_result_publications",
+              1
+            ],
+            [
+              "native_result_validation",
+              true
+            ],
+            [
+              "native_symbol_index",
+              true
+            ],
+            [
+              "native_symbol_index_bytes",
+              2825
+            ],
+            [
+              "parser_calls",
+              0
+            ],
+            [
+              "per_row_ffi_calls",
+              0
+            ],
+            [
+              "python_symbol_validation_rows",
+              0
+            ],
+            [
+              "resolver_calls",
+              0
+            ],
+            [
+              "scalar_axiom_materializations",
+              0
+            ],
+            [
+              "scalar_term_materializations",
+              0
+            ],
+            [
+              "structural_copy_bytes",
+              0
+            ],
+            [
+              "wire_decoder_calls",
+              0
+            ],
+            [
+              "wire_encoder_calls",
+              0
+            ]
+          ],
+          "query_support": [
+            [
+              "consistency",
+              "consistency",
+              true
+            ],
+            [
+              "class_satisfiability",
+              "afd1ce2bb1ab11461b30655f73073a6b5c6a28b4a2843a44b738773b04a6688e",
+              true
+            ],
+            [
+              "class_satisfiability",
+              "972ec0115adffe5a5f8b0137191ef47df7f7f139241587d092b363fa63c0a63d",
+              true
+            ],
+            [
+              "active_satisfiability",
+              "aafab0ddae6178914c1e09c04447e94d4c3511ce209afc53b1dc67f6e9d6cbb4",
+              true
+            ]
+          ]
+        },
+        "schema_version": "exact-repair/owl-check/v2"
+      }
+    }
+  ]
+}

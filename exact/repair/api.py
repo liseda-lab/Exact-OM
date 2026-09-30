@@ -189,7 +189,7 @@ def prepare_repair(
 
     from exact.io.writers._frames import canonical_frame
 
-    from .candidates import deduplicate_candidates, mapping_candidates
+    from .candidates import mapping_candidates
 
     source, target = owl.coerce_snapshot(source), owl.coerce_snapshot(target)
     occurrences = ontology_occurrences(source, target)
@@ -235,7 +235,6 @@ def prepare_repair(
                 )
             )
     objects = []
-    object_relations = {}
     features: dict[str, Any] = {}
     entities = {
         "class": owl.Class,
@@ -278,7 +277,6 @@ def prepare_repair(
             expressions=expressions,
             endpoint_alternatives=(endpoint_alternatives or {}).get(object_id, ()),
         )
-        object_relations[object_id] = relation
         row["object_id"] = object_id
         keep = next(c for c in candidates if "keep" in c.action_tags)
         objects.append(
@@ -359,35 +357,18 @@ def prepare_repair(
         from .retrieval import retrieve_vocabulary
 
         retrieved = retrieve_vocabulary(problem, config=retrieval_config)
-        augmented = []
-        for obj in problem.objects:
-            alternatives = retrieved.for_object(obj.object_id).endpoint_alternatives
-            if obj.kind == "mapping" and alternatives:
-                candidates = mapping_candidates(
-                    obj.object_id,
-                    obj.source_entity,
-                    obj.target_entity,
-                    object_relations[obj.object_id],
-                    eligible=obj.eligible,
-                    locked=obj.locked,
-                    endpoint_alternatives=alternatives,
-                    enabled_actions=("keep", "replace_endpoint"),
-                )
-                augmented.append(
-                    dataclasses.replace(
-                        obj, candidates=deduplicate_candidates((*obj.candidates, *candidates))
-                    )
-                )
-            else:
-                augmented.append(obj)
+        from .candidates import materialize_retrieved_endpoints
+
+        problem = materialize_retrieved_endpoints(problem, retrieved)
         problem = dataclasses.replace(
             problem,
-            objects=tuple(augmented),
             evidence=tuple(
                 sorted({**dict(problem.evidence), "retrieval": retrieved.capture()}.items())
             ),
         )
-    return problem
+    from .records import promote_input_v3
+
+    return promote_input_v3(problem)
 
 
 def matching_run_evidence(run_dir: str | Path) -> tuple[Any, dict[str, Any]]:
@@ -443,7 +424,13 @@ def matching_run_evidence(run_dir: str | Path) -> tuple[Any, dict[str, Any]]:
 
 
 def repair_alignment(
-    source: Any, target: Any, mappings: Any, *, objective: ObjectiveV2 | None = None, **options: Any
+    source: Any,
+    target: Any,
+    mappings: Any,
+    *,
+    objective: ObjectiveV2 | None = None,
+    search_options: Mapping[str, Any] | None = None,
+    **options: Any,
 ) -> RepairResultV2:
     """Run standalone, or immediately after any matcher using its in-memory output."""
     from .kernel import repair
@@ -459,7 +446,7 @@ def repair_alignment(
             ("human_authored_ontology_edit", 2.0),
         ),
     )
-    return repair(problem, objective)
+    return repair(problem, objective, **dict(search_options or {}))
 
 
 def write_artifact(path: str | Path, payload: Mapping[str, Any]) -> None:

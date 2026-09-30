@@ -1,0 +1,291 @@
+{
+  "schema": "exact-repair/requirement-coverage/v3",
+  "scope": "Implementation-to-local-test map for XR-2.1. The final validation record binds source hashes to observed test outcomes; local conformance does not claim new research performance.",
+  "requirements": [
+    {
+      "requirement": "MIG-01",
+      "implementation": [
+        "exact/repair/graph.py",
+        "exact/repair/pipeline.py",
+        "tools/repair/train.py"
+      ],
+      "tests": [
+        "tests/repair_learning_v3_test.py::test_shared_pair_selector_accounts_explanation_candidate_links_and_factor_caps"
+      ],
+      "behavior": "Shared deterministic selector records graph/support/prospective links and degree/pair/factor truncation."
+    },
+    {
+      "requirement": "MIG-02",
+      "implementation": [
+        "exact/repair/candidates.py",
+        "exact/repair/pipeline.py"
+      ],
+      "tests": [
+        "tests/repair_generation_v3_test.py::test_final_bundle_removal_survives_every_producer",
+        "tests/repair_generation_v3_test.py::test_vocabulary_grammar_controls_and_progressive_epochs"
+      ],
+      "behavior": "Evaluator-only final filter after all producers; separate missing-vocabulary/grammar intervention."
+    },
+    {
+      "requirement": "MIG-03",
+      "implementation": [
+        "exact/repair/api.py",
+        "exact/repair/candidates.py",
+        "exact/repair/pipeline.py"
+      ],
+      "tests": [
+        "tests/repair_generation_v3_test.py::test_direct_and_prepared_retrieved_endpoints_materialize_same_ids"
+      ],
+      "behavior": "Shared typed endpoint materialization."
+    },
+    {
+      "requirement": "MIG-04",
+      "implementation": [
+        "exact/repair/circuit.py"
+      ],
+      "tests": [
+        "tests/repair_generation_v3_test.py::test_owned_collection_and_vtrees_keep_identical_support"
+      ],
+      "behavior": "Protected roots and separate allocation/liveness/reachability resource accounting; compare declared vtrees."
+    },
+    {
+      "requirement": "MIG-05",
+      "implementation": [
+        "exact/repair/compilation.py"
+      ],
+      "tests": [
+        "tests/repair_generation_v3_test.py::test_persistent_artifact_cross_process_and_corruption"
+      ],
+      "behavior": "Atomic immutable compiler artifacts, semantic identities and integrity rejection."
+    },
+    {
+      "requirement": "MIG-06",
+      "implementation": [
+        "exact/repair/grammar.py",
+        "exact/repair/circuit.py"
+      ],
+      "tests": [
+        "tests/repair_generation_v3_test.py::test_family_reduction_preserves_mass_aliases_and_gradients",
+        "tests/repair_generation_v3_test.py::test_immutable_range_disjointness_filters_active_expressions_only"
+      ],
+      "behavior": "Family factoring, exact branch mass and immutable proof-conditioned constraints."
+    },
+    {
+      "requirement": "MIG-07",
+      "implementation": [
+        "exact/repair/learning.py",
+        "tools/repair/train.py"
+      ],
+      "tests": [
+        "tests/repair_learning_v3_test.py::test_sample_proposal_mass_masks_are_explicit"
+      ],
+      "behavior": "Exact versus explicitly sample-conditioned targets and visible missing mass."
+    },
+    {
+      "requirement": "MIG-08",
+      "implementation": [
+        "exact/repair/learning.py",
+        "tools/repair/train.py"
+      ],
+      "tests": [
+        "tests/repair_learning_v3_test.py::test_generated_checkpoint_ignores_better_cached_regret_and_preserves_denominator",
+        "tests/repair_learning_v3_test.py::test_v3_training_selects_generated_repairs_and_saves_resumable_acquisition"
+      ],
+      "behavior": "Generated-pool verified development criterion and declared missing-label fallback."
+    },
+    {
+      "requirement": "MIG-09",
+      "implementation": [
+        "exact/repair/model.py",
+        "exact/repair/learning.py"
+      ],
+      "tests": [
+        "tests/repair_learning_v3_test.py::test_quartet_masks_and_higher_order_risk_do_not_make_pair_negatives",
+        "tests/repair_learning_v3_test.py::test_v3_model_gauge_risk_and_frozen_prefix_are_separate"
+      ],
+      "behavior": "Anchored value factors, feasible quartets, separate whole-plan risk/hyperedges."
+    },
+    {
+      "requirement": "MIG-10",
+      "implementation": [
+        "exact/repair/kernel.py",
+        "exact/repair/maxsat.py",
+        "exact/repair/detection.py"
+      ],
+      "tests": [
+        "tests/repair_v3_kernel_test.py::test_parent_passes_duplicate_emitter_proof_to_master",
+        "tests/repair_v3_kernel_test.py::test_fixed_only_conditional_support_preserves_inactive_plan"
+      ],
+      "behavior": "Revalidated asserted supports become presence cuts with correct emitters/activation; required-query failures only exclude assignment."
+    },
+    {
+      "requirement": "MIG-11",
+      "implementation": [
+        "exact/repair/kernel.py",
+        "exact/repair/study.py"
+      ],
+      "tests": [
+        "tests/repair_v3_study_test.py::test_four_baselines_are_reused_by_greedy_exact_and_no_search",
+        "tests/repair_v3_study_test.py::test_campaign_baseline_is_charged_once_and_resume_uses_same_record",
+        "tests/repair_study_test.py"
+      ],
+      "behavior": "Shared four-theory diagnosis and explicitly separated common preprocessing accounting."
+    },
+    {
+      "requirement": "MIG-12",
+      "implementation": [
+        "exact/repair/owl.py",
+        "exact/repair/detection.py"
+      ],
+      "tests": [
+        "tests/repair_owl_test.py",
+        "tests/repair_v3_kernel_test.py::test_domain_range_and_nested_witness_proofs_have_asserted_premises"
+      ],
+      "behavior": "Capability-first conservative routing, qualified strict backends, source consistency before exceptions."
+    },
+    {
+      "requirement": "MIG-13",
+      "implementation": [
+        "exact/repair/workers.py",
+        "exact/repair/kernel.py"
+      ],
+      "tests": [
+        "tests/repair_v3_kernel_test.py::test_streamed_failure_survives_later_timeout_and_is_durable"
+      ],
+      "behavior": "Parent-acknowledged completed query events preserve proved failures after later worker loss."
+    },
+    {
+      "requirement": "MIG-14",
+      "implementation": [
+        "exact/repair/records.py",
+        "exact/repair/api.py"
+      ],
+      "tests": [
+        "tests/repair_v3_kernel_test.py::test_v3_signature_includes_new_candidate_and_deleted_original_and_read_is_strict"
+      ],
+      "behavior": "Complete public signature over original and candidate classes before freezing; private activations remain separate."
+    },
+    {
+      "requirement": "MIG-15",
+      "implementation": [
+        "exact/repair/workers.py",
+        "exact/repair/kernel.py",
+        "exact/repair/checkpointing.py",
+        "tools/repair/train.py"
+      ],
+      "tests": [
+        "tests/repair_v3_kernel_test.py::test_startup_serialization_and_completed_events_are_supervised",
+        "tests/repair_v3_kernel_test.py::test_output_cannot_run_user_deserialization_in_coordinator",
+        "tests/repair_v3_resources_test.py",
+        "tests/repair_training_v3_cli_test.py"
+      ],
+      "behavior": "Independent startup/serialization supervision, constrained return decoding and durable operation reservations. CPU reservations and allocated-GPU campaign accounting persist across replacement workers."
+    },
+    {
+      "requirement": "EXT-01",
+      "implementation": [
+        "exact/repair/detection.py"
+      ],
+      "tests": [
+        "tests/repair_v3_kernel_test.py::test_separate_existentials_do_not_invent_witness_equality",
+        "tests/repair_v3_kernel_test.py::test_domain_range_and_nested_witness_proofs_have_asserted_premises"
+      ],
+      "behavior": "Sound incomplete asserted-support detector; absence of detection is never acceptance."
+    },
+    {
+      "requirement": "EXT-02",
+      "implementation": [
+        "exact/repair/kernel.py"
+      ],
+      "tests": [
+        "tests/repair_v3_kernel_test.py::test_risk_keeps_higher_untested_plan_in_upper_bound",
+        "tests/repair_v3_kernel_test.py::test_first_feasible_full_master_optimum_certifies_without_exhaustion",
+        "tests/repair_v3_kernel_test.py::test_restart_keeps_costs_bounds_and_pending_and_rejects_changed_epoch"
+      ],
+      "behavior": "Bounded utility shortlist and risk scheduling retain pending/untested bounds and restart costs."
+    },
+    {
+      "requirement": "EXT-03",
+      "implementation": [
+        "exact/repair/learning.py",
+        "tools/repair/train.py"
+      ],
+      "tests": [
+        "tests/repair_learning_v3_test.py::test_sample_collection_retains_unknowns_split_and_new_inventory_identity",
+        "tests/repair_learning_v3_test.py::test_v3_training_selects_generated_repairs_and_saves_resumable_acquisition"
+      ],
+      "behavior": "Frozen supervised sampled acquisition with strata, identities, unknown masks and checkpointed state."
+    },
+    {
+      "requirement": "EXT-04",
+      "implementation": [
+        "exact/repair/model.py",
+        "exact/repair/pipeline.py"
+      ],
+      "tests": [
+        "tests/repair_learning_v3_test.py::test_v3_model_gauge_risk_and_frozen_prefix_are_separate"
+      ],
+      "behavior": "Optional selected-other-action proposal context; final inventory rescored before selection."
+    },
+    {
+      "requirement": "EXT-05",
+      "implementation": [
+        "exact/repair/semantic_fidelity.py",
+        "exact/repair/learning.py"
+      ],
+      "tests": [
+        "tests/repair_semantic_fidelity_test.py",
+        "tests/repair_semantic_fidelity_test.py::test_verified_plan_builder_binds_actual_complete_content_and_query_masks"
+      ],
+      "behavior": "Offline grounded weak semantic comparisons, fixed applicability, tie/abstention, blinding and independent roles."
+    },
+    {
+      "requirement": "EXT-06",
+      "implementation": [
+        "tools/repair/corpus.py"
+      ],
+      "tests": [
+        "tests/repair_learning_v3_test.py::test_conflict_families_have_actual_three_way_supports_and_coherent_cycle_control"
+      ],
+      "behavior": "Explicit interacting conflict witnesses and coherent incidence-cycle controls."
+    },
+    {
+      "requirement": "EXT-07",
+      "implementation": [
+        "exact/repair/records.py",
+        "exact/repair/protocol.py"
+      ],
+      "tests": [
+        "tests/repair_protocol_v3_test.py",
+        "tests/repair_v3_kernel_test.py::test_v3_signature_includes_new_candidate_and_deleted_original_and_read_is_strict",
+        "tests/repair_generation_v3_test.py"
+      ],
+      "behavior": "New v3 records/protocol identities, strict loader and explicit training projection; v2 historical inputs retained."
+    },
+    {
+      "requirement": "EXT-08",
+      "implementation": [
+        "exact/repair/semantic_fidelity.py"
+      ],
+      "tests": [
+        "tests/repair_semantic_fidelity_test.py",
+        "tests/openrouter_ledger_test.py"
+      ],
+      "behavior": "Existing OpenRouter runtime/ledger reused with explicit roles, bounded reservations, strict parsing and replay."
+    }
+  ],
+  "research_gates": {
+    "fresh_confirmatory_parents": "required_before_confirmatory_experiment",
+    "development_generation_quality_report": "not_a_research_run_in_this_implementation",
+    "LLM_calibration_and_independent_evaluation": "not_run",
+    "production_matcher_input": "deferred_by_user",
+    "historical_experiment_resume": "not_authorized_by_this_implementation_task"
+  },
+  "review_notes": [
+    "Worker input serialization and output constructor boundaries reviewed; durable retries claimed before dispatch.",
+    "Presence cuts are proof-supported and active-expression guarded; source/readout risk cannot create cuts.",
+    "Resume resets scalar-only solver bounds conservatively and retains elapsed costs and unresolved frontier."
+  ],
+  "backend_evidence": "specs/exact-repair/implementation/xr21-backend-conformance.json",
+  "final_validation": "specs/exact-repair/implementation/xr21-validation.json"
+}
