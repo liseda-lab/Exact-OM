@@ -77,7 +77,12 @@ invoke gpt-6-astra with xhigh reasoning only for repair/planning or email delive
 No daily repair ceiling applies. After two unsuccessful attempts at the same cause,
 request human intervention instead of retrying indefinitely.
 
-Persist failure, approval-needed, escalation and verified-recovery alerts in an outbox.
+Keep failure detection, automatic repair progress and recovery in local receipts.
+Email only when human action is required: a decision, approval, resource change, or
+exhausted same-cause repair attempts. Apply this filter to both newly recorded events
+and undelivered outbox messages; preserve sent and uncertain delivery evidence.
+Transient supervisor check errors stay local; the same error persisting for at least
+three checks and fifteen minutes requires a human check and produces one deduplicated alert.
 The separate email worker uses the reviewed ChatGPT/Codex Gmail connection and requires
 an actual send receipt. Safe failures retry with bounded backoff while supervision and
 repair continue. Uncertain delivery becomes an actionable reconciliation incident rather

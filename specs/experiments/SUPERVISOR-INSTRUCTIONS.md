@@ -77,8 +77,11 @@ as a blocker when no allowed approach can complete the action.
 
 Check the supervisor's `PAUSE` and `STOP` files and applicable experiment STOP files before
 mutations/submissions. Never clear a user's pause/STOP or resume an intentional interruption.
-Write the report and handoff locally. The supervisor queues detection, approval-needed and verified-recovery alerts independently
-of repair through its durable outbox. Do not send additional external messages from a repair agent.
+Write the report and handoff locally. Email is reserved for required human decisions,
+approval, unavailable resources, or exhausted same-cause repairs. Detection, automatic
+repair progress and recovery stay in local receipts; they do not generate emails.
+State the exact required action in a needs_user result. The supervisor handles its durable
+outbox independently. Do not send additional external messages from a repair agent.
 
 Reviewed `pending_batches[].launch` descriptors are submitted automatically by the 15-second
 queue poll after dependencies and capacity are ready; never launch these manually or invoke a
