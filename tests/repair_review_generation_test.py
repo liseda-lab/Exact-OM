@@ -232,7 +232,8 @@ print(json.dumps(dict(circuit.telemetry)))
     assert second["cold_receipt"]["limits"]["seconds"] == 5
     assert second["admission_limits"]["seconds"] == 8
     assert first["cold_receipt"]["measurements"]["minimization_seconds"] is None
-    assert first["cold_receipt"]["measurements"]["peak_manager_allocated_nodes"] is None
+    measurements = first["cold_receipt"]["measurements"]
+    assert measurements["peak_manager_allocated_nodes"] >= measurements["manager_allocated_nodes"]
     assert {row["phase"] for row in first["phases"]} >= {
         "native_compile",
         "dag_serialization",

@@ -1258,6 +1258,87 @@ def compact_verification_report(report: Any) -> Any:
     return CompactVerificationReportV3(**values)
 
 
+def compose_verification_report(
+    report: VerificationReportV3,
+    base_expected: tuple[str, ...],
+    additions: tuple[ObligationV2, ...],
+    *,
+    source_exception_proof_hashes: tuple[str, ...],
+) -> VerificationReportV3:
+    """Extend exact coverage without promoting incomplete base evidence.
+
+    The caller supplies independently reconstructed base queries and qualified
+    source proof identities. Compact reports retain counts and the union hash;
+    they do not expand their bounded inline evidence into a full query list.
+    """
+    extra_names = tuple(q.name for q in additions)
+    expected = base_expected + extra_names
+    unique = len(set(expected)) == len(expected)
+    support = dict(report.support)
+    if "coverage_composition" in support:
+        identity_matches = (
+            support["coverage_composition"] == "coverage-composition/v1"
+            and tuple(support.get("source_exception_proof_hashes", ()))
+            == source_exception_proof_hashes
+            and support.get("source_exception_checks_hash") == canonical_hash(additions)
+        )
+        coverage_matches = (
+            report.exact_coverage
+            and report.coverage_count == len(expected)
+            and report.coverage_hash == canonical_hash(tuple(sorted(expected)))
+            if isinstance(report, CompactVerificationReportV3)
+            else (
+                len(report.expected_obligations) == len(expected)
+                and set(report.expected_obligations) == set(expected)
+                and tuple(q for q in report.obligations if q.name in extra_names) == additions
+            )
+        )
+        if identity_matches and unique and coverage_matches:
+            return report
+        return dataclasses.replace(report, verdict="UNKNOWN", scope="partial_detection")
+    support.update(
+        coverage_composition="coverage-composition/v1",
+        source_exception_proof_hashes=source_exception_proof_hashes,
+        source_exception_checks_hash=canonical_hash(additions),
+    )
+    if isinstance(report, CompactVerificationReportV3):
+        exact = (
+            report.exact_coverage
+            and report.coverage_count == len(base_expected)
+            and report.coverage_hash == canonical_hash(tuple(sorted(base_expected)))
+            and unique
+        )
+        passed = sum(q.complete and q.verdict == "pass" for q in additions)
+        failed = sum(q.complete and q.verdict == "fail" for q in additions)
+        return dataclasses.replace(
+            report,
+            obligations=tuple(q for q in additions + report.obligations if q.verdict != "pass")[
+                :32
+            ],
+            expected_obligations=(),
+            coverage_hash=canonical_hash(tuple(sorted(expected))),
+            coverage_count=report.coverage_count + len(additions),
+            passed_count=report.passed_count + passed,
+            failed_count=report.failed_count + failed,
+            unknown_count=report.unknown_count + len(additions) - passed - failed,
+            exact_coverage=exact,
+            support=tuple(sorted(support.items())),
+        )
+    exact = (
+        len(report.expected_obligations) == len(base_expected)
+        and set(report.expected_obligations) == set(base_expected)
+        and unique
+    )
+    return dataclasses.replace(
+        report,
+        obligations=additions + report.obligations,
+        expected_obligations=extra_names + report.expected_obligations,
+        verdict=report.verdict if exact else "UNKNOWN",
+        scope=report.scope if exact else "partial_detection",
+        support=tuple(sorted(support.items())),
+    )
+
+
 @dataclasses.dataclass(frozen=True)
 class RecoverySearchLedgerV3(SearchLedgerV3):
     """Corrective recovery identity retaining exception proofs and event journals."""

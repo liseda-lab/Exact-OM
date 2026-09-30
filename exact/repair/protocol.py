@@ -24,14 +24,14 @@ class StrictSection(BaseModel):
 
 
 class Identity(StrictSection):
-    implementation_revision: Literal["exact-repair/review-corrections/v1"]
+    implementation_revision: Literal["exact-repair/review-corrections/v2"]
     research_revision: Literal["XR-2.1"]
     record_schema: Literal["exact-repair/records/v3"]
     feature_schema: Literal["exact-repair/observable-features/v3"]
     label_schema: Literal[
         "exact-repair/teacher-cache/v3",
-        "exact-repair/fidelity-training/v3.2",
-        "exact-repair/mixed-targets/v3.2",
+        "exact-repair/fidelity-training/v3.3",
+        "exact-repair/mixed-targets/v3.3",
     ]
     code_hash: Text
     dirty_hash: Text
@@ -242,7 +242,7 @@ class LLMLabels(StrictSection):
     cache_policy: Literal["dependency_bound_raw_revalidation"]
     independent_evaluator: bool
     annotation_manifest: str | None
-    aggregation_revision: Literal["exact-repair/semantic-fidelity-aggregate/v3.2"]
+    aggregation_revision: Literal["exact-repair/semantic-fidelity-aggregate/v3.3"]
 
 
 class Objective(StrictSection):
@@ -371,8 +371,8 @@ class RepairProtocolV3(StrictSection):
     def cross_fields(self):
         target_schema = {
             "symbolic": "exact-repair/teacher-cache/v3",
-            "ai_weak": "exact-repair/fidelity-training/v3.2",
-            "mixed": "exact-repair/mixed-targets/v3.2",
+            "ai_weak": "exact-repair/fidelity-training/v3.3",
+            "mixed": "exact-repair/mixed-targets/v3.3",
         }[self.losses.target_basis]
         if self.identity.label_schema != target_schema:
             raise ValueError("Declared label schema does not match the target basis")

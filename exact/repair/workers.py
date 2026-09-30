@@ -92,19 +92,27 @@ class CommittedEvents(Sequence):
         )
         try:
             cursor = connection.execute(
-                "SELECT ordinal,payload FROM events WHERE ordinal < ? ORDER BY ordinal",
+                "SELECT ordinal,payload,digest,total_count FROM events WHERE ordinal < ? ORDER BY ordinal",
                 (self.batches,),
             )
             rows = 0
-            for index, payload in cursor:
+            for index, payload, digest, total_count in cursor:
                 if index != rows or len(payload) > _MAX_FRAME:
                     raise ValueError("invalid committed event batch")
+                if hashlib.sha256(payload).hexdigest() != digest:
+                    raise ValueError("committed event batch checksum mismatch")
                 ordinal, parent_hash, values = _ResultReader(io.BytesIO(payload)).load()
                 if ordinal != index or parent_hash != previous or not isinstance(values, tuple):
                     raise ValueError("invalid event journal coverage chain")
                 previous = hashlib.sha256(payload).hexdigest()
                 count += len(values)
                 rows += 1
+                # Authenticate each committed prefix before exposing evidence. A
+                # consumer may stop after an independently qualified conflict.
+                if count != total_count or (
+                    rows == self.batches and (count != self.event_count or previous != self.digest)
+                ):
+                    raise ValueError("committed event prefix receipt mismatch")
                 yield from values
             if rows != self.batches or count != self.event_count or previous != self.digest:
                 raise ValueError("event journal receipt mismatch")

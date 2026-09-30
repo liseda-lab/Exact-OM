@@ -35,6 +35,7 @@ from .records import (
     VerificationReportV2,
     VerificationReportV3,
     canonical_hash,
+    compose_verification_report,
     freeze_public_policy,
     read_record,
 )
@@ -220,7 +221,8 @@ def verify_assignment(problem: RepairInputV2, assignment: tuple[int, ...]) -> Ve
     ):
         raise ValueError("incomplete public policy; explicitly migrate the input before execution")
     axioms, active = materialize(problem, assignment)
-    exception_checks = _verify_exceptions(problem)
+    artifact = _verify_exception_artifact(problem) if problem.policy.exceptions else None
+    exception_checks = artifact.exception_checks if artifact is not None else ()
     if any(not query.complete or query.verdict != "pass" for query in exception_checks):
         return VerificationReportV2(
             canonical_hash(assignment),
@@ -232,11 +234,7 @@ def verify_assignment(problem: RepairInputV2, assignment: tuple[int, ...]) -> Ve
             detail="a frozen source exception could not be proved",
         )
     report = verify_theory(axioms, active, problem.policy, canonical_hash(assignment))
-    return dataclasses.replace(
-        report,
-        obligations=exception_checks + report.obligations,
-        expected_obligations=tuple(q.name for q in exception_checks) + report.expected_obligations,
-    )
+    return _compose_exceptions(problem, assignment, report, exception_checks, artifact)
 
 
 def source_exception_evidence(
@@ -574,18 +572,49 @@ def collect_baselines(problem: RepairInputV2) -> BaselineReportV3:
     )
 
 
+def _compose_exceptions(
+    problem: RepairInputV2,
+    assignment: tuple[int, ...],
+    report: VerificationReportV2,
+    exceptions: tuple[ObligationV2, ...],
+    artifact: BaselineReportV3 | None,
+) -> VerificationReportV2:
+    if not problem.policy.exceptions:
+        return report
+    if not isinstance(artifact, QualifiedBaselineReportV3) or not isinstance(
+        report, VerificationReportV3
+    ):
+        return _unknown(problem, assignment, "missing qualified exception composition evidence")
+    if exceptions != artifact.exception_checks or any(
+        not q.complete or q.verdict != "pass" for q in exceptions
+    ):
+        return _unknown(problem, assignment, "unresolved exception composition evidence")
+    _, active = materialize(problem, assignment)
+    return compose_verification_report(
+        report,
+        expected_queries(active, problem.policy),
+        exceptions,
+        source_exception_proof_hashes=tuple(
+            proof.content_hash for proof in artifact.exception_proofs
+        ),
+    )
+
+
 def _verify_with_exceptions(
-    problem: RepairInputV2, assignment: tuple[int, ...], exceptions: tuple[ObligationV2, ...]
+    problem: RepairInputV2,
+    assignment: tuple[int, ...],
+    exceptions: tuple[ObligationV2, ...],
+    artifact: BaselineReportV3 | None = None,
 ) -> VerificationReportV2:
     if any(not q.complete or q.verdict != "pass" for q in exceptions):
         return _unknown(problem, assignment, "frozen exception proof is unresolved")
+    if problem.policy.exceptions:
+        artifact = artifact or _verify_exception_artifact(problem)
+        if _validated_baseline_exceptions(problem, artifact) != exceptions:
+            return _unknown(problem, assignment, "exception checks lack matching source proof")
     axioms, active = materialize(problem, assignment)
     report = verify_theory(axioms, active, problem.policy, canonical_hash(assignment))
-    return dataclasses.replace(
-        report,
-        obligations=exceptions + report.obligations,
-        expected_obligations=tuple(q.name for q in exceptions) + report.expected_obligations,
-    )
+    return _compose_exceptions(problem, assignment, report, exceptions, artifact)
 
 
 def _atomic_record(path: Path, record: Any) -> None:
@@ -783,6 +812,12 @@ def _replay_journal(problem: RepairInputV2, assignment: tuple[int, ...], directo
     for event in receipt:
         if not validator(event):
             raise ValueError("invalid committed verification event")
+        if validator.failure is not None:
+            # A qualified counterexample is sufficient independently of any later
+            # query or completion record. Positive acceptance still needs all of them.
+            return validator.failure, _event_failure_report(
+                validator.failure, "qualified committed conflict; completion not required"
+            )
     validator._initialize()
     report = committed_result(directory)
     return validator.failure, validator.finish(report) if report is not None else None
@@ -1124,6 +1159,8 @@ def repair(
         args: tuple[Any, ...] = (problem, assignment)
         if verifier is verify_assignment:
             function, args = _verify_with_exceptions, (problem, assignment, exceptions)
+            if problem.policy.exceptions:
+                args += (retained_baseline,)
         allowance = remaining(budgets.verification_seconds)
         proof_deadline = time.monotonic() + allowance
         outcome = stage_call(
@@ -1420,11 +1457,8 @@ def repair(
         ):
             existing = dataclasses.replace(existing, assignment_hash=canonical_hash(original))
             if exceptions and existing.authorizes and isinstance(existing, VerificationReportV3):
-                existing = dataclasses.replace(
-                    existing,
-                    obligations=exceptions + existing.obligations,
-                    expected_obligations=tuple(q.name for q in exceptions)
-                    + existing.expected_obligations,
+                existing = _compose_exceptions(
+                    problem, original, existing, exceptions, retained_baseline
                 )
             if _valid_report(problem, original, existing):
                 accept_report(original, existing)

@@ -28,8 +28,8 @@ ROLES = (TEACHER, EVALUATOR)
 CRITERIA = ("meaning_retention", "assertion_fidelity", "collateral_fidelity")
 PARSER_VERSION = "semantic-fidelity-validator/v3.1"
 PROMPT_VERSION = "semantic-fidelity-prompt/v3.1"
-AGGREGATION_REVISION = "exact-repair/semantic-fidelity-aggregate/v3.2"
-FIDELITY_TRAINING_SCHEMA = "exact-repair/fidelity-training/v3.2"
+AGGREGATION_REVISION = "exact-repair/semantic-fidelity-aggregate/v3.3"
+FIDELITY_TRAINING_SCHEMA = "exact-repair/fidelity-training/v3.3"
 PROMPT = """Compare the complete effects of two verified feasible repairs using only the
 frozen evidence below. The provisional alignment may be wrong. Judge supported
 meaning retention, assertion fidelity (directions, endpoints, quantifiers and
@@ -996,19 +996,37 @@ def aggregate_comparisons(
         for _, c, _ in decided
     ]
     counts = {v: votes.count(v) for v in ("A", "B", "tie")}
-    winner = max(counts, key=lambda vote: counts[vote])
-    dissent = (len(votes) - counts[winner]) / len(votes) if votes else 1.0
-    outcome = (
-        winner
-        if len(decided) >= schedule.quorum and dissent <= schedule.max_disagreement
-        else "abstain"
-    )
+    highest_count = max(counts.values())
+    winners = [vote for vote, count in counts.items() if count == highest_count]
+    dissent = (len(votes) - highest_count) / len(votes) if votes else 1.0
     scores_a, scores_b = [], []
     for _, comparison, _ in decided:
         a, b = comparison.overall_score_a, comparison.overall_score_b
         assert a is not None and b is not None
         scores_a.append(a if comparison.plan_a_id == origin else b)
         scores_b.append(b if comparison.plan_a_id == origin else a)
+    # Vote ties do not supply a preference. An explicit, uniquely winning tie
+    # vote is different: it can supervise equal values if the medians agree.
+    median_a = statistics.median(scores_a) if scores_a else None
+    median_b = statistics.median(scores_b) if scores_b else None
+    numeric_tie_tolerance = 1e-6  # Frozen by AGGREGATION_REVISION.
+    numeric_decision = None
+    if median_a is not None and median_b is not None:
+        numeric_decision = (
+            "tie"
+            if abs(median_a - median_b) <= numeric_tie_tolerance
+            else ("A" if median_a > median_b else "B")
+        )
+    abstention_reason = None
+    if len(decided) < schedule.quorum:
+        abstention_reason = "insufficient_quorum"
+    elif len(winners) != 1:
+        abstention_reason = "tied_vote_counts"
+    elif dissent > schedule.max_disagreement:
+        abstention_reason = "excess_disagreement"
+    elif numeric_decision != winners[0]:
+        abstention_reason = "preference_numeric_conflict"
+    outcome = winners[0] if abstention_reason is None else "abstain"
     return {
         "schema": AGGREGATION_REVISION,
         "schedule_hash": schedule.content_hash,
@@ -1024,8 +1042,13 @@ def aggregate_comparisons(
         "quorum": schedule.quorum,
         "max_disagreement": schedule.max_disagreement,
         "numeric_rule": "median",
-        "overall_score_a": statistics.median(scores_a) if outcome != "abstain" else None,
-        "overall_score_b": statistics.median(scores_b) if outcome != "abstain" else None,
+        "adjudication_rule": "unique_vote_winner_and_consistent_medians",
+        "vote_tie_rule": "abstain",
+        "numeric_tie_tolerance": numeric_tie_tolerance,
+        "numeric_decision": numeric_decision,
+        "abstention_reason": abstention_reason,
+        "overall_score_a": median_a if outcome != "abstain" else None,
+        "overall_score_b": median_b if outcome != "abstain" else None,
         "input_ids": [c.comparison_id for _, c, _ in ordered],
         "unique_observations": [observation for _, _, observation in ordered],
         "audit": audit,

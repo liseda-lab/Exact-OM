@@ -12,7 +12,7 @@ from exact.repair.protocol import (
 )
 
 DIRECTORY = Path(__file__).resolve().parents[1] / "specs/exact-repair/protocol"
-SAMPLE = DIRECTORY / "xr21-review-conformance.json"
+SAMPLE = DIRECTORY / "xr21-review2-conformance.json"
 
 
 def _load(tmp_path, mutate):
@@ -26,7 +26,7 @@ def _load(tmp_path, mutate):
 def test_corrective_protocol_freezes_every_effective_identity_and_explicit_auxiliary():
     value = load_protocol_v3(SAMPLE)
     projection = training_projection_v3(value)
-    assert value.identity.implementation_revision == "exact-repair/review-corrections/v1"
+    assert value.identity.implementation_revision == "exact-repair/review-corrections/v2"
     assert value.model.preparation_schema == "exact-repair/effective-preparation/v3.1"
     assert value.model.support_admission_policy == "atomic-complete-support/v3.1"
     assert value.teacher.target_schema == "exact-repair/semantic-target/v3.1"
@@ -40,7 +40,7 @@ def test_corrective_protocol_freezes_every_effective_identity_and_explicit_auxil
     )
     assert value.collection.quartet_budget_unit == "assignment_attempts"
     assert (
-        json.loads((DIRECTORY / "schema-v3.2.json").read_text())
+        json.loads((DIRECTORY / "schema-v3.3.json").read_text())
         == RepairProtocolV3.model_json_schema()
     )
     # The original manifest is still available as historical data, not reinterpreted.
@@ -89,3 +89,10 @@ def test_nonunit_target_weights_and_nondefault_preparation_project_exactly(tmp_p
 def test_progressive_language_cannot_shrink_while_preserving_old_pool(tmp_path):
     with pytest.raises(ValueError, match="nested language"):
         _load(tmp_path, lambda p: p["generation"]["stages"][1].update(classes_per_side=1))
+
+
+def test_previous_corrective_protocol_remains_historical_and_cannot_execute():
+    old = json.loads((DIRECTORY / "xr21-review-conformance.json").read_text())
+    assert old["identity"]["implementation_revision"] == "exact-repair/review-corrections/v1"
+    with pytest.raises(ValueError, match="implementation_revision"):
+        load_protocol_v3(DIRECTORY / "xr21-review-conformance.json", for_execution=True)

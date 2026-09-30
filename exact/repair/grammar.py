@@ -397,17 +397,28 @@ def _first_model(root: Any, width: int, max_steps: int) -> tuple[bool, ...] | No
 
 
 def protected_representatives(
-    encoding: GrammarEncoding, circuit: Any = None, *, max_checks: int = 100000
+    encoding: GrammarEncoding,
+    circuit: Any = None,
+    *,
+    max_checks: int = 100000,
+    enumerated_candidates: Sequence[ReplacementCandidateV2] | None = None,
 ) -> tuple[tuple[ReplacementCandidateV2, ...], tuple[dict[str, Any], ...]]:
     """Protect one fully admissible bundle per template; report unresolved coverage.
 
     Completed family DAGs prove empty support or yield one satisfying assignment.
-    Without a completed circuit, the bounded named/original-expression traversal
-    may establish a representative, but exhaustion never claims logical emptiness.
+    A successfully completed exhaustive enumeration is authoritative too: its
+    per-template provenance establishes representatives or empty support without
+    rerunning the weaker fallback search. Pass it only after enumeration returns,
+    never a truncated prefix. Otherwise bounded fallback exhaustion stays unknown.
     """
     if type(max_checks) is not int or max_checks < 0:
         raise ValueError("representative search budget must be a nonnegative integer")
     families = {f.name: f for f in getattr(circuit, "families", ())}
+    enumerated: dict[str, ReplacementCandidateV2] = {}
+    for enumerated_candidate in sorted(enumerated_candidates or (), key=lambda c: c.candidate_id):
+        for key, template_name in enumerated_candidate.provenance:
+            if key == "grammar_template":
+                enumerated.setdefault(template_name, enumerated_candidate)
     arguments = list(encoding.classes)
     for axiom in normalise_axioms(encoding.revision.original_axioms):
         if isinstance(axiom, owl.SubClassOf):
@@ -425,7 +436,14 @@ def protected_representatives(
                 "search_exhausted",
                 "bounded fallback did not establish admissible coverage",
             )
-            if family is not None and family.status == "empty_language":
+            if enumerated_candidates is not None:
+                candidate = enumerated.get(template.name)
+                status, detail = (
+                    ("retained", "representative from completed declared enumeration")
+                    if candidate is not None
+                    else ("empty_language", "completed declared enumeration proved empty support")
+                )
+            elif family is not None and family.status == "empty_language":
                 status, detail = "empty_language", "completed family proved empty support"
             elif family is not None and family.circuit is not None:
                 try:

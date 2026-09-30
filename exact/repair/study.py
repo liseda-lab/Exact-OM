@@ -24,7 +24,9 @@ from .api import write_artifact
 from .checkpointing import CumulativeBudget
 from .evaluation import outcome_metrics
 from .kernel import (
+    _compose_exceptions,
     _valid_report,
+    _validated_baseline_exceptions,
     _verify_with_exceptions,
     baseline_identity,
     collect_baselines,
@@ -325,6 +327,11 @@ def _captured_scores(case: StudyCaseV2) -> dict[str, float]:
     return scores
 
 
+def _baseline_with_exceptions(problem, current, report, baseline_evidence):
+    exceptions = _validated_baseline_exceptions(problem, baseline_evidence)
+    return _compose_exceptions(problem, current, report, exceptions, baseline_evidence)
+
+
 def _greedy(
     problem: RepairInputV2,
     objective: ObjectiveV2,
@@ -379,24 +386,22 @@ def _greedy(
                 existing, assignment_hash=canonical_hash(current)
             )
             assert baseline_evidence is not None
-            if baseline_evidence.exception_checks and candidate_report.authorizes:
-                if isinstance(candidate_report, VerificationReportV3):
-                    candidate_report = dataclasses.replace(
-                        candidate_report,
-                        obligations=baseline_evidence.exception_checks
-                        + candidate_report.obligations,
-                        expected_obligations=tuple(
-                            q.name for q in baseline_evidence.exception_checks
-                        )
-                        + candidate_report.expected_obligations,
-                    )
-                else:
-                    candidate_report = dataclasses.replace(
-                        candidate_report,
-                        obligations=baseline_evidence.exception_checks
-                        + candidate_report.obligations,
-                    )
-            outcome = CallResult("complete", candidate_report)
+            if problem.policy.exceptions and candidate_report.authorizes:
+                outcome = bounded_call(
+                    _baseline_with_exceptions,
+                    problem,
+                    current,
+                    candidate_report,
+                    baseline_evidence,
+                    timeout=min(remaining, problem.budgets.verification_seconds),
+                    **(
+                        {"memory_mb": problem.budgets.memory_mb}
+                        if problem.budgets.memory_mb is not None
+                        else {}
+                    ),
+                )
+            else:
+                outcome = CallResult("complete", candidate_report)
         else:
             checks += 1
             function: Callable[..., VerificationReportV2] = verifier
@@ -407,6 +412,8 @@ def _greedy(
                     current,
                     baseline_evidence.exception_checks,
                 )
+                if problem.policy.exceptions:
+                    args += (baseline_evidence,)
             worker_limits: dict[str, Any] = (
                 {"memory_mb": problem.budgets.memory_mb}
                 if problem.budgets.memory_mb is not None

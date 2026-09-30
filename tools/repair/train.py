@@ -11,6 +11,7 @@ import os
 import random
 import tempfile
 import time
+from importlib.metadata import version as distribution_version
 from pathlib import Path
 from typing import Any, Mapping, Sequence, cast
 
@@ -18,6 +19,7 @@ import pyowl_core as owl
 
 from exact.repair.graph import FEATURE_SCHEMA_V3, EffectivePreparation
 from exact.repair.learning import (
+    SUPPORT_READOUT_IDENTITY,
     OwlTeacherOracle,
     RepairLabel,
     SemanticTargetSpec,
@@ -616,6 +618,7 @@ def train_cases(
     collection_options: Mapping[str, Any] | None = None,
     plan_risk: bool = True,
     support_enabled: bool = False,
+    support_readout_identity: str = SUPPORT_READOUT_IDENTITY,
     support_loss_weight: float = 0.2,
     support_target: str = "qualified_witness_violation/v1",
     selection_options: Mapping[str, Any] | None = None,
@@ -846,6 +849,7 @@ def train_cases(
         revision=revision,
         plan_risk=plan_risk,
         support_enabled=support_enabled,
+        support_readout_identity=support_readout_identity,
         pair_factor_bound=pair_factor_bound,
     ).to(device)
     adaptation_new_parameters = []
@@ -1148,7 +1152,12 @@ def train_cases(
                 selected_targets.append(target)
                 support_logits.append(
                     model.support_violation_logit(
-                        case.problem.objects, memory, target.assignment, witness
+                        case.problem.objects,
+                        memory,
+                        target.assignment,
+                        witness,
+                        obligation_kind=target.obligation_kind,
+                        expected_truth=target.expected_truth,
                     )
                 )
             if support_logits:
@@ -1548,6 +1557,10 @@ def train_cases(
                             tuple(obj.candidates for obj in generated.problem.objects)
                         ),
                         "input": generated.problem.content_hash,
+                        "patch": canonical_hash(generated.problem.objects),
+                        "backend": canonical_hash(
+                            ("pyhermit", distribution_version("pyhermit"), "python")
+                        ),
                         "policy": generated.problem.policy.content_hash,
                         "query": canonical_hash(case.probes),
                         "profile": canonical_hash(profile),
@@ -1915,6 +1928,7 @@ def train_cases(
         "retrieval": {
             key: json.loads(canonical_json(value.provenance)) for key, value in retrievals.items()
         },
+        "model_configuration": dict(model.config),
         "settings": {
             "layers": layers,
             "heads": heads,
@@ -1989,6 +2003,8 @@ def _protocol_arguments(protocol: Mapping[str, Any]) -> dict[str, Any]:
         "held_out_supervision": False,
     }
     if revision == "v3":
+        if protocol["model"]["unary_benefit"] is not True:
+            raise ValueError("Disabled unary_benefit is not supported by this trainer")
         supported.update(
             benefit_loss="anchored_value_rank_quartet_risk",
             proposal_loss="exact_and_sample_conditioned",
@@ -1998,6 +2014,8 @@ def _protocol_arguments(protocol: Mapping[str, Any]) -> dict[str, Any]:
         raise ValueError("Unsupported optimizer, loss, checkpoint or supervision protocol")
     return {
         "revision": revision,
+        "encoder": graph["encoder"],
+        "pairwise": protocol["model"]["pair_benefit"] if revision == "v3" else False,
         **(
             {
                 "case_cpu_seconds": protocol["resources"]["case_cpu_seconds"],
@@ -2010,6 +2028,7 @@ def _protocol_arguments(protocol: Mapping[str, Any]) -> dict[str, Any]:
                 "collection_options": protocol["collection"],
                 "plan_risk": protocol["model"]["plan_risk"],
                 "support_enabled": protocol["model"].get("support_enabled", False),
+                "support_readout_identity": SUPPORT_READOUT_IDENTITY,
                 "support_target": protocol["model"].get(
                     "support_target", "qualified_witness_violation/v1"
                 ),
@@ -2107,6 +2126,69 @@ def _protocol_arguments(protocol: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
+def _resolve_architecture(
+    config: Mapping[str, Any],
+    *,
+    encoder: str | None,
+    pairwise: bool | None,
+    warm: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    """V3 architecture is frozen by its protocol; overrides require a new protocol."""
+    resolved = dict(config)
+    if warm is not None and (
+        warm.get("model_schema") not in {"exact-repair/model/v2", "exact-repair/model/v3"}
+        or warm.get("training_provenance", {}).get("heldout_supervision") is not False
+    ):
+        raise ValueError(
+            "Adaptation requires a versioned checkpoint with declared held-out restrictions"
+        )
+    if config["revision"] != "v3":
+        # Preserve the historical v2 CLI contract; v3 amendments are explicit files.
+        architecture = warm["config"] if warm else {}
+        for key in ("hidden_dim", "layers", "heads", "dropout"):
+            if key in architecture:
+                resolved[key] = architecture[key]
+        resolved["encoder"] = encoder or architecture.get("encoder", config["encoder"])
+        resolved["pairwise"] = architecture.get("pairwise", bool(pairwise))
+        return resolved
+    for key, override in (("encoder", encoder), ("pairwise", pairwise)):
+        if override is not None and override != config[key]:
+            raise ValueError(
+                f"CLI {key} conflicts with the protocol architecture; amend the protocol explicitly"
+            )
+    if warm is not None:
+        expected = {
+            key: config[key]
+            for key in (
+                "revision",
+                "hidden_dim",
+                "layers",
+                "heads",
+                "dropout",
+                "encoder",
+                "pairwise",
+                "plan_risk",
+                "support_enabled",
+                "support_readout_identity",
+                "pair_factor_bound",
+            )
+        }
+        expected["feature_dim"] = 128
+        actual = warm.get("config", {})
+        conflicts = [
+            key for key, value in expected.items() if key not in actual or actual[key] != value
+        ]
+        if warm.get("model_schema") != "exact-repair/model/v3":
+            conflicts.append("model_schema")
+        if conflicts:
+            raise ValueError(
+                "Warm-start architecture conflicts with the protocol: "
+                + ", ".join(conflicts)
+                + "; use compatible weights or an explicit protocol amendment"
+            )
+    return resolved
+
+
 def _protocol_profile(protocol: Mapping[str, Any]) -> tuple:
     return tuple(sorted(protocol["preferences"]["cost_weights"].items()))
 
@@ -2172,7 +2254,7 @@ def main() -> int:
     parser.add_argument(
         "--case-limit", type=int, help="explicit per-split conformance cap, recorded in coverage"
     )
-    parser.add_argument("--pairwise", action="store_true")
+    parser.add_argument("--pairwise", action=argparse.BooleanOptionalAction, default=None)
     parser.add_argument(
         "--fidelity-labels",
         type=Path,
@@ -2197,6 +2279,12 @@ def main() -> int:
     if args.case_limit is not None and args.case_limit < 1:
         parser.error("--case-limit must be positive")
     config = _protocol_arguments(protocol)
+    warm = None
+    if args.warm_start:
+        import torch
+
+        warm = torch.load(args.warm_start, weights_only=True, map_location="cpu")
+    config = _resolve_architecture(config, encoder=args.encoder, pairwise=args.pairwise, warm=warm)
     profile = _protocol_profile(protocol)
     from contextlib import nullcontext
 
@@ -2212,7 +2300,9 @@ def main() -> int:
             raise ValueError("Allocated CUDA devices exceed the frozen allocated_gpus declaration")
         campaign_context = CumulativeBudget(
             args.output / "campaign-budget.json",
-            canonical_hash((protocol, seed, args.encoder, args.pairwise, args.case_limit)),
+            canonical_hash(
+                (protocol, seed, config["encoder"], config["pairwise"], args.case_limit)
+            ),
             protocol["resources"]["campaign_wall_seconds"],
             gpu_hours=protocol["resources"]["campaign_gpu_hours"],
             allocated_gpus=allocation,
@@ -2433,30 +2523,6 @@ def main() -> int:
         arm = "training_side_adaptation" if origins == {"training_side_real"} else "generated_only"
         import torch
 
-        warm = (
-            torch.load(args.warm_start, weights_only=True, map_location="cpu")
-            if args.warm_start
-            else None
-        )
-        if warm is not None:
-            if (
-                warm.get("model_schema") not in {"exact-repair/model/v2", "exact-repair/model/v3"}
-                or warm.get("training_provenance", {}).get("heldout_supervision") is not False
-            ):
-                raise ValueError(
-                    "Adaptation requires a versioned checkpoint with declared held-out restrictions"
-                )
-            # Architecture is inherited from pretraining; optimizer and development
-            # selection remain fresh and depend exclusively on the adaptation split.
-            architecture = warm["config"]
-            for key, config_key in (
-                ("hidden_dim", "hidden_dim"),
-                ("layers", "layers"),
-                ("heads", "heads"),
-                ("dropout", "dropout"),
-            ):
-                config[config_key] = architecture[key]
-
         from exact.repair.semantic_fidelity import read_fidelity_training_artifact
 
         def read_fidelity_file(path, expected_split):
@@ -2470,11 +2536,8 @@ def main() -> int:
             config,
             fidelity_labels=fidelity_labels,
             fidelity_development_labels=fidelity_development_labels,
-            encoder=args.encoder
-            or (warm["config"]["encoder"] if warm else protocol["graph"]["encoder"]),
             seed=seed,
             profile=profile,
-            pairwise=warm["config"]["pairwise"] if warm else args.pairwise,
             arm=arm,
             warm_start_weights=warm["state_dict"] if warm else None,
             warm_start_metadata=warm["metadata"] if warm else None,
@@ -2530,6 +2593,7 @@ def main() -> int:
             protocol_hash=canonical_hash(protocol),
             preparation_hash=canonical_hash(preparation),
             measured_training_resources=dict(outcome.resource_usage),
+            model_configuration=dict(checkpoint["config"]),
         )
         (args.output / "report.json").write_text(
             json.dumps(report, indent=2, allow_nan=False) + "\n"
@@ -2567,6 +2631,7 @@ def main() -> int:
             ],
             "heldout_supervision": False,
             "warm_start_weights_only": warm is not None,
+            "model_configuration": dict(checkpoint["config"]),
             "supervision_manifest_hash": preparation.get("manifest_hash"),
         }
         checkpoint.update(

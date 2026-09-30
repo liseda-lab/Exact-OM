@@ -10,6 +10,7 @@ import tempfile
 from dataclasses import asdict, dataclass, replace
 from functools import lru_cache
 from importlib.metadata import version
+from math import isfinite
 from pathlib import Path
 from time import monotonic, process_time
 from typing import Any, Sequence
@@ -208,7 +209,17 @@ def _serialize_compile(
 ) -> tuple[CircuitArtifact, tuple, int, str, str]:
     phase_started = _phase_start()
     if isinstance(encoding, ProposalEncoding):
-        compiled = compile_encoding(encoding, variable_order=order)
+        compiled = compile_encoding(
+            encoding,
+            variable_order=order,
+            max_nodes=max_nodes,
+            max_seconds=seconds,
+            vtree_type=vtree_type,
+            collect=collect,
+            max_live_nodes=max_live_nodes,
+            max_reachable_nodes=max_reachable_nodes,
+            max_elements=max_elements,
+        )
     else:
         from .grammar import compile_grammar
 
@@ -223,8 +234,10 @@ def _serialize_compile(
             max_reachable_nodes=max_reachable_nodes,
             max_elements=max_elements,
         )
-    if compiled.node_count > max_nodes:
-        raise ValueError("Compiled circuit exceeds the declared node budget")
+    if compiled.manager.count() > max_nodes:
+        raise ValueError("Compiled circuit exceeds the declared allocated node budget")
+    if max_live_nodes is not None and compiled.manager.live_count() > max_live_nodes:
+        raise ValueError("Compiled circuit exceeds the declared live node budget")
     if max_reachable_nodes is not None and compiled.node_count > max_reachable_nodes:
         raise ValueError("Compiled circuit exceeds the reachable node budget")
     if max_elements is not None and compiled.root.size() > max_elements:
@@ -342,6 +355,22 @@ def _compile_persistent_worker(
     """Supervise compile/cache/save/restore work and preserve the originating cold receipt."""
     if type(max_nodes) is not int or max_nodes < 1:
         raise ValueError("max_nodes must be a positive integer")
+    if any(
+        limit is not None and (type(limit) is not int or limit < 1)
+        for limit in (max_live_nodes, max_reachable_nodes, max_elements)
+    ):
+        raise ValueError("circuit structural limits must be positive integers")
+    if type(collect) is not bool:
+        raise ValueError("compiler collect must be Boolean")
+    layouts = (
+        {"right", "balanced"}
+        if isinstance(encoding, ProposalEncoding)
+        else {"right", "balanced", "grouped"}
+    )
+    if vtree_type not in layouts:
+        raise ValueError("unsupported vtree_type for this compiler encoding")
+    if type(seconds) not in (int, float) or not isfinite(seconds) or seconds <= 0:
+        raise ValueError("compiler wall limit must be finite and positive")
     total_started = _phase_start()
     started = total_started[0]
     implementation_hash = canonical_hash(
@@ -411,23 +440,20 @@ def _compile_persistent_worker(
                     data["sdd"] = base64.b64decode(data["sdd"], validate=True)
                     data["vtree"] = base64.b64decode(data["vtree"], validate=True)
                     artifact = CircuitArtifact(**data)
-                    if (
-                        artifact.variable_count != encoding.variable_count
-                        or artifact.node_count > max_nodes
-                    ):
-                        raise ValueError("artifact binding or resource admission mismatch")
-                    if max_live_nodes is not None and artifact.node_count > max_live_nodes:
-                        raise ValueError("artifact live node limit admission mismatch")
-                    if (
-                        max_reachable_nodes is not None
-                        and artifact.node_count > max_reachable_nodes
-                    ):
-                        raise ValueError("artifact reachable node limit admission mismatch")
-                    if (
-                        max_elements is not None
-                        and sum(len(row[3]) for row in value["table"]) > max_elements
-                    ):
-                        raise ValueError("artifact element limit admission mismatch")
+                    if artifact.variable_count != encoding.variable_count:
+                        raise ValueError("artifact binding mismatch")
+                    measured = dict(artifact.telemetry)["backend_measurements"]
+                    limits_and_counts = (
+                        ("allocated node", max_nodes, measured["manager_allocated_nodes"]),
+                        ("live node", max_live_nodes, measured["manager_live_nodes"]),
+                        ("reachable node", max_reachable_nodes, artifact.node_count),
+                        ("element", max_elements, measured["root_elements"]),
+                    )
+                    for name, limit, count in limits_and_counts:
+                        if limit is not None and count > limit:
+                            from .grammar import CircuitBudgetExceeded
+
+                            raise CircuitBudgetExceeded(f"artifact {name} limit admission mismatch")
                     payload = (
                         artifact,
                         value["table"],
@@ -508,6 +534,7 @@ def _compile_persistent_worker(
     receipt = dict(
         schema="exact-repair/compiler-measurements/review-1",
         structural_identity=identity,
+        resource_contract="compiler-resource-contract/review-2",
         cache_mode="warm_load" if cache_hit else "cold_compile",
         cold_receipt=cold_receipt,
         admission_limits=limits,
@@ -599,6 +626,7 @@ def _compile_bounded_cached(
             "measurement_receipt",
             dict(
                 schema="exact-repair/compiler-measurements/review-1",
+                resource_contract="compiler-resource-contract/review-2",
                 structural_identity=None,
                 encoding_identity=encoding.content_hash,
                 cache_mode="failed_attempt",

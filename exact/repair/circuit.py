@@ -11,6 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from functools import lru_cache
 from importlib.metadata import version
+from math import isfinite
 from time import perf_counter
 from typing import Any, Iterable, Sequence, cast
 
@@ -207,8 +208,15 @@ def compile_encoding(
     encoding: ProposalEncoding,
     *,
     variable_order: Sequence[int] | None = None,
+    max_nodes: int | None = None,
+    max_seconds: float | None = None,
+    vtree_type: str = "balanced",
+    collect: bool = True,
+    max_live_nodes: int | None = None,
+    max_reachable_nodes: int | None = None,
+    max_elements: int | None = None,
 ) -> CompiledCircuit:
-    """Compile designated assignments using PySDD, cached by language/order/version."""
+    """Compile finite assignments with explicit native ownership and resource limits."""
     order = (
         tuple(range(1, encoding.variable_count + 1))
         if variable_order is None
@@ -216,37 +224,130 @@ def compile_encoding(
     )
     if sorted(order) != list(range(1, encoding.variable_count + 1)):
         raise ValueError("variable order must be a permutation of all Boolean variables")
+    if vtree_type not in {"right", "balanced"}:
+        raise ValueError("finite ProposalEncoding vtree_type must be right or balanced")
+    if type(collect) is not bool:
+        raise ValueError("compiler collect must be Boolean")
+    if any(
+        value is not None and (type(value) is not int or value < 1)
+        for value in (max_nodes, max_live_nodes, max_reachable_nodes, max_elements)
+    ):
+        raise ValueError("circuit structural limits must be positive integers")
+    if max_seconds is not None and (not isfinite(max_seconds) or max_seconds <= 0):
+        raise ValueError("compiler wall limit must be finite and positive")
     try:
         compiler_version = version("pysdd")
     except ModuleNotFoundError as exc:
         raise ImportError("repair proposals require the optional pysdd dependency") from exc
-    return _compile(encoding, order, compiler_version)
+    return _compile(
+        encoding,
+        order,
+        compiler_version,
+        max_nodes,
+        max_seconds,
+        vtree_type,
+        collect,
+        max_live_nodes,
+        max_reachable_nodes,
+        max_elements,
+    )
 
 
 @lru_cache(maxsize=32)
 def _compile(
-    encoding: ProposalEncoding, order: tuple[int, ...], compiler_version: str
+    encoding: ProposalEncoding,
+    order: tuple[int, ...],
+    compiler_version: str,
+    max_nodes: int | None,
+    max_seconds: float | None,
+    vtree_type: str,
+    collect: bool,
+    max_live_nodes: int | None,
+    max_reachable_nodes: int | None,
+    max_elements: int | None,
 ) -> CompiledCircuit:
     try:
         from pysdd.sdd import SddManager, Vtree
     except ImportError as exc:
         raise ImportError("repair proposals require the optional pysdd dependency") from exc
+    from .grammar import CircuitBudgetExceeded
+
     started = perf_counter()
     manager = SddManager(
-        vtree=Vtree(var_count=encoding.variable_count, var_order=list(order)),
+        vtree=Vtree(
+            var_count=encoding.variable_count, var_order=list(order), vtree_type=vtree_type
+        ),
         auto_gc_and_minimize=False,
     )
+    checks = peak_allocated = 0
+
+    def check() -> None:
+        nonlocal checks, peak_allocated
+        checks += 1
+        peak_allocated = max(peak_allocated, manager.count())
+        if collect and (
+            checks % 128 == 0 or (max_nodes is not None and manager.count() > max_nodes)
+        ):
+            manager.garbage_collect()
+        if max_nodes is not None and manager.count() > max_nodes:
+            raise CircuitBudgetExceeded("finite compilation exceeds its allocated node limit")
+        if max_live_nodes is not None and manager.live_count() > max_live_nodes:
+            raise CircuitBudgetExceeded("finite compilation exceeds its live node limit")
+        if max_elements is not None and manager.live_size() > max_elements:
+            raise CircuitBudgetExceeded("finite compilation exceeds its live element limit")
+        if max_seconds is not None and perf_counter() - started > max_seconds:
+            raise CircuitBudgetExceeded("finite compilation exceeds its wall time limit")
+
     root = manager.false()
+    root.ref()
+    check()
     for assignment in encoding.assignments:
         term = manager.true()
+        term.ref()
         for variable, value in enumerate(assignment, 1):
-            term = term & manager.literal(variable if value else -variable)
-        root = root | term
-    root.ref()
-    manager.garbage_collect()
-    key = canonical_hash((encoding.content_hash, order, "pysdd", compiler_version))
+            replacement = term & manager.literal(variable if value else -variable)
+            replacement.ref()
+            term.deref()
+            term = replacement
+            check()
+        replacement = root | term
+        replacement.ref()
+        root.deref()
+        term.deref()
+        root = replacement
+        check()
+    if collect:
+        manager.garbage_collect()
+    check()
+    if max_reachable_nodes is not None and root.count() > max_reachable_nodes:
+        raise CircuitBudgetExceeded("finite compilation exceeds its reachable node limit")
+    if max_elements is not None and root.size() > max_elements:
+        raise CircuitBudgetExceeded("finite compilation exceeds its reachable element limit")
+    key = canonical_hash(
+        (
+            encoding.content_hash,
+            order,
+            "pysdd",
+            compiler_version,
+            "finite-resource-contract/review-2",
+            vtree_type,
+            collect,
+        )
+    )
     return CompiledCircuit(
-        encoding, manager, root, key, compiler_version, perf_counter() - started, root.count()
+        encoding,
+        manager,
+        root,
+        key,
+        compiler_version,
+        perf_counter() - started,
+        root.count(),
+        (
+            ("vtree", vtree_type),
+            ("collect", collect),
+            ("peak_allocated", peak_allocated),
+            ("resource_contract", "compiler-resource-contract/review-2"),
+        ),
     )
 
 

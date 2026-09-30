@@ -20,6 +20,7 @@ from .graph import (
     structural_id,
     validate_admitted_supports,
 )
+from .learning import SUPPORT_OBLIGATION_KINDS, SUPPORT_READOUT_IDENTITY
 
 
 def _bucket(value: str, size: int = 256) -> int:
@@ -62,11 +63,16 @@ class RepairModel(nn.Module):
         revision: str = "v2",
         plan_risk: bool = True,
         support_enabled: bool = False,
+        support_readout_identity: str = SUPPORT_READOUT_IDENTITY,
         pair_factor_bound: float = 1.0,
     ) -> None:
         super().__init__()
         if revision not in {"v2", "v3"}:
             raise ValueError("Unknown repair model revision")
+        if support_readout_identity != SUPPORT_READOUT_IDENTITY:
+            raise ValueError(
+                "Unsupported support readout identity; explicit checkpoint migration required"
+            )
         self.revision = revision
         self.plan_risk_enabled = revision == "v3" and plan_risk
         self.support_enabled = revision == "v3" and support_enabled
@@ -94,6 +100,8 @@ class RepairModel(nn.Module):
             "support_enabled": support_enabled,
             "pair_factor_bound": pair_factor_bound,
         }
+        if revision == "v3":
+            self.config["support_readout_identity"] = support_readout_identity
         self.input_projection = nn.ModuleDict(
             {kind: nn.Linear(feature_dim, hidden_dim) for kind in self.metadata[0]}
         )
@@ -134,7 +142,9 @@ class RepairModel(nn.Module):
         if revision == "v3":
             self.candidate_context_head = _mlp(3 * hidden_dim, hidden_dim, hidden_dim)
             self.risk_head = _mlp(3 * hidden_dim, 1, hidden_dim)
-            self.support_head = _mlp(2 * hidden_dim, 1, hidden_dim)
+            self.support_head = _mlp(
+                2 * hidden_dim + len(SUPPORT_OBLIGATION_KINDS) + 1, 1, hidden_dim
+            )
             self.plan_context_head = _mlp(2 * hidden_dim, hidden_dim, hidden_dim)
 
     def encode(self, graph: ObservableGraph) -> GraphMemory:
@@ -430,11 +440,24 @@ class RepairModel(nn.Module):
         return cast(Tensor, self.plan_context_head(torch.cat((selected, background))))
 
     def support_violation_logit(
-        self, objects: Iterable[Any], memory: GraphMemory, assignment: tuple[int, ...], witness: Any
+        self,
+        objects: Iterable[Any],
+        memory: GraphMemory,
+        assignment: tuple[int, ...],
+        witness: Any,
+        *,
+        obligation_kind: str,
+        expected_truth: bool,
     ) -> Tensor:
-        """Predict a declared witness under the whole plan, without proof-label input."""
+        """Predict violation from the declared obligation and plan, never its proof or label."""
         if not self.support_enabled:
             raise ValueError("Support auxiliary is disabled")
+        if obligation_kind not in SUPPORT_OBLIGATION_KINDS:
+            raise ValueError("Unknown support obligation kind")
+        if type(expected_truth) is not bool or expected_truth is not (
+            obligation_kind != "prohibited_entailment"
+        ):
+            raise ValueError("Support obligation and expected truth disagree")
         objects = tuple(objects)
         if len(objects) != len(assignment) or any(
             type(choice) is not int or not 0 <= choice < len(obj.candidates)
@@ -449,7 +472,11 @@ class RepairModel(nn.Module):
         ]
         pooled = torch.stack(selected).sum(0) if selected else self.empty_bundle
         query = self.encode_structure(witness, memory)
-        return cast(Tensor, self.support_head(torch.cat((pooled, query))).squeeze(-1))
+        obligation = pooled.new_tensor(
+            [float(obligation_kind == kind) for kind in SUPPORT_OBLIGATION_KINDS]
+            + [float(expected_truth)]
+        )
+        return cast(Tensor, self.support_head(torch.cat((pooled, query, obligation))).squeeze(-1))
 
     def plan_risk_logit(
         self,

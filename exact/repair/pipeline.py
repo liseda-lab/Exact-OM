@@ -716,8 +716,8 @@ def freeze_neural_round(
 
                     controls, protected_reports = protected_representatives(
                         encoding,
-                        getattr(distribution, "circuit", None),
                         max_checks=representative_max_checks,
+                        enumerated_candidates=sampled_candidates,
                     )
                     context = model.object_context(obj.object_id, memory)
                     ranked = {
@@ -848,7 +848,7 @@ def freeze_neural_round(
                         "object_id": obj.object_id,
                         "generation_identity": canonical_hash(
                             (
-                                "protected-generation/review-1",
+                                "protected-generation/review-2",
                                 encoding.content_hash,
                                 representative_max_checks,
                                 tuple(sorted(removed)),

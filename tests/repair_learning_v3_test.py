@@ -151,7 +151,21 @@ def test_sample_collection_retains_unknowns_split_and_new_inventory_identity():
         case_id="case",
         parent_group_id="parent",
         split="train",
-        hashes={"inventory": "new"},
+        hashes={
+            **{
+                key: key
+                for key in (
+                    "input",
+                    "patch",
+                    "policy",
+                    "query",
+                    "backend",
+                    "profile",
+                    "semantic_target",
+                )
+            },
+            "inventory": "new",
+        },
         model_hash="frozen",
         round_id="0",
         max_assignments=6,

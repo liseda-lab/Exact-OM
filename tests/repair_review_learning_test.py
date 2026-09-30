@@ -99,7 +99,21 @@ def test_complete_plan_quotas_preserve_every_origin_and_finite_denominator():
         case_id="case",
         parent_group_id="parent",
         split="train",
-        hashes={"inventory": "pool"},
+        hashes={
+            **{
+                key: key
+                for key in (
+                    "input",
+                    "patch",
+                    "policy",
+                    "query",
+                    "backend",
+                    "profile",
+                    "semantic_target",
+                )
+            },
+            "inventory": "pool",
+        },
         model_hash="model",
         round_id="0",
         max_assignments=128,
@@ -212,6 +226,8 @@ def test_native_three_action_witness_targets_train_support_head_without_proof_le
         memory,
         target.assignment,
         owl.decode_canonical(bytes.fromhex(target.witness)),
+        obligation_kind=target.obligation_kind,
+        expected_truth=target.expected_truth,
     )
     terms = support_loss(value.reshape(1), (target,))
     terms["loss"].backward()
@@ -516,7 +532,21 @@ def test_collection_committed_attempts_resume_without_reverification():
         case_id="case",
         parent_group_id="p",
         split="train",
-        hashes={"inventory": "pool"},
+        hashes={
+            **{
+                key: key
+                for key in (
+                    "input",
+                    "patch",
+                    "policy",
+                    "query",
+                    "backend",
+                    "profile",
+                    "semantic_target",
+                )
+            },
+            "inventory": "pool",
+        },
         model_hash="model",
         round_id="1",
         max_assignments=8,
@@ -950,7 +980,21 @@ def test_sampler_deadline_retains_unvisited_denominators_and_masks_partial_quart
         case_id="deadline",
         parent_group_id="p",
         split="train",
-        hashes={"inventory": "pool"},
+        hashes={
+            **{
+                key: key
+                for key in (
+                    "input",
+                    "patch",
+                    "policy",
+                    "query",
+                    "backend",
+                    "profile",
+                    "semantic_target",
+                )
+            },
+            "inventory": "pool",
+        },
         model_hash="model",
         round_id="0",
         max_assignments=8,

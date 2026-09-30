@@ -213,6 +213,15 @@ class SemanticTargetSpec:
         )
 
 
+SUPPORT_OBLIGATION_KINDS = (
+    "class_satisfiability",
+    "active_satisfiability",
+    "required_entailment",
+    "prohibited_entailment",
+)
+SUPPORT_READOUT_IDENTITY = "obligation-conditioned-violation/v2"
+
+
 @dataclass(frozen=True)
 class SupportTarget:
     """Qualified witness-violation label; proof contents remain evaluator-only."""
@@ -234,6 +243,8 @@ class SupportTarget:
     def __post_init__(self):
         if self.schema != "qualified-witness-violation/v1" or self.available_before_decision:
             raise ValueError("Support labels require the evaluator-only auxiliary schema")
+        if self.obligation_kind not in SUPPORT_OBLIGATION_KINDS:
+            raise ValueError("Unsupported witness obligation kind")
         if self.violated is not None and type(self.violated) is not bool:
             raise ValueError("Support targets use qualified Boolean/unknown outcomes")
         if (
@@ -244,6 +255,11 @@ class SupportTarget:
             raise ValueError(
                 "Support labels require complete assignment and policy/theory provenance"
             )
+
+    @property
+    def expected_truth(self) -> bool:
+        """The policy's expected underlying satisfiability/entailment truth."""
+        return self.obligation_kind != "prohibited_entailment"
 
     @property
     def eligible(self) -> bool:
@@ -298,6 +314,8 @@ def support_targets(
         key = result.kind, result.query_id
         if key not in lookup or not result.complete or type(result.satisfied) is not bool:
             continue
+        if result.expected is not (result.kind != "prohibited_entailment"):
+            raise ValueError("Qualified support obligation has inconsistent expected truth")
         proof = proofs.get(key)
         violated = result.satisfied is False
         if violated and proof is None:
@@ -847,10 +865,12 @@ class SampledRepairRound:
     duplicates: int
     stop_reason: str
     assignment_maps: tuple[tuple[str, tuple[tuple[str, str], ...]], ...] = ()
-    schema: str = "exact-repair/sampled-round/v3.1"
+    schema: str = "exact-repair/sampled-round/v3.2"
     attempts: tuple[Mapping[str, Any], ...] = ()
     strata: tuple[tuple[str, tuple[tuple[str, int], ...]], ...] = ()
     sampler_settings: tuple[tuple[str, Any], ...] = ()
+    collection_identity: str = ""
+    collection_dependencies: Mapping[str, Any] | None = None
 
 
 def collect_sampled_repairs(
@@ -887,6 +907,30 @@ def collect_sampled_repairs(
 
     if split != "train":
         raise ValueError("Active supervised acquisition is training-only")
+    hashes = dict(hashes)  # Keep the caller's mutable mapping out of saved provenance.
+    required = {
+        "input",
+        "patch",
+        "policy",
+        "query",
+        "inventory",
+        "backend",
+        "profile",
+        "semantic_target",
+    }
+    if not required <= hashes.keys() or any(
+        not isinstance(key, str) or not isinstance(value, str) or not value
+        for key, value in hashes.items()
+    ):
+        raise ValueError(
+            "Collection requires complete nonempty supervision dependencies: "
+            + ", ".join(sorted(required))
+        )
+    if any(
+        not isinstance(value, str) or not value
+        for value in (case_id, parent_group_id, model_hash, round_id)
+    ):
+        raise ValueError("Collection requires case, parent, model and round provenance")
     counts = tuple(candidate_counts)
     if (
         any(type(n) is not int or n < 1 for n in counts)
@@ -1010,6 +1054,27 @@ def collect_sampled_repairs(
         quartet_attempts=quartet_attempts,
     )
     sampler_hash = canonical_hash((settings, counts, schedule))
+    dependencies = dict(
+        revision="exact-repair/collection-dependencies/v1",
+        case_id=case_id,
+        parent_group_id=parent_group_id,
+        split=split,
+        hashes=dict(sorted(hashes.items())),
+        model_hash=model_hash,
+        round_id=round_id,
+        candidate_counts=list(counts),
+        object_candidate_ids=[[name, list(ids)] for name, ids in object_candidate_ids],
+        sampler_hash=sampler_hash,
+    )
+    collection_identity = canonical_hash(dependencies)
+    # Validate the complete label context before deserializing or reusing labels.
+    # Legacy partial state has no recoverable proof of those dependencies.
+    if resume_state is not None and (
+        resume_state.get("schema") != "exact-repair/collection-state/v3.2"
+        or resume_state.get("collection_identity") != collection_identity
+        or canonical_hash(resume_state.get("collection_dependencies")) != collection_identity
+    ):
+        raise ValueError("Partial collection supervision dependencies/identity changed or missing")
     started = time.monotonic()
     previous_elapsed = float((resume_state or {}).get("elapsed_seconds", 0.0))
     labels: list[RepairLabel] = []
@@ -1056,7 +1121,15 @@ def collect_sampled_repairs(
             )
             for row in resume_state["labels"]
         ]
-        attempts = [dict(row) for row in resume_state["attempts"]]
+        attempts = [
+            dict(
+                row,
+                assignment=(
+                    tuple(row["assignment"]) if row.get("assignment") is not None else None
+                ),
+            )
+            for row in resume_state["attempts"]
+        ]
         counters = {name: dict(values) for name, values in resume_state["counters"].items()}
         seen = {label.assignment: index for index, label in enumerate(labels)}
         selections = [
@@ -1105,6 +1178,9 @@ def collect_sampled_repairs(
 
             progress(
                 dict(
+                    schema="exact-repair/collection-state/v3.2",
+                    collection_identity=collection_identity,
+                    collection_dependencies=dependencies,
                     sampler_hash=sampler_hash,
                     labels=[asdict(label) for label in labels],
                     attempts=attempts,
@@ -1153,6 +1229,8 @@ def collect_sampled_repairs(
         attempts=tuple(attempts),
         strata=tuple((name, tuple(sorted(counts_.items()))) for name, counts_ in counters.items()),
         sampler_settings=tuple(sorted(settings.items())),
+        collection_identity=collection_identity,
+        collection_dependencies=dependencies,
     )
 
 
