@@ -90,6 +90,8 @@ matching:
   extraction:
     # Global extraction strategy; greedy preserves shipped behavior.
     mode: greedy
+    # Reject conflicting exact anchors or retain them as scored competitors.
+    anchor_conflict_policy: error
     # Connected-component size above which assignment falls back to threshold-first greedy.
     assignment_component_cap: 500
   # E02 anchor-guided structural rescoring controls.
@@ -124,6 +126,7 @@ matching:
     artifact:
     training_source_labels:
     pool_miss_development_reference:
+    pool_miss_candidate_labels:
     label_semantics: unknown
     # Common scale for real candidates and NIL.
     ranking_scale: joint_accept_probability
@@ -212,6 +215,7 @@ matching:
       formulation: normalised
       # Persist pivot-reason diagnostics.
       dump_components: false
+      controlled_perturbations: false
       incompatibilities: []
       relation_interpretation:
     # E26 lexical-quality controls.
@@ -291,6 +295,10 @@ dataset:
   max_diff_triples: 24
   # Maximum literal or annotation snippets per entity.
   max_attr_items: 12
+  # Pinned per-property annotation and identifier semantics.
+  annotation_semantics: {}
+  # Deduplicate semantically identical annotations before evidence truncation.
+  annotation_provenance_dedup: false
   # Feature-build debug progress interval in unique entities.
   pair_adaptive_feature_log_every: 1000
   # Ontology-native hierarchical relation families and aliases.
@@ -1013,6 +1021,7 @@ selector:
 # Per-component supervision-mode resolution.
 supervision:
   transfer_artifact:
+  inference_artifact:
   negative_label_policy: unknown
   label_budget:
   label_selection: passive
