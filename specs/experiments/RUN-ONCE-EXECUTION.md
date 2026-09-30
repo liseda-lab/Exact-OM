@@ -37,6 +37,13 @@ caches across compatible cells. Roles, seeds, input bytes and numerical dependen
 remain in identities. Changes to downstream fusion/calibration/extraction reuse only the
 upstream evidence they cannot affect. Query-dependent features keep their query context.
 
+The 2026-09-30 capacity amendment sets the campaign's shared numerical-cache allowance to
+128 GiB of payloads (`EXACT_NUMERICAL_CACHE_MAX_BYTES=137438953472`); SQLite overhead is
+additional. Bind this setting through the supervisor registry's current successor environment
+for prepared and future batches. Preserve existing entries and the uncached-computation
+fallback when full. This is a disk-cache allowance, not a RAM allocation or task cutoff.
+Already-running workers retain their original environment until they finish.
+
 Bounded encoder prefetch, resident embedding rows and bulk tensor transfers remove
 avoidable GPU synchronization and repeated copies. Verified local scratch staging reduces
 NAS reads while durable inputs, checkpoints, receipts and results remain on NAS. Cache
