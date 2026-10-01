@@ -213,6 +213,7 @@ def _source_inventory(path: Path, *, source_format, options, cache_root=None):
         "datalog_facts": _datalog_fact_count(source),
     }
     if cache_path is not None:
+        assert identity is not None
         if sha256_file(path) != identity["sha256"] or any(
             sha256_file(Path(binding["path"])) != binding["sha256"]
             for binding in identity["imports"].values()

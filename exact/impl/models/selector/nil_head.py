@@ -272,21 +272,6 @@ def source_decision_records(frame, source_universe, *, artifact=None, dataset=No
     return records
 
 
-def restrict_benchmark_exact_matches(dataset):
-    """Exact label matches may not expand an explicitly supplied benchmark pool."""
-    exact = getattr(dataset, "_exact_matches", None)
-    if exact is None or exact.empty:
-        return
-    pool = set(zip(dataset.candidates.Src.astype(str), dataset.candidates.Tgt.astype(str)))
-    keep = [(str(row.Src), str(row.Tgt)) in pool for row in exact.itertuples()]
-    dataset._exact_matches = exact.loc[keep].copy()
-    dataset._active_candidate_config["benchmark_pool_exact_scope"] = {
-        "version": 1,
-        "excluded_exact_pairs": len(keep) - sum(keep),
-    }
-    dataset._refresh_candidate_pool_manifest(origin="provided_benchmark_pool")
-
-
 def remove_development_positives(
     frame,
     reference_pairs,

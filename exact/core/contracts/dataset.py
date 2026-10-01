@@ -38,6 +38,10 @@ class IDataset(SelfRegisteringComponent, LoggingClass, Dataset):
         ):
             raise NotImplementedError("This dataset does not support retrieval training")
 
+    def restrict_benchmark_exact_matches(self) -> None:
+        """Restrict exact matches to the supplied benchmark candidate pool."""
+        raise NotImplementedError("This dataset does not support benchmark exact-match scoping")
+
     def prepare_pool_miss_diagnostic(self, reference_path, **kwargs) -> None:
         """Apply a named development-only candidate intervention."""
         raise NotImplementedError("This dataset does not support pool-miss diagnostics")

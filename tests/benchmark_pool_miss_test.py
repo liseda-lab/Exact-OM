@@ -11,10 +11,10 @@ from exact.core.entities.configs.config import ConfigModel
 from exact.core.entities.configs.experimental import NilConfig, PoolMissCandidateLabels
 from exact.experiments.nil_evaluation import evaluate_source_labels
 from exact.experiments.public_inference import prepare_public_inference
+from exact.impl.datasets.base import BaseAlignmentDataset
 from exact.impl.models.selector.nil_head import (
     prepare_pool_miss_diagnostic,
     remove_development_positives,
-    restrict_benchmark_exact_matches,
 )
 from exact.utils.frozen_inference import _check_config
 from exact.utils.provenance import sha256_file
@@ -300,11 +300,16 @@ def test_exact_prefilter_and_actual_trace_writer_preserve_the_supplied_pool(tmp_
     dataset._exact_matches = pd.DataFrame(
         [("s0", "t0"), ("s0", "t1"), ("s0", "outside")], columns=["Src", "Tgt"]
     )
-    restrict_benchmark_exact_matches(dataset)
+    BaseAlignmentDataset.restrict_benchmark_exact_matches(dataset)
     assert set(zip(dataset._exact_matches.Src, dataset._exact_matches.Tgt)) == {
         ("s0", "t0"),
         ("s0", "t1"),
     }
+    assert dataset._active_candidate_config["benchmark_pool_exact_scope"] == {
+        "version": 1,
+        "excluded_exact_pairs": 1,
+    }
+    assert dataset.manifest_origin == "provided_benchmark_pool"
     prepare_pool_miss_diagnostic(
         dataset,
         reference_path,

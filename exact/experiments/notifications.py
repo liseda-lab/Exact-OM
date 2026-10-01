@@ -16,9 +16,11 @@ from email.message import EmailMessage
 from pathlib import Path
 from typing import Any, Mapping
 
-
 _ACTION_REQUIRED_OUTCOMES = {
-    "needs_user", "requires_user", "approval_needed", "incident_attempt_limit",
+    "needs_user",
+    "requires_user",
+    "approval_needed",
+    "incident_attempt_limit",
     "supervisor_unavailable",
 }
 
@@ -30,15 +32,19 @@ def _suppress_non_actionable(alert: dict[str, Any]) -> bool:
     previous = alert.get("delivery")
     if previous not in {"sent", "ambiguous", "suppressed"}:
         alert.update(
-            delivery="suppressed", suppressed_delivery=previous,
+            delivery="suppressed",
+            suppressed_delivery=previous,
             suppression_reason="action_required_only",
             updated_at=datetime.now(timezone.utc).isoformat(),
         )
         if previous == "sending":
             # Even command replay could send an old informational message. Keep
             # the uncertain attempt visible for receipt inspection, never retry it.
-            alert.update(delivery="ambiguous", needs_attention=True,
-                         error="Delivery interrupted; inspect transport receipt before resolving")
+            alert.update(
+                delivery="ambiguous",
+                needs_attention=True,
+                error="Delivery interrupted; inspect transport receipt before resolving",
+            )
         _write(Path(alert["path"]), alert)
     return True
 
@@ -210,7 +216,7 @@ def notify_intervention(
             if _suppress_non_actionable(alert):
                 return alert
             _write(path, alert)
-        if configured and not defer:
+        if configured and not defer and config is not None:
             return _attempt(alert, config)
     except Exception as exc:
         alert.update(
@@ -244,8 +250,11 @@ def flush_notifications(directory: str | Path, config: Mapping[str, Any]) -> dic
                     and time.time() >= alert.get("next_attempt_epoch", 0)
                 ):
                     if delivery == "sending" and config.get("transport") != "command":
-                        alert.update(delivery="ambiguous", needs_attention=True,
-                                     error="Delivery interrupted; inspect transport")
+                        alert.update(
+                            delivery="ambiguous",
+                            needs_attention=True,
+                            error="Delivery interrupted; inspect transport",
+                        )
                         _write(path, alert)
                     else:
                         alert = _attempt(alert, config)
@@ -254,7 +263,11 @@ def flush_notifications(directory: str | Path, config: Mapping[str, Any]) -> dic
             except (OSError, ValueError, KeyError, TypeError):
                 # One corrupt/unavailable alert cannot block the rest of the outbox.
                 counts["unreadable"] = counts.get("unreadable", 0) + 1
-    result = {"status": "checked", "counts": counts, "checked_at": datetime.now(timezone.utc).isoformat()}
+    result = {
+        "status": "checked",
+        "counts": counts,
+        "checked_at": datetime.now(timezone.utc).isoformat(),
+    }
     _write(directory / "notification-status.json", result)
     return result
 
@@ -275,10 +288,15 @@ def notification_incidents(directory: str | Path) -> list[dict[str, Any]]:
         if alert.get("delivery") != "ambiguous" or alert.get("notification_incident"):
             continue
         identity = hashlib.sha256(("notification:" + alert["id"]).encode()).hexdigest()[:24]
-        incidents.append({
-            "id": identity, "kind": "notification_delivery_uncertain", "run_ids": [],
-            "alert_path": str(path),
-            "reason": "Email delivery is uncertain. Inspect the saved Gmail receipt for alert "
-                      + alert["id"] + "; do not assume delivery or resend blindly.",
-        })
+        incidents.append(
+            {
+                "id": identity,
+                "kind": "notification_delivery_uncertain",
+                "run_ids": [],
+                "alert_path": str(path),
+                "reason": "Email delivery is uncertain. Inspect the saved Gmail receipt for alert "
+                + alert["id"]
+                + "; do not assume delivery or resend blindly.",
+            }
+        )
     return incidents

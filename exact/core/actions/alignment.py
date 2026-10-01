@@ -861,11 +861,7 @@ def _run_alignment_session(
                     **configs.candidates.model_dump(mode="python"),
                 )
             if benchmark_pool:
-                from exact.impl.models.selector.nil_head import (
-                    restrict_benchmark_exact_matches,
-                )
-
-                restrict_benchmark_exact_matches(dataset)
+                dataset.restrict_benchmark_exact_matches()
             if nil_diagnostic_reference is not None:
                 dataset.prepare_pool_miss_diagnostic(
                     nil_diagnostic_reference,
