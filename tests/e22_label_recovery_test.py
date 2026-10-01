@@ -194,6 +194,21 @@ def label_free(root):
                     "identity_migration": {"reason": "earlier-key-repair"},
                 }
             ).encode()
+        if stage == "evaluation":
+            outputs["evaluation/evaluation_results.json"] = json.dumps(
+                {
+                    "builtin": {"F1": 0.718},
+                    "meta": {
+                        "refs": {
+                            "alignment": {
+                                "path": "/original/predictions.csv",
+                                "sha256": "same-predictions",
+                                "rows": 293,
+                            }
+                        }
+                    },
+                }
+            ).encode()
         store.publish(old, outputs)
         if stage != "inputs":
             store.restore(old["artifact_id"], source)
@@ -287,3 +302,23 @@ def test_inactive_analytic_gate_is_compatible_but_negative_policy_is_retained():
     assert repair.feature_config(old) == repair.feature_config(new)
     new["supervision"]["negative_label_policy"] = "complete_reference"
     assert repair.feature_config(old) != repair.feature_config(new)
+
+
+@pytest.mark.parametrize("damage", [None, "metric", "checksum", "rows"])
+def test_label_free_allows_only_portable_evaluation_provenance(tmp_path, damage):
+    args = label_free(tmp_path)
+    report_path = args[2].parent / "evaluation/evaluation_results.json"
+    report = json.loads(report_path.read_text())
+    report["meta"]["refs"]["alignment"]["path"] = "/restored/predictions.csv"
+    if damage == "metric":
+        report["builtin"]["F1"] = 0.9
+    elif damage == "checksum":
+        report["meta"]["refs"]["alignment"]["sha256"] = "changed-predictions"
+    elif damage == "rows":
+        report["meta"]["refs"]["alignment"]["rows"] = 999
+    write(report_path, report)
+    if damage:
+        with pytest.raises(ValueError, match="changed consumed output"):
+            repair.verify_label_free(*args)
+    else:
+        repair.verify_label_free(*args)

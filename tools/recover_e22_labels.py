@@ -215,9 +215,11 @@ def verify_label_free(cell, recovery, source, old_store, old_impl):
         if actual != expected_identity:
             raise ValueError("Label-free identity differs beyond the approved fitting-only repair")
         if stage != "inputs":
-            for name, output in payload["outputs"].items():
-                if binding(source.parent / name)["sha256"] != output["sha256"]:
-                    raise ValueError("Label-free exposed outputs differ from stored bytes")
+            from exact.experiments.runtime import _verify_materialized
+
+            # Restored evaluation provenance rewrites paths while retaining hashes.
+            # Use the same scientific-content validation as normal recovery.
+            _verify_materialized(old_store, payload, source.parent)
         saved[stage] = payload
     measurement = saved["extraction"]["outputs"]["stats/execution_measurement.json"]
     original = read(old_store._blob(measurement["sha256"]))
