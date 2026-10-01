@@ -10,6 +10,7 @@ from time import monotonic
 from typing import TYPE_CHECKING, Any, cast
 
 from .candidates import deduplicate_candidates, finite_expression_menu
+from .grammar import GrammarEncoding, GrammarEnumeration, GrammarTemplate
 from .records import (
     RepairInputV2,
     ReplacementCandidateV2,
@@ -31,20 +32,20 @@ PROPOSAL_ARMS = (
 )
 
 
-def enumerate_grammar_candidates(
-    encoding: Any,
+def enumerate_grammar(
+    encoding: GrammarEncoding,
     *,
     max_expressions: int = 10000,
     deadline: float | None = None,
-) -> tuple[ReplacementCandidateV2, ...]:
-    """Enumerate exactly the same typed templates/menus/bounds as the direct grammar.
+) -> GrammarEnumeration:
+    """Enumerate candidates and fresh witnesses under the current typed grammar.
 
     ``deadline`` is an absolute monotonic deadline. An exceeded expression or
     wall budget raises; callers must record an unresolved enumeration arm, never
     call a truncated prefix exhaustive. Fixed elementary states remain in the
     optimizer's independently captured input even if this comparison fails.
     """
-    options = {
+    options: dict[str, Any] = {
         "max_depth": encoding.max_depth,
         "max_constructors": encoding.max_constructors,
         "max_expressions": max_expressions,
@@ -64,7 +65,25 @@ def enumerate_grammar_candidates(
         if result.status != "complete":
             raise ValueError(f"grammar enumeration failed: {result.detail}")
         expressions = result.value
-    pool = list(encoding.elementary_candidates)
+    pool: list[ReplacementCandidateV2] = []
+    witnesses: dict[str, tuple[bool, ...] | None] = {t.name: None for t in encoding.templates}
+    representative_ids: dict[str, str] = {}
+
+    def retain(template: GrammarTemplate, assignment: tuple[bool, ...]) -> None:
+        candidate = encoding.decode(assignment)
+        pool.append(candidate)
+        if (
+            template.name not in representative_ids
+            or candidate.candidate_id < representative_ids[template.name]
+        ):
+            representative_ids[template.name] = candidate.candidate_id
+            witnesses[template.name] = assignment
+
+    for template in encoding.templates:
+        if template.fixed is not None:
+            assignment = encoding.assignment(template)
+            if encoding.accepts(assignment):
+                retain(template, assignment)
     for expression in expressions:
         if deadline is not None and monotonic() >= deadline:
             raise TimeoutError("grammar enumeration deadline exhausted")
@@ -73,8 +92,24 @@ def enumerate_grammar_candidates(
                 continue
             assignment = encoding.assignment(template, expression)
             if encoding.accepts(assignment):
-                pool.append(encoding.emit(template, expression))
-    return deduplicate_candidates(pool)
+                retain(template, assignment)
+    candidates = deduplicate_candidates(pool)
+    language_hash = encoding.content_hash
+    if deadline is not None and monotonic() >= deadline:
+        raise TimeoutError("grammar enumeration deadline exhausted")
+    return GrammarEnumeration(language_hash, candidates, tuple(witnesses.items()))
+
+
+def enumerate_grammar_candidates(
+    encoding: GrammarEncoding,
+    *,
+    max_expressions: int = 10000,
+    deadline: float | None = None,
+) -> tuple[ReplacementCandidateV2, ...]:
+    """Compatibility candidate-only view; provenance is not current coverage evidence."""
+    return enumerate_grammar(
+        encoding, max_expressions=max_expressions, deadline=deadline
+    ).candidates
 
 
 class UnconditionedMixture:

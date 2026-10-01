@@ -350,6 +350,64 @@ class GrammarEncoding:
         return tuple(sorted(bits for bits in result if self.accepts(bits)))
 
 
+@dataclass(frozen=True)
+class GrammarEnumeration:
+    """Completed current-language enumeration, independent of candidate history.
+
+    Each template has one accepted Boolean witness, or None after its entire
+    finite expression menu was exhausted. Partial enumerations never return this
+    receipt. Candidate provenance may include older languages and is not evidence.
+    """
+
+    language_hash: str
+    candidates: tuple[ReplacementCandidateV2, ...]
+    family_witnesses: tuple[tuple[str, tuple[bool, ...] | None], ...]
+
+    @property
+    def content_hash(self) -> str:
+        return canonical_hash(
+            (
+                "current-grammar-enumeration/v1",
+                self.language_hash,
+                tuple(c.candidate_id for c in self.candidates),
+                self.family_witnesses,
+            )
+        )
+
+    def representatives(
+        self, encoding: GrammarEncoding
+    ) -> dict[str, ReplacementCandidateV2 | None]:
+        """Check current grammar binding and replay each positive template witness."""
+        witnesses = dict(self.family_witnesses)
+        if (
+            self.language_hash != encoding.content_hash
+            or len(witnesses) != len(self.family_witnesses)
+            or set(witnesses) != {t.name for t in encoding.templates}
+        ):
+            raise ValueError("enumeration witnesses do not cover the current grammar")
+        pool = {c.candidate_id: c for c in self.candidates}
+        if len(pool) != len(self.candidates) or any(
+            c.object_id != encoding.revision.object_id for c in self.candidates
+        ):
+            raise ValueError("enumeration witnesses have an invalid candidate pool")
+        representatives: dict[str, ReplacementCandidateV2 | None] = {}
+        for name, bits in self.family_witnesses:
+            if bits is None:
+                representatives[name] = None
+                continue
+            if not encoding.accepts(bits) or encoding.choices(bits)["template"] != name:
+                raise ValueError("enumeration witness violates its current template")
+            decoded = encoding.decode(bits)
+            candidate = pool.get(decoded.candidate_id)
+            if candidate is None or (
+                candidate.axioms != decoded.axioms
+                or candidate.active_expressions != decoded.active_expressions
+            ):
+                raise ValueError("enumeration witness is absent from its candidate pool")
+            representatives[name] = candidate
+        return representatives
+
+
 def _first_model(root: Any, width: int, max_steps: int) -> tuple[bool, ...] | None:
     """Deterministic satisfying assignment of a decomposable compiler DAG."""
     satisfiable: dict[int, bool] = {}
@@ -401,24 +459,20 @@ def protected_representatives(
     circuit: Any = None,
     *,
     max_checks: int = 100000,
-    enumerated_candidates: Sequence[ReplacementCandidateV2] | None = None,
+    enumeration: GrammarEnumeration | None = None,
 ) -> tuple[tuple[ReplacementCandidateV2, ...], tuple[dict[str, Any], ...]]:
     """Protect one fully admissible bundle per template; report unresolved coverage.
 
     Completed family DAGs prove empty support or yield one satisfying assignment.
-    A successfully completed exhaustive enumeration is authoritative too: its
-    per-template provenance establishes representatives or empty support without
-    rerunning the weaker fallback search. Pass it only after enumeration returns,
-    never a truncated prefix. Otherwise bounded fallback exhaustion stays unknown.
+    A successfully completed exhaustive enumeration supplies fresh, grammar-bound
+    template witnesses or empty support without rerunning weaker fallback search.
+    Historical candidate provenance never establishes current family membership.
+    Otherwise bounded fallback exhaustion stays unknown.
     """
     if type(max_checks) is not int or max_checks < 0:
         raise ValueError("representative search budget must be a nonnegative integer")
     families = {f.name: f for f in getattr(circuit, "families", ())}
-    enumerated: dict[str, ReplacementCandidateV2] = {}
-    for enumerated_candidate in sorted(enumerated_candidates or (), key=lambda c: c.candidate_id):
-        for key, template_name in enumerated_candidate.provenance:
-            if key == "grammar_template":
-                enumerated.setdefault(template_name, enumerated_candidate)
+    enumerated = enumeration.representatives(encoding) if enumeration is not None else None
     arguments = list(encoding.classes)
     for axiom in normalise_axioms(encoding.revision.original_axioms):
         if isinstance(axiom, owl.SubClassOf):
@@ -431,19 +485,19 @@ def protected_representatives(
         candidate = template.fixed
         status, detail = "retained", "deterministic elementary alternative"
         family = families.get(template.name)
-        if candidate is None:
+        if enumerated is not None:
+            candidate = enumerated[template.name]
+            status, detail = (
+                ("retained", "current-template witness from completed declared enumeration")
+                if candidate is not None
+                else ("empty_language", "completed declared enumeration proved empty support")
+            )
+        elif candidate is None:
             status, detail = (
                 "search_exhausted",
                 "bounded fallback did not establish admissible coverage",
             )
-            if enumerated_candidates is not None:
-                candidate = enumerated.get(template.name)
-                status, detail = (
-                    ("retained", "representative from completed declared enumeration")
-                    if candidate is not None
-                    else ("empty_language", "completed declared enumeration proved empty support")
-                )
-            elif family is not None and family.status == "empty_language":
+            if family is not None and family.status == "empty_language":
                 status, detail = "empty_language", "completed family proved empty support"
             elif family is not None and family.circuit is not None:
                 try:

@@ -702,14 +702,16 @@ def freeze_neural_round(
                 samples: tuple[Any, ...] = ()
                 rejected = 0
                 enumerated = 0
+                enumeration = None
                 if proposal_arm == "bounded_enumeration":
-                    from .proposals import enumerate_grammar_candidates
+                    from .proposals import enumerate_grammar
 
-                    sampled_candidates = enumerate_grammar_candidates(
+                    enumeration = enumerate_grammar(
                         encoding,
                         max_expressions=max_enumerated_expressions,
                         deadline=monotonic() + compile_seconds,
                     )
+                    sampled_candidates = enumeration.candidates
                     enumerated = len(sampled_candidates)
                     setup_seconds = monotonic() - before
                     from .grammar import protected_representatives
@@ -717,7 +719,7 @@ def freeze_neural_round(
                     controls, protected_reports = protected_representatives(
                         encoding,
                         max_checks=representative_max_checks,
-                        enumerated_candidates=sampled_candidates,
+                        enumeration=enumeration,
                     )
                     context = model.object_context(obj.object_id, memory)
                     ranked = {
@@ -848,8 +850,9 @@ def freeze_neural_round(
                         "object_id": obj.object_id,
                         "generation_identity": canonical_hash(
                             (
-                                "protected-generation/review-2",
+                                "protected-generation/current-witnesses-v1",
                                 encoding.content_hash,
+                                enumeration.content_hash if enumeration is not None else None,
                                 representative_max_checks,
                                 tuple(sorted(removed)),
                                 tuple(sorted(omitted)),
