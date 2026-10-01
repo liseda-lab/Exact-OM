@@ -660,6 +660,28 @@ def run_recipe(path):
                     tokens=0,
                     actual_usd=0,
                 )
+        if recipe.get("e22_label_repair"):
+            from tools.finalize_prepared_selection import charge_failed_finalization
+            from tools.recover_e22_labels import prepare_label_recovery
+
+            work = "preparation/E22/label-repair/" + os.environ["SLURM_STEP_ID"]
+            ledger.admit(work, group="reserve", seconds=0, forecast_known=False)
+            migration_start, migration_status = time.time(), "failed"
+            try:
+                if recipe.get("failed_finalization_interval"):
+                    charge_failed_finalization(recipe, ledger, read(runtime / "budget.json"))
+                prepare_label_recovery(recipe, campaign, runtime, code)
+                migration_status = "complete"
+            finally:
+                ledger.finish(
+                    work,
+                    start=migration_start,
+                    end=time.time(),
+                    status=migration_status,
+                    requests=0,
+                    tokens=0,
+                    actual_usd=0,
+                )
         guarded_execute(campaign, root, code, check_pause=lambda: controls(supervisor, root))
         selection = runtime / "screen/selection.json"
         result = read(selection)["experiments"][recipe["scientific_step"]]

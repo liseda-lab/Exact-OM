@@ -36,6 +36,32 @@ def units(path, budget, *, prefix="train", report="donor-report", signature="don
     return payload
 
 
+def fitted_selector(units_path):
+    membership = {
+        key: value for key, value in json.loads(units_path.read_text()).items() if key != "binding"
+    }
+    sources = membership["selected_sources"]
+    return freeze_json(
+        units_path.with_name("selector.json"),
+        {
+            "kind": "fitted_selector",
+            "fit_provenance": {
+                "training_sources": sources,
+                "application": {"training_budget": membership},
+            },
+            "folds": [
+                {
+                    "train_sources": [
+                        source for index, source in enumerate(sources) if index % 5 != fold
+                    ],
+                    "heldout_sources": sources[fold::5],
+                }
+                for fold in range(5)
+            ],
+        },
+    )
+
+
 def evidence(path, *, supported=True):
     rows = []
     for arm, low in zip(
@@ -59,9 +85,10 @@ def evidence(path, *, supported=True):
 
 
 def curve(tmp_path, *, supported=True):
-    donor = {arm: tmp_path / (arm + ".json") for arm in BUDGET_ARMS}
+    donor = {arm: tmp_path / arm / "training_units.json" for arm in BUDGET_ARMS}
     for arm, budget in zip(BUDGET_ARMS, [25, 100, 400]):
         units(donor[arm], budget)
+        fitted_selector(donor[arm])
     evaluation = tmp_path / "evaluation.json"
     units(evaluation, 100, prefix="independent", report="recipient-report", signature="recipient")
     bootstrap = tmp_path / "bootstrap.json"
@@ -123,6 +150,25 @@ def test_policy_rejects_population_leakage_and_unequal_joint_counts(tmp_path):
     evaluation.write_text(json.dumps(payload))
     with pytest.raises(ValueError, match="equal effective"):
         prepare_count_policy_followup(bootstrap, donor, evaluation, tmp_path / "p")
+
+
+@pytest.mark.parametrize("corruption", ["all_groups", "fold_leak", "duplicate_heldout", "unbound"])
+def test_policy_rejects_declared_budget_with_incompatible_observed_fit(tmp_path, corruption):
+    donor, evaluation, bootstrap = curve(tmp_path)
+    path = donor["budget_25"].with_name("selector.json")
+    artifact = json.loads(path.read_text())
+    if corruption == "all_groups":
+        artifact["fit_provenance"]["training_sources"] = [f"train-{i}" for i in range(2000)]
+    elif corruption == "fold_leak":
+        artifact["folds"][0]["train_sources"].append("outside-budget")
+    elif corruption == "duplicate_heldout":
+        artifact["folds"][1] = artifact["folds"][0]
+    else:
+        artifact["fit_provenance"]["application"].pop("training_budget")
+    path.write_text(json.dumps(artifact))
+    with pytest.raises(ValueError, match="label budget"):
+        prepare_count_policy_followup(bootstrap, donor, evaluation, tmp_path / "policy")
+    assert not (tmp_path / "policy").exists()
 
 
 def test_train_count_preparation_uses_confirmed_labels_and_no_reporting_labels(tmp_path):
@@ -195,7 +241,10 @@ def declaration(tmp_path, identifier, arms, overlay, settings=None):
     return harness.ExperimentSource(config, path)
 
 
-def test_materialize_uses_completed_nested_units_and_real_paired_bootstrap(tmp_path, monkeypatch):
+@pytest.mark.parametrize("include_active", [False, True])
+def test_materialize_uses_completed_nested_units_and_real_paired_bootstrap(
+    tmp_path, monkeypatch, include_active
+):
     source_path, target_path = tmp_path / "source.owl", tmp_path / "target.owl"
     source_path.write_text("synthetic source ontology")
     target_path.write_text("synthetic target ontology")
@@ -225,7 +274,8 @@ def test_materialize_uses_completed_nested_units_and_real_paired_bootstrap(tmp_p
         tmp_path,
         "E22",
         [{"id": "label_free", "role": "baseline"}]
-        + [{"id": arm, "role": "candidate"} for arm in BUDGET_ARMS],
+        + [{"id": arm, "role": "candidate"} for arm in BUDGET_ARMS]
+        + ([{"id": "active_100", "role": "candidate"}] if include_active else []),
         overlay,
     )
     followup = declaration(
@@ -240,7 +290,7 @@ def test_materialize_uses_completed_nested_units_and_real_paired_bootstrap(tmp_p
     )
     stage_root = tmp_path / "fixture" / "screen"
     manifests, records = [], []
-    for arm in ["label_free", *BUDGET_ARMS]:
+    for arm in ["label_free", *BUDGET_ARMS, *(["active_100"] if include_active else [])]:
         output = stage_root / "runs" / "E22" / arm / "development" / "seed-17"
         output.mkdir(parents=True)
         if arm != "label_free":
@@ -248,6 +298,12 @@ def test_materialize_uses_completed_nested_units_and_real_paired_bootstrap(tmp_p
                 output / "fitting" / "scorer" / "labels-hash" / "training_units.json",
                 int(arm.split("_")[1]),
             )
+            units_path = output / "fitting" / "scorer" / "labels-hash" / "training_units.json"
+            if arm == "active_100":
+                payload = json.loads(units_path.read_text())
+                payload["selection"] = "uncertainty"
+                units_path.write_text(json.dumps(payload))
+            fitted_selector(units_path)
         manifests.append(
             {
                 "experiment_id": "E22",
@@ -290,6 +346,7 @@ def test_materialize_uses_completed_nested_units_and_real_paired_bootstrap(tmp_p
     assert bound.path.is_file() and bound.path != followup.path
     policy = json.loads((bound.directory / "count_policy.json").read_text())
     assert policy["components"]["rerank"]["minimum_groups"] == 100
+    assert set(policy["selection_provenance"]["fitted_selectors_sha256"]) == set(BUDGET_ARMS)
     assert policy["binding"]["dataset_signature"] == dataset_signature_for_paths(
         source_path, target_path
     )
@@ -309,6 +366,13 @@ def test_materialize_uses_completed_nested_units_and_real_paired_bootstrap(tmp_p
             == "supervised"
         )
     assert materialize_followup(followup, suite, manifests).raw_hash() == bound.raw_hash()
+    if include_active:
+        path = next((stage_root / "runs" / "E22" / "active_100").glob("**/selector.json"))
+        artifact = json.loads(path.read_text())
+        artifact["fit_provenance"]["training_sources"].append("outside-budget")
+        path.write_text(json.dumps(artifact))
+        with pytest.raises(ValueError, match="label budget"):
+            materialize_followup(followup, suite, manifests)
     manifests[0]["status"] = "interrupted"
     with pytest.raises(ValueError, match="all completed"):
         materialize_followup(followup, suite, manifests)

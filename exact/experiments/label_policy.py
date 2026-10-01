@@ -60,6 +60,31 @@ def prepare_training_units(candidates, reference, path, *, binding, budget=100, 
     )
 
 
+def _verified_budget_selector(units_path):
+    """Bind observed training groups and OOF membership, not just requested counts."""
+    from exact.impl.trainer.fitting import _validate_budgeted_selector_fit
+
+    units_path = Path(units_path)
+    units = json.loads(units_path.read_text())
+    membership = {key: value for key, value in units.items() if key != "binding"}
+    selected = membership["selected_sources"]
+    if (
+        membership["requested_groups"] is None
+        or len(set(selected)) != len(selected)
+        or len(selected) != membership["effective_groups"]
+        or len(selected) != min(membership["requested_groups"], membership["available_groups"])
+    ):
+        raise ValueError("E22 effective membership differs from the requested label budget")
+    path = units_path.with_name("selector.json")
+    if not path.is_file():
+        raise ValueError("E22 budget curve lacks its fitted selector artifact")
+    artifact = json.loads(path.read_text())
+    if artifact.get("kind") != "fitted_selector" or not artifact.get("folds"):
+        raise ValueError("E22 budget curve requires fitted selector OOF evidence")
+    _validate_budgeted_selector_fit(artifact, membership)
+    return sha256_file(path)
+
+
 def prepare_count_policy_followup(
     paired_bootstrap_path,
     training_units_by_arm,
@@ -130,6 +155,9 @@ def prepare_count_policy_followup(
             raise ValueError(
                 "E22 joint selector requires equal effective rank/accept source counts"
             )
+    selector_hashes = {
+        arm: _verified_budget_selector(path) for arm, path in training_units_by_arm.items()
+    }
     records = []
     for arm in BUDGET_ARMS:
         matches = [
@@ -181,6 +209,7 @@ def prepare_count_policy_followup(
         "training_units_sha256": {
             arm: sha256_file(Path(path)) for arm, path in training_units_by_arm.items()
         },
+        "fitted_selectors_sha256": selector_hashes,
         "evaluation_units_sha256": sha256_file(Path(evaluation_units_path)),
         "budget_source_sets_sha256": fingerprint([sorted(items) for items in memberships]),
         "fixed_minimum": fixed_minimum,
@@ -306,6 +335,18 @@ def materialize_followup(source, suite, manifests):
         or any(item.get("status") != "complete" or item.get("seed") != 17 for item in selected)
     ):
         raise ValueError("E22 policy requires all completed passive and label-free screen cells")
+    # The active arm does not fit the passive policy curve, but a declared E22
+    # family must not finalize with an unverified budgeted treatment.
+    active = [
+        item
+        for item in manifests
+        if item.get("experiment_id") == "E22"
+        and item.get("stage") == "screen"
+        and item.get("arm_id") == "active_100"
+    ]
+    if any(arm.id == "active_100" for arm in producer.config.arms):
+        if len(active) != 1 or active[0].get("status") != "complete" or active[0].get("seed") != 17:
+            raise ValueError("E22 policy requires the completed active budget treatment")
     roots = set()
     units_by_arm = {}
     output_dirs = {}
@@ -326,6 +367,21 @@ def materialize_followup(source, suite, manifests):
                     f"E22 {item['arm_id']} needs one unambiguous completed training-unit artifact"
                 )
             units_by_arm[item["arm_id"]] = matches[0]
+    active_selector_hash = None
+    for item in active:
+        output = Path(item["fingerprint_payload"]["output_dir"]).resolve()
+        if len(output.parents) < 5 or output.parents[4] not in roots:
+            raise ValueError("E22 active treatment is outside the completed producer stage")
+        matches = sorted((output / "fitting").glob("**/training_units.json"))
+        if len(matches) != 1:
+            raise ValueError("E22 active treatment needs one completed training-unit artifact")
+        active_units = json.loads(matches[0].read_text())
+        if (
+            active_units.get("requested_groups") != 100
+            or active_units.get("selection") != "uncertainty"
+        ):
+            raise ValueError("E22 active treatment differs from its declared label budget")
+        active_selector_hash = _verified_budget_selector(matches[0])
     if len(roots) != 1:
         raise ValueError("E22 policy cannot mix completed outputs from different stages")
     stage_root = roots.pop()
@@ -410,6 +466,7 @@ def materialize_followup(source, suite, manifests):
         "source_declaration_sha256": source.raw_hash(),
         "policy_sha256": sha256_file(Path(result["policy_path"])),
         "followup_sha256": sha256_file(destination / "followup.json"),
+        **({"active_selector_sha256": active_selector_hash} if active_selector_hash else {}),
     }
     resolved = ExperimentConfig.model_validate(declaration)
     path = destination / "resolved-experiment.json"

@@ -34,6 +34,35 @@ def source_batches(frame, batch_size):
         yield batch
 
 
+def _validate_budgeted_selector_fit(payload, membership):
+    """Reject fitted artifacts whose actual groups or OOF splits exceed the budget."""
+    if membership["requested_groups"] is None:
+        return
+    selected = set(membership["selected_sources"])
+    provenance = payload["fit_provenance"]
+    if set(provenance["training_sources"]) != selected:
+        raise ValueError("Fitted training sources differ from the selected label budget")
+    if provenance["application"].get("training_budget") != membership:
+        raise ValueError("Fitted artifact is not bound to the selected label budget")
+    if "folds" in payload:
+        heldout_groups = []
+        for fold in payload["folds"]:
+            train, heldout = set(fold["train_sources"]), set(fold["heldout_sources"])
+            if train & heldout or train | heldout != selected:
+                raise ValueError("Fitted OOF split differs from the selected label budget")
+            heldout_groups.extend(heldout)
+        if set(heldout_groups) != selected or len(heldout_groups) != len(selected):
+            raise ValueError("Fitted OOF coverage differs from the selected label budget")
+    else:
+        source_folds = {}
+        for row in payload["oof_predictions"]:
+            previous = source_folds.setdefault(row["source"], row["fold"])
+            if previous != row["fold"]:
+                raise ValueError("Calibration OOF split divides a source group")
+        if set(source_folds) != selected:
+            raise ValueError("Calibration OOF coverage differs from the selected label budget")
+
+
 class TrainingPoolMixin:
     def fit_relation_head(self):
         config = getattr(self, "relation_config", {})
@@ -46,6 +75,8 @@ class TrainingPoolMixin:
         artifact = config.get("relation_artifact")
         training_file = config.get("relation_training_file")
         if training_file:
+            if getattr(self, "supervision_config", {}).get("label_budget") is not None:
+                raise ValueError("Source label budgets do not define typed relation training units")
             typed = typed_reference_frame(training_file)
             artifact = artifact or self.output_dir / "fitting" / "relation_head.json"
             state = fit_relation_artifact(
@@ -139,6 +170,8 @@ class TrainingPoolMixin:
             return
         seed = getattr(self.model, "request_seed", consumers[0].request_seed if consumers else 17)
         supervision = getattr(self, "supervision_config", {})
+        if nil_consumers and supervision.get("label_budget") is not None:
+            raise ValueError("Positive-source label budgets do not define NIL training units")
         policy = supervision.get("negative_label_policy", "unknown")
         if (consumers or pending) and policy not in {"complete_reference", "confirmed_negatives"}:
             raise ValueError(
@@ -345,10 +378,19 @@ class TrainingPoolMixin:
             seed=seed,
             selection=supervision.get("label_selection", "passive"),
         )
+        self._training_effective_units = {**membership, "binding": application}
         if supervision.get("label_budget") is not None:
+            # Bound the actual rows before any learner can promote confirmed
+            # positives back into the reference. Keep complete candidate groups,
+            # including their permitted negatives; raw score caches stay shared.
+            selected_sources = set(membership["selected_sources"])
+            training = training[training.Src.astype(str).isin(selected_sources)].copy()
+            training = training.reset_index(drop=True)
+            if set(training.Src.astype(str)) != selected_sources:
+                raise ValueError("Training score cache is missing selected label-budget sources")
+            application = {**application, "training_budget": membership}
             cache_dir = cache_dir / ("labels-" + fingerprint(membership))
         freeze_json(cache_dir / "label_budget.json", membership)
-        self._training_effective_units = {**membership, "binding": application}
         freeze_json(cache_dir / "training_units.json", self._training_effective_units)
         graph_config = getattr(self, "fitting_graph_config", None)
         if graph_config:
@@ -509,6 +551,7 @@ class TrainingPoolMixin:
                     selector.matching_calibration["artifact"],
                     application=application,
                 )
+                _validate_budgeted_selector_fit(fitted_calibrator, membership)
                 oof = {
                     (row["source"], row["target"]): row["probability"]
                     for row in fitted_calibrator["oof_predictions"]
@@ -524,13 +567,14 @@ class TrainingPoolMixin:
                 "artifact"
             ):
                 artifact = selector.rerank_config.get("artifact") or cache_dir / "selector.json"
-                selector.fit_training_artifact(
+                fitted_selector = selector.fit_training_artifact(
                     selector_training,
                     reference,
                     artifact,
                     application=application,
                     logger=getattr(self, "logger", None),
                 )
+                _validate_budgeted_selector_fit(fitted_selector, membership)
         self._checkpoint_fingerprint_payload = self._build_checkpoint_fingerprint_payload()
         self._checkpoint_fingerprint = self._hash_checkpoint_fingerprint_payload(
             self._checkpoint_fingerprint_payload

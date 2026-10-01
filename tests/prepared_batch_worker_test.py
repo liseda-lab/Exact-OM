@@ -60,6 +60,61 @@ def test_saved_treatment_import_is_charged_and_failure_never_runs_cells(
         assert (tail["start"], tail["end"], tail["status"]) == (4, 5, "failed")
 
 
+@pytest.mark.parametrize("failed", [False, True])
+@pytest.mark.parametrize("retained_charge", [False, True])
+def test_label_repair_precedes_cells_and_closes_accounting_on_failure(
+    tmp_path, monkeypatch, failed, retained_charge
+):
+    from tools import finalize_prepared_selection, recover_e22_labels
+
+    worker = _worker(tmp_path, monkeypatch)
+    recipe = prepared_batch.read(worker.path)
+    recipe.update(
+        parent_run_id="E22-budget-recovery",
+        e22_label_repair={"snapshots": []},
+        failed_finalization_interval={"run_id": "E22-policy-recovery-01", "start": 4, "end": 5},
+    )
+    if retained_charge:
+        finalize_prepared_selection.charge_failed_finalization(
+            recipe, BudgetLedger(worker.parent, worker.limits), prepared_batch.read(worker.parent)
+        )
+    prepared_batch.write(worker.path, recipe)
+    calls = []
+
+    def prepare(actual_recipe, lock, runtime, code):
+        assert actual_recipe == recipe
+        assert lock == worker.root / "campaign.lock.yaml" and runtime == worker.runtime
+        assert str(code) == recipe["code_root"]
+        tail = prepared_batch.read(runtime / "budget.json")["work"][
+            "failed-finalization/E22-policy-recovery-01"
+        ]
+        assert (tail["start"], tail["end"], tail["status"]) == (4, 5, "failed")
+        calls.append("prepare")
+        if failed:
+            raise ValueError("Unverified label-repair snapshot")
+
+    def execute(*args, **kwargs):
+        calls.append("execute")
+        _outputs(worker)
+
+    monkeypatch.setattr(recover_e22_labels, "prepare_label_recovery", prepare)
+    monkeypatch.setattr(experiment_resources, "guarded_execute", execute)
+    if failed:
+        with pytest.raises(ValueError, match="Unverified label-repair snapshot"):
+            prepared_batch.run_recipe(worker.path)
+    else:
+        prepared_batch.run_recipe(worker.path)
+    assert calls == (["prepare"] if failed else ["prepare", "execute"])
+    account = prepared_batch.read(worker.runtime / "budget.json")
+    work = account["work"]["preparation/E22/label-repair/40"]
+    assert work["status"] == ("failed" if failed else "complete")
+    assert work["end"] >= work["start"]
+    assert work["requests"] == work["tokens"] == work["actual_usd"] == 0
+    assert [key for key in account["work"] if key.startswith("failed-finalization/")] == [
+        "failed-finalization/E22-policy-recovery-01"
+    ]
+
+
 def _request(directory, label, tokens):
     ledger = RequestLedger(directory)
     key = ledger.plan({"role": "decision", "payload": {"max_tokens": 8, "text": label}})
