@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import copy
+import hashlib
+import json
 import time
 import uuid
 from dataclasses import replace
@@ -12,6 +14,31 @@ from tools.prepared_batch import binding, read, verified, write
 
 OLD_LINE = "            supervision=cell.resolved_supervision,\n"
 NEW_LINE = "            resolved_supervision=cell.resolved_supervision,\n"
+
+
+def migrate_execution_measurement(
+    data: bytes, *, source_artifact_id: str, target_artifact_id: str, source_sha256: str
+) -> bytes:
+    """Rebind verified execution cost without changing the original observation."""
+    if hashlib.sha256(data).hexdigest() != source_sha256:
+        raise ValueError("Original execution measurement checksum differs")
+    measurement = json.loads(data)
+    if (
+        not isinstance(measurement, dict)
+        or measurement.get("schema_version") != 1
+        or measurement.get("artifact_id") != source_artifact_id
+        or "identity_migration" in measurement
+    ):
+        raise ValueError("Original execution measurement does not match its extraction")
+    measurement.update(
+        artifact_id=target_artifact_id,
+        identity_migration={
+            "reason": "E22-supervision-key-v1",
+            "source_artifact_id": source_artifact_id,
+            "source_measurement_sha256": source_sha256,
+        },
+    )
+    return (json.dumps(measurement, indent=2, sort_keys=True, allow_nan=False) + "\n").encode()
 
 
 def verify_identity_transition(old, new, *, old_implementation, stage, parent=None):
@@ -186,11 +213,20 @@ def _import_verified_controls(recipe, campaign, runtime, code, *, verify_only=Fa
                 17,
             ):
                 raise ValueError("Control training recipe differs")
-        imports.append((cell, recovery, report, path, saved))
+        measurement = saved["extraction"]["outputs"].get("stats/execution_measurement.json")
+        if measurement is None:
+            raise ValueError("Original control lacks its execution measurement")
+        migrated_measurement = migrate_execution_measurement(
+            old_store._blob(measurement["sha256"]).read_bytes(),
+            source_artifact_id=artifacts["extraction"],
+            target_artifact_id=recovery.identities["extraction"]["artifact_id"],
+            source_sha256=measurement["sha256"],
+        )
+        imports.append((cell, recovery, report, path, saved, migrated_measurement))
     if len(set(identities.values())) != 5:
         raise ValueError("Distinct E22 supervision recipes still share prediction identity")
     records = []
-    for cell, recovery, report, path, saved in imports:
+    for cell, recovery, report, path, saved, migrated_measurement in imports:
         migrated = {k: v["artifact_id"] for k, v in recovery.identities.items()}
         records.append(
             {
@@ -203,12 +239,15 @@ def _import_verified_controls(recipe, campaign, runtime, code, *, verify_only=Fa
         if verify_only:
             continue
         for stage in ("inputs", "extraction", "evaluation"):
+            outputs: dict[str, Path | bytes] = {
+                name: old_store._blob(output["sha256"])
+                for name, output in saved[stage]["outputs"].items()
+            }
+            if stage == "extraction":
+                outputs["stats/execution_measurement.json"] = migrated_measurement
             store.publish(
                 recovery.identities[stage],
-                {
-                    name: old_store._blob(output["sha256"])
-                    for name, output in saved[stage]["outputs"].items()
-                },
+                outputs,
             )
         index = runtime / "recovery/cells" / (_hash([cell.suite_id, cell.cell_id]) + ".json")
         if not index.exists():

@@ -624,6 +624,42 @@ def run_recipe(path):
             from tools.recover_e22_budget import import_verified_controls
 
             import_verified_controls(recipe, campaign, runtime, code)
+        if recipe.get("e22_completed_treatments"):
+            from tools.finalize_prepared_selection import charge_failed_finalization
+            from tools.recover_e22_measurements import import_completed_treatments
+
+            work = "preparation/E22/treatment-import/" + os.environ["SLURM_STEP_ID"]
+            ledger.admit(work, group="reserve", seconds=0, forecast_known=False)
+            migration_start, migration_status = time.time(), "failed"
+            try:
+                import_completed_treatments(recipe, campaign, runtime, code)
+                parent_root = Path(
+                    recipe["e22_completed_treatments"]["source_runtime"]
+                ).parent.parent
+                old_budget = read(parent_root / "runtime" / recipe["campaign_id"] / "budget.json")
+                interval = {
+                    "run_id": recipe["parent_run_id"],
+                    "start": max(row["end"] for row in old_budget["work"].values() if "end" in row),
+                    "end": read(parent_root / "status.json")["at"],
+                }
+                if interval["end"] < interval["start"]:
+                    raise ValueError("E22 failed finalization interval is inconsistent")
+                charge_failed_finalization(
+                    {**recipe, "failed_finalization_interval": interval},
+                    ledger,
+                    read(runtime / "budget.json"),
+                )
+                migration_status = "complete"
+            finally:
+                ledger.finish(
+                    work,
+                    start=migration_start,
+                    end=time.time(),
+                    status=migration_status,
+                    requests=0,
+                    tokens=0,
+                    actual_usd=0,
+                )
         guarded_execute(campaign, root, code, check_pause=lambda: controls(supervisor, root))
         selection = runtime / "screen/selection.json"
         result = read(selection)["experiments"][recipe["scientific_step"]]

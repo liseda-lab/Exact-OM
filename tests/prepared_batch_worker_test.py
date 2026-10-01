@@ -15,6 +15,51 @@ from tests.prepared_batch_history_test import _fixture as history_fixture
 from tools import experiment_resources, prepared_batch, resume_e19_once
 
 
+@pytest.mark.parametrize("failed", [False, True])
+def test_saved_treatment_import_is_charged_and_failure_never_runs_cells(
+    tmp_path, monkeypatch, failed
+):
+    from tools import recover_e22_measurements
+
+    worker = _worker(tmp_path, monkeypatch)
+    donor = tmp_path / "donor"
+    source = donor / "runtime" / worker.lock["campaign_id"]
+    prepared_batch.write(source / "budget.json", {"work": {"last": {"end": 4}}})
+    prepared_batch.write(donor / "status.json", {"at": 5})
+    recipe = prepared_batch.read(worker.path)
+    recipe.update(
+        parent_run_id="E22-prior",
+        e22_completed_treatments={"source_runtime": str(source)},
+    )
+    prepared_batch.write(worker.path, recipe)
+    calls = []
+
+    def migrate(*args):
+        calls.append("import")
+        if failed:
+            raise ValueError("Treatment checksum changed")
+
+    def execute(*args, **kwargs):
+        calls.append("execute")
+        _outputs(worker)
+
+    monkeypatch.setattr(recover_e22_measurements, "import_completed_treatments", migrate)
+    monkeypatch.setattr(experiment_resources, "guarded_execute", execute)
+    if failed:
+        with pytest.raises(ValueError, match="Treatment checksum changed"):
+            prepared_batch.run_recipe(worker.path)
+    else:
+        prepared_batch.run_recipe(worker.path)
+    assert calls == (["import"] if failed else ["import", "execute"])
+    account = prepared_batch.read(worker.runtime / "budget.json")
+    work = account["work"]["preparation/E22/treatment-import/40"]
+    assert work["status"] == ("failed" if failed else "complete")
+    assert work["requests"] == work["tokens"] == work["actual_usd"] == 0
+    if not failed:
+        tail = account["work"]["failed-finalization/E22-prior"]
+        assert (tail["start"], tail["end"], tail["status"]) == (4, 5, "failed")
+
+
 def _request(directory, label, tokens):
     ledger = RequestLedger(directory)
     key = ledger.plan({"role": "decision", "payload": {"max_tokens": 8, "text": label}})
