@@ -5,7 +5,6 @@ from __future__ import annotations
 import copy
 import json
 import re
-import shutil
 from dataclasses import replace
 from pathlib import Path
 
@@ -281,6 +280,31 @@ def _cells(recipe, campaign, runtime):
     return suite, cells
 
 
+def checkpoint_raw_features(store, recovery, training_identity, files):
+    """Seed incomplete raw evidence through normal recovery, never a fitted artifact."""
+    identity = recovery.identities["extraction"]
+    # An actual continuation must retain its newest verified checkpoint.
+    previous = store.latest_checkpoint(identity["artifact_id"])
+    if previous is not None:
+        return previous
+    store.publish(
+        recovery.identities["inputs"],
+        recovery.input_files or {"_locked_inputs/manifest.json": b"{}"},
+    )
+    outputs = {}
+    for name, path, digest in files:
+        if binding(path)["sha256"] != digest:
+            raise ValueError("Raw feature bytes changed before checkpoint publication")
+        outputs[f"fitting/{training_identity}/{name}"] = path
+    return store.checkpoint(
+        identity,
+        completed_ids=sorted(outputs),
+        cursor={"stage": "raw-training-features", "fitting_complete": False},
+        outputs=outputs,
+        state={"migration": "E22-raw-feature-checkpoint-v1"},
+    )
+
+
 def prepare_label_recovery(recipe, campaign, runtime, code, *, verify_only=False):
     """Seed raw scores and one label-free control; all supervised outputs run normally."""
     from exact.experiments import harness
@@ -330,22 +354,12 @@ def prepare_label_recovery(recipe, campaign, runtime, code, *, verify_only=False
                 raise ValueError(
                     "Raw training features differ in scorer settings or input bindings"
                 )
-            for name, path, digest in files:
-                target = cell.output_dir / "fitting" / snapshot["training_identity"] / name
-                if target.exists() and binding(target)["sha256"] != digest:
-                    raise ValueError("Destination raw feature file already differs")
-                targets.append((path, target, digest))
+            targets.append(recovery)
     if len(set(identities.values())) != len(cells):
         raise ValueError("Distinct label treatments share prediction identity")
     if not verify_only:
-        for path, target, digest in targets:
-            if not target.exists():
-                target.parent.mkdir(parents=True, exist_ok=True)
-                temporary = target.with_suffix(".migration-partial")
-                shutil.copyfile(path, temporary)
-                if binding(temporary)["sha256"] != digest:
-                    raise ValueError("Copied raw feature checksum differs")
-                temporary.replace(target)
+        for recovery in targets:
+            checkpoint_raw_features(store, recovery, snapshot["training_identity"], files)
         for cell, recovery, source, report, saved, measurement in imports:
             for stage in STAGES:
                 outputs = {
@@ -372,7 +386,8 @@ def prepare_label_recovery(recipe, campaign, runtime, code, *, verify_only=False
         "schema_version": 1,
         "repair_record": settings["repair_record"],
         "raw_features": settings["raw_features"],
-        "seeded_files": len(targets),
+        "seeded_files": len(targets) * len(files),
+        "raw_feature_transport": "verified_incomplete_extraction_checkpoint",
         "controls": [cell.arm_id for cell, *_ in imports],
         "extraction_identities": identities,
         "supervised_predictions_imported": 0,

@@ -322,3 +322,78 @@ def test_label_free_allows_only_portable_evaluation_provenance(tmp_path, damage)
             repair.verify_label_free(*args)
     else:
         repair.verify_label_free(*args)
+
+
+@pytest.mark.parametrize("consolidated", [False, True])
+def test_raw_checkpoint_survives_real_cell_preparation(tmp_path, monkeypatch, consolidated):
+    from exact.experiments import harness, runtime
+    from tests.experiment_runtime_test import fixture
+
+    cell, suite, _ = fixture(tmp_path, monkeypatch)
+    provenance = harness._provenance_payload(cell, suite, workdir=tmp_path)
+    recovery = runtime.CellRecovery(cell, provenance, tmp_path)
+    sample = snapshot(tmp_path / "donor")
+    item = sample["files"][0]
+    donor = Path(item["path"])
+    name = "training_scores.json" if consolidated else item["name"]
+    files = [(name, donor, item["sha256"])]
+    # Reproduce the old failure before any scientific subprocess could run.
+    direct = cell.output_dir / "fitting" / sample["training_identity"] / name
+    direct.parent.mkdir(parents=True)
+    direct.write_bytes(donor.read_bytes())
+    with pytest.raises(FileExistsError, match="without a provenance manifest"):
+        harness._prepare_cell(cell, suite, workdir=tmp_path, resume=True, recovery=recovery)
+    direct.unlink()
+    direct.parent.rmdir()
+    direct.parent.parent.rmdir()
+
+    saved = repair.checkpoint_raw_features(
+        recovery.store, recovery, sample["training_identity"], files
+    )
+    assert not direct.exists()
+    assert saved["cursor"]["fitting_complete"] is False
+    pending, reused = harness._prepare_cell(
+        cell, suite, workdir=tmp_path, resume=True, recovery=recovery
+    )
+    assert pending["status"] == "pending" and not reused
+    assert "extraction" not in recovery.reuse
+    recovery.prepare()
+    assert direct.read_bytes() == donor.read_bytes()
+    assert direct.stat().st_ino != donor.stat().st_ino
+    with pytest.raises((OSError, ValueError)):
+        recovery.store.verify(recovery.identities["extraction"]["artifact_id"])
+    assert not (cell.output_dir / "selector.json").exists()
+    newer = recovery.store.checkpoint(
+        recovery.identities["extraction"],
+        completed_ids=["later-raw-shard"],
+        cursor={"stage": "later"},
+        outputs={"fitting/later.json": b"later"},
+    )
+    assert (
+        repair.checkpoint_raw_features(recovery.store, recovery, sample["training_identity"], files)
+        == newer
+    )
+
+
+def test_raw_checkpoint_rejects_changed_bytes(tmp_path, monkeypatch):
+    from exact.experiments import harness, runtime
+    from tests.experiment_runtime_test import fixture
+
+    cell, suite, _ = fixture(tmp_path, monkeypatch)
+    recovery = runtime.CellRecovery(
+        cell, harness._provenance_payload(cell, suite, workdir=tmp_path), tmp_path
+    )
+    sample = snapshot(tmp_path / "donor")
+    item = sample["files"][0]
+    donor = Path(item["path"])
+    donor.write_text("changed")
+    with pytest.raises(ValueError, match="changed before checkpoint"):
+        repair.checkpoint_raw_features(
+            recovery.store,
+            recovery,
+            sample["training_identity"],
+            [(item["name"], donor, item["sha256"])],
+        )
+    assert (
+        recovery.store.latest_checkpoint(recovery.identities["extraction"]["artifact_id"]) is None
+    )
