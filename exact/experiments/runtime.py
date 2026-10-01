@@ -165,7 +165,7 @@ class CellRecovery:
             }
         parameters.update(
             source_cap=cell.source_cap,
-            supervision=cell.resolved_supervision,
+            resolved_supervision=cell.resolved_supervision,
             negative_label_policy=cell.negative_label_policy,
         )
         packages = {name.lower(): version for name, version in provenance["packages"].items()}

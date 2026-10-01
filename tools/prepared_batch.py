@@ -11,7 +11,6 @@ import shlex
 import shutil
 import sqlite3
 import subprocess
-import sys
 import time
 from pathlib import Path
 
@@ -620,6 +619,10 @@ def run_recipe(path):
             scientific_step=recipe["scientific_step"],
             cumulative_budget=str(runtime / "budget.json"),
         )
+        if recipe.get("e22_recovery"):
+            from tools.recover_e22_budget import import_verified_controls
+
+            import_verified_controls(recipe, campaign, runtime, code)
         guarded_execute(campaign, root, code, check_pause=lambda: controls(supervisor, root))
         selection = runtime / "screen/selection.json"
         result = read(selection)["experiments"][recipe["scientific_step"]]

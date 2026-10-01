@@ -946,3 +946,53 @@ def test_shared_dataset_namespace_keeps_reference_bindings_separate(tmp_path, mo
         first.environment()["EXACT_DATASET_CACHE_DIR"]
         != different_labels.environment()["EXACT_DATASET_CACHE_DIR"]
     )
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("label_budget", 100),
+        ("label_selection", "uncertainty"),
+        ("negative_label_policy", "confirmed_negatives"),
+        ("auto_policy", {"kind": "profile_rule", "artifact": None}),
+    ],
+)
+def test_supervision_recipe_changes_invalidate_prediction_reuse(
+    tmp_path, monkeypatch, field, value
+):
+    cell, suite, _ = fixture(tmp_path, monkeypatch)
+    supervision = {
+        "mode": "supervised",
+        "label_budget": 25,
+        "label_selection": "passive",
+        "negative_label_policy": "complete_reference",
+    }
+    cell = replace(
+        cell,
+        resolved_config={**cell.resolved_config, "supervision": supervision},
+        resolved_supervision={"rerank": {"resolved": "supervised"}},
+    )
+    calls = []
+
+    def run(command, **kwargs):
+        calls.append(command)
+        output = Path(yaml.safe_load(Path(command[-1]).read_text())["job"]["output_dir"])
+        write_outputs(output, cell)
+        return 0, 0.1, None
+
+    monkeypatch.setattr(harness, "_run_subprocess", run)
+    original = harness.execute_cell(cell, suite, workdir=tmp_path, resume=False)
+    changed = replace(
+        cell,
+        arm_id="changed",
+        output_dir=Path(cell.recovery["root"]) / "changed",
+        resolved_config={**cell.resolved_config, "supervision": {**supervision, field: value}},
+    )
+    result = harness.execute_cell(changed, suite, workdir=tmp_path, resume=False)
+    assert len(calls) == 2
+    assert original["recovery"]["artifacts"]["inputs"] == result["recovery"]["artifacts"]["inputs"]
+    assert (
+        original["recovery"]["artifacts"]["extraction"]
+        != result["recovery"]["artifacts"]["extraction"]
+    )
+    assert "extraction" not in result["recovery"]["reused_stages"]
