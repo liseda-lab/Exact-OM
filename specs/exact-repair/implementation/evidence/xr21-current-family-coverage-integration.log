@@ -1,0 +1,14 @@
+........................................................................ [ 60%]
+................................................                         [100%]
+=============================== warnings summary ===============================
+tests/repair_current_family_coverage_test.py::test_six_candidate_budget_cannot_claim_current_family_coverage[False]
+tests/repair_current_family_coverage_test.py::test_six_candidate_budget_cannot_claim_current_family_coverage[True]
+tests/repair_current_family_coverage_test.py::test_reused_inventory_receipts_name_actual_current_family_members
+tests/repair_current_family_coverage_test.py::test_compatible_reuse_keeps_valid_family_aliases_and_history
+tests/repair_current_family_coverage_test.py::test_poisoned_historical_tags_cannot_supply_current_family_witnesses
+  /home/pgcotovio/Exact-OM/.worktrees/current-family-witnesses-20261001/exact/repair/workers.py:485: DeprecationWarning: This process (pid=3237017) is multi-threaded, use of fork() may lead to deadlocks in the child.
+    pid = os.fork()
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+------- generated xml file: /tmp/current-family-coverage-integration.xml -------
+120 passed, 5 warnings in 24.24s

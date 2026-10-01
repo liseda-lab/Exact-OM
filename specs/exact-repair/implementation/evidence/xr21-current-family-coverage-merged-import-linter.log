@@ -1,0 +1,25 @@
+
+╔══╗─────────▶╔╗ ╔╗      ╔╗◀───┐
+╚╣╠╝◀─────┐  ╔╝╚╗║║────▶╔╝╚╗   │
+ ║║   ╔══╦══╦╩╗╔╝║║  ╔╦═╩╗╔╝╔═╦══╗
+ ║║╔══╣╔╗║╔╗║╔╣║ ║║ ╔╬╣╔╗║║ ║│║╔═╝
+╔╣╠╣║║║╚╝║╚╝║║║╚╗║╚═╝║║║║║╚╗║═╣║
+╚══╩╩╩╣╔═╩══╩╝╚═╝╚═══╩╩╝╚╩═╩╩═╩╝
+  └──▶║║                    ▲
+      ╚╝────────────────────┘
+
+
+---------
+Contracts
+---------
+
+Analyzed 346 files, 2297 dependencies.
+--------------------------------------
+
+Core does not depend on implementation or outer layers KEPT
+Ontology does not depend on implementation or delivery KEPT
+Implementation does not depend on analysis or delivery KEPT
+Library and analysis subsystems do not depend on delivery KEPT
+rdflib is isolated in IO sources KEPT
+
+Contracts: 5 kept, 0 broken.

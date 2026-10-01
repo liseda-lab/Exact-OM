@@ -1,0 +1,114 @@
+.FF.F                                                                    [100%]
+=================================== FAILURES ===================================
+_____ test_six_candidate_budget_cannot_claim_current_family_coverage[True] _____
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x73eaffefa780>
+reuse = True
+
+    @pytest.mark.parametrize("reuse", [False, True])
+    def test_six_candidate_budget_cannot_claim_current_family_coverage(monkeypatch, reuse):
+        problem, model, graph, encoding = fixture(monkeypatch, reuse=reuse)
+        members = current_family_members(encoding)
+        required = set().union(*members.values())
+        # Every nonempty family is a singleton here: four elementary controls and
+        # four current A-based necessary-condition bundles require eight slots.
+        assert all(len(values) <= 1 for values in members.values())
+        assert len(required) == 8
+        try:
+            frozen = freeze(problem, model, graph, 6)
+        except ValueError as error:
+            assert "candidate budget" in str(error) and "cap 6" in str(error)
+            return
+        final = {c.candidate_id for c in frozen.problem.objects[0].candidates}
+        missing = [name for name, values in members.items() if values and not values & final]
+>       pytest.fail(
+            f"Six-slot freeze accepted {len(final)} candidates with "
+            f"status {frozen.proposal_reports[0]['generation_status']}; "
+            f"current families without retained members: {missing}"
+        )
+E       Failed: Six-slot freeze accepted 6 candidates with status COMPLETE_DECLARED_ENUMERATION; current families without retained members: ['add_necessary_condition:0:all', 'add_necessary_condition:0:other']
+
+tests/repair_current_family_coverage_test.py:135: Failed
+______ test_reused_inventory_receipts_name_actual_current_family_members _______
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x73eaff4f98e0>
+
+    def test_reused_inventory_receipts_name_actual_current_family_members(monkeypatch):
+        problem, model, graph, encoding = fixture(monkeypatch)
+        frozen = freeze(problem, model, graph, 8)
+        assert len(frozen.problem.objects[0].candidates) == 8
+>       assert_current_coverage(frozen, encoding)
+
+tests/repair_current_family_coverage_test.py:146:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+frozen = FrozenNeuralRound(problem=RepairInputV3(fixed_axioms=(), objects=(RevisionObjectV3(object_id='m', kind='mapping', orig...reports=(GenerationReportV3(payload=<exact.repair.records.FrozenMapping object at 0x73eaff4f7a00>),), risk_scorer=None)
+encoding = GrammarEncoding(revision=RevisionObjectV3(object_id='m', kind='mapping', original_axioms=(SubClassOf(sub_class=Class(k...inate_fixed_fields=False, forbidden_assignments=(), context_proofs=(), contextual_checks=0, contextual_truncated=False)
+
+    def assert_current_coverage(frozen, encoding):
+        members = current_family_members(encoding)
+        final = {candidate.candidate_id for candidate in frozen.problem.objects[0].candidates}
+        report = frozen.proposal_reports[0]
+        assert report["generation_status"] == "COMPLETE_DECLARED_ENUMERATION"
+        for row in report["protected_family_reports"]:
+            expected = members[row["template"]]
+            if expected:
+                assert row["status"] == "retained"
+>               assert row["candidate_id"] in expected, (
+                    "Historical tags cannot witness this current family", row, expected
+                )
+E               AssertionError: ('Historical tags cannot witness this current family', <exact.repair.records.FrozenMapping object at 0x73eaffedf940>, {'d9eb18195034fc6e8e0ed3835cf7b87d6b86893a3ea0327e558cc02a615ef7ea'})
+E               assert '7bb84da6fbed60b233bd577a40e738ac1af4b610f58510beb4db11f6026c292d' in {'d9eb18195034fc6e8e0ed3835cf7b87d6b86893a3ea0327e558cc02a615ef7ea'}
+
+tests/repair_current_family_coverage_test.py:109: AssertionError
+_____ test_poisoned_historical_tags_cannot_supply_current_family_witnesses _____
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x73eaff4f7860>
+
+    def test_poisoned_historical_tags_cannot_supply_current_family_witnesses(monkeypatch):
+        problem, model, graph, encoding = fixture(monkeypatch, reuse=False, poisoned=True)
+        frozen = freeze(problem, model, graph, 8)
+>       assert_current_coverage(frozen, encoding)
+
+tests/repair_current_family_coverage_test.py:169:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+frozen = FrozenNeuralRound(problem=RepairInputV3(fixed_axioms=(), objects=(RevisionObjectV3(object_id='m', kind='mapping', orig...reports=(GenerationReportV3(payload=<exact.repair.records.FrozenMapping object at 0x73eaff6a9ff0>),), risk_scorer=None)
+encoding = GrammarEncoding(revision=RevisionObjectV3(object_id='m', kind='mapping', original_axioms=(SubClassOf(sub_class=Class(k...inate_fixed_fields=False, forbidden_assignments=(), context_proofs=(), contextual_checks=0, contextual_truncated=False)
+
+    def assert_current_coverage(frozen, encoding):
+        members = current_family_members(encoding)
+        final = {candidate.candidate_id for candidate in frozen.problem.objects[0].candidates}
+        report = frozen.proposal_reports[0]
+        assert report["generation_status"] == "COMPLETE_DECLARED_ENUMERATION"
+        for row in report["protected_family_reports"]:
+            expected = members[row["template"]]
+            if expected:
+                assert row["status"] == "retained"
+                assert row["candidate_id"] in expected, (
+                    "Historical tags cannot witness this current family", row, expected
+                )
+                assert row["candidate_id"] in final
+            else:
+>               assert row["status"] == "empty_language"
+E               AssertionError: assert 'retained' == 'empty_language'
+E
+E                 - empty_language
+E                 + retained
+
+tests/repair_current_family_coverage_test.py:114: AssertionError
+=============================== warnings summary ===============================
+tests/repair_current_family_coverage_test.py::test_six_candidate_budget_cannot_claim_current_family_coverage[False]
+tests/repair_current_family_coverage_test.py::test_six_candidate_budget_cannot_claim_current_family_coverage[True]
+tests/repair_current_family_coverage_test.py::test_reused_inventory_receipts_name_actual_current_family_members
+tests/repair_current_family_coverage_test.py::test_compatible_reuse_keeps_valid_family_aliases_and_history
+tests/repair_current_family_coverage_test.py::test_poisoned_historical_tags_cannot_supply_current_family_witnesses
+  /home/pgcotovio/Exact-OM/.worktrees/current-family-witnesses-20261001/exact/repair/workers.py:485: DeprecationWarning: This process (pid=3227657) is multi-threaded, use of fork() may lead to deadlocks in the child.
+    pid = os.fork()
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/repair_current_family_coverage_test.py::test_six_candidate_budget_cannot_claim_current_family_coverage[True]
+FAILED tests/repair_current_family_coverage_test.py::test_reused_inventory_receipts_name_actual_current_family_members
+FAILED tests/repair_current_family_coverage_test.py::test_poisoned_historical_tags_cannot_supply_current_family_witnesses
+3 failed, 2 passed, 5 warnings in 13.01s

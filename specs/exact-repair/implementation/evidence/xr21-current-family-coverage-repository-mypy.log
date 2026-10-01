@@ -1,0 +1,7 @@
+exact/impl/datasets/prepared_cache.py:23: error: Need type annotation for "_VERIFIED"  [var-annotated]
+exact/impl/datasets/prepared_cache.py:54: error: Returning Any from function declared to return "dict[Any, Any]"  [no-any-return]
+exact/experiments/notifications.py:214: error: Argument 2 to "_attempt" has incompatible type "Mapping[str, Any] | None"; expected "Mapping[str, Any]"  [arg-type]
+exact_inspect/study/resources.py:255: note: By default the bodies of untyped functions are not checked, consider using --check-untyped-defs  [annotation-unchecked]
+exact/experiments/reporting.py:216: error: Value of type "dict[str, Any] | None" is not indexable  [index]
+exact/experiments/reporting.py:218: error: Value of type "dict[str, Any] | None" is not indexable  [index]
+Found 5 errors in 3 files (checked 295 source files)

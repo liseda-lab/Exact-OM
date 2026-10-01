@@ -1,0 +1,8 @@
+COMMAND: ['-m', 'black', '--check']
+All done! ✨ 🍰 ✨
+4 files would be left unchanged.
+EXIT: 0
+COMMAND: ['-m', 'isort', '--check-only']
+EXIT: 0
+COMMAND: ['-m', 'flake8']
+EXIT: 0

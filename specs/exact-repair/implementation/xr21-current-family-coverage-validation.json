@@ -1,0 +1,313 @@
+{
+  "schema": "exact-repair/current-family-coverage-validation/v1",
+  "status": "passed_local_conformance",
+  "recorded_at_utc": "2026-10-01T01:09:55.486344+00:00",
+  "requirements_source": "User P2: historical provenance incorrectly establishes current action-family coverage after vocabulary change",
+  "reviewed_implementation_commit": "e5db5bb26db8377c3a8c357634496d5ba99f9dbb",
+  "implementation_commit": "e79843f62357d419e011d78d322917bdd0a74492",
+  "identities": {
+    "enumeration": "current-grammar-enumeration/v1",
+    "generation": "protected-generation/current-witnesses-v1"
+  },
+  "reproduction": {
+    "mapping": "S equivalent to T",
+    "historical_vocabulary": [
+      "S",
+      "T"
+    ],
+    "current_vocabulary": [
+      "A"
+    ],
+    "max_depth": 0,
+    "max_constructors": 0,
+    "candidate_cap": 6,
+    "old_behavior": "Six retained candidates and COMPLETE_DECLARED_ENUMERATION despite missing current necessary-condition family members.",
+    "corrected_behavior": "Reject six-slot budget; eight-slot pool retains all eight distinct required current candidates and accurate family reports.",
+    "before_tests": {
+      "failed": 3,
+      "passed": 2
+    }
+  },
+  "implementation": {
+    "enumeration": "exact/repair/proposals.py",
+    "witness_validation_and_protection": "exact/repair/grammar.py",
+    "budgeting_and_identity": "exact/repair/pipeline.py",
+    "regression": "tests/repair_current_family_coverage_test.py"
+  },
+  "acceptance_tests": [
+    "test_six_candidate_budget_cannot_claim_current_family_coverage[False]",
+    "test_six_candidate_budget_cannot_claim_current_family_coverage[True]",
+    "test_reused_inventory_receipts_name_actual_current_family_members",
+    "test_compatible_reuse_keeps_valid_family_aliases_and_history",
+    "test_poisoned_historical_tags_cannot_supply_current_family_witnesses",
+    "test_enumeration_receipt_rejects_another_current_vocabulary",
+    "test_enumeration_receipt_requires_exact_template_coverage[duplicate]",
+    "test_enumeration_receipt_requires_exact_template_coverage[missing]",
+    "test_enumeration_receipt_replays_positive_current_template_witnesses[wrong_template]",
+    "test_enumeration_receipt_replays_positive_current_template_witnesses[unaccepted_assignment]",
+    "test_current_witnesses_survive_candidate_dedup_and_tuple_wrapper",
+    "test_exhausted_enumeration_does_not_return_completed_witness_receipt"
+  ],
+  "checks": {
+    "repair_pytest": {
+      "status": "passed",
+      "tests": 495,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 478.422,
+      "command": "OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python -m pytest -q -x tests/repair_*test.py tests/openrouter_ledger_test.py --tb=short -o junit_family=xunit1 --junitxml=/tmp/current-family-coverage-pytest.xml",
+      "tested_commit": "e79843f62357d419e011d78d322917bdd0a74492"
+    },
+    "repair_mypy": {
+      "status": "passed",
+      "source_files": 32,
+      "command": "python -m mypy --explicit-package-bases exact/repair tools/repair",
+      "tested_commit": "e79843f62357d419e011d78d322917bdd0a74492"
+    },
+    "changed_python_style": {
+      "status": "passed",
+      "files": 4,
+      "tools": [
+        "black --check",
+        "isort --check-only",
+        "flake8"
+      ],
+      "tested_commit": "e79843f62357d419e011d78d322917bdd0a74492"
+    },
+    "historical_preservation": {
+      "status": "passed",
+      "files_checked": 88,
+      "baseline_commit": "e5db5bb26db8377c3a8c357634496d5ba99f9dbb"
+    },
+    "integration_pytest": {
+      "status": "passed",
+      "tested_commit": "f1191b521e9bc501b35840c9c56e712f811ff591",
+      "tests": 120,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 24.219,
+      "command": "OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python -m pytest -q -x tests/benchmark_pool_miss_test.py tests/alignment_evaluation_inputs_test.py tests/candidate_recall_test.py tests/prepared_dataset_cache_test.py tests/inventory_cache_test.py tests/experiment_reporting_test.py tests/experiments_notifications_test.py tests/repair_current_family_coverage_test.py --tb=short -o junit_family=xunit1 --junitxml=/tmp/current-family-coverage-integration.xml"
+    },
+    "repository_mypy": {
+      "status": "passed",
+      "tested_commit": "f1191b521e9bc501b35840c9c56e712f811ff591",
+      "source_files": 295,
+      "command": "python -m mypy"
+    },
+    "import_linter": {
+      "status": "passed",
+      "tested_commit": "f1191b521e9bc501b35840c9c56e712f811ff591",
+      "contracts_kept": 5,
+      "contracts_broken": 0,
+      "command": "lint-imports"
+    }
+  },
+  "source_sha256": {
+    "exact/delivery/cli/repair.py": "b388fd2fc943ab1cae1a16a5a9d6eac04b6431d5023ec74d37fd02df45644123",
+    "exact/repair/__init__.py": "26a08a2edbf01d95937dda7e189d7171cc125f07ef5133bda22c0afaed0b4c1b",
+    "exact/repair/api.py": "c0deeec4469a04294f1566229ad22b223ff250a11ccfb4364457d3e7302b01ab",
+    "exact/repair/candidates.py": "c1ff85583156065ad28c0017615bb134c328a0a1491c7049504e16210cb7b2de",
+    "exact/repair/checkpointing.py": "ea8c6b00f2459cc8d0925432d9db9bcbc81e9ed9713cd2b3a4a664a89c9ca7d3",
+    "exact/repair/circuit.py": "db0805bb258949dca0afc74b7dd138656c71d069e1c6fca3adf750d437016906",
+    "exact/repair/comparisons.py": "ff68342382c67c4f5f29d30e9b5402e8e16c0563f9ef4da6483af102beebd97f",
+    "exact/repair/compilation.py": "48158ae67670197b0e71dd69f12c38044d249794432b35df2c32e4c4fa429d02",
+    "exact/repair/detection.py": "f10b164da24b197116c6221e9e18b1813e0d5e11eb944b3031feb4210711bf00",
+    "exact/repair/evaluation.py": "90063151e48e49e26b5211cf877a56d62cd29ae2a758ba1419665d68131be147",
+    "exact/repair/grammar.py": "1e7500420e9d64f0cbecdc9d5ad0150a15809269afb00abc8f28179a4345209d",
+    "exact/repair/graph.py": "5c72a058e1d0d4d27ab42acf62d02c5e518b215b23f3572da4c1b78439650e1c",
+    "exact/repair/kernel.py": "0270987812273dbd7b7a2dd81509a05e8373e92f46b647a876a789dcbd304b1e",
+    "exact/repair/learning.py": "9b9c79d77fce39d25ad76880f5d510ccb0a0a94c5f082ca2697fbd18e3f01c0a",
+    "exact/repair/maxsat.py": "04ea8d0db37b0a5479e6a82b5cd84be06f2707f80bb8849eece8fa6be0bcfbce",
+    "exact/repair/model.py": "1ff996b245490cf931162b6e6f2086c04a56d7ae5c991b9098faf7a23bf2cb20",
+    "exact/repair/owl.py": "e9f5c1fd2d566727c0333d762af88c8e1d1884d5ed756175bfdce1153a812912",
+    "exact/repair/pipeline.py": "dfe66c79ac3bf5df4a48e48091c3b3b6a40fb99b4e216a89fb684ab95572494d",
+    "exact/repair/proposals.py": "fd3c36dde74bc11b7b833477489c247662f4700248faa7b2632543befb3d55b5",
+    "exact/repair/protocol.py": "27db8a162682c9ba702d5910acfd2a87e517a31dc1691037c6126d30a9797357",
+    "exact/repair/records.py": "33c9486698a6271d88914fe47cf2b5b505fd93b2ecf3466a2d673e8680291a0e",
+    "exact/repair/retrieval.py": "7c143ee27dcdce81eee86164d45df8e41508d97a4719b30a93c3688034fda5b0",
+    "exact/repair/semantic_fidelity.py": "20484d93cbcba4a1e8760a5b0019fe48f7b9f7d264b086b0c93938b7d4a9c274",
+    "exact/repair/study.py": "447d563445995e8f67d331f731ad470ee38b6cb105b59743a442c5283461e5ba",
+    "exact/repair/workers.py": "57a5a7b4eb7f42cab1eafe1a85859ec047bfea3eec57dccf49124371b212382c",
+    "specs/exact-repair/protocol/schema-v3.3.json": "157a60dc819641388f1d672a4fe2b19d29d69b61628b0ddc576668be9d64a6b2",
+    "specs/exact-repair/protocol/xr21-review2-conformance.json": "caa90fb84079322e9eccfa2b7bfd4aafe9dc6a68fd263bab4f2ef574197347a1",
+    "tests/openrouter_ledger_test.py": "bda7ae7d1f97427b73ccc6089be97c3348db35f8f50e76b960fb563c4aa9cdd0",
+    "tests/repair_api_test.py": "26a203f78619e9388157ef9a1962d6e8893e98b5aae719828a375d87dc48a43d",
+    "tests/repair_batch_test.py": "6cb203a0c51f73a5038ebd6b4bb7a71afe4580ff85a0e5efe5da468b7acd9747",
+    "tests/repair_candidates_test.py": "d557102711fa19acaeb35ab1e07159d2e8f3f49197622f44ce01a7d7b3c56a36",
+    "tests/repair_checkpointing_test.py": "114329640768a2a78431bb9b549e8f02e4afd5ab8f5e3b9a2c4f3462016107bc",
+    "tests/repair_circuit_test.py": "36f4ccbb74e25ba4ea88c73a3c12967ead3123c4bdd524d34cf0bd3bfaa65f50",
+    "tests/repair_cli_resume_v3_test.py": "51bd5a702109c24f64d7c1106756656a15d4f2e0f8a5ec44edcde1afb6f5353a",
+    "tests/repair_compilation_test.py": "b7222820bb7da9369eafe6af8c651202e057e73fb1ee20ac46bda3993e90cc00",
+    "tests/repair_current_family_coverage_test.py": "732c15ae40a6bac36151da62cdd2e057e2b3693ca519dedcb5e49c7b5188937f",
+    "tests/repair_evaluation_test.py": "d665d514aafcc317b1ba610afcdc8eb0447f752ae3f8bbc0cf3a5595f9f0e293",
+    "tests/repair_generation_v3_test.py": "e5001c6fd16d0a12720d0d415271c40525c044e696add1842e0b8a6193be2bdf",
+    "tests/repair_grammar_test.py": "b7457702e81e376614c7f0ab052b4f4835ee5664a3ca46a3ae3525ffb2696a31",
+    "tests/repair_kernel_test.py": "6cf43aa560109d2ea543c06734cf7e27de7cd381f11db6f39609e81e1547d38b",
+    "tests/repair_learning_test.py": "cd409d14b34b3dbe5bedc3e13c917d31dc315a193052ccd1afd91ba71cd4cc4b",
+    "tests/repair_learning_v3_test.py": "5ad9f28ac1aa2f84a89819ce6da690055a0f42114da5e59b1acca0e4ab4663d0",
+    "tests/repair_owl_test.py": "e4b9cec7cff9b2d7f87bbfc6832cedc7825e4e96fc9f8fc4a56551f9afe65319",
+    "tests/repair_pipeline_completion_test.py": "14340d00ba415101b589c6e5a020d06398eead3377995f7a1bd489cdc6284bf0",
+    "tests/repair_proposals_test.py": "a90df320f8eef1d9d3aa7d58270778eed31585d7efb329d7f1344e244fc3280c",
+    "tests/repair_protocol_reporting_test.py": "a9f0bd43fad0e4137f01d473f87b7394c04c11b9e38390c45c795fb3bc272f9b",
+    "tests/repair_protocol_v3_test.py": "19817830f357de70da664f0446992b1667b48011f4ba4d1420d20e90899d6926",
+    "tests/repair_retrieval_test.py": "858d897d43bb6df109fad83e16454cf8e942f964443c4f306cc99568fb49b93d",
+    "tests/repair_review2_architecture_test.py": "2c2e5c02c282996e8d91f5f15cae6f21ad6307c456e00f6d21949cdbdefaf549",
+    "tests/repair_review2_generation_test.py": "a90e0f748fe85bd2b52d68c2d50669df796b4e35eff467d16d33f7489a250b17",
+    "tests/repair_review2_labels_test.py": "b65dbdba9213ed63a0fd9a9ee2c19d679eb0f7677b28b8ba6566928330fc3d07",
+    "tests/repair_review2_verification_test.py": "1158d81d36619c2f36128f1866cd84db8bd621d5851b5af0febfc6006b82c02d",
+    "tests/repair_review_exception_resume_test.py": "257531778321ea43e1a821da104ab241ff2bd1c130b84b67783b5862526872ac",
+    "tests/repair_review_generation_test.py": "d03bdb269a7b3aa053d5dd3a556eb11ea021afe2c3ee88f5345e8d3b037b94c2",
+    "tests/repair_review_learning_test.py": "6c1d5206a7f8733a038432739474252a0ddbcb83df3cfa88ceb47fae25b3664a",
+    "tests/repair_review_protocol_test.py": "4d82f43265ff9ccdeb777ca0b94dfe430f1e48193e4fef1b4ffae5c80eba474a",
+    "tests/repair_review_semantic_test.py": "97437909da660c810e25cc17746ab13ca5a9d1ce6925c1409e249f4ad51f3fc9",
+    "tests/repair_review_transport_test.py": "95e8f540a07a7a0f627d3470a52beb4997e45df3bf8071841e8009582926159e",
+    "tests/repair_semantic_fidelity_test.py": "69525a62afeffe9ab7b5b0c51db92ef31f3673ad88a5a5052e7727e98e22a366",
+    "tests/repair_study_test.py": "c80c87f80fa71e9d57b7ad4a138cb7901ee14d22bfe879a688a18d4e7bfb857f",
+    "tests/repair_supervision_test.py": "1dc7bc623d75a35f7913d030f2b4f65cb0e27009a15878e746019ddf34969077",
+    "tests/repair_training_completion_test.py": "2d540f5eee1cb8cfd40272d0da4dc5fd6ab521e14ce2423983fe1e12c6dd9c8c",
+    "tests/repair_training_v3_cli_test.py": "201b0e4e956b2eeaa5aa6b74b30acd4c4515a3568071176628f5d5a8834d86ab",
+    "tests/repair_v3_kernel_test.py": "6497e2593a1f3196f19503398c106544c1aa4cfcda75f47a1907c7dfc300288e",
+    "tests/repair_v3_resources_test.py": "490f143d5449e7b09b9b85f18675e48ebc42f385b02904e9af6ee70976fa8f60",
+    "tests/repair_v3_study_test.py": "3fbe87cbab23524f50de220ccf80a5982156d030eacf0a76f87a543338a864a6",
+    "tools/repair/batch.py": "ada3e7d9a9ff6e8e3141976b3a86ad05efdd4574b438ca6a4bbe7ead0d3c89d4",
+    "tools/repair/compare_proposals.py": "f32dac1659ab69fa81c19a643f69f94ebd83111c7dddf993f99a71affd3a250f",
+    "tools/repair/corpus.py": "0e4b59a1babb56cb604f40a5e015e4bab52a4c40ee5c8bd4269aa5a199ba9b18",
+    "tools/repair/prepare.py": "71f44c9abed18b1cfe1a11ae2249a03d69a7356905dbc978a07f365ee73d9566",
+    "tools/repair/prepare_study.py": "b2dd8803e8d3b7d411d74a4e656b8728ce3772351e966e1ebb0ad1d45c08ccad",
+    "tools/repair/report_study.py": "7f7a188d97526af9d8f290992dfbc0b683199e6253470024157b5d6d327fa439",
+    "tools/repair/run_study.py": "c3f801cb4ddb442e258de86bcefd2b2e4f28b805c9465fda44b4948a3d30b6b8",
+    "tools/repair/train.py": "68e65119ba6f7d544dc9aadc89649dbc98332e0afa72d796fc2cb242f8153e78"
+  },
+  "artifact_sha256": {
+    "specs/exact-repair/implementation/xr21-current-family-coverage.txt": "716a6731da3f18de4ea3f95940b13304519925a4a99a4aafe4d309f16e467552",
+    "specs/exact-repair/implementation/evidence/xr21-current-family-coverage-before.log": "2c37dd6d0a2bc8c894b1885c3fb4ce2be15c64f7283fac6430f329d9ffbeac8a",
+    "specs/exact-repair/implementation/evidence/xr21-current-family-coverage-pytest.log": "118cd3fcef1835890838dd5456dc9ba7c3b518fabd7c1ce30434221b0a91f3f6",
+    "specs/exact-repair/implementation/evidence/xr21-current-family-coverage-pytest.xml": "e2fb46b26ce5192cd0e00d2ef1746b4215a82a31e541ff5ebe63d7e16cf28a08",
+    "specs/exact-repair/implementation/evidence/xr21-current-family-coverage-mypy.log": "4561eccc219f5beefb55c5dabd7075f7748f0c104468fc2f0b62799c9e3c9e91",
+    "specs/exact-repair/implementation/evidence/xr21-current-family-coverage-style.log": "e1115f167f43f40edf260d8f1a9a1a1e16df519a1313538e325b66012554b153",
+    "specs/exact-repair/implementation/evidence/xr21-current-family-coverage-repository-mypy.log": "b01c5b2bb24867ded0acf54d53a30ec5e3f181ef7c86f66b9e3141ffd7f45373",
+    "specs/exact-repair/implementation/evidence/xr21-current-family-coverage-import-linter.log": "842eec028348e2a96151845670455187a1f35841450a4fbf54b08b88285b0447",
+    "specs/exact-repair/implementation/evidence/xr21-current-family-coverage-integration.log": "09442b4a152ab74ee1b294b6d31b5a125062a494d4dbdf6db06e1886cd1c4afa",
+    "specs/exact-repair/implementation/evidence/xr21-current-family-coverage-integration.xml": "bc1870750fec553028f3b7a197c1982648e686b16699592d7708172dca606221",
+    "specs/exact-repair/implementation/evidence/xr21-current-family-coverage-merged-mypy.log": "eca362c29051aa0e2bb8f06b8f17f07eeab098d4c822eae403b2491e247d72a0",
+    "specs/exact-repair/implementation/evidence/xr21-current-family-coverage-merged-import-linter.log": "2153fa64dc485cc10144d11dca799c3ddb3852a1952808bcf3897d7e499ae3da"
+  },
+  "artifact_normalization": {
+    "xr21-current-family-coverage-before.log": {
+      "operation": "Trim trailing whitespace and final blank lines only; diagnostic text unchanged.",
+      "original_sha256": "eb4ea64ad61d3368d0521040265c36a2e1b41c320b03e5afcdc325b51fe96787"
+    },
+    "xr21-current-family-coverage-pytest.xml": {
+      "operation": "Trim trailing whitespace and final blank lines only; diagnostic text unchanged.",
+      "original_sha256": "0065e6c30bd9205ff84af7b417f3f5c68502b3e821bd26baeba38940473da241"
+    },
+    "xr21-current-family-coverage-import-linter.log": {
+      "operation": "Trim trailing whitespace and final blank lines only; diagnostic text unchanged.",
+      "original_sha256": "5e58b84310eb6d1900fdb528bfd514fe4452187306cb24115a048438a59698af"
+    },
+    "xr21-current-family-coverage-integration.xml": {
+      "operation": "Trim trailing whitespace and final blank lines only; diagnostic text unchanged.",
+      "original_sha256": "611b84a1f8cb3030b5963401d9c700ccf86f91f67791d8053e889abeaa188dda"
+    },
+    "xr21-current-family-coverage-merged-import-linter.log": {
+      "operation": "Trim trailing whitespace and final blank lines only; diagnostic text unchanged.",
+      "original_sha256": "90c399a0cdd6af1320e8ccf4b2ab080ffc06d049dfd62f3787a80a7906c0e578"
+    }
+  },
+  "environment": {
+    "python": "3.12.3",
+    "platform": "Linux-6.8.0-139-generic-x86_64-with-glibc2.39",
+    "packages": {
+      "pytest": "8.4.2",
+      "torch": "2.7.0+cu128",
+      "torch-geometric": "2.6.1",
+      "pysdd": "1.0.6",
+      "python-sat": "1.8.dev24",
+      "pyowl-core": "0.2.1",
+      "pyhermit": "0.2.1",
+      "pyelk-reasoner": "0.2.1",
+      "pydantic": "2.13.4"
+    },
+    "thread_limits": {
+      "OMP_NUM_THREADS": "1",
+      "MKL_NUM_THREADS": "1"
+    }
+  },
+  "limitations": [
+    "Local typed-grammar/freeze conformance, not model-quality or large real-ontology performance qualification",
+    "Empty-family evidence relies on the trusted completed enumerator; receipts are internal, not externally authenticated proofs",
+    "Existing worker fork-from-multithreaded-process warnings remain in the full-suite log"
+  ],
+  "operational_state": {
+    "new_research_jobs_submitted": 0,
+    "live_provider_calls": 0,
+    "supervisor_changes": false,
+    "historical_data_split_and_budget_changes": false,
+    "concurrent_changes_preserved": "511a17cfb6c989430a80cc6bae0d637a782ca53d"
+  },
+  "checks_at_implementation_commit": {
+    "repair_pytest": {
+      "status": "passed",
+      "tests": 495,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 478.422,
+      "command": "OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python -m pytest -q -x tests/repair_*test.py tests/openrouter_ledger_test.py --tb=short -o junit_family=xunit1 --junitxml=/tmp/current-family-coverage-pytest.xml"
+    },
+    "repair_mypy": {
+      "status": "passed",
+      "source_files": 32,
+      "command": "python -m mypy --explicit-package-bases exact/repair tools/repair"
+    },
+    "changed_python_style": {
+      "status": "passed",
+      "files": 4,
+      "tools": [
+        "black --check",
+        "isort --check-only",
+        "flake8"
+      ]
+    },
+    "repository_mypy": {
+      "status": "same five pre-existing errors outside repair",
+      "errors": [
+        "exact/impl/datasets/prepared_cache.py:23: error: Need type annotation for \"_VERIFIED\"  [var-annotated]",
+        "exact/impl/datasets/prepared_cache.py:54: error: Returning Any from function declared to return \"dict[Any, Any]\"  [no-any-return]",
+        "exact/experiments/notifications.py:214: error: Argument 2 to \"_attempt\" has incompatible type \"Mapping[str, Any] | None\"; expected \"Mapping[str, Any]\"  [arg-type]",
+        "exact/experiments/reporting.py:216: error: Value of type \"dict[str, Any] | None\" is not indexable  [index]",
+        "exact/experiments/reporting.py:218: error: Value of type \"dict[str, Any] | None\" is not indexable  [index]"
+      ]
+    },
+    "import_linter": {
+      "status": "same pre-existing boundary violation",
+      "edge": "exact.core.actions.alignment -> exact.impl.models.selector.nil_head:864"
+    },
+    "historical_preservation": {
+      "status": "passed",
+      "files_checked": 88,
+      "baseline_commit": "e5db5bb26db8377c3a8c357634496d5ba99f9dbb"
+    }
+  },
+  "integration": {
+    "merge_commit": "f1191b521e9bc501b35840c9c56e712f811ff591",
+    "concurrent_commit_preserved": "511a17cfb6c989430a80cc6bae0d637a782ca53d",
+    "description": "Preserved independently committed fixes for prior typing/import-boundary findings. These do not overlap repair sources or the new coverage regression.",
+    "source_sha256": {
+      "exact/core/actions/alignment.py": "9eef9bbf76a0e94aab61056cfb1a2f87357678ed80a50d5c5c14d4b3ff9015a0",
+      "exact/core/contracts/dataset.py": "1553cbb406c78787c2dd395de65fdb7ce9cd44eb91fd8d739524517a3598fa4f",
+      "exact/experiments/notifications.py": "80f4a63dcf3fb7c371dad8a7670cf57222a81983408ce3632fc096fb1c00d5e1",
+      "exact/experiments/reporting.py": "def38d2b574c1e00441813a8ead946bb609e2e1264ce79dd0a86bf8d73edfe14",
+      "exact/impl/datasets/base.py": "0fb00e7b45e2e5ffed50c8d5ea95f232d19a370e339f377adc357f59b48b23c5",
+      "exact/impl/datasets/prepared_cache.py": "ed9480c7d7ce4f97d8e03af866cd0e496db2645770093211e42af0408fa3c4ee",
+      "exact/impl/models/selector/nil_head.py": "3b5e4202d1de60fa3030c061750c620c3e1ac38fdd0503c91752e8fef48d64a1",
+      "tests/alignment_evaluation_inputs_test.py": "cfbc2a854254672b3f78714a9b4520740bfb078edec8aee70fb4b26879e70b15",
+      "tests/benchmark_pool_miss_test.py": "e71327a23d883cb8c0895166dd3a9efdcc35a9963cbd203251e4a3f4782e4f52",
+      "tests/candidate_recall_test.py": "35ce89045517b4e2c7c835275f3b16d2f3724db83d46628ed245cb7cf8bc8a09"
+    },
+    "validation_scope": "495-test full repair run on implementation commit, byte-identical repair code/test sources at merge; 120 focused merged-tree integration tests plus clean repository type/import checks."
+  },
+  "content_sha256": "aacf1362e3fb653d461378995790f82a6e692e67d970d378ce5fbc2c4b1877c3"
+}
