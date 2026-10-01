@@ -112,6 +112,10 @@ Health and repair checks remain every 300 seconds. Descriptors bind the worker, 
 source, inputs, environment and a unique launch nonce. The dispatcher reserves ownership
 under `registry.json.lock` before launching and registers only a verified numeric Slurm
 step or matching terminal receipt. A controller restart reconciles the existing launch.
+A queued recovery uses `pending_recovery`; set `superseded_by` only after its real numeric
+run has been registered. Keep scientifically invalidated predecessors disabled while
+waiting. Validate the proposed registry and recovery chains before atomic publication;
+a prepared descriptor is not proof of a submitted or completed experiment.
 Science launchers belong to an existing tmux server in the allocation's extern cgroup;
 replacing the supervisor step cannot terminate them. Keep a dedicated idle tmux session
 in that server for the allocation's lifetime.
