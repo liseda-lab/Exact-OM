@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import copy
+import time
+import uuid
 from dataclasses import replace
 from pathlib import Path
 
@@ -28,6 +30,35 @@ def verify_identity_transition(old, new, *, old_implementation, stage, parent=No
 
 
 def import_verified_controls(recipe, campaign, runtime, code, *, verify_only=False):
+    """Account for actual migration work, retaining prior execution charges once."""
+    if verify_only:
+        return _import_verified_controls(recipe, campaign, runtime, code, verify_only=True)
+    from exact.experiments.budget import BudgetLedger
+    from tools.finalize_prepared_selection import charge_failed_finalization
+
+    state = read(runtime / "budget.json")
+    ledger = BudgetLedger(runtime / "budget.json", state["limits"])
+    charge_failed_finalization(recipe, ledger, state)
+    work_id = "preparation/E22/supervision-key-migration/" + uuid.uuid4().hex
+    ledger.admit(work_id, group="reserve", seconds=0, forecast_known=False)
+    started, status = time.time(), "failed"
+    try:
+        result = _import_verified_controls(recipe, campaign, runtime, code)
+        status = "complete"
+        return result
+    finally:
+        ledger.finish(
+            work_id,
+            start=started,
+            end=time.time(),
+            status=status,
+            requests=0,
+            tokens=0,
+            actual_usd=0,
+        )
+
+
+def _import_verified_controls(recipe, campaign, runtime, code, *, verify_only=False):
     """Verify both original controls, then import without fits or duplicated charges."""
     from exact.core.entities.configs.yaml_io import load_yaml_mapping
     from exact.experiments import harness
@@ -40,14 +71,6 @@ def import_verified_controls(recipe, campaign, runtime, code, *, verify_only=Fal
     from exact.experiments.runtime import CellRecovery, _code_identity, _hash
 
     settings = recipe["e22_recovery"]
-    if not verify_only:
-        from exact.experiments.budget import BudgetLedger
-        from tools.finalize_prepared_selection import charge_failed_finalization
-
-        state = read(runtime / "budget.json")
-        charge_failed_finalization(
-            recipe, BudgetLedger(runtime / "budget.json", state["limits"]), state
-        )
     verified(settings["reuse_plan"])
     old_code = Path(settings["source_code"])
     old_runtime = verified(settings["runtime_source"])

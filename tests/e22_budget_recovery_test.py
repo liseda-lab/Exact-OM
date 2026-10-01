@@ -47,3 +47,42 @@ def test_migration_rejects_other_changes(change):
         implementation = {"files": {"runtime.py": "unverified"}}
     with pytest.raises(ValueError, match="differs beyond"):
         verify_identity_transition(old, new, old_implementation=implementation, stage="extraction")
+
+
+@pytest.mark.parametrize("fail", [False, True])
+def test_migration_charges_success_and_failure_once(tmp_path, monkeypatch, fail):
+    from tools import finalize_prepared_selection
+    from tools import recover_e22_budget as repair
+
+    (tmp_path / "budget.json").write_text('{"limits": {}}')
+    ledger = []
+
+    class Account:
+        def admit(self, work_id, **kw):
+            ledger.append(("admit", work_id, kw))
+
+        def finish(self, work_id, **kw):
+            ledger.append(("finish", work_id, kw))
+
+    monkeypatch.setattr("exact.experiments.budget.BudgetLedger", lambda *a: Account())
+    monkeypatch.setattr(
+        finalize_prepared_selection,
+        "charge_failed_finalization",
+        lambda *a: ledger.append(("prior",)),
+    )
+
+    def execute(*a, **kw):
+        if fail:
+            raise ValueError("damaged artifact")
+        return {"verified": True}
+
+    monkeypatch.setattr(repair, "_import_verified_controls", execute)
+    if fail:
+        with pytest.raises(ValueError, match="damaged artifact"):
+            repair.import_verified_controls({}, None, tmp_path, None)
+    else:
+        assert repair.import_verified_controls({}, None, tmp_path, None) == {"verified": True}
+    assert [item[0] for item in ledger] == ["prior", "admit", "finish"]
+    assert ledger[1][1] == ledger[2][1]
+    assert ledger[2][2]["status"] == ("failed" if fail else "complete")
+    assert ledger[2][2]["requests"] == ledger[2][2]["tokens"] == 0
