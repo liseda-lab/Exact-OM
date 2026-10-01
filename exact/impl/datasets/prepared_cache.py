@@ -10,6 +10,7 @@ import shutil
 import tempfile
 from collections import OrderedDict
 from pathlib import Path
+from typing import TypedDict
 
 from exact.utils.provenance import sha256_file
 
@@ -20,12 +21,23 @@ _REQUIRED = {
     "candidate_recall.tsv",
 }
 _TEMPLATES = {"verbalization_templates.json", "verbalization_templates.meta.json"}
-_VERIFIED = OrderedDict()
+_CacheKey = tuple[str, str, str]
+_Signature = list[list[str | int]]
 
 
-def _signature(directory: Path) -> list:
+class _Manifest(TypedDict):
+    schema_version: int
+    fingerprint: str
+    role: str
+    files: dict[str, str]
+
+
+_VERIFIED: OrderedDict[_CacheKey, tuple[_Signature, _Manifest]] = OrderedDict()
+
+
+def _signature(directory: Path) -> _Signature:
     """An immutable-file receipt is invalidated by content writes or replacement."""
-    result = []
+    result: _Signature = []
     for name in sorted(_REQUIRED | _TEMPLATES | {"manifest.json"}):
         path = directory / name
         if path.exists():
@@ -45,14 +57,14 @@ def _location(fingerprint: str) -> tuple[Path, str] | None:
     return Path(root) / role / fingerprint, role
 
 
-def _verify(directory: Path, fingerprint: str, role: str) -> dict:
+def _verify(directory: Path, fingerprint: str, role: str) -> _Manifest:
     signature = _signature(directory)
-    key = (str(directory.resolve()), fingerprint, role)
+    key: _CacheKey = (str(directory.resolve()), fingerprint, role)
     cached = _VERIFIED.get(key)
     if cached is not None and cached[0] == signature:
         _VERIFIED.move_to_end(key)
         return cached[1]
-    record: dict = json.loads((directory / "manifest.json").read_text())
+    record: _Manifest = json.loads((directory / "manifest.json").read_text())
     if not isinstance(record, dict):
         raise ValueError("Shared dataset cache has an incompatible manifest")
     files = record.get("files", {})
@@ -85,7 +97,7 @@ def _verify(directory: Path, fingerprint: str, role: str) -> dict:
     return record
 
 
-def _local_source(source: Path, fingerprint: str, role: str) -> tuple[Path, dict]:
+def _local_source(source: Path, fingerprint: str, role: str) -> tuple[Path, _Manifest]:
     root = os.getenv("EXACT_DATASET_CACHE_LOCAL_DIR")
     if not root:
         return source, _verify(source, fingerprint, role)
@@ -185,7 +197,7 @@ def publish(directory: Path, fingerprint: str) -> Path | None:
         )
         for name in names:
             shutil.copyfile(directory / name, temporary / name)
-        record = {
+        record: _Manifest = {
             "schema_version": 1,
             "fingerprint": fingerprint,
             "role": role,

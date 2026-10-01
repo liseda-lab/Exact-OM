@@ -109,6 +109,20 @@ class BaseAlignmentDataset(IDataset):
 
         prepare_retrieval_training(self, configs, **kwargs)
 
+    def restrict_benchmark_exact_matches(self) -> None:
+        """Exact label matches may not expand an explicitly supplied benchmark pool."""
+        exact = getattr(self, "_exact_matches", None)
+        if exact is None or exact.empty:
+            return
+        pool = set(zip(self.candidates.Src.astype(str), self.candidates.Tgt.astype(str)))
+        keep = [(str(row.Src), str(row.Tgt)) in pool for row in exact.itertuples()]
+        self._exact_matches = exact.loc[keep].copy()
+        self._active_candidate_config["benchmark_pool_exact_scope"] = {
+            "version": 1,
+            "excluded_exact_pairs": len(keep) - sum(keep),
+        }
+        self._refresh_candidate_pool_manifest(origin="provided_benchmark_pool")
+
     def prepare_pool_miss_diagnostic(self, reference_path, **kwargs) -> None:
         from exact.impl.models.selector.nil_head import prepare_pool_miss_diagnostic
 

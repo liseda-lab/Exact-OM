@@ -167,7 +167,10 @@ def test_local_reporting_join_keeps_all_positives_and_empty_candidate_groups(tmp
     assert metrics["MRR"] == 0.5  # (1 + 1/2 + empty-pool zero) / three official queries
 
 
-def test_cache_hit_attaches_and_scopes_reporting_reference_before_training(tmp_path):
+@pytest.mark.parametrize("label_semantics", ["unknown", "benchmark_pool"])
+def test_cache_hit_attaches_and_scopes_reporting_reference_before_training(
+    tmp_path, label_semantics
+):
     from exact.core.actions.alignment import _run_alignment_session
     from exact.core.entities.configs.config import ConfigModel
     from exact.utils.timing import TimingLedger
@@ -199,6 +202,7 @@ def test_cache_hit_attaches_and_scopes_reporting_reference_before_training(tmp_p
             "config_version": 2,
             "run": {"use_file_cache": True, "source_cap": 2, "seed": 17, "experiment_audit": True},
             "data": {"execution_mode": "global_alignment", "source_universe": str(universe)},
+            "matching": {"nil": {"label_semantics": label_semantics}},
             "dataset": {
                 "filter_exact_matches": False,
                 "which": [],

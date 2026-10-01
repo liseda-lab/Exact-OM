@@ -288,3 +288,22 @@ def test_shared_prepared_cache_uses_normal_native_gate(
     prepared_cache.publish(cold.output_path, cold.cache_fingerprint)
     with pytest.raises(ValueError, match="native/schema compatibility"):
         make(tmp_path / "legacy-arm").has_cache()
+
+
+def test_benchmark_exact_scope_preserves_candidates_and_updates_manifest(cached_reporting_dataset):
+    dataset, _, _ = cached_reporting_dataset
+    candidates = dataset.candidates.copy(deep=True)
+    original_fingerprint = dataset.candidate_pool_manifest["fingerprint"]
+
+    dataset.restrict_benchmark_exact_matches()
+
+    pd.testing.assert_frame_equal(dataset.candidates, candidates)
+    assert set(zip(dataset.exact_matches.Src, dataset.exact_matches.Tgt)) == {("s", "gold")}
+    manifest = json.loads((dataset.output_path / "candidate_pool_manifest.json").read_text())
+    assert manifest == dataset.candidate_pool_manifest
+    assert manifest["origin"] == "provided_benchmark_pool"
+    assert manifest["retrieval_config"]["benchmark_pool_exact_scope"] == {
+        "version": 1,
+        "excluded_exact_pairs": 1,
+    }
+    assert manifest["fingerprint"] != original_fingerprint
