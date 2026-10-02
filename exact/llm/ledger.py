@@ -59,6 +59,21 @@ class RequestLedger:
                     authorization_id TEXT NOT NULL, consumed_by INTEGER,
                     PRIMARY KEY(request_id, number)
                 )""",
+                # The ledger is copied between frozen workers, including older
+                # clients that do not know this table. Enforce consumed approvals
+                # in SQLite too, so rejected retries cannot escape their limit.
+                """CREATE TRIGGER IF NOT EXISTS enforce_one_shot_retry
+                BEFORE INSERT ON attempts
+                WHEN EXISTS (
+                    SELECT 1 FROM retry_authorizations g
+                    WHERE g.request_id=NEW.request_id AND g.consumed_by IS NOT NULL
+                    AND NEW.number > g.consumed_by AND g.number=(
+                        SELECT MAX(number) FROM retry_authorizations
+                        WHERE request_id=NEW.request_id
+                    )
+                ) BEGIN
+                    SELECT RAISE(ABORT, 'Approved paid retry already used');
+                END""",
             ):
                 db.execute(statement)
             columns = {row["name"] for row in db.execute("PRAGMA table_info(attempts)")}

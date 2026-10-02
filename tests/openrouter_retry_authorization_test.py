@@ -191,3 +191,43 @@ def test_approval_file_is_bound_to_copied_account_and_original_reservation(tmp_p
     recipe["hosted_retry_authorizations"] = binding(approval)
     with pytest.raises(ValueError, match="reservation differs"):
         apply_authorizations(recipe, runtime)
+
+
+def test_legacy_writer_cannot_bypass_consumed_grant_after_account_copy(tmp_path, monkeypatch):
+    from tools.prepared_batch import copy_account
+
+    original = tmp_path / "original"
+    ledger = RequestLedger(original / "openrouter")
+    key = pending(ledger, monkeypatch)
+    ledger.unknown(key, 1, "fixture")
+    ledger.authorize_unknown_once(key, attempt=1, authorization_id="approval")
+    ledger.received(key, ledger.sent(key), b'{"error":"busy"}', 429)
+    (original / "budget.json").write_text('{"work":{}}')
+    target = tmp_path / "copied"
+    copy_account(original / "budget.json", {"work": {}}, target)
+    copied = RequestLedger(target / "openrouter")
+    # Old clients know only attempts/reservations, not the new Python guard.
+    before = rows(copied, "reservations")
+    with pytest.raises(sqlite3.IntegrityError, match="Approved paid retry already used"):
+        with copied._transaction() as db:
+            db.execute("INSERT INTO reservations VALUES (?,?,?)", (key, 3, before[0][2]))
+            db.execute(
+                "INSERT INTO attempts(request_id,number,state,pid,host) VALUES (?,?,?,?,?)",
+                (key, 3, "sent", os.getpid(), socket.gethostname()),
+            )
+    assert rows(copied, "reservations") == before
+    assert len(rows(copied, "attempts")) == 2
+    other = copied.plan({"payload": {"max_tokens": 4, "prompt": "unrelated"}})
+    assert copied.sent(other) == 1
+
+
+def test_a_later_explicit_approval_can_authorize_a_new_ambiguous_attempt(tmp_path, monkeypatch):
+    ledger = RequestLedger(tmp_path)
+    key = pending(ledger, monkeypatch)
+    ledger.unknown(key, 1, "fixture")
+    ledger.authorize_unknown_once(key, attempt=1, authorization_id="approval-1")
+    ledger.unknown(key, ledger.sent(key), "retry ambiguous")
+    ledger.authorize_unknown_once(key, attempt=2, authorization_id="separate-approval-2")
+    assert ledger.sent(key) == 3
+    with pytest.raises(RuntimeError, match="already used"):
+        ledger.sent(key)
