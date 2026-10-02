@@ -71,7 +71,13 @@ def test_v3_cli_accounts_shared_campaign_and_stage_cpu_and_preserves_resume(tmp_
                 },
                 output / "checkpoints",
             )
-            value = (descriptor, {"schema": "exact-repair/training/v3", "status": "fixture"})
+            value = (
+                descriptor,
+                train.publish_report(
+                    {"schema": "exact-repair/training/v3", "status": "fixture"},
+                    output / "reports",
+                ),
+            )
             cpu = 0.75
         else:
             raise AssertionError(function)

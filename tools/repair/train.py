@@ -47,6 +47,7 @@ from exact.repair.records import (
 )
 from exact.repair.workers import bounded_call
 from tools.repair.corpus import GeneratedCase
+from tools.repair.training_report import publish_report, read_report
 
 DEFAULT_PROFILE = (
     ("delete", 0.1),
@@ -2335,7 +2336,7 @@ def _train_payload(training, development, options):
             _publish_training_checkpoint(
                 state, Path(options["checkpoint_path"]).parent / "checkpoints"
             ),
-            report,
+            publish_report(report, Path(options["checkpoint_path"]).parent / "reports"),
         )
     buffer = io.BytesIO()
     torch.save(state, buffer)
@@ -2734,6 +2735,9 @@ def main() -> int:
         checkpoint_transfer, report = outcome.value
         if options.get("revision") == "v3":
             checkpoint = _read_training_checkpoint(checkpoint_transfer, args.output / "checkpoints")
+            report_transfer = report
+            report = read_report(report_transfer, args.output / "reports")
+            report["training_report_artifact"] = report_transfer
             report["selected_checkpoint_artifact"] = checkpoint_transfer
         else:
             import io
