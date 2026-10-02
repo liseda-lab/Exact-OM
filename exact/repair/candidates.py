@@ -502,6 +502,27 @@ def mapping_candidates(
     return deduplicate_candidates(result)
 
 
+def _original_mapping_relation(obj: Any, source: Any, target: Any, kind: str) -> str | None:
+    """Match the entire observed bundle, including both directions of equality."""
+    return next(
+        (
+            relation
+            for relation in ("=", "<", ">")
+            if not (kind == "individual" and relation != "=")
+            and mapping_candidates(
+                obj.object_id,
+                source,
+                target,
+                relation,
+                entity_kind=kind,
+                enabled_actions=("keep",),
+            )[0].axioms
+            == normalise_axioms(obj.original_axioms)
+        ),
+        None,
+    )
+
+
 def materialize_retrieved_endpoints(problem: Any, retrieval: Any) -> Any:
     """Construct the same typed elementary endpoints on API and direct paths."""
     objects = []
@@ -519,29 +540,35 @@ def materialize_retrieved_endpoints(problem: Any, retrieval: Any) -> Any:
         kind = constructors.get(type(obj.source_entity))
         if kind is None or type(obj.source_entity) is not type(obj.target_entity):
             raise ValueError("retrieved endpoints require explicit, identically typed endpoints")
-        relation = next(
-            (
-                relation
-                for relation in ("=", "<", ">")
-                if not (kind == "individual" and relation != "=")
-                and mapping_candidates(
-                    obj.object_id,
-                    obj.source_entity,
-                    obj.target_entity,
-                    relation,
-                    entity_kind=kind,
-                    enabled_actions=("keep",),
-                )[0].axioms
-                == normalise_axioms(obj.original_axioms)
-            ),
-            None,
-        )
+        source, target = obj.source_entity, obj.target_entity
+        relation = _original_mapping_relation(obj, source, target, kind)
+        if relation is None and kind == "class":
+            # Coherent controls can retain the original mapping's endpoint
+            # provenance after replacing its observed bundle. Infer only an
+            # elementary complete bundle anchored by one unchanged endpoint;
+            # never use the designated answer or discard additional axioms.
+            entities = {
+                entity
+                for axiom in obj.original_axioms
+                for entity in owl.signature(axiom)
+                if isinstance(entity, owl.Class)
+            }
+            matches = []
+            for left in sorted(entities, key=_key):
+                for right in sorted(entities, key=_key):
+                    if left == right or not (left == source or right == target):
+                        continue
+                    inferred = _original_mapping_relation(obj, left, right, kind)
+                    if inferred is not None:
+                        matches.append((left, right, inferred))
+            if len(matches) == 1:
+                source, target, relation = matches[0]
         if relation is None:
             raise ValueError("cannot infer complete original relation for endpoint retrieval")
         additions = mapping_candidates(
             obj.object_id,
-            obj.source_entity,
-            obj.target_entity,
+            source,
+            target,
             relation,
             entity_kind=kind,
             eligible=obj.eligible,

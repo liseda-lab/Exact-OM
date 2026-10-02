@@ -697,6 +697,7 @@ def train_cases(
     case_cpu_seconds: float | None = None,
     total_training_seconds: float | None = None,
     resume_acquisition_deadline: bool = False,
+    resume_endpoint_retrieval: Path | None = None,
 ) -> tuple[Any, dict[str, Any]]:
     """Train masked full-plan tasks and select v3 checkpoints on generated repair quality.
 
@@ -716,6 +717,7 @@ def train_cases(
         "deadline_seconds",
         "warm_start_weights",
         "resume_acquisition_deadline",
+        "resume_endpoint_retrieval",
     ):
         identity_options.pop(key)
     import torch
@@ -971,24 +973,44 @@ def train_cases(
             or saved.get("identity") != resume_identity
             or (revision == "v3" and saved.get("recovery_revision") != "exact-phase-resume/v3.1")
         ):
-            if not resume_acquisition_deadline or revision != "v3":
-                raise ValueError(
-                    "Training checkpoint is incompatible with settings, inputs or splits"
+            if resume_endpoint_retrieval is not None and revision == "v3":
+                from tools.repair.endpoint_recovery import recover_endpoint_state
+
+                dependencies = canonical_hash(
+                    [
+                        (path.name, path.read_bytes().hex())
+                        for path in sorted(
+                            (Path(__file__).resolve().parents[2] / "exact" / "repair").glob("*.py")
+                        )
+                        if path.name != "candidates.py"
+                    ]
                 )
-            dependencies = canonical_hash(
-                [
-                    (path.name, path.read_bytes().hex())
-                    for path in sorted(
-                        (Path(__file__).resolve().parents[2] / "exact" / "repair").glob("*.py")
+                saved = recover_endpoint_state(
+                    saved,
+                    torch.load(resume_endpoint_retrieval, weights_only=True, map_location=device),
+                    identity_options,
+                    warm_start_hash,
+                    dependencies,
+                )
+            else:
+                if not resume_acquisition_deadline or revision != "v3":
+                    raise ValueError(
+                        "Training checkpoint is incompatible with settings, inputs or splits"
                     )
-                    if path.name != "learning.py"
-                ]
-            )
-            migration = _acquisition_deadline_recovery(
-                saved, identity_options, warm_start_hash, dependencies
-            )
-            saved["pending_acquisition"]["case_deadline_exhausted"] = True
-            recovery_lineage.append(migration)
+                dependencies = canonical_hash(
+                    [
+                        (path.name, path.read_bytes().hex())
+                        for path in sorted(
+                            (Path(__file__).resolve().parents[2] / "exact" / "repair").glob("*.py")
+                        )
+                        if path.name != "learning.py"
+                    ]
+                )
+                migration = _acquisition_deadline_recovery(
+                    saved, identity_options, warm_start_hash, dependencies
+                )
+                saved["pending_acquisition"]["case_deadline_exhausted"] = True
+                recovery_lineage.append(migration)
         recovery_lineage = [*saved.get("recovery_lineage", []), *recovery_lineage]
         previous_elapsed = float(saved.get("elapsed_seconds", 0.0))
         execution_count = int(saved.get("execution_count", 0)) + 1
@@ -2360,6 +2382,11 @@ def main() -> int:
         "--case-limit", type=int, help="explicit per-split conformance cap, recorded in coverage"
     )
     parser.add_argument(
+        "--resume-endpoint-retrieval",
+        type=Path,
+        help="dependency-checked rollback to an archived pre-optimization checkpoint",
+    )
+    parser.add_argument(
         "--resume-acquisition-deadline",
         action="store_true",
         help="recover the pinned pre-optimization case-deadline defect without renewing its cap",
@@ -2666,6 +2693,7 @@ def main() -> int:
             warm_start_metadata=warm["metadata"] if warm else None,
             checkpoint_path=args.output / "training-state.pt",
             resume_acquisition_deadline=args.resume_acquisition_deadline,
+            resume_endpoint_retrieval=args.resume_endpoint_retrieval,
         )
         with CumulativeBudget(
             args.output / "training-budget.json",
