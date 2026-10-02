@@ -147,6 +147,9 @@ def freeze(specification, destination):
         root / "runtime.json",
         archive,
     ]
+    # Bind external immutable inputs too; runtime outputs/ledgers must stay outside
+    # this list. Resolve relative inputs against the specified source checkout.
+    paths += [(repo / item).resolve() for item in spec.get("input_files", [])]
     batch = {
         **spec,
         "commit": commit,
