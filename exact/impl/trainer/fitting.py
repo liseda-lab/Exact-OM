@@ -358,7 +358,9 @@ class TrainingPoolMixin:
                             }
                         )
                         rows.append(row)
-                    freeze_json(shard, {"source_ids": source_ids, "rows": rows})
+                    freeze_json(
+                        shard, {"source_ids": source_ids, "rows": rows}, max_bytes=256 * 1024**2
+                    )
                     records.extend(rows)
             finally:
                 self.model.use_llm = original_llm
@@ -674,7 +676,9 @@ class TrainingPoolMixin:
                         zip(batch["src_iri"], batch["tgt_iri"])
                     )
                 ]
-                freeze_json(shard, {"source_ids": source_ids, "rows": rows})
+                freeze_json(
+                    shard, {"source_ids": source_ids, "rows": rows}, max_bytes=256 * 1024**2
+                )
                 records.extend(rows)
         finally:
             self.model.use_llm = original_llm

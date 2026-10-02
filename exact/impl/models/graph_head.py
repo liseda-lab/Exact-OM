@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import random
 from collections import Counter, defaultdict
 from pathlib import Path
@@ -41,6 +42,95 @@ HIERARCHY_PREDICATES = [
     "subClassOf",
     "subPropertyOf",
 ]
+
+
+def compact_graph_fingerprints(manifests):
+    """Bind complete graph controls without repeating their edge lists per pair.
+
+    Manifests without removed-edge lists retain their original representation.
+    The full control is kept separately, addressed by its canonical checksum.
+    """
+    result = {}
+    for side, manifest in manifests.items():
+        removal = manifest.get("hierarchy_removal") if isinstance(manifest, dict) else None
+        direct = isinstance(manifest, dict) and "removed" in manifest
+        if direct:
+            removal = manifest
+        if not isinstance(removal, dict) or "removed" not in removal:
+            result[side] = manifest
+            continue
+        compact = {key: value for key, value in removal.items() if key != "removed"}
+        compact.update(
+            removed_count=len(removal["removed"]),
+            removed_sha256=fingerprint(removal["removed"]),
+        )
+        result[side] = {
+            **(compact if direct else {**manifest, "hierarchy_removal": compact}),
+            "manifest_sha256": fingerprint(manifest),
+        }
+    return result
+
+
+def verify_graph_manifests(manifests, directory):
+    """Verify relocated full controls against their compact per-pair bindings."""
+    for side, manifest in manifests.items():
+        digest = manifest.get("manifest_sha256") if isinstance(manifest, dict) else None
+        if digest is None:
+            continue
+        if (
+            not isinstance(digest, str)
+            or len(digest) != 64
+            or any(char not in "0123456789abcdef" for char in digest)
+        ):
+            raise ValueError("Invalid graph control manifest checksum")
+        full = json.loads((Path(directory) / (digest + ".json")).read_text())
+        if (
+            fingerprint(full) != digest
+            or compact_graph_fingerprints({side: full})[side] != manifest
+        ):
+            raise ValueError("Graph control manifest does not match its compact binding")
+
+
+def _persist_graph_manifests(dataset, directory):
+    # The experiment recovery contract already includes the entire fitting tree.
+    # Other callers can supply a directory, or inspect this registry in memory.
+    if directory is None:
+        runtime = os.environ.get("EXACT_EXPERIMENT_RUNTIME")
+        if runtime:
+            directory = Path(runtime).parent / "fitting" / "graph-manifests"
+    if directory is None:
+        return
+    written = getattr(dataset, "_inductive_graph_manifest_paths", None)
+    if written is None:
+        written = dataset._inductive_graph_manifest_paths = set()
+    for digest, manifest in getattr(dataset, "_inductive_graph_manifests", {}).items():
+        path = Path(directory) / (digest + ".json")
+        if path not in written:
+            freeze_json(path, manifest)
+            written.add(path)
+
+
+def graph_control_evidence(dataset, *, manifest_directory=None):
+    """Compact the scoring view's immutable controls once, including graph-off arms."""
+    controls = getattr(dataset, "graph_control_manifests", {})
+    cache = getattr(dataset, "_compact_graph_control_cache", None)
+    if cache is None:
+        cache = dataset._compact_graph_control_cache = {}
+    result = {}
+    for name, full in controls.items():
+        # Control views publish complete manifests, replacing rather than mutating
+        # them. Retain the object reference so Python cannot recycle its identity.
+        if name not in cache or cache[name][0] is not full:
+            compact = compact_graph_fingerprints({name: full})[name]
+            cache[name] = (full, compact)
+            if "manifest_sha256" in compact:
+                registry = getattr(dataset, "_inductive_graph_manifests", None)
+                if registry is None:
+                    registry = dataset._inductive_graph_manifests = {}
+                registry[compact["manifest_sha256"]] = full
+        result[name] = cache[name][1]
+    _persist_graph_manifests(dataset, manifest_directory)
+    return result
 
 
 def structural_profiles(edges):
@@ -82,7 +172,7 @@ def structural_profiles(edges):
     return profiles
 
 
-def graph_pair_features(dataset, src_iris, tgt_iris, config, seed):
+def graph_pair_features(dataset, src_iris, tgt_iris, config, seed, *, manifest_directory=None):
     """Use ontology-wide unsupervised profiles, with a separate lock for each control."""
     if seed is None and (config.get("hierarchy_removal") or config.get("shuffled")):
         raise ValueError("graph controls require an explicit request_seed")
@@ -111,8 +201,15 @@ def graph_pair_features(dataset, src_iris, tgt_iris, config, seed):
             if config.get("shuffled"):
                 edges, manifest["shuffle"] = shuffle_relations(edges, seed=seed)
             manifest["output_sha256"] = graph_fingerprint(edges)
-            cache[key] = (structural_profiles(edges), manifest)
+            compact = compact_graph_fingerprints({side: manifest})[side]
+            if "manifest_sha256" in compact:
+                registry = getattr(dataset, "_inductive_graph_manifests", None)
+                if registry is None:
+                    registry = dataset._inductive_graph_manifests = {}
+                registry[compact["manifest_sha256"]] = manifest
+            cache[key] = (structural_profiles(edges), compact)
         side_profiles[side], manifests[side] = cache[key]
+    _persist_graph_manifests(dataset, manifest_directory)
     rows = []
     for src, tgt in zip(src_iris, tgt_iris):
         source, target = side_profiles["src"].get(src), side_profiles["tgt"].get(tgt)
@@ -248,7 +345,10 @@ def graph_predictions(features, artifact):
     weights = np.asarray(artifact["weights"], dtype=float)
     if weights.shape != (len(FEATURE_SCHEMA),) or not np.isfinite(weights).all():
         raise ValueError("graph artifact weights are invalid")
-    if any(row["graph_fingerprints"] != artifact["graph_fingerprints"] for row in features):
+    # Existing fitted heads retain the complete legacy manifest. Normalize only
+    # the provenance binding; weights, features and predictions remain unchanged.
+    expected = compact_graph_fingerprints(artifact["graph_fingerprints"])
+    if any(compact_graph_fingerprints(row["graph_fingerprints"]) != expected for row in features):
         raise ValueError("graph artifact graph/profile fingerprint mismatch")
     if not np.isfinite(float(artifact["bias"])):
         raise ValueError("graph artifact bias must be finite")

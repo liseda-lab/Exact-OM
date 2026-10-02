@@ -2330,6 +2330,11 @@ class PairAdaptiveSemanticScorer(
         if "graph" in struct_weights:
             result["s_graph"] = channel_score_tensors["graph"]
             result["I_graph"] = I_struct * struct_weights["graph"]
+        graph_controls: Dict[str, Any] = {}
+        if getattr(dataset, "graph_control_manifests", None):
+            from exact.impl.models.graph_head import graph_control_evidence
+
+            graph_controls = graph_control_evidence(dataset)
         result["kind_evidence"] = {
             "source": {
                 iri: features.get("experiment_evidence")
@@ -2339,7 +2344,7 @@ class PairAdaptiveSemanticScorer(
                 iri: features.get("experiment_evidence")
                 for iri, features in tgt_feature_map.items()
             },
-            "graph_controls": dict(getattr(dataset, "graph_control_manifests", {})),
+            "graph_controls": graph_controls,
         }
         result["fusion_channels"] = {
             "label": {"score": s_label, "quality": q_label, "active": label_active},
@@ -2440,7 +2445,7 @@ class PairAdaptiveSemanticScorer(
                     experiment_diagnostics["kind_evidence"] = {
                         "source": kind_source,
                         "target": kind_target,
-                        "graph_controls": dict(getattr(dataset, "graph_control_manifests", {})),
+                        "graph_controls": graph_controls,
                     }
                 explanations.append(
                     {
