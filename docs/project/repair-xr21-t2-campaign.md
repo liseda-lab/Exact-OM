@@ -100,3 +100,34 @@ for this new campaign govern this series; old campaign stops remain intact.
 
 The launch session stops after verifying the first batch and supervisor startup.
 The supervisor owns subsequent progress and publishes the final scope accounting.
+
+## B08 held-out evaluation adapter
+
+`tools.repair.evaluate_campaign` freezes the six development-selected model
+identities and all four reserved cases before querying any test consequence.
+Unavailable models keep their four primary rows. Native v3 checkpoint freezing,
+shared effective preparation and interaction selection, exact repair, and the
+original symbolic target evaluator provide the primary generated-pool results.
+Inference uses the same CPU worker profile across available arms; model fitting
+and checkpoint selection are closed. Each primary row retains the 300-second,
+600-CPU-second and 8,192-MiB case ceilings, including startup and transport.
+Generation receives 60 seconds; selection retains 60 seconds of the remaining
+case allowance for independent labels and five seconds for orchestration.
+
+The small circuit diagnostic schedules grammar-only and ontology-informed
+circuits against the existing bounded semantic expression enumerator, separately
+for every object in every reserved case. The latter is an exhaustive finite
+expression decoder, not an implemented incremental learned decoder. It uses the
+same stage-0 menus, proof-supported conditions and uniform derivation sampling.
+Each object/method row has 60 seconds and 32 draws, so each method has at most
+240 seconds per four-object case. Compiler cold and warm attempts retain their
+actual cache telemetry. This diagnostic does not establish repair quality or
+learning efficiency. Every timeout, error, partial family and unvisited row
+remains in the schedule denominator.
+
+The batch has a 25,200-second cumulative worker ceiling and a 24,900-second
+inner allowance. Results and per-row budget receipts are dependency-bound and
+reused without repeating completed evaluation. Both labels and full repair/pool
+evidence are saved behind small artifact receipts to avoid transport truncation.
+B09 remains responsible for cumulative campaign costs and finite-scope closure
+once B08 has an actual completion receipt.
