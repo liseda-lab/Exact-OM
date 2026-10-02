@@ -134,6 +134,7 @@ def _charge(path, limits, key, *, requests=1, tokens=12, status="complete"):
 
 
 def _worker(tmp_path, monkeypatch):
+    monkeypatch.setattr(os, "environ", os.environ.copy())
     for key in (
         "EXACT_OPENROUTER_REQUEST_CAP",
         "EXACT_OPENROUTER_TOKEN_CAP",
