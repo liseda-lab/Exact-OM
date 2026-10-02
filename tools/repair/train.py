@@ -301,6 +301,21 @@ def label_case(
     return cache
 
 
+def _label_payload(case: GeneratedCase, directory: Path, **options) -> dict:
+    from tools.repair.prepare import publish_label_cache
+
+    return publish_label_cache(label_case(case, **options), directory)
+
+
+def _retryable_label_transport(row: Mapping[str, Any]) -> bool:
+    """Only retry lost result transport, never a logical unknown or partial cache."""
+    return (
+        row.get("status") == "unverified_parent"
+        and row.get("detail")
+        == "Label worker error: ValueError: worker result exceeds the transport frame limit"
+    )
+
+
 def decoded_development(
     objective, cache: TeacherCache, *, max_checks: int = 256, deadline_seconds: float = 10.0
 ) -> dict[str, Any]:
@@ -2228,6 +2243,7 @@ def main() -> int:
         load_preparation,
         load_protocol,
         prepare_real_manifest,
+        read_label_cache,
         save_preparation,
     )
 
@@ -2250,6 +2266,11 @@ def main() -> int:
     )
     parser.add_argument(
         "--prepare-only", action="store_true", help="save cases and bounded labels without training"
+    )
+    parser.add_argument(
+        "--retry-label-transport-errors",
+        action="store_true",
+        help="retry recorded oversized result errors within the original cumulative budgets",
     )
     parser.add_argument(
         "--case-limit", type=int, help="explicit per-split conformance cap, recorded in coverage"
@@ -2421,7 +2442,18 @@ def main() -> int:
             label_budget._save()
             for case in selected:
                 if case.case_id in rows:
-                    continue
+                    previous = rows[case.case_id]
+                    if not (
+                        args.retry_label_transport_errors
+                        and case.case_id not in caches
+                        and _retryable_label_transport(previous)
+                    ):
+                        continue
+                    history = preparation.setdefault("label_retry_history", [])
+                    if sum(row["case_id"] == case.case_id for row in history) >= 2:
+                        continue
+                    history.append(dict(previous))
+                    save_preparation(resume_preparation, cases, preparation, caches)
                 if case.case_id in caches:
                     row = dict(
                         case_id=case.case_id,
@@ -2452,8 +2484,9 @@ def main() -> int:
                     labeled = None
                     try:
                         labeled = bounded_call(
-                            label_case,
+                            _label_payload,
                             case,
+                            args.output / "label-caches",
                             timeout=reserved,
                             cpu_seconds=cpu_cap,
                             memory_mb=protocol["resources"]
@@ -2468,12 +2501,13 @@ def main() -> int:
                         )
                         if labeled.status != "complete":
                             raise ValueError(f"Label worker {labeled.status}: {labeled.detail}")
-                        cache = labeled.value
+                        cache = read_label_cache(labeled.value, args.output / "label-caches", case)
                         caches[case.case_id] = cache
                         row = dict(
                             case_id=case.case_id,
                             status="complete" if cache.complete else "partial",
                             coverage=cache.coverage,
+                            artifact=labeled.value,
                         )
                     except ValueError as error:
                         row = dict(

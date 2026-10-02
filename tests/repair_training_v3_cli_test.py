@@ -11,7 +11,7 @@ from exact.repair.workers import CallResult
 from tests.repair_training_completion_test import cache_for
 from tools.repair import train
 from tools.repair.corpus import generate_corpus
-from tools.repair.prepare import load_preparation
+from tools.repair.prepare import load_preparation, publish_label_cache
 
 
 def test_v3_cli_accounts_shared_campaign_and_stage_cpu_and_preserves_resume(tmp_path, monkeypatch):
@@ -40,6 +40,7 @@ def test_v3_cli_accounts_shared_campaign_and_stage_cpu_and_preserves_resume(tmp_
     monkeypatch.delenv("SLURM_STEP_GPUS", raising=False)
     monkeypatch.delenv("SLURM_JOB_GPUS", raising=False)
     cases = generate_corpus(
+        revision="v3",
         split_counts={"train": 1, "development": 1, "test": 0},
         siblings_per_parent=1,
         families=("range",),
@@ -50,8 +51,11 @@ def test_v3_cli_accounts_shared_campaign_and_stage_cpu_and_preserves_resume(tmp_
         calls.append((function.__name__, options))
         if function.__name__ == "generated_from_protocol":
             value, cpu = cases, 0.25
-        elif function is train.label_case:
-            value = replace(cache_for(worker_args[0]), schema="exact-repair/teacher-cache/v3")
+        elif function is train._label_payload:
+            value = publish_label_cache(
+                replace(cache_for(worker_args[0]), schema="exact-repair/teacher-cache/v3"),
+                worker_args[1],
+            )
             cpu = 0.5
         elif function is train._train_payload:
             train_rows, dev_rows, model_options = worker_args
@@ -93,8 +97,8 @@ def test_v3_cli_accounts_shared_campaign_and_stage_cpu_and_preserves_resume(tmp_
     }
     assert [name for name, _ in calls] == [
         "generated_from_protocol",
-        "label_case",
-        "label_case",
+        "_label_payload",
+        "_label_payload",
         "_train_payload",
     ]
     assert [options["cpu_seconds"] for _, options in calls] == [600, 300, 300, 1800]
