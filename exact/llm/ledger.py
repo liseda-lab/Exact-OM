@@ -54,6 +54,11 @@ class RequestLedger:
                     elapsed_seconds REAL,
                     PRIMARY KEY(request_id, number)
                 )""",
+                """CREATE TABLE IF NOT EXISTS retry_authorizations (
+                    request_id TEXT NOT NULL, number INTEGER NOT NULL,
+                    authorization_id TEXT NOT NULL, consumed_by INTEGER,
+                    PRIMARY KEY(request_id, number)
+                )""",
             ):
                 db.execute(statement)
             columns = {row["name"] for row in db.execute("PRAGMA table_info(attempts)")}
@@ -132,14 +137,24 @@ class RequestLedger:
             last = db.execute(
                 "SELECT * FROM attempts WHERE request_id=? ORDER BY number DESC LIMIT 1", (key,)
             ).fetchone()
+            grant = db.execute(
+                "SELECT * FROM retry_authorizations WHERE request_id=? "
+                "ORDER BY number DESC LIMIT 1",
+                (key,),
+            ).fetchone()
             if last is not None:
                 if last["state"] == "completed":
                     raise RuntimeError("Request completed concurrently; reload its cached response")
+                if grant is not None and grant["consumed_by"] is not None:
+                    raise RuntimeError(
+                        "Approved paid retry already used; another attempt requires authorization"
+                    )
                 if last["state"] == "sent":
                     raise RuntimeError(
                         "Request has an active or unresolved sender; recover it explicitly"
                     )
-                if last["state"] == "unknown" and not retry_unknown:
+                authorized = grant is not None and grant["number"] == last["number"]
+                if last["state"] == "unknown" and not (retry_unknown or authorized):
                     raise RuntimeError(
                         "Unknown paid request; explicit retry authorization is required"
                     )
@@ -182,7 +197,54 @@ class RequestLedger:
                 "INSERT INTO attempts(request_id,number,state,pid,host) VALUES (?,?,?,?,?)",
                 (key, number, "sent", os.getpid(), socket.gethostname()),
             )
+            if grant is not None:
+                db.execute(
+                    "UPDATE retry_authorizations SET consumed_by=? "
+                    "WHERE request_id=? AND number=? AND consumed_by IS NULL",
+                    (number, key, grant["number"]),
+                )
         return number
+
+    def authorize_unknown_once(self, key: str, *, attempt: int, authorization_id: str) -> None:
+        """Bind explicit approval to one extra wire attempt, retaining uncertain charges.
+
+        Reapplying the same approval is idempotent, including after it was used.
+        Approval and dead-sender recovery share a transaction; no network is called.
+        """
+        if type(attempt) is not int or attempt < 1 or not authorization_id.strip():
+            raise ValueError("An exact attempt and nonempty approval identity are required")
+        with self._transaction() as db:
+            grant = db.execute(
+                "SELECT * FROM retry_authorizations WHERE request_id=? AND number=?",
+                (key, attempt),
+            ).fetchone()
+            if grant is not None:
+                if grant["authorization_id"] != authorization_id:
+                    raise ValueError("Retry approval identity changed")
+                return
+            row = db.execute(
+                "SELECT * FROM attempts WHERE request_id=? ORDER BY number DESC LIMIT 1",
+                (key,),
+            ).fetchone()
+            if row is None or row["number"] != attempt or row["state"] not in {"sent", "unknown"}:
+                raise ValueError("Approval must name the latest unresolved attempt")
+            if row["state"] == "sent":
+                if row["host"] != socket.gethostname():
+                    raise ValueError("Cannot establish that a remote sender exited")
+                try:
+                    os.kill(int(row["pid"]), 0)
+                except ProcessLookupError:
+                    db.execute(
+                        "UPDATE attempts SET state='unknown',error='sender exited' "
+                        "WHERE request_id=? AND number=?",
+                        (key, attempt),
+                    )
+                else:
+                    raise ValueError("Sender is still alive")
+            db.execute(
+                "INSERT INTO retry_authorizations VALUES (?,?,?,NULL)",
+                (key, attempt, authorization_id),
+            )
 
     def received(
         self,
