@@ -591,6 +591,12 @@ def run_recipe(path):
                 },
                 immutable=True,
             )
+        if recipe.get("deferred_lineage_registration"):
+            from tools.finalize_prepared_selection import register_lineage
+
+            # The predecessor may own the newest cumulative account. Keep it enabled
+            # until both the copied request history/budget and launch receipt are durable.
+            registry = register_lineage(recipe)
         os.environ.update(hosted_caps(state, runtime / "openrouter"))
         plan = campaign_plan(campaign, stage="screen")
         relevant = [row for row in plan["rows"] if row["step"] == recipe["scientific_step"]]
@@ -671,6 +677,33 @@ def run_recipe(path):
                 if recipe.get("failed_finalization_interval"):
                     charge_failed_finalization(recipe, ledger, read(runtime / "budget.json"))
                 prepare_label_recovery(recipe, campaign, runtime, code)
+                migration_status = "complete"
+            finally:
+                ledger.finish(
+                    work,
+                    start=migration_start,
+                    end=time.time(),
+                    status=migration_status,
+                    requests=0,
+                    tokens=0,
+                    actual_usd=0,
+                )
+        if recipe.get("graph_storage_repair"):
+            from tools.finalize_prepared_selection import charge_failed_finalization
+            from tools.recover_graph_storage import import_saved
+
+            work = (
+                "preparation/"
+                + recipe["scientific_step"]
+                + "/graph-storage/"
+                + os.environ["SLURM_STEP_ID"]
+            )
+            ledger.admit(work, group="reserve", seconds=0, forecast_known=False)
+            migration_start, migration_status = time.time(), "failed"
+            try:
+                if recipe.get("failed_finalization_interval"):
+                    charge_failed_finalization(recipe, ledger, read(runtime / "budget.json"))
+                import_saved(recipe, campaign, runtime, code)
                 migration_status = "complete"
             finally:
                 ledger.finish(
@@ -843,6 +876,9 @@ export PYTHONPATH={shlex.quote(str(code))}
             "completion_path": str((root / "completion.json").resolve()),
         },
     }
+    from tools.storage_guard import guard_launch
+
+    descriptor = guard_launch(descriptor, read(supervisor / "policy.json"), supervisor)
     write(root / "launch-descriptor.json", descriptor, immutable=True)
     status(root, "prepared_waiting_dependencies", dependencies=batch["depends_on"])
     return descriptor

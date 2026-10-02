@@ -29,6 +29,8 @@ from exact.experiments.supervision import (  # noqa: E402
     pending_batches,
 )
 
+from tools import storage_guard  # noqa: E402
+
 RESULT_SCHEMA = {
     "type": "object",
     "properties": {
@@ -383,6 +385,7 @@ def dispatch_worker(directory, policy, stop_event):
             result = dispatch_ready(
                 directory, policy["allocation"], slurm_steps(policy["allocation"]),
                 supervisor_step=os.environ.get("SLURM_STEP_ID"),
+                validate_launch=lambda launch: storage_guard.validate_launch(launch, policy, directory),
             )
             write(directory / "dispatch-status.json", {**result, "checked_at": timestamp()})
         except Exception as exc:
@@ -482,6 +485,11 @@ def check(directory, policy, state, *, act=False, stop_requested=lambda: False):
     paused_by = [str(path) for path in pause_paths if path.exists()]
     if paused_by:
         current.update(status="paused", paused_by=paused_by)
+        storage_incident = storage_guard.pause_incident(paused_by)
+        if act and storage_incident is not None:
+            current["notification"] = notify_blocker(
+                directory, policy, storage_incident, "requires_user"
+            )
     elif act:
         for key, record in state["incidents"].items():
             if (key not in active and record.get("alerted") and not record.get("recovered")
@@ -606,6 +614,8 @@ def validate_policy(policy):
         raise ValueError(
             "Positive retry/time limits and an interval of at least one minute required"
         )
+    if policy.get("storage_guard") is not None:
+        storage_guard.validate_policy(policy["storage_guard"])
     daily_limit = policy.get("max_agent_runs_per_day")
     if daily_limit is not None and (
         isinstance(daily_limit, bool) or not isinstance(daily_limit, int) or daily_limit < 1

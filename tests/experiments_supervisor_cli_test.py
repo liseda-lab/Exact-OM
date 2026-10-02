@@ -817,3 +817,20 @@ def test_queued_recovery_chain_does_not_spawn_a_second_repair(
     assert cli.read(tmp_path / 'registry.json') == registry
     assert not (tmp_path / 'dispatch-state.json').exists()
     assert not Path(recovery['launch']['step_path']).exists()
+
+
+@pytest.mark.parametrize("storage", [False, True])
+def test_storage_pause_alerts_without_starting_repairs(cli, controller, tmp_path, monkeypatch, storage):
+    policy, state = controller
+    cli.write(tmp_path / "registry.json", {"runs": [], "pending_batches": [], "capacity": {}})
+    reason = "Storage safety guard: reserve reached" if storage else "User maintenance"
+    (tmp_path / "PAUSE").write_text(reason)
+    notifications = []
+    monkeypatch.setattr(cli, "notify_blocker", lambda *a, **kw: notifications.append((a, kw)))
+    monkeypatch.setattr(cli, "run_agent", lambda *a, **kw: pytest.fail("must remain paused"))
+    current = cli.check(tmp_path, policy, state, act=True)
+    assert current["status"] == "paused"
+    assert len(notifications) == int(storage)
+    if storage:
+        assert notifications[0][0][2]["kind"] == "storage_safety"
+        assert notifications[0][0][3] == "requires_user"

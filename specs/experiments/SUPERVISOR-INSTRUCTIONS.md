@@ -148,3 +148,11 @@ exact delivery journal and decision required. Never reset ambiguous-send guards,
 or blindly send another copy. This incident may repair notification evidence, not policy or
 supervisor retry state. The controller queues one separate escalation and suppresses recursive
 mail-about-mail incidents; experiments and independent eligible work continue.
+
+When `policy.storage_guard` is configured, wrap every new custom launch descriptor with
+`tools.storage_guard.guard_launch(descriptor, policy, supervisor_directory)` before publishing
+it. `prepared_batch.prepare()` does this automatically. Preserve the bound original worker,
+guard source, runtime STOP and policy fingerprint; the dispatcher refuses unguarded launches.
+Never remove a `Storage safety guard:` pause until the storage cause is resolved and the
+configured admission checks pass. Full graph controls belong once in `fitting/graph-manifests`;
+raw feature rows retain compact checksum bindings. Do not restore repeated edge lists.

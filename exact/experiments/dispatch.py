@@ -162,7 +162,7 @@ def _register(registry, batch, step):
             registry["pause_paths"].append(path)
 
 
-def dispatch_ready(directory, allocation, steps, *, supervisor_step=None):
+def dispatch_ready(directory, allocation, steps, *, supervisor_step=None, validate_launch=None):
     """Reserve, start or reconcile at most one prepared batch under the registry lock.
 
     An uncertain prior spawn is never repeated. Its receipt can be recovered after
@@ -258,6 +258,8 @@ def dispatch_ready(directory, allocation, steps, *, supervisor_step=None):
             _write(state_path, state)  # Durable reservation precedes any process creation.
             try:
                 launch = _validate(batch, allocation)
+                if validate_launch is not None:
+                    validate_launch(launch)
                 if Path(launch["step_path"]).exists():
                     raise ValueError("Fresh dispatch already has a step receipt; inspect prior owner")
                 command, server_pid = _tmux_server(launch)

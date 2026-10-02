@@ -388,7 +388,7 @@ def test_registered_parent_states_remain_valid(recovery_chain, status):
 def test_matching_inflight_queued_ancestor_remains_waiting(recovery_chain, status):
     registry, observation, main, _ = recovery_chain
     state = {'main': {'status': status, 'nonce': main['launch']['nonce'],
-                     'descriptor_sha256': dispatch._identity(main), 'resources': main['resources']}}
+                      'descriptor_sha256': dispatch._identity(main), 'resources': main['resources']}}
     assert waiting_recoveries(registry, observation, state) == {'failed': 'E18'}
 
 
@@ -425,3 +425,34 @@ def test_registered_supersession_chains_are_checked(recovery_chain, cycle):
     if cycle:
         registry['runs'][-1]['superseded_by'] = 'complete'
     assert waiting_recoveries(registry, observation) == ({} if cycle else {'failed': 'E18'})
+
+
+def test_optional_guard_validation_runs_under_lock_before_spawn(tmp_path, queue):
+    validated = []
+
+    def guard(launch):
+        with (tmp_path / "registry.json.lock").open("a") as handle:
+            with pytest.raises(BlockingIOError):
+                fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        validated.append(launch)
+        raise ValueError("Required storage guard missing")
+
+    result = dispatch.dispatch_ready(tmp_path, "14372", {"14372.0": "RUNNING"},
+                                     supervisor_step="35", validate_launch=guard)
+    assert result["status"] == "failed"
+    assert validated and not queue[2]
+    state = load(tmp_path / "dispatch-state.json")["E18"]
+    assert state["may_have_started"] is False
+    assert "storage guard" in dispatch.dispatch_incidents(tmp_path)[0]["reason"]
+
+
+def test_new_guard_does_not_invalidate_already_started_receipts(tmp_path, queue):
+    _, batch, calls = queue
+    tick(tmp_path)
+    receipt(batch)
+    result = dispatch.dispatch_ready(
+        tmp_path, "14372", {"14372.0": "RUNNING", "14372.36": "RUNNING"},
+        supervisor_step="35", validate_launch=lambda launch: pytest.fail("already launched"),
+    )
+    assert result["status"] == "registered"
+    assert len(calls) == 1
