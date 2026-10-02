@@ -70,6 +70,7 @@ def _checkpoint(tmp_path, count):
     dataset.write_text(
         "Src,SrcKind,Tgt,TgtKind,inference\n"
         + "".join(f"S{i},class,T{i},class,True\n" for i in range(5844))
+        + "".join(f"Exact{i},class,Exact{i},class,False\n" for i in range(156))
     )
     saved = tmp_path / "inference"
     write(
