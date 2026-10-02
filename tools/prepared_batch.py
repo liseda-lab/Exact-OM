@@ -591,6 +591,10 @@ def run_recipe(path):
                 },
                 immutable=True,
             )
+        if recipe.get("hosted_retry_authorizations"):
+            from tools.authorize_hosted_retries import apply_authorizations
+
+            apply_authorizations(recipe, runtime)
         if recipe.get("deferred_lineage_registration"):
             from tools.finalize_prepared_selection import register_lineage
 
@@ -703,6 +707,26 @@ def run_recipe(path):
             try:
                 if recipe.get("failed_finalization_interval"):
                     charge_failed_finalization(recipe, ledger, read(runtime / "budget.json"))
+                import_saved(recipe, campaign, runtime, code)
+                migration_status = "complete"
+            finally:
+                ledger.finish(
+                    work,
+                    start=migration_start,
+                    end=time.time(),
+                    status=migration_status,
+                    requests=0,
+                    tokens=0,
+                    actual_usd=0,
+                )
+        if recipe.get("e14_ledger_repair"):
+            from tools.recover_e14_ledger import charge_missing_setup, import_saved
+
+            work = "preparation/E14/ledger-recovery/" + os.environ["SLURM_STEP_ID"]
+            ledger.admit(work, group="reserve", seconds=0, forecast_known=False)
+            migration_start, migration_status = time.time(), "failed"
+            try:
+                charge_missing_setup(recipe, ledger)
                 import_saved(recipe, campaign, runtime, code)
                 migration_status = "complete"
             finally:
