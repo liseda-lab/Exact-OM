@@ -902,6 +902,7 @@ def collect_sampled_repairs(
     Every stratum shares one finite interleaved schedule; quartet budgets count
     assignment attempts in groups of four. Probabilities describe draws, never
     deduplicated inclusion. No rejection-resampling removes unknown outcomes.
+    A zero remaining deadline finalizes unvisited slots without invoking the labeler.
     """
     from .records import canonical_hash
 
@@ -935,7 +936,7 @@ def collect_sampled_repairs(
     if (
         any(type(n) is not int or n < 1 for n in counts)
         or max_assignments < 0
-        or deadline_seconds <= 0
+        or deadline_seconds < 0
     ):
         raise ValueError("Invalid sample inventory/budgets")
     if object_candidate_ids and (

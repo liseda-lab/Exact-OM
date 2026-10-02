@@ -56,6 +56,53 @@ DEFAULT_PROFILE = (
 )
 
 
+# The pre-fix trainer stopped at a bounded case deadline before any optimization.
+# These pins admit only that implementation and unchanged graph/model/teacher code.
+_ACQUISITION_DEADLINE_PREDECESSOR = (
+    "e71392f8cbc31a0932cde613f8357e20b0f6cd5efe824a737d8561ce9544da24"
+)
+_ACQUISITION_UNCHANGED_DEPENDENCIES = (
+    "a820a6a062a810a6756fe379d8e69ee3709027b0659a85424cb1075d226af99d"
+)
+
+
+def _acquisition_deadline_recovery(saved, identity_options, warm_start_hash, dependencies):
+    """Admit a diagnosed pre-optimization deadline without editing checkpoint identity.
+
+    All input/configuration dependencies must reproduce the predecessor identity.
+    The pending case is finalized as bounded/unvisited, never granted more time.
+    """
+    pending = saved.get("pending_acquisition", {})
+    collection = pending.get("collection_state", {})
+    expected = canonical_hash(
+        (identity_options, warm_start_hash, _ACQUISITION_DEADLINE_PREDECESSOR)
+    )
+    if not (
+        dependencies == _ACQUISITION_UNCHANGED_DEPENDENCIES
+        and saved.get("schema") == "exact-repair/training-state/v3"
+        and saved.get("recovery_revision") == "exact-phase-resume/v3.1"
+        and saved.get("identity") == expected
+        and saved.get("phase") == "acquisition"
+        and saved.get("next_epoch") == saved.get("next_offset") == saved.get("optimized") == 0
+        and not saved.get("history")
+        and not saved.get("optimizer", {}).get("state")
+        and saved.get("best_state") is None
+        and pending.get("epoch") == 0
+        and "proposed" in pending
+        and collection.get("schema") == "exact-repair/collection-state/v3.2"
+        and collection.get("collection_identity")
+        == canonical_hash(collection.get("collection_dependencies"))
+    ):
+        raise ValueError("Acquisition deadline recovery dependencies or phase are incompatible")
+    return dict(
+        migration="bounded-acquisition-deadline/v1",
+        source_identity=expected,
+        source_implementation=_ACQUISITION_DEADLINE_PREDECESSOR,
+        reused="model, optimizer, RNG, completed acquisition and partial labels",
+        invalidated="pending case continuation after its exhausted deadline",
+    )
+
+
 def save_training_state(path: Path, state: dict) -> None:
     """Atomically publish a tensors-and-primitives checkpoint, including optimizer/RNG."""
     import torch
@@ -649,6 +696,7 @@ def train_cases(
     mixture_symbolic_weight: float = 0.5,
     case_cpu_seconds: float | None = None,
     total_training_seconds: float | None = None,
+    resume_acquisition_deadline: bool = False,
 ) -> tuple[Any, dict[str, Any]]:
     """Train masked full-plan tasks and select v3 checkpoints on generated repair quality.
 
@@ -663,7 +711,12 @@ def train_cases(
     if not math.isfinite(total_training_seconds) or total_training_seconds <= 0:
         raise ValueError("Cumulative training allowance must be finite and positive")
     identity_options = dict(locals())
-    for key in ("checkpoint_path", "deadline_seconds", "warm_start_weights"):
+    for key in (
+        "checkpoint_path",
+        "deadline_seconds",
+        "warm_start_weights",
+        "resume_acquisition_deadline",
+    ):
         identity_options.pop(key)
     import torch
 
@@ -910,6 +963,7 @@ def train_cases(
     pending_acquisition: dict[str, Any] = {}
     previous_elapsed = 0.0
     execution_count = 1
+    recovery_lineage: list[dict[str, Any]] = []
     if checkpoint_path is not None and checkpoint_path.exists():
         saved = torch.load(checkpoint_path, weights_only=True, map_location=device)
         if (
@@ -917,7 +971,25 @@ def train_cases(
             or saved.get("identity") != resume_identity
             or (revision == "v3" and saved.get("recovery_revision") != "exact-phase-resume/v3.1")
         ):
-            raise ValueError("Training checkpoint is incompatible with settings, inputs or splits")
+            if not resume_acquisition_deadline or revision != "v3":
+                raise ValueError(
+                    "Training checkpoint is incompatible with settings, inputs or splits"
+                )
+            dependencies = canonical_hash(
+                [
+                    (path.name, path.read_bytes().hex())
+                    for path in sorted(
+                        (Path(__file__).resolve().parents[2] / "exact" / "repair").glob("*.py")
+                    )
+                    if path.name != "learning.py"
+                ]
+            )
+            migration = _acquisition_deadline_recovery(
+                saved, identity_options, warm_start_hash, dependencies
+            )
+            saved["pending_acquisition"]["case_deadline_exhausted"] = True
+            recovery_lineage.append(migration)
+        recovery_lineage = [*saved.get("recovery_lineage", []), *recovery_lineage]
         previous_elapsed = float(saved.get("elapsed_seconds", 0.0))
         execution_count = int(saved.get("execution_count", 0)) + 1
         model.load_state_dict(saved["model"])
@@ -1008,6 +1080,7 @@ def train_cases(
                     elapsed_seconds=previous_elapsed + time.monotonic() - started,
                     total_training_seconds=total_training_seconds,
                     execution_count=execution_count,
+                    recovery_lineage=recovery_lineage,
                     phase=current_phase,
                     epoch_order=epoch_order,
                     development_progress=development_progress,
@@ -1475,8 +1548,13 @@ def train_cases(
                     )
                     checkpoint(epoch)
                 acquire_started = time.monotonic()
-                acquire_budget = min(decode_seconds, remaining_training_seconds())
-                if acquire_budget <= 0:
+                previous_acquisition_seconds = pending_acquisition.get("elapsed_seconds", 0.0)
+                case_remaining = max(0.0, decode_seconds - previous_acquisition_seconds)
+                if pending_acquisition.get("case_deadline_exhausted"):
+                    case_remaining = 0.0
+                stage_limited = remaining_training_seconds() < case_remaining
+                acquire_budget = min(case_remaining, remaining_training_seconds())
+                if acquire_budget <= 0 and stage_limited:
                     break
 
                 def acquire_label(assignment):
@@ -1559,6 +1637,9 @@ def train_cases(
 
                 def save_collection(state):
                     pending_acquisition["collection_state"] = copy.deepcopy(state)
+                    pending_acquisition["elapsed_seconds"] = (
+                        previous_acquisition_seconds + time.monotonic() - acquire_started
+                    )
                     checkpoint(epoch)
 
                 acquired = collect_sampled_repairs(
@@ -1590,7 +1671,7 @@ def train_cases(
                     resume_state=pending_acquisition.get("collection_state"),
                     progress=save_collection,
                     deadline_seconds=max(
-                        0.001, acquire_budget - (time.monotonic() - acquire_started)
+                        0.0, acquire_budget - (time.monotonic() - acquire_started)
                     ),
                     seed=seed + epoch,
                     proposed=proposed,
@@ -1602,7 +1683,9 @@ def train_cases(
                     counterfactual_attempts=(collection_options or {}).get("diversity_attempts"),
                     quartet_attempts=(collection_options or {}).get("quartet_attempts", 0),
                 )
-                if acquired.stop_reason == "deadline":
+                if acquired.stop_reason == "deadline" and stage_limited:
+                    # Resume only an interrupted whole-stage slice. A completed
+                    # bounded case keeps its partial labels and unvisited slots.
                     checkpoint(epoch)
                     break
                 pending_acquisition = {}
@@ -1936,6 +2019,7 @@ def train_cases(
         "selected_epoch": best_epoch,
         "elapsed_seconds": previous_elapsed + time.monotonic() - started,
         "execution_count": execution_count,
+        "recovery_lineage": recovery_lineage,
         "total_training_seconds": total_training_seconds,
         "adaptation_new_parameters": adaptation_new_parameters,
         "proposal_coverage": proposal_coverage,
@@ -2275,6 +2359,11 @@ def main() -> int:
     parser.add_argument(
         "--case-limit", type=int, help="explicit per-split conformance cap, recorded in coverage"
     )
+    parser.add_argument(
+        "--resume-acquisition-deadline",
+        action="store_true",
+        help="recover the pinned pre-optimization case-deadline defect without renewing its cap",
+    )
     parser.add_argument("--pairwise", action=argparse.BooleanOptionalAction, default=None)
     parser.add_argument(
         "--fidelity-labels",
@@ -2576,6 +2665,7 @@ def main() -> int:
             warm_start_weights=warm["state_dict"] if warm else None,
             warm_start_metadata=warm["metadata"] if warm else None,
             checkpoint_path=args.output / "training-state.pt",
+            resume_acquisition_deadline=args.resume_acquisition_deadline,
         )
         with CumulativeBudget(
             args.output / "training-budget.json",
