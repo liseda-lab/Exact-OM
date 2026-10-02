@@ -559,59 +559,64 @@ class OpenRouterClient:
                     )
             return result
 
-        cached = ledger.cached(key)
-        if cached is not None:
-            return decode(cached)
-        api_key = self.resolve_api_key(profile)
-        if not api_key:
-            raise RuntimeError(f"Missing OpenRouter API key for profile '{profile.name}'.")
-        content = _dump_json_payload(payload)
-        allow_unknown = (
-            self.retry_unknown_requests or os.getenv("EXACT_OPENROUTER_RETRY_UNKNOWN") == "1"
-        )
-        for retry in range(self.max_retries + 1):
-            number = ledger.sent(key, retry_unknown=allow_unknown)
-            started = monotonic()
-            try:
-                response = self._client.request(
-                    method="POST",
-                    url=url,
-                    headers=_json_headers(api_key=api_key, extra=profile.extra_headers),
-                    content=content,
-                    timeout=profile.timeout_secs,
-                )
-            except httpx.TransportError as exc:
-                ledger.unknown(
-                    key, number, type(exc).__name__, elapsed_seconds=monotonic() - started
-                )
-                # Delivery may have happened. Only explicit policy allows another paid attempt.
-                if allow_unknown and retry < self.max_retries:
-                    self._sleep_before_retry(retry)
-                    continue
-                raise RuntimeError(
-                    f"OpenRouter request {key} has unknown delivery; checkpoint preserved"
-                ) from exc
-            except BaseException as exc:
-                ledger.unknown(
-                    key, number, type(exc).__name__, elapsed_seconds=monotonic() - started
-                )
-                raise
-            # This transaction commits bytes before JSON/probability extraction.
-            elapsed_seconds = monotonic() - started
-            ledger.received(
-                key, number, response.content, response.status_code, elapsed_seconds=elapsed_seconds
+        with ledger.request_lock(key):
+            cached = ledger.cached(key)
+            if cached is not None:
+                return decode(cached)
+            api_key = self.resolve_api_key(profile)
+            if not api_key:
+                raise RuntimeError(f"Missing OpenRouter API key for profile '{profile.name}'.")
+            content = _dump_json_payload(payload)
+            allow_unknown = (
+                self.retry_unknown_requests or os.getenv("EXACT_OPENROUTER_RETRY_UNKNOWN") == "1"
             )
-            if response.is_error:
-                if self._should_retry_status(response.status_code) and retry < self.max_retries:
-                    self._sleep_before_retry(retry)
-                    continue
-                raise RuntimeError(
-                    f"OpenRouter HTTP {response.status_code}; request {key} retained"
+            for retry in range(self.max_retries + 1):
+                number = ledger.sent(key, retry_unknown=allow_unknown)
+                started = monotonic()
+                try:
+                    response = self._client.request(
+                        method="POST",
+                        url=url,
+                        headers=_json_headers(api_key=api_key, extra=profile.extra_headers),
+                        content=content,
+                        timeout=profile.timeout_secs,
+                    )
+                except httpx.TransportError as exc:
+                    ledger.unknown(
+                        key, number, type(exc).__name__, elapsed_seconds=monotonic() - started
+                    )
+                    # Delivery may have happened. Only explicit policy allows another paid attempt.
+                    if allow_unknown and retry < self.max_retries:
+                        self._sleep_before_retry(retry)
+                        continue
+                    raise RuntimeError(
+                        f"OpenRouter request {key} has unknown delivery; checkpoint preserved"
+                    ) from exc
+                except BaseException as exc:
+                    ledger.unknown(
+                        key, number, type(exc).__name__, elapsed_seconds=monotonic() - started
+                    )
+                    raise
+                # This transaction commits bytes before JSON/probability extraction.
+                elapsed_seconds = monotonic() - started
+                ledger.received(
+                    key,
+                    number,
+                    response.content,
+                    response.status_code,
+                    elapsed_seconds=elapsed_seconds,
                 )
-            result = decode(response.content)
-            ledger.usage(key, number, result.get("usage") or {})
-            return result
-        raise RuntimeError("OpenRouter request attempts exhausted")
+                if response.is_error:
+                    if self._should_retry_status(response.status_code) and retry < self.max_retries:
+                        self._sleep_before_retry(retry)
+                        continue
+                    raise RuntimeError(
+                        f"OpenRouter HTTP {response.status_code}; request {key} retained"
+                    )
+                result = decode(response.content)
+                ledger.usage(key, number, result.get("usage") or {})
+                return result
+            raise RuntimeError("OpenRouter request attempts exhausted")
 
 
 class LLMRouter:

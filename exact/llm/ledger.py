@@ -6,6 +6,7 @@ responses replay without another paid request. SQLite serializes concurrent clai
 
 from __future__ import annotations
 
+import fcntl
 import hashlib
 import json
 import math
@@ -62,18 +63,25 @@ class RequestLedger:
 
     @contextmanager
     def _transaction(self) -> Iterator[sqlite3.Connection]:
-        db = sqlite3.connect(self.path, timeout=30)
-        db.row_factory = sqlite3.Row
-        try:
-            db.execute("PRAGMA synchronous=FULL")
-            db.execute("BEGIN IMMEDIATE")
-            yield db
-            db.commit()
-        except BaseException:
-            db.rollback()
-            raise
-        finally:
-            db.close()
+        # Queue local writers before SQLite's bounded busy timeout, especially on
+        # NFS. Never hold this lock during a hosted request or response parsing.
+        with self.path.with_suffix(".transaction.lock").open("a") as handle:
+            fcntl.flock(handle, fcntl.LOCK_EX)
+            try:
+                db = sqlite3.connect(self.path, timeout=30)
+                db.row_factory = sqlite3.Row
+                try:
+                    db.execute("PRAGMA synchronous=FULL")
+                    db.execute("BEGIN IMMEDIATE")
+                    yield db
+                    db.commit()
+                except BaseException:
+                    db.rollback()
+                    raise
+                finally:
+                    db.close()
+            finally:
+                fcntl.flock(handle, fcntl.LOCK_UN)
 
     def plan(self, identity: Mapping[str, Any]) -> str:
         """Durably record the exact planned request before any network activity."""
@@ -96,6 +104,25 @@ class RequestLedger:
         if hashlib.sha256(raw).hexdigest() != row["sha256"]:
             raise ValueError(f"Corrupted completed OpenRouter response {key}")
         return raw
+
+    @contextmanager
+    def request_lock(self, key: str) -> Iterator[None]:
+        """Serialize an exact request through response commit, across local clients.
+
+        Waiting callers must recheck the cache under this lock. A crashed sender
+        releases the file lock but retains its sent/unknown row and retry guard.
+        Distinct requests use separate locks and retain transport concurrency.
+        """
+        if len(key) != 64 or any(char not in "0123456789abcdef" for char in key):
+            raise ValueError("Invalid canonical request identity")
+        directory = self.path.parent / "request-locks"
+        directory.mkdir(exist_ok=True)
+        with (directory / (key + ".lock")).open("a") as handle:
+            fcntl.flock(handle, fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                fcntl.flock(handle, fcntl.LOCK_UN)
 
     def sent(self, key: str, *, retry_unknown: bool = False) -> int:
         """Claim one wire attempt; duplicate active writers and unapproved retries fail."""
