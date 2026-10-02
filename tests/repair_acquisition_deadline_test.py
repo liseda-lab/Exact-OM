@@ -141,3 +141,38 @@ def test_legacy_migration_requires_all_dependencies_and_preoptimization_state():
     ):
         with pytest.raises(ValueError, match="incompatible"):
             train._acquisition_deadline_recovery(saved, changed_options, None, changed_dependencies)
+
+
+def test_deadline_recovery_with_endpoint_fix_checks_retained_generation():
+    from dataclasses import replace
+
+    from tests.repair_endpoint_recovery_test import fixture, recovery_fixture
+
+    _, saved, options = recovery_fixture()
+    original = copy.deepcopy(saved)
+    dependencies = train._ACQUISITION_ENDPOINT_DEPENDENCIES
+    result = train._acquisition_deadline_recovery(saved, options, None, dependencies)
+    assert result["retained_acquisition_cases"] == [options["training"][0][0].case_id]
+    assert result["budgets_reset"] is False
+    assert saved == original
+
+    # Even a correctly identified source cannot reuse generation affected by
+    # the fallback: it needs its own invalidation/recomputation boundary.
+    case = options["training"][0][0]
+    problem, _, _, _, _ = fixture()
+    changed_options = {**options, "training": [(replace(case, problem=problem), None)]}
+    changed = copy.deepcopy(saved)
+    changed["identity"] = canonical_hash(
+        (changed_options, None, train._ACQUISITION_DEADLINE_PREDECESSOR)
+    )
+    with pytest.raises(ValueError, match="changed endpoint"):
+        train._acquisition_deadline_recovery(changed, changed_options, None, dependencies)
+
+    for field, value in (
+        ("acquisition_completed", [(1, case.case_id)]),
+        ("sampled_training", {"not-a-training-case": {}}),
+    ):
+        with pytest.raises(ValueError, match="epoch-zero|frozen training"):
+            train._acquisition_deadline_recovery(
+                {**saved, field: value}, options, None, dependencies
+            )

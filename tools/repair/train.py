@@ -65,6 +65,33 @@ _ACQUISITION_DEADLINE_PREDECESSOR = (
 _ACQUISITION_UNCHANGED_DEPENDENCIES = (
     "a820a6a062a810a6756fe379d8e69ee3709027b0659a85424cb1075d226af99d"
 )
+# Same dependencies with the coherent-endpoint fallback. Retained acquisitions
+# must prove they never needed that fallback before this pin permits reuse.
+_ACQUISITION_ENDPOINT_DEPENDENCIES = (
+    "56ef92798d0abc0b9405cacce5a647d76575fe3761aee163d523b7600843a347"
+)
+
+
+def _check_acquisition_endpoints(saved, identity_options):
+    from exact.repair.candidates import _original_mapping_relation
+
+    completed = saved.get("acquisition_completed", [])
+    retained = {case_id for epoch, case_id in completed if epoch == 0}
+    if len(retained) != len(completed):
+        raise ValueError("Acquisition recovery requires epoch-zero acquisitions")
+    retained.add(saved["pending_acquisition"].get("case_id"))
+    cases = {case.case_id: case for case, _ in identity_options["training"]}
+    if not retained <= cases.keys() or not set(saved.get("sampled_training", {})) <= retained:
+        raise ValueError("Retained acquisitions are not in the frozen training split")
+    for case_id in retained:
+        for obj in cases[case_id].problem.objects:
+            if (
+                obj.kind == "mapping"
+                and _original_mapping_relation(obj, obj.source_entity, obj.target_entity, "class")
+                is None
+            ):
+                raise ValueError("Retained acquisition depends on changed endpoint generation")
+    return sorted(retained)
 
 
 def _acquisition_deadline_recovery(saved, identity_options, warm_start_hash, dependencies):
@@ -79,7 +106,7 @@ def _acquisition_deadline_recovery(saved, identity_options, warm_start_hash, dep
         (identity_options, warm_start_hash, _ACQUISITION_DEADLINE_PREDECESSOR)
     )
     if not (
-        dependencies == _ACQUISITION_UNCHANGED_DEPENDENCIES
+        dependencies in {_ACQUISITION_UNCHANGED_DEPENDENCIES, _ACQUISITION_ENDPOINT_DEPENDENCIES}
         and saved.get("schema") == "exact-repair/training-state/v3"
         and saved.get("recovery_revision") == "exact-phase-resume/v3.1"
         and saved.get("identity") == expected
@@ -95,12 +122,20 @@ def _acquisition_deadline_recovery(saved, identity_options, warm_start_hash, dep
         == canonical_hash(collection.get("collection_dependencies"))
     ):
         raise ValueError("Acquisition deadline recovery dependencies or phase are incompatible")
+    endpoint_check = {}
+    if dependencies == _ACQUISITION_ENDPOINT_DEPENDENCIES:
+        endpoint_check = dict(
+            retained_acquisition_cases=_check_acquisition_endpoints(saved, identity_options),
+            endpoint_reuse="original anchored bundles; corrected fallback not consulted",
+        )
     return dict(
         migration="bounded-acquisition-deadline/v1",
         source_identity=expected,
         source_implementation=_ACQUISITION_DEADLINE_PREDECESSOR,
         reused="model, optimizer, RNG, completed acquisition and partial labels",
         invalidated="pending case continuation after its exhausted deadline",
+        budgets_reset=False,
+        **endpoint_check,
     )
 
 
