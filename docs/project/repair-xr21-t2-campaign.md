@@ -131,3 +131,30 @@ reused without repeating completed evaluation. Both labels and full repair/pool
 evidence are saved behind small artifact receipts to avoid transport truncation.
 B09 remains responsible for cumulative campaign costs and finite-scope closure
 once B08 has an actual completion receipt.
+
+## B09 cumulative reporting and finite-scope closure
+
+`tools.repair.report_campaign` binds completed worker outputs, the frozen B07/B08
+schedules, selected-model evidence, terminal HGT accounting and every attempt.
+It preserves 24 primary model/test rows, 48 circuit diagnostic rows and 80
+common-inventory control rows. B07's 20 reserved-test controls remain explicitly
+deferred; its unavailable score-based controls and unknown logical outcomes
+remain in the denominator. No missing observation becomes zero or success.
+
+The report separates model process completion, training, verified repair rows,
+finite-scope accounting and scientific conclusions. G0–G2 and XR-E00–XR-E09
+completion are not inferred. Means over known observations are named as subset
+means; an all-scheduled semantic mean is null if any value is unavailable.
+Selector-local first-repair time remains distinct from the full row's elapsed
+resources. This smoke does not establish learned efficiency or superiority.
+
+The report worker uses the existing 3,600-second allowance. The batch runner
+settles its cost before the reporting closure command can publish final costs
+and completion. The closure checks all active completion receipts and rejects
+pending work or outstanding reservations. Historical pilot and retained smoke
+costs are included once, failed attempts remain charged, and the original
+172,800-second incremental ceiling remains intact. Final closure artifacts live
+separately from the worker's receipt-bound report, preserving that output hash.
+After closure the registry marks remaining scope terminal and monitoring idle;
+larger cohorts, additional seeds, real/production inputs and wider grammar
+remain explicitly deferred.
