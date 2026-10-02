@@ -118,7 +118,22 @@ def test_all_six_arms_migrate_by_verified_artifact_without_family_progress(tmp_p
     checkpoints = {"brief_binary": 3, "facts_binary": 3, "retrieved_listwise": 2}
     cells, targets, reports, original_measurements = [], {}, {}, {}
     for arm in sorted(module.ARMS):
-        cell = Cell(arm_id=arm, config_hash=arm, resolved_config={"arm": arm})
+        cell = Cell(
+            arm_id=arm,
+            config_hash=arm,
+            resolved_config={
+                "arm": arm,
+                "llm": {
+                    "experiment": {
+                        "enabled": True,
+                        "gate": {
+                            "mode": "source_top_fraction",
+                            "artifact": None,
+                        },
+                    }
+                },
+            },
+        )
         cells.append(cell)
         source = old_root / "screen/runs/E07" / arm / cell.task_id / "seed-17"
         source.mkdir(parents=True)
@@ -191,7 +206,7 @@ def test_all_six_arms_migrate_by_verified_artifact_without_family_progress(tmp_p
                     "checkpoints/values.json": b'{"values":[0.25]}',
                     "dataset/dataset.csv": (
                         "Src,SrcKind,Tgt,TgtKind,inference\n"
-                        + "\n".join(f"s{i},class,t,class,True" for i in range(4))
+                        + "\n".join(f"s{i},class,t,class,True" for i in reversed(range(4)))
                     ).encode(),
                     "checkpoints/inference_1.json": json.dumps(
                         dict(

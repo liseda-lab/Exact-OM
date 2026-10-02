@@ -62,7 +62,7 @@ def verify_identity(saved, expected, old_impl, *, stage, old_extraction=None):
         raise ValueError("Artifact identity differs beyond hosted synchronization: " + stage)
 
 
-def verify_checkpoint(checkpoint, store):
+def verify_checkpoint(checkpoint, store, config):
     """Check the complete ordered inference prefix and its matching runner cursor."""
     outputs, cursor = checkpoint["outputs"], checkpoint["cursor"]
     count, total = cursor["next_pair"], cursor["dataset_rows"]
@@ -72,11 +72,22 @@ def verify_checkpoint(checkpoint, store):
         rows = list(csv.DictReader(stream))
     if any(row.get("inference") not in {"True", "False"} for row in rows):
         raise ValueError("E07 checkpoint lacks explicit inference membership")
-    ordered = [
-        json.dumps([row[k] for k in ("Src", "SrcKind", "Tgt", "TgtKind")])
-        for row in rows
-        if row["inference"] == "True"
-    ]
+    experiment = config.get("llm", {}).get("experiment", {})
+    gate = experiment.get("gate", {})
+    if (
+        experiment.get("enabled") is not True
+        or gate.get("mode") != "source_top_fraction"
+        or gate.get("artifact") is not None
+    ):
+        raise ValueError("E07 checkpoint requires its original fitted population gate")
+    # alignment.py creates fitting_gate_config for this original gate. Runner.run
+    # then sorts all six E07 arms for grouped decisions, after dataset.csv is saved.
+    columns = ("Src", "SrcKind", "Tgt", "TgtKind")
+    active = sorted(
+        (row for row in rows if row["inference"] == "True"),
+        key=lambda row: tuple(row[k] for k in columns),
+    )
+    ordered = [json.dumps([row[k] for k in columns]) for row in active]
     if len(ordered) != total or checkpoint["completed_ids"] != ordered[:count]:
         raise ValueError("E07 checkpoint is not the exact ordered inference prefix")
     names = [name for name in outputs if name.startswith("checkpoints/inference_")]
@@ -236,7 +247,7 @@ def import_saved(recipe, campaign, runtime, code, *, verify_only=False):
             if checkpoint is not None:
                 if checkpoint["identity"] != source_identity:
                     raise ValueError("Treatment checkpoint identity differs")
-                verify_checkpoint(checkpoint, old_store)
+                verify_checkpoint(checkpoint, old_store, cell.resolved_config)
                 count = checkpoint["cursor"]["next_pair"]
                 if (
                     count <= 0
