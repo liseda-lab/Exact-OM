@@ -591,6 +591,7 @@ def run_recipe(path):
                 },
                 immutable=True,
             )
+        os.environ.update(hosted_caps(state, runtime / "openrouter"))
         if recipe.get("hosted_retry_authorizations"):
             from tools.authorize_hosted_retries import apply_authorizations
 
@@ -601,7 +602,6 @@ def run_recipe(path):
             # The predecessor may own the newest cumulative account. Keep it enabled
             # until both the copied request history/budget and launch receipt are durable.
             registry = register_lineage(recipe)
-        os.environ.update(hosted_caps(state, runtime / "openrouter"))
         plan = campaign_plan(campaign, stage="screen")
         relevant = [row for row in plan["rows"] if row["step"] == recipe["scientific_step"]]
         if plan["budget_errors"] or not relevant or any(row["issues"] for row in relevant):
