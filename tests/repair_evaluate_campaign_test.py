@@ -217,3 +217,58 @@ def test_native_generated_row_uses_v3_preparation_and_independent_labels(prepare
     if outcome.value["logical_status"] == "VERIFIED_FEASIBLE":
         assert outcome.value["semantic_status"] == "known", outcome.value
         assert (directory / "selected-label.json").exists()
+
+
+def test_worker_protocol_roundtrip_preserves_schema_alias(prepared, tmp_path, monkeypatch):
+    from tools.repair.prepare import case_to_dict
+
+    source, protocol = prepared
+    cases, _, _ = load_preparation(source)
+    case = next(c for c in cases if c.split == "development")
+    schedule = {
+        "cases": [case_to_dict(case)],
+        "arms": [{"id": "fixture", "protocol": evaluation.binding(protocol)}],
+    }
+    row = {"kind": "circuit", "id": "fixture", "case_id": case.case_id}
+
+    def check(_case, _row, value, _directory):
+        assert value["schema"] == "exact-repair/protocol/v3"
+        assert "schema_id" not in value
+        evaluation.generation_options(value, tmp_path / "cache")
+        return {"status": "complete"}
+
+    monkeypatch.setattr(evaluation, "circuit_row", check)
+    artifact = evaluation.evaluate_row(schedule, row, tmp_path / "worker")
+    assert evaluation.check_binding(artifact).exists()
+
+
+def test_protocol_alias_error_retry_keeps_error_evidence_and_budget(
+    prepared, tmp_path, monkeypatch
+):
+    path, schedule = campaign_fixture(prepared, tmp_path, monkeypatch)
+    calls = []
+
+    def fail(_function, _schedule, row, _directory, **_options):
+        calls.append(row["id"])
+        return CallResult(
+            "error",
+            detail="2 validation errors for RepairProtocolV3 schema_id Extra inputs are not permitted",
+            resource_usage=(("cpu_seconds", 1.0),),
+        )
+
+    monkeypatch.setattr(evaluation, "bounded_call", fail)
+    output = tmp_path / "results"
+    first = evaluation.run(path, output)
+    before = len(calls)
+    evaluation.run(path, output)
+    assert len(calls) == 2 * before
+    available = next(row for row in first["rows"] if row["status"] == "error")
+    directory = output / "rows" / available["id"]
+    assert json.loads((directory / "protocol-alias-error-001.json").read_text()) == available
+    budget = json.loads((directory / "budget.json").read_text())
+    assert len(budget["attempts"]) == 2
+    assert budget["spent_cpu_seconds"] == 2.0
+    assert budget["limit_seconds"] == available["seconds"]
+
+    with pytest.raises(ValueError, match="exceeds its one retry"):
+        evaluation.run(path, output)

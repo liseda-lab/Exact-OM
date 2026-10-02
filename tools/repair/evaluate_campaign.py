@@ -501,7 +501,9 @@ def evaluate_row(schedule, row, directory):
         case_from_dict(c) for c in schedule["cases"] if c["case"]["case_id"] == row["case_id"]
     )
     arm = next((a for a in schedule["arms"] if a["id"] == row.get("arm_id")), schedule["arms"][0])
-    protocol = load_protocol_v3(check_binding(arm["protocol"]), for_execution=True).model_dump()
+    protocol = load_protocol_v3(check_binding(arm["protocol"]), for_execution=True).model_dump(
+        by_alias=True
+    )
     result = (
         generated_row(case, arm, protocol, directory)
         if row["kind"] == "generated_pool"
@@ -543,8 +545,23 @@ def run(schedule_path, output):
                     raise ValueError("Saved evaluation row dependency changed")
                 if saved.get("artifact"):
                     check_binding(saved["artifact"])
-                results.append(saved)
-                continue
+                alias_failure = (
+                    saved["status"] == "error"
+                    and saved.get("artifact") is None
+                    and "2 validation errors for RepairProtocolV3" in saved.get("detail", "")
+                    and "schema_id" in saved.get("detail", "")
+                    and "Extra inputs are not permitted" in saved.get("detail", "")
+                )
+                if alias_failure:
+                    archive = directory / "protocol-alias-error-001.json"
+                    if archive.exists():
+                        raise ValueError("Repeated protocol alias recovery exceeds its one retry")
+                    write_artifact(archive, saved)
+                    # The row's persistent wall/CPU budget and schedule identity stay unchanged.
+                    # This failure occurred during protocol validation, before scientific work.
+                else:
+                    results.append(saved)
+                    continue
             arm = next((a for a in schedule["arms"] if a["id"] == row.get("arm_id")), None)
             saved = {
                 **row,
