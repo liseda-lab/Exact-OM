@@ -1,5 +1,14 @@
 # Explanation framework implementation programme
 
+> **Current corrective assignment, 2026-10-02:** Both implementations now exist. Read
+> [14 — Corrective programme](14-corrective-programme.md),
+> [15 — Frontend corrections](15-frontend-corrections.md) and
+> [16 — Backend corrections](16-backend-corrections.md) first. These govern the new
+> shared-workspace, interactive-training and tool-neutral study changes. Frontend leads
+> the corrective workflow/contract inventory, then backend contract work and frontend
+> integration proceed together. The original bootstrap sequence below is historical for
+> this iteration; technical and participant-launch gates still apply.
+
 **Revision: 2026-09-20. Status: approved design direction; implementation and operational verification pending.** Audited baseline: `e81865aceed0cd1257580097bc788329cd9084ae`. Reconcile this inventory with the implementing checkout. Specifications, source inspection, raw-file profiles and a small library probe are not completed backend features.
 
 Build two products sharing one explanation engine: an exploration app (local bundle import and a fixed-bundle online demo), and a complete Render-hosted study application. The study uses partial candidate ranking with explicit none/insufficient-information responses and both answer-present and answer-absent cases. Ontology context, recorded matcher evidence, decision history and generated explanation are distinct components, not four separate products. Neither fluent prose nor agreement with Exact establishes human benefit.
@@ -32,7 +41,14 @@ The user’s instructions take precedence. This suite governs the new explanatio
 | [11 — Ranking study](11-study-design-and-ranking.md) | Conditions, mixed cases, assignment, response and metric semantics |
 | [12 — Study service](12-study-service-and-render.md) | Reusable invitations, durable state, telemetry, administration and Render |
 | [13 — Questionnaires](13-study-questionnaires.md) | Setup, participant questions, per-case resource use and final feedback |
+| [14 — Corrective programme](14-corrective-programme.md) | Current amendment, external-tool freedom, training, issue ownership and sequencing |
+| [15 — Frontend corrections](15-frontend-corrections.md) | Shared workspace, usable ranking, citations, tutorial, assessment and acceptance |
+| [16 — Backend corrections](16-backend-corrections.md) | Safe context adapter, durable training/reporting, ordered forms and version migration |
 | [AGENT-HANDOFF](AGENT-HANDOFF.md) | Assignment and completion rules |
+
+The existing study runtime OpenAPI/schema and v1 fixtures describe the implemented legacy
+contract. New v2 interfaces in 16 are planned and must be generated from implemented models
+when delivered; the amendment does not pretend those endpoints already exist.
 
 [protocol/development.json](protocol/development.json) is a **design blueprint**, not a configuration accepted by the current runtime. B0 defines strict stage-scoped execution locks: resolve every dependency before its consuming stage runs. Future run/model bindings may remain pending without blocking independent context preparation; no stage may execute with an unresolved required input. [contract.schema.json](protocol/contract.schema.json) defines the target shared wire primitives, not every future route response. Runtime response models/OpenAPI must extend these primitives and cover all resources in 01/04; extra route fields do not waive invariants. Fixtures marked illustrative or raw-profile evidence must never be presented as fresh matcher output.
 

@@ -1,5 +1,12 @@
 # Backend implementation assignment; frontend deferred
 
+> **Historical bootstrap assignment.** For the implemented products' 2026-10-02 corrective
+> iteration, start with [14](14-corrective-programme.md), then the separate
+> [frontend](15-frontend-corrections.md) and [backend](16-backend-corrections.md) assignments.
+> Frontend leads workflow design and contract inventory; backend implements the required
+> contract changes before integrated acceptance. The deferral below does not prohibit that
+> corrective frontend work. Existing data/policy/recovery and launch gates remain binding.
+
 Implement B0–B5 from this suite in the existing Exact-OM repository. The user has chosen a separate backend review and a specialized frontend agent **only after backend readiness**, for full frontend design/implementation. Do not create an early frontend review dependency or implement a speculative full frontend while building the backend.
 
 Read README, status, contracts, 02–07 and 09–13; inspect the current checkout and preserve unrelated changes. The inventory is a baseline, not a claim that missing features are now implemented. Reuse pyowl-core/Exact storage and producers; no second matcher/parser/workflow platform. All generative calls go through OpenRouter, using existing authorized configuration and recorded costs. The user has broad spending discretion; do not block preparation on inventing another arbitrary monetary cap. Concurrency/retry bounds still apply.

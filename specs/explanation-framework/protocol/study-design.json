@@ -62,11 +62,32 @@
   "unsubmitted_is_missing": true,
   "original_order_preserved": true,
   "public_negative_flag": false,
-  "protege_preparation_required": true,
+  "protege_preparation_required": false,
   "consultation_asked_each_case": true,
   "tab_hidden_automatically_pauses": false,
   "invitation_consumed_on_first_use": false,
   "participant_identity_fields": [],
   "case_count_finalization": "duration_pilot_and_study_publication_lock",
-  "invitation_expiry": "configured_at_study_publication_not_browser_session_expiry"
+  "invitation_expiry": "configured_at_study_publication_not_browser_session_expiry",
+  "corrective_amendment": "2026-10-02/14-corrective-programme.md",
+  "external_inspection_policy": {
+    "protege_recommended_only": true,
+    "external_use_required": false,
+    "multiple_methods_allowed": true,
+    "method_changes_between_cases_allowed": true,
+    "method_commitment_required": false,
+    "reporting_unit": "source_plus_candidate_set_case",
+    "candidate_level_reports_required": false,
+    "same_frozen_information_scope": true
+  },
+  "tutorial_policy": {
+    "interactive_shared_workspace_required": true,
+    "synthetic_disjoint_resources_required": true,
+    "identical_preassignment_exposure": true,
+    "comprehension_items": 5,
+    "eventual_core_pass_required": true,
+    "feedback_and_unlimited_retries": true,
+    "durable_progress_required": true,
+    "scored_time_includes_preparation": false
+  }
 }

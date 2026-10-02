@@ -1,5 +1,10 @@
 # Specialized frontend implementation — F1, after B5
 
+> For the existing implementation's corrective iteration, [14](14-corrective-programme.md)
+> and [15](15-frontend-corrections.md) supersede the initial admission sequence below.
+> The specialist now leads shared-workspace and tutorial design, coordinating versioned
+> backend changes through [16](16-backend-corrections.md).
+
 **Do not start the specialized frontend agent until G5 in 07 passes.** This brief is written now to make backend obligations concrete; it does not require an early frontend design phase. Once admitted, the specialist owns full information architecture, visual design, responsive implementation and integration for both the exploration app and complete study application in 10–13. Use the actual backend handoff and fixtures; inspect existing React/Next/Cytoscape code before choosing a refactor or replacement.
 
 ## Product outcome
@@ -50,4 +55,4 @@ The baseline must use the same ranking component, source/candidate identities/sc
 
 Prior-study feedback adds these acceptance cases: immediate explicit descriptions rather than delayed hover; parallel edges remain distinguishable; conventional drag, permanent fit/reset and recoverable graph position; practice progresses in complexity outside the scored set; source references are as discoverable as target context. Numeric agreement strength must not be mislabeled as semantic equivalence. Table, graph and generated text use the same qualified facts; 'only described on this side' does not mean contradiction. Preserve umbrella/conditional inheritance and onset qualifiers; show original axioms for verification. Add regression fixtures for the reported same-attribute conflict and mixed inheritance/onset cases without declaring the old cases medically wrong from feedback alone.
 
-Verify the entire study across reload, closure/original-link return, slow/disconnected networks, narrow screens and keyboard use. A desktop with installed Protégé is the initial scored-study setup; mobile resumption must preserve state and explain any unmet setup requirement rather than silently changing condition. Prototype and integration tests use synthetic participant records, never fabricated study findings. Final live launch requires the separate readiness in 07/12.
+Verify the entire study across reload, closure/original-link return, slow/disconnected networks, narrow screens and keyboard use. A larger screen may be recommended, but Protégé installation/use is optional under the 2026-10-02 amendment. Mobile resumption must preserve state and explain actual unmet requirements rather than silently changing condition. Implement the interactive shared-workspace tutorial and short assessment in 14–16. Prototype and integration tests use synthetic participant records, never fabricated study findings. Final live launch requires the separate readiness in 07/12.

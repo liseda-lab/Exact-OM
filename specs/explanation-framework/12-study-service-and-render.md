@@ -1,12 +1,17 @@
 # Anonymous study service, persistence and Render — B3/B5/F1
 
+> The [2026-10-02 corrective amendment](14-corrective-programme.md) and
+> [backend correction contract](16-backend-corrections.md) add versioned interactive
+> tutorial/assessment, tool-neutral setup and consultation drafts. The existing v1 runtime
+> remains unchanged until implementation; new publications use the planned v2 contract.
+
 Implement a complete first-party study service, not an iframe wrapper around a third-party survey. Reuse frozen ontology/context packages; do not parse ontologies, match or call OpenRouter during participation. Questionnaire content is in 13; case/metric semantics are in 11.
 
 ## Resources and state machine
 
 Versioned resources: `StudyDefinition`, `QuestionnaireDefinition`, researcher-only `CaseKey`, `Invitation`, anonymous `ParticipantSession`, `Assignment`, `RankingResponse`, `CaseConsultation`, `QuestionnaireResponse`, `ConsentReceipt`, `TimingSegment`, `InteractionEvent` and `ExportManifest`. Server ownership binds study revision, assignment, package, case/presentation order and permitted resources. An ordinary application `ReviewDecision` is not a study ranking response.
 
-Participant progression: welcome/information and consent -> setup check -> background questionnaire -> tutorial/practice -> assigned case/ranking -> per-case consultation -> next case -> final questionnaire -> completion. Save each step. Declining or leaving is not a completed response. Finish only after required steps are acknowledged; optional text may remain empty. No correctness feedback or score against the answer key is returned to participants.
+Participant progression: welcome/information and consent -> tool-neutral setup -> background questionnaire -> interactive tutorial/practice and comprehension check -> assigned case/ranking -> per-case consultation -> next case -> final questionnaire -> completion. Save each step, including unfinished training and consultation. Declining or leaving is not a completed response. Finish only after required steps are acknowledged; optional text may remain empty. No scored-case correctness feedback or score against the research answer key is returned to participants. Synthetic tutorial assessment feedback is explicitly allowed and required by 14.
 
 Researcher workflow: validate/freeze study configuration and assets; preview both conditions with test sessions; generate invitation links in a batch; inspect aggregate progress; revoke/close links when needed; export versioned analysis data. Use researcher authentication separate from participant bearer links. An authenticated CLI plus minimal administration UI is sufficient; do not build a general account/recruitment platform. No automatic sending of invitations is required or authorized.
 
@@ -32,7 +37,7 @@ All routes are target additions under `/api/v1`; B0 generates final models/OpenA
 | `GET /study/state` | Restore current stage, version, assignment progress, draft and acknowledgements |
 | `PUT /study/consent` | Persist supplied information/consent version, accept/decline and acknowledgement time; gate all later research steps |
 | `PUT /study/questionnaires/{form_id}` | Versioned, idempotent background/final answers |
-| `PUT /study/setup` | Installation/openability/readiness and practice completion |
+| `PUT /study/setup` | Tool-neutral setup draft/readiness; legacy v1 installation/practice semantics remain version-adapted |
 | `GET /study/cases/current` | Only authorized current case and condition-filtered assets |
 | `PUT /study/cases/{case_id}/draft` | Autosave explicit partial answer with expected revision |
 | `POST /study/cases/{case_id}/submit` | Validate/freeze ranking and atomically advance to consultation |

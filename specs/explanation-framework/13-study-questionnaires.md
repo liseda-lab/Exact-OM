@@ -6,9 +6,11 @@ All questions, wording, answer codes, skip rules and required/optional status ar
 
 Explain the task, study duration estimated from the pilot, voluntary participation, response/click timing collection and link-based resumption. Ask users to retain the original private invitation link and not share it or include identifying details in comments. Consent/information text is supplied by the study owner before launch; do not fabricate approval or consent wording beyond the supplied protocol.
 
-Before scored cases, participants must confirm that Protégé is installed and both supplied ontology files can be opened. Provide pinned downloads/hashes and platform-neutral setup instructions ahead of participation. Record setup success/failure and self-reported Protégé version where known. Ask them to locate a practice source and inspect its definition/parents. Do not require Proof of installation or inspect their computer; mark checks as self-reported/task-confirmed. Failure routes to setup help or save-and-return, not silent entry into a different study condition.
+Before scored cases, confirm task instructions and access to the two supplied ontology resources, with pinned downloads/hashes and platform-neutral help. **Protégé is optional**, as are actual external inspection and installation of any named tool. Participants may use any method or combination and change methods across cases. A resource-access problem routes to help/retry/save-and-return, not a forced installation claim or condition change. The [2026-10-02 amendment](14-corrective-programme.md) defines tool-neutral readiness, the shared interactive tutorial and durable five-item comprehension assessment; it supersedes the previous Protégé installation gate.
 
 Provide an unscored tutorial explaining source/candidate identity, scores versus correctness, entity descriptions, hierarchy, evidence relations and ranking controls. Include simple, complex, partial-ranking and none-of-these practice. Make clear that some scored cases have no equivalent among the displayed candidates, and that insufficient evidence is a valid distinct response. No scored-case answers appear in tutorials or the public demo.
+
+Practice must exercise the actual shared workspace and both condition workflows using disjoint synthetic resources. Persist lesson/assessment progress; provide targeted feedback and unlimited supported retries. Completed checkboxes alone do not satisfy training. Complete all core comprehension items before allocation, without grading medical expertise or silently excluding unsuccessful first attempts. Full behavior and assessment topics are in 14–16.
 
 ## Background form
 
@@ -40,10 +42,10 @@ Instruction: 'Rank the candidates you consider plausible equivalents of the sour
 Immediately after the ranking is committed, ask in **both** conditions:
 
 1. `consulted_external_ontologies`: 'For this case, did you consult the ontology resources outside the study's explanation panels?' Yes / No. This is required; internal panel use is captured separately and must not be confused with external-file consultation.
-2. If Yes, `consultation_methods`: 'How did you consult them? Select all that apply.' Protégé / Another ontology editor / The ontology files directly (for example, in a text editor) / Another ontology resource or viewer.
-3. Optional `other_editor` / `other_resource` short text when appropriate. No URL, institution or personal name is needed.
+2. If Yes, `consultation_methods` (runtime field `methods`): 'How did you consult them? Select all that apply.' Protégé / Another ontology editor / The ontology files directly (for example, in a text editor) / Another ontology resource or viewer / Queries or scripts / A reasoner / Another method. The last three are v2 additions; do not rewrite historical codes.
+3. Optional `other_editor` / `other_resource` / v2 other-method name text when appropriate. No URL, institution or personal name is needed; exact bounded fields are frozen under 16.
 
-A participant may use several methods. A clicked link is not automatically recorded as Yes; this question records self-report, separate from telemetry. No means an empty methods list. Save this step separately and return to it after a refresh without changing the already submitted ranking. Time spent completing this post-case consultation questionnaire is excluded from ranking-task duration. Time spent inspecting ontology resources before ranking submission remains included.
+A participant may use several methods and change them within or between cases. Here a case means one source and its five candidates, not the entire ontology pair and not one questionnaire per candidate. Do not require sticking to a study-wide choice. A clicked link is not automatically recorded as Yes; this question records self-report, separate from telemetry. No means an empty methods list. Add an optional supplied-only/different-or-additional/unsure resource-scope question; unanswered remains unknown. Save incomplete drafts separately from the final commit, restore them after refresh, and never change the already submitted ranking. Time spent completing this post-case consultation questionnaire is excluded from ranking-task duration. Time spent inspecting ontology resources before ranking submission remains included. See 16 for versioning, validation and export semantics.
 
 Optional per-case confidence or difficulty questions must be declared before publication, identical across conditions and included in burden estimates. They are not required for the initial study; avoid extra questions that interrupt every comparison unnecessarily.
 
@@ -61,5 +63,7 @@ Optional per-case confidence or difficulty questions must be declared before pub
 Keep preference separate from measured performance. Display only components actually provided in the frozen interface; adding/removing a component changes the form version. Distinguish original definitions from generated prose. Completion confirms receipt and permits return to the completion page; it does not reveal the answer key while recruitment is active.
 
 ## Acceptance
+
+Freeze explicit option and matrix-row order in v2; JSON object-key order is not a presentation contract. Canonical sorted-key serialization must not reorder ordinal scales in the UI. Version legacy definitions and do not reinterpret historical answers.
 
 Test branching, exclusive options, multi-role answers, question order, validation errors, keyboard/touch use, saving indicators and restored drafts. Required steps cannot be skipped by manipulating a URL, while optional free text remains optional. Questionnaire edits during an active study do not rewrite historical responses. Export codes, labels, versions and skipped/not-answered states distinctly.

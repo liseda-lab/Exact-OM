@@ -16,9 +16,13 @@ implementation; human recruitment and the final participant study are not backen
 ## Required design
 
 Use a frozen two-condition within-participant design: explanations plus candidates/scores versus
-the same candidates/scores with access to external ontology inspection. Participants install
-Protégé and both ontologies before scored tasks; record actual external-resource/tool use after
-every case in both conditions. Do not label optional Protégé use a randomized treatment.
+the same candidates/scores with access to external ontology inspection. Under the
+[2026-10-02 amendment](../explanation-framework/14-corrective-programme.md), Protégé is an
+optional recommendation. Permit any inspection method or combination, including no external
+use, and changes between cases. Provide both frozen ontologies, tool-neutral setup and the
+interactive tutorial/comprehension assessment before scored tasks. Record actual external
+methods after every source-plus-candidate-set case in both conditions. Do not require a
+study-wide method commitment or label self-selected method use a randomized treatment.
 
 Each participant sees disjoint cases under each condition; complementary assignments expose each
 case under both conditions across participants. Counterbalance block order and original system

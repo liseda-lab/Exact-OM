@@ -1,5 +1,10 @@
 # Implementation inventory and package boundaries
 
+> The inventory and bootstrap ownership below are historical. For the implemented products'
+> current corrections, use [14](14-corrective-programme.md),
+> [15](15-frontend-corrections.md) and [16](16-backend-corrections.md), including their
+> frontend-led corrective design sequence and unchanged evidence/launch gates.
+
 **Observed status at `e81865a`, 2026-09-19. All B/F acceptance gates are pending.** Verify symbols at current HEAD before work; do not assume this inventory is timeless.
 
 Current implementation evidence is maintained in the [status ledger](../../docs/verification/explanation-framework-status.json) and [backend verification report](../../docs/verification/explanation-backend-report.md). The dated inventory below remains the historical baseline.
