@@ -22,11 +22,19 @@ def stalled_handler(event):
 
 
 def test_rev01_large_event_count_uses_bounded_durable_stream(record_property):
-    outcome = bounded_call(many_events, 10001, timeout=30)
-    assert outcome.status == "complete", outcome.detail
+    # This checks cardinality and durability, not storage throughput. Each
+    # singleton is FULL-synchronous and acknowledged separately; 10,001 commits
+    # on allocation 14408's disk need more than the old 30-second allowance.
+    # Keep a finite engineering deadline; scientific case budgets and the short
+    # REV-02 deadline-responsiveness regressions are independent and unchanged.
+    timeout = 900
+    outcome = bounded_call(many_events, 10001, timeout=timeout)
+    record_property("qualification_timeout_seconds", timeout)
     record_property("transported_events", len(outcome.events))
+    record_property("transport_status", outcome.status)
     for key, value in outcome.resource_usage:
         record_property(key, value)
+    assert outcome.status == "complete", outcome.detail
     assert outcome.value == 10001 and len(outcome.events) == 10001
     assert list(outcome.events)[-1] == ("coverage", 10000)
     assert dict(outcome.resource_usage)["peak_buffered_event_bytes"] <= 16 * 1024 * 1024
