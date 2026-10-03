@@ -84,6 +84,14 @@ def completed_run(run):
         raise ValueError("Required comparison is incomplete: " + run["id"])
     if complete.get("selection"):
         verified(complete["selection"])
+    if complete.get("diagnostic"):
+        diagnostic = read(verified(complete["diagnostic"]))
+        if (
+            diagnostic.get("status") != "complete"
+            or diagnostic.get("selection_eligible") is not False
+        ):
+            raise ValueError("Incomplete non-selecting diagnostic: " + run["id"])
+        verified(diagnostic["diagnostic"])
     for item in complete.get("manifests", []):
         if read(verified(item)).get("status") != "complete":
             raise ValueError("Incomplete upstream cell")

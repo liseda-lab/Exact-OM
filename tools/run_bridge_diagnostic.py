@@ -55,6 +55,7 @@ def prepare_recipe(bindings, originals, output):
         "hosted_calls": False,
         "rationales": False,
         "max_memory_bytes": 80 * 1024**3,
+        "max_compile_work": 2**64 - 1,
         "timeout_seconds": None,
         "comparison_scope": "known_valid_pairs_graph_view_vs_full_OWL_not_logical_parity_or_end_to_end_F1",
     }
@@ -149,6 +150,7 @@ def run_diagnostic(recipe_path):
         anchor_rows=anchor_records(remap(anchors, source_ids, target_ids)),
         timeout_seconds=recipe["timeout_seconds"],
         max_memory_bytes=recipe["max_memory_bytes"],
+        max_compile_work=recipe.get("max_compile_work"),
         import_map=imports,
         checkpoint_path=output / "native-checkpoint.json",
     )

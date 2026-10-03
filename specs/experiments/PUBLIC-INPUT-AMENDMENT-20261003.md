@@ -35,6 +35,8 @@ reasoner at a time, and checkpoints each query with document/import, algorithm a
 native-wheel identities. Operational failures (memory exhaustion or backend faults) fail the
 worker rather than becoming scientific abstentions. The approved E14 recipe has no wall-clock
 timeout; its explicit native memory allowance remains subordinate to available node resources.
+An explicit native compilation work allowance covers every compiler phase; structural and
+overflow checks remain enforced. Defaults for all existing experiments are unchanged.
 Native HermiT profile validation retains its logical checks, threads the configured memory
 allowance through compilation, and releases temporary accounting when temporary buffers are
 freed. Native imported-declaration support must preserve strict RDF mapping and cache identity.
@@ -45,6 +47,8 @@ and keep rationales off. The GPU lane remains serialized. The E14 candidate envi
 isolated; never replace packages inside the environment of an active experiment.
 
 Full validation/queue receipts belong under the ignored `data/experiments-v2` tree. A blocked
-native admission is not readiness: retain its detailed failure, repair it, and only then enable
-its descriptor. The supervisor may prepare and run E23's own pool and comparison under this
+native admission is not readiness: retain its detailed failure and repair it. The comparison
+descriptor depends on a completed admission whose original inputs, imports and installed native
+packages match the comparison. Admission checkpoints each successfully validated ontology,
+so a target failure does not repeat a compatible successful source check. The supervisor may prepare and run E23's own pool and comparison under this
 approval; it does not need another decision about the public dataset substitution.

@@ -22,13 +22,29 @@ from tools.prepared_batch import (
 )
 
 
-def prepare(root, batch, *, diagnostic, code, supervisor, environment_path, checks, python=None):
+def prepare(
+    root,
+    batch,
+    *,
+    diagnostic,
+    code,
+    supervisor,
+    environment_path,
+    checks,
+    python=None,
+    admission_run=None,
+):
     root, code, supervisor = map(Path, (root, code, supervisor))
     root.mkdir(parents=True, exist_ok=True)
     if batch.get("needs_user"):
         raise ValueError("Diagnostic still needs a scientific decision")
     protocol = read(diagnostic)
-    if protocol.get("kind") not in {"e24_directional_known_pairs", "e14_native_known_pairs"}:
+    if protocol.get("kind") not in {
+        "e24_directional_known_pairs",
+        "e14_native_known_pairs",
+        "e14_native_admission",
+        "e23_pool_preparation",
+    }:
         raise ValueError("Unsupported diagnostic protocol")
     policy = read(supervisor / "policy.json")
     recipe = {
@@ -50,6 +66,12 @@ def prepare(root, batch, *, diagnostic, code, supervisor, environment_path, chec
         "campaign_id": "diagnostic-" + batch["scientific_step"],
         "dispatch_nonce": uuid.uuid4().hex,
     }
+    if protocol["kind"] == "e14_native_known_pairs":
+        if admission_run not in batch["depends_on"]:
+            raise ValueError(
+                "Native comparison requires its admitted original-ontology prerequisite"
+            )
+        recipe["admission_run"] = admission_run
     if python is not None:
         recipe["python"] = str(Path(python).absolute())
     return prepare_launch(recipe, root, code, supervisor, batch)
@@ -62,14 +84,39 @@ def run_prepared_diagnostic(recipe_path, registry):
     root = Path(recipe["root"])
     diagnostic_path = verified(recipe["diagnostic"])
     protocol = read(diagnostic_path)
-    if protocol.get("kind") not in {"e24_directional_known_pairs", "e14_native_known_pairs"}:
+    if protocol.get("kind") not in {
+        "e24_directional_known_pairs",
+        "e14_native_known_pairs",
+        "e14_native_admission",
+        "e23_pool_preparation",
+    }:
         raise ValueError("Unsupported diagnostic protocol")
     if protocol["kind"] == "e24_directional_known_pairs":
         from tools.run_directional_diagnostic import run_diagnostic
-    else:
+    elif protocol["kind"] == "e14_native_known_pairs":
         from tools.run_bridge_diagnostic import run_diagnostic
+    elif protocol["kind"] == "e14_native_admission":
+        from tools.validate_native_owl import run_diagnostic
+    else:
+        from tools.prepare_openea_pools import run_diagnostic
     for identifier in recipe["depends_on"]:
         completed_run(resolve_run(registry, identifier))
+    if protocol["kind"] == "e14_native_known_pairs":
+        from exact.ontology.versions import ontology_execution_identity
+
+        admission_run = recipe.get("admission_run")
+        if admission_run not in recipe["depends_on"]:
+            raise ValueError("Native comparison lacks its admission prerequisite")
+        completion = completed_run(resolve_run(registry, admission_run))
+        admission_completion = read(verified(completion["diagnostic"]))
+        admission = read(verified(admission_completion["diagnostic"]))
+        if (
+            admission.get("status") != "passed"
+            or admission.get("inputs") != protocol["owl"]
+            or admission.get("imports") != protocol["imports"]
+            or admission.get("installed_code") != ontology_execution_identity("hermit")
+        ):
+            raise ValueError("Native admission does not match the current originals and packages")
     runtime = root / "runtime" / recipe["campaign_id"]
     parent, state = latest_account(registry)
     launch_path = root / "launch.json"

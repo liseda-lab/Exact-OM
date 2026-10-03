@@ -90,3 +90,47 @@ def test_bridge_comparison_rejects_test_reference_binding(tmp_path):
     path.write_text(json.dumps(recipe))
     with pytest.raises(ValueError, match="public train/valid only"):
         diagnostic.run_diagnostic(path)
+
+
+def test_bridge_comparison_detects_inputs_changing_during_native_work(tmp_path, monkeypatch):
+    path, recipe = _fixture(tmp_path)
+    original = diagnostic.native_bridge
+
+    def changed(*args, **kwargs):
+        result = original(*args, **kwargs)
+        target = tmp_path / "target/properties.csv"
+        target.write_text(target.read_text() + "\n")
+        return result
+
+    monkeypatch.setattr(diagnostic, "native_bridge", changed)
+    with pytest.raises(ValueError, match="input changed"):
+        diagnostic.run_diagnostic(path)
+    assert not (tmp_path / "result/completion.json").exists()
+
+
+def test_native_admission_does_not_read_alignment_references(tmp_path):
+    from tools.validate_native_owl import run_diagnostic
+
+    _, recipe = _fixture(tmp_path)
+    admission = {
+        "kind": "e14_native_admission",
+        "inputs": recipe["owl"],
+        "imports": {},
+        "output": str(tmp_path / "admission"),
+        "max_memory_bytes": 64 * 1024**2,
+        "query_classes": {"source": "urn:a", "target": "urn:b"},
+    }
+    for role in ("train", "valid"):
+        (tmp_path / (role + ".tsv")).unlink()
+    path = tmp_path / "admission-recipe.json"
+    path.write_text(json.dumps(admission))
+    result = run_diagnostic(path)
+    assert result["status"] == "passed"
+    assert {report["status"] for report in result["ontologies"].values()} == {"passed"}
+    assert json.loads((tmp_path / "admission/completion.json").read_text())["status"] == "complete"
+    second = run_diagnostic(path)
+    assert second["reused_ontologies"] == ["source", "target"]
+    admission["inputs"]["test"] = admission["inputs"]["source"]
+    path.write_text(json.dumps(admission))
+    with pytest.raises(ValueError, match="only original OWL inputs"):
+        run_diagnostic(path)
