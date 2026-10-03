@@ -147,7 +147,7 @@ def test_native_control_generation_and_evaluator_pipeline(prepared, tmp_path, ar
     problem = read_record(pool["input"])
     objective = read_record(pool["objective"])
     assert objective.pool_hash == canonical_hash(problem.objects)
-    assert all(r["arm"] == "grammar_uniform" for r in pool["proposal_reports"])
+    assert all(r["payload"]["arm"] == "grammar_uniform" for r in pool["proposal_reports"])
     if payload["logical_status"] == "VERIFIED_FEASIBLE":
         assert payload["semantic_status"] == "known", payload
         assert (tmp_path / "run/selected-label.json").exists()
