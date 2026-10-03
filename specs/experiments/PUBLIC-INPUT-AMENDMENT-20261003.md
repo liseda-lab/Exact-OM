@@ -11,7 +11,7 @@ snapshot; it does not revise its historical completion counts.
 | E08 signed identifiers | Defer only the signed/exclusive identifier follow-up. Public xrefs do not establish exclusive identifiers, and forbidden external reference-building resources cannot supply independent evidence. The three completed main E08 arms remain valid. | No further run; explicit deferred disposition, not a negative result. |
 | E24 asymmetric difference | Both fixed `<` and `>` hypotheses on existing public T0 train/validation known pairs; shared production evidence/support matrix, reversed-input check, ties/missing evidence reported, labels used only for reporting. | Checksum-bound recipe; 300 source groups per split, seed 17; diagnostic only, no setting selection or end-to-end F1 claim. |
 | E23 natural KG | OpenEA v2.0 `D_W_15K_V1`, official `721_5fold/1` train/valid. A separate `K0_OpenEA` case preserves the eight-feature supervised graph learner and its four controls. Keep StarWars K0 unchanged for other experiments. | Its own frozen label-free retrieval pools; at most 2,000 training sources and 300 validation sources, seed 17. No private/test/combined alignment file enters preparation. |
-| E14 native bridge | Exact recovered NCIT 26.04d and DOID commit `a3447b9f2464872d7f584baca1e7d55663528718`, with verified offline imports. Compare the existing named hierarchy view and full native OWL on the same public validation pairs and training-equivalence anchors. | Full original-ontology admission with repaired native packages before dispatch; fail closed on missing imports, unsupported mapping or resource failure. No Python ontology/reasoner fallback. |
+| E14 native bridge | Exact recovered NCIT 26.04d and DOID commit `a3447b9f2464872d7f584baca1e7d55663528718`, with verified offline imports. Compare the existing named hierarchy view and native reasoning over preserved full logical content on the same public validation pairs and training-equivalence anchors. | Repository-local reasoning-input preparation under the approved amendment below, small correctness fixtures, then full strict native admission before comparison dispatch. Fail closed on missing imports, unsupported mapping or resource failure. No Python ontology/reasoner fallback. |
 
 E23 negatives are **benchmark-bijection-derived nonmatches**, only between endpoints in
 different official training pairs. Other candidate pairs remain unknown and are excluded
@@ -48,12 +48,17 @@ isolated; never replace packages inside the environment of an active experiment.
 
 Full validation/queue receipts belong under the ignored `data/experiments-v2` tree. A blocked
 native admission is not readiness: retain its detailed failure and repair it. The comparison
-descriptor depends on a completed admission whose original inputs, imports and installed native
-packages match the comparison. Admission checkpoints each successfully validated ontology,
+descriptor depends on a completed admission whose prepared reasoning inputs, preparation
+receipt, original-source provenance, imports and installed native packages match the comparison. Admission checkpoints each successfully validated ontology,
 so a target failure does not repeat a compatible successful source check. The supervisor may prepare and run E23's own pool and comparison under this
 approval; it does not need another decision about the public dataset substitution.
 
-## Proposed E14 datatype admission amendment — awaiting approval
+## Approved E14 reasoning-input preparation — 2026-10-03
+
+The user approved repository-local preparation and requeueing, explicitly declining a
+pyHermiT admission-policy change for this issue. No pyowlcore, pyHermiT, pyELK or projector
+package behavior changes are authorized by this amendment; the installed native reasoner
+continues to enforce its existing strict profile policy.
 
 The original NCIT admission failed `UNSUPPORTED_DATATYPE`. A complete read-only XML
 inventory of the pinned NCIT file found `textArea`, `user-system` and `date-time-system`
@@ -63,22 +68,39 @@ This is a valid strict-profile rejection: [OWL 2 structural restrictions](https:
 require supported or defined datatypes. However, [Direct Semantics](https://www.w3.org/TR/owl2-direct-semantics/#Introduction)
 ignores annotations and declarations when interpreting logical axioms.
 
-Proposed treatment: an explicit, native, metadata-only datatype admission option for
-this class-reasoning diagnostic. Keep strict rejection as the default, preserve the original
-files and all logical axioms, and make no inferred datatype definitions or conversions.
-Before admission, prove across the whole import closure and composed bridge world that
-each unsupported datatype occurs only in declarations or annotation metadata. Reject
-any typed literal, datatype definition, data restriction, logical axiom or unsupported
-query using it. All other profile restrictions remain enforced. Record the original strict
-profile failure separately from successful admission for this limited reasoning scope.
+Prepare a separate reasoning document using a native XML engine, coordinated by Python.
+Keep the original files byte-for-byte for retrieval, descriptions and provenance. The only
+permitted removals are the three verified datatype declaration elements and the eight
+annotation-property range elements naming those datatypes. Preserve every logical axiom,
+class/entity identifier outside the removed datatype declarations, remaining annotation,
+ontology identity and import IRI; invent no datatype definitions or conversions. Record the
+original and prepared checksums, exact removed entries, implementation identity and native
+XML engine identity in a durable preparation receipt. The experiment's claim becomes
+reasoning over the preserved full logical content, not admission of the unmodified document.
 
-Required validation: native fixtures with unchanged subclass, equivalence and satisfiability
-results; rejection of logical/literal uses, including uses introduced by imports or bridge
-composition; unchanged strict-default behavior; and separate cache identities for the option.
-Pin a new isolated wheel, admission recipe and checkpoint namespace, then rerun full native
-admission before enabling the diagnostic. Run the small usage/admission checks first to
-avoid repeating the previous 2h25m NCIT load for an already-known incompatibility.
+Before publishing the prepared input, verify every bound document in the offline import
+closure, reject unbound imports and any additional use of the named datatype IRIs, and
+prove that the native transformation made only the listed removals. Typed literals,
+logical restrictions, datatype definitions, unexpected RDF/XML shapes and datatype uses
+introduced through imports must fail closed. Preserve import resolution without fetching
+unbound external documents. A new or composed bridge world must use only the prepared
+identity-bound ontology inputs and class-equivalence anchors; unsupported logical datatype
+uses still fail normal strict native admission. Do not use broad warning/ignore policies,
+arbitrary triple stripping or a Python ontology/reasoner implementation.
 
-This section is a proposal, not authorization or a passing result. The bridge remains
-blocked pending approval; no native packages, ontology bytes or queued E14 scope are
-changed by this proposal. Further restrictions may still appear during full admission.
+Required gates, in order:
+
+1. Small native preparation fixtures prove the exact removal scope, source immutability,
+   preserved imports and failure on unsafe datatype uses. Native reasoning fixtures verify
+   subclass, equivalence and satisfiability behavior against the intended logical content.
+2. Prepare the real input once, publish its receipt atomically, and bind both the fresh
+   admission and comparison recipes to the same original/prepared identities and imports.
+   Use a fresh checkpoint namespace; never reuse the failed original NCIT admission as a pass.
+3. Rerun full strict native admission in the isolated existing native environment. Only a
+   successful matching admission enables the diagnostic. Keep the original failure and all
+   cumulative accounting; compatible verified work may be reused only under its full identity.
+
+These gates are implementation and validation requirements, not claims that they have
+passed. Full admission may reveal other restrictions. The prior proposed native-package
+metadata-admission option is superseded by this approved preparation; no package API or
+policy extension is required. The main E14 CSV experiment and other active runs are unchanged.

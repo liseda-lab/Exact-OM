@@ -65,6 +65,13 @@ No individual experiment uses final outcomes to qualify its component for E17.
 - A mapping cannot be independently justified solely by inserting itself.
 - All relation labels have real counts/provenance; unresolved label completeness remains explicit.
 - Reasoner timeout/unsupported profile is unknown, not safe or proven equivalent.
+- The optional native known-pair comparison follows the [approved public-input amendment](PUBLIC-INPUT-AMENDMENT-20261003.md).
+  Keep original NCIT/DOID sources unchanged; a separately prepared reasoning input may remove
+  only the verified unsupported datatype declarations and annotation-property ranges while
+  preserving full logical content and import identity. Native XML preparation must fail closed
+  on other datatype uses. Small correctness fixtures and fresh full strict native admission
+  are prerequisites for comparison execution; no native package policy change is required.
+  Report prepared-input reasoning distinctly from admission of the unmodified original.
 
 Durable boundaries: **Typed train features/heads, bridge queries, typed predictions.**
 All changed inputs/semantics invalidate their consuming descendants; preserve valid upstream
