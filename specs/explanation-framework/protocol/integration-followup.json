@@ -21,27 +21,35 @@
     "R01": {
       "priority": 1,
       "owner": "backend_then_frontend",
-      "status": "joint_verified",
+      "status": "reopened",
       "acceptance": [
         "J01",
         "J02",
         "J03"
       ],
       "backend_status": "backend_verified",
-      "joint_verified": true,
-      "frontend_status": "frontend_verified"
+      "joint_verified": false,
+      "frontend_status": "reopened",
+      "reopened_by": [
+        "R06",
+        "R07"
+      ]
     },
     "R02": {
       "priority": 1,
       "owner": "frontend_with_backend_contract",
-      "status": "joint_verified",
+      "status": "reopened",
       "acceptance": [
         "J04",
         "J05"
       ],
       "backend_status": "backend_verified",
-      "joint_verified": true,
-      "frontend_status": "frontend_verified"
+      "joint_verified": false,
+      "frontend_status": "reopened",
+      "reopened_by": [
+        "R08",
+        "R09"
+      ]
     },
     "R03": {
       "priority": 2,
@@ -143,5 +151,45 @@
   },
   "implementation_evidence": "../../../docs/verification/explanation-integration-backend-receipt.json",
   "frontend_implementation_evidence": "../../../docs/verification/explanation-integration-frontend-receipt.json",
-  "acceptance_evidence": "../../../docs/verification/explanation-integration-acceptance-receipt.json"
+  "acceptance_evidence": "../../../docs/verification/explanation-integration-acceptance-receipt.json",
+  "post_implementation_findings": {
+    "review": "../evidence/frontend-integration-review-20261003.md",
+    "reviewed_commit": "8755431",
+    "findings": {
+      "R05": {
+        "priority": 3,
+        "owner": "frontend",
+        "status": "fixed_and_verified",
+        "summary": "Cytoscape inline style under the study CSP"
+      },
+      "R06": {
+        "priority": 2,
+        "owner": "frontend",
+        "reopens": "R01",
+        "requirement": "F16",
+        "status": "open"
+      },
+      "R07": {
+        "priority": 2,
+        "owner": "frontend",
+        "reopens": "R01",
+        "requirement": "F17",
+        "status": "open"
+      },
+      "R08": {
+        "priority": 2,
+        "owner": "frontend",
+        "reopens": "R02",
+        "requirement": "F18",
+        "status": "open"
+      },
+      "R09": {
+        "priority": 1,
+        "owner": "frontend",
+        "reopens": "R02",
+        "requirement": "F19",
+        "status": "open"
+      }
+    }
+  }
 }

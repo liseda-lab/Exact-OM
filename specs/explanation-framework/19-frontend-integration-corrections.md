@@ -1,7 +1,8 @@
 # Frontend assignment: consume and verify the complete study workspace
 
-**2026-10-03. Implemented in `6895bc6`; S2 verified and S3 recorded. R01, R02 and R04 are
-joint-verified; R03 awaits the manual screen-reader/keyboard audit in J10.** See the
+**2026-10-03. F11–F15 implemented in `6895bc6`. Post-implementation findings R06–R09 reopen
+R01/R02; F16–F19 below are required before they close. R04 is joint-verified; R03 awaits the
+manual screen-reader/keyboard audit in J10.** See the
 [frontend handoff](../../docs/verification/explanation-integration-frontend-handoff.md) and the
 [joint acceptance record](../../docs/verification/explanation-integration-acceptance.md). The
 requirements below remain normative. Follow
@@ -194,3 +195,57 @@ Deliver S2/S3 handoffs with backend/frontend SHAs, contract and fixture hashes, 
 newly discovered issues and release gates. Do not close R01 on a shared import, R02 on one
 prefetch, R03 on a reload after extra actions, or R04 on a summed timing field. Any backend
 failure goes back to its owner with the request, response and minimal reproduction.
+
+## F16 / R06 — Continue every truncatable fact category
+
+The shared entity card must continue every category it displays and the response pages
+(definitions, alternate definitions, synonyms, each defining-fact category, parents and the
+other recorded facts) from that page's own cursor:
+- fact categories through `/entity-facts` with the category;
+- parents through the parent hierarchy route.
+
+Show “N of M” when a total is known and “more exist” when only a cursor is known. Never claim
+“all are shown” for a page that has a continuation. Continuation is lazy, local and
+deduplicated by fact or edge identity, appends in the service's order, and keeps earlier items,
+citation access and fact identities. Loading, failure and retry are local and never read as
+absence. The main app and study use the same component. Tests must page beyond the first page
+in both products and prove every item becomes reachable exactly once.
+
+## F17 / R07 — Full context inside the study workspace
+
+The study's hierarchy browser offers “Open full context” for any entity it focuses, opening
+the shared full-context card over the authorized scope. Original facts appear only when
+`original_context` is admitted. Generated descriptions appear only for focal entities and
+admitted `entity_description`. Restricted reads are never requested, and the baseline still
+has no workspace. Opening or closing the dialog keeps the ranking, draft, inspected candidate
+and hierarchy navigation; a parent selected inside it navigates the hierarchy. Opening reports
+an existing declared event type.
+
+## F18 / R08 — Validate before caching; retry refetches unusable results
+
+The shared read cache accepts a focal context or explanation only after its required
+structure validates: identity, label, pages with item lists, category pages and completeness
+for contexts; task, entities and claims for available explanations. Anything else is a local
+failure, evicted so that the next read or Retry fetches it again.
+
+A render failure evicts the cached focal results before Retry remounts the workspace.
+
+Readiness transitions are tagged with their attempt, so a late load, render report or older
+attempt cannot overwrite a blocked state or ready another attempt, presentation or session.
+
+A 403 from an optional read blocks submission only if the scope's capabilities are then also
+refused. Otherwise it stays local to its panel.
+
+## F19 / R09 — Readiness follows the admitted components
+
+The render check requires exactly what the frozen condition displays:
+- the pair question always;
+- both entity cards when `original_context` or `entity_description` is admitted;
+- generated descriptions when `entity_description` is admitted;
+- the comparison when `pair_comparison` is admitted.
+
+Lazy tabs are never required. Absent components are not awaited, and admitted ones are not
+skipped. Tests cover the full set and comparison-only, original-context-only,
+description-only and hierarchy/evidence-only publications. Each must show readiness,
+recorded absence, failure and retry.
+

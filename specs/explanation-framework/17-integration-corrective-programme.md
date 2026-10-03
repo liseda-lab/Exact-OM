@@ -1,7 +1,7 @@
 # Integration corrective programme and agent protocol
 
-**2026-10-03. Status: S1, S2 and S3 run; R01, R02 and R04 joint-verified; R03 blocked only on
-the manual J10 audit. Reviewed baseline: `2d9715b`.**
+**2026-10-03. Status: R01 and R02 reopened by post-implementation findings R06–R09 (see below);
+R04 joint-verified; R03 blocked only on the manual J10 audit. Reviewed baseline: `2d9715b`.**
 The [backend handoff](../../docs/verification/explanation-integration-backend-handoff.md)
 records implementation `96b76fe`; the [frontend handoff](../../docs/verification/explanation-integration-frontend-handoff.md)
 records `6895bc6`; the [joint acceptance record](../../docs/verification/explanation-integration-acceptance.md)
@@ -57,6 +57,21 @@ authorized by this assignment. Existing real-data, recovery and launch gates rem
 | R02 | P1; C16/C23 | The API adapter's readiness path waits for the source only. A target failure can coexist with an enabled submission. Readiness must cover a bounded, explicit set of required case content and actual shared-workspace state. | Frontend; backend contract/tests |
 | R03 | P2; C14 | Navigation saves the old lesson; assessment position is ambiguous; omitted positions can clear persisted state. Persist explicit lesson/assessment position and restore it without an extra interaction. Move keyboard focus on deliberate navigation. | Backend state contract, then frontend |
 | R04 | P2; C16/C27 | Summed observations from independent page clocks are subtracted from elapsed time as if they were unique coverage. Preserve raw page observations and export unknown coverage honestly. | Backend export, frontend consumer/regression |
+
+### Post-implementation findings (after `8755431`)
+
+The [post-implementation review](evidence/frontend-integration-review-20261003.md) reproduced
+four frontend defects that the S2/S3 suites missed. They reopen R01 and R02. Neither can be
+re-closed until F16–F19 in [19](19-frontend-integration-corrections.md) are implemented and
+their regressions pass on the real service. R05 (Cytoscape's inline style under the study
+CSP, P3) was found and fixed during S3.
+
+| ID | Reopens | Priority | Defect and required outcome | Owner |
+|---|---|---|---|---|
+| R06 | R01 / J03 | P2 | The entity card shows only the first page of definitions, alternate definitions, synonyms, defining facts and parents, and calls truncated definitions complete. Every displayed category that can be truncated must continue to its end, with accurate shown/total counts and local loading, failure and retry. | Frontend |
+| R07 | R01 / J03 | P2 | The study hierarchy cannot open a searched entity's full context. Offer the main app's shared full-context inspection over the authorized scope, within the frozen components, preserving the case's pair, candidate, draft and navigation. | Frontend |
+| R08 | R02 / J04–J05 | P2 | A malformed 200 response stays in the shared cache, so Retry reuses it. Validate the required structure before treating a response as usable, invalidate unusable results, and keep late completions from overwriting a blocked state or readying another case. | Frontend |
+| R09 | R02 / J04–J05 | P1 | Readiness requires two entity cards even when the frozen condition admits none, so valid configurations (for example comparison-only) can never be answered. Readiness must check what the admitted components actually render, without weakening it. | Frontend |
 
 The existing browser test's “hierarchy region is visible” assertion misses R01; an action
 after changing lesson hides R03. Test strengthening is part of each correction, not a fifth
