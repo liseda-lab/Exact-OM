@@ -113,7 +113,21 @@ def costs(campaign):
     expected = (
         lineage["historical_pilot_worker_seconds"] + lineage["incremental_limit_worker_seconds"]
     )
-    if not math.isclose(ledger["limit_worker_seconds"], expected):
+    amendment = ledger.get("time_limit_amendment")
+    unlimited = ledger["limit_worker_seconds"] is None
+    if unlimited:
+        decision = checked(amendment) if amendment else {}
+        if not (
+            decision.get("schema") == "exact-repair/time-limit-amendment/v1"
+            and decision.get("campaign") == str(campaign)
+            and decision.get("previous_limit_worker_seconds") == expected
+            and "limit_worker_seconds" in decision
+            and decision["limit_worker_seconds"] is None
+            and decision.get("costs_reset") is False
+            and decision.get("user_authorization")
+        ):
+            raise ValueError("Unlimited campaign time requires a bound user amendment")
+    elif not math.isclose(ledger["limit_worker_seconds"], expected):
         raise ValueError("Campaign budget ceiling changed")
     accounted = totals(ledger["attempts"])
     if not math.isclose(
@@ -122,11 +136,15 @@ def costs(campaign):
     ):
         raise ValueError("Cumulative worker accounting does not reconcile")
     remaining = (
-        lineage["incremental_limit_worker_seconds"]
-        - current["worker_seconds"]
-        - current["reserved_worker_seconds"]
+        None
+        if unlimited
+        else (
+            lineage["incremental_limit_worker_seconds"]
+            - current["worker_seconds"]
+            - current["reserved_worker_seconds"]
+        )
     )
-    if remaining < 0:
+    if remaining is not None and remaining < 0:
         raise ValueError("Authorized incremental budget exhausted")
     jobs = sorted({v["logical_id"] for v in new.values()})
     return {
@@ -137,7 +155,10 @@ def costs(campaign):
         "historical_smoke": smoke_totals,
         "xr21_incremental": current,
         "combined": totals({**ledger["attempts"], **smoke["attempts"]}),
-        "incremental_limit_worker_seconds": lineage["incremental_limit_worker_seconds"],
+        "incremental_limit_worker_seconds": (
+            None if unlimited else lineage["incremental_limit_worker_seconds"]
+        ),
+        "time_limit_amendment": amendment,
         "unreserved_worker_seconds": remaining,
         "jobs": {
             job: totals({k: v for k, v in new.items() if v["logical_id"] == job}) for job in jobs

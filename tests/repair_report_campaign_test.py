@@ -77,6 +77,36 @@ def test_costs_include_failures_and_smoke_once_without_counting_reservation_as_s
     assert len(value["historical_attempts"]["pilot"]) == 1
 
 
+def test_unlimited_time_requires_bound_authorization_and_preserves_accounting(campaign):
+    path = campaign / "resource-ledger.json"
+    ledger = json.loads(path.read_text())
+    ledger["limit_worker_seconds"] = None
+    save(path, ledger)
+    with pytest.raises(ValueError, match="bound user amendment"):
+        costs(campaign)
+    decision = save(
+        campaign / "authorization.json",
+        {
+            "schema": "exact-repair/time-limit-amendment/v1",
+            "campaign": str(campaign),
+            "previous_limit_worker_seconds": 230,
+            "limit_worker_seconds": None,
+            "costs_reset": False,
+            "user_authorization": "No campaign time limit",
+        },
+    )
+    ledger["time_limit_amendment"] = binding(decision)
+    save(path, ledger)
+    value = costs(campaign)
+    assert value["incremental_limit_worker_seconds"] is None
+    assert value["unreserved_worker_seconds"] is None
+    assert value["combined"]["worker_seconds"] == 45
+    assert value["combined"]["reserved_worker_seconds"] == 100
+    decision.write_text("{}")
+    with pytest.raises(ValueError, match="dependency changed"):
+        costs(campaign)
+
+
 @pytest.mark.parametrize("change", ["history", "ceiling", "cumulative"])
 def test_costs_reject_reset_or_inconsistent_ledger(campaign, change):
     path = campaign / "resource-ledger.json"

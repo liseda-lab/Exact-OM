@@ -57,7 +57,11 @@ def charge(ledger, job, attempt, *, elapsed=None, cpu_seconds=None, peak_rss_mb=
                 for row in value["attempts"].values()
                 if row["logical_id"] == job["id"]
             )
-            remaining = min(value["limit_worker_seconds"] - total, job["seconds"] - prior)
+            remaining = job["seconds"] - prior
+            # Explicit null removes only the campaign-wide ceiling. A worker
+            # still has a finite, cumulatively charged logical-job allowance.
+            if value["limit_worker_seconds"] is not None:
+                remaining = min(value["limit_worker_seconds"] - total, remaining)
             if remaining <= 0:
                 raise TimeoutError("Cumulative campaign/job budget exhausted")
             value["attempts"][key] = {

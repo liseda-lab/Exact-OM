@@ -7,6 +7,21 @@ import pytest
 from tools.repair.batch import charge, checked_batch, run
 
 
+def test_unlimited_campaign_preserves_costs_and_finite_worker_reservations(tmp_path):
+    ledger = tmp_path / "ledger.json"
+    ledger.write_text(json.dumps({"limit_worker_seconds": None, "attempts": {}}))
+    job = {"id": "one", "seconds": 50, "resources": {"cpus": 2, "gpus": 0, "memory_mb": 512}}
+    assert charge(ledger, job, "first") == 50
+    charge(ledger, job, "first", elapsed=20, cpu_seconds=10)
+    assert charge(ledger, job, "retry") == 30
+    with pytest.raises(TimeoutError):
+        charge(ledger, job, "duplicate-work")
+    assert charge(ledger, {**job, "id": "independent"}, "next") == 50
+    value = json.loads(ledger.read_text())
+    assert value["cumulative"]["worker_seconds"] == 100
+    assert value["attempts"]["first"]["elapsed_seconds"] == 20
+
+
 def test_replacement_costs_and_unsettled_reservations_are_never_reset(tmp_path):
     ledger = tmp_path / "ledger.json"
     ledger.write_text(json.dumps({"limit_worker_seconds": 100, "attempts": {}}))

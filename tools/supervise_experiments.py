@@ -461,6 +461,11 @@ def check(directory, policy, state, *, act=False, stop_requested=lambda: False):
     for finding in observation["findings"]:
         if finding.get("retryable") and finding.get("errors"):
             observation["incidents"].append(inspection_incident(registry["runs"], finding))
+    from exact.experiments.completion import idle_completion
+
+    completed_queue = idle_completion(registry, observation, dispatch_state)
+    if completed_queue:
+        observation["status"] = "completed_waiting_for_decision"
     active = {item["id"] for item in observation["incidents"]}
     for key, record in state["incidents"].items():
         if key not in active:
@@ -483,6 +488,17 @@ def check(directory, policy, state, *, act=False, stop_requested=lambda: False):
     if paused_by:
         current.update(status="paused", paused_by=paused_by)
     elif act:
+        if completed_queue and policy.get("notify_when_idle", False):
+            current["notification"] = notify_blocker(
+                directory, policy, completed_queue, "approval_needed", result={
+                    "summary": "The authorized experiment queue has finished. No experiment jobs "
+                    "remain queued or running. Please approve the next study in the Codex "
+                    "conversation. The supervisor will keep monitoring; it will not invent "
+                    "another study. Completed results, failures and cumulative costs are "
+                    "recorded in the campaign handoff.",
+                    "handoff": registry.get("handoff", ""),
+                },
+            )
         for key, record in state["incidents"].items():
             if (key not in active and record.get("alerted") and not record.get("recovered")
                     and observed_recovery(record.get("incident", {}), registry, observation)):
