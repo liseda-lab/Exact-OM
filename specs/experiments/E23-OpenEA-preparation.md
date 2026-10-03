@@ -42,3 +42,36 @@ The four arms must share the resulting candidate-pool identities, sources and tr
 This new individual case cannot reuse class/StarWars fitted-head identities. No preparation
 result is empirical readiness or evidence of model quality. `preparation.json` records the
 exact accessed archive members and hashes every output; repeat preparation verifies them.
+
+The own-pool preparation is a separate queued CPU/GPU preparation step, without scoring or
+head fitting:
+
+```bash
+python tools/prepare_openea_pools.py \
+  --config data/experiments-v2/locks/R_v2.config.yaml \
+  --prepared data/experiments-v2/openea-v2-D_W_15K_V1-fold1-02 \
+  --output data/experiments-v2/openea-v2-D_W_15K_V1-fold1-pools-01 \
+  --device cuda:0
+```
+
+Use metadata revision 2, whose source sampling explicitly uses the `individual` kind; the
+existing class sampler retains its default. This tool calls the normal dataset ontology
+loader, source-universe freezer and candidate generator with the supplied configuration.
+It passes no alignment reference to retrieval. Pool receipts pin that recipe, its implementation,
+public KG hashes, selected sources, and resulting rows; completed roles resume without another
+encoder pass. The approved R_v2 baseline uses its pinned MiniLM candidate retriever with k=20.
+
+Merge the resulting `bindings-fragment.json` into the campaign's explicit bindings before
+calling `prepare_campaign`. The `e23_natural_case` override changes E23 alone. Its own pools
+replace StarWars dependencies and policy inheritance; the existing rich class ablations and
+E12 keep their original bindings. Metadata-only preparation remains blocked until pool receipts
+exist. All four natural-KG arms share one train pool and one validation pool, with caps and seed
+checked against their receipt. Retrieval controls already applied during pool generation are
+disabled during provided-pool loading, so they cannot rerank or expand the frozen rows a second
+time. This preparation does not establish empirical readiness or authorize using test labels.
+
+For an automatic immutable campaign handoff, add both `--campaign-bindings <original.yaml>`
+and `--campaign-output <new-directory>` to the pool command. After both roles finish, the CLI
+writes `campaign-bindings.json = deep_merge(original_bindings, own_pool_fragment)` and calls
+`prepare_campaign` with the same base config. The supplied original bindings must not override
+E23 back to K0 or reinstate its former pool inheritance; these conflicts fail explicitly.

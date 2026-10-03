@@ -202,7 +202,7 @@ def prepare_openea(
         "training_cap": training_cap,
         "source_cap": source_cap,
         "seed": seed,
-        "schema_version": 1,
+        "schema_version": 2,
     }
     if sha256_file(archive) != ARCHIVE_SHA256:
         raise ValueError("OpenEA archive differs from the approved v2.0 release")
@@ -248,8 +248,8 @@ def prepare_openea(
             or len(valid) != valid_count
         ):
             raise ValueError("OpenEA official population counts differ from the pinned case")
-        training = nested_sources(train, training_cap, seed=seed)
-        validation = nested_sources(valid, None, seed=seed)
+        training = nested_sources(train, training_cap, seed=seed, kind="individual")
+        validation = nested_sources(valid, None, seed=seed, kind="individual")
         for role, links in [("train", train), ("valid", valid)]:
             _table(
                 stage / f"{role}.reference.tsv",

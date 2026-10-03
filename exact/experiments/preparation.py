@@ -631,6 +631,8 @@ def prepare_campaign(
         if family == "E26":
             dependencies += ["pool_freeze"]
         extra: dict[str, Any] = {}
+        case_id = CASE_BY_FAMILY.get(family, "D0")
+        openea_pools = None
         if family == "E24":
             extra["additional_cases"] = ["D0"]
         if family == "E19":
@@ -660,17 +662,71 @@ def prepare_campaign(
                     ["E00", "pool_freeze"],
                 )
             arms = [arm for arm in arms if not arm["id"].startswith("rich_")]
-            dependencies += ["instance_pool_freeze"]
-            extra["inherits"] = ["instance_pool_freeze"]
+            if "e23_natural_case" in bindings:
+                from exact.experiments.openea import CASE_ID
+                from exact.experiments.openea_pools import validate_pool_bindings
+
+                case_id = bindings["e23_natural_case"]
+                natural_case = cases.get(case_id, {})
+                if (
+                    case_id != CASE_ID
+                    or natural_case.get("kind") != "individual"
+                    or natural_case.get("role") != "development"
+                    or natural_case.get("negative_policy") != "confirmed_only"
+                    or "scoped_bijective_training_negatives"
+                    not in natural_case.get("capabilities", [])
+                ):
+                    raise ValueError("E23 OpenEA requires its scoped individual development case")
+                openea_pools = validate_pool_bindings(bindings)
+                # The replacement has its own retrieval and training population;
+                # K0/StarWars policy ports cannot provide its frozen pools.
+                dependencies = ["E00"]
+                extra["inherits"] = []
+            else:
+                dependencies += ["instance_pool_freeze"]
+                extra["inherits"] = ["instance_pool_freeze"]
         make_step(
             family,
             family,
             arms,
-            CASE_BY_FAMILY.get(family, "D0"),
+            case_id,
             entry["budget_group"],
             dependencies,
             **extra,
         )
+        if family == "E23" and "e23_natural_case" in bindings:
+            natural = steps[-1]
+            if (
+                natural["case"] != case_id
+                or natural.get("inherits")
+                or natural["requires"] != ["E00"]
+            ):
+                raise ValueError("E23 OpenEA cannot inherit another case's pool or policy")
+            natural["design"]["assumptions"].append(
+                "OpenEA v2.0 fold 1: negatives are cross-pairs between bijective official "
+                "training endpoints only; unknown pairs are excluded from fitting. "
+                "No test links, gold pool insertion, or ontology-wide NIL assumption."
+            )
+            if openea_pools is None:
+                for stages in natural["readiness"].values():
+                    for stage in stages.values():
+                        stage.update(
+                            status="blocked_input_resolution",
+                            reason="Prepare and bind this OpenEA case's own train/validation "
+                            "pools using the frozen retrieval recipe before execution.",
+                        )
+            else:
+                generator = openea_pools["generator"]
+                if (
+                    natural.get("source_cap", 300) != generator["source_cap"]
+                    or natural.get("training_source_cap", 2000) != generator["training_cap"]
+                    or natural.get("seeds", [17]) != [generator["seed"]]
+                ):
+                    raise ValueError("E23 OpenEA caps/seed differ from its frozen retrieval pools")
+                natural["design"]["assumptions"].append(
+                    "Own retrieval/split/negative-scope provenance SHA256="
+                    + bindings["e23_pool_provenance"]["sha256"]
+                )
     for step in [item for item in steps if item["family"] == "E23"]:
         case_binding = cases[step["case"]]
         if case_binding.get("negative_policy", "positive_unlabelled") != "positive_unlabelled":

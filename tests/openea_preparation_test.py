@@ -162,3 +162,232 @@ def test_archive_identity_and_recipe_are_immutable(package, tmp_path):
     package.write_bytes(b"different archive")
     with pytest.raises(ValueError, match="approved v2.0"):
         openea.prepare_openea(package, tmp_path / "other", training_cap=2, source_cap=1)
+
+
+def _pools(package, tmp_path, monkeypatch):
+    from pathlib import Path
+    from exact.experiments import openea_pools
+
+    prepared = tmp_path / "prepared"
+    openea.prepare_openea(package, prepared, training_cap=2, source_cap=1)
+    calls = []
+
+    def generate(config, case, sources, output, *, cap, seed, device):
+        assert set(case) == {"source", "target"}  # No reference reaches retrieval.
+        assert seed == 17 and device == "cpu"
+        calls.append((list(sources), cap, config.candidates.model_dump(mode="json")))
+        if "s1" in sources:
+            frame = pd.DataFrame(
+                {"Src": ["s1", "s1", "s1"], "Tgt": ["t1", "t2", "t3"], "cand_sim": [0.9, 0.8, 0.7]}
+            )
+        else:
+            # Deliberately absent gold t3: preparation must never insert it.
+            frame = pd.DataFrame({"Src": ["s3"], "Tgt": ["t4"], "cand_sim": [0.6]})
+        return frame, sorted(sources), {"origin": "generated", "fixture": True}
+
+    monkeypatch.setattr(openea_pools, "_generate", generate)
+    config = Path(__file__).resolve().parents[1] / "exact/default_config.yaml"
+    destination = tmp_path / "pools"
+    fragment = openea_pools.prepare_pools(config, prepared, destination, device="cpu")
+    return config, prepared, destination, fragment, calls
+
+
+def test_own_pools_keep_retrieval_scores_split_boundaries_and_resume(
+    package, tmp_path, monkeypatch
+):
+    from exact.experiments import openea_pools
+
+    config, prepared, destination, fragment, calls = _pools(package, tmp_path, monkeypatch)
+    assert len(calls) == 2
+    train = pd.read_csv(destination / "train.candidates.tsv", sep="\t")
+    valid = pd.read_csv(destination / "valid.candidates.tsv", sep="\t")
+    assert train.cand_sim.tolist() == [0.9, 0.8, 0.7]
+    assert train.confirmed_label.iloc[:2].tolist() == [1, 0]
+    assert pd.isna(train.confirmed_label.iloc[2])
+    assert valid.Tgt.tolist() == ["t4"] and "confirmed_label" not in valid
+    proof = openea_pools.validate_pool_bindings(fragment)
+    assert proof["roles"]["train"]["confirmed_negative"] == 1
+    assert proof["roles"]["train"]["unknown"] == 1
+    assert proof["roles"]["valid"]["gold_insertions"] == 0
+    assert proof["generator"]["candidates"] == calls[0][2] == calls[1][2]
+    assert openea_pools.prepare_pools(config, prepared, destination, device="cpu") == fragment
+    assert len(calls) == 2
+    (destination / "train.candidates.tsv").write_text("tampered")
+    with pytest.raises(ValueError, match="pool input changed"):
+        openea_pools.prepare_pools(config, prepared, destination, device="cpu")
+
+
+def test_own_pool_provenance_rejects_transplanted_case_or_missing_proof(
+    package, tmp_path, monkeypatch
+):
+    from copy import deepcopy
+    from exact.experiments import openea_pools
+
+    _, _, _, fragment, _ = _pools(package, tmp_path, monkeypatch)
+    changed = deepcopy(fragment)
+    changed["cases"][openea.CASE_ID]["source"]["sha256"] = "0" * 64
+    with pytest.raises(ValueError, match="KG identity changed"):
+        openea_pools.validate_pool_bindings(changed)
+    del fragment["e23_pool_provenance"]
+    with pytest.raises(ValueError, match="lack retrieval provenance"):
+        openea_pools.validate_pool_bindings(fragment)
+
+
+def test_campaign_openea_is_separate_and_requires_own_pools(package, tmp_path):
+    from tests.campaign_preparation_test import _cases
+    from tests.graph_campaign_cases_test import prepare
+
+    prepared = tmp_path / "inputs"
+    openea.prepare_openea(package, prepared, training_cap=2, source_cap=1)
+    fragment = json.loads((prepared / "bindings-fragment.json").read_text())
+    cases = _cases()
+    cases.update(fragment.pop("cases"))
+    steps = prepare(tmp_path / "campaign", cases, **fragment)
+    assert steps["E23"].case == openea.CASE_ID
+    assert steps["E12"].case == "K0"
+    assert steps["E23"].requires == ["E00"] and steps["E23"].inherits == []
+    assert [arm.id for arm in steps["E23"].arms] == [
+        "natural_graph_off",
+        "natural_inductive",
+        "graph_only",
+        "graph_shuffled",
+    ]
+    assert all(
+        stage.status == "blocked_input_resolution"
+        for stages in steps["E23"].readiness.values()
+        for stage in stages.values()
+    )
+    assert all(steps[f"E23-rich-{fraction}"].case == "D1" for fraction in (0, 50, 100))
+
+
+def test_campaign_bound_pools_reject_stale_caps_and_inheritance(package, tmp_path, monkeypatch):
+    from tests.campaign_preparation_test import _cases
+    from tests.graph_campaign_cases_test import prepare
+
+    _, _, _, fragment, _ = _pools(package, tmp_path, monkeypatch)
+    cases = _cases()
+    cases.update(fragment.pop("cases"))
+    with pytest.raises(ValueError, match="caps/seed differ"):
+        prepare(tmp_path / "wrong-cap", cases, **fragment)
+    override = {"E23": {"source_cap": 1, "training_source_cap": 2}}
+    steps = prepare(tmp_path / "matched", cases, steps=override, **fragment)
+    assert steps["E23"].case == openea.CASE_ID
+    assert all(
+        stage.status == "implementing"
+        for stages in steps["E23"].readiness.values()
+        for stage in stages.values()
+    )
+    override["E23"]["inherits"] = ["instance_pool_freeze"]
+    with pytest.raises(ValueError, match="another case's pool"):
+        prepare(tmp_path / "wrong-inheritance", cases, steps=override, **fragment)
+
+
+def test_source_sampling_preserves_legacy_default_and_individual_identity():
+    import hashlib
+    from exact.experiments.inputs import nested_sources
+
+    sources = [f"entity{i}" for i in range(50)]
+    expected = sorted(
+        sources, key=lambda iri: (hashlib.sha256(f"17\x1f{iri}\x1fclass".encode()).digest(), iri)
+    )[:10]
+    assert nested_sources(sources, 10) == expected
+    individual = sorted(
+        sources,
+        key=lambda iri: (hashlib.sha256(f"17\x1f{iri}\x1findividual".encode()).digest(), iri),
+    )[:10]
+    assert nested_sources(sources, 10, kind="individual") == individual
+    assert individual != expected
+
+
+def test_pool_generation_uses_normal_dataset_route_without_references(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    from exact.core.entities.registry import ComponentRegistry
+    from exact.experiments.openea_pools import _generate
+
+    calls = []
+    candidates = {"top_k": 20, "retrieval_strategy": "hybrid"}
+
+    class Dataset:
+        eligible_source_iris = ("s1",)
+        candidate_pool_manifest = {"origin": "generated"}
+
+        def __init__(self, **kwargs):
+            assert kwargs["entity_kinds"] == ["individual"]
+            assert kwargs["input_format"] == "csv-kg"
+            assert kwargs["candidate_generation_params"] == candidates
+            assert not any("reference" in key for key in kwargs)
+            calls.append("init")
+
+        def load_ontologies(self, source, target):
+            assert source == tmp_path / "source" and target == tmp_path / "target"
+            calls.append("ontologies")
+
+        def freeze_source_universe(self, sources, *, cap, seed):
+            assert sources == ["s1"] and cap == 1 and seed == 17
+            calls.append("source_cap")
+
+        def load_candidates(self, path, **kwargs):
+            assert path is None
+            assert kwargs["top_k"] == 20 and kwargs["retrieval_strategy"] == "hybrid"
+            calls.append("retrieval")
+
+        def candidate_recall_frames(self):
+            return pd.DataFrame({"Src": ["s1"], "Tgt": ["t1"], "cand_sim": [0.8]}), None
+
+    config = SimpleNamespace(
+        resolve_dependencies=lambda: calls.append("resolve"),
+        dataset_runtime=Dataset,
+        dataset_params=SimpleNamespace(model_dump=lambda **_: {}),
+        candidates=SimpleNamespace(model_dump=lambda **_: candidates),
+        matching=SimpleNamespace(anchor_rescoring=SimpleNamespace(exact_policy=None)),
+    )
+    monkeypatch.setattr(ComponentRegistry, "get", lambda *_: lambda seed: calls.append(seed))
+    frame, sources, manifest = _generate(
+        config,
+        {
+            "source": {"path": str(tmp_path / "source")},
+            "target": {"path": str(tmp_path / "target")},
+        },
+        ["s1"],
+        tmp_path / "out",
+        cap=1,
+        seed=17,
+        device="cpu",
+    )
+    assert calls == ["resolve", 17, "init", "ontologies", "source_cap", "retrieval"]
+    assert sources == ["s1"] and manifest == {"origin": "generated"}
+    assert frame.cand_sim.tolist() == [0.8]
+
+
+def test_pool_cli_merges_only_case_fragment_before_campaign_preparation(tmp_path, monkeypatch):
+    import sys
+    from tools import prepare_openea_pools as cli
+
+    base = tmp_path / "base.json"
+    base.write_text(json.dumps({"cases": {"K0": {"task": "original"}}, "untouched": True}))
+    fragment = {"cases": {openea.CASE_ID: {"task": "new"}}, "e23_natural_case": openea.CASE_ID}
+    monkeypatch.setattr(cli, "prepare_pools", lambda *_, **__: fragment)
+    seen = []
+    monkeypatch.setattr(cli, "prepare_campaign", lambda *args: seen.append(args) or "campaign")
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "prepare_openea_pools.py",
+            "--config",
+            str(tmp_path / "config.yaml"),
+            "--prepared",
+            str(tmp_path / "prepared"),
+            "--output",
+            str(tmp_path / "pools"),
+            "--campaign-bindings",
+            str(base),
+            "--campaign-output",
+            str(tmp_path / "campaign"),
+        ],
+    )
+    cli.main()
+    merged = json.loads((tmp_path / "pools/campaign-bindings.json").read_text())
+    assert merged["cases"]["K0"] == {"task": "original"}
+    assert merged["cases"][openea.CASE_ID] == {"task": "new"}
+    assert merged["untouched"] is True and seen[0][2] == merged
