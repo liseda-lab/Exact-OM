@@ -212,3 +212,12 @@ logical-job cumulative cap across all attempts. Attempt 003 writes the merged
 72-row evaluation to `work/xr21-t2-evaluation/addendum-003/evaluation-report.json`,
 preserving the original evaluation and report outputs. Report revision
 preparation must consume that relative output from its actual completion receipt.
+
+Report preparation and closure accept `--run-id` for the registered revision.
+Preparation uses the evaluation run's receipt-bound `evaluation_report_relative`;
+closure uses the report run's `report_relative`. Report 002 writes beneath
+`work/xr21-t2-report/revision-002` while retaining the same logical job and
+3,600-second cumulative allowance. Its manifest pins the earlier scope report,
+completion and costs as historical evidence. Existing report and closure files
+cannot be overwritten. The merged evaluation keeps each reused row's original
+schedule identity; reporting preserves that provenance and all 152 planned rows.

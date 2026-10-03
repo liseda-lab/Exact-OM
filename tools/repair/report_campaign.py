@@ -9,6 +9,7 @@ from collections import Counter
 from pathlib import Path
 
 from exact.repair.api import write_artifact
+from exact.repair.records import canonical_hash
 from tools.repair.batch import locked, read, sha
 
 SCHEMA = "exact-repair/campaign-report/v3"
@@ -150,14 +151,16 @@ def costs(campaign):
     }
 
 
-def prepare(campaign, output):
+def prepare(campaign, output, run_id="xr21-t2-report-001"):
     campaign, output = Path(campaign).resolve(), Path(output).resolve()
     if output.exists():
         raise FileExistsError("Preserve existing report manifest")
     registry = read(campaign / "supervisor/registry.json")
     plan = read(campaign / "plan.json")
     runs = {r["id"]: r for r in registry["runs"]}
-    pending = next(p for p in registry["pending_batches"] if p["id"] == "xr21-t2-report-001")
+    pending = next(p for p in registry["pending_batches"] if p["id"] == run_id)
+    if pending["logical_id"] != "xr21-t2-report":
+        raise ValueError("Expected the existing logical report job")
     dependencies = [runs[name] for name in pending["depends_on"]]
     evaluation_run = next(r for r in dependencies if r["logical_id"] == "xr21-t2-evaluation")
     controls_run = next(r for r in dependencies if r["logical_id"] == "xr21-t2-controls")
@@ -168,14 +171,19 @@ def prepare(campaign, output):
         and not r.get("superseded_by")
         and r.get("enabled", True)
     )
-    evaluation = output_binding(evaluation_run, "evaluation-report.json")
+    evaluation = output_binding(
+        evaluation_run, evaluation_run.get("evaluation_report_relative", "evaluation-report.json")
+    )
     controls = output_binding(controls_run, "control-report.json")
-    schedule = checked(evaluation)["schedule"]
-    checked(schedule)
+    evaluated = checked(evaluation)
+    schedule = evaluated["schedule"]
+    schedule_value = checked(schedule)
+    checked_evaluation_rows(schedule_value, evaluated)
     snapshot = output.with_name("registry-input.json")
     write_artifact(snapshot, registry)
     manifest = {
         "schema": SCHEMA,
+        "run_id": run_id,
         "campaign": str(campaign),
         "plan": binding(campaign / "plan.json"),
         "registry": binding(snapshot),
@@ -189,12 +197,18 @@ def prepare(campaign, output):
         "planned_arm_ids": [a["id"] for a in plan["arms"]],
         "worker_seconds": plan["budgets"]["report"],
         "deferred_scope": DEFERRED,
+        "historical_scope_completions": registry.get("historical_scope_completions", []),
     }
     files = {
         value["path"]
         for value in manifest.values()
         if isinstance(value, dict) and "sha256" in value
     }
+    files.update(
+        item["path"]
+        for item in schedule_value.get("reuse", {}).values()
+        if isinstance(item, dict) and "sha256" in item
+    )
     for run in runs.values():
         check_receipt(run, success=False)
         files.add(run["completion_path"])
@@ -218,6 +232,14 @@ def prepare(campaign, output):
         if sha(item["snapshot"]) != item["sha256"]:
             raise ValueError("Historical snapshot changed")
         files.add(item["snapshot"])
+    for previous in manifest["historical_scope_completions"]:
+        completion = checked(previous["completion"])
+        checked(previous["costs"])
+        checked(completion["report"])
+        files.update(
+            item["path"]
+            for item in (previous["completion"], previous["costs"], completion["report"])
+        )
     manifest["inputs"] = [binding(p) for p in sorted(files)]
     costs(campaign)
     write_artifact(output, manifest)
@@ -237,6 +259,28 @@ def matched_rows(schedule_rows, rows, *, key):
     return [by_id[value] for value in planned]
 
 
+def checked_evaluation_rows(schedule, evaluation):
+    rows = matched_rows(schedule["rows"], evaluation["rows"], key=lambda r: r["id"])
+    if schedule.get("reuse"):
+        from tools.repair.evaluation_addendum import checked_reuse
+
+        reused = checked_reuse(schedule)
+        if (
+            evaluation.get("reuse") != schedule["reuse"]
+            or evaluation.get("reused_rows") != len(reused)
+            or evaluation.get("new_rows") != len(rows) - len(reused)
+        ):
+            raise ValueError("Merged evaluation reuse accounting changed")
+        identity = canonical_hash(schedule)
+        for row in rows:
+            if row["id"] in reused:
+                if row != reused[row["id"]]:
+                    raise ValueError("Merged evaluation changed an original reused row")
+            elif row["schedule_hash"] != identity:
+                raise ValueError("New evaluation row has another schedule identity")
+    return rows
+
+
 def summary(rows):
     known = [r.get("measurement", r).get("semantic_benefit") for r in rows]
     observed = [v for v in known if v is not None]
@@ -253,6 +297,8 @@ def summary(rows):
 
 
 def report(manifest_path, output):
+    if (Path(output) / "report.json").exists():
+        raise FileExistsError("Preserve existing report output; use a new revision directory")
     manifest = read(manifest_path)
     if manifest["schema"] != SCHEMA:
         raise ValueError("Unsupported report manifest")
@@ -268,7 +314,7 @@ def report(manifest_path, output):
         check_receipt(run)
     if controls["schedule_sha256"] != manifest["controls_schedule"]["sha256"]:
         raise ValueError("Control schedule identity mismatch")
-    rows = matched_rows(schedule["rows"], evaluation["rows"], key=lambda r: r["id"])
+    rows = checked_evaluation_rows(schedule, evaluation)
     detailed = []
     for planned, row in zip(schedule["rows"], rows):
         if any(row.get(k) != v for k, v in planned.items()):
@@ -329,6 +375,14 @@ def report(manifest_path, output):
     report_value = {
         "schema": SCHEMA,
         "manifest": binding(manifest_path),
+        "historical_scope_completions": manifest.get("historical_scope_completions", []),
+        "evaluation_provenance": {
+            "report": manifest["evaluation"],
+            "schedule": manifest["evaluation_schedule"],
+            "reuse": evaluation.get("reuse"),
+            "reused_rows": evaluation.get("reused_rows", 0),
+            "new_rows": evaluation.get("new_rows", len(rows)),
+        },
         "process_status": "report_materialized_pending_worker_receipt",
         "finite_scope_status": "accounted_pending_report_receipt_and_final_costs",
         "study_status": "incomplete_with_unavailable_and_deferred_rows",
@@ -384,10 +438,12 @@ def close(campaign, output, run_id="xr21-t2-report-001"):
     """Publish final costs only after the runner settled its own report attempt."""
     campaign, output = Path(campaign).resolve(), Path(output).resolve()
     with locked(campaign / "supervisor/registry.json.lock"):
+        if any((output / name).exists() for name in ("completion.json", "costs.json")):
+            raise FileExistsError("Preserve existing scope closure; use a new revision directory")
         registry = read(campaign / "supervisor/registry.json")
         run = next(r for r in registry["runs"] if r["id"] == run_id)
         receipt = check_receipt(run)
-        report_ref = output_binding(run, "report.json")
+        report_ref = output_binding(run, run.get("report_relative", "report.json"))
         payload = checked(report_ref)
         if payload["planned_model_arm_count"] != 6 or len(payload["arms"]) != 6:
             raise ValueError("Incomplete report arm accounting")
@@ -412,6 +468,7 @@ def close(campaign, output, run_id="xr21-t2-report-001"):
             "scientific_result_status": payload["scientific_result_status"],
             "source_commit": read(receipt["batch"])["commit"] if receipt.get("batch") else None,
             "report": report_ref,
+            "historical_scope_completions": payload.get("historical_scope_completions", []),
             "costs": binding(output / "costs.json"),
             "completion_receipt": binding(run["completion_path"]),
             "planned_model_arm_count": 6,
@@ -448,9 +505,11 @@ def main():
     parser.add_argument("command", choices=["prepare", "run", "close"])
     parser.add_argument("source", type=Path)
     parser.add_argument("output", type=Path)
+    parser.add_argument("--run-id", default="xr21-t2-report-001")
     args = parser.parse_args()
+    kwargs = {} if args.command == "run" else {"run_id": args.run_id}
     result = {"prepare": prepare, "run": report, "close": close}[args.command](
-        args.source, args.output
+        args.source, args.output, **kwargs
     )
     print(json.dumps({"schema": result["schema"], "output": str(args.output)}))
     return 0

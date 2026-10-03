@@ -1,6 +1,7 @@
 """Report boundaries: immutable evidence, complete denominators and cumulative costs."""
 
 import json
+from pathlib import Path
 
 import pytest
 
@@ -287,13 +288,24 @@ def test_report_keeps_unavailable_arms_and_deferrals(report_fixture):
     assert result["finite_scope_status"] == "accounted_pending_report_receipt_and_final_costs"
 
 
-def test_closure_requires_settled_report_and_preserves_immutable_output(report_fixture, campaign):
+@pytest.mark.parametrize("revision", [False, True])
+def test_closure_requires_settled_report_and_preserves_immutable_output(
+    report_fixture, campaign, revision
+):
     from tools.repair.report_campaign import close, report
 
     manifest, output, runs = report_fixture
     report(manifest, output)
     report_path = output / "report.json"
     original = report_path.read_bytes()
+    relative = "revision-002/report.json" if revision else "report.json"
+    run_id = "xr21-t2-report-002" if revision else "xr21-t2-report-001"
+    old_report = save(output / "old-report.json", {"historical": True})
+    if revision:
+        report_path = output / relative
+        report_path.parent.mkdir()
+        (output / "report.json").rename(report_path)
+        (output / "report.json").write_bytes(old_report.read_bytes())
     completion = save(
         campaign / "attempts/report/001/completion.json",
         {
@@ -305,11 +317,12 @@ def test_closure_requires_settled_report_and_preserves_immutable_output(report_f
             "elapsed_seconds": 2,
         },
     )
-    save(completion.with_name("outputs.json"), {"report.json": binding(report_path)["sha256"]})
+    save(completion.with_name("outputs.json"), {relative: binding(report_path)["sha256"]})
     runs.append(
         {
-            "id": "xr21-t2-report-001",
+            "id": run_id,
             "logical_id": "report",
+            "report_relative": relative,
             "completion_path": str(completion),
             "step_id": "1.99",
             "dispatch_nonce": "report",
@@ -317,17 +330,128 @@ def test_closure_requires_settled_report_and_preserves_immutable_output(report_f
     )
     save(campaign / "supervisor/registry.json", {"runs": runs, "pending_batches": []})
     with pytest.raises(ValueError, match="unsettled"):
-        close(campaign, campaign / "final")
+        close(campaign, campaign / "final", run_id)
     ledger_path = campaign / "resource-ledger.json"
     ledger = json.loads(ledger_path.read_text())
     ledger["attempts"][str(campaign / "attempts/job/002")] = attempt(3)
     ledger["attempts"][str(completion.parent)] = attempt(2)
     ledger["cumulative"]["worker_seconds"] = 45
     save(ledger_path, ledger)
-    result = close(campaign, campaign / "final")
+    result = close(campaign, campaign / "final", run_id)
     assert result["remaining_work_status"] == "terminal"
     final_costs = checked(result["costs"])
     assert final_costs["xr21_incremental"]["worker_seconds"] == 15
     assert final_costs["combined"]["worker_seconds"] == 50
     assert final_costs["combined"]["reserved_worker_seconds"] == 0
     assert report_path.read_bytes() == original
+    assert result["report"] == binding(report_path)
+    if revision:
+        assert (output / "report.json").read_bytes() == old_report.read_bytes()
+    with pytest.raises(FileExistsError, match="scope closure"):
+        close(campaign, campaign / "final", run_id)
+
+
+def test_report_refuses_to_overwrite_a_published_revision(report_fixture):
+    from tools.repair.report_campaign import report
+
+    manifest, output, _ = report_fixture
+    report(manifest, output)
+    original = (output / "report.json").read_bytes()
+    with pytest.raises(FileExistsError, match="existing report output"):
+        report(manifest, output)
+    assert (output / "report.json").read_bytes() == original
+
+
+def test_prepare_revision_binds_addendum_and_preserves_prior_report(report_fixture, campaign):
+    from tools.repair.report_campaign import prepare
+
+    manifest_path, _, runs = report_fixture
+    manifest = json.loads(manifest_path.read_text())
+    plan = checked(manifest["plan"])
+    plan.update(
+        arms=[{"id": name} for name in manifest["planned_arm_ids"]], budgets={"report": 3600}
+    )
+    save(campaign / "plan.json", plan)
+    for run, logical, source, relative in [
+        (
+            runs[-2],
+            "xr21-t2-evaluation",
+            manifest["evaluation"],
+            "addendum-003/evaluation-report.json",
+        ),
+        (runs[-1], "xr21-t2-controls", manifest["controls"], "control-report.json"),
+    ]:
+        run["logical_id"] = logical
+        receipt = checked(binding(run["completion_path"]))
+        value = checked(source)
+        if logical == "xr21-t2-evaluation":
+            run["evaluation_report_relative"] = relative
+            value["schedule"] = manifest["evaluation_schedule"]
+            save(Path(receipt["work"]) / "evaluation-report.json", {"old": True})
+        path = save(Path(receipt["work"]) / relative, value)
+        save(
+            Path(run["completion_path"]).with_name("outputs.json"),
+            {relative: binding(path)["sha256"]},
+        )
+    prep = dict(runs[-1], id="prepare-001", logical_id="xr21-t2-prepare")
+    prep_receipt = checked(binding(prep["completion_path"]))
+    gate = save(Path(prep_receipt["work"]) / "preparation-gate.json", {"status": "complete"})
+    outputs_path = Path(prep["completion_path"]).with_name("outputs.json")
+    outputs = json.loads(outputs_path.read_text())
+    outputs["preparation-gate.json"] = binding(gate)["sha256"]
+    save(outputs_path, outputs)
+    save(campaign / "artifacts/controls-001/schedule.json", checked(manifest["controls_schedule"]))
+    previous_report = save(campaign / "work/report/report.json", {"old": True})
+    previous = {
+        "completion": binding(
+            save(campaign / "old/completion.json", {"report": binding(previous_report)})
+        ),
+        "costs": binding(save(campaign / "old/costs.json", {"spent": 8})),
+    }
+    save(
+        campaign / "supervisor/registry.json",
+        {
+            "runs": [*runs, prep],
+            "historical_scope_completions": [previous],
+            "pending_batches": [
+                {
+                    "id": "xr21-t2-report-002",
+                    "logical_id": "xr21-t2-report",
+                    "depends_on": [runs[-2]["id"], runs[-1]["id"]],
+                }
+            ],
+        },
+    )
+    result = prepare(campaign, campaign / "revision/manifest.json", "xr21-t2-report-002")
+    assert result["evaluation"]["path"].endswith("addendum-003/evaluation-report.json")
+    assert result["worker_seconds"] == 3600
+    assert result["historical_scope_completions"] == [previous]
+    assert binding(previous_report) in result["inputs"]
+    assert checked(binding(previous_report)) == {"old": True}
+
+
+@pytest.mark.parametrize("change", [None, "old_row", "new_identity", "count", "provenance"])
+def test_report_validates_mixed_schedule_reuse(monkeypatch, change):
+    from exact.repair.records import canonical_hash
+    from tools.repair import evaluation_addendum
+    from tools.repair.report_campaign import checked_evaluation_rows
+
+    schedule = {"rows": [{"id": "old"}, {"id": "new"}], "reuse": {"source": "original"}}
+    original = {"id": "old", "schedule_hash": "original-schedule", "status": "unknown"}
+    monkeypatch.setattr(evaluation_addendum, "checked_reuse", lambda value: {"old": original})
+    rows = [dict(original), {"id": "new", "schedule_hash": canonical_hash(schedule)}]
+    evaluation = {"rows": rows, "reuse": dict(schedule["reuse"]), "reused_rows": 1, "new_rows": 1}
+    if change == "old_row":
+        rows[0]["status"] = "complete"
+    elif change == "new_identity":
+        rows[1]["schedule_hash"] = "original-schedule"
+    elif change == "count":
+        evaluation["reused_rows"] = 0
+    elif change == "provenance":
+        evaluation["reuse"] = {}
+    if change:
+        with pytest.raises(ValueError):
+            checked_evaluation_rows(schedule, evaluation)
+    else:
+        assert checked_evaluation_rows(schedule, evaluation) == rows
+        assert rows[0] == original
