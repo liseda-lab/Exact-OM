@@ -8,6 +8,10 @@
 > isolated checkouts, explicit ownership and backend-first integration. The deferral below
 > does not prohibit this assigned correction. Specs 14–16's product decisions and existing
 > data/policy/recovery/launch gates remain binding. See 17 for ready-to-use agent instructions.
+>
+> S1 is now backend-verified at `96b76fe`. The next owner reads the
+> [backend integration handoff](../../docs/verification/explanation-integration-backend-handoff.md),
+> implements 19 and performs S2/S3. Backend checks do not close browser acceptance.
 
 Implement B0–B5 from this suite in the existing Exact-OM repository. The user has chosen a separate backend review and a specialized frontend agent **only after backend readiness**, for full frontend design/implementation. Do not create an early frontend review dependency or implement a speculative full frontend while building the backend.
 

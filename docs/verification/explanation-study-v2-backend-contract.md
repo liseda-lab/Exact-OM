@@ -9,6 +9,12 @@ resource policy, software, and analysis export.
 
 ## Compatibility and migration
 
+The additive runtime extension is `integration_contract: "study-integration/1"` on fresh
+authenticated v2 state. Frozen publications remain `exact-study/2.0`. Historical mutation
+receipts retain their original shape on replay; refresh state after replay to discover
+current runtime capabilities. See the [integration handoff](explanation-integration-backend-handoff.md)
+for implementation commits, generated schemas and actual serialized examples.
+
 | Publication | Read/resume | Mutation contract | New publication |
 |---|---|---|---|
 | `exact-study/1.0` | Existing frozen state and assignment continue through the legacy adapter | Original setup, question order, consultation, status codes and receipts | Synthetic regression fixtures allowed; new live v1 revisions rejected |
@@ -64,6 +70,22 @@ frozen `requirement_id` and `action` code, plus the corresponding typed evidence
 - Ranking controls: `response_type` and `ranked_candidate_ids` in synthetic scope.
 - Consultation practice: allowed unique `methods` (multiple or none as required).
 - Download discovery: the synthetic ontology `asset_ids`.
+
+Corrected clients send a complete `position` object: either
+`{"view":"lesson","lesson_id":"<frozen lesson ID>","question_id":null}` or
+`{"view":"assessment","lesson_id":null,"question_id":null}`. An assessment may name a
+frozen question instead of null. Position-only saves are valid and durable. Omission
+preserves position; explicit null, unknown IDs and inconsistent shapes return 422 atomically.
+The deprecated `current_lesson_id` alias is derived from position. A non-null legacy lesson
+updates position, while a null or omitted legacy lesson preserves it. If both fields are
+sent they must agree. Action-scoping `lesson_id` does not navigate.
+
+Old progress without position is normalized on read: a valid old lesson wins, otherwise
+drafts/attempts select assessment landing, otherwise the first lesson. This fallback does
+not recover historical screen focus. The next successful mutation persists it; reads leave
+stored bytes intact. Old mutation hashes, saved receipts, completion and assignment remain
+unchanged. Clients must wait for acknowledgement and use the returned revision for queued
+saves; a stale competing write gets the existing 409.
 
 `completed_requirements` is a cumulative acknowledgement echo: it may only name requirements
 already acknowledged or satisfied by typed actions in the same request. A checkbox list or
@@ -133,20 +155,68 @@ requires `EXACT_STUDY_TEST_PGBIN`, `EXACT_STUDY_TEST_PGDATA`, and the marked syn
 used by the existing recovery harness. It restores to a separate database and compares
 completed tutorial state, consultation draft and immutable export.
 
-V2 JSON/CSV exports use `exact-study-analysis/2` and `exact-study-csv/2`. They retain
+V2 JSON/CSV exports support `exact-study-analysis/2` and `exact-study-csv/2` for historical
+compatibility, and `exact-study-analysis/3` and `exact-study-csv/3` for corrected timing.
+The new fixture CLI explicitly freezes version 3; model and test-helper defaults remain 2
+so previously canonicalized publications retain their hashes. They retain
 consultation method combinations and optional resource-scope missingness, first/final
 assessment attempts, eventual completion, and separate observed tutorial/consultation
 seconds. Late unavailable timing intervals are explicitly retained and excluded from
 observed durations. Preparation is not a validated expertise score; method sets do not
 establish candidate-level use, time attribution, compliance, or causal effects.
 
+The admin create-export route accepts optional `analysis_schema`. For v2 choose 2 or 3;
+omission selects the publication's frozen source export version. V1 only supports 1.
+Unsupported combinations return 422. A researcher can derive analysis 3 from an existing
+analysis-2 v2 publication without rewriting it: `manifest.schema` describes the derivation,
+`manifest.source_protocol_versions` and `data.protocol_versions` preserve the source.
+Revision inventory exposes `source_export_version` and `supported_analysis_schemas`;
+the older `export_version` remains the source-version alias. Saved export retrieval and
+CSV conversion use the saved manifest and retain its original content/hash.
+
+Analysis 3 reports `page_observation_seconds`, sorted `per_page_observation_seconds`,
+`page_instance_count`, `coverage_status`, `coverage_reason`,
+`unique_elapsed_coverage_seconds`, `unobserved_elapsed_seconds` and `active_duration_known`.
+The same summary appears in session `tutorial_timing` and case `consultation_timing`.
+Page sums count only accepted bounded, deduplicated, non-overlapping eligible intervals.
+Unavailable intervals remain in raw records with their reasons, excluded from sums/counts.
+The three old observed-seconds fields are aliases of their corresponding raw page sums.
+
+Coverage is always `not_established`, and both coverage/unobserved seconds are null,
+including for one page. Reasons distinguish zero eligible clocks, one unmapped clock and
+multiple clocks. Two pages observing 60 seconds each yield 120 page-seconds even if server
+elapsed time is 100 seconds: no clamping, subtraction, inferred concurrency or attention.
+`raw_elapsed_seconds` runs from the first usable-content server receipt for that
+presentation to submission; subsequent ready events do not reset it. Tutorial/consultation
+time stays outside scored time. JSON/CSV dictionaries define every field and null meaning.
+Nested CSV JSON preserves null, while top-level missing scalar cells are empty, never zero.
+Historical analysis-2 coverage arithmetic is not corrected elapsed-coverage evidence.
+
+## Authorized workspace and readiness
+
+Fresh v2 explanation current-case responses include strict `workspace: {"scope_id":"…"}`.
+Use its URL-encoded ID with the same-origin `/api/v1/study/workspace/{scope_id}/…` routes.
+The descriptor exposes no filesystem locations. Baseline returns null and no explanation
+refs. Missing or unusable required frozen resources produce typed 503, distinct from an
+explicit prepared `not_exported` result. Capabilities describe the physically filtered
+frozen scope; they do not authorize unrelated contexts or imply unrestricted completeness.
+Every read retains session, generation, consent, stage, condition and presentation checks.
+Paused discovery is available but scoped reads remain denied; consultation keeps its
+existing current-workspace permission. Tutorial help grants no scored-baseline access.
+
+`case_ready` is a client assertion, not proof of rendering or attention. Each page must
+report its own ready event before its case observations are eligible. The frontend still
+owns the six-entity required-content readiness state machine and retry/focus behavior.
+S1 backend tests do not establish those pending browser requirements.
+
 ## Errors and missingness at the wire boundary
 
 | Situation | Response or preserved value |
 |---|---|
-| An old tab sends another session's `X-Study-Session` | 409; no read or write runs under the replacement session |
+| A mutation, current-case or scoped-workspace request sends another session's `X-Study-Session` | 409; the operation does not run under the replacement session |
 | Baseline attempts to read its scored explanation workspace | 403; opening synthetic help grants no scored access |
-| An unknown or cross-query continuation is reused | 422 domain error; no partial result is returned |
+| A malformed continuation is supplied | 422 `invalid_cursor`; no partial result is returned |
+| A continuation from another query, scope or revision is reused | 409 `stale_cursor`; no partial result is returned |
 | Final No includes stale consultation methods, names or scope | 422 validation error; the previous canonical answer is unchanged |
 | Setup acknowledgements or resource access are incomplete on explicit submit | 422 validation error; no allocation occurs |
 | Tutorial completion has outstanding mandatory interactions or core items | 422; progress and attempts remain resumable |

@@ -486,7 +486,7 @@
   },
   "current_acceptance_authority": "specs/explanation-framework/17-integration-corrective-programme.md",
   "integration_followup_20261003": {
-    "status": "specified_not_implemented",
+    "status": "backend_verified_frontend_and_joint_pending",
     "reviewed_commit": "2d9715b",
     "authority": "specs/explanation-framework/17-integration-corrective-programme.md",
     "evidence": "specs/explanation-framework/evidence/integration-review-20261003.md",
@@ -500,48 +500,75 @@
       "R01": {
         "priority": 1,
         "owner": "backend_then_frontend",
-        "status": "open",
+        "status": "frontend_pending",
         "acceptance": [
           "J01",
           "J02",
           "J03"
+        ],
+        "backend_status": "backend_verified",
+        "joint_verified": false,
+        "evidence": [
+          "tests/explanation_integration_contract_test.py",
+          "tests/explanation_study_workspace_test.py"
         ]
       },
       "R02": {
         "priority": 1,
         "owner": "frontend_with_backend_contract",
-        "status": "open",
+        "status": "frontend_pending",
         "acceptance": [
           "J04",
           "J05"
+        ],
+        "backend_status": "backend_verified",
+        "joint_verified": false,
+        "evidence": [
+          "tests/explanation_integration_contract_test.py::test_page_readiness_is_local_and_does_not_restart_case_clock",
+          "tests/explanation_telemetry_policy_test.py"
         ]
       },
       "R03": {
         "priority": 2,
         "owner": "backend_then_frontend",
-        "status": "open",
+        "status": "frontend_pending",
         "acceptance": [
           "J06",
           "J07",
           "J09",
           "J10"
+        ],
+        "backend_status": "backend_verified",
+        "joint_verified": false,
+        "evidence": [
+          "tests/explanation_integration_position_test.py",
+          "tests/explanation_study_v2_test.py::test_v2_postgresql_backup_restore_preserves_training_and_draft"
         ]
       },
       "R04": {
         "priority": 2,
         "owner": "backend_with_frontend_consumer",
-        "status": "open",
+        "status": "frontend_pending",
         "acceptance": [
           "J08",
           "J09"
+        ],
+        "backend_status": "backend_verified",
+        "joint_verified": false,
+        "evidence": [
+          "tests/explanation_integration_timing_test.py"
         ]
       }
     },
-    "implementation_acceptance": "pending_backend_frontend_and_joint_verification",
+    "implementation_acceptance": "S1_backend_verified_S2_S3_pending",
     "historical_evidence_preserved": true,
     "launch_gates_waived": false,
     "live_publication": false,
     "recruitment": false,
-    "deployment": false
+    "deployment": false,
+    "backend_implementation_commit": "96b76fe74afab6d2fdb6437e2ff0b1c28d9b5a3f",
+    "backend_handoff": "docs/verification/explanation-integration-backend-handoff.md",
+    "backend_receipt": "docs/verification/explanation-integration-backend-receipt.json",
+    "runtime_extension": "study-integration/1"
   }
 }

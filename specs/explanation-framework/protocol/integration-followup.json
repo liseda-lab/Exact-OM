@@ -21,41 +21,49 @@
     "R01": {
       "priority": 1,
       "owner": "backend_then_frontend",
-      "status": "specified_not_implemented",
+      "status": "frontend_pending",
       "acceptance": [
         "J01",
         "J02",
         "J03"
-      ]
+      ],
+      "backend_status": "backend_verified",
+      "joint_verified": false
     },
     "R02": {
       "priority": 1,
       "owner": "frontend_with_backend_contract",
-      "status": "specified_not_implemented",
+      "status": "frontend_pending",
       "acceptance": [
         "J04",
         "J05"
-      ]
+      ],
+      "backend_status": "backend_verified",
+      "joint_verified": false
     },
     "R03": {
       "priority": 2,
       "owner": "backend_then_frontend",
-      "status": "specified_not_implemented",
+      "status": "frontend_pending",
       "acceptance": [
         "J06",
         "J07",
         "J09",
         "J10"
-      ]
+      ],
+      "backend_status": "backend_verified",
+      "joint_verified": false
     },
     "R04": {
       "priority": 2,
       "owner": "backend_with_frontend_consumer",
-      "status": "specified_not_implemented",
+      "status": "frontend_pending",
       "acceptance": [
         "J08",
         "J09"
-      ]
+      ],
+      "backend_status": "backend_verified",
+      "joint_verified": false
     }
   },
   "joint_acceptance_ids": [
@@ -127,5 +135,6 @@
     "fresh_full_tutorial_journey_required": true,
     "mock_success_is_joint_acceptance": false,
     "waives_backend_or_launch_gates": false
-  }
+  },
+  "implementation_evidence": "../../../docs/verification/explanation-integration-backend-receipt.json"
 }

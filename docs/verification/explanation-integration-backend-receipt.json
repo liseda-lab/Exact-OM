@@ -1,0 +1,375 @@
+{
+  "schema_version": "exact-study-integration-backend-verification/1",
+  "recorded_at": "2026-10-03T16:15:04.834017+00:00",
+  "status": "backend_verified_frontend_and_joint_pending",
+  "stage": "S1",
+  "synthetic_only": true,
+  "start_commit": "b5d8b6470887e6e28dba10d6d22d9fddbe35a0bc",
+  "reviewed_baseline_commit": "2d9715b81c379eca10ee0463d15873cf24c60c8d",
+  "implementation_commit": "96b76fe74afab6d2fdb6437e2ff0b1c28d9b5a3f",
+  "implementation_commits": [
+    "6aa4a9c6d709eb39e9ef79fc1a1ea0418b69d4d3",
+    "acdb252385ff1666b20fc34dab1187e788ee6f4f",
+    "8e76aa60c47e9adbd44c9bb6b2ffaeea89fb4e36",
+    "96b76fe74afab6d2fdb6437e2ff0b1c28d9b5a3f"
+  ],
+  "documentation_commit": "Subsequent commit containing this receipt; deliberately not self-referential",
+  "branch": "dev",
+  "runtime_extension": "study-integration/1",
+  "publication_protocol": "exact-study/2.0",
+  "corrected_analysis_schema": "exact-study-analysis/3",
+  "corrected_csv_schema": "exact-study-csv/3",
+  "generated_contracts_sha256": {
+    "specs/explanation-framework/protocol/study-publication.runtime-schema.json": "8ab442c83f8e48cb04d95d0fa1314aadd74d0276aceab701bdab0afe8167bf71",
+    "specs/explanation-framework/protocol/study-resource.runtime-schema.json": "377adad61c90efb788bea90e6c40ec7f5a6f9b0a3b99390b00b7ea23623909bc",
+    "specs/explanation-framework/protocol/study-tutorial.runtime-schema.json": "f43a26ced867b7f2a1a4a86506cbd0daa7fd3eee3ddc42597372e2631375c619",
+    "specs/explanation-framework/protocol/study.runtime-openapi.json": "fc546d42e83ae9fbe9e2c9d847c82482e2d8751580864bd15f10a812eab40780"
+  },
+  "implementation_files_sha256": {
+    "exact_inspect/study/__main__.py": "200d0544f39528b5d11daf2b67e5e42947707cb9a42d30e0f47a5c425cf1a926",
+    "exact_inspect/study/administration.py": "4bd923ad79782c78711ede37d0e9afa6223ee10e8c4934e04297bba47eb1eb6e",
+    "exact_inspect/study/api.py": "fc8a7716c14cbd7a0f866f00a555e9e87f5755bdeaa3f11f08cc0d03ab96eeb3",
+    "exact_inspect/study/exports.py": "48e9444ac6d5f22ab0f44b46c7c8af6f83eec236e4400fd338cdd17279224707",
+    "exact_inspect/study/store.py": "4bf37d7205088dbeaf163a9c3935ee73457935c6e01a8a23e69d575ae3b7b7e6",
+    "exact_inspect/study/tutorial.py": "983fac4902d5fac367ab78e9d692e053893dbc882f8b7e5922b95ab324c68e9b",
+    "exact_inspect/study/v2_models.py": "57ad40d2f0842d84602dc4c88b3f1fedf7aedc36505836b6b936d49ec15de65a",
+    "exact_inspect/study/workspace.py": "cc0585b35f548a8134a09b31c4c77d9f80d3f6a71a064985305f72d5b9ffef51",
+    "tests/explanation_integration_contract_test.py": "2e73e0080bc9793911d132d355f7271d2b515402d3f46af91808f02e10c4dc0b",
+    "tests/explanation_integration_position_test.py": "2730d1d2d2ddf58cf1b8a0e97c9110b023e34ec74fb2bbf528636bca324a51a0",
+    "tests/explanation_integration_timing_test.py": "8c5197160d81272c5669ab7be9afd3461d5a463223cc6f8ef101cee2a84f0aef",
+    "tests/explanation_study_v2_test.py": "4b7c00fc8b71283025db7c1aa2b3acb7dc21e137e799e22343dc9b4b9b79b61b",
+    "tools/build_explanation_v2_fixture.py": "a0ac8e341452b6db3e6c1128b2da77711c23cb6e6ac5c02af5b11a023729b409",
+    "tools/record_explanation_integration_examples.py": "658114053d1407137d7d0a9a11708e1f3850ce10fb2b09a2c8feca05f0672a53"
+  },
+  "parallel_ownership": [
+    {
+      "branch": "dev",
+      "owner": "root",
+      "scope": "Workspace discovery, durable position, readiness tests, generated contracts, fixture navigation, runtime marker and handoff"
+    },
+    {
+      "branch": "codex/study-timing-integration",
+      "owner": "timing_exports",
+      "scope": "Export logic/selectors/metadata and dedicated timing tests in isolated managed checkout",
+      "source_commit": "d92dcf2b5be4045ff883f42c6a11fc0e7153b81d",
+      "integrated_commit": "8e76aa60c47e9adbd44c9bb6b2ffaeea89fb4e36",
+      "shared_mutable_database": false
+    },
+    {
+      "owner": "integration_review",
+      "scope": "Independent read-only source and saved CSV compatibility review",
+      "edits": false
+    }
+  ],
+  "baseline_reproduction": {
+    "source_commit": "b5d8b6470887e6e28dba10d6d22d9fddbe35a0bc",
+    "result": "3 failed regressions before implementation",
+    "observed": [
+      "Current-case HTTP response workspace null",
+      "Position-only mutation rejected as extra field (422)",
+      "Omitted lesson alias clears prior saved position"
+    ],
+    "timing_regression": "New oracle tests compare historical analysis-2 overcount/clamp with corrected analysis-3 unknown coverage on the same stored observations"
+  },
+  "fixture": {
+    "generator": "python -m tools.build_explanation_v2_fixture <empty-directory> --navigation-size 65",
+    "local_path": "/tmp/exact-study-integration-20261003",
+    "file_count": 59,
+    "inventory_file": "docs/verification/explanation-integration-fixture-inventory.json",
+    "inventory_file_sha256": "b398c12455130665926db0386b95f0b6432cafdf2adddfc1c8b00dcb13e64467",
+    "canonical_inventory_sha256": "54889b496b889efa1288360efe2101c1bf7f66ba3993965f55c002482163d096",
+    "publication_file_sha256": "500963709434c1c9ee45ce3d64153691d20b19be7406f5a39a4b4fb0c5996704",
+    "admission": {
+      "study_revision": "synthetic-v2-1b7b2e2bd65b475fae84eb6a853c8356",
+      "frozen_hash": "27ef646d370c22e0fb92db6e5ff020589f93d1b647a0c2206a976afe2ee1f243",
+      "synthetic": true
+    },
+    "protocol_versions": {
+      "setup": "setup/2",
+      "tutorial": "tutorial/2.0-native-2-nav65",
+      "assessment": "assessment/2",
+      "forms": "exact-study-forms/2",
+      "information": "synthetic-information-v2",
+      "resource_policy": "synthetic-study-v2",
+      "software": "exact-explain-ui-1.2",
+      "export": "exact-study-analysis/3"
+    },
+    "policy_hash": "9e7985e43f352d766bfb714ebe8e1408de1eb38c03ea6db3fe5fb4c680958ad7",
+    "provenance": "Fresh synthetic OWL documents/indexes from the native pyowl-core stack; non-focal search, multiple inheritance and multi-page facts/children. No matcher/provider request or human record.",
+    "regeneration": "New revision IDs/timestamps change hashes; preserve recorded package and recalculate hashes for a new package."
+  },
+  "serialized_examples": {
+    "path": "docs/verification/explanation-integration-backend-examples.json",
+    "sha256": "4a3962a6fa8f484c2ee5996b6382459af65472da0b5b4ae2a8a199ec4f4fdb0d",
+    "count": 12,
+    "generator": "python -m tools.record_explanation_integration_examples --fixture <fixture> --output <new-file>",
+    "transport": "FastAPI TestClient through actual router with real frozen indexes; backend helpers complete setup/training, not a UI journey",
+    "statuses": {
+      "lesson_position": 200,
+      "assessment_position": 200,
+      "position_omitted": 200,
+      "position_null": 422,
+      "explanation_case": 200,
+      "capabilities": 200,
+      "mismatched_cursor": 409,
+      "terminal_absence": 200,
+      "missing_required_workspace_injected": 503,
+      "analysis_3": 200,
+      "baseline_case": 200,
+      "stale_scope_denied": 403
+    },
+    "fault_injection": [
+      "Missing required workspace removed from a copied server publication during one read",
+      "Timing oracle uses controlled synthetic server timestamps"
+    ],
+    "credentials_recorded": false,
+    "human_participant_data": false
+  },
+  "dependencies": {
+    "python": "3.12.14",
+    "sqlite": "3.53.1",
+    "postgresql": "16.2",
+    "fastapi": "0.116.2",
+    "pydantic": "2.13.5",
+    "httpx": "0.28.1",
+    "pytest": "9.1.1",
+    "psycopg": "3.3.6",
+    "pyowl-core": "0.2.1",
+    "uvicorn": "0.35.0"
+  },
+  "checks": {
+    "sqlite": {
+      "status": "passed",
+      "passed": 153,
+      "skipped": 2,
+      "warnings": 1,
+      "seconds": 246.71,
+      "command": [
+        "python",
+        "-m",
+        "pytest",
+        "tests/explanation_integration_contract_test.py",
+        "tests/explanation_integration_position_test.py",
+        "tests/explanation_integration_timing_test.py",
+        "tests/explanation_study_test.py",
+        "tests/explanation_study_v2_test.py",
+        "tests/explanation_study_workspace_test.py",
+        "tests/explanation_study_resource_test.py",
+        "tests/explanation_telemetry_policy_test.py",
+        "tests/explanation_corrective_http_test.py",
+        "tests/explanation_study_image_contents_test.py",
+        "tests/explanation_http_runtime_test.py",
+        "tests/explanation_export_policy_test.py",
+        "-q",
+        "-ra",
+        "--tb=short",
+        "--maxfail=2"
+      ],
+      "environment": "EXACT_STUDY_TEST_* unset; loopback/subprocess access permitted",
+      "skips": "Only legacy/v2 PostgreSQL restart/restore tests; both executed and passed in PostgreSQL run"
+    },
+    "postgresql": {
+      "status": "passed",
+      "passed": 64,
+      "skipped": 0,
+      "warnings": 1,
+      "seconds": 257.59,
+      "command": [
+        "python",
+        "-m",
+        "pytest",
+        "tests/explanation_study_test.py",
+        "tests/explanation_study_v2_test.py",
+        "tests/explanation_integration_contract_test.py",
+        "tests/explanation_integration_position_test.py",
+        "tests/explanation_integration_timing_test.py",
+        "tests/explanation_corrective_http_test.py",
+        "-q",
+        "-ra",
+        "--tb=short",
+        "--maxfail=2"
+      ],
+      "environment": {
+        "EXACT_STUDY_TEST_DATABASE_URL": "postgresql://127.0.0.1:18973/exact_integration",
+        "EXACT_STUDY_TEST_PGBIN": "/tmp/exact-backend-corrections-20261003/pg/bin",
+        "EXACT_STUDY_TEST_PGDATA": "/tmp/exact-backend-corrections-20261003/pgdata-utf8",
+        "EXACT_STUDY_TEST_RECOVERY_DIR": "<repo>/data/explanation-framework/postgres/integration-20261003"
+      },
+      "coverage": [
+        "Concurrency and stale revisions",
+        "Process exit before/after commit",
+        "Actual server restart",
+        "pg_dump/pg_restore into separate temporary databases",
+        "Assessment focus, completed training and consultation draft persist",
+        "Immutable analysis-2 and analysis-3 exports survive restore; schema-3 CSV bytes identical"
+      ]
+    },
+    "postgresql_recovery": {
+      "artifact_type": "study_recovery_verification",
+      "schema_version": 1,
+      "executed_at": "2026-10-03T16:07:39.274676+00:00",
+      "synthetic_only": true,
+      "database": "postgres (PostgreSQL) 16.2",
+      "verified": [
+        "actual_server_restart",
+        "reusable_invitation",
+        "same_assignment_and_submission",
+        "same_acknowledgements_history_and_events",
+        "pg_dump_and_pg_restore_into_separate_database",
+        "same_immutable_export"
+      ],
+      "verified_row_counts": {
+        "sessions": 1,
+        "mutations": 6,
+        "history": 6,
+        "events": 2,
+        "timing_segments": 1
+      },
+      "backup_sha256": "08550fc311037849cc4158844ac39b41325ff173d8d7192dd97c15ba3bd7eeb7",
+      "backup_size_bytes": 18463207,
+      "immutable_export_sha256": "cc50a7db3ce71248cddeef687e70ff56241943d14dbb16f4dbd0e8854e9ecbd8",
+      "retention": "Private ignored local test artifacts; no production retention claim"
+    },
+    "contract_snapshots": {
+      "status": "passed",
+      "command": "python -m tools.freeze_explanation_contracts --check"
+    },
+    "spec_validator": {
+      "status": "passed",
+      "command": "python specs/explanation-framework/protocol/validate_specs.py",
+      "scope": "Specification artifacts only, not release acceptance",
+      "json_files": 27,
+      "schema_fixtures": 13,
+      "local_links": 166,
+      "study_schedules": 8,
+      "scoring_oracles": 9
+    },
+    "formatting": {
+      "status": "passed",
+      "python_files": 14,
+      "checks": [
+        "isort --check-only",
+        "black --check",
+        "git diff --check"
+      ]
+    },
+    "independent_review": {
+      "status": "passed",
+      "blocking_findings_remaining": 0,
+      "reviewed": [
+        "Position/hash compatibility and immutable receipt projections",
+        "Workspace authorization and configuration failures",
+        "Export source/derivation separation and all unknown-coverage rules",
+        "Fresh-v2-only extension marker"
+      ],
+      "saved_csv_baseline_comparison": {
+        "baseline": "b5d8b6470887e6e28dba10d6d22d9fddbe35a0bc",
+        "schema1_bytes": 1639,
+        "schema2_bytes": 2320,
+        "result": "Canonically saved synthetic exports are byte-identical under baseline and current converters"
+      }
+    },
+    "warning": "Upstream Starlette testclient uses deprecated anyio.abc.BlockingPortal alias; no application failure",
+    "frontend_and_joint": {
+      "status": "pending",
+      "fresh_browser_journey_run": false,
+      "backend_tests_do_not_prove_rendered_readiness": true
+    },
+    "receipt_integrity": {
+      "status": "passed",
+      "scope": "Generated-contract and implementation hashes equal committed bytes; captured export content hash and100/120 timing oracle match; all12 example status codes and local handoff links checked"
+    }
+  },
+  "resolved_during_verification": [
+    "Historical final-consultation response was injecting new default fields",
+    "Encoded slash scope was unreachable with non-path routing",
+    "Unavailable frozen asset root surfaced as422 instead of503",
+    "Broad configuration wrapper changed an internal ValueError integrity contract; narrowed conversion while retaining HTTP503",
+    "Crash test serialized omitted position asnull; request fixture now preserves presence",
+    "Revision inventory test assumed a single page; now exhausts pagination",
+    "New and fetched CSV exports differed due to mapping traversal order; canonical saved archive ordering preserved"
+  ],
+  "acceptance": {
+    "R01": {
+      "acceptance": [
+        "J01",
+        "J02",
+        "J03"
+      ],
+      "evidence": [
+        "tests/explanation_integration_contract_test.py",
+        "tests/explanation_study_workspace_test.py"
+      ],
+      "frontend_pending": "Scoped browser adapter and full-context navigation assertions",
+      "status": "frontend_pending",
+      "backend_status": "backend_verified",
+      "backend_implemented": true,
+      "joint_verified": false
+    },
+    "R02": {
+      "acceptance": [
+        "J04",
+        "J05"
+      ],
+      "evidence": [
+        "tests/explanation_integration_contract_test.py::test_page_readiness_is_local_and_does_not_restart_case_clock",
+        "tests/explanation_telemetry_policy_test.py"
+      ],
+      "frontend_pending": "Required-content UI state machine, delayed targets/comparisons, retry and real usable render",
+      "status": "frontend_pending",
+      "backend_status": "backend_verified",
+      "backend_implemented": true,
+      "joint_verified": false
+    },
+    "R03": {
+      "acceptance": [
+        "J06",
+        "J07",
+        "J09",
+        "J10"
+      ],
+      "evidence": [
+        "tests/explanation_integration_position_test.py",
+        "tests/explanation_study_v2_test.py::test_v2_postgresql_backup_restore_preserves_training_and_draft"
+      ],
+      "frontend_pending": "Acknowledged navigation restoration, focus and fresh UI-completed training",
+      "status": "frontend_pending",
+      "backend_status": "backend_verified",
+      "backend_implemented": true,
+      "joint_verified": false
+    },
+    "R04": {
+      "acceptance": [
+        "J08",
+        "J09"
+      ],
+      "evidence": [
+        "tests/explanation_integration_timing_test.py"
+      ],
+      "frontend_pending": "Explicit admin analysis-3 selector and browser interpretation",
+      "status": "frontend_pending",
+      "backend_status": "backend_verified",
+      "backend_implemented": true,
+      "joint_verified": false
+    }
+  },
+  "remaining_gates": {
+    "frontend_S2": "pending",
+    "joint_S3": "pending",
+    "real_release_package": "Not present at data/explanation-framework/backend-release/package/package.json",
+    "docker_image": "Docker daemon unavailable; source-layout cold import test passed but no built-image result",
+    "deployment_and_render": "Not run",
+    "manual_accessibility_usability_duration_pilot": "Not run",
+    "historical_ontology_admission_and_owner_approval": "Unchanged open gates"
+  },
+  "scope_controls": {
+    "pushed": false,
+    "deployed": false,
+    "recruited": false,
+    "contacted_participants": false,
+    "historical_receipts_modified": false,
+    "unrelated_archive_staged": false,
+    "launch_gates_waived": false,
+    "dedicated_test_postgresql_stopped_after_checks": true
+  }
+}

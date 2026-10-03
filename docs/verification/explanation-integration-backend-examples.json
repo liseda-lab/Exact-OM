@@ -1,0 +1,2147 @@
+{
+  "synthetic_only": true,
+  "transport": "FastAPI TestClient through actual study router; backend test helpers complete preparation/training",
+  "publication_file_sha256": "500963709434c1c9ee45ce3d64153691d20b19be7406f5a39a4b4fb0c5996704",
+  "publication_receipt": {
+    "study_revision": "synthetic-v2-1b7b2e2bd65b475fae84eb6a853c8356",
+    "frozen_hash": "27ef646d370c22e0fb92db6e5ff020589f93d1b647a0c2206a976afe2ee1f243",
+    "synthetic": true
+  },
+  "examples": {
+    "lesson_position": {
+      "method": "PUT",
+      "path": "/api/v1/study/tutorial/progress",
+      "status": 200,
+      "response_projection": [
+        "contract_version",
+        "integration_contract",
+        "revision",
+        "tutorial_progress"
+      ],
+      "body": {
+        "contract_version": "exact-study/2.0",
+        "integration_contract": "study-integration/1",
+        "revision": 4,
+        "tutorial_progress": {
+          "tutorial_version": "tutorial/2.0-native-2-nav65",
+          "current_lesson_id": "context",
+          "position": {
+            "view": "lesson",
+            "lesson_id": "context",
+            "question_id": null
+          },
+          "completed_requirements": [],
+          "practice": {},
+          "assessment_drafts": {},
+          "attempts": [],
+          "passed_items": [],
+          "outstanding": [
+            "identity",
+            "context",
+            "evidence",
+            "answers",
+            "baseline",
+            "score_meaning",
+            "equivalence_scope",
+            "response_states",
+            "evidence_origin",
+            "external_methods"
+          ],
+          "help_opened": 0,
+          "completed_at": null
+        }
+      },
+      "request": {
+        "idempotency_key": "203b577a88fe45ee99d95dda789bf693",
+        "expected_revision": 3,
+        "tutorial_version": "tutorial/2.0-native-2-nav65",
+        "position": {
+          "view": "lesson",
+          "lesson_id": "context",
+          "question_id": null
+        }
+      }
+    },
+    "assessment_position": {
+      "method": "PUT",
+      "path": "/api/v1/study/tutorial/progress",
+      "status": 200,
+      "response_projection": [
+        "contract_version",
+        "integration_contract",
+        "revision",
+        "tutorial_progress"
+      ],
+      "body": {
+        "contract_version": "exact-study/2.0",
+        "integration_contract": "study-integration/1",
+        "revision": 5,
+        "tutorial_progress": {
+          "tutorial_version": "tutorial/2.0-native-2-nav65",
+          "current_lesson_id": null,
+          "position": {
+            "view": "assessment",
+            "lesson_id": null,
+            "question_id": "score_meaning"
+          },
+          "completed_requirements": [],
+          "practice": {},
+          "assessment_drafts": {},
+          "attempts": [],
+          "passed_items": [],
+          "outstanding": [
+            "identity",
+            "context",
+            "evidence",
+            "answers",
+            "baseline",
+            "score_meaning",
+            "equivalence_scope",
+            "response_states",
+            "evidence_origin",
+            "external_methods"
+          ],
+          "help_opened": 0,
+          "completed_at": null
+        }
+      },
+      "request": {
+        "idempotency_key": "f158a7154f184e72b5eb3e66edaad84e",
+        "expected_revision": 4,
+        "tutorial_version": "tutorial/2.0-native-2-nav65",
+        "position": {
+          "view": "assessment",
+          "lesson_id": null,
+          "question_id": "score_meaning"
+        }
+      }
+    },
+    "position_omitted": {
+      "method": "PUT",
+      "path": "/api/v1/study/tutorial/progress",
+      "status": 200,
+      "response_projection": [
+        "revision",
+        "tutorial_progress"
+      ],
+      "body": {
+        "revision": 6,
+        "tutorial_progress": {
+          "tutorial_version": "tutorial/2.0-native-2-nav65",
+          "current_lesson_id": null,
+          "position": {
+            "view": "assessment",
+            "lesson_id": null,
+            "question_id": "score_meaning"
+          },
+          "completed_requirements": [],
+          "practice": {},
+          "assessment_drafts": {},
+          "attempts": [],
+          "passed_items": [],
+          "outstanding": [
+            "identity",
+            "context",
+            "evidence",
+            "answers",
+            "baseline",
+            "score_meaning",
+            "equivalence_scope",
+            "response_states",
+            "evidence_origin",
+            "external_methods"
+          ],
+          "help_opened": 1,
+          "completed_at": null
+        }
+      }
+    },
+    "position_null": {
+      "method": "PUT",
+      "path": "/api/v1/study/tutorial/progress",
+      "status": 422,
+      "response_projection": "entire body",
+      "body": {
+        "detail": [
+          {
+            "loc": [
+              "body"
+            ],
+            "type": "value_error",
+            "msg": "Value error, Position must be a complete object, not null"
+          }
+        ]
+      }
+    },
+    "explanation_case": {
+      "method": "GET",
+      "path": "/api/v1/study/cases/current",
+      "status": 200,
+      "response_projection": "entire body",
+      "body": {
+        "artifact_type": "study_case",
+        "contract_version": "exact-study/2.0",
+        "study_revision": "synthetic-v2-1b7b2e2bd65b475fae84eb6a853c8356",
+        "case_id": "case-0",
+        "presentation_id": "c123ada8-f3dc-4577-801a-9bcff413bbd5",
+        "condition": "explanation",
+        "source": {
+          "ontology_version_id": "sha256:2e48b4170969ecbd597e02ef7b6d9f673b4641d779306ea1ec8f2b95c2faa1fb",
+          "iri": "urn:source:0",
+          "kind": "class"
+        },
+        "source_label": "Synthetic source 0",
+        "candidates": [
+          {
+            "candidate_id": "candidate-1",
+            "entity": {
+              "ontology_version_id": "sha256:dc5f22cc619b180b6c0f97dd4b753c2823faecd2058c3b3746755bd1e71de769",
+              "iri": "urn:target:1",
+              "kind": "class"
+            },
+            "label": "Synthetic candidate 1",
+            "score": 0.9,
+            "score_meaning": "Invented fixture score; not probability of correctness",
+            "display_position": 1
+          },
+          {
+            "candidate_id": "candidate-2",
+            "entity": {
+              "ontology_version_id": "sha256:dc5f22cc619b180b6c0f97dd4b753c2823faecd2058c3b3746755bd1e71de769",
+              "iri": "urn:target:2",
+              "kind": "class"
+            },
+            "label": "Synthetic candidate 2",
+            "score": 0.8,
+            "score_meaning": "Invented fixture score; not probability of correctness",
+            "display_position": 2
+          },
+          {
+            "candidate_id": "candidate-3",
+            "entity": {
+              "ontology_version_id": "sha256:dc5f22cc619b180b6c0f97dd4b753c2823faecd2058c3b3746755bd1e71de769",
+              "iri": "urn:target:3",
+              "kind": "class"
+            },
+            "label": "Synthetic candidate 3",
+            "score": 0.7,
+            "score_meaning": "Invented fixture score; not probability of correctness",
+            "display_position": 3
+          },
+          {
+            "candidate_id": "candidate-4",
+            "entity": {
+              "ontology_version_id": "sha256:dc5f22cc619b180b6c0f97dd4b753c2823faecd2058c3b3746755bd1e71de769",
+              "iri": "urn:target:4",
+              "kind": "class"
+            },
+            "label": "Synthetic candidate 4",
+            "score": 0.6,
+            "score_meaning": "Invented fixture score; not probability of correctness",
+            "display_position": 4
+          },
+          {
+            "candidate_id": "candidate-5",
+            "entity": {
+              "ontology_version_id": "sha256:dc5f22cc619b180b6c0f97dd4b753c2823faecd2058c3b3746755bd1e71de769",
+              "iri": "urn:target:5",
+              "kind": "class"
+            },
+            "label": "Synthetic candidate 5",
+            "score": 0.5,
+            "score_meaning": "Invented fixture score; not probability of correctness",
+            "display_position": 5
+          }
+        ],
+        "ontology_resource_ids": [
+          "source",
+          "target"
+        ],
+        "package_version": "synthetic-package-v2",
+        "explanation_refs": [
+          "case-explanations-0"
+        ],
+        "workspace": {
+          "scope_id": "synthetic-v2-0"
+        }
+      }
+    },
+    "capabilities": {
+      "method": "GET",
+      "path": "/api/v1/study/workspace/synthetic-v2-0/capabilities",
+      "status": 200,
+      "response_projection": "entire body",
+      "body": {
+        "contract_version": "exact-explain/1.0",
+        "scope_id": "synthetic-v2-0",
+        "study_revision": "synthetic-v2-1b7b2e2bd65b475fae84eb6a853c8356",
+        "policy_hash": "sha256:9e7985e43f352d766bfb714ebe8e1408de1eb38c03ea6db3fe5fb4c680958ad7",
+        "synthetic": false,
+        "focal_entities": [
+          {
+            "ontology_version_id": "sha256:2e48b4170969ecbd597e02ef7b6d9f673b4641d779306ea1ec8f2b95c2faa1fb",
+            "iri": "urn:source:0",
+            "kind": "class"
+          },
+          {
+            "ontology_version_id": "sha256:dc5f22cc619b180b6c0f97dd4b753c2823faecd2058c3b3746755bd1e71de769",
+            "iri": "urn:target:1",
+            "kind": "class"
+          },
+          {
+            "ontology_version_id": "sha256:dc5f22cc619b180b6c0f97dd4b753c2823faecd2058c3b3746755bd1e71de769",
+            "iri": "urn:target:2",
+            "kind": "class"
+          },
+          {
+            "ontology_version_id": "sha256:dc5f22cc619b180b6c0f97dd4b753c2823faecd2058c3b3746755bd1e71de769",
+            "iri": "urn:target:3",
+            "kind": "class"
+          },
+          {
+            "ontology_version_id": "sha256:dc5f22cc619b180b6c0f97dd4b753c2823faecd2058c3b3746755bd1e71de769",
+            "iri": "urn:target:4",
+            "kind": "class"
+          },
+          {
+            "ontology_version_id": "sha256:dc5f22cc619b180b6c0f97dd4b753c2823faecd2058c3b3746755bd1e71de769",
+            "iri": "urn:target:5",
+            "kind": "class"
+          }
+        ],
+        "components": [
+          "context",
+          "hierarchy",
+          "profiles",
+          "comparison",
+          "evidence"
+        ],
+        "page_limit": 100,
+        "iri_limit": 2048,
+        "ontology_versions": [
+          "sha256:2e48b4170969ecbd597e02ef7b6d9f673b4641d779306ea1ec8f2b95c2faa1fb",
+          "sha256:dc5f22cc619b180b6c0f97dd4b753c2823faecd2058c3b3746755bd1e71de769"
+        ],
+        "bases": [
+          "literal_asserted",
+          "structural_navigation"
+        ],
+        "reasoner": "not_run",
+        "reason": "No recorded inference artifact was prepared",
+        "completeness": {
+          "sha256:2e48b4170969ecbd597e02ef7b6d9f673b4641d779306ea1ec8f2b95c2faa1fb": {
+            "scope": "root",
+            "axiom_count": 732,
+            "category_counts": {
+              "axioms": 70,
+              "comments": 260,
+              "definitions": 4,
+              "hierarchy": 329,
+              "labels": 69
+            },
+            "domain_completeness": "not_established",
+            "entity_count": 70,
+            "extraction": "complete_for_policy",
+            "imports_complete": true
+          },
+          "sha256:dc5f22cc619b180b6c0f97dd4b753c2823faecd2058c3b3746755bd1e71de769": {
+            "scope": "root",
+            "axiom_count": 866,
+            "category_counts": {
+              "axioms": 71,
+              "comments": 325,
+              "definitions": 5,
+              "hierarchy": 395,
+              "labels": 70
+            },
+            "domain_completeness": "not_established",
+            "entity_count": 71,
+            "extraction": "complete_for_policy",
+            "imports_complete": true
+          }
+        },
+        "coverage": "complete_declared_context_scope",
+        "continuation": "query_bound_keyset",
+        "original_format": "typed_ast_and_canonical_bytes_base64; base64 is not human-readable syntax",
+        "graph_form": "recorded_features_only; channel bridges do not imply feature pairing"
+      }
+    },
+    "mismatched_cursor": {
+      "method": "GET",
+      "path": "/api/v1/study/workspace/synthetic-v2-0/hierarchy?ontology_version_id=sha256%3A2e48b4170969ecbd597e02ef7b6d9f673b4641d779306ea1ec8f2b95c2faa1fb&iri=urn%3Asource%3A0&kind=class&direction=parents&cursor=eyJsYXN0IjoiZXlKc1lYTjBJam9pYzJoaE1qVTJPakF3TWpNeU4ySTFPRFl4WlRZNU1UUmlaVEE0Wm1Fd01Ua3dNalF6TnpVeE5UQTNaREptT0RrellXSTBOVEppTURJMVlXTmxZak0wTmpObFpEZ3hZekFpTENKelkyOXdaU0k2SW5Ob1lUSTFOanBoWVRrNE56YzVPV014TnpsaE1qaGxPR0kwTXprMlpEY3daV1EyTnpKak5HVmpaRFJsTTJSak5XSXlORFptTkRNNFpUUmtNRGRsWTJNMlpUY3pNelF6SW4wIiwic2NvcGUiOiJzaGEyNTY6Yzk2NzUwMDgyODU5MmYxNmE3Mjg1N2JjODU0M2UxNGJlODdmMzdhYTljZTIyOTJjMDkxNDNhZDQzMzhiODhkYiJ9",
+      "status": 409,
+      "response_projection": "entire body",
+      "body": {
+        "code": "stale_cursor",
+        "message": "Cursor belongs to another query or package revision",
+        "retryable": false,
+        "context_id": null
+      }
+    },
+    "terminal_absence": {
+      "method": "GET",
+      "path": "/api/v1/study/workspace/synthetic-v2-0/explanations?ontology_version_id=sha256%3A2e48b4170969ecbd597e02ef7b6d9f673b4641d779306ea1ec8f2b95c2faa1fb&iri=urn%3Asource%3A0&kind=class&task=entity_profile&counterpart_ontology_version_id=sha256%3Adc5f22cc619b180b6c0f97dd4b753c2823faecd2058c3b3746755bd1e71de769&counterpart_iri=urn%3Atarget%3A1",
+      "status": 200,
+      "response_projection": "entire body",
+      "body": {
+        "items": [],
+        "returned_count": 0,
+        "total_count": 0,
+        "next_cursor": null,
+        "truncated": false,
+        "scope": {
+          "ontology_version_id": "sha256:2e48b4170969ecbd597e02ef7b6d9f673b4641d779306ea1ec8f2b95c2faa1fb",
+          "context_revision": "synthetic-v2-1b7b2e2bd65b475fae84eb6a853c8356",
+          "basis": "prepared_explanations",
+          "visibility_policy_hash": "sha256:9e7985e43f352d766bfb714ebe8e1408de1eb38c03ea6db3fe5fb4c680958ad7",
+          "filter_id": "sha256:941bfc86f48b3fd44d302109129c8307f38af5c1f36a3d373b46615526d8ee2e"
+        },
+        "status": "not_exported",
+        "reason": "No resource was prepared for this selection",
+        "order": null
+      }
+    },
+    "missing_required_workspace_injected": {
+      "method": "GET",
+      "path": "/api/v1/study/cases/current",
+      "status": 503,
+      "response_projection": "entire body",
+      "body": {
+        "detail": "Frozen case workspace is unavailable; retry or contact the study team"
+      }
+    },
+    "analysis_3": {
+      "method": "POST",
+      "path": "/api/v1/admin/studies/synthetic-v2-1b7b2e2bd65b475fae84eb6a853c8356/exports?analysis_schema=exact-study-analysis%2F3&include_test=true",
+      "status": 200,
+      "response_projection": "entire body",
+      "body": {
+        "manifest": {
+          "artifact_type": "export_manifest",
+          "contract_version": "exact-study/2.0",
+          "export_id": "03115f9a-68a2-4999-bdf3-7dad21b3fc23",
+          "created_at": "2026-10-03T16:06:15.270324+00:00",
+          "study_revision": "synthetic-v2-1b7b2e2bd65b475fae84eb6a853c8356",
+          "content_sha256": "0956c86b7455ce9ad04c105d54aeb9c4151ee3e80baa0671dc19fd134d1625d5",
+          "include_test": true,
+          "includes_private_key_join": false,
+          "schema": "exact-study-analysis/3",
+          "source_protocol_versions": {
+            "assessment": "assessment/2",
+            "export": "exact-study-analysis/3",
+            "forms": "exact-study-forms/2",
+            "information": "synthetic-information-v2",
+            "resource_policy": "synthetic-study-v2",
+            "setup": "setup/2",
+            "software": "exact-explain-ui-1.2",
+            "tutorial": "tutorial/2.0-native-2-nav65"
+          },
+          "session_count": 1
+        },
+        "data": {
+          "study_revision": "synthetic-v2-1b7b2e2bd65b475fae84eb6a853c8356",
+          "software_version": "exact-explain-ui-1.2",
+          "policy_hash": "9e7985e43f352d766bfb714ebe8e1408de1eb38c03ea6db3fe5fb4c680958ad7",
+          "questionnaire_definitions": {
+            "background": [
+              {
+                "id": "cs_experience_years",
+                "label": "How much study or professional experience do you have in computer science or computing?",
+                "matrix": null,
+                "multiple": false,
+                "option_order": [
+                  "none",
+                  "less_than_1",
+                  "1_2",
+                  "3_4",
+                  "5_9",
+                  "10_plus",
+                  "prefer_not_to_say"
+                ],
+                "options": {
+                  "10_plus": "10 or more years",
+                  "1_2": "1\u20132 years",
+                  "3_4": "3\u20134 years",
+                  "5_9": "5\u20139 years",
+                  "less_than_1": "Less than 1 year",
+                  "none": "None",
+                  "prefer_not_to_say": "Prefer not to say"
+                },
+                "required": true,
+                "row_order": [],
+                "show_if": null
+              },
+              {
+                "id": "health_bio_experience_years",
+                "label": "How much study or professional experience do you have in health, medicine or biosciences?",
+                "matrix": null,
+                "multiple": false,
+                "option_order": [
+                  "none",
+                  "less_than_1",
+                  "1_2",
+                  "3_4",
+                  "5_9",
+                  "10_plus",
+                  "prefer_not_to_say"
+                ],
+                "options": {
+                  "10_plus": "10 or more years",
+                  "1_2": "1\u20132 years",
+                  "3_4": "3\u20134 years",
+                  "5_9": "5\u20139 years",
+                  "less_than_1": "Less than 1 year",
+                  "none": "None",
+                  "prefer_not_to_say": "Prefer not to say"
+                },
+                "required": true,
+                "row_order": [],
+                "show_if": null
+              },
+              {
+                "id": "domain_specialty",
+                "label": "What is your main health or bioscience field, if any? Please do not identify an institution or employer.",
+                "matrix": null,
+                "multiple": false,
+                "option_order": [],
+                "options": null,
+                "required": false,
+                "row_order": [],
+                "show_if": null
+              },
+              {
+                "id": "semantic_web_experience",
+                "label": "Have you used semantic-web technologies or worked with ontologies in study or professional work?",
+                "matrix": null,
+                "multiple": false,
+                "option_order": [
+                  "yes",
+                  "no",
+                  "prefer_not_to_say"
+                ],
+                "options": {
+                  "no": "No",
+                  "prefer_not_to_say": "Prefer not to say",
+                  "yes": "Yes"
+                },
+                "required": true,
+                "row_order": [],
+                "show_if": null
+              },
+              {
+                "id": "clinical_experience",
+                "label": "Do you have practical experience in clinical medicine?",
+                "matrix": null,
+                "multiple": false,
+                "option_order": [
+                  "yes",
+                  "no",
+                  "prefer_not_to_say"
+                ],
+                "options": {
+                  "no": "No",
+                  "prefer_not_to_say": "Prefer not to say",
+                  "yes": "Yes"
+                },
+                "required": true,
+                "row_order": [],
+                "show_if": null
+              },
+              {
+                "id": "bioinformatics_experience",
+                "label": "Do you have practical experience in bioinformatics?",
+                "matrix": null,
+                "multiple": false,
+                "option_order": [
+                  "yes",
+                  "no",
+                  "prefer_not_to_say"
+                ],
+                "options": {
+                  "no": "No",
+                  "prefer_not_to_say": "Prefer not to say",
+                  "yes": "Yes"
+                },
+                "required": true,
+                "row_order": [],
+                "show_if": null
+              },
+              {
+                "id": "doid_familiarity",
+                "label": "Before this study, how familiar were you with the Disease Ontology (DOID)?",
+                "matrix": null,
+                "multiple": false,
+                "option_order": [
+                  "unheard",
+                  "heard",
+                  "used",
+                  "prefer_not_to_say"
+                ],
+                "options": {
+                  "heard": "Had heard of it but not used it",
+                  "prefer_not_to_say": "Prefer not to say",
+                  "unheard": "Had not heard of it",
+                  "used": "Had used it"
+                },
+                "required": true,
+                "row_order": [],
+                "show_if": null
+              },
+              {
+                "id": "doid_contexts",
+                "label": "In which contexts have you used DOID?",
+                "matrix": null,
+                "multiple": true,
+                "option_order": [
+                  "research",
+                  "clinical",
+                  "teaching",
+                  "curation",
+                  "other",
+                  "prefer_not_to_say"
+                ],
+                "options": {
+                  "clinical": "Clinical work",
+                  "curation": "Curation",
+                  "other": "Other",
+                  "prefer_not_to_say": "Prefer not to say",
+                  "research": "Research",
+                  "teaching": "Teaching"
+                },
+                "required": true,
+                "row_order": [],
+                "show_if": {
+                  "doid_familiarity": "used"
+                }
+              },
+              {
+                "id": "ncit_familiarity",
+                "label": "Before this study, how familiar were you with the NCI Thesaurus (NCIT)?",
+                "matrix": null,
+                "multiple": false,
+                "option_order": [
+                  "unheard",
+                  "heard",
+                  "used",
+                  "prefer_not_to_say"
+                ],
+                "options": {
+                  "heard": "Had heard of it but not used it",
+                  "prefer_not_to_say": "Prefer not to say",
+                  "unheard": "Had not heard of it",
+                  "used": "Had used it"
+                },
+                "required": true,
+                "row_order": [],
+                "show_if": null
+              },
+              {
+                "id": "ncit_contexts",
+                "label": "In which contexts have you used NCIT?",
+                "matrix": null,
+                "multiple": true,
+                "option_order": [
+                  "research",
+                  "clinical",
+                  "teaching",
+                  "curation",
+                  "other",
+                  "prefer_not_to_say"
+                ],
+                "options": {
+                  "clinical": "Clinical work",
+                  "curation": "Curation",
+                  "other": "Other",
+                  "prefer_not_to_say": "Prefer not to say",
+                  "research": "Research",
+                  "teaching": "Teaching"
+                },
+                "required": true,
+                "row_order": [],
+                "show_if": {
+                  "ncit_familiarity": "used"
+                }
+              },
+              {
+                "id": "roles",
+                "label": "Which roles describe your current work or study?",
+                "matrix": null,
+                "multiple": true,
+                "option_order": [
+                  "undergraduate",
+                  "postgraduate",
+                  "researcher",
+                  "senior_researcher",
+                  "clinician",
+                  "other",
+                  "prefer_not_to_say"
+                ],
+                "options": {
+                  "clinician": "Medical doctor / clinician",
+                  "other": "Other",
+                  "postgraduate": "Postgraduate student",
+                  "prefer_not_to_say": "Prefer not to say",
+                  "researcher": "Researcher",
+                  "senior_researcher": "Senior researcher",
+                  "undergraduate": "Undergraduate student"
+                },
+                "required": true,
+                "row_order": [],
+                "show_if": null
+              },
+              {
+                "id": "correspondence_confidence",
+                "label": "How confident are you in identifying when two medical or disease terms refer to the same concept?",
+                "matrix": null,
+                "multiple": false,
+                "option_order": [
+                  "not_at_all",
+                  "slightly",
+                  "moderately",
+                  "highly",
+                  "prefer_not_to_say"
+                ],
+                "options": {
+                  "highly": "Highly",
+                  "moderately": "Moderately",
+                  "not_at_all": "Not at all",
+                  "prefer_not_to_say": "Prefer not to say",
+                  "slightly": "Slightly"
+                },
+                "required": true,
+                "row_order": [],
+                "show_if": null
+              },
+              {
+                "id": "ontology_activities",
+                "label": "Which of the following have you done with ontologies?",
+                "matrix": null,
+                "multiple": true,
+                "option_order": [
+                  "annotated",
+                  "software",
+                  "curation",
+                  "developed",
+                  "other",
+                  "never_used",
+                  "prefer_not_to_say"
+                ],
+                "options": {
+                  "annotated": "Described / annotated data",
+                  "curation": "Used for manual curation",
+                  "developed": "Developed / maintained ontologies",
+                  "never_used": "Never used",
+                  "other": "Other",
+                  "prefer_not_to_say": "Prefer not to say",
+                  "software": "Used in automated analysis or software"
+                },
+                "required": true,
+                "row_order": [],
+                "show_if": null
+              },
+              {
+                "id": "protege_experience",
+                "label": "Before preparing for this study, how often had you used Prot\u00e9g\u00e9?",
+                "matrix": null,
+                "multiple": false,
+                "option_order": [
+                  "never",
+                  "occasionally",
+                  "regularly",
+                  "prefer_not_to_say"
+                ],
+                "options": {
+                  "never": "Never",
+                  "occasionally": "Tried occasionally",
+                  "prefer_not_to_say": "Prefer not to say",
+                  "regularly": "Used regularly"
+                },
+                "required": false,
+                "row_order": [],
+                "show_if": null
+              }
+            ],
+            "consultation": [
+              {
+                "id": "consulted_external_ontologies",
+                "label": "For the source and candidates you just ranked, did you inspect ontology information outside this study interface?",
+                "matrix": null,
+                "multiple": false,
+                "option_order": [
+                  "true",
+                  "false"
+                ],
+                "options": {
+                  "false": "No",
+                  "true": "Yes"
+                },
+                "required": true,
+                "row_order": [],
+                "show_if": null
+              },
+              {
+                "id": "methods",
+                "label": "Select all methods you actually used for this case. You may combine methods and change them between cases.",
+                "matrix": null,
+                "multiple": true,
+                "option_order": [
+                  "protege",
+                  "other_editor",
+                  "plain_files",
+                  "other_resource",
+                  "queries_scripts",
+                  "reasoner",
+                  "other_method"
+                ],
+                "options": {
+                  "other_editor": "Another ontology editor",
+                  "other_method": "Another inspection method",
+                  "other_resource": "Another ontology resource or viewer",
+                  "plain_files": "The ontology files directly (for example, in a text editor)",
+                  "protege": "Prot\u00e9g\u00e9",
+                  "queries_scripts": "Queries or scripts",
+                  "reasoner": "A reasoner"
+                },
+                "required": true,
+                "row_order": [],
+                "show_if": {
+                  "consulted_external_ontologies": true
+                }
+              },
+              {
+                "id": "other_editor",
+                "label": "Which other ontology editor did you use? Please do not include a personal name, institution or URL.",
+                "matrix": null,
+                "multiple": false,
+                "option_order": [],
+                "options": null,
+                "required": false,
+                "row_order": [],
+                "show_if": {
+                  "methods": {
+                    "contains": "other_editor"
+                  }
+                }
+              },
+              {
+                "id": "other_resource",
+                "label": "Which other ontology resource or viewer did you use? Please do not include a personal name, institution or URL.",
+                "matrix": null,
+                "multiple": false,
+                "option_order": [],
+                "options": null,
+                "required": false,
+                "row_order": [],
+                "show_if": {
+                  "methods": {
+                    "contains": "other_resource"
+                  }
+                }
+              },
+              {
+                "id": "other_method",
+                "label": "Optional method name; do not include identities, paths or URLs.",
+                "matrix": null,
+                "multiple": false,
+                "option_order": [],
+                "options": null,
+                "required": false,
+                "row_order": [],
+                "show_if": {
+                  "methods": {
+                    "contains": "other_method"
+                  }
+                }
+              },
+              {
+                "id": "resource_scope",
+                "label": "Which ontology resources did you inspect? (Optional)",
+                "matrix": null,
+                "multiple": false,
+                "option_order": [
+                  "supplied_only",
+                  "different_or_additional",
+                  "unsure"
+                ],
+                "options": {
+                  "different_or_additional": "Different or additional resources",
+                  "supplied_only": "Only the supplied ontology versions",
+                  "unsure": "Unsure"
+                },
+                "required": false,
+                "row_order": [],
+                "show_if": {
+                  "consulted_external_ontologies": true
+                }
+              }
+            ],
+            "experience_note": "Years mean approximate combined study/work experience; count overlapping years once.",
+            "final": [
+              {
+                "id": "component_usefulness",
+                "label": "How helpful was each component for deciding your ranking?",
+                "matrix": {
+                  "entity_description": "Generated entity descriptions",
+                  "evidence_graph": "Evidence graph",
+                  "evidence_table": "Comparison and evidence table",
+                  "hierarchy": "Hierarchy browser",
+                  "original_context": "Original entity definitions and context",
+                  "pair_comparison": "Generated pair comparison"
+                },
+                "multiple": false,
+                "option_order": [
+                  "not_helpful",
+                  "slightly",
+                  "moderately",
+                  "very",
+                  "cannot_judge"
+                ],
+                "options": {
+                  "cannot_judge": "Did not use / cannot judge",
+                  "moderately": "Moderately helpful",
+                  "not_helpful": "Not helpful",
+                  "slightly": "Slightly helpful",
+                  "very": "Very helpful"
+                },
+                "required": true,
+                "row_order": [
+                  "original_context",
+                  "entity_description",
+                  "hierarchy",
+                  "evidence_table",
+                  "evidence_graph",
+                  "pair_comparison"
+                ],
+                "show_if": null
+              },
+              {
+                "id": "most_helpful_components",
+                "label": "Which explanation component or components were most helpful?",
+                "matrix": null,
+                "multiple": true,
+                "option_order": [
+                  "original_context",
+                  "entity_description",
+                  "hierarchy",
+                  "evidence_table",
+                  "evidence_graph",
+                  "pair_comparison",
+                  "all_equally",
+                  "none_helpful",
+                  "cannot_judge"
+                ],
+                "options": {
+                  "all_equally": "All equally helpful",
+                  "cannot_judge": "Cannot judge",
+                  "entity_description": "Generated entity descriptions",
+                  "evidence_graph": "Evidence graph",
+                  "evidence_table": "Comparison and evidence table",
+                  "hierarchy": "Hierarchy browser",
+                  "none_helpful": "None helpful",
+                  "original_context": "Original entity definitions and context",
+                  "pair_comparison": "Generated pair comparison"
+                },
+                "required": true,
+                "row_order": [],
+                "show_if": null
+              },
+              {
+                "id": "workflow_preference",
+                "label": "Which approach would you prefer for similar tasks?",
+                "matrix": null,
+                "multiple": false,
+                "option_order": [
+                  "explanation",
+                  "ontology_baseline",
+                  "no_preference",
+                  "cannot_judge"
+                ],
+                "options": {
+                  "cannot_judge": "Cannot judge",
+                  "explanation": "Explanation interface",
+                  "no_preference": "No preference",
+                  "ontology_baseline": "Candidates/scores with separate ontology inspection"
+                },
+                "required": true,
+                "row_order": [],
+                "show_if": null
+              },
+              {
+                "id": "mental_effort",
+                "label": "How much mental effort did each approach require?",
+                "matrix": {
+                  "explanation": "Explanation interface",
+                  "ontology_baseline": "Candidates/scores with separate ontology inspection"
+                },
+                "multiple": false,
+                "option_order": [
+                  "very_low",
+                  "low",
+                  "moderate",
+                  "high",
+                  "very_high",
+                  "cannot_judge"
+                ],
+                "options": {
+                  "cannot_judge": "Cannot judge",
+                  "high": "High",
+                  "low": "Low",
+                  "moderate": "Moderate",
+                  "very_high": "Very high",
+                  "very_low": "Very low"
+                },
+                "required": true,
+                "row_order": [
+                  "explanation",
+                  "ontology_baseline"
+                ],
+                "show_if": null
+              },
+              {
+                "id": "preference_reason",
+                "label": "Why did you prefer those components or that approach?",
+                "matrix": null,
+                "multiple": false,
+                "option_order": [],
+                "options": null,
+                "required": false,
+                "row_order": [],
+                "show_if": null
+              },
+              {
+                "id": "comments",
+                "label": "What was confusing, missing or difficult, and what would you change? Please avoid identifying details.",
+                "matrix": null,
+                "multiple": false,
+                "option_order": [],
+                "options": null,
+                "required": false,
+                "row_order": [],
+                "show_if": null
+              }
+            ],
+            "version": "exact-study-forms/2"
+          },
+          "sessions": [
+            {
+              "session_id": "8379cd8e-75e5-4a37-9025-dca139aff849",
+              "test": true,
+              "stage": "consultation",
+              "revoked": false,
+              "assignment": {
+                "assigned_at": "2026-10-03T16:06:15.098470+00:00",
+                "assignment_id": "331cd537-1be4-48c7-a90b-c125d2d4ab6a",
+                "presentations": [
+                  {
+                    "block_index": 0,
+                    "case_id": "case-0",
+                    "condition": "explanation",
+                    "presentation_id": "c123ada8-f3dc-4577-801a-9bcff413bbd5"
+                  },
+                  {
+                    "block_index": 0,
+                    "case_id": "case-2",
+                    "condition": "explanation",
+                    "presentation_id": "06bd6a8d-4ae7-40b3-b44e-c3ea01771bda"
+                  },
+                  {
+                    "block_index": 1,
+                    "case_id": "case-1",
+                    "condition": "ontology_baseline",
+                    "presentation_id": "90f3aac2-a5ce-4737-9f67-3aa57939707b"
+                  },
+                  {
+                    "block_index": 1,
+                    "case_id": "case-3",
+                    "condition": "ontology_baseline",
+                    "presentation_id": "b1c933bf-9270-4a4c-95e2-629ed14f6850"
+                  }
+                ],
+                "schedule_id": "form-0-forward",
+                "seed": 4981918894708847376
+              },
+              "questionnaires": {
+                "background": {
+                  "answer_states": {
+                    "bioinformatics_experience": "answered",
+                    "clinical_experience": "answered",
+                    "correspondence_confidence": "answered",
+                    "cs_experience_years": "answered",
+                    "doid_contexts": "skipped",
+                    "doid_familiarity": "answered",
+                    "domain_specialty": "not_answered",
+                    "health_bio_experience_years": "answered",
+                    "ncit_contexts": "skipped",
+                    "ncit_familiarity": "answered",
+                    "ontology_activities": "answered",
+                    "protege_experience": "not_answered",
+                    "roles": "answered",
+                    "semantic_web_experience": "answered"
+                  },
+                  "answers": {
+                    "bioinformatics_experience": "prefer_not_to_say",
+                    "clinical_experience": "prefer_not_to_say",
+                    "correspondence_confidence": "prefer_not_to_say",
+                    "cs_experience_years": "prefer_not_to_say",
+                    "doid_familiarity": "prefer_not_to_say",
+                    "health_bio_experience_years": "prefer_not_to_say",
+                    "ncit_familiarity": "prefer_not_to_say",
+                    "ontology_activities": [
+                      "prefer_not_to_say"
+                    ],
+                    "roles": [
+                      "prefer_not_to_say"
+                    ],
+                    "semantic_web_experience": "prefer_not_to_say"
+                  },
+                  "form_version": "exact-study-forms/2",
+                  "saved_at": "2026-10-03T16:06:14.925351+00:00",
+                  "submitted": true
+                }
+              },
+              "consent": {
+                "accepted": true,
+                "acknowledged_at": "2026-10-03T16:06:14.914977+00:00",
+                "information_version": "synthetic-information-v2"
+              },
+              "setup": {
+                "external_inspection_optional_understood": true,
+                "instructions_acknowledged": true,
+                "resource_access": "available",
+                "saved_at": "2026-10-03T16:06:14.920898+00:00",
+                "setup_version": "setup/2",
+                "submitted": true
+              },
+              "cases": [
+                {
+                  "block_index": 0,
+                  "case_id": "case-0",
+                  "condition": "explanation",
+                  "presentation_id": "c123ada8-f3dc-4577-801a-9bcff413bbd5",
+                  "consultation_timing": {
+                    "page_observation_seconds": 0.0,
+                    "per_page_observation_seconds": [],
+                    "page_instance_count": 0,
+                    "coverage_status": "not_established",
+                    "coverage_reason": "no_eligible_observations",
+                    "unique_elapsed_coverage_seconds": null,
+                    "unobserved_elapsed_seconds": null,
+                    "active_duration_known": false
+                  },
+                  "candidates": [
+                    {
+                      "candidate_id": "candidate-1",
+                      "display_position": 1,
+                      "entity": {
+                        "iri": "urn:target:1",
+                        "kind": "class",
+                        "ontology_version_id": "sha256:dc5f22cc619b180b6c0f97dd4b753c2823faecd2058c3b3746755bd1e71de769"
+                      },
+                      "label": "Synthetic candidate 1",
+                      "score": 0.9,
+                      "score_meaning": "Invented fixture score; not probability of correctness"
+                    },
+                    {
+                      "candidate_id": "candidate-2",
+                      "display_position": 2,
+                      "entity": {
+                        "iri": "urn:target:2",
+                        "kind": "class",
+                        "ontology_version_id": "sha256:dc5f22cc619b180b6c0f97dd4b753c2823faecd2058c3b3746755bd1e71de769"
+                      },
+                      "label": "Synthetic candidate 2",
+                      "score": 0.8,
+                      "score_meaning": "Invented fixture score; not probability of correctness"
+                    },
+                    {
+                      "candidate_id": "candidate-3",
+                      "display_position": 3,
+                      "entity": {
+                        "iri": "urn:target:3",
+                        "kind": "class",
+                        "ontology_version_id": "sha256:dc5f22cc619b180b6c0f97dd4b753c2823faecd2058c3b3746755bd1e71de769"
+                      },
+                      "label": "Synthetic candidate 3",
+                      "score": 0.7,
+                      "score_meaning": "Invented fixture score; not probability of correctness"
+                    },
+                    {
+                      "candidate_id": "candidate-4",
+                      "display_position": 4,
+                      "entity": {
+                        "iri": "urn:target:4",
+                        "kind": "class",
+                        "ontology_version_id": "sha256:dc5f22cc619b180b6c0f97dd4b753c2823faecd2058c3b3746755bd1e71de769"
+                      },
+                      "label": "Synthetic candidate 4",
+                      "score": 0.6,
+                      "score_meaning": "Invented fixture score; not probability of correctness"
+                    },
+                    {
+                      "candidate_id": "candidate-5",
+                      "display_position": 5,
+                      "entity": {
+                        "iri": "urn:target:5",
+                        "kind": "class",
+                        "ontology_version_id": "sha256:dc5f22cc619b180b6c0f97dd4b753c2823faecd2058c3b3746755bd1e71de769"
+                      },
+                      "label": "Synthetic candidate 5",
+                      "score": 0.5,
+                      "score_meaning": "Invented fixture score; not probability of correctness"
+                    }
+                  ],
+                  "package_version": "synthetic-package-v2",
+                  "case_kind": "answer_present",
+                  "case_origin": "natural",
+                  "first_response": {
+                    "artifact_type": "ranking_response",
+                    "case_id": "case-0",
+                    "contract_version": "exact-study/2.0",
+                    "presentation_id": "c123ada8-f3dc-4577-801a-9bcff413bbd5",
+                    "ranked_candidate_ids": [],
+                    "response_type": "none_of_these",
+                    "revision": 14,
+                    "saved_at": "2026-01-01T00:01:40+00:00",
+                    "session_id": "8379cd8e-75e5-4a37-9025-dca139aff849",
+                    "study_revision": "synthetic-v2-1b7b2e2bd65b475fae84eb6a853c8356",
+                    "submitted_at": "2026-01-01T00:01:40+00:00",
+                    "workflow_state": "submitted"
+                  },
+                  "final_response": {
+                    "artifact_type": "ranking_response",
+                    "case_id": "case-0",
+                    "contract_version": "exact-study/2.0",
+                    "presentation_id": "c123ada8-f3dc-4577-801a-9bcff413bbd5",
+                    "ranked_candidate_ids": [],
+                    "response_type": "none_of_these",
+                    "revision": 14,
+                    "saved_at": "2026-01-01T00:01:40+00:00",
+                    "session_id": "8379cd8e-75e5-4a37-9025-dca139aff849",
+                    "study_revision": "synthetic-v2-1b7b2e2bd65b475fae84eb6a853c8356",
+                    "submitted_at": "2026-01-01T00:01:40+00:00",
+                    "workflow_state": "submitted"
+                  },
+                  "draft_response": null,
+                  "consultation": null,
+                  "timing": {
+                    "raw_elapsed_seconds": 100.0,
+                    "observed_segment_seconds": 120.0,
+                    "unobserved_elapsed_seconds": null,
+                    "active_duration_known": false,
+                    "consultation_observed_seconds": 0.0,
+                    "unavailable_intervals": [],
+                    "gap_reports": [],
+                    "explicit_breaks": [],
+                    "page_observation_seconds": 120.0,
+                    "per_page_observation_seconds": [
+                      {
+                        "page_instance_id": "page-a",
+                        "seconds": 60.0
+                      },
+                      {
+                        "page_instance_id": "page-b",
+                        "seconds": 60.0
+                      }
+                    ],
+                    "page_instance_count": 2,
+                    "coverage_status": "not_established",
+                    "coverage_reason": "multiple_page_clocks",
+                    "unique_elapsed_coverage_seconds": null
+                  },
+                  "missingness_reason": null,
+                  "score": {
+                    "missing": false,
+                    "rr": 0.0,
+                    "response_depth": 0,
+                    "system_rr": 1.0,
+                    "delta_rr": -1.0,
+                    "hit_at_1": 0,
+                    "acceptable_omitted": 1,
+                    "uncertain": 0,
+                    "explicit_none": 1,
+                    "correct_to_wrong": 1,
+                    "wrong_to_correct": 0
+                  }
+                },
+                {
+                  "block_index": 0,
+                  "case_id": "case-2",
+                  "condition": "explanation",
+                  "presentation_id": "06bd6a8d-4ae7-40b3-b44e-c3ea01771bda",
+                  "consultation_timing": {
+                    "page_observation_seconds": 0.0,
+                    "per_page_observation_seconds": [],
+                    "page_instance_count": 0,
+                    "coverage_status": "not_established",
+                    "coverage_reason": "no_eligible_observations",
+                    "unique_elapsed_coverage_seconds": null,
+                    "unobserved_elapsed_seconds": null,
+                    "active_duration_known": false
+                  },
+                  "candidates": [
+                    {
+                      "candidate_id": "candidate-1",
+                      "display_position": 1,
+                      "entity": {
+                        "iri": "urn:target:1",
+                        "kind": "class",
+                        "ontology_version_id": "sha256:dc5f22cc619b180b6c0f97dd4b753c2823faecd2058c3b3746755bd1e71de769"
+                      },
+                      "label": "Synthetic candidate 1",
+                      "score": 0.9,
+                      "score_meaning": "Invented fixture score; not probability of correctness"
+                    },
+                    {
+                      "candidate_id": "candidate-2",
+                      "display_position": 2,
+                      "entity": {
+                        "iri": "urn:target:2",
+                        "kind": "class",
+                        "ontology_version_id": "sha256:dc5f22cc619b180b6c0f97dd4b753c2823faecd2058c3b3746755bd1e71de769"
+                      },
+                      "label": "Synthetic candidate 2",
+                      "score": 0.8,
+                      "score_meaning": "Invented fixture score; not probability of correctness"
+                    },
+                    {
+                      "candidate_id": "candidate-3",
+                      "display_position": 3,
+                      "entity": {
+                        "iri": "urn:target:3",
+                        "kind": "class",
+                        "ontology_version_id": "sha256:dc5f22cc619b180b6c0f97dd4b753c2823faecd2058c3b3746755bd1e71de769"
+                      },
+                      "label": "Synthetic candidate 3",
+                      "score": 0.7,
+                      "score_meaning": "Invented fixture score; not probability of correctness"
+                    },
+                    {
+                      "candidate_id": "candidate-4",
+                      "display_position": 4,
+                      "entity": {
+                        "iri": "urn:target:4",
+                        "kind": "class",
+                        "ontology_version_id": "sha256:dc5f22cc619b180b6c0f97dd4b753c2823faecd2058c3b3746755bd1e71de769"
+                      },
+                      "label": "Synthetic candidate 4",
+                      "score": 0.6,
+                      "score_meaning": "Invented fixture score; not probability of correctness"
+                    },
+                    {
+                      "candidate_id": "candidate-5",
+                      "display_position": 5,
+                      "entity": {
+                        "iri": "urn:target:5",
+                        "kind": "class",
+                        "ontology_version_id": "sha256:dc5f22cc619b180b6c0f97dd4b753c2823faecd2058c3b3746755bd1e71de769"
+                      },
+                      "label": "Synthetic candidate 5",
+                      "score": 0.5,
+                      "score_meaning": "Invented fixture score; not probability of correctness"
+                    }
+                  ],
+                  "package_version": "synthetic-package-v2",
+                  "case_kind": "answer_absent",
+                  "case_origin": "natural",
+                  "first_response": null,
+                  "final_response": null,
+                  "draft_response": null,
+                  "consultation": null,
+                  "timing": {
+                    "raw_elapsed_seconds": null,
+                    "observed_segment_seconds": 0.0,
+                    "unobserved_elapsed_seconds": null,
+                    "active_duration_known": false,
+                    "consultation_observed_seconds": 0.0,
+                    "unavailable_intervals": [],
+                    "gap_reports": [],
+                    "explicit_breaks": [],
+                    "page_observation_seconds": 0.0,
+                    "per_page_observation_seconds": [],
+                    "page_instance_count": 0,
+                    "coverage_status": "not_established",
+                    "coverage_reason": "no_eligible_observations",
+                    "unique_elapsed_coverage_seconds": null
+                  },
+                  "missingness_reason": "unsubmitted",
+                  "score": {
+                    "missing": true,
+                    "rr": null
+                  }
+                },
+                {
+                  "block_index": 1,
+                  "case_id": "case-1",
+                  "condition": "ontology_baseline",
+                  "presentation_id": "90f3aac2-a5ce-4737-9f67-3aa57939707b",
+                  "consultation_timing": {
+                    "page_observation_seconds": 0.0,
+                    "per_page_observation_seconds": [],
+                    "page_instance_count": 0,
+                    "coverage_status": "not_established",
+                    "coverage_reason": "no_eligible_observations",
+                    "unique_elapsed_coverage_seconds": null,
+                    "unobserved_elapsed_seconds": null,
+                    "active_duration_known": false
+                  },
+                  "candidates": [
+                    {
+                      "candidate_id": "candidate-1",
+                      "display_position": 1,
+                      "entity": {
+                        "iri": "urn:target:1",
+                        "kind": "class",
+                        "ontology_version_id": "sha256:dc5f22cc619b180b6c0f97dd4b753c2823faecd2058c3b3746755bd1e71de769"
+                      },
+                      "label": "Synthetic candidate 1",
+                      "score": 0.9,
+                      "score_meaning": "Invented fixture score; not probability of correctness"
+                    },
+                    {
+                      "candidate_id": "candidate-2",
+                      "display_position": 2,
+                      "entity": {
+                        "iri": "urn:target:2",
+                        "kind": "class",
+                        "ontology_version_id": "sha256:dc5f22cc619b180b6c0f97dd4b753c2823faecd2058c3b3746755bd1e71de769"
+                      },
+                      "label": "Synthetic candidate 2",
+                      "score": 0.8,
+                      "score_meaning": "Invented fixture score; not probability of correctness"
+                    },
+                    {
+                      "candidate_id": "candidate-3",
+                      "display_position": 3,
+                      "entity": {
+                        "iri": "urn:target:3",
+                        "kind": "class",
+                        "ontology_version_id": "sha256:dc5f22cc619b180b6c0f97dd4b753c2823faecd2058c3b3746755bd1e71de769"
+                      },
+                      "label": "Synthetic candidate 3",
+                      "score": 0.7,
+                      "score_meaning": "Invented fixture score; not probability of correctness"
+                    },
+                    {
+                      "candidate_id": "candidate-4",
+                      "display_position": 4,
+                      "entity": {
+                        "iri": "urn:target:4",
+                        "kind": "class",
+                        "ontology_version_id": "sha256:dc5f22cc619b180b6c0f97dd4b753c2823faecd2058c3b3746755bd1e71de769"
+                      },
+                      "label": "Synthetic candidate 4",
+                      "score": 0.6,
+                      "score_meaning": "Invented fixture score; not probability of correctness"
+                    },
+                    {
+                      "candidate_id": "candidate-5",
+                      "display_position": 5,
+                      "entity": {
+                        "iri": "urn:target:5",
+                        "kind": "class",
+                        "ontology_version_id": "sha256:dc5f22cc619b180b6c0f97dd4b753c2823faecd2058c3b3746755bd1e71de769"
+                      },
+                      "label": "Synthetic candidate 5",
+                      "score": 0.5,
+                      "score_meaning": "Invented fixture score; not probability of correctness"
+                    }
+                  ],
+                  "package_version": "synthetic-package-v2",
+                  "case_kind": "answer_present",
+                  "case_origin": "natural",
+                  "first_response": null,
+                  "final_response": null,
+                  "draft_response": null,
+                  "consultation": null,
+                  "timing": {
+                    "raw_elapsed_seconds": null,
+                    "observed_segment_seconds": 0.0,
+                    "unobserved_elapsed_seconds": null,
+                    "active_duration_known": false,
+                    "consultation_observed_seconds": 0.0,
+                    "unavailable_intervals": [],
+                    "gap_reports": [],
+                    "explicit_breaks": [],
+                    "page_observation_seconds": 0.0,
+                    "per_page_observation_seconds": [],
+                    "page_instance_count": 0,
+                    "coverage_status": "not_established",
+                    "coverage_reason": "no_eligible_observations",
+                    "unique_elapsed_coverage_seconds": null
+                  },
+                  "missingness_reason": "unsubmitted",
+                  "score": {
+                    "missing": true,
+                    "rr": null
+                  }
+                },
+                {
+                  "block_index": 1,
+                  "case_id": "case-3",
+                  "condition": "ontology_baseline",
+                  "presentation_id": "b1c933bf-9270-4a4c-95e2-629ed14f6850",
+                  "consultation_timing": {
+                    "page_observation_seconds": 0.0,
+                    "per_page_observation_seconds": [],
+                    "page_instance_count": 0,
+                    "coverage_status": "not_established",
+                    "coverage_reason": "no_eligible_observations",
+                    "unique_elapsed_coverage_seconds": null,
+                    "unobserved_elapsed_seconds": null,
+                    "active_duration_known": false
+                  },
+                  "candidates": [
+                    {
+                      "candidate_id": "candidate-1",
+                      "display_position": 1,
+                      "entity": {
+                        "iri": "urn:target:1",
+                        "kind": "class",
+                        "ontology_version_id": "sha256:dc5f22cc619b180b6c0f97dd4b753c2823faecd2058c3b3746755bd1e71de769"
+                      },
+                      "label": "Synthetic candidate 1",
+                      "score": 0.9,
+                      "score_meaning": "Invented fixture score; not probability of correctness"
+                    },
+                    {
+                      "candidate_id": "candidate-2",
+                      "display_position": 2,
+                      "entity": {
+                        "iri": "urn:target:2",
+                        "kind": "class",
+                        "ontology_version_id": "sha256:dc5f22cc619b180b6c0f97dd4b753c2823faecd2058c3b3746755bd1e71de769"
+                      },
+                      "label": "Synthetic candidate 2",
+                      "score": 0.8,
+                      "score_meaning": "Invented fixture score; not probability of correctness"
+                    },
+                    {
+                      "candidate_id": "candidate-3",
+                      "display_position": 3,
+                      "entity": {
+                        "iri": "urn:target:3",
+                        "kind": "class",
+                        "ontology_version_id": "sha256:dc5f22cc619b180b6c0f97dd4b753c2823faecd2058c3b3746755bd1e71de769"
+                      },
+                      "label": "Synthetic candidate 3",
+                      "score": 0.7,
+                      "score_meaning": "Invented fixture score; not probability of correctness"
+                    },
+                    {
+                      "candidate_id": "candidate-4",
+                      "display_position": 4,
+                      "entity": {
+                        "iri": "urn:target:4",
+                        "kind": "class",
+                        "ontology_version_id": "sha256:dc5f22cc619b180b6c0f97dd4b753c2823faecd2058c3b3746755bd1e71de769"
+                      },
+                      "label": "Synthetic candidate 4",
+                      "score": 0.6,
+                      "score_meaning": "Invented fixture score; not probability of correctness"
+                    },
+                    {
+                      "candidate_id": "candidate-5",
+                      "display_position": 5,
+                      "entity": {
+                        "iri": "urn:target:5",
+                        "kind": "class",
+                        "ontology_version_id": "sha256:dc5f22cc619b180b6c0f97dd4b753c2823faecd2058c3b3746755bd1e71de769"
+                      },
+                      "label": "Synthetic candidate 5",
+                      "score": 0.5,
+                      "score_meaning": "Invented fixture score; not probability of correctness"
+                    }
+                  ],
+                  "package_version": "synthetic-package-v2",
+                  "case_kind": "answer_absent",
+                  "case_origin": "natural",
+                  "first_response": null,
+                  "final_response": null,
+                  "draft_response": null,
+                  "consultation": null,
+                  "timing": {
+                    "raw_elapsed_seconds": null,
+                    "observed_segment_seconds": 0.0,
+                    "unobserved_elapsed_seconds": null,
+                    "active_duration_known": false,
+                    "consultation_observed_seconds": 0.0,
+                    "unavailable_intervals": [],
+                    "gap_reports": [],
+                    "explicit_breaks": [],
+                    "page_observation_seconds": 0.0,
+                    "per_page_observation_seconds": [],
+                    "page_instance_count": 0,
+                    "coverage_status": "not_established",
+                    "coverage_reason": "no_eligible_observations",
+                    "unique_elapsed_coverage_seconds": null
+                  },
+                  "missingness_reason": "unsubmitted",
+                  "score": {
+                    "missing": true,
+                    "rr": null
+                  }
+                }
+              ],
+              "events": [
+                {
+                  "build_version": "exact-explain-ui-1.2",
+                  "case_id": "case-0",
+                  "client_monotonic_ms": 0.0,
+                  "component_id": null,
+                  "element_id": null,
+                  "event_id": "dc91a7ed83a247beaa67152298bcf578",
+                  "lesson_id": null,
+                  "loading_ms": null,
+                  "page_instance_id": "page-a",
+                  "presentation_id": "c123ada8-f3dc-4577-801a-9bcff413bbd5",
+                  "scope": "case",
+                  "sequence": 0,
+                  "sequence_gap_before": null,
+                  "server_received_at": "2026-01-01T00:00:00+00:00",
+                  "tutorial_version": null,
+                  "type": "case_ready",
+                  "visibility": null
+                },
+                {
+                  "build_version": "exact-explain-ui-1.2",
+                  "case_id": "case-0",
+                  "client_monotonic_ms": 0.0,
+                  "component_id": null,
+                  "element_id": null,
+                  "event_id": "aedd38c3517e497494ce9d5ab64ee6bf",
+                  "lesson_id": null,
+                  "loading_ms": null,
+                  "page_instance_id": "page-b",
+                  "presentation_id": "c123ada8-f3dc-4577-801a-9bcff413bbd5",
+                  "scope": "case",
+                  "sequence": 0,
+                  "sequence_gap_before": null,
+                  "server_received_at": "2026-01-01T00:00:00+00:00",
+                  "tutorial_version": null,
+                  "type": "case_ready",
+                  "visibility": null
+                }
+              ],
+              "timing_segments": [
+                {
+                  "availability": "observed",
+                  "case_id": "case-0",
+                  "monotonic_end_ms": 60000.0,
+                  "monotonic_start_ms": 0.0,
+                  "page_instance_id": "page-b",
+                  "presentation_id": "c123ada8-f3dc-4577-801a-9bcff413bbd5",
+                  "reason": null,
+                  "segment_id": "0e92bb5bebfa4ec8ac73f1a884245b47",
+                  "server_received_at": "2026-01-01T00:00:00+00:00",
+                  "stage": "case"
+                },
+                {
+                  "availability": "observed",
+                  "case_id": "case-0",
+                  "monotonic_end_ms": 60000.0,
+                  "monotonic_start_ms": 0.0,
+                  "page_instance_id": "page-a",
+                  "presentation_id": "c123ada8-f3dc-4577-801a-9bcff413bbd5",
+                  "reason": null,
+                  "segment_id": "85de789edf5a40fdb952d9a940d6cf22",
+                  "server_received_at": "2026-01-01T00:00:00+00:00",
+                  "stage": "case"
+                }
+              ],
+              "tutorial_timing": {
+                "page_observation_seconds": 0.0,
+                "per_page_observation_seconds": [],
+                "page_instance_count": 0,
+                "coverage_status": "not_established",
+                "coverage_reason": "no_eligible_observations",
+                "unique_elapsed_coverage_seconds": null,
+                "unobserved_elapsed_seconds": null,
+                "active_duration_known": false
+              },
+              "tutorial_progress": {
+                "assessment_drafts": {},
+                "attempts": [
+                  {
+                    "attempt_id": "d6a7da75ee7a4e10bf4053c7104358fd",
+                    "correct": true,
+                    "feedback": "Right. The initial position and the matching score are recorded advice from the matcher. Neither proves equivalence, and the score is not a calibrated probability.",
+                    "question_id": "score_meaning",
+                    "response": {
+                      "choice": "advice"
+                    },
+                    "revisit_lesson_id": null,
+                    "submitted_at": "2026-10-03T16:06:15.068535+00:00"
+                  },
+                  {
+                    "attempt_id": "1076969dd15f4b39b1e5ea9acbbde5bc",
+                    "correct": true,
+                    "feedback": "Right. Circles of any colour include red circles but also blue ones, so the candidate is broader. Overlap or a broader category is not the same meaning.",
+                    "question_id": "equivalence_scope",
+                    "response": {
+                      "choice": "broader"
+                    },
+                    "revisit_lesson_id": null,
+                    "submitted_at": "2026-10-03T16:06:15.073228+00:00"
+                  },
+                  {
+                    "attempt_id": "ca781caeb54f4f238a4262237b54df5d",
+                    "correct": true,
+                    "feedback": "Right. None of these is an explicit judgment, Insufficient information says you cannot judge, and an empty draft is not a submitted answer.",
+                    "question_id": "response_states",
+                    "response": {
+                      "matches": {
+                        "cannot_judge": "insufficient_evidence",
+                        "judged_none": "none_of_these",
+                        "not_answered": "unanswered"
+                      }
+                    },
+                    "revisit_lesson_id": null,
+                    "submitted_at": "2026-10-03T16:06:15.077562+00:00"
+                  },
+                  {
+                    "attempt_id": "035f4fffc1da4207bd47c7aaa0f4bc0d",
+                    "correct": true,
+                    "feedback": "Right. Each kind of information keeps its origin, and information missing from the loaded scope does not prove incompatibility.",
+                    "question_id": "evidence_origin",
+                    "response": {
+                      "matches": {
+                        "feature": "matcher",
+                        "statement": "original",
+                        "summary": "generated"
+                      },
+                      "part_b": "no"
+                    },
+                    "revisit_lesson_id": null,
+                    "submitted_at": "2026-10-03T16:06:15.082235+00:00"
+                  },
+                  {
+                    "attempt_id": "d53f19956e5c4a97ad6056adb9414556",
+                    "correct": true,
+                    "feedback": "Right. Outside inspection is optional, you can combine and change methods, and you report what you actually used after each case.",
+                    "question_id": "external_methods",
+                    "response": {
+                      "choices": [
+                        "optional",
+                        "combine_change",
+                        "per_case"
+                      ]
+                    },
+                    "revisit_lesson_id": null,
+                    "submitted_at": "2026-10-03T16:06:15.090628+00:00"
+                  }
+                ],
+                "completed_at": "2026-10-03T16:06:15.096953+00:00",
+                "completed_requirements": [
+                  "identity.inspect",
+                  "identity.return",
+                  "context.search",
+                  "context.parent",
+                  "context.child",
+                  "context.return",
+                  "evidence.citation",
+                  "evidence.axiom",
+                  "evidence.locate",
+                  "graph.inspect",
+                  "graph.view",
+                  "graph.rank",
+                  "answers.add",
+                  "answers.move",
+                  "answers.remove",
+                  "answers.undo",
+                  "answers.keep",
+                  "answers.partial",
+                  "answers.none",
+                  "answers.insufficient",
+                  "baseline.copy",
+                  "baseline.downloads",
+                  "baseline.multi",
+                  "baseline.no"
+                ],
+                "current_lesson_id": "baseline",
+                "help_opened": 1,
+                "outstanding": [],
+                "passed_items": [
+                  "score_meaning",
+                  "equivalence_scope",
+                  "response_states",
+                  "evidence_origin",
+                  "external_methods"
+                ],
+                "position": {
+                  "lesson_id": "baseline",
+                  "question_id": null,
+                  "view": "lesson"
+                },
+                "practice": {},
+                "tutorial_version": "tutorial/2.0-native-2-nav65"
+              },
+              "tutorial_outcomes": {
+                "score_meaning": {
+                  "first": {
+                    "attempt_id": "d6a7da75ee7a4e10bf4053c7104358fd",
+                    "correct": true,
+                    "feedback": "Right. The initial position and the matching score are recorded advice from the matcher. Neither proves equivalence, and the score is not a calibrated probability.",
+                    "question_id": "score_meaning",
+                    "response": {
+                      "choice": "advice"
+                    },
+                    "revisit_lesson_id": null,
+                    "submitted_at": "2026-10-03T16:06:15.068535+00:00"
+                  },
+                  "final": {
+                    "attempt_id": "d6a7da75ee7a4e10bf4053c7104358fd",
+                    "correct": true,
+                    "feedback": "Right. The initial position and the matching score are recorded advice from the matcher. Neither proves equivalence, and the score is not a calibrated probability.",
+                    "question_id": "score_meaning",
+                    "response": {
+                      "choice": "advice"
+                    },
+                    "revisit_lesson_id": null,
+                    "submitted_at": "2026-10-03T16:06:15.068535+00:00"
+                  }
+                },
+                "equivalence_scope": {
+                  "first": {
+                    "attempt_id": "1076969dd15f4b39b1e5ea9acbbde5bc",
+                    "correct": true,
+                    "feedback": "Right. Circles of any colour include red circles but also blue ones, so the candidate is broader. Overlap or a broader category is not the same meaning.",
+                    "question_id": "equivalence_scope",
+                    "response": {
+                      "choice": "broader"
+                    },
+                    "revisit_lesson_id": null,
+                    "submitted_at": "2026-10-03T16:06:15.073228+00:00"
+                  },
+                  "final": {
+                    "attempt_id": "1076969dd15f4b39b1e5ea9acbbde5bc",
+                    "correct": true,
+                    "feedback": "Right. Circles of any colour include red circles but also blue ones, so the candidate is broader. Overlap or a broader category is not the same meaning.",
+                    "question_id": "equivalence_scope",
+                    "response": {
+                      "choice": "broader"
+                    },
+                    "revisit_lesson_id": null,
+                    "submitted_at": "2026-10-03T16:06:15.073228+00:00"
+                  }
+                },
+                "response_states": {
+                  "first": {
+                    "attempt_id": "ca781caeb54f4f238a4262237b54df5d",
+                    "correct": true,
+                    "feedback": "Right. None of these is an explicit judgment, Insufficient information says you cannot judge, and an empty draft is not a submitted answer.",
+                    "question_id": "response_states",
+                    "response": {
+                      "matches": {
+                        "cannot_judge": "insufficient_evidence",
+                        "judged_none": "none_of_these",
+                        "not_answered": "unanswered"
+                      }
+                    },
+                    "revisit_lesson_id": null,
+                    "submitted_at": "2026-10-03T16:06:15.077562+00:00"
+                  },
+                  "final": {
+                    "attempt_id": "ca781caeb54f4f238a4262237b54df5d",
+                    "correct": true,
+                    "feedback": "Right. None of these is an explicit judgment, Insufficient information says you cannot judge, and an empty draft is not a submitted answer.",
+                    "question_id": "response_states",
+                    "response": {
+                      "matches": {
+                        "cannot_judge": "insufficient_evidence",
+                        "judged_none": "none_of_these",
+                        "not_answered": "unanswered"
+                      }
+                    },
+                    "revisit_lesson_id": null,
+                    "submitted_at": "2026-10-03T16:06:15.077562+00:00"
+                  }
+                },
+                "evidence_origin": {
+                  "first": {
+                    "attempt_id": "035f4fffc1da4207bd47c7aaa0f4bc0d",
+                    "correct": true,
+                    "feedback": "Right. Each kind of information keeps its origin, and information missing from the loaded scope does not prove incompatibility.",
+                    "question_id": "evidence_origin",
+                    "response": {
+                      "matches": {
+                        "feature": "matcher",
+                        "statement": "original",
+                        "summary": "generated"
+                      },
+                      "part_b": "no"
+                    },
+                    "revisit_lesson_id": null,
+                    "submitted_at": "2026-10-03T16:06:15.082235+00:00"
+                  },
+                  "final": {
+                    "attempt_id": "035f4fffc1da4207bd47c7aaa0f4bc0d",
+                    "correct": true,
+                    "feedback": "Right. Each kind of information keeps its origin, and information missing from the loaded scope does not prove incompatibility.",
+                    "question_id": "evidence_origin",
+                    "response": {
+                      "matches": {
+                        "feature": "matcher",
+                        "statement": "original",
+                        "summary": "generated"
+                      },
+                      "part_b": "no"
+                    },
+                    "revisit_lesson_id": null,
+                    "submitted_at": "2026-10-03T16:06:15.082235+00:00"
+                  }
+                },
+                "external_methods": {
+                  "first": {
+                    "attempt_id": "d53f19956e5c4a97ad6056adb9414556",
+                    "correct": true,
+                    "feedback": "Right. Outside inspection is optional, you can combine and change methods, and you report what you actually used after each case.",
+                    "question_id": "external_methods",
+                    "response": {
+                      "choices": [
+                        "optional",
+                        "combine_change",
+                        "per_case"
+                      ]
+                    },
+                    "revisit_lesson_id": null,
+                    "submitted_at": "2026-10-03T16:06:15.090628+00:00"
+                  },
+                  "final": {
+                    "attempt_id": "d53f19956e5c4a97ad6056adb9414556",
+                    "correct": true,
+                    "feedback": "Right. Outside inspection is optional, you can combine and change methods, and you report what you actually used after each case.",
+                    "question_id": "external_methods",
+                    "response": {
+                      "choices": [
+                        "optional",
+                        "combine_change",
+                        "per_case"
+                      ]
+                    },
+                    "revisit_lesson_id": null,
+                    "submitted_at": "2026-10-03T16:06:15.090628+00:00"
+                  }
+                }
+              },
+              "tutorial_observed_seconds": 0.0,
+              "consultation_drafts": {}
+            }
+          ],
+          "summary": {
+            "missing": 3,
+            "excluded_unresolved": 0,
+            "system_mrr": 1.0,
+            "mean_delta_rr": -1.0,
+            "hit_at_1": 0.0,
+            "acceptable_omission_rate": 1.0,
+            "positive_uncertain_rate": 0.0,
+            "positive_explicit_none_rate": 1.0,
+            "mean_positive_response_depth": 0.0,
+            "natural_positive_change_denominator": 1,
+            "correct_to_wrong": 1,
+            "wrong_to_correct": 0,
+            "assigned": 4,
+            "submitted": 1,
+            "positive_submitted": 1,
+            "negative_submitted": 0,
+            "mrr": 0.0,
+            "correct_none_rate": null,
+            "false_endorsement_rate": null,
+            "negative_uncertain_rate": null
+          },
+          "condition_summaries": {
+            "explanation": {
+              "missing": 1,
+              "excluded_unresolved": 0,
+              "system_mrr": 1.0,
+              "mean_delta_rr": -1.0,
+              "hit_at_1": 0.0,
+              "acceptable_omission_rate": 1.0,
+              "positive_uncertain_rate": 0.0,
+              "positive_explicit_none_rate": 1.0,
+              "mean_positive_response_depth": 0.0,
+              "natural_positive_change_denominator": 1,
+              "correct_to_wrong": 1,
+              "wrong_to_correct": 0,
+              "assigned": 2,
+              "submitted": 1,
+              "positive_submitted": 1,
+              "negative_submitted": 0,
+              "mrr": 0.0,
+              "correct_none_rate": null,
+              "false_endorsement_rate": null,
+              "negative_uncertain_rate": null
+            },
+            "ontology_baseline": {
+              "missing": 2,
+              "excluded_unresolved": 0,
+              "system_mrr": null,
+              "mean_delta_rr": null,
+              "hit_at_1": null,
+              "acceptable_omission_rate": null,
+              "positive_uncertain_rate": null,
+              "positive_explicit_none_rate": null,
+              "mean_positive_response_depth": null,
+              "natural_positive_change_denominator": 0,
+              "correct_to_wrong": 0,
+              "wrong_to_correct": 0,
+              "assigned": 2,
+              "submitted": 0,
+              "positive_submitted": 0,
+              "negative_submitted": 0,
+              "mrr": null,
+              "correct_none_rate": null,
+              "false_endorsement_rate": null,
+              "negative_uncertain_rate": null
+            }
+          },
+          "data_dictionary": {
+            "rr": "First acceptable candidate reciprocal rank; submitted positive cases only",
+            "system_mrr": "Mean original-system RR on the same submitted positive cases with original order available",
+            "mean_delta_rr": "Mean participant-minus-original-system RR on submitted positive cases",
+            "condition_summaries": "The same quality and missingness metrics restricted to each server-assigned condition",
+            "correct_to_wrong": "Count of natural submitted positives changing original correct top-1 to participant wrong/empty top-1",
+            "wrong_to_correct": "Count of natural submitted positives changing original wrong top-1 to participant correct top-1",
+            "draft_response": "Current recoverable unsubmitted answer; never included in submitted quality denominators",
+            "raw_gap_seconds": "Server receipt interval preceding a reconnect report; activity remains self-reported and uncertain",
+            "missing": "Unsubmitted cases are excluded from quality denominators",
+            "raw_elapsed_seconds": "Seconds from the first accepted usable-content server receipt to ranking submission for that presentation, including breaks and gaps; null when either endpoint is missing. Later page-ready events do not restart this interval.",
+            "observed_segment_seconds": "Compatibility alias of case timing.page_observation_seconds in analysis/3; page-seconds, not unique elapsed coverage or active duration.",
+            "first_response": "First intentional submitted ranking, otherwise null; recoverable draft is separate",
+            "test": "Synthetic/preview records excluded unless include_test is explicitly requested",
+            "questionnaire_answer_states": "answered, skipped, not_answered; free text omitted from anonymous export",
+            "tutorial_outcomes": "First/final synthetic comprehension attempts and eventual completion; descriptive preparation data, not a validated expertise score",
+            "consultation": "Per-case reported method combinations; no per-candidate attribution or causal interpretation; missing resource_scope remains unknown",
+            "unavailable_intervals": "Raw late/pre-ready intervals and their reasons are retained; unavailable intervals never contribute page counts or page-seconds.",
+            "page_observation_seconds": "Page-seconds: sum of accepted bounded, deduplicated, non-overlapping eligible client intervals, grouped by stage/case. Excludes availability=unavailable; zero means no observed page-seconds, never zero elapsed task time. May exceed raw elapsed seconds.",
+            "per_page_observation_seconds": "Deterministically ordered page_instance_id and seconds pairs from the same eligible intervals as page_observation_seconds; each monotonic clock is local to one page. Never compare offsets across pages or infer concurrency/disjointness.",
+            "page_instance_count": "Count of page clocks with eligible intervals for this stage/case; not a concurrency measure.",
+            "coverage_status": "Always not_established: no validated mapping from client monotonic clocks to the server ready/submit interval exists.",
+            "coverage_reason": "no_eligible_observations for zero contributing pages, single_page_clock_unmapped for one, multiple_page_clocks for more than one; neither overlap nor disjointness is established.",
+            "unique_elapsed_coverage_seconds": "Null means unknown elapsed coverage in seconds, even for one page. It is never the raw page sum or a clamped value.",
+            "unobserved_elapsed_seconds": "Null means unknown elapsed time without observations in seconds; never computed by subtracting page-seconds from raw elapsed seconds.",
+            "active_duration_known": "Always false: page observations, visibility and receipt timestamps do not establish attention or active task duration; hidden pages are not implicitly paused.",
+            "tutorial_observed_seconds": "Compatibility alias of session tutorial_timing.page_observation_seconds; tutorial/practice page-seconds, excluded from scored case time.",
+            "consultation_observed_seconds": "Compatibility alias of case consultation_timing.page_observation_seconds; consultation page-seconds, excluded from scored case time.",
+            "tutorial_timing": "Observation summary for tutorial/practice stages with no scored case, independently grouped per session. Preparation outcomes do not change ranking-quality denominators.",
+            "consultation_timing": "Observation summary for consultation stage of this case only, independent of scored case observations.",
+            "protocol_versions": "Frozen source publication protocol versions copied unchanged at data.protocol_versions; the export derivation schema is separate.",
+            "source_protocol_versions": "Manifest copy of the unchanged source publication versions, including its frozen export default; source study_revision and content_sha256 bind the derived result.",
+            "analysis_schema": "manifest.schema=exact-study-analysis/3 identifies corrected derived semantics; archive_schema=exact-study-csv/3 is its CSV representation. Saved archives retain their original schema and hash.",
+            "csv_nulls": "Nested JSON summary values retain null. Top-level nullable scalar CSV cells are empty, meaning unknown/missing rather than zero; dictionaries and JSON are authoritative."
+          },
+          "protocol_versions": {
+            "assessment": "assessment/2",
+            "export": "exact-study-analysis/3",
+            "forms": "exact-study-forms/2",
+            "information": "synthetic-information-v2",
+            "resource_policy": "synthetic-study-v2",
+            "setup": "setup/2",
+            "software": "exact-explain-ui-1.2",
+            "tutorial": "tutorial/2.0-native-2-nav65"
+          },
+          "tutorial_hash": "sha256:e039633b6889cdc174dde0cd14adf77d15ca2002649bf60142370ebb6a54a311",
+          "resource_scope_analysis_rule": "Describe supplied-only, different/additional, unsure and unanswered separately; no outcome-dependent exclusion."
+        }
+      }
+    },
+    "baseline_case": {
+      "method": "GET",
+      "path": "/api/v1/study/cases/current",
+      "status": 200,
+      "response_projection": "entire body",
+      "body": {
+        "artifact_type": "study_case",
+        "contract_version": "exact-study/2.0",
+        "study_revision": "synthetic-v2-1b7b2e2bd65b475fae84eb6a853c8356",
+        "case_id": "case-1",
+        "presentation_id": "90f3aac2-a5ce-4737-9f67-3aa57939707b",
+        "condition": "ontology_baseline",
+        "source": {
+          "ontology_version_id": "sha256:2e48b4170969ecbd597e02ef7b6d9f673b4641d779306ea1ec8f2b95c2faa1fb",
+          "iri": "urn:source:1",
+          "kind": "class"
+        },
+        "source_label": "Synthetic source 1",
+        "candidates": [
+          {
+            "candidate_id": "candidate-1",
+            "entity": {
+              "ontology_version_id": "sha256:dc5f22cc619b180b6c0f97dd4b753c2823faecd2058c3b3746755bd1e71de769",
+              "iri": "urn:target:1",
+              "kind": "class"
+            },
+            "label": "Synthetic candidate 1",
+            "score": 0.9,
+            "score_meaning": "Invented fixture score; not probability of correctness",
+            "display_position": 1
+          },
+          {
+            "candidate_id": "candidate-2",
+            "entity": {
+              "ontology_version_id": "sha256:dc5f22cc619b180b6c0f97dd4b753c2823faecd2058c3b3746755bd1e71de769",
+              "iri": "urn:target:2",
+              "kind": "class"
+            },
+            "label": "Synthetic candidate 2",
+            "score": 0.8,
+            "score_meaning": "Invented fixture score; not probability of correctness",
+            "display_position": 2
+          },
+          {
+            "candidate_id": "candidate-3",
+            "entity": {
+              "ontology_version_id": "sha256:dc5f22cc619b180b6c0f97dd4b753c2823faecd2058c3b3746755bd1e71de769",
+              "iri": "urn:target:3",
+              "kind": "class"
+            },
+            "label": "Synthetic candidate 3",
+            "score": 0.7,
+            "score_meaning": "Invented fixture score; not probability of correctness",
+            "display_position": 3
+          },
+          {
+            "candidate_id": "candidate-4",
+            "entity": {
+              "ontology_version_id": "sha256:dc5f22cc619b180b6c0f97dd4b753c2823faecd2058c3b3746755bd1e71de769",
+              "iri": "urn:target:4",
+              "kind": "class"
+            },
+            "label": "Synthetic candidate 4",
+            "score": 0.6,
+            "score_meaning": "Invented fixture score; not probability of correctness",
+            "display_position": 4
+          },
+          {
+            "candidate_id": "candidate-5",
+            "entity": {
+              "ontology_version_id": "sha256:dc5f22cc619b180b6c0f97dd4b753c2823faecd2058c3b3746755bd1e71de769",
+              "iri": "urn:target:5",
+              "kind": "class"
+            },
+            "label": "Synthetic candidate 5",
+            "score": 0.5,
+            "score_meaning": "Invented fixture score; not probability of correctness",
+            "display_position": 5
+          }
+        ],
+        "ontology_resource_ids": [
+          "source",
+          "target"
+        ],
+        "package_version": "synthetic-package-v2",
+        "explanation_refs": [],
+        "workspace": null
+      }
+    },
+    "stale_scope_denied": {
+      "method": "GET",
+      "path": "/api/v1/study/workspace/synthetic-v2-0/capabilities",
+      "status": 403,
+      "response_projection": "entire body",
+      "body": {
+        "detail": "Workspace unavailable for the current presentation"
+      }
+    }
+  }
+}

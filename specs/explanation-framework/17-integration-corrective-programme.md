@@ -1,12 +1,15 @@
 # Integration corrective programme and agent protocol
 
-**2026-10-03. Status: specified, not implemented or accepted. Reviewed baseline: `2d9715b`.**
+**2026-10-03. Status: S1 backend verified; frontend and joint acceptance pending. Reviewed baseline: `2d9715b`.**
+The [backend handoff](../../docs/verification/explanation-integration-backend-handoff.md)
+records implementation `96b76fe` and the API/database verification boundary. Continue with
+S2 against that handoff; the joint findings remain open until S3.
 Start here for the next correction cycle. The [review record](evidence/integration-review-20261003.md)
 separates direct observations, a diagnostic reproduction and checks that remain outstanding.
 The implementation assignments are [18 — Backend](18-backend-integration-corrections.md)
 and [19 — Frontend](19-frontend-integration-corrections.md). The
 [machine-readable acceptance contract](protocol/integration-followup.json) is a design
-artifact, not a declaration that these extensions exist in the running service.
+artifact, not runtime configuration or proof of a deployed service.
 
 ## Authority and preserved decisions
 

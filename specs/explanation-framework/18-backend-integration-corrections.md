@@ -1,6 +1,8 @@
 # Backend assignment: discovery, recovery and timing integrity
 
-**2026-10-03. Target contract; not yet implemented.** Read
+**2026-10-03. Implemented and backend-verified in `96b76fe`; frontend/joint acceptance pending.**
+See the [S1 handoff](../../docs/verification/explanation-integration-backend-handoff.md)
+and its exact verification receipt. The requirements below remain normative. Read
 [17](17-integration-corrective-programme.md) for order, ownership and acceptance. This assignment
 extends [16](16-backend-corrections.md), rather than replacing its implemented security,
 preparation, publication or storage behavior. Deliver the backend handoff before frontend
