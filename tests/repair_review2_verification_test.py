@@ -181,10 +181,32 @@ def replay_with_blocked_completion(problem, directory):
     return kernel._replay_journal(problem, (), directory)
 
 
-def test_review2_06_negative_replay_does_not_wait_for_completion(tmp_path):
+def test_review2_06_negative_replay_does_not_wait_for_completion(
+    tmp_path, monkeypatch, record_property
+):
     problem = conflict_problem()
     directory = journal(tmp_path / "events", conflict_event(problem))
-    result = workers.bounded_call(replay_with_blocked_completion, problem, directory, timeout=0.8)
+
+    def forbidden_completion(_):
+        raise AssertionError("qualified negative replay must not read final completion")
+
+    # Assert independence directly, without conflating process startup/storage
+    # throughput with the negative-replay contract.
+    with monkeypatch.context() as patch:
+        patch.setattr(kernel, "committed_result", forbidden_completion)
+        failure, report = kernel._replay_journal(problem, (), directory)
+    assert failure.proof is not None and not report.authorizes
+
+    # Retain the actual spawned-worker/stalled-completion regression. Five
+    # seconds allows OWL imports and durable result transport on the allocated
+    # node, but cannot conceal the 30-second blocked completion above. Separate
+    # REV-02 tests continue to check subsecond deadline responsiveness.
+    timeout = 5
+    result = workers.bounded_call(replay_with_blocked_completion, problem, directory, timeout=timeout)
+    record_property("qualification_timeout_seconds", timeout)
+    record_property("replay_status", result.status)
+    for key, value in result.resource_usage:
+        record_property(key, value)
     assert result.status == "complete", result.detail
     assert result.value[0].proof is not None and not result.value[1].authorizes
 
