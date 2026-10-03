@@ -125,8 +125,10 @@ def native_probe(problem_record, profile, scale, memory_mb, directory):
     original_budgets = problem.budgets
     problem = dataclasses.replace(problem, budgets=dataclasses.replace(original_budgets,
         memory_mb=min(original_budgets.memory_mb or memory_mb, memory_mb)))
+    # Complex unchanged bundles may still require active-expression checks.
+    # Retain those expressions when qualifying routes; they are not edits.
     current = tuple(next(i for i, c in enumerate(obj.candidates)
-                         if set(c.axioms) == set(obj.original_axioms) and not c.active_expressions)
+                         if set(c.axioms) == set(obj.original_axioms))
                     for obj in problem.objects)
     axioms, active = materialize(problem, current)
     routes = qualified_routes(snapshot_from_axioms(axioms),
