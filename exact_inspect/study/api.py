@@ -401,8 +401,17 @@ def create_study_router(store, *, signing_secret, researcher_token, origin):
         include_test: bool = False,
         include_keys: bool = False,
         format: Literal["json", "csv"] = "json",
+        analysis_schema: (
+            Literal["exact-study-analysis/1", "exact-study-analysis/2", "exact-study-analysis/3"]
+            | None
+        ) = None,
     ):
-        result = store.export(revision, include_test=include_test, include_keys=include_keys)
+        result = store.export(
+            revision,
+            include_test=include_test,
+            include_keys=include_keys,
+            analysis_schema=analysis_schema,
+        )
         if format == "csv":
             return Response(
                 csv_archive(result),

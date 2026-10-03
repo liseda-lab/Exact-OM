@@ -383,7 +383,7 @@ class ProtocolVersions(StrictModel):
     information: Identifier
     resource_policy: Identifier
     software: Identifier
-    export: Literal["exact-study-analysis/2"] = "exact-study-analysis/2"
+    export: Literal["exact-study-analysis/2", "exact-study-analysis/3"] = "exact-study-analysis/2"
 
 
 class StudyDefinitionV2(StudyDefinition):

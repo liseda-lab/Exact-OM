@@ -40,6 +40,11 @@ def main():
     parser.add_argument("--include-test", action="store_true")
     parser.add_argument("--include-keys", action="store_true")
     parser.add_argument("--format", choices=["json", "csv"], default="json")
+    parser.add_argument(
+        "--analysis-schema",
+        choices=["exact-study-analysis/1", "exact-study-analysis/2", "exact-study-analysis/3"],
+        help="Derived analysis schema; omission uses the frozen source export version. /2 retains historical timing semantics; use /3 for corrected v2 observations.",
+    )
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     origin = os.environ["EXACT_STUDY_ORIGIN"].rstrip("/")
@@ -80,6 +85,11 @@ def main():
                     "include_test": str(args.include_test).lower(),
                     "include_keys": str(args.include_keys).lower(),
                     "format": args.format,
+                    **(
+                        {"analysis_schema": args.analysis_schema}
+                        if args.analysis_schema is not None
+                        else {}
+                    ),
                 }
             )
     request = urllib.request.Request(

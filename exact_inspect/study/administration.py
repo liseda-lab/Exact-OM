@@ -16,6 +16,8 @@ class RevisionSummary(StrictModel):
     tutorial_version: str | None
     setup_version: str | None
     export_version: str
+    source_export_version: str
+    supported_analysis_schemas: list[str]
     frozen_hash: str
     closed: bool
     synthetic: bool
@@ -61,6 +63,12 @@ def revisions(store, *, limit=50, cursor=None):
                     "tutorial_version": (definition.get("tutorial") or {}).get("version"),
                     "setup_version": versions.get("setup"),
                     "export_version": versions.get("export", "exact-study-analysis/1"),
+                    "source_export_version": versions.get("export", "exact-study-analysis/1"),
+                    "supported_analysis_schemas": (
+                        ["exact-study-analysis/2", "exact-study-analysis/3"]
+                        if protocol == "exact-study/2.0"
+                        else ["exact-study-analysis/1"]
+                    ),
                     "frozen_hash": row["frozen_hash"],
                     "closed": bool(row["closed"]),
                     "synthetic": definition["synthetic"],

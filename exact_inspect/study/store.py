@@ -1182,10 +1182,24 @@ class StudyStore:
                 counts[key] = counts.get(key, 0) + 1
             return {"study_revision": revision, "counts": counts}
 
-    def export(self, revision, *, include_test=False, include_keys=False):
+    def export(self, revision, *, include_test=False, include_keys=False, analysis_schema=None):
         """Freeze a reproducible anonymous analysis export; credentials never enter it."""
+        from .exports import analysis3_dictionary, observation_summary
+
         with self.transaction() as db:
             study_row, study = self._study(db, revision)
+            source_schema = study.get("protocol_versions", {}).get(
+                "export", "exact-study-analysis/1"
+            )
+            schema = source_schema if analysis_schema is None else analysis_schema
+            supported = (
+                {"exact-study-analysis/2", "exact-study-analysis/3"}
+                if study["contract_version"] == "exact-study/2.0"
+                else {"exact-study-analysis/1"}
+            )
+            if schema not in supported:
+                raise StudyError(422, "Analysis schema is unsupported for this study contract")
+            corrected_timing = schema == "exact-study-analysis/3"
             keys = json.loads(
                 db.execute(
                     "SELECT payload FROM researcher_case_keys WHERE study_revision = ?",
@@ -1234,7 +1248,12 @@ class StudyStore:
                     ready = [
                         e["server_received_at"]
                         for e in events
-                        if e["case_id"] == cid and e["type"] == "case_ready"
+                        if e["case_id"] == cid
+                        and e["type"] == "case_ready"
+                        and (
+                            not corrected_timing
+                            or e.get("presentation_id") == presentation["presentation_id"]
+                        )
                     ]
                     end = response.get("submitted_at") if response else None
                     elapsed = (
@@ -1280,9 +1299,21 @@ class StudyStore:
                         "gap_reports": [g for g in state["gaps"] if g["case_id"] == cid],
                         "explicit_breaks": [p for p in state["pauses"] if p["case_id"] == cid],
                     }
+                    if corrected_timing:
+                        timing.update(observation_summary(segments, stages={"case"}, case_id=cid))
+                        timing["observed_segment_seconds"] = timing["page_observation_seconds"]
                     rows.append(
                         {
                             **presentation,
+                            **(
+                                {
+                                    "consultation_timing": observation_summary(
+                                        segments, stages={"consultation"}, case_id=cid
+                                    )
+                                }
+                                if corrected_timing
+                                else {}
+                            ),
                             "candidates": case["candidates"],
                             "package_version": case["package_version"],
                             "case_kind": key["case_kind"],
@@ -1335,6 +1366,15 @@ class StudyStore:
                         "cases": rows,
                         "events": events,
                         "timing_segments": segments,
+                        **(
+                            {
+                                "tutorial_timing": observation_summary(
+                                    segments, stages={"tutorial", "practice"}
+                                )
+                            }
+                            if corrected_timing
+                            else {}
+                        ),
                         **(
                             {
                                 "tutorial_progress": state["tutorial_progress"],
@@ -1432,6 +1472,16 @@ class StudyStore:
                         "unavailable_intervals": "Rejected late/pre-ready timing observations retained explicitly; excluded from observed durations",
                     }
                 )
+            if corrected_timing:
+                for session in sessions:
+                    session["tutorial_observed_seconds"] = session["tutorial_timing"][
+                        "page_observation_seconds"
+                    ]
+                    for case in session["cases"]:
+                        case["timing"]["consultation_observed_seconds"] = case[
+                            "consultation_timing"
+                        ]["page_observation_seconds"]
+                content["data_dictionary"].update(analysis3_dictionary())
             if include_keys:
                 content["researcher_case_keys"] = keys
             export_id, now = str(uuid4()), utcnow()
@@ -1444,10 +1494,11 @@ class StudyStore:
                 "content_sha256": digest(canonical(content)),
                 "include_test": include_test,
                 "includes_private_key_join": include_keys,
-                "schema": (
-                    "exact-study-analysis/2"
-                    if study["contract_version"] == "exact-study/2.0"
-                    else "exact-study-analysis/1"
+                "schema": schema,
+                **(
+                    {"source_protocol_versions": study["protocol_versions"]}
+                    if corrected_timing
+                    else {}
                 ),
                 "session_count": len(sessions),
             }

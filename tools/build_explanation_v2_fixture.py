@@ -91,7 +91,7 @@ def _base_publication():
     }
 
 
-def publication_v2(root, *, navigation_size=0):
+def publication_v2(root, *, navigation_size=0, export_version="exact-study-analysis/2"):
     import pyowl_core as core
 
     root = Path(root)
@@ -402,7 +402,7 @@ def publication_v2(root, *, navigation_size=0):
             information="synthetic-information-v2",
             resource_policy="synthetic-study-v2",
             software="exact-explain-ui-1.2",
-            export="exact-study-analysis/2",
+            export=export_version,
         ),
         setup_instructions="Read the instructions and confirm access to the supplied resources. External tools are optional; any combination of methods may be used.",
     )
@@ -422,12 +422,20 @@ def main():
         default=0,
         help="Add non-focal entities and paged context for integration checks (0-200)",
     )
+    parser.add_argument(
+        "--export-version",
+        choices=["exact-study-analysis/2", "exact-study-analysis/3"],
+        default="exact-study-analysis/3",
+        help="Freeze the export default explicitly; /2 retains historical compatibility semantics",
+    )
     args = parser.parse_args()
     if not 0 <= args.navigation_size <= 200:
         parser.error("Navigation size must be between 0 and 200")
     if args.destination.exists() and any(args.destination.iterdir()):
         parser.error("Destination must be new or empty; frozen packages are never overwritten")
-    frozen = publication_v2(args.destination, navigation_size=args.navigation_size)
+    frozen = publication_v2(
+        args.destination, navigation_size=args.navigation_size, export_version=args.export_version
+    )
     path = args.destination / "publication.json"
     path.write_text(frozen.model_dump_json(indent=2) + "\n")
     print(path.resolve())
