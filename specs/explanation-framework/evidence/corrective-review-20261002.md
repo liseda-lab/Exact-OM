@@ -60,7 +60,7 @@ Further source findings:
   change together with models, queue routes and timer transition handling.
 - [Telemetry](../../../explanations_visualizer/src/study/telemetry.ts) currently emits only
   case/presentation-bound events, so it cannot serve as durable tutorial completion state.
-- [StudyExplanation](../../../explanations_visualizer/src/components/study/StudyExplanation.tsx)
+- StudyExplanation (`explanations_visualizer/src/components/study/StudyExplanation.tsx` at `57e501a`; removed when the shared workspace replaced it)
   emits `hierarchy_expand` when merely opening the Hierarchy tab. Its resource normalization
   drops capabilities, uses hardcoded original interpretation for graph facts and can omit
   unsupported nonliteral evidence readings. These are source-confirmed problems, not a

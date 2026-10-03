@@ -1,0 +1,177 @@
+{
+  "artifact": "exact-explanation-frontend-v2-contract-proposal",
+  "status": "proposed_for_B0_freeze",
+  "recorded_at": "2026-10-03",
+  "note": "Frontend data needs for the exact-study/2.0 corrective contract (specs 14-16). These are NOT implemented backend routes. The in-browser preview service (explanations_visualizer/src/study/v2/fixtureServer.ts) implements exactly these shapes for development only. Every mutation uses the existing envelope: idempotency_key, expected_revision, X-Study-Session header; a stale revision answers 409 {detail, current_revision}; replaying an idempotency key returns the original response.",
+  "version_dispatch": {
+    "field": "StudyState.contract_version",
+    "supported": {"exact-study/1.0": "legacy flows unchanged", "exact-study/2.0": "corrected flows"},
+    "other_values": "visible 'not supported' page; no answers are collected"
+  },
+  "state_additions": {
+    "setup": {
+      "setup_version": "setup/2",
+      "instructions_acknowledged": true,
+      "external_inspection_optional_understood": true,
+      "resource_access": "available",
+      "familiar_methods": ["protege", "plain_files"],
+      "submitted": false,
+      "saved_at": "2026-10-03T10:00:00Z"
+    },
+    "ontology_resources_item": {
+      "asset_id": "ncit-ontology",
+      "sha256": "<64 hex>",
+      "size_bytes": 123456,
+      "kind": "ontology",
+      "media_type": "application/owl-functional",
+      "title": "NCI Thesaurus (filtered study copy)",
+      "role": "source",
+      "ontology_version_id": "sha256:<context id>",
+      "version_label": "24.09e",
+      "license_note": "<owner text>",
+      "information_notice": "<owner text: what the policy withholds>"
+    },
+    "tutorial": {
+      "tutorial_id": "exact-explain-tutorial",
+      "version": "tutorial/2.0-draft-1",
+      "hash": "sha256:<frozen definition>",
+      "synthetic": true,
+      "intro": "<participant text>",
+      "lessons": [
+        {
+          "lesson_id": "context",
+          "title": "Context: parents, children and missing information",
+          "view": "explanation",
+          "steps": ["<instruction tied to a control>"],
+          "requirements": [
+            {"requirement_id": "context.search", "action": "search_entity", "label": "Find an entity with search"},
+            {"requirement_id": "context.parent", "action": "navigate_parent", "label": "Open a parent"}
+          ]
+        },
+        {
+          "lesson_id": "graph",
+          "optional": true,
+          "requirements": [
+            {"requirement_id": "graph.view", "action": "change_graph_view", "label": "Zoom or fit the graph", "alternatives": ["inspect_graph_or_list"]}
+          ]
+        }
+      ],
+      "assessment": [
+        {
+          "question_id": "evidence_origin",
+          "title": "Where information comes from",
+          "prompt": "Match each kind of information to its origin.",
+          "kind": "match_and_single",
+          "rows": [{"row_id": "statement", "label": "A statement in the ontology"}],
+          "row_options": [{"code": "original", "label": "Original ontology fact"}],
+          "part_b": {"prompt": "<yes/no prompt>", "options": [{"code": "yes", "label": "Yes"}, {"code": "no", "label": "No"}]},
+          "lesson_id": "evidence"
+        }
+      ],
+      "case": {
+        "source": {"ontology_version_id": "synthetic:practice-ontology-a/1", "iri": "https://example.org/practice/a#ClosedRoundPieceCrate", "kind": "class"},
+        "source_label": "closed crate of round pieces",
+        "candidates": "<5 StudyCandidate, synthetic ids practice-c1..c5, illustrative scores>",
+        "explanation_refs": ["practice-explanations"],
+        "ontology_resources": "<2 synthetic downloads with role/title/version>"
+      }
+    },
+    "tutorial_progress": {
+      "tutorial_version": "tutorial/2.0-draft-1",
+      "current_lesson_id": "evidence",
+      "completed_requirements": ["identity.inspect", "identity.return", "context.search"],
+      "practice": {"practice-case": {"response_type": "ranked_candidates", "ranked_candidate_ids": ["practice-c2"]}},
+      "assessment_drafts": {"score_meaning": {"choice": "advice"}},
+      "attempts": [
+        {
+          "attempt_id": "<uuid>",
+          "question_id": "score_meaning",
+          "response": {"choice": "certain"},
+          "correct": false,
+          "feedback": "<server feedback text>",
+          "revisit_lesson_id": "identity",
+          "submitted_at": "2026-10-03T10:05:00Z"
+        }
+      ],
+      "passed_items": [],
+      "outstanding": ["evidence", "answers", "baseline", "score_meaning", "equivalence_scope", "response_states", "evidence_origin", "external_methods"],
+      "help_opened": 1,
+      "completed_at": null
+    },
+    "consultation_draft": {
+      "presentation_id": "<current presentation>",
+      "form_version": "exact-study-forms/2",
+      "consulted_external_ontologies": true,
+      "methods": ["queries_scripts", "reasoner"],
+      "other_editor": null,
+      "other_resource": null,
+      "other_method": null,
+      "resource_scope": null,
+      "saved_at": "2026-10-03T10:20:00Z"
+    },
+    "previous_consultation": "<the session's last submitted ConsultationReceiptV2, offered only for explicit reuse>",
+    "protocol_versions": {"setup": "setup/2", "tutorial": "tutorial/2.0-draft-1", "forms": "exact-study-forms/2"},
+    "telemetry": {"event_types": ["<v1 types>", "tab_open", "hierarchy_navigate", "search_select", "graph_reset", "graph_edge_open", "copy_iri", "resources_open", "help_open"], "scopes": ["case"]},
+    "forms_question_order": {
+      "id": "component_usefulness",
+      "options": {"<code>": "<label>"},
+      "option_order": ["not_helpful", "slightly", "moderately", "very", "cannot_judge"],
+      "matrix": {"<row code>": "<label>"},
+      "row_order": ["original_context", "entity_description", "hierarchy", "evidence_table", "evidence_graph", "pair_comparison"]
+    },
+    "study_case_workspace": {"workspace": {"scope_id": "<opaque, explanation condition only>"}}
+  },
+  "routes": [
+    {
+      "method": "PUT", "path": "/api/v1/study/setup", "transition": "only when submitted=true",
+      "request": {"setup_version": "setup/2", "instructions_acknowledged": true, "external_inspection_optional_understood": true, "resource_access": "available", "familiar_methods": [], "submitted": true},
+      "success": "StudyState, stage background",
+      "errors": {"422": "submitted without both acknowledgements or resource_access != available (draft saves never fail on readiness)", "409": "stale revision or not at setup"}
+    },
+    {
+      "method": "PUT", "path": "/api/v1/study/tutorial/progress", "transition": false, "coalescing": "drafts of the same lesson or assessment item only",
+      "request": {"tutorial_version": "tutorial/2.0-draft-1", "current_lesson_id": "context", "lesson_id": "context", "completed_requirements": ["identity.inspect", "context.search"], "practice": {"key": "practice-case", "response_type": null, "ranked_candidate_ids": []}, "assessment_draft": {"question_id": "score_meaning", "response": {"choice": "advice"}}, "help_opened": true},
+      "semantics": "completed_requirements is cumulative and add-only; unknown requirement IDs are rejected; no scored IDs accepted",
+      "errors": {"409": "tutorial version mismatch or stale revision", "422": "unknown requirement/question id or oversize payload"}
+    },
+    {
+      "method": "POST", "path": "/api/v1/study/tutorial/assessment", "transition": false, "coalescing": "never",
+      "request": {"tutorial_version": "tutorial/2.0-draft-1", "question_id": "evidence_origin", "attempt_id": "<uuid>", "response": {"matches": {"statement": "original", "feature": "matcher", "summary": "generated"}, "part_b": "no"}},
+      "success": "StudyState with the appended attempt receipt, correctness, feedback and revisit lesson",
+      "semantics": "graded on the server; unlimited attempts; replaying an attempt_id returns the original result; an incorrect attempt never allocates or erases progress",
+      "errors": {"422": "unknown question or malformed response"}
+    },
+    {
+      "method": "POST", "path": "/api/v1/study/tutorial/complete", "transition": true,
+      "request": {"tutorial_version": "tutorial/2.0-draft-1"},
+      "success": "StudyState stage case (allocation happens atomically here)",
+      "errors": {"422": "outstanding lessons or items (state.tutorial_progress.outstanding lists them)", "409": "stale revision"}
+    },
+    {
+      "method": "PUT", "path": "/api/v1/study/cases/{case_id}/consultation/draft", "transition": false, "coalescing": "per case",
+      "request": {"presentation_id": "<current>", "form_version": "exact-study-forms/2", "consulted_external_ontologies": null, "methods": [], "other_editor": null, "other_resource": null, "other_method": null, "resource_scope": null},
+      "semantics": "never advances, never changes the committed ranking; No is normalized to empty methods/names/scope before sending",
+      "errors": {"409": "not the current case/presentation or stale revision", "422": "unknown method code or oversize name"}
+    },
+    {
+      "method": "PUT", "path": "/api/v1/study/cases/{case_id}/consultation", "transition": true,
+      "request": {"presentation_id": "<current>", "form_version": "exact-study-forms/2", "consulted_external_ontologies": true, "methods": ["protege", "plain_files"], "other_editor": null, "other_resource": null, "other_method": null, "resource_scope": "supplied_only"},
+      "success": "StudyState for the next case or the final form; previous_consultation updated",
+      "errors": {"422": "Yes without a method, No with methods, or unknown code"}
+    },
+    {
+      "method": "GET", "path": "/api/v1/study/resources/{asset_id}",
+      "addition": "serves the publication's synthetic tutorial resources (study_explanation shape) to any active v2 session during training and help; never a scored case's resource",
+      "errors": {"403": "explanation resource outside the active explanation case (unchanged)"}
+    },
+    {
+      "method": "GET", "path": "/api/v1/study/workspace/{scope_id}/{entity-context|axioms/{fact_id}|explanations|hierarchy|entities|labels|pair-evidence}",
+      "addition": "B1 participant-safe workspace mirroring the exploration read shapes; the frontend switches to it when cases/current.workspace.scope_id is present (apiSource with base /api/v1/study/workspace/{scope_id})",
+      "errors": {"403": "baseline case, other session, past/future case, revoked cookie or stale scope", "409": "cursor bound to another scope or policy"}
+    }
+  ],
+  "event_additions": {
+    "types": ["tab_open", "hierarchy_navigate", "search_select", "graph_reset", "graph_edge_open", "copy_iri", "resources_open", "help_open"],
+    "rule": "sent only when state.telemetry.event_types declares them; v1 services never receive them; no free text, URLs or external observations"
+  }
+}

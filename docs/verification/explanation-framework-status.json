@@ -176,6 +176,29 @@
         "Study-owner content/readiness, duration pilot, recruitment and frozen evaluation remain separate; no full-scale experiments were run."
       ],
       "implementation_status": "complete"
+    },
+    "F1_corrective": {
+      "owner": "Frontend corrective assignment (specs 14-15), 2026-10-03",
+      "inspected_commit": "8ac76ce6ab19a434e6a44215f536595f0970aa45",
+      "status": "frontend_implemented_backend_pending",
+      "implemented_paths": [
+        "explanations_visualizer/src/lib/workspace",
+        "explanations_visualizer/src/components/workspace",
+        "explanations_visualizer/src/components/study",
+        "explanations_visualizer/src/study",
+        "explanations_visualizer/e2e",
+        "tests/explanation_frontend_form_order_test.py"
+      ],
+      "evidence_ids": [
+        "frontend_corrective"
+      ],
+      "remaining_inputs_or_checks": [
+        "Backend B0-B9 (spec 16): v2 setup/tutorial/assessment/report-draft routes, ordered forms, participant-safe case workspace, event scopes, library/revision routes, SQLite URI fix. The v2 frontend flows run only against the development preview service until then.",
+        "Joint acceptance on the real backend-release package and PostgreSQL/HTTPS; Docker/Render rehearsal.",
+        "Screen-reader and manual keyboard passes, formative usability sessions and tutorial/case burden re-estimation.",
+        "Tutorial material in src/study/v2/tutorialContent.ts is a proposal for the backend owner to freeze; no publication may certify it as a frontend fallback."
+      ],
+      "implementation_status": "partial"
     }
   },
   "gates": {
@@ -375,6 +398,11 @@
       "sha256": "sha256:d61bfe265f4a60442fdcedbad9dae0441e6aa6ca7237fd26de1337bc5603d84e",
       "status": "passed",
       "scope": "Bounded operational/browser verification under user authorization; no formal F1/G5 or live-study admission."
+    },
+    "frontend_corrective": {
+      "path": "docs/verification/explanation-frontend-corrections.md",
+      "status": "partial",
+      "scope": "Frontend corrective implementation: unit/type/build checks, Playwright on the small NCIT/DOID fixture and the SQLite study harness (loopback origin rewrite), and the v2 preview journey. No real-package, PostgreSQL/HTTPS, deployment, screen-reader or usability evidence."
     }
   },
   "resource_targets": {
@@ -409,7 +437,9 @@
     "operational_evidence": "docs/verification/explanation-backend-operational.json",
     "durable_preparation": "data/explanation-framework/prepared-combined",
     "execution_lock": "data/explanation-framework/prepared-combined/execution-47388b7e7a83f4afd4d7a4d649d7faf769a7f84271242211da531f5b604075f1.json",
-    "frontend_verification": "docs/verification/explanation-frontend-e2e.md"
+    "frontend_verification": "docs/verification/explanation-frontend-e2e.md",
+    "frontend_corrective_handoff": "docs/verification/explanation-frontend-corrections.md",
+    "frontend_v2_contract_examples": "docs/verification/explanation-frontend-v2-contract-examples.json"
   },
   "deferred": [
     "48-pair baseline/challenger model-selection exercise",
