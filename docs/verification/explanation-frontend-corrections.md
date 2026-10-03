@@ -26,7 +26,25 @@ This is **not** a readiness claim: the backend assignment in [16](../../specs/ex
 | Transitions (F8) | The old Protégé-field heuristic is replaced by explicit `transition` flags. Drafts, progress saves and assessment attempts never close timing; setup submit, tutorial completion, ranking submit, final report and similar do. The outbox route allowlist includes the planned routes, and coalescing never crosses an attempt or commit. |
 | Candidates (C20) | No 500 cap: "Load the next 100 candidates" continues the server cursor. Badges show the recorded rank, never a subset position relabelled as rank. |
 | Library, reviews, admin (C21, C22) | The limits are stated in the UI: no copy deletion or metadata route, reviews kept only in this browser, revision entered manually. These need backend routes (B8). |
-| Accessibility found during this work (C24) | Clipboard refusals now fall back to a selected IRI field. On phones at 200% text the sticky header no longer hides focused controls (WCAG 2.4.11): it becomes static on narrow layouts, and the page reserves scroll padding for sticky bars. |
+| Accessibility found during this work (C24) | Clipboard refusals now fall back to a selected IRI field. On phones at 200% text the sticky header no longer hides focused controls (WCAG 2.4.11): it becomes static on narrow layouts, and the page reserves scroll padding for sticky bars. Pages reflow from 320 to 2560 px at 100% and 200% text with no horizontal scrolling (see §1.1). |
+
+### 1.1 Follow-up audit (same day)
+
+A second pass over spec 15 found and fixed these gaps:
+
+| Gap | Fix |
+|---|---|
+| A case that declares a B1 workspace scope fell through to an empty workspace if the scope failed. | `CaseView` loads the source's context from the scoped route first. If that fails, the case is blocked with a visible error and a retry route; it never silently falls back to the bounded resources. |
+| A broken or mismatched tutorial publication could start an empty tutorial. | `TutorialStage` refuses to start when lessons, items or practice candidates are missing, or when the saved progress names another tutorial version. It shows "The tutorial for this study cannot be shown" and substitutes nothing. |
+| Researcher progress had no row for the v2 tutorial stage, and stages unknown to the table were dropped. | "Tutorial and check" appears when the service reports it, and any other reported stage gets its own row. |
+| The graph view could carry over between scopes that reuse a pair key. | The graph is keyed by the workspace and the pair, so a new scope starts a new view. Expansion labels follow the entity kind (subclass, instance or subproperty of). |
+| Compact study cards hid the other recorded categories. | They now show the same "More recorded information" disclosure as exploration. |
+| Special answers (prefer not to say, cannot judge…) looked like ordinary options. | They are marked visually, including the matrix columns, as well as being exclusive. |
+| A candidate's inspection state was not linked to its button for screen readers. | The inspect button is described by "Inspecting / Viewed / Not viewed yet, initial position N". |
+| The setup page and the files dialog did not say how the files can be opened. | Both show a neutral "How to open them" note, naming Protégé only as one example. |
+| At 320 px or 200% text, steps, long headings, lesson links, dialogs, grids and the admin title overflowed. | Headings and legends wrap anywhere, grids use `minmax(min(100%, …), 1fr)`, dialogs fit the viewport, and steps collapse to "Step N of 6" in narrow containers. Two new e2e tests cover this (§7). |
+
+The proposed v2 participant wording is collected for review in [`explanation-frontend-v2-participant-copy.md`](explanation-frontend-v2-participant-copy.md). The private design canvas now has a "Ranking study · corrected (v2)" page: setup, tutorial lesson, assessment, case, per-case report, fact inspector and phone. Its legend shows the bridge as round dots, as the code draws it. The canvas link is kept out of the repository.
 
 ## 2. Component and state map (F0, F1)
 
@@ -56,7 +74,7 @@ Cache keys include the product, package or session, presentation and resource id
 
 ## 3. Participant copy (F5–F7)
 
-The exact wording is in the code. The authored synthetic tutorial material, with lessons, items, answer keys and feedback, is in [`src/study/v2/tutorialContent.ts`](../../explanations_visualizer/src/study/v2/tutorialContent.ts), for the backend to freeze in the v2 publication. The frontend never uses it as a fallback for a real publication.
+The exact wording is in the code and is collected for review in [`explanation-frontend-v2-participant-copy.md`](explanation-frontend-v2-participant-copy.md). The authored synthetic tutorial material, with lessons, items, answer keys and feedback, is in [`src/study/v2/tutorialContent.ts`](../../explanations_visualizer/src/study/v2/tutorialContent.ts), for the backend to freeze in the v2 publication. The frontend never uses it as a fallback for a real publication.
 
 - **Setup** ([`SetupV2.tsx`](../../explanations_visualizer/src/components/study/SetupV2.tsx)): the task and the two files, with an information-scope notice that names no tool. "Can you get the two files?" A problem routes to retry, Pause or contact, never a false confirmation. The programme's method-freedom paragraph appears verbatim. An optional list of familiar methods is described as committing to nothing.
 - **Lessons:**
@@ -133,7 +151,7 @@ Machine-readable request, response and error examples are in [`explanation-front
 | C21 | **Disposition:** manual revision entry stated in the UI; selector needs B8 listing. Sign-out/revision privacy unchanged. | researcher e2e journey passes |
 | C22 | **Disposition:** limits stated (browser-local reviews; no copy removal). Deletion and metadata need B8. | library e2e passes |
 | C23 | **Preserved;** new routes integrated with the outbox, allowlist, coalescing and session header. | outbox unit tests; recovery e2e; preview offline check |
-| C24 | **Partly done:** axe audits now cover real cases with evidence, per-case reports, tutorial lessons and the assessment (light, dark, phone at 200%). Focus-obscured and clipboard issues fixed. **Screen-reader and manual keyboard passes not done.** | accessibility e2e (28 audits), preview audits (4) |
+| C24 | **Partly done:** axe audits now cover real cases with evidence, per-case reports, tutorial lessons and the assessment (light, dark, phone at 200%). Focus-obscured and clipboard issues fixed. **Screen-reader and manual keyboard passes not done.** | accessibility e2e (28 audits), preview audits (4), two reflow tests (320–2560 px at 100% and 200% text: v1 case; v2 setup, lesson and case) |
 | C25 | **Not done here:** real package, PostgreSQL/HTTPS and deployment were not available on this machine. | — |
 | C26 | **Implemented (frontend):** version dispatch; v1 flows untouched; unsupported versions fail visibly. Backend migration and versioning (B0) pending. | browser checks for v1 and v2 |
 | C27 | **This document;** earlier fixes kept (outbox, typed browse, legacy, stale search). | full e2e suite |
@@ -145,8 +163,10 @@ Machine-readable request, response and error examples are in [`explanation-front
 | `npm run typecheck`, `npm run build` | Pass. The study HTML has no inline styles. Production `/preview/participate/` is a 1.3 kB notice, and the export contains no preview service or grading text. |
 | `npm run test:unit` (Node 24.21) | **46 passed:** outbox incl. v2 routes, form order, reports, events, lesson evidence, tutorial content and keys, resource adapter, OWL regression fixtures. |
 | Backend: `explanation_frontend_form_order`, `frontend_serving`, `study`, `study_resource`, `preparation` | **79 passed, 1 skipped** (PostgreSQL restart). black and isort pass on the new test. |
-| Playwright with system Chrome, all specs | **43 passed, 2 skipped** (legacy run directory not available). Exploration and public demo on the small fixture (`EXACT_E2E_SEARCH_TERM=syndrome`), library import with the exported fixture ZIP, study suites on the **SQLite harness with the loopback origin rewrite (not PostgreSQL/HTTPS)**, and the v2 preview journey under `next dev`. |
+| Playwright with system Chrome, all specs | **45 passed, 2 skipped** (legacy run directory not available). Exploration and public demo on the small fixture (`EXACT_E2E_SEARCH_TERM=syndrome`), library import with the exported fixture ZIP, study suites on the **SQLite harness with the loopback origin rewrite (not PostgreSQL/HTTPS)**, and the v2 preview journey under `next dev`. The two extra tests are the reflow checks from §1.1. |
+| Spec validator (`specs/explanation-framework/protocol/validate_specs.py`) | No errors (128 local links). |
 | axe | 32 audits without violations or page-wide overflow. In `accessibility.spec.ts`, 28 audits run across desktop and phone at 200% text, each in light and dark: comparison, browsing, library, study welcome, researcher sign-in, and the **study case with evidence plus its per-case report**. The preview journey adds 4: lesson, assessment, case and report. |
+| Overflow probes | No horizontal overflow at 320 px and 200% text on: study welcome, setup, background, tutorial, case, report, final and admin; exploration compare, browse and library. |
 | Manual (in-app browser) | Citations by keyboard, tab roving, graph persistence, bridge rendering, bounded hierarchy wording, v1 order and report restore, baseline makes no explanation requests, all v2 lessons and items, offline/reconnect, narrow layout. |
 
 **Not verified:** the real `backend-release` package, PostgreSQL and real HTTPS, Docker and Render, VoiceOver/NVDA, formative usability, the legacy real-run viewer, and v2 routes on a real backend (none exist yet).

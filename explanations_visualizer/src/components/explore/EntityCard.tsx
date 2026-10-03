@@ -259,7 +259,7 @@ export function EntityCard({
             )}
           </Section>
 
-          {!compact && moreCategories.length > 0 && (
+          {moreCategories.length > 0 && (
             <div className="card-section">
               <button type="button" className="btn btn-sm" aria-expanded={moreOpen} onClick={() => setMoreOpen((value) => !value)}>
                 {moreOpen ? "Hide other recorded facts" : `Other recorded facts (${moreCategories.reduce((sum, c) => sum + (ctx.categories[c]?.items.length ?? 0), 0)})`}

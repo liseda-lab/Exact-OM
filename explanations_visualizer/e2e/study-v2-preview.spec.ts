@@ -173,3 +173,48 @@ test("tool-neutral setup, interactive tutorial, server-graded assessment and dur
   await expect(page.locator("#q-component_usefulness tbody th").first()).toHaveText("Original entity definitions and context");
   expect(errors).toEqual([]);
 });
+
+async function seed(page: Page, state: Record<string, unknown>) {
+  await page.addInitScript((value) => localStorage.setItem("exact.preview.v2.server", JSON.stringify(value)), state);
+}
+
+/** The control can be scrolled to and is the topmost element at its centre; layout switches
+ * re-render the rail, so a detached handle is simply retried. */
+async function topmost(page: Page, name: RegExp | string) {
+  const control = page.getByRole("button", { name }).first();
+  try {
+    await control.scrollIntoViewIfNeeded({ timeout: 2000 });
+    return await control.evaluate((element) => {
+      const box = element.getBoundingClientRect();
+      const top = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+      return box.right <= innerWidth + 1 && Boolean(top && (top === element || element.contains(top)));
+    }, undefined, { timeout: 2000 });
+  } catch {
+    return false;
+  }
+}
+
+const consent = { information_version: "preview-information/1", accepted: true, acknowledged_at: "2026-10-03T00:00:00Z" };
+const setup = { setup_version: "setup/2-preview", instructions_acknowledged: true, external_inspection_optional_understood: true, resource_access: "available", familiar_methods: [], submitted: true };
+
+test("v2 setup, tutorial lessons and cases reflow from 320 to 2560 px and at 200% text (C24)", async ({ page }) => {
+  test.setTimeout(240_000);
+  for (const [stage, extra, control] of [
+    ["setup", { setup: null }, "Continue"],
+    ["tutorial", {}, /^Add .* as rank 1$/],
+    ["case", { assigned: true, caseIndex: 0 }, "Submit answer"],
+  ] as const) {
+    await page.context().clearCookies();
+    await seed(page, Object.assign({ stage, revision: 5, consent, setup }, extra));
+    for (const scale of [1, 2]) {
+      await page.addInitScript((value) => localStorage.setItem("exact.textScale", String(value)), scale);
+      await page.goto(`${preview}/preview/participate/`);
+      await expect(page.getByRole("button", { name: control }).first()).toBeVisible();
+      for (const width of [320, 360, 390, 768, 1024, 1280, 1440, 2560]) {
+        await page.setViewportSize({ width, height: 800 });
+        await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), { message: `${stage} overflow at ${width}px, ${scale}x` }).toBe(true);
+        await expect.poll(() => topmost(page, control), { message: `${stage} control hidden at ${width}px, ${scale}x` }).toBe(true);
+      }
+    }
+  }
+});

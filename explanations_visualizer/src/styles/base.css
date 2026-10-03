@@ -493,7 +493,7 @@ code,
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  padding: 4vh 1rem;
+  padding: 4vh min(1rem, 3vw);
   overflow-y: auto;
 }
 
@@ -504,10 +504,13 @@ code,
   border: 1px solid var(--line-strong);
   border-radius: 0.875rem;
   box-shadow: var(--shadow);
-  padding: 1.5rem;
+  /* Rem padding at 200% text would leave almost no room on a phone. */
+  padding: min(1.5rem, 5vw);
   display: flex;
   flex-direction: column;
   gap: 1rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .dialog-header {
@@ -529,4 +532,15 @@ code,
   height: 1px;
   overflow: hidden;
   clip: rect(0, 0, 0, 0);
+}
+
+/* At 200% text on narrow screens a single long word must not widen the page; words that
+   fit are never broken. */
+h1,
+h2,
+h3,
+h4,
+legend {
+  overflow-wrap: anywhere;
+  min-width: 0;
 }

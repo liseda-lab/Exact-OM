@@ -212,7 +212,7 @@ export function PairWorkspace({
                   if (active === "graph")
                     return evidence.data ? (
                       evidence.data.items.length ? (
-                        <EvidenceGraph source={source} target={target} bundle={evidence.data} viewKey={`${workspace.key}|${viewKey}`} selected={selectedEvidence} onSelect={setSelectedEvidence} />
+                        <EvidenceGraph key={`${workspace.key}|${viewKey}`} source={source} target={target} bundle={evidence.data} viewKey={`${workspace.key}|${viewKey}`} selected={selectedEvidence} onSelect={setSelectedEvidence} />
                       ) : (
                         <EvidenceList state={evidence} />
                       )

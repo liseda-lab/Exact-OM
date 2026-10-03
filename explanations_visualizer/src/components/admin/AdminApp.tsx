@@ -17,6 +17,7 @@ const STAGE_NAMES: [string, string][] = [
   ["setup", "Setup"],
   ["background", "Background"],
   ["practice", "Practice"],
+  ["tutorial", "Tutorial and check"],
   ["case", "Ranking a case"],
   ["consultation", "Consultation question"],
   ["final", "Final feedback"],
@@ -24,6 +25,13 @@ const STAGE_NAMES: [string, string][] = [
   ["completed", "Completed"],
   ["closed", "Closed or declined"],
 ];
+
+/** Known stages in order, then any other stage the service reports, so no count is dropped. */
+function progressRows(counts: Record<string, number>): [string, string][] {
+  const known = new Set(STAGE_NAMES.map(([code]) => code));
+  const reported = Array.from(new Set(Object.keys(counts).map((key) => key.split(":").slice(1).join(":")))).filter((code) => code && !known.has(code));
+  return [...STAGE_NAMES.filter(([code]) => code !== "tutorial" || `participant:${code}` in counts || `test:${code}` in counts), ...reported.map((code): [string, string] => [code, code.replace(/_/g, " ")])];
+}
 
 async function adminRequest<T>(token: string, method: "GET" | "POST", path: string, body?: unknown): Promise<{ data: T; blob?: Blob; filename?: string }> {
   let response: Response;
@@ -257,7 +265,7 @@ export function AdminApp() {
                   </tr>
                 </thead>
                 <tbody>
-                  {STAGE_NAMES.map(([code, name]) => (
+                  {progressRows(progress).map(([code, name]) => (
                     <tr key={code}>
                       <th scope="row">{name}</th>
                       <td>{progress[`participant:${code}`] ?? 0}</td>

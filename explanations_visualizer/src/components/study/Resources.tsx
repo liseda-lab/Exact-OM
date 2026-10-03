@@ -23,6 +23,9 @@ const FORMATS: Record<string, string> = {
 export const SCOPE_NOTICE =
   "These are the exact ontology versions and the information this study supplies. Another release, an online viewer or another source may show different or additional information, including mappings this study withholds. You may use any inspection method; if you consult a different source, you can say so after the case.";
 
+export const OPEN_HELP =
+  "How to open them: ontology editors (Protégé is one) and many ontology viewers open these files directly, and any text editor shows them as plain text. Opening them is optional; nothing on your computer is checked.";
+
 function roleText(asset: PublicAsset): string {
   if (asset.role === "source") return "Source ontology";
   if (asset.role === "target") return "Target ontology";
@@ -112,6 +115,7 @@ export function ResourceAccessButton({
         <Dialog title="Ontology files for this study" onClose={() => setOpen(false)} wide>
           <p className="muted">{SCOPE_NOTICE}</p>
           <ResourceList resources={resources} onDownload={onDownload} baseUrl={baseUrl} />
+          <p className="meta">{OPEN_HELP}</p>
           <p className="meta">Downloading is optional and is not recorded as using a tool. Time you spend inspecting before you submit counts as part of the case.</p>
         </Dialog>
       )}

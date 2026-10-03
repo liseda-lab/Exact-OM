@@ -75,7 +75,7 @@ function Choice({
     return (
       <div className="option-grid">
         {options.map(([code, label]) => (
-          <label key={code} className={selected.includes(code) ? "option on" : "option"}>
+          <label key={code} className={`option${selected.includes(code) ? " on" : ""}${SPECIAL.has(code) ? " special" : ""}`}>
             <input type="checkbox" name={name} value={code} checked={selected.includes(code)} disabled={disabled} onChange={() => toggle(code)} />
             <span>{label}</span>
           </label>
@@ -86,7 +86,7 @@ function Choice({
   return (
     <div className="option-grid">
       {options.map(([code, label]) => (
-        <label key={code} className={value === code ? "option on" : "option"}>
+        <label key={code} className={`option${value === code ? " on" : ""}${SPECIAL.has(code) ? " special" : ""}`}>
           <input type="radio" name={name} value={code} checked={value === code} disabled={disabled} onChange={() => onChange(code)} />
           <span>{label}</span>
         </label>
@@ -108,7 +108,7 @@ function Matrix({ question, value, onChange, disabled, name, version }: { questi
               <span className="sr-only">Item</span>
             </th>
             {columns.map(([code, label]) => (
-              <th key={code} scope="col">
+              <th key={code} scope="col" className={SPECIAL.has(code) ? "special" : undefined}>
                 {label}
               </th>
             ))}
@@ -119,7 +119,7 @@ function Matrix({ question, value, onChange, disabled, name, version }: { questi
             <tr key={row}>
               <th scope="row">{rowLabel}</th>
               {columns.map(([code, label]) => (
-                <td key={code}>
+                <td key={code} className={SPECIAL.has(code) ? "special" : undefined}>
                   <input
                     type="radio"
                     name={`${name}-${row}`}
@@ -140,7 +140,7 @@ function Matrix({ question, value, onChange, disabled, name, version }: { questi
             <legend>{rowLabel}</legend>
             <div className="option-grid">
               {columns.map(([code, label]) => (
-                <label key={code} className={current[row] === code ? "option on" : "option"}>
+                <label key={code} className={`option${current[row] === code ? " on" : ""}${SPECIAL.has(code) ? " special" : ""}`}>
                   <input type="radio" name={`${name}-card-${row}`} checked={current[row] === code} disabled={disabled} onChange={() => onChange({ ...current, [row]: code })} />
                   <span>{label}</span>
                 </label>

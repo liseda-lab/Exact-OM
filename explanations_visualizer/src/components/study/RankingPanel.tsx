@@ -146,12 +146,14 @@ export function CandidateRows({
                   {candidate.position}
                 </span>
                 {onInspect ? (
-                  <button type="button" className="initial-text inspect-target" aria-pressed={isInspecting} aria-label={`Inspect ${candidate.label}`} onClick={() => onInspect(candidate.id)}>
+                  <button type="button" className="initial-text inspect-target" aria-pressed={isInspecting} aria-label={`Inspect ${candidate.label}`} aria-describedby={`inspect-state-${candidate.id}`} onClick={() => onInspect(candidate.id)}>
                     <span className="initial-label">{candidate.label}</span>
                     <span className="meta">
                       <span className="iri">{candidate.identifier}</span> · {practice ? "illustrative score" : "matching score"} {candidate.score}
                     </span>
-                    <span className={isInspecting ? "inspect-state on" : "inspect-state"}>{isInspecting ? "Inspecting" : seen ? "Viewed" : "Not viewed yet"}</span>
+                    <span id={`inspect-state-${candidate.id}`} className={isInspecting ? "inspect-state on" : "inspect-state"}>
+                      {isInspecting ? "Inspecting" : seen ? "Viewed" : "Not viewed yet"}, initial position {candidate.position}
+                    </span>
                   </button>
                 ) : (
                   <span className="initial-text">

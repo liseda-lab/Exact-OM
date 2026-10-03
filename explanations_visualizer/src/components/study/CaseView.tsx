@@ -102,7 +102,15 @@ export function CaseView({ state, session, telemetry, timingEnabled = true }: { 
         const seen = readViewed(current.presentation_id);
         if (first) seen.add(first);
         setViewed(seen);
-        if (current.condition === "explanation" && !current.workspace?.scope_id && current.explanation_refs.length) {
+        if (current.condition === "explanation" && current.workspace?.scope_id) {
+          // A scoped workspace (16 B1) is ready only once the source's context actually loads.
+          try {
+            await getJson(`/api/v1/study/workspace/${encodeURIComponent(current.workspace.scope_id)}/entity-context`, { ontology_version_id: current.source.ontology_version_id, iri: current.source.iri, kind: current.source.kind });
+          } catch (error) {
+            if (!cancelled) setResourceError(`The case information could not be loaded: ${describeError(error)} Reconnect and retry before answering this case.`);
+            return;
+          }
+        } else if (current.condition === "explanation" && current.explanation_refs.length) {
           try {
             const loaded = await Promise.all(current.explanation_refs.map((ref) => getJson<ExplanationResource>(`/api/v1/study/resources/${encodeURIComponent(ref)}`)));
             if (!cancelled) setResources(loaded);

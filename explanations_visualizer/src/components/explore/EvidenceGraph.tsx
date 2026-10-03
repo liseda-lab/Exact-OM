@@ -62,7 +62,7 @@ function remember(key: string, view: GraphView) {
 }
 
 export const EDGE_MEANING: Record<EdgeKind, string> = {
-  asserted: "An asserted subclass axiom, added to the graph from the ontology.",
+  asserted: "An asserted hierarchy axiom (subclass or subproperty), added to the graph from the ontology.",
   structural: "A parent reached by a documented structural rule, not asserted directly.",
   feature: "A feature Exact selected for this pair, projected from the original record shown in the evidence list.",
   bridge: "Exact compared features of this kind from both entities when scoring. This does not state that any two features correspond or are equivalent.",
@@ -533,7 +533,7 @@ export function EvidenceGraph({
       for (const edge of page.items) {
         const id = nodeId(node.ontology, edge.parent.iri);
         if (!model.nodes.some((item) => item.id === id)) nodes.push({ id, side: node.side, role: "context", iri: edge.parent.iri, kind: edge.parent.kind, ontology: node.ontology, group: "expanded", anchor: node.id });
-        edges.push({ id: `h:${edge.id}`, source: node.id, target: id, label: "subclass of", kind: edge.basis === "structural_navigation" ? "structural" : "asserted" });
+        edges.push({ id: `h:${edge.id}`, source: node.id, target: id, label: node.kind === "class" ? "subclass of" : node.kind === "individual" ? "instance of" : "subproperty of", kind: edge.basis === "structural_navigation" ? "structural" : "asserted" });
       }
       if (!edges.length) {
         setExpandError(page.status === "absent_in_scope" ? "No asserted parent is recorded for this node in the loaded scope." : page.reason ?? "Parents of this node are not available in this view.");

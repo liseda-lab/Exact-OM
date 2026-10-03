@@ -111,6 +111,9 @@ export function StudyHeader({
               </li>
             ))}
           </ol>
+          <p className="study-step-summary" aria-hidden="true">
+            Step {index + 1} of {STEPS.length}: {STEPS[index].label === "Practice" ? tutorialLabel : STEPS[index].label}
+          </p>
         </nav>
       )}
       {session.hasRecovery && (

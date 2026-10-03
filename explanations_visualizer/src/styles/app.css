@@ -796,7 +796,7 @@
 
 .provenance-list {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
   gap: 0.5rem 1rem;
   margin: 0.25rem 0 0;
   font-size: 0.875rem;
@@ -1093,7 +1093,7 @@
 
 .kv-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
   gap: 0.75rem 1.25rem;
 }
 
@@ -1693,7 +1693,7 @@
 
 .help-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
   gap: 1.25rem 2rem;
 }
 
@@ -1879,6 +1879,9 @@
 }
 
 /* Long ontology words (e.g. has_material_basis_in, full IRIs) must wrap, not widen the page. */
+.pair-heading,
+.pair-question,
+.entity-title,
 .claim,
 .claim-text,
 .parent-link,
@@ -1988,7 +1991,7 @@ button.citation:hover {
 
 .inspector-facts {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
   gap: 0.5rem 1rem;
   margin: 0;
 }

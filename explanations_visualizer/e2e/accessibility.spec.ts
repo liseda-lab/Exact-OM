@@ -154,6 +154,33 @@ for (const profile of profiles) for (const theme of ["light", "dark"]) {
   });
 }
 
+/** The control can be scrolled to and is the topmost element at its centre (not clipped or covered). */
+async function usable(page: Page, locator: ReturnType<Page["locator"]>) {
+  await locator.scrollIntoViewIfNeeded();
+  return locator.evaluate((element) => {
+    const box = element.getBoundingClientRect();
+    if (box.width === 0 || box.height === 0 || box.right > innerWidth + 1 || box.left < -1) return false;
+    const top = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+    return Boolean(top && (top === element || element.contains(top)));
+  });
+}
+
+test("a study case reflows from 320 to 2560 px and at 200% text without hidden controls (C24)", async ({ page }) => {
+  test.skip(!study, "Requires the private synthetic study harness configuration");
+  test.setTimeout(180_000);
+  await caseReady(page);
+  for (const scale of [1, 2]) {
+    await page.evaluate((value) => { localStorage.setItem("exact.textScale", String(value)); document.documentElement.style.setProperty("--text-scale", String(value)); }, scale);
+    for (const width of [320, 360, 390, 768, 1024, 1280, 1440, 2560]) {
+      await page.setViewportSize({ width, height: 800 });
+      await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), { message: `overflow at ${width}px, ${scale}x` }).toBe(true);
+      for (const control of [page.getByRole("button", { name: /^Add .* as rank 1$/ }).first(), page.getByRole("radio", { name: /^None of these/ }), page.getByRole("button", { name: "Submit answer", exact: true })]) {
+        await expect.poll(() => usable(page, control).catch(() => false), { message: `control hidden at ${width}px, ${scale}x` }).toBe(true);
+      }
+    }
+  }
+});
+
 test("dialog keyboard focus wraps and returns to its trigger", async ({ page }) => {
   await page.goto("/");
   await comparisonReady(page);

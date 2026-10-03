@@ -46,6 +46,16 @@ export function TutorialStage({ state, session, onPause }: { state: StudyState; 
       </MessagePage>
     );
   }
+  // An incomplete or mismatched tutorial is a publication problem, never replaced by a fallback.
+  const progressVersion = state.tutorial_progress?.tutorial_version;
+  if (!tutorial.lessons.length || !tutorial.assessment.length || !tutorial.case?.candidates?.length || (progressVersion && progressVersion !== tutorial.version)) {
+    return (
+      <MessagePage title="The tutorial for this study cannot be shown">
+        <p>The tutorial included with this study version is incomplete or does not match your saved progress, so this page will not continue with it or substitute another one. Your progress is saved.</p>
+        <p className="muted">Please tell the study team. Tutorial version {tutorial.version}.</p>
+      </MessagePage>
+    );
+  }
   return <Tutorial state={state} session={session} tutorial={tutorial} onPause={onPause} />;
 }
 

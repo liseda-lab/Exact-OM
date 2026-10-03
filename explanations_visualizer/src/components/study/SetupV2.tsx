@@ -8,7 +8,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import { ResourceList, SCOPE_NOTICE } from "@/components/study/Resources";
+import { OPEN_HELP, ResourceList, SCOPE_NOTICE } from "@/components/study/Resources";
 import { Paragraphs } from "@/components/study/StudyChrome";
 import type { StudySession } from "@/study/session";
 import { isSetupV2, type ResourceAccess, type SetupV2, type StudyState } from "@/study/types";
@@ -112,6 +112,7 @@ export function SetupStageV2({ state, session }: { state: StudyState; session: S
         <h2 id="setup-files-h">2 · The two ontology files</h2>
         <p className="muted">{SCOPE_NOTICE}</p>
         <ResourceList resources={state.ontology_resources} />
+        <p className="meta">{OPEN_HELP}</p>
         <fieldset className="question">
           <legend className="question-label">Can you get the two files?</legend>
           <p className="meta">Downloading now is optional; this only checks that they are available to you if you want them.</p>
