@@ -200,3 +200,15 @@ rows and all larger/deferred studies remain deferred. Routine preparation and
 small tested adapter changes for this addendum are already authorized; do not
 request approval for them. If one arm becomes terminal again, account for it and
 continue the independent eligible arm and reporting.
+
+`tools.repair.evaluation_addendum` freezes the recovered selections before
+reading prior outcomes for provenance. It requires identical serialized cases,
+protocols, schedule rows and inference dependencies. The evaluation runner
+retains each reused row's original schedule hash, receipt, proof and cost record;
+only previously unavailable recovered HGT rows execute. The original evaluation
+stage ledger remains unchanged, and its spent time is deducted from the new
+revision's inner allowance. The batch runner additionally enforces the unchanged
+logical-job cumulative cap across all attempts. Attempt 003 writes the merged
+72-row evaluation to `work/xr21-t2-evaluation/addendum-003/evaluation-report.json`,
+preserving the original evaluation and report outputs. Report revision
+preparation must consume that relative output from its actual completion receipt.

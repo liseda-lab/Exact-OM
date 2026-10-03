@@ -531,12 +531,21 @@ def run(schedule_path, output):
             if key in arm:
                 check_binding(arm[key])
     identity = canonical_hash(schedule)
+    reused = {}
+    if "reuse" in schedule:
+        from tools.repair.evaluation_addendum import checked_reuse
+
+        reused = checked_reuse(schedule)
     results = []
     with CumulativeBudget(
         output / "evaluation-budget.json", identity, schedule["inner_seconds"]
     ) as total:
         total.begin()
         for row in schedule["rows"]:
+            if row["id"] in reused:
+                # Preserve the original schedule identity and evidence byte-for-byte.
+                results.append(reused[row["id"]])
+                continue
             directory = output / "rows" / row["id"]
             receipt = directory / "receipt.json"
             if receipt.exists():
@@ -638,6 +647,10 @@ def run(schedule_path, output):
         "production_matcher": "deferred",
         "external_api_cost_usd": 0,
     }
+    if reused:
+        report["reuse"] = schedule["reuse"]
+        report["reused_rows"] = len(reused)
+        report["new_rows"] = len(results) - len(reused)
     write_artifact(output / "evaluation-report.json", report)
     return report
 
