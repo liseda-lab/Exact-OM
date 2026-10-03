@@ -178,7 +178,7 @@ def test_native_uniform_robustness_pipeline(prepared, tmp_path, condition):
     assert read_record(pool["objective"]).pool_hash == canonical_hash(
         read_record(pool["input"]).objects
     )
-    assert fresh.bound(item["evaluator"]) == case_to_dict(case)
+    assert canonical_hash(fresh.bound(item["evaluator"])) == canonical_hash(case_to_dict(case))
 
 
 def test_learned_checkpoint_uses_same_final_exclusion(prepared, tmp_path):
