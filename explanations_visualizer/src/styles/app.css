@@ -1904,3 +1904,150 @@
   min-width: 0;
   overflow-wrap: anywhere;
 }
+
+/* ---------- Shared workspace ---------- */
+
+.pair-workspace {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  min-width: 0;
+}
+
+.hierarchy-pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1.25rem;
+}
+
+@container (min-width: 56rem) {
+  .hierarchy-pair {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .hierarchy-pair > .btn {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+}
+
+.hierarchy-pair .browser {
+  box-shadow: none;
+}
+
+button.citation {
+  background: transparent;
+  font: inherit;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  min-height: 1.75rem;
+  cursor: pointer;
+  color: var(--ink-2);
+}
+
+button.citation:hover {
+  border-color: var(--line-strong);
+  background: var(--surface-2);
+}
+
+.located {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+  border-radius: var(--radius-sm);
+  transition: outline-color 0.2s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .located {
+    transition: none;
+  }
+}
+
+.inspector {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+  min-width: 0;
+}
+
+.inspector-subjects ul {
+  list-style: none;
+  margin: 0.25rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.inspector-subjects li {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  overflow-wrap: anywhere;
+}
+
+.inspector-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: 0.5rem 1rem;
+  margin: 0;
+}
+
+.inspector-facts dt {
+  font-size: 0.8125rem;
+  color: var(--ink-2);
+}
+
+.inspector-facts dd {
+  margin: 0;
+}
+
+.inspector-literal {
+  margin: 0;
+  padding: 0.75rem 1rem;
+  border-left: 3px solid var(--line-strong);
+  background: var(--surface-2);
+  font-family: var(--font-display);
+  font-size: 1.125rem;
+  overflow-wrap: anywhere;
+}
+
+.limits.card {
+  padding: 0.875rem 1.25rem;
+}
+
+.limits summary {
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.limits ul {
+  margin: 0.5rem 0 0;
+  padding-left: 1.25rem;
+  font-size: 0.9375rem;
+  color: var(--ink-2);
+}
+
+.evidence-item[aria-current="true"] {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.copy-iri {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.375rem;
+  max-width: 100%;
+}
+
+.copy-fallback {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  width: min(100%, 26rem);
+}
+
+.copy-fallback .input {
+  font-size: 0.875rem;
+}

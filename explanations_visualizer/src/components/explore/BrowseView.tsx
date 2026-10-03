@@ -10,6 +10,7 @@ import { useEntityContext } from "@/components/explore/CompareView";
 import { EntityCard } from "@/components/explore/EntityCard";
 import { ontologyName, useExplore } from "@/components/explore/ExploreContext";
 import { HierarchyBrowser } from "@/components/explore/HierarchyBrowser";
+import { FactInspectorProvider } from "@/components/workspace/FactInspector";
 import type { EntityKind, EntityRef, OntologyMeta } from "@/lib/types";
 import { useUrlState } from "@/lib/urlState";
 
@@ -107,6 +108,7 @@ export function BrowseView() {
       </div>
       {contextFor && contextEntity && (
         <Dialog title="Full context" onClose={() => setContextFor(null)} wide>
+          <FactInspectorProvider>
           <EntityCard
             side={contextFor.side}
             entity={contextEntity}
@@ -120,6 +122,7 @@ export function BrowseView() {
               setContextFor(null);
             }}
           />
+          </FactInspectorProvider>
         </Dialog>
       )}
     </div>

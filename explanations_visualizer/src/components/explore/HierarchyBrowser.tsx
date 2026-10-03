@@ -1,7 +1,9 @@
 "use client";
 
 // Independent hierarchy browser for one ontology. It never depends on the match graph:
-// every step is a bounded query by entity, with the hierarchy basis stated explicitly.
+// every step is a bounded query by entity through the active workspace, with the hierarchy
+// basis stated explicitly. A workspace that holds only part of an ontology says where its
+// information ends instead of showing an empty tree.
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -9,23 +11,21 @@ import { ErrorNote, Skeleton } from "@/components/common/ErrorNote";
 import { IconChevronDown, IconChevronUp, SideMarker } from "@/components/common/Icons";
 import { EmptyReason } from "@/components/common/StatusText";
 import { EntitySearch } from "@/components/explore/EntitySearch";
-import { getJson } from "@/lib/api";
 import { curie, KIND_NAMES } from "@/lib/iri";
-import { useLabels } from "@/lib/labels";
-import type { EntityKind, HierarchyEdge, HierarchyPage } from "@/lib/types";
+import { useLabelLookup } from "@/lib/labelSource";
+import type { EntityKind, HierarchyEdge } from "@/lib/types";
 import { useAsync } from "@/lib/useAsync";
+import type { Basis } from "@/lib/workspace/types";
+import { useWorkspace, useWorkspaceAction } from "@/lib/workspace/WorkspaceContext";
 
-export type Basis = "literal_asserted" | "structural_navigation" | "reasoner_inferred";
+export type { Basis } from "@/lib/workspace/types";
+export type FocusVia = "parent" | "child" | "search" | "card" | "return";
 
 const BASES: { value: Basis; label: string; note: string }[] = [
   { value: "literal_asserted", label: "Asserted", note: "Named parents exactly as asserted in the ontology file." },
   { value: "structural_navigation", label: "Structural navigation", note: "Also named parts of equivalence and intersection axioms, by a documented rule." },
   { value: "reasoner_inferred", label: "Reasoner inferred", note: "Only when a reasoner was run for this bundle." },
 ];
-
-function fetchHierarchy(ontology: string, iri: string, kind: EntityKind, direction: "parents" | "children", basis: Basis, cursor?: string | null, signal?: AbortSignal) {
-  return getJson<HierarchyPage>("/api/v1/hierarchy", { ontology_version_id: ontology, iri, kind, direction, basis, limit: 50, cursor }, signal);
-}
 
 function ParentBranch({
   ontology,
@@ -41,20 +41,34 @@ function ParentBranch({
   kind: EntityKind;
   basis: Basis;
   depth: number;
-  onFocus: (iri: string, kind: EntityKind) => void;
+  onFocus: (iri: string, kind: EntityKind, via: FocusVia) => void;
   side: "source" | "target";
 }) {
+  const workspace = useWorkspace();
+  const report = useWorkspaceAction();
   const [open, setOpen] = useState(false);
-  const state = useAsync(open ? `parents|${ontology}|${kind}|${iri}|${basis}` : null, (signal) => fetchHierarchy(ontology, iri, kind, "parents", basis, null, signal));
+  const state = useAsync(open ? `${workspace.key}|parents|${ontology}|${kind}|${iri}|${basis}` : null, (signal) =>
+    workspace.hierarchy({ ontology_version_id: ontology, iri, kind }, "parents", basis, null, signal),
+  );
   const parents = (state.data?.items ?? []).filter((edge) => edge.child.iri === iri);
-  const label = useLabels(ontology, [iri, ...parents.map((edge) => edge.parent.iri)]);
+  const label = useLabelLookup(ontology, [iri, ...parents.map((edge) => edge.parent.iri)]);
   return (
     <li className="tree-item">
       <div className="tree-row">
-        <button type="button" className="tree-toggle" aria-expanded={open} aria-label={`${open ? "Hide" : "Show"} parents of ${label(iri)?.value ?? curie(iri)}`} onClick={() => setOpen((value) => !value)} disabled={depth > 12}>
+        <button
+          type="button"
+          className="tree-toggle"
+          aria-expanded={open}
+          aria-label={`${open ? "Hide" : "Show"} parents of ${label(iri)?.value ?? curie(iri)}`}
+          onClick={() => {
+            report({ type: open ? "hierarchy_collapse" : "hierarchy_expand", side, iri });
+            setOpen((value) => !value);
+          }}
+          disabled={depth > 12}
+        >
           {open ? <IconChevronDown /> : <IconChevronUp />}
         </button>
-        <button type="button" className={`tree-label tree-${side}`} onClick={() => onFocus(iri, kind)}>
+        <button type="button" className={`tree-label tree-${side}`} onClick={() => onFocus(iri, kind, "parent")}>
           {label(iri)?.value ?? <span className="muted">{curie(iri)}</span>}
         </button>
         <span className="iri">{curie(iri)}</span>
@@ -63,7 +77,7 @@ function ParentBranch({
         <div className="tree-children">
           {state.error ? <ErrorNote error={state.error} onRetry={state.reload} /> : null}
           {!state.data && !state.error ? <Skeleton lines={1} title={false} /> : null}
-          {state.data && !parents.length && <p className="meta">No named parent in this basis and scope.</p>}
+          {state.data && !parents.length && <EmptyReason status={state.data.status} what="named parent" reason={state.data.reason} />}
           {parents.length > 0 && (
             <ul>
               {parents.map((edge) => (
@@ -96,6 +110,7 @@ export function HierarchyBrowser({
   entityCount,
   scopeNote,
   onOpenContext,
+  headingLevel = 2,
 }: {
   side: "source" | "target";
   ontology: string;
@@ -104,19 +119,23 @@ export function HierarchyBrowser({
   kind?: EntityKind;
   pinnedIri?: string | null;
   pinnedKind?: EntityKind;
-  onFocus: (iri: string, kind: EntityKind) => void;
+  onFocus: (iri: string, kind: EntityKind, via: FocusVia) => void;
   reasonerStatus?: string;
   entityCount?: number;
   scopeNote?: React.ReactNode;
   onOpenContext?: (iri: string, kind: EntityKind) => void;
+  headingLevel?: 2 | 3;
 }) {
+  const workspace = useWorkspace();
+  const report = useWorkspaceAction();
   const [basis, setBasis] = useState<Basis>("literal_asserted");
   const [childPages, setChildPages] = useState<HierarchyEdge[]>([]);
   const [childCursor, setChildCursor] = useState<string | null>(null);
   const [childMoreError, setChildMoreError] = useState<unknown>(null);
+  const focus = focusIri ? { ontology_version_id: ontology, iri: focusIri, kind } : null;
 
-  const parents = useAsync(focusIri ? `p|${ontology}|${kind}|${focusIri}|${basis}` : null, (signal) => fetchHierarchy(ontology, focusIri!, kind, "parents", basis, null, signal));
-  const children = useAsync(focusIri ? `c|${ontology}|${kind}|${focusIri}|${basis}` : null, (signal) => fetchHierarchy(ontology, focusIri!, kind, "children", basis, null, signal));
+  const parents = useAsync(focus ? `${workspace.key}|p|${ontology}|${kind}|${focusIri}|${basis}` : null, (signal) => workspace.hierarchy(focus!, "parents", basis, null, signal));
+  const children = useAsync(focus ? `${workspace.key}|c|${ontology}|${kind}|${focusIri}|${basis}` : null, (signal) => workspace.hierarchy(focus!, "children", basis, null, signal));
   useEffect(() => {
     setChildPages(children.data?.items ?? []);
     setChildCursor(children.data?.next_cursor ?? null);
@@ -131,31 +150,44 @@ export function HierarchyBrowser({
     const controller = new AbortController();
     moreController.current = controller;
     try {
-      const page = await fetchHierarchy(ontology, focusIri, kind, "children", basis, childCursor, controller.signal);
+      const page = await workspace.hierarchy({ ontology_version_id: ontology, iri: focusIri, kind }, "children", basis, childCursor, controller.signal);
       if (controller.signal.aborted) return;
       setChildPages((list) => [...list, ...page.items]);
       setChildCursor(page.next_cursor);
     } catch (error) {
       if (!controller.signal.aborted) setChildMoreError(error);
     }
-  }, [basis, childCursor, focusIri, kind, ontology]);
+  }, [basis, childCursor, focusIri, kind, ontology, workspace]);
 
   const parentEdges = (parents.data?.items ?? []).filter((edge) => edge.child.iri === focusIri);
-  const label = useLabels(ontology, [focusIri ?? "", pinnedIri ?? "", ...parentEdges.map((edge) => edge.parent.iri), ...childPages.map((edge) => edge.child.iri)].filter(Boolean));
-  const reasonerAvailable = reasonerStatus === "available";
+  const label = useLabelLookup(ontology, [focusIri ?? "", pinnedIri ?? "", ...parentEdges.map((edge) => edge.parent.iri), ...childPages.map((edge) => edge.child.iri)].filter(Boolean));
+  const prepared = (value: Basis) =>
+    workspace.kind === "exploration" ? value !== "reasoner_inferred" || reasonerStatus === "available" : workspace.capabilities.bases.includes(value);
+  const Heading = headingLevel === 2 ? "h2" : "h3";
+  const Sub = headingLevel === 2 ? "h3" : "h4";
+  const sideName = side === "source" ? "Source" : "Target";
+  const partialScope = workspace.capabilities.navigation === "partial";
 
   return (
-    <section className={`card browser browser-${side}`} aria-label={`${side === "source" ? "Source" : "Target"} ontology browser`}>
+    <section className={`card browser browser-${side}`} aria-label={`${sideName} ontology browser`}>
       <div className="browser-head">
         <div className="browser-title">
           <SideMarker side={side} />
-          <h2>{/^(Source|Target) ontology$/.test(ontologyLabel) ? ontologyLabel : `${side === "source" ? "Source" : "Target"} ontology · ${ontologyLabel}`}</h2>
+          <Heading>{/^(Source|Target) ontology$/.test(ontologyLabel) ? ontologyLabel : `${sideName} ontology · ${ontologyLabel}`}</Heading>
           {entityCount != null && <span className="meta">{entityCount.toLocaleString()} entities</span>}
         </div>
-        <EntitySearch ontology={ontology} label={`Search the ${side} ontology`} placeholder="Search by label, synonym prefix or full IRI" onChoose={(item) => onFocus(item.entity.iri, item.entity.kind)} />
+        <EntitySearch
+          ontology={ontology}
+          label={`Search the ${side} ontology`}
+          placeholder="Search by label, synonym prefix or full IRI"
+          onChoose={(item) => {
+            report({ type: "search", side });
+            onFocus(item.entity.iri, item.entity.kind, "search");
+          }}
+        />
         <div className="basis-group" role="radiogroup" aria-label="Hierarchy basis">
           {BASES.map((option) => {
-            const disabled = option.value === "reasoner_inferred" && !reasonerAvailable;
+            const disabled = !prepared(option.value);
             return (
               <button
                 key={option.value}
@@ -176,6 +208,11 @@ export function HierarchyBrowser({
         <p className="meta">{BASES.find((option) => option.value === basis)?.note}</p>
       </div>
       {scopeNote}
+      {partialScope && (
+        <p className="note browser-note" role="note">
+          {workspace.capabilities.scopeNote ?? "Only part of this ontology is available here."} Where the prepared information ends, the browser says so.
+        </p>
+      )}
       {!focusIri ? (
         <div className="browser-body">
           <p className="note">Search for an entity to start browsing this ontology.</p>
@@ -184,8 +221,8 @@ export function HierarchyBrowser({
         <div className="browser-body">
           <div className="browser-section">
             <div className="section-head">
-              <h3 className="eyebrow">Parents</h3>
-              {parents.data && <span className="meta">{parentEdges.length ? `${parentEdges.length}${parentEdges.length > 1 ? " · multiple inheritance" : ""}` : ""}</span>}
+              <Sub className="eyebrow">Parents</Sub>
+              {parents.data && <span className="meta">{parentEdges.length ? `${parentEdges.length}${parentEdges.length > 1 ? " · multiple inheritance" : ""}${parents.data.status === "partial" ? " · more may exist" : ""}` : ""}</span>}
             </div>
             {parents.error ? <ErrorNote error={parents.error} onRetry={parents.reload} what="Parents" /> : null}
             {!parents.data && !parents.error ? <Skeleton lines={2} title={false} /> : null}
@@ -210,7 +247,7 @@ export function HierarchyBrowser({
                 </button>
               )}
               {pinnedIri && (pinnedIri !== focusIri || pinnedKind !== kind) && (
-                <button type="button" className="btn btn-sm" onClick={() => onFocus(pinnedIri, pinnedKind)}>
+                <button type="button" className="btn btn-sm" onClick={() => onFocus(pinnedIri, pinnedKind, "return")}>
                   Return to {label(pinnedIri)?.value ?? curie(pinnedIri)}
                 </button>
               )}
@@ -219,10 +256,10 @@ export function HierarchyBrowser({
 
           <div className="browser-section">
             <div className="section-head">
-              <h3 className="eyebrow">Children</h3>
+              <Sub className="eyebrow">Children</Sub>
               {children.data && (
                 <span className="meta">
-                  {childPages.length ? `${childPages.length} of ${children.data.total_count ?? "?"}` : ""}
+                  {childPages.length ? (children.data.total_count != null ? `${childPages.length} of ${children.data.total_count}` : `${childPages.length} shown${children.data.status === "partial" ? " · more may exist" : ""}`) : ""}
                 </span>
               )}
             </div>
@@ -233,7 +270,7 @@ export function HierarchyBrowser({
               <ul className="child-list">
                 {childPages.map((edge) => (
                   <li key={edge.id}>
-                    <button type="button" className={`tree-label tree-${side}`} onClick={() => onFocus(edge.child.iri, edge.child.kind)}>
+                    <button type="button" className={`tree-label tree-${side}`} onClick={() => onFocus(edge.child.iri, edge.child.kind, "child")}>
                       {label(edge.child.iri)?.value ?? <span className="muted">{curie(edge.child.iri)}</span>}
                     </button>
                     <span className="iri">{curie(edge.child.iri)}</span>

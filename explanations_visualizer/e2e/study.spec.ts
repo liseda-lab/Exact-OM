@@ -82,10 +82,36 @@ test("complete HTTPS/PostgreSQL participant journey, pause, reload, timing and c
     await expect(page.getByRole("radio", { name: /^None of these/ })).toBeEnabled();
     const current = await (await page.request.get(`${config!.origin}/api/v1/study/cases/current`)).json();
     conditions.add(current.condition);
+    // Both conditions share the case layout and the same downloads entry point.
+    await expect(page.getByRole("button", { name: /Ontology files/ })).toBeVisible();
+    await expect(page.getByRole("complementary", { name: "Candidates and your answer" })).toBeVisible();
     if (current.condition === "ontology_baseline") {
-      await expect(page.getByRole("button", { name: "Inspect", exact: true })).toHaveCount(0);
+      await expect(page.getByRole("tab")).toHaveCount(0);
+      await expect(page.locator(".comparison, .generated")).toHaveCount(0);
       const resource = await page.request.get(`${config!.origin}/api/v1/study/resources/explanation-0`);
       expect(resource.status()).toBe(403);
+    } else {
+      // Every prepared citation in the explanation workspace opens its original record (C03).
+      const citations = page.locator("button.citation");
+      for (let item = 0; item < await citations.count(); item += 1) {
+        await citations.nth(item).click();
+        await expect(page.getByRole("dialog")).toContainText("Origin");
+        await page.keyboard.press("Escape");
+      }
+      // Editing the answer keeps the evidence graph view (C07); a candidate without prepared
+      // evidence says so explicitly instead of drawing an empty graph.
+      await page.getByRole("tab", { name: "Evidence graph", exact: true }).click();
+      const graph = page.getByRole("img", { name: /^Evidence graph with/ });
+      await expect(graph.or(page.getByText("No matcher evidence was prepared for this candidate."))).toBeVisible();
+      if (await graph.isVisible()) {
+        await page.getByRole("button", { name: "Zoom in", exact: true }).click();
+        const zoom = () => page.locator(".graph-canvas").evaluate((element) => (element as unknown as { _cyreg: { cy: { zoom: () => number } } })._cyreg.cy.zoom());
+        const before = await zoom();
+        await page.getByRole("button", { name: /^Add .* as rank \d$/ }).first().click();
+        await expect(page.locator(".save-indicator")).toContainText("Saved");
+        expect(await zoom()).toBe(before);
+        await page.getByRole("button", { name: "Undo", exact: true }).click();
+      }
     }
     if (index === 0) {
       await page.getByRole("button", { name: /^Add .* as rank 1$/ }).first().click();

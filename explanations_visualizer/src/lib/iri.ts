@@ -9,6 +9,9 @@ const PREFIXES: [string, string][] = [
   ["http://www.w3.org/2001/XMLSchema#", "xsd:"],
   ["http://www.geneontology.org/formats/oboInOwl#", "oboInOwl:"],
   ["http://purl.org/sig/ont/fma/", "FMA:"],
+  // Synthetic tutorial namespaces (example.org is reserved for documentation).
+  ["https://example.org/practice/a#", "practiceA:"],
+  ["https://example.org/practice/b#", "practiceB:"],
 ];
 
 const OBO = "http://purl.obolibrary.org/obo/";

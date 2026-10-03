@@ -72,6 +72,9 @@ export function EmptyReason({
     default:
       text = reason || `No ${what} to show.`;
   }
+  // A view-specific reason (for example "not prepared for this study case") is more precise
+  // than the generic bundle wording; absence in scope keeps its fixed explanation.
+  if (reason && status && status !== "absent_in_scope" && status !== "available") text = reason;
   const warn = status === "unresolved_import" || status === "partial" || status === "failed";
   return (
     <p className={warn ? "note note-warn" : "note"}>

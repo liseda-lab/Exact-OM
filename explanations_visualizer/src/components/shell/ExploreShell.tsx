@@ -1,8 +1,21 @@
 "use client";
 
-import { ExploreProvider, useExplore } from "@/components/explore/ExploreContext";
+import { useMemo } from "react";
+
 import { Skeleton } from "@/components/common/ErrorNote";
+import { ExploreProvider, useExplore } from "@/components/explore/ExploreContext";
 import { AppHeader, type NavKey } from "@/components/shell/AppHeader";
+import { createApiSource } from "@/lib/workspace/apiSource";
+import { WorkspaceProvider } from "@/lib/workspace/WorkspaceContext";
+
+/** The exploration app reads its shared workspace from the open bundle's API. */
+function ExplorationWorkspace({ children }: { children: React.ReactNode }) {
+  const state = useExplore();
+  const packageId = state.health?.package_id ?? "none";
+  const ontologies = state.ontologies;
+  const source = useMemo(() => createApiSource({ key: `exploration|${packageId}`, ontologyName: (id) => ontologies[id]?.name ?? null }), [packageId, ontologies]);
+  return <WorkspaceProvider source={source}>{children}</WorkspaceProvider>;
+}
 
 function Gate({ active, children, allowWithoutBundle }: { active: NavKey; children: React.ReactNode; allowWithoutBundle?: boolean }) {
   const state = useExplore();
@@ -45,7 +58,7 @@ function Gate({ active, children, allowWithoutBundle }: { active: NavKey; childr
     );
   }
   void active;
-  return <>{children}</>;
+  return <ExplorationWorkspace>{children}</ExplorationWorkspace>;
 }
 
 export function ExploreShell({ active, children, allowWithoutBundle = false }: { active: NavKey; children: React.ReactNode; allowWithoutBundle?: boolean }) {

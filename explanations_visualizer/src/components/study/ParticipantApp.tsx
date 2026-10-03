@@ -2,20 +2,33 @@
 
 // First-party participant application. The page GET does nothing server-side; the private
 // link is exchanged by POST for an HttpOnly session cookie and removed from the address bar.
+// The study contract version selects the flow: exact-study/1.0 sessions keep their frozen
+// legacy steps, exact-study/2.0 uses tool-neutral setup, the interactive tutorial and
+// durable per-case reports. Any other version fails visibly before collecting answers.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Skeleton } from "@/components/common/ErrorNote";
 import { CaseView } from "@/components/study/CaseView";
-import { ConsultationStage, FormStage, GapDialog, MessagePage, PausedStage, PracticeStage, SetupStage, WelcomeStage } from "@/components/study/Stages";
+import { ConsultationStageV2 } from "@/components/study/ConsultationV2";
+import { LegacyConsultationStage, LegacyPracticeStage, LegacySetupStage } from "@/components/study/LegacyStages";
+import { SetupStageV2 } from "@/components/study/SetupV2";
+import { FormStage, GapDialog, MessagePage, PausedStage, WelcomeStage, type Protocol } from "@/components/study/Stages";
 import { StudyHeader } from "@/components/study/StudyChrome";
+import { TutorialStage } from "@/components/study/Tutorial";
 import { getJson } from "@/lib/api";
+import type { Mutation } from "@/study/mutationQueue";
 import { useStudySession } from "@/study/session";
 import { useTelemetry } from "@/study/telemetry";
-import type { StudyCase } from "@/study/types";
+import type { StudyCase, StudyState } from "@/study/types";
 
-const PAUSABLE = new Set(["setup", "background", "practice", "case", "consultation", "final"]);
+const PAUSABLE = new Set(["setup", "background", "practice", "tutorial", "case", "consultation", "final"]);
 const SEEN_KEY = "exact.study.lastSeen";
+const CONTRACTS: Record<string, Protocol> = { "exact-study/1.0": "v1", "exact-study/2.0": "v2" };
+
+export function protocolOf(state: StudyState): Protocol | null {
+  return CONTRACTS[state.contract_version ?? "exact-study/1.0"] ?? null;
+}
 
 function lastSeen(sessionId: string): number | null {
   try {
@@ -34,23 +47,19 @@ function markSeen(sessionId: string) {
   }
 }
 
-/** Saves that can move the participant to another step; timing must be closed first. */
-function changesStage(path: string, body: Record<string, unknown>): boolean {
-  if (/\/(consent|submit|consultation|pause|complete)$/.test(path)) return true;
-  if (path.endsWith("/setup")) return ["protege_installed", "source_opened", "target_opened", "practice_source_located", "practice_definition_parents_inspected"].every((field) => body[field] === true);
-  return path.includes("/questionnaires/") && body.submitted === true;
-}
-
 export function ParticipantApp() {
   const rawSession = useStudySession();
   const state = rawSession.state;
   const telemetry = useTelemetry(rawSession.phase === "ready" ? state : null);
   const transitioning = useRef(false);
+  // Only operations declared as transitions (consent, setup submit, tutorial completion,
+  // questionnaire submit, ranking submit, final consultation save, pause, completion) close
+  // timing first. Drafts, progress saves and individual assessment attempts never do.
   const session = useMemo(
     () => ({
       ...rawSession,
-      mutate: async (mutation: Parameters<typeof rawSession.mutate>[0]) => {
-        const transition = changesStage(mutation.path, mutation.body);
+      mutate: async (mutation: Mutation) => {
+        const transition = Boolean(mutation.transition);
         if (transition && transitioning.current) throw new Error("A step is already being saved.");
         if (transition) transitioning.current = true;
         try {
@@ -103,7 +112,7 @@ export function ParticipantApp() {
       .then((current) => {
         if (!cancelled)
           setCaseMeta({
-            condition: current.condition === "explanation" ? "With explanation tools" : "With Protégé and the ontology files",
+            condition: current.condition === "explanation" ? "With explanation tools" : "With your own inspection methods",
             sourceLabel: current.source_label,
           });
       })
@@ -123,7 +132,7 @@ export function ParticipantApp() {
 
   const pause = useCallback(async () => {
     telemetry.emit("pause");
-    await session.mutate({ method: "POST", path: "/api/v1/study/pause", body: {} }).catch(() => undefined);
+    await session.mutate({ method: "POST", path: "/api/v1/study/pause", body: {}, transition: true }).catch(() => undefined);
   }, [session, telemetry]);
 
   if (session.phase === "booting") {
@@ -136,11 +145,13 @@ export function ParticipantApp() {
     );
   }
 
+  const protocol = state ? protocolOf(state) : null;
   const header = (
     <StudyHeader
       session={session}
       stage={state?.stage ?? null}
       condition={caseMeta?.condition ?? null}
+      tutorialLabel={protocol === "v2" ? "Tutorial" : "Practice"}
       progress={
         state && (state.stage === "case" || state.stage === "consultation") && state.assigned_case_count
           ? `Case ${Math.min(state.completed_cases + 1, state.assigned_case_count)} of ${state.assigned_case_count}`
@@ -177,13 +188,20 @@ export function ParticipantApp() {
         <p>Your saved answers are safe on the study server. Check your connection and reload this page.</p>
       </MessagePage>
     );
+  } else if (!protocol) {
+    body = (
+      <MessagePage title="This study version is not supported here">
+        <p>This page cannot show study version {state.contract_version}, so it does not collect answers. Nothing you saved earlier is lost.</p>
+        <p className="muted">Please tell the study team; the study may need a matching version of this page.</p>
+      </MessagePage>
+    );
   } else {
     switch (state.stage) {
       case "welcome":
-        body = <WelcomeStage state={state} session={session} />;
+        body = <WelcomeStage state={state} session={session} protocol={protocol} />;
         break;
       case "setup":
-        body = <SetupStage key={state.session_id} state={state} session={session} />;
+        body = protocol === "v2" ? <SetupStageV2 key={state.session_id} state={state} session={session} /> : <LegacySetupStage key={state.session_id} state={state} session={session} />;
         break;
       case "background":
         body = (
@@ -193,18 +211,24 @@ export function ParticipantApp() {
             formId="background"
             title="About your background"
             intro="Broad answers only. “Prefer not to say” is always available and is never read as a lack of experience."
-            submitLabel="Continue to practice"
+            submitLabel={protocol === "v2" ? "Continue to the tutorial" : "Continue to practice"}
           />
         );
         break;
       case "practice":
-        body = <PracticeStage state={state} session={session} />;
+      case "tutorial":
+        body = protocol === "v2" ? <TutorialStage key={state.session_id} state={state} session={session} onPause={pause} /> : <LegacyPracticeStage state={state} session={session} />;
         break;
       case "case":
         body = <CaseView key={`${state.session_id}|${state.current_case_id}|${state.current_presentation_id}`} state={state} session={session} telemetry={telemetry} timingEnabled={!needsGapAnswer} />;
         break;
       case "consultation":
-        body = <ConsultationStage state={state} session={session} sourceLabel={caseMeta?.sourceLabel ?? null} />;
+        body =
+          protocol === "v2" ? (
+            <ConsultationStageV2 key={`${state.session_id}|${state.current_presentation_id}`} state={state} session={session} sourceLabel={caseMeta?.sourceLabel ?? null} />
+          ) : (
+            <LegacyConsultationStage key={`${state.session_id}|${state.current_presentation_id}`} state={state} session={session} sourceLabel={caseMeta?.sourceLabel ?? null} />
+          );
         break;
       case "final":
         body = (
@@ -216,13 +240,13 @@ export function ParticipantApp() {
             intro="All cases are done. These answers describe your experience; they are not used to score your rankings."
             submitLabel="Finish the study"
             onSubmitted={async () => {
-              await session.mutate({ method: "POST", path: "/api/v1/study/complete", body: {} });
+              await session.mutate({ method: "POST", path: "/api/v1/study/complete", body: {}, transition: true });
             }}
           />
         );
         break;
       case "paused":
-        body = <PausedStage session={session} onResume={resume} />;
+        body = <PausedStage onResume={resume} />;
         break;
       case "completed":
         body = (
@@ -260,4 +284,3 @@ export function ParticipantApp() {
     </div>
   );
 }
-

@@ -5,10 +5,10 @@ import { useCallback, useEffect, useRef } from "react";
 import { request } from "@/lib/api";
 import { uuid } from "@/study/session";
 import { retainCurrentTiming, splitTiming, type OpenSegment } from "@/study/timing";
-import type { EventType, Stage, StudyState } from "@/study/types";
+import { V1_EVENT_TYPES, type EventType, type Stage, type StudyState } from "@/study/types";
 
-export const BUILD_VERSION = "exact-explain-ui-1.1";
-const TIMED: Stage[] = ["setup", "background", "practice", "case", "consultation", "final"];
+export const BUILD_VERSION = "exact-explain-ui-1.2";
+const TIMED: Stage[] = ["setup", "background", "practice", "tutorial", "case", "consultation", "final"];
 interface StudyEvent {
   event_id: string; page_instance_id: string; sequence: number; case_id: string;
   presentation_id: string; type: EventType; component_id?: string; element_id?: string;
@@ -28,6 +28,10 @@ export function useTelemetry(state: StudyState | null) {
   const segment = useRef<OpenSegment | null>(null);
   const stateRef = useRef(state);
   stateRef.current = state;
+  // Only event types this service version accepts are sent; others are not invented as v1 types.
+  const declared = state?.telemetry?.event_types;
+  const supported = useRef<Set<string>>(new Set(V1_EVENT_TYPES));
+  supported.current = new Set(declared?.length ? declared : V1_EVENT_TYPES);
 
   // A new invitation must never inherit another session's telemetry or ready marker.
   useEffect(() => {
@@ -80,6 +84,7 @@ export function useTelemetry(state: StudyState | null) {
 
   const emit = useCallback((type: EventType, extra: { component?: string; element?: string; visibility?: "visible" | "hidden"; loadingMs?: number } = {}) => {
     const current = stateRef.current;
+    if (!supported.current.has(type)) return undefined;
     if (!current?.current_case_id || !current.current_presentation_id || !["case", "consultation", "paused"].includes(current.stage) || current.session_id !== owner.current) return undefined;
     const now = performance.now();
     events.current.push({ event_id: uuid(), page_instance_id: pageInstance.current, sequence: sequence.current++, case_id: current.current_case_id,
@@ -138,7 +143,7 @@ export function useTelemetry(state: StudyState | null) {
     }, 15_000);
     const visibility = () => {
       emit("visibility", { visibility: document.visibilityState === "hidden" ? "hidden" : "visible" });
-      capture(); // A hidden tab may be active Protégé work; do not pause it.
+      capture(); // A hidden tab may be external work on the case; never pause automatically.
       void flush();
     };
     document.addEventListener("visibilitychange", visibility);

@@ -7,9 +7,13 @@ function subscribe(listener: () => void) {
   // The text-size control changes the root font size through an inline custom property.
   const observer = new MutationObserver(listener);
   observer.observe(document.documentElement, { attributes: true, attributeFilter: ["style"] });
+  // Some environments resize the viewport without a resize event; the root box still changes.
+  const sizes = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(listener);
+  sizes?.observe(document.documentElement);
   return () => {
     window.removeEventListener("resize", listener);
     observer.disconnect();
+    sizes?.disconnect();
   };
 }
 

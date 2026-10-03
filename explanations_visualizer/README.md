@@ -10,9 +10,10 @@ itself into another profile.
 | `/` | Compare: source and target meaning cards, generated comparison, optional hierarchy, evidence list and graph, decision trace, scores | `local_app`, `public_demo` |
 | `/browse/` | Two independent ontology browsers (search, parents/children paging, basis choice, full context) | `local_app`, `public_demo` |
 | `/library/` | Local bundle import (manifest preview, progress, cancel, validation errors) and library selection | `local_app` only |
-| `/participate/` | Ranking study: private link, consent, setup, background form, practice, scored cases in both conditions, per-case consultation, final form, completion | `study` only |
+| `/participate/` | Ranking study: private link, consent, setup, background form, practice (v1) or interactive tutorial and five-item check (v2), scored cases in both conditions, per-case report, final form, completion | `study` only |
 | `/admin/` | Researcher administration: publish, progress, invitation links, replace/revoke, exports | `study` only |
 | `/legacy/` | The historical run-directory viewer, used automatically when `/` finds only the old `/api/health` backend | legacy `serve --run-dir` |
+| `/preview/participate/` | Development only: the proposed exact-study/2.0 participant flow against an in-browser synthetic service | `next dev` only; production builds contain a notice and no profile serves it |
 
 Everything reads the backend contracts in `exact_inspect` (`/api/v1/...` and
 `/api/v1/study/...`); the frontend never parses OWL, calls a model or infers equivalence.
@@ -21,6 +22,8 @@ Missing, filtered, unexported, unsupported and failed states are shown with thei
 What was built, how it was verified and the known backend issues are in the
 [F1 handoff](../docs/verification/explanation-frontend-handoff.md) and its
 [real-package/PostgreSQL verification](../docs/verification/explanation-frontend-e2e.md).
+The 2026-10 corrective iteration (specs 14–16: shared workspace, tutorial, tool-neutral study)
+is recorded in the [corrective frontend handoff](../docs/verification/explanation-frontend-corrections.md).
 
 ## Design decisions
 
@@ -32,17 +35,30 @@ Tokens (both themes) live in `src/styles/base.css`; product styles in `app.css` 
   (for example "Original · NCIT P97 definition"); generated text sits in a dashed "Generated" frame
   and cites the facts it rests on; Exact's saved decisions are labelled "Matcher record". Scores are
   "matching scores", never percentages or probabilities unless calibration is validated.
+- **One workspace for every product.** The meaning cards, comparison, hierarchy browsers, evidence
+  list, evidence graph and fact inspector read through one data-source interface
+  (`src/lib/workspace`): the exploration API, a study case's frozen resources (later its scoped
+  workspace routes) or the synthetic tutorial. Shells own selection, answers and navigation state.
+- **Every citation opens its record.** Citations are buttons that resolve the exact original record
+  (typed subject, origin, interpretation, original axiom), whether or not it is shown on the page.
 - **Reading order.** Choose a candidate, read both cards and the comparison, then open optional
   details. Details stay closed by default; numeric matching weights are hidden until asked for.
+  In study cases the candidates and the answer stay in a sticky rail beside the workspace.
 - **No hover-driven geometry.** The evidence graph uses a fixed layout, explicit zoom/fit/reset and
-  drag-to-pan; clicking selects. Line patterns carry meaning (solid assertion, dash-dot matcher
-  feature, double-line cross-ontology comparison) and the evidence list is its accessible equivalent.
+  drag-to-pan; clicking selects. Line patterns carry meaning (solid assertion, dashed structural
+  relation, dash-dot matcher feature, a dotted purple line for a feature kind compared across
+  ontologies) and the evidence list is its accessible equivalent. The view belongs to the compared
+  pair and survives re-renders, saves, tab switches and layout changes.
 - **Text size and reflow.** Sizes are in rem; a persistent A−/A+ control scales the whole app to
   200%. Layout breakpoints are container queries in rem, so enlarged text gets the narrow layout
   instead of a cramped wide one. No page-wide horizontal scrolling from 320 px upward.
 - **State lives in the URL or on the server.** Source, candidate, focused entities and open tab are
   URL parameters (reload, back/forward and resize preserve them). Study answers, stage and revision
   belong to the study server; the browser keeps only the latest unsent draft for resend.
+- **Versioned study flows.** `exact-study/1.0` sessions keep their frozen legacy steps;
+  `exact-study/2.0` uses tool-neutral setup, the interactive tutorial with server-graded items and
+  durable per-case reports; any other version fails visibly. Questionnaires follow declared option
+  order (v2 `option_order`/`row_order`, v1 a versioned table checked against `forms.py`).
 - **Study integrity.** One ranking component for both conditions; the baseline receives no
   explanation data from the server at all. Answers start empty; "None of these" and "Insufficient
   information" are explicit; nothing auto-submits. Every mutation carries an idempotency key and the
@@ -63,7 +79,8 @@ EXACT_DEV_BACKEND=http://127.0.0.1:8000 npm run dev
 
 `next dev` forwards `/api/*` to `EXACT_DEV_BACKEND`. For the study pages, the backend's origin
 check requires the HTTPS origin it was configured with, so test the study through a built export
-served by the study service instead.
+served by the study service instead. The proposed v2 participant flow can be tried without any
+study service at `/preview/participate/` under `next dev` (synthetic, browser-only).
 
 A realistic development package (real NCIT/DOID excerpts, a clearly synthetic run and offline
 exact-excerpt generations; no network, model or provider) can be prepared with:
@@ -99,5 +116,7 @@ The prepared and study Dockerfiles in `deploy/render` build the export in a Node
 Use `npm run typecheck`, `npm run test:unit` (Node.js 24), and `npm run test:e2e`.
 The browser suite targets running prepared/study services; see the integration verification
 guide above for URLs, the synthetic HTTPS/PostgreSQL harness, and optional test inputs.
+`EXACT_E2E_PREVIEW_URL` (a `next dev` server) enables the v2 preview journey, and
+`EXACT_E2E_SEARCH_TERM` replaces the real-package search term when testing the small fixture.
 Production uses the static `out/` export served by `exact-inspect`; `next start` is not
 compatible with this export mode.

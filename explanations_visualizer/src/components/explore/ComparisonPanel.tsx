@@ -4,12 +4,13 @@
 // generated without Exact's score or verdict; shared wording and one-sided information are
 // labelled as such and never presented as proof of equivalence or incompatibility.
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { ErrorNote } from "@/components/common/ErrorNote";
 import { IconDiffer, IconQuestion, IconShared, IconWarning } from "@/components/common/Icons";
-import { Citations, ProvenanceDetails, useExplanation, type CitedFact } from "@/components/explore/GeneratedBlock";
-import type { Claim } from "@/lib/types";
+import { Citations, ProvenanceDetails, type CitedFact } from "@/components/explore/GeneratedBlock";
+import type { Claim, EntityRef } from "@/lib/types";
+import { useExplanation } from "@/lib/workspace/WorkspaceContext";
 
 const GROUPS: { key: string; title: string; categories: string[]; tone: string; icon: React.ReactNode }[] = [
   { key: "shared", title: "Shared", categories: ["agreement"], tone: "ok", icon: <IconShared /> },
@@ -18,32 +19,29 @@ const GROUPS: { key: string; title: string; categories: string[]; tone: string; 
   { key: "open", title: "Open questions", categories: ["unknown", "review_question"], tone: "neutral", icon: <IconQuestion /> },
 ];
 
-export function ComparisonPanel({
-  pairKey,
-  params,
-  cite,
-}: {
-  pairKey: string;
-  params: Record<string, string>;
-  cite: (factId: string) => CitedFact | undefined;
-}) {
-  const state = useExplanation(`comparison|${pairKey}`, { ...params, task: "pair_comparison" });
+export function ComparisonPanel({ source, target, cite, headingLevel = 2 }: { source: EntityRef; target: EntityRef; cite: (factId: string) => CitedFact | undefined; headingLevel?: 2 | 3 }) {
+  const entities = useMemo(() => [source, target], [source, target]);
+  const state = useExplanation("pair_comparison", entities);
   const [showExcerpts, setShowExcerpts] = useState(false);
+  const Heading = headingLevel === 2 ? "h2" : "h3";
+  const Group = headingLevel === 2 ? "h3" : "h4";
+  const data = state.data;
   return (
     <section className="card comparison" aria-labelledby="comparison-h">
       <div className="comparison-head">
-        <h2 id="comparison-h">How the two descriptions compare</h2>
+        <Heading id="comparison-h">How the two descriptions compare</Heading>
         <span className="origin-tag origin-generated">Generated · prepared without Exact&apos;s score or verdict</span>
       </div>
       {state.error ? <ErrorNote error={state.error} onRetry={state.reload} what="Comparison" /> : null}
-      {!state.data && !state.error ? <div className="comparison-grid skeleton-row" aria-busy="true" /> : null}
-      {state.data?.status === "not_requested" && (
-        <p className="note">No comparison was prepared for this pair. Read the two cards side by side, or open the evidence and decision trace below.</p>
+      {!data && !state.error ? <div className="comparison-grid skeleton-row" aria-busy="true" /> : null}
+      {data?.status === "not_requested" && (
+        <p className="note">No comparison was prepared for this pair. Read the two cards side by side, or open the evidence below.</p>
       )}
-      {state.data?.status === "unverified" && <p className="note">A comparison exists but has not passed grounding review, so it is not shown.</p>}
-      {state.data?.status === "available" &&
+      {data?.status === "not_exported" && <p className="note">{data.reason}</p>}
+      {data?.status === "unverified" && <p className="note">A comparison exists but has not passed grounding review, so it is not shown.</p>}
+      {data?.status === "available" &&
         (() => {
-          const claims = state.data.explanation.claims;
+          const claims = data.explanation.claims;
           const byGroup = (categories: string[]) => claims.filter((claim) => categories.includes(claim.category));
           const excerpts = claims.filter((claim) => ["meaning", "key_fact"].includes(claim.category));
           return (
@@ -53,14 +51,14 @@ export function ComparisonPanel({
                   const items = byGroup(group.categories);
                   return (
                     <div key={group.key} className={items.length ? `comparison-group tone-${group.tone}` : "comparison-group"}>
-                      <h3>
+                      <Group>
                         {group.icon}
                         <span>{group.title}</span>
-                      </h3>
+                      </Group>
                       {items.length ? (
                         <ul>
                           {items.map((claim, index) => (
-                            <ClaimItem key={claim.claim_id ?? index} claim={claim} cite={cite} />
+                            <ClaimItem key={claim.claim_id ?? index} claim={claim} ontologies={data.factOntologies} cite={cite} />
                           ))}
                         </ul>
                       ) : (
@@ -78,11 +76,11 @@ export function ComparisonPanel({
                   );
                 })}
               </div>
-              {state.data.explanation.limitations.length > 0 && (
+              {data.explanation.limitations.length > 0 && (
                 <div className="note">
                   <span>
                     <strong>Limits: </strong>
-                    {state.data.explanation.limitations.join(" ")}
+                    {data.explanation.limitations.join(" ")}
                   </span>
                 </div>
               )}
@@ -94,13 +92,13 @@ export function ComparisonPanel({
                   {showExcerpts && (
                     <ul className="excerpt-list">
                       {excerpts.map((claim, index) => (
-                        <ClaimItem key={claim.claim_id ?? index} claim={claim} cite={cite} quote />
+                        <ClaimItem key={claim.claim_id ?? index} claim={claim} ontologies={data.factOntologies} cite={cite} quote />
                       ))}
                     </ul>
                   )}
                 </div>
               )}
-              <ProvenanceDetails explanation={state.data.explanation} />
+              <ProvenanceDetails provenance={data.provenance} />
             </>
           );
         })()}
@@ -108,11 +106,11 @@ export function ComparisonPanel({
   );
 }
 
-function ClaimItem({ claim, cite, quote = false }: { claim: Claim; cite: (factId: string) => CitedFact | undefined; quote?: boolean }) {
+function ClaimItem({ claim, ontologies, cite, quote = false }: { claim: Claim; ontologies: string[]; cite: (factId: string) => CitedFact | undefined; quote?: boolean }) {
   return (
     <li className="claim">
       <span className={quote ? "claim-text claim-quote" : "claim-text"}>{quote ? `“${claim.text}”` : claim.text}</span>
-      <Citations claim={claim} cite={cite} />
+      <Citations claim={claim} ontologies={ontologies} cite={cite} />
     </li>
   );
 }

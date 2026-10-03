@@ -1,11 +1,14 @@
 "use client";
 
-// Renders a frozen, versioned questionnaire exactly as published: wording, codes, branching
-// and required status come from the server. Special choices (prefer not to say, never used,
-// cannot judge…) are exclusive; hidden branches are cleared when their parent changes.
+// Renders a frozen, versioned questionnaire exactly as published: wording, codes, branching,
+// required status and presentation order come from the server (or, for legacy v1 forms, from
+// their versioned declared order; never from object key order). Special choices (prefer not
+// to say, never used, cannot judge…) are exclusive; hidden branches are cleared when their
+// parent changes.
 
 import { useId } from "react";
 
+import { orderedEntries, orderedKeys } from "@/study/formOrder";
 import type { Question } from "@/study/types";
 
 export const SPECIAL = new Set(["prefer_not_to_say", "never_used", "all_equally", "none_helpful", "cannot_judge"]);
@@ -52,14 +55,16 @@ function Choice({
   onChange,
   disabled,
   name,
+  version,
 }: {
   question: Question;
   value: unknown;
   onChange: (next: unknown) => void;
   disabled: boolean;
   name: string;
+  version: string;
 }) {
-  const options = Object.entries(question.options ?? {});
+  const options = orderedEntries(question.options, orderedKeys(question, "options", version));
   if (question.multiple) {
     const selected = Array.isArray(value) ? (value as string[]) : [];
     const toggle = (code: string) => {
@@ -90,9 +95,9 @@ function Choice({
   );
 }
 
-function Matrix({ question, value, onChange, disabled, name }: { question: Question; value: unknown; onChange: (next: unknown) => void; disabled: boolean; name: string }) {
-  const rows = Object.entries(question.matrix ?? {});
-  const columns = Object.entries(question.options ?? {});
+function Matrix({ question, value, onChange, disabled, name, version }: { question: Question; value: unknown; onChange: (next: unknown) => void; disabled: boolean; name: string; version: string }) {
+  const rows = orderedEntries(question.matrix, orderedKeys(question, "rows", version));
+  const columns = orderedEntries(question.options, orderedKeys(question, "options", version));
   const current = (value && typeof value === "object" ? value : {}) as Record<string, string>;
   return (
     <div className="matrix-wrap">
@@ -150,6 +155,7 @@ function Matrix({ question, value, onChange, disabled, name }: { question: Quest
 
 export function QuestionnaireForm({
   questions,
+  version,
   answers,
   onChange,
   errors,
@@ -157,6 +163,8 @@ export function QuestionnaireForm({
   revealNote,
 }: {
   questions: Question[];
+  /** Form version, which selects the legacy declared order when no explicit order exists. */
+  version: string;
   answers: Answers;
   onChange: (next: Answers, changed: string) => void;
   errors: Record<string, string>;
@@ -191,7 +199,7 @@ export function QuestionnaireForm({
               {question.label} {question.multiple && <span className="meta">Select all that apply</span>} {hint && <span className="meta">{hint}</span>}
             </legend>
             {note && <p className="reveal-note">{note}</p>}
-            {question.matrix ? <Matrix question={question} value={value} onChange={update} disabled={disabled} name={name} /> : <Choice question={question} value={value} onChange={update} disabled={disabled} name={name} />}
+            {question.matrix ? <Matrix question={question} value={value} onChange={update} disabled={disabled} name={name} version={version} /> : <Choice question={question} value={value} onChange={update} disabled={disabled} name={name} version={version} />}
             {error && (
               <p className="field-error" id={`${name}-error`}>
                 {error}

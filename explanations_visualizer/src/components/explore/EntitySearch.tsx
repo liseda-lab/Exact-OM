@@ -1,13 +1,15 @@
 "use client";
 
-// Accessible combobox over GET /api/v1/entities (exact IRI or label/synonym prefix).
+// Accessible combobox over the active workspace's entity search (exact IRI or label/synonym
+// prefix). A workspace that can only search part of an ontology says so in the results.
 
 import { useEffect, useId, useRef, useState } from "react";
 
 import { IconSearch } from "@/components/common/Icons";
-import { describeError, getJson } from "@/lib/api";
+import { describeError } from "@/lib/api";
 import { curie, KIND_NAMES } from "@/lib/iri";
-import type { Page, SearchItem } from "@/lib/types";
+import type { SearchItem } from "@/lib/types";
+import { useWorkspace } from "@/lib/workspace/WorkspaceContext";
 
 export function EntitySearch({
   ontology,
@@ -20,6 +22,11 @@ export function EntitySearch({
   placeholder: string;
   onChoose: (item: SearchItem) => void;
 }) {
+  const workspace = useWorkspace();
+  // Search restarts only for a different term, ontology or workspace scope, never because
+  // the same workspace was re-created by an unrelated state update.
+  const workspaceRef = useRef(workspace);
+  workspaceRef.current = workspace;
   const id = useId();
   const [term, setTerm] = useState("");
   const [open, setOpen] = useState(false);
@@ -27,6 +34,7 @@ export function EntitySearch({
   const [results, setResults] = useState<SearchItem[]>([]);
   const [total, setTotal] = useState<number | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
+  const [scopeReason, setScopeReason] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const controller = useRef<AbortController | null>(null);
@@ -40,15 +48,17 @@ export function EntitySearch({
     setTotal(null);
     setCursor(null);
     setError(null);
+    setScopeReason(null);
     setLoading(Boolean(query));
     if (!query) return () => current.abort();
     const timer = window.setTimeout(async () => {
       try {
-        const page = await getJson<Page<SearchItem>>("/api/v1/entities", { ontology_version_id: ontology, term: query, limit: 20 }, current.signal);
+        const page = await workspaceRef.current.search(ontology, query, null, current.signal);
         if (current.signal.aborted) return;
         setResults(page.items);
         setTotal(page.total_count);
         setCursor(page.next_cursor);
+        setScopeReason(page.status === "partial" ? page.reason : null);
         setError(null);
         setActive(0);
         setOpen(true);
@@ -58,15 +68,18 @@ export function EntitySearch({
         if (!current.signal.aborted) setLoading(false);
       }
     }, 250);
-    return () => { window.clearTimeout(timer); current.abort(); };
-  }, [term, ontology]);
+    return () => {
+      window.clearTimeout(timer);
+      current.abort();
+    };
+  }, [term, ontology, workspace.key]);
 
   const loadMore = async () => {
     const current = controller.current;
     if (!cursor || !current || current.signal.aborted || loading) return;
     setLoading(true);
     try {
-      const page = await getJson<Page<SearchItem>>("/api/v1/entities", { ontology_version_id: ontology, term: term.trim(), limit: 20, cursor }, current.signal);
+      const page = await workspaceRef.current.search(ontology, term.trim(), cursor, current.signal);
       if (current.signal.aborted) return;
       setResults((list) => [...list, ...page.items]);
       setCursor(page.next_cursor);
@@ -146,11 +159,11 @@ export function EntitySearch({
               </span>
             </li>
           ))}
-          {!results.length && !loading && <li className="combo-empty">No label, synonym or IRI starts with “{term.trim()}”.</li>}
-          {results.length > 0 && (
+          {!results.length && !loading && <li className="combo-empty">No label, synonym or IRI starts with “{term.trim()}”{scopeReason ? " in the searchable part of this view" : ""}.</li>}
+          {(results.length > 0 || scopeReason) && (
             <li className="combo-footer">
               <span className="meta">
-                {results.length} of {total ?? "?"} matches
+                {results.length} of {total ?? "?"} matches{scopeReason ? ` · ${scopeReason}` : ""}
               </span>
               {cursor && (
                 <button type="button" className="btn btn-sm" disabled={loading} onMouseDown={(event) => event.preventDefault()} onClick={loadMore}>

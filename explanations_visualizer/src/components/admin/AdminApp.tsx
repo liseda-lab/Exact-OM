@@ -187,7 +187,11 @@ export function AdminApp() {
                 writeStored("exact.admin.revision", event.target.value);
               }}
               placeholder="as published"
+              aria-describedby="revision-note"
             />
+            <span id="revision-note" className="meta">
+              This service version cannot list studies: enter the revision exactly as published. The page remembers the last revision you used, never the token.
+            </span>
           </div>
           <label className="btn file-label">
             Publish a study revision…

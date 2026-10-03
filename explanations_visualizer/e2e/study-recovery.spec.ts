@@ -114,7 +114,7 @@ test("failed explanation content blocks ranking and pending submission does not 
   await page.route("**/api/v1/study/cases/*/submit", async (route) => { reached(); await allowed; await route.continue(); });
   await page.getByRole("button", { name: "Submit answer", exact: true }).click();
   await intercepted;
-  await expect(page.getByText("Answer submitted and saved.", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Answer received and saved by the study server.", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Submitting…", exact: true })).toBeDisabled();
   release();
   await expect(page.getByRole("heading", { name: "One question about this case", exact: true })).toBeVisible();

@@ -7,7 +7,9 @@ import { Fragment, useMemo } from "react";
 
 import { curie } from "@/lib/iri";
 import { useLabelLookup } from "@/lib/labelSource";
-import { collectIris, iriOf, isNamed } from "@/lib/owl";
+import { collectIris, hasReading, iriOf, isNamed } from "@/lib/owl";
+
+export { hasReading };
 
 type Lookup = (iri: string) => { value: string | null; status: string } | undefined;
 
@@ -135,19 +137,6 @@ function render(node: unknown, lookup: Lookup, onOpen: ((iri: string) => void) |
     default:
       return null;
   }
-}
-
-/** True when every constructor in the expression has a reading template. */
-export function hasReading(node: unknown): boolean {
-  if (!node || typeof node !== "object") return true;
-  const record = node as Record<string, unknown>;
-  const type = String(record.type ?? "");
-  const known =
-    isNamed(record) ||
-    ["IRI", "Literal"].includes(type) ||
-    /^(Object|Data)(SomeValuesFrom|AllValuesFrom|HasValue|HasSelf|MinCardinality|MaxCardinality|ExactCardinality|IntersectionOf|UnionOf|ComplementOf|InverseOf|OneOf)$/.test(type);
-  if (!known) return false;
-  return Object.entries(record).every(([key, value]) => key === "iri" || key === "annotations" || (Array.isArray(value) ? value.every(hasReading) : typeof value === "object" ? hasReading(value) : true));
 }
 
 export function Expression({ node, ontology, onOpen }: { node: unknown; ontology: string; onOpen?: (iri: string) => void }) {

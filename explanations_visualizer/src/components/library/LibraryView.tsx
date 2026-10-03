@@ -304,6 +304,10 @@ export function LibraryView() {
           <h2 id="library-h">Library</h2>
           <span className="meta">{bundles.data ? `${bundles.data.length} ${bundles.data.length === 1 ? "bundle" : "bundles"} on this computer` : ""}</span>
         </div>
+        <p className="meta">
+          Imported copies are kept in this computer&apos;s library folder; the files you imported from are never changed. Removing a copy from this page is not available in this version, and details such as entity counts
+          appear for the bundle that is open.
+        </p>
         {bundles.error ? <ErrorNote error={bundles.error} onRetry={bundles.reload} what="Library" /> : null}
         {selectError ? <ErrorNote error={selectError} what="Opening bundle" /> : null}
         {!bundles.data && !bundles.error && <Skeleton lines={3} />}

@@ -2,8 +2,9 @@
 // it prints the already-structured axiom as OWL 2 Functional Syntax for verification, and
 // exposes a few conservative constructor readings ("some", "only", "at least n").
 
-import { curie } from "@/lib/iri";
-import type { OwlNode } from "@/lib/types";
+// @ts-expect-error Node's direct TypeScript runner requires the explicit extension.
+import { curie } from "./iri.ts";
+import type { OwlNode } from "./types";
 
 const ENTITY_TYPES = new Set(["Class", "ObjectProperty", "DataProperty", "AnnotationProperty", "NamedIndividual", "Datatype", "Entity"]);
 
@@ -169,4 +170,17 @@ export function axiomRelation(ast: OwlNode, subjectIri: string): { relation: str
   if (type === "ObjectPropertyDomain" || type === "DataPropertyDomain") return { relation: "Domain", other: ast.domain };
   if (type === "ObjectPropertyRange" || type === "DataPropertyRange") return { relation: "Range", other: ast.range };
   return null;
+}
+
+/** True when every constructor in the expression has a conservative reading template. */
+export function hasReading(node: unknown): boolean {
+  if (!node || typeof node !== "object") return true;
+  const record = node as Record<string, unknown>;
+  const type = String(record.type ?? "");
+  const known =
+    isNamed(record) ||
+    ["IRI", "Literal"].includes(type) ||
+    /^(Object|Data)(SomeValuesFrom|AllValuesFrom|HasValue|HasSelf|MinCardinality|MaxCardinality|ExactCardinality|IntersectionOf|UnionOf|ComplementOf|InverseOf|OneOf)$/.test(type);
+  if (!known) return false;
+  return Object.entries(record).every(([key, value]) => key === "iri" || key === "annotations" || (Array.isArray(value) ? value.every(hasReading) : typeof value === "object" ? hasReading(value) : true));
 }
