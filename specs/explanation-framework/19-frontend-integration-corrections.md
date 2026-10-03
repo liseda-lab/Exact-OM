@@ -1,9 +1,9 @@
 # Frontend assignment: consume and verify the complete study workspace
 
-**2026-10-03. F11–F15 implemented in `6895bc6`; F16–F19 (findings R06–R09) in
-`ad03312`–`3a1fcd0` and verified at `23aa74f` ([follow-up handoff](../../docs/verification/explanation-integration-frontend-followup.md)).
-R01, R02 and R04 are joint-verified on the synthetic fixture; R03 awaits the manual
-screen-reader/keyboard audit in J10.** See the
+**2026-10-04. F11–F15 implemented in `6895bc6`; F16–F19 (R06–R09) verified at `23aa74f`
+([follow-up handoff](../../docs/verification/explanation-integration-frontend-followup.md)).
+R10–R11 reopen R02/R01 and require F20–F21 below. R04 is joint-verified; R03 awaits the
+manual screen-reader/keyboard audit in J10.** See the
 [frontend handoff](../../docs/verification/explanation-integration-frontend-handoff.md) and the
 [joint acceptance record](../../docs/verification/explanation-integration-acceptance.md). The
 requirements below remain normative. Follow
@@ -249,4 +249,35 @@ Lazy tabs are never required. Absent components are not awaited, and admitted on
 skipped. Tests cover the full set and comparison-only, original-context-only,
 description-only and hierarchy/evidence-only publications. Each must show readiness,
 recorded absence, failure and retry.
+
+## F20 / R10 — Access checks belong to the work that issued them
+
+When an optional read is refused and the shell re-checks the scope's capabilities, bind that
+check to the attempt, workspace scope and session current when it is **issued**. The shared
+read source survives retries, so the binding cannot be fixed when that source is created.
+
+Retry and teardown cancel outstanding checks. A check that still resolves for a superseded
+attempt, presentation, scope or session is ignored. A check issued and refused within the
+current attempt still blocks submission. Recovery keeps the ranking, draft and validated
+cached content.
+
+Tests must hold an older check across a successful Retry and release it afterwards. They must
+also show that a check from an obsolete presentation or session cannot affect the current case,
+and that a genuine current loss still blocks.
+
+## F21 / R11 — Navigation carries typed entities
+
+Every navigation callback receives the complete typed entity the backend supplied
+(`ontology_version_id`, `iri`, `kind`), never an IRI plus a guessed kind:
+- card parents from either the first page or a continuation;
+- original-axiom terms;
+- evidence-list terms;
+- the main app's browse view and comparison workspace, and the study's pair cards and
+  full-context dialog.
+
+A term without a recorded type, such as a bare IRI value, is shown but not navigable.
+
+Tests cover object and data properties with more than one page of named superproperties in
+both products, and keep class coverage. A test chooses a later-page parent and checks its
+ontology, IRI and kind, that its context loads, and that the study ranking and draft are kept.
 

@@ -1,8 +1,8 @@
 # Integration corrective programme and agent protocol
 
-**2026-10-03. Status: R01 and R02 were reopened by R06–R09, which are now fixed and verified, so
-R01 and R02 are joint-verified again ([follow-up handoff](../../docs/verification/explanation-integration-frontend-followup.md)).
-R04 joint-verified; R03 blocked only on the manual J10 audit. Reviewed baseline: `2d9715b`.**
+**2026-10-04. Status: R01 and R02 reopened again by R10–R11 (second post-implementation review)
+after R06–R09 were fixed. R04 joint-verified; R03 blocked only on the manual J10 audit.
+Reviewed baseline: `2d9715b`.**
 The [backend handoff](../../docs/verification/explanation-integration-backend-handoff.md)
 records implementation `96b76fe`; the [frontend handoff](../../docs/verification/explanation-integration-frontend-handoff.md)
 records `6895bc6`; the [joint acceptance record](../../docs/verification/explanation-integration-acceptance.md)
@@ -74,6 +74,11 @@ CSP, P3) was found and fixed during S3.
 | R07 | R01 / J03 | P2 | The study hierarchy cannot open a searched entity's full context. Offer the main app's shared full-context inspection over the authorized scope, within the frozen components, preserving the case's pair, candidate, draft and navigation. | Frontend |
 | R08 | R02 / J04–J05 | P2 | A malformed 200 response stays in the shared cache, so Retry reuses it. Validate the required structure before treating a response as usable, invalidate unusable results, and keep late completions from overwriting a blocked state or readying another case. | Frontend |
 | R09 | R02 / J04–J05 | P1 | Readiness requires two entity cards even when the frozen condition admits none, so valid configurations (for example comparison-only) can never be answered. Readiness must check what the admitted components actually render, without weakening it. | Frontend |
+| R10 | R02 / J04–J05 | P2 | A scope access check that resolves after a successful Retry blocks the recovered case, because its failure is attached to the current attempt. Bind each check to the attempt, workspace and session that issued it; cancel or ignore superseded checks; keep blocking on a genuine loss during the current attempt. | Frontend |
+| R11 | R01 / J03 | P2 | Parents loaded by continuation lose their entity type, so a property's later-page superproperty opens as a class. Carry the backend's typed entity through continuation records and every navigation callback in both products. | Frontend |
+
+The [second review](evidence/frontend-integration-review-20261004.md) reproduced R10 and R11 at
+`ad9461c`; they reopen R02 and R01 until F20–F21 are verified.
 
 The existing browser test's “hierarchy region is visible” assertion misses R01; an action
 after changing lesson hides R03. Test strengthening is part of each correction, not a fifth

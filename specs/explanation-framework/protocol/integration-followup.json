@@ -21,34 +21,36 @@
     "R01": {
       "priority": 1,
       "owner": "backend_then_frontend",
-      "status": "joint_verified",
+      "status": "reopened",
       "acceptance": [
         "J01",
         "J02",
         "J03"
       ],
       "backend_status": "backend_verified",
-      "joint_verified": true,
-      "frontend_status": "frontend_verified",
+      "joint_verified": false,
+      "frontend_status": "reopened",
       "reopened_by": [
         "R06",
-        "R07"
+        "R07",
+        "R11"
       ]
     },
     "R02": {
       "priority": 1,
       "owner": "frontend_with_backend_contract",
-      "status": "joint_verified",
+      "status": "reopened",
       "acceptance": [
         "J04",
         "J05"
       ],
       "backend_status": "backend_verified",
-      "joint_verified": true,
-      "frontend_status": "frontend_verified",
+      "joint_verified": false,
+      "frontend_status": "reopened",
       "reopened_by": [
         "R08",
-        "R09"
+        "R09",
+        "R10"
       ]
     },
     "R03": {
@@ -189,8 +191,25 @@
         "reopens": "R02",
         "requirement": "F19",
         "status": "fixed_and_verified"
+      },
+      "R10": {
+        "priority": 2,
+        "owner": "frontend",
+        "reopens": "R02",
+        "requirement": "F20",
+        "status": "open",
+        "summary": "A superseded scope access check blocked a recovered case"
+      },
+      "R11": {
+        "priority": 2,
+        "owner": "frontend",
+        "reopens": "R01",
+        "requirement": "F21",
+        "status": "open",
+        "summary": "Continued parents lost their entity type during navigation"
       }
     },
-    "followup_evidence": "../../../docs/verification/explanation-integration-frontend-followup-receipt.json"
+    "followup_evidence": "../../../docs/verification/explanation-integration-frontend-followup-receipt.json",
+    "second_review": "../evidence/frontend-integration-review-20261004.md"
   }
 }

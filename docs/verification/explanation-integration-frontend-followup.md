@@ -1,5 +1,9 @@
 # Study integration frontend follow-up: R06–R09 — 2026-10-03
 
+> **Reopened 2026-10-04.** A second review reproduced R10 (a superseded access check blocks a
+> recovered case) and R11 (continued parents lose their entity type). They reopen R02 and R01;
+> see the [second review](../../specs/explanation-framework/evidence/frontend-integration-review-20261004.md).
+
 **Implementation complete and verified on the synthetic fixture; not a release-readiness claim.**
 Four frontend defects reproduced after the S3 record (`8755431`) reopened R01 and R02:
 - R06: truncated fact categories;

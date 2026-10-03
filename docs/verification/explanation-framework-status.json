@@ -486,7 +486,7 @@
   },
   "current_acceptance_authority": "specs/explanation-framework/17-integration-corrective-programme.md",
   "integration_followup_20261003": {
-    "status": "R01_R02_R04_joint_verified_R03_blocked_on_J10_manual_audit",
+    "status": "R01_R02_reopened_by_R10_R11_R04_joint_verified_R03_blocked_on_J10_manual_audit",
     "reviewed_commit": "2d9715b",
     "authority": "specs/explanation-framework/17-integration-corrective-programme.md",
     "evidence": "specs/explanation-framework/evidence/integration-review-20261003.md",
@@ -500,42 +500,44 @@
       "R01": {
         "priority": 1,
         "owner": "backend_then_frontend",
-        "status": "joint_verified",
+        "status": "reopened",
         "acceptance": [
           "J01",
           "J02",
           "J03"
         ],
         "backend_status": "backend_verified",
-        "joint_verified": true,
+        "joint_verified": false,
         "evidence": [
           "tests/explanation_integration_contract_test.py",
           "tests/explanation_study_workspace_test.py"
         ],
-        "frontend_status": "frontend_verified",
+        "frontend_status": "reopened",
         "reopened_by": [
           "R06",
-          "R07"
+          "R07",
+          "R11"
         ]
       },
       "R02": {
         "priority": 1,
         "owner": "frontend_with_backend_contract",
-        "status": "joint_verified",
+        "status": "reopened",
         "acceptance": [
           "J04",
           "J05"
         ],
         "backend_status": "backend_verified",
-        "joint_verified": true,
+        "joint_verified": false,
         "evidence": [
           "tests/explanation_integration_contract_test.py::test_page_readiness_is_local_and_does_not_restart_case_clock",
           "tests/explanation_telemetry_policy_test.py"
         ],
-        "frontend_status": "frontend_verified",
+        "frontend_status": "reopened",
         "reopened_by": [
           "R08",
-          "R09"
+          "R09",
+          "R10"
         ]
       },
       "R03": {
@@ -624,9 +626,31 @@
           "specs/explanation-framework/evidence/frontend-integration-review-20261003.md",
           "docs/verification/explanation-integration-frontend-followup.md"
         ]
+      },
+      "R10": {
+        "priority": 2,
+        "owner": "frontend",
+        "reopens": "R02",
+        "requirement": "F20",
+        "status": "open",
+        "summary": "A superseded scope access check blocked a recovered case",
+        "evidence": [
+          "specs/explanation-framework/evidence/frontend-integration-review-20261004.md"
+        ]
+      },
+      "R11": {
+        "priority": 2,
+        "owner": "frontend",
+        "reopens": "R01",
+        "requirement": "F21",
+        "status": "open",
+        "summary": "Continued parents lost their entity type during navigation",
+        "evidence": [
+          "specs/explanation-framework/evidence/frontend-integration-review-20261004.md"
+        ]
       }
     },
-    "implementation_acceptance": "R06_R09_fixed_R01_R02_reverified_R03_blocked_on_J10_manual_audit",
+    "implementation_acceptance": "R01_R02_reopened_second_post_implementation_review",
     "historical_evidence_preserved": true,
     "launch_gates_waived": false,
     "live_publication": false,
