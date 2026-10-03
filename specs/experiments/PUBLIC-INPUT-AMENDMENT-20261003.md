@@ -104,3 +104,32 @@ These gates are implementation and validation requirements, not claims that they
 passed. Full admission may reveal other restrictions. The prior proposed native-package
 metadata-admission option is superseded by this approved preparation; no package API or
 policy extension is required. The main E14 CSV experiment and other active runs are unchanged.
+
+### Implementation and verification — 2026-10-03
+
+Implemented in `e08179bf`, `f337fe47` and `060f11d8`; queued execution is frozen at
+`060f11d88c3285fef9b907ac20b34696dcc54033`. The preparation uses native libxml2/libxslt
+traversal without document-wide XPath node sets, preserving the document base and every
+other XML node. Strict pyHermiT policy and the installed native packages are unchanged.
+The built-in `rdfs:comment` annotation range is admitted in its RDF description form;
+undeclared custom properties and logical uses still fail preparation.
+
+All **60 focused tests passed** in the existing isolated native environment, including
+real prepared-input admission, imported bridge inference, resume, input mutation, unsafe
+uses, and mismatched admission identities. Black, isort, flake8 and diff checks passed.
+Full input preparation checked **17 documents** in **185 seconds**, with approximately
+**9.35 GiB peak RSS**. It removed exactly three declarations and eight annotation ranges,
+verified the remaining canonical XML content, and retained unchanged original files,
+DOID and import bindings. The sole large new file is a **746,099,036-byte** NCIT copy.
+
+`E14-native-admission-20261003-02` is queued, and `E14-bridge-run-once-followup` now depends
+on that admission and binds the identical preparation manifest. Prior ready-work priority,
+including E12, is preserved. The historical original-file failure remains recorded.
+**Full native admission and the scientific comparison have not yet passed.** This verifies
+implementation and input preparation, not native NCIT reasoning or an experimental result.
+
+Local execution receipts and publication evidence are under
+`data/experiments-v2/e14-metadata-recovery-20261003-01/`: `test-evidence-02.json`,
+`input-verification-02.json`, `reasoning-inputs-02/preparation.json`, `HANDOFF.md` and
+`publication.json`. The preparation manifest SHA-256 is
+`09112a63da125e413e63a2400534ca42e889fae25cf1a60ff24745645ccb0a04`.
