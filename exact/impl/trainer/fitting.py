@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import copy
 import json
+import logging
 from ast import literal_eval
 from pathlib import Path
 
@@ -372,8 +373,14 @@ class TrainingPoolMixin:
             freeze_json(frame_path, {"identity": identity, "rows": records})
             # The durable aggregate contains these exact rows; retain shards only
             # while this pass is unfinished, and avoid a second shared-cache copy.
-            for shard in consumed_shards:
-                shard.unlink(missing_ok=True)
+            try:
+                for shard in consumed_shards:
+                    shard.unlink(missing_ok=True)
+            except OSError as error:
+                logging.getLogger(__name__).warning(
+                    "Training aggregate is durable; retaining redundant shards after cleanup failed: %s",
+                    error,
+                )
             training = pd.DataFrame(records)
         from exact.impl.models.selector.label_budget import select_label_budget
 

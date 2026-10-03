@@ -1,6 +1,7 @@
 """Training feature storage retires only redundant, durably aggregated shards."""
 
 import json
+from pathlib import Path
 
 import pandas as pd
 import pytest
@@ -142,3 +143,33 @@ def test_legacy_shared_aggregate_remains_readable_without_republishing(tmp_path,
     assert restarted.model.calls == []
     restored = next((tmp_path / "legacy-replay").glob("fitting/*/training_scores.json"))
     assert restored.read_bytes() == saved
+
+
+def test_redundant_shard_unlink_failure_warns_once_without_failing_science(
+    tmp_path, monkeypatch, caplog
+):
+    unlink = Path.unlink
+    deleted, retained = [], []
+
+    def flaky_unlink(path, *args, **kwargs):
+        if path.suffix == ".json" and len(path.stem) == 64 and path.is_relative_to(tmp_path):
+            if deleted:
+                retained.append(path)
+                raise OSError("Temporary storage cleanup failure")
+            deleted.append(path)
+        return unlink(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "unlink", flaky_unlink)
+    runner = runner_at(tmp_path)
+    runner.fit_training_pool(batch_size=5)
+    assert runner._training_pool_fitted is True
+    aggregate = next(tmp_path.glob("fitting/*/training_scores.json"))
+    assert len(json.loads(aggregate.read_text())["rows"]) == 18
+    assert len(deleted) == len(retained) == 1
+    assert not deleted[0].exists() and retained[0].exists()
+    assert len([path for path in aggregate.parent.glob("*.json") if len(path.stem) == 64]) == 4
+    warnings = [
+        record for record in caplog.records if "retaining redundant shards" in record.message
+    ]
+    assert len(warnings) == 1
+    assert "Temporary storage cleanup failure" in warnings[0].message
