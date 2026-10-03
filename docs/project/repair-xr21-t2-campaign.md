@@ -158,3 +158,45 @@ separately from the worker's receipt-bound report, preserving that output hash.
 After closure the registry marks remaining scope terminal and monitoring idle;
 larger cohorts, additional seeds, real/production inputs and wider grammar
 remain explicitly deferred.
+
+## HGT report recovery authorized on 2026-10-03
+
+The user's request, “Can we repair and run the HGT armas then?”, authorizes
+reopening the two terminal HGT arms. Their ten optimization epochs and original
+development selections are already complete. Attempt 003 failed while returning
+an oversized report through the worker channel. `--resume-report-transport`
+admits only the pinned predecessor with unchanged repair dependencies, settings,
+input/split identities and a complete selection. It finalizes saved work using
+the existing report artifact transport; it performs no further optimization or
+development selection. Pairwise retains epoch 5; unary retains epoch 10.
+
+The machine-readable amendment, checkpoint backups, actual-checkpoint preflight,
+tests and launch descriptors are in
+`artifacts/hgt-report-recovery-20261003` under the campaign directory. Preserve
+all old terminal receipts, previous repair attempts and the first scope report
+as historical evidence. The explicit authorization starts one recovery episode
+for report transport, with at most two unsuccessful attempts at the same error
+across replacement descendants. It does not expand any resource budget. All
+existing logical model, training-stage and campaign ledgers remain authoritative.
+
+Attempt 004 for each HGT arm uses its original logical work directory, frozen
+protocol and four-thread, one-GPU, 32768-MiB profile. The existing dispatcher
+runs them sequentially. Shared supervisor source and pinned instructions stay
+unchanged. Its supplied registry and current handoff identify the authorized
+reopening and remaining work.
+
+After both model receipts exist, prepare an evaluation addendum for the eight
+previously unavailable HGT primary rows using the original four held-out cases,
+original frozen inference settings and these already selected model weights.
+Validate dependency compatibility and retain the sixteen completed non-HGT rows
+and forty-eight model-independent circuit rows with their original schedule
+hashes and provenance. Do not relabel old rows with a new schedule hash or rerun
+completed evaluation unnecessarily. The addendum and its merged report must
+retain all original denominators and unavailable outcomes. Use the original
+evaluation logical ID and cumulative 25200-second cap, and the original report
+logical ID and 3600-second cap. Publish a new report revision without modifying
+the completed first report or its receipts. B07's twenty reserved-test control
+rows and all larger/deferred studies remain deferred. Routine preparation and
+small tested adapter changes for this addendum are already authorized; do not
+request approval for them. If one arm becomes terminal again, account for it and
+continue the independent eligible arm and reporting.

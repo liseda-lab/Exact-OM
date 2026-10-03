@@ -734,6 +734,7 @@ def train_cases(
     total_training_seconds: float | None = None,
     resume_acquisition_deadline: bool = False,
     resume_endpoint_retrieval: Path | None = None,
+    resume_report_transport: bool = False,
 ) -> tuple[Any, dict[str, Any]]:
     """Train masked full-plan tasks and select v3 checkpoints on generated repair quality.
 
@@ -747,6 +748,13 @@ def train_cases(
     )
     if not math.isfinite(total_training_seconds) or total_training_seconds <= 0:
         raise ValueError("Cumulative training allowance must be finite and positive")
+    if resume_report_transport and (
+        checkpoint_path is None
+        or not checkpoint_path.is_file()
+        or resume_acquisition_deadline
+        or resume_endpoint_retrieval is not None
+    ):
+        raise ValueError("Report recovery requires an existing checkpoint and no other migration")
     identity_options = dict(locals())
     for key in (
         "checkpoint_path",
@@ -754,6 +762,7 @@ def train_cases(
         "warm_start_weights",
         "resume_acquisition_deadline",
         "resume_endpoint_retrieval",
+        "resume_report_transport",
     ):
         identity_options.pop(key)
     import torch
@@ -1009,7 +1018,23 @@ def train_cases(
             or saved.get("identity") != resume_identity
             or (revision == "v3" and saved.get("recovery_revision") != "exact-phase-resume/v3.1")
         ):
-            if resume_endpoint_retrieval is not None and revision == "v3":
+            if resume_report_transport and revision == "v3":
+                from tools.repair.report_recovery import completed_report_recovery
+
+                dependencies = canonical_hash(
+                    [
+                        (path.name, path.read_bytes().hex())
+                        for path in sorted(
+                            (Path(__file__).resolve().parents[2] / "exact" / "repair").glob("*.py")
+                        )
+                    ]
+                )
+                recovery_lineage.append(
+                    completed_report_recovery(
+                        saved, identity_options, warm_start_hash, dependencies
+                    )
+                )
+            elif resume_endpoint_retrieval is not None and revision == "v3":
                 from tools.repair.endpoint_recovery import recover_endpoint_state
 
                 dependencies = canonical_hash(
@@ -2427,6 +2452,11 @@ def main() -> int:
         action="store_true",
         help="recover the pinned pre-optimization case-deadline defect without renewing its cap",
     )
+    parser.add_argument(
+        "--resume-report-transport",
+        action="store_true",
+        help="finalize a dependency-checked completed run after its report transfer failed",
+    )
     parser.add_argument("--pairwise", action=argparse.BooleanOptionalAction, default=None)
     parser.add_argument(
         "--fidelity-labels",
@@ -2730,6 +2760,7 @@ def main() -> int:
             checkpoint_path=args.output / "training-state.pt",
             resume_acquisition_deadline=args.resume_acquisition_deadline,
             resume_endpoint_retrieval=args.resume_endpoint_retrieval,
+            resume_report_transport=args.resume_report_transport,
         )
         with CumulativeBudget(
             args.output / "training-budget.json",

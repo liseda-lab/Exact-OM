@@ -14,7 +14,10 @@ from tools.repair.corpus import generate_corpus
 from tools.repair.prepare import load_preparation, publish_label_cache
 
 
-def test_v3_cli_accounts_shared_campaign_and_stage_cpu_and_preserves_resume(tmp_path, monkeypatch):
+@pytest.mark.parametrize("report_resume", [False, True])
+def test_v3_cli_accounts_shared_campaign_and_stage_cpu_and_preserves_resume(
+    tmp_path, monkeypatch, report_resume
+):
     pytest.importorskip("torch")
     template = (
         Path(__file__).parents[1] / "specs/exact-repair/protocol/xr21-review2-conformance.json"
@@ -36,6 +39,8 @@ def test_v3_cli_accounts_shared_campaign_and_stage_cpu_and_preserves_resume(tmp_
     path.write_text(json.dumps(protocol))
     output = tmp_path / "run"
     args = ["repair-train", "--protocol", str(path), "--output", str(output)]
+    if report_resume:
+        args.append("--resume-report-transport")
     monkeypatch.setattr(sys, "argv", args)
     monkeypatch.delenv("SLURM_STEP_GPUS", raising=False)
     monkeypatch.delenv("SLURM_JOB_GPUS", raising=False)
@@ -59,6 +64,7 @@ def test_v3_cli_accounts_shared_campaign_and_stage_cpu_and_preserves_resume(tmp_
             cpu = 0.5
         elif function is train._train_payload:
             train_rows, dev_rows, model_options = worker_args
+            assert model_options["resume_report_transport"] is report_resume
             assert len(train_rows) == len(dev_rows) == 1
             assert model_options["revision"] == "v3"
             assert model_options["deadline_seconds"] < options["timeout"]
