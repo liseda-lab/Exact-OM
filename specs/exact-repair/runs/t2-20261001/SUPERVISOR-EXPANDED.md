@@ -109,3 +109,20 @@ diagnostic model call. Repeated checks and restarts must not resend it. Await th
 user's approval for an additional research program. Do not send duplicate manual
 completion emails. Genuine blockers still notify through the same mechanism,
 while independent eligible work continues.
+
+## Controller recovery and direct preparation (2026-10-03)
+
+The model request now points to an immutable, hash-bound context snapshot rather
+than embedding the full growing queue. Inspect the focused stage and its actual
+receipts, then the live registry before writing. Invocation history is permanent;
+only unsuccessful repairs consume the two-attempt error limit. A successful
+preparation turn requires evidence of new registered work or completed reporting.
+`MANUAL_CONTROL` means a user-authorized agent owns preparation: deterministic
+monitoring and dispatch continue, while automatic model calls and emails wait.
+Do not remove that marker yourself. The handoff records its deliberate removal.
+
+The manual recovery handoff registered in the live registry binds the historical
+final audit, current-source qualification, development-only label acquisition,
+conflict-overlap witnesses and real-ontology projection jobs. Preserve their
+explicit limitations. Native call errors must retain detail and evidence;
+completed batch processes do not imply complete or usable scientific labels.

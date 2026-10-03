@@ -142,7 +142,7 @@ def test_read_only_check_does_not_send_or_repair(monitor, tmp_path, monkeypatch)
         cli, "notify_intervention", lambda *args, **kwargs: pytest.fail("Read only")
     )
     monkeypatch.setattr(cli, "run_agent", lambda *args: pytest.fail("Read only"))
-    assert cli.check(tmp_path, policy, state, act=False)["status"] == "needs_attention"
+    assert cli.check(tmp_path, policy, state, act=False)["status"] == "blocked"
     assert not (tmp_path / "alerts").exists()
 
 
