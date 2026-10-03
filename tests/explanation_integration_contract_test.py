@@ -15,7 +15,7 @@ from exact_inspect.study import store as store_module
 from exact_inspect.study import telemetry
 from exact_inspect.study.api import create_study_app
 from tests.explanation_corrective_http_test import corrected, mutate, reach_tutorial
-from tests.explanation_study_test import ADMIN, ORIGIN, SECRET, invite
+from tests.explanation_study_test import ADMIN, ORIGIN, SECRET, invite, service
 from tests.explanation_study_v2_test import prepare, train
 from tools.build_explanation_v2_fixture import publication_v2
 
@@ -26,6 +26,24 @@ def allocate(corrected):
     prepare(store, publication, (sid, 1))
     train(store, publication, (sid, 1))
     return client, store, publication, sid
+
+
+def test_runtime_extension_preserves_publication_and_v1_state(corrected, service):
+    client, store, publication = corrected
+    before = store.publish(publication)
+    response = client.get("/api/v1/study/state")
+    assert response.status_code == 200
+    assert response.json()["integration_contract"] == "study-integration/1"
+    assert response.json()[
+        "protocol_versions"
+    ] == publication.definition.protocol_versions.model_dump(mode="json")
+    assert store.publish(publication) == before
+    app, legacy_store, legacy = service
+    old = TestClient(app, base_url=ORIGIN, headers={"Origin": ORIGIN})
+    legacy_state = old.post("/api/v1/study/session", json={"secret": invite(legacy_store, legacy)})
+    assert legacy_state.status_code == 200
+    assert "integration_contract" not in legacy_state.json()
+    assert "tutorial_progress" not in legacy_state.json()
 
 
 def test_current_case_serializes_frozen_workspace_descriptor(corrected):
@@ -51,12 +69,10 @@ def test_current_case_serializes_frozen_workspace_descriptor(corrected):
         ).status_code
         == 409
     )
-    assert (
-        client.get(
-            "/api/v1/study/cases/current", cookies={"exact_study_session": "invalid"}
-        ).status_code
-        == 401
+    invalid_client = TestClient(
+        client.app, base_url=ORIGIN, cookies={"exact_study_session": "invalid"}
     )
+    assert invalid_client.get("/api/v1/study/cases/current").status_code == 401
 
     # Discovery remains available when paused; reads preserve their stricter rule.
     assert mutate(client, "POST", "pause").status_code == 200

@@ -3072,6 +3072,27 @@
               "default": "json",
               "title": "Format"
             }
+          },
+          {
+            "name": "analysis_schema",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "exact-study-analysis/1",
+                    "exact-study-analysis/2",
+                    "exact-study-analysis/3"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Analysis Schema"
+            }
           }
         ],
         "responses": {
@@ -7182,7 +7203,10 @@
           },
           "export": {
             "type": "string",
-            "const": "exact-study-analysis/2",
+            "enum": [
+              "exact-study-analysis/2",
+              "exact-study-analysis/3"
+            ],
             "title": "Export",
             "default": "exact-study-analysis/2"
           }
@@ -7955,6 +7979,17 @@
             "type": "string",
             "title": "Export Version"
           },
+          "source_export_version": {
+            "type": "string",
+            "title": "Source Export Version"
+          },
+          "supported_analysis_schemas": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Supported Analysis Schemas"
+          },
           "frozen_hash": {
             "type": "string",
             "title": "Frozen Hash"
@@ -7995,6 +8030,8 @@
           "tutorial_version",
           "setup_version",
           "export_version",
+          "source_export_version",
+          "supported_analysis_schemas",
           "frozen_hash",
           "closed",
           "synthetic",
@@ -9517,6 +9554,18 @@
           "gap_recovery": {
             "type": "string",
             "title": "Gap Recovery"
+          },
+          "integration_contract": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "study-integration/1"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Integration Contract"
           },
           "tutorial": {
             "$ref": "#/components/schemas/TutorialPublic"

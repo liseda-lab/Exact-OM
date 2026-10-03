@@ -340,7 +340,13 @@ def test_export_selector_preserves_publication_defaults_and_saved_artifacts(stud
             assert json.loads(zipped.read("manifest.json"))["schema"] == default
         with pytest.raises(StudyError, match="unsupported"):
             store.export(frozen.definition.study_revision, analysis_schema="arbitrary")
-    metadata = {x["study_revision"]: x for x in revisions(store)["items"]}
+    metadata, cursor = {}, None
+    while True:
+        page = revisions(store, cursor=cursor)
+        metadata.update({x["study_revision"]: x for x in page["items"]})
+        cursor = page["next_cursor"]
+        if cursor is None:
+            break
     assert metadata[old.definition.study_revision]["source_export_version"] == SCHEMA2
     assert metadata[old.definition.study_revision]["supported_analysis_schemas"] == [
         SCHEMA2,

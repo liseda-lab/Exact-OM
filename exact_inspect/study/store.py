@@ -572,6 +572,7 @@ class StudyStore:
             submitted = list(state["consultations"].values())
             result.update(
                 {
+                    "integration_contract": "study-integration/1",
                     "tutorial": public_tutorial(study["tutorial"]),
                     "tutorial_progress": state["tutorial_progress"],
                     "consultation_draft": state["consultation_drafts"].get(case_id),

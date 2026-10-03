@@ -1143,8 +1143,11 @@
           "type": "string"
         },
         "export": {
-          "const": "exact-study-analysis/2",
           "default": "exact-study-analysis/2",
+          "enum": [
+            "exact-study-analysis/2",
+            "exact-study-analysis/3"
+          ],
           "title": "Export",
           "type": "string"
         }

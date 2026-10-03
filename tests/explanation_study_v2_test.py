@@ -690,6 +690,11 @@ def test_v2_postgresql_backup_restore_preserves_training_and_draft(corrected, tm
     )
     exported = store.export(frozen.definition.study_revision, include_test=True)
     url = urlsplit(store.database_url)
+    derived = store.export(
+        frozen.definition.study_revision,
+        include_test=True,
+        analysis_schema="exact-study-analysis/3",
+    )
     env = {
         **os.environ,
         "PGHOST": url.hostname or "127.0.0.1",
@@ -728,6 +733,10 @@ def test_v2_postgresql_backup_restore_preserves_training_and_draft(corrected, tm
         )
         assert restored.state(*identity) == before
         assert restored.saved_export(exported["manifest"]["export_id"]) == exported
+        assert restored.saved_export(derived["manifest"]["export_id"]) == derived
+        assert csv_archive(restored.saved_export(derived["manifest"]["export_id"])) == csv_archive(
+            derived
+        )
         assert restored.state(*identity)["tutorial_progress"]["completed_at"]
         assert restored.state(*identity)["tutorial_progress"]["position"] == position
         assert restored.state(*identity)["consultation_draft"]["methods"] == ["reasoner"]

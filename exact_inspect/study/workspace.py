@@ -346,7 +346,7 @@ def _open_runtime_resources(store, scope, policy):
 
     try:
         return _open_resources(store, scope, policy)
-    except (StudyError, ValueError, OSError, KeyError, sqlite3.DatabaseError) as exc:
+    except StudyError as exc:
         raise _error(
             503, "Frozen workspace resources are unavailable; retry or contact the study team"
         ) from exc

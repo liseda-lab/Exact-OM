@@ -459,6 +459,8 @@ class FormsV2(StrictModel):
 
 class StudyStateV2(StudyState):
     contract_version: Literal["exact-study/2.0"] = "exact-study/2.0"
+    # Old immutable mutation receipts may omit this additive runtime capability.
+    integration_contract: Literal["study-integration/1"] | None = None
     stage: Literal[
         "welcome",
         "setup",
