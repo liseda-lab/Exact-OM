@@ -117,7 +117,7 @@ export function BrowseView() {
             cite={() => undefined}
             onOpenEntity={(iri) => {
               const sourceSide = contextFor.side === "source";
-              const parent = context.data?.parents.items.some((fact) => fact.value?.term_type === "iri" && fact.value.iri === iri);
+              const parent = context.data?.parents.items.some((fact) => (fact.hierarchy_projection?.parent.iri ?? (fact.value?.term_type === "iri" ? fact.value.iri : null)) === iri);
               setParams({ [sourceSide ? "s" : "t"]: iri, [sourceSide ? "sk" : "tk"]: parent ? contextEntity.kind : "class" });
               setContextFor(null);
             }}

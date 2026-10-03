@@ -16,12 +16,22 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "action",
-        choices=["publish", "invitations", "progress", "export", "reissue", "revoke", "close"],
+        choices=[
+            "list",
+            "publish",
+            "invitations",
+            "progress",
+            "export",
+            "reissue",
+            "revoke",
+            "close",
+        ],
     )
     parser.add_argument("--study")
     parser.add_argument("--session")
     parser.add_argument("--publication", type=Path)
     parser.add_argument("--count", type=int, default=1)
+    parser.add_argument("--cursor", help="Continue a bounded revision listing")
     parser.add_argument(
         "--live",
         action="store_true",
@@ -36,7 +46,12 @@ def main():
     if not origin.startswith("https://"):
         parser.error("Researcher API requires HTTPS")
     body, method = {}, "POST"
-    if args.action == "publish":
+    if args.action == "list":
+        method = "GET"
+        route = "/admin/studies" + (
+            "?" + urllib.parse.urlencode({"cursor": args.cursor}) if args.cursor else ""
+        )
+    elif args.action == "publish":
         if not args.publication:
             parser.error("publish requires --publication")
         body = json.loads(args.publication.read_text())

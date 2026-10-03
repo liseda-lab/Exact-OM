@@ -7,11 +7,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { ErrorNote, Skeleton } from "@/components/common/ErrorNote";
+import { Dialog } from "@/components/common/Dialog";
 import { IconCheck, IconSpinner, IconUpload, IconWarning } from "@/components/common/Icons";
 import { useExplore } from "@/components/explore/ExploreContext";
 import { ApiError, getJson, request, sendJson } from "@/lib/api";
 import { shortHash } from "@/lib/iri";
-import type { BundleListItem, ImportJob } from "@/lib/types";
+import type { BundleListItem, ImportJob, Page } from "@/lib/types";
 import { useAsync } from "@/lib/useAsync";
 import { formatBytes, readBundlePreview, type BundlePreview } from "@/lib/zipManifest";
 
@@ -30,6 +31,7 @@ const IMPORT_ERRORS: Record<string, string> = {
   import_cancelled: "The import was cancelled.",
   import_conflict: "This import was already started in another tab.",
   library_unavailable: "This service was started without a local bundle library. Restart it with --library-dir.",
+  library_busy: "An import or library change is in progress. Wait for it to finish and try again.",
   origin_denied: "The request came from another site and was refused.",
 };
 
@@ -58,7 +60,15 @@ function uploadWithProgress(url: string, file: File, onProgress: (sent: number) 
 
 export function LibraryView() {
   const state = useExplore();
-  const bundles = useAsync<BundleListItem[]>("bundles", (signal) => getJson<BundleListItem[]>("/api/v1/bundles", undefined, signal));
+  const bundles = useAsync<Page<BundleListItem>>("bundles", (signal) => getJson<Page<BundleListItem>>("/api/v1/bundles/page", { limit: 20 }, signal));
+  const [more, setMore] = useState<{ base: Page<BundleListItem>; items: BundleListItem[]; cursor: string | null; loading: boolean; error: unknown } | null>(null);
+  const expanded = more?.base === bundles.data ? more : null;
+  const bundleItems = expanded?.items ?? bundles.data?.items;
+  const bundleCursor = expanded ? expanded.cursor : bundles.data?.next_cursor;
+  const [confirmRemove, setConfirmRemove] = useState<BundleListItem | null>(null);
+  const [removing, setRemoving] = useState(false);
+  const [removeError, setRemoveError] = useState<string | null>(null);
+  const [removedNotice, setRemovedNotice] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<BundlePreview | null | "unreadable">(null);
   const [phase, setPhase] = useState<Phase>("idle");
@@ -166,6 +176,41 @@ export function LibraryView() {
   const busy = phase === "uploading" || phase === "validating";
   const percent = file && file.size ? Math.min(100, Math.round((sent / file.size) * 100)) : 0;
   const current = state.health?.package_id ?? null;
+
+  const loadMore = async () => {
+    const base = bundles.data;
+    if (!base || !bundleCursor || expanded?.loading || bundles.loading) return;
+    const previous = bundleItems ?? [];
+    const cursor = bundleCursor;
+    setMore({ base, items: previous, cursor, loading: true, error: null });
+    try {
+      const page = await getJson<Page<BundleListItem>>("/api/v1/bundles/page", { limit: 20, cursor });
+      const combined = new Map([...previous, ...page.items].map((item) => [item.package_id, item]));
+      setMore({ base, items: [...combined.values()], cursor: page.next_cursor, loading: false, error: null });
+    } catch (err) {
+      setMore({ base, items: previous, cursor, loading: false, error: err });
+    }
+  };
+
+  const removeCopy = async () => {
+    if (!confirmRemove || removing) return;
+    setRemoving(true);
+    setRemoveError(null);
+    try {
+      await request(`/api/v1/bundles/${encodeURIComponent(confirmRemove.package_id)}`, { method: "DELETE" });
+      setRemovedNotice(`Removed library copy ${shortHash(confirmRemove.package_id, 16)}.`);
+      setConfirmRemove(null);
+      bundles.reload();
+    } catch (err) {
+      setRemoveError(err instanceof ApiError
+        ? err.code === "package_in_use" ? "This copy is open or still being read. Open another bundle, wait for pending reads to finish, and try again."
+          : err.code === "unowned_package" ? "This copy was not created by the library importer and cannot be removed here."
+          : IMPORT_ERRORS[err.code] ?? err.message
+        : "The copy could not be removed. Try again.");
+    } finally {
+      setRemoving(false);
+    }
+  };
 
   return (
     <div className="library-page" id="main" tabIndex={-1}>
@@ -302,25 +347,25 @@ export function LibraryView() {
       <section className="library-list" aria-labelledby="library-h">
         <div className="section-head">
           <h2 id="library-h">Library</h2>
-          <span className="meta">{bundles.data ? `${bundles.data.length} ${bundles.data.length === 1 ? "bundle" : "bundles"} on this computer` : ""}</span>
+          <span className="meta">{bundleItems ? `${bundleItems.length} ${bundleItems.length === 1 ? "bundle" : "bundles"} loaded${bundleCursor ? " · more available" : ""}` : ""}</span>
         </div>
         <p className="meta">
-          Imported copies are kept in this computer&apos;s library folder; the files you imported from are never changed. Removing a copy from this page is not available in this version, and details such as entity counts
-          appear for the bundle that is open.
+          Imported copies are kept in this computer&apos;s library folder. You can remove an owned copy after opening another bundle. Original input files and exports are kept. Review decisions stay in this browser and are not stored in or removed with a bundle.
         </p>
         {bundles.error ? <ErrorNote error={bundles.error} onRetry={bundles.reload} what="Library" /> : null}
         {selectError ? <ErrorNote error={selectError} what="Opening bundle" /> : null}
         {!bundles.data && !bundles.error && <Skeleton lines={3} />}
-        {bundles.data && bundles.data.length === 0 && <p className="note">No bundle has been imported yet.</p>}
-        {current && bundles.data && !bundles.data.some((item) => item.package_id === current) && (
+        {removedNotice && <p className="note" role="status">{removedNotice}</p>}
+        {bundleItems && bundleItems.length === 0 && <p className="note">No bundle has been imported yet.</p>}
+        {current && bundleItems && !bundleItems.some((item) => item.package_id === current) && (
           <article className="card bundle-card current">
             <span className="pill pill-strong">Open now</span>
-            <h3>Bundle started with the service</h3>
+            <h3>Open bundle</h3>
             <span className="iri">{current}</span>
-            <p className="meta">This bundle was passed on the command line and is not a library copy.</p>
+            <p className="meta">{bundleCursor ? "The open bundle is outside the loaded library page. Load more to check for its library copy." : "This bundle was passed on the command line and is not a library copy."}</p>
           </article>
         )}
-        {bundles.data?.map((item) => {
+        {bundleItems?.map((item) => {
           const isCurrent = item.package_id === current;
           return (
             <article key={item.package_id} className={isCurrent ? "card bundle-card current" : "card bundle-card"}>
@@ -329,6 +374,8 @@ export function LibraryView() {
                 <h3>{isCurrent ? state.runs[0]?.run_id ?? "Open bundle" : "Bundle"}</h3>
               </div>
               <span className="iri">{item.package_id}</span>
+              <p className="meta">{item.counts.ontologies} ontologies · {item.counts.runs} runs · {item.counts.explanations} prepared texts · {formatBytes(item.artifact_bytes)}</p>
+              <p className="meta">{item.contract_version} · policy {item.policy_id}</p>
               <ul className="capability-list">
                 {Object.entries(item.capabilities).map(([name, status]) => (
                   <li key={name} className={status === "available" ? "status status-ok" : "status"}>
@@ -348,10 +395,28 @@ export function LibraryView() {
                   {selecting === item.package_id ? "Opening…" : "Open this bundle"}
                 </button>
               )}
+              <button type="button" className="btn" disabled={isCurrent || !item.owned_library_copy || busy || removing || selecting !== null} onClick={() => { setConfirmRemove(item); setRemoveError(null); }}>
+                Remove library copy
+              </button>
+              {isCurrent && <p className="meta">Open another bundle before removing this copy.</p>}
+              {!item.owned_library_copy && <p className="meta">This copy predates ownership records or was added outside the importer; removal here is unavailable.</p>}
             </article>
           );
         })}
+        {expanded?.error ? <ErrorNote error={expanded.error} onRetry={loadMore} what="More library bundles" /> : null}
+        {bundleCursor && <button type="button" className="btn" onClick={loadMore} disabled={expanded?.loading || bundles.loading}>{expanded?.loading ? "Loading…" : "Load the next 20 bundles"}</button>}
       </section>
+      {confirmRemove && (
+        <Dialog title="Remove this library copy?" onClose={() => { if (!removing) setConfirmRemove(null); }}>
+          <p className="iri">{confirmRemove.package_id}</p>
+          <p>This removes the imported copy from this computer&apos;s library. The original input and export files and your browser-local review decisions are kept.</p>
+          {removeError && <p className="note" role="alert">{removeError}</p>}
+          <div className="import-actions">
+            <button type="button" className="btn" onClick={() => setConfirmRemove(null)} disabled={removing}>Keep this copy</button>
+            <button type="button" className="btn btn-danger" onClick={removeCopy} disabled={removing}>{removing ? "Removing…" : "Remove this copy"}</button>
+          </div>
+        </Dialog>
+      )}
     </div>
   );
 }

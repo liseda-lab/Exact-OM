@@ -217,7 +217,7 @@ export function ParticipantApp() {
         break;
       case "practice":
       case "tutorial":
-        body = protocol === "v2" ? <TutorialStage key={state.session_id} state={state} session={session} onPause={pause} /> : <LegacyPracticeStage state={state} session={session} />;
+        body = protocol === "v2" ? <TutorialStage key={state.session_id} state={state} session={session} onPause={pause} telemetry={telemetry} /> : <LegacyPracticeStage state={state} session={session} />;
         break;
       case "case":
         body = <CaseView key={`${state.session_id}|${state.current_case_id}|${state.current_presentation_id}`} state={state} session={session} telemetry={telemetry} timingEnabled={!needsGapAnswer} />;

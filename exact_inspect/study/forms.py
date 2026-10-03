@@ -174,7 +174,7 @@ BACKGROUND = [
 ]
 
 
-def definitions(components=None, version="exact-study-forms/1"):
+def definitions(components=None, version="exact-study-forms/1", *, ordered=False):
     """Return a detached, ordered definition; historical versions are frozen in the DB."""
     selected = {k: COMPONENTS[k] for k in (components if components is not None else COMPONENTS)}
     final = [
@@ -225,7 +225,7 @@ def definitions(components=None, version="exact-study-forms/1"):
             required=False,
         ),
     ]
-    return deepcopy(
+    result = deepcopy(
         {
             "version": version,
             "background": BACKGROUND,
@@ -264,6 +264,65 @@ def definitions(components=None, version="exact-study-forms/1"):
             "experience_note": "Years mean approximate combined study/work experience; count overlapping years once.",
         }
     )
+
+    if ordered or version == "exact-study-forms/2":
+        next(q for q in result["background"] if q["id"] == "protege_experience")["required"] = False
+        methods = result["consultation"][1]
+        result["consultation"][0][
+            "label"
+        ] = "For the source and candidates you just ranked, did you inspect ontology information outside this study interface?"
+        methods["label"] = (
+            "Select all methods you actually used for this case. You may combine methods and change them between cases."
+        )
+        methods["options"].update(
+            {
+                "queries_scripts": "Queries or scripts",
+                "reasoner": "A reasoner",
+                "other_method": "Another inspection method",
+            }
+        )
+        result["consultation"].extend(
+            [
+                question(
+                    "other_method",
+                    "Optional method name; do not include identities, paths or URLs.",
+                    required=False,
+                    when={"methods": {"contains": "other_method"}},
+                ),
+                question(
+                    "resource_scope",
+                    "Which ontology resources did you inspect? (Optional)",
+                    {
+                        "supplied_only": "Only the supplied ontology versions",
+                        "different_or_additional": "Different or additional resources",
+                        "unsure": "Unsure",
+                    },
+                    required=False,
+                    when={"consulted_external_ontologies": True},
+                ),
+            ]
+        )
+        for form_id in ("background", "consultation", "final"):
+            for q in result[form_id]:
+                q["option_order"] = list(q["options"] or {})
+                q["row_order"] = list(q["matrix"] or {})
+        validate_ordered_forms(result)
+    return result
+
+
+def validate_ordered_forms(forms):
+    """Require explicit exact permutations; canonical object-key sorting is irrelevant."""
+    for name in ("background", "consultation", "final"):
+        for question in forms[name]:
+            for values, order in (("options", "option_order"), ("matrix", "row_order")):
+                codes = set(question[values] or {})
+                arranged = question.get(order)
+                if (
+                    not isinstance(arranged, list)
+                    or len(arranged) != len(set(arranged))
+                    or set(arranged) != codes
+                ):
+                    raise ValueError(f"Invalid explicit {order} for {question['id']}")
 
 
 def validate_answers(form, answers, *, submitted):

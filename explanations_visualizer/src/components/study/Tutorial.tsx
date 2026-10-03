@@ -26,8 +26,10 @@ import { indexResources } from "@/lib/workspace/resourceIndex";
 import { createResourceSource } from "@/lib/workspace/resourceSource";
 import type { WorkspaceAction } from "@/lib/workspace/types";
 import { WorkspaceProvider } from "@/lib/workspace/WorkspaceContext";
+import type { Telemetry } from "@/study/telemetry";
+import { workspaceEvent } from "@/study/workspaceEvents";
 import { uuid, type StudySession } from "@/study/session";
-import { requirementsFor, type LessonSignal } from "@/study/tutorialProgress";
+import { requirementsFor, evidenceFor, type TutorialActionEvidence, type LessonSignal } from "@/study/tutorialProgress";
 import type { AssessmentItem, AssessmentResponse, ExplanationResource, RequirementAction, StudyState, TutorialLesson, TutorialPublic } from "@/study/types";
 
 const PRACTICE_KEY = "practice-case";
@@ -36,7 +38,7 @@ function ontologyNames(tutorial: TutorialPublic) {
   return (id: string) => tutorial.case.ontology_resources.find((asset) => asset.ontology_version_id === id)?.title ?? (id === tutorial.case.source.ontology_version_id ? "Practice source ontology" : "Practice target ontology");
 }
 
-export function TutorialStage({ state, session, onPause }: { state: StudyState; session: StudySession; onPause: () => void }) {
+export function TutorialStage({ state, session, onPause, telemetry }: { state: StudyState; session: StudySession; onPause: () => void; telemetry: Telemetry }) {
   const tutorial = state.tutorial ?? null;
   if (!tutorial) {
     return (
@@ -56,10 +58,10 @@ export function TutorialStage({ state, session, onPause }: { state: StudyState; 
       </MessagePage>
     );
   }
-  return <Tutorial state={state} session={session} tutorial={tutorial} onPause={onPause} />;
+  return <Tutorial state={state} session={session} tutorial={tutorial} onPause={onPause} telemetry={telemetry} />;
 }
 
-function Tutorial({ state, session, tutorial, onPause }: { state: StudyState; session: StudySession; tutorial: TutorialPublic; onPause: () => void }) {
+function Tutorial({ state, session, tutorial, onPause, telemetry }: { state: StudyState; session: StudySession; tutorial: TutorialPublic; onPause: () => void; telemetry: Telemetry }) {
   const progress = state.tutorial_progress ?? null;
   const [resources, setResources] = useState<ExplanationResource[] | null>(null);
   const [loadError, setLoadError] = useState<unknown>(null);
@@ -101,9 +103,10 @@ function Tutorial({ state, session, tutorial, onPause }: { state: StudyState; se
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resources, tutorial.version, state.session_id, ontologyName]);
 
+  const actionEvidence = useRef<Map<string, TutorialActionEvidence>>(new Map());
   const save = useCallback(
     (body: Record<string, unknown>, coalesce: string) =>
-      session.mutate({ method: "PUT", path: "/api/v1/study/tutorial/progress", body: { tutorial_version: tutorial.version, current_lesson_id: view === "assessment" ? null : view, ...body }, coalesce, debounceMs: 400 }).catch(() => undefined),
+      session.mutate({ method: "PUT", path: "/api/v1/study/tutorial/progress", body: { tutorial_version: tutorial.version, current_lesson_id: view === "assessment" ? null : view, actions: Array.from(actionEvidence.current.values()), ...body }, coalesce, debounceMs: 400 }).catch(() => undefined),
     [session, tutorial.version, view],
   );
 
@@ -122,14 +125,17 @@ function Tutorial({ state, session, tutorial, onPause }: { state: StudyState; se
   const record = useCallback(
     (signal: LessonSignal | null, practice?: Record<string, unknown>) => {
       if (!lesson) return;
+      const observation = signal?.kind === "workspace" ? workspaceEvent(signal.action) : signal?.kind === "rank" ? { type: signal.event, component: "ranking" } : signal?.kind === "inspect" ? { type: "candidate_inspected" as const } : signal?.kind === "downloads" ? { type: "resources_open" as const, component: "downloads" } : null;
+      if (observation) telemetry.emit(observation.type, { component: observation.component, scope: "tutorial", lessonId: lesson.lesson_id });
       if (practice) practiceRef.current = practice;
+      if (signal) evidenceFor(lesson, signal, tutorial, resources ?? [], practiceRef.current).forEach((action) => actionEvidence.current.set(action.requirement_id, action));
       const satisfied = signal ? requirementsFor(lesson, signal).filter((id) => !completed.has(id)) : [];
       if (!satisfied.length && !practice) return;
       const all = Array.from(new Set([...completed, ...satisfied]));
       if (satisfied.length) setPending((current) => new Set([...current, ...satisfied]));
       void save({ lesson_id: lesson.lesson_id, completed_requirements: all, ...(practiceRef.current ? { practice: practiceRef.current } : {}) }, `tutorial:lesson:${lesson.lesson_id}`);
     },
-    [lesson, completed, save],
+    [lesson, completed, save, tutorial, resources, telemetry],
   );
 
   const go = (next: string) => {
@@ -220,6 +226,7 @@ function Tutorial({ state, session, tutorial, onPause }: { state: StudyState; se
               className="btn"
               onClick={() => {
                 setHelpOpen(true);
+                telemetry.emit("help_open", { component: "tutorial_help", scope: "help", lessonId: lesson?.lesson_id });
                 void save({ completed_requirements: Array.from(completed), help_opened: true }, "tutorial:help");
               }}
             >
@@ -297,7 +304,7 @@ function LessonWorkspace({
     setViewed((current) => new Set([...current, id]));
     record({ kind: "inspect", position: tutorial.case.candidates.find((candidate) => candidate.candidate_id === id)?.display_position ?? 1, returning });
   };
-  const onAction = useCallback((action: WorkspaceAction) => record({ kind: "workspace", action }), [record]);
+  const onAction = useCallback((action: WorkspaceAction) => record({ kind: "workspace", action, ...(action.type === "copy_iri" ? { entity: action.side === "source" ? tutorial.case.source : inspected.entity } : {}) }), [record, tutorial.case.source, inspected.entity]);
   const check = () => {
     const n = value.ranked.length;
     if (value.responseType === "ranked_candidates" && n >= 1 && n <= 4) {
@@ -325,8 +332,8 @@ function LessonWorkspace({
       <div className="pair-workspace baseline-workspace">
         {question({ source: tutorial.case.source_label, target: inspected.label })}
         <div className="card-pair">
-          <IdentityCard side="source" entity={tutorial.case.source} label={tutorial.case.source_label} ontology={ontologyNames(tutorial)(tutorial.case.source.ontology_version_id)} title="Source concept" onCopied={() => record({ kind: "workspace", action: { type: "copy_iri", side: "source" } })} />
-          <IdentityCard side="target" entity={inspected.entity} label={inspected.label} ontology={ontologyNames(tutorial)(inspected.entity.ontology_version_id)} title={`Candidate · initial position ${inspected.display_position}`} onCopied={() => record({ kind: "workspace", action: { type: "copy_iri", side: "target" } })} />
+          <IdentityCard side="source" entity={tutorial.case.source} label={tutorial.case.source_label} ontology={ontologyNames(tutorial)(tutorial.case.source.ontology_version_id)} title="Source concept" onCopied={() => record({ kind: "workspace", action: { type: "copy_iri", side: "source" }, entity: tutorial.case.source })} />
+          <IdentityCard side="target" entity={inspected.entity} label={inspected.label} ontology={ontologyNames(tutorial)(inspected.entity.ontology_version_id)} title={`Candidate · initial position ${inspected.display_position}`} onCopied={() => record({ kind: "workspace", action: { type: "copy_iri", side: "target" }, entity: inspected.entity })} />
         </div>
         <section className="study-card baseline-tools">
           <h3>Inspect with your own methods</h3>
@@ -439,11 +446,11 @@ function PracticeReports({ record }: { record: (signal: LessonSignal | null) => 
               onClick={() => {
                 if (task.id === "multi") {
                   if (answer.consulted && answer.methods.length >= 2) {
-                    record({ kind: "report", methods: answer.methods.length, consulted: true });
+                    record({ kind: "report", methods: answer.methods.length, methodCodes: answer.methods, consulted: true });
                     setFeedback((current) => ({ ...current, multi: "That is how you report two methods for one case: Yes, with every method you used selected." }));
                   } else setFeedback((current) => ({ ...current, multi: "In this situation you used two methods: answer Yes and select both of them." }));
                 } else if (answer.consulted === false) {
-                  record({ kind: "report", methods: 0, consulted: false });
+                  record({ kind: "report", methods: 0, methodCodes: [], consulted: false });
                   setFeedback((current) => ({ ...current, none: "That is how you report a case where you used nothing outside the study pages: No." }));
                 } else setFeedback((current) => ({ ...current, none: "In this situation you used nothing outside the study pages: answer No." }));
               }}

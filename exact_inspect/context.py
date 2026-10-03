@@ -462,7 +462,9 @@ class OntologyContext:
             if row is None:
                 continue
             fact = _fact_view(json.loads(row[0]), ref, policy)
-            fact["value"] = {"term_type": "iri", "iri": edge["parent"]["iri"]}
+            # The navigation edge may be projected from a richer original axiom.
+            # Preserve that fact verbatim and identify the projection separately.
+            fact["hierarchy_projection"] = edge
             parent_facts.append(fact)
         parent_page = {
             key: value

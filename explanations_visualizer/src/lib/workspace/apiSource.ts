@@ -2,16 +2,32 @@
 // study workspace (16 B1) mirrors these response shapes under its own scoped prefix, so the
 // same implementation can serve it by changing `base` once those routes exist.
 
-import { ApiError, getJson } from "../api";
+import { ApiError, buildUrl, request } from "../api";
 import type { Axiom, EntityContext, EntityRef, ExplanationSummary, GeneratedExplanation, HierarchyPage, Page, SearchItem, SelectedEvidence } from "../types";
 import type { Basis, EvidenceBundle, ExplanationResult, FactRef, PairScope, ResolvedFact, WorkspaceCapabilities, WorkspaceSource } from "./types";
 
 const axiomCache = new Map<string, Promise<Axiom>>();
 
-export function loadAxiom(base: string, ontology: string, factId: string, signal?: AbortSignal): Promise<Axiom> {
-  const key = `${base}|${ontology}|${factId}`;
+export function scopedRead<T>(base: string, suffix: string, params?: Parameters<typeof buildUrl>[1], signal?: AbortSignal, sessionId?: string): Promise<T> {
+  return request<T>(buildUrl(`${base}${suffix}`, params), { signal, headers: { Accept: "application/json", ...(sessionId ? { "X-Study-Session": sessionId } : {}) } });
+}
+
+export async function loadWorkspaceCapabilities(base: string, sessionId: string): Promise<WorkspaceCapabilities> {
+  const value = await scopedRead<{ components: string[]; bases: Basis[]; synthetic: boolean; reasoner: string; coverage: string; reason: string | null }>(base, "/capabilities", undefined, undefined, sessionId);
+  return {
+    search: "available", navigation: "available", bases: value.bases, reasoner: value.reasoner,
+    graphExpansion: true, profiles: value.components.includes("profiles") ? "available" : "not_exported",
+    comparison: value.components.includes("comparison") ? "available" : "not_exported",
+    evidence: value.components.includes("evidence") ? "available" : "not_exported",
+    scopeNote: "Browse the complete declared context of the admitted frozen ontologies.",
+    limitations: value.reason ? [value.reason] : [], synthetic: value.synthetic,
+  };
+}
+
+export function loadAxiom(base: string, ontology: string, factId: string, signal?: AbortSignal, scope?: { key: string; sessionId?: string }): Promise<Axiom> {
+  const key = `${scope?.key ?? base}|${scope?.sessionId ?? ""}|${base}|${ontology}|${factId}`;
   if (!axiomCache.has(key)) {
-    const promise = getJson<Axiom>(`${base}/axioms/${encodeURIComponent(factId)}`, { ontology_version_id: ontology }, signal);
+    const promise = scopedRead<Axiom>(base, `/axioms/${encodeURIComponent(factId)}`, { ontology_version_id: ontology }, signal, scope?.sessionId);
     promise.catch(() => axiomCache.delete(key));
     axiomCache.set(key, promise);
   }
@@ -98,13 +114,17 @@ export function createApiSource(options: {
   base?: string;
   ontologyName: (id: string) => string | null;
   reasonerStatus?: (id: string) => string;
+  sessionId?: string;
+  kind?: WorkspaceSource["kind"];
+  capabilities?: WorkspaceCapabilities;
 }): WorkspaceSource {
   const base = options.base ?? "/api/v1";
-  const capabilities: WorkspaceCapabilities = {
+  const read = <T,>(suffix: string, params?: Parameters<typeof buildUrl>[1], signal?: AbortSignal) => scopedRead<T>(base, suffix, params, signal, options.sessionId);
+  const capabilities: WorkspaceCapabilities = options.capabilities ?? {
     search: "available",
     navigation: "available",
-    bases: ["literal_asserted", "structural_navigation", "reasoner_inferred"],
-    reasoner: "per_ontology",
+    bases: options.sessionId ? ["literal_asserted", "structural_navigation"] : ["literal_asserted", "structural_navigation", "reasoner_inferred"],
+    reasoner: options.sessionId ? "not_run" : "per_ontology",
     graphExpansion: true,
     profiles: "available",
     comparison: "available",
@@ -118,12 +138,12 @@ export function createApiSource(options: {
     const [subject, counterpart] = entities;
     const params: Record<string, string> = { ...entityParams(subject), task };
     if (task === "pair_comparison" && counterpart) Object.assign(params, entityParams(counterpart, "counterpart_"));
-    const page = await getJson<Page<ExplanationSummary>>(`${base}/explanations`, { ...params, limit: 100 }, signal);
+    const page = await read<Page<ExplanationSummary>>("/explanations", { ...params, limit: 100 }, signal);
     if (!page.items.length) return { status: "not_requested" };
     const chosen = page.items.find((item) => item.grounding_status === "validated") ?? page.items[0];
     if (chosen.grounding_status !== "validated") return { status: "unverified" };
     try {
-      const item = await getJson<GeneratedExplanation>(`${base}/explanations/${encodeURIComponent(chosen.explanation_id)}`, undefined, signal);
+      const item = await read<GeneratedExplanation>(`/explanations/${encodeURIComponent(chosen.explanation_id)}`, undefined, signal);
       return {
         status: "available",
         explanation: item,
@@ -146,7 +166,7 @@ export function createApiSource(options: {
   const fact = async (ref: FactRef, signal?: AbortSignal): Promise<ResolvedFact> => {
     for (const ontology of ref.ontologies) {
       try {
-        return resolvedFromAxiom(ref, await loadAxiom(base, ontology, ref.factId, signal));
+        return resolvedFromAxiom(ref, await loadAxiom(base, ontology, ref.factId, signal, options));
       } catch (error) {
         if (notFound(error)) continue;
         if (error instanceof ApiError && error.code === "axiom_detail_too_large") {
@@ -159,12 +179,13 @@ export function createApiSource(options: {
   };
 
   const evidence = async (pair: PairScope, signal?: AbortSignal): Promise<EvidenceBundle> => {
-    if (!pair.runId || !pair.pairId) return { items: [], total: 0, status: "not_exported", reason: "This pair has no saved matcher record.", axioms: {} };
+    const scoped = Boolean(options.sessionId && pair.candidateId);
+    if (!scoped && (!pair.runId || !pair.pairId)) return { items: [], total: 0, status: "not_exported", reason: "This pair has no saved matcher record.", axioms: {} };
     const items: SelectedEvidence[] = [];
     let cursor: string | null = null;
     let first: Page<SelectedEvidence> | null = null;
     for (let guard = 0; guard < 10; guard += 1) {
-      const page: Page<SelectedEvidence> = await getJson<Page<SelectedEvidence>>(`${base}/runs/${encodeURIComponent(pair.runId)}/pair-evidence`, { pair_id: pair.pairId, limit: 100, cursor }, signal);
+      const page: Page<SelectedEvidence> = await read<Page<SelectedEvidence>>(scoped ? "/evidence" : `/runs/${encodeURIComponent(pair.runId!)}/pair-evidence`, { ...(scoped ? { candidate_id: pair.candidateId } : { pair_id: pair.pairId }), limit: 100, cursor }, signal);
       first = first ?? page;
       items.push(...page.items);
       if (!page.next_cursor) break;
@@ -177,7 +198,7 @@ export function createApiSource(options: {
       items.flatMap((item) =>
         item.fact_ids.map(async (factId) => {
           try {
-            axioms[factId] = await loadAxiom(base, item.entity.ontology_version_id, factId, signal);
+            axioms[factId] = await loadAxiom(base, item.entity.ontology_version_id, factId, signal, options);
           } catch {
             axioms[factId] = null;
           }
@@ -190,16 +211,17 @@ export function createApiSource(options: {
 
   return {
     key: options.key,
-    kind: "exploration",
+    kind: options.kind ?? (options.sessionId ? "study_resource" : "exploration"),
     capabilities,
     ontologyName: options.ontologyName,
-    entityContext: (entity, signal) => getJson<EntityContext>(`${base}/entity-context`, entityParams(entity), signal),
+    entityContext: (entity, signal) => read<EntityContext>("/entity-context", entityParams(entity), signal),
     fact,
     explanation,
     hierarchy: (entity, direction, basis: Basis, cursor, signal) =>
-      getJson<HierarchyPage>(`${base}/hierarchy`, { ...entityParams(entity), direction, basis, limit: 50, cursor }, signal),
-    search: (ontology, term, cursor, signal) => getJson<Page<SearchItem>>(`${base}/entities`, { ontology_version_id: ontology, term, limit: 20, cursor }, signal),
+      read<HierarchyPage>("/hierarchy", { ...entityParams(entity), direction, basis, limit: 50, cursor }, signal),
+    search: (ontology, term, cursor, signal) => read<Page<SearchItem>>("/entities", { ontology_version_id: ontology, term, limit: 20, cursor }, signal),
     evidence,
     labels: null,
+    remoteLabels: { key: options.key, base, sessionId: options.sessionId },
   };
 }

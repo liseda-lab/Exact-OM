@@ -9,6 +9,7 @@ import json
 import os
 import threading
 import time
+from collections import OrderedDict
 from pathlib import Path
 from typing import Literal
 
@@ -18,12 +19,14 @@ from fastapi import (
     FastAPI,
     Header,
     HTTPException,
+    Query,
     Request,
     Response,
 )
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 
+from .administration import RevisionPage, revisions
 from .exports import csv_archive
 from .models import (
     Consent,
@@ -44,6 +47,23 @@ from .models import (
     TimingSegment,
 )
 from .store import StudyError, StudyStore, canonical
+from .telemetry import (
+    EventBatchV2,
+    TimingAcknowledgementV2,
+    TimingSegmentV2,
+    save_events,
+    save_timing,
+)
+from .v2_models import (
+    ConsultationDraftV2,
+    ConsultationV2,
+    SetupV2,
+    StudyCaseV2,
+    StudyStateV2,
+    TutorialAssessment,
+    TutorialComplete,
+    TutorialProgressMutation,
+)
 
 COOKIE = "exact_study_session"
 
@@ -101,6 +121,7 @@ class Authentication:
         self.origin = origin.rstrip("/")
         self.lock = threading.Lock()
         self.invalid_exchanges = []
+        self.tutorial_requests = OrderedDict()
 
     def cookie(self, sid, generation):
         payload = (
@@ -147,6 +168,30 @@ class Authentication:
         if not hmac.compare_digest(supplied, f"Bearer {self.researcher_token}"):
             raise HTTPException(401, "Researcher authentication required")
 
+    def tutorial_write(
+        self,
+        request: Request,
+        x_study_session: str | None = Header(default=None, alias="X-Study-Session"),
+    ):
+        """A short request throttle; pedagogical retries have no lifetime limit."""
+        identity = self.participant_write(request, x_study_session)
+        now = time.monotonic()
+        with self.lock:
+            timestamps = [
+                value for value in self.tutorial_requests.pop(identity[0], []) if now - value < 60
+            ]
+            limited = len(timestamps) >= 120
+            self.tutorial_requests[identity[0]] = timestamps if limited else [*timestamps, now]
+            while len(self.tutorial_requests) > 2048:
+                self.tutorial_requests.popitem(last=False)
+        if limited:
+            raise HTTPException(
+                429,
+                "Please retry shortly; your tutorial progress is saved",
+                headers={"Retry-After": "60"},
+            )
+        return identity
+
     def exchange_allowed(self):
         now = time.monotonic()
         with self.lock:
@@ -163,8 +208,11 @@ def create_study_router(store, *, signing_secret, researcher_token, origin):
     """Build isolated study and separately authenticated researcher routes."""
     auth = Authentication(signing_secret, researcher_token, origin)
     router = APIRouter(prefix="/api/v1")
+    from .workspace import install_workspace_routes
 
-    @router.post("/study/session", response_model=StudyState)
+    install_workspace_routes(router, store, auth.participant_write)
+
+    @router.post("/study/session", response_model=StudyState | StudyStateV2)
     def exchange(body: Exchange, response: Response):
         auth.exchange_allowed()
         try:
@@ -183,55 +231,77 @@ def create_study_router(store, *, signing_secret, researcher_token, origin):
         )
         return state
 
-    @router.get("/study/state", response_model=StudyState)
+    @router.get("/study/state", response_model=StudyState | StudyStateV2)
     def state(identity=Depends(auth.participant)):
         return store.state(*identity)
 
-    @router.put("/study/consent", response_model=StudyState)
+    @router.put("/study/consent", response_model=StudyState | StudyStateV2)
     def consent(body: Consent, identity=Depends(auth.participant_write)):
         return store.mutate(*identity, "consent", body)
 
-    @router.put("/study/setup", response_model=StudyState)
-    def setup(body: Setup, identity=Depends(auth.participant_write)):
+    @router.put("/study/setup", response_model=StudyState | StudyStateV2)
+    def setup(body: Setup | SetupV2, identity=Depends(auth.participant_write)):
         return store.mutate(*identity, "setup", body)
 
-    @router.put("/study/questionnaires/{form_id}", response_model=StudyState)
+    @router.put("/study/tutorial/progress", response_model=StudyStateV2)
+    def tutorial_progress(body: TutorialProgressMutation, identity=Depends(auth.tutorial_write)):
+        return store.mutate(*identity, "tutorial_progress", body)
+
+    @router.post("/study/tutorial/assessment", response_model=StudyStateV2)
+    def tutorial_assessment(body: TutorialAssessment, identity=Depends(auth.tutorial_write)):
+        return store.mutate(*identity, "tutorial_assessment", body)
+
+    @router.post("/study/tutorial/complete", response_model=StudyStateV2)
+    def tutorial_complete(body: TutorialComplete, identity=Depends(auth.tutorial_write)):
+        return store.mutate(*identity, "tutorial_complete", body)
+
+    @router.put("/study/questionnaires/{form_id}", response_model=StudyState | StudyStateV2)
     def questionnaire(form_id: str, body: Questionnaire, identity=Depends(auth.participant_write)):
         return store.mutate(*identity, f"questionnaire:{form_id}", body)
 
-    @router.get("/study/cases/current", response_model=StudyCase)
+    @router.get("/study/cases/current", response_model=StudyCase | StudyCaseV2)
     def current(identity=Depends(auth.participant)):
         return store.current_case(*identity)
 
-    @router.put("/study/cases/{case_id:path}/draft", response_model=StudyState)
+    @router.put("/study/cases/{case_id:path}/consultation/draft", response_model=StudyStateV2)
+    def consultation_draft(
+        case_id: str, body: ConsultationDraftV2, identity=Depends(auth.participant_write)
+    ):
+        return store.mutate(*identity, "consultation_draft", body, case_id)
+
+    @router.put("/study/cases/{case_id:path}/draft", response_model=StudyState | StudyStateV2)
     def draft(case_id: str, body: Ranking, identity=Depends(auth.participant_write)):
         return store.mutate(*identity, "draft", body, case_id)
 
-    @router.post("/study/cases/{case_id:path}/submit", response_model=StudyState)
+    @router.post("/study/cases/{case_id:path}/submit", response_model=StudyState | StudyStateV2)
     def submit(case_id: str, body: Ranking, identity=Depends(auth.participant_write)):
         return store.mutate(*identity, "submit", body, case_id)
 
-    @router.put("/study/cases/{case_id:path}/consultation", response_model=StudyState)
-    def consultation(case_id: str, body: Consultation, identity=Depends(auth.participant_write)):
+    @router.put(
+        "/study/cases/{case_id:path}/consultation", response_model=StudyState | StudyStateV2
+    )
+    def consultation(
+        case_id: str, body: Consultation | ConsultationV2, identity=Depends(auth.participant_write)
+    ):
         return store.mutate(*identity, "consultation", body, case_id)
 
     @router.post("/study/events", response_model=EventAcknowledgement)
-    def events(body: EventBatch, identity=Depends(auth.participant_write)):
-        return store.events(*identity, body)
+    def events(body: EventBatch | EventBatchV2, identity=Depends(auth.participant_write)):
+        return save_events(store, *identity, body)
 
-    @router.post("/study/timing", response_model=TimingAcknowledgement)
-    def timing(body: TimingSegment, identity=Depends(auth.participant_write)):
-        return store.timing(*identity, body)
+    @router.post("/study/timing", response_model=TimingAcknowledgement | TimingAcknowledgementV2)
+    def timing(body: TimingSegment | TimingSegmentV2, identity=Depends(auth.participant_write)):
+        return save_timing(store, *identity, body)
 
-    @router.post("/study/pause", response_model=StudyState)
+    @router.post("/study/pause", response_model=StudyState | StudyStateV2)
     def pause(body: Mutation, identity=Depends(auth.participant_write)):
         return store.mutate(*identity, "pause", body)
 
-    @router.post("/study/resume", response_model=StudyState)
+    @router.post("/study/resume", response_model=StudyState | StudyStateV2)
     def resume(body: Resume, identity=Depends(auth.participant_write)):
         return store.mutate(*identity, "resume", body)
 
-    @router.post("/study/complete", response_model=StudyState)
+    @router.post("/study/complete", response_model=StudyState | StudyStateV2)
     def complete(body: Mutation, identity=Depends(auth.participant_write)):
         return store.mutate(*identity, "complete", body)
 
@@ -249,6 +319,15 @@ def create_study_router(store, *, signing_secret, researcher_token, origin):
     @router.post("/admin/studies", dependencies=[Depends(auth.researcher)])
     def publish(body: Publish):
         return store.publish(body)
+
+    @router.get(
+        "/admin/studies", response_model=RevisionPage, dependencies=[Depends(auth.researcher)]
+    )
+    def list_revisions(
+        limit: int = Query(50, ge=1, le=100),
+        cursor: str | None = Query(None, max_length=128, pattern=r"^[A-Za-z0-9_.:/-]+$"),
+    ):
+        return revisions(store, limit=limit, cursor=cursor)
 
     @router.post(
         "/admin/studies/{revision:path}/invitations", dependencies=[Depends(auth.researcher)]

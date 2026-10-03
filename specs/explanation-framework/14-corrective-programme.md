@@ -1,9 +1,12 @@
 # Corrective programme: shared exploration and study readiness
 
-**Date: 2026-10-02. Status: approved corrective direction, implementation pending.**
+**Direction approved: 2026-10-02. Implementation update: 2026-10-03.**
+Backend corrections and frontend integration are implemented; see the
+[dated backend handoff](../../docs/verification/explanation-backend-corrections-20261003.md)
+for demonstrated checks and remaining release gates. The requirements below remain normative.
 This amendment follows the user's review of the implemented tool and the bounded
 source/browser review at `57e501a`. It is an implementation assignment, not a report
-that the corrections already work. Read the [verification record](evidence/corrective-review-20261002.md),
+that every release gate has passed. Read the [verification record](evidence/corrective-review-20261002.md),
 [frontend assignment](15-frontend-corrections.md) and [backend assignment](16-backend-corrections.md).
 
 ## Authority and scope

@@ -76,6 +76,8 @@ function download(blob: Blob, filename: string) {
 }
 
 export function AdminApp() {
+  const [revisions, setRevisions] = useState<{ study_revision: string; contract_version: string; synthetic: boolean; closed: boolean; tutorial_version: string | null }[]>([]);
+  const [revisionCursor, setRevisionCursor] = useState<string | null>(null);
   const [token, setToken] = useState("");
   const [tokenInput, setTokenInput] = useState("");
   const [revision, setRevision] = useState(() => (typeof window === "undefined" ? "" : readStored<string>("exact.admin.revision", "")));
@@ -102,6 +104,8 @@ export function AdminApp() {
     setReissued(null);
     setSessionId("");
     setProgress(null);
+    setRevisions([]);
+    setRevisionCursor(null);
     setConfirmClose(false);
     setBusy(null);
     setMessage(null);
@@ -198,8 +202,15 @@ export function AdminApp() {
               aria-describedby="revision-note"
             />
             <span id="revision-note" className="meta">
-              This service version cannot list studies: enter the revision exactly as published. The page remembers the last revision you used, never the token.
+              Load published revisions or enter one exactly. The page remembers the last revision you used, never the token.
             </span>
+            <button type="button" className="btn btn-sm" disabled={busy !== null} onClick={async () => {
+              const result = await run("revisions", () => adminRequest<{ items: typeof revisions; next_cursor: string | null }>(token, "GET", `/api/v1/admin/studies${revisionCursor ? `?cursor=${encodeURIComponent(revisionCursor)}` : ""}`));
+              if (result) { setRevisions((current) => revisionCursor ? [...current, ...result.data.items] : result.data.items); setRevisionCursor(result.data.next_cursor); }
+            }}>{revisionCursor ? "Load more revisions" : "Load published revisions"}</button>
+            {revisions.length > 0 && <select className="input" aria-label="Published study revision" value={revisions.some((item) => item.study_revision === revision) ? revision : ""} disabled={busy !== null} onChange={(event) => {
+              setProgress(null); setLinks([]); setReissued(null); setRevision(event.target.value); writeStored("exact.admin.revision", event.target.value);
+            }}><option value="" disabled>Select a publication</option>{revisions.map((item) => <option key={item.study_revision} value={item.study_revision}>{item.study_revision} · {item.contract_version} · {item.synthetic ? "synthetic" : "participant"} · {item.closed ? "closed" : "open"}{item.tutorial_version ? ` · ${item.tutorial_version}` : ""}</option>)}</select>}
           </div>
           <label className="btn file-label">
             Publish a study revision…

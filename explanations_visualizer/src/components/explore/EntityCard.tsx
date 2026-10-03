@@ -128,7 +128,7 @@ export function EntityCard({
   const profile = useExplanation("entity_profile", entities);
 
   const parentIris = useMemo(
-    () => (ctx?.parents.items ?? []).map((fact) => (fact.value?.term_type === "iri" ? fact.value.iri : null)).filter((iri): iri is string => Boolean(iri)),
+    () => (ctx?.parents.items ?? []).map((fact) => (fact.hierarchy_projection?.parent.iri ?? (fact.value?.term_type === "iri" ? fact.value.iri : null))).filter((iri): iri is string => Boolean(iri)),
     [ctx],
   );
   const parentLabel = useLabelLookup(entity.ontology_version_id, parentIris);
@@ -241,7 +241,7 @@ export function EntityCard({
             {parentIris.length ? (
               <ul className="parent-list">
                 {ctx.parents.items.map((fact) => {
-                  const iri = fact.value?.term_type === "iri" ? fact.value.iri : null;
+                  const iri = fact.hierarchy_projection?.parent.iri ?? (fact.value?.term_type === "iri" ? fact.value.iri : null);
                   if (!iri) return null;
                   const text = parentLabel(iri);
                   return (

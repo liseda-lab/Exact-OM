@@ -5,16 +5,19 @@
 
 import { createContext, useContext } from "react";
 
-import { useLabels, type LabelEntry } from "@/lib/labels";
+import { useLabels, type LabelEntry, type RemoteLabelSource } from "@/lib/labels";
 
 export type LabelLookup = (iri: string) => LabelEntry | undefined;
 
 export const LabelSourceContext = createContext<((ontology: string) => LabelLookup) | null>(null);
 
+export const RemoteLabelSourceContext = createContext<RemoteLabelSource | undefined>(undefined);
+
 /** Returns a label lookup for one ontology from the active source. */
 export function useLabelLookup(ontology: string | null | undefined, iris: string[]): LabelLookup {
   const override = useContext(LabelSourceContext);
-  const remote = useLabels(override ? null : ontology, override ? [] : iris);
+  const source = useContext(RemoteLabelSourceContext);
+  const remote = useLabels(override ? null : ontology, override ? [] : iris, source);
   if (override && ontology) return override(ontology);
   return remote;
 }

@@ -81,7 +81,9 @@ def export_policy_context(
         counts: dict[str, int] = {}
         source_spans = False
         with context._connection(vm_step_budget=50_000_000_000) as source, closing(
-            sqlite3.connect(database)
+            # ATTACH file: sources must honor mode=ro even on SQLite builds
+            # compiled/configured with URI filename interpretation disabled.
+            sqlite3.connect(database, uri=True)
         ) as output:
             output.execute("PRAGMA synchronous=FULL")
             output.execute("PRAGMA cache_size=-262144")

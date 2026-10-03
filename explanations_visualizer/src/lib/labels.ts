@@ -5,7 +5,7 @@
 
 import { useEffect, useSyncExternalStore } from "react";
 
-import { getJson } from "@/lib/api";
+import { buildUrl, request } from "@/lib/api";
 import type { LabelItem } from "@/lib/types";
 
 export interface LabelEntry {
@@ -13,14 +13,23 @@ export interface LabelEntry {
   value: string | null;
 }
 
+export interface RemoteLabelSource {
+  /** Session/publication/presentation namespace, independent of an opaque route locator. */
+  key: string;
+  base: string;
+  sessionId?: string;
+}
+const defaultSource: RemoteLabelSource = { key: "exploration", base: "/api/v1" };
+const sources = new Map<string, { source: RemoteLabelSource; ontology: string }>();
+
 const cache = new Map<string, LabelEntry>();
 const queue = new Map<string, Set<string>>();
 const listeners = new Set<() => void>();
 let version = 0;
 let timer: ReturnType<typeof setTimeout> | null = null;
 
-function key(ontology: string, iri: string): string {
-  return `${ontology}\u0000${iri}`;
+function key(ontology: string, iri: string, source: RemoteLabelSource = defaultSource): string {
+  return `${source.key}\u0000${source.base}\u0000${source.sessionId ?? ""}\u0000${ontology}\u0000${iri}`;
 }
 
 function notify() {
@@ -32,12 +41,13 @@ async function flush() {
   timer = null;
   const batches = Array.from(queue.entries());
   queue.clear();
-  for (const [ontology, set] of batches) {
+  for (const [batchKey, set] of batches) {
+    const { source, ontology } = sources.get(batchKey)!;
     const iris = Array.from(set);
     for (let start = 0; start < iris.length; start += 100) {
       const chunk = iris.slice(start, start + 100);
       try {
-        const page = await getJson<{ items: LabelItem[] }>("/api/v1/labels", { ontology_version_id: ontology, iri: chunk });
+        const page = await request<{ items: LabelItem[] }>(buildUrl(`${source.base}/labels`, { ontology_version_id: ontology, iri: chunk }), { headers: { Accept: "application/json", ...(source.sessionId ? { "X-Study-Session": source.sessionId } : {}) } });
         const seen = new Set<string>();
         for (const item of page.items) {
           const iri = item.entity?.iri ?? item.iri;
@@ -46,27 +56,29 @@ async function flush() {
           // Prefer a class label when one IRI is punned across kinds.
           if (seen.has(iri) && item.entity?.kind !== "class") continue;
           seen.add(iri);
-          cache.set(key(ontology, iri), label.value ? { status: "available", value: label.value } : { status: "absent", value: null });
+          cache.set(key(ontology, iri, source), label.value ? { status: "available", value: label.value } : { status: label.status === "not_exported" ? "not_included" : "absent", value: null });
         }
         chunk.forEach((iri) => {
-          if (cache.get(key(ontology, iri))?.status === "loading") cache.set(key(ontology, iri), { status: "absent", value: null });
+          if (cache.get(key(ontology, iri, source))?.status === "loading") cache.set(key(ontology, iri, source), { status: "absent", value: null });
         });
       } catch {
-        chunk.forEach((iri) => cache.set(key(ontology, iri), { status: "failed", value: null }));
+        chunk.forEach((iri) => cache.set(key(ontology, iri, source), { status: "failed", value: null }));
       }
       notify();
     }
   }
 }
 
-export function requestLabels(ontology: string | null | undefined, iris: string[]) {
+export function requestLabels(ontology: string | null | undefined, iris: string[], source: RemoteLabelSource = defaultSource) {
   if (!ontology) return;
+  const batchKey = key(ontology, "", source);
+  sources.set(batchKey, { source, ontology });
   let queued = false;
   for (const iri of iris) {
-    if (!iri || cache.has(key(ontology, iri))) continue;
-    cache.set(key(ontology, iri), { status: "loading", value: null });
-    if (!queue.has(ontology)) queue.set(ontology, new Set());
-    queue.get(ontology)!.add(iri);
+    if (!iri || cache.has(key(ontology, iri, source))) continue;
+    cache.set(key(ontology, iri, source), { status: "loading", value: null });
+    if (!queue.has(batchKey)) queue.set(batchKey, new Set());
+    queue.get(batchKey)!.add(iri);
     queued = true;
   }
   if (queued && !timer) timer = setTimeout(flush, 12);
@@ -74,16 +86,16 @@ export function requestLabels(ontology: string | null | undefined, iris: string[
 }
 
 /** Seed labels the page already knows (e.g. from an entity context) to avoid refetching. */
-export function seedLabel(ontology: string, iri: string, value: string | null) {
-  if (!cache.has(key(ontology, iri)) || cache.get(key(ontology, iri))?.status !== "available") {
-    cache.set(key(ontology, iri), value ? { status: "available", value } : { status: "absent", value: null });
+export function seedLabel(ontology: string, iri: string, value: string | null, source: RemoteLabelSource = defaultSource) {
+  if (!cache.has(key(ontology, iri, source)) || cache.get(key(ontology, iri, source))?.status !== "available") {
+    cache.set(key(ontology, iri, source), value ? { status: "available", value } : { status: "absent", value: null });
     notify();
   }
 }
 
-export function peekLabel(ontology: string | null | undefined, iri: string): LabelEntry | undefined {
+export function peekLabel(ontology: string | null | undefined, iri: string, source: RemoteLabelSource = defaultSource): LabelEntry | undefined {
   if (!ontology) return undefined;
-  return cache.get(key(ontology, iri));
+  return cache.get(key(ontology, iri, source));
 }
 
 function subscribe(listener: () => void) {
@@ -96,11 +108,11 @@ export function useLabelVersion(): number {
 }
 
 /** Returns a lookup for labels in one ontology, fetching any that are missing. */
-export function useLabels(ontology: string | null | undefined, iris: string[]): (iri: string) => LabelEntry | undefined {
+export function useLabels(ontology: string | null | undefined, iris: string[], source: RemoteLabelSource = defaultSource): (iri: string) => LabelEntry | undefined {
   useLabelVersion();
   const signature = iris.join("\n");
   useEffect(() => {
-    requestLabels(ontology, signature ? signature.split("\n") : []);
-  }, [ontology, signature]);
-  return (iri: string) => peekLabel(ontology, iri);
+    requestLabels(ontology, signature ? signature.split("\n") : [], source);
+  }, [ontology, signature, source]);
+  return (iri: string) => peekLabel(ontology, iri, source);
 }

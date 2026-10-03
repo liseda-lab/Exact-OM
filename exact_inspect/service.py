@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 import tempfile
 import threading
+import weakref
+from contextvars import ContextVar
 from pathlib import Path
-from typing import Any, Literal, cast
+from typing import Any, Literal
 
 from fastapi import FastAPI, Query, Request
 from fastapi.exceptions import RequestValidationError, ResponseValidationError
@@ -300,15 +303,32 @@ def create_prepared_app(
         selected = json.loads((library.root / "selection.json").read_bytes())["package_id"]
         package = library.select(selected)
     app.state.service = PreparedService(package) if package else None
+
+    def retain_library_copy(active: PreparedService) -> None:
+        if (
+            library
+            and active.path.resolve()
+            == library.root / active.manifest.package_id[7:] / "package.json"
+        ):
+            descriptor = library.lease(active.manifest.package_id)
+            weakref.finalize(active, os.close, descriptor)
+
+    if app.state.service is not None:
+        retain_library_copy(app.state.service)
     if profile == "public_demo" and app.state.service.manifest.audience != "development_demo":
         raise ValueError(
             "Public demo requires a bundle explicitly approved for development demonstration"
         )
 
+    request_service: ContextVar[PreparedService | None] = ContextVar(
+        "prepared_service", default=None
+    )
+
     def service() -> PreparedService:
-        if app.state.service is None:
+        active = request_service.get()
+        if active is None:
             raise DomainError("package_unavailable", "Import or select a prepared package", 503)
-        return cast(PreparedService, app.state.service)
+        return active
 
     @app.exception_handler(DomainError)
     async def domain_error(request: Request, exc: DomainError):
@@ -367,7 +387,13 @@ def create_prepared_app(
                         "retryable": False,
                     },
                 )
-        response = await call_next(request)
+        # Retain this immutable service and its file lease until the read finishes,
+        # even when another request selects a different bundle in the meantime.
+        token = request_service.set(app.state.service)
+        try:
+            response = await call_next(request)
+        finally:
+            request_service.reset(token)
         response.headers["Cache-Control"] = "no-store"
         response.headers["X-Content-Type-Options"] = "nosniff"
         return response
@@ -755,8 +781,37 @@ def create_prepared_app(
             return library
 
         @app.get("/api/v1/bundles")
-        def bundles():
-            return bounded(require_library().list())
+        def bundles(limit: int = Query(100, ge=1, le=100), after: str = ""):
+            # Keep the existing array response for deployed frontends.
+            return bounded(require_library().list(limit=limit, after=after))
+
+        @app.get("/api/v1/bundles/page", response_model=Page[dict[str, Any]])
+        def bundle_page(limit: int = Query(20, ge=1, le=100), cursor: str | None = None):
+            store = require_library()
+            scope = Scope(
+                ontology_version_id="library",
+                context_revision=canonical_hash(str(store.root)),
+                basis="library",
+                visibility_policy_hash=canonical_hash("local_app"),
+                filter_id="bundles:package_id",
+            )
+            after = decode_cursor(cursor, scope)
+            if after is not None and not isinstance(after, str):
+                raise DomainError("invalid_cursor", "Invalid library cursor")
+            items = store.list(limit=limit + 1, after=after or "")
+            more = len(items) > limit
+            items = items[:limit]
+            return bounded(
+                Page(
+                    items=items,
+                    returned_count=len(items),
+                    next_cursor=encode_cursor(scope, items[-1]["package_id"]) if more else None,
+                    truncated=more,
+                    scope=scope,
+                    status="available" if items else "absent_in_scope",
+                    order="package_id_ascending",
+                )
+            )
 
         @app.post("/api/v1/bundles/import-jobs")
         def create_import():
@@ -794,7 +849,9 @@ def create_prepared_app(
                 return import_jobs.get(job_id)["cancel_requested"]
 
             try:
-                with tempfile.NamedTemporaryFile(dir=store.root, prefix=".upload-") as upload:
+                with store.operation(), tempfile.NamedTemporaryFile(
+                    dir=store.root, prefix=".upload-"
+                ) as upload:
                     size = 0
                     async for block in request.stream():
                         if cancelled():
@@ -809,7 +866,10 @@ def create_prepared_app(
                     upload.flush()
                     import_jobs.update(job_id, status="validating")
                     manifest = await run_in_threadpool(
-                        store.import_archive, Path(upload.name), cancelled=cancelled
+                        store.import_archive,
+                        Path(upload.name),
+                        cancelled=cancelled,
+                        operation_locked=True,
                     )
                     return import_jobs.update(
                         job_id, package_id=manifest.package_id, status="available"
@@ -824,12 +884,25 @@ def create_prepared_app(
 
         @app.post("/api/v1/bundles/{package_id}/select")
         def select(package_id: str):
-            path = require_library().select(package_id)
-            active = PreparedService(path)
-            app.state.service = (
-                active  # Each in-flight request retains its previous immutable service.
-            )
+            store = require_library()
+            with store.operation():
+                path = store.package_path(package_id)
+                active = PreparedService(path)
+                retain_library_copy(active)
+                store.select(package_id, operation_locked=True)
+                app.state.service = active
             return {"package_id": active.manifest.package_id, "status": "available"}
+
+        @app.get("/api/v1/bundles/{package_id}")
+        def bundle_metadata(package_id: str):
+            result = require_library().metadata(package_id)
+            active = app.state.service
+            result["selected"] = bool(active and active.manifest.package_id == package_id)
+            return bounded(result)
+
+        @app.delete("/api/v1/bundles/{package_id}")
+        def remove_bundle(package_id: str):
+            return require_library().remove(package_id)
 
     from .frontend import mount_frontend
 

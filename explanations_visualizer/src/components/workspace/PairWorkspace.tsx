@@ -130,7 +130,7 @@ export function PairWorkspace({
   const openFromCard = (side: Side) => (iri: string) => {
     const ctx = side === "source" ? sourceCtx.data : targetCtx.data;
     const entity = side === "source" ? source : target;
-    const parent = ctx?.parents.items.some((fact) => fact.value?.term_type === "iri" && fact.value.iri === iri);
+    const parent = ctx?.parents.items.some((fact) => (fact.hierarchy_projection?.parent.iri ?? (fact.value?.term_type === "iri" ? fact.value.iri : null)) === iri);
     if (!components.has("hierarchy")) return;
     navigation.set(side, { iri, kind: parent ? entity.kind : "class" });
     report({ type: "hierarchy_focus", side, iri, kind: parent ? entity.kind : "class", via: "card" });

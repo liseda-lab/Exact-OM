@@ -108,6 +108,7 @@ export interface WorkspaceSource {
   hierarchy: (entity: EntityRef, direction: "parents" | "children", basis: Basis, cursor: string | null, signal?: AbortSignal) => Promise<HierarchyPage>;
   search: (ontology: string, term: string, cursor: string | null, signal?: AbortSignal) => Promise<Page<SearchItem>>;
   evidence: (pair: PairScope, signal?: AbortSignal) => Promise<EvidenceBundle>;
+  remoteLabels?: import("../labels").RemoteLabelSource;
   /** Local label lookup; null means the shared remote label cache applies. */
   labels: ((ontology: string) => (iri: string) => { status: "loading" | "available" | "absent" | "failed" | "not_included"; value: string | null } | undefined) | null;
 }

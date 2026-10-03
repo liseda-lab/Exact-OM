@@ -13,6 +13,13 @@ inline styles. All examples and recovery checks in this implementation use synth
 sessions; no invitations were sent, participants recruited, live study published, or
 full experiment run.
 
+New corrected publications use `exact-study/2.0`. The
+[v2 contract and migration notes](../verification/explanation-study-v2-backend-contract.md)
+and [dated corrective handoff](../verification/explanation-backend-corrections-20261003.md)
+describe the implemented setup, tutorial, workspace, consultation and export contracts.
+Existing v1 sessions retain their original semantics and can resume without a database
+rewrite; new live v1 publications are rejected. Historical v1 behavior below is labeled.
+
 ## Configuration and publication
 
 Install the `study` extra, or the small dependency list at
@@ -36,7 +43,7 @@ Hosting logs may independently contain IP addresses and user agents: verify and
 record the selected hosting/log retention arrangement before claiming anonymity.
 
 `exact_inspect.study.models.Publish` is the complete publication input model.
-`StudyDefinition` holds only participant-safe cases, pinned resources, frozen
+Its versioned `StudyDefinition`/`StudyDefinitionV2` holds only participant-safe cases, pinned resources, frozen
 forms/instructions, information and consent versions, four or more crossed
 schedules, software identity, information-policy hash, and analysis plan. The
 owner supplies consent wording; the software provides none. Real publication
@@ -46,15 +53,18 @@ separate field in the researcher publication envelope and persists in the
 Protect database access and the admin credential accordingly.
 
 
-Optional `practice_cases` freezes four synthetic control exercises in order: `simple`,
+For legacy v1 only, optional `practice_cases` freezes four synthetic control exercises in order: `simple`,
 `complex`, `partial_ranking`, `none_of_these`. Each supplies a title/instructions,
 a source label/description and exactly five candidate labels/descriptions. Practice
 IDs are unique and separate from scored case/candidate IDs; scores and answer-key
 fields are rejected. The same frozen content is returned in `StudyState` for both
 conditions. Existing definitions omit it and retain their original publication hash.
-Practice uses the existing tutorial/setup acknowledgement, not scored ranking or
-adjudication endpoints. Owner-supplied setup instructions still identify the separate
-ontology class to inspect in Protégé.
+Legacy practice uses its original tutorial/setup acknowledgement. V2 instead requires a
+frozen six-lesson tutorial with typed interaction requirements, five server-graded core
+items and synthetic resources disjoint from the scored cases. Setup acknowledges instructions,
+optional external inspection and resource access; it never requires installing or using
+Protégé or another named tool. Publish complete policy-filtered context indexes for the
+scoped workspace. Serving does not parse ontologies or generate explanations.
 
 A case has exactly five distinct candidates in contiguous initial positions.
 Publication verifies the adjudicated IDs, all original ranks, natural-top-five
@@ -102,6 +112,7 @@ send messages or distribute links:
 
 ```sh
 python -m exact_inspect.study publish --publication frozen-publication.json --output publication-receipt.json
+python -m exact_inspect.study list --output revision-page.json
 python -m exact_inspect.study invitations --study synthetic-study-v1 --count 8 --output private-test-links.json
 python -m exact_inspect.study progress --study synthetic-study-v1 --output progress.json
 python -m exact_inspect.study export --study synthetic-study-v1 --include-test --output analysis.json
@@ -114,6 +125,9 @@ Researcher reissue keeps the same session and history and rejects both old links
 and old cookies. `/close` freezes access without deleting study data. Published
 study definitions, instructions, case content, forms and adjudication cannot be
 rewritten: publish a new revision and follow the exposure/repair protocol.
+Revision listing is authenticated and bounded; pass its `next_cursor` with `list --cursor`
+to continue. Summaries include protocol/form/tutorial/setup/software/export versions and
+lifecycle/test counts, without private invitations or keys.
 
 ## Participant API contract
 
@@ -138,10 +152,14 @@ and credentials. The secure HttpOnly SameSite cookie is a replaceable access
 credential; the original invitation is reusable. A page preview or exchange does
 not allocate cases or start time.
 
-Progression is consent → setup → background → practice → ranking → consultation
+V2 progression is consent → explicit setup submission → background → tutorial/assessment → ranking → consultation
 (repeated) → final questionnaire → explicit completion. Decline closes the
-session. Setup failures persist without allocating a condition. Call the setup
-endpoint again during practice with all tutorial step indices acknowledged.
+session. Setup failures and drafts persist without allocating a condition. Save tutorial
+progress using `/study/tutorial/progress`, submit each assessment attempt using
+`/study/tutorial/assessment`, then explicitly call `/study/tutorial/complete`.
+Mandatory typed interactions and all five eventual passes are required for allocation.
+Legacy v1 retains its original practice/step-index acknowledgement; it is not relabeled
+as an assessment pass.
 Allocation reserves the next counterbalanced schedule transactionally, shuffles
 only within blocks using a persisted seed, and never rerandomizes on refresh.
 Assignments from started sessions remain reserved, including dropouts. The
@@ -152,7 +170,11 @@ adding stratified allocation.
 Ranking begins empty, supports an explicit partial list or explicit none or
 insufficient evidence, and freezes on first submission. Submitted cases have no
 revision API. Consultation is saved separately after submit; its time is outside
-ranking duration. Forms include ordered wording/codes, exclusive options and
+ranking duration. V2 consultation has `/consultation/draft` and `/consultation` endpoints,
+both bound to the current presentation and frozen form version. Final No rejects stale
+method/name/scope fields; the frontend clears them. Reports are per case, can combine
+methods and change across cases, and are never inferred from downloads or telemetry.
+V2 forms include explicit option/matrix-row order arrays, ordered wording/codes, exclusive options and
 conditional branches, including the separate consultation wording. `show_if`
 uses field equality or `{"contains": "option_code"}` for a multi-select condition;
 the consultation yes/no keys map to the API's boolean field. Publication rejects
@@ -171,6 +193,10 @@ telemetry never blocks answer submission, and unknown/overnight gaps are never
 silently counted as known active work. Cross-device overlapping activity is raw
 self-report, not a reliable measure of attention. The backend does not observe
 actions inside desktop Protégé.
+V2 observations have separate case/tutorial/help scopes. A late v2 timing segment is
+acknowledged as unavailable with a reason and excluded from observed duration; its retry
+cannot create duplicate time. Tutorial and consultation durations remain separate from
+ranking-task time. V1 late timing status behavior remains unchanged.
 
 Exports are immutable JSON manifests plus data dictionaries, frozen form labels,
 assignments, scores, response/consultation states, events and raw/derived timing.

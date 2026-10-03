@@ -449,5 +449,33 @@
     "Participant recruitment, invitations to people and live study launch",
     "Optional whole-ontology inference, complete KGA and production repair"
   ],
-  "implementation_status": "complete"
+  "implementation_status": "complete",
+  "corrective_programme_20261003": {
+    "status": "backend_implemented_release_gates_unverified",
+    "scope": "Specifications14/16 backend corrections and integration with the corrected frontend. Historical gates and evidence above retain their original meaning.",
+    "report": "docs/verification/explanation-backend-corrections-20261003.md",
+    "receipt": "docs/verification/explanation-backend-corrections-20261003.json",
+    "contract": "docs/verification/explanation-study-v2-backend-contract.md",
+    "protocol": "exact-study/2.0",
+    "legacy_sessions": "Original v1 canonical bytes and resume behavior preserved; no human-session migration.",
+    "verified": [
+      "synthetic native ontology preparation",
+      "SQLite regression",
+      "PostgreSQL concurrency/crash/restart/restore",
+      "real HTTPS PostgreSQL browser completion",
+      "frontend production build and typecheck",
+      "minimal image copied-source cold import"
+    ],
+    "remaining": [
+      "real-package current release integration",
+      "built Docker image and deployed redeploy/restore",
+      "historical original pinned DOID and import-closure admission gates",
+      "manual accessibility/usability and duration pilot",
+      "real case adjudication and owner consent/information approval",
+      "Render readiness"
+    ],
+    "live_publication": false,
+    "recruitment": false,
+    "deployment": false
+  }
 }

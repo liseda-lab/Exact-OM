@@ -18,10 +18,10 @@ import { ALL_COMPONENTS, PairWorkspace, type Component, type Focus } from "@/com
 import { describeError, getJson } from "@/lib/api";
 import { curie } from "@/lib/iri";
 import type { EntityRef } from "@/lib/types";
-import { createApiSource } from "@/lib/workspace/apiSource";
+import { createApiSource, loadWorkspaceCapabilities, scopedRead } from "@/lib/workspace/apiSource";
 import { indexResources } from "@/lib/workspace/resourceIndex";
 import { createResourceSource } from "@/lib/workspace/resourceSource";
-import type { WorkspaceAction, WorkspaceSource } from "@/lib/workspace/types";
+import type { WorkspaceAction, WorkspaceSource, WorkspaceCapabilities } from "@/lib/workspace/types";
 import { WorkspaceProvider } from "@/lib/workspace/WorkspaceContext";
 import { orderedKeys } from "@/study/formOrder";
 import type { StudySession } from "@/study/session";
@@ -63,10 +63,11 @@ function readViewed(presentationId: string): Set<string> {
 }
 
 export function CaseView({ state, session, telemetry, timingEnabled = true }: { state: StudyState; session: StudySession; telemetry: Telemetry; timingEnabled?: boolean }) {
-  const caseKey = `${state.current_case_id}|${state.current_presentation_id}`;
+  const caseKey = `${state.session_id}|${state.study_revision}|${state.current_case_id}|${state.current_presentation_id}`;
   const [studyCase, setStudyCase] = useState<StudyCase | null>(null);
   const [caseError, setCaseError] = useState<unknown>(null);
   const [resources, setResources] = useState<ExplanationResource[] | null>(null);
+  const [workspaceCapabilities, setWorkspaceCapabilities] = useState<WorkspaceCapabilities | null>(null);
   const [resourceError, setResourceError] = useState<string | null>(null);
   const [value, setValue] = useState<RankingValue>({ responseType: null, ranked: [] });
   const [inspecting, setInspecting] = useState<string | null>(null);
@@ -87,12 +88,13 @@ export function CaseView({ state, session, telemetry, timingEnabled = true }: { 
     loadStarted.current = performance.now();
     setStudyCase(null);
     setResources(null);
+    setWorkspaceCapabilities(null);
     setCaseError(null);
     setResourceError(null);
     setContentReady(false);
     (async () => {
       try {
-        const current = await getJson<StudyCase>("/api/v1/study/cases/current");
+        const current = await scopedRead<StudyCase>("/api/v1/study", "/cases/current", undefined, undefined, state.session_id);
         if (cancelled) return;
         setStudyCase(current);
         const saved = state.ranking && state.ranking.presentation_id === current.presentation_id ? state.ranking : null;
@@ -105,7 +107,12 @@ export function CaseView({ state, session, telemetry, timingEnabled = true }: { 
         if (current.condition === "explanation" && current.workspace?.scope_id) {
           // A scoped workspace (16 B1) is ready only once the source's context actually loads.
           try {
-            await getJson(`/api/v1/study/workspace/${encodeURIComponent(current.workspace.scope_id)}/entity-context`, { ontology_version_id: current.source.ontology_version_id, iri: current.source.iri, kind: current.source.kind });
+            const base = `/api/v1/study/workspace/${encodeURIComponent(current.workspace.scope_id)}`;
+            const [capabilities] = await Promise.all([
+              loadWorkspaceCapabilities(base, state.session_id),
+              scopedRead(base, "/entity-context", { ontology_version_id: current.source.ontology_version_id, iri: current.source.iri, kind: current.source.kind }, undefined, state.session_id),
+            ]);
+            if (!cancelled) setWorkspaceCapabilities(capabilities);
           } catch (error) {
             if (!cancelled) setResourceError(`The case information could not be loaded: ${describeError(error)} Reconnect and retry before answering this case.`);
             return;
@@ -213,9 +220,10 @@ export function CaseView({ state, session, telemetry, timingEnabled = true }: { 
   // One workspace source per presentation: nothing from another case or session can appear.
   const source: WorkspaceSource | null = useMemo(() => {
     if (!studyCase || studyCase.condition !== "explanation") return null;
-    const key = `study|${state.session_id}|${studyCase.presentation_id}`;
+    const key = `study|${state.session_id}|${state.study_revision}|${studyCase.presentation_id}`;
     if (studyCase.workspace?.scope_id) {
-      return createApiSource({ key, base: `/api/v1/study/workspace/${encodeURIComponent(studyCase.workspace.scope_id)}`, ontologyName: (id) => ontologyLabel(id) });
+      if (!workspaceCapabilities) return null;
+      return createApiSource({ key, sessionId: state.session_id, kind: "study_resource", capabilities: workspaceCapabilities, base: `/api/v1/study/workspace/${encodeURIComponent(studyCase.workspace.scope_id)}`, ontologyName: (id) => ontologyLabel(id) });
     }
     if (!resources) return null;
     return createResourceSource({
@@ -226,7 +234,7 @@ export function CaseView({ state, session, telemetry, timingEnabled = true }: { 
       scopeNote: "Only the information prepared for this case is available here.",
       ontologyName: (id) => ontologyLabel(id),
     });
-  }, [studyCase, resources, caseLabels, ontologyLabel, state.session_id]);
+  }, [studyCase, resources, caseLabels, ontologyLabel, state.session_id, workspaceCapabilities]);
 
   const onAction = useCallback(
     (action: WorkspaceAction) => {
@@ -358,7 +366,7 @@ export function CaseView({ state, session, telemetry, timingEnabled = true }: { 
               )}
             </div>
             <ResourceAccessButton resources={state.ontology_resources} onOpen={() => telemetry.emit("resources_open", { component: "downloads" })} onDownload={(asset) => telemetry.emit("external_resource_link", { component: "downloads", element: asset })} />
-            {state.tutorial && <TutorialHelpButton tutorial={state.tutorial} onOpen={() => telemetry.emit("help_open", { component: "tutorial_help" })} />}
+            {state.tutorial && <TutorialHelpButton tutorial={state.tutorial} onOpen={() => telemetry.emit("help_open", { component: "tutorial_help", scope: "help" })} />}
           </div>
         }
         rows={<CandidateRows controller={controller} inspecting={inspected.candidate_id} viewed={viewed} onInspect={inspect} compact />}

@@ -4,14 +4,14 @@
       "additionalProperties": false,
       "description": "Half-open original-document byte interval, never arbitrary provenance metadata.",
       "properties": {
-        "end": {
-          "minimum": 0,
-          "title": "End",
-          "type": "integer"
-        },
         "start": {
           "minimum": 0,
           "title": "Start",
+          "type": "integer"
+        },
+        "end": {
+          "minimum": 0,
+          "title": "End",
           "type": "integer"
         },
         "unit": {
@@ -31,6 +31,13 @@
     "EntityRef": {
       "additionalProperties": false,
       "properties": {
+        "ontology_version_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:/-]+$",
+          "title": "Ontology Version Id",
+          "type": "string"
+        },
         "iri": {
           "maxLength": 2048,
           "minLength": 1,
@@ -47,13 +54,6 @@
           ],
           "title": "Kind",
           "type": "string"
-        },
-        "ontology_version_id": {
-          "maxLength": 128,
-          "minLength": 1,
-          "pattern": "^[A-Za-z0-9_.:/-]+$",
-          "title": "Ontology Version Id",
-          "type": "string"
         }
       },
       "required": [
@@ -66,25 +66,18 @@
     "EvidenceLink": {
       "additionalProperties": false,
       "properties": {
-        "candidate_id": {
-          "maxLength": 128,
-          "minLength": 1,
-          "pattern": "^[A-Za-z0-9_.:/-]+$",
-          "title": "Candidate Id",
-          "type": "string"
-        },
-        "channel": {
-          "maxLength": 128,
-          "minLength": 1,
-          "pattern": "^[A-Za-z0-9_.:/-]+$",
-          "title": "Channel",
-          "type": "string"
-        },
         "evidence_id": {
           "maxLength": 128,
           "minLength": 1,
           "pattern": "^[A-Za-z0-9_.:/-]+$",
           "title": "Evidence Id",
+          "type": "string"
+        },
+        "candidate_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:/-]+$",
+          "title": "Candidate Id",
           "type": "string"
         },
         "fact_ids": {
@@ -97,12 +90,11 @@
           "title": "Fact Ids",
           "type": "array"
         },
-        "interpretation": {
-          "enum": [
-            "projected",
-            "matcher_comparison"
-          ],
-          "title": "Interpretation",
+        "channel": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:/-]+$",
+          "title": "Channel",
           "type": "string"
         },
         "role": {
@@ -113,6 +105,21 @@
           ],
           "title": "Role",
           "type": "string"
+        },
+        "interpretation": {
+          "enum": [
+            "projected",
+            "matcher_comparison"
+          ],
+          "title": "Interpretation",
+          "type": "string"
+        },
+        "scores": {
+          "items": {
+            "$ref": "#/$defs/Score"
+          },
+          "title": "Scores",
+          "type": "array"
         },
         "saved_value": {
           "anyOf": [
@@ -126,22 +133,6 @@
           "default": null,
           "title": "Saved Value"
         },
-        "scores": {
-          "items": {
-            "$ref": "#/$defs/Score"
-          },
-          "title": "Scores",
-          "type": "array"
-        },
-        "status": {
-          "enum": [
-            "available",
-            "not_exported",
-            "unresolved"
-          ],
-          "title": "Status",
-          "type": "string"
-        },
         "value_meaning": {
           "anyOf": [
             {
@@ -153,6 +144,15 @@
           ],
           "default": null,
           "title": "Value Meaning"
+        },
+        "status": {
+          "enum": [
+            "available",
+            "not_exported",
+            "unresolved"
+          ],
+          "title": "Status",
+          "type": "string"
         }
       },
       "required": [
@@ -170,6 +170,11 @@
     "FactOrigin": {
       "additionalProperties": false,
       "properties": {
+        "document_sha256": {
+          "pattern": "^sha256:[a-f0-9]{64}$",
+          "title": "Document Sha256",
+          "type": "string"
+        },
         "axiom_id": {
           "anyOf": [
             {
@@ -182,10 +187,15 @@
           ],
           "title": "Axiom Id"
         },
-        "document_sha256": {
-          "pattern": "^sha256:[a-f0-9]{64}$",
-          "title": "Document Sha256",
-          "type": "string"
+        "source_span": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ByteSourceSpan"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "provenance_status": {
           "enum": [
@@ -196,16 +206,6 @@
           ],
           "title": "Provenance Status",
           "type": "string"
-        },
-        "source_span": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/ByteSourceSpan"
-            },
-            {
-              "type": "null"
-            }
-          ]
         }
       },
       "required": [
@@ -220,6 +220,45 @@
     "GroundedClaim": {
       "additionalProperties": false,
       "properties": {
+        "claim_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:/-]+$",
+          "title": "Claim Id",
+          "type": "string"
+        },
+        "text": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        },
+        "fact_ids": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.:/-]+$",
+            "type": "string"
+          },
+          "maxItems": 20,
+          "minItems": 1,
+          "title": "Fact Ids",
+          "type": "array"
+        },
+        "interpretation": {
+          "const": "generated",
+          "default": "generated",
+          "title": "Interpretation",
+          "type": "string"
+        },
+        "grounding": {
+          "enum": [
+            "exact_extract",
+            "semantic_template"
+          ],
+          "title": "Grounding",
+          "type": "string"
+        },
         "category": {
           "default": "key_fact",
           "enum": [
@@ -235,43 +274,13 @@
           "title": "Category",
           "type": "string"
         },
-        "claim_id": {
-          "maxLength": 128,
-          "minLength": 1,
-          "pattern": "^[A-Za-z0-9_.:/-]+$",
-          "title": "Claim Id",
-          "type": "string"
-        },
-        "fact_ids": {
+        "scoped_entities": {
           "items": {
-            "maxLength": 128,
-            "minLength": 1,
-            "pattern": "^[A-Za-z0-9_.:/-]+$",
-            "type": "string"
+            "$ref": "#/$defs/EntityRef"
           },
-          "maxItems": 20,
-          "minItems": 1,
-          "title": "Fact Ids",
+          "maxItems": 2,
+          "title": "Scoped Entities",
           "type": "array"
-        },
-        "generation_manifest_sha256": {
-          "pattern": "^[a-f0-9]{64}$",
-          "title": "Generation Manifest Sha256",
-          "type": "string"
-        },
-        "grounding": {
-          "enum": [
-            "exact_extract",
-            "semantic_template"
-          ],
-          "title": "Grounding",
-          "type": "string"
-        },
-        "interpretation": {
-          "const": "generated",
-          "default": "generated",
-          "title": "Interpretation",
-          "type": "string"
         },
         "packet_fact_ids": {
           "items": {
@@ -307,18 +316,9 @@
           "default": null,
           "title": "Reviewer Receipt"
         },
-        "scoped_entities": {
-          "items": {
-            "$ref": "#/$defs/EntityRef"
-          },
-          "maxItems": 2,
-          "title": "Scoped Entities",
-          "type": "array"
-        },
-        "text": {
-          "maxLength": 4000,
-          "minLength": 1,
-          "title": "Text",
+        "generation_manifest_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Generation Manifest Sha256",
           "type": "string"
         }
       },
@@ -335,6 +335,12 @@
     "HierarchyEdge": {
       "additionalProperties": false,
       "properties": {
+        "child": {
+          "$ref": "#/$defs/EntityRef"
+        },
+        "parent": {
+          "$ref": "#/$defs/EntityRef"
+        },
         "basis": {
           "enum": [
             "literal_asserted",
@@ -343,21 +349,6 @@
           ],
           "title": "Basis",
           "type": "string"
-        },
-        "child": {
-          "$ref": "#/$defs/EntityRef"
-        },
-        "derivation": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Derivation"
         },
         "fact_ids": {
           "items": {
@@ -370,8 +361,17 @@
           "title": "Fact Ids",
           "type": "array"
         },
-        "parent": {
-          "$ref": "#/$defs/EntityRef"
+        "derivation": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Derivation"
         }
       },
       "required": [
@@ -386,12 +386,26 @@
     "OriginalFact": {
       "additionalProperties": false,
       "properties": {
-        "axiom_ref": {
+        "fact_id": {
           "maxLength": 128,
           "minLength": 1,
           "pattern": "^[A-Za-z0-9_.:/-]+$",
-          "title": "Axiom Ref",
+          "title": "Fact Id",
           "type": "string"
+        },
+        "subject": {
+          "$ref": "#/$defs/EntityRef"
+        },
+        "predicate_iri": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Predicate Iri"
         },
         "category": {
           "enum": [
@@ -420,17 +434,23 @@
           "title": "Category",
           "type": "string"
         },
-        "derivation": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Derivation"
+        "value": {
+          "$ref": "#/$defs/OriginalValue"
+        },
+        "qualifiers": {
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Qualifiers",
+          "type": "array"
+        },
+        "axiom_ref": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:/-]+$",
+          "title": "Axiom Ref",
+          "type": "string"
         },
         "document_sha256": {
           "anyOf": [
@@ -445,12 +465,12 @@
           "default": null,
           "title": "Document Sha256"
         },
-        "fact_id": {
-          "maxLength": 128,
-          "minLength": 1,
-          "pattern": "^[A-Za-z0-9_.:/-]+$",
-          "title": "Fact Id",
-          "type": "string"
+        "origins": {
+          "items": {
+            "$ref": "#/$defs/FactOrigin"
+          },
+          "title": "Origins",
+          "type": "array"
         },
         "interpretation": {
           "enum": [
@@ -462,24 +482,6 @@
           "title": "Interpretation",
           "type": "string"
         },
-        "origins": {
-          "items": {
-            "$ref": "#/$defs/FactOrigin"
-          },
-          "title": "Origins",
-          "type": "array"
-        },
-        "predicate_iri": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "title": "Predicate Iri"
-        },
         "premises": {
           "items": {
             "maxLength": 128,
@@ -490,19 +492,17 @@
           "title": "Premises",
           "type": "array"
         },
-        "qualifiers": {
-          "items": {
-            "additionalProperties": true,
-            "type": "object"
-          },
-          "title": "Qualifiers",
-          "type": "array"
-        },
-        "subject": {
-          "$ref": "#/$defs/EntityRef"
-        },
-        "value": {
-          "$ref": "#/$defs/OriginalValue"
+        "derivation": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Derivation"
         }
       },
       "required": [
@@ -521,30 +521,14 @@
       "additionalProperties": false,
       "description": "A complete literal, exact IRI, or faithful original OWL expression.",
       "properties": {
-        "ast": {
-          "anyOf": [
-            {
-              "additionalProperties": true,
-              "type": "object"
-            },
-            {
-              "type": "null"
-            }
+        "term_type": {
+          "enum": [
+            "literal",
+            "iri",
+            "expression_ref"
           ],
-          "default": null,
-          "title": "Ast"
-        },
-        "datatype": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Datatype"
+          "title": "Term Type",
+          "type": "string"
         },
         "expression_id": {
           "anyOf": [
@@ -561,29 +545,18 @@
           "default": null,
           "title": "Expression Id"
         },
-        "iri": {
+        "ast": {
           "anyOf": [
             {
-              "type": "string"
+              "additionalProperties": true,
+              "type": "object"
             },
             {
               "type": "null"
             }
           ],
           "default": null,
-          "title": "Iri"
-        },
-        "language": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Language"
+          "title": "Ast"
         },
         "lexical_form": {
           "anyOf": [
@@ -597,6 +570,42 @@
           "default": null,
           "title": "Lexical Form"
         },
+        "datatype": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Datatype"
+        },
+        "language": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Language"
+        },
+        "iri": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Iri"
+        },
         "syntax": {
           "default": null,
           "title": "Syntax",
@@ -606,15 +615,6 @@
           "default": null,
           "title": "Syntax Format",
           "type": "null"
-        },
-        "term_type": {
-          "enum": [
-            "literal",
-            "iri",
-            "expression_ref"
-          ],
-          "title": "Term Type",
-          "type": "string"
         }
       },
       "required": [
@@ -627,34 +627,20 @@
       "additionalProperties": false,
       "description": "A recorded value with stage semantics, never an implied calibrated probability.",
       "properties": {
-        "calibration_artifact": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Calibration Artifact"
-        },
-        "calibration_status": {
-          "default": "not_established",
-          "enum": [
-            "not_established",
-            "validated",
-            "not_applicable"
-          ],
-          "title": "Calibration Status",
+        "name": {
+          "title": "Name",
           "type": "string"
+        },
+        "stage": {
+          "title": "Stage",
+          "type": "string"
+        },
+        "value": {
+          "title": "Value",
+          "type": "number"
         },
         "meaning": {
           "title": "Meaning",
-          "type": "string"
-        },
-        "name": {
-          "title": "Name",
           "type": "string"
         },
         "range": {
@@ -672,13 +658,27 @@
           "default": null,
           "title": "Range"
         },
-        "stage": {
-          "title": "Stage",
+        "calibration_status": {
+          "default": "not_established",
+          "enum": [
+            "not_established",
+            "validated",
+            "not_applicable"
+          ],
+          "title": "Calibration Status",
           "type": "string"
         },
-        "value": {
-          "title": "Value",
-          "type": "number"
+        "calibration_artifact": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Calibration Artifact"
         }
       },
       "required": [
@@ -699,6 +699,80 @@
       "default": "study_explanation",
       "title": "Artifact Type",
       "type": "string"
+    },
+    "contract_version": {
+      "const": "exact-study/1.0",
+      "default": "exact-study/1.0",
+      "title": "Contract Version",
+      "type": "string"
+    },
+    "policy_hash": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Policy Hash",
+      "type": "string"
+    },
+    "entities": {
+      "items": {
+        "$ref": "#/$defs/EntityRef"
+      },
+      "minItems": 1,
+      "title": "Entities",
+      "type": "array"
+    },
+    "facts": {
+      "items": {
+        "$ref": "#/$defs/OriginalFact"
+      },
+      "title": "Facts",
+      "type": "array"
+    },
+    "referenced_labels": {
+      "items": {
+        "$ref": "#/$defs/OriginalFact"
+      },
+      "maxItems": 100,
+      "title": "Referenced Labels",
+      "type": "array"
+    },
+    "referenced_labels_truncated": {
+      "default": false,
+      "title": "Referenced Labels Truncated",
+      "type": "boolean"
+    },
+    "entity_profiles": {
+      "items": {
+        "$ref": "#/$defs/GroundedClaim"
+      },
+      "title": "Entity Profiles",
+      "type": "array"
+    },
+    "pair_comparison": {
+      "items": {
+        "$ref": "#/$defs/GroundedClaim"
+      },
+      "title": "Pair Comparison",
+      "type": "array"
+    },
+    "hierarchy": {
+      "items": {
+        "$ref": "#/$defs/HierarchyEdge"
+      },
+      "title": "Hierarchy",
+      "type": "array"
+    },
+    "evidence": {
+      "items": {
+        "$ref": "#/$defs/EvidenceLink"
+      },
+      "title": "Evidence",
+      "type": "array"
+    },
+    "limitations": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Limitations",
+      "type": "array"
     },
     "capabilities": {
       "additionalProperties": {
@@ -722,80 +796,6 @@
       },
       "title": "Capabilities",
       "type": "object"
-    },
-    "contract_version": {
-      "const": "exact-study/1.0",
-      "default": "exact-study/1.0",
-      "title": "Contract Version",
-      "type": "string"
-    },
-    "entities": {
-      "items": {
-        "$ref": "#/$defs/EntityRef"
-      },
-      "minItems": 1,
-      "title": "Entities",
-      "type": "array"
-    },
-    "entity_profiles": {
-      "items": {
-        "$ref": "#/$defs/GroundedClaim"
-      },
-      "title": "Entity Profiles",
-      "type": "array"
-    },
-    "evidence": {
-      "items": {
-        "$ref": "#/$defs/EvidenceLink"
-      },
-      "title": "Evidence",
-      "type": "array"
-    },
-    "facts": {
-      "items": {
-        "$ref": "#/$defs/OriginalFact"
-      },
-      "title": "Facts",
-      "type": "array"
-    },
-    "hierarchy": {
-      "items": {
-        "$ref": "#/$defs/HierarchyEdge"
-      },
-      "title": "Hierarchy",
-      "type": "array"
-    },
-    "limitations": {
-      "items": {
-        "type": "string"
-      },
-      "title": "Limitations",
-      "type": "array"
-    },
-    "pair_comparison": {
-      "items": {
-        "$ref": "#/$defs/GroundedClaim"
-      },
-      "title": "Pair Comparison",
-      "type": "array"
-    },
-    "policy_hash": {
-      "pattern": "^[a-f0-9]{64}$",
-      "title": "Policy Hash",
-      "type": "string"
-    },
-    "referenced_labels": {
-      "items": {
-        "$ref": "#/$defs/OriginalFact"
-      },
-      "maxItems": 100,
-      "title": "Referenced Labels",
-      "type": "array"
-    },
-    "referenced_labels_truncated": {
-      "default": false,
-      "title": "Referenced Labels Truncated",
-      "type": "boolean"
     }
   },
   "required": [

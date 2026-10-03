@@ -688,3 +688,20 @@ def test_alignment_eligibility_distinguishes_unknown_explicit_exclusion_and_lega
     assert rows["urn:A"]["alignment_eligibility_status"] == "available"
     assert rows["urn:duplicate"]["alignment_eligible"] is None
     assert rows["urn:duplicate"]["alignment_eligibility_status"] == "not_exported"
+
+
+def test_parent_navigation_preserves_original_fact_and_separate_projection(context):
+    index, _ = context
+    summary = index.entity_context(ref(index))
+    facts = {
+        fact["fact_id"]: fact
+        for fact in index.facts(ref(index), category="hierarchy", limit=100)["items"]
+    }
+    assert summary["parents"]["items"]
+    for parent in summary["parents"]["items"]:
+        original = facts[parent["fact_id"]]
+        assert {
+            key: value for key, value in parent.items() if key != "hierarchy_projection"
+        } == original
+        assert parent["hierarchy_projection"]["parent"]["iri"] in {"urn:B", "urn:C"}
+        assert parent["value"]["term_type"] == "expression_ref"

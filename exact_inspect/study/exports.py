@@ -47,6 +47,28 @@ def csv_archive(export):
         "timing_segments.csv": segments,
         "summary.csv": [export["data"]["summary"]],
     }
+    if export["manifest"]["schema"] == "exact-study-analysis/2":
+        tables["tutorial_attempts.csv"] = [
+            {"session_id": s["session_id"], **attempt}
+            for s in export["data"]["sessions"]
+            for attempt in s["tutorial_progress"]["attempts"]
+        ]
+        tables["tutorial_outcomes.csv"] = [
+            {
+                "session_id": s["session_id"],
+                "question_id": q,
+                **result,
+                "completed_at": s["tutorial_progress"]["completed_at"],
+                "tutorial_observed_seconds": s["tutorial_observed_seconds"],
+            }
+            for s in export["data"]["sessions"]
+            for q, result in s["tutorial_outcomes"].items()
+        ]
+        tables["consultation_drafts.csv"] = [
+            {"session_id": s["session_id"], "case_id": cid, **draft}
+            for s in export["data"]["sessions"]
+            for cid, draft in s["consultation_drafts"].items()
+        ]
     files, columns = {}, {}
     for name, rows in tables.items():
         fields = sorted({key for row in rows for key in row})
@@ -72,7 +94,11 @@ def csv_archive(export):
     files["manifest.json"] = canonical(
         {
             **export["manifest"],
-            "archive_schema": "exact-study-csv/1",
+            "archive_schema": (
+                "exact-study-csv/2"
+                if export["manifest"]["schema"] == "exact-study-analysis/2"
+                else "exact-study-csv/1"
+            ),
             "files": {
                 name: {"sha256": hashlib.sha256(content).hexdigest(), "size_bytes": len(content)}
                 for name, content in files.items()

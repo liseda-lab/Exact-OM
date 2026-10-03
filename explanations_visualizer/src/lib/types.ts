@@ -137,6 +137,7 @@ export interface Fact {
   synonym_scope?: string | null;
   availability?: Availability;
   reason?: string;
+  hierarchy_projection?: { child: EntityRef; parent: EntityRef; basis: string };
 }
 
 export interface EntityContext {
@@ -323,6 +324,12 @@ export interface Axiom {
 export interface BundleListItem {
   package_id: string;
   capabilities: Record<string, string>;
+  contract_version: string;
+  audience: "local" | "development_demo";
+  policy_id: string;
+  counts: { ontologies: number; runs: number; explanations: number; jobs: number; artifacts: number };
+  artifact_bytes: number;
+  owned_library_copy: boolean;
 }
 
 export interface ImportJob {

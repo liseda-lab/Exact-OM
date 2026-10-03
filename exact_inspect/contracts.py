@@ -89,6 +89,7 @@ class Page(WireModel, Generic[T]):
     scope: Scope
     status: Availability = "available"
     reason: str | None = None
+    order: Literal["pair_id_ascending", "source_id_ascending", "package_id_ascending"] | None = None
 
     @model_validator(mode="after")
     def check_counts(self) -> Page[T]:

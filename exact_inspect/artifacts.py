@@ -4,11 +4,14 @@ from __future__ import annotations
 
 import json
 import os
+import re
+import shutil
 import stat
 import tempfile
 import threading
 import zipfile
 from collections import OrderedDict
+from contextlib import contextmanager, nullcontext
 from pathlib import Path, PurePosixPath
 from typing import Any, Callable, Literal
 
@@ -191,15 +194,151 @@ class BundleLibrary:
     ):
         self.root = Path(root)
         self.root.mkdir(parents=True, exist_ok=True)
+        self.root = self.root.resolve()
         self.max_bytes, self.max_files, self.max_ratio = max_bytes, max_files, max_ratio
 
+    @contextmanager
+    def operation(self):
+        """Serialize publication, selection and removal across local serving processes."""
+        import fcntl
+
+        fd = os.open(self.root / ".library.lock", os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
+        try:
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError as exc:
+                raise DomainError(
+                    "library_busy", "A library import or change is in progress", 409
+                ) from exc
+            yield
+        finally:
+            os.close(fd)
+
+    def package_path(self, package_id: str) -> Path:
+        """Resolve only content-addressed library copies, never caller-supplied paths."""
+        if re.fullmatch(r"sha256:[a-f0-9]{64}", package_id) is None:
+            raise DomainError("unknown_package", "Unknown package", 404)
+        path = relative_path(self.root, package_id[7:] + "/package.json")
+        if not path.is_file():
+            raise DomainError("unknown_package", "Unknown package", 404)
+        return path
+
+    def lease(self, package_id: str):
+        """Hold a shared process-safe lease while an immutable service can read a copy."""
+        import fcntl
+
+        self.package_path(package_id)
+        path = self.root / (".use-" + package_id[7:])
+        fd = os.open(path, os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
+        try:
+            fcntl.flock(fd, fcntl.LOCK_SH | fcntl.LOCK_NB)
+        except BaseException:
+            os.close(fd)
+            raise
+        return fd
+
+    def metadata(self, package_id: str) -> dict[str, Any]:
+        """Return bounded identifying metadata without reading any ontology or run data."""
+        path = self.package_path(package_id)
+        manifest = InspectionBundle.model_validate(read_metadata(path))
+        if (
+            manifest.package_id != package_id
+            or canonical_hash(manifest.model_dump(mode="json", exclude={"package_id"}))
+            != package_id
+        ):
+            raise DomainError("invalid_identity", "Package identity does not match manifest", 409)
+        marker = path.parent / ".library-copy.json"
+        owned = marker.is_file() and read_metadata(marker).get("package_id") == package_id
+        value = {
+            "package_id": package_id,
+            "contract_version": manifest.contract_version,
+            "audience": manifest.audience,
+            "portable": manifest.portable,
+            "capabilities": manifest.capabilities,
+            "policy_id": manifest.policy.policy_id,
+            "policy_hash": manifest.policy.policy_hash,
+            "license_treatment": manifest.license_treatment,
+            "counts": {
+                name: len(getattr(manifest, name))
+                for name in ("ontologies", "runs", "explanations", "jobs", "artifacts")
+            },
+            "artifact_bytes": sum(item.size for item in manifest.artifacts),
+            "owned_library_copy": owned,
+        }
+        if len(canonical_json(value)) > 64 * 1024:
+            raise DomainError(
+                "metadata_too_large", "Package metadata exceeds its allowed bound", 413
+            )
+        return value
+
+    def remove(self, package_id: str) -> dict[str, Any]:
+        """Remove an idle owned copy; never follow links or remove a mounted original."""
+        import fcntl
+
+        with self.operation():
+            path = self.package_path(package_id)
+            if not self.metadata(package_id)["owned_library_copy"]:
+                raise DomainError(
+                    "unowned_package",
+                    "Only copies created by this library importer can be removed",
+                    409,
+                )
+            selection = self.root / "selection.json"
+            if selection.is_file() and read_metadata(selection).get("package_id") == package_id:
+                raise DomainError(
+                    "package_in_use", "Select another bundle before removing this copy", 409
+                )
+            fd = os.open(
+                self.root / (".use-" + package_id[7:]),
+                os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW,
+                0o600,
+            )
+            try:
+                try:
+                    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                except BlockingIOError as exc:
+                    raise DomainError(
+                        "package_in_use", "This library copy is still in use", 409
+                    ) from exc
+                # Reject links and mounted subtrees before deletion. fd-based rmtree
+                # also refuses a directory swapped for a symlink during traversal.
+                device = self.root.stat().st_dev
+                for root, directories, files in os.walk(path.parent, followlinks=False):
+                    for entry in [Path(root), *(Path(root) / name for name in directories + files)]:
+                        if (
+                            entry.is_symlink()
+                            or entry.stat().st_dev != device
+                            or os.path.ismount(entry)
+                        ):
+                            raise DomainError(
+                                "unsafe_path",
+                                "Linked or mounted files are not removable library copies",
+                                409,
+                            )
+                if not shutil.rmtree.avoids_symlink_attacks:
+                    raise DomainError(
+                        "deletion_unsupported",
+                        "Safe library deletion is unavailable on this platform",
+                        409,
+                    )
+                shutil.rmtree(path.parent)
+            finally:
+                os.close(fd)
+            return {"package_id": package_id, "status": "removed"}
+
     def import_archive(
-        self, archive_path: Path, *, cancelled: Callable[[], bool] = lambda: False
+        self,
+        archive_path: Path,
+        *,
+        cancelled: Callable[[], bool] = lambda: False,
+        operation_locked: bool = False,
     ) -> InspectionBundle:
         """Reject unsafe ZIP entries and stream bounded contents into isolated staging."""
         if archive_path.stat().st_size > self.max_bytes:
             raise DomainError("payload_too_large", "Upload exceeds the local import limit", 413)
-        with tempfile.TemporaryDirectory(prefix=".import-", dir=self.root) as directory:
+        with nullcontext() if operation_locked else self.operation(), tempfile.TemporaryDirectory(
+            prefix=".import-", dir=self.root
+        ) as directory:
             staging = Path(directory)
             try:
                 with zipfile.ZipFile(archive_path) as archive:
@@ -256,34 +395,39 @@ class BundleLibrary:
                 if {p for p in seen if not p.endswith("/")} != allowed:
                     raise DomainError("unbound_artifact", "Archive contains unmanifested files")
                 destination = self.root / manifest.package_id.removeprefix("sha256:")
+                relative_path(self.root, manifest.package_id[7:])
                 if destination.exists():
                     validate_bundle(destination / "package.json")
                 else:
                     os.replace(staging, destination)
+                    atomic_json(
+                        destination / ".library-copy.json", {"package_id": manifest.package_id}
+                    )
                 return manifest
             except (zipfile.BadZipFile, OSError) as exc:
                 raise DomainError(
                     "corrupt_archive", "Archive is corrupt or incomplete", 409
                 ) from exc
 
-    def list(self) -> list[dict[str, Any]]:
+    def list(self, *, limit: int = 100, after: str = "") -> list[dict[str, Any]]:
         """List published manifests only; incomplete staging is never a library entry."""
+        if limit < 1 or limit > 101:
+            raise DomainError("invalid_limit", "Library limit must be between 1 and 100")
+        identities = sorted(
+            "sha256:" + p.name for p in self.root.iterdir() if re.fullmatch(r"[a-f0-9]{64}", p.name)
+        )
         return [
-            {"package_id": m.package_id, "capabilities": m.capabilities}
-            for p in sorted(self.root.glob("[!.]*/package.json"))
-            if (m := validate_bundle(p, verify_hashes=False))
+            self.metadata(identity)
+            for identity in [item for item in identities if item > after][:limit]
         ]
 
-    def select(self, package_id: str) -> Path:
+    def select(self, package_id: str, *, operation_locked: bool = False) -> Path:
         """Persist local selection only after validating the requested library package."""
-        if len(package_id) != 71 or not package_id.startswith("sha256:"):
-            raise DomainError("unknown_package", "Unknown package", 404)
-        path = relative_path(self.root, package_id[7:] + "/package.json")
-        if not path.is_file():
-            raise DomainError("unknown_package", "Unknown package", 404)
-        validate_bundle(path)
-        atomic_json(self.root / "selection.json", {"package_id": package_id})
-        return path
+        with nullcontext() if operation_locked else self.operation():
+            path = self.package_path(package_id)
+            validate_bundle(path)
+            atomic_json(self.root / "selection.json", {"package_id": package_id})
+            return path
 
 
 class BoundedCache:

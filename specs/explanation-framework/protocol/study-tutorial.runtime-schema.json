@@ -1,0 +1,799 @@
+{
+  "$defs": {
+    "AssessmentItem": {
+      "additionalProperties": false,
+      "properties": {
+        "question_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:/-]+$",
+          "title": "Question Id",
+          "type": "string"
+        },
+        "title": {
+          "maxLength": 512,
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "prompt": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Prompt",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "single",
+            "multiple",
+            "match",
+            "match_and_single"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "options": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/AssessmentOption"
+              },
+              "maxItems": 12,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Options"
+        },
+        "rows": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/AssessmentRow"
+              },
+              "maxItems": 12,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rows"
+        },
+        "row_options": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/AssessmentOption"
+              },
+              "maxItems": 12,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Row Options"
+        },
+        "part_b": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AssessmentPartB"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "lesson_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:/-]+$",
+          "title": "Lesson Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "question_id",
+        "title",
+        "prompt",
+        "kind",
+        "lesson_id"
+      ],
+      "title": "AssessmentItem",
+      "type": "object"
+    },
+    "AssessmentOption": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:/-]+$",
+          "title": "Code",
+          "type": "string"
+        },
+        "label": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Label",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "label"
+      ],
+      "title": "AssessmentOption",
+      "type": "object"
+    },
+    "AssessmentPartB": {
+      "additionalProperties": false,
+      "properties": {
+        "prompt": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Prompt",
+          "type": "string"
+        },
+        "options": {
+          "items": {
+            "$ref": "#/$defs/AssessmentOption"
+          },
+          "maxItems": 12,
+          "minItems": 2,
+          "title": "Options",
+          "type": "array"
+        }
+      },
+      "required": [
+        "prompt",
+        "options"
+      ],
+      "title": "AssessmentPartB",
+      "type": "object"
+    },
+    "AssessmentResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "choice": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.:/-]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Choice"
+        },
+        "choices": {
+          "anyOf": [
+            {
+              "items": {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9_.:/-]+$",
+                "type": "string"
+              },
+              "maxItems": 12,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Choices"
+        },
+        "matches": {
+          "anyOf": [
+            {
+              "maxProperties": 12,
+              "patternProperties": {
+                "^[A-Za-z0-9_.:/-]+$": {
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "pattern": "^[A-Za-z0-9_.:/-]+$",
+                  "type": "string"
+                }
+              },
+              "propertyNames": {
+                "maxLength": 128,
+                "minLength": 1
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Matches"
+        },
+        "part_b": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.:/-]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Part B"
+        }
+      },
+      "title": "AssessmentResponse",
+      "type": "object"
+    },
+    "AssessmentRow": {
+      "additionalProperties": false,
+      "properties": {
+        "row_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:/-]+$",
+          "title": "Row Id",
+          "type": "string"
+        },
+        "label": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Label",
+          "type": "string"
+        }
+      },
+      "required": [
+        "row_id",
+        "label"
+      ],
+      "title": "AssessmentRow",
+      "type": "object"
+    },
+    "AssessmentRule": {
+      "additionalProperties": false,
+      "properties": {
+        "response": {
+          "$ref": "#/$defs/AssessmentResponse"
+        },
+        "correct_feedback": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Correct Feedback",
+          "type": "string"
+        },
+        "incorrect_feedback": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Incorrect Feedback",
+          "type": "string"
+        }
+      },
+      "required": [
+        "response",
+        "correct_feedback",
+        "incorrect_feedback"
+      ],
+      "title": "AssessmentRule",
+      "type": "object"
+    },
+    "Candidate": {
+      "additionalProperties": false,
+      "properties": {
+        "candidate_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:/-]+$",
+          "title": "Candidate Id",
+          "type": "string"
+        },
+        "entity": {
+          "$ref": "#/$defs/EntityRef"
+        },
+        "label": {
+          "maxLength": 512,
+          "minLength": 1,
+          "title": "Label",
+          "type": "string"
+        },
+        "score": {
+          "title": "Score",
+          "type": "number"
+        },
+        "score_meaning": {
+          "maxLength": 512,
+          "minLength": 1,
+          "title": "Score Meaning",
+          "type": "string"
+        },
+        "display_position": {
+          "maximum": 5,
+          "minimum": 1,
+          "title": "Display Position",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "candidate_id",
+        "entity",
+        "label",
+        "score",
+        "score_meaning",
+        "display_position"
+      ],
+      "title": "Candidate",
+      "type": "object"
+    },
+    "EntityRef": {
+      "additionalProperties": false,
+      "properties": {
+        "ontology_version_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:/-]+$",
+          "title": "Ontology Version Id",
+          "type": "string"
+        },
+        "iri": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "title": "Iri",
+          "type": "string"
+        },
+        "kind": {
+          "default": "class",
+          "enum": [
+            "class",
+            "object_property",
+            "data_property",
+            "individual"
+          ],
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "ontology_version_id",
+        "iri"
+      ],
+      "title": "EntityRef",
+      "type": "object"
+    },
+    "LessonRequirement": {
+      "additionalProperties": false,
+      "properties": {
+        "requirement_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:/-]+$",
+          "title": "Requirement Id",
+          "type": "string"
+        },
+        "action": {
+          "enum": [
+            "inspect_other_candidate",
+            "return_to_candidate",
+            "search_entity",
+            "navigate_parent",
+            "navigate_child",
+            "return_to_compared",
+            "open_citation",
+            "open_original_axiom",
+            "locate_in_evidence_list",
+            "inspect_graph_or_list",
+            "change_graph_view",
+            "rank_with_details_open",
+            "add_rank",
+            "move_rank",
+            "remove_rank",
+            "undo_rank",
+            "keep_initial_order",
+            "check_partial_ranking",
+            "choose_none",
+            "choose_insufficient",
+            "copy_iri",
+            "locate_downloads",
+            "report_multiple_methods",
+            "report_no_methods"
+          ],
+          "title": "Action",
+          "type": "string"
+        },
+        "label": {
+          "maxLength": 512,
+          "minLength": 1,
+          "title": "Label",
+          "type": "string"
+        },
+        "alternatives": {
+          "items": {
+            "enum": [
+              "inspect_other_candidate",
+              "return_to_candidate",
+              "search_entity",
+              "navigate_parent",
+              "navigate_child",
+              "return_to_compared",
+              "open_citation",
+              "open_original_axiom",
+              "locate_in_evidence_list",
+              "inspect_graph_or_list",
+              "change_graph_view",
+              "rank_with_details_open",
+              "add_rank",
+              "move_rank",
+              "remove_rank",
+              "undo_rank",
+              "keep_initial_order",
+              "check_partial_ranking",
+              "choose_none",
+              "choose_insufficient",
+              "copy_iri",
+              "locate_downloads",
+              "report_multiple_methods",
+              "report_no_methods"
+            ],
+            "type": "string"
+          },
+          "maxItems": 4,
+          "title": "Alternatives",
+          "type": "array"
+        }
+      },
+      "required": [
+        "requirement_id",
+        "action",
+        "label"
+      ],
+      "title": "LessonRequirement",
+      "type": "object"
+    },
+    "PublicAssetV2": {
+      "additionalProperties": false,
+      "properties": {
+        "title": {
+          "maxLength": 512,
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "role": {
+          "enum": [
+            "source",
+            "target",
+            "both"
+          ],
+          "title": "Role",
+          "type": "string"
+        },
+        "ontology_version_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:/-]+$",
+          "title": "Ontology Version Id",
+          "type": "string"
+        },
+        "version_label": {
+          "maxLength": 160,
+          "minLength": 1,
+          "title": "Version Label",
+          "type": "string"
+        },
+        "license_note": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "License Note",
+          "type": "string"
+        },
+        "information_notice": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Information Notice",
+          "type": "string"
+        },
+        "asset_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:/-]+$",
+          "title": "Asset Id",
+          "type": "string"
+        },
+        "sha256": {
+          "title": "Sha256",
+          "type": "string"
+        },
+        "size_bytes": {
+          "minimum": 0,
+          "title": "Size Bytes",
+          "type": "integer"
+        },
+        "kind": {
+          "const": "ontology",
+          "title": "Kind",
+          "type": "string"
+        },
+        "media_type": {
+          "title": "Media Type",
+          "type": "string"
+        },
+        "policy_hash": {
+          "title": "Policy Hash",
+          "type": "string"
+        }
+      },
+      "required": [
+        "title",
+        "role",
+        "ontology_version_id",
+        "version_label",
+        "license_note",
+        "information_notice",
+        "asset_id",
+        "sha256",
+        "size_bytes",
+        "kind",
+        "media_type",
+        "policy_hash"
+      ],
+      "title": "PublicAssetV2",
+      "type": "object"
+    },
+    "TutorialCase": {
+      "additionalProperties": false,
+      "properties": {
+        "case_id": {
+          "default": "practice-case",
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:/-]+$",
+          "title": "Case Id",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/EntityRef"
+        },
+        "source_label": {
+          "maxLength": 512,
+          "minLength": 1,
+          "title": "Source Label",
+          "type": "string"
+        },
+        "candidates": {
+          "items": {
+            "$ref": "#/$defs/Candidate"
+          },
+          "maxItems": 5,
+          "minItems": 5,
+          "title": "Candidates",
+          "type": "array"
+        },
+        "explanation_refs": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.:/-]+$",
+            "type": "string"
+          },
+          "maxItems": 10,
+          "minItems": 1,
+          "title": "Explanation Refs",
+          "type": "array"
+        },
+        "ontology_resources": {
+          "items": {
+            "$ref": "#/$defs/PublicAssetV2"
+          },
+          "maxItems": 10,
+          "minItems": 2,
+          "title": "Ontology Resources",
+          "type": "array"
+        }
+      },
+      "required": [
+        "source",
+        "source_label",
+        "candidates",
+        "explanation_refs",
+        "ontology_resources"
+      ],
+      "title": "TutorialCase",
+      "type": "object"
+    },
+    "TutorialLesson": {
+      "additionalProperties": false,
+      "properties": {
+        "lesson_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:/-]+$",
+          "title": "Lesson Id",
+          "type": "string"
+        },
+        "title": {
+          "maxLength": 512,
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "steps": {
+          "items": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 20,
+          "minItems": 1,
+          "title": "Steps",
+          "type": "array"
+        },
+        "view": {
+          "enum": [
+            "explanation",
+            "baseline"
+          ],
+          "title": "View",
+          "type": "string"
+        },
+        "requirements": {
+          "items": {
+            "$ref": "#/$defs/LessonRequirement"
+          },
+          "maxItems": 30,
+          "minItems": 1,
+          "title": "Requirements",
+          "type": "array"
+        },
+        "optional": {
+          "default": false,
+          "title": "Optional",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "lesson_id",
+        "title",
+        "steps",
+        "view",
+        "requirements"
+      ],
+      "title": "TutorialLesson",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "tutorial_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_.:/-]+$",
+      "title": "Tutorial Id",
+      "type": "string"
+    },
+    "version": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_.:/-]+$",
+      "title": "Version",
+      "type": "string"
+    },
+    "hash": {
+      "default": "",
+      "title": "Hash",
+      "type": "string"
+    },
+    "synthetic": {
+      "const": true,
+      "default": true,
+      "title": "Synthetic",
+      "type": "boolean"
+    },
+    "intro": {
+      "maxLength": 8000,
+      "minLength": 1,
+      "title": "Intro",
+      "type": "string"
+    },
+    "lessons": {
+      "items": {
+        "$ref": "#/$defs/TutorialLesson"
+      },
+      "maxItems": 20,
+      "minItems": 6,
+      "title": "Lessons",
+      "type": "array"
+    },
+    "assessment": {
+      "items": {
+        "$ref": "#/$defs/AssessmentItem"
+      },
+      "maxItems": 5,
+      "minItems": 5,
+      "title": "Assessment",
+      "type": "array"
+    },
+    "case": {
+      "$ref": "#/$defs/TutorialCase"
+    },
+    "practice_id": {
+      "default": "practice-case",
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_.:/-]+$",
+      "title": "Practice Id",
+      "type": "string"
+    },
+    "transfer_group": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_.:/-]+$",
+      "title": "Transfer Group",
+      "type": "string"
+    },
+    "assessment_version": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_.:/-]+$",
+      "title": "Assessment Version",
+      "type": "string"
+    },
+    "compatible_builds": {
+      "items": {
+        "maxLength": 128,
+        "minLength": 1,
+        "pattern": "^[A-Za-z0-9_.:/-]+$",
+        "type": "string"
+      },
+      "maxItems": 20,
+      "minItems": 1,
+      "title": "Compatible Builds",
+      "type": "array"
+    },
+    "completion_policy": {
+      "const": "all_required_actions_and_all_items_pass",
+      "default": "all_required_actions_and_all_items_pass",
+      "title": "Completion Policy",
+      "type": "string"
+    },
+    "grading": {
+      "patternProperties": {
+        "^[A-Za-z0-9_.:/-]+$": {
+          "$ref": "#/$defs/AssessmentRule"
+        }
+      },
+      "propertyNames": {
+        "maxLength": 128,
+        "minLength": 1
+      },
+      "title": "Grading",
+      "type": "object"
+    }
+  },
+  "required": [
+    "tutorial_id",
+    "version",
+    "intro",
+    "lessons",
+    "assessment",
+    "case",
+    "transfer_group",
+    "assessment_version",
+    "compatible_builds",
+    "grading"
+  ],
+  "title": "TutorialDefinition",
+  "type": "object"
+}

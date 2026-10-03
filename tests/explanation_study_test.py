@@ -770,7 +770,10 @@ def test_postgresql_real_restart_and_backup_restore(service, tmp_path):
     pgdata_path = Path(pgdata).resolve()
     dedicated_root = Path(__file__).resolve().parents[1] / "data/explanation-framework/postgres"
     if (
-        not (pgdata_path.is_relative_to(Path("/tmp")) or pgdata_path.is_relative_to(dedicated_root))
+        not (
+            pgdata_path.is_relative_to(Path("/tmp").resolve())
+            or pgdata_path.is_relative_to(dedicated_root)
+        )
         or not (pgdata_path / ".exact-synthetic-test-cluster").is_file()
     ):
         pytest.fail("Recovery requires an explicitly marked dedicated synthetic PostgreSQL cluster")
@@ -1337,9 +1340,14 @@ def test_study_openapi_has_strict_participant_outputs(service):
     app, _, _ = service
     schema = app.openapi()
     for route in ("/api/v1/study/session", "/api/v1/study/cases/{case_id}/submit"):
-        assert schema["paths"][route]["post"]["responses"]["200"]["content"]["application/json"][
-            "schema"
-        ] == {"$ref": "#/components/schemas/StudyState"}
+        response = schema["paths"][route]["post"]["responses"]["200"]["content"][
+            "application/json"
+        ]["schema"]
+        assert response["anyOf"] == [
+            {"$ref": "#/components/schemas/StudyState"},
+            {"$ref": "#/components/schemas/StudyStateV2"},
+        ]
+    assert schema["components"]["schemas"]["StudyStateV2"]["additionalProperties"] is False
     case = schema["components"]["schemas"]["StudyCase"]
     assert case["additionalProperties"] is False
     assert (
