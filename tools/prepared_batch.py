@@ -551,6 +551,10 @@ def run_recipe(path):
             previous_completion.unlink()
         os.environ.update(read(verified(recipe["environment"])))
         os.environ["EXACT_EVIDENCE_PREFETCH"] = "0"
+        if recipe.get("diagnostic"):
+            from tools.prepared_diagnostic import run_prepared_diagnostic
+
+            return run_prepared_diagnostic(path, registry)
         os.environ["OPENROUTER_API_KEY"] = (
             (Path(recipe["repository"]) / "api_key").read_text().strip()
         )
@@ -885,9 +889,14 @@ def prepare(root, batch, *, base_campaign, code, supervisor, environment_path, c
         recipe, root / "preview", read(supervisor / "registry.json"), completed=False
     )
     CampaignLock.model_validate(preview)
+    return prepare_launch(recipe, root, code, supervisor, batch)
+
+
+def prepare_launch(recipe, root, code, supervisor, batch):
+    """Share immutable Slurm receipt and storage guard wiring across worker types."""
     recipe_path = root / "recipe.json"
     write(recipe_path, recipe, immutable=True)
-    python = Path(recipe["repository"]) / ".venv/bin/python"
+    python = Path(recipe.get("python", str(Path(recipe["repository"]) / ".venv/bin/python")))
     worker = root / "worker-entry.sh"
     step_path = root / "step.json"
     worker.write_text(
