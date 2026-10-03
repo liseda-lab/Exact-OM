@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 // @ts-expect-error Node's direct TypeScript runner requires the explicit extension.
-import { contextBindingProblem, explanationProblem, inBatches, requiredContent, validateCapabilities, validateCase, workspaceCapabilities } from "./caseReadiness.ts";
+import { contextBindingProblem, contextProblem, explanationProblem, inBatches, renderExpectations, requiredContent, validateCapabilities, validateCase, workspaceCapabilities } from "./caseReadiness.ts";
 
 // The backend's actual serialized HTTP examples (S1 handoff), not hand-written shapes.
 const examples = JSON.parse(readFileSync(new URL("../../../docs/verification/explanation-integration-backend-examples.json", import.meta.url), "utf8")).examples;
@@ -95,7 +95,7 @@ test("terminal absence is usable; a dangling, mismatched or unknown result is no
   assert.equal(explanationProblem({ status: "not_exported", reason: "No resource was prepared for this selection" }, "entity_profile", [source]), null);
   assert.equal(explanationProblem({ status: "not_requested" }, "pair_comparison", [source, target]), null);
   assert.equal(explanationProblem({ status: "unverified" }, "pair_comparison", [source, target]), null);
-  const available = (task: string, entities: object[]) => ({ status: "available", explanation: { task, entities }, provenance: {}, factOntologies: [] }) as never;
+  const available = (task: string, entities: object[]) => ({ status: "available", explanation: { task, entities, claims: [] }, provenance: {}, factOntologies: [] }) as never;
   assert.equal(explanationProblem(available("pair_comparison", [source, target]), "pair_comparison", [source, target]), null);
   assert.match(explanationProblem(available("entity_profile", [source]), "pair_comparison", [source, target]) ?? "", /different task/);
   assert.match(explanationProblem(available("pair_comparison", [source, explanationCase.candidates[1].entity]), "pair_comparison", [source, target]) ?? "", /different entities/);
@@ -119,3 +119,45 @@ test("required reads run with capped concurrency and keep their order", async ()
   assert.ok(peak <= 3);
   assert.deepEqual(results.map((item: PromiseSettledResult<number>) => (item.status === "fulfilled" ? item.value : "failed")), [10, 20, 30, 40, "failed", 60, 70]);
 });
+
+const pageOf = (items: unknown[] = [], next_cursor: string | null = null) => ({ items, next_cursor, total_count: items.length, returned_count: items.length, truncated: Boolean(next_cursor), status: "available", reason: null, scope: {} });
+const validContext = (entity: object) => ({
+  artifact_type: "entity_context",
+  entity,
+  preferred_label: { status: "available", value: "x" },
+  labels: [],
+  definitions: pageOf(),
+  synonyms: pageOf(),
+  parents: pageOf(),
+  categories: { definitions: pageOf(), comments: pageOf([], "cursor") },
+  completeness: { scope: "root", extraction: "complete_for_policy", imports_complete: true },
+});
+
+test("a 200 context missing a required collection is unusable, not absent (R08)", () => {
+  const entity = explanationCase.source;
+  assert.equal(contextProblem(validContext(entity), entity), null);
+  for (const field of ["synonyms", "definitions", "parents", "categories", "completeness", "preferred_label", "labels"]) {
+    const broken = validContext(entity) as Record<string, unknown>;
+    delete broken[field];
+    assert.ok(contextProblem(broken, entity), `missing ${field}`);
+  }
+  const badPage = validContext(entity) as Record<string, any>;
+  badPage.categories.comments = { next_cursor: null };
+  assert.match(contextProblem(badPage, entity) ?? "", /categories are incomplete/);
+  assert.match(contextProblem(validContext(explanationCase.candidates[0].entity), entity) ?? "", /different entity/);
+  assert.match(contextProblem(null, entity) ?? "", /unreadable/);
+});
+
+test("render expectations follow the admitted components exactly (R09)", () => {
+  assert.deepEqual(renderExpectations(ALL), { cards: true, profiles: true, comparison: true });
+  assert.deepEqual(renderExpectations(new Set(["pair_comparison"] as const)), { cards: false, profiles: false, comparison: true });
+  assert.deepEqual(renderExpectations(new Set(["original_context"] as const)), { cards: true, profiles: false, comparison: false });
+  assert.deepEqual(renderExpectations(new Set(["entity_description"] as const)), { cards: true, profiles: true, comparison: false });
+  assert.deepEqual(renderExpectations(new Set(["hierarchy", "evidence_table", "evidence_graph"] as const)), { cards: false, profiles: false, comparison: false });
+  // The required reads match: descriptions and comparisons only when admitted.
+  const kinds = (components: Set<string>) => requiredContent(explanationCase, components as never, capabilities).map((item: { kind: string }) => item.kind);
+  assert.deepEqual([...new Set(kinds(new Set(["pair_comparison"])))], ["context", "comparison"]);
+  assert.deepEqual([...new Set(kinds(new Set(["entity_description"])))], ["context", "profile"]);
+  assert.deepEqual([...new Set(kinds(new Set(["hierarchy"])))], ["context"]);
+});
+

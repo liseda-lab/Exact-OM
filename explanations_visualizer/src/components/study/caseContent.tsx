@@ -1,12 +1,14 @@
 "use client";
 
-// Loads and validates one scored presentation, then reports its readiness (19 F11/F12):
-//   loading → (required content validated) → rendered → usable
+// Loads and validates one scored presentation, then reports its readiness (19 F11/F12/F18/F19):
+//   loading → (required content validated) → rendering → (admitted components rendered) → usable
 //   any required failure, incompatible service or lost session → blocked (retry keeps work)
 // v2 explanation cases read only their authorized scope through the shared API adapter;
 // a missing descriptor or incompatible capabilities block the case instead of selecting
 // another adapter. v1 keeps its explicitly selected legacy resource adapter. Baseline cases
-// make no workspace request. The focal reads are shared with the rendered workspace.
+// make no workspace request. The focal reads are validated before they are cached and are
+// shared with the rendered workspace. Every transition is tagged with its attempt, so a late
+// result can neither overwrite a blocked state nor ready another attempt.
 
 import { Component, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
@@ -14,11 +16,11 @@ import { ApiError, describeError, getJson, isAbort } from "@/lib/api";
 import { createApiSource, scopedRead } from "@/lib/workspace/apiSource";
 import { indexResources } from "@/lib/workspace/resourceIndex";
 import { createResourceSource } from "@/lib/workspace/resourceSource";
-import { contextKey, explanationKey, shareReads, type SharedSource } from "@/lib/workspace/sharedReads";
+import { shareReads, type SharedSource } from "@/lib/workspace/sharedReads";
 import type { WorkspaceSource } from "@/lib/workspace/types";
 import { useEntityContext, useExplanation } from "@/lib/workspace/WorkspaceContext";
 import type { EntityRef } from "@/lib/types";
-import { contextBindingProblem, explanationProblem, inBatches, requiredContent, validateCapabilities, validateCase, workspaceCapabilities, type CaseComponent, type ScopeCapabilities } from "@/study/caseReadiness";
+import { contextProblem, explanationProblem, inBatches, renderExpectations, requiredContent, validateCapabilities, validateCase, workspaceCapabilities, type CaseComponent, type ScopeCapabilities } from "@/study/caseReadiness";
 import type { ExplanationResource, StudyCase, StudyState } from "@/study/types";
 
 export interface ContentFailure {
@@ -26,28 +28,40 @@ export interface ContentFailure {
   detail: string;
 }
 
-export type CaseReadiness =
+export type CaseReadiness = { attempt: number } & (
   | { kind: "loading"; done: number; total: number }
   | { kind: "rendering" }
   | { kind: "usable" }
-  | { kind: "blocked"; cause: "service" | "content" | "session" | "render"; title: string; failures: ContentFailure[] };
+  | { kind: "blocked"; cause: "service" | "content" | "session" | "render"; title: string; failures: ContentFailure[] }
+);
+
+type Blocked = Extract<CaseReadiness, { kind: "blocked" }>;
 
 const CONCURRENCY = 4;
+const LOST_ACCESS = "This page no longer has access to the case.";
 
-function serviceFailure(error: unknown, what: string): CaseReadiness {
+function detailOf(error: unknown): string {
+  return error instanceof ApiError ? describeError(error) : error instanceof Error ? error.message : "The request failed.";
+}
+
+function failureFrom(error: unknown, what: string, attempt: number): Blocked {
   if (error instanceof ApiError && error.status === 503)
-    return { kind: "blocked", cause: "service", title: "The study service could not provide this case right now.", failures: [{ label: what, detail: error.message }] };
+    return { attempt, kind: "blocked", cause: "service", title: "The study service could not provide this case right now.", failures: [{ label: what, detail: error.message }] };
   if (error instanceof ApiError && (error.status === 401 || error.status === 403 || error.status === 409))
-    return { kind: "blocked", cause: "session", title: "This page no longer has access to the case.", failures: [{ label: what, detail: error.message }] };
-  return { kind: "blocked", cause: "content", title: "Part of this case could not be loaded.", failures: [{ label: what, detail: describeError(error) }] };
+    return { attempt, kind: "blocked", cause: "session", title: LOST_ACCESS, failures: [{ label: what, detail: error.message }] };
+  return { attempt, kind: "blocked", cause: "content", title: "Part of this case could not be loaded.", failures: [{ label: what, detail: detailOf(error) }] };
 }
 
 export function useCaseContent({ state, components, ontologyName, caseLabels }: { state: StudyState; components: Set<CaseComponent>; ontologyName: (id: string) => string; caseLabels: (current: StudyCase) => Record<string, string> }) {
   const binding = `${state.session_id}|${state.study_revision}|${state.current_case_id}|${state.current_presentation_id}`;
   const [studyCase, setStudyCase] = useState<StudyCase | null>(null);
   const [source, setSource] = useState<WorkspaceSource | null>(null);
-  const [readiness, setReadiness] = useState<CaseReadiness>({ kind: "loading", done: 0, total: 1 });
+  const [readiness, setReadiness] = useState<CaseReadiness>({ attempt: 0, kind: "loading", done: 0, total: 1 });
   const [attempt, setAttempt] = useState(0);
+  const attemptRef = useRef(0);
+  attemptRef.current = attempt;
+  const readinessRef = useRef(readiness);
+  readinessRef.current = readiness;
   const shared = useRef<{ key: string; source: SharedSource } | null>(null);
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -62,42 +76,51 @@ export function useCaseContent({ state, components, ontologyName, caseLabels }: 
   useEffect(() => {
     setStudyCase(null);
     setSource(null);
-    setReadiness({ kind: "loading", done: 0, total: 1 });
+    setReadiness({ attempt: attemptRef.current, kind: "loading", done: 0, total: 1 });
     return () => {
       shared.current?.source.close();
       shared.current = null;
     };
   }, [binding]);
 
+  /** Block the case, unless the blocking result belongs to an attempt that has been superseded. */
+  const block = useCallback((next: Blocked) => {
+    if (next.attempt !== attemptRef.current) return;
+    setReadiness(next);
+  }, []);
+
   useEffect(() => {
+    const mine = attempt;
     const controller = new AbortController();
-    const live = () => !controller.signal.aborted;
-    const block = (next: CaseReadiness) => live() && setReadiness(next);
+    const live = () => !controller.signal.aborted && attemptRef.current === mine;
     const session = stateRef.current.session_id;
+    // Only advance a state that this attempt still owns; never overwrite a block.
+    const advance = (next: CaseReadiness) =>
+      setReadiness((value) => (value.attempt === mine && (value.kind === "loading" || value.kind === "rendering") ? next : value));
     (async () => {
-      setReadiness((current) => (current.kind === "usable" ? current : { kind: "loading", done: 0, total: 1 }));
+      setReadiness({ attempt: mine, kind: "loading", done: 0, total: 1 });
       let current: StudyCase;
       try {
         current = await scopedRead<StudyCase>("/api/v1/study", "/cases/current", undefined, controller.signal, session);
       } catch (error) {
-        if (!isAbort(error)) block(serviceFailure(error, "The case"));
+        if (!isAbort(error) && live()) block(failureFrom(error, "The case", mine));
         return;
       }
       if (!live()) return;
       const { reject, block: blocking } = validateCase(stateRef.current, current);
       if (reject.length) {
         setStudyCase(null);
-        block({ kind: "blocked", cause: "service", title: "The study service sent a case that does not match this session.", failures: reject.map((detail) => ({ label: "The case", detail })) });
+        block({ attempt: mine, kind: "blocked", cause: "service", title: "The study service sent a case that does not match this session.", failures: reject.map((detail) => ({ label: "The case", detail })) });
         return;
       }
       setStudyCase(current);
       if (blocking.length) {
-        block({ kind: "blocked", cause: "service", title: "This case cannot be shown with this version of the study service.", failures: blocking.map((detail) => ({ label: "The case", detail })) });
+        block({ attempt: mine, kind: "blocked", cause: "service", title: "This case cannot be shown with this version of the study service.", failures: blocking.map((detail) => ({ label: "The case", detail })) });
         return;
       }
       const v2 = (current.contract_version ?? "exact-study/1.0") === "exact-study/2.0";
       if (current.condition !== "explanation") {
-        setReadiness({ kind: "rendering" });
+        advance({ attempt: mine, kind: "rendering" });
         return;
       }
       if (!v2) {
@@ -115,9 +138,9 @@ export function useCaseContent({ state, components, ontologyName, caseLabels }: 
               ontologyName: (id) => namesRef.current(id),
             }),
           );
-          setReadiness({ kind: "rendering" });
+          advance({ attempt: mine, kind: "rendering" });
         } catch (error) {
-          if (!isAbort(error)) block(serviceFailure(error, "The prepared explanations"));
+          if (!isAbort(error) && live()) block(failureFrom(error, "The prepared explanations", mine));
         }
         return;
       }
@@ -127,67 +150,74 @@ export function useCaseContent({ state, components, ontologyName, caseLabels }: 
       try {
         caps = await scopedRead<ScopeCapabilities>(base, "/capabilities", undefined, controller.signal, session);
       } catch (error) {
-        if (!isAbort(error)) block(serviceFailure(error, "The case's workspace"));
+        if (!isAbort(error) && live()) block(failureFrom(error, "The case's workspace", mine));
         return;
       }
       if (!live()) return;
       const incompatible = validateCapabilities(caps, { scopeId: scope, studyRevision: stateRef.current.study_revision, current, components: componentsRef.current });
       if (incompatible.length) {
-        block({ kind: "blocked", cause: "service", title: "The study service described a workspace that does not match this case.", failures: incompatible.map((detail) => ({ label: "The case's workspace", detail })) });
+        block({ attempt: mine, kind: "blocked", cause: "service", title: "The study service described a workspace that does not match this case.", failures: incompatible.map((detail) => ({ label: "The case's workspace", detail })) });
         return;
       }
       const key = `study|${session}|${current.study_revision}|${current.presentation_id}|${scope}|${caps.policy_hash}`;
       if (shared.current?.key !== key) {
         shared.current?.source.close();
         const api = createApiSource({ key, base, sessionId: session, kind: "study_resource", capabilities: workspaceCapabilities(caps, (id) => namesRef.current(id)), ontologyName: (id) => namesRef.current(id) });
+        // A refused optional read (for example a restricted resource) is local; only a
+        // refusal of the scope itself means the session or policy no longer permits the case.
+        const suspect = (error: unknown) => {
+          const lost = () => block({ attempt: attemptRef.current, kind: "blocked", cause: "session", title: LOST_ACCESS, failures: [{ label: "Your session", detail: error instanceof Error ? error.message : "Access changed." }] });
+          if (error instanceof ApiError && error.status !== 403) return lost();
+          scopedRead(base, "/capabilities", undefined, undefined, session).then(
+            () => undefined,
+            (check) => {
+              if (check instanceof ApiError && [401, 403, 409].includes(check.status)) lost();
+            },
+          );
+        };
         shared.current = {
           key,
-          source: shareReads(api, (error) =>
-            setReadiness({ kind: "blocked", cause: "session", title: "This page no longer has access to the case.", failures: [{ label: "Your session", detail: error instanceof Error ? error.message : "Access changed." }] }),
-          ),
+          source: shareReads(api, {
+            onSuspect: suspect,
+            validateContext: (entity, value) => contextProblem(value, entity),
+            validateExplanation: (task, entities, value) => explanationProblem(value, task, entities),
+          }),
         };
       }
       const reads = shared.current.source;
       const required = requiredContent(current, componentsRef.current, caps);
       let done = 0;
-      setReadiness((value) => (value.kind === "usable" ? value : { kind: "loading", done, total: required.length }));
+      advance({ attempt: mine, kind: "loading", done, total: required.length });
       const results = await inBatches(required, CONCURRENCY, async (item) => {
-        if (item.kind === "context") {
-          const ctx = await reads.entityContext(item.entities[0], controller.signal);
-          const problem = contextBindingProblem(ctx, item.entities[0]);
-          if (problem) {
-            reads.forget("context", contextKey(item.entities[0]));
-            throw new Error(problem);
-          }
-        } else {
-          const task = item.kind === "profile" ? "entity_profile" : "pair_comparison";
-          const result = await reads.explanation(task, item.entities, controller.signal);
-          const problem = explanationProblem(result, task, item.entities);
-          if (problem) {
-            reads.forget("explanation", explanationKey(task, item.entities));
-            throw new Error(problem);
-          }
-        }
+        if (item.kind === "context") await reads.entityContext(item.entities[0], controller.signal);
+        else await reads.explanation(item.kind === "profile" ? "entity_profile" : "pair_comparison", item.entities, controller.signal);
         done += 1;
-        if (live()) setReadiness((value) => (value.kind === "loading" ? { kind: "loading", done, total: required.length } : value));
+        if (live()) advance({ attempt: mine, kind: "loading", done, total: required.length });
       });
-      if (!live()) return;
-      const failures = results.flatMap((result, index): ContentFailure[] => (result.status === "rejected" && !isAbort(result.reason) ? [{ label: required[index].label, detail: result.reason instanceof ApiError ? describeError(result.reason) : (result.reason as Error).message }] : []));
-      if (results.some((result) => result.status === "rejected" && isAbort(result.reason))) return;
+      if (!live() || results.some((result) => result.status === "rejected" && isAbort(result.reason))) return;
       setSource(reads);
+      const failures = results.flatMap((result, index): ContentFailure[] => (result.status === "rejected" ? [{ label: required[index].label, detail: detailOf(result.reason) }] : []));
       if (failures.length) {
         const lost = results.find((result) => result.status === "rejected" && result.reason instanceof ApiError && [401, 403, 409].includes(result.reason.status));
-        block({ kind: "blocked", cause: lost ? "session" : "content", title: lost ? "This page no longer has access to the case." : "Part of this case could not be loaded.", failures });
+        block({ attempt: mine, kind: "blocked", cause: lost ? "session" : "content", title: lost ? LOST_ACCESS : "Part of this case could not be loaded.", failures });
         return;
       }
-      setReadiness((value) => (value.kind === "usable" ? value : { kind: "rendering" }));
+      advance({ attempt: mine, kind: "rendering" });
     })();
     return () => controller.abort();
-  }, [binding, attempt]);
+  }, [binding, attempt, block]);
 
-  const retry = useCallback(() => setAttempt((value) => value + 1), []);
-  const rendered = useCallback(() => setReadiness((value) => (value.kind === "rendering" ? { kind: "usable" } : value)), []);
-  const renderFailed = useCallback((error: unknown) => setReadiness({ kind: "blocked", cause: "render", title: "This case's information could not be displayed.", failures: [{ label: "The case display", detail: error instanceof Error ? error.message : "The display did not finish." }] }), []);
+  const retry = useCallback(() => {
+    // After a render failure the culprit is unknown: refetch every focal read rather than
+    // re-rendering a cached response that may be unusable.
+    if (readinessRef.current.kind === "blocked" && readinessRef.current.cause === "render") shared.current?.source.reset();
+    setAttempt((value) => value + 1);
+  }, []);
+  const rendered = useCallback((forAttempt: number) => setReadiness((value) => (value.kind === "rendering" && value.attempt === forAttempt ? { attempt: forAttempt, kind: "usable" } : value)), []);
+  const renderFailed = useCallback(
+    (error: unknown) => block({ attempt: attemptRef.current, kind: "blocked", cause: "render", title: "This case's information could not be displayed.", failures: [{ label: "The case display", detail: error instanceof Error ? error.message : "The display did not finish." }] }),
+    [block],
+  );
   return { studyCase, source, readiness, retry, rendered, renderFailed, attempt };
 }
 
@@ -206,19 +236,21 @@ export class WorkspaceBoundary extends Component<{ onError: (error: unknown) => 
 }
 
 /**
- * Confirms that the shown pair rendered from validated data: the same reads the cards use
- * have settled, and the cards are no longer marked busy. Reports once per mount.
+ * Confirms that the shown pair rendered from validated data, exactly as far as the frozen
+ * condition displays it (19 F19): the question always, both entity cards only when original
+ * context or descriptions are admitted, descriptions only when admitted, and the comparison
+ * only when admitted. Reports once per mount, for the attempt that mounted it.
  */
-export function RenderProbe({ source, target, components, onRendered, onStalled }: { source: EntityRef; target: EntityRef; components: Set<CaseComponent>; onRendered: () => void; onStalled: () => void }) {
+export function RenderProbe({ source, target, components, attempt, onRendered, onStalled }: { source: EntityRef; target: EntityRef; components: Set<CaseComponent>; attempt: number; onRendered: (attempt: number) => void; onStalled: () => void }) {
+  const expected = renderExpectations(components);
   const sourceCtx = useEntityContext(source);
   const targetCtx = useEntityContext(target);
   const pair = useMemo(() => [source, target], [source, target]);
   const one = useMemo(() => [source], [source]);
   const other = useMemo(() => [target], [target]);
-  const profiles = components.has("entity_description");
-  const sourceProfile = useExplanation("entity_profile", profiles ? one : null);
-  const targetProfile = useExplanation("entity_profile", profiles ? other : null);
-  const comparison = useExplanation("pair_comparison", components.has("pair_comparison") ? pair : null);
+  const sourceProfile = useExplanation("entity_profile", expected.profiles ? one : null);
+  const targetProfile = useExplanation("entity_profile", expected.profiles ? other : null);
+  const comparison = useExplanation("pair_comparison", expected.comparison ? pair : null);
   const settled = [sourceCtx, targetCtx, sourceProfile, targetProfile, comparison].every((item) => !item.loading && !item.error) && Boolean(sourceCtx.data && targetCtx.data);
   const reported = useRef(false);
   useEffect(() => {
@@ -227,11 +259,15 @@ export function RenderProbe({ source, target, components, onRendered, onStalled 
     const started = performance.now();
     const check = () => {
       const page = document.querySelector(".case-page");
+      const question = Boolean(page?.querySelector(".pair-question"));
       const cards = page?.querySelectorAll(".card-pair .entity-card").length ?? 0;
-      const busy = page?.querySelector(".card-pair .skeleton-block, .card-pair [aria-busy='true'], .comparison [aria-busy='true']");
-      if (cards === 2 && !busy) {
+      const cardsBusy = Boolean(page?.querySelector(".card-pair .skeleton-block, .card-pair [aria-busy='true']"));
+      const comparisonShown = Boolean(page?.querySelector(".comparison"));
+      const comparisonBusy = Boolean(page?.querySelector(".comparison [aria-busy='true']"));
+      const ready = question && (expected.cards ? cards === 2 && !cardsBusy : cards === 0) && (expected.comparison ? comparisonShown && !comparisonBusy : !comparisonShown);
+      if (ready) {
         reported.current = true;
-        onRendered();
+        onRendered(attempt);
         return;
       }
       if (performance.now() - started > 10_000) {
@@ -243,6 +279,6 @@ export function RenderProbe({ source, target, components, onRendered, onStalled 
     };
     frame = requestAnimationFrame(check);
     return () => cancelAnimationFrame(frame);
-  }, [settled, onRendered, onStalled]);
+  }, [settled, onRendered, onStalled, attempt, expected.cards, expected.comparison]);
   return null;
 }

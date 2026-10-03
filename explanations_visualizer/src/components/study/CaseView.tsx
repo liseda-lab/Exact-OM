@@ -94,11 +94,11 @@ function ReadinessNote({ readiness, onRetry }: { readiness: CaseReadiness; onRet
 }
 
 /** Baseline cases need no workspace; they are usable once their identity cards render. */
-function BaselineRendered({ onRendered }: { onRendered: () => void }) {
+function BaselineRendered({ attempt, onRendered }: { attempt: number; onRendered: (attempt: number) => void }) {
   useEffect(() => {
-    const frame = requestAnimationFrame(onRendered);
+    const frame = requestAnimationFrame(() => onRendered(attempt));
     return () => cancelAnimationFrame(frame);
-  }, [onRendered]);
+  }, [attempt, onRendered]);
   return null;
 }
 
@@ -255,6 +255,9 @@ export function CaseView({ state, session, telemetry, timingEnabled = true }: { 
   if (!studyCase) return readiness.kind === "blocked" ? <ReadinessNote readiness={readiness} onRetry={content.retry} /> : <Skeleton lines={6} />;
 
   const explanation = studyCase.condition === "explanation";
+  // Generated descriptions exist only for the source and its five candidates; never request others.
+  const focal = new Set([studyCase.source, ...studyCase.candidates.map((candidate) => candidate.entity)].map((entity) => `${entity.ontology_version_id}|${entity.kind}|${entity.iri}`));
+  const isFocal = (entity: EntityRef) => focal.has(`${entity.ontology_version_id}|${entity.kind}|${entity.iri}`);
   const inspected = studyCase.candidates.find((candidate) => candidate.candidate_id === inspecting) ?? studyCase.candidates[0];
   const inspect = (id: string) => {
     setInspecting(id);
@@ -276,8 +279,11 @@ export function CaseView({ state, session, telemetry, timingEnabled = true }: { 
     </div>
   );
 
+  // While blocked the workspace is not shown: nothing re-reads a failed dependency behind the
+  // participant's back, and Retry is the one path that refetches it (19 F18). The answer,
+  // inspected candidate, focus, tab and cached usable content are all kept.
   const workspace = explanation ? (
-    source ? (
+    source && readiness.kind !== "blocked" ? (
       <WorkspaceProvider source={source} onAction={onAction}>
         <WorkspaceBoundary key={content.attempt} onError={content.renderFailed}>
           <PairWorkspace
@@ -295,9 +301,10 @@ export function CaseView({ state, session, telemetry, timingEnabled = true }: { 
             header={question}
             cardTitles={{ source: "Source concept", target: `Candidate · initial position ${inspected.display_position}` }}
             compactCards
+            profileAllowed={isFocal}
           />
           {readiness.kind === "rendering" && (
-            <RenderProbe source={studyCase.source} target={inspected.entity} components={components} onRendered={content.rendered} onStalled={() => content.renderFailed(new Error("The case display did not finish."))} />
+            <RenderProbe source={studyCase.source} target={inspected.entity} components={components} attempt={readiness.attempt} onRendered={content.rendered} onStalled={() => content.renderFailed(new Error("The case display did not finish."))} />
           )}
         </WorkspaceBoundary>
       </WorkspaceProvider>
@@ -322,7 +329,7 @@ export function CaseView({ state, session, telemetry, timingEnabled = true }: { 
         <ResourceList resources={state.ontology_resources} compact onDownload={(asset) => telemetry.emit("external_resource_link", { component: "downloads", element: asset })} />
         <p className="meta">Time you spend inspecting before you submit counts as part of this case. Switching windows does not pause anything.</p>
       </section>
-      {readiness.kind === "rendering" && <BaselineRendered onRendered={content.rendered} />}
+      {readiness.kind === "rendering" && <BaselineRendered attempt={readiness.attempt} onRendered={content.rendered} />}
     </div>
   );
 

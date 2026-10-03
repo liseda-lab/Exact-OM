@@ -159,11 +159,47 @@ export function contextBindingProblem(ctx: { entity?: unknown } | null | undefin
   return identity(ctx.entity) === identity(entity) ? null : "The response describes a different entity.";
 }
 
+const isPage = (value: unknown): boolean => {
+  const page = value as { items?: unknown; next_cursor?: unknown } | null;
+  return Boolean(page) && typeof page === "object" && Array.isArray(page!.items) && (page!.next_cursor == null || typeof page!.next_cursor === "string");
+};
+
+/**
+ * The structure the description view needs from an entity context (19 F18): identity,
+ * label, the definition/synonym/parent pages, every category page and completeness.
+ * A 200 response missing any of these is a failure, never a usable or absent result.
+ */
+export function contextProblem(ctx: unknown, entity: EntityRef): string | null {
+  const value = ctx as Record<string, unknown> | null;
+  if (!value || typeof value !== "object") return "The response is unreadable.";
+  const binding = contextBindingProblem(value as { entity?: unknown }, entity);
+  if (binding) return binding;
+  const label = value.preferred_label as { status?: unknown } | null;
+  if (!label || typeof label !== "object" || typeof label.status !== "string") return "The response has no label record.";
+  if (!Array.isArray(value.labels)) return "The response has no label list.";
+  for (const name of ["definitions", "synonyms", "parents"]) if (!isPage(value[name])) return `The response has no ${name} page.`;
+  const categories = value.categories as Record<string, unknown> | null;
+  if (!categories || typeof categories !== "object" || Object.values(categories).some((page) => !isPage(page))) return "The response's fact categories are incomplete.";
+  const completeness = value.completeness as { scope?: unknown } | null;
+  if (!completeness || typeof completeness !== "object" || typeof completeness.scope !== "string") return "The response has no completeness record.";
+  return null;
+}
+
+/** What the frozen condition renders and readiness must therefore see rendered (19 F19). */
+export function renderExpectations(components: Set<CaseComponent>) {
+  return {
+    cards: components.has("original_context") || components.has("entity_description"),
+    profiles: components.has("entity_description"),
+    comparison: components.has("pair_comparison"),
+  };
+}
+
 /** Terminal honest statuses are usable; anything else is a failure. */
 export function explanationProblem(result: ExplanationResult | null | undefined, task: "entity_profile" | "pair_comparison", entities: EntityRef[]): string | null {
   if (!result || typeof result !== "object") return "The response is unreadable.";
   if (result.status === "unverified" || result.status === "not_requested" || result.status === "not_exported") return null;
   if (result.status !== "available") return "The response has an unknown status.";
+  if (!result.explanation || typeof result.explanation !== "object" || !Array.isArray(result.explanation.claims) || !Array.isArray(result.explanation.entities)) return "The response is missing its claims or entities.";
   if (result.explanation.task !== task) return "The response is for a different task.";
   const wanted = new Set(entities.map(identity));
   const subjects = Array.isArray(result.explanation.entities) ? result.explanation.entities.filter(isEntity).map(identity) : [];
