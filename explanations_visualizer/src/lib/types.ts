@@ -137,7 +137,8 @@ export interface Fact {
   synonym_scope?: string | null;
   availability?: Availability;
   reason?: string;
-  hierarchy_projection?: { child: EntityRef; parent: EntityRef; basis: string };
+  /** The hierarchy edge a parent fact projects to; `id` is the edge identity used by continuations. */
+  hierarchy_projection?: { id?: string; child: EntityRef; parent: EntityRef; basis: string };
 }
 
 export interface EntityContext {

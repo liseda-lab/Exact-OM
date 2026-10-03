@@ -551,6 +551,8 @@ export function EvidenceGraph({
         return;
       }
       setExpansions((list) => [...list, { nodes, edges }]);
+      // The graph is bounded; never imply that a first page is all of a node's parents.
+      if (page.next_cursor) setExpandError(`Added ${edges.length}${page.total_count != null ? ` of ${page.total_count}` : ""} parents; more are recorded. The hierarchy view lists them all.`);
     } catch {
       setExpandError("Parents could not be loaded.");
     }
