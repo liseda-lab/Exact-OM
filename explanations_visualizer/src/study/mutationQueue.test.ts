@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 // @ts-expect-error Node's direct TypeScript runner requires the explicit extension.
-import { MutationQueue, type PendingMutation, type QueueState } from "./mutationQueue.ts";
+import { MutationQueue, OUTBOX_ROUTE, type PendingMutation, type QueueState } from "./mutationQueue.ts";
 
 const state = { session_id: "session-a", revision: 0 };
 const draft = (value: string) => ({ method: "PUT" as const, path: "/api/v1/study/cases/c/draft", body: { value }, coalesce: "draft:c" });
@@ -122,4 +122,26 @@ test("edits during a conflict refresh are archived without retrying against stal
   assert.equal(writes, 1);
   assert.deepEqual(archives.map((value) => JSON.parse(value).entries[0].body.value), ["original conflict", "typed during refresh"]);
   assert.equal(queue.size, 0);
+});
+
+test("the outbox accepts the planned v2 participant routes and nothing else (F8)", () => {
+  for (const path of ["/api/v1/study/tutorial/progress", "/api/v1/study/tutorial/assessment", "/api/v1/study/tutorial/complete", "/api/v1/study/cases/c-1/consultation/draft", "/api/v1/study/cases/c-1/consultation", "/api/v1/study/setup"]) {
+    assert.ok(OUTBOX_ROUTE.test(path), path);
+  }
+  for (const path of ["/api/v1/study/admin", "/api/v1/admin/studies/x", "/api/v1/study/tutorial/grade", "/api/v1/study/cases/c/consultation/draft/x", "/api/v1/study/resources/r"]) {
+    assert.equal(OUTBOX_ROUTE.test(path), false, path);
+  }
+});
+
+test("a draft never coalesces across an assessment attempt or a final consultation save", async () => {
+  const f = fixture(() => new Promise(() => undefined));
+  const progress = (value: string) => ({ method: "PUT" as const, path: "/api/v1/study/tutorial/progress", body: { value }, coalesce: "tutorial:item:q1" });
+  void f.queue.enqueue(progress("draft one")).catch(() => undefined);
+  void f.queue.enqueue({ method: "POST", path: "/api/v1/study/tutorial/assessment", body: { attempt_id: "a1" } }).catch(() => undefined);
+  void f.queue.enqueue(progress("draft two")).catch(() => undefined);
+  void f.queue.enqueue(progress("draft three")).catch(() => undefined);
+  const stored = JSON.parse(f.saved()!);
+  assert.deepEqual(stored.entries.map((entry: PendingMutation) => entry.body.value ?? entry.body.attempt_id), ["draft one", "a1", "draft three"]);
+  assert.deepEqual(stored.entries.map((entry: PendingMutation) => entry.expected), [0, 1, 2]);
+  f.queue.stop();
 });

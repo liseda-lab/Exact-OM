@@ -1,14 +1,18 @@
 "use client";
 
 // Prepared generated text, visibly distinct from original ontology statements. Only
-// explanations that passed grounding are shown; every claim links to its cited facts.
+// explanations that passed grounding are shown; every claim cites the original records it
+// rests on, and each citation opens that exact record.
 
 import { useState } from "react";
 
 import { ErrorNote } from "@/components/common/ErrorNote";
-import { ApiError, getJson } from "@/lib/api";
-import type { Claim, ExplanationSummary, GeneratedExplanation, Page } from "@/lib/types";
-import { useAsync } from "@/lib/useAsync";
+import { useFactInspector } from "@/components/workspace/FactInspector";
+import { useSideOf } from "@/lib/workspace/WorkspaceContext";
+import { shortHash } from "@/lib/iri";
+import type { Claim, EntityRef } from "@/lib/types";
+import type { AsyncState } from "@/lib/useAsync";
+import type { ExplanationProvenance, ExplanationResult } from "@/lib/workspace/types";
 
 export interface CitedFact {
   label: string;
@@ -30,48 +34,46 @@ export function claimCategoryName(category: string): string {
   return CATEGORY_NAMES[category] ?? category.replace(/_/g, " ");
 }
 
-export async function findExplanations(
-  params: Record<string, string | undefined>,
-  signal?: AbortSignal,
-): Promise<ExplanationSummary[]> {
-  const page = await getJson<Page<ExplanationSummary>>("/api/v1/explanations", { ...params, limit: 100 }, signal);
-  return page.items;
-}
-
-/** Loads the validated explanation for a selection, reporting absence and review state. */
-export function useExplanation(key: string | null, params: Record<string, string | undefined> | null) {
-  return useAsync(key, async (signal) => {
-    const items = await findExplanations(params ?? {}, signal);
-    if (!items.length) return { status: "not_requested" as const };
-    const chosen = items.find((item) => item.grounding_status === "validated") ?? items[0];
-    if (chosen.grounding_status !== "validated") return { status: "unverified" as const, summary: chosen };
-    try {
-      const explanation = await getJson<GeneratedExplanation>(`/api/v1/explanations/${encodeURIComponent(chosen.explanation_id)}`, undefined, signal);
-      return { status: "available" as const, explanation };
-    } catch (error) {
-      if (error instanceof ApiError && error.code === "explanation_unverified") return { status: "unverified" as const, summary: chosen };
-      throw error;
-    }
-  });
-}
-
-export function Citations({ claim, cite }: { claim: Claim; cite: (factId: string) => CitedFact | undefined }) {
+export function Citations({
+  claim,
+  ontologies,
+  subject,
+  cite,
+}: {
+  claim: Claim;
+  ontologies: string[];
+  subject?: EntityRef | null;
+  cite: (factId: string) => CitedFact | undefined;
+}) {
+  const inspector = useFactInspector();
+  const sideOf = useSideOf();
   if (!claim.fact_ids.length) return null;
   return (
     <span className="citations">
-      {claim.fact_ids.map((factId) => {
+      {claim.fact_ids.map((factId, index) => {
         const fact = cite(factId);
+        const label = fact?.label ?? (claim.fact_ids.length > 1 ? `cited fact ${index + 1}` : "cited fact");
+        // Look the record up in the ontology of the side it was cited from first.
+        const ordered = fact?.side ? [...ontologies].sort((a, b) => Number(sideOf(b) === fact.side) - Number(sideOf(a) === fact.side)) : ontologies;
         return (
-          <a key={factId} href={`#fact-${factId.slice(7, 19)}`} className={`citation ${fact?.side ? `citation-${fact.side}` : ""}`} title={factId}>
-            {fact?.label ?? "cited fact"}
-          </a>
+          <button
+            key={factId}
+            type="button"
+            className={`citation ${fact?.side ? `citation-${fact.side}` : ""}`}
+            aria-label={`Open the cited original record: ${label}`}
+            title={`Reference ${shortHash(factId, 12)}`}
+            onClick={() => inspector?.open({ factId, ontologies: ordered, subject: subject ?? null }, label)}
+            disabled={!inspector}
+          >
+            {label}
+          </button>
         );
       })}
     </span>
   );
 }
 
-export function ProvenanceDetails({ explanation }: { explanation: GeneratedExplanation }) {
+export function ProvenanceDetails({ provenance }: { provenance: ExplanationProvenance }) {
   const [open, setOpen] = useState(false);
   return (
     <div className="provenance">
@@ -80,25 +82,51 @@ export function ProvenanceDetails({ explanation }: { explanation: GeneratedExpla
       </button>
       {open && (
         <dl className="provenance-list">
-          <div>
-            <dt>Model requested</dt>
-            <dd>{explanation.manifest.requested_model}</dd>
-          </div>
-          <div>
-            <dt>Model returned</dt>
-            <dd>{explanation.manifest.returned_model ?? "not recorded"}</dd>
-          </div>
-          <div>
-            <dt>Provider</dt>
-            <dd>{explanation.manifest.provider ?? "not recorded"}</dd>
-          </div>
+          {provenance.kind === "manifest" ? (
+            <>
+              <div>
+                <dt>Model requested</dt>
+                <dd>{provenance.requestedModel || "not recorded"}</dd>
+              </div>
+              <div>
+                <dt>Model returned</dt>
+                <dd>{provenance.returnedModel ?? "not recorded"}</dd>
+              </div>
+              <div>
+                <dt>Provider</dt>
+                <dd>{provenance.provider ?? "not recorded"}</dd>
+              </div>
+              <div>
+                <dt>Language</dt>
+                <dd>{provenance.language || "not recorded"}</dd>
+              </div>
+            </>
+          ) : (
+            <>
+              <div>
+                <dt>Prepared</dt>
+                <dd>{provenance.synthetic ? "Authored synthetic practice text; no model or matcher was run" : "Before the study, frozen with its publication; nothing is generated while you take part"}</dd>
+              </div>
+              {provenance.manifestHashes && provenance.manifestHashes.length > 0 && (
+                <div>
+                  <dt>Generation record</dt>
+                  <dd className="mono">{provenance.manifestHashes.map((hash) => shortHash(hash, 12)).join(", ")}</dd>
+                </div>
+              )}
+              {provenance.claimGrounding && (
+                <div>
+                  <dt>Claim checks</dt>
+                  <dd>
+                    {Object.values(provenance.claimGrounding).filter((value) => value === "exact_extract").length} exact quotations ·{" "}
+                    {Object.values(provenance.claimGrounding).filter((value) => value === "semantic_template").length} fixed comparison templates
+                  </dd>
+                </div>
+              )}
+            </>
+          )}
           <div>
             <dt>Grounding</dt>
-            <dd>{explanation.grounding_status}</dd>
-          </div>
-          <div>
-            <dt>Language</dt>
-            <dd>{explanation.manifest.language}</dd>
+            <dd>{provenance.grounding}</dd>
           </div>
         </dl>
       )}
@@ -108,27 +136,27 @@ export function ProvenanceDetails({ explanation }: { explanation: GeneratedExpla
 
 export function GeneratedProfile({
   state,
+  subject,
   cite,
 }: {
-  state: ReturnType<typeof useExplanation>;
+  state: AsyncState<ExplanationResult>;
+  subject: EntityRef;
   cite: (factId: string) => CitedFact | undefined;
 }) {
   if (state.error) return <ErrorNote error={state.error} onRetry={state.reload} what="Generated description" />;
   if (!state.data) return <div className="generated generated-loading" aria-busy="true" />;
   const data = state.data;
-  if (data.status === "not_requested") {
+  if (data.status !== "available") {
+    const text =
+      data.status === "unverified"
+        ? "A generated description exists but has not passed grounding review, so it is not shown."
+        : data.status === "not_exported"
+          ? data.reason
+          : "No generated description was prepared for this entity. The original facts above are complete for the loaded scope.";
     return (
       <section className="generated generated-empty" aria-label="Generated description">
         <h3 className="generated-title">Generated description</h3>
-        <p className="meta">No generated description was prepared for this entity. The original facts above are complete for the loaded scope.</p>
-      </section>
-    );
-  }
-  if (data.status === "unverified") {
-    return (
-      <section className="generated generated-empty" aria-label="Generated description">
-        <h3 className="generated-title">Generated description</h3>
-        <p className="meta">A generated description exists but has not passed grounding review, so it is not shown.</p>
+        <p className="meta">{text}</p>
       </section>
     );
   }
@@ -148,7 +176,7 @@ export function GeneratedProfile({
           <li key={claim.claim_id ?? index} className="claim">
             <span className="claim-category">{claimCategoryName(claim.category)}</span>
             <span className="claim-text">{claim.text}</span>
-            <Citations claim={claim} cite={cite} />
+            <Citations claim={claim} ontologies={data.factOntologies} subject={subject} cite={cite} />
           </li>
         ))}
       </ul>
@@ -159,7 +187,7 @@ export function GeneratedProfile({
           ))}
         </ul>
       )}
-      <ProvenanceDetails explanation={explanation} />
+      <ProvenanceDetails provenance={data.provenance} />
     </section>
   );
 }

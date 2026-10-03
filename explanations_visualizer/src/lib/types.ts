@@ -311,6 +311,10 @@ export interface Axiom {
   interpretation: { kind: string; scope: string };
   availability: Availability;
   ast: OwlNode;
+  origins?: { document_key: string; source_sha256: string; span: Record<string, unknown> | null }[];
+  original_axiom_digest?: string;
+  /** Canonical stored bytes (base64); never shown as human-readable syntax. */
+  original_syntax?: string | null;
   original_availability: Availability;
   original_format: string;
   rendering: { status: Availability; text: string };

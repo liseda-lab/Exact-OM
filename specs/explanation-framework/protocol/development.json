@@ -135,21 +135,34 @@
     "shared_engine": true
   },
   "study": {
-    "spec_revision": "2026-09-20",
+    "spec_revision": "2026-10-02",
     "protocol": "study-design.json",
     "case_count_is_configurable": true,
     "anonymous_no_participant_account": true,
     "reusable_invitation_resume": true,
     "state_backend": "postgresql",
     "external_setup_required": [
-      "protege",
-      "source_ontology",
-      "target_ontology"
+      "source_ontology_available",
+      "target_ontology_available"
     ],
     "per_case_consultation": true,
     "mixed_case_types": true,
     "frontend_includes_full_survey": true,
     "invitation_exchange_is_replay_safe": true,
-    "researcher_key_separate": true
+    "researcher_key_separate": true,
+    "recommended_external_tool": "protege",
+    "named_external_tool_required": false
+  },
+  "sequence_scope": "original_bootstrap_only",
+  "corrective_iteration": {
+    "spec_revision": "2026-10-02",
+    "authority": "../14-corrective-programme.md",
+    "sequence": [
+      "frontend_workflow_and_contract_inventory",
+      "joint_contract_freeze",
+      "backend_corrections_and_frontend_integration",
+      "joint_acceptance"
+    ],
+    "waives_backend_or_launch_gates": false
   }
 }

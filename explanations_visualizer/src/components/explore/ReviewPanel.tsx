@@ -51,7 +51,7 @@ export function ReviewPanel({ packageId, pairId }: { packageId: string; pairId: 
         <h2 id="review-h" className="eyebrow">
           Your review
         </h2>
-        <span className="meta">Saved in this browser</span>
+        <span className="meta">Only in this browser</span>
       </div>
       <div className="field">
         <label htmlFor="review-relation" className="muted">
@@ -73,7 +73,7 @@ export function ReviewPanel({ packageId, pairId }: { packageId: string; pairId: 
         ))}
       </div>
       <p className="meta" aria-live="polite">
-        {review?.action ? `${ACTION_TEXT[review.action]}. ` : ""}Your review does not change Exact&apos;s saved result.
+        {review?.action ? `${ACTION_TEXT[review.action]}. ` : ""}Your review does not change Exact&apos;s saved result. It is stored only in this browser for this bundle: it is not sent anywhere, and clearing site data or using another browser loses it.
       </p>
     </section>
   );

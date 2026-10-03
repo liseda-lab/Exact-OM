@@ -38,6 +38,42 @@ async function welcome(page: Page) {
   await expect(page.getByRole("heading", { level: 1, name: /^Welcome,/ })).toBeVisible();
   await expect(page.getByRole("region", { name: "Participant information and consent text" })).toBeVisible();
 }
+/** A v1 test session advanced to its first scored case through the participant API. */
+async function caseReady(page: Page) {
+  const issued = await page.request.post(`${study!.origin}/api/v1/admin/studies/${encodeURIComponent(study!.study_revision)}/invitations`, {
+    headers: { Authorization: `Bearer ${study!.researcher_token}` }, data: { count: 1, test: true },
+  });
+  const invitation = (await issued.json()).invitations[0].invitation as string;
+  const secret = new URLSearchParams(invitation.split("#")[1]).get("invite");
+  let state = await (await page.request.post(`${study!.origin}/api/v1/study/session`, { headers: { Origin: study!.origin }, data: { secret } })).json();
+  const mutate = async (path: string, body: Record<string, unknown>) => {
+    const response = await page.request.fetch(`${study!.origin}/api/v1/study/${path}`, {
+      method: "PUT", headers: { Origin: study!.origin, "X-Study-Session": state.session_id },
+      data: { ...body, expected_revision: state.revision, idempotency_key: crypto.randomUUID() },
+    });
+    expect(response.ok()).toBe(true);
+    state = await response.json();
+  };
+  await mutate("consent", { information_version: state.information_version, accepted: true });
+  const setup = { protege_installed: true, source_opened: true, target_opened: true, practice_source_located: true, practice_definition_parents_inspected: true, protege_version: null, completed_tutorial_steps: [] };
+  await mutate("setup", setup);
+  const answers: Record<string, unknown> = {};
+  for (const question of state.forms.background) {
+    if (question.show_if || !question.required) continue;
+    const options = Object.keys(question.options ?? {});
+    const value = options.includes("prefer_not_to_say") ? "prefer_not_to_say" : options[0];
+    answers[question.id] = question.multiple ? [value] : value;
+  }
+  await mutate("questionnaires/background", { form_version: state.forms.version, answers, submitted: true });
+  await mutate("setup", { ...setup, completed_tutorial_steps: state.tutorial_steps.map((_: string, index: number) => index) });
+  await page.goto(`${study!.origin}/participate/`);
+  await expect(page.getByRole("button", { name: "Submit answer", exact: true })).toBeVisible();
+  // A session first opened mid-case asks what happened in the gap; dismiss it if shown.
+  const skip = page.getByRole("button", { name: "Skip this question", exact: true });
+  await skip.click({ timeout: 3000 }).catch(() => undefined);
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+}
+
 async function audit(page: Page, info: TestInfo) {
   await page.evaluate(() => document.fonts.ready);
   const result = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"]).analyze();
@@ -76,7 +112,7 @@ for (const profile of profiles) for (const theme of ["light", "dark"]) {
     test("ontology browsing accessibility", async ({ page }, info) => {
       await page.goto("/browse/");
       const search = page.getByRole("combobox", { name: "Search the source ontology" });
-      await search.fill("myopathy");
+      await search.fill(process.env.EXACT_E2E_SEARCH_TERM ?? "myopathy");
       await expect(page.getByRole("listbox").getByRole("option").first()).toBeVisible();
       await search.press("ArrowDown");
       await search.press("Enter");
@@ -95,6 +131,20 @@ for (const profile of profiles) for (const theme of ["light", "dark"]) {
       await welcome(page);
       await audit(page, info);
     });
+    test("study case, evidence and per-case report accessibility", async ({ page }, info) => {
+      test.skip(!study, "Requires the private synthetic study harness configuration");
+      await caseReady(page);
+      const evidence = page.getByRole("tab", { name: "Evidence", exact: true });
+      if (await evidence.count()) {
+        await evidence.click();
+        await expect(page.getByRole("tabpanel")).toBeVisible();
+      }
+      await audit(page, info);
+      await page.getByRole("radio", { name: /^None of these/ }).click();
+      await page.getByRole("button", { name: "Submit answer", exact: true }).click();
+      await expect(page.getByRole("heading", { name: "One question about this case" })).toBeVisible();
+      await audit(page, info);
+    });
     test("researcher sign-in accessibility", async ({ page }, info) => {
       test.skip(!study, "Requires the private synthetic study harness");
       await page.goto(`${study!.origin}/admin/`);
@@ -103,6 +153,33 @@ for (const profile of profiles) for (const theme of ["light", "dark"]) {
     });
   });
 }
+
+/** The control can be scrolled to and is the topmost element at its centre (not clipped or covered). */
+async function usable(page: Page, locator: ReturnType<Page["locator"]>) {
+  await locator.scrollIntoViewIfNeeded();
+  return locator.evaluate((element) => {
+    const box = element.getBoundingClientRect();
+    if (box.width === 0 || box.height === 0 || box.right > innerWidth + 1 || box.left < -1) return false;
+    const top = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+    return Boolean(top && (top === element || element.contains(top)));
+  });
+}
+
+test("a study case reflows from 320 to 2560 px and at 200% text without hidden controls (C24)", async ({ page }) => {
+  test.skip(!study, "Requires the private synthetic study harness configuration");
+  test.setTimeout(180_000);
+  await caseReady(page);
+  for (const scale of [1, 2]) {
+    await page.evaluate((value) => { localStorage.setItem("exact.textScale", String(value)); document.documentElement.style.setProperty("--text-scale", String(value)); }, scale);
+    for (const width of [320, 360, 390, 768, 1024, 1280, 1440, 2560]) {
+      await page.setViewportSize({ width, height: 800 });
+      await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), { message: `overflow at ${width}px, ${scale}x` }).toBe(true);
+      for (const control of [page.getByRole("button", { name: /^Add .* as rank 1$/ }).first(), page.getByRole("radio", { name: /^None of these/ }), page.getByRole("button", { name: "Submit answer", exact: true })]) {
+        await expect.poll(() => usable(page, control).catch(() => false), { message: `control hidden at ${width}px, ${scale}x` }).toBe(true);
+      }
+    }
+  }
+});
 
 test("dialog keyboard focus wraps and returns to its trigger", async ({ page }) => {
   await page.goto("/");
@@ -146,7 +223,7 @@ test("detail tabs support arrow-key navigation and activation", async ({ page })
   await page.keyboard.press("ArrowRight");
   await page.keyboard.press("Enter");
   await expect(evidence).toHaveAttribute("aria-selected", "true");
-  await expect(page.getByRole("tabpanel")).toHaveAttribute("aria-labelledby", "tab-evidence");
+  await expect(page.getByRole("tabpanel")).toHaveAttribute("aria-labelledby", (await evidence.getAttribute("id"))!);
   expect(new URL(page.url()).searchParams.get("details")).toBe("evidence");
   await page.keyboard.press("Tab");
   await expect(page.getByRole("tabpanel")).toBeFocused();

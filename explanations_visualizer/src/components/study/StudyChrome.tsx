@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useRef } from "react";
+
 import { IconCheck, IconOffline, IconSpinner, IconWarning } from "@/components/common/Icons";
 import { TextSizeControl } from "@/components/shell/Preferences";
 import type { StudySession } from "@/study/session";
@@ -9,7 +11,7 @@ const STEPS: { label: string; stages: Stage[] }[] = [
   { label: "Welcome", stages: ["welcome"] },
   { label: "Setup", stages: ["setup"] },
   { label: "About you", stages: ["background"] },
-  { label: "Practice", stages: ["practice"] },
+  { label: "Practice", stages: ["practice", "tutorial"] },
   { label: "Ranking", stages: ["case", "consultation"] },
   { label: "Feedback", stages: ["final", "completed"] },
 ];
@@ -56,16 +58,33 @@ export function StudyHeader({
   progress,
   condition,
   onPause,
+  tutorialLabel = "Practice",
 }: {
   session: StudySession;
   stage: Stage | null;
   progress?: string | null;
   condition?: string | null;
   onPause?: () => void;
+  tutorialLabel?: string;
 }) {
   const index = stage ? stepIndex(stage) : -1;
+  // Sticky regions below the header (the case rail) need its current height at any text size.
+  const node = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const element = node.current;
+    if (!element) return;
+    // Only a sticky header covers content; on narrow layouts it scrolls away (height 0 here).
+    const update = () => {
+      const sticky = getComputedStyle(element).position === "sticky";
+      document.documentElement.style.setProperty("--study-header-h", `${sticky ? Math.ceil(element.getBoundingClientRect().height) : 0}px`);
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
   return (
-    <header className="study-header">
+    <header className="study-header" ref={node}>
       <div className="study-header-row">
         <span className="study-title">Ontology matching study</span>
         {condition && <span className="pill study-condition">{condition}</span>}
@@ -86,12 +105,15 @@ export function StudyHeader({
               <li key={step.label} aria-current={position === index ? "step" : undefined} className={position < index ? "done" : position === index ? "current" : ""}>
                 <span className="study-step-bar" aria-hidden="true" />
                 <span className="study-step-label">
-                  {step.label}
+                  {step.label === "Practice" ? tutorialLabel : step.label}
                   {position < index && <span className="sr-only"> (completed)</span>}
                 </span>
               </li>
             ))}
           </ol>
+          <p className="study-step-summary" aria-hidden="true">
+            Step {index + 1} of {STEPS.length}: {STEPS[index].label === "Practice" ? tutorialLabel : STEPS[index].label}
+          </p>
         </nav>
       )}
       {session.hasRecovery && (

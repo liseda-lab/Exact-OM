@@ -6,7 +6,7 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "typecheck": "tsc --noEmit",
-    "test:unit": "node --test src/study/*.test.ts",
+    "test:unit": "node --test src/study/*.test.ts src/study/v2/*.test.ts src/lib/*.test.ts src/lib/workspace/*.test.ts",
     "test:e2e": "playwright test"
   },
   "dependencies": {

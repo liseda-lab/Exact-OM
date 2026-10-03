@@ -20,7 +20,7 @@ test("prepared comparison, evidence, graph and saved pair navigation", async ({ 
     if (name === "Evidence graph") {
       await expect(page.getByRole("img", { name: /^Evidence graph with/ })).toBeVisible();
       await page.getByRole("button", { name: "Zoom in", exact: true }).click();
-      await page.getByRole("button", { name: "Fit", exact: true }).click();
+      await page.getByRole("button", { name: "Fit all", exact: true }).click();
       await page.getByRole("button", { name: "Reset view", exact: true }).click();
     }
   }
@@ -35,6 +35,52 @@ test("prepared comparison, evidence, graph and saved pair navigation", async ({ 
   expect(page.url()).toBe(selected);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(heading);
   expect(errors).toEqual([]);
+});
+
+test("every generated-text citation opens its exact original record and returns focus (C03)", async ({ page }) => {
+  await page.goto("/");
+  await ready(page);
+  const citations = page.locator("button.citation");
+  await expect(citations.first()).toBeVisible();
+  const count = await citations.count();
+  expect(count).toBeGreaterThan(0);
+  for (let index = 0; index < count; index += 1) {
+    const citation = citations.nth(index);
+    await citation.focus();
+    await page.keyboard.press("Enter");
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toContainText("Origin");
+    await expect(dialog).not.toContainText("not available in the open bundle");
+    await expect(dialog.locator(".inspector-subjects")).not.toContainText("Subject not recorded");
+    await page.keyboard.press("Escape");
+    await expect(dialog).toHaveCount(0);
+    await expect(citation).toBeFocused();
+  }
+});
+
+test("the graph keeps its view across tabs and draws only supported, legend-matched lines (C07, C08)", async ({ page }) => {
+  const warnings: string[] = [];
+  page.on("console", (message) => { if (/style property|invalid/i.test(message.text())) warnings.push(message.text()); });
+  await page.goto("/?details=graph");
+  await ready(page);
+  await expect(page.getByRole("img", { name: /^Evidence graph with/ })).toBeVisible();
+  const view = () => page.locator(".graph-canvas").evaluate((element) => {
+    const cy = (element as unknown as { _cyreg: { cy: { zoom: () => number; pan: () => { x: number; y: number } } } })._cyreg.cy;
+    return { zoom: cy.zoom(), pan: cy.pan() };
+  });
+  await page.getByRole("button", { name: "Zoom in", exact: true }).click();
+  await page.getByRole("button", { name: "Zoom in", exact: true }).click();
+  const zoomed = await view();
+  await page.getByRole("tab", { name: "Evidence", exact: true }).click();
+  await page.getByRole("tab", { name: "Evidence graph", exact: true }).click();
+  await expect(page.getByRole("img", { name: /^Evidence graph with/ })).toBeVisible();
+  await expect.poll(view).toEqual(zoomed);
+  const styles = await page.locator(".graph-canvas").evaluate((element) => {
+    const cy = (element as unknown as { _cyreg: { cy: { edges: () => { data: (k: string) => string; style: (k: string) => string }[] } } })._cyreg.cy;
+    return Array.from(cy.edges(), (edge) => [edge.data("kind"), edge.style("line-style")]);
+  });
+  expect(styles.every(([, style]) => ["solid", "dashed", "dotted"].includes(style))).toBe(true);
+  expect(warnings).toEqual([]);
 });
 
 test("run-discovery failures remain errors and can be retried", async ({ page }) => {
@@ -73,7 +119,7 @@ test("ontology search, independent focus, hierarchy and keyboard dialog", async 
   const source = page.getByRole("region", { name: "Source ontology browser" });
   const target = page.getByRole("region", { name: "Target ontology browser" });
   const search = page.getByRole("combobox", { name: "Search the source ontology" });
-  await search.fill("myopathy");
+  await search.fill(process.env.EXACT_E2E_SEARCH_TERM ?? "myopathy");
   await expect(page.getByRole("listbox").getByRole("option").first()).toBeVisible();
   await search.press("ArrowDown");
   await search.press("Enter");

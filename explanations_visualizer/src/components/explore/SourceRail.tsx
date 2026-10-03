@@ -120,6 +120,12 @@ export function SourcePicker({
   );
 }
 
+function rankOf(candidate: Candidate, basis: OrderBasis): number | null {
+  if (basis === "joint_rank") return candidate.ordinal_ranks.candidate_joint_rank;
+  if (basis === "retrieval_rank") return candidate.ordinal_ranks.retrieval_rank;
+  return null;
+}
+
 export function CandidateList({
   candidates,
   basis,
@@ -128,8 +134,10 @@ export function CandidateList({
   onRetry,
   selectedPair,
   onSelect,
-  truncated,
+  complete,
   total,
+  onLoadMore,
+  loadingMore,
 }: {
   candidates: Candidate[];
   basis: OrderBasis;
@@ -138,8 +146,11 @@ export function CandidateList({
   onRetry: () => void;
   selectedPair: string | null;
   onSelect: (candidate: Candidate) => void;
-  truncated: boolean;
+  /** False while the service holds candidates that are not loaded yet. */
+  complete: boolean;
   total: number | null;
+  onLoadMore: () => void;
+  loadingMore: boolean;
 }) {
   const ontology = candidates[0]?.target.ontology_version_id;
   const label = useLabels(ontology, candidates.map((candidate) => candidate.target.iri));
@@ -152,10 +163,14 @@ export function CandidateList({
         <h2 id="candidates-h" className="eyebrow">
           Target candidates
         </h2>
-        <span className="meta">{candidates.length ? `${candidates.length}${truncated ? "+" : ""}` : ""}</span>
+        <span className="meta">{candidates.length ? `${candidates.length}${complete ? "" : ` of ${total ?? "more"}`}` : ""}</span>
       </div>
-      {candidates.length > 0 && <p className="meta rail-sub">{orderDescription(basis)}</p>}
-      {truncated && <p className="note note-warn">Showing a loaded subset: {candidates.length}{total === null ? "" : ` of ${total}`} candidates. Positions refer to this subset; additional candidates may rank higher.</p>}
+      {candidates.length > 0 && <p className="meta rail-sub">{orderDescription(basis)}{rankOf(candidates[0], basis) !== null ? "; numbers are the recorded ranks" : "; numbers are positions in this list"}</p>}
+      {!complete && (
+        <p className="note note-warn">
+          Showing a loaded subset: {candidates.length}{total === null ? "" : ` of ${total}`} candidates. The service lists candidates by identifier, so additional candidates may rank higher than those shown.
+        </p>
+      )}
       {error ? <ErrorNote error={error} onRetry={onRetry} what="Candidates" /> : null}
       {loading && !candidates.length ? <Skeleton lines={4} title={false} /> : null}
       {!loading && !error && candidates.length === 0 && <p className="note">Exact saved no candidates for this source.</p>}
@@ -165,6 +180,7 @@ export function CandidateList({
           if (collapsed && !current) return null;
           const text = label(candidate.target.iri);
           const score = primaryScore(candidate);
+          const rank = rankOf(candidate, basis);
           return (
             <li key={candidate.pair_id}>
               <button
@@ -176,8 +192,8 @@ export function CandidateList({
                   setOpen(false);
                 }}
               >
-                <span className="position-badge" aria-label={`${truncated ? "Loaded position" : "Position"} ${index + 1}`}>
-                  {index + 1}
+                <span className="position-badge" aria-label={rank !== null ? `Recorded rank ${rank}` : `${complete ? "Position" : "Loaded position"} ${index + 1}`}>
+                  {rank ?? index + 1}
                 </span>
                 <span className="candidate-text">
                   <span className="candidate-label">{text?.value ?? (text?.status === "loading" ? "Loading label…" : "No label in scope")}</span>
@@ -192,6 +208,11 @@ export function CandidateList({
           );
         })}
       </ol>
+      {!complete && !collapsed && (
+        <button type="button" className="btn btn-sm" onClick={onLoadMore} disabled={loadingMore}>
+          {loadingMore ? "Loading…" : "Load the next 100 candidates"}
+        </button>
+      )}
       {narrow && candidates.length > 1 && (
         <button type="button" className="btn btn-sm" aria-expanded={!collapsed} onClick={() => setOpen((value) => !value)}>
           {collapsed ? `Show all ${candidates.length} candidates` : "Show only the selected candidate"}

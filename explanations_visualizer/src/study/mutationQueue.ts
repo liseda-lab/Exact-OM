@@ -3,10 +3,16 @@ export interface Mutation {
   method: "PUT" | "POST";
   path: string;
   body: Record<string, unknown>;
+  /** Coalesce only drafts: a later draft with the same key replaces the last unsent one. */
   coalesce?: string;
   persist?: boolean;
   debounceMs?: number;
+  /** The operation can move the participant to another step (timing closes first). */
+  transition?: boolean;
 }
+
+/** Participant write routes, including the planned exact-study/2.0 routes (16 B2–B4). */
+export const OUTBOX_ROUTE = /^\/api\/v1\/study\/(?:consent|setup|pause|resume|complete|questionnaires\/(?:background|final)|tutorial\/(?:progress|assessment|complete)|cases\/[^/]+\/(?:draft|submit|consultation|consultation\/draft))$/;
 export interface QueueState { session_id: string; revision: number }
 export interface PendingMutation extends Mutation { key: string; expected: number }
 interface Entry extends PendingMutation { resolve: (value: QueueState) => void; reject: (error: unknown) => void }
@@ -45,7 +51,7 @@ export class MutationQueue {
       const stored = JSON.parse(options.snapshot);
       if (stored.session_id !== options.state.session_id || !Array.isArray(stored.entries) || stored.entries.length > MAX_ENTRIES) throw new Error("Invalid outbox");
       this.entries = stored.entries.map((entry: PendingMutation) => {
-        if (!entry || !["PUT", "POST"].includes(entry.method) || typeof entry.path !== "string" || !/^\/api\/v1\/study\/(?:consent|setup|pause|resume|complete|questionnaires\/(?:background|final)|cases\/[^/]+\/(?:draft|submit|consultation))$/.test(entry.path) || !entry.body || typeof entry.body !== "object" || Array.isArray(entry.body) || typeof entry.key !== "string" || !Number.isSafeInteger(entry.expected) || entry.expected < 0) throw new Error("Invalid outbox entry");
+        if (!entry || !["PUT", "POST"].includes(entry.method) || typeof entry.path !== "string" || !OUTBOX_ROUTE.test(entry.path) || !entry.body || typeof entry.body !== "object" || Array.isArray(entry.body) || typeof entry.key !== "string" || !Number.isSafeInteger(entry.expected) || entry.expected < 0) throw new Error("Invalid outbox entry");
         return { ...entry, resolve: () => undefined, reject: () => undefined };
       });
     } catch {

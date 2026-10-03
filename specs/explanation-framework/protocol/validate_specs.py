@@ -28,6 +28,28 @@ def validate_study_documents(documents, require, errors, counts):
         require(study["unsubmitted_is_missing"], "Unsubmitted study answers must remain missing")
         require(not study["invitation_consumed_on_first_use"], "Invitation must remain resumable")
         require(not study["tab_hidden_automatically_pauses"], "Hidden tab may be external-tool work")
+        require(study.get("protege_preparation_required") is False,
+                "Corrective protocol must not require Protege installation")
+        external = study.get("external_inspection_policy", {})
+        require(external.get("protege_recommended_only") is True
+                and external.get("external_use_required") is False
+                and external.get("multiple_methods_allowed") is True
+                and external.get("method_changes_between_cases_allowed") is True
+                and external.get("method_commitment_required") is False,
+                "External inspection must remain optional, combinable and changeable")
+        require(study.get("consultation_asked_each_case") is True
+                and external.get("reporting_unit") == "source_plus_candidate_set_case"
+                and external.get("candidate_level_reports_required") is False
+                and external.get("same_frozen_information_scope") is True,
+                "Consultation granularity or information scope disagrees with amendment 14")
+        tutorial = study.get("tutorial_policy", {})
+        require(all(tutorial.get(field) is True for field in (
+                    "interactive_shared_workspace_required", "synthetic_disjoint_resources_required",
+                    "identical_preassignment_exposure", "eventual_core_pass_required",
+                    "feedback_and_unlimited_retries", "durable_progress_required"))
+                and tutorial.get("comprehension_items") == 5
+                and tutorial.get("scored_time_includes_preparation") is False,
+                "Interactive training, assessment or timing policy disagrees with amendment 14")
         require(study["participant_identity_fields"] == [], "Do not request participant identity")
         cases = {v["case_id"]: v for name, v in documents.items()
                  if name.startswith("fixtures/study/") and v.get("artifact_type") == "study_case"}
@@ -210,6 +232,16 @@ def main():
     require(blueprint.get("sequence") == ["B0", "B1+B2", "B3+B4", "B5", "F1"],
             "Blueprint sequencing disagrees with handoff")
     require(blueprint.get("early_frontend_agent") is False, "Unexpected early frontend dependency")
+    require(blueprint.get("sequence_scope") == "original_bootstrap_only"
+            and blueprint.get("corrective_iteration", {}).get("sequence") == [
+                "frontend_workflow_and_contract_inventory", "joint_contract_freeze",
+                "backend_corrections_and_frontend_integration", "joint_acceptance"]
+            and blueprint.get("corrective_iteration", {}).get("waives_backend_or_launch_gates") is False,
+            "Corrective sequencing must be explicit without waiving acceptance gates")
+    require(blueprint.get("study", {}).get("named_external_tool_required") is False
+            and blueprint.get("study", {}).get("external_setup_required") == [
+                "source_ontology_available", "target_ontology_available"],
+            "Development blueprint must not reintroduce mandatory external software")
     generation = blueprint.get("generation", {})
     require(generation.get("provider") == "openrouter" and generation.get("llm_calls_on_read") is False,
             "Generation provider/read-path policy changed")
