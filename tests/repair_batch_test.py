@@ -81,3 +81,47 @@ def test_worker_preserves_failure_receipt_and_cost(tmp_path, monkeypatch):
     value = json.loads(ledger.read_text())
     assert value["cumulative"]["worker_seconds"] > 0
     assert value["attempts"][str(attempt)]["status"] == "settled"
+
+
+def test_freeze_records_export_runtime_instead_of_callers_editable_installation(tmp_path):
+    import subprocess
+    import sys
+
+    from tools.repair.batch import freeze
+
+    repo = tmp_path / "repository"
+    package = repo / "exact" / "repair"
+    package.mkdir(parents=True)
+    (repo / "exact" / "__init__.py").write_text("")
+    (package / "__init__.py").write_text("")
+    (package / "study.py").write_text(
+        "def runtime_manifest():\n    return {'identity': 'committed-export-runtime'}\n"
+    )
+    (repo / "protocol.json").write_text("{}")
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    subprocess.run(["git", "add", "."], cwd=repo, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Fixture",
+            "-c",
+            "user.email=fixture@example.invalid",
+            "commit",
+            "-qm",
+            "Fixture source",
+        ],
+        cwd=repo,
+        check=True,
+    )
+    spec = tmp_path / "spec.json"
+    spec.write_text(
+        json.dumps(
+            dict(repository=str(repo), protocol_source="protocol.json", python=sys.executable)
+        )
+    )
+    destination = tmp_path / "export"
+    freeze(spec, destination)
+    assert json.loads((destination / "runtime.json").read_text()) == {
+        "identity": "committed-export-runtime"
+    }

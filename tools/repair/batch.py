@@ -139,10 +139,22 @@ def freeze(specification, destination):
         stream.extractall(code, filter="data")
     protocol = load_protocol(repo / spec["protocol_source"])
     write_artifact(root / "protocol.json", protocol)
-    # Runtime source/native dependency hashes qualify the same installed optional stack.
-    from exact.repair.study import runtime_manifest
-
-    write_artifact(root / "runtime.json", runtime_manifest())
+    # Resolve source/native identities exactly as the worker will: with the
+    # declared interpreter in the committed export. An external preparation
+    # script may itself have imported a different editable installation.
+    runtime = json.loads(
+        subprocess.check_output(
+            [
+                spec["python"],
+                "-c",
+                "import json; from exact.repair.study import runtime_manifest; "
+                "print(json.dumps(runtime_manifest()))",
+            ],
+            cwd=code,
+            text=True,
+        )
+    )
+    write_artifact(root / "runtime.json", runtime)
     packages = json.loads(
         subprocess.check_output([spec["python"], "-m", "pip", "list", "--format=json"], text=True)
     )
