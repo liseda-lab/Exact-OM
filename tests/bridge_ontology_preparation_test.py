@@ -247,3 +247,68 @@ def test_incomplete_receipt_is_not_published(tmp_path, monkeypatch):
         prepare(inputs, tmp_path)
     assert not (tmp_path / "derived/preparation.json").exists()
     assert not list((tmp_path / "derived").glob(".preparation*.tmp"))
+
+
+def test_native_scan_preserves_reference_locations_among_nested_nodes_and_comments(tmp_path):
+    source = tmp_path / "nested.owl"
+    source.write_text(
+        document(
+            '<!-- preceding sibling -->\n<owl:Class rdf:about="urn:outer">'
+            '<unqualified xmlns=""><!-- nested comment -->text<child rdf:about="urn:innocent"/>'
+            '<child xml:base="' + preparation.NCIT[:-1] + '" rdf:type="#textArea"/>'
+            "</unqualified></owl:Class>"
+        )
+    )
+    tree = preparation._parse(source)
+    references = preparation._candidate_attributes(tree, preparation.EXPECTED)
+    assert len(references) == 1
+    assert references[0].getparent().tag == "child"
+    assert preparation._iri(references[0]) == IRI
+    with pytest.raises(ValueError, match="non-metadata use"):
+        preparation._audit(tree)
+
+
+@pytest.mark.parametrize(
+    "attribute",
+    [
+        'n:textArea="anything"',
+        f'rdf:type="{IRI}"',
+        'owl:imports="urn:unknown"',
+    ],
+)
+def test_native_scan_includes_document_root_attributes(tmp_path, attribute):
+    source = tmp_path / "root.owl"
+    source.write_text(document("", base=attribute))
+    with pytest.raises(ValueError, match="Unsupported datatype|element-form imports"):
+        preparation._audit(preparation._parse(source))
+
+
+def test_builtin_comment_annotation_range_does_not_need_explicit_declaration(tmp_path):
+    inputs = fixture(tmp_path)
+    source = tmp_path / "source.owl"
+    source.write_text(
+        source.read_text()
+        .replace(
+            '<owl:AnnotationProperty rdf:about="#description">',
+            '<rdf:Description rdf:about="' + preparation.NS["rdfs"] + 'comment">',
+        )
+        .replace("</owl:AnnotationProperty>", "</rdf:Description>")
+    )
+    inputs["source"] = preparation.bind(source)
+    receipt = prepare(inputs, tmp_path)
+    derived, _ = preparation.verify_preparation(receipt, inputs, {})
+    tree = preparation._parse(derived["source"]["path"])
+    assert (
+        tree.xpath("string(//rdf:Description/rdfs:label)", namespaces=preparation.NS)
+        == "Description"
+    )
+    assert not tree.xpath("//rdf:Description/rdfs:range", namespaces=preparation.NS)
+
+
+def test_undeclared_custom_property_range_remains_rejected(tmp_path):
+    inputs = fixture(tmp_path)
+    source = tmp_path / "source.owl"
+    source.write_text(source.read_text().replace("owl:AnnotationProperty", "rdf:Description"))
+    inputs["source"] = preparation.bind(source)
+    with pytest.raises(ValueError, match="non-metadata use"):
+        prepare(inputs, tmp_path)

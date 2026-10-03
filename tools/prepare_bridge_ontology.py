@@ -47,6 +47,7 @@ def _implementation():
         "sha256": sha256_file(Path(__file__)),
         "lxml": list(etree.LXML_VERSION),
         "libxml2": list(etree.LIBXML_VERSION),
+        "libxslt": list(etree.LIBXSLT_VERSION),
         "policy": "e14_ncit_metadata_only_v1",
     }
 
@@ -74,18 +75,62 @@ def _iri(attribute):
 
 
 def _candidate_attributes(tree, iris, context=None):
-    # Native XPath scans the document; Python sees only potential matches and
-    # relative references (the pinned release uses absolute RDF identifiers).
+    # libxml2 caps XPath node sets at 10M entries, fewer than NCIT's elements.
+    # Native XSLT walks immediate children and emits only candidate references;
+    # Python never walks the document. Selected paths recover original nodes,
+    # including inherited xml:base, without a document-wide wildcard node set.
+    xslt = "http://www.w3.org/1999/XSL/Transform"
+    stylesheet = etree.Element("{" + xslt + "}stylesheet", nsmap={"xsl": xslt, **NS}, version="1.0")
+
+    def instruction(parent, instruction_name, **attributes):
+        return etree.SubElement(parent, "{" + xslt + "}" + instruction_name, **attributes)
+
+    top = instruction(stylesheet, "template", match="/")
+    output = etree.SubElement(top, "scan")
+    instruction(output, "apply-templates", select="*")
+    instruction(stylesheet, "template", match="text()|comment()|processing-instruction()")
+    element = instruction(stylesheet, "template", match="*")
+    qnames = " or ".join(f"concat(namespace-uri(), local-name())='{iri}'" for iri in EXPECTED)
+    condition = instruction(element, "if", test=qnames)
+    etree.SubElement(condition, "invalid", kind="qname")
+    instruction(element, "apply-templates", select="@*|*")
+    attribute = instruction(stylesheet, "template", match="@*")
+    invalid = instruction(attribute, "if", test=qnames)
+    etree.SubElement(invalid, "invalid", kind="qname")
+    invalid_import = instruction(
+        attribute, "if", test="namespace-uri()='" + NS["owl"] + "' and local-name()='imports'"
+    )
+    etree.SubElement(invalid_import, "invalid", kind="import_attribute")
     fragments = sorted({iri.rsplit("#", 1)[-1].rsplit("/", 1)[-1] for iri in iris})
     terms = [f"contains(., '{fragment}')" for fragment in fragments]
     predicate = "not(contains(., ':')) or " + " or ".join(terms)
     if context:
         predicate = f"({predicate}) and ({context})"
-    return tree.xpath(
-        f"//@rdf:about[{predicate}] | //@rdf:resource[{predicate}] | "
-        f"//@rdf:datatype[{predicate}] | //@rdf:ID[{predicate}] | //@rdf:type[{predicate}]",
-        namespaces=NS,
+    types = " or ".join(
+        f"local-name()='{name}'" for name in ("about", "resource", "datatype", "ID", "type")
     )
+    match = instruction(
+        attribute, "if", test=f"namespace-uri()='{NS['rdf']}' and ({types}) and ({predicate})"
+    )
+    reference = etree.SubElement(match, "reference")
+    name = instruction(reference, "attribute", name="name")
+    instruction(name, "value-of", select="local-name()")
+    path = instruction(reference, "attribute", name="path")
+    ancestors = instruction(path, "for-each", select="ancestor::*")
+    instruction(ancestors, "text").text = "/*["
+    instruction(ancestors, "value-of", select="count(preceding-sibling::*) + 1")
+    instruction(ancestors, "text").text = "]"
+    scan = etree.XSLT(stylesheet, access_control=etree.XSLTAccessControl.DENY_ALL)(tree)
+    attributes = []
+    for entry in scan.getroot():
+        if entry.tag == "invalid":
+            if entry.get("kind") == "qname":
+                raise ValueError("Unsupported datatype appears as an XML name")
+            raise ValueError("E14 preparation requires element-form imports")
+        attributes.extend(
+            tree.xpath(entry.get("path") + "/@rdf:" + entry.get("name"), namespaces=NS)
+        )
+    return attributes
 
 
 def _audit(tree):
@@ -107,7 +152,16 @@ def _audit(tree):
         elif (
             node.tag == "{" + NS["rdfs"] + "}range"
             and attribute.attrname == "{" + NS["rdf"] + "}resource"
-            and node.getparent().tag == "{" + NS["owl"] + "}AnnotationProperty"
+            and (
+                node.getparent().tag == "{" + NS["owl"] + "}AnnotationProperty"
+                or (
+                    node.getparent().tag == "{" + NS["rdf"] + "}Description"
+                    and _resolved(
+                        node.getparent(), node.getparent().get("{" + NS["rdf"] + "}about", "")
+                    )
+                    == NS["rdfs"] + "comment"
+                )
+            )
             and node.getparent().getparent() is root
             and set(node.getparent().attrib) == {"{" + NS["rdf"] + "}about"}
             and empty
@@ -122,16 +176,8 @@ def _audit(tree):
             )
         nodes.append(node)
         records.append({"datatype": iri, "kind": kind, "line": node.sourceline})
-    for iri in EXPECTED:
-        # Expanded XML names can encode RDF predicates/types without RDF IRI attributes.
-        if tree.xpath(
-            "boolean(//*[concat(namespace-uri(), local-name())=$iri] | "
-            "//@*[concat(namespace-uri(), local-name())=$iri])",
-            iri=iri,
-        ):
-            raise ValueError(f"Unsupported datatype appears as an XML name: {iri}")
     imported = set()
-    for node in tree.xpath("//owl:imports", namespaces=NS):
+    for node in tree.xpath("descendant::owl:imports", namespaces=NS):
         if (
             set(node.attrib) != {"{" + NS["rdf"] + "}resource"}
             or len(node)
@@ -139,9 +185,6 @@ def _audit(tree):
         ):
             raise ValueError("E14 preparation requires explicit resource-valued imports")
         imported.add(_resolved(node, node.get("{" + NS["rdf"] + "}resource")))
-    # Do not silently miss imports encoded as generic RDF property attributes.
-    if tree.xpath("boolean(//@owl:imports)", namespaces=NS):
-        raise ValueError("E14 preparation requires element-form imports")
     return nodes, records, properties, imported
 
 
