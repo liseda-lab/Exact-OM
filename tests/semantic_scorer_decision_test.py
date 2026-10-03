@@ -1,7 +1,9 @@
 import importlib.util
+import sqlite3
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
 import torch
 
 _MODULE_PATH = (
@@ -54,7 +56,7 @@ class _DummyHosted:
         }
 
 
-def test_hosted_chat_binary_head_returns_binary_probability():
+def _hosted_scorer():
     scorer = object.__new__(SemanticScorer)
     scorer.use_llm = True
     scorer.device = torch.device("cpu")
@@ -100,7 +102,13 @@ def test_hosted_chat_binary_head_returns_binary_probability():
     )
     scorer.llm_decision_batch_size = 8
     scorer.request_seed = 123
+    return scorer
 
+
+def test_hosted_chat_binary_head_returns_binary_probability(monkeypatch):
+    monkeypatch.setenv("EXACT_EXPERIMENT_MODE", "1")
+    scorer = _hosted_scorer()
+    scorer.llm_experiment_enabled = False
     probs = scorer.llm_yesno_probs_batched(
         ["src"],
         ["tgt"],
@@ -119,6 +127,59 @@ def test_hosted_chat_binary_head_returns_binary_probability():
     assert scorer.llm_decision_stats()["hosted_attempted"] == 1
     assert scorer.llm_decision_stats()["hosted_scored"] == 1
     assert scorer.llm_decision_stats()["local_fallbacks"] == 0
+
+
+def _inject_hosted_failure(scorer, failure):
+    if failure == "probe":
+        scorer._probe_hosted_decision_profile = lambda profile: {
+            "passed": False,
+            "error": "fixture probe unavailable",
+        }
+    else:
+
+        def locked(**kwargs):
+            raise sqlite3.OperationalError("database is locked")
+
+        scorer._llm_router.hosted.chat_completion = locked
+        scorer._record_hosted_decision_request_debug = lambda *args, **kwargs: "fixture"
+
+
+@pytest.mark.parametrize("failure", ["probe", "request"])
+@pytest.mark.parametrize(
+    "global_mode,selector_enabled", [(True, False), (False, True), (True, True)]
+)
+def test_experiment_failure_preserves_hosted_backend_without_local_fallback(
+    monkeypatch, failure, global_mode, selector_enabled
+):
+    monkeypatch.setenv("EXACT_EXPERIMENT_MODE", "1" if global_mode else "0")
+    scorer = _hosted_scorer()
+    scorer.llm_experiment_enabled = selector_enabled
+    _inject_hosted_failure(scorer, failure)
+
+    with pytest.raises(RuntimeError, match="experiment stage paused") as error:
+        scorer.llm_yesno_probs_batched(["src"], ["tgt"], ["source"], ["target"])
+
+    if failure == "request":
+        assert isinstance(error.value.__cause__.__cause__, sqlite3.OperationalError)
+    else:
+        assert "fixture probe unavailable" in str(error.value)
+    assert scorer._last_decision_backend_meta["backend"] == "openrouter"
+    assert scorer._last_decision_backend_meta["fallback_triggered"] is False
+    assert scorer.llm_decision_stats()["local_fallbacks"] == 0
+
+
+@pytest.mark.parametrize("failure", ["probe", "request"])
+def test_production_hosted_failure_still_reaches_local_fallback(monkeypatch, failure):
+    monkeypatch.delenv("EXACT_EXPERIMENT_MODE", raising=False)
+    scorer = _hosted_scorer()
+    scorer.llm_experiment_enabled = False
+    _inject_hosted_failure(scorer, failure)
+    # The existing fake loader raises instead of downloading a local model.
+    with pytest.raises(AssertionError, match="Local fallback was not expected"):
+        scorer.llm_yesno_probs_batched(["src"], ["tgt"], ["source"], ["target"])
+    assert scorer._last_decision_backend_meta["backend"] == "local_hf"
+    assert scorer._last_decision_backend_meta["fallback_triggered"] is True
+    assert scorer.llm_decision_stats()["local_fallbacks"] == 1
 
 
 def test_clean_summary_text_drops_fence_only_response():

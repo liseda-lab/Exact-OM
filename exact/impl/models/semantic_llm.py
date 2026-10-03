@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib  # noqa: F401
 import json  # noqa: F401
 import math
+import os
 from concurrent.futures import ThreadPoolExecutor, as_completed  # noqa: F401
 from typing import Any, Callable, Dict, List, Optional, Tuple  # noqa: F401
 from urllib import error as urlerror  # noqa: F401
@@ -1071,7 +1072,9 @@ class SemanticLLMMixin:
                         "debug",
                     )
                 if not probe.get("passed"):
-                    if getattr(self, "llm_experiment_enabled", False):
+                    if os.getenv("EXACT_EXPERIMENT_MODE") == "1" or getattr(
+                        self, "llm_experiment_enabled", False
+                    ):
                         raise RuntimeError(
                             f"OpenRouter decision capability probe failed: {probe.get('error')}; experiment stage paused"
                         )
@@ -1193,7 +1196,9 @@ class SemanticLLMMixin:
                         self._last_decision_backend_meta["provider"] = last_provider
                         return torch.tensor(outputs, dtype=torch.float32, device=self.device)
                     except (RuntimeError, ValueError, KeyError, OSError, urlerror.URLError) as exc:
-                        if getattr(self, "llm_experiment_enabled", False):
+                        if os.getenv("EXACT_EXPERIMENT_MODE") == "1" or getattr(
+                            self, "llm_experiment_enabled", False
+                        ):
                             raise RuntimeError(
                                 "OpenRouter judgment failed; experiment stage paused without local fallback"
                             ) from exc
