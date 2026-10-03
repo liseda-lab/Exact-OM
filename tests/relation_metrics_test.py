@@ -128,3 +128,88 @@ def test_harness_loads_verified_typed_endpoints(tmp_path, monkeypatch):
     (alignment / "relations.oracle.tsv").write_text("changed")
     with pytest.raises(ValueError, match="identity changed"):
         cell_metrics(tmp_path)
+
+
+def test_native_bridge_reuses_worlds_resumes_and_checks_endpoints(tmp_path, monkeypatch):
+    from exact.core.entities.kinds import EntityKind
+    from exact.io.relation_bridge import native_bridge
+    from exact.ontology import reasoning
+
+    source, target, imported = (tmp_path / name for name in ("s.ofn", "t.ofn", "i.ofn"))
+    source.write_text(
+        "Ontology(Import(<urn:import>) Declaration(Class(<urn:a>)) "
+        "SubClassOf(<urn:a> <urn:b>) Declaration(Class(<urn:bad>)) "
+        "SubClassOf(<urn:bad> <http://www.w3.org/2002/07/owl#Nothing>))"
+    )
+    imported.write_text("Ontology(Declaration(Class(<urn:b>)))")
+    target.write_text(
+        "Ontology(Declaration(Class(<urn:c>)) Declaration(Class(<urn:d>)) "
+        "SubClassOf(<urn:c> <urn:d>))"
+    )
+    frame = pd.DataFrame(
+        [("urn:a", "urn:d"), ("urn:a", "urn:c"), ("urn:bad", "urn:d"), ("urn:b", "urn:c")],
+        columns=["SrcEntity", "TgtEntity"],
+    ).assign(Score=0.0)
+    anchors = [
+        {"src": "urn:b", "tgt": "urn:c", "src_kind": EntityKind.CLASS, "tgt_kind": EntityKind.CLASS}
+    ]
+    calls = []
+    original = reasoning._create_hermit
+
+    def create(view, settings):
+        calls.append(settings)
+        return original(view, settings)
+
+    monkeypatch.setattr(reasoning, "_create_hermit", create)
+    options = dict(
+        anchor_rows=anchors,
+        timeout_seconds=None,
+        import_map={"urn:import": imported},
+        checkpoint_path=tmp_path / "checkpoint.json",
+        max_memory_bytes=64 * 1024**2,
+    )
+    result = native_bridge(frame, source, target, **options)
+    assert len(calls) == 2  # Three queries share one world; one excludes its own bridge.
+    assert calls[0].max_memory_bytes == 64 * 1024**2
+    assert result.Relation.tolist() == ["<", "<"]
+    assert {item["reason"] for item in result.attrs["relation_abstentions"]} == {
+        "unsatisfiable_endpoint",
+        "not_entailed",
+    }
+    assert result.attrs["coherence_audit"]["unsatisfiable_query_pairs"] == 1
+    repeated = native_bridge(frame.assign(Score=0.5), source, target, **options)
+    assert len(calls) == 2
+    assert repeated.Relation.tolist() == ["<", "<"]
+    assert repeated.Score.tolist() == [0.5, 0.5]
+    imported.write_text("Ontology(Declaration(Class(<urn:changed>)))")
+    with pytest.raises(ValueError, match="checkpoint inputs or implementation changed"):
+        native_bridge(frame, source, target, **options)
+
+
+@pytest.mark.parametrize("error_name", ["ResourceLimitError", "BackendPoisonedError"])
+def test_bridge_does_not_cache_operational_native_failures(tmp_path, monkeypatch, error_name):
+    import pyhermit
+
+    from exact.io.relation_bridge import native_bridge
+
+    source = tmp_path / "source.ofn"
+    target = tmp_path / "target.ofn"
+    source.write_text("Ontology(Declaration(Class(<urn:a>)))")
+    target.write_text("Ontology(Declaration(Class(<urn:b>)))")
+    error = getattr(pyhermit, error_name)
+
+    def broken(*args, **kwargs):
+        raise error("fixture native failure")
+
+    monkeypatch.setattr("exact.ontology.reasoning._create_hermit", broken)
+    path = tmp_path / "checkpoint.json"
+    with pytest.raises(error):
+        native_bridge(
+            _frame([("urn:a", "urn:b", "=")]),
+            source,
+            target,
+            anchor_rows=[],
+            timeout_seconds=None,
+            checkpoint_path=path,
+        )
+    assert json.loads(path.read_text())["queries"] == {}
