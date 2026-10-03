@@ -604,7 +604,7 @@ os._exit(92)
                 "database": store.database_url,
                 "assets": str(store.assets_dir),
                 "identity": identity,
-                "request": request.model_dump(mode="json"),
+                "request": request.model_dump(mode="json", exclude_unset=True),
             }
         )
     )

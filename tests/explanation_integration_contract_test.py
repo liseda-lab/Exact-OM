@@ -136,12 +136,14 @@ def test_encoded_scope_identifier_retains_authorization(corrected, monkeypatch):
     assert client.get(base + "/capabilities").status_code == 403
 
 
-@pytest.mark.parametrize("damage", ["missing", "invalid", "changed_index"])
+@pytest.mark.parametrize("damage", ["missing", "invalid", "changed_index", "asset_root"])
 def test_broken_required_workspace_is_typed_503(corrected, monkeypatch, damage):
     client, store, publication, sid = allocate(corrected)
     original = store._study
     current = client.get("/api/v1/study/cases/current").json()
     scope_id = current["workspace"]["scope_id"]
+    if damage == "asset_root":
+        monkeypatch.setattr(store, "assets_dir", None)
 
     def damaged(db, revision, **kwargs):
         row, study = original(db, revision, **kwargs)
@@ -151,7 +153,7 @@ def test_broken_required_workspace_is_typed_503(corrected, monkeypatch, damage):
             study["workspace_scopes"].remove(scope)
         elif damage == "invalid":
             scope["contexts"] = []
-        else:
+        elif damage == "changed_index":
             scope["index_sha256"] = "0" * 64
         return row, study
 

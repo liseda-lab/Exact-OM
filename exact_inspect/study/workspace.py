@@ -340,6 +340,18 @@ def _open_resources(store, scope, policy):
     return contexts, index
 
 
+def _open_runtime_resources(store, scope, policy):
+    """Classify failure of already-frozen resources without changing admission errors."""
+    from .store import StudyError
+
+    try:
+        return _open_resources(store, scope, policy)
+    except (StudyError, ValueError, OSError, KeyError, sqlite3.DatabaseError) as exc:
+        raise _error(
+            503, "Frozen workspace resources are unavailable; retry or contact the study team"
+        ) from exc
+
+
 def case_workspace_descriptor(store, study, case):
     """Discover only the already-authorized case's frozen, usable locator."""
     try:
@@ -355,9 +367,11 @@ def case_workspace_descriptor(store, study, case):
             c.ontology_version_id for c in scope.contexts
         }:
             raise ValueError("Workspace does not cover the case ontologies")
-        _open_resources(store, scope, VisibilityPolicy.model_validate(study["visibility_policy"]))
+        _open_runtime_resources(
+            store, scope, VisibilityPolicy.model_validate(study["visibility_policy"])
+        )
         return {"scope_id": scope.scope_id}
-    except (ValueError, OSError, KeyError) as exc:
+    except (ValueError, OSError, KeyError, sqlite3.DatabaseError) as exc:
         raise _error(
             503, "Frozen case workspace is unavailable; retry or contact the study team"
         ) from exc
@@ -534,7 +548,7 @@ class ParticipantWorkspace:
     def __init__(self, store, scope, study, case, binding):
         self.scope, self.study, self.case, self.binding = scope, study, case, binding
         self.policy = VisibilityPolicy.model_validate(study["visibility_policy"])
-        self.contexts, self.index = _open_resources(store, scope, self.policy)
+        self.contexts, self.index = _open_runtime_resources(store, scope, self.policy)
 
     def context(self, version):
         if version not in self.contexts:
