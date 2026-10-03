@@ -266,10 +266,20 @@ def evaluate(schedule, row, output, cache_source=None):
     return binding(output/'result.json')
 
 
+def validate_payloads(saved):
+    """Check scaling's full row contract and every immutable payload on resume."""
+    for item in saved.get('payloads', []):
+        if sha(item['path']) != item['sha256']:
+            raise ValueError('Completed scaling payload changed')
+    if saved.get('result'):
+        result = bound(saved['result'])
+        if result.get('row') != saved['row']:
+            raise ValueError('Scaling payload row identity differs')
+
+
 def run(schedule_path, output, start, stop):
     from exact.repair.workers import bounded_call
     from exact.repair.study import runtime_manifest
-    from tools.repair.fresh_evaluation import validate_payloads
 
     schedule = read(schedule_path)
     if schedule['schema']!='exact-repair/scaling/v1' or not 0<=start<stop<=len(schedule['rows']):

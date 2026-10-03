@@ -114,3 +114,59 @@ def test_inflight_and_nested_cleanup_prevent_silent_retry(tmp_path,monkeypatch):
     with pytest.raises(RuntimeError,match='cleanup incomplete'):
         scaling.run(schedule,tmp_path/'nested',0,2)
     assert (tmp_path/'nested/inflight/cold.json').exists()
+
+
+def test_completed_evaluator_payload_resumes_with_charged_cold_cache(tmp_path, monkeypatch):
+    """Exercise the real result producer and consumer, including nested timeouts."""
+    import exact.repair.workers
+    from tools.repair.prepare import case_to_dict
+    from tools.repair.batch import read
+
+    case_path = tmp_path / 'case.json'
+    write_artifact(case_path, case_to_dict(parent_case('papers', 1, 13)))
+    protocol_path = tmp_path / 'protocol.json'
+    write_artifact(protocol_path, dict(
+        objective=dict(edit_weights={}, integer_scale=100),
+        selection=dict(max_candidate_checks=1, max_master_solves=1, retry_budget=0),
+        resources=dict(verification_seconds=1)))
+    schedule_path = schedule_fixture(tmp_path / 'schedule')
+    schedule = read(schedule_path)
+    schedule.update(protocol=binding(protocol_path), generation_seconds=1,
+                    cases=[dict(case=binding(case_path), parent='papers:path-1', config={})])
+    for row in schedule['rows']:
+        row.update(case_index=0, method='grammar_circuit')
+    write_artifact(schedule_path, schedule)
+    outer_calls = []
+
+    def call(fn, *args, **kwargs):
+        if fn is scaling.evaluate:
+            outer_calls.append(args[1]['id'])
+            return CallResult('complete', value=fn(*args), cleanup_complete=True)
+        # Native generation/search can time out while the enclosing row finishes
+        # correctly and retains UNKNOWN in the scientific denominator.
+        return CallResult('timeout', cleanup_complete=True)
+
+    monkeypatch.setattr(exact.repair.workers, 'bounded_call', call)
+    output = tmp_path / 'work'
+    report = scaling.run(schedule_path, output, 0, 2)
+    assert report['counts'] == {'complete': 2}
+    assert outer_calls == ['cold', 'warm']
+    cold = bound(read(output / 'rows/cold.json')['result'])
+    warm = bound(read(output / 'rows/warm.json')['result'])
+    assert cold['logical_status'] == warm['logical_status'] == 'UNKNOWN'
+    assert cold['row'] == schedule['rows'][0]
+    assert warm['cache_source'] == str(output / 'payloads/cold/compiler-cache')
+    assert scaling.run(schedule_path, output, 0, 2) == report
+    assert outer_calls == ['cold', 'warm']
+    (output / 'payloads/cold/result.json').write_text('{}')
+    with pytest.raises(ValueError, match='payload changed'):
+        scaling.run(schedule_path, output, 0, 2)
+
+
+def test_scaling_payload_rejects_wrong_full_row_even_with_valid_file_hash(tmp_path):
+    row = dict(id='same-id', seconds=300, method='grammar_circuit')
+    result = tmp_path / 'result.json'
+    write_artifact(result, dict(row=dict(row, seconds=600)))
+    saved = dict(row=row, result=binding(result), payloads=[binding(result)])
+    with pytest.raises(ValueError, match='row identity differs'):
+        scaling.validate_payloads(saved)
