@@ -258,6 +258,12 @@ test("fresh browser journey: training, both conditions, reports and completion o
         await expect(comments.locator("h4 .meta")).toHaveText("65 of 65");
         const factIds = await comments.locator("[data-fact-id]").evaluateAll((nodes) => nodes.map((node) => node.getAttribute("data-fact-id")));
         expect(new Set(factIds).size).toBe(65);
+        // Admitted evidence views read the scope's own evidence for this candidate.
+        await page.getByRole("tab", { name: "Evidence", exact: true }).click();
+        await expect.poll(() => traffic.requests.some((item) => item.path.startsWith(`${scopedPath(scope)}/evidence?`) && item.status === 200)).toBe(true);
+        await page.getByRole("tab", { name: "Evidence graph", exact: true }).click();
+        await expect(page.locator(".graph-canvas, .details [role='tabpanel'] .note").first()).toBeVisible();
+        await page.getByRole("tab", { name: "Hierarchy", exact: true }).click();
         await page.locator("button.citation").first().click();
         const dialog = page.getByRole("dialog");
         await expect(dialog.locator(".iri").first()).toHaveText(/^urn:(source|target):\d$/);
