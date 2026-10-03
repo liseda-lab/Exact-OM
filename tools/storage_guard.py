@@ -7,11 +7,13 @@ import copy
 import hashlib
 import json
 import os
+import re
 import shlex
 import shutil
 import signal
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -134,6 +136,46 @@ def deduplicate_completed(helper, batch_root):
         _diagnostic("Completed fitting deduplication skipped: " + str(error))
 
 
+def publish_step_receipt(path, nonce):
+    """Identify this real Slurm guard before a potentially slow admission scan."""
+    if path is None and nonce is None:
+        return
+    if (
+        path is None
+        or not Path(path).is_absolute()
+        or not isinstance(nonce, str)
+        or not re.fullmatch(r"[A-Za-z0-9_-]{12,128}", nonce)
+    ):
+        raise ValueError("Step receipt requires an absolute path and valid dispatch nonce")
+    job, step = os.getenv("SLURM_JOB_ID", ""), os.getenv("SLURM_STEP_ID", "")
+    if not re.fullmatch(r"[0-9]+", job) or not re.fullmatch(r"[0-9]+", step):
+        raise ValueError("Step receipt requires a numeric Slurm job and step")
+    cgroup = Path("/proc/self/cgroup").read_text()
+    if not re.search(r"(?:^|/)step_" + re.escape(step) + r"(?:/|$)", cgroup, re.MULTILINE):
+        raise ValueError("Step receipt requires the matching Slurm step cgroup")
+    path = Path(path)
+    payload = {"step_id": job + "." + step, "dispatch_nonce": nonce}
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary = tempfile.mkstemp(prefix=".step-receipt-", dir=path.parent)
+    try:
+        with os.fdopen(descriptor, "w") as stream:
+            stream.write(json.dumps(payload, sort_keys=True) + "\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+        try:
+            os.link(temporary, path)
+        except FileExistsError:
+            if path.is_symlink() or json.loads(path.read_text()) != payload:
+                raise ValueError("Existing Slurm step receipt conflicts with this dispatch")
+        directory = os.open(path.parent, os.O_DIRECTORY)
+        try:
+            os.fsync(directory)
+        finally:
+            os.close(directory)
+    finally:
+        Path(temporary).unlink(missing_ok=True)
+
+
 def run(
     command,
     *,
@@ -146,6 +188,8 @@ def run(
     scan_interval=60,
     dedup_helper=None,
     completed_run_root=None,
+    step_path=None,
+    dispatch_nonce=None,
 ):
     if not command or min(min_free, max_used, growth_reserve, interval, scan_interval) < 0:
         raise ValueError("A worker command and nonnegative storage limits are required")
@@ -155,6 +199,7 @@ def run(
         raise ValueError("Completed fitting deduplication requires helper and batch root")
     process = None
     try:
+        publish_step_receipt(step_path, dispatch_nonce)
         used = check_storage(
             root, min_free=min_free, max_used=max_used, growth_reserve=growth_reserve
         )
@@ -237,7 +282,9 @@ def validate_policy(config):
             raise ValueError("Completed fitting deduplication source binding changed")
 
 
-def _wrapper(config, supervisor, worker, stop_path, completion_path=None):
+def _wrapper(
+    config, supervisor, worker, stop_path, completion_path=None, step_path=None, dispatch_nonce=None
+):
     command = [
         config["python"],
         "-u",
@@ -266,6 +313,15 @@ def _wrapper(config, supervisor, worker, stop_path, completion_path=None):
                 str(Path(completion_path).parent),
             ]
         )
+    if step_path is not None or dispatch_nonce is not None:
+        if (
+            not isinstance(step_path, str)
+            or not Path(step_path).is_absolute()
+            or not isinstance(dispatch_nonce, str)
+            or not re.fullmatch(r"[A-Za-z0-9_-]{12,128}", dispatch_nonce)
+        ):
+            raise ValueError("Storage guard requires bound Slurm receipt metadata")
+        command.extend(["--step-path", step_path, "--dispatch-nonce", dispatch_nonce])
     command.extend(["--", "/bin/bash", worker])
     return "#!/bin/bash\nset -euo pipefail\nexec " + shlex.join(command) + "\n"
 
@@ -292,7 +348,13 @@ def guard_launch(launch, policy, supervisor):
         Path(worker).stem + ".storage-guard-" + _policy_hash(config)[:12] + ".sh"
     )
     content = _wrapper(
-        config, supervisor, worker, stop_path, launch.get("run", {}).get("completion_path")
+        config,
+        supervisor,
+        worker,
+        stop_path,
+        launch.get("run", {}).get("completion_path"),
+        launch.get("step_path"),
+        launch.get("nonce"),
     )
     if wrapper.exists():
         if wrapper.read_text() != content:
@@ -348,7 +410,13 @@ def validate_launch(launch, policy, supervisor):
         raise ValueError("Storage guard runtime STOP is not a registered control")
     wrapper = Path(launch["argv"][-1])
     if _binding(wrapper) not in launch["bindings"] or wrapper.read_text() != _wrapper(
-        config, supervisor, original["path"], stop, launch.get("run", {}).get("completion_path")
+        config,
+        supervisor,
+        original["path"],
+        stop,
+        launch.get("run", {}).get("completion_path"),
+        launch.get("step_path"),
+        launch.get("nonce"),
     ):
         raise ValueError("Prepared worker does not execute the required storage guard")
 
@@ -383,6 +451,8 @@ def main():
     parser.add_argument("--growth-reserve-bytes", type=int, default=16 * GIB)
     parser.add_argument("--dedup-helper", type=Path)
     parser.add_argument("--completed-run-root", type=Path)
+    parser.add_argument("--step-path", type=Path)
+    parser.add_argument("--dispatch-nonce")
     parser.add_argument("command", nargs=argparse.REMAINDER)
     args = parser.parse_args()
 
@@ -401,6 +471,8 @@ def main():
             growth_reserve=args.growth_reserve_bytes,
             dedup_helper=args.dedup_helper,
             completed_run_root=args.completed_run_root,
+            step_path=args.step_path,
+            dispatch_nonce=args.dispatch_nonce,
         )
     )
 
