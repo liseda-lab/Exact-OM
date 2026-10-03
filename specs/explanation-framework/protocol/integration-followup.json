@@ -21,30 +21,32 @@
     "R01": {
       "priority": 1,
       "owner": "backend_then_frontend",
-      "status": "frontend_pending",
+      "status": "joint_verified",
       "acceptance": [
         "J01",
         "J02",
         "J03"
       ],
       "backend_status": "backend_verified",
-      "joint_verified": false
+      "joint_verified": true,
+      "frontend_status": "frontend_verified"
     },
     "R02": {
       "priority": 1,
       "owner": "frontend_with_backend_contract",
-      "status": "frontend_pending",
+      "status": "joint_verified",
       "acceptance": [
         "J04",
         "J05"
       ],
       "backend_status": "backend_verified",
-      "joint_verified": false
+      "joint_verified": true,
+      "frontend_status": "frontend_verified"
     },
     "R03": {
       "priority": 2,
       "owner": "backend_then_frontend",
-      "status": "frontend_pending",
+      "status": "blocked",
       "acceptance": [
         "J06",
         "J07",
@@ -52,18 +54,21 @@
         "J10"
       ],
       "backend_status": "backend_verified",
-      "joint_verified": false
+      "joint_verified": false,
+      "frontend_status": "frontend_verified",
+      "blocked_by": "J10 manual screen-reader and keyboard audit not performed"
     },
     "R04": {
       "priority": 2,
       "owner": "backend_with_frontend_consumer",
-      "status": "frontend_pending",
+      "status": "joint_verified",
       "acceptance": [
         "J08",
         "J09"
       ],
       "backend_status": "backend_verified",
-      "joint_verified": false
+      "joint_verified": true,
+      "frontend_status": "frontend_verified"
     }
   },
   "joint_acceptance_ids": [
@@ -136,5 +141,7 @@
     "mock_success_is_joint_acceptance": false,
     "waives_backend_or_launch_gates": false
   },
-  "implementation_evidence": "../../../docs/verification/explanation-integration-backend-receipt.json"
+  "implementation_evidence": "../../../docs/verification/explanation-integration-backend-receipt.json",
+  "frontend_implementation_evidence": "../../../docs/verification/explanation-integration-frontend-receipt.json",
+  "acceptance_evidence": "../../../docs/verification/explanation-integration-acceptance-receipt.json"
 }

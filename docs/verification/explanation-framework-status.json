@@ -486,7 +486,7 @@
   },
   "current_acceptance_authority": "specs/explanation-framework/17-integration-corrective-programme.md",
   "integration_followup_20261003": {
-    "status": "backend_verified_frontend_and_joint_pending",
+    "status": "R01_R02_R04_joint_verified_R03_blocked_on_J10_manual_audit",
     "reviewed_commit": "2d9715b",
     "authority": "specs/explanation-framework/17-integration-corrective-programme.md",
     "evidence": "specs/explanation-framework/evidence/integration-review-20261003.md",
@@ -500,38 +500,40 @@
       "R01": {
         "priority": 1,
         "owner": "backend_then_frontend",
-        "status": "frontend_pending",
+        "status": "joint_verified",
         "acceptance": [
           "J01",
           "J02",
           "J03"
         ],
         "backend_status": "backend_verified",
-        "joint_verified": false,
+        "joint_verified": true,
         "evidence": [
           "tests/explanation_integration_contract_test.py",
           "tests/explanation_study_workspace_test.py"
-        ]
+        ],
+        "frontend_status": "frontend_verified"
       },
       "R02": {
         "priority": 1,
         "owner": "frontend_with_backend_contract",
-        "status": "frontend_pending",
+        "status": "joint_verified",
         "acceptance": [
           "J04",
           "J05"
         ],
         "backend_status": "backend_verified",
-        "joint_verified": false,
+        "joint_verified": true,
         "evidence": [
           "tests/explanation_integration_contract_test.py::test_page_readiness_is_local_and_does_not_restart_case_clock",
           "tests/explanation_telemetry_policy_test.py"
-        ]
+        ],
+        "frontend_status": "frontend_verified"
       },
       "R03": {
         "priority": 2,
         "owner": "backend_then_frontend",
-        "status": "frontend_pending",
+        "status": "blocked",
         "acceptance": [
           "J06",
           "J07",
@@ -543,24 +545,36 @@
         "evidence": [
           "tests/explanation_integration_position_test.py",
           "tests/explanation_study_v2_test.py::test_v2_postgresql_backup_restore_preserves_training_and_draft"
-        ]
+        ],
+        "frontend_status": "frontend_verified",
+        "blocked_by": "J10 manual screen-reader and keyboard audit not performed"
       },
       "R04": {
         "priority": 2,
         "owner": "backend_with_frontend_consumer",
-        "status": "frontend_pending",
+        "status": "joint_verified",
         "acceptance": [
           "J08",
           "J09"
         ],
         "backend_status": "backend_verified",
-        "joint_verified": false,
+        "joint_verified": true,
         "evidence": [
           "tests/explanation_integration_timing_test.py"
+        ],
+        "frontend_status": "frontend_verified"
+      },
+      "R05": {
+        "priority": 3,
+        "owner": "frontend",
+        "status": "fixed_and_verified",
+        "summary": "Cytoscape inline <style> blocked by the study CSP; rule moved to app.css",
+        "evidence": [
+          "explanations_visualizer/e2e/study-v2-backend.spec.ts"
         ]
       }
     },
-    "implementation_acceptance": "S1_backend_verified_S2_S3_pending",
+    "implementation_acceptance": "S1_S2_S3_run_R03_blocked_on_J10_manual_audit",
     "historical_evidence_preserved": true,
     "launch_gates_waived": false,
     "live_publication": false,
@@ -569,6 +583,11 @@
     "backend_implementation_commit": "96b76fe74afab6d2fdb6437e2ff0b1c28d9b5a3f",
     "backend_handoff": "docs/verification/explanation-integration-backend-handoff.md",
     "backend_receipt": "docs/verification/explanation-integration-backend-receipt.json",
-    "runtime_extension": "study-integration/1"
+    "runtime_extension": "study-integration/1",
+    "frontend_implementation_commit": "6895bc64a04bf43a68deb51266cea4fa797c9610",
+    "frontend_handoff": "docs/verification/explanation-integration-frontend-handoff.md",
+    "frontend_receipt": "docs/verification/explanation-integration-frontend-receipt.json",
+    "acceptance_record": "docs/verification/explanation-integration-acceptance.md",
+    "acceptance_receipt": "docs/verification/explanation-integration-acceptance-receipt.json"
   }
 }

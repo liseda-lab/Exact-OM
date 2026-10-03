@@ -1,9 +1,12 @@
 # Integration corrective programme and agent protocol
 
-**2026-10-03. Status: S1 backend verified; frontend and joint acceptance pending. Reviewed baseline: `2d9715b`.**
+**2026-10-03. Status: S1, S2 and S3 run; R01, R02 and R04 joint-verified; R03 blocked only on
+the manual J10 audit. Reviewed baseline: `2d9715b`.**
 The [backend handoff](../../docs/verification/explanation-integration-backend-handoff.md)
-records implementation `96b76fe` and the API/database verification boundary. Continue with
-S2 against that handoff; the joint findings remain open until S3.
+records implementation `96b76fe`; the [frontend handoff](../../docs/verification/explanation-integration-frontend-handoff.md)
+records `6895bc6`; the [joint acceptance record](../../docs/verification/explanation-integration-acceptance.md)
+gives the J01–J12 results, a new fixed finding (R05) and the remaining human and release gates.
+The follow-up is not fully accepted until a person completes the J10 screen-reader/keyboard audit.
 Start here for the next correction cycle. The [review record](evidence/integration-review-20261003.md)
 separates direct observations, a diagnostic reproduction and checks that remain outstanding.
 The implementation assignments are [18 — Backend](18-backend-integration-corrections.md)

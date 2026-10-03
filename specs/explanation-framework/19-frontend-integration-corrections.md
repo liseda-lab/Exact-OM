@@ -1,6 +1,10 @@
 # Frontend assignment: consume and verify the complete study workspace
 
-**2026-10-03. Target behavior; not yet implemented.** Follow
+**2026-10-03. Implemented in `6895bc6`; S2 verified and S3 recorded. R01, R02 and R04 are
+joint-verified; R03 awaits the manual screen-reader/keyboard audit in J10.** See the
+[frontend handoff](../../docs/verification/explanation-integration-frontend-handoff.md) and the
+[joint acceptance record](../../docs/verification/explanation-integration-acceptance.md). The
+requirements below remain normative. Follow
 [17](17-integration-corrective-programme.md), consume the backend handoff from
 [18](18-backend-integration-corrections.md), and preserve the shared components and study
 decisions already implemented under [15](15-frontend-corrections.md). This is an integration
