@@ -52,3 +52,33 @@ descriptor depends on a completed admission whose original inputs, imports and i
 packages match the comparison. Admission checkpoints each successfully validated ontology,
 so a target failure does not repeat a compatible successful source check. The supervisor may prepare and run E23's own pool and comparison under this
 approval; it does not need another decision about the public dataset substitution.
+
+## Proposed E14 datatype admission amendment — awaiting approval
+
+The original NCIT admission failed `UNSUPPORTED_DATATYPE`. A complete read-only XML
+inventory of the pinned NCIT file found `textArea`, `user-system` and `date-time-system`
+only in three datatype declarations and eight annotation-property ranges (six, one and
+one respectively), with no typed literals or logical uses of those datatype IRIs.
+This is a valid strict-profile rejection: [OWL 2 structural restrictions](https://www.w3.org/TR/owl2-syntax/#The_Restrictions_on_the_Axiom_Closure)
+require supported or defined datatypes. However, [Direct Semantics](https://www.w3.org/TR/owl2-direct-semantics/#Introduction)
+ignores annotations and declarations when interpreting logical axioms.
+
+Proposed treatment: an explicit, native, metadata-only datatype admission option for
+this class-reasoning diagnostic. Keep strict rejection as the default, preserve the original
+files and all logical axioms, and make no inferred datatype definitions or conversions.
+Before admission, prove across the whole import closure and composed bridge world that
+each unsupported datatype occurs only in declarations or annotation metadata. Reject
+any typed literal, datatype definition, data restriction, logical axiom or unsupported
+query using it. All other profile restrictions remain enforced. Record the original strict
+profile failure separately from successful admission for this limited reasoning scope.
+
+Required validation: native fixtures with unchanged subclass, equivalence and satisfiability
+results; rejection of logical/literal uses, including uses introduced by imports or bridge
+composition; unchanged strict-default behavior; and separate cache identities for the option.
+Pin a new isolated wheel, admission recipe and checkpoint namespace, then rerun full native
+admission before enabling the diagnostic. Run the small usage/admission checks first to
+avoid repeating the previous 2h25m NCIT load for an already-known incompatibility.
+
+This section is a proposal, not authorization or a passing result. The bridge remains
+blocked pending approval; no native packages, ontology bytes or queued E14 scope are
+changed by this proposal. Further restrictions may still appear during full admission.
