@@ -399,7 +399,10 @@ def materialize_followup(source, suite, manifests):
         raise ValueError("E22 aggregate metrics do not match the completed producer manifests")
     # Stage-wide bootstrap is finalized later; compute just this already-complete
     # producer using the same source-unit inference code and frozen seed.
-    destination = stage_root / "policies" / source.config.experiment_id
+    # Producer outputs are immutable and may belong to a historical attempt.
+    # Bind derived policy files to this consumer's materialized declaration so
+    # preflight and execution cannot collide on their different absolute paths.
+    destination = source.directory / "policies" / source.config.experiment_id
     evidence_path = destination / "paired_bootstrap.json"
     freeze_json(
         evidence_path,
