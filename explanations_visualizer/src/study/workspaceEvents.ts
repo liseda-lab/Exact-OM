@@ -41,6 +41,8 @@ export function workspaceEvent(action: WorkspaceAction): MappedEvent | null {
       return { type: "graph_reset", component: "graph" };
     case "copy_iri":
       return { type: "copy_iri", component: "workspace", element: action.side };
+    case "context_open":
+      return { type: "definition_open", component: `context_${action.side}`, element: action.iri };
     default:
       return null;
   }

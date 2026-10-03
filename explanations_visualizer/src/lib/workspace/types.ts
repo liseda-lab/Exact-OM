@@ -130,4 +130,5 @@ export type WorkspaceAction =
   | { type: "graph_fit" }
   | { type: "graph_reset" }
   | { type: "locate_fact"; factId: string; inList: boolean }
-  | { type: "copy_iri"; side: Side };
+  | { type: "copy_iri"; side: Side }
+  | { type: "context_open"; side: Side; iri: string };
