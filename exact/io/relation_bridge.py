@@ -39,6 +39,7 @@ def native_bridge(
     checkpoint_path=None,
     max_memory_bytes=None,
     max_compile_work=None,
+    preparation_identity=None,
 ):
     import pyhermit
     import pyowl_core as core
@@ -105,6 +106,7 @@ def native_bridge(
                 "roots": [str(path) for path in origins],
                 "anchors": anchors,
                 "queries": queries,
+                "reasoning_preparation": preparation_identity,
             }
         )
         state["identity"] = identity

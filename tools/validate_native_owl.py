@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Native original-ontology admission without reading any alignment reference."""
+"""Strict native admission of recorded OWL inputs, without alignment references."""
 from __future__ import annotations
 
 import json
@@ -24,8 +24,15 @@ def run_diagnostic(recipe_path):
         raise ValueError("Native admission accepts only original OWL inputs")
     output = Path(recipe["output"])
     output.mkdir(parents=True, exist_ok=True)
-    paths = {side: verified(value) for side, value in recipe["inputs"].items()}
-    imports = {iri: verified(value) for iri, value in recipe["imports"].items()}
+    reasoning_inputs, reasoning_imports = recipe["inputs"], recipe["imports"]
+    if recipe.get("reasoning_preparation"):
+        from tools.prepare_bridge_ontology import verify_preparation
+
+        reasoning_inputs, reasoning_imports = verify_preparation(
+            recipe["reasoning_preparation"], recipe["inputs"], recipe["imports"]
+        )
+    paths = {side: verified(value) for side, value in reasoning_inputs.items()}
+    imports = {iri: verified(value) for iri, value in reasoning_imports.items()}
     result = {
         "status": "running",
         "selection_eligible": False,
@@ -34,6 +41,13 @@ def run_diagnostic(recipe_path):
         "imports": recipe["imports"],
         "ontologies": {},
     }
+    if recipe.get("reasoning_preparation"):
+        result.update(
+            reasoning_preparation=recipe["reasoning_preparation"],
+            reasoning_inputs=reasoning_inputs,
+            reasoning_imports=reasoning_imports,
+            admission_scope="full_original_logical_content_with_recorded_metadata_exclusions",
+        )
     result["identity_sha256"] = digest(
         {
             "recipe": {key: value for key, value in recipe.items() if key != "output"},
@@ -80,7 +94,7 @@ def run_diagnostic(recipe_path):
             report.update(compile_seconds=time.monotonic() - started, stage="native_queries")
             write(output / "admission.json", result)
             if not reasoner.is_consistent():
-                raise ValueError("Original ontology is inconsistent: " + side)
+                raise ValueError("Admitted ontology is inconsistent: " + side)
             entity = core.Class(core.IRI(recipe["query_classes"][side]))
             if not reasoner.is_defined(entity) or not reasoner.entails(
                 core.SubClassOf(entity, entity)
@@ -95,6 +109,8 @@ def run_diagnostic(recipe_path):
             write(output / "admission.json", result)
         for value in [*recipe["inputs"].values(), *recipe["imports"].values()]:
             verified(value)
+        if recipe.get("reasoning_preparation"):
+            verify_preparation(recipe["reasoning_preparation"], recipe["inputs"], recipe["imports"])
         result["status"] = "passed"
     except Exception as error:
         result.update(

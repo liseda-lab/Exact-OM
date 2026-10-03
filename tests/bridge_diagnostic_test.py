@@ -7,6 +7,8 @@ import pytest
 
 from tools import run_bridge_diagnostic as diagnostic
 
+_METADATA_DATATYPE = "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#textArea"
+
 
 def _fixture(tmp_path):
     from tools.run_directional_diagnostic import write
@@ -134,3 +136,86 @@ def test_native_admission_does_not_read_alignment_references(tmp_path):
     path.write_text(json.dumps(admission))
     with pytest.raises(ValueError, match="only original OWL inputs"):
         run_diagnostic(path)
+
+
+def _prepared_fixture(tmp_path):
+    from tools.prepare_bridge_ontology import EXPECTED, prepare
+
+    path, recipe = _fixture(tmp_path)
+    for side, declarations, edge in [
+        ("source", ["a", "c"], ("c", "a")),
+        ("target", ["b", "d"], ("b", "d")),
+    ]:
+        ontology = tmp_path / (side + ".owl")
+        metadata = ""
+        if side == "source":
+            for datatype, counts in EXPECTED.items():
+                metadata += f'<rdfs:Datatype rdf:about="{datatype}"/>'
+                for index in range(counts["annotation_range"]):
+                    metadata += (
+                        f'<owl:AnnotationProperty rdf:about="urn:description:{datatype}:{index}">'
+                        f'<rdfs:range rdf:resource="{datatype}"/></owl:AnnotationProperty>'
+                    )
+        ontology.write_text(
+            '<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" '
+            'xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#" '
+            'xmlns:owl="http://www.w3.org/2002/07/owl#">'
+            + metadata
+            + "".join(f'<owl:Class rdf:about="urn:{name}"/>' for name in declarations)
+            + f'<owl:Class rdf:about="urn:{edge[0]}">'
+            f'<rdfs:subClassOf rdf:resource="urn:{edge[1]}"/></owl:Class></rdf:RDF>'
+        )
+        recipe["owl"][side] = diagnostic.bind(ontology)
+    recipe["reasoning_preparation"] = prepare(
+        recipe["owl"], recipe["imports"], tmp_path / "preparation"
+    )
+    path.write_text(json.dumps(recipe))
+    return path, recipe
+
+
+def test_prepared_native_bridge_preserves_full_logical_chain_and_checkpoint(tmp_path):
+    path, recipe = _prepared_fixture(tmp_path)
+    result = diagnostic.run_diagnostic(path)
+    assert result["native"]["by_relation"]["<"]["tp"] == 1
+    assert result["graph"]["by_relation"]["<"]["tp"] == 1
+    assert result["reasoning_preparation"] == recipe["reasoning_preparation"]
+    assert result["reasoning_inputs"]["source"] != recipe["owl"]["source"]
+    assert result["native_coherence"]["compiled_anchor_worlds"] == 1
+    assert result["native_coherence"]["ontology_consistency"] == "consistent"
+    assert diagnostic.run_diagnostic(path)["native_coherence"]["compiled_anchor_worlds"] == 0
+
+
+def test_prepared_bridge_rechecks_derived_bytes_after_native_work(tmp_path, monkeypatch):
+    path, recipe = _prepared_fixture(tmp_path)
+    original = diagnostic.native_bridge
+
+    def changed(frame, source, target, **options):
+        result = original(frame, source, target, **options)
+        source.write_text(source.read_text() + "\n")
+        return result
+
+    monkeypatch.setattr(diagnostic, "native_bridge", changed)
+    with pytest.raises(ValueError, match="input changed"):
+        diagnostic.run_diagnostic(path)
+    assert not (tmp_path / "result/completion.json").exists()
+
+
+@pytest.mark.parametrize("entity", ["a", "c"])
+def test_prepared_bridge_rejects_removed_datatype_as_anchor_or_query_class(
+    tmp_path, monkeypatch, entity
+):
+    path, recipe = _prepared_fixture(tmp_path)
+    properties = tmp_path / "source/properties.csv"
+    frame = pd.read_csv(properties)
+    frame.loc[frame.node_id.eq(entity), "iri"] = _METADATA_DATATYPE
+    frame.to_csv(properties, index=False)
+    recipe["inputs"]["source"] = diagnostic.bind(properties.parent)
+    path.write_text(json.dumps(recipe))
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("Unsafe bridge must be rejected before native reasoning")
+
+    monkeypatch.setattr(diagnostic, "native_bridge", forbidden)
+    with pytest.raises(ValueError, match="datatype cannot be a native bridge/query class"):
+        diagnostic.run_diagnostic(path)
+    assert not (tmp_path / "result/completion.json").exists()

@@ -110,11 +110,25 @@ def run_prepared_diagnostic(recipe_path, registry):
         completion = completed_run(resolve_run(registry, admission_run))
         admission_completion = read(verified(completion["diagnostic"]))
         admission = read(verified(admission_completion["diagnostic"]))
+        preparation = protocol.get("reasoning_preparation")
+        reasoning_matches = admission.get("reasoning_preparation") == preparation
+        if preparation:
+            from tools.prepare_bridge_ontology import verify_preparation
+
+            reasoning_inputs, reasoning_imports = verify_preparation(
+                preparation, protocol["owl"], protocol["imports"]
+            )
+            reasoning_matches = (
+                reasoning_matches
+                and admission.get("reasoning_inputs") == reasoning_inputs
+                and admission.get("reasoning_imports") == reasoning_imports
+            )
         if (
             admission.get("status") != "passed"
             or admission.get("inputs") != protocol["owl"]
             or admission.get("imports") != protocol["imports"]
             or admission.get("installed_code") != ontology_execution_identity("hermit")
+            or not reasoning_matches
         ):
             raise ValueError("Native admission does not match the current originals and packages")
     runtime = root / "runtime" / recipe["campaign_id"]

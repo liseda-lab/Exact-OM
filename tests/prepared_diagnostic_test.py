@@ -47,7 +47,19 @@ def test_dependency_validation_checks_both_nested_diagnostic_bindings(tmp_path, 
 
 
 @pytest.mark.parametrize(
-    "admission_state", ["failed", "different_code", "different_input", "passed"]
+    "admission_state",
+    [
+        "failed",
+        "different_code",
+        "different_input",
+        "passed",
+        "prepared_passed",
+        "different_preparation",
+        "missing_preparation",
+        "unexpected_preparation",
+        "different_reasoning_input",
+        "different_reasoning_import",
+    ],
 )
 def test_e14_requires_compatible_passed_admission_before_account_copy_or_execution(
     tmp_path, monkeypatch, admission_state
@@ -68,6 +80,34 @@ def test_e14_requires_compatible_passed_admission_before_account_copy_or_executi
         report["installed_code"] = {**installed, "pyhermit": "old-code"}
     if admission_state == "different_input":
         report["inputs"] = {**owl, "target": {**owl["target"], "sha256": "0" * 64}}
+    preparation = {"path": str(tmp_path / "preparation.json"), "sha256": "a" * 64}
+    uses_preparation = admission_state in {
+        "prepared_passed",
+        "different_preparation",
+        "missing_preparation",
+        "different_reasoning_input",
+        "different_reasoning_import",
+    }
+    if uses_preparation or admission_state == "unexpected_preparation":
+        derived = {side: {**value, "sha256": "b" * 64} for side, value in owl.items()}
+        report.update(
+            reasoning_preparation=preparation,
+            reasoning_inputs=derived,
+            reasoning_imports={},
+        )
+        monkeypatch.setitem(
+            sys.modules,
+            "tools.prepare_bridge_ontology",
+            SimpleNamespace(verify_preparation=lambda *args: (derived, {})),
+        )
+        if admission_state == "different_preparation":
+            report["reasoning_preparation"] = {**preparation, "sha256": "c" * 64}
+        elif admission_state == "missing_preparation":
+            report.pop("reasoning_preparation")
+        elif admission_state == "different_reasoning_input":
+            report["reasoning_inputs"] = owl
+        elif admission_state == "different_reasoning_import":
+            report["reasoning_imports"] = {"urn:unadmitted": owl["target"]}
     upstream = _chain(tmp_path / "admission", report)
     recipe = prepared_batch.read(worker.path)
     registry_path = Path(recipe["supervisor"]) / "registry.json"
@@ -78,7 +118,13 @@ def test_e14_requires_compatible_passed_admission_before_account_copy_or_executi
     output = tmp_path / "diagnostic-output"
     prepared_batch.write(
         protocol,
-        {"kind": "e14_native_known_pairs", "owl": owl, "imports": {}, "output": str(output)},
+        {
+            "kind": "e14_native_known_pairs",
+            "owl": owl,
+            "imports": {},
+            "output": str(output),
+            **({"reasoning_preparation": preparation} if uses_preparation else {}),
+        },
     )
     recipe.update(
         diagnostic=prepared_batch.binding(protocol),
@@ -105,7 +151,7 @@ def test_e14_requires_compatible_passed_admission_before_account_copy_or_executi
         )
 
     monkeypatch.setattr(run_bridge_diagnostic, "run_diagnostic", execute)
-    if admission_state != "passed":
+    if admission_state not in {"passed", "prepared_passed"}:
         with pytest.raises(ValueError, match="admission does not match"):
             prepared_batch.run_recipe(worker.path)
         assert calls == [] and not worker.runtime.exists()

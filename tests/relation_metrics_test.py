@@ -181,6 +181,14 @@ def test_native_bridge_reuses_worlds_resumes_and_checks_endpoints(tmp_path, monk
     assert len(calls) == 2
     assert repeated.Relation.tolist() == ["<", "<"]
     assert repeated.Score.tolist() == [0.5, 0.5]
+    with pytest.raises(ValueError, match="checkpoint inputs or implementation changed"):
+        native_bridge(
+            frame,
+            source,
+            target,
+            preparation_identity={"path": "new-preparation.json", "sha256": "a" * 64},
+            **options,
+        )
     imported.write_text("Ontology(Declaration(Class(<urn:changed>)))")
     with pytest.raises(ValueError, match="checkpoint inputs or implementation changed"):
         native_bridge(frame, source, target, **options)

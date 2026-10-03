@@ -121,8 +121,20 @@ def run_diagnostic(recipe_path):
     if set(recipe["inputs"]) != {"source", "target", "train", "valid"}:
         raise ValueError("E14 inputs must be public train/valid only")
     paths = {name: verified(value) for name, value in recipe["inputs"].items()}
-    owl = {name: verified(value) for name, value in recipe["owl"].items()}
-    imports = {name: verified(value) for name, value in recipe["imports"].items()}
+    reasoning_inputs, reasoning_imports = recipe["owl"], recipe["imports"]
+    preparation = recipe.get("reasoning_preparation")
+    excluded_datatypes = set()
+    if preparation:
+        from tools.prepare_bridge_ontology import verify_preparation
+
+        reasoning_inputs, reasoning_imports = verify_preparation(
+            preparation, recipe["owl"], recipe["imports"]
+        )
+        excluded_datatypes = set(
+            json.loads(verified(preparation).read_text())["excluded_datatypes"]
+        )
+    owl = {name: verified(value) for name, value in reasoning_inputs.items()}
+    imports = {name: verified(value) for name, value in reasoning_imports.items()}
     source_ids, target_ids = (iri_map(paths[side]) for side in ("source", "target"))
     gold, sources = load_pairs(paths["valid"], recipe["source_cap"], recipe["seed"])
     training = pd.read_csv(paths["train"], sep="\t", dtype=str)
@@ -130,6 +142,16 @@ def run_diagnostic(recipe_path):
         raise ValueError("E14 train anchors and development query sources overlap")
     anchors = training.loc[training.Relation.eq("="), ["SrcEntity", "TgtEntity"]].drop_duplicates()
     pairs = gold[["SrcEntity", "TgtEntity"]].assign(Score=0.0)
+    native_pairs = remap(pairs, source_ids, target_ids)
+    native_anchors = remap(anchors, source_ids, target_ids)
+    endpoints = {
+        value
+        for frame in (native_pairs, native_anchors)
+        for column in ("SrcEntity", "TgtEntity")
+        for value in frame[column]
+    }
+    if endpoints & excluded_datatypes:
+        raise ValueError("Excluded metadata datatype cannot be a native bridge/query class")
     output = Path(recipe["output"])
     output.mkdir(parents=True, exist_ok=True)
     write(
@@ -144,15 +166,16 @@ def run_diagnostic(recipe_path):
         },
     )
     native = native_bridge(
-        remap(pairs, source_ids, target_ids),
+        native_pairs,
         owl["source"],
         owl["target"],
-        anchor_rows=anchor_records(remap(anchors, source_ids, target_ids)),
+        anchor_rows=anchor_records(native_anchors),
         timeout_seconds=recipe["timeout_seconds"],
         max_memory_bytes=recipe["max_memory_bytes"],
         max_compile_work=recipe.get("max_compile_work"),
         import_map=imports,
         checkpoint_path=output / "native-checkpoint.json",
+        preparation_identity=preparation,
     )
     native_attrs = native.attrs.copy()
     native = remap(
@@ -161,6 +184,8 @@ def run_diagnostic(recipe_path):
     for collection in (recipe["inputs"], recipe["owl"], recipe["imports"]):
         for value in collection.values():
             verified(value)
+    if preparation:
+        verify_preparation(preparation, recipe["owl"], recipe["imports"])
     # One explicit anchor inventory is shared by both methods. No exact-label or
     # scored-candidate anchor discovery is allowed in this controlled comparison.
     graph = _semantic_entailment(
@@ -177,6 +202,8 @@ def run_diagnostic(recipe_path):
     for collection in (recipe["inputs"], recipe["owl"], recipe["imports"]):
         for value in collection.values():
             verified(value)
+    if preparation:
+        verify_preparation(preparation, recipe["owl"], recipe["imports"])
     native.to_csv(output / "native.tsv", sep="\t", index=False)
     graph.to_csv(output / "graph.tsv", sep="\t", index=False)
     result = {
@@ -191,6 +218,13 @@ def run_diagnostic(recipe_path):
         "graph_abstentions": graph.attrs.get("relation_abstentions", []),
         "predictions": {name: bind(output / (name + ".tsv")) for name in ("native", "graph")},
     }
+    if preparation:
+        result.update(
+            reasoning_preparation=preparation,
+            reasoning_inputs=reasoning_inputs,
+            reasoning_imports=reasoning_imports,
+            admission_scope="full_original_logical_content_with_recorded_metadata_exclusions",
+        )
     write(output / "bridge-diagnostic.json", result)
     write(
         output / "completion.json",
