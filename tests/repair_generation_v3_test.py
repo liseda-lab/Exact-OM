@@ -321,7 +321,9 @@ def test_v3_frozen_risk_snapshot_and_objective_survive_supervised_transport(tmp_
     result = bounded_freeze_neural_round(
         problem,
         model,
-        seconds=30,
+        # This checks immutable transport, not generation speed. Native compiler
+        # startup under concurrent Slurm work needs a separate finite fixture cap.
+        seconds=120,
         draws_per_object=0,
         max_depth=0,
         max_constructors=0,
