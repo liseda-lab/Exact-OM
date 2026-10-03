@@ -92,7 +92,7 @@ def test_native_production_uniform_replay_serializes_partial_or_generated_pool(t
         draws_per_object=2,candidate_cap=16,max_depth=1,max_constructors=1,
         compile_seconds=10,max_circuit_nodes=100000,max_graph_nodes=4096,max_graph_edges=32768,
         max_explanations=64,max_text_tokens=128,pair_factor_limit_per_object=16,
-        quantization_scale=10000,contextual_filtering=False,factored=True,
+        quantization_scale=10000,contextual_filtering=False,factored=False,
         proposal_arm='grammar_uniform',vtree_type='balanced')
     model=dict(encoder='none',hidden_dim=8,heads=2,layers=0,dropout=0,revision='v3',pairwise=False,plan_risk=False)
     from exact.repair.workers import bounded_call
@@ -105,3 +105,28 @@ def test_native_production_uniform_replay_serializes_partial_or_generated_pool(t
     assert all(row['arm']=='grammar_uniform' for row in result['reports'])
     assert all(row['attempted_draws']==2 for row in result['reports'])
     assert all('family_statuses' in row for row in result['reports'])
+
+
+def test_monolithic_proposal_forwards_declared_cache_vtree_and_node_limit(monkeypatch, tmp_path):
+    from types import SimpleNamespace
+    import torch
+    import exact.repair.compilation
+    import exact.repair.pipeline
+    import exact.repair.circuit
+    from exact.repair.grammar import mapping_grammar
+    from exact.repair.retrieval import retrieve_vocabulary
+    case = case_from_dict(archived_case())
+    obj = case.problem.objects[0]
+    menu = retrieve_vocabulary(case.problem).for_object(obj.object_id)
+    encoding = mapping_grammar(obj, menu.classes, menu.properties, max_depth=1, max_constructors=1)
+    observed = {}
+    def compile_stub(actual, **kwargs):
+        assert actual is encoding
+        observed.update(kwargs)
+        return SimpleNamespace(node_count=3)
+    monkeypatch.setattr(exact.repair.compilation, 'compile_bounded', compile_stub)
+    monkeypatch.setattr(exact.repair.circuit, 'ConditionedMixture', lambda circuit, logits: logits)
+    exact.repair.pipeline.proposal_distribution(SimpleNamespace(empty_bundle=torch.zeros(1)), None,
+        obj, encoding=encoding, uniform=True, factored=False, compile_seconds=20,
+        max_circuit_nodes=1000000, compiler_cache_directory=str(tmp_path), vtree_type='balanced')
+    assert observed == dict(seconds=20, max_nodes=1000000, cache_directory=str(tmp_path), vtree_type='balanced')

@@ -89,16 +89,16 @@ def make_plan(preparation_path, report_path, protocol_path, legacy_train_path, q
                         max_explanations=settings['max_explanations'], max_text_tokens=settings['max_text_tokens'],
                         pair_factor_limit_per_object=settings['pair_factor_limit_per_object'],
                         quantization_scale=settings['quantization_scale'],
-                        contextual_filtering=False, factored=True, proposal_arm='grammar_uniform',
+                        contextual_filtering=False, factored=False, proposal_arm='grammar_uniform',
                         vtree_type='balanced'),
         model=dict(encoder='none', hidden_dim=8, heads=2, layers=0, dropout=0,
                    revision='v3', pairwise=False, plan_risk=False),
         scope='Production uniform generator engineering replay; no neural performance or semantic quality comparison',
-        changes_from_archive=['explicit v3 migration', 'current factored compiler and production generator',
+        changes_from_archive=['explicit v3 migration', 'current monolithic compiler and production generator',
                               'uniform proposal control with disposable untrained scoring model',
                               'persistent per-case cold/warm cache', 'current protected elementary actions'],
         model_role='Uniform proposals ignore weights; generated objective is discarded, no fitting or checkpoints',
-        scientific_limits='Original generation allowance 0.8*300=240s, 20s compiler aggregate per object, 1M nodes per family; no widening of grammar',
+        scientific_limits='Original generation allowance 0.8*300=240s, 20s compiler aggregate per object, 1M allocated nodes per monolithic object circuit; no widening of grammar',
         next_stage='xr21-expanded-historical-audit-001', study_complete=False,
     )
 
@@ -158,7 +158,8 @@ def run(plan_path, output, start, stop):
     if not 0 <= start < stop <= len(plan['rows']):
         raise ValueError('Invalid frozen case shard')
     runtime = runtime_manifest()
-    identity = canonical_hash((sha(plan_path), sha(__file__), runtime))
+    identity = canonical_hash((sha(plan_path), sha(__file__),
+        [(name, sha(Path(__file__).with_name(name))) for name in ('expanded_profile.py', 'prepare.py')], runtime))
     output.mkdir(parents=True, exist_ok=True)
     rows = []
     for item in plan['rows'][start:stop]:

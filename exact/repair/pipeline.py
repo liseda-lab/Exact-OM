@@ -370,7 +370,13 @@ def proposal_distribution(
     elif compile_seconds is not None:
         from .compilation import compile_bounded
 
-        compiled = compile_bounded(encoding, seconds=compile_seconds, max_nodes=max_circuit_nodes)
+        compiled = compile_bounded(
+            encoding,
+            seconds=compile_seconds,
+            max_nodes=max_circuit_nodes,
+            cache_directory=compiler_cache_directory,
+            vtree_type=vtree_type,
+        )
     elif hasattr(encoding, "decode"):
         from .grammar import compile_grammar
 
