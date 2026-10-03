@@ -161,6 +161,8 @@ test.describe("R03 tutorial position (J06)", () => {
     const before = await api.state();
     await page.reload();
     await expect(add1(page)).toBeEnabled();
+    // Background label lookups for the cards may still be finishing; mark after they settle.
+    await page.waitForLoadState("networkidle");
     const mark = traffic.requests.length;
     await page.getByRole("button", { name: "Tutorial help", exact: true }).click();
     await expect(page.getByRole("dialog", { name: "Tutorial help" })).toBeVisible();
