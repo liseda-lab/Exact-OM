@@ -163,6 +163,18 @@
       "backend_corrections_and_frontend_integration",
       "joint_acceptance"
     ],
+    "waives_backend_or_launch_gates": false,
+    "sequence_scope": "initial_2026_10_02_correction_only"
+  },
+  "integration_followup": {
+    "spec_revision": "2026-10-03",
+    "authority": "../17-integration-corrective-programme.md",
+    "contract": "integration-followup.json",
+    "sequence": [
+      "backend_contract_implementation_and_handoff",
+      "frontend_integration",
+      "joint_acceptance"
+    ],
     "waives_backend_or_launch_gates": false
   }
 }

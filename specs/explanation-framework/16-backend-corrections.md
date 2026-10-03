@@ -1,5 +1,10 @@
 # Backend corrective assignment
 
+> **Current follow-up:** review at `2d9715b` reopened discovery, readiness, tutorial-position
+> and timing-export issues. Start with [17](17-integration-corrective-programme.md) and
+> [18](18-backend-integration-corrections.md), delivering backend contracts before frontend
+> integration. The delivered work and historical evidence below do not close those findings.
+
 **Implemented 2026-10-03; release acceptance remains partly gated.** See the
 [dated backend handoff](../../docs/verification/explanation-backend-corrections-20261003.md)
 and [v2 contract](../../docs/verification/explanation-study-v2-backend-contract.md).

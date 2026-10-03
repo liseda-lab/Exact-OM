@@ -1,0 +1,131 @@
+{
+  "schema": "exact-study-integration-followup/1",
+  "status": "design_only_not_current_runtime_config",
+  "reviewed_commit": "2d9715b",
+  "authority": "../17-integration-corrective-programme.md",
+  "backend_assignment": "../18-backend-integration-corrections.md",
+  "frontend_assignment": "../19-frontend-integration-corrections.md",
+  "sequence": [
+    "backend_contract_implementation_and_handoff",
+    "frontend_integration",
+    "joint_acceptance"
+  ],
+  "parallel": {
+    "isolated_checkouts_required": true,
+    "shared_file_owner_required": true,
+    "merge_backend_first": true,
+    "waives_handoff_or_joint_acceptance": false
+  },
+  "runtime_extension": "study-integration/1",
+  "issues": {
+    "R01": {
+      "priority": 1,
+      "owner": "backend_then_frontend",
+      "status": "specified_not_implemented",
+      "acceptance": [
+        "J01",
+        "J02",
+        "J03"
+      ]
+    },
+    "R02": {
+      "priority": 1,
+      "owner": "frontend_with_backend_contract",
+      "status": "specified_not_implemented",
+      "acceptance": [
+        "J04",
+        "J05"
+      ]
+    },
+    "R03": {
+      "priority": 2,
+      "owner": "backend_then_frontend",
+      "status": "specified_not_implemented",
+      "acceptance": [
+        "J06",
+        "J07",
+        "J09",
+        "J10"
+      ]
+    },
+    "R04": {
+      "priority": 2,
+      "owner": "backend_with_frontend_consumer",
+      "status": "specified_not_implemented",
+      "acceptance": [
+        "J08",
+        "J09"
+      ]
+    }
+  },
+  "joint_acceptance_ids": [
+    "J01",
+    "J02",
+    "J03",
+    "J04",
+    "J05",
+    "J06",
+    "J07",
+    "J08",
+    "J09",
+    "J10",
+    "J11",
+    "J12"
+  ],
+  "workspace": {
+    "v2_explanation_descriptor_required": true,
+    "v2_prepared_excerpt_fallback_allowed": false,
+    "baseline_descriptor": null,
+    "scope_is_authorization": false,
+    "legacy_v1_adapter_preserved": true
+  },
+  "readiness": {
+    "source_context_required": true,
+    "candidate_initial_context_count": 5,
+    "admitted_initial_profiles_and_comparisons_required": true,
+    "usable_render_required": true,
+    "lazy_all_ontology_prefetch_required": false,
+    "request_failure_is_absence": false,
+    "premature_submission_allowed": false,
+    "hidden_tab_automatically_pauses": false
+  },
+  "tutorial_position": {
+    "views": [
+      "lesson",
+      "assessment"
+    ],
+    "omitted_patch": "preserve",
+    "explicit_null_patch": "reject_422",
+    "position_only_mutation_allowed": true,
+    "save_destination_not_previous_view": true,
+    "frozen_content_rewritten": false
+  },
+  "exports": {
+    "corrected_analysis_schema": "exact-study-analysis/3",
+    "corrected_csv_schema": "exact-study-csv/3",
+    "v2_admin_explicit_selection_required": true,
+    "saved_export_bytes_preserved": true,
+    "source_protocol_versions_preserved": true,
+    "observations_unit": "page_seconds",
+    "cross_page_monotonic_offsets_comparable": false,
+    "coverage_status": "not_established",
+    "unique_elapsed_coverage_seconds": null,
+    "unobserved_elapsed_seconds": null,
+    "active_duration_known": false
+  },
+  "preserved_protocol": {
+    "protege_required": false,
+    "multiple_methods_allowed": true,
+    "method_changes_between_cases_allowed": true,
+    "external_use_required": false,
+    "reporting_unit": "source_plus_candidate_set_case",
+    "assessment_items": 5,
+    "server_owned_completion": true
+  },
+  "evidence": {
+    "real_service_browser_required": true,
+    "fresh_full_tutorial_journey_required": true,
+    "mock_success_is_joint_acceptance": false,
+    "waives_backend_or_launch_gates": false
+  }
+}

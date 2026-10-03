@@ -198,7 +198,8 @@
         "Screen-reader and manual keyboard passes, formative usability sessions and tutorial/case burden re-estimation.",
         "Tutorial material in src/study/v2/tutorialContent.ts is a proposal for the backend owner to freeze; no publication may certify it as a frontend fallback."
       ],
-      "implementation_status": "partial"
+      "implementation_status": "partial",
+      "historical_status_note": "Receipt from the earlier frontend-before-backend phase; current follow-up status is in integration_followup_20261003."
     }
   },
   "gates": {
@@ -439,7 +440,11 @@
     "execution_lock": "data/explanation-framework/prepared-combined/execution-47388b7e7a83f4afd4d7a4d649d7faf769a7f84271242211da531f5b604075f1.json",
     "frontend_verification": "docs/verification/explanation-frontend-e2e.md",
     "frontend_corrective_handoff": "docs/verification/explanation-frontend-corrections.md",
-    "frontend_v2_contract_examples": "docs/verification/explanation-frontend-v2-contract-examples.json"
+    "frontend_v2_contract_examples": "docs/verification/explanation-frontend-v2-contract-examples.json",
+    "current_corrective_assignment": "specs/explanation-framework/17-integration-corrective-programme.md",
+    "backend_integration_assignment": "specs/explanation-framework/18-backend-integration-corrections.md",
+    "frontend_integration_assignment": "specs/explanation-framework/19-frontend-integration-corrections.md",
+    "integration_review": "specs/explanation-framework/evidence/integration-review-20261003.md"
   },
   "deferred": [
     "48-pair baseline/challenger model-selection exercise",
@@ -449,7 +454,7 @@
     "Participant recruitment, invitations to people and live study launch",
     "Optional whole-ontology inference, complete KGA and production repair"
   ],
-  "implementation_status": "complete",
+  "implementation_status": "partial",
   "corrective_programme_20261003": {
     "status": "backend_implemented_release_gates_unverified",
     "scope": "Specifications14/16 backend corrections and integration with the corrected frontend. Historical gates and evidence above retain their original meaning.",
@@ -474,6 +479,67 @@
       "real case adjudication and owner consent/information approval",
       "Render readiness"
     ],
+    "live_publication": false,
+    "recruitment": false,
+    "deployment": false,
+    "followup_note": "Historical implementation receipt. Independent review at 2d9715b reopened R01-R04; see integration_followup_20261003. Earlier verified claims are not current joint closure."
+  },
+  "current_acceptance_authority": "specs/explanation-framework/17-integration-corrective-programme.md",
+  "integration_followup_20261003": {
+    "status": "specified_not_implemented",
+    "reviewed_commit": "2d9715b",
+    "authority": "specs/explanation-framework/17-integration-corrective-programme.md",
+    "evidence": "specs/explanation-framework/evidence/integration-review-20261003.md",
+    "contract": "specs/explanation-framework/protocol/integration-followup.json",
+    "sequence": [
+      "backend_contract_implementation_and_handoff",
+      "frontend_integration",
+      "joint_acceptance"
+    ],
+    "issues": {
+      "R01": {
+        "priority": 1,
+        "owner": "backend_then_frontend",
+        "status": "open",
+        "acceptance": [
+          "J01",
+          "J02",
+          "J03"
+        ]
+      },
+      "R02": {
+        "priority": 1,
+        "owner": "frontend_with_backend_contract",
+        "status": "open",
+        "acceptance": [
+          "J04",
+          "J05"
+        ]
+      },
+      "R03": {
+        "priority": 2,
+        "owner": "backend_then_frontend",
+        "status": "open",
+        "acceptance": [
+          "J06",
+          "J07",
+          "J09",
+          "J10"
+        ]
+      },
+      "R04": {
+        "priority": 2,
+        "owner": "backend_with_frontend_consumer",
+        "status": "open",
+        "acceptance": [
+          "J08",
+          "J09"
+        ]
+      }
+    },
+    "implementation_acceptance": "pending_backend_frontend_and_joint_verification",
+    "historical_evidence_preserved": true,
+    "launch_gates_waived": false,
     "live_publication": false,
     "recruitment": false,
     "deployment": false

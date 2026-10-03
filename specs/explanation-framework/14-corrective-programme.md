@@ -1,9 +1,13 @@
 # Corrective programme: shared exploration and study readiness
 
 **Direction approved: 2026-10-02. Implementation update: 2026-10-03.**
-Backend corrections and frontend integration are implemented; see the
+The initial correction implementations were delivered; see the
 [dated backend handoff](../../docs/verification/explanation-backend-corrections-20261003.md)
-for demonstrated checks and remaining release gates. The requirements below remain normative.
+for demonstrated checks and remaining release gates. Independent review at `2d9715b`
+reopened four integration findings. Start the next work with
+[17](17-integration-corrective-programme.md), [18](18-backend-integration-corrections.md)
+and [19](19-frontend-integration-corrections.md), which override this iteration's original
+sequencing. The product/study requirements below remain normative; delivery is not closure.
 This amendment follows the user's review of the implemented tool and the bounded
 source/browser review at `57e501a`. It is an implementation assignment, not a report
 that every release gate has passed. Read the [verification record](evidence/corrective-review-20261002.md),
@@ -176,6 +180,10 @@ use these IDs as acceptance-test IDs; none may disappear without a recorded disp
 | C27 | P1 / regression | Retain subsequent fixes and distinguish historical defects from current ones; publish evidence and updated handoff without unsupported completion claims. | Both |
 
 ## Implementation order and handoffs
+
+This was the initial 2026-10-02 correction sequence. For the next cycle use
+[17's backend-first protocol](17-integration-corrective-programme.md); do not repeat the
+completed frontend design/inventory phase or treat this historical order as a conflicting gate.
 
 **Frontend first for workflow design and the contract inventory, not frontend-only
 implementation against imaginary endpoints.** Suggested ordered work:

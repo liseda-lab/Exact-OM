@@ -1,11 +1,13 @@
 # Backend implementation assignment; frontend deferred
 
-> **Historical bootstrap assignment.** For the implemented products' 2026-10-02 corrective
-> iteration, start with [14](14-corrective-programme.md), then the separate
-> [frontend](15-frontend-corrections.md) and [backend](16-backend-corrections.md) assignments.
-> Frontend leads workflow design and contract inventory; backend implements the required
-> contract changes before integrated acceptance. The deferral below does not prohibit that
-> corrective frontend work. Existing data/policy/recovery and launch gates remain binding.
+> **Historical bootstrap assignment below.** For the current follow-up, start with
+> [17 — Agent protocol and acceptance](17-integration-corrective-programme.md).
+> Run [18 — Backend](18-backend-integration-corrections.md) first, then
+> [19 — Frontend](19-frontend-integration-corrections.md), then the joint matrix.
+> The backend handoff is an input to frontend integration. Optional parallel work requires
+> isolated checkouts, explicit ownership and backend-first integration. The deferral below
+> does not prohibit this assigned correction. Specs 14–16's product decisions and existing
+> data/policy/recovery/launch gates remain binding. See 17 for ready-to-use agent instructions.
 
 Implement B0–B5 from this suite in the existing Exact-OM repository. The user has chosen a separate backend review and a specialized frontend agent **only after backend readiness**, for full frontend design/implementation. Do not create an early frontend review dependency or implement a speculative full frontend while building the backend.
 
