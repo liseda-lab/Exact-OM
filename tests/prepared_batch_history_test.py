@@ -60,7 +60,8 @@ def _fixture(tmp_path):
 
 
 @pytest.mark.parametrize(
-    "unfinished_status", ["blocked", "blocked_input_resolution", "deferred_budget"]
+    "unfinished_status",
+    ["blocked", "blocked_input_resolution", "deferred_budget", "selected", "screened_out"],
 )
 def test_prepared_history_skips_known_selection_and_unfinished_placeholders(
     tmp_path, monkeypatch, unfinished_status
@@ -148,3 +149,37 @@ def test_failed_independent_history_is_not_a_dependency(tmp_path, required):
             prepared_batch.prepare_lock(recipe, tmp_path / "new", registry)
     else:
         CampaignLock.model_validate(prepared_batch.prepare_lock(recipe, tmp_path / "new", registry))
+
+
+@pytest.mark.parametrize("transitive", [False, True])
+def test_required_history_is_checked_through_named_output_ports(tmp_path, monkeypatch, transitive):
+    recipe, retained, _ = _fixture(tmp_path)
+    retained["steps"][0]["external_selection"] = None
+    retained["steps"][0]["produces"] = ["required_policy"]
+    target = retained["steps"][1]
+    target.update(requires=["required_policy"], inherits=[])
+    if transitive:
+        retained["steps"][2].update(requires=["required_policy"], produces=["intermediate_policy"])
+        target["requires"] = ["intermediate_policy"]
+    campaign = Path(recipe["base_campaign"]["path"])
+    campaign.write_text(yaml.safe_dump(retained))
+    recipe["base_campaign"] = prepared_batch.binding(campaign)
+    group_path = Path(recipe["group"]["path"])
+    group = json.loads(group_path.read_text())
+    group["rows"][0]["declaration"] = target
+    group_path.write_text(json.dumps(group))
+    recipe["group"] = prepared_batch.binding(group_path)
+    selection = tmp_path / "required-selection.json"
+    selection.write_text(json.dumps({"experiments": {"E05": {"status": "selected"}}}))
+    completion = tmp_path / "required-completion.json"
+    completion.write_text(
+        json.dumps({"status": "complete", "selection": prepared_batch.binding(selection)})
+    )
+    registry = {"runs": [{"id": "required", "completion_path": str(completion)}]}
+
+    def required_source(_):
+        raise ValueError("Required source must still be verified")
+
+    monkeypatch.setattr(prepared_batch, "source_campaign", required_source)
+    with pytest.raises(ValueError, match="Required source must still be verified"):
+        prepared_batch.prepare_lock(recipe, tmp_path / "new", registry)

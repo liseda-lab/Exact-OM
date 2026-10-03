@@ -260,6 +260,20 @@ def prepare_lock(recipe, root, registry, *, completed=True):
     if completed:
         for identifier in recipe["depends_on"]:
             completed_run(resolve_run(registry, identifier))
+    # Import scientific history only along this comparison's declared dependency
+    # graph. Operational/accounting predecessors need not contribute a policy.
+    by_id = {step["id"]: step for step in lock["steps"]}
+    producers = {port: step["id"] for step in lock["steps"] for port in step.get("produces", [])}
+    required_history, pending = set(), [name]
+    while pending:
+        current = pending.pop()
+        for dependency in by_id[current].get("requires", []):
+            parent = producers.get(dependency, dependency)
+            if parent not in by_id:
+                raise ValueError("Unknown historical dependency: " + parent)
+            if parent not in required_history:
+                required_history.add(parent)
+                pending.append(parent)
     known = {
         step["id"]
         for step in lock["steps"]
@@ -286,7 +300,7 @@ def prepare_lock(recipe, root, registry, *, completed=True):
             - known
             - {name}
         )
-        needed &= {step["id"] for step in lock["steps"]}
+        needed &= required_history
         if not needed:
             continue
         previous_path = source_campaign(receipt)
