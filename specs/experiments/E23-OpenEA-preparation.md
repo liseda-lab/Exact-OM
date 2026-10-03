@@ -83,3 +83,12 @@ partition is unusable, the original retrieved rows and failure counts remain sav
 stops before producing executable bindings, and retries reuse that receipt. This requires an
 explicit scientific decision; the tool never changes seeds, injects missing gold targets, or
 widens the negative-label scope to force a fit. The support report does not measure accuracy.
+
+The supervisor can call `tools.prepare_openea_pools.run_diagnostic(recipe_path)` with the
+strict `e23_pool_preparation` recipe: four checksummed `inputs` bindings (`config`,
+`preparation`, `campaign_bindings`, `blueprint`), absolute `output`/`campaign_output`, one
+`device`, fixed case/caps/seed, and false hosted/rationale/selection flags. The producer
+checks those inputs before and after encoder work, publishes campaign metadata atomically,
+and emits `group.json`, `preparation-receipt.json`, and non-selecting `completion.json`.
+A subsequent ordinary prepared E23 worker consumes that group and its `source_design`;
+preparation itself never launches a comparison or selects an arm.
