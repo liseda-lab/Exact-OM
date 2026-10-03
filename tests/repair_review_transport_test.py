@@ -208,7 +208,7 @@ def test_rev01_invalid_coverage_never_manufactures_acceptance():
             assert "integrity discrepancy" in result.value.detail
 
 
-def test_rev01_committed_failure_survives_hang_and_broken_frame():
+def test_rev01_committed_failure_survives_hang_and_broken_frame(record_property):
     from exact.repair.kernel import _VerificationStream
 
     for kind in ("hang", "broken"):
@@ -217,10 +217,18 @@ def test_rev01_committed_failure_survives_hang_and_broken_frame():
             malformed_stream,
             problem,
             kind,
-            timeout=0.8,
+            # Allow spawned OWL imports and the first durable ACK to complete.
+            # This checks retention after a hang/broken frame; the independent
+            # REV-02 tests below enforce subsecond deadline responsiveness.
+            timeout=5,
             event_handler=_VerificationStream(problem, ()),
         )
+        record_property(kind + "_transported_events", len(result.events))
+        record_property(kind + "_transport_status", result.status)
+        for key, value in result.resource_usage:
+            record_property(kind + "_" + key, value)
         assert result.status in {"timeout", "error"}
+        assert result.event_failure is not None, result.detail
         assert result.event_failure.obligation.verdict == "fail"
         assert len(result.events) == 1
 
