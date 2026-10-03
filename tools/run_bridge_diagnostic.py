@@ -156,6 +156,9 @@ def run_diagnostic(recipe_path):
     native = remap(
         native, {v: k for k, v in source_ids.items()}, {v: k for k, v in target_ids.items()}
     )
+    for collection in (recipe["inputs"], recipe["owl"], recipe["imports"]):
+        for value in collection.values():
+            verified(value)
     # One explicit anchor inventory is shared by both methods. No exact-label or
     # scored-candidate anchor discovery is allowed in this controlled comparison.
     graph = _semantic_entailment(
@@ -169,6 +172,9 @@ def run_diagnostic(recipe_path):
         timeout_seconds=float("inf"),
         frozen_anchor_rows=anchor_records(anchors),
     )
+    for collection in (recipe["inputs"], recipe["owl"], recipe["imports"]):
+        for value in collection.values():
+            verified(value)
     native.to_csv(output / "native.tsv", sep="\t", index=False)
     graph.to_csv(output / "graph.tsv", sep="\t", index=False)
     result = {
