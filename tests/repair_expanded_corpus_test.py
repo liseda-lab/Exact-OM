@@ -1,6 +1,7 @@
 """Corpus releases preserve independence, missingness and immutable resume."""
 
 import dataclasses
+from pathlib import Path
 
 import pytest
 
@@ -116,7 +117,9 @@ def test_full_denominators_resume_without_requery(tmp_path, monkeypatch, failure
     for split, target in corpus.TARGETS.items():
         release = corpus.bound(report["releases"][split]["manifest"])
         assert len(release["rows"]) == target
-        cases, caches, info = load_preparation(report["releases"][split]["preparation"]["path"])
+        cases, caches, info = load_preparation(
+            Path(report["releases"][split]["preparation"]["path"])
+        )
         assert not caches and not info["test_outcomes_opened"]
     assert corpus.run(path, output) == report
     assert len(calls) == 1
