@@ -442,3 +442,23 @@ def test_failed_native_result_attestation_does_not_publish(
             reasoner.direct_parents("urn:exact:test:A")
     finally:
         reasoner.close()
+
+
+@pytest.mark.parametrize("allowance", [True, 0, -1, 1.5, 2**64])
+def test_compile_work_allowance_rejects_invalid_values(allowance):
+    with pytest.raises(ValueError, match="positive u64"):
+        ReasonerSettings.from_value({"max_compile_work": allowance})
+
+
+def test_compile_resource_settings_are_explicit_and_native_hermit_only():
+    from exact.ontology.reasoning import reasoner_cache_identity, require_native_reasoner_support
+
+    settings = ReasonerSettings.from_value(
+        {"backend": "native", "max_memory_bytes": 1024**3, "max_compile_work": 2**64 - 1}
+    )
+    identity = reasoner_cache_identity("hermit", settings)
+    assert identity["max_compile_work"] == 2**64 - 1
+    assert identity["max_memory_bytes"] == 1024**3
+    assert "max_compile_work" not in reasoner_cache_identity("hermit")
+    with pytest.raises(ValueError, match="native HermiT"):
+        require_native_reasoner_support("elk", {"max_compile_work": 100})

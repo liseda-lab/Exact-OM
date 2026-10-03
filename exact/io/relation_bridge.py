@@ -38,6 +38,7 @@ def native_bridge(
     import_map=None,
     checkpoint_path=None,
     max_memory_bytes=None,
+    max_compile_work=None,
 ):
     import pyhermit
     import pyowl_core as core
@@ -56,6 +57,7 @@ def native_bridge(
         timeout_seconds=timeout_seconds,
         workers=1,
         max_memory_bytes=max_memory_bytes,
+        max_compile_work=max_compile_work,
     )
     # A path allows diagnostic admission without loading the two roots twice.
     origins = [

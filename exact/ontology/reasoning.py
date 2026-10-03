@@ -278,6 +278,7 @@ class ReasonerSettings:
     fallback: ReasonerFallback = "error"
     worker_wire: bool = False
     max_memory_bytes: int | None = None
+    max_compile_work: int | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.backend, str) or not self.backend:
@@ -305,6 +306,12 @@ class ReasonerSettings:
             or self.max_memory_bytes <= 0
         ):
             raise ValueError("reasoner max_memory_bytes must be a positive integer or None")
+        if self.max_compile_work is not None and (
+            isinstance(self.max_compile_work, bool)
+            or not isinstance(self.max_compile_work, int)
+            or not 0 < self.max_compile_work <= 2**64 - 1
+        ):
+            raise ValueError("reasoner max_compile_work must be a positive u64 or None")
 
     @classmethod
     def from_value(cls, value: object = None) -> "ReasonerSettings":
@@ -330,6 +337,7 @@ class ReasonerSettings:
                 "fallback",
                 "worker_wire",
                 "max_memory_bytes",
+                "max_compile_work",
             }
         )
         if unknown:
@@ -341,6 +349,7 @@ class ReasonerSettings:
             fallback=cast(ReasonerFallback, normalized.get("fallback", "error")),
             worker_wire=cast(bool, normalized.get("worker_wire", False)),
             max_memory_bytes=cast(int | None, normalized.get("max_memory_bytes")),
+            max_compile_work=cast(int | None, normalized.get("max_compile_work")),
         )
 
 
@@ -623,6 +632,11 @@ def reasoner_cache_identity(
             if selected.max_memory_bytes is not None
             else {}
         ),
+        **(
+            {"max_compile_work": selected.max_compile_work}
+            if selected.max_compile_work is not None
+            else {}
+        ),
         "core_package_version": core_package_version,
         "core_api_version": list(pyowl_core.API_VERSION),
         "core_model_schema_version": int(pyowl_core.MODEL_SCHEMA_VERSION),
@@ -665,8 +679,12 @@ def require_native_reasoner_support(
         return
     selected = ReasonerSettings.from_value(settings)
     _validate_backend(name, selected.backend)
-    if name != "hermit" and selected.max_memory_bytes is not None:
-        raise ValueError("max_memory_bytes is supported only by the native HermiT adapter")
+    if name != "hermit" and (
+        selected.max_memory_bytes is not None or selected.max_compile_work is not None
+    ):
+        raise ValueError(
+            "Compilation resource settings are supported only by the native HermiT adapter"
+        )
     module = _optional_module("pyelk" if name == "elk" else "pyhermit", name)
     check = getattr(module, "require_native_pipeline_support", None)
     if not callable(check):
@@ -986,6 +1004,11 @@ def _create_hermit(
         timeout=settings.timeout_seconds,
         workers=settings.workers,
         max_memory_bytes=settings.max_memory_bytes,
+        **(
+            {"max_compile_work": settings.max_compile_work}
+            if settings.max_compile_work is not None
+            else {}
+        ),
     )
     reasoner = pyhermit.Reasoner(snapshot, config=config)
     try:
