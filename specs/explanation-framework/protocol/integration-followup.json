@@ -21,15 +21,15 @@
     "R01": {
       "priority": 1,
       "owner": "backend_then_frontend",
-      "status": "reopened",
+      "status": "joint_verified",
       "acceptance": [
         "J01",
         "J02",
         "J03"
       ],
       "backend_status": "backend_verified",
-      "joint_verified": false,
-      "frontend_status": "reopened",
+      "joint_verified": true,
+      "frontend_status": "frontend_verified",
       "reopened_by": [
         "R06",
         "R07"
@@ -38,14 +38,14 @@
     "R02": {
       "priority": 1,
       "owner": "frontend_with_backend_contract",
-      "status": "reopened",
+      "status": "joint_verified",
       "acceptance": [
         "J04",
         "J05"
       ],
       "backend_status": "backend_verified",
-      "joint_verified": false,
-      "frontend_status": "reopened",
+      "joint_verified": true,
+      "frontend_status": "frontend_verified",
       "reopened_by": [
         "R08",
         "R09"
@@ -167,29 +167,30 @@
         "owner": "frontend",
         "reopens": "R01",
         "requirement": "F16",
-        "status": "open"
+        "status": "fixed_and_verified"
       },
       "R07": {
         "priority": 2,
         "owner": "frontend",
         "reopens": "R01",
         "requirement": "F17",
-        "status": "open"
+        "status": "fixed_and_verified"
       },
       "R08": {
         "priority": 2,
         "owner": "frontend",
         "reopens": "R02",
         "requirement": "F18",
-        "status": "open"
+        "status": "fixed_and_verified"
       },
       "R09": {
         "priority": 1,
         "owner": "frontend",
         "reopens": "R02",
         "requirement": "F19",
-        "status": "open"
+        "status": "fixed_and_verified"
       }
-    }
+    },
+    "followup_evidence": "../../../docs/verification/explanation-integration-frontend-followup-receipt.json"
   }
 }

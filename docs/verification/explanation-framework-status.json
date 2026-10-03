@@ -486,7 +486,7 @@
   },
   "current_acceptance_authority": "specs/explanation-framework/17-integration-corrective-programme.md",
   "integration_followup_20261003": {
-    "status": "R01_R02_reopened_by_R06_R09_R04_joint_verified_R03_blocked_on_J10_manual_audit",
+    "status": "R01_R02_R04_joint_verified_R03_blocked_on_J10_manual_audit",
     "reviewed_commit": "2d9715b",
     "authority": "specs/explanation-framework/17-integration-corrective-programme.md",
     "evidence": "specs/explanation-framework/evidence/integration-review-20261003.md",
@@ -500,19 +500,19 @@
       "R01": {
         "priority": 1,
         "owner": "backend_then_frontend",
-        "status": "reopened",
+        "status": "joint_verified",
         "acceptance": [
           "J01",
           "J02",
           "J03"
         ],
         "backend_status": "backend_verified",
-        "joint_verified": false,
+        "joint_verified": true,
         "evidence": [
           "tests/explanation_integration_contract_test.py",
           "tests/explanation_study_workspace_test.py"
         ],
-        "frontend_status": "reopened",
+        "frontend_status": "frontend_verified",
         "reopened_by": [
           "R06",
           "R07"
@@ -521,18 +521,18 @@
       "R02": {
         "priority": 1,
         "owner": "frontend_with_backend_contract",
-        "status": "reopened",
+        "status": "joint_verified",
         "acceptance": [
           "J04",
           "J05"
         ],
         "backend_status": "backend_verified",
-        "joint_verified": false,
+        "joint_verified": true,
         "evidence": [
           "tests/explanation_integration_contract_test.py::test_page_readiness_is_local_and_does_not_restart_case_clock",
           "tests/explanation_telemetry_policy_test.py"
         ],
-        "frontend_status": "reopened",
+        "frontend_status": "frontend_verified",
         "reopened_by": [
           "R08",
           "R09"
@@ -585,44 +585,48 @@
         "priority": 2,
         "owner": "frontend",
         "reopens": "R01",
-        "status": "open",
+        "status": "fixed_and_verified",
         "summary": "Entity card limited truncatable categories to their first page and claimed completeness",
         "evidence": [
-          "specs/explanation-framework/evidence/frontend-integration-review-20261003.md"
+          "specs/explanation-framework/evidence/frontend-integration-review-20261003.md",
+          "docs/verification/explanation-integration-frontend-followup.md"
         ]
       },
       "R07": {
         "priority": 2,
         "owner": "frontend",
         "reopens": "R01",
-        "status": "open",
+        "status": "fixed_and_verified",
         "summary": "Study hierarchy could not open a searched entity's full context",
         "evidence": [
-          "specs/explanation-framework/evidence/frontend-integration-review-20261003.md"
+          "specs/explanation-framework/evidence/frontend-integration-review-20261003.md",
+          "docs/verification/explanation-integration-frontend-followup.md"
         ]
       },
       "R08": {
         "priority": 2,
         "owner": "frontend",
         "reopens": "R02",
-        "status": "open",
+        "status": "fixed_and_verified",
         "summary": "Malformed cached response reused by Retry",
         "evidence": [
-          "specs/explanation-framework/evidence/frontend-integration-review-20261003.md"
+          "specs/explanation-framework/evidence/frontend-integration-review-20261003.md",
+          "docs/verification/explanation-integration-frontend-followup.md"
         ]
       },
       "R09": {
         "priority": 1,
         "owner": "frontend",
         "reopens": "R02",
-        "status": "open",
+        "status": "fixed_and_verified",
         "summary": "Render readiness required entity cards for every component configuration",
         "evidence": [
-          "specs/explanation-framework/evidence/frontend-integration-review-20261003.md"
+          "specs/explanation-framework/evidence/frontend-integration-review-20261003.md",
+          "docs/verification/explanation-integration-frontend-followup.md"
         ]
       }
     },
-    "implementation_acceptance": "R01_R02_reopened_post_implementation",
+    "implementation_acceptance": "R06_R09_fixed_R01_R02_reverified_R03_blocked_on_J10_manual_audit",
     "historical_evidence_preserved": true,
     "launch_gates_waived": false,
     "live_publication": false,
@@ -636,6 +640,9 @@
     "frontend_handoff": "docs/verification/explanation-integration-frontend-handoff.md",
     "frontend_receipt": "docs/verification/explanation-integration-frontend-receipt.json",
     "acceptance_record": "docs/verification/explanation-integration-acceptance.md",
-    "acceptance_receipt": "docs/verification/explanation-integration-acceptance-receipt.json"
+    "acceptance_receipt": "docs/verification/explanation-integration-acceptance-receipt.json",
+    "followup_handoff": "docs/verification/explanation-integration-frontend-followup.md",
+    "followup_receipt": "docs/verification/explanation-integration-frontend-followup-receipt.json",
+    "followup_commit": "23aa74f"
   }
 }

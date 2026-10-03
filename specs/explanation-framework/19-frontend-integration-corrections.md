@@ -1,8 +1,9 @@
 # Frontend assignment: consume and verify the complete study workspace
 
-**2026-10-03. F11–F15 implemented in `6895bc6`. Post-implementation findings R06–R09 reopen
-R01/R02; F16–F19 below are required before they close. R04 is joint-verified; R03 awaits the
-manual screen-reader/keyboard audit in J10.** See the
+**2026-10-03. F11–F15 implemented in `6895bc6`; F16–F19 (findings R06–R09) in
+`ad03312`–`3a1fcd0` and verified at `23aa74f` ([follow-up handoff](../../docs/verification/explanation-integration-frontend-followup.md)).
+R01, R02 and R04 are joint-verified on the synthetic fixture; R03 awaits the manual
+screen-reader/keyboard audit in J10.** See the
 [frontend handoff](../../docs/verification/explanation-integration-frontend-handoff.md) and the
 [joint acceptance record](../../docs/verification/explanation-integration-acceptance.md). The
 requirements below remain normative. Follow

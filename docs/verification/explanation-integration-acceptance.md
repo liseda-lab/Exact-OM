@@ -1,8 +1,9 @@
 # Study integration joint acceptance — 2026-10-03 (S3)
 
-> **Reopened after this record.** A post-implementation review reproduced R06–R09, which
-> reopen R01 and R02 ([review](../../specs/explanation-framework/evidence/frontend-integration-review-20261003.md)).
-> The R01/R02 results below are historical until those findings are verified.
+> **Reopened after this record, then re-closed.** A post-implementation review reproduced
+> R06–R09, which reopened R01 and R02 ([review](../../specs/explanation-framework/evidence/frontend-integration-review-20261003.md)).
+> They were fixed and verified in the [follow-up handoff](explanation-integration-frontend-followup.md).
+> The R01/R02 results below are historical; the follow-up's evidence supersedes them.
 
 **Result: R01, R02 and R04 are joint-verified. R03 is verified except for the manual
 screen-reader and keyboard audit in J10, which was not performed; the follow-up is therefore

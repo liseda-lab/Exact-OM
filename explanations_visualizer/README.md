@@ -26,7 +26,9 @@ is recorded in the [corrective frontend handoff](../docs/verification/explanatio
 The integration follow-up (specs 17–19: scoped study workspace, case readiness, durable tutorial
 position, analysis-3 exports) is in the
 [integration frontend handoff](../docs/verification/explanation-integration-frontend-handoff.md)
-and the [joint acceptance record](../docs/verification/explanation-integration-acceptance.md).
+and the [joint acceptance record](../docs/verification/explanation-integration-acceptance.md);
+post-implementation findings R06–R09 (fact paging, study full context, retry, component-aware
+readiness) are in the [follow-up handoff](../docs/verification/explanation-integration-frontend-followup.md).
 
 exact-study/2.0 sessions run only against a study service that advertises
 `integration_contract: "study-integration/1"`; otherwise the page says the service needs an
@@ -144,5 +146,13 @@ scripts for its CSP when it starts. For the J03 comparison with the main app, wr
 frozen contexts with `python explanations_visualizer/e2e/prepare_main_app_package.py /tmp/exact-v2
 /tmp/exact-v2-main`, serve that package with `exact-inspect serve --profile local_app`, and set
 `EXACT_E2E_MAIN_APP_URL`.
+
+Add `--paged-facts 26` to the fixture build for the paging regressions: it adds a non-focal
+source class, "Paged facts source", whose categories and parents exceed the first page. For the
+main-app paging test, wrap the same contexts with `prepare_main_app_package.py …
+--extra-category alternate_definitions`, serve that package, and set `EXACT_E2E_PAGED_MAIN_APP_URL`
+and `EXACT_E2E_PAGED_SOURCE` (the fixture's source ontology version).
+
 Production uses the static `out/` export served by `exact-inspect`; `next start` is not
 compatible with this export mode.
+
