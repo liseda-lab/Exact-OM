@@ -179,6 +179,8 @@ function useThemeVersion() {
 }
 
 /** Legend glyphs drawn with the same patterns as the rendered edges. */
+const CYTOSCAPE_STYLESHEET = "__________cytoscape_stylesheet";
+
 export function EdgeGlyph({ kind }: { kind: EdgeKind }) {
   if (kind === "bridge")
     return (
@@ -433,6 +435,15 @@ export function EvidenceGraph({
     (async () => {
       const cytoscape = (await import("cytoscape")).default;
       if (destroyed || !container.current) return;
+      // Cytoscape injects an inline <style> unless its stylesheet id already exists; the study
+      // CSP forbids inline styles, so its one rule lives in app.css and the id is reserved here.
+      if (!document.getElementById(CYTOSCAPE_STYLESHEET)) {
+        const marker = document.createElement("meta");
+        marker.id = CYTOSCAPE_STYLESHEET;
+        marker.name = "cytoscape-stylesheet";
+        marker.content = "app.css";
+        document.head.appendChild(marker);
+      }
       const cy = cytoscape({
         container: container.current,
         elements: elementsRef.current() as never,

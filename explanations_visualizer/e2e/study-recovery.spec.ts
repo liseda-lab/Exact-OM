@@ -99,12 +99,12 @@ test("failed explanation content blocks ranking and pending submission does not 
   await useExplanationCase(page);
   await page.route("**/api/v1/study/resources/*", (route) => route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ detail: "Synthetic resource outage" }) }));
   await page.goto(`${config!.origin}/participate/`);
-  await expect(page.getByRole("button", { name: "Retry explanations", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Retry loading this case", exact: true })).toBeVisible();
   await dismissGap(page);
   await expect(page.getByRole("button", { name: /^Add .* as rank 1$/ }).first()).toBeDisabled();
   await expect(page.getByRole("button", { name: "Submit answer", exact: true })).toBeDisabled();
   await page.unroute("**/api/v1/study/resources/*");
-  await page.getByRole("button", { name: "Retry explanations", exact: true }).click();
+  await page.getByRole("button", { name: "Retry loading this case", exact: true }).click();
   await expect(page.getByRole("button", { name: /^Add .* as rank 1$/ }).first()).toBeEnabled();
   await page.getByRole("button", { name: /^Add .* as rank 1$/ }).first().click();
   let release!: () => void;

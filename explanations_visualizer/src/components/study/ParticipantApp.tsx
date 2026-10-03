@@ -20,7 +20,7 @@ import { getJson } from "@/lib/api";
 import type { Mutation } from "@/study/mutationQueue";
 import { useStudySession } from "@/study/session";
 import { useTelemetry } from "@/study/telemetry";
-import type { StudyCase, StudyState } from "@/study/types";
+import { INTEGRATION_CONTRACT, type StudyCase, type StudyState } from "@/study/types";
 
 const PAUSABLE = new Set(["setup", "background", "practice", "tutorial", "case", "consultation", "final"]);
 const SEEN_KEY = "exact.study.lastSeen";
@@ -146,6 +146,9 @@ export function ParticipantApp() {
   }
 
   const protocol = state ? protocolOf(state) : null;
+  // The corrected v2 flows run only against a service that implements this frontend's
+  // integration extension (18 B10); otherwise nothing new is collected or changed.
+  const incompatible = Boolean(state && protocol === "v2" && state.integration_contract !== INTEGRATION_CONTRACT && !["completed", "closed"].includes(state.stage));
   const header = (
     <StudyHeader
       session={session}
@@ -157,7 +160,7 @@ export function ParticipantApp() {
           ? `Case ${Math.min(state.completed_cases + 1, state.assigned_case_count)} of ${state.assigned_case_count}`
           : null
       }
-      onPause={state && PAUSABLE.has(state.stage) ? pause : undefined}
+      onPause={state && PAUSABLE.has(state.stage) && !incompatible ? pause : undefined}
     />
   );
 
@@ -193,6 +196,13 @@ export function ParticipantApp() {
       <MessagePage title="This study version is not supported here">
         <p>This page cannot show study version {state.contract_version}, so it does not collect answers. Nothing you saved earlier is lost.</p>
         <p className="muted">Please tell the study team; the study may need a matching version of this page.</p>
+      </MessagePage>
+    );
+  } else if (incompatible) {
+    body = (
+      <MessagePage title="The study service needs an update before you continue">
+        <p>This page and the study service are different versions, so the page will not collect or change any answers. Everything you saved so far is kept on the study server, and you can continue with your private link once the service is updated.</p>
+        <p className="muted">Please tell the study team: the service does not offer {INTEGRATION_CONTRACT}.</p>
       </MessagePage>
     );
   } else {

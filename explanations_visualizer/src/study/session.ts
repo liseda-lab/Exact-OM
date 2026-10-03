@@ -117,7 +117,17 @@ export function useStudySession() {
             headers: { "Content-Type": "application/json", Accept: "application/json", "X-Study-Session": next.session_id },
             body: JSON.stringify({ ...entry.body, idempotency_key: entry.key, expected_revision: entry.expected }),
           }),
-          update: (value) => setState(value as StudyState),
+          update: (value) => {
+            // An identical replay may return an original pre-extension receipt (18 B10). Keep
+            // the confirmed runtime fields until a fresh state read replaces them.
+            const next = value as StudyState;
+            const current = stateRef.current;
+            if (next.contract_version === "exact-study/2.0" && !next.integration_contract && current?.integration_contract) {
+              const position = next.tutorial_progress && !next.tutorial_progress.position ? current.tutorial_progress?.position : undefined;
+              setState({ ...next, integration_contract: current.integration_contract, ...(position && next.tutorial_progress ? { tutorial_progress: { ...next.tutorial_progress, position } } : {}) });
+              void refresh().catch(() => undefined);
+            } else setState(next);
+          },
           status: (kind, pending) => {
             setOnline(kind !== "offline");
             setSave(kind === "offline" ? { kind, pending } : kind === "saved" ? { kind, at: Date.now() } : { kind });

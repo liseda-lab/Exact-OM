@@ -1,27 +1,16 @@
-// Exploration workspace over the exact-explain/1.0 read API. The planned participant-safe
-// study workspace (16 B1) mirrors these response shapes under its own scoped prefix, so the
-// same implementation can serve it by changing `base` once those routes exist.
+// Workspace over the exact-explain/1.0 read API. The exploration app reads `/api/v1`; a
+// v2 explanation case reads its authorized scope at `/api/v1/study/workspace/{scope}` (18
+// B11), which serves the same response shapes, with the participant's session header and
+// the capabilities the case validated (see study/caseReadiness.ts).
 
 import { ApiError, buildUrl, request } from "../api";
-import type { Axiom, EntityContext, EntityRef, ExplanationSummary, GeneratedExplanation, HierarchyPage, Page, SearchItem, SelectedEvidence } from "../types";
+import type { Axiom, EntityContext, EntityRef, ExplanationSummary, Fact, GeneratedExplanation, HierarchyPage, Page, SearchItem, SelectedEvidence } from "../types";
 import type { Basis, EvidenceBundle, ExplanationResult, FactRef, PairScope, ResolvedFact, WorkspaceCapabilities, WorkspaceSource } from "./types";
 
 const axiomCache = new Map<string, Promise<Axiom>>();
 
 export function scopedRead<T>(base: string, suffix: string, params?: Parameters<typeof buildUrl>[1], signal?: AbortSignal, sessionId?: string): Promise<T> {
   return request<T>(buildUrl(`${base}${suffix}`, params), { signal, headers: { Accept: "application/json", ...(sessionId ? { "X-Study-Session": sessionId } : {}) } });
-}
-
-export async function loadWorkspaceCapabilities(base: string, sessionId: string): Promise<WorkspaceCapabilities> {
-  const value = await scopedRead<{ components: string[]; bases: Basis[]; synthetic: boolean; reasoner: string; coverage: string; reason: string | null }>(base, "/capabilities", undefined, undefined, sessionId);
-  return {
-    search: "available", navigation: "available", bases: value.bases, reasoner: value.reasoner,
-    graphExpansion: true, profiles: value.components.includes("profiles") ? "available" : "not_exported",
-    comparison: value.components.includes("comparison") ? "available" : "not_exported",
-    evidence: value.components.includes("evidence") ? "available" : "not_exported",
-    scopeNote: "Browse the complete declared context of the admitted frozen ontologies.",
-    limitations: value.reason ? [value.reason] : [], synthetic: value.synthetic,
-  };
 }
 
 export function loadAxiom(base: string, ontology: string, factId: string, signal?: AbortSignal, scope?: { key: string; sessionId?: string }): Promise<Axiom> {
@@ -139,7 +128,8 @@ export function createApiSource(options: {
     const params: Record<string, string> = { ...entityParams(subject), task };
     if (task === "pair_comparison" && counterpart) Object.assign(params, entityParams(counterpart, "counterpart_"));
     const page = await read<Page<ExplanationSummary>>("/explanations", { ...params, limit: 100 }, signal);
-    if (!page.items.length) return { status: "not_requested" };
+    // An empty page is a terminal, recorded absence; keep the service's own status and reason.
+    if (!page.items.length) return page.status === "not_exported" ? { status: "not_exported", reason: page.reason ?? "No resource was prepared for this selection." } : { status: "not_requested", reason: page.reason ?? undefined };
     const chosen = page.items.find((item) => item.grounding_status === "validated") ?? page.items[0];
     if (chosen.grounding_status !== "validated") return { status: "unverified" };
     try {
@@ -220,6 +210,7 @@ export function createApiSource(options: {
     hierarchy: (entity, direction, basis: Basis, cursor, signal) =>
       read<HierarchyPage>("/hierarchy", { ...entityParams(entity), direction, basis, limit: 50, cursor }, signal),
     search: (ontology, term, cursor, signal) => read<Page<SearchItem>>("/entities", { ontology_version_id: ontology, term, limit: 20, cursor }, signal),
+    facts: (entity, category, cursor, signal) => read<Page<Fact>>("/entity-facts", { ...entityParams(entity), category, limit: 50, cursor }, signal),
     evidence,
     labels: null,
     remoteLabels: { key: options.key, base, sessionId: options.sessionId },

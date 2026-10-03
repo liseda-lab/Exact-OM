@@ -112,9 +112,14 @@ export interface StudyState extends StudyStateV2Fields {
   synthetic: boolean;
   gap_recovery: string;
   contract_version?: string;
-  /** Proposed exact-study/2.0: event types and scopes the service accepts (16 B7). */
+  /** exact-study/2.0 runtime extension (18 B10). The corrected v2 flows require it. */
+  integration_contract?: string | null;
+  /** Event types and scopes the service accepts (16 B7). */
   telemetry?: { event_types?: string[]; scopes?: string[] };
 }
+
+/** The runtime extension this frontend implements for exact-study/2.0 sessions. */
+export const INTEGRATION_CONTRACT = "study-integration/1";
 
 export interface StudyCandidate {
   candidate_id: string;
@@ -127,6 +132,7 @@ export interface StudyCandidate {
 
 export interface StudyCase {
   artifact_type: "study_case";
+  contract_version?: string;
   study_revision: string;
   case_id: string;
   presentation_id: string;
@@ -137,7 +143,7 @@ export interface StudyCase {
   ontology_resource_ids: string[];
   package_version: string;
   explanation_refs: string[];
-  /** Proposed exact-study/2.0: participant-safe workspace scope for the active explanation case (16 B1). */
+  /** exact-study/2.0: locator of the active explanation case's authorized workspace (18 B11). */
   workspace?: { scope_id: string } | null;
 }
 
@@ -248,14 +254,14 @@ export const V1_EVENT_TYPES = [
   "revision",
 ] as const;
 
-/** Proposed exact-study/2.0 additions (16 B7); sent only when the service declares them. */
+/** exact-study/2.0 additions (16 B7); sent only when the service declares them. */
 export const V2_EVENT_TYPES = ["tab_open", "hierarchy_navigate", "search_select", "graph_reset", "graph_edge_open", "copy_iri", "resources_open", "help_open"] as const;
 
 export type EventType = (typeof V1_EVENT_TYPES)[number] | (typeof V2_EVENT_TYPES)[number];
 
 // ---------------------------------------------------------------------------------------
-// Proposed exact-study/2.0 participant contract (specs 14–16). These are the frontend's
-// data needs for B0, not implemented backend routes; a v1 service never sends them.
+// exact-study/2.0 participant contract (specs 14–16, 18), as implemented by the study
+// service and its generated runtime schemas. A v1 service never sends these fields.
 // ---------------------------------------------------------------------------------------
 
 export type ResourceAccess = "not_checked" | "available" | "needs_help";
@@ -369,9 +375,15 @@ export interface AttemptReceipt {
   submitted_at: string;
 }
 
+/** Durable tutorial screen (18 B12): a frozen lesson, or the assessment landing/question. */
+export type TutorialPosition = { view: "lesson"; lesson_id: string; question_id: null } | { view: "assessment"; lesson_id: null; question_id: string | null };
+
 export interface TutorialProgress {
   tutorial_version: string;
+  /** Deprecated alias derived from `position`; corrected clients never send it. */
   current_lesson_id: string | null;
+  /** Server-normalized position; only pre-extension receipts omit it. */
+  position?: TutorialPosition | null;
   completed_requirements: string[];
   practice: Record<string, { response_type: ResponseType | null; ranked_candidate_ids: string[] }>;
   assessment_drafts: Record<string, AssessmentResponse>;

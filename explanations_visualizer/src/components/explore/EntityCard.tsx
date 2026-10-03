@@ -4,7 +4,7 @@
 // prominence; every section states its own availability instead of silently disappearing.
 // The card reads through the active workspace, so exploration, study and tutorial share it.
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { ErrorNote, Skeleton } from "@/components/common/ErrorNote";
 import { IconCopy, SideMarker } from "@/components/common/Icons";
@@ -14,7 +14,7 @@ import { AxiomBlock } from "@/components/owl/AxiomBlock";
 import { curie, predicateName, sideTitle } from "@/lib/iri";
 import { useLabelLookup } from "@/lib/labelSource";
 import { seedLabel } from "@/lib/labels";
-import type { EntityContext, EntityRef, Fact } from "@/lib/types";
+import type { EntityContext, EntityRef, Fact, Page } from "@/lib/types";
 import type { AsyncState } from "@/lib/useAsync";
 import { useExplanation, useWorkspace, useWorkspaceAction } from "@/lib/workspace/WorkspaceContext";
 
@@ -93,6 +93,65 @@ function Section({ title, meta, children }: { title: string; meta?: React.ReactN
 function scopeText(ctx: EntityContext): string {
   if (ctx.completeness.scope === "study_resource") return "the information prepared for this view";
   return ctx.completeness.scope === "root" ? "root document; imports not loaded" : "resolved import closure";
+}
+
+/**
+ * One recorded fact category, continuing the context's own cursor page by page. Later
+ * pages are read only on request; a failure stays local and never reads as absence.
+ */
+function MoreCategory({ category, page, entity, onOpenEntity }: { category: string; page: Page<Fact>; entity: EntityRef; onOpenEntity?: (iri: string) => void }) {
+  const source = useWorkspace();
+  const [extra, setExtra] = useState<{ base: Page<Fact>; items: Fact[]; cursor: string | null } | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<unknown>(null);
+  const controller = useRef<AbortController | null>(null);
+  useEffect(() => () => controller.current?.abort(), []);
+  const current = extra?.base === page ? extra : null;
+  const items = current ? current.items : page.items;
+  const cursor = current ? current.cursor : page.next_cursor;
+  const loadMore = async () => {
+    if (!cursor || !source.facts || loading) return;
+    controller.current?.abort();
+    const abort = new AbortController();
+    controller.current = abort;
+    setLoading(true);
+    setError(null);
+    try {
+      const next = await source.facts(entity, category, cursor, abort.signal);
+      const seen = new Set(items.map((fact) => fact.fact_id));
+      setExtra({ base: page, items: [...items, ...next.items.filter((fact) => !seen.has(fact.fact_id))], cursor: next.next_cursor });
+    } catch (failure) {
+      if (!abort.signal.aborted) setError(failure);
+    } finally {
+      if (!abort.signal.aborted) setLoading(false);
+    }
+  };
+  const total = page.total_count;
+  return (
+    <div className="more-category">
+      <h4>
+        {MORE_NAMES[category]} <span className="meta">{total != null ? `${items.length} of ${total}` : `${items.length} shown${cursor ? " · more exist" : ""}`}</span>
+      </h4>
+      {items.map((fact) =>
+        literalText(fact) ? (
+          <p key={fact.fact_id} data-fact-id={fact.fact_id} className="more-literal">
+            {literalText(fact)} <span className="meta">· {predicateName(fact.predicate_iri)}</span>
+          </p>
+        ) : (
+          <AxiomBlock key={fact.fact_id} ontology={entity.ontology_version_id} factId={fact.fact_id} subject={entity} onOpen={onOpenEntity} />
+        ),
+      )}
+      {error ? <ErrorNote error={error} onRetry={loadMore} what={MORE_NAMES[category]} /> : null}
+      {cursor &&
+        (source.facts ? (
+          <button type="button" className="btn btn-sm" disabled={loading} onClick={loadMore}>
+            {loading ? "Loading…" : `Load more ${MORE_NAMES[category].toLowerCase()}`}
+          </button>
+        ) : (
+          <p className="meta">More are recorded but are not available in this view.</p>
+        ))}
+    </div>
+  );
 }
 
 export function EntityCard({
@@ -262,23 +321,12 @@ export function EntityCard({
           {moreCategories.length > 0 && (
             <div className="card-section">
               <button type="button" className="btn btn-sm" aria-expanded={moreOpen} onClick={() => setMoreOpen((value) => !value)}>
-                {moreOpen ? "Hide other recorded facts" : `Other recorded facts (${moreCategories.reduce((sum, c) => sum + (ctx.categories[c]?.items.length ?? 0), 0)})`}
+                {moreOpen ? "Hide other recorded facts" : `Other recorded facts (${moreCategories.reduce((sum, c) => sum + (ctx.categories[c]?.total_count ?? ctx.categories[c]?.items.length ?? 0), 0)})`}
               </button>
               {moreOpen && (
                 <div className="fact-stack">
                   {moreCategories.map((category) => (
-                    <div key={category} className="more-category">
-                      <h4>{MORE_NAMES[category]}</h4>
-                      {ctx.categories[category].items.map((fact) =>
-                        literalText(fact) ? (
-                          <p key={fact.fact_id} data-fact-id={fact.fact_id} className="more-literal">
-                            {literalText(fact)} <span className="meta">· {predicateName(fact.predicate_iri)}</span>
-                          </p>
-                        ) : (
-                          <AxiomBlock key={fact.fact_id} ontology={entity.ontology_version_id} factId={fact.fact_id} subject={entity} onOpen={onOpenEntity} />
-                        ),
-                      )}
-                    </div>
+                    <MoreCategory key={category} category={category} page={ctx.categories[category]} entity={entity} onOpenEntity={onOpenEntity} />
                   ))}
                 </div>
               )}

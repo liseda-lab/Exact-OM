@@ -26,6 +26,8 @@ export function useTelemetry(state: StudyState | null) {
   const segments = useRef<Record<string, unknown>[]>([]);
   const flushing = useRef<Promise<void> | null>(null);
   const segment = useRef<OpenSegment | null>(null);
+  // The presentation whose required content this page has validated and rendered (19 F12).
+  const usablePresentation = useRef<string | null>(null);
   const stateRef = useRef(state);
   stateRef.current = state;
   // Only event types this service version accepts are sent; others are not invented as v1 types.
@@ -40,6 +42,7 @@ export function useTelemetry(state: StudyState | null) {
     events.current = [];
     segments.current = [];
     segment.current = null;
+    usablePresentation.current = null;
     sequence.current = 0;
     pageInstance.current = uuid();
     flushing.current = null;
@@ -107,9 +110,15 @@ export function useTelemetry(state: StudyState | null) {
       presentation_id: part.presentationId, monotonic_start_ms: part.start, monotonic_end_ms: part.end });
   }, []);
 
+  const setCaseUsable = useCallback((presentationId: string | null) => {
+    usablePresentation.current = presentationId;
+  }, []);
+
+  /** One ready observation per page and presentation, only after its content is usable. */
   const markCaseReady = useCallback((loadingMs: number) => {
     const current = stateRef.current;
     if (!current?.current_case_id || current.stage !== "case" || current.session_id !== owner.current) return;
+    if (!current.current_presentation_id || usablePresentation.current !== current.current_presentation_id) return;
     if (segment.current?.stage === "case" && segment.current.presentationId === current.current_presentation_id) return;
     const now = emit("case_ready", { loadingMs });
     if (now !== undefined) segment.current = { stage: "case", caseId: current.current_case_id, presentationId: current.current_presentation_id, start: now };
@@ -118,6 +127,7 @@ export function useTelemetry(state: StudyState | null) {
   const resumeTiming = useCallback(() => {
     const current = stateRef.current;
     if (!current || segment.current || current.session_id !== owner.current || !TIMED.includes(current.stage)) return;
+    // A case segment reopens only on a page whose content is already usable for it.
     if (current.stage === "case") { markCaseReady(0); return; }
     segment.current = { stage: current.stage, caseId: current.stage === "consultation" ? current.current_case_id : null,
       presentationId: current.stage === "consultation" ? current.current_presentation_id : null, start: performance.now() };
@@ -155,6 +165,6 @@ export function useTelemetry(state: StudyState | null) {
     return () => { clearInterval(timer); document.removeEventListener("visibilitychange", visibility); };
   }, [capture, emit, flush]);
 
-  return { emit, flushTiming, markCaseReady, resumeTiming, pageInstanceId: pageInstance.current };
+  return { emit, flushTiming, markCaseReady, setCaseUsable, resumeTiming, pageInstanceId: pageInstance.current };
 }
 export type Telemetry = ReturnType<typeof useTelemetry>;

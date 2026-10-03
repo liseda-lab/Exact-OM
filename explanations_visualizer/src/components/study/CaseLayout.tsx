@@ -12,6 +12,7 @@ import { useNarrow } from "@/lib/useMedia";
 
 export function CaseLayout({
   toolbar,
+  status,
   rows,
   answer,
   workspace,
@@ -20,6 +21,8 @@ export function CaseLayout({
   railLabel = "Candidates and your answer",
 }: {
   toolbar?: React.ReactNode;
+  /** Readiness or service status for the whole case, shown above both columns. */
+  status?: React.ReactNode;
   rows: React.ReactNode;
   answer: React.ReactNode;
   workspace: React.ReactNode;
@@ -36,6 +39,7 @@ export function CaseLayout({
   return (
     <div className={narrow ? "case-layout narrow" : "case-layout wide"}>
       {toolbar}
+      {status}
       <div className="case-columns">
         <aside className="case-rail" aria-label={railLabel} hidden={narrow}>
           {!narrow && (

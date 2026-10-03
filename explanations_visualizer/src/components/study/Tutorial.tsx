@@ -6,6 +6,9 @@
 // shown as saved only once the server acknowledges them. The five items are graded by the
 // server, which returns specific feedback; retries are unlimited. Allocation happens only
 // when the server accepts completion. Nothing here is scored or touches a scored case.
+// The screen is a durable `position` (18 B12): navigation saves its destination, a reload or
+// another device restores the server's acknowledged position, and focus follows deliberate
+// navigation only (19 F13).
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -29,8 +32,9 @@ import { WorkspaceProvider } from "@/lib/workspace/WorkspaceContext";
 import type { Telemetry } from "@/study/telemetry";
 import { workspaceEvent } from "@/study/workspaceEvents";
 import { uuid, type StudySession } from "@/study/session";
+import { assessmentPosition, followAcknowledged, lessonPosition, restoredPosition } from "@/study/tutorialPosition";
 import { requirementsFor, evidenceFor, type TutorialActionEvidence, type LessonSignal } from "@/study/tutorialProgress";
-import type { AssessmentItem, AssessmentResponse, ExplanationResource, RequirementAction, StudyState, TutorialLesson, TutorialPublic } from "@/study/types";
+import type { AssessmentItem, AssessmentResponse, ExplanationResource, RequirementAction, StudyState, TutorialLesson, TutorialPosition, TutorialPublic } from "@/study/types";
 
 const PRACTICE_KEY = "practice-case";
 
@@ -66,7 +70,12 @@ function Tutorial({ state, session, tutorial, onPause, telemetry }: { state: Stu
   const [resources, setResources] = useState<ExplanationResource[] | null>(null);
   const [loadError, setLoadError] = useState<unknown>(null);
   const [reload, setReload] = useState(0);
-  const [view, setView] = useState<string>(progress?.current_lesson_id ?? tutorial.lessons[0]?.lesson_id ?? "assessment");
+  const [position, setPosition] = useState<TutorialPosition>(() => restoredPosition(tutorial, progress?.position));
+  const view = position.view === "lesson" ? position.lesson_id : "assessment";
+  // Focus moves only after deliberate navigation, never on restore or an autosave.
+  const focusAfterNavigation = useRef(false);
+  const heading = useRef<HTMLHeadingElement>(null);
+  const [restoredPending] = useState(() => session.pendingCount() > 0);
   const [pending, setPending] = useState<Set<string>>(new Set());
   const [helpOpen, setHelpOpen] = useState(false);
   const acknowledged = useMemo(() => new Set(progress?.completed_requirements ?? []), [progress?.completed_requirements]);
@@ -104,11 +113,28 @@ function Tutorial({ state, session, tutorial, onPause, telemetry }: { state: Stu
   }, [resources, tutorial.version, state.session_id, ontologyName]);
 
   const actionEvidence = useRef<Map<string, TutorialActionEvidence>>(new Map());
+  // Evidence and drafts never carry a position; only navigation changes it.
   const save = useCallback(
     (body: Record<string, unknown>, coalesce: string) =>
-      session.mutate({ method: "PUT", path: "/api/v1/study/tutorial/progress", body: { tutorial_version: tutorial.version, current_lesson_id: view === "assessment" ? null : view, actions: Array.from(actionEvidence.current.values()), ...body }, coalesce, debounceMs: 400 }).catch(() => undefined),
-    [session, tutorial.version, view],
+      session.mutate({ method: "PUT", path: "/api/v1/study/tutorial/progress", body: { tutorial_version: tutorial.version, actions: Array.from(actionEvidence.current.values()), ...body }, coalesce, debounceMs: 400 }).catch(() => undefined),
+    [session, tutorial.version],
   );
+
+  // Follow the server's acknowledged position when it changes underneath an unchanged screen
+  // (an outbox entry replayed after reload), and adopt it after a conflict.
+  const serverPosition = progress?.position ?? null;
+  const lastServer = useRef(serverPosition);
+  useEffect(() => {
+    const previous = lastServer.current;
+    lastServer.current = serverPosition;
+    setPosition((current) => followAcknowledged(current, previous, serverPosition, tutorial));
+  }, [serverPosition, tutorial]);
+  const handledConflict = useRef(0);
+  useEffect(() => {
+    if (session.save.kind !== "conflict" || session.save.at === handledConflict.current) return;
+    handledConflict.current = session.save.at;
+    setPosition(restoredPosition(tutorial, progress?.position));
+  }, [session.save, progress?.position, tutorial]);
 
   // Clear local pending marks once the server has acknowledged them.
   useEffect(() => {
@@ -138,11 +164,24 @@ function Tutorial({ state, session, tutorial, onPause, telemetry }: { state: Stu
     [lesson, completed, save, tutorial, resources, telemetry],
   );
 
-  const go = (next: string) => {
-    setView(next);
-    window.scrollTo({ top: 0 });
-    void save({ completed_requirements: Array.from(completed), lesson_id: next === "assessment" ? null : next }, "tutorial:position");
+  // Build the destination first, then save exactly that object; a newer destination may
+  // replace an unsent one, but never another lesson's evidence, drafts or attempts.
+  const navigate = (destination: TutorialPosition) => {
+    focusAfterNavigation.current = true;
+    setPosition(destination);
+    void session.mutate({ method: "PUT", path: "/api/v1/study/tutorial/progress", body: { tutorial_version: tutorial.version, position: destination }, coalesce: "tutorial:position", debounceMs: 300 }).catch(() => undefined);
   };
+  const go = (next: string) => navigate(next === "assessment" ? assessmentPosition() : lessonPosition(next));
+  const positionKey = `${position.view}|${position.lesson_id ?? ""}|${position.question_id ?? ""}`;
+  useEffect(() => {
+    if (!focusAfterNavigation.current) return;
+    focusAfterNavigation.current = false;
+    const target = position.view === "assessment" && position.question_id ? document.getElementById(`assessment-${position.question_id}-h`) : heading.current;
+    if (!target) return;
+    target.focus({ preventScroll: true });
+    target.scrollIntoView({ block: "start" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [positionKey]);
 
   if (loadError) {
     return (
@@ -159,8 +198,15 @@ function Tutorial({ state, session, tutorial, onPause, telemetry }: { state: Stu
     <div className="study-page study-page-wide tutorial-page">
       <div className="study-intro">
         <span className="pill pill-warn">Practice · not scored · synthetic</span>
-        <h1>{lesson ? `Lesson ${index + 1} of ${tutorial.lessons.length}: ${lesson.title}` : "Check your understanding"}</h1>
+        <h1 ref={heading} id="tutorial-heading" tabIndex={-1}>
+          {lesson ? `Lesson ${index + 1} of ${tutorial.lessons.length}: ${lesson.title}` : "Check your understanding"}
+        </h1>
         {index <= 0 && view !== "assessment" && <p className="lead">{tutorial.intro}</p>}
+        {restoredPending && session.pendingCount() > 0 && (
+          <p className="note" role="status">
+            Changes made before this page was reloaded are still being saved. Until the study server confirms them, this page shows your last saved position and steps.
+          </p>
+        )}
       </div>
       <nav className="lesson-nav" aria-label="Tutorial lessons">
         <ol>
@@ -239,7 +285,7 @@ function Tutorial({ state, session, tutorial, onPause, telemetry }: { state: Stu
           </div>
         </>
       ) : (
-        <Assessment tutorial={tutorial} state={state} session={session} onRevisit={go} outstandingLessons={outstandingLessons} />
+        <Assessment tutorial={tutorial} state={state} session={session} onRevisit={go} onQuestion={(questionId) => navigate(assessmentPosition(questionId))} focusedQuestion={position.question_id} outstandingLessons={outstandingLessons} />
       )}
       {helpOpen && lesson && (
         <Dialog title={`Help · ${lesson.title}`} onClose={() => setHelpOpen(false)} wide>
@@ -474,14 +520,23 @@ function Assessment({
   state,
   session,
   onRevisit,
+  onQuestion,
+  focusedQuestion,
   outstandingLessons,
 }: {
   tutorial: TutorialPublic;
   state: StudyState;
   session: StudySession;
   onRevisit: (lessonId: string) => void;
+  onQuestion: (questionId: string) => void;
+  focusedQuestion: string | null;
   outstandingLessons: TutorialLesson[];
 }) {
+  // A restored question is brought into view without taking keyboard focus.
+  const restored = useRef(focusedQuestion);
+  useEffect(() => {
+    if (restored.current) document.getElementById(`assessment-${restored.current}`)?.scrollIntoView({ block: "start" });
+  }, []);
   const progress = state.tutorial_progress ?? null;
   const passed = new Set(progress?.passed_items ?? []);
   const [busy, setBusy] = useState(false);
@@ -503,6 +558,18 @@ function Assessment({
         <p>
           These five questions check that the task is clear. They are not a test of medical or ontology knowledge, and you can try each one again as often as you like. Each answer is checked on the study server, which explains it straight away.
         </p>
+        <nav aria-label="Questions">
+          <ol className="question-nav">
+            {tutorial.assessment.map((item, index) => (
+              <li key={item.question_id}>
+                <button type="button" className={item.question_id === focusedQuestion ? "btn btn-sm current" : "btn btn-sm"} aria-current={item.question_id === focusedQuestion ? "location" : undefined} onClick={() => onQuestion(item.question_id)}>
+                  {index + 1} · {item.title}
+                  {passed.has(item.question_id) ? <span className="sr-only"> (passed)</span> : null}
+                </button>
+              </li>
+            ))}
+          </ol>
+        </nav>
       </section>
       {tutorial.assessment.map((item, index) => (
         <AssessmentCard key={item.question_id} item={item} number={index + 1} state={state} session={session} tutorial={tutorial} passed={passed.has(item.question_id)} onRevisit={onRevisit} />
@@ -585,9 +652,11 @@ function AssessmentCard({
       .mutate({ method: "PUT", path: "/api/v1/study/tutorial/progress", body: { tutorial_version: tutorial.version, assessment_draft: { question_id: item.question_id, response: next } }, coalesce: `tutorial:item:${item.question_id}`, debounceMs: 500 })
       .catch(() => undefined);
   };
+  const errorRef = useRef<HTMLSpanElement>(null);
   const submit = async () => {
     if (!complete(item, response)) {
       setError("Answer every part before checking.");
+      requestAnimationFrame(() => errorRef.current?.focus());
       return;
     }
     setBusy(true);
@@ -604,9 +673,9 @@ function AssessmentCard({
   const name = `assessment-${item.question_id}`;
   const lesson = tutorial.lessons.find((value) => value.lesson_id === (latest?.revisit_lesson_id ?? item.lesson_id));
   return (
-    <section className={passed ? "study-card assessment-item passed" : "study-card assessment-item"} aria-labelledby={`${name}-h`}>
+    <section id={name} className={passed ? "study-card assessment-item passed" : "study-card assessment-item"} aria-labelledby={`${name}-h`}>
       <div className="section-head">
-        <h2 id={`${name}-h`}>
+        <h2 id={`${name}-h`} tabIndex={-1}>
           {number} · {item.title}
         </h2>
         {passed && (
@@ -677,7 +746,7 @@ function AssessmentCard({
             {busy ? "Checking…" : attempts.length ? "Check again" : "Check answer"}
           </button>
           {error && (
-            <span className="field-error" role="alert">
+            <span className="field-error" role="alert" tabIndex={-1} ref={errorRef}>
               {error}
             </span>
           )}

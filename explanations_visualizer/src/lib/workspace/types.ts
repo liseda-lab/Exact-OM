@@ -4,7 +4,7 @@
 // that cannot do something says so through its capabilities and availability statuses;
 // it never returns an empty answer for missing preparation.
 
-import type { Availability, Axiom, EntityContext, EntityKind, EntityRef, GeneratedExplanation, HierarchyPage, Page, SearchItem, SelectedEvidence } from "../types";
+import type { Availability, Axiom, EntityContext, EntityKind, EntityRef, Fact, GeneratedExplanation, HierarchyPage, Page, SearchItem, SelectedEvidence } from "../types";
 
 export type Basis = "literal_asserted" | "structural_navigation" | "reasoner_inferred";
 export type Side = "source" | "target";
@@ -107,6 +107,8 @@ export interface WorkspaceSource {
   explanation: (task: "entity_profile" | "pair_comparison", entities: EntityRef[], signal?: AbortSignal) => Promise<ExplanationResult>;
   hierarchy: (entity: EntityRef, direction: "parents" | "children", basis: Basis, cursor: string | null, signal?: AbortSignal) => Promise<HierarchyPage>;
   search: (ontology: string, term: string, cursor: string | null, signal?: AbortSignal) => Promise<Page<SearchItem>>;
+  /** Later pages of one fact category, continuing an entity context's own cursor. */
+  facts?: (entity: EntityRef, category: string, cursor: string, signal?: AbortSignal) => Promise<Page<Fact>>;
   evidence: (pair: PairScope, signal?: AbortSignal) => Promise<EvidenceBundle>;
   remoteLabels?: import("../labels").RemoteLabelSource;
   /** Local label lookup; null means the shared remote label cache applies. */

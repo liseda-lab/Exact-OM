@@ -1,5 +1,6 @@
-// Read only package.json from a local ZIP before upload, so the import screen can show the
-// bundle's declared identity and coverage. The service still validates everything.
+// Read single entries from a ZIP in the browser: package.json from a local bundle before
+// upload (the service still validates everything), and manifest.json from a downloaded
+// study export so the researcher page can verify the derived schema it actually received.
 
 export interface BundlePreview {
   package_id?: string;
@@ -20,7 +21,8 @@ async function inflate(data: Uint8Array): Promise<Uint8Array> {
   return new Uint8Array(await new Response(stream).arrayBuffer());
 }
 
-export async function readBundlePreview(file: File): Promise<BundlePreview | null> {
+/** Read one named entry from a ZIP (stored or deflated), or null when absent or unreadable. */
+export async function readZipEntry(file: Blob, wanted: string, maxBytes = 64 * 1024 * 1024): Promise<Uint8Array | null> {
   const tailSize = Math.min(file.size, 66 * 1024);
   const tail = new DataView(await file.slice(file.size - tailSize).arrayBuffer());
   let eocd = -1;
@@ -48,32 +50,36 @@ export async function readBundlePreview(file: File): Promise<BundlePreview | nul
     const localOffset = cd.getUint32(pointer + 42, true);
     const name = decoder.decode(new Uint8Array(cd.buffer, cd.byteOffset + pointer + 46, nameLength));
     pointer += 46 + nameLength + extraLength + commentLength;
-    if (name !== "package.json") continue;
-    if (compressed > 64 * 1024 * 1024) return null;
+    if (name !== wanted) continue;
+    if (compressed > maxBytes) return null;
     const header = new DataView(await file.slice(localOffset, localOffset + 30).arrayBuffer());
     if (header.getUint32(0, true) !== 0x04034b50) return null;
     const start = localOffset + 30 + header.getUint16(26, true) + header.getUint16(28, true);
     const raw = new Uint8Array(await file.slice(start, start + compressed).arrayBuffer());
-    const bytes = method === 0 ? raw : method === 8 ? await inflate(raw) : null;
-    if (!bytes) return null;
-    const manifest = JSON.parse(decoder.decode(bytes)) as Record<string, unknown>;
-    const artifacts = Array.isArray(manifest.artifacts) ? (manifest.artifacts as { size?: number }[]) : [];
-    const count = (value: unknown) => (value && typeof value === "object" ? Object.keys(value).length : 0);
-    return {
-      package_id: typeof manifest.package_id === "string" ? manifest.package_id : undefined,
-      contract_version: typeof manifest.contract_version === "string" ? manifest.contract_version : undefined,
-      schema_version: typeof manifest.schema_version === "string" ? manifest.schema_version : undefined,
-      audience: typeof manifest.audience === "string" ? manifest.audience : undefined,
-      ontologies: count(manifest.ontologies),
-      runs: count(manifest.runs),
-      explanations: count(manifest.explanations),
-      artifacts: artifacts.length,
-      artifactBytes: artifacts.reduce((sum, item) => sum + (typeof item.size === "number" ? item.size : 0), 0),
-      capabilities: (manifest.capabilities as Record<string, string>) ?? {},
-      portable: typeof manifest.portable === "boolean" ? manifest.portable : undefined,
-    };
+    return method === 0 ? raw : method === 8 ? inflate(raw) : null;
   }
   return null;
+}
+
+export async function readBundlePreview(file: File): Promise<BundlePreview | null> {
+  const bytes = await readZipEntry(file, "package.json");
+  if (!bytes) return null;
+  const manifest = JSON.parse(new TextDecoder().decode(bytes)) as Record<string, unknown>;
+  const artifacts = Array.isArray(manifest.artifacts) ? (manifest.artifacts as { size?: number }[]) : [];
+  const count = (value: unknown) => (value && typeof value === "object" ? Object.keys(value).length : 0);
+  return {
+    package_id: typeof manifest.package_id === "string" ? manifest.package_id : undefined,
+    contract_version: typeof manifest.contract_version === "string" ? manifest.contract_version : undefined,
+    schema_version: typeof manifest.schema_version === "string" ? manifest.schema_version : undefined,
+    audience: typeof manifest.audience === "string" ? manifest.audience : undefined,
+    ontologies: count(manifest.ontologies),
+    runs: count(manifest.runs),
+    explanations: count(manifest.explanations),
+    artifacts: artifacts.length,
+    artifactBytes: artifacts.reduce((sum, item) => sum + (typeof item.size === "number" ? item.size : 0), 0),
+    capabilities: (manifest.capabilities as Record<string, string>) ?? {},
+    portable: typeof manifest.portable === "boolean" ? manifest.portable : undefined,
+  };
 }
 
 export function formatBytes(bytes: number): string {
