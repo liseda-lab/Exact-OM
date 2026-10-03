@@ -163,6 +163,61 @@ def test_worker_exit_code_is_preserved(tmp_path, monkeypatch):
     assert not (tmp_path / "PAUSE").exists()
 
 
+@pytest.mark.parametrize("exit_code", [0, 1])
+def test_completed_cleanup_runs_only_after_successful_worker_exit(tmp_path, monkeypatch, exit_code):
+    events = []
+    monkeypatch.setattr(storage_guard, "check_storage", lambda *a, **kw: 0)
+
+    def wait(**kwargs):
+        events.append("worker-exited")
+        return exit_code
+
+    monkeypatch.setattr(
+        storage_guard.subprocess, "Popen", lambda *a, **kw: SimpleNamespace(wait=wait)
+    )
+    monkeypatch.setattr(
+        storage_guard, "deduplicate_completed", lambda *a: events.append(("dedup", a))
+    )
+    assert (
+        storage_guard.run(
+            ["worker"],
+            root=tmp_path,
+            pause_paths=[],
+            dedup_helper="helper",
+            completed_run_root=tmp_path,
+        )
+        == exit_code
+    )
+    expected = ["worker-exited"]
+    if exit_code == 0:
+        expected.append(("dedup", ("helper", tmp_path)))
+    assert events == expected
+
+
+def test_optional_cleanup_failure_keeps_scientific_success(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(storage_guard, "check_storage", lambda *a, **kw: 0)
+    monkeypatch.setattr(
+        storage_guard.subprocess, "Popen", lambda *a, **kw: SimpleNamespace(wait=lambda **kw: 0)
+    )
+
+    def fail(command, **kwargs):
+        assert command[-2:] == ["--receipt", str(tmp_path / "storage-dedup.json")]
+        raise storage_guard.subprocess.CalledProcessError(1, command)
+
+    monkeypatch.setattr(storage_guard.subprocess, "run", fail)
+    assert (
+        storage_guard.run(
+            ["worker"],
+            root=tmp_path,
+            pause_paths=[],
+            dedup_helper="helper",
+            completed_run_root=tmp_path,
+        )
+        == 0
+    )
+    assert "deduplication skipped" in capsys.readouterr().err
+
+
 @pytest.fixture
 def launch_policy(tmp_path):
     worker = tmp_path / "original.sh"
@@ -237,6 +292,27 @@ def test_optional_policy_preserves_old_deployments(launch_policy, tmp_path):
     assert storage_guard.validate_launch(launch, {}, tmp_path) is None
 
 
+def test_new_policy_uses_fresh_wrapper_and_binds_completed_cleanup(launch_policy, tmp_path):
+    launch, policy = launch_policy
+    old = storage_guard.guard_launch(launch, policy, tmp_path)
+    old_bytes = Path(old["argv"][-1]).read_bytes()
+    helper = tmp_path / "deduplicate_fitting.py"
+    helper.write_text("# reviewed helper\n")
+    policy["storage_guard"]["completed_fitting_dedup"] = {"source": storage_guard._binding(helper)}
+    with pytest.raises(ValueError, match="completion.json"):
+        storage_guard.guard_launch(launch, policy, tmp_path)
+    launch["run"] = {"completion_path": str(tmp_path / "completion.json")}
+    new = storage_guard.guard_launch(launch, policy, tmp_path)
+    assert new["argv"][-1] != old["argv"][-1]
+    assert Path(old["argv"][-1]).read_bytes() == old_bytes
+    assert "--completed-run-root " + str(tmp_path) in Path(new["argv"][-1]).read_text()
+    assert storage_guard._binding(helper) in new["bindings"]
+    storage_guard.validate_launch(new, policy, tmp_path)
+    helper.write_text("# changed\n")
+    with pytest.raises(ValueError, match="source binding changed"):
+        storage_guard.validate_launch(new, policy, tmp_path)
+
+
 def test_storage_pause_incident_is_stable_across_multiple_markers(tmp_path):
     plain, first, second = [tmp_path / name for name in ("USER", "PAUSE", "STOP")]
     plain.write_text("User requested maintenance\n")
@@ -283,7 +359,7 @@ def test_preparing_new_batch_automatically_binds_storage_guard(
         checks=["test"],
     )
     storage_guard.validate_launch(launch, policy, supervisor)
-    assert launch["argv"][-1].endswith("worker-entry.storage-guard.sh")
+    assert Path(launch["argv"][-1]).name.startswith("worker-entry.storage-guard-")
     assert launch["storage_guard"]["worker"]["path"].endswith("worker-entry.sh")
 
 

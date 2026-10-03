@@ -113,6 +113,27 @@ def _diagnostic(message):
         pass  # The launcher's log may share the exhausted/read-only filesystem.
 
 
+def deduplicate_completed(helper, batch_root):
+    """Optional maintenance after the scientific worker has settled and exited."""
+    if helper is None:
+        return
+    try:
+        subprocess.run(
+            [
+                sys.executable,
+                str(helper),
+                str(batch_root),
+                "--apply",
+                "--receipt",
+                str(Path(batch_root) / "storage-dedup.json"),
+            ],
+            check=True,
+        )
+    except (OSError, subprocess.CalledProcessError) as error:
+        # Originals remain valid; an optional reclamation failure is not a failed run.
+        _diagnostic("Completed fitting deduplication skipped: " + str(error))
+
+
 def run(
     command,
     *,
@@ -123,11 +144,15 @@ def run(
     growth_reserve=16 * GIB,
     interval=5,
     scan_interval=60,
+    dedup_helper=None,
+    completed_run_root=None,
 ):
     if not command or min(min_free, max_used, growth_reserve, interval, scan_interval) < 0:
         raise ValueError("A worker command and nonnegative storage limits are required")
     if not interval or not scan_interval or not max_used:
         raise ValueError("Storage ceiling and polling intervals must be positive")
+    if (dedup_helper is None) != (completed_run_root is None):
+        raise ValueError("Completed fitting deduplication requires helper and batch root")
     process = None
     try:
         used = check_storage(
@@ -138,7 +163,10 @@ def run(
         scanned = time.monotonic()
         while True:
             try:
-                return process.wait(timeout=interval)
+                result = process.wait(timeout=interval)
+                if result == 0:
+                    deduplicate_completed(dedup_helper, completed_run_root)
+                return result
             except subprocess.TimeoutExpired:
                 now = time.monotonic()
                 rescan = now - scanned >= scan_interval
@@ -196,9 +224,20 @@ def validate_policy(config):
         or _binding(source["path"]) != source
     ):
         raise ValueError("Storage guard source binding changed")
+    if "completed_fitting_dedup" in config:
+        retention = config["completed_fitting_dedup"]
+        if not isinstance(retention, dict) or not isinstance(retention.get("source"), dict):
+            raise ValueError("Completed fitting deduplication requires a source binding")
+        helper = retention["source"]
+        if (
+            not isinstance(helper.get("path"), str)
+            or Path(helper["path"]).parent != Path(source["path"]).parent
+            or _binding(helper["path"]) != helper
+        ):
+            raise ValueError("Completed fitting deduplication source binding changed")
 
 
-def _wrapper(config, supervisor, worker, stop_path):
+def _wrapper(config, supervisor, worker, stop_path, completion_path=None):
     command = [
         config["python"],
         "-u",
@@ -212,6 +251,21 @@ def _wrapper(config, supervisor, worker, stop_path):
     ]
     for option in ("min_free_bytes", "max_used_bytes", "growth_reserve_bytes"):
         command.extend(["--" + option.replace("_", "-"), str(config[option])])
+    if "completed_fitting_dedup" in config:
+        if (
+            not isinstance(completion_path, str)
+            or not Path(completion_path).is_absolute()
+            or Path(completion_path).name != "completion.json"
+        ):
+            raise ValueError("Completed fitting deduplication requires bound completion.json")
+        command.extend(
+            [
+                "--dedup-helper",
+                config["completed_fitting_dedup"]["source"]["path"],
+                "--completed-run-root",
+                str(Path(completion_path).parent),
+            ]
+        )
     command.extend(["--", "/bin/bash", worker])
     return "#!/bin/bash\nset -euo pipefail\nexec " + shlex.join(command) + "\n"
 
@@ -234,8 +288,12 @@ def guard_launch(launch, policy, supervisor):
     if not stops or not all(Path(path).is_absolute() for path in stops):
         raise ValueError("Storage guard requires a registered absolute runtime STOP path")
     stop_path = stops[-1]
-    wrapper = Path(worker).with_name(Path(worker).stem + ".storage-guard.sh")
-    content = _wrapper(config, supervisor, worker, stop_path)
+    wrapper = Path(worker).with_name(
+        Path(worker).stem + ".storage-guard-" + _policy_hash(config)[:12] + ".sh"
+    )
+    content = _wrapper(
+        config, supervisor, worker, stop_path, launch.get("run", {}).get("completion_path")
+    )
     if wrapper.exists():
         if wrapper.read_text() != content:
             raise ValueError("Immutable storage guard wrapper changed: " + str(wrapper))
@@ -248,6 +306,8 @@ def guard_launch(launch, policy, supervisor):
     for binding in (_binding(wrapper), config["source"]):
         if binding not in launch["bindings"]:
             launch["bindings"].append(binding)
+    if "completed_fitting_dedup" in config:
+        launch["bindings"].append(config["completed_fitting_dedup"]["source"])
     launch["storage_guard"] = {
         "worker": original,
         "stop_path": stop_path,
@@ -274,6 +334,11 @@ def validate_launch(launch, policy, supervisor):
         or config["source"] not in launch["bindings"]
     ):
         raise ValueError("Storage guard source or original worker lacks a valid binding")
+    if (
+        "completed_fitting_dedup" in config
+        and config["completed_fitting_dedup"]["source"] not in launch["bindings"]
+    ):
+        raise ValueError("Completed fitting deduplication helper lacks a valid binding")
     stop = record.get("stop_path")
     if (
         not isinstance(stop, str)
@@ -283,7 +348,7 @@ def validate_launch(launch, policy, supervisor):
         raise ValueError("Storage guard runtime STOP is not a registered control")
     wrapper = Path(launch["argv"][-1])
     if _binding(wrapper) not in launch["bindings"] or wrapper.read_text() != _wrapper(
-        config, supervisor, original["path"], stop
+        config, supervisor, original["path"], stop, launch.get("run", {}).get("completion_path")
     ):
         raise ValueError("Prepared worker does not execute the required storage guard")
 
@@ -316,6 +381,8 @@ def main():
     parser.add_argument("--min-free-bytes", type=int, default=100 * GIB)
     parser.add_argument("--max-used-bytes", type=int, default=600 * GIB)
     parser.add_argument("--growth-reserve-bytes", type=int, default=16 * GIB)
+    parser.add_argument("--dedup-helper", type=Path)
+    parser.add_argument("--completed-run-root", type=Path)
     parser.add_argument("command", nargs=argparse.REMAINDER)
     args = parser.parse_args()
 
@@ -332,6 +399,8 @@ def main():
             min_free=args.min_free_bytes,
             max_used=args.max_used_bytes,
             growth_reserve=args.growth_reserve_bytes,
+            dedup_helper=args.dedup_helper,
+            completed_run_root=args.completed_run_root,
         )
     )
 

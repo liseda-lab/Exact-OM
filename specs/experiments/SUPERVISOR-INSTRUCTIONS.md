@@ -151,8 +151,16 @@ mail-about-mail incidents; experiments and independent eligible work continue.
 
 When `policy.storage_guard` is configured, wrap every new custom launch descriptor with
 `tools.storage_guard.guard_launch(descriptor, policy, supervisor_directory)` before publishing
-it. `prepared_batch.prepare()` does this automatically. Preserve the bound original worker,
-guard source, runtime STOP and policy fingerprint; the dispatcher refuses unguarded launches.
+it. Use the reviewed module at `policy.storage_guard.source.path`; older frozen preparation
+tools can emit wrappers that lack current retention controls. Preserve the bound original
+worker, guard/helper sources, runtime STOP and policy fingerprint; validate against the current
+policy before publishing. Policy updates require a fresh wrapper, never rewriting an old one.
 Never remove a `Storage safety guard:` pause until the storage cause is resolved and the
 configured admission checks pass. Full graph controls belong once in `fitting/graph-manifests`;
 raw feature rows retain compact checksum bindings. Do not restore repeated edge lists.
+Training shards retire only after the unchanged aggregate is durably saved. Preserve that
+aggregate during recovery even if failure preceded the first inference checkpoint; inspect
+the working fitting directory and superseded artifacts before accepting repeated scoring.
+Completed fitting JSON may share hash-verified read-only CAS inodes through the reviewed
+post-completion helper. Never apply this cleanup to an unfinished runtime or mutate linked
+outputs in place; recovery restores into a new independent destination.
