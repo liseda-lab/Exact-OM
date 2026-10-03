@@ -178,7 +178,11 @@ def _pools(package, tmp_path, monkeypatch):
         calls.append((list(sources), cap, config.candidates.model_dump(mode="json")))
         if "s1" in sources:
             frame = pd.DataFrame(
-                {"Src": ["s1", "s1", "s1"], "Tgt": ["t1", "t2", "t3"], "cand_sim": [0.9, 0.8, 0.7]}
+                {
+                    "Src": ["s1", "s1", "s1", "s2", "s2"],
+                    "Tgt": ["t1", "t2", "t3", "t2", "t1"],
+                    "cand_sim": [0.9, 0.8, 0.7, 0.6, 0.5],
+                }
             )
         else:
             # Deliberately absent gold t3: preparation must never insert it.
@@ -201,12 +205,12 @@ def test_own_pools_keep_retrieval_scores_split_boundaries_and_resume(
     assert len(calls) == 2
     train = pd.read_csv(destination / "train.candidates.tsv", sep="\t")
     valid = pd.read_csv(destination / "valid.candidates.tsv", sep="\t")
-    assert train.cand_sim.tolist() == [0.9, 0.8, 0.7]
+    assert train.cand_sim.tolist() == [0.9, 0.8, 0.7, 0.6, 0.5]
     assert train.confirmed_label.iloc[:2].tolist() == [1, 0]
     assert pd.isna(train.confirmed_label.iloc[2])
     assert valid.Tgt.tolist() == ["t4"] and "confirmed_label" not in valid
     proof = openea_pools.validate_pool_bindings(fragment)
-    assert proof["roles"]["train"]["confirmed_negative"] == 1
+    assert proof["roles"]["train"]["confirmed_negative"] == 2
     assert proof["roles"]["train"]["unknown"] == 1
     assert proof["roles"]["valid"]["gold_insertions"] == 0
     assert proof["generator"]["candidates"] == calls[0][2] == calls[1][2]
@@ -391,3 +395,41 @@ def test_pool_cli_merges_only_case_fragment_before_campaign_preparation(tmp_path
     assert merged["cases"]["K0"] == {"task": "original"}
     assert merged["cases"][openea.CASE_ID] == {"task": "new"}
     assert merged["untouched"] is True and seen[0][2] == merged
+
+
+def test_sparse_training_keeps_receipt_and_requires_decision_without_regeneration(
+    package, tmp_path, monkeypatch
+):
+    from pathlib import Path
+    from exact.experiments import openea_pools
+
+    prepared, destination = tmp_path / "prepared", tmp_path / "pools"
+    openea.prepare_openea(package, prepared, training_cap=2, source_cap=1)
+    frame = pd.DataFrame({"Src": ["s1", "s2"], "Tgt": ["t1", "t1"], "cand_sim": [0.9, 0.8]})
+    calls = []
+
+    def generate(*args, **kwargs):
+        calls.append(1)
+        return frame.copy(), ["s1", "s2"], {"origin": "generated"}
+
+    monkeypatch.setattr(openea_pools, "_generate", generate)
+    config = Path(__file__).resolve().parents[1] / "exact/default_config.yaml"
+    for _ in range(2):
+        with pytest.raises(ValueError, match="lacks usable source-fold supervision"):
+            openea_pools.prepare_pools(config, prepared, destination, device="cpu")
+    assert calls == [1]
+    receipt = json.loads((destination / "train.pool.json").read_text())
+    assert receipt["training_support"]["usable"] is False
+    assert receipt["training_support"]["total"] == {
+        "source_groups": 2,
+        "positive": 1,
+        "negative": 1,
+    }
+    assert all(
+        row["training"]["positive"] == 0 or row["training"]["negative"] == 0
+        for row in receipt["training_support"]["folds"]
+    )
+    retained = pd.read_csv(destination / "train.candidates.tsv", sep="\t")
+    pd.testing.assert_frame_equal(retained.drop(columns="confirmed_label"), frame)
+    assert not (destination / "valid.candidates.tsv").exists()
+    assert not (destination / "bindings-fragment.json").exists()

@@ -5,8 +5,11 @@ from __future__ import annotations
 import copy
 import json
 import logging
+import random
 from pathlib import Path
 from typing import Any
+
+import pandas as pd
 
 from exact.experiments.openea import CASE_ID, label_training_candidates, verify_prepared
 from exact.experiments.recovery import implementation_identity
@@ -23,6 +26,50 @@ def _verified(binding: dict[str, str]) -> Path:
     if sha256_file(path) != binding["sha256"]:
         raise ValueError("OpenEA pool input changed: " + str(path))
     return path
+
+
+def training_support(frame: pd.DataFrame, *, seed: int) -> dict[str, Any]:
+    """Audit the existing graph recipe's source folds; never repair their labels or rows."""
+    labeled = frame.loc[frame.confirmed_label.isin([0, 1])]
+    groups = sorted(set(labeled.Src.astype(str)))
+    random.Random(int(seed)).shuffle(groups)
+
+    def counts(part: pd.DataFrame) -> dict[str, int]:
+        return {
+            "source_groups": int(part.Src.nunique()),
+            "positive": int(part.confirmed_label.eq(1).sum()),
+            "negative": int(part.confirmed_label.eq(0).sum()),
+        }
+
+    problems = []
+    total = counts(labeled)
+    if len(groups) < 2 or not total["positive"] or not total["negative"]:
+        problems.append("Need at least two labeled source groups and both permitted label classes")
+    folds = []
+    for fold in range(min(3, len(groups))):
+        heldout = set(groups[fold :: min(3, len(groups))])
+        mask = labeled.Src.astype(str).isin(heldout)
+        record: dict[str, Any] = {
+            "fold": fold,
+            "training": counts(labeled.loc[~mask]),
+            "heldout": counts(labeled.loc[mask]),
+        }
+        for role in ("training", "heldout"):
+            if not record[role]["positive"] or not record[role]["negative"]:
+                problems.append(
+                    f"Graph fold {fold} {role} lacks positive or permitted negative examples"
+                )
+        folds.append(record)
+    return {
+        "usable": not problems,
+        "problems": problems,
+        "seed": seed,
+        "recipe": "inductive_graph_statistics_logistic_l2_0.01_v1",
+        "total": total,
+        "unknown_pairs": int(frame.confirmed_label.isna().sum()),
+        "source_groups_without_labels": int(frame.Src.nunique()) - len(groups),
+        "folds": folds,
+    }
 
 
 def _generate(config, case, sources, output, *, cap, seed, device):
@@ -153,7 +200,15 @@ def prepare_pools(config_path: Path, prepared: Path, destination: Path, *, devic
                 ),
                 "unknown": int(frame.confirmed_label.isna().sum()) if role == "train" else None,
             }
+            if role == "train":
+                receipt["training_support"] = training_support(frame, seed=generator["seed"])
             freeze_json(receipt_path, receipt)
+        if role == "train" and not receipt.get("training_support", {}).get("usable"):
+            raise ValueError(
+                "OpenEA retrieved training pool lacks usable source-fold supervision; "
+                f"inspect {receipt_path}. Retained rows are unchanged; do not regenerate "
+                "with different seeds, insert gold, or invent negatives."
+            )
         receipts[role] = receipt
     if set(Path(receipts["train"]["sources"]["path"]).read_text().splitlines()) & set(
         Path(receipts["valid"]["sources"]["path"]).read_text().splitlines()
@@ -205,6 +260,8 @@ def validate_pool_bindings(fragment: dict[str, Any]) -> dict[str, Any] | None:
         raise ValueError("OpenEA frozen pool training scope changed")
     if any(value["generator"][side] != case[side] for side in ("source", "target")):
         raise ValueError("OpenEA frozen pool KG identity changed")
+    if not value["roles"]["train"].get("training_support", {}).get("usable"):
+        raise ValueError("OpenEA frozen pool lacks usable source-fold supervision")
     if (
         value["roles"]["train"]["pool"] != case["candidates"].get("train")
         or value["roles"]["valid"]["pool"] != case["frozen_global_candidates"].get("valid")

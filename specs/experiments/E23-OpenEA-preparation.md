@@ -75,3 +75,11 @@ and `--campaign-output <new-directory>` to the pool command. After both roles fi
 writes `campaign-bindings.json = deep_merge(original_bindings, own_pool_fragment)` and calls
 `prepare_campaign` with the same base config. The supplied original bindings must not override
 E23 back to K0 or reinstate its former pool inheritance; these conflicts fail explicitly.
+
+Before any validation retrieval or graph fitting, the train-pool receipt checks supervision
+support using the graph learner's unchanged seed-shuffled source-group folds (up to three).
+Each training and held-out partition must contain positives and permitted negatives. If a
+partition is unusable, the original retrieved rows and failure counts remain saved, preparation
+stops before producing executable bindings, and retries reuse that receipt. This requires an
+explicit scientific decision; the tool never changes seeds, injects missing gold targets, or
+widens the negative-label scope to force a fit. The support report does not measure accuracy.
