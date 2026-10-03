@@ -7,6 +7,10 @@ unchanged, binds them under the publication's own visibility policy with the lib
 
     python explanations_visualizer/e2e/prepare_main_app_package.py FIXTURE_DIR OUTPUT_DIR
     exact-inspect serve --package OUTPUT_DIR/package.json --profile local_app --port 18985
+
+``--extra-category`` widens the copied policy for main-app-only checks (for example
+``alternate_definitions`` to page alternate definitions, which the study policy withholds);
+leave it out for the J03 parity comparison, which must use the study's own policy.
 """
 
 from __future__ import annotations
@@ -24,6 +28,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("fixture", type=Path)
     parser.add_argument("output", type=Path)
+    parser.add_argument("--extra-category", action="append", default=[])
     args = parser.parse_args()
     if args.output.exists() and any(args.output.iterdir()):
         parser.error("The output directory must be empty")
@@ -37,6 +42,10 @@ def main() -> None:
         shutil.copytree(args.fixture / f"{name}-v2-context", args.output / f"{name}-context")
         ontologies[manifest["ontology_version_id"]] = f"{name}-context"
     policy = VisibilityPolicy.model_validate(definition["visibility_policy"])
+    if args.extra_category:
+        policy = policy.model_copy(
+            update={"categories": tuple(dict.fromkeys([*policy.categories, *args.extra_category]))}
+        )
     path = publish_bundle(
         args.output,
         ontologies=ontologies,

@@ -4,7 +4,8 @@ import { join } from "node:path";
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page, type Route } from "@playwright/test";
 
-import { harness, newInvitation, ParticipantApi, recordTraffic, scopedPath, seedAdvance, seedCondition, seedToCase, seedToTutorial } from "./v2Harness";
+import { exhaustBrowserParents, exhaustPagedCard } from "./factPagination";
+import { harness, newInvitation, ParticipantApi, publishVariant, recordTraffic, scopedPath, seedAdvance, seedCondition, seedToCase, seedToTutorial } from "./v2Harness";
 
 // Integration regressions for specs 17–19 against the real v2 service (HTTPS, PostgreSQL,
 // compiled frontend, normal CSP). Sessions here are seeded through the API to reach fault
@@ -37,8 +38,8 @@ function caseSegments(traffic: ReturnType<typeof recordTraffic>) {
 const routeFor = (scope: string, suffix: string, match: (params: URLSearchParams) => boolean = () => true) => (url: URL) =>
   url.pathname === `${scopedPath(scope)}${suffix}` && match(url.searchParams);
 
-async function explanationCase(page: Page) {
-  const api = await seedToCase(page);
+async function explanationCase(page: Page, revision?: string) {
+  const api = await seedToCase(page, revision);
   const current = await seedCondition(page, api, "explanation");
   const byPosition = (n: number) => current.candidates.find((item: { display_position: number }) => item.display_position === n);
   return { api, current, scope: current.workspace.scope_id as string, byPosition };
@@ -521,3 +522,204 @@ test.describe("J10 layout and accessibility on the real service", () => {
       test.info().annotations.push({ type: "viewport-metrics", description: metrics.join("\n") });
     });
 });
+
+const submitButton = (page: Page) => page.getByRole("button", { name: "Submit answer", exact: true });
+const definitionOpened = (traffic: ReturnType<typeof recordTraffic>, side: string) =>
+  traffic.requests.some((item) => item.path === "/api/v1/study/events" && JSON.stringify(item.body).includes('"definition_open"') && JSON.stringify(item.body).includes(`context_${side}`));
+
+async function focusSearched(page: Page, term: string) {
+  await page.getByRole("tab", { name: "Hierarchy", exact: true }).click();
+  const browser = page.getByRole("region", { name: "Source ontology browser" });
+  await browser.getByRole("combobox").fill(term);
+  await expect(browser.getByRole("listbox").getByRole("option", { name: new RegExp(`^${term}`) })).toBeVisible();
+  await browser.getByRole("combobox").press("ArrowDown");
+  await browser.getByRole("combobox").press("Enter");
+  await expect(browser.locator(".focus-label")).toHaveText(term);
+  return browser;
+}
+
+test.describe("R06/R07 study full context and fact pagination (19 F16, F17)", () => {
+  test("a searched non-focal entity's full context pages every category; closing keeps the case", async ({ page }) => {
+    test.setTimeout(120_000);
+    const traffic = recordTraffic(page);
+    const { api, current, scope, byPosition } = await explanationCase(page);
+    await api.write("PUT", `/cases/${encodeURIComponent(current.case_id)}/draft`, { presentation_id: current.presentation_id, response_type: "ranked_candidates", ranked_candidate_ids: [byPosition(3).candidate_id, byPosition(1).candidate_id] });
+    await page.reload();
+    await expect(submitButton(page)).toBeEnabled();
+    await page.getByRole("button", { name: /^Inspect / }).nth(2).click();
+    const browser = await focusSearched(page, "Paged facts source");
+    await exhaustBrowserParents(browser);
+    const mark = traffic.requests.length;
+    await browser.getByRole("button", { name: "Open full context", exact: true }).click();
+    const dialog = page.getByRole("dialog", { name: "Full context" });
+    await exhaustPagedCard(dialog.locator(".entity-card"), { alternate: false });
+    // Facts open as original axioms; no description is read for a non-focal entity.
+    await dialog.locator('[data-category="restrictions"]').getByRole("button", { name: "Show original axiom" }).first().click();
+    await expect(dialog.locator('[data-category="restrictions"] .original-axiom').first()).toBeVisible();
+    await expect(dialog.getByRole("region", { name: "Generated description" })).toHaveCount(0);
+    const reads = traffic.requests.slice(mark);
+    expect(reads.filter((item) => item.path.includes("/explanations"))).toEqual([]);
+    expect(reads.filter((item) => (item.status ?? 0) >= 400)).toEqual([]);
+    expect(reads.filter((item) => /\/(entity-facts|hierarchy|entity-context|axioms)/.test(item.path) && !item.path.startsWith(scopedPath(scope)))).toEqual([]);
+    await page.keyboard.press("Escape");
+    await expect(dialog).toHaveCount(0);
+    // The ranked pair, inspected candidate, draft and navigation are as they were.
+    await expect(browser.locator(".focus-label")).toHaveText("Paged facts source");
+    await expect(page.getByText("Inspecting initial position 3 of 5")).toBeVisible();
+    const ranking = page.getByRole("list", { name: "Your ranking" });
+    await expect(ranking.locator("li").first()).toContainText(byPosition(3).label);
+    await expect(ranking.locator("li").nth(1)).toContainText(byPosition(1).label);
+    await expect(submitButton(page)).toBeEnabled();
+    expect(caseReady(traffic).length).toBe(1);
+    await expect.poll(() => definitionOpened(traffic, "source"), { timeout: 20_000 }).toBe(true);
+    expect(traffic.errors).toEqual([]);
+  });
+
+  test("a focal entity's full context shows its description; a citation opens and returns; a parent navigates", async ({ page }) => {
+    const traffic = recordTraffic(page);
+    await explanationCase(page);
+    await page.reload();
+    await expect(add1(page)).toBeEnabled();
+    await page.getByRole("tab", { name: "Hierarchy", exact: true }).click();
+    const browser = page.getByRole("region", { name: "Source ontology browser" });
+    await browser.getByRole("button", { name: "Open full context", exact: true }).click();
+    const dialog = page.getByRole("dialog", { name: "Full context" });
+    const citation = dialog.getByRole("region", { name: "Generated description" }).locator("button.citation").first();
+    await citation.click();
+    const cited = page.getByRole("dialog", { name: /^Cited fact/ });
+    await expect(cited.locator(".iri").first()).toHaveText(/^urn:source:\d$/);
+    await page.keyboard.press("Escape");
+    await expect(cited).toHaveCount(0);
+    await expect(citation).toBeFocused();
+    await dialog.locator('[data-category="parents"] li').first().getByRole("button").click();
+    await expect(dialog).toHaveCount(0);
+    await expect(browser.locator(".focus-label")).not.toHaveText(/^Synthetic source \d$/);
+    await expect(add1(page)).toBeEnabled();
+    expect(traffic.requests.filter((item) => (item.status ?? 0) >= 400)).toEqual([]);
+  });
+});
+
+test.describe("R08 retry refetches unusable responses (19 F18)", () => {
+  test("a malformed 200 context injected once blocks the case; Retry refetches it and restores usability in place", async ({ page }) => {
+    const traffic = recordTraffic(page);
+    const { api, current, scope, byPosition } = await explanationCase(page);
+    await api.write("PUT", `/cases/${encodeURIComponent(current.case_id)}/draft`, { presentation_id: current.presentation_id, response_type: "ranked_candidates", ranked_candidate_ids: [byPosition(4).candidate_id] });
+    const target = byPosition(2).entity.iri;
+    let injected = 0;
+    // Diagnostic interception, once: the real response with a required collection removed.
+    await page.route(routeFor(scope, "/entity-context", (params) => params.get("iri") === target), async (route) => {
+      if (injected) return route.continue();
+      injected += 1;
+      const response = await route.fetch();
+      const body = await response.json();
+      delete body.synonyms;
+      await route.fulfill({ response, json: body });
+    });
+    const contextReads = () => traffic.requests.filter((item) => item.path.startsWith(`${scopedPath(scope)}/entity-context`) && new URL(item.path, harness!.origin).searchParams.get("iri") === target);
+    await page.reload();
+    await expect(page.getByRole("alert").filter({ hasText: /Ontology information for candidate 2: The response has no synonyms page/ })).toBeVisible();
+    await expect(submitButton(page)).toBeDisabled();
+    await page.waitForTimeout(800);
+    expect(contextReads()).toHaveLength(1);
+    expect(caseReady(traffic)).toEqual([]);
+    await page.evaluate(() => ((window as unknown as { __sameDocument: boolean }).__sameDocument = true));
+    await page.getByRole("button", { name: "Retry loading this case" }).click();
+    await expect(submitButton(page)).toBeEnabled();
+    expect(contextReads()).toHaveLength(2);
+    expect(await page.evaluate(() => (window as unknown as { __sameDocument?: boolean }).__sameDocument)).toBe(true);
+    await expect(page.getByRole("list", { name: "Your ranking" }).locator("li").first()).toContainText(byPosition(4).label);
+    await expect.poll(() => caseReady(traffic).length).toBe(1);
+    expect(traffic.errors).toEqual([]);
+  });
+
+  test("a slow required read finishing after another failed cannot unblock the case", async ({ page }) => {
+    const traffic = recordTraffic(page);
+    const { scope, byPosition } = await explanationCase(page);
+    await page.route(routeFor(scope, "/entity-context", (params) => params.get("iri") === byPosition(2).entity.iri), fail());
+    await page.route(routeFor(scope, "/entity-context", (params) => params.get("iri") === byPosition(5).entity.iri), delay(2500));
+    await page.reload();
+    await expect(page.getByRole("alert").filter({ hasText: /Ontology information for candidate 2/ })).toBeVisible();
+    await page.waitForTimeout(3500);
+    await expect(page.getByRole("alert").filter({ hasText: /Ontology information for candidate 2/ })).toBeVisible();
+    await expect(add1(page)).toBeDisabled();
+    expect(caseReady(traffic)).toEqual([]);
+  });
+});
+
+test.describe("Optional reads refused with 403 (19 F18)", () => {
+  test("a refused optional read stays local; only a refused scope blocks the case", async ({ page }) => {
+    const traffic = recordTraffic(page);
+    const { scope } = await explanationCase(page);
+    await page.reload();
+    await expect(add1(page)).toBeEnabled();
+    await page.route(routeFor(scope, "/hierarchy"), fail(403));
+    await page.getByRole("tab", { name: "Hierarchy", exact: true }).click();
+    await expect(page.getByRole("region", { name: "Source ontology browser" }).getByRole("alert").first()).toBeVisible();
+    await page.waitForTimeout(1000);
+    await expect(add1(page)).toBeEnabled();
+    expect(traffic.requests.some((item) => item.path === `${scopedPath(scope)}/capabilities` && item.status === 200)).toBe(true);
+    // Now the scope itself is refused: the same kind of read means access was lost.
+    await page.route(routeFor(scope, "/capabilities"), fail(403));
+    await page.getByRole("region", { name: "Source ontology browser" }).getByRole("button", { name: "Try again" }).first().click();
+    await expect(page.getByRole("alert").filter({ hasText: /no longer has access/ })).toBeVisible();
+    await expect(add1(page)).toBeDisabled();
+  });
+});
+
+test.describe("R09 readiness follows the admitted components (19 F19)", () => {
+  const variants = [
+    { suffix: "cmp", components: ["pair_comparison"], cards: 0, comparison: true, profiles: false, tabs: 0 },
+    { suffix: "ctx", components: ["original_context"], cards: 2, comparison: false, profiles: false, tabs: 0 },
+    { suffix: "desc", components: ["entity_description"], cards: 2, comparison: false, profiles: true, tabs: 0 },
+    { suffix: "nav", components: ["hierarchy", "evidence_table", "evidence_graph"], cards: 0, comparison: false, profiles: false, tabs: 3 },
+  ] as const;
+  for (const variant of variants)
+    test(`${variant.components.join(" + ")} only: usable once exactly its content renders; a failure blocks and Retry recovers`, async ({ page }) => {
+      const traffic = recordTraffic(page);
+      const revision = await publishVariant(page, variant.suffix, [...variant.components]);
+      const { scope, byPosition } = await explanationCase(page, revision);
+      // First load: one required read fails, nothing is ready, Retry recovers.
+      const failing = variant.comparison
+        ? routeFor(scope, "/explanations", (params) => params.get("task") === "pair_comparison" && params.get("counterpart_iri") === byPosition(1).entity.iri)
+        : variant.profiles
+          ? routeFor(scope, "/explanations", (params) => params.get("task") === "entity_profile" && params.get("iri") === byPosition(1).entity.iri)
+          : routeFor(scope, "/entity-context", (params) => params.get("iri") === byPosition(1).entity.iri);
+      await page.route(failing, fail());
+      await page.reload();
+      await expect(page.getByRole("alert").filter({ hasText: /could not be loaded/ })).toBeVisible();
+      await expect(add1(page)).toBeDisabled();
+      expect(caseReady(traffic)).toEqual([]);
+      await page.unroute(failing);
+      await page.getByRole("button", { name: "Retry loading this case" }).click();
+      await expect(add1(page)).toBeEnabled({ timeout: 15_000 });
+      await expect.poll(() => caseReady(traffic).length).toBe(1);
+      // Exactly the admitted components are shown and awaited; nothing else is read.
+      await expect(page.locator(".pair-question")).toBeVisible();
+      await expect(page.locator(".card-pair .entity-card")).toHaveCount(variant.cards);
+      await expect(page.locator(".comparison")).toHaveCount(variant.comparison ? 1 : 0);
+      await expect(page.getByRole("tab")).toHaveCount(variant.tabs);
+      await expect(page.locator(".card-pair").getByRole("region", { name: "Generated description" })).toHaveCount(variant.profiles ? 2 : 0);
+      const explanations = traffic.requests.filter((item) => item.path.startsWith(`${scopedPath(scope)}/explanations?`));
+      expect(explanations.some((item) => item.path.includes("task=entity_profile"))).toBe(variant.profiles);
+      expect(explanations.some((item) => item.path.includes("task=pair_comparison"))).toBe(variant.comparison);
+      if (variant.cards) await expect(page.locator(".card-pair .entity-card").first().getByRole("heading", { name: "Definition" })).toHaveCount((variant.components as readonly string[]).includes("original_context") ? 1 : 0);
+      if (variant.tabs) {
+        await page.getByRole("tab", { name: "Hierarchy", exact: true }).click();
+        // Original context is not admitted, so the browser offers no full-context view.
+        await expect(page.getByRole("button", { name: "Open full context" })).toHaveCount(0);
+      }
+      expect(traffic.errors).toEqual([]);
+    });
+
+  test("comparison only: a recorded absence is usable (diagnostic)", async ({ page }) => {
+    const revision = await publishVariant(page, "cmp", ["pair_comparison"]);
+    const { scope, byPosition } = await explanationCase(page, revision);
+    const absence = JSON.parse(readFileSync(join(__dirname, "../../docs/verification/explanation-integration-backend-examples.json"), "utf8")).examples.terminal_absence.body;
+    await page.route(routeFor(scope, "/explanations", (params) => params.get("task") === "pair_comparison" && params.get("counterpart_iri") === byPosition(1).entity.iri), (route) => route.fulfill({ status: 200, json: absence }));
+    await page.reload();
+    await expect(add1(page)).toBeEnabled();
+    await expect(page.locator(".comparison")).toBeVisible();
+    await expect(page.getByRole("alert").filter({ hasText: /could not be loaded/ })).toHaveCount(0);
+  });
+});
+

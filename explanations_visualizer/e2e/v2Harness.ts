@@ -34,8 +34,8 @@ function publication() {
   };
 }
 
-export async function newInvitation(page: Page): Promise<string> {
-  const response = await page.request.post(`${harness!.origin}/api/v1/admin/studies/${encodeURIComponent(harness!.study_revision)}/invitations`, {
+export async function newInvitation(page: Page, revision = harness!.study_revision): Promise<string> {
+  const response = await page.request.post(`${harness!.origin}/api/v1/admin/studies/${encodeURIComponent(revision)}/invitations`, {
     headers: { Authorization: `Bearer ${harness!.researcher_token}` },
     data: { count: 1, test: true },
   });
@@ -97,9 +97,26 @@ function tutorialActions() {
   return actions;
 }
 
+/**
+ * Publish a variant of the fixture that shows only `components` (19 F19). Forms derive from
+ * the components, so the variant freezes its own form version; everything else, including the
+ * admitted workspaces, is the fixture's. Publishing the same variant again is idempotent.
+ */
+export async function publishVariant(page: Page, suffix: string, components: string[]): Promise<string> {
+  const variant = JSON.parse(readFileSync(harness!.publication, "utf8"));
+  const definition = variant.definition;
+  definition.study_revision = `${definition.study_revision}-${suffix}`;
+  definition.components = components;
+  definition.form_version = `exact-study-forms/2-${suffix}`;
+  definition.protocol_versions.forms = definition.form_version;
+  const response = await page.request.post(`${harness!.origin}/api/v1/admin/studies`, { headers: { Authorization: `Bearer ${harness!.researcher_token}` }, data: variant });
+  if (!response.ok()) throw new Error(`Publishing ${suffix} → ${response.status()} ${await response.text()}`);
+  return definition.study_revision as string;
+}
+
 /** Fault scenarios only: consent, setup and background through the API. */
-export async function seedToTutorial(page: Page) {
-  const invitation = await newInvitation(page);
+export async function seedToTutorial(page: Page, revision?: string) {
+  const invitation = await newInvitation(page, revision);
   await page.goto(harness!.origin + invitation);
   await expect(page.getByRole("button", { name: "I agree to take part", exact: true })).toBeVisible();
   const api = new ParticipantApi(page);
@@ -119,8 +136,8 @@ export async function seedToTutorial(page: Page) {
 }
 
 /** Fault scenarios only: API-completed training, so the scored case can be loaded directly. */
-export async function seedToCase(page: Page) {
-  const api = await seedToTutorial(page);
+export async function seedToCase(page: Page, revision?: string) {
+  const api = await seedToTutorial(page, revision);
   const { tutorial } = publication().definition;
   const actions = tutorialActions();
   await api.write("PUT", "/tutorial/progress", { tutorial_version: tutorial.version, lesson_id: tutorial.lessons.at(-1)!.lesson_id, actions, completed_requirements: actions.map((action) => action.requirement_id) });

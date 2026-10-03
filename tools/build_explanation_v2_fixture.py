@@ -91,7 +91,9 @@ def _base_publication():
     }
 
 
-def publication_v2(root, *, navigation_size=0, export_version="exact-study-analysis/2"):
+def publication_v2(
+    root, *, navigation_size=0, export_version="exact-study-analysis/2", paged_facts=0
+):
     import pyowl_core as core
 
     root = Path(root)
@@ -134,6 +136,11 @@ def publication_v2(root, *, navigation_size=0, export_version="exact-study-analy
                             f'AnnotationAssertion(<http://www.w3.org/2000/01/rdf-schema#comment> <urn:{name}:{focal}> "Original navigation fact {i:03}")',
                         ]
                     )
+        # Optional frontend paging fixture (spec 19 F16): one non-focal source class whose
+        # definitions, alternate definitions, synonyms, restrictions, comments and parents
+        # each exceed the entity context's first page. Default 0 leaves fixtures unchanged.
+        if paged_facts and name == "source":
+            axioms.extend(_paged_facts_axioms(paged_facts))
         context = build_context_package(
             core.load_snapshot(("Ontology(" + " ".join(axioms) + ")").encode()),
             root / f"{name}-v2-context",
@@ -409,6 +416,37 @@ def publication_v2(root, *, navigation_size=0, export_version="exact-study-analy
     return Publish.model_validate(legacy)
 
 
+def _paged_facts_axioms(count, parents=55):
+    """Axioms for `urn:source:paged`: every displayed category spans more than one page."""
+    iri = "urn:source:paged"
+    relation = "urn:source:paged-relation"
+    axioms = [
+        f"Declaration(Class(<{iri}>))",
+        f'AnnotationAssertion(<http://www.w3.org/2000/01/rdf-schema#label> <{iri}> "Paged facts source")',
+        f"Declaration(ObjectProperty(<{relation}>))",
+        f'AnnotationAssertion(<http://www.w3.org/2000/01/rdf-schema#label> <{relation}> "paged relation")',
+    ]
+    for i in range(count):
+        filler = f"urn:source:paged:filler:{i:03}"
+        axioms += [
+            f'AnnotationAssertion(<http://purl.obolibrary.org/obo/IAO_0000115> <{iri}> "Paged definition {i:03}")',
+            f'AnnotationAssertion(<http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#P325> <{iri}> "Paged alternate definition {i:03}")',
+            f'AnnotationAssertion(<http://www.geneontology.org/formats/oboInOwl#hasExactSynonym> <{iri}> "paged synonym {i:03}")',
+            f'AnnotationAssertion(<http://www.w3.org/2000/01/rdf-schema#comment> <{iri}> "Paged comment {i:03}")',
+            f"Declaration(Class(<{filler}>))",
+            f'AnnotationAssertion(<http://www.w3.org/2000/01/rdf-schema#label> <{filler}> "Paged filler {i:03}")',
+            f"SubClassOf(<{iri}> ObjectSomeValuesFrom(<{relation}> <{filler}>))",
+        ]
+    for i in range(parents):
+        parent = f"urn:source:paged:parent:{i:03}"
+        axioms += [
+            f"Declaration(Class(<{parent}>))",
+            f'AnnotationAssertion(<http://www.w3.org/2000/01/rdf-schema#label> <{parent}> "Paged parent {i:03}")',
+            f"SubClassOf(<{iri}> <{parent}>)",
+        ]
+    return axioms
+
+
 def main():
     import argparse
 
@@ -423,6 +461,12 @@ def main():
         help="Add non-focal entities and paged context for integration checks (0-200)",
     )
     parser.add_argument(
+        "--paged-facts",
+        type=int,
+        default=0,
+        help="Add one non-focal source class with this many facts per displayed category and 55 parents (0-200)",
+    )
+    parser.add_argument(
         "--export-version",
         choices=["exact-study-analysis/2", "exact-study-analysis/3"],
         default="exact-study-analysis/3",
@@ -431,10 +475,15 @@ def main():
     args = parser.parse_args()
     if not 0 <= args.navigation_size <= 200:
         parser.error("Navigation size must be between 0 and 200")
+    if not 0 <= args.paged_facts <= 200:
+        parser.error("Paged facts must be between 0 and 200")
     if args.destination.exists() and any(args.destination.iterdir()):
         parser.error("Destination must be new or empty; frozen packages are never overwritten")
     frozen = publication_v2(
-        args.destination, navigation_size=args.navigation_size, export_version=args.export_version
+        args.destination,
+        navigation_size=args.navigation_size,
+        export_version=args.export_version,
+        paged_facts=args.paged_facts,
     )
     path = args.destination / "publication.json"
     path.write_text(frozen.model_dump_json(indent=2) + "\n")
