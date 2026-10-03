@@ -212,7 +212,11 @@ def create_study_router(store, *, signing_secret, researcher_token, origin):
 
     install_workspace_routes(router, store, auth.participant_write)
 
-    @router.post("/study/session", response_model=StudyState | StudyStateV2)
+    @router.post(
+        "/study/session",
+        response_model=StudyState | StudyStateV2,
+        response_model_exclude_unset=True,
+    )
     def exchange(body: Exchange, response: Response):
         auth.exchange_allowed()
         try:
@@ -231,54 +235,86 @@ def create_study_router(store, *, signing_secret, researcher_token, origin):
         )
         return state
 
-    @router.get("/study/state", response_model=StudyState | StudyStateV2)
+    @router.get(
+        "/study/state", response_model=StudyState | StudyStateV2, response_model_exclude_unset=True
+    )
     def state(identity=Depends(auth.participant)):
         return store.state(*identity)
 
-    @router.put("/study/consent", response_model=StudyState | StudyStateV2)
+    @router.put(
+        "/study/consent",
+        response_model=StudyState | StudyStateV2,
+        response_model_exclude_unset=True,
+    )
     def consent(body: Consent, identity=Depends(auth.participant_write)):
         return store.mutate(*identity, "consent", body)
 
-    @router.put("/study/setup", response_model=StudyState | StudyStateV2)
+    @router.put(
+        "/study/setup", response_model=StudyState | StudyStateV2, response_model_exclude_unset=True
+    )
     def setup(body: Setup | SetupV2, identity=Depends(auth.participant_write)):
         return store.mutate(*identity, "setup", body)
 
-    @router.put("/study/tutorial/progress", response_model=StudyStateV2)
+    @router.put(
+        "/study/tutorial/progress", response_model=StudyStateV2, response_model_exclude_unset=True
+    )
     def tutorial_progress(body: TutorialProgressMutation, identity=Depends(auth.tutorial_write)):
         return store.mutate(*identity, "tutorial_progress", body)
 
-    @router.post("/study/tutorial/assessment", response_model=StudyStateV2)
+    @router.post(
+        "/study/tutorial/assessment", response_model=StudyStateV2, response_model_exclude_unset=True
+    )
     def tutorial_assessment(body: TutorialAssessment, identity=Depends(auth.tutorial_write)):
         return store.mutate(*identity, "tutorial_assessment", body)
 
-    @router.post("/study/tutorial/complete", response_model=StudyStateV2)
+    @router.post(
+        "/study/tutorial/complete", response_model=StudyStateV2, response_model_exclude_unset=True
+    )
     def tutorial_complete(body: TutorialComplete, identity=Depends(auth.tutorial_write)):
         return store.mutate(*identity, "tutorial_complete", body)
 
-    @router.put("/study/questionnaires/{form_id}", response_model=StudyState | StudyStateV2)
+    @router.put(
+        "/study/questionnaires/{form_id}",
+        response_model=StudyState | StudyStateV2,
+        response_model_exclude_unset=True,
+    )
     def questionnaire(form_id: str, body: Questionnaire, identity=Depends(auth.participant_write)):
         return store.mutate(*identity, f"questionnaire:{form_id}", body)
 
     @router.get("/study/cases/current", response_model=StudyCase | StudyCaseV2)
-    def current(identity=Depends(auth.participant)):
+    def current(identity=Depends(auth.participant_write)):
         return store.current_case(*identity)
 
-    @router.put("/study/cases/{case_id:path}/consultation/draft", response_model=StudyStateV2)
+    @router.put(
+        "/study/cases/{case_id:path}/consultation/draft",
+        response_model=StudyStateV2,
+        response_model_exclude_unset=True,
+    )
     def consultation_draft(
         case_id: str, body: ConsultationDraftV2, identity=Depends(auth.participant_write)
     ):
         return store.mutate(*identity, "consultation_draft", body, case_id)
 
-    @router.put("/study/cases/{case_id:path}/draft", response_model=StudyState | StudyStateV2)
+    @router.put(
+        "/study/cases/{case_id:path}/draft",
+        response_model=StudyState | StudyStateV2,
+        response_model_exclude_unset=True,
+    )
     def draft(case_id: str, body: Ranking, identity=Depends(auth.participant_write)):
         return store.mutate(*identity, "draft", body, case_id)
 
-    @router.post("/study/cases/{case_id:path}/submit", response_model=StudyState | StudyStateV2)
+    @router.post(
+        "/study/cases/{case_id:path}/submit",
+        response_model=StudyState | StudyStateV2,
+        response_model_exclude_unset=True,
+    )
     def submit(case_id: str, body: Ranking, identity=Depends(auth.participant_write)):
         return store.mutate(*identity, "submit", body, case_id)
 
     @router.put(
-        "/study/cases/{case_id:path}/consultation", response_model=StudyState | StudyStateV2
+        "/study/cases/{case_id:path}/consultation",
+        response_model=StudyState | StudyStateV2,
+        response_model_exclude_unset=True,
     )
     def consultation(
         case_id: str, body: Consultation | ConsultationV2, identity=Depends(auth.participant_write)
@@ -293,15 +329,23 @@ def create_study_router(store, *, signing_secret, researcher_token, origin):
     def timing(body: TimingSegment | TimingSegmentV2, identity=Depends(auth.participant_write)):
         return save_timing(store, *identity, body)
 
-    @router.post("/study/pause", response_model=StudyState | StudyStateV2)
+    @router.post(
+        "/study/pause", response_model=StudyState | StudyStateV2, response_model_exclude_unset=True
+    )
     def pause(body: Mutation, identity=Depends(auth.participant_write)):
         return store.mutate(*identity, "pause", body)
 
-    @router.post("/study/resume", response_model=StudyState | StudyStateV2)
+    @router.post(
+        "/study/resume", response_model=StudyState | StudyStateV2, response_model_exclude_unset=True
+    )
     def resume(body: Resume, identity=Depends(auth.participant_write)):
         return store.mutate(*identity, "resume", body)
 
-    @router.post("/study/complete", response_model=StudyState | StudyStateV2)
+    @router.post(
+        "/study/complete",
+        response_model=StudyState | StudyStateV2,
+        response_model_exclude_unset=True,
+    )
     def complete(body: Mutation, identity=Depends(auth.participant_write)):
         return store.mutate(*identity, "complete", body)
 

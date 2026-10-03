@@ -340,6 +340,29 @@ def _open_resources(store, scope, policy):
     return contexts, index
 
 
+def case_workspace_descriptor(store, study, case):
+    """Discover only the already-authorized case's frozen, usable locator."""
+    try:
+        matches = [
+            s
+            for s in study.get("workspace_scopes", [])
+            if s.get("kind") == "case" and s.get("case_id") == case["case_id"]
+        ]
+        if len(matches) != 1:
+            raise ValueError("Missing or ambiguous case workspace")
+        scope = WorkspaceScope.model_validate(matches[0])
+        if not {e["ontology_version_id"] for e in _focal(case)} <= {
+            c.ontology_version_id for c in scope.contexts
+        }:
+            raise ValueError("Workspace does not cover the case ontologies")
+        _open_resources(store, scope, VisibilityPolicy.model_validate(study["visibility_policy"]))
+        return {"scope_id": scope.scope_id}
+    except (ValueError, OSError, KeyError) as exc:
+        raise _error(
+            503, "Frozen case workspace is unavailable; retry or contact the study team"
+        ) from exc
+
+
 def validate_publication_workspaces(store, study, admitted_explanations):
     """Reject incomplete capabilities, alien case records and scored tutorial graphs."""
     scopes = [WorkspaceScope.model_validate(s) for s in study.get("workspace_scopes", [])]
@@ -648,7 +671,7 @@ def install_workspace_routes(router, store, participant_dependency):
     from fastapi import Depends, Query
     from fastapi.responses import JSONResponse
 
-    prefix = "/study/workspace/{scope_id}"
+    prefix = "/study/workspace/{scope_id:path}"
 
     def read(scope_id, identity, operation):
         try:
@@ -661,6 +684,10 @@ def install_workspace_routes(router, store, participant_dependency):
             raise _error(404, "Workspace resource unavailable") from exc
         except DomainError as exc:
             return JSONResponse(exc.envelope.model_dump(mode="json"), status_code=exc.status_code)
+        except (ValueError, OSError, sqlite3.DatabaseError) as exc:
+            raise _error(
+                503, "Frozen workspace resources are unavailable; retry or contact the study team"
+            ) from exc
 
     def entity(version, iri, kind):
         return EntityRef(ontology_version_id=version, iri=iri, kind=kind).model_dump()

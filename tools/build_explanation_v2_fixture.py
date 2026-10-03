@@ -91,7 +91,7 @@ def _base_publication():
     }
 
 
-def publication_v2(root):
+def publication_v2(root, *, navigation_size=0):
     import pyowl_core as core
 
     root = Path(root)
@@ -115,6 +115,25 @@ def publication_v2(root):
                     f"SubClassOf(<{iri}> <urn:{name}:parent>)",
                 ]
             )
+        # Optional full-scope fixture: these original entities are deliberately
+        # outside focal explanation packets, with paged children and facts.
+        if navigation_size:
+            for i in range(navigation_size):
+                iri = f"urn:{name}:navigation:{i:03}"
+                axioms.extend(
+                    [
+                        f"Declaration(Class(<{iri}>))",
+                        f'AnnotationAssertion(<http://www.w3.org/2000/01/rdf-schema#label> <{iri}> "Navigation {name} {i:03}")',
+                        f"SubClassOf(<{iri}> <urn:{name}:parent>)",
+                    ]
+                )
+                for focal in indices:
+                    axioms.extend(
+                        [
+                            f"SubClassOf(<{iri}> <urn:{name}:{focal}>)",
+                            f'AnnotationAssertion(<http://www.w3.org/2000/01/rdf-schema#comment> <urn:{name}:{focal}> "Original navigation fact {i:03}")',
+                        ]
+                    )
         context = build_context_package(
             core.load_snapshot(("Ontology(" + " ".join(axioms) + ")").encode()),
             root / f"{name}-v2-context",
@@ -182,7 +201,7 @@ def publication_v2(root):
         if a["asset_id"].startswith("practice-")
     ]
     tutorial.update(
-        version="tutorial/2.0-native-2",
+        version="tutorial/2.0-native-2" + (f"-nav{navigation_size}" if navigation_size else ""),
         practice_id="practice-case",
         transfer_group="synthetic-tutorial-transfer/2",
         assessment_version="assessment/2",
@@ -233,9 +252,17 @@ def publication_v2(root):
                     for e in pair
                 ],
                 policy_hash=policy.policy_hash,
-                facts=facts,
+                facts=facts[:100],
                 missingness=[],
-                selection={},
+                selection=(
+                    {
+                        "limit": 100,
+                        "available_count": len(facts),
+                        "selected_count": min(100, len(facts)),
+                    }
+                    if navigation_size
+                    else {}
+                ),
             )
             output = factual_fallback(packet)
             if not output.claims:
@@ -389,10 +416,18 @@ def main():
         description="Build a synthetic exact-study/2.0 package for local integration checks; does not publish or recruit"
     )
     parser.add_argument("destination", type=Path)
+    parser.add_argument(
+        "--navigation-size",
+        type=int,
+        default=0,
+        help="Add non-focal entities and paged context for integration checks (0-200)",
+    )
     args = parser.parse_args()
+    if not 0 <= args.navigation_size <= 200:
+        parser.error("Navigation size must be between 0 and 200")
     if args.destination.exists() and any(args.destination.iterdir()):
         parser.error("Destination must be new or empty; frozen packages are never overwritten")
-    frozen = publication_v2(args.destination)
+    frozen = publication_v2(args.destination, navigation_size=args.navigation_size)
     path = args.destination / "publication.json"
     path.write_text(frozen.model_dump_json(indent=2) + "\n")
     print(path.resolve())

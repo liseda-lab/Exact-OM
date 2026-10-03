@@ -2009,6 +2009,26 @@
       "get": {
         "summary": "Current",
         "operationId": "current_api_v1_study_cases_current_get",
+        "parameters": [
+          {
+            "name": "X-Study-Session",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Expected session ID; a cookie switch returns 409 before mutation.",
+              "title": "X-Study-Session"
+            },
+            "description": "Expected session ID; a cookie switch returns 409 before mutation."
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -2024,6 +2044,16 @@
                     }
                   ],
                   "title": "Response Current Api V1 Study Cases Current Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -3327,6 +3357,41 @@
           "options"
         ],
         "title": "AssessmentPartB"
+      },
+      "AssessmentPosition": {
+        "properties": {
+          "view": {
+            "type": "string",
+            "const": "assessment",
+            "title": "View"
+          },
+          "lesson_id": {
+            "type": "null",
+            "title": "Lesson Id"
+          },
+          "question_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9_.:/-]+$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Question Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "view",
+          "lesson_id",
+          "question_id"
+        ],
+        "title": "AssessmentPosition"
       },
       "AssessmentResponse": {
         "properties": {
@@ -6170,6 +6235,34 @@
         "title": "LabelsResponse",
         "description": "Bounded batch lookup; punning may produce multiple typed results per IRI."
       },
+      "LessonPosition": {
+        "properties": {
+          "view": {
+            "type": "string",
+            "const": "lesson",
+            "title": "View"
+          },
+          "lesson_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.:/-]+$",
+            "title": "Lesson Id"
+          },
+          "question_id": {
+            "type": "null",
+            "title": "Question Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "view",
+          "lesson_id",
+          "question_id"
+        ],
+        "title": "LessonPosition"
+      },
       "LessonRequirement": {
         "properties": {
           "requirement_id": {
@@ -8593,14 +8686,12 @@
           "workspace": {
             "anyOf": [
               {
-                "additionalProperties": true,
-                "type": "object"
+                "$ref": "#/components/schemas/WorkspaceDescriptor"
               },
               {
                 "type": "null"
               }
-            ],
-            "title": "Workspace"
+            ]
           }
         },
         "additionalProperties": false,
@@ -10283,6 +10374,31 @@
             "pattern": "^[A-Za-z0-9_.:/-]+$",
             "title": "Tutorial Version"
           },
+          "position": {
+            "anyOf": [
+              {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/LessonPosition"
+                  },
+                  {
+                    "$ref": "#/components/schemas/AssessmentPosition"
+                  }
+                ],
+                "discriminator": {
+                  "propertyName": "view",
+                  "mapping": {
+                    "assessment": "#/components/schemas/AssessmentPosition",
+                    "lesson": "#/components/schemas/LessonPosition"
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Position"
+          },
           "current_lesson_id": {
             "anyOf": [
               {
@@ -10455,6 +10571,31 @@
               }
             ],
             "title": "Current Lesson Id"
+          },
+          "position": {
+            "anyOf": [
+              {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/LessonPosition"
+                  },
+                  {
+                    "$ref": "#/components/schemas/AssessmentPosition"
+                  }
+                ],
+                "discriminator": {
+                  "propertyName": "view",
+                  "mapping": {
+                    "assessment": "#/components/schemas/AssessmentPosition",
+                    "lesson": "#/components/schemas/LessonPosition"
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Position"
           },
           "completed_requirements": {
             "items": {
@@ -10804,6 +10945,23 @@
           "database_sha256"
         ],
         "title": "WorkspaceContextRef"
+      },
+      "WorkspaceDescriptor": {
+        "properties": {
+          "scope_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.:/-]+$",
+            "title": "Scope Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "scope_id"
+        ],
+        "title": "WorkspaceDescriptor"
       },
       "WorkspaceScope": {
         "properties": {

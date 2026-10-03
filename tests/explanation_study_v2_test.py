@@ -672,6 +672,22 @@ def test_v2_postgresql_backup_restore_preserves_training_and_draft(corrected, tm
         ),
         case["case_id"],
     )
+    position = {
+        "view": "assessment",
+        "lesson_id": None,
+        "question_id": frozen.definition.tutorial.assessment[0].question_id,
+    }
+    before = store.mutate(
+        *identity,
+        "tutorial_progress",
+        TutorialProgressMutation(
+            idempotency_key=uuid4().hex,
+            expected_revision=before["revision"],
+            tutorial_version=frozen.definition.tutorial.version,
+            position=position,
+            help_opened=True,
+        ),
+    )
     exported = store.export(frozen.definition.study_revision, include_test=True)
     url = urlsplit(store.database_url)
     env = {
@@ -713,6 +729,7 @@ def test_v2_postgresql_backup_restore_preserves_training_and_draft(corrected, tm
         assert restored.state(*identity) == before
         assert restored.saved_export(exported["manifest"]["export_id"]) == exported
         assert restored.state(*identity)["tutorial_progress"]["completed_at"]
+        assert restored.state(*identity)["tutorial_progress"]["position"] == position
         assert restored.state(*identity)["consultation_draft"]["methods"] == ["reasoner"]
     finally:
         run("dropdb", restored_name)

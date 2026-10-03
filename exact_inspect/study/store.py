@@ -134,7 +134,12 @@ class StudyStore:
             timezone.utc
         ):
             raise StudyError(410, "Study closed")
-        return row, json.loads(row["state"]), study
+        state = json.loads(row["state"])
+        if study["contract_version"] == "exact-study/2.0":
+            from .tutorial import normalize_position
+
+            normalize_position(study["tutorial"], state["tutorial_progress"])
+        return row, state, study
 
     def publish(self, publication: Publish):
         """Verify and freeze participant packages; store keys in a separate table."""
@@ -622,6 +627,10 @@ class StudyStore:
     def mutate(self, sid, generation, operation, payload, case_id=None):
         """Replay an identical acknowledged mutation before checking stale revisions."""
         data = payload.model_dump(mode="json")
+        if operation == "tutorial_progress" and "position" not in payload.model_fields_set:
+            # Old requests were hashed with all old defaults. Keep that exact
+            # canonical shape; omission/null of the legacy alias both preserve position.
+            data.pop("position", None)
         request_hash = digest(
             canonical({"operation": operation, "case_id": case_id, "payload": data})
         )
@@ -923,6 +932,8 @@ class StudyStore:
             current = self._current(state)
             if not current or state["stage"] not in {"case", "consultation", "paused"}:
                 raise StudyError(409, "No case available at this step")
+            if not (state.get("consent") or {}).get("accepted"):
+                raise StudyError(403, "Consent is required")
             case = next(c for c in study["cases"] if c["case_id"] == current["case_id"])
             allowed = {
                 k: case[k]
@@ -935,7 +946,7 @@ class StudyStore:
                     "package_version",
                 )
             }
-            return {
+            result = {
                 "artifact_type": "study_case",
                 "contract_version": study["contract_version"],
                 "study_revision": row["study_revision"],
@@ -946,6 +957,15 @@ class StudyStore:
                     case["explanation_refs"] if current["condition"] == "explanation" else []
                 ),
             }
+            if study["contract_version"] == "exact-study/2.0":
+                from .workspace import case_workspace_descriptor
+
+                result["workspace"] = (
+                    case_workspace_descriptor(self, study, case)
+                    if current["condition"] == "explanation"
+                    else None
+                )
+            return result
 
     def resource(self, sid, generation, asset_id):
         """Verify bytes on every read; baseline never receives explanation resources."""

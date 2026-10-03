@@ -293,6 +293,11 @@ def initial_progress(tutorial):
     progress = {
         "tutorial_version": tutorial["version"],
         "current_lesson_id": tutorial["lessons"][0]["lesson_id"],
+        "position": {
+            "view": "lesson",
+            "lesson_id": tutorial["lessons"][0]["lesson_id"],
+            "question_id": None,
+        },
         "completed_requirements": [],
         "practice": {},
         "assessment_drafts": {},
@@ -304,6 +309,53 @@ def initial_progress(tutorial):
     }
     refresh_outstanding(tutorial, progress)
     return progress
+
+
+def normalize_position(tutorial, progress):
+    """Normalize a detached state on read; storage changes only on a valid mutation."""
+    if "position" not in progress:
+        lesson = progress.get("current_lesson_id")
+        if lesson in {item["lesson_id"] for item in tutorial["lessons"]}:
+            position = {"view": "lesson", "lesson_id": lesson, "question_id": None}
+        elif progress.get("assessment_drafts") or progress.get("attempts"):
+            position = {"view": "assessment", "lesson_id": None, "question_id": None}
+        else:
+            position = {
+                "view": "lesson",
+                "lesson_id": tutorial["lessons"][0]["lesson_id"],
+                "question_id": None,
+            }
+        progress["position"] = position
+    progress["current_lesson_id"] = progress["position"]["lesson_id"]
+    return progress
+
+
+def patch_position(tutorial, progress, data):
+    normalize_position(tutorial, progress)
+    if "position" in data:
+        position = data["position"]
+        from .v2_models import AssessmentPosition, LessonPosition
+
+        model = LessonPosition if position["view"] == "lesson" else AssessmentPosition
+        position = model.model_validate(position).model_dump(mode="json")
+        if position["view"] == "lesson" and position["lesson_id"] not in {
+            l["lesson_id"] for l in tutorial["lessons"]
+        }:
+            raise ValueError("Unknown tutorial position lesson")
+        if (
+            position["view"] == "assessment"
+            and position["question_id"] is not None
+            and position["question_id"] not in {q["question_id"] for q in tutorial["assessment"]}
+        ):
+            raise ValueError("Unknown tutorial position question")
+        progress["position"] = position
+    elif data.get("current_lesson_id") is not None:
+        progress["position"] = {
+            "view": "lesson",
+            "lesson_id": data["current_lesson_id"],
+            "question_id": None,
+        }
+    progress["current_lesson_id"] = progress["position"]["lesson_id"]
 
 
 def refresh_outstanding(tutorial, progress):
@@ -521,7 +573,7 @@ def apply_progress(store, study, progress, data, interaction_state=None):
         )
     interaction_state["inspected_candidates"] = sorted(visited)
     progress["completed_requirements"] = [r for r in requirements if r in completed]
-    progress["current_lesson_id"] = data.get("current_lesson_id")
+    patch_position(tutorial, progress, data)
     if data.get("practice"):
         answer = data["practice"]
         if answer["key"] != tutorial["practice_id"]:

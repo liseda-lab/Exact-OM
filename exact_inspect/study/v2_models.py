@@ -249,8 +249,24 @@ class AssessmentDraft(StrictModel):
     response: AssessmentResponse
 
 
+class LessonPosition(StrictModel):
+    view: Literal["lesson"]
+    lesson_id: Identifier
+    question_id: None
+
+
+class AssessmentPosition(StrictModel):
+    view: Literal["assessment"]
+    lesson_id: None
+    question_id: Identifier | None
+
+
+TutorialPosition = Annotated[LessonPosition | AssessmentPosition, Field(discriminator="view")]
+
+
 class TutorialProgressMutation(Mutation):
     tutorial_version: Identifier
+    position: TutorialPosition | None = None
     current_lesson_id: Identifier | None = None
     lesson_id: Identifier | None = None
     completed_requirements: Annotated[list[Identifier], Field(max_length=100)] = Field(
@@ -260,6 +276,16 @@ class TutorialProgressMutation(Mutation):
     practice: PracticeAnswer | None = None
     assessment_draft: AssessmentDraft | None = None
     help_opened: bool = False
+
+    @model_validator(mode="after")
+    def explicit_position(self):
+        if "position" in self.model_fields_set:
+            if self.position is None:
+                raise ValueError("Position must be a complete object, not null")
+            if "current_lesson_id" in self.model_fields_set:
+                if self.current_lesson_id != self.position.lesson_id:
+                    raise ValueError("Legacy lesson and position disagree")
+        return self
 
 
 class TutorialAssessment(Mutation):
@@ -286,6 +312,9 @@ class AttemptReceipt(StrictModel):
 class TutorialReceipt(StrictModel):
     tutorial_version: Identifier
     current_lesson_id: Identifier | None
+    # Only pre-extension immutable mutation receipts may omit position. Fresh
+    # state always projects a normalized complete object; omit this default on replay.
+    position: TutorialPosition | None = None
     completed_requirements: list[Identifier]
     practice: dict
     assessment_drafts: dict[Identifier, AssessmentResponse]
@@ -392,9 +421,13 @@ class RankingResponseV2(RankingResponse):
     contract_version: Literal["exact-study/2.0"] = "exact-study/2.0"
 
 
+class WorkspaceDescriptor(StrictModel):
+    scope_id: Identifier
+
+
 class StudyCaseV2(StudyCase):
     contract_version: Literal["exact-study/2.0"] = "exact-study/2.0"
-    workspace: dict | None = None
+    workspace: WorkspaceDescriptor | None = None
 
 
 class QuestionDefinitionV2(StrictModel):
