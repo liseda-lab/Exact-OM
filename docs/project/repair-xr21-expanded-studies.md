@@ -57,3 +57,44 @@ preparation may proceed alongside qualification; dependent scientific claims
 wait for the relevant gates. Implementation, source commits, schedules and
 configuration exports remain frozen separately for every batch. Original pilot
 artifacts and reports remain unchanged.
+
+## Frozen robustness evidence/omission branch
+
+The first robustness branch pairs all 64 fresh-evaluation cases (32 existing
+parent groups, with both clean and corrupted variants) across the six frozen
+pilot models and the three historical controls. It schedules a new charged
+baseline plus four separate interventions: Gaussian score/channel noise with
+standard deviation 0.20 clipped to [0, 1]; removal of half the numerical evidence
+fields; final removal of half the supplied nonempty changed candidates; and
+omission of a quarter of retrieved output-menu symbols after protecting every
+original editable-axiom symbol. Fractions round up, and empty eligible target
+sets are explicit no-ops. Targets and noise are determined from observable
+inputs and the parent group with seed 20261003, before opening test outcomes.
+No perturbations are combined. The schedule contains 320 case variants and
+2,880 arm rows; variants inherit their original split and parent.
+
+All arms use 300 seconds wall, 600 seconds CPU, 8192 MiB per case, including
+60 seconds for generation. Cold caches are isolated per row. Sixteen rows form
+a 5400-second operational slice, based on the development profile's native
+timeouts and the full original case allowances; productive continuation can
+raise the operational allowance while preserving scientific caps and costs.
+The existing primary evaluation and pilot results are immutable. This named
+robustness baseline is independently charged, not a retry of primary evaluation.
+
+Final-candidate targets stay outside ordinary evidence. Vocabulary omission
+changes the declared generation menus and endpoint producers; asserted theory
+and evidence remain visible. The runner asserts final exclusion after generation
+and retains pool identities, proposal reports, search ledgers and unknowns.
+The semantic target/query scope still requires the final audit. The historical
+retained-axiom symbolic heuristic does not qualify strongest-symbolic comparisons.
+Report parent-paired effects, coverage and effort with 2,000 parent bootstrap
+resamples (seed 20261003), descriptive 95% intervals, and no confirmatory
+significance claims. No checkpoint selection or fitting uses these outcomes.
+
+Conflict overlap remains a separate registered preparation/evaluation branch,
+requiring actual witnessed overlapping supports and paired controls, structural
+fingerprint/exposure audit and inherited group splits before its schedule is
+frozen. It is not declared complete by this branch. Receipt review, semantic
+scope review and the final failure-inclusive paired report remain registered
+through actual completion. Larger trained-model robustness is not added to this
+schedule; any addition requires a separate predeclared design.

@@ -253,7 +253,7 @@ def control_objective(problem, arm, protocol):
     return problem, objective
 
 
-def generate_control(problem, arm, protocol, directory):
+def generate_control(problem, arm, protocol, directory, generation_overrides=None):
     import torch
     from exact.repair.graph import EffectivePreparation
     from exact.repair.model import RepairModel
@@ -263,6 +263,7 @@ def generate_control(problem, arm, protocol, directory):
     torch.set_num_threads(1)
     torch.manual_seed(13)
     options = pilot.generation_options(protocol, Path(directory) / "compiler-cache")
+    options.update(generation_overrides or {})
     preparation = EffectivePreparation(
         max_graph_nodes=options["max_graph_nodes"],
         max_graph_edges=options["max_graph_edges"],
@@ -292,7 +293,11 @@ def generate_control(problem, arm, protocol, directory):
         for parameter in model.parameters():
             parameter.zero_()
     frozen = freeze_neural_round(
-        problem, model, graph=graph, proposal_arm="grammar_uniform", **options
+        problem,
+        model,
+        graph=None if generation_overrides else graph,
+        proposal_arm="grammar_uniform",
+        **options,
     )
     problem, objective = control_objective(frozen.problem, arm, protocol)
     return dataclasses.replace(frozen, problem=problem, objective=objective, risk_scorer=None)
@@ -324,6 +329,9 @@ def evaluate_row(schedule, row, directory):
     resources, selection = protocol["resources"], protocol["selection"]
     # The evaluator record is deliberately unopened until selection completes.
     problem = read_record(bound(item["observable"]))
+    from tools.repair.robustness import generation_overrides, audit_final_pool
+
+    overrides = generation_overrides(item, problem)
     problem = dataclasses.replace(
         problem,
         budgets=dataclasses.replace(
@@ -341,7 +349,7 @@ def evaluate_row(schedule, row, directory):
             seconds=resources["generation_seconds"],
             memory_mb=row["memory_mb"],
             cpu_seconds=row["cpu_seconds"],
-            **pilot.generation_options(protocol, directory / "compiler-cache"),
+            **{**pilot.generation_options(protocol, directory / "compiler-cache"), **overrides},
         )
     else:
         generated = bounded_call(
@@ -350,6 +358,7 @@ def evaluate_row(schedule, row, directory):
             arm["id"],
             protocol,
             str(directory),
+            generation_overrides=overrides or None,
             timeout=resources["generation_seconds"],
             memory_mb=row["memory_mb"],
             cpu_seconds=row["cpu_seconds"],
@@ -366,6 +375,7 @@ def evaluate_row(schedule, row, directory):
     )
     if generated.status == "complete":
         frozen = generated.value
+        result["intervention_audit"] = audit_final_pool(frozen.problem, item)
         if arm["kind"] == "learned" and frozen.model_hash != arm["model_hash"]:
             raise ValueError("Frozen model identity changed during generation")
         write_artifact(
@@ -481,6 +491,9 @@ def evaluate_row(schedule, row, directory):
         row_id=row["id"],
         schedule_hash=canonical_hash(schedule),
         case_id=item["case_id"],
+        base_case_id=item.get("base_case_id", item["case_id"]),
+        condition=item.get("condition", "baseline"),
+        group_id=item.get("group_id", item["structural_parent"]),
         parent=item["structural_parent"],
         family=item["family"],
         family_exposure=item["family_exposure"],
@@ -621,7 +634,7 @@ def run(schedule_path, output, start, stop):
             outcomes=dict(Counter(r["status"] for r in rows)),
             runtime=runtime,
             study_complete=False,
-            followup="xr21-expanded-evaluation-001",
+            followup=schedule.get("followup", "xr21-expanded-evaluation-001"),
             gates_passed=False,
             api_spend_usd=0,
         )
