@@ -26,6 +26,7 @@ from exact.experiments.notifications import (  # noqa: E402
 )
 from exact.experiments.interventions import (  # noqa: E402
     MAX_PROMPT_CHARACTERS, account_intervention, intervention_prompt, migrate_retry_accounting,
+    migrate_incident_aliases,
 )
 from exact.experiments.supervision import (  # noqa: E402
     inspect_runs,
@@ -310,7 +311,7 @@ def refresh_progress(policy, directory):
             health["status"] = "blocked"
         write(directory / "health.json", health)
         write(directory / "status.json", {**status, "blocked_incidents": blocked,
-                                           "checked_at": timestamp()})
+                                          "checked_at": timestamp()})
     except Exception as exc:
         write(
             directory / "observation-error.json",
@@ -486,6 +487,7 @@ def check(directory, policy, state, *, act=False, stop_requested=lambda: False):
     completed_queue = idle_completion(registry, observation, dispatch_state)
     if completed_queue:
         observation["status"] = "completed_waiting_for_decision"
+    migrate_incident_aliases(state, observation["incidents"])
     active = {item["id"] for item in observation["incidents"]}
     for key, record in state["incidents"].items():
         if key not in active:
@@ -579,7 +581,8 @@ def check(directory, policy, state, *, act=False, stop_requested=lambda: False):
                 "unsuccessful_attempts": record["unsuccessful_attempts"],
                 "max_attempts": policy["max_attempts_per_incident"],
                 "previous_interventions": [previous for previous in state["agent_runs"]
-                                           if previous["incident"] == incident["id"]],
+                                           if previous["incident"] in {
+                                               incident["id"], *record.get("merged_incident_ids", [])}],
             }
             # Context serialization and character preflight precede charging an
             # invocation. Every launched request has complete immutable evidence.
@@ -611,7 +614,7 @@ def check(directory, policy, state, *, act=False, stop_requested=lambda: False):
             before = dict(registry)
             if previous_handoff and Path(previous_handoff).is_file():
                 before["intervention_handoff"] = {"path": previous_handoff,
-                                                   "sha256": digest(Path(previous_handoff))}
+                                                  "sha256": digest(Path(previous_handoff))}
             try:
                 report = run_agent(policy, run, prompt, stop_requested)
             except Exception as exc:

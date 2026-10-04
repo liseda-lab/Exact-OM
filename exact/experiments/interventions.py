@@ -56,6 +56,7 @@ def intervention_prompt(directory: Path, instructions: str, context: dict) -> st
     }
     # Arbitrarily large reasons/paths remain in the snapshot. The bound also
     # applies to individual strings, not just the number of registry entries.
+
     def compact(value):
         if isinstance(value, str):
             return value if len(value) <= 2048 else value[:2048] + " [see full snapshot]"
@@ -172,3 +173,51 @@ def account_intervention(record: dict, incident: dict, report: dict, before: dic
     elif not charged:
         record["unsuccessful_attempts"] = record.get("unsuccessful_attempts", 0) + 1
     return fresh
+
+
+def migrate_incident_aliases(state: dict, incidents: list[dict]) -> None:
+    """Carry every charged invocation across a receipt-qualified identity correction."""
+    records = state["incidents"]
+    for incident in incidents:
+        aliases = incident.get("legacy_incident_ids", [])
+        failed_replacements = incident.get("unsuccessful_recovery_run_ids", [])
+        if not aliases and not failed_replacements:
+            continue
+        target = records.setdefault(incident["id"],
+                                    dict(attempts=0, unsuccessful_attempts=0, observations=0))
+        merged = set(target.get("merged_incident_ids", []))
+        for identity in aliases:
+            source = records.get(identity)
+            if not source or identity in merged:
+                continue
+            if source.get("merged_into") not in {None, incident["id"]}:
+                raise ValueError("Incident retry history already belongs to another cause")
+            target.setdefault("merged_history", {})[identity] = dict(source)
+            target["attempts"] += source.get("attempts", 0)
+            target["unsuccessful_attempts"] += source.get("unsuccessful_attempts", source.get("attempts", 0))
+            target["observations"] = max(target.get("observations", 0), source.get("observations", 0))
+            if "first_seen_epoch" in source:
+                target["first_seen_epoch"] = min(target.get("first_seen_epoch", source["first_seen_epoch"]),
+                                                 source["first_seen_epoch"])
+            if source.get("last_seen", "") >= target.get("last_seen", ""):
+                for key in ("last_seen", "last_result"):
+                    if key in source:
+                        target[key] = source[key]
+            target["progress_witnesses"] = sorted(
+                set(target.get("progress_witnesses", [])) | set(source.get("progress_witnesses", []))
+            )
+            if source.get("needs_user"):
+                target["needs_user"] = True
+            if source.get("alerted"):
+                target["alerted"] = True
+            merged.add(identity)
+            source["merged_into"] = incident["id"]
+        target["merged_incident_ids"] = sorted(merged)
+        # Manual repairs have no model invocation record. Qualified failed
+        # replacement receipts provide a lower bound, never a second charge.
+        target["unsuccessful_recovery_run_ids"] = sorted(
+            set(target.get("unsuccessful_recovery_run_ids", [])) | set(failed_replacements)
+        )
+        target["unsuccessful_attempts"] = max(
+            target["unsuccessful_attempts"], len(target["unsuccessful_recovery_run_ids"])
+        )

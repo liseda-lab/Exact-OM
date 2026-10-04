@@ -177,6 +177,17 @@ def _recovery_detail(value: Any, aliases: Mapping[str, str]) -> Any:
     return value
 
 
+def _batch_failure_detail(detail: Any) -> Any:
+    """Ignore only the wrapper command position, never the exit code or diagnosis."""
+    if isinstance(detail, dict) and detail.get("type") == "RuntimeError":
+        message = detail.get("message")
+        if isinstance(message, str):
+            return {**detail, "message": re.sub(
+                r"^command [0-9]+(?= exited -?[0-9]+: )", "command 0", message
+            )}
+    return detail
+
+
 def inspection_incident(runs: Sequence[Mapping[str, Any]], finding: Mapping[str, Any]) -> dict:
     """Identify unreadable evidence by its error and registered recovery lineage."""
     _registry(runs)
@@ -218,7 +229,10 @@ def inspect_runs(
     snapshot means the step is no longer live. No scheduler query runs here.
     """
     observations = {}
-    for run in _registry(runs):
+    enabled = {run["id"] for run in _registry(runs)}
+    # Disabled ancestor receipts qualify migration of already charged retries.
+    # Their read errors never become active findings or authorize a new worker.
+    for run in runs:
         observation: dict[str, Any] = {"errors": []}
         for field, key in (
             ("status", "status_path"),
@@ -229,7 +243,8 @@ def inspect_runs(
                 observation[field] = _read(run.get(key), json_object=field != "exit_code")
             except (OSError, ValueError, UnicodeError) as exc:
                 observation["errors"].append(f"{field}: {type(exc).__name__}: {exc}")
-        scientific = inspect_science(run, observation.get("completion"))
+        scientific = (inspect_science(run, observation.get("completion"))
+                      if run["id"] in enabled else dict(errors=[], failures=[]))
         observation["errors"].extend(scientific["errors"])
         observation["scientific_failures"] = scientific["failures"]
         observations[run["id"]] = observation
@@ -288,10 +303,47 @@ def assess_runs(
     """Pure health assessment with stable incident IDs and upstream deduplication."""
     enabled = _registry(runs)
     identities = _recovery_identities(runs)
+    by_id = {run["id"]: run for run in runs}
 
     def failure(name: str, kind: str, reason: str, detail: Any = None) -> dict:
         scope, aliases = identities[name]
-        return _incident(name, kind, reason, _recovery_detail(detail, aliases), scope=scope)
+        original = _recovery_detail(detail, aliases)
+        members = [key for key, (root, _) in identities.items() if root == scope]
+        completion_error = (original.get("error") if kind == "completion_failed"
+                            and isinstance(original, dict) else None)
+        if isinstance(completion_error, dict) and re.match(
+            r"^command [0-9]+ exited -?[0-9]+: ", str(completion_error.get("message", ""))
+        ) and completion_error.get("type") == "RuntimeError" and len(members) > 1:
+            kind, original = "run_failed", completion_error
+        if kind != "run_failed" or len(members) < 2:
+            return _incident(name, kind, reason, original, scope=scope)
+        normalized = _batch_failure_detail(original)
+        incident = _incident(name, kind, reason, normalized, scope=scope)
+        legacy, failed_replacements = set(), []
+        for member in members:
+            observed = observations.get(member, {})
+            for source in (observed.get("status"), observed.get("completion")):
+                candidate = _recovery_detail((source or {}).get("error"), aliases)
+                if candidate is not None and _batch_failure_detail(candidate) == normalized:
+                    legacy.add(_incident(member, kind, reason, candidate, scope=scope)["id"])
+            completion, run = observed.get("completion") or {}, by_id[member]
+            candidate = _recovery_detail(completion.get("error"), aliases)
+            if candidate is not None and _batch_failure_detail(candidate) == normalized:
+                legacy_detail = _recovery_detail(
+                    {key: completion.get(key) for key in ("status", "exit_code", "error")}, aliases
+                )
+                legacy.add(_incident(member, "completion_failed", reason, legacy_detail, scope=scope)["id"])
+                if (member != scope and completion.get("status") == "failed"
+                        and completion.get("step_id") == run["step_id"]
+                        and run.get("dispatch_nonce") is not None
+                        and completion.get("dispatch_nonce") == run["dispatch_nonce"]):
+                    failed_replacements.append(member)
+        legacy.discard(incident["id"])
+        if legacy:
+            incident["legacy_incident_ids"] = sorted(legacy)
+        if failed_replacements:
+            incident["unsuccessful_recovery_run_ids"] = sorted(failed_replacements)
+        return incident
 
     findings = {}
     incidents = {}

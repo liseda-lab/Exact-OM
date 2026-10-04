@@ -355,3 +355,48 @@ def test_independent_batches_advance_past_failed_runs_with_capacity():
     registry["capacity"]["gpus"] = 2
     registry["pending_batches"][1]["needs_user"] = True
     assert pending_batches(registry, health) == []
+
+
+def test_batch_command_position_is_stable_only_in_registered_recovery_lineage():
+    before = _recovery_runs()[:1]
+    before[0].pop('superseded_by')
+    before[0]['enabled'] = True
+    message = 'command 0 exited 1: RuntimeError: Worker cleanup incomplete'
+    first = _failure_id(before, message, error_type='RuntimeError')
+    assert _failure_id(_recovery_runs(), message.replace('command 0', 'command 1'),
+                       error_type='RuntimeError') == first
+    assert _failure_id(_recovery_runs(), message.replace('exited 1', 'exited 2'),
+                       error_type='RuntimeError') != first
+    assert _failure_id(_recovery_runs(), message.replace('cleanup incomplete', 'budget invalid'),
+                       error_type='RuntimeError') != first
+    # Ordinary, unlinked runs do not gain a broad command-number alias.
+    assert _failure_id(before, message.replace('command 0', 'command 1'),
+                       error_type='RuntimeError') != first
+    assert _failure_id(_recovery_runs(), 'prefix ' + message,
+                       error_type='RuntimeError') != first
+
+
+def test_disabled_original_receipts_qualify_legacy_command_identity(tmp_path):
+    from exact.experiments.supervision import inspect_runs, _incident
+    runs = _recovery_runs()
+    for index, run in enumerate(runs):
+        path = tmp_path / f'{index}.json'
+        run['status_path'] = str(path)
+        path.write_text(__import__('json').dumps({'status': 'failed', 'error': {
+            'type': 'RuntimeError', 'message': f'command {2 if index == 0 else 1} exited 1: same cause'}}))
+    incident = inspect_runs(runs, step_states={})['incidents'][0]
+    legacy = {_incident(None, 'run_failed', '', {'type': 'RuntimeError',
+              'message': f'command {index} exited 1: same cause'}, scope='E10-original')['id']
+              for index in (1, 2)}
+    assert set(incident['legacy_incident_ids']) == legacy
+
+
+def test_batch_completion_only_failure_keeps_recovery_incident_identity():
+    runs = _recovery_runs()
+    detail = {'type': 'RuntimeError', 'message': 'command 1 exited 1: RuntimeError: cleanup failed'}
+    ordinary = assess_runs(runs, {runs[-1]['id']: {'status': {'status': 'failed', 'error': detail}}},
+                           step_states={})['incidents'][0]
+    fallback = assess_runs(runs, {runs[-1]['id']: {'completion': {
+        'status': 'failed', 'exit_code': 1, 'error': detail}}}, step_states={})['incidents'][0]
+    assert fallback['kind'] == 'run_failed'
+    assert fallback['id'] == ordinary['id']

@@ -87,7 +87,7 @@ def test_migration_proves_success_and_preserves_unproven_failures(tmp_path):
     state = {"incidents": {"planning": {"attempts": 4, "incident": incident},
                            "worker": {"attempts": 2, "incident": {"kind": "run_failed"}}}, "agent_runs": []}
     for number, report in enumerate([result(["1.1"]), result(["1.2"]), result(["1.2"]),
-                                      {"status": "failed", "result": None}], 1):
+                                     {"status": "failed", "result": None}], 1):
         directory = tmp_path / str(number)
         directory.mkdir()
         (directory / "report.json").write_text(json.dumps(report))
@@ -262,3 +262,21 @@ def test_failed_prompt_preflight_preserves_evidence_without_stranding_next_attem
     monkeypatch.setattr(cli, "run_agent", lambda *a: result(outcome="no_change"))
     assert cli.check(tmp_path, policy, state, act=True)["unsuccessful_attempts"] == 1
     assert state["incidents"]["prepare"]["attempts"] == 1
+
+
+def test_alias_migration_preserves_observation_and_result_history():
+    from exact.experiments.interventions import migrate_incident_aliases
+    old = dict(attempts=2, unsuccessful_attempts=2, observations=9, first_seen_epoch=1,
+               last_seen='2026-01-01', last_result={'handoff': 'original'}, progress_witnesses=['saved'],
+               needs_user=True, alerted=True)
+    state = {'incidents': {'old': dict(old)}, 'agent_runs': [{'incident': 'old', 'attempt': 1}]}
+    incident = dict(id='new', legacy_incident_ids=['old'], unsuccessful_recovery_run_ids=['replacement'])
+    migrate_incident_aliases(state, [incident])
+    current = state['incidents']['new']
+    assert current['merged_history']['old'] == old
+    for key in ('attempts', 'unsuccessful_attempts', 'observations', 'first_seen_epoch', 'last_seen',
+                'last_result', 'progress_witnesses', 'needs_user', 'alerted'):
+        assert current[key] == old[key]
+    migrate_incident_aliases(state, [incident])
+    assert current['attempts'] == current['unsuccessful_attempts'] == 2
+    assert state['agent_runs'] == [{'incident': 'old', 'attempt': 1}]

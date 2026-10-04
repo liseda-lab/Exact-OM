@@ -836,3 +836,73 @@ def test_qualified_nested_failure_with_queued_recovery_does_not_invoke_second_re
     assert current['status'] == 'waiting'
     assert not cli.read(tmp_path / 'health.json')['incidents']
     assert state['incidents'][incident['id']]['attempts'] == 1
+
+
+def test_command_index_migration_conserves_all_attempts_and_blocks_third_repair(
+    cli, controller, tmp_path, monkeypatch
+):
+    from exact.experiments.supervision import _incident
+    policy, state = controller
+    original = dict(id='original', step_id='14372.1', enabled=False, superseded_by='replacement',
+                    status_path=str(tmp_path / 'original.json'))
+    replacement = dict(id='replacement', step_id='14372.2', status_path=str(tmp_path / 'replacement.json'))
+    cli.write(tmp_path / 'registry.json', {'runs': [original, replacement]})
+    for row, index in [(original, 2), (replacement, 1)]:
+        detail = dict(type='RuntimeError', message=f'command {index} exited 1: RuntimeError: cleanup failed')
+        cli.write(Path(row['status_path']), dict(status='failed', error=detail))
+        identity = _incident(row['id'], 'run_failed', '', detail, scope='original')['id']
+        state['incidents'][identity] = dict(attempts=1, unsuccessful_attempts=1, observations=1)
+        state['agent_runs'].append(dict(incident=identity, attempt=1, directory=f'original-report-{index}',
+                                        started_epoch=0))
+    archived = json.loads(json.dumps(state['agent_runs']))
+    monkeypatch.setattr(cli, 'run_agent', lambda *a: pytest.fail('Two same-cause failures exhausted retries'))
+    monkeypatch.setattr(cli, 'notify_blocker', lambda *a, **kw: {})
+    result = cli.check(tmp_path, policy, state, act=True)
+    assert result['action'] == 'incident_attempt_limit'
+    health = cli.read(tmp_path / 'health.json')
+    identity = health['incidents'][0]['id']
+    merged = state['incidents'][identity]
+    assert merged['attempts'] == merged['unsuccessful_attempts'] == 2
+    assert len(merged['merged_incident_ids']) == 2
+    assert state['agent_runs'] == archived
+    assert all(state['incidents'][row['incident']]['attempts'] == 1 for row in archived)
+    cli.check(tmp_path, policy, state, act=True)
+    assert merged['attempts'] == merged['unsuccessful_attempts'] == 2
+    assert state['agent_runs'] == archived
+
+
+@pytest.mark.parametrize('invalid', [None, 'nonce', 'cause', 'status_only'])
+def test_failed_manual_replacements_bound_retries_without_model_calls(
+    cli, controller, tmp_path, monkeypatch, invalid
+):
+    policy, state = controller
+    runs = []
+    for index in range(3):
+        row = dict(id=f'run{index}', step_id=f'14372.{index+1}', dispatch_nonce=f'owner{index}',
+                   status_path=str(tmp_path / f'status{index}.json'),
+                   completion_path=str(tmp_path / f'completion{index}.json'))
+        if index < 2:
+            row.update(enabled=False, superseded_by=f'run{index+1}')
+        detail = dict(type='RuntimeError', message=f'command {index} exited 1: RuntimeError: cleanup failed')
+        if invalid == 'cause' and index == 1:
+            detail['message'] += ' in an unrelated subsystem'
+        cli.write(Path(row['status_path']), dict(status='failed', error=detail))
+        if invalid != 'status_only' or index != 1:
+            cli.write(Path(row['completion_path']), dict(
+                status='failed', exit_code=1, error=detail,
+                step_id=row['step_id'], dispatch_nonce='wrong' if invalid == 'nonce' and index == 1
+                else row['dispatch_nonce']))
+        runs.append(row)
+    cli.write(tmp_path / 'registry.json', {'runs': runs})
+    monkeypatch.setattr(cli, 'run_agent', lambda *a: pytest.fail('Read-only test must not launch a model'))
+    result = cli.check(tmp_path, policy, state, act=False)
+    incident = cli.read(tmp_path / 'health.json')['incidents'][0]
+    record = state['incidents'][incident['id']]
+    assert record['attempts'] == 0 and state['agent_runs'] == []
+    assert record['unsuccessful_attempts'] == (2 if invalid is None else 1)
+    assert (result['status'] == 'blocked') == (invalid is None)
+    # A model invocation already charged for the same failed replacement is not
+    # charged again by the receipt lower bound on the following observation.
+    record['unsuccessful_attempts'] = 2
+    cli.check(tmp_path, policy, state, act=False)
+    assert record['unsuccessful_attempts'] == 2
