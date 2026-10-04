@@ -203,6 +203,20 @@ def descendants(pid):
     return found
 
 
+def record_outputs(work, attempt):
+    """Retain atomic-write debris as metadata, never as published output bytes."""
+    from tools.repair.scaling_payload_recovery import payload_manifest
+
+    published, unpublished = payload_manifest(work)
+    outputs = {str(Path(item['path']).relative_to(work)): item['sha256']
+               for item in published}
+    write_artifact(Path(attempt) / 'outputs-unpublished.json', {
+        'schema': 'exact-repair/unpublished-output-inventory/v1',
+        'files': unpublished, 'original_files_modified': False})
+    write_artifact(Path(attempt) / 'outputs.json', outputs)
+    return outputs
+
+
 def run(path, job_id, attempt):
     import resource
 
@@ -296,12 +310,7 @@ def run(path, job_id, attempt):
                         f"command {index} exited {process.returncode}: " + " ".join(tail)[:1000]
                     )
                 process = None
-        outputs = {
-            str(p.relative_to(work)): sha(p)
-            for p in work.rglob("*")
-            if p.is_file() and p.suffix != ".lock"
-        }
-        write_artifact(attempt / "outputs.json", outputs)
+        record_outputs(work, attempt)
     except Exception as exc:
         error, code = {"type": type(exc).__name__, "message": str(exc)}, 1
     finally:

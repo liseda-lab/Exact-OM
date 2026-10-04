@@ -26,6 +26,24 @@ def test_manifest_keeps_unreadable_atomic_debris_without_opening(tmp_path):
         recovery.payload_manifest(tmp_path)
 
 
+def test_batch_outputs_preserve_old_unreadable_debris_without_failure(tmp_path):
+    from tools.repair.batch import record_outputs
+    work, attempt = tmp_path/'work', tmp_path/'attempt'
+    result = work/'scaling-revision-002/payloads/row/result.json'
+    write_artifact(result, dict(logical_status='UNKNOWN'))
+    debris = result.with_name('.result.json.7af4pfkk');debris.touch(mode=0)
+    expected = {'scaling-revision-002/payloads/row/result.json': sha(result)}
+    assert record_outputs(work, attempt) == expected
+    assert read(attempt/'outputs.json') == expected
+    inventory = read(attempt/'outputs-unpublished.json')
+    assert inventory['files'][0]['path'] == str(debris)
+    assert inventory['files'][0]['mode'] == 0 and debris.exists()
+    assert not inventory['original_files_modified']
+    result.chmod(0)
+    with pytest.raises(PermissionError):
+        record_outputs(work, attempt)
+
+
 def fixture(tmp_path, monkeypatch):
     import exact.repair.study
     import tools.repair.batch
