@@ -108,7 +108,7 @@ def test_rejects_missing_or_changed_evidence(tmp_path,monkeypatch,field):
     else:
         path=(original/'payloads/0/partial.json' if field=='payload' else
             Path(e['rows'][0]['call']['path']) if field=='call' else Path(e[field]['path']))
-        path.write_text('{}')
+        path.write_text('{"changed":true}')
     with pytest.raises((ValueError,KeyError)):
         recovery.run(plan,output,owner_check=owner)
 
