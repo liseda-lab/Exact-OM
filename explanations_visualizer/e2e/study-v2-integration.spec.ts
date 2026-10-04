@@ -4,7 +4,7 @@ import { join } from "node:path";
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page, type Route } from "@playwright/test";
 
-import { exhaustBrowserParents, exhaustPagedCard } from "./factPagination";
+import { chooseContinuedParent, exhaustBrowserParents, exhaustPagedCard, TYPED } from "./factPagination";
 import { harness, newInvitation, ParticipantApi, publishVariant, recordTraffic, scopedPath, seedAdvance, seedCondition, seedToCase, seedToTutorial } from "./v2Harness";
 
 // Integration regressions for specs 17–19 against the real v2 service (HTTPS, PostgreSQL,
@@ -723,5 +723,132 @@ test.describe("R09 readiness follows the admitted components (19 F19)", () => {
     await expect(page.locator(".comparison")).toBeVisible();
     await expect(page.getByRole("alert").filter({ hasText: /could not be loaded/ })).toHaveCount(0);
   });
+});
+
+/** Holds scope capability checks until released, then refuses them (labelled fault injection). */
+async function holdChecks(page: Page, scope: string) {
+  const releases: (() => void)[] = [];
+  const done: Promise<void>[] = [];
+  let passthrough = false;
+  await page.route(routeFor(scope, "/capabilities"), async (route) => {
+    if (passthrough) return route.continue();
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    releases.push(release);
+    let finished!: () => void;
+    done.push(new Promise<void>((resolve) => (finished = resolve)));
+    await gate;
+    await route.fulfill({ status: 403, json: { detail: "Injected access-check refusal" } }).catch(() => undefined);
+    finished();
+  });
+  return {
+    count: () => releases.length,
+    release: async (index: number) => {
+      releases[index]();
+      await done[index];
+    },
+    passThrough: () => (passthrough = true),
+  };
+}
+
+test.describe("R10 access checks belong to the attempt that issued them (19 F20)", () => {
+  test("a delayed check failure cannot undo a successful retry; the draft and cached contexts survive", async ({ page }) => {
+    const traffic = recordTraffic(page);
+    const { api, current, scope, byPosition } = await explanationCase(page);
+    await api.write("PUT", `/cases/${encodeURIComponent(current.case_id)}/draft`, { presentation_id: current.presentation_id, response_type: "ranked_candidates", ranked_candidate_ids: [byPosition(2).candidate_id, byPosition(5).candidate_id] });
+    await page.reload();
+    await expect(submitButton(page)).toBeEnabled();
+    const checks = await holdChecks(page, scope);
+    const optional = routeFor(scope, "/hierarchy");
+    await page.route(optional, fail(403));
+    await page.getByRole("tab", { name: "Hierarchy", exact: true }).click();
+    await expect.poll(() => checks.count()).toBeGreaterThanOrEqual(2);
+    // The first check is refused within this attempt: a genuine loss, so the case blocks.
+    await checks.release(0);
+    await expect(page.getByRole("alert").filter({ hasText: /no longer has access/ })).toBeVisible();
+    await expect(submitButton(page)).toBeDisabled();
+    // Access is restored; Retry recovers without refetching the validated contexts.
+    checks.passThrough();
+    await page.unroute(optional);
+    const contextsBefore = traffic.requests.filter((item) => item.path.includes("/entity-context")).length;
+    await page.getByRole("button", { name: "Retry loading this case" }).click();
+    await expect(submitButton(page)).toBeEnabled();
+    expect(traffic.requests.filter((item) => item.path.includes("/entity-context")).length).toBe(contextsBefore);
+    // The older, still-held check now fails: it belongs to the superseded attempt.
+    await checks.release(1);
+    await page.waitForTimeout(500);
+    await expect(page.getByRole("alert").filter({ hasText: /no longer has access/ })).toHaveCount(0);
+    await expect(submitButton(page)).toBeEnabled();
+    const ranking = page.getByRole("list", { name: "Your ranking" });
+    await expect(ranking.locator("li").first()).toContainText(byPosition(2).label);
+    await expect(ranking.locator("li").nth(1)).toContainText(byPosition(5).label);
+    expect((await api.state()).ranking.ranked_candidate_ids).toEqual([byPosition(2).candidate_id, byPosition(5).candidate_id]);
+  });
+
+  test("a check still in flight from a submitted presentation cannot affect the next case", async ({ page }) => {
+    const { scope } = await explanationCase(page);
+    await page.reload();
+    await expect(add1(page)).toBeEnabled();
+    const checks = await holdChecks(page, scope);
+    await page.route(routeFor(scope, "/hierarchy"), fail(403));
+    await page.getByRole("tab", { name: "Hierarchy", exact: true }).click();
+    await expect.poll(() => checks.count()).toBeGreaterThanOrEqual(1);
+    await page.getByRole("radio", { name: /^Insufficient information/ }).click();
+    await submitButton(page).click();
+    await page.getByRole("radio", { name: "No", exact: true }).check();
+    await page.getByRole("button", { name: /^Save and (go to case|continue)/ }).click();
+    await expect(page.getByRole("complementary", { name: "Candidates and your answer" })).toBeVisible();
+    await expect(add1(page)).toBeEnabled();
+    await checks.release(0);
+    await page.waitForTimeout(500);
+    await expect(page.getByRole("alert").filter({ hasText: /no longer has access/ })).toHaveCount(0);
+    await expect(add1(page)).toBeEnabled();
+  });
+
+  test("a check still in flight from a replaced session cannot affect the new session", async ({ page }) => {
+    const { scope } = await explanationCase(page);
+    await page.reload();
+    await expect(add1(page)).toBeEnabled();
+    const checks = await holdChecks(page, scope);
+    await page.route(routeFor(scope, "/hierarchy"), fail(403));
+    await page.getByRole("tab", { name: "Hierarchy", exact: true }).click();
+    await expect.poll(() => checks.count()).toBeGreaterThanOrEqual(1);
+    const invitation = await newInvitation(page);
+    await page.evaluate((hash) => { window.location.hash = hash; }, invitation.split("#")[1]);
+    await expect(page.getByRole("button", { name: "I agree to take part", exact: true })).toBeVisible();
+    await checks.release(0);
+    await page.waitForTimeout(500);
+    await expect(page.getByRole("alert").filter({ hasText: /no longer has access/ })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "I agree to take part", exact: true })).toBeVisible();
+  });
+});
+
+test.describe("R11 continued parents keep their entity type (19 F21)", () => {
+  for (const typed of TYPED)
+    test(`study: a ${typed.name}'s later-page superproperty opens as a ${typed.name}; the case is kept`, async ({ page }) => {
+      const traffic = recordTraffic(page);
+      const { api, current, scope, byPosition } = await explanationCase(page);
+      await api.write("PUT", `/cases/${encodeURIComponent(current.case_id)}/draft`, { presentation_id: current.presentation_id, response_type: "ranked_candidates", ranked_candidate_ids: [byPosition(4).candidate_id] });
+      await page.reload();
+      await expect(submitButton(page)).toBeEnabled();
+      const browser = await focusSearched(page, typed.label);
+      await expect(browser.getByText(`Focused ${typed.name}`)).toBeVisible();
+      await browser.getByRole("button", { name: "Open full context", exact: true }).click();
+      const dialog = page.getByRole("dialog", { name: "Full context" });
+      const iri = await chooseContinuedParent(dialog, typed.kind);
+      await expect(dialog).toHaveCount(0);
+      await expect(browser.locator(".focus-label")).toHaveText(typed.parent);
+      await expect(browser.getByText(`Focused ${typed.name}`)).toBeVisible();
+      await browser.getByRole("button", { name: "Open full context", exact: true }).click();
+      await expect(page.getByRole("dialog", { name: "Full context" }).locator(".entity-title")).toHaveText(typed.parent);
+      const reads = traffic.requests.filter((item) => item.path.startsWith(scopedPath(scope)) && new URL(item.path, harness!.origin).searchParams.get("iri") === iri);
+      expect(reads.some((item) => item.path.includes("/entity-context") && item.status === 200 && new URL(item.path, harness!.origin).searchParams.get("kind") === typed.kind)).toBe(true);
+      expect(reads.some((item) => item.path.includes("/hierarchy") && item.status === 200)).toBe(true);
+      expect(reads.filter((item) => new URL(item.path, harness!.origin).searchParams.has("kind") && new URL(item.path, harness!.origin).searchParams.get("kind") !== typed.kind)).toEqual([]);
+      await page.keyboard.press("Escape");
+      await expect(page.getByRole("list", { name: "Your ranking" }).locator("li").first()).toContainText(byPosition(4).label);
+      await expect(submitButton(page)).toBeEnabled();
+      expect(traffic.errors).toEqual([]);
+    });
 });
 

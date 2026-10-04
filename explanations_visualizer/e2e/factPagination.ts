@@ -94,3 +94,25 @@ export async function exhaustBrowserParents(browser: Locator) {
   expect(new Set(labels).size).toBe(PAGED.parents);
 }
 
+export const TYPED = [
+  { slug: "object", kind: "object_property", label: "Paged object property", parent: /^Paged object parent \d{3}$/, name: "object property" },
+  { slug: "data", kind: "data_property", label: "Paged data property", parent: /^Paged data parent \d{3}$/, name: "data property" },
+] as const;
+
+/**
+ * Page a property's superproperties past the first page in its full-context card and choose a
+ * later-page parent (19 F21). Returns the chosen parent's IRI; every listed parent keeps its kind.
+ */
+export async function chooseContinuedParent(dialog: Locator, kind: string): Promise<string> {
+  const items = dialog.locator('[data-category="parents"] li');
+  await expect(items).toHaveCount(50);
+  await dialog.getByRole("button", { name: "Load more parents", exact: true }).click();
+  await expect(items).toHaveCount(PAGED.parents);
+  const kinds = await items.evaluateAll((nodes) => nodes.map((node) => node.getAttribute("data-kind")));
+  expect(new Set(kinds)).toEqual(new Set([kind]));
+  const chosen = items.last();
+  const iri = (await chosen.getAttribute("data-iri"))!;
+  await chosen.getByRole("button").click();
+  return iri;
+}
+

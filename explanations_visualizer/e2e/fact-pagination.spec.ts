@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { exhaustBrowserParents, exhaustPagedCard } from "./factPagination";
+import { chooseContinuedParent, exhaustBrowserParents, exhaustPagedCard, TYPED } from "./factPagination";
 
 // R06 / 19 F16 in the main app: the shared entity card continues every truncatable category.
 // EXACT_E2E_PAGED_MAIN_APP_URL serves the paged fixture contexts with alternate definitions
@@ -26,5 +26,32 @@ test("main app: full context pages every category beyond its first page, without
   await dialog.locator('[data-category="parents"] li').last().getByRole("button").click();
   await expect(dialog).toHaveCount(0);
   await expect(browser.locator(".focus-label")).toHaveText(/^Paged parent \d{3}$/);
+  expect(new URL(page.url()).searchParams.get("sk")).toBe("class");
   expect(errors).toEqual([]);
 });
+
+for (const typed of TYPED)
+  test(`main app: a ${typed.name}'s later-page superproperty opens as a ${typed.name} (R11)`, async ({ page }) => {
+    const reads: { path: string; status: number }[] = [];
+    page.on("response", (response) => {
+      const url = new URL(response.url());
+      if (url.pathname.startsWith("/api/v1/")) reads.push({ path: url.pathname + url.search, status: response.status() });
+    });
+    await page.goto(`${app}/browse/?so=${encodeURIComponent(ontology!)}&s=${encodeURIComponent(`urn:source:paged-${typed.slug}-property`)}&sk=${typed.kind}`);
+    const browser = page.getByRole("region", { name: "Source ontology browser" });
+    await expect(browser.locator(".focus-label")).toHaveText(typed.label);
+    await browser.getByRole("button", { name: "Open full context", exact: true }).click();
+    const dialog = page.getByRole("dialog", { name: "Full context" });
+    const iri = await chooseContinuedParent(dialog, typed.kind);
+    await expect(dialog).toHaveCount(0);
+    // Ontology, IRI and kind are preserved in the navigation and the parent's own reads succeed.
+    const params = new URL(page.url()).searchParams;
+    expect([params.get("so"), params.get("s"), params.get("sk")]).toEqual([ontology, iri, typed.kind]);
+    await expect(browser.locator(".focus-label")).toHaveText(typed.parent);
+    await expect(browser.getByText(`Focused ${typed.name}`)).toBeVisible();
+    await browser.getByRole("button", { name: "Open full context", exact: true }).click();
+    await expect(page.getByRole("dialog", { name: "Full context" }).locator(".entity-title")).toHaveText(typed.parent);
+    const parentReads = reads.filter((item) => new URLSearchParams(item.path.split("?")[1]).get("iri") === iri);
+    expect(parentReads.some((item) => item.path.startsWith("/api/v1/entity-context") && item.status === 200 && item.path.includes(`kind=${typed.kind}`))).toBe(true);
+    expect(parentReads.filter((item) => item.path.includes("kind=class"))).toEqual([]);
+  });

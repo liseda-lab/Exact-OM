@@ -417,7 +417,8 @@ def publication_v2(
 
 
 def _paged_facts_axioms(count, parents=55):
-    """Axioms for `urn:source:paged`: every displayed category spans more than one page."""
+    """Axioms for `urn:source:paged` (every displayed category spans more than one page) and
+    for two properties whose superproperties span more than one page."""
     iri = "urn:source:paged"
     relation = "urn:source:paged-relation"
     axioms = [
@@ -444,6 +445,24 @@ def _paged_facts_axioms(count, parents=55):
             f'AnnotationAssertion(<http://www.w3.org/2000/01/rdf-schema#label> <{parent}> "Paged parent {i:03}")',
             f"SubClassOf(<{iri}> <{parent}>)",
         ]
+    # Typed parents (spec 19 F21): an object and a data property whose named superproperties
+    # also exceed the first page, so continued parents must keep their property kind.
+    for slug, kind, sub in (
+        ("object", "ObjectProperty", "SubObjectPropertyOf"),
+        ("data", "DataProperty", "SubDataPropertyOf"),
+    ):
+        prop = f"urn:source:paged-{slug}-property"
+        axioms += [
+            f"Declaration({kind}(<{prop}>))",
+            f'AnnotationAssertion(<http://www.w3.org/2000/01/rdf-schema#label> <{prop}> "Paged {slug} property")',
+        ]
+        for i in range(parents):
+            parent = f"{prop}:parent:{i:03}"
+            axioms += [
+                f"Declaration({kind}(<{parent}>))",
+                f'AnnotationAssertion(<http://www.w3.org/2000/01/rdf-schema#label> <{parent}> "Paged {slug} parent {i:03}")',
+                f"{sub}(<{prop}> <{parent}>)",
+            ]
     return axioms
 
 
@@ -464,7 +483,7 @@ def main():
         "--paged-facts",
         type=int,
         default=0,
-        help="Add one non-focal source class with this many facts per displayed category and 55 parents (0-200)",
+        help="Add a non-focal source class with this many facts per displayed category and 55 parents, and object/data properties with 55 superproperties (0-200)",
     )
     parser.add_argument(
         "--export-version",
