@@ -167,3 +167,23 @@ Unexpected software errors retain their receipts and stop dependent execution.
 Six evaluation slices each retain 12 rows and their complete cold/warm pairs,
 with 4200-second operational slices and unchanged 300-wall/600-CPU/8192-MiB row
 budgets. The final receipt audit and resource report remain separate obligations.
+
+## Fresh-evaluation primary receipt audit
+
+The frozen primary audit retains all 576 scheduled rows (384 learned and 192
+control), 64 cases and 32 parent groups. It checks the 36 completed schema
+descendants against their original attempts, nonce/step receipts, source/runtime,
+payloads, search ledgers and settled charges. Registry logical IDs inherited
+from primary jobs remain distinct from the schema worker IDs charged by the
+ledger. The cleanup-reconciled row stays unknown without replay. Compatible
+recoveries must debit previously spent wall, CPU and generation allowances.
+
+Stored known semantic scores must match a saved verified assignment, selected
+label and frozen query identity. Receipt integrity does not establish native
+truth for the intended parent or extend the query basis. The audit records
+desired/unwanted and explicit nonvacuity query counts, preserves the four
+development profile timeouts, and makes no gate or learning-efficiency claim.
+Common-inventory value/selection diagnostics, intended-parent/query qualification,
+required semantic-control review and the final failure-inclusive parent-group
+report remain registered obligations after this audit. No checkpoint, scientific
+case budget or test-driven setting is changed by the audit.
