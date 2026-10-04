@@ -289,6 +289,17 @@ remain intact. The revised report keeps all 16 slice rows and the 288-row study
 denominator. A companion report projects the same row bindings into the existing
 controller's monitoring format; it adds no scientific result or gate claim.
 
+The seventh diagnostic slice stopped on the same nested cleanup error after four
+finished rows (indices 96–99) and one interrupted row (100). The existing recovery
+adapter is frozen separately for this slice, retaining the four original rows and
+the interrupted row as unknown without replay. Only the eleven untouched rows
+(101–111) continue with the original scientific export, runtime and per-case
+budgets. Separate ownership checks, all five original row receipts, payloads,
+guard, failed-attempt costs and replacement ancestry bind the recovery. Its report
+retains all 16 slice rows and the 288-row study denominator. This is the first
+repair of this logical slice; it does not reset unsuccessful recovery history or
+qualify the unknown label, training eligibility or research gates.
+
 ## Robustness ontology output-omission correction
 
 Robustness schema slice 093 stopped after twelve saved rows when a fixed domain

@@ -10,6 +10,8 @@ from exact.repair.graph_schema import generic_graph_schema
 from tools.repair import development_decode as decode
 from tools.repair.historical_regression import binding
 
+pytest_plugins = ["tests.repair_prepare_controls_test"]
+
 
 def schedule_for(tmp_path):
     from tools.repair.corpus import generate_corpus
