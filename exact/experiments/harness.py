@@ -13,6 +13,7 @@ import subprocess
 import sys
 import threading
 import time
+import traceback
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
@@ -2901,22 +2902,30 @@ def run_cells(
             try:
                 completed.append(future.result())
             except Exception as exc:
-                completed.append(
-                    {
-                        "schema_version": SCHEMA_VERSION,
-                        "suite_id": cell.suite_id,
-                        "experiment_id": cell.experiment_id,
-                        "stage": cell.stage,
-                        "arm_id": cell.arm_id,
-                        "task_id": cell.task_id,
-                        "seed": cell.seed,
-                        "reference_completeness": cell.reference_completeness,
-                        "baseline_manifest": _baseline_record(suite),
-                        "specification": suite.specification,
-                        "status": "failed",
-                        "failure": {"type": type(exc).__name__, "message": str(exc)},
-                    }
-                )
+                failure = {
+                    "schema_version": SCHEMA_VERSION,
+                    "suite_id": cell.suite_id,
+                    "experiment_id": cell.experiment_id,
+                    "stage": cell.stage,
+                    "arm_id": cell.arm_id,
+                    "task_id": cell.task_id,
+                    "seed": cell.seed,
+                    "reference_completeness": cell.reference_completeness,
+                    "baseline_manifest": _baseline_record(suite),
+                    "specification": suite.specification,
+                    "status": "failed",
+                    "failure": {"type": type(exc).__name__, "message": str(exc)},
+                }
+                # Setup can fail before a run directory or provenance manifest exists.
+                # Keep its diagnostic beside that directory, so it neither overwrites
+                # a valid result nor makes the next resume reject a nonempty directory.
+                diagnostic = cell.output_dir.with_name(cell.output_dir.name + ".setup-failure.json")
+                try:
+                    _atomic_json(diagnostic, {**failure, "traceback": traceback.format_exc()})
+                except OSError as report_error:
+                    # A quota/permission failure must not hide the original setup error.
+                    failure["diagnostic_write_error"] = str(report_error)
+                completed.append(failure)
     return sorted(
         completed,
         key=lambda item: (
@@ -2946,7 +2955,16 @@ def _require_successful_cells(
         if manifest.get("status") != "complete"
     ]
     if failed:
-        raise ValueError(f"{stage} stage has failed or incomplete cells: {sorted(failed)}")
+        causes = sorted(
+            {
+                f"{failure.get('type', 'Error')}: {failure.get('message', '')}"
+                for manifest in manifests
+                if manifest.get("status") != "complete"
+                and isinstance(failure := manifest.get("failure"), Mapping)
+            }
+        )
+        detail = "; causes: " + " | ".join(causes) if causes else ""
+        raise ValueError(f"{stage} stage has failed or incomplete cells: {sorted(failed)}{detail}")
     missing_metrics: list[str] = []
     metric_errors: list[str] = []
     for manifest in manifests:

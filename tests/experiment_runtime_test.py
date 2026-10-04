@@ -996,3 +996,66 @@ def test_supervision_recipe_changes_invalidate_prediction_reuse(
         != result["recovery"]["artifacts"]["extraction"]
     )
     assert "extraction" not in result["recovery"]["reused_stages"]
+
+
+def test_setup_failure_survives_progress_and_does_not_obstruct_resume(tmp_path, monkeypatch):
+    from exact.experiments.campaign import write_progress
+
+    cell, suite, _ = fixture(tmp_path, monkeypatch)
+    suite = replace(suite, campaign=cell.recovery)
+    provenance = harness._provenance_payload
+
+    def broken(*args, **kwargs):
+        raise FileNotFoundError("required prepared input is unavailable")
+
+    monkeypatch.setattr(harness, "_provenance_payload", broken)
+    failed = harness.run_cells([cell], suite, workdir=tmp_path, jobs=1, resume=True)
+    diagnostic = cell.output_dir.with_name(cell.output_dir.name + ".setup-failure.json")
+    saved = json.loads(diagnostic.read_text())
+    assert saved["failure"] == failed[0]["failure"]
+    assert "FileNotFoundError: required prepared input is unavailable" in saved["traceback"]
+    assert not cell.output_dir.exists()
+    write_progress(suite, "screen", {}, failed, status="interrupted")
+    progress = json.loads((Path(cell.recovery["root"]) / "screen/progress.json").read_text())
+    assert progress["cells"][0]["failure"] == saved["failure"]
+    with pytest.raises(
+        ValueError, match="FileNotFoundError: required prepared input is unavailable"
+    ) as first:
+        harness._require_successful_cells(failed, stage="screen")
+    with pytest.raises(ValueError) as repeated:
+        harness._require_successful_cells(failed, stage="screen")
+    assert str(first.value) == str(repeated.value)
+    different = [
+        {**failed[0], "failure": {"type": "ValueError", "message": "different setup fault"}}
+    ]
+    with pytest.raises(ValueError) as changed:
+        harness._require_successful_cells(different, stage="screen")
+    assert str(changed.value) != str(first.value)
+
+    # A diagnostic beside the output directory neither replaces a scientific
+    # manifest nor becomes a nonempty partial directory rejected by resume.
+    monkeypatch.setattr(harness, "_provenance_payload", provenance)
+    manifest, reused = harness._prepare_cell(cell, suite, workdir=tmp_path, resume=True)
+    assert reused is False
+    assert manifest["status"] == "pending"
+    assert diagnostic.is_file()
+
+
+def test_setup_failure_keeps_original_error_when_diagnostic_cannot_be_written(
+    tmp_path, monkeypatch
+):
+    cell, suite, _ = fixture(tmp_path, monkeypatch)
+
+    def broken(*args, **kwargs):
+        raise ValueError("original setup fault")
+
+    def unwritable(*args, **kwargs):
+        raise OSError("quota temporarily exceeded")
+
+    monkeypatch.setattr(harness, "_provenance_payload", broken)
+    monkeypatch.setattr(harness, "_atomic_json", unwritable)
+    failed = harness.run_cells([cell], suite, workdir=tmp_path, jobs=1, resume=True)
+    assert failed[0]["failure"]["message"] == "original setup fault"
+    assert failed[0]["diagnostic_write_error"] == "quota temporarily exceeded"
+    with pytest.raises(ValueError, match="ValueError: original setup fault"):
+        harness._require_successful_cells(failed, stage="screen")

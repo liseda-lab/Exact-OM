@@ -1406,7 +1406,7 @@ def write_progress(
         "cells": [
             {
                 key: item.get(key)
-                for key in ("experiment_id", "arm_id", "task_id", "seed", "status", "recovery")
+                for key in ("experiment_id", "arm_id", "task_id", "seed", "status", "recovery", "failure")
             }
             for item in manifests
         ],
