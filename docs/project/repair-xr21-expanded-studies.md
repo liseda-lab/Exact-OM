@@ -269,3 +269,13 @@ eligibility, optimizer capacity, actual supervised generated acquisition and
 development selection, all 18 strict fitting protocols, held-out matched semantic
 controls and final reporting remain registered obligations. Passing all 45 mapped
 fixture requirements still does not establish G0-G2 or learning efficiency.
+
+The first diagnostic slice stopped on a nested cleanup error after five finished
+rows and one interrupted row. Its separately frozen recovery adapter verifies
+the original nonce, command, row receipts, payload hashes, runtime and departed
+Slurm ownership. It retains the interrupted row as unknown without replay and
+continues only the ten untouched rows under the original scientific export and
+case budgets. Original artifacts, the ownership guard and failed-attempt costs
+remain intact. The revised report keeps all 16 slice rows and the 288-row study
+denominator. A companion report projects the same row bindings into the existing
+controller's monitoring format; it adds no scientific result or gate claim.
