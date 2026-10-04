@@ -57,6 +57,7 @@ def record_call(directory, result, seconds, case, assignment):
         deadline_seconds=seconds, resources=dict(result.resource_usage)))
     if not result.cleanup_complete:
         raise RuntimeError('Acquisition child cleanup incomplete')
+    raise_on_software_failure(dict(status=result.status, detail=result.detail))
 
 
 def case_worker(record, settings, directory):
