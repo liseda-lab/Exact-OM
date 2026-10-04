@@ -300,3 +300,75 @@ def test_only_proven_first_occurrence_floor_is_corrected_and_calls_remain(calls,
     migrate_incident_aliases(state, [incident])
     assert len(record['receipt_floor_corrections']) == 1
     assert record['unsuccessful_attempts'] == expected
+
+
+def launched_preparation(tmp_path, *, attribution='followup_stages'):
+    status = tmp_path / 'new/status.json'
+    status.parent.mkdir()
+    ownership = dict(step_id='14408.334', dispatch_nonce='new-unique-owner-334')
+    status.with_name('step.json').write_text(json.dumps(ownership))
+    run = dict(id='prepared-validation', status_path=str(status), **ownership)
+    run[attribution] = ['target'] if attribution == 'followup_stages' else 'target'
+    before = dict(runs=[], pending_batches=[dict(id='target')])
+    after = dict(runs=[run], pending_batches=[dict(id='target')])
+    report = result(['Audited49attempts and registered frozen validation.'])
+    return before, after, report
+
+
+@pytest.mark.parametrize('attribution', ['followup_stages', 'parent_preparation_stage'])
+def test_prepared_jobs_dispatched_before_return_are_owned_progress_despite_prose(tmp_path, attribution):
+    before, after, report = launched_preparation(tmp_path, attribution=attribution)
+    incident = dict(kind='next_batch', batch_id='target')
+    assert preparation_progress(before, after, incident, report) == ['step:14408.334']
+    record = dict(attempts=4, unsuccessful_attempts=2)
+    assert account_intervention(record, incident, report, before, after, charged=True) == ['step:14408.334']
+    assert record['attempts'] == 4 and record['unsuccessful_attempts'] == 1
+    assert not account_intervention(record, incident, report, before, after, charged=True)
+    assert record['unsuccessful_attempts'] == 1  # Existing witness cannot be refunded again.
+
+
+@pytest.mark.parametrize('invalid', [
+    'old_queued', 'old_registered', 'old_step', 'unrelated_stage', 'missing_receipt',
+    'nonce_mismatch', 'step_mismatch', 'malformed_receipt', 'oversized_receipt',
+    'extra_receipt_fields', 'invalid_step', 'invalid_nonce', 'relative_status',
+    'invalid_id', 'invalid_step_type', 'failed_report', 'no_change',
+])
+def test_launched_progress_rejects_unattributed_stale_or_unowned_claims(tmp_path, invalid):
+    before, after, report = launched_preparation(tmp_path)
+    run = after['runs'][0]
+    receipt = Path(run['status_path']).with_name('step.json')
+    if invalid == 'old_queued':
+        before['pending_batches'].append(dict(id=run['id'], launch=dict(run=dict(id=run['id']))))
+    elif invalid == 'old_registered':
+        before['runs'].append(dict(run, step_id='14408.333'))
+    elif invalid == 'old_step':
+        before['runs'].append(dict(id='unrelated-prior', step_id=run['step_id']))
+    elif invalid == 'unrelated_stage':
+        run['followup_stages'] = ['another-stage']
+    elif invalid == 'missing_receipt':
+        receipt.unlink()
+    elif invalid == 'nonce_mismatch':
+        receipt.write_text(json.dumps(dict(step_id=run['step_id'], dispatch_nonce='another-owner')))
+    elif invalid == 'step_mismatch':
+        receipt.write_text(json.dumps(dict(step_id='14408.999', dispatch_nonce=run['dispatch_nonce'])))
+    elif invalid == 'malformed_receipt':
+        receipt.write_text('{broken')
+    elif invalid == 'oversized_receipt':
+        receipt.write_text(' ' * 16_385 + receipt.read_text())
+    elif invalid == 'extra_receipt_fields':
+        receipt.write_text(json.dumps(dict(step_id=run['step_id'], dispatch_nonce=run['dispatch_nonce'], stale=True)))
+    elif invalid == 'invalid_step':
+        run['step_id'] = 'fake'
+    elif invalid == 'invalid_nonce':
+        run['dispatch_nonce'] = 'short'
+    elif invalid == 'relative_status':
+        run['status_path'] = 'relative/status.json'
+    elif invalid == 'invalid_id':
+        run['id'] = None
+    elif invalid == 'invalid_step_type':
+        run['step_id'] = []
+    elif invalid == 'failed_report':
+        report['status'] = 'failed'
+    elif invalid == 'no_change':
+        report['result']['outcome'] = 'no_change'
+    assert preparation_progress(before, after, dict(kind='next_batch', batch_id='target'), report) == []

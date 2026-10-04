@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from collections import Counter
 from pathlib import Path
 from typing import Any
@@ -79,7 +80,10 @@ def intervention_prompt(directory: Path, instructions: str, context: dict) -> st
         "If a prior intervention timed out, reconcile HANDOFF.md, report and relevant events before "
         "new work. Never duplicate a live worker or reset same-cause error history. Record actual "
         "new registered steps, prepared descriptors or completed preparation with a durable handoff; "
-        "a success claim alone is not proof of progress.\n\nFocused observations:\n"
+        "a success claim alone is not proof of progress. "
+        "In the final result, steps contains only actual numeric Slurm step IDs such as "
+        "14408.334; put explanations in summary and use [] when work is only queued."
+        "\n\nFocused observations:\n"
         + json.dumps(compact(summary), indent=2, sort_keys=True)
     )
     if len(prompt) > MAX_PROMPT_CHARACTERS - 4096:
@@ -95,10 +99,36 @@ def preparation_progress(before: dict, after: dict, incident: dict, report: dict
     previous_steps = {row.get("step_id") for row in before.get("runs", [])}
     prepared_ids = {row.get("launch", {}).get("run", {}).get("id")
                     for row in before.get("pending_batches", [])}
-    registered_steps = {row.get("step_id") for row in after.get("runs", [])
-                        if row.get("id") not in prepared_ids}
+    registered_steps = {row["step_id"] for row in after.get("runs", [])
+                        if row.get("id") not in prepared_ids and isinstance(row.get("step_id"), str)}
     proof = ["step:" + step for step in result.get("steps", [])
              if step in registered_steps and step not in previous_steps]
+    # A fast dispatcher may consume every new descriptor before the model
+    # returns. A fresh, stage-attributed ownership receipt remains evidence even
+    # when result.steps is prose; pre-existing queued work is never credited.
+    previous_ids = {row["id"] for row in before.get("runs", [])} | set(prepared_ids)
+    batch_id = incident.get("batch_id")
+    for run in after.get("runs", []):
+        stages = run.get("followup_stages", [])
+        attributed = (run.get("parent_preparation_stage") == batch_id
+                      or isinstance(stages, list) and batch_id in stages)
+        step, nonce = run.get("step_id"), run.get("dispatch_nonce")
+        if (not batch_id or not attributed or not isinstance(run.get("id"), str)
+                or not run["id"] or run["id"] in previous_ids
+                or not isinstance(step, str) or step in previous_steps
+                or not re.fullmatch(r"[0-9]+\.[0-9]+", step)
+                or not isinstance(nonce, str) or not re.fullmatch(r"[A-Za-z0-9_-]{12,128}", nonce)):
+            continue
+        try:
+            status_path = Path(run["status_path"])
+            if not status_path.is_absolute():
+                continue
+            with status_path.with_name("step.json").open("rb") as stream:
+                raw = stream.read(16_385)
+            if len(raw) <= 16_384 and json.loads(raw) == dict(step_id=step, dispatch_nonce=nonce):
+                proof.append("step:" + step)
+        except (OSError, ValueError, KeyError, TypeError, RecursionError):
+            continue
     old_batches = {row["id"]: row for row in before.get("pending_batches", [])}
     for batch in after.get("pending_batches", []):
         launch = batch.get("launch")
@@ -114,7 +144,6 @@ def preparation_progress(before: dict, after: dict, incident: dict, report: dict
     # A reporting/preparation stage can finish without launching numerical work.
     # It must be removed from the registry and leave a new, machine-readable
     # handoff. The snapshot binds the previous handoff to prevent recycling one.
-    batch_id = incident.get("batch_id")
     if batch_id in old_batches and not any(row["id"] == batch_id for row in after.get("pending_batches", [])):
         handoff = Path(result.get("handoff") or "/nonexistent")
         try:

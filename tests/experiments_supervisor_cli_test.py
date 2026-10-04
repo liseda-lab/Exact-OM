@@ -195,6 +195,8 @@ def _fake_child(cli, monkeypatch, directory, *, result, code=0, completed=True, 
     "result,code,completed,expected",
     [
         (json.dumps(_result()), 0, True, "complete"),
+        (json.dumps({**_result(), "steps": ["14408.334: legacy launch explanation"]}),
+         0, True, "complete"),
         (json.dumps(_result()), 1, True, "failed"),
         (json.dumps(_result()), 0, False, "failed"),
         (json.dumps(["invalid result"]), 0, True, "failed"),
@@ -212,6 +214,12 @@ def test_agent_result_must_be_valid_and_keep_usage(
     assert report["exit_code"] == code
     assert report["usage"] == ([{"input_tokens": 9}] if completed else [])
     assert cli.read(tmp_path / "report.json") == report
+    # Guide new responses without invalidating historical prose-bearing results;
+    # preparation credit is decided separately from receipt evidence.
+    steps = cli.read(tmp_path / "schema.json")["properties"]["steps"]
+    assert steps["items"] == {"type": "string"}
+    assert "Slurm step IDs" in steps["description"]
+    assert "14408.334" in steps["description"] and "Use []" in steps["description"]
 
 
 def test_interrupted_child_records_exit_and_usage(cli, controller, tmp_path, monkeypatch):

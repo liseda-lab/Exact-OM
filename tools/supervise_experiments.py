@@ -39,7 +39,13 @@ RESULT_SCHEMA = {
     "properties": {
         "outcome": {"type": "string", "enum": ["repaired", "submitted", "no_change", "needs_user"]},
         "summary": {"type": "string"},
-        "steps": {"type": "array", "items": {"type": "string"}},
+        "steps": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "Only actual full numeric Slurm step IDs, for example 14408.334. "
+                           "Put explanations in summary. Use [] when work is prepared or queued "
+                           "but has not launched.",
+        },
         "commits": {"type": "array", "items": {"type": "string"}},
         "handoff": {"type": "string"},
     },
