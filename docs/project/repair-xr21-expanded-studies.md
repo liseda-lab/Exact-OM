@@ -216,3 +216,23 @@ teacher enumeration claim. Intended-parent/query qualification, missing required
 semantic-control review, diagnostic receipt review and the final failure-inclusive
 parent-group report remain obligations. No diagnostic result replaces the
 primary generated-pool evidence or establishes research gates.
+
+## Final bounded scaling receipt report
+
+The final resource report preserves three separate denominators: 240 primary
+sweep rows, 72 support-incidence rows, and 24 endpoint-disabled amendment rows.
+It rechecks nonce/step/exit receipts, frozen source/runtime, all published payloads,
+replacement lineage and settled attempt charges. Known semantic scores must match
+a saved native-authorized selection, its label, and the frozen query list. This
+receipt audit makes no new native calls and does not enlarge the query scope.
+
+The original 120 composite-control endpoint admission errors are explicitly
+accounted as unavailable generation comparisons, with their fallback results and
+costs retained. The separate endpoint-disabled amendment does not retrospectively
+repair those comparisons or establish whole-bundle endpoint substitution. Partial
+generation and incomplete language comparisons remain visible. Shared/nonshared
+incidence pairs retain missing outcomes and one inherited development ancestry;
+clean controls are paired within size/condition and are not load-matched to corrupt
+cases. No confidence interval across independent parents is supported for this
+single ancestry. Optional depth 3 remains unactivated. Final receipt review closes
+only the registered scaling stage; other expanded studies remain registered.
