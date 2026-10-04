@@ -115,10 +115,14 @@ export function BrowseView() {
             context={context}
             ontologyLabel={ontologyName(state, contextEntity.ontology_version_id, run)}
             cite={() => undefined}
-            onOpenEntity={(iri) => {
+            onOpenEntity={(target) => {
+              // The card supplies the recorded typed entity, whichever page it came from (19 F21).
               const sourceSide = contextFor.side === "source";
-              const parent = context.data?.parents.items.some((fact) => (fact.hierarchy_projection?.parent.iri ?? (fact.value?.term_type === "iri" ? fact.value.iri : null)) === iri);
-              setParams({ [sourceSide ? "s" : "t"]: iri, [sourceSide ? "sk" : "tk"]: parent ? contextEntity.kind : "class" });
+              setParams({
+                [sourceSide ? "s" : "t"]: target.iri,
+                [sourceSide ? "sk" : "tk"]: target.kind,
+                ...(target.ontology_version_id !== contextEntity.ontology_version_id ? { [sourceSide ? "so" : "to"]: target.ontology_version_id } : {}),
+              });
               setContextFor(null);
             }}
           />

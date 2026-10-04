@@ -135,13 +135,12 @@ export function PairWorkspace({
     navigation.set(side, { iri, kind });
     report({ type: "hierarchy_focus", side, iri, kind, via });
   };
-  const openFromCard = (side: Side) => (iri: string) => {
-    const ctx = side === "source" ? sourceCtx.data : targetCtx.data;
-    const entity = side === "source" ? source : target;
-    const parent = ctx?.parents.items.some((fact) => (fact.hierarchy_projection?.parent.iri ?? (fact.value?.term_type === "iri" ? fact.value.iri : null)) === iri);
-    if (!components.has("hierarchy")) return;
-    navigation.set(side, { iri, kind: parent ? entity.kind : "class" });
-    report({ type: "hierarchy_focus", side, iri, kind: parent ? entity.kind : "class", via: "card" });
+  // Card links carry the recorded typed entity; a side's browser stays within its ontology (19 F21).
+  const openFromCard = (side: Side) => (entity: EntityRef) => {
+    const ontology = (side === "source" ? source : target).ontology_version_id;
+    if (!components.has("hierarchy") || entity.ontology_version_id !== ontology) return;
+    navigation.set(side, { iri: entity.iri, kind: entity.kind });
+    report({ type: "hierarchy_focus", side, iri: entity.iri, kind: entity.kind, via: "card" });
     onTab("hierarchy");
     report({ type: "tab_open", tab: "hierarchy" });
   };
@@ -248,9 +247,10 @@ export function PairWorkspace({
               cite={cite}
               showProfile={components.has("entity_description") && profileAllowed(contextFor.entity)}
               onClose={() => setContextFor(null)}
-              onOpenEntity={(iri, kind) => {
-                navigation.set(contextFor.side, { iri, kind });
-                report({ type: "hierarchy_focus", side: contextFor.side, iri, kind, via: "card" });
+              onOpenEntity={(entity) => {
+                if (entity.ontology_version_id !== contextFor.entity.ontology_version_id) return;
+                navigation.set(contextFor.side, { iri: entity.iri, kind: entity.kind });
+                report({ type: "hierarchy_focus", side: contextFor.side, iri: entity.iri, kind: entity.kind, via: "card" });
                 setContextFor(null);
               }}
             />
@@ -288,7 +288,7 @@ function FullContextDialog({
   cite: (factId: string) => CitedFact | undefined;
   showProfile: boolean;
   onClose: () => void;
-  onOpenEntity: (iri: string, kind: EntityKind) => void;
+  onOpenEntity: (entity: EntityRef) => void;
 }) {
   const context = useEntityContext(entity);
   return (
@@ -301,10 +301,7 @@ function FullContextDialog({
           ontologyLabel={ontologyLabel}
           cite={cite}
           showProfile={showProfile}
-          onOpenEntity={(iri) => {
-            const parent = context.data?.parents.items.some((fact) => (fact.hierarchy_projection?.parent.iri ?? (fact.value?.term_type === "iri" ? fact.value.iri : null)) === iri);
-            onOpenEntity(iri, parent ? entity.kind : "class");
-          }}
+          onOpenEntity={onOpenEntity}
         />
       </FactInspectorProvider>
     </Dialog>

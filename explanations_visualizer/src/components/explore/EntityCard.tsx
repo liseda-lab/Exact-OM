@@ -150,7 +150,7 @@ function FactLiteral({ fact, className }: { fact: Fact; className: string }) {
 }
 
 /** One recorded fact category under "Other recorded facts". */
-function MoreCategory({ category, page, entity, onOpenEntity }: { category: string; page: Page<Fact>; entity: EntityRef; onOpenEntity?: (iri: string) => void }) {
+function MoreCategory({ category, page, entity, onOpenEntity }: { category: string; page: Page<Fact>; entity: EntityRef; onOpenEntity?: (entity: EntityRef) => void }) {
   const pages = useFactPages(entity, category, page);
   return (
     <div className="more-category">
@@ -172,7 +172,7 @@ function MoreCategory({ category, page, entity, onOpenEntity }: { category: stri
 }
 
 /** One defining-fact category (restrictions, types, …) with its own continuation. */
-function DefiningCategory({ category, page, entity, onOpenEntity }: { category: string; page: Page<Fact>; entity: EntityRef; onOpenEntity?: (iri: string) => void }) {
+function DefiningCategory({ category, page, entity, onOpenEntity }: { category: string; page: Page<Fact>; entity: EntityRef; onOpenEntity?: (entity: EntityRef) => void }) {
   const pages = useFactPages(entity, category, page);
   return (
     <div className="defining-category" data-category={category}>
@@ -184,8 +184,10 @@ function DefiningCategory({ category, page, entity, onOpenEntity }: { category: 
   );
 }
 
+/** A parent from any page, with the complete typed entity the service recorded (19 F21). */
 interface ParentItem {
   key: string;
+  entity: EntityRef | null;
   iri: string;
   factId: string | null;
 }
@@ -207,7 +209,8 @@ export function EntityCard({
   context: AsyncState<EntityContext>;
   ontologyLabel: string;
   cite: (factId: string) => CitedFact | undefined;
-  onOpenEntity?: (iri: string) => void;
+  /** Receives the complete typed entity (ontology, IRI, kind), never a bare IRI. */
+  onOpenEntity?: (entity: EntityRef) => void;
   compact?: boolean;
   titleOverride?: string;
   /** Study publications admit components individually; absent ones are not rendered at all. */
@@ -231,8 +234,11 @@ export function EntityCard({
       ctx
         ? {
             items: ctx.parents.items.flatMap((fact): ParentItem[] => {
-              const iri = fact.hierarchy_projection?.parent.iri ?? (fact.value?.term_type === "iri" ? fact.value.iri : null);
-              return iri ? [{ key: fact.hierarchy_projection?.id ?? fact.fact_id, iri, factId: fact.fact_id }] : [];
+              const projected = fact.hierarchy_projection?.parent ?? null;
+              const iri = projected?.iri ?? (fact.value?.term_type === "iri" ? fact.value.iri : null);
+              // Only a projection records the parent's type; a bare IRI value is shown, not opened.
+              const typed = projected ? { ontology_version_id: projected.ontology_version_id ?? entity.ontology_version_id, iri: projected.iri, kind: projected.kind } : null;
+              return iri ? [{ key: fact.hierarchy_projection?.id ?? fact.fact_id, entity: typed, iri, factId: fact.fact_id }] : [];
             }),
             next_cursor: ctx.parents.next_cursor,
             total_count: ctx.parents.total_count,
@@ -243,7 +249,7 @@ export function EntityCard({
   const loadParents = useCallback(
     (cursor: string, signal: AbortSignal) =>
       source.hierarchy(entity, "parents", "literal_asserted", cursor, signal).then((page) => ({
-        items: page.items.map((edge): ParentItem => ({ key: edge.id, iri: edge.parent.iri, factId: null })),
+        items: page.items.map((edge): ParentItem => ({ key: edge.id, entity: { ontology_version_id: edge.parent.ontology_version_id ?? entity.ontology_version_id, iri: edge.parent.iri, kind: edge.parent.kind }, iri: edge.parent.iri, factId: null })),
         next_cursor: page.next_cursor,
       })),
     [source, entity],
@@ -370,8 +376,8 @@ export function EntityCard({
                 {parents.items.map((item) => {
                   const text = parentLabel(item.iri);
                   return (
-                    <li key={item.key} data-fact-id={item.factId ?? undefined} data-edge-id={item.key}>
-                      <button type="button" className={`parent-link parent-${side}`} onClick={() => onOpenEntity?.(item.iri)} disabled={!onOpenEntity}>
+                    <li key={item.key} data-fact-id={item.factId ?? undefined} data-edge-id={item.key} data-iri={item.iri} data-kind={item.entity?.kind}>
+                      <button type="button" className={`parent-link parent-${side}`} onClick={() => item.entity && onOpenEntity?.(item.entity)} disabled={!onOpenEntity || !item.entity}>
                         <span>{text?.value ?? curie(item.iri)}</span>
                         <span className="iri">{curie(item.iri)}</span>
                       </button>

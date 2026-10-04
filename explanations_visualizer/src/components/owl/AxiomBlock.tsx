@@ -37,7 +37,7 @@ export function OriginalAxiom({ axiom }: { axiom: Axiom }) {
   );
 }
 
-export function AxiomBlock({ ontology, factId, subject, onOpen }: { ontology: string; factId: string; subject: EntityRef; onOpen?: (iri: string) => void }) {
+export function AxiomBlock({ ontology, factId, subject, onOpen }: { ontology: string; factId: string; subject: EntityRef; onOpen?: (entity: EntityRef) => void }) {
   const [open, setOpen] = useState(false);
   const report = useWorkspaceAction();
   const state = useResolvedFact({ factId, ontologies: [ontology], subject });
@@ -58,7 +58,7 @@ export function AxiomBlock({ ontology, factId, subject, onOpen }: { ontology: st
     <div className="fact-block" data-fact-id={factId}>
       {readable && relation ? (
         <p className="fact-reading">
-          <span className="fact-relation">{relation.relation}</span> <Expression node={relation.other} ontology={ontology} onOpen={onOpen} />
+          <span className="fact-relation">{relation.relation}</span> <Expression node={relation.other} ontology={ontology} onOpen={onOpen ? (iri, kind) => onOpen({ ontology_version_id: ontology, iri, kind }) : undefined} />
         </p>
       ) : (
         <p className="meta">No plain-language template exists for this axiom; its original form is shown in full.</p>
