@@ -31,6 +31,17 @@ function caseReady(traffic: ReturnType<typeof recordTraffic>) {
   return traffic.requests.filter((item) => item.path === "/api/v1/study/events" && JSON.stringify(item.body).includes('"case_ready"'));
 }
 
+/** The service's answer to the next event batch carrying case_ready; register it before the action. */
+function caseReadyAcknowledged(page: Page) {
+  return page
+    .waitForResponse((response) => new URL(response.url()).pathname === "/api/v1/study/events" && response.request().method() === "POST" && (response.request().postData() ?? "").includes('"case_ready"'), { timeout: 20_000 })
+    .then(async (response) => {
+      const events = (response.request().postDataJSON() as { events: { event_id: string; type: string }[] }).events;
+      const acknowledged = response.ok() ? ((await response.json()) as { acknowledged_event_ids: string[] }).acknowledged_event_ids : [];
+      return { status: response.status(), sent: events.filter((event) => event.type === "case_ready").map((event) => event.event_id), acknowledged };
+    });
+}
+
 function caseSegments(traffic: ReturnType<typeof recordTraffic>) {
   return traffic.requests.filter((item) => item.path === "/api/v1/study/timing" && (item.body as { stage?: string })?.stage === "case");
 }
@@ -302,9 +313,15 @@ test.describe("R01/R02 scored explanation case (J01, J04, J05)", () => {
     await page.reload();
     await expect(page.getByRole("alert").filter({ hasText: /Generated description of the source concept/ })).toBeVisible();
     await page.unroute(profile);
+    const acknowledged = caseReadyAcknowledged(page);
     await page.getByRole("button", { name: "Retry loading this case" }).click();
     await expect(add1(page)).toBeEnabled();
-    expect(caseReady(traffic).length).toBe(1);
+    // The UI can recover before the service acknowledges case_ready: wait for that response.
+    const ack = await acknowledged;
+    expect(ack.status).toBe(200);
+    expect(ack.sent).toHaveLength(1);
+    expect(ack.acknowledged).toEqual(expect.arrayContaining(ack.sent));
+    await expect.poll(() => caseReady(traffic).map((item) => item.status)).toEqual([200]);
   });
 
   test("an authorized, recorded absence is a usable terminal status, not a failure (diagnostic)", async ({ page }) => {
@@ -572,7 +589,7 @@ test.describe("R06/R07 study full context and fact pagination (19 F16, F17)", ()
     await expect(ranking.locator("li").first()).toContainText(byPosition(3).label);
     await expect(ranking.locator("li").nth(1)).toContainText(byPosition(1).label);
     await expect(submitButton(page)).toBeEnabled();
-    expect(caseReady(traffic).length).toBe(1);
+    await expect.poll(() => caseReady(traffic).map((item) => item.status)).toEqual([200]);
     await expect.poll(() => definitionOpened(traffic, "source"), { timeout: 20_000 }).toBe(true);
     expect(traffic.errors).toEqual([]);
   });
@@ -852,3 +869,65 @@ test.describe("R11 continued parents keep their entity type (19 F21)", () => {
     });
 });
 
+
+test.describe("R12 tutorial card parents keep their recorded type (19 F21)", () => {
+  const PARENTS = [
+    { name: "crate", iri: "https://example.org/practice/a#Crate", parent: "container" },
+    { name: "lidded object", iri: "https://example.org/practice/a#LiddedObject", parent: "object" },
+  ];
+
+  test("lesson 1's source card opens both parents as typed classes; lesson 2 saves a typed parent action", async ({ page }) => {
+    const traffic = recordTraffic(page);
+    const api = await seedToTutorial(page);
+    await page.reload();
+    await expect(page.getByRole("heading", { level: 1, name: /^Lesson 1 of / })).toBeVisible();
+    const { tutorial } = await api.state();
+    const ontology = tutorial.case.source.ontology_version_id as string;
+    // Workspace and lesson state that the card navigation must keep.
+    await page.getByRole("button", { name: /^Inspect / }).nth(2).click();
+    await expect(page.locator(".lesson-checklist li .meta").filter({ hasText: "Done · saved" })).toHaveCount(1);
+    const before = (await api.state()).tutorial_progress;
+    const card = page.locator(".entity-card-source");
+    await expect(card.locator('[data-category="parents"] li')).toHaveCount(PARENTS.length);
+    const browser = page.getByRole("region", { name: "Source ontology browser" });
+    for (const parent of PARENTS) {
+      const row = card.locator(`[data-category="parents"] li[data-iri="${parent.iri}"]`);
+      await expect(row).toHaveAttribute("data-kind", "class");
+      await expect(row).toHaveAttribute("data-fact-id", /^sha256:/);
+      const button = row.getByRole("button");
+      await expect(button).toBeEnabled();
+      await expect(button).toContainText(parent.name);
+      await button.click();
+      await expect(page.getByRole("tab", { name: "Hierarchy", exact: true })).toHaveAttribute("aria-selected", "true");
+      await expect(browser.locator(".focus-label")).toHaveText(parent.name);
+      await expect(browser.locator(".focus-card .iri")).toHaveText(parent.iri);
+      await expect(browser.locator(".focus-card .eyebrow")).toHaveText("Focused class");
+      // The typed lookup finds the parent's own recorded parent; a wrong kind or ontology finds none.
+      await expect(browser.locator("ul.tree > li.tree-item > .tree-row .tree-label")).toHaveText([parent.parent]);
+    }
+    await expect(page.getByRole("heading", { level: 1, name: /^Lesson 1 of / })).toBeVisible();
+    await expect(page.getByText(/inspecting initial position 3 of 5/)).toBeVisible();
+    const after = (await api.state()).tutorial_progress;
+    expect(after.position).toEqual(before.position);
+    expect(after.completed_requirements).toEqual(expect.arrayContaining(before.completed_requirements));
+
+    // In the context lesson the same card link is accepted by the service as a typed parent action.
+    await page.getByRole("button", { name: "Next lesson", exact: true }).click();
+    await expect(page.getByRole("heading", { level: 1, name: /^Lesson 2 of / })).toBeFocused();
+    await card.locator(`[data-category="parents"] li[data-iri="${PARENTS[0].iri}"]`).getByRole("button").click();
+    const requirement = tutorial.lessons[1].requirements.find((item: { action: string }) => item.action === "navigate_parent");
+    await expect(page.locator(".lesson-checklist li").filter({ hasText: requirement.label }).locator(".meta")).toHaveText(/Done · saved/);
+    expect((await api.state()).tutorial_progress.completed_requirements).toContain(requirement.requirement_id);
+    const saves = () => traffic.requests.filter((item) => item.method === "PUT" && item.path === "/api/v1/study/tutorial/progress");
+    const typedSaves = () => saves().filter((item) => ((item.body as { actions?: { action: string; entity?: unknown }[] }).actions ?? []).some((action) => action.action === "navigate_parent"));
+    // Traffic is recorded once a request finishes, which can follow the UI's acknowledgement.
+    await expect.poll(() => typedSaves().length).toBeGreaterThan(0);
+    for (const save of typedSaves()) {
+      expect(save.status).toBe(200);
+      const action = (save.body as { actions: { action: string; entity?: unknown }[] }).actions.find((item) => item.action === "navigate_parent");
+      expect(action?.entity).toEqual({ ontology_version_id: ontology, iri: PARENTS[0].iri, kind: "class" });
+    }
+    expect(saves().filter((item) => (item.status ?? 0) >= 400)).toEqual([]);
+    expect(traffic.errors).toEqual([]);
+  });
+});
