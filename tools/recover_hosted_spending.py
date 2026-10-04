@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+import json
 from dataclasses import replace
 from pathlib import Path
 
@@ -49,6 +50,100 @@ def verify_identity(saved, expected, old_impl):
     source.pop("artifact_id")
     if source != target:
         raise ValueError("Checkpoint input/config/role/seed identity differs")
+
+
+def relocate_inference_checkpoint(payload, source_cell, target_cell, routing_binding):
+    """Rebind only gate paths after verifying their original numerical bytes."""
+    from exact.impl.trainer.checkpointing import CheckpointingMixin
+
+    fingerprint = CheckpointingMixin._hash_checkpoint_fingerprint_payload
+    source_cell, target_cell = Path(source_cell).resolve(), Path(target_cell).resolve()
+    original = copy.deepcopy(payload)
+    models = original.get("checkpoint_fingerprint_payload", {}).get("models", [])
+    if len(models) != 1 or models[0].get("class") != "PairAdaptiveSemanticScorer":
+        raise ValueError("Expected the original E25 primary scorer fingerprint")
+    model = models[0]
+    if model.get("fingerprint") != fingerprint(model["payload"]) or original.get(
+        "checkpoint_fingerprint"
+    ) != fingerprint(original["checkpoint_fingerprint_payload"]):
+        raise ValueError("Original trainer checkpoint fingerprint is inconsistent")
+    channels = model["payload"]["pair_adaptive_channels"]["experiments"]
+    gate = channels["llm"]["gate"]
+    provenance = channels["gate_artifact"]
+    old_gate = Path(gate["artifact"])
+    if (
+        gate.get("mode") != "forced_sample"
+        or str(old_gate) != provenance.get("path")
+        or not old_gate.is_absolute()
+        or not old_gate.resolve().is_relative_to(source_cell / "routing")
+        or old_gate.name != "selection.json"
+        or old_gate.parent.parent != source_cell / "routing"
+    ):
+        raise ValueError("Expected the original cell's forced-source routing artifact")
+    manifest = read(verified(routing_binding))
+    if manifest.get("schema_version") != 1 or manifest.get("directory") != str(old_gate.parent):
+        raise ValueError("Routing manifest does not bind the checkpoint's gate directory")
+    files = manifest.get("files", {})
+    inventory = {
+        path.relative_to(old_gate.parent).as_posix()
+        for path in old_gate.parent.rglob("*")
+        if path.is_file()
+    }
+    if not files or set(files) != inventory:
+        raise ValueError("Routing manifest must bind every retained prepass file")
+    outputs = {}
+    for relative, item in files.items():
+        path = verified(item)
+        if path != old_gate.parent / relative or not path.resolve().is_relative_to(old_gate.parent):
+            raise ValueError("Routing binding escapes the original gate directory")
+        # This file contains its old absolute selection path. The regular cached
+        # prepass regenerates this provenance from the retained numerical shards.
+        if relative != "prepass.json":
+            outputs[path.relative_to(source_cell).as_posix()] = path
+    if (
+        files["selection.json"]["sha256"] != provenance.get("sha256")
+        or old_gate.stat().st_size != provenance.get("bytes")
+        or read(old_gate).get("mode") != "forced_sample"
+    ):
+        raise ValueError("Retained routing selection differs from checkpoint gate provenance")
+    new_gate = target_cell / old_gate.relative_to(source_cell)
+    channels["llm"]["gate"]["artifact"] = str(new_gate)
+    channels["gate_artifact"]["path"] = str(new_gate)
+    model["fingerprint"] = fingerprint(model["payload"])
+    original["checkpoint_fingerprint"] = fingerprint(original["checkpoint_fingerprint_payload"])
+
+    # Prove the only changes are the two relocated paths and their dependent
+    # fingerprints; inference mappings, timings and all model choices stay intact.
+    restored = copy.deepcopy(original)
+    restored_model = restored["checkpoint_fingerprint_payload"]["models"][0]
+    restored_channels = restored_model["payload"]["pair_adaptive_channels"]["experiments"]
+    restored_channels["llm"]["gate"]["artifact"] = str(old_gate)
+    restored_channels["gate_artifact"]["path"] = str(old_gate)
+    restored_model["fingerprint"] = payload["checkpoint_fingerprint_payload"]["models"][0][
+        "fingerprint"
+    ]
+    restored["checkpoint_fingerprint"] = payload["checkpoint_fingerprint"]
+    if restored != payload:
+        raise ValueError("Checkpoint relocation changed content outside path provenance")
+    return (
+        original,
+        outputs,
+        {
+            "source_gate": files["selection.json"],
+            "replacement_gate_path": str(new_gate),
+            "routing_manifest": routing_binding,
+            "routing_files_restored": len(outputs),
+            "routing_prepass_metadata_regenerated": "prepass.json" in files,
+            "original_trainer_fingerprint": payload["checkpoint_fingerprint"],
+            "replacement_trainer_fingerprint": original["checkpoint_fingerprint"],
+            "changed_checkpoint_fields": [
+                "checkpoint_fingerprint_payload.models[0].payload.pair_adaptive_channels.experiments.llm.gate.artifact",
+                "checkpoint_fingerprint_payload.models[0].payload.pair_adaptive_channels.experiments.gate_artifact.path",
+                "checkpoint_fingerprint_payload.models[0].fingerprint",
+                "checkpoint_fingerprint",
+            ],
+        },
+    )
 
 
 def _cells(recipe, campaign, runtime):
@@ -160,6 +255,22 @@ def import_saved(recipe, campaign, runtime, code, *, verify_only=False):
         raise ValueError("Expected an exact, incomplete inference checkpoint boundary")
     store = ArtifactStore(runtime)
     identity = recovery.identities["extraction"]
+    outputs = {name: source._blob(item["sha256"]) for name, item in payload["outputs"].items()}
+    inference = [name for name in outputs if name.startswith("checkpoints/inference_")]
+    if len(inference) != 1:
+        raise ValueError("Expected one exact saved trainer inference checkpoint")
+    relocated, routing_outputs, relocation = relocate_inference_checkpoint(
+        read(outputs[inference[0]]),
+        manifest.parent,
+        cell.output_dir,
+        settings["source_routing_manifest"],
+    )
+    if relocated.get("processed_examples") != count:
+        raise ValueError("Trainer checkpoint count differs from the retained boundary")
+    outputs[inference[0]] = (json.dumps(relocated, indent=2, ensure_ascii=False) + "\n").encode()
+    if set(outputs) & set(routing_outputs):
+        raise ValueError("Routing migration would replace an existing checkpoint output")
+    outputs.update(routing_outputs)
     if not verify_only:
         previous = store.latest_checkpoint(identity["artifact_id"])
         if previous is None:
@@ -169,9 +280,7 @@ def import_saved(recipe, campaign, runtime, code, *, verify_only=False):
                 completed_ids=payload["completed_ids"],
                 cursor=payload["cursor"],
                 state=payload["state"],
-                outputs={
-                    name: source._blob(item["sha256"]) for name, item in payload["outputs"].items()
-                },
+                outputs=outputs,
             )
         elif previous["cursor"]["next_pair"] < count:
             raise ValueError("Destination checkpoint regressed behind the imported boundary")
@@ -184,8 +293,9 @@ def import_saved(recipe, campaign, runtime, code, *, verify_only=False):
         "repair_record": settings["repair_record"],
         "original_artifact_id": artifact_id,
         "replacement_artifact_id": identity["artifact_id"],
-        "checkpoint_output_bytes_unchanged": True,
-        "original_accounting_retained": True,
+        "numerical_output_bytes_unchanged": True,
+        "checkpoint_metadata_relocated": relocation,
+        "accounting_handoff": "Caller must retain the latest closed cumulative account before import",
     }
     write(
         runtime
