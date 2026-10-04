@@ -8,6 +8,8 @@ import re
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
+from exact.experiments.science_health import inspect_science
+
 _ACTIVE = {
     "RUNNING",
     "PENDING",
@@ -227,6 +229,9 @@ def inspect_runs(
                 observation[field] = _read(run.get(key), json_object=field != "exit_code")
             except (OSError, ValueError, UnicodeError) as exc:
                 observation["errors"].append(f"{field}: {type(exc).__name__}: {exc}")
+        scientific = inspect_science(run, observation.get("completion"))
+        observation["errors"].extend(scientific["errors"])
+        observation["scientific_failures"] = scientific["failures"]
         observations[run["id"]] = observation
     return assess_runs(runs, observations, step_states=step_states)
 
@@ -335,6 +340,14 @@ def assess_runs(
         elif observed.get("errors"):
             finding.update(status="waiting", retryable=True, errors=observed["errors"])
             reason = "Receipt temporarily unreadable; retry without launching work"
+        elif observed.get("scientific_failures"):
+            failures = observed["scientific_failures"]
+            # One cause owns each intervention. Counts, affected row IDs and
+            # changing payload paths do not reset its retry budget.
+            first = min(failures, key=lambda row: json.dumps(row["signature"], sort_keys=True))
+            reason = f"{name} contains a completed nested software failure: " + first["signature"]["detail"]
+            incident = failure(name, "scientific_software_error", reason, first["signature"])
+            finding["scientific_failures"] = failures
         elif completion is not None and (
             completion.get("status") != "complete" or completion.get("exit_code", 0) != 0
         ):

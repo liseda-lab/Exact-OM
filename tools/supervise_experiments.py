@@ -430,7 +430,7 @@ def check(directory, policy, state, *, act=False, stop_requested=lambda: False):
     suppressed = set()
     for incident in observation["incidents"]:
         focus = incident.get("focus_run_id") or next(iter(incident.get("run_ids", [])), None)
-        if focus in recoveries and incident["kind"] in {"run_failed", "launcher_failed", "step_missing"}:
+        if focus in recoveries and incident["kind"] in {"run_failed", "launcher_failed", "step_missing", "scientific_software_error"}:
             suppressed.add(incident["id"])
             for finding in observation["findings"]:
                 if finding["run_id"] in incident["run_ids"]:

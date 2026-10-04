@@ -817,3 +817,22 @@ def test_queued_recovery_chain_does_not_spawn_a_second_repair(
     assert cli.read(tmp_path / 'registry.json') == registry
     assert not (tmp_path / 'dispatch-state.json').exists()
     assert not Path(recovery['launch']['step_path']).exists()
+
+
+def test_qualified_nested_failure_with_queued_recovery_does_not_invoke_second_repair(
+    cli, queued_recovery, tmp_path, monkeypatch
+):
+    policy, state, registry, _ = queued_recovery
+    observed = cli.inspect_runs(registry['runs'], step_states={'14372.38': 'RUNNING'})
+    incident = observed['incidents'][0]
+    incident['kind'] = 'scientific_software_error'
+    state['incidents'][incident['id']] = {
+        'attempts': 1, 'observations': 1, 'incident': incident, 'alerted': True,
+    }
+    monkeypatch.setattr(cli, 'inspect_runs', lambda *a, **k: observed)
+    monkeypatch.setattr(cli, 'run_agent', lambda *a: pytest.fail('Qualified replacement is already queued'))
+    monkeypatch.setattr(cli, 'notify_blocker', lambda *a, **k: pytest.fail('Prepared recovery needs no alert'))
+    current = cli.check(tmp_path, policy, state, act=True)
+    assert current['status'] == 'waiting'
+    assert not cli.read(tmp_path / 'health.json')['incidents']
+    assert state['incidents'][incident['id']]['attempts'] == 1

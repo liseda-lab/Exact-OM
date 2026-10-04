@@ -267,12 +267,18 @@ def _assignment_label(
     desired_family_weight: float = 1.0,
     false_positive_weight: float = 1.0,
     semantic_target: SemanticTargetSpec | None = None,
+    evidence_directory: Path | None = None,
 ) -> RepairLabel:
     from exact.repair.kernel import materialize
     from exact.repair.owl import OwlVerifier, snapshot_from_axioms
 
     axioms, active = materialize(case.problem, assignment)
-    verifier = OwlVerifier("hermit", backend="python")
+    if evidence_directory is None:
+        verifier = OwlVerifier("hermit", backend="python")
+    else:
+        from tools.repair.acquisition import RecordingVerifier
+
+        verifier = RecordingVerifier(evidence_directory)
     snapshot = snapshot_from_axioms(axioms)
     report = verifier.check_theory(
         snapshot,
@@ -296,11 +302,16 @@ def _assignment_label(
     return RepairLabel(assignment, True, semantic.benefit, cost, semantic.outcomes, auxiliary)
 
 
-def _verify_intended(case: GeneratedCase) -> bool:
+def _verify_intended(case: GeneratedCase, evidence_directory: Path | None = None) -> bool:
     """Verify the evaluator-only intended parent even when its candidate is withheld."""
     from exact.repair.owl import OwlVerifier, snapshot_from_axioms
 
-    verifier = OwlVerifier("hermit", backend="python")
+    if evidence_directory is None:
+        verifier = OwlVerifier("hermit", backend="python")
+    else:
+        from tools.repair.acquisition import RecordingVerifier
+
+        verifier = RecordingVerifier(evidence_directory)
     snapshot = snapshot_from_axioms(case.intended_theory)
     report = verifier.check_theory(
         snapshot,
@@ -326,6 +337,7 @@ def label_case(
     profile: tuple = DEFAULT_PROFILE,
     desired_family_weight: float = 1.0,
     false_positive_weight: float = 1.0,
+    evidence_directory: Path | None = None,
 ) -> TeacherCache:
     """Verify the intended clean parent, then enumerate whole-case labels under deadlines."""
     from importlib.metadata import version
@@ -338,7 +350,13 @@ def label_case(
         canonical_hash(case.probes), desired_family_weight, false_positive_weight
     )
     started = time.monotonic()
-    intended = bounded_call(_verify_intended, case, timeout=min(call_seconds, deadline_seconds))
+    intended_options = {} if evidence_directory is None else {"evidence_directory": Path(evidence_directory) / "intended"}
+    intended_limit = min(call_seconds, deadline_seconds)
+    intended = bounded_call(_verify_intended, case, timeout=intended_limit, **intended_options)
+    if evidence_directory is not None:
+        from tools.repair.acquisition import record_call
+
+        record_call(Path(evidence_directory) / "intended", intended, intended_limit, case, None)
     if intended.status != "complete" or intended.value is not True:
         raise ValueError(
             "Generated intended parent has not been verified feasible and query-complete"
@@ -346,6 +364,10 @@ def label_case(
 
     def label(assignment: tuple[int, ...]) -> RepairLabel:
         remaining = deadline_seconds - (time.monotonic() - started)
+        assignment_directory = (None if evidence_directory is None else
+                                Path(evidence_directory) / canonical_hash(assignment))
+        options = {} if assignment_directory is None else {"evidence_directory": assignment_directory}
+        call_limit = min(call_seconds, max(0.0, remaining))
         result = bounded_call(
             _assignment_label,
             case,
@@ -354,8 +376,11 @@ def label_case(
             desired_family_weight,
             false_positive_weight,
             semantic_target,
-            timeout=min(call_seconds, max(0.0, remaining)),
+            timeout=call_limit,
+            **options,
         )
+        if assignment_directory is not None:
+            record_call(assignment_directory, result, call_limit, case, assignment)
         if result.status == "complete":
             return cast(RepairLabel, result.value)
         return RepairLabel(assignment, None, None, 0.0)

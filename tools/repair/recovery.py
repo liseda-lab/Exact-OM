@@ -11,6 +11,7 @@ import sys
 from pathlib import Path
 
 from exact.experiments.dispatch import _read, _register, _step, _validate, _write
+from exact.experiments.science_health import inspect_science
 
 
 def link_recovery(directory, run_id, *, steps, step_id):
@@ -42,12 +43,18 @@ def link_recovery(directory, run_id, *, steps, step_id):
         if not 1 <= candidate["repair_attempt"] <= candidate["max_repairs"] <= 2:
             raise ValueError("Recovery repair limit exceeded")
         receipt = Path(prior["completion_path"])
-        if (
-            hashlib.sha256(receipt.read_bytes()).hexdigest()
-            != candidate["recovery_completion_sha256"]
-            or _read(receipt).get("status") != "failed"
-        ):
+        if hashlib.sha256(receipt.read_bytes()).hexdigest() != candidate["recovery_completion_sha256"]:
             raise ValueError("Failed predecessor evidence changed")
+        completion = _read(receipt)
+        if completion.get("status") != "failed":
+            # Successful orchestration can contain failed native rows. This
+            # exception requires explicit, byte-bound scanner evidence; a model
+            # claim or an ordinary completed result never authorizes replay.
+            expected = candidate.get("recovery_scientific_failure")
+            scientific = inspect_science(prior, completion)
+            if (completion.get("status") != "complete" or not isinstance(expected, dict)
+                    or scientific["errors"] or expected not in scientific["failures"]):
+                raise ValueError("Completed predecessor has no matching qualified scientific failure")
         if prior.get("superseded_by") not in {None, run_id}:
             raise ValueError("Another replacement already owns the predecessor")
         if prior.get("superseded_by") is None and prior.get("pending_recovery") != run_id:

@@ -72,3 +72,62 @@ def test_recovery_links_once_and_rejects_live_parent(tmp_path, queued):
     (tmp_path / "step.json").write_text(json.dumps(dict(step_id="12.2", dispatch_nonce="wrong")))
     with pytest.raises(ValueError, match="nonce"):
         link_recovery(tmp_path, "new", steps={"12.2": "RUNNING"}, step_id="12.2")
+
+
+def scientific_recovery(tmp_path, status="generation_error"):
+    from exact.experiments.science_health import inspect_science
+    def put(path, value):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(value))
+        return dict(path=str(path), sha256=hashlib.sha256(path.read_bytes()).hexdigest())
+    work = tmp_path / "old-work"
+    payload = put(work / "result.json", dict(row_id="row", status=status, detail="ValueError: bad edge"))
+    row = put(work / "row.json", dict(row=dict(id="row"), status="complete", result=payload))
+    report = put(work / "evaluation/report.json", dict(schema="exact-repair/fresh-evaluation/v1",
+                 status="complete", scheduled=1, recorded=1, rows=[dict(row, row_id="row")]))
+    complete = dict(status="complete", step_id="12.1", dispatch_nonce="old-nonce", work=str(work))
+    completion = put(tmp_path / "old-attempt/completion.json", complete)
+    put(tmp_path / "old-attempt/outputs.json", {"evaluation/report.json": report["sha256"]})
+    old = dict(id="old", logical_id="job", step_id="12.1", dispatch_nonce="old-nonce",
+               completion_path=completion["path"], science_report_relative="evaluation/report.json",
+               pending_recovery="new", enabled=True)
+    failures = inspect_science(old, complete)["failures"]
+    new = dict(id="new", logical_id="job", step_id="12.2", recovery_of="old",
+               status_path=str(tmp_path / "new-attempt/status.json"), dispatch_nonce="new-nonce",
+               repair_attempt=1, max_repairs=2, recovery_completion_sha256=completion["sha256"])
+    put(tmp_path / "new-attempt/step.json", dict(step_id="12.2", dispatch_nonce="new-nonce"))
+    registry = dict(runs=[old, new], pending_batches=[])
+    put(tmp_path / "registry.json", registry)
+    return registry, failures
+
+
+def test_completed_parent_requires_explicit_qualified_scientific_failure(tmp_path):
+    registry, failures = scientific_recovery(tmp_path)
+    before = (tmp_path / "registry.json").read_bytes()
+    with pytest.raises(ValueError, match="no matching qualified scientific failure"):
+        link_recovery(tmp_path, "new", steps={"12.2": "RUNNING"}, step_id="12.2")
+    assert (tmp_path / "registry.json").read_bytes() == before
+    registry["runs"][1]["recovery_scientific_failure"] = failures[0]
+    (tmp_path / "registry.json").write_text(json.dumps(registry))
+    for _ in range(2):
+        result = link_recovery(tmp_path, "new", steps={"12.2": "RUNNING"}, step_id="12.2")
+        assert result["status"] == "linked"
+    saved = json.loads((tmp_path / "registry.json").read_text())
+    assert saved["runs"][0]["superseded_by"] == "new"
+    assert saved["runs"][1]["recovery_scientific_failure"] == failures[0]
+
+
+@pytest.mark.parametrize("tamper", ["payload", "row_ids", "healthy"])
+def test_scientific_recovery_rejects_unqualified_or_changed_evidence(tmp_path, tamper):
+    registry, failures = scientific_recovery(tmp_path, "evaluated" if tamper == "healthy" else "generation_error")
+    expected = failures[0] if failures else dict(signature=dict(status="generation_error", detail="claimed"), row_ids=["row"], evidence={})
+    registry["runs"][1]["recovery_scientific_failure"] = expected
+    if tamper == "payload":
+        (tmp_path / "old-work/result.json").write_text("{}")
+    elif tamper == "row_ids":
+        expected["row_ids"] = ["different-row"]
+    (tmp_path / "registry.json").write_text(json.dumps(registry))
+    before = (tmp_path / "registry.json").read_bytes()
+    with pytest.raises(ValueError, match="qualified scientific failure"):
+        link_recovery(tmp_path, "new", steps={"12.2": "RUNNING"}, step_id="12.2")
+    assert (tmp_path / "registry.json").read_bytes() == before

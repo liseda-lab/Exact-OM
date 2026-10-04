@@ -310,7 +310,7 @@ def ensure_cleanup(outcome):
         )
 
 
-def evaluate_row(schedule, row, directory):
+def evaluate_row(schedule, row, directory, *, remaining_budget=None):
     """Full comparison call including generation, solving and evaluator-only queries."""
     from exact.repair.pipeline import bounded_freeze_checkpoint, repair_neural_round
     from exact.repair.workers import bounded_call
@@ -326,7 +326,13 @@ def evaluate_row(schedule, row, directory):
     protocol = load_protocol_v3(Path(arm["protocol"]["path"]), for_execution=True).model_dump(
         by_alias=True
     )
-    resources, selection = protocol["resources"], protocol["selection"]
+    resources, selection = dict(protocol["resources"]), protocol["selection"]
+    if remaining_budget is not None:
+        from tools.repair.schema_recovery import validate_remaining_budget
+
+        validate_remaining_budget(remaining_budget, row, resources)
+        resources["case_wall_seconds"] = remaining_budget["wall_seconds"]
+        resources["generation_seconds"] = remaining_budget["generation_seconds"]
     # The evaluator record is deliberately unopened until selection completes.
     problem = read_record(bound(item["observable"]))
     from tools.repair.robustness import generation_overrides, audit_final_pool
@@ -373,6 +379,11 @@ def evaluate_row(schedule, row, directory):
         semantic_status="not_evaluated",
         generation_resources=dict(generated.resource_usage),
     )
+    if generated.status == "error" and generated.detail == "ValueError: cannot infer complete original relation for endpoint retrieval":
+        result["status"] = "unsupported_original_mapping_bundle"
+    if generated.status == "error" and generated.detail.startswith("ModelGraphSchemaError:"):
+        result["status"] = "unavailable_model_schema"
+        result["compatibility_scope"] = "Frozen graph encoder lacks required relation or node parameters; no weights changed"
     if generated.status == "complete":
         frozen = generated.value
         result["intervention_audit"] = audit_final_pool(frozen.problem, item)
@@ -471,6 +482,7 @@ def evaluate_row(schedule, row, directory):
                     ensure_cleanup(labeled)
                     result.update(
                         semantic_status=labeled.status,
+                        semantic_detail=labeled.detail,
                         evaluator_resources=dict(labeled.resource_usage),
                     )
                     if labeled.status == "complete":
@@ -499,6 +511,8 @@ def evaluate_row(schedule, row, directory):
         family_exposure=item["family_exposure"],
         elapsed_seconds=time.monotonic() - started,
     )
+    if remaining_budget is not None:
+        result["resource_recovery"] = dict(remaining_budget)
     write_artifact(directory / "result.json", result)
     return binding(directory / "result.json")
 
@@ -584,6 +598,20 @@ def one_row(schedule, row, output, identity):
     return saved
 
 
+def raise_on_software_failure(saved):
+    """Stop after persisting a failed row; expected scientific limits are outcomes."""
+    from exact.experiments.science_health import software_failure
+
+    candidates = [(saved.get("status"), saved.get("detail", ""))]
+    if saved.get("result"):
+        payload = bound(saved["result"])
+        candidates.extend([(payload.get("status"), payload.get("detail", "")),
+                           (payload.get("semantic_status"), payload.get("semantic_detail", ""))])
+    for status, detail in candidates:
+        if software_failure(status, detail):
+            raise RuntimeError("Scientific worker software failure: " + (detail or str(status)))
+
+
 def run(schedule_path, output, start, stop):
     from exact.repair.study import runtime_manifest
 
@@ -614,6 +642,7 @@ def run(schedule_path, output, start, stop):
                 dict(stage="evaluation", slice=[start, stop], recorded=len(rows), row=row["id"]),
             )
             saved = one_row(schedule, row, output, identity)
+            raise_on_software_failure(saved)
             rows.append(
                 dict(
                     **binding(output / "rows" / (row["id"] + ".json")),
