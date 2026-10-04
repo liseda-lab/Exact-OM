@@ -159,26 +159,35 @@ def requirement_review(matrices, qualifications, source):
                     raise ValueError('Qualification evidence changed')
             for test in ET.parse(group['junit']['path']).getroot().iter('testcase'):
                 name = test.get('classname', '') + '::' + test.get('name', '')
-                observed[name] = not any(test.find(tag) is not None for tag in ('failure', 'error', 'skipped'))
+                passed = not any(test.find(tag) is not None for tag in ('failure', 'error', 'skipped'))
+                observed[name] = observed.get(name, True) and passed
         evidence.append((item, batch, observed))
     rows = []
     for matrix_ref in matrices:
         matrix = verify_binding(matrix_ref)
         for requirement in matrix['requirements']:
-            requested = requirement.get('tests', requirement.get('acceptance_tests', []))
+            requested = list(requirement.get('tests', requirement.get('acceptance_tests', [])))
             requested += [test for case in requirement.get('acceptance_cases', []) for test in case['tests']]
             checks = []
             for test in requested:
-                filename, name = test.split('::', 1)
-                prefix = filename[:-3].replace('/', '.') + '::' + name
+                filename, separator, name = test.partition('::')
+                module = filename[:-3].replace('/', '.')
+                prefix = module + '::' + name
                 sources = []
                 for item, batch, observed in evidence:
                     code = Path(batch['code'])
                     files = [*requirement['implementation'], filename]
                     compatibility = {file: (code.joinpath(file).exists() and
                         sha(code/file) == sha(source/file)) for file in files}
-                    matches = {key: value for key, value in observed.items()
-                               if key == prefix or key.startswith(prefix + '[')}
+                    # A file selector requests every observed case in that module,
+                    # including class methods. Keep module boundaries exact and
+                    # retain failed/skipped cases and parameterized test variants.
+                    if separator:
+                        matches = {key: value for key, value in observed.items()
+                                   if key == prefix or key.startswith(prefix + '[')}
+                    else:
+                        matches = {key: value for key, value in observed.items()
+                                   if key.startswith(module + '::') or key.startswith(module + '.')}
                     sources.append(dict(run_id=item['run_id'], report=item['report'],
                         source_compatibility=compatibility, observed=matches,
                         passed=bool(matches) and all(matches.values()) and all(compatibility.values())))

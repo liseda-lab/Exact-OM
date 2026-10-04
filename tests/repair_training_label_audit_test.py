@@ -102,3 +102,57 @@ def test_passing_junit_cannot_qualify_changed_implementation(tmp_path):
     assert result['source_compatible'] == 0
     (source/'impl.py').write_text('old implementation')
     assert requirement_review([binding(matrix)], [(item, report, dict(code=str(frozen)))], source)['source_compatible'] == 1
+
+
+@pytest.mark.parametrize('outcome', ['', '<failure/>', '<error/>', '<skipped/>'])
+@pytest.mark.parametrize('selector', ['tests/case.py', 'tests/case.py::test_example'])
+def test_requirement_selectors_keep_all_parameterized_outcomes(tmp_path, outcome, selector):
+    from tools.repair.training_audit import requirement_review
+    source = tmp_path/'source'
+    (source/'tests').mkdir(parents=True)
+    (source/'tests/case.py').write_text('source-bound tests')
+    (source/'impl.py').write_text('source-bound implementation')
+    matrix = tmp_path/'matrix.json'
+    write_artifact(matrix, dict(requirements=[dict(requirement='fixture', implementation=['impl.py'],
+                                                  tests=[selector])]))
+    xml, log = tmp_path/'junit.xml', tmp_path/'log.txt'
+    xml.write_text('<testsuites><testsuite>'
+                  '<testcase classname="tests.case" name="test_example[0]" />'
+                  '<testcase classname="tests.case" name="test_example[1]">' + outcome + '</testcase>'
+                  '<testcase classname="tests.case_extra" name="test_example"><failure/></testcase>'
+                  '</testsuite></testsuites>')
+    log.write_text('qualification log')
+    report = dict(schema='exact-repair/native-qualification/v1',
+                  groups=[dict(junit=binding(xml), log=binding(log))])
+    evidence = [(dict(run_id='qualified-source', report=binding(xml)), report, dict(code=str(source)))]
+    result = requirement_review([binding(matrix)], evidence, source)
+    assert result['required'] == 1 and result['source_compatible'] == int(not outcome)
+    observed = result['requirements'][0]['tests'][0]['evidence'][0]['observed']
+    assert set(observed) == {'tests.case::test_example[0]', 'tests.case::test_example[1]'}
+
+
+@pytest.mark.parametrize('mode', ['class', 'absent', 'changed_test', 'changed_impl', 'duplicate_failure'])
+def test_file_requirement_needs_matching_source_and_unambiguous_passes(tmp_path, mode):
+    from tools.repair.training_audit import requirement_review
+    source, frozen = tmp_path/'source', tmp_path/'frozen'
+    for root in (source, frozen):
+        (root/'tests').mkdir(parents=True)
+        (root/'tests/case.py').write_text('tests')
+        (root/'impl.py').write_text('implementation')
+    if mode == 'changed_test': (source/'tests/case.py').write_text('new tests')
+    if mode == 'changed_impl': (source/'impl.py').write_text('new implementation')
+    matrix = tmp_path/'matrix.json'
+    write_artifact(matrix, dict(requirements=[dict(requirement='fixture', implementation=['impl.py'],
+                                                  acceptance_tests=['tests/case.py'])]))
+    classname = 'tests.case_extra' if mode == 'absent' else 'tests.case.TestExample'
+    case = '<testcase classname="' + classname + '" name="test_example"'
+    contents = case + ' />'
+    if mode == 'duplicate_failure': contents = case + '><failure/></testcase>' + contents
+    xml, log = tmp_path/'junit.xml', tmp_path/'log.txt'
+    xml.write_text('<testsuites><testsuite>' + contents + '</testsuite></testsuites>')
+    log.write_text('qualification log')
+    report = dict(schema='exact-repair/native-qualification/v1',
+                  groups=[dict(junit=binding(xml), log=binding(log))])
+    evidence = [(dict(run_id='qualified-source', report=binding(xml)), report, dict(code=str(frozen)))]
+    result = requirement_review([binding(matrix)], evidence, source)
+    assert result['source_compatible'] == int(mode == 'class')
