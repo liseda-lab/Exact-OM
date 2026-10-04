@@ -65,7 +65,7 @@
       ],
       "backend_status": "backend_verified",
       "joint_verified": false,
-      "frontend_status": "reopened",
+      "frontend_status": "frontend_verified",
       "blocked_by": "J10 manual screen-reader and keyboard audit not performed",
       "reopened_by": [
         "R12"
@@ -216,20 +216,21 @@
         "owner": "frontend",
         "reopens": "R03",
         "requirement": "F21",
-        "status": "open",
+        "status": "fixed_and_verified",
         "summary": "Tutorial and v1 card parents lost navigation: the frozen-resource adapter supplied untyped parents"
       },
       "R13": {
         "priority": 3,
         "owner": "frontend",
         "evidence_for": "R02",
-        "status": "open",
+        "status": "fixed_and_verified",
         "summary": "A recovery test read recorded traffic before the case_ready acknowledgement was recorded"
       }
     },
     "followup_evidence": "../../../docs/verification/explanation-integration-frontend-followup-receipt.json",
     "second_review": "../evidence/frontend-integration-review-20261004.md",
     "second_followup_evidence": "../../../docs/verification/explanation-integration-frontend-followup-2-receipt.json",
-    "third_review": "../evidence/frontend-integration-review-20261004-3.md"
+    "third_review": "../evidence/frontend-integration-review-20261004-3.md",
+    "third_followup_evidence": "../../../docs/verification/explanation-integration-frontend-followup-3-receipt.json"
   }
 }

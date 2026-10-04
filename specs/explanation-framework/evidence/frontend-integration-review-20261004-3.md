@@ -15,4 +15,4 @@ which already carried typed edges, never through the card's parent buttons. R11'
 exercised only the scoped API adapter.
 
 The reviewer's diagnostics are starting points; the maintained regressions are listed in the
-third follow-up handoff.
+[third follow-up](../../../docs/verification/explanation-integration-frontend-followup-3.md).

@@ -1,5 +1,9 @@
 # Study integration frontend follow-up 2: R10–R11 — 2026-10-04
 
+> **Follow-up.** A third review found that the R11 correction disabled card parents built by the
+> frozen-resource adapter, used by the tutorial and v1 publications (R12), and that one recovery
+> test was racy (R13). Both are fixed in the [third follow-up](explanation-integration-frontend-followup-3.md).
+
 **Implementation complete and verified on the synthetic fixture; not a release-readiness claim.**
 A second review of `ad9461c` reproduced two further frontend defects that reopened R02 and R01.
 Both are fixed, and their regressions pass against the real study service and the main app.

@@ -29,8 +29,10 @@ position, analysis-3 exports) is in the
 and the [joint acceptance record](../docs/verification/explanation-integration-acceptance.md);
 post-implementation findings R06–R09 (fact paging, study full context, retry, component-aware
 readiness) are in the [follow-up handoff](../docs/verification/explanation-integration-frontend-followup.md),
-and R10–R11 (attempt-bound access checks, typed navigation) in the
-[second follow-up](../docs/verification/explanation-integration-frontend-followup-2.md).
+R10–R11 (attempt-bound access checks, typed navigation) in the
+[second follow-up](../docs/verification/explanation-integration-frontend-followup-2.md), and
+R12–R13 (typed card parents in the tutorial and v1 publications, a race in a recovery test) in the
+[third follow-up](../docs/verification/explanation-integration-frontend-followup-3.md).
 
 exact-study/2.0 sessions run only against a study service that advertises
 `integration_contract: "study-integration/1"`; otherwise the page says the service needs an

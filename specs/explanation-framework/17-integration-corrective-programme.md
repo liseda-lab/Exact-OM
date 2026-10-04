@@ -2,9 +2,10 @@
 
 **2026-10-04. Status: R06–R11 (post-implementation findings) fixed and verified at `eb4f955`, so
 R01 and R02 are joint-verified again ([second follow-up](../../docs/verification/explanation-integration-frontend-followup-2.md)).
-A third review of `e36cfa5` found R12 (tutorial and v1 card parents no longer navigate; reopens
-R03's frontend status) and R13 (racy readiness test evidence); both are open. R04 joint-verified;
-R03 blocked on the manual J10 audit. Reviewed baseline: `2d9715b`.**
+A third review of `e36cfa5` found R12 (tutorial and v1 card parents no longer navigate; reopened
+R03's frontend status) and R13 (racy readiness test evidence); both are fixed and verified at
+`1808ed0` ([third follow-up](../../docs/verification/explanation-integration-frontend-followup-3.md)).
+R04 joint-verified; R03 blocked only on the manual J10 audit. Reviewed baseline: `2d9715b`.**
 The [backend handoff](../../docs/verification/explanation-integration-backend-handoff.md)
 records implementation `96b76fe`; the [frontend handoff](../../docs/verification/explanation-integration-frontend-handoff.md)
 records `6895bc6`; the [joint acceptance record](../../docs/verification/explanation-integration-acceptance.md)
@@ -84,8 +85,8 @@ CSP, P3) was found and fixed during S3.
 The [second review](evidence/frontend-integration-review-20261004.md) reproduced R10 and R11 at
 `ad9461c`. They reopened R02 and R01 until F20–F21 were verified, which happened at `eb4f955`.
 The [third review](evidence/frontend-integration-review-20261004-3.md) found R12 and R13 at
-`e36cfa5`. R12 reopens R03's frontend status (R03 also stays blocked on J10). R13 weakens R02's
-evidence without a product defect.
+`e36cfa5`. R12 reopened R03's frontend status (R03 also stays blocked on J10). R13 weakened R02's
+evidence without a product defect. Both were fixed and verified at `1808ed0`.
 
 The existing browser test's “hierarchy region is visible” assertion misses R01; an action
 after changing lesson hides R03. Test strengthening is part of each correction, not a fifth

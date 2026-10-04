@@ -4,7 +4,8 @@
 ([follow-up](../../docs/verification/explanation-integration-frontend-followup.md)); F20–F21
 (R10–R11) in `d8b19a0`/`e754e77`, verified at `eb4f955`
 ([second follow-up](../../docs/verification/explanation-integration-frontend-followup-2.md)).
-F21 is reopened for the frozen-resource adapter (R12, [third review](evidence/frontend-integration-review-20261004-3.md)).
+F21's frozen-resource adapter clause (R12, [third review](evidence/frontend-integration-review-20261004-3.md))
+is fixed in `a0479ef` and verified at `1808ed0` ([third follow-up](../../docs/verification/explanation-integration-frontend-followup-3.md)).
 R01, R02 and R04 are joint-verified on the synthetic fixture; R03 awaits the manual
 screen-reader/keyboard audit in J10.** See the
 [frontend handoff](../../docs/verification/explanation-integration-frontend-handoff.md) and the
