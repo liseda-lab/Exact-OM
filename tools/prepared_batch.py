@@ -128,6 +128,9 @@ def latest_account(registry):
     for _, _, previous in choices:
         if state["limits"] != previous["limits"]:
             raise ValueError("Divergent cumulative accounting limits")
+        for identity, policy in previous.get("spending_policies", {}).items():
+            if state.get("spending_policies", {}).get(identity) != policy:
+                raise ValueError("Lost cumulative hosted spending amendment")
         for allocation, observation in previous.get("allocations", {}).items():
             current = state.get("allocations", {}).get(allocation, {})
             if (
@@ -377,9 +380,16 @@ def copy_account(source, state, destination, *, request_ledger=None):
 
 
 def hosted_caps(state, ledger):
+    from exact.utils.hosted_spending import (
+        load_spending_policy,
+        spending_policy_environment,
+    )
     from tools.qualify_cached_family import usage
 
     actual = usage(ledger)
+    policy = load_spending_policy()
+    if policy:
+        return spending_policy_environment(policy)
     limits = state["limits"]
     result = {}
     for plural, wire in (("requests", "attempts"), ("tokens", "billable_tokens")):
@@ -536,6 +546,7 @@ def run_recipe(path):
 
     from exact.core.entities.configs.yaml_io import dump_yaml_document
     from exact.experiments.campaign import campaign_plan
+    from exact.utils.hosted_spending import load_spending_policy, record_spending_policy
     from tools.experiment_resources import guarded_execute
     from tools.resume_e19_once import check_owner
 
@@ -572,6 +583,9 @@ def run_recipe(path):
             write(root / ("failed-" + previous["step_id"] + ".json"), previous, immutable=True)
             previous_completion.unlink()
         os.environ.update(read(verified(recipe["environment"])))
+        spending_policy = load_spending_policy()
+        if spending_policy:
+            record_spending_policy(root, spending_policy)
         os.environ["EXACT_EVIDENCE_PREFETCH"] = "0"
         if recipe.get("diagnostic"):
             from tools.prepared_diagnostic import run_prepared_diagnostic
@@ -614,6 +628,7 @@ def run_recipe(path):
                     "recipe": binding(path),
                     "source_commit": identity,
                     "parent_budget": binding(parent),
+                    **({"spending_policy": spending_policy} if spending_policy else {}),
                 },
                 immutable=True,
             )

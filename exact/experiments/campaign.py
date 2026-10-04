@@ -31,6 +31,7 @@ from exact.experiments.schema import (
     SelectionConfig,
     _identifier,
 )
+from exact.utils.hosted_spending import load_spending_policy, record_spending_policy
 from exact.utils.provenance import sha256_file, sha256_path
 
 ReadinessStatus = Literal[
@@ -760,6 +761,7 @@ def campaign_plan(path: Path, *, stage: str, verify_inputs: bool = True) -> dict
     if stage not in {"screen", "confirm"}:
         raise ValueError("public stages are screen and confirm")
     lock, blueprint = load_campaign(path)
+    spending_policy = load_spending_policy()
     root = path.resolve().parent
     verified: set[tuple[Path, str]] = set()
 
@@ -884,12 +886,14 @@ def campaign_plan(path: Path, *, stage: str, verify_inputs: bool = True) -> dict
         if amount > envelopes[group] * 3600:
             time_warnings.append(f"{group} forecast exceeds historical {envelopes[group]} hours")
     if (
-        requests + (lock.final_requests_reserved if stage == "screen" else 0)
+        not spending_policy
+        and requests + (lock.final_requests_reserved if stage == "screen" else 0)
         > limits["llm_request_planning_cap"]
     ):
         blockers.append("request forecast consumes protected final allocation")
     if (
-        tokens + (lock.final_tokens_reserved if stage == "screen" else 0)
+        not spending_policy
+        and tokens + (lock.final_tokens_reserved if stage == "screen" else 0)
         > limits["llm_token_planning_cap"]
     ):
         blockers.append("token forecast consumes protected final allocation")
@@ -904,6 +908,7 @@ def campaign_plan(path: Path, *, stage: str, verify_inputs: bool = True) -> dict
         "budget_errors": blockers,
         "time_warnings": sorted(set(time_warnings)),
         "time_policy": "advisory_2026-09-29",
+        "spending_policy": spending_policy,
         "forecast_hours": {key: value / 3600 for key, value in seconds.items()},
         "envelopes_hours": envelopes,
         "requests": requests,
@@ -1346,12 +1351,15 @@ def execute_campaign(
             "final_requests_reserved": lock.final_requests_reserved,
             "final_tokens_reserved": lock.final_tokens_reserved,
         },
+        "spending_policy": plan["spending_policy"],
         "allowed_steps": sorted(ready),
         "profile": lock.profile,
         "cpu_workers": min(jobs, lock.max_cpu_workers),
         "openrouter_concurrency": lock.openrouter_concurrency,
     }
     suite = replace(suite, campaign=metadata)
+    if metadata["spending_policy"]:
+        record_spending_policy(Path(metadata["root"]), metadata["spending_policy"])
     stop_context = (
         nullcontext()
         if reuse_plan_only
@@ -1566,6 +1574,7 @@ def run_comparison(cells: Any, suite: Any, source: Any, **kwargs: Any) -> list[d
         tokens=estimate.tokens if estimate else 0,
         projected_usd=estimate.projected_usd if estimate else 0,
         forecast_known=estimate is not None,
+        hosted_usage_baseline=before,
     )
     start, status = time.time(), "failed"
     try:

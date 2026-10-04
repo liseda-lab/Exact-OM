@@ -18,6 +18,10 @@ from exact.experiments.recovery import (
     finish_attempt,
     stage_identity,
 )
+from exact.utils.hosted_spending import (
+    load_spending_policy,
+    spending_policy_environment,
+)
 from exact.utils.provenance import sha256_file, sha256_path
 
 
@@ -352,6 +356,9 @@ class CellRecovery:
             for unit in ("request", "token")
             if f"{unit}s_cap" in limits
         }
+        policy = load_spending_policy(self.metadata.get("spending_policy"))
+        if policy:
+            budget = spending_policy_environment(policy)
         return {
             **budget,
             **{

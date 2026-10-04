@@ -11,6 +11,8 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Iterator, Mapping, cast
 
+from exact.utils.hosted_spending import load_spending_policy
+
 
 def interval_seconds(intervals: list[list[float]]) -> float:
     """Measure the union of overlapping node allocation intervals."""
@@ -34,19 +36,26 @@ class BudgetLedger:
     def __init__(self, path: Path, limits: Mapping[str, Any]):
         self.path = Path(path)
         self.limits = dict(limits)
+        self.spending_policy = load_spending_policy()
 
     @contextmanager
     def _transaction(self) -> Iterator[dict[str, Any]]:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self.path.with_suffix(".lock").open("a") as lock:
             fcntl.flock(lock, fcntl.LOCK_EX)
-            state = (
+            state: dict[str, Any] = (
                 json.loads(self.path.read_text())
                 if self.path.exists()
                 else {"schema_version": 2, "limits": self.limits, "work": {}, "intervals": []}
             )
             if state["limits"] != self.limits:
                 raise ValueError("budget limits changed without a recorded amendment")
+            if self.spending_policy:
+                policies = state.setdefault("spending_policies", {})
+                identity = self.spending_policy["sha256"]
+                if identity in policies and policies[identity] != self.spending_policy:
+                    raise ValueError("Recorded hosted spending amendment changed")
+                policies[identity] = self.spending_policy
             yield state
             descriptor, name = tempfile.mkstemp(prefix=".budget-", dir=self.path.parent)
             try:
@@ -68,6 +77,7 @@ class BudgetLedger:
         tokens: int = 0,
         projected_usd: float = 0,
         forecast_known: bool = True,
+        hosted_usage_baseline: Mapping[str, float] | None = None,
     ) -> None:
         """Record a forecast before scheduling; time overruns are warnings only."""
         if (
@@ -79,6 +89,10 @@ class BudgetLedger:
             or projected_usd < 0
         ):
             raise ValueError("invalid work estimate")
+        if hosted_usage_baseline is not None and any(
+            not math.isfinite(value) or value < 0 for value in hosted_usage_baseline.values()
+        ):
+            raise ValueError("invalid hosted usage baseline")
         with self._transaction() as state:
             if work_id in state["work"]:
                 raise ValueError("work ID already admitted; a retry needs a new attempt ID")
@@ -109,7 +123,10 @@ class BudgetLedger:
                 spent = sum(
                     item[field] for item in items if group == "final" or item["group"] != "final"
                 )
-                if spent + amount + reserve > self.limits[f"{field}_cap"]:
+                if (
+                    not self.spending_policy
+                    and spent + amount + reserve > self.limits[f"{field}_cap"]
+                ):
                     raise ValueError(f"deferred_budget: {field} would consume protected final work")
             state["work"][work_id] = {
                 "group": group,
@@ -123,6 +140,10 @@ class BudgetLedger:
                 "forecast_known": forecast_known,
                 "time_warnings": warnings,
             }
+            if self.spending_policy:
+                state["work"][work_id]["spending_policy_sha256"] = self.spending_policy["sha256"]
+            if hosted_usage_baseline is not None:
+                state["work"][work_id]["hosted_usage_baseline"] = dict(hosted_usage_baseline)
             state["time_policy"] = "advisory_2026-09-29"
 
     def finish(

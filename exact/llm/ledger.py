@@ -17,6 +17,8 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Iterator, Mapping
 
+from exact.utils.hosted_spending import load_spending_policy
+
 
 def request_identity(payload: Mapping[str, Any]) -> tuple[str, str]:
     """Canonical identity contains exact public request semantics, never credentials."""
@@ -59,6 +61,9 @@ class RequestLedger:
                     authorization_id TEXT NOT NULL, consumed_by INTEGER,
                     PRIMARY KEY(request_id, number)
                 )""",
+                """CREATE TABLE IF NOT EXISTS spending_policies (
+                    sha256 TEXT PRIMARY KEY, record TEXT NOT NULL
+                )""",
                 # The ledger is copied between frozen workers, including older
                 # clients that do not know this table. Enforce consumed approvals
                 # in SQLite too, so rejected retries cannot escape their limit.
@@ -80,6 +85,8 @@ class RequestLedger:
             if "elapsed_seconds" not in columns:
                 # Prior attempts have no measured duration; never infer it from timestamps.
                 db.execute("ALTER TABLE attempts ADD COLUMN elapsed_seconds REAL")
+            if "spending_policy_sha256" not in columns:
+                db.execute("ALTER TABLE attempts ADD COLUMN spending_policy_sha256 TEXT")
 
     @contextmanager
     def _transaction(self) -> Iterator[sqlite3.Connection]:
@@ -146,6 +153,7 @@ class RequestLedger:
 
     def sent(self, key: str, *, retry_unknown: bool = False) -> int:
         """Claim one wire attempt; duplicate active writers and unapproved retries fail."""
+        policy = load_spending_policy()
         with self._transaction() as db:
             if db.execute("SELECT 1 FROM requests WHERE request_id=?", (key,)).fetchone() is None:
                 raise ValueError("Request was not planned")
@@ -176,7 +184,7 @@ class RequestLedger:
             number = int(last["number"]) + 1 if last else 1
             request_cap = os.getenv("EXACT_OPENROUTER_REQUEST_CAP")
             token_cap = os.getenv("EXACT_OPENROUTER_TOKEN_CAP")
-            if request_cap or token_cap:
+            if request_cap or token_cap or policy:
                 rows = db.execute(
                     "SELECT a.usage,r.tokens FROM attempts a LEFT JOIN reservations r USING(request_id,number)"
                 ).fetchall()
@@ -188,7 +196,7 @@ class RequestLedger:
                     ).fetchone()[0]
                 )
                 payload = identity.get("payload", {})
-                if not payload.get("max_tokens"):
+                if type(payload.get("max_tokens")) is not int or payload["max_tokens"] <= 0:
                     raise ValueError("Budgeted hosted requests need a finite max_tokens bound")
                 # UTF-8 bytes bound text token counts conservatively; include framing overhead.
                 reserved = (
@@ -199,7 +207,10 @@ class RequestLedger:
                 used = 0
                 for row in rows:
                     usage = json.loads(row["usage"] or "{}")
-                    if "prompt_tokens" in usage and "completion_tokens" in usage:
+                    if all(
+                        usage.get(field) is not None
+                        for field in ("prompt_tokens", "completion_tokens")
+                    ):
                         used += int(usage["prompt_tokens"]) + int(usage["completion_tokens"])
                     elif row["tokens"] is not None:
                         used += int(row["tokens"])
@@ -208,9 +219,28 @@ class RequestLedger:
                 if token_cap and used + reserved > int(token_cap):
                     raise ValueError("OpenRouter token budget exhausted before transmission")
                 db.execute("INSERT INTO reservations VALUES (?,?,?)", (key, number, reserved))
+            if policy:
+                record = json.dumps(policy, sort_keys=True, allow_nan=False)
+                retained = db.execute(
+                    "SELECT record FROM spending_policies WHERE sha256=?", (policy["sha256"],)
+                ).fetchone()
+                if retained is not None and retained["record"] != record:
+                    raise ValueError("Retained hosted spending policy receipt changed")
+                db.execute(
+                    "INSERT OR IGNORE INTO spending_policies VALUES (?,?)",
+                    (policy["sha256"], record),
+                )
             db.execute(
-                "INSERT INTO attempts(request_id,number,state,pid,host) VALUES (?,?,?,?,?)",
-                (key, number, "sent", os.getpid(), socket.gethostname()),
+                "INSERT INTO attempts(request_id,number,state,pid,host,spending_policy_sha256) "
+                "VALUES (?,?,?,?,?,?)",
+                (
+                    key,
+                    number,
+                    "sent",
+                    os.getpid(),
+                    socket.gethostname(),
+                    policy["sha256"] if policy else None,
+                ),
             )
             if grant is not None:
                 db.execute(
