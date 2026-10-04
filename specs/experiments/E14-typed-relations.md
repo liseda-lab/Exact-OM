@@ -98,6 +98,16 @@ NCIT admission or a bridge result. Evidence is in
 Another 41 adjacent tests pass. Tiny real native admission and bridge fixtures fail at a
 one-byte index limit and succeed at an explicit 128 MiB allowance with strict reasoning.
 
+The corrective upstream branch `fix/native-compilation-resource-limits` is pushed at
+`e074de753f49364a4ce0185ede8b5aeeaa0fb79d`. Its native/compatibility checks and a tiny Exact
+adapter/bridge fixture using the combined intended allowances pass. GitHub rejected PR
+creation with an integration-permission 403; the owner must open/review the comparison and
+publish a corrected version after CI. Hosted CI and Distribution matrix started on push.
+The supervisor registry records this publication prerequisite; it retains the old comparison
+descriptor as ineligible and preserves the completed main experiment and failed history.
+See the local `HANDOFF.md` and `integration.json` in the evidence directory for the branch,
+verification report, CI links, exact owner action and next admission/queue steps.
+
 Durable boundaries: **Typed train features/heads, bridge queries, typed predictions.**
 All changed inputs/semantics invalidate their consuming descendants; preserve valid upstream
 artifacts. Store completed source/request/fold IDs and attempt lineage. Tests must demonstrate
