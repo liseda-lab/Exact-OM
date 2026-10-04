@@ -4,6 +4,7 @@
 ([follow-up](../../docs/verification/explanation-integration-frontend-followup.md)); F20–F21
 (R10–R11) in `d8b19a0`/`e754e77`, verified at `eb4f955`
 ([second follow-up](../../docs/verification/explanation-integration-frontend-followup-2.md)).
+F21 is reopened for the frozen-resource adapter (R12, [third review](evidence/frontend-integration-review-20261004-3.md)).
 R01, R02 and R04 are joint-verified on the synthetic fixture; R03 awaits the manual
 screen-reader/keyboard audit in J10.** See the
 [frontend handoff](../../docs/verification/explanation-integration-frontend-handoff.md) and the
@@ -279,7 +280,20 @@ Every navigation callback receives the complete typed entity the backend supplie
 
 A term without a recorded type, such as a bare IRI value, is shown but not navigable.
 
+The frozen-resource adapter (the synthetic tutorial and v1 study publications) supplies the
+same typed parent for every card parent (R12): the recorded hierarchy edge for that fact, else
+the type the axiom's own AST node records. It keeps the parent's ontology, the fact's identity
+and its provenance. It never defaults a kind; a parent whose type is unrecorded or
+contradictory stays shown but not navigable.
+
 Tests cover object and data properties with more than one page of named superproperties in
 both products, and keep class coverage. A test chooses a later-page parent and checks its
 ontology, IRI and kind, that its context loads, and that the study ranking and draft are kept.
+Tests also open the tutorial's card parents (checking the lesson, the inspected candidate and
+progress are kept, and that the service accepts a card parent as a typed lesson action) and a
+v1 publication's card parents, and show that an untyped parent stays non-navigable.
+
+Assertions about recorded traffic wait, with a bound, for the response they depend on. The
+traffic recorder adds a request only after it finishes, which can follow the UI's recovery
+(R13).
 
