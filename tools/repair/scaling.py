@@ -255,6 +255,8 @@ def evaluate(schedule, row, output, cache_source=None):
                     memory_mb=row['memory_mb'], cpu_seconds=row['cpu_seconds'])
                 ensure_cleanup(labeled)
                 result['semantic_status'] = labeled.status
+                result['semantic_detail'] = labeled.detail
+                result['semantic_resources'] = dict(labeled.resource_usage)
                 if labeled.status=='complete':
                     label = labeled.value
                     write_artifact(output/'selected-label.json', json.loads(canonical_json(label)))
@@ -277,7 +279,26 @@ def validate_payloads(saved):
             raise ValueError('Scaling payload row identity differs')
 
 
-def run(schedule_path, output, start, stop):
+def check_software_errors(saved):
+    """Fail visibly after saving evidence; finite scientific timeouts remain rows."""
+    from exact.experiments.science_health import software_failure
+
+    outcomes = [(saved['status'], saved.get('detail', ''))]
+    if saved.get('result'):
+        result = bound(saved['result'])
+        outcomes.extend((result.get(stage + '_status'), result.get(stage + '_detail', ''))
+                        for stage in ('generation', 'selection', 'semantic'))
+        if result.get('pool'):
+            for obj in bound(result['pool'])['reports']:
+                error = obj.get('error', '')
+                if error and not error.startswith('TimeoutError:'):
+                    outcomes.append(('error', error))
+    for status, detail in outcomes:
+        if software_failure(status, detail):
+            raise RuntimeError('Scaling software failure: ' + str(detail))
+
+
+def run(schedule_path, output, start, stop, *, strict_errors=False):
     from exact.repair.workers import bounded_call
     from exact.repair.study import runtime_manifest
 
@@ -326,6 +347,8 @@ def run(schedule_path, output, start, stop):
             validate_payloads(saved)
             if guard.exists() or not saved['cleanup_complete']:
                 raise RuntimeError('Saved row requires cleanup reconciliation')
+            if strict_errors:
+                check_software_errors(saved)
             rows.append(dict(binding(path),status=saved['status']))
             write_artifact(output/'progress.json',dict(recorded=len(rows),scheduled=stop-start,last_row=key))
         return checkpoint(output/'report.json',identity,schema='exact-repair/scaling-shard/v1',

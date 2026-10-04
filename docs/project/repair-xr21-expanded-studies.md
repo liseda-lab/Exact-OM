@@ -142,3 +142,15 @@ their evaluation rows in the denominator. Native witness completion, generation
 adapter qualification, actual evaluation and the final resource report remain
 separate stages. No held-out, G0-G2, strongest-symbolic or learning claim follows
 from this preparation.
+
+The incidence evaluation reuses the frozen 12 cases and all 72 method/cache rows.
+Generation qualification first checks every observed input and then runs 36
+separately charged probes (one per case and method), each with the existing
+60-second generation allowance, 600 CPU seconds and 8192 MiB. Its 2700-second
+operational slice covers these probes and input checks. Probe caches are isolated
+and never reused by evaluation. Partial or timed-out generation is reported as
+coverage; successful compatibility qualification does not assert complete pools.
+Unexpected software errors retain their receipts and stop dependent execution.
+Six evaluation slices each retain 12 rows and their complete cold/warm pairs,
+with 4200-second operational slices and unchanged 300-wall/600-CPU/8192-MiB row
+budgets. The final receipt audit and resource report remain separate obligations.
