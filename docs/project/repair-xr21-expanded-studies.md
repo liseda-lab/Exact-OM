@@ -217,6 +217,15 @@ semantic-control review, diagnostic receipt review and the final failure-inclusi
 parent-group report remain obligations. No diagnostic result replaces the
 primary generated-pool evidence or establishes research gates.
 
+The seventeenth diagnostic slice stopped after twelve finished rows and one
+nested cleanup error. A separately frozen recovery adapter validates the original
+nonce, command, row/payload receipts, runtime and departed Slurm ownership. It
+retains the interrupted row as unknown without replay and continues only the
+three untouched rows under the original scientific export and per-case budgets.
+The original guard, partial artifacts, failed-attempt costs and all sixteen rows
+remain represented. Its monitoring projection references the same row receipts;
+this recovery does not establish semantic regret or primary generated quality.
+
 ## Final bounded scaling receipt report
 
 The final resource report preserves three separate denominators: 240 primary
