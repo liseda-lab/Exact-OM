@@ -310,7 +310,7 @@ def ensure_cleanup(outcome):
         )
 
 
-def evaluate_row(schedule, row, directory, *, remaining_budget=None):
+def evaluate_row(schedule, row, directory, *, remaining_budget=None, inventory_only=False):
     """Full comparison call including generation, solving and evaluator-only queries."""
     from exact.repair.pipeline import bounded_freeze_checkpoint, repair_neural_round
     from exact.repair.workers import bounded_call
@@ -347,7 +347,15 @@ def evaluate_row(schedule, row, directory, *, remaining_budget=None):
             memory_mb=resources["case_rss_mb"],
         ),
     )
-    if arm["kind"] == "learned":
+    if inventory_only:
+        from tools.repair.common_inventory import freeze_inventory
+
+        generated = bounded_call(
+            freeze_inventory, problem, arm, protocol, str(directory),
+            timeout=resources["generation_seconds"],
+            memory_mb=row["memory_mb"], cpu_seconds=row["cpu_seconds"],
+        )
+    elif arm["kind"] == "learned":
         generated = bounded_freeze_checkpoint(
             problem,
             arm["model"]["path"],
@@ -462,6 +470,11 @@ def evaluate_row(schedule, row, directory, *, remaining_budget=None):
             if repair.assignment is not None and repair.logical_status == "VERIFIED_FEASIBLE":
                 if repair.verification is None or not repair.verification.authorizes:
                     raise ValueError("Missing authorizing verification")
+                if inventory_only:
+                    result["selected_objective_utility"] = (
+                        frozen.objective.score(repair.assignment) / frozen.objective.scale
+                    )
+                    result["selected_assignment"] = list(repair.assignment)
                 case = case_from_dict(bound(item["evaluator"]))
                 weights = protocol["teacher"]["family_weights"]
                 target = SemanticTargetSpec(
@@ -513,6 +526,21 @@ def evaluate_row(schedule, row, directory, *, remaining_budget=None):
     )
     if remaining_budget is not None:
         result["resource_recovery"] = dict(remaining_budget)
+    if inventory_only:
+        result["inventory_scoring_resources"] = result.pop("generation_resources")
+        if result["status"].startswith("generation_"):
+            result["status"] = result["status"].replace("generation_", "scoring_", 1)
+        result.update(
+            study_kind="common_inventory_diagnostic",
+            common_inventory_regret=None,
+            regret_status="unavailable_no_complete_external_teacher",
+            value_error_scope="selected verified assignment only; semantic query scope unqualified",
+            selected_utility_error=(
+                result["selected_objective_utility"] - result["selected_utility"]
+                if arm["kind"] == "learned" and result.get("selected_utility") is not None
+                else None
+            ),
+        )
     write_artifact(directory / "result.json", result)
     return binding(directory / "result.json")
 
@@ -527,7 +555,7 @@ def validate_payloads(saved):
             raise ValueError("Evaluation payload row identity differs")
 
 
-def one_row(schedule, row, output, identity):
+def one_row(schedule, row, output, identity, *, evaluator=None):
     from exact.repair.workers import bounded_call
 
     key = row["id"]
@@ -563,7 +591,7 @@ def one_row(schedule, row, output, identity):
             checkpoint(guard, row_identity, row=row, started_epoch=time.time())
             start = time.monotonic()
             outcome = bounded_call(
-                evaluate_row,
+                evaluator or evaluate_row,
                 schedule,
                 row,
                 str(payload),

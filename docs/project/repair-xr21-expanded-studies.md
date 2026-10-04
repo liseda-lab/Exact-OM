@@ -187,3 +187,32 @@ Common-inventory value/selection diagnostics, intended-parent/query qualificatio
 required semantic-control review and the final failure-inclusive parent-group
 report remain registered obligations after this audit. No checkpoint, scientific
 case budget or test-driven setting is changed by the audit.
+
+## Fresh-evaluation common-inventory diagnostics
+
+The separate diagnostic schedule retains the same 64 cases, 32 parent groups,
+six frozen pilot models and three controls (576 rows). Each row uses the original
+observable supplied candidates, without generation or fitting. The deletion
+control is an explicit keep/delete language ablation. Learned arms use the
+original effective graph/retrieval/pair settings and frozen value/risk heads;
+schema incompatibilities remain unavailable. The retained-axiom symbolic
+heuristic retains its original limitation and cannot qualify strongest-symbolic
+comparisons.
+
+All rows retain 300 wall seconds, 600 CPU seconds and 8192 MiB, with scoring
+within the existing 60-second preparation allowance. Native selection,
+verification and evaluator-only post-selection queries share the remaining row
+budget. Sixteen rows occupy each 5400-second operational slice, using the
+existing development resource profile and per-row allowances. Rows checkpoint
+individually; an interrupted ownership guard requires explicit budget and
+descendant reconciliation before any continuation.
+
+The saved coefficients and selected quantized utility support a selected-only
+value diagnostic against independently measured utility when that label is
+usable. This is not whole-inventory calibration. Exact semantic regret remains
+unavailable without a complete external teacher; neither learned-objective
+optimality nor partial labels substitute for one. This stage makes no new
+teacher enumeration claim. Intended-parent/query qualification, missing required
+semantic-control review, diagnostic receipt review and the final failure-inclusive
+parent-group report remain obligations. No diagnostic result replaces the
+primary generated-pool evidence or establishes research gates.
