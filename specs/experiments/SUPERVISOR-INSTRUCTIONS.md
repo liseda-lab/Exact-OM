@@ -36,8 +36,14 @@ work. Use the supplied incident and machine observations to locate current evide
 - Carry forward the latest cumulative accounting, including failed/interrupted attempts and
   uncertain charged requests. Never reset usage or import a stale earlier ledger. Time forecasts,
   group time allowances and the one-week target are advisory: do not kill or block healthy work
-  because they are exceeded. Keep explicit external spending limits and actual host protection;
-  checkpoint and report a genuine resource/spending blocker instead of restarting from scratch.
+  because they are exceeded. The user's 2026-10-04 amendment authorizes larger hosted
+  allowances as needed. With the bound notification-only hosted spending policy, historical
+  request/token ceilings and protected final reserves remain accounting history, not admission
+  stops. The supervisor sends one notification at 100,000,000 cumulative accounted hosted
+  tokens; reaching that milestone does not stop dispatch, healthy work or automatic repair.
+  Keep actual host/storage protection and durable accounting for every paid or uncertain
+  attempt. Use the reviewed bound policy for new spending lanes; do not mutate old accounts,
+  erase charges, remove unknown-send guards or rewrite running source/configurations.
   Verify no old owner remains before reconciling reservations. Count shared setup once.
 - Execute each scientific cell once. Do not run complete qualification matrices before repeating
   the same comparison. Use prior measurements or the first checkpointed portion of the actual
@@ -50,6 +56,8 @@ work. Use the supplied incident and machine observations to locate current evide
   roles. No private test references may influence optimization, admission or selection.
   Rationales stay off. Ontology loading, processing, reasoning and projection use the native
   packages, never Python/JVM fallbacks. Do not invent negatives or fitted artifacts.
+  The separate pyHermiT integration awaits the user's publication; do not install unpublished
+  code, implement a replacement or include that integration in routine campaign repairs.
 - All experimental generative calls use OpenRouter under their declared accounting and role
   controls. Preserve historical cache-only queues; prepare separate properly bound roles for
   new authorized hosted comparisons rather than reusing a cached-only template. Replay identical
@@ -78,7 +86,8 @@ as a blocker when no allowed approach can complete the action.
 Check the supervisor's `PAUSE` and `STOP` files and applicable experiment STOP files before
 mutations/submissions. Never clear a user's pause/STOP or resume an intentional interruption.
 Write the report and handoff locally. Email is reserved for required human decisions,
-approval, unavailable resources, or exhausted same-cause repairs. Detection, automatic
+approval, unavailable resources, exhausted same-cause repairs, and the explicitly requested
+one-time 100,000,000 hosted-token milestone. Detection, automatic
 repair progress and recovery stay in local receipts; they do not generate emails.
 State the exact required action in a needs_user result. The supervisor handles its durable
 outbox independently. Do not send additional external messages from a repair agent.
@@ -145,7 +154,10 @@ adapter transcript/receipt. A completed Gmail send receipt with matching argumen
 delivery; agent prose does not. Reconcile the corresponding outbox record only from verified
 receipt evidence and preserve its history. If there is no proof, report needs_user with the
 exact delivery journal and decision required. Never reset ambiguous-send guards, invent success,
-or blindly send another copy. This incident may repair notification evidence, not policy or
+or blindly send another copy. An operator may mark an obsolete spending decision
+superseded by the user's recorded authorization while preserving its original delivery
+state and receipt history; that resolution is not proof the message was delivered.
+This incident may repair notification evidence, not policy or
 supervisor retry state. The controller queues one separate escalation and suppresses recursive
 mail-about-mail incidents; experiments and independent eligible work continue.
 
