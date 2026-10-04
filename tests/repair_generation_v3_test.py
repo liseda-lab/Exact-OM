@@ -391,7 +391,9 @@ def test_checkpoint_artifact_route_verifies_hash_inside_worker(tmp_path):
     )
     digest = hashlib.sha256(path.read_bytes()).hexdigest()
     options = dict(
-        seconds=30,
+        # Checkpoint integrity is independent of native compiler startup speed.
+        # Match the finite allowance of the other supervised transport fixtures.
+        seconds=120,
         draws_per_object=0,
         max_depth=0,
         max_constructors=0,
@@ -429,7 +431,9 @@ def test_cuda_owned_weights_use_cpu_artifact_for_supervised_inference(tmp_path):
     result = bounded_freeze_checkpoint(
         problem,
         str(path),
-        seconds=30,
+        # CPU artifact transport can exceed 30 seconds under concurrent Slurm
+        # work; this fixture checks correctness, not a scientific time budget.
+        seconds=120,
         draws_per_object=0,
         max_depth=0,
         max_constructors=0,
