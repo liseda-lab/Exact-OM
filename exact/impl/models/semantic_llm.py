@@ -27,6 +27,57 @@ from exact.llm.routing import extract_chat_text, extract_first_token_top_logprob
 
 
 class SemanticLLMMixin:
+    def llm_binary_decision_probs(
+        self, src_iris, tgt_iris, src_labels, tgt_labels, briefs, pair_scores
+    ):
+        """Use the binary judge unchanged, retaining costed per-source observations."""
+        size = len(src_iris)
+        if any(
+            len(values) != size
+            for values in (tgt_iris, src_labels, tgt_labels, briefs, pair_scores)
+        ):
+            raise ValueError("Binary judgment inputs must have matching lengths")
+        pairs = list(zip(map(str, src_iris), map(str, tgt_iris)))
+        if len(set(pairs)) != size:
+            raise ValueError("Binary judgment inputs contain duplicate pairs")
+        groups = {}
+        for index, (source, _) in enumerate(pairs):
+            groups.setdefault(source, []).append(index)
+        suffixes, exemplars = [""] * size, {}
+        if self.llm_experiment_config.get("exemplars") == "knn":
+            from exact.impl.models.selector.llm_learning import exemplar_context
+
+            for source, indices in groups.items():
+                suffix, exemplars[source] = exemplar_context(
+                    self, source, [float(pair_scores[index]) for index in indices]
+                )
+                for index in indices:
+                    suffixes[index] = suffix
+        observations = []
+        probabilities = self.llm_yesno_probs_batched(
+            src_labels,
+            tgt_labels,
+            briefs,
+            [""] * size,
+            observations=observations,
+            prompt_suffixes=suffixes,
+        )
+        if len(observations) != size:
+            raise ValueError("Binary teacher requires an observed hosted response for every pair")
+        records = [
+            {
+                "source": source,
+                "valid": True,
+                "pair_probabilities": {
+                    pairs[index][1]: float(probabilities[index]) for index in indices
+                },
+                "calls": [{**observations[index], "target": pairs[index][1]} for index in indices],
+                "exemplar_sources": exemplars.get(source, []),
+            }
+            for source, indices in groups.items()
+        ]
+        return probabilities, records
+
     def llm_listwise_probs_batched(self, plans: List[ListwiseCallPlan]) -> List[Dict[str, Any]]:
         """Execute source plans via the shared hosted ledger, abstaining on invalid output."""
         if not plans:
@@ -1030,7 +1081,12 @@ class SemanticLLMMixin:
         tgt_labels: List[str],
         src_summaries: List[str],
         tgt_summaries: List[str],
+        *,
+        observations: Optional[List[Dict[str, Any]]] = None,
+        prompt_suffixes: Optional[List[str]] = None,
     ) -> torch.Tensor:
+        if prompt_suffixes is not None and len(prompt_suffixes) != len(src_labels):
+            raise ValueError("Binary prompt suffixes must match the judgment batch")
         if not self.use_llm:
             return torch.zeros(len(src_labels), device=self.device)
         if not src_labels:
@@ -1109,6 +1165,11 @@ class SemanticLLMMixin:
                                 src_labels, tgt_labels, src_summaries, tgt_summaries
                             )
                         ]
+                        if prompt_suffixes is not None:
+                            prompts = [
+                                {**prompt, "user": prompt["user"] + suffix}
+                                for prompt, suffix in zip(prompts, prompt_suffixes)
+                            ]
                         if prompts:
                             self._log_once(
                                 "hosted_decision_first_chunk_start",
@@ -1194,6 +1255,17 @@ class SemanticLLMMixin:
                             outputs.append(float(torch.softmax(stacked, dim=-1)[0].item()))
                         self._record_decision_stat("hosted_scored", len(outputs))
                         self._last_decision_backend_meta["provider"] = last_provider
+                        if observations is not None:
+                            observations.extend(
+                                {
+                                    "provider": payload.get("provider"),
+                                    "model": payload.get("model"),
+                                    "response_id": payload.get("id"),
+                                    "usage": payload.get("usage", {}),
+                                    "probability": probability,
+                                }
+                                for payload, probability in zip(payloads, outputs)
+                            )
                         return torch.tensor(outputs, dtype=torch.float32, device=self.device)
                     except (RuntimeError, ValueError, KeyError, OSError, urlerror.URLError) as exc:
                         if os.getenv("EXACT_EXPERIMENT_MODE") == "1" or getattr(

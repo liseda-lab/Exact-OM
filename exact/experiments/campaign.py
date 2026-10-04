@@ -1180,7 +1180,7 @@ def materialize_campaign(path: Path, directory: Path, *, stage: str) -> Any:
                 ),
                 **(
                     {"selected_judge": {"producer": "E07"}}
-                    if step.id in {"E21", "E04-listwise"}
+                    if step.id in {"E21", "E04-listwise", "E04-listwise-diagnostic"}
                     else {}
                 ),
                 **(
@@ -1193,6 +1193,18 @@ def materialize_campaign(path: Path, directory: Path, *, stage: str) -> Any:
                         }
                     }
                     if step.id == "E22-policy"
+                    else {}
+                ),
+                **(
+                    {
+                        "fixed_listwise_diagnostic": {
+                            "producer": "E07",
+                            "arm": "facts_listwise",
+                            "selection_eligible": False,
+                            "label_semantics": "benchmark_pool",
+                        }
+                    }
+                    if step.id == "E04-listwise-diagnostic"
                     else {}
                 ),
                 "campaign_v2": {
@@ -1406,7 +1418,15 @@ def write_progress(
         "cells": [
             {
                 key: item.get(key)
-                for key in ("experiment_id", "arm_id", "task_id", "seed", "status", "recovery", "failure")
+                for key in (
+                    "experiment_id",
+                    "arm_id",
+                    "task_id",
+                    "seed",
+                    "status",
+                    "recovery",
+                    "failure",
+                )
             }
             for item in manifests
         ],
@@ -1511,12 +1531,21 @@ def run_comparison(cells: Any, suite: Any, source: Any, **kwargs: Any) -> list[d
                 "SELECT a.state,a.usage,r.tokens FROM attempts a LEFT JOIN reservations r "
                 "USING(request_id,number)"
             ).fetchall()
-        totals = dict(attempts=len(rows), billable_tokens=0, reported_cost_usd=0.0,
-                      unpriced_attempts=0, unknown=0)
+        totals = dict(
+            attempts=len(rows),
+            billable_tokens=0,
+            reported_cost_usd=0.0,
+            unpriced_attempts=0,
+            unknown=0,
+        )
         for row in rows:
             actual = json.loads(row["usage"] or "{}")
-            known = int(actual.get("prompt_tokens") or 0) + int(actual.get("completion_tokens") or 0)
-            if all(actual.get(field) is not None for field in ("prompt_tokens", "completion_tokens")):
+            known = int(actual.get("prompt_tokens") or 0) + int(
+                actual.get("completion_tokens") or 0
+            )
+            if all(
+                actual.get(field) is not None for field in ("prompt_tokens", "completion_tokens")
+            ):
                 totals["billable_tokens"] += known
             elif row["tokens"] is not None:
                 totals["billable_tokens"] += max(known, int(row["tokens"]))
@@ -1560,8 +1589,11 @@ def run_comparison(cells: Any, suite: Any, source: Any, **kwargs: Any) -> list[d
             status=status,
             requests=int(delta["attempts"]),
             tokens=tokens,
-            actual_usd=(None if delta["unpriced_attempts"] or delta["unknown"]
-                        else delta["reported_cost_usd"]),
+            actual_usd=(
+                None
+                if delta["unpriced_attempts"] or delta["unknown"]
+                else delta["reported_cost_usd"]
+            ),
         )
 
 

@@ -1,0 +1,103 @@
+schema_version: 1
+amendment_id: E21-selected-binary-judge-20261004
+experiment: E21
+approved: true
+approval_scope: Support the selected E07 binary judge; preserve five E21 treatments and original roles.
+specification: E21-supervised-llm.md
+status: metadata_preflight_passed_source_freeze_and_publication_pending
+scientific_results: not_executed
+changes_shared_native_packages: false
+selected_teacher:
+  producer: E07
+  arm: facts_binary
+  selection_run: E07-selection-recovery-02
+  evidence: structured_packet
+  mode: binary
+  fusion_weight: beta_u
+  beta: 0.8
+  effective_pair_threshold: 0.7
+  max_candidates_per_source: 5
+  ordering: descending_base_score_then_target_iri
+  immutable_bindings_required:
+    - completed_selection_and_resolved_config
+    - provider_model_prompt_probability_and_seed
+    - candidate_and_source_population
+    - effective_acceptance_and_fusion
+  rationales: false
+treatments:
+  - frozen_judge
+  - knn_exemplars
+  - benefit_router
+  - student_gold
+  - student_distilled
+population:
+  case: D0_E03
+  development_source_cap: 200
+  training_source_cap: 2000
+  teacher_source_cap: 200
+  seed: 17
+  training_reference_role: train
+  development_reference_role: valid
+  training_development_source_overlap: forbidden
+  private_test_reference_access: forbidden
+  negative_labels: confirmed_provided_training_candidates_or_explicit_complete_reference
+binary_teacher:
+  requests: forced_selected_top_candidates_on_training_sources_only
+  uninvoked_candidates: retain_base_scores_and_full_source_outcome_population
+  invalid_or_partial_response: block_fitting_preserve_completed_requests_and_shards_for_recovery
+  silently_reduce_training_population: false
+  accounting: retain_raw_responses_actual_usage_and_completed_request_reuse
+  unknown_paid_retry_bypass: false
+router:
+  target: correction_minus_harm_per_1000_actual_tokens
+  target_scope: explicit_source_local_proxy_before_global_extraction
+  final_endpoint: measured_complete_population_F1_and_cost
+  all_training_candidate_outcomes_required: true
+students:
+  matched: [features, architecture, optimizer, source_population, grouped_folds, inference_integration]
+  gold_target: public_training_gold
+  distilled_target: equal_gold_teacher_mixture_for_valid_teacher_pairs_otherwise_gold
+  teacher_coverage_and_generation_cost_reported: true
+helpfulness_prerequisite:
+  baseline: E25/decision_off
+  metric: F1
+  minimum_gain: 0.003
+  existing_selected_score: 0.823
+  existing_baseline_score: 0.779
+  population_size: 200
+  candidate_pairs: 4000
+  sampled_pool_fingerprints_equal: false
+  discrepancy: E07 cached sample manifest lacks E25 encoder and retrieval metadata.
+  observed_equal: [full_pool_manifest, source_ids, candidate_pairs, base_scores, uncertainty, protected_exact]
+  required_before_admission: Bound verified population/reference/scoring/acceptance compatibility proof.
+verification:
+  tests: passed
+  combined_fixture_suite:
+    passed: 382
+    warnings: 2
+    seconds: 94.31
+    log: ../../data/experiments-v2/approved-judges-20261004-01/final-tests.log
+  runtime_preflight:
+    status: passed
+    seconds: 46.98
+    evidence: ../../data/experiments-v2/e21-binary-recovery-01/preflight-validation.json
+    arms: 5
+    protected_exact_candidates: 106
+    protected_exact_candidates_excluded_by_extraction: 1
+    scientific_calls: 0
+    hosted_calls: 0
+  source_freeze: pending
+  publication: pending
+  paid_calls_during_implementation: 0
+  required_regressions:
+    - binary_fusion_and_effective_threshold
+    - uninvoked_candidates_remain_in_counterfactual_population
+    - incomplete_or_invalid_teacher_results
+    - training_and_development_role_isolation
+    - matched_gold_and_distilled_students
+    - teacher_request_and_source_shard_resume
+    - helpfulness_population_and_reference_compatibility
+limitations:
+  - Source-local router targets do not reproduce cross-source greedy target competition.
+  - Hosted weight revision may not be independently immutable; retain the resolved identity limitation.
+  - Passing fixtures and metadata preflight do not establish measured E21 quality or release readiness.

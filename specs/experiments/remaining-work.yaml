@@ -289,7 +289,7 @@ work:
   binding_group: nil
   state: pending_binding_or_dependency
   remaining_forecast_hours: null
-- step: E04-listwise
+- step: E04-listwise-diagnostic
   remaining_cells: 2
   cases:
   - N0
@@ -430,11 +430,14 @@ binding_groups:
     steps:
     - E04
     - E04-pool-miss
-    - E04-listwise
+    - E04-listwise-diagnostic
     work: Bind historical 2024 Bio-LLM N0 ontologies and benchmark-pool labels, distinct from natural
       NIL. E04-pool-miss removes only public N0 validation positives, with hash-bound complete labels
       for the original benchmark pool; reuse main E04 nil_off only on verified identical identities.
-      Listwise requires E07. Never inherit D0 trained heads implicitly.
+      The optional E04-listwise-diagnostic fixes the completed E07 facts_listwise comparator and
+      is not selection eligible; completed E04 and the E07 facts_binary winner stay unchanged.
+      The original selected-judge E04-listwise is inapplicable and must not be requeued. Never
+      inherit D0 trained heads implicitly.
   feature:
     steps:
     - E11

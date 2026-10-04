@@ -129,6 +129,91 @@ def test_hosted_chat_binary_head_returns_binary_probability(monkeypatch):
     assert scorer.llm_decision_stats()["local_fallbacks"] == 0
 
 
+def test_binary_teacher_retains_ordered_costs_without_changing_prompts(monkeypatch):
+    monkeypatch.setenv("EXACT_EXPERIMENT_MODE", "1")
+    scorer = _hosted_scorer()
+    scorer.llm_experiment_config = {"exemplars": "off"}
+    seen = []
+    original = scorer._llm_router.hosted.chat_completion
+
+    def hosted(**kwargs):
+        seen.append(kwargs["messages"])
+        return {**original(**kwargs), "id": "response", "usage": {"total_tokens": 19}}
+
+    scorer._llm_router.hosted.chat_completion = hosted
+    baseline = scorer.llm_yesno_probs_batched(["src"], ["tgt"], ["facts"], [""])
+    probabilities, records = scorer.llm_binary_decision_probs(
+        ["source"], ["target"], ["src"], ["tgt"], ["facts"], [0.6]
+    )
+    assert torch.equal(baseline, probabilities)
+    assert seen[0] == seen[1]
+    assert records[0]["pair_probabilities"] == {"target": float(probabilities[0])}
+    assert records[0]["calls"][0]["usage"]["total_tokens"] == 19
+    assert records[0]["calls"][0]["response_id"] == "response"
+    assert records[0]["calls"][0]["target"] == "target"
+
+
+def test_binary_exemplars_reach_hosted_prompt_and_reject_training_query(monkeypatch):
+    from exact.impl.models.selector.llm_learning import teacher_identity
+
+    monkeypatch.setenv("EXACT_EXPERIMENT_MODE", "1")
+    scorer = _hosted_scorer()
+    scorer.llm_experiment_config = {
+        "decision": {"mode": "binary"},
+        "exemplars": "knn",
+        "exemplar_count": 3,
+    }
+    scorer._llm_router.routing = SimpleNamespace(
+        decision_profile="hosted", default_profile="hosted"
+    )
+    scorer._llm_router.profiles["hosted"].backend = "openrouter"
+    scorer._llm_router.profiles["hosted"].revision = "fixture-revision"
+    scorer._attached_dataset = SimpleNamespace(dataset_signature="fixture")
+    scorer._exemplar_artifact = {
+        "schema_version": 1,
+        "training_sources": ["train1", "train2", "train3", "train4"],
+        "application": {"dataset_signature": "fixture"},
+        "teacher_binding": teacher_identity(scorer),
+        "examples": [
+            {
+                "source": source,
+                "features": [0.6, 0.6, 0.0, 1.0],
+                "candidates": [
+                    {"target": source + "target", "equivalent": True, "evidence": "training fact"}
+                ],
+            }
+            for source in ["train1", "train2", "train3", "train4"]
+        ],
+    }
+    seen = []
+    original = scorer._llm_router.hosted.chat_completion
+
+    def hosted(**kwargs):
+        seen.append(kwargs["messages"][-1]["content"])
+        return original(**kwargs)
+
+    scorer._llm_router.hosted.chat_completion = hosted
+    _, records = scorer.llm_binary_decision_probs(
+        ["heldout"], ["target"], ["src"], ["tgt"], ["facts"], [0.6]
+    )
+    assert records[0]["exemplar_sources"] == ["train1", "train2", "train3"]
+    assert "Training-only examples" in seen[0]
+    assert "training fact" in seen[0] and "train4" not in seen[0]
+    with pytest.raises(ValueError, match="overlaps training"):
+        scorer.llm_binary_decision_probs(["train1"], ["target"], ["src"], ["tgt"], ["facts"], [0.6])
+    assert len(seen) == 1
+
+
+def test_binary_teacher_rejects_unobserved_probabilities(monkeypatch):
+    scorer = _hosted_scorer()
+    scorer.llm_experiment_config = {"exemplars": "off"}
+    monkeypatch.setattr(
+        scorer, "llm_yesno_probs_batched", lambda *args, **kwargs: torch.tensor([0.8])
+    )
+    with pytest.raises(ValueError, match="observed hosted response"):
+        scorer.llm_binary_decision_probs(["s"], ["t"], ["src"], ["tgt"], ["facts"], [0.6])
+
+
 def _inject_hosted_failure(scorer, failure):
     if failure == "probe":
         scorer._probe_hosted_decision_profile = lambda profile: {

@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 
 from exact.core.entities.configs.config import ConfigModel
+from exact.experiments.rationale_policy import apply_rationale_policy
 from exact.utils.fitted_artifacts import fingerprint, freeze_json
 from exact.utils.provenance import sha256_file
 
@@ -137,7 +138,7 @@ def _judge_benefit(judge_item, judge_config, judge_path, manifests):
     baseline, config, path = _completed_cell("E25", "decision_off", manifests)
     if (
         not judge_item.get("candidate_pool_fingerprint")
-        or judge_item["candidate_pool_fingerprint"] != baseline.get("candidate_pool_fingerprint")
+        or not baseline.get("candidate_pool_fingerprint")
         or any(
             judge_item.get(key) != baseline.get(key) for key in ("task_id", "seed", "source_cap")
         )
@@ -148,6 +149,11 @@ def _judge_benefit(judge_item, judge_config, judge_path, manifests):
         )
     if config.llm.experiment.gate.mode != "off":
         raise ValueError("Judge benefit control did not disable decision calls")
+    population_proof = None
+    if judge_item["candidate_pool_fingerprint"] != baseline["candidate_pool_fingerprint"]:
+        from .judge_benefit import observed_judge_population
+
+        population_proof = observed_judge_population(judge_item, baseline, judge_config, config)
     scores = [_metric_value(cell_metrics(p.parent.parent), "F1") for p in (path, judge_path)]
     if any(value is None for value in scores):
         raise PrerequisiteUnavailable("Judge benefit needs both completed development F1 outcomes")
@@ -158,6 +164,7 @@ def _judge_benefit(judge_item, judge_config, judge_path, manifests):
         "baseline_score": scores[0],
         "judge_score": scores[1],
         "gain": scores[1] - scores[0],
+        **({"population_proof": population_proof} if population_proof is not None else {}),
     }
     if evidence["gain"] < evidence["minimum_gain"]:
         raise PrerequisiteUnavailable(
@@ -223,10 +230,16 @@ def materialize_selected_judge(source, suite, manifests, selections):
     """Bind the actual E07 winner, checking each consumer's intended contract."""
     from exact.experiments.harness import _inventory_config, deep_merge
 
+    if source.config.frozen_constants.get("fixed_listwise_diagnostic") is not None:
+        from exact.experiments.nil_listwise import materialize_fixed_listwise
+
+        return materialize_fixed_listwise(source, suite, manifests, selections)
+
     (item, producer, path), selection = _selected_cell("E07", manifests, selections)
     judge = producer.llm.experiment.model_dump(mode="json", by_alias=True)
     identifier = source.config.experiment_id
-    if judge["decision"]["mode"] not in {"listwise", "listwise_sc"}:
+    binary = judge["decision"]["mode"] == "binary"
+    if identifier == "E04-listwise" and binary:
         raise PrerequisiteUnavailable(
             f"{identifier} needs a selected comparative judge; the E07 winner is binary",
             status="inapplicable",
@@ -234,10 +247,10 @@ def materialize_selected_judge(source, suite, manifests, selections):
         )
     if identifier == "E21" and (
         judge["decision"]["evidence"] == "generated_brief"
-        or judge["fusion_weight"] != "source_first"
+        or judge["fusion_weight"] != ("beta_u" if binary else "source_first")
     ):
         raise PrerequisiteUnavailable(
-            "E21 benefit routing needs the selected packet judge with source_first integration",
+            "E21 benefit routing needs selected packets with binary beta_u or comparative source_first integration",
             status="inapplicable",
             code="incompatible_selected_judge",
         )
@@ -254,17 +267,25 @@ def materialize_selected_judge(source, suite, manifests, selections):
         if (
             producer.selector.runtime_enabled
             or producer.matching.calibration.threshold_mode != "fixed"
+            or producer.pipeline[0].params.get("use_llm_calibration", False)
         ):
             raise PrerequisiteUnavailable(
-                "E21 judge benefit requires fixed pair-threshold acceptance without a selector"
+                "E21 judge benefit requires fixed pair-threshold acceptance without a selector or LLM recalibration"
             )
+        record["counterfactual_scoring"] = {
+            "threshold": producer.matching.threshold,
+            "beta": float(producer.pipeline[0].params.get("beta", 0.8)),
+            "fusion_weight": judge["fusion_weight"],
+            "constant_weight": judge["constant_weight"],
+            "scope": "source_independent_before_global_extraction",
+        }
         record["benefit"] = _judge_benefit(item, producer, path, manifests)
     overlays = {}
     for arm in source.config.arms:
         if identifier == "E04-listwise" and arm.id != "listwise_none":
             overlays[arm.id] = {}
             continue
-        # Preserve the selected profile/provider and source-first policy. Only the
+        # Preserve the selected profile/provider and integration policy. Only the
         # declared learning intervention may change gate/exemplars/student state.
         llm = deep_merge(
             producer.llm.model_dump(mode="json", by_alias=True), arm.overlay.get("llm", {})
@@ -287,9 +308,12 @@ def materialize_selected_judge(source, suite, manifests, selections):
         if identifier == "E21":
             if _score_contract(producer) != _score_contract(
                 ConfigModel.from_mapping(
-                    deep_merge(
-                        consumer.model_dump(mode="json", by_alias=True),
-                        source.config.arms[0].overlay,
+                    apply_rationale_policy(
+                        deep_merge(
+                            consumer.model_dump(mode="json", by_alias=True),
+                            source.config.arms[0].overlay,
+                        ),
+                        generate_rationales=source.config.generate_rationales,
                     )
                 )
             ):

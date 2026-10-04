@@ -5576,6 +5576,11 @@ def select_experiment(
         "candidate_pool_design_hash": _candidate_design_hash(base),
         "status": "complete" if diagnostic else "selected" if any_selected else "screened_out",
         "decision_mode": "diagnostic" if diagnostic else "independent",
+        **(
+            {"selection_eligible": False}
+            if config.frozen_constants.get("fixed_listwise_diagnostic")
+            else {}
+        ),
         "all_decisions_selected": all_selected,
         "combined_selected_overlay": (
             combined_selected_overlay if any_selected or diagnostic else None

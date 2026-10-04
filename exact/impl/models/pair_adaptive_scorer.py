@@ -2171,12 +2171,22 @@ class PairAdaptiveSemanticScorer(
             src_best = [pair_payloads[i]["src_label"] for i in decision_idxs]
             tgt_best = [pair_payloads[i]["tgt_label"] for i in decision_idxs]
             decision_briefs = [pair_briefs[i] for i in decision_idxs]
-            p_yes_needed = self.llm_yesno_probs_batched(
-                src_best,
-                tgt_best,
-                decision_briefs,
-                ["" for _ in decision_briefs],
-            )
+            if self.llm_experiment_config.get("exemplars") == "knn":
+                p_yes_needed, grouped_records = self.llm_binary_decision_probs(
+                    [src_iris[i] for i in decision_idxs],
+                    [tgt_iris[i] for i in decision_idxs],
+                    src_best,
+                    tgt_best,
+                    decision_briefs,
+                    [float(S_base[i]) for i in decision_idxs],
+                )
+            else:
+                p_yes_needed = self.llm_yesno_probs_batched(
+                    src_best,
+                    tgt_best,
+                    decision_briefs,
+                    ["" for _ in decision_briefs],
+                )
             if self.use_llm_calibration:
                 if self._llm_calibration_can_apply:
                     p_yes_needed = self._apply_llm_calibration(p_yes_needed)

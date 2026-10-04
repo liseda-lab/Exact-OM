@@ -117,3 +117,48 @@ removal, or inapplicability is a deliverable; an unimplemented arm is not an emp
 Resolve this family's question into numbered research questions and a primary endpoint in the
 executable design before its screen; answer each as supported, not supported or inconclusive
 with evidence. RUN-PLAN section 7 governs incomplete references and claim limitations.
+
+## Optional fixed-listwise diagnostic amendment — 2026-10-04
+
+The completed E07 comparison selected `facts_binary`. The original conditional
+`E04-listwise` is therefore inapplicable; this is not an empirical NIL result. User approval
+on 2026-10-04 permits a **separate** `E04-listwise-diagnostic` with the completed, unselected
+`facts_listwise` comparator. Main E04 results, the E07 winner and downstream selected policies
+remain unchanged. This amendment is descriptive and `selection_eligible: false`; its two arms
+have no selection decisions, no policy outputs and no promotion into E17.
+
+Use only the existing N0 validation case (all 20 sources), seed 17, original full benchmark
+pools, frozen ontologies, label-free scorer and heuristic NIL selector. The two arms are
+`nil_heuristic` (decision calls disabled) and `listwise_none` (fixed comparative treatment).
+They differ only in LLM treatment; no fitting, new labels, dataset creation, manual annotation,
+private references, source expansion or model search is authorized. Reuse a completed control
+only when the full numerical/evaluation identity matches; otherwise compute this small control
+once. Preserve the original conditionally blocked attempt and its zero-request setup costs.
+
+The treatment binds the completed E07 `facts_listwise` configuration and provider/model profile:
+score-blind structured facts, deterministic displayed top five, one listwise call per routed
+source, raw joint categorical probabilities over candidates plus `Z`/`__NONE__`, all eligible
+sources routed and `source_first` integration. Record the candidate alphabet, target identities,
+full categorical vector, unshown candidates and request identities. Candidate choice is applied
+before unchanged heuristic NIL acceptance; a displayed-NONE choice abstains. The model's
+NONE probability concerns only the displayed candidates; it is **not** a calibrated probability
+of ontology-wide absence or proof that a true target is absent from the original full pool.
+Retain omitted candidates and source denominators for ranking/evaluation. Empty pools and
+unusable model responses retain their existing explicit handling and are not silently counted
+as successful NIL judgments. Rationale generation remains disabled.
+
+Freeze both the actual E07 winner and fixed comparator provenance before execution. Reject
+missing/tampered completed cells, changed model profiles, selectable diagnostic declarations,
+non-N0/reporting inputs, altered acceptance/pool settings or candidate/NONE semantics.
+Report paired benchmark-pool NIL-aware F1, non-NIL MRR, candidate recall, false abstentions,
+per-source choices and actual incremental requests/tokens/cost. This small public development
+case supports an exploratory diagnostic only; it cannot establish an official test result,
+ontology-wide NIL detection, an improved E07 winner or a held-out generalization claim.
+
+Implementation: `exact/experiments/nil_listwise.py` binds the completed comparator;
+`campaign.py` materializes only the separately named diagnostic; the harness emits
+`selection_eligible: false` and no selected overlay. Regression evidence is in
+`tests/nil_listwise_diagnostic_test.py`, together with existing grouped-choice/NIL tests.
+Fixture verification and immutable real-input preflight must be recorded separately from a
+completed numerical experiment. Queue/publication and numerical completion remain runtime
+receipts rather than claims made by this specification.

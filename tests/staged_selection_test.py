@@ -117,8 +117,11 @@ def test_analytic_selection_freezes_six_outcomes_before_both_acceptance_fits(tmp
         materialize_analytic_selection(consumer, suite, manifests[:-1], selection)
 
 
-def judge_fixture(tmp_path, bound, *, evidence="scored_packet", mode="listwise", gain=0.01):
+def judge_fixture(
+    tmp_path, bound, *, evidence="scored_packet", mode="listwise", gain=0.01, fusion=None
+):
     base, suite = bound
+    resolved_base = harness.apply_rationale_policy(base, generate_rationales=False)
     judge = {
         "enabled": True,
         "decision": {
@@ -128,14 +131,14 @@ def judge_fixture(tmp_path, bound, *, evidence="scored_packet", mode="listwise",
             "max_evidence_packets": 2,
         },
         "gate": {"mode": "source_top_fraction", "quantile_fraction": 1.0},
-        "fusion_weight": "source_first",
+        "fusion_weight": fusion or ("beta_u" if mode == "binary" else "source_first"),
     }
     manifests = [
         complete(
             tmp_path,
             "E07",
             "winner",
-            harness.deep_merge(base, {"llm": {"experiment": judge}}),
+            harness.deep_merge(resolved_base, {"llm": {"experiment": judge}}),
             score=0.6 + gain,
         ),
         complete(
@@ -143,7 +146,7 @@ def judge_fixture(tmp_path, bound, *, evidence="scored_packet", mode="listwise",
             "E25",
             "decision_off",
             harness.deep_merge(
-                base, {"llm": {"experiment": {"enabled": True, "gate": {"mode": "off"}}}}
+                resolved_base, {"llm": {"experiment": {"enabled": True, "gate": {"mode": "off"}}}}
             ),
             score=0.6,
         ),
@@ -171,10 +174,35 @@ def test_learning_consumes_selected_prompt_and_freezes_train_only_binding(tmp_pa
     assert all("valid.tsv" not in entry["path"] for entry in payload["training"][0]["inputs"])
 
 
+def test_learning_contract_resolves_campaign_rationale_policy(tmp_path, bound):
+    source, suite, manifests, selections = judge_fixture(tmp_path, bound, mode="binary")
+    assert any(entry["params"].get("generate_llm_rationales") for entry in bound[0]["pipeline"])
+    assert source.config.generate_rationales is False
+    materialize_selected_judge(source, suite, manifests, selections)
+    source.config.generate_rationales = True
+    with pytest.raises(PrerequisiteUnavailable, match="preserve the selected judge"):
+        materialize_selected_judge(source, suite, manifests, selections)
+
+
+def test_learning_preserves_actual_binary_winner_and_beta_u(tmp_path, bound):
+    values = judge_fixture(tmp_path, bound, mode="binary", evidence="structured_packet")
+    result = materialize_selected_judge(*values)
+    for arm in result.config.arms:
+        judge = arm.overlay["llm"]["experiment"]
+        assert judge["decision"]["mode"] == "binary"
+        assert judge["decision"]["evidence"] == "structured_packet"
+        assert judge["fusion_weight"] == "beta_u"
+    record = json.loads(
+        Path(result.config.frozen_constants["staged_selection_binding"]["path"]).read_text()
+    )
+    assert record["judge"]["decision"]["mode"] == "binary"
+    assert record["benefit"]["gain"] == pytest.approx(0.01)
+
+
 @pytest.mark.parametrize(
     "change,expected",
     [
-        ({"mode": "binary"}, "inapplicable"),
+        ({"mode": "binary", "fusion": "constant"}, "inapplicable"),
         ({"evidence": "generated_brief"}, "inapplicable"),
         ({"gain": 0.0}, "screened_out"),
     ],

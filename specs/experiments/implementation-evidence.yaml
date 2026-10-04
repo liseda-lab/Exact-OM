@@ -46,16 +46,29 @@ families:
       - exact/utils/artifact_transfer.py
       - exact/impl/models/selector/nil_head.py
       - exact/experiments/nil_evaluation.py
+      - exact/experiments/nil_listwise.py
     tests:
       - tests/biollm_nil_inputs_test.py
       - tests/benchmark_nil_test.py
       - tests/nil_transfer_test.py
       - tests/natural_nil_test.py
       - tests/nil_evaluation_test.py
+      - tests/nil_listwise_diagnostic_test.py
     required_inputs:
       - N0 benchmark-pool training/evaluation labels are bound with original legacy ontologies.
       - N1 FMA strict loading remains unresolved; selected frozen donor artifact and explicit reporting declaration await development freeze.
       - No verified ontology-wide NIL claim is supported by these historical benchmark labels.
+    fixed_listwise_amendment:
+      specification: specs/experiments/E04-nil-abstention.md
+      scientific_step: E04-listwise-diagnostic
+      selection_eligible: false
+      selected_E07_winner: facts_binary
+      fixed_unselected_comparator: facts_listwise
+      implementation_status: implemented_fixture_verified
+      real_input_preflight: metadata_verified_pending_frozen_source_launch
+      preflight_receipt: data/experiments-v2/e04-fixed-listwise-diagnostic-01/preflight-evidence.json
+      numerical_status: not_run
+      historical_conditional_E04_listwise: inapplicable_not_an_empirical_null
   E05:
     implemented_paths:
       - exact/utils/candidate_generation.py
@@ -192,14 +205,23 @@ families:
         bound; fitting and resource forecast remain unexecuted. Combined treatment requires a later
         supported declaration.
   E21:
+    amendment: E21-binary-judge-amendment.yaml
+    amendment_status: metadata_preflight_passed_source_freeze_and_publication_pending
     implemented_paths:
       - exact/impl/models/selector/llm_learning.py
       - exact/impl/models/semantic_llm.py
+      - exact/experiments/staged_selection.py
     tests:
       - tests/grouped_fitting_test.py
+      - tests/e21_binary_learning_test.py
+      - tests/staged_selection_test.py
+      - tests/judge_benefit_test.py
     required_inputs:
-      - Selected E07 and immutable teacher cache; router requires fully confirmed source pools.
-        Generated-brief benefit routing is unsupported.
+      - Five-arm metadata preflight passed with a bound E25/E07 helpfulness population proof;
+        final frozen source, regression evidence and descriptor publication remain separate gates.
+      - Immutable training-only teacher cache; router requires fully confirmed source pools.
+        Preserve beta_u, actual effective threshold and matched students. Generated-brief benefit
+        routing is unsupported. No completed E21 scientific cells are established by this record.
   E22:
     implemented_paths:
       - exact/experiments/label_policy.py

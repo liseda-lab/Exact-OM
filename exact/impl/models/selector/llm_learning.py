@@ -9,6 +9,7 @@ from pathlib import Path
 import torch
 
 from .fitting import fingerprint, freeze_json, safe_training_labels
+from .oracle_replay import _outcome
 
 PAIR_FEATURES = ["S_base", "U", "q_lex", "Q_struct"]
 SOURCE_FEATURES = ["top_score", "top_two_margin", "candidate_entropy", "displayed_count"]
@@ -35,6 +36,7 @@ def teacher_identity(model):
     profile = router.profiles.get(name)
     if profile is None or profile.backend != "openrouter":
         raise ValueError("Teacher binding requires an explicit OpenRouter decision profile")
+    binary = model.llm_experiment_config["decision"]["mode"] == "binary"
     return {
         "profile": name,
         **{
@@ -50,7 +52,16 @@ def teacher_identity(model):
         },
         "decision": dict(model.llm_experiment_config["decision"]),
         "seed": model.request_seed,
-        "prompt_version": "listwise-v2-raw-categorical",
+        "prompt_version": "binary-chat-logprobs-v1" if binary else "listwise-v2-raw-categorical",
+        **(
+            {
+                "labels": list(model.hosted_decision_labels),
+                "logit_bias": float(model.hosted_decision_logit_bias),
+                "max_tokens": 1,
+            }
+            if binary
+            else {}
+        ),
         "weight_revision_limitation": (
             "hosted_revision_not_immutable" if not profile.revision else None
         ),
@@ -156,14 +167,13 @@ def read_learning_artifact(path, kind):
     return payload
 
 
-def exemplar_prompt(model, plan):
-    from dataclasses import replace
-
+def exemplar_context(model, source_iri, candidate_scores):
+    """Shared source-level retrieval for the selected binary or comparative prompt."""
     payload = model._exemplar_artifact
-    validate_learning_binding(payload, model, [plan.source_iri])
-    profile = source_features(plan.candidate_scores)
+    validate_learning_binding(payload, model, [source_iri])
+    profile = source_features(candidate_scores)
     ordered = sorted(
-        [row for row in payload["examples"] if row["source"] != plan.source_iri],
+        [row for row in payload["examples"] if row["source"] != source_iri],
         key=lambda row: (
             sum((a - b) ** 2 for a, b in zip(row["features"], profile)),
             row["source"],
@@ -173,11 +183,18 @@ def exemplar_prompt(model, plan):
     text = "\nTraining-only examples (their gold labels concern other sources):\n" + json.dumps(
         [{key: row[key] for key in ("source", "candidates")} for row in selected], sort_keys=True
     )
+    return text, [row["source"] for row in selected]
+
+
+def exemplar_prompt(model, plan):
+    from dataclasses import replace
+
+    text, sources = exemplar_context(model, plan.source_iri, plan.candidate_scores)
     calls = tuple(
         replace(call, prompt={**call.prompt, "user": call.prompt["user"] + text})
         for call in plan.calls
     )
-    return replace(plan, calls=calls), [row["source"] for row in selected]
+    return replace(plan, calls=calls), sources
 
 
 def validate_learning_binding(payload, model, source_ids):
@@ -194,23 +211,64 @@ def validate_learning_binding(payload, model, source_ids):
         raise ValueError(
             "Teacher/provider/prompt identity changed; learned LLM artifact is incompatible"
         )
+    if payload.get("kind") == "llm_gate" and payload.get("counterfactual_scoring") != {
+        "threshold": float(model.threshold),
+        "beta": float(model.beta),
+        "fusion_weight": model.llm_experiment_config["fusion_weight"],
+        "constant_weight": float(model.llm_experiment_config.get("constant_weight", 0.5)),
+    }:
+        raise ValueError("Learned router counterfactual scoring changed")
     signature = getattr(model._attached_dataset, "dataset_signature", None)
     if payload["application"].get("dataset_signature") != signature:
         raise ValueError("Learned LLM application dataset mismatch")
+
+
+def _validate_binary_teacher(records, source, targets):
+    """An actual binary source intervention must cover every displayed pair."""
+    if len(records) != 1 or records[0].get("source") != source or not records[0].get("valid"):
+        raise ValueError("Binary teacher requires one valid observed source intervention")
+    record = records[0]
+    probabilities = record.get("pair_probabilities", {})
+    if set(probabilities) != targets or any(
+        not math.isfinite(float(value)) or not 0 <= float(value) <= 1
+        for value in probabilities.values()
+    ):
+        raise ValueError("Binary teacher probabilities do not cover the frozen displayed pool")
+    if (
+        len(record.get("calls", [])) != len(targets)
+        or {call.get("target") for call in record.get("calls", [])} != targets
+    ):
+        raise ValueError("Binary teacher requires recorded usage for every displayed pair")
+    if any(
+        not math.isfinite(float(call.get("usage", {}).get("total_tokens", 0)))
+        or float(call.get("usage", {}).get("total_tokens", 0)) <= 0
+        for call in record["calls"]
+    ):
+        raise ValueError("Binary teacher requires positive observed call token costs")
 
 
 def fit_llm_artifacts(model, frame, reference_pairs, directory, *, config, application):
     """Teacher requests are executed only when this explicit runtime fit is called."""
     original_counts = frame.groupby("Src").size()
     frame, reference = safe_training_labels(frame, reference_pairs, application)
+    binary = config["decision"]["mode"] == "binary"
+    if binary and getattr(model, "use_llm_calibration", False):
+        raise ValueError("Binary E21 learning requires the frozen uncalibrated judge probabilities")
+    limit_candidates = int(config["decision"].get("listwise_max_candidates", 5))
+    scoring = {
+        "threshold": float(model.threshold),
+        "beta": float(model.beta),
+        "fusion_weight": config.get("fusion_weight", "beta_u"),
+        "constant_weight": float(config.get("constant_weight", 0.5)),
+    }
     if config.get("distill") == "student" and config.get("fusion_weight") == "source_first":
         raise ValueError("The pair student requires beta_u or constant integration")
     if config["gate"]["mode"] == "learned" and (
-        config.get("fusion_weight") != "source_first"
+        config.get("fusion_weight") != ("beta_u" if binary else "source_first")
         or config.get("decision", {}).get("evidence", "structured_packet") == "generated_brief"
     ):
         raise ValueError(
-            "Benefit router requires scored or structured packets and frozen source_first integration"
+            "Benefit router requires packets and frozen binary beta_u or comparative source_first integration"
         )
     if (
         config["gate"]["mode"] == "learned"
@@ -228,16 +286,20 @@ def fit_llm_artifacts(model, frame, reference_pairs, directory, *, config, appli
                 "Benefit router requires every candidate of each training source to have an explicit confirmed label"
             )
     sources = sorted(set(frame.Src.astype(str)))
+    if set(sources) & set(map(str, application.get("source_ids", []))):
+        raise ValueError("Training and reporting source groups overlap")
     binding = teacher_identity(model)
     recipe = {
+        "learning_version": 2,
         "application": application,
         "teacher": binding,
         "features": frame[["Src", "Tgt", *PAIR_FEATURES]].to_dict("records"),
+        "labels": frame[["src_label_text", "tgt_label_text"]].to_dict("records"),
         "references": sorted(reference),
         "student": config.get("student_training", "gold_teacher"),
         "outcomes": config.get("outcome_policy", "unknown"),
         "teacher_source_cap": config.get("teacher_source_cap", 200),
-        "threshold": float(model.threshold),
+        "counterfactual_scoring": scoring,
         "evidence": (
             frame.get("llm_evidence_packet", []).tolist() if "llm_evidence_packet" in frame else []
         ),
@@ -255,7 +317,9 @@ def fit_llm_artifacts(model, frame, reference_pairs, directory, *, config, appli
     if config.get("exemplars") == "knn":
         examples = []
         for source, group in frame.groupby("Src", sort=True):
-            group = group.sort_values(["S_base", "Tgt"], ascending=[False, True]).head(5)
+            group = group.sort_values(["S_base", "Tgt"], ascending=[False, True]).head(
+                limit_candidates
+            )
             examples.append(
                 {
                     "source": source,
@@ -284,46 +348,67 @@ def fit_llm_artifacts(model, frame, reference_pairs, directory, *, config, appli
     )
     teacher_records = []
     if needs_teacher:
-        if config["decision"]["mode"] == "binary":
-            raise ValueError("E21 source counterfactuals require the frozen comparative judge")
         if (
             config["gate"]["mode"] == "learned"
             and config.get("outcome_policy") != "complete_sources"
         ):
             raise ValueError("Benefit router needs complete/adjudicated source outcomes")
         limit = int(config.get("teacher_source_cap", 200))
+        import random
+
+        teacher_sources = sorted(frame.Src.astype(str).unique())
+        random.Random(model.request_seed).shuffle(teacher_sources)
+        teacher_sources = teacher_sources[:limit]
         teacher_path = directory / "teacher.json"
         if teacher_path.exists():
-            teacher_records = json.loads(teacher_path.read_text())["records"]
+            teacher_payload = json.loads(teacher_path.read_text())
+            if teacher_payload["teacher_binding"] != binding:
+                raise ValueError("Cached teacher identity changed")
+            teacher_records = teacher_payload["records"]
         else:
-            import random
-
-            teacher_sources = sorted(frame.Src.astype(str).unique())
-            random.Random(model.request_seed).shuffle(teacher_sources)
-            for source in teacher_sources[:limit]:
+            for source in teacher_sources:
                 group = frame[frame.Src.astype(str) == source]
-                group = group.sort_values(["S_base", "Tgt"], ascending=[False, True]).head(5)
+                group = group.sort_values(["S_base", "Tgt"], ascending=[False, True]).head(
+                    limit_candidates
+                )
                 shard = directory / (fingerprint(source) + ".json")
                 if shard.exists():
-                    teacher_records.extend(json.loads(shard.read_text())["records"])
+                    records = json.loads(shard.read_text())["records"]
+                    if binary:
+                        _validate_binary_teacher(records, str(source), set(group.Tgt.astype(str)))
+                    teacher_records.extend(records)
                     continue
                 briefs = group.llm_evidence_packet.astype(str).tolist()
                 if config["decision"].get("evidence") == "generated_brief":
                     briefs = model.generate_pair_briefs_batched(
                         group.src_label_text.tolist(), group.tgt_label_text.tolist(), briefs
                     )
-                _, _, records = model.llm_grouped_decision_probs(
+                args = (
                     group.Src.tolist(),
                     group.Tgt.tolist(),
                     group.src_label_text.tolist(),
                     group.tgt_label_text.tolist(),
                     briefs,
                     group.S_base.tolist(),
-                    [True] * len(group),
                 )
+                if binary:
+                    _, records = model.llm_binary_decision_probs(*args)
+                else:
+                    _, _, records = model.llm_grouped_decision_probs(*args, [True] * len(group))
+                if binary:
+                    _validate_binary_teacher(records, str(source), set(group.Tgt.astype(str)))
                 freeze_json(shard, {"records": records})
                 teacher_records.extend(records)
             freeze_json(teacher_path, {"teacher_binding": binding, "records": teacher_records})
+        if binary:
+            if sorted(record["source"] for record in teacher_records) != sorted(teacher_sources):
+                raise ValueError("Binary teacher cache changed its frozen source population")
+            for record in teacher_records:
+                group = frame[frame.Src.astype(str) == record["source"]]
+                displayed = group.sort_values(["S_base", "Tgt"], ascending=[False, True]).head(
+                    limit_candidates
+                )
+                _validate_binary_teacher([record], record["source"], set(displayed.Tgt.astype(str)))
     teacher_by_source = {
         record["source"]: record for record in teacher_records if record.get("valid")
     }
@@ -363,21 +448,13 @@ def fit_llm_artifacts(model, frame, reference_pairs, directory, *, config, appli
             )
             if tokens <= 0:
                 continue
-            base = group.sort_values(["S_base", "Tgt"], ascending=[False, True]).iloc[0]
-            base_correct = (str(source), str(base.Tgt)) in reference and float(
-                base.S_base
-            ) >= model.threshold
-            choice = teacher["choice"]
-            chosen = group[group.Tgt == choice]
-            judged_correct = (
-                (str(source), choice) in reference
-                and not chosen.empty
-                and float(chosen.iloc[0].S_base) >= model.threshold
+            outcome = _outcome(
+                group, teacher["pair_probabilities"], teacher.get("choice"), reference, **scoring
             )
-            benefit = int(judged_correct) - int(base_correct)
+            benefit = outcome["net_correction"]
             examples.append(
                 {
-                    "source": source,
+                    **outcome,
                     "features": source_features(group.S_base),
                     "outcome": (
                         "correction" if benefit > 0 else "harm" if benefit < 0 else "no_change"
@@ -407,6 +484,7 @@ def fit_llm_artifacts(model, frame, reference_pairs, directory, *, config, appli
             "target": "correction_minus_harm_per_1000_tokens",
             "outcome_policy": config["outcome_policy"],
             "outcome_scope": "frozen_fully_labeled_candidate_pool",
+            "counterfactual_scoring": scoring,
             "counterfactuals": examples,
         }
         result["router"] = freeze_json(directory / "router.json", payload)

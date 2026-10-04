@@ -69,6 +69,35 @@ class _TinyDataset:
         }
 
 
+def test_binary_exemplar_inference_retains_frozen_candidate_cap(monkeypatch):
+    scorer = _scorer()
+    scorer.attach_dataset(_TinyDataset())
+    scorer.use_llm = True
+    scorer.llm_experiment_enabled = True
+    scorer.llm_experiment_config["exemplars"] = "knn"
+    scorer.llm_experiment_config["decision"]["evidence"] = "structured_packet"
+    scorer.llm_experiment_config["gate"] = {"mode": "analytic", "threshold": 0.0}
+    calls = []
+
+    def binary(sources, targets, *args):
+        calls.append((sources, targets))
+        return torch.full((len(targets),), 0.9), [{"source": "s", "exemplar_sources": ["train"]}]
+
+    monkeypatch.setattr(scorer, "llm_binary_decision_probs", binary)
+    monkeypatch.setattr(
+        scorer, "llm_yesno_probs_batched", lambda *args: pytest.fail("Exemplar path was bypassed")
+    )
+    result = scorer(
+        src_iris=["s"] * 6,
+        tgt_iris=["t5", "t4", "t3", "t2", "t1", "t0"],
+        src_label_lists=[["source"]] * 6,
+        tgt_label_lists=[["target"]] * 6,
+    )
+    assert calls == [(["s"] * 5, ["t4", "t3", "t2", "t1", "t0"])]
+    assert result["S_final"][0] == result["S_base"][0]
+    assert result["llm_grouped_decisions"][0]["exemplar_sources"] == ["train"]
+
+
 def test_string_metrics_and_abbreviation_are_bounded_and_conservative() -> None:
     assert isub_similarity("Heart Valve", "heart valve") == pytest.approx(1.0)
     assert jaro_winkler_similarity("martha", "marhta") == pytest.approx(0.961, abs=0.002)

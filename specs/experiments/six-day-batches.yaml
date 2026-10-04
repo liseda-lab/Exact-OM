@@ -107,7 +107,7 @@ batches:
     steps:
       - E04
       - E04-pool-miss
-      - E04-listwise
+      - E04-listwise-diagnostic
       - E11
       - E12-retrieval
       - E12
