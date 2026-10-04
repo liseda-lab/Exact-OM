@@ -427,15 +427,20 @@ def _semantic_entailment(
     relation_threshold: float,
     timeout_seconds: float,
     anchor_candidates: Any | None = None,
+    frozen_anchor_rows: list[dict[str, Any]] | None = None,
 ) -> pd.DataFrame:
     deadline = time.monotonic() + max(0.001, float(timeout_seconds))
-    anchor_rows = _semantic_anchor_rows(
-        frame if anchor_candidates is None else anchor_candidates,
-        source,
-        target,
-        anchors=anchors,
-        threshold=anchor_threshold,
-        margin=anchor_margin,
+    anchor_rows = (
+        frozen_anchor_rows
+        if frozen_anchor_rows is not None
+        else _semantic_anchor_rows(
+            frame if anchor_candidates is None else anchor_candidates,
+            source,
+            target,
+            anchors=anchors,
+            threshold=anchor_threshold,
+            margin=anchor_margin,
+        )
     )
     try:
         adjacency = _semantic_graph(source, target, anchor_rows, deadline=deadline)
@@ -633,9 +638,10 @@ def predict_relations(
     equivalence_anchor_threshold: float = 0.95,
     equivalence_anchor_margin: float = 0.10,
     relation_confidence_threshold: float = 0.5,
-    timeout_seconds: float = 60.0,
+    timeout_seconds: float | None = 60.0,
     artifact: Any | None = None,
     anchor_candidates: Any | None = None,
+    bridge_options: dict[str, Any] | None = None,
 ) -> pd.DataFrame:
     """Type accepted pairs while preserving the shipped all-equivalent default.
 
@@ -659,7 +665,7 @@ def predict_relations(
         if backend == "bridge_reasoner":
             from exact.io.relation_bridge import native_bridge
 
-            if timeout_seconds <= 0:
+            if timeout_seconds is not None and timeout_seconds <= 0:
                 raise WriterOptionsError("relation bridge timeout must be positive")
             anchor_rows = _semantic_anchor_rows(
                 frame if anchor_candidates is None else anchor_candidates,
@@ -674,7 +680,8 @@ def predict_relations(
                 source,
                 target,
                 anchor_rows=anchor_rows,
-                timeout_seconds=float(timeout_seconds),
+                timeout_seconds=timeout_seconds,
+                **(bridge_options or {}),
             )
         if backend != "graph_closure":
             raise WriterOptionsError(
@@ -682,6 +689,8 @@ def predict_relations(
             )
         if source is None or target is None:
             raise WriterOptionsError("semantic relation typing requires source and target graphs")
+        if timeout_seconds is None:
+            raise WriterOptionsError("graph closure requires a positive timeout")
         if not 0.0 <= float(equivalence_anchor_threshold) <= 1.0:
             raise WriterOptionsError("equivalence anchor threshold must be in [0, 1]")
         if not 0.0 <= float(equivalence_anchor_margin) <= 1.0:

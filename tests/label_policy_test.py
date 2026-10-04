@@ -1,4 +1,5 @@
 import json
+from dataclasses import replace
 from pathlib import Path
 
 import pandas as pd
@@ -366,6 +367,30 @@ def test_materialize_uses_completed_nested_units_and_real_paired_bootstrap(
             == "supervised"
         )
     assert materialize_followup(followup, suite, manifests).raw_hash() == bound.raw_hash()
+    assert bound.directory.is_relative_to(followup.directory)
+    assert not (stage_root / "policies").exists()
+    producer_bytes = {path: path.read_bytes() for path in stage_root.rglob("*") if path.is_file()}
+    # Relocation must leave the completed producer read-only, even when the
+    # consumer's base configuration path changes between preflight and execution.
+    relocated = tmp_path / "second-consumer" / followup.path.name
+    relocated_base = relocated.parent / "base.config.yaml"
+    relocated.parent.mkdir()
+    relocated_base.write_bytes(followup.base_config_path.read_bytes())
+    relocated_config = followup.config.model_copy(update={"base_config": relocated_base})
+    freeze_json(relocated, relocated_config.model_dump(mode="json"))
+    second = replace(followup, path=relocated, config=relocated_config)
+    rebound = materialize_followup(second, suite, manifests)
+    assert rebound.directory.is_relative_to(relocated.parent)
+    assert rebound.directory != bound.directory
+    second_policy = json.loads((rebound.directory / "count_policy.json").read_text())
+    assert second_policy["components"] == policy["components"]
+    assert second_policy["binding"] == policy["binding"]
+    assert {
+        path: path.read_bytes() for path in stage_root.rglob("*") if path.is_file()
+    } == producer_bytes
+    (rebound.directory / "resolved-experiment.json").write_text("{}")
+    with pytest.raises(ValueError, match="Fitted artifact identity conflict"):
+        materialize_followup(second, suite, manifests)
     if include_active:
         path = next((stage_root / "runs" / "E22" / "active_100").glob("**/selector.json"))
         artifact = json.loads(path.read_text())

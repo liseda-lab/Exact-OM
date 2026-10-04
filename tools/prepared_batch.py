@@ -84,6 +84,14 @@ def completed_run(run):
         raise ValueError("Required comparison is incomplete: " + run["id"])
     if complete.get("selection"):
         verified(complete["selection"])
+    if complete.get("diagnostic"):
+        diagnostic = read(verified(complete["diagnostic"]))
+        if (
+            diagnostic.get("status") != "complete"
+            or diagnostic.get("selection_eligible") is not False
+        ):
+            raise ValueError("Incomplete non-selecting diagnostic: " + run["id"])
+        verified(diagnostic["diagnostic"])
     for item in complete.get("manifests", []):
         if read(verified(item)).get("status") != "complete":
             raise ValueError("Incomplete upstream cell")
@@ -551,6 +559,10 @@ def run_recipe(path):
             previous_completion.unlink()
         os.environ.update(read(verified(recipe["environment"])))
         os.environ["EXACT_EVIDENCE_PREFETCH"] = "0"
+        if recipe.get("diagnostic"):
+            from tools.prepared_diagnostic import run_prepared_diagnostic
+
+            return run_prepared_diagnostic(path, registry)
         os.environ["OPENROUTER_API_KEY"] = (
             (Path(recipe["repository"]) / "api_key").read_text().strip()
         )
@@ -591,13 +603,17 @@ def run_recipe(path):
                 },
                 immutable=True,
             )
+        os.environ.update(hosted_caps(state, runtime / "openrouter"))
+        if recipe.get("hosted_retry_authorizations"):
+            from tools.authorize_hosted_retries import apply_authorizations
+
+            apply_authorizations(recipe, runtime)
         if recipe.get("deferred_lineage_registration"):
             from tools.finalize_prepared_selection import register_lineage
 
             # The predecessor may own the newest cumulative account. Keep it enabled
             # until both the copied request history/budget and launch receipt are durable.
             registry = register_lineage(recipe)
-        os.environ.update(hosted_caps(state, runtime / "openrouter"))
         plan = campaign_plan(campaign, stage="screen")
         relevant = [row for row in plan["rows"] if row["step"] == recipe["scientific_step"]]
         if plan["budget_errors"] or not relevant or any(row["issues"] for row in relevant):
@@ -715,6 +731,69 @@ def run_recipe(path):
                     tokens=0,
                     actual_usd=0,
                 )
+        if recipe.get("e14_ledger_repair"):
+            from tools.recover_e14_ledger import charge_missing_setup, import_saved
+
+            work = "preparation/E14/ledger-recovery/" + os.environ["SLURM_STEP_ID"]
+            ledger.admit(work, group="reserve", seconds=0, forecast_known=False)
+            migration_start, migration_status = time.time(), "failed"
+            try:
+                charge_missing_setup(recipe, ledger)
+                import_saved(recipe, campaign, runtime, code)
+                migration_status = "complete"
+            finally:
+                ledger.finish(
+                    work,
+                    start=migration_start,
+                    end=time.time(),
+                    status=migration_status,
+                    requests=0,
+                    tokens=0,
+                    actual_usd=0,
+                )
+        if recipe.get("e07_ledger_repair"):
+            from tools.recover_e07_ledger import import_saved
+
+            work = "preparation/E07/ledger-repair/" + os.environ["SLURM_STEP_ID"]
+            ledger.admit(work, group="reserve", seconds=0, forecast_known=False)
+            migration_start, migration_status = time.time(), "failed"
+            try:
+                import_saved(recipe, campaign, runtime, code)
+                migration_status = "complete"
+            finally:
+                ledger.finish(
+                    work,
+                    start=migration_start,
+                    end=time.time(),
+                    status=migration_status,
+                    requests=0,
+                    tokens=0,
+                    actual_usd=0,
+                )
+        if recipe.get("training_retention_repair"):
+            from tools.recover_training_retention import import_saved
+
+            work = (
+                "preparation/"
+                + recipe["scientific_step"]
+                + "/training-retention/"
+                + os.environ["SLURM_STEP_ID"]
+            )
+            ledger.admit(work, group="reserve", seconds=0, forecast_known=False)
+            migration_start, migration_status = time.time(), "failed"
+            try:
+                import_saved(recipe, campaign, runtime, code)
+                migration_status = "complete"
+            finally:
+                ledger.finish(
+                    work,
+                    start=migration_start,
+                    end=time.time(),
+                    status=migration_status,
+                    requests=0,
+                    tokens=0,
+                    actual_usd=0,
+                )
         guarded_execute(campaign, root, code, check_pause=lambda: controls(supervisor, root))
         selection = runtime / "screen/selection.json"
         result = read(selection)["experiments"][recipe["scientific_step"]]
@@ -818,9 +897,14 @@ def prepare(root, batch, *, base_campaign, code, supervisor, environment_path, c
         recipe, root / "preview", read(supervisor / "registry.json"), completed=False
     )
     CampaignLock.model_validate(preview)
+    return prepare_launch(recipe, root, code, supervisor, batch)
+
+
+def prepare_launch(recipe, root, code, supervisor, batch):
+    """Share immutable Slurm receipt and storage guard wiring across worker types."""
     recipe_path = root / "recipe.json"
     write(recipe_path, recipe, immutable=True)
-    python = Path(recipe["repository"]) / ".venv/bin/python"
+    python = Path(recipe.get("python", str(Path(recipe["repository"]) / ".venv/bin/python")))
     worker = root / "worker-entry.sh"
     step_path = root / "step.json"
     worker.write_text(

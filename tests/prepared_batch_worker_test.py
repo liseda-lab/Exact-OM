@@ -134,6 +134,7 @@ def _charge(path, limits, key, *, requests=1, tokens=12, status="complete"):
 
 
 def _worker(tmp_path, monkeypatch):
+    monkeypatch.setattr(os, "environ", os.environ.copy())
     for key in (
         "EXACT_OPENROUTER_REQUEST_CAP",
         "EXACT_OPENROUTER_TOKEN_CAP",
@@ -452,3 +453,54 @@ def test_shell_exit_helper_archives_prior_failed_step_before_recording_retry(tmp
     latest = prepared_batch.read(root / "completion.json")
     assert latest["status"] == "failed" and latest["exit_code"] == 143
     assert latest["step_id"] == "14372.42" and latest["dispatch_nonce"] == "short-job-nonce"
+
+
+@pytest.mark.parametrize("failed", [False, True])
+def test_diagnostic_worker_preserves_account_and_does_not_run_campaign(
+    tmp_path, monkeypatch, failed
+):
+    from tools import run_directional_diagnostic
+
+    worker = _worker(tmp_path, monkeypatch)
+    recipe = prepared_batch.read(worker.path)
+    output = tmp_path / "diagnostic"
+    diagnostic = tmp_path / "diagnostic-recipe.json"
+    prepared_batch.write(diagnostic, {"kind": "e24_directional_known_pairs", "output": str(output)})
+    recipe["diagnostic"] = prepared_batch.binding(diagnostic)
+    prepared_batch.write(worker.path, recipe)
+    # Offline diagnostics must not even require access to the hosted credential.
+    (tmp_path / "api_key").unlink(missing_ok=True)
+    monkeypatch.setattr(
+        experiment_resources,
+        "guarded_execute",
+        lambda *a, **k: pytest.fail("diagnostic ran a selecting campaign"),
+    )
+
+    def run(path):
+        assert path == diagnostic
+        if failed:
+            raise RuntimeError("fixture failed after checkpoint")
+        artifact = output / "diagnostic.json"
+        prepared_batch.write(artifact, {"result": "fixture"})
+        prepared_batch.write(
+            output / "completion.json",
+            {
+                "status": "complete",
+                "selection_eligible": False,
+                "diagnostic": prepared_batch.binding(artifact),
+            },
+        )
+
+    monkeypatch.setattr(run_directional_diagnostic, "run_diagnostic", run)
+    if failed:
+        with pytest.raises(RuntimeError, match="fixture failed"):
+            prepared_batch.run_recipe(worker.path)
+    else:
+        prepared_batch.run_recipe(worker.path)
+        completion = prepared_batch.read(worker.root / "completion.json")
+        assert completion["selection_eligible"] is False
+        assert "selection" not in completion
+    account = prepared_batch.read(worker.runtime / "budget.json")
+    charge = account["work"]["diagnostic/E18/40"]
+    assert charge["status"] == ("failed" if failed else "complete")
+    assert charge["requests"] == charge["tokens"] == charge["actual_usd"] == 0

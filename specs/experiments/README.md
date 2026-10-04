@@ -1,5 +1,9 @@
 # Exact-OM experiment programme v2
 
+**Approved optional-input amendment, 2026-10-03:**
+[Public-input amendment](PUBLIC-INPUT-AMENDMENT-20261003.md) records the E08 deferral,
+E24 directional diagnostic, E23 OpenEA case, and gated E14 native OWL comparison.
+
 **Operational amendment, 2026-09-29:** [RUN-ONCE-EXECUTION.md](RUN-ONCE-EXECUTION.md)
 supersedes time caps, full qualification repeats and the old dispatch dates below.
 Runtime figures are advisory forecasts; they neither terminate work nor prevent admission.

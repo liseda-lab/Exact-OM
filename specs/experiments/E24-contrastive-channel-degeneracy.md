@@ -79,3 +79,47 @@ removal, or inapplicability is a deliverable; an unimplemented arm is not an emp
 Resolve this family's question into numbered research questions and a primary endpoint in the
 executable design before its screen; answer each as supported, not supported or inconclusive
 with evidence. RUN-PLAN section 7 governs incomplete references and claim limitations.
+
+## Bound asymmetric diagnostic (2026-10-03)
+
+The optional asymmetric branch is a **known-pair diagnostic on T0 public train and
+validation**, not an alignment treatment or an end-to-end F1 result. Each split uses
+300 nested source groups (all if fewer), selected by the existing seed-17 source hash
+without relation labels. All known pairs in those groups are retained. No absent pair
+is treated as a negative; training labels do not fit this diagnostic.
+
+For every pair, the production dataset extracts object evidence and the existing
+encoder computes one support matrix. The production difference channel scores both
+fixed hypotheses (`<` and `>`). Higher support chooses the direction; a gap no larger
+than `1e-6` abstains. Missing positive-weight evidence on either side, or no positive
+cross-side support, is unsupported and also abstains. Replaying swapped evidence with
+the transposed matrix checks that the two scores and decisions reverse consistently.
+The same scores produce a symmetric always-abstaining control, and an always-`<`
+control is evaluated on exactly the directional diagnostic's decided pairs.
+
+Report per-relation coverage, balanced accuracy counting abstentions as incorrect,
+and conditional balanced accuracy only when both relations have covered examples.
+Equality pairs have a separate absolute score-gap/direction-decision diagnostic;
+they do not enter directional accuracy. These are development diagnostics, with no
+automatic promotion or claim of logical entailment or held-out alignment performance.
+
+Executable preparation and producer:
+
+```sh
+python tools/run_directional_diagnostic.py prepare \
+  --bindings data/experiments-v2/local-bindings.yaml \
+  --config /path/to/frozen/resolved-config.yaml \
+  --output /path/to/e24-diagnostic \
+  --recipe /path/to/e24-recipe.json
+python tools/run_directional_diagnostic.py run --recipe /path/to/e24-recipe.json
+```
+
+The config must bind immutable encoder revisions or checksummed local models. The
+producer uses the bound CSV graph descriptors, deterministic evidence rendering,
+and no hosted decisions, rationales, fitting, or reference-derived anchors. Its
+compact SQLite checkpoint stores label-free pair components, verified against the
+input/config/code/dependency/device identity before reuse. Each pair commits before
+the next starts; interruption resumes without rescoring completed pairs. Separate
+JSON diagnostics contain development labels and metrics. The completion record is
+explicitly ineligible for selection. The ordinary E24 missingness experiments and
+their F1 selection rule remain separate.

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import copy
 import json
+import logging
 from ast import literal_eval
 from pathlib import Path
 
@@ -277,7 +278,7 @@ class TrainingPoolMixin:
             view._df[view.default_kind] = True
             if hasattr(view, "_invalidate_active_dataframe_cache"):
                 view._invalidate_active_dataframe_cache()
-            records = []
+            records, consumed_shards = [], []
             # Train-only head fitting never requests decision/brief/rationale calls.
             original_llm = getattr(self.model, "use_llm", False)
             original_scoring_role = getattr(self.model, "_numerical_scoring_role", None)
@@ -287,6 +288,7 @@ class TrainingPoolMixin:
                 for indices in source_batches(view._df, int(batch_size)):
                     source_ids = list(view._df.iloc[indices].Src.astype(str).unique())
                     shard = cache_dir / (fingerprint(source_ids) + ".json")
+                    consumed_shards.append(shard)
                     if shard.exists():
                         records.extend(json.loads(shard.read_text())["rows"])
                         continue
@@ -369,7 +371,16 @@ class TrainingPoolMixin:
                 else:
                     self.model._numerical_scoring_role = original_scoring_role
             freeze_json(frame_path, {"identity": identity, "rows": records})
-            shared_training_scores(self.model, identity, application, batch_size, rows=records)
+            # The durable aggregate contains these exact rows; retain shards only
+            # while this pass is unfinished, and avoid a second shared-cache copy.
+            try:
+                for shard in consumed_shards:
+                    shard.unlink(missing_ok=True)
+            except OSError as error:
+                logging.getLogger(__name__).warning(
+                    "Training aggregate is durable; retaining redundant shards after cleanup failed: %s",
+                    error,
+                )
             training = pd.DataFrame(records)
         from exact.impl.models.selector.label_budget import select_label_budget
 

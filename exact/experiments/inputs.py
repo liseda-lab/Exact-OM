@@ -13,11 +13,13 @@ import pandas as pd
 from exact.utils.provenance import sha256_file
 
 
-def nested_sources(sources: Iterable[str], cap: int | None, *, seed: int = 17) -> list[str]:
+def nested_sources(
+    sources: Iterable[str], cap: int | None, *, seed: int = 17, kind: str = "class"
+) -> list[str]:
     """Choose nested source samples independently of predictions and labels."""
     ranked = sorted(
         set(map(str, sources)),
-        key=lambda iri: (hashlib.sha256(f"{seed}\x1f{iri}\x1fclass".encode()).digest(), iri),
+        key=lambda iri: (hashlib.sha256(f"{seed}\x1f{iri}\x1f{kind}".encode()).digest(), iri),
     )
     if cap is not None and cap < 1:
         raise ValueError("source cap must be positive")
