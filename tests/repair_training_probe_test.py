@@ -94,9 +94,12 @@ def test_gradient_probe_rejects_nonfinite_and_zero():
     assert all(p.grad is None for p in model.parameters())
 
 
-@pytest.mark.parametrize("encoder", ["none", "rgcn", "hgt"])
+@pytest.mark.parametrize(
+    "encoder,head",
+    [("none", "unary"), ("none", "pairwise"), ("rgcn", "pairwise"), ("hgt", "pairwise")],
+)
 def test_actual_full_schema_proposal_backward_without_teacher_or_optimizer(
-    tmp_path, monkeypatch, encoder
+    tmp_path, monkeypatch, encoder, head
 ):
     from tools.repair.corpus import generate_corpus
     from tools.repair import train
@@ -127,11 +130,17 @@ def test_actual_full_schema_proposal_backward_without_teacher_or_optimizer(
         cases[0].problem.to_dict(),
         settings,
         generic_graph_schema(),
-        encoder + "-pairwise",
+        encoder + "-" + head,
         tmp_path,
     )
     assert result["readout_gradients"]["nonzero_parameters"]
-    assert result["selected_pairs"] > 0 and result["pair_factors"] > 0
+    assert result["status"] == "complete"
+    if head == "pairwise":
+        assert result["selected_pairs"] > 0 and result["pair_factors"] > 0
+    else:
+        assert result["selected_pairs"] == result["pair_factors"] == 0
+        # Disabled interactions are deliberate, even when the observable graph links objects.
+        assert any(count > 0 for _, count in result["pair_omissions"])
     assert result["optimizer_steps"] == result["checkpoints_written"] == 0
     assert all(row["status"] == "complete" for row in result["proposals"])
     assert all(row["gradients"]["nonzero_parameters"] for row in result["proposals"])
@@ -190,3 +199,25 @@ def test_resume_preserves_timeout_denominator_and_refuses_pending_owner(tmp_path
     with pytest.raises(RuntimeError, match="prior-owner"):
         training_probe.run(plan_path, "none-unary", tmp_path / "output")
     assert len(calls) == 32
+
+
+@pytest.mark.parametrize("arm", ["hgt-unary", "hgt-pairwise"])
+def test_probe_omission_interpretation_preserves_actual_missingness(arm):
+    from copy import deepcopy
+    from tools.repair.training_probe import probe_status
+
+    result = dict(arm=arm, omitted_nodes=0, omitted_supports=0, omitted_evidence=[],
+                  support_omissions=[], pair_omissions=[["fixed_axiom", 0]],
+                  proposals=[dict(status="complete", missing_candidates=0)])
+    original = deepcopy(result)
+    assert probe_status(result) == "complete"
+    assert result == original
+    result["pair_omissions"] = [["fixed_axiom", 3]]
+    assert probe_status(result) == ("partial" if arm.endswith("-pairwise") else "complete")
+    for key, value in [("omitted_nodes", 1), ("omitted_supports", 1),
+                       ("omitted_evidence", ["missing"]),
+                       ("support_omissions", [["support", "graph_budget"]]),
+                       ("proposals", [dict(status="proposal_deadline")]),
+                       ("proposals", [dict(status="complete", missing_candidates=1)])]:
+        missing = {**original, key: value}
+        assert probe_status(missing) == "partial"

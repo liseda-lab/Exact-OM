@@ -78,6 +78,23 @@ def gradient_summary(model, loss, *, retain_graph=False):
     )
 
 
+def probe_status(result):
+    """Classify omissions relative to the arm that was actually requested."""
+    pairwise = result["arm"].endswith("-pairwise")
+    incomplete = (
+        result["omitted_nodes"]
+        or result["omitted_supports"]
+        or result["omitted_evidence"]
+        or result["support_omissions"]
+        or (pairwise and any(count > 0 for _, count in result["pair_omissions"]))
+        or any(
+            p["status"] != "complete" or p.get("missing_candidates", 0)
+            for p in result["proposals"]
+        )
+    )
+    return "partial" if incomplete else "complete"
+
+
 def probe(record, settings, declaration, arm, directory):
     import torch
     from exact.repair.graph import EffectivePreparation
@@ -215,17 +232,7 @@ def probe(record, settings, declaration, arm, directory):
             device=torch.cuda.get_device_name(0),
         )
     result["elapsed_seconds"] = time.monotonic() - started
-    if (
-        result["omitted_nodes"]
-        or result["omitted_supports"]
-        or result["omitted_evidence"]
-        or result["support_omissions"]
-        or result["pair_omissions"]
-        or any(
-            p["status"] != "complete" or p.get("missing_candidates", 0) for p in result["proposals"]
-        )
-    ):
-        result["status"] = "partial"
+    result["status"] = probe_status(result)
     write_artifact(output / "progress.json", result)
     return result
 
