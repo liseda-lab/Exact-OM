@@ -70,6 +70,27 @@ prove navigation parity. Never access the unrestricted exploration API from the 
 
 ## B12 / R03 — Explicit durable tutorial position
 
+### R14 — Explicit typed tutorial action evidence (2026-10-04)
+
+When a v2 `TutorialAction` supplies `entity`, its `kind` is required at the HTTP
+request boundary: exactly `class`, `object_property`, `data_property` or `individual`.
+Omitted, null or unknown kinds return 422 before mutation. The full typed identity
+must belong to the frozen tutorial scope and satisfy the action's recorded relation;
+a legal kind with the wrong identity also returns 422 atomically. Never infer a class
+from an IRI or fill the kind before validating action evidence. The frontend already
+sends recorded kinds (19 F21 / R12).
+
+Use an action-specific entity model. Preserve shared legacy entity defaults and
+frozen v1/v2 publication canonicalization, content hashes, resume state and exports.
+Previously stored action receipts remain immutable. An old request that omitted kind
+now fails validation, including retries; resending its explicit normalized kind under
+the same idempotency key preserves the original canonical request hash and replays
+the original receipt. This is stricter runtime action validation, not a publication
+protocol migration. Regenerate OpenAPI and test actual HTTP rejection, exact typed
+identity, unchanged state/history on failure and historical receipt replay.
+
+### Durable position contract
+
 Add `position` to `TutorialReceipt` and the v2 tutorial progress patch. Its two complete shapes
 are:
 

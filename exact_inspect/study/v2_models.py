@@ -224,11 +224,17 @@ class TutorialDefinition(TutorialPublic):
         return self
 
 
+class TutorialActionEntity(EntityRef):
+    """Action evidence must carry the recorded type; frozen publications keep v1 defaults."""
+
+    kind: Literal["class", "object_property", "data_property", "individual"]
+
+
 class TutorialAction(StrictModel):
     requirement_id: Identifier
     action: RequirementAction
     candidate_id: Identifier | None = None
-    entity: EntityRef | None = None
+    entity: TutorialActionEntity | None = None
     fact_id: Identifier | None = None
     ranked_candidate_ids: Annotated[list[Identifier] | None, Field(max_length=5)] = None
     response_type: ResponseType | None = None

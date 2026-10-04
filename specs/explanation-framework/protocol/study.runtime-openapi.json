@@ -9908,7 +9908,7 @@
           "entity": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/EntityRef-Input"
+                "$ref": "#/components/schemas/TutorialActionEntity"
               },
               {
                 "type": "null"
@@ -10013,6 +10013,42 @@
           "action"
         ],
         "title": "TutorialAction"
+      },
+      "TutorialActionEntity": {
+        "properties": {
+          "ontology_version_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.:/-]+$",
+            "title": "Ontology Version Id"
+          },
+          "iri": {
+            "type": "string",
+            "maxLength": 2048,
+            "minLength": 1,
+            "title": "Iri"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "class",
+              "object_property",
+              "data_property",
+              "individual"
+            ],
+            "title": "Kind"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "ontology_version_id",
+          "iri",
+          "kind"
+        ],
+        "title": "TutorialActionEntity",
+        "description": "Action evidence must carry the recorded type; frozen publications keep v1 defaults."
       },
       "TutorialAssessment": {
         "properties": {

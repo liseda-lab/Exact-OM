@@ -171,7 +171,9 @@ def validate_definition(tutorial):
 
 
 def entity_key(entity):
-    return (entity["ontology_version_id"], entity["iri"], entity.get("kind", "class"))
+    if entity.get("kind") not in {"class", "object_property", "data_property", "individual"}:
+        raise ValueError("Entity evidence requires an explicit recorded kind")
+    return (entity["ontology_version_id"], entity["iri"], entity["kind"])
 
 
 def walk_entities(value):
@@ -460,10 +462,15 @@ def apply_progress(store, study, progress, data, interaction_state=None):
             or action.get("fact_id")
         ):
             if resources is None:
+                from .resources import ExplanationResource
+
+                # Historical admitted resource bytes may omit legacy class defaults.
+                # Normalize through their original model, without rewriting frozen assets
+                # or applying those defaults to new participant action evidence.
                 resources = [
-                    json.loads(
+                    ExplanationResource.model_validate_json(
                         store._asset_bytes(next(a for a in study["assets"] if a["asset_id"] == aid))
-                    )
+                    ).model_dump(mode="json")
                     for aid in tutorial["case"]["explanation_refs"]
                 ]
             identities = {entity_key(e) for e in walk_entities(resources)} | {
