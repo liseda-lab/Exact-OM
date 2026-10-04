@@ -2,10 +2,108 @@
 
 import copy
 import json
+import sqlite3
 
 import pytest
 
-from exact.experiments.supervision import assess_runs, inspect_runs, inspection_incident
+from exact.experiments.supervision import (
+    assess_runs, inspect_hosted_spending, inspect_runs, inspection_incident,
+)
+
+
+def _spending_run(tmp_path, name, work):
+    root = tmp_path / name
+    root.mkdir()
+    budget = root / "budget.json"
+    budget.write_text(json.dumps({"limits": {"tokens_cap": 24_000_000}, "work": work}))
+    status = root / "status.json"
+    status.write_text(json.dumps({"cumulative_budget": str(budget)}))
+    return {"id": name, "status_path": str(status)}
+
+
+def _request_usage(root, rows):
+    directory = root / "openrouter"
+    directory.mkdir()
+    with sqlite3.connect(directory / "requests.sqlite3") as db:
+        db.execute("CREATE TABLE attempts (request_id TEXT,number INTEGER,usage TEXT)")
+        db.execute("CREATE TABLE reservations (request_id TEXT,number INTEGER,tokens INTEGER)")
+        for ident, (usage, reserved) in enumerate(rows):
+            db.execute("INSERT INTO attempts VALUES (?,1,?)", (str(ident), json.dumps(usage)))
+            if reserved is not None:
+                db.execute("INSERT INTO reservations VALUES (?,1,?)", (str(ident), reserved))
+
+
+def test_hosted_milestone_uses_one_cumulative_account_and_live_delta(tmp_path):
+    history = {
+        "historical/G0": {"status": "reserved", "tokens": 2_000_000},
+        "failed-attempt": {"status": "failed", "tokens": 95_000_000},
+    }
+    older = _spending_run(tmp_path, "old", history)
+    current = _spending_run(tmp_path, "new", {
+        **history,
+        "interrupted-attempt": {"status": "interrupted", "tokens": 1_000_000},
+        "live": {"status": "reserved", "tokens": 900_000_000,
+                 "hosted_usage_baseline": {"billable_tokens": 10_000_000}},
+    })
+    _request_usage(tmp_path / "new", [
+        ({"prompt_tokens": 9_000_000, "completion_tokens": 1_000_000}, 20_000_000),
+        ({"prompt_tokens": 1_000_000, "completion_tokens": 500_000}, 3_000_000),
+        ({"prompt_tokens": 100_000}, 500_000),
+    ])
+    result = inspect_hosted_spending({"runs": [older, current]})
+    assert result["status"] == "observed"
+    assert result["closed_accounted_tokens"] == 98_000_000
+    assert result["active_accounted_tokens"] == 2_000_000
+    assert result["accounted_tokens"] == 100_000_000
+    assert result["request_ledger_usage"]["unreported_attempts"] == 1
+    assert result["request_ledger_usage"]["reported_tokens"] == 11_600_000
+
+
+def test_hosted_milestone_refuses_divergent_copied_accounts(tmp_path):
+    a = _spending_run(tmp_path, "a", {"shared": {"status": "complete", "tokens": 10}})
+    b = _spending_run(tmp_path, "b", {"fork": {"status": "complete", "tokens": 100_000_000}})
+    with pytest.raises(ValueError, match="Divergent cumulative accounting"):
+        inspect_hosted_spending({"runs": [a, b]})
+
+
+def test_hosted_milestone_keeps_unbound_forecasts_out_of_actual_usage(tmp_path):
+    run = _spending_run(tmp_path, "current", {
+        "failed": {"status": "failed", "tokens": 19},
+        "live": {"status": "reserved", "tokens": 100_000_000},
+    })
+    result = inspect_hosted_spending({"runs": [run]})
+    assert result["status"] == "incomplete" and result["accounted_tokens"] == 19
+    assert "baseline" in result["error"]
+
+
+def test_hosted_milestone_does_not_treat_unbounded_unknown_usage_as_zero(tmp_path):
+    run = _spending_run(tmp_path, "current", {
+        "live": {"status": "reserved", "tokens": 0,
+                 "hosted_usage_baseline": {"billable_tokens": 0}},
+    })
+    _request_usage(tmp_path / "current", [({}, None)])
+    with pytest.raises(ValueError, match="lacks a retained token reservation"):
+        inspect_hosted_spending({"runs": [run]})
+
+
+def test_hosted_milestone_retries_when_work_finalizes_during_snapshot(tmp_path, monkeypatch):
+    from exact.experiments import supervision
+
+    run = _spending_run(tmp_path, "current", {
+        "live": {"status": "reserved", "tokens": 0,
+                 "hosted_usage_baseline": {"billable_tokens": 0}},
+    })
+    def finalized(_path):
+        path = tmp_path / "current" / "budget.json"
+        account = json.loads(path.read_text())
+        account["work"]["live"].update(status="complete", tokens=100_000_000)
+        path.write_text(json.dumps(account))
+        return {"billable_tokens": 100_000_000}
+
+    monkeypatch.setattr(supervision, "_hosted_wire_usage", finalized)
+    with pytest.raises(ValueError, match="changed during observation"):
+        inspect_hosted_spending({"runs": [run]})
+    assert inspect_hosted_spending({"runs": [run]})["accounted_tokens"] == 100_000_000
 
 
 def _runs():

@@ -5,6 +5,8 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import sqlite3
+from contextlib import closing
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
@@ -229,6 +231,102 @@ def inspect_runs(
                 observation["errors"].append(f"{field}: {type(exc).__name__}: {exc}")
         observations[run["id"]] = observation
     return assess_runs(runs, observations, step_states=step_states)
+
+
+def _token_count(value: Any) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise ValueError("Hosted token counts must be nonnegative integers")
+    return value
+
+
+def _hosted_wire_usage(path: Path) -> dict[str, int]:
+    """Read a consistent request snapshot without creating or modifying the ledger."""
+    totals = {"billable_tokens": 0, "reported_tokens": 0, "unreported_attempts": 0}
+    with closing(sqlite3.connect(path.resolve().as_uri() + "?mode=ro", uri=True, timeout=1)) as db:
+        rows = db.execute(
+            "SELECT a.usage,r.tokens FROM attempts a LEFT JOIN reservations r "
+            "USING(request_id,number)"
+        )
+        for raw, reserved in rows:
+            usage = json.loads(raw or "{}")
+            known = sum(_token_count(usage.get(key) or 0)
+                        for key in ("prompt_tokens", "completion_tokens"))
+            totals["reported_tokens"] += known
+            if all(usage.get(key) is not None for key in ("prompt_tokens", "completion_tokens")):
+                totals["billable_tokens"] += known
+            else:
+                if reserved is None:
+                    raise ValueError("Unreported hosted usage lacks a retained token reservation")
+                totals["billable_tokens"] += max(known, _token_count(reserved))
+                totals["unreported_attempts"] += 1
+    return totals
+
+
+def inspect_hosted_spending(registry: Mapping[str, Any]) -> dict[str, Any]:
+    """Observe one cumulative lineage, adding only usage since active admission.
+
+    Closed attempts (including failures) already contain their hosted charges.
+    Copied cumulative accounts and request histories must never be summed. The
+    legacy historical/G0 reservation is retained exposure, not a pending forecast.
+    Live reservations require a durable wire-usage baseline; forecasts alone are
+    never counted as tokens spent. Observation errors are handled by the caller
+    and never become a scientific dispatch gate.
+    """
+    choices = {}
+    for run in registry["runs"]:
+        if not run.get("enabled", True):
+            continue
+        report = _read(run.get("status_path"), json_object=True)
+        if not report or not report.get("cumulative_budget"):
+            continue
+        path = Path(report["cumulative_budget"]).resolve()
+        account = _read(path, json_object=True)
+        if account is None:
+            raise ValueError("Declared cumulative budget is missing: " + str(path))
+        choices[path] = account
+    if not choices:
+        raise ValueError("No authoritative cumulative hosted account")
+    path = max(choices, key=lambda item: (len(choices[item]["work"]), item.stat().st_mtime_ns))
+    account = choices[path]
+    for previous in choices.values():
+        if previous["limits"] != account["limits"]:
+            raise ValueError("Divergent cumulative accounting limits")
+        for key, value in previous["work"].items():
+            if value["status"] != "reserved" or key == "historical/G0":
+                if account["work"].get(key) != value:
+                    raise ValueError("Divergent cumulative accounting: " + key)
+    # Recheck the budget after SQLite to avoid double counting if finalization
+    # replaces the reservation with actual charges while this observation runs.
+    before = account
+    closed = [row for key, row in account["work"].items()
+              if row["status"] != "reserved" or key == "historical/G0"]
+    active = [(key, row) for key, row in account["work"].items()
+              if row["status"] == "reserved" and key != "historical/G0"]
+    closed_tokens = sum(_token_count(row["tokens"]) for row in closed)
+    result = {
+        "status": "observed", "budget_path": str(path),
+        "closed_accounted_tokens": closed_tokens, "active_accounted_tokens": 0,
+        "accounted_tokens": closed_tokens,
+        "active_work_ids": [key for key, _ in active],
+        "accounting": "Closed charged tokens plus live delta; unreported usage retains conservative reservations.",
+    }
+    if active:
+        if len(active) != 1 or not isinstance(active[0][1].get("hosted_usage_baseline"), dict):
+            result.update(status="incomplete", error="Active work lacks a unique hosted usage baseline")
+            return result
+        baseline = _token_count(active[0][1]["hosted_usage_baseline"]["billable_tokens"])
+        wire_path = path.parent / "openrouter" / "requests.sqlite3"
+        wire = _hosted_wire_usage(wire_path)
+        if wire["billable_tokens"] < baseline:
+            raise ValueError("Hosted request accounting fell below its admission baseline")
+        delta = wire["billable_tokens"] - baseline
+        result.update(
+            active_accounted_tokens=delta, accounted_tokens=closed_tokens + delta,
+            request_ledger_path=str(wire_path), request_ledger_usage=wire,
+        )
+    if _read(path, json_object=True) != before:
+        raise ValueError("Cumulative accounting changed during observation; retry next check")
+    return result
 
 
 def pending_batches(registry: Mapping[str, Any], health: Mapping[str, Any]) -> list[dict]:

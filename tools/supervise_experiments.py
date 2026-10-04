@@ -24,6 +24,7 @@ from exact.experiments.notifications import (  # noqa: E402
     notify_intervention,
 )
 from exact.experiments.supervision import (  # noqa: E402
+    inspect_hosted_spending,
     inspect_runs,
     inspection_incident,
     pending_batches,
@@ -293,6 +294,7 @@ def refresh_progress(policy, directory):
     """Observe during an intervention without authenticating or starting a model."""
     try:
         registry = read(directory / "registry.json")
+        observe_hosted_spending(directory, policy, registry, act=True)
         health = inspect_runs(registry["runs"], step_states=slurm_steps(policy["allocation"]))
         write(directory / "health.json", health)
         status = read(directory / "status.json")
@@ -302,6 +304,47 @@ def refresh_progress(policy, directory):
             directory / "observation-error.json",
             {"error": type(exc).__name__ + ": " + str(exc), "checked_at": timestamp()},
         )
+
+
+def observe_hosted_spending(directory, policy, registry, *, act=False):
+    """Queue a requested milestone independently of repairs and dispatch admission."""
+    config = policy.get("hosted_spending_milestone")
+    if config is None:
+        return None
+    result = {
+        "checked_at": timestamp(), "milestone_id": config["id"],
+        "notification_tokens": config["notification_tokens"], "mode": "notification_only",
+    }
+    try:
+        result.update(inspect_hosted_spending(registry))
+    except Exception as exc:
+        result.update(status="unavailable", error=type(exc).__name__ + ": " + str(exc))
+    result["threshold_reached"] = result.get("accounted_tokens", 0) >= config["notification_tokens"]
+    if act and result["threshold_reached"]:
+        incident = {
+            "id": "hosted-token-milestone:" + config["id"],
+            "kind": "hosted_token_milestone", "run_ids": [],
+            "reason": f"Requested {config['notification_tokens']:,} hosted-token milestone reached.",
+        }
+        summary = (
+            f"Cumulative accounted hosted tokens: {result['accounted_tokens']:,}; "
+            f"closed charges: {result['closed_accounted_tokens']:,}; "
+            f"active usage since admission: {result['active_accounted_tokens']:,}. "
+            "Unreported usage retains conservative token reservations; this is not an exact "
+            "provider-reported total. This milestone is notification-only. "
+            "Authorized experiments, dispatch and automatic repair continue."
+        )
+        if result["status"] != "observed":
+            summary += " Active usage is incomplete: " + result["error"] + "."
+        result["notification"] = notify_intervention(
+            directory, incident, "hosted_token_milestone", summary,
+            config=policy.get("notifications", {}), handoff=result["budget_path"], defer=True,
+        )
+    try:
+        write(directory / "hosted-spending.json", result)
+    except OSError as exc:
+        result["persistence_error"] = type(exc).__name__
+    return result
 
 
 def notify_blocker(directory, policy, incident, action, *, result=None, report=None):
@@ -403,6 +446,7 @@ def dispatch_worker(directory, policy, stop_event):
 
 def check(directory, policy, state, *, act=False, stop_requested=lambda: False):
     registry = read(directory / "registry.json")
+    spending = observe_hosted_spending(directory, policy, registry, act=act)
     steps = slurm_steps(policy["allocation"])
     if not any(key.startswith(policy["allocation"] + ".") for key in steps):
         raise ValueError("Retained allocation is unavailable; do not create or cancel allocations")
@@ -481,6 +525,8 @@ def check(directory, policy, state, *, act=False, stop_requested=lambda: False):
         "status": observation["status"],
         "health": str(directory / "health.json"),
     }
+    if spending is not None:
+        current["hosted_spending"] = spending
     pause_paths = [directory / "PAUSE", *(Path(p) for p in registry.get("pause_paths", []))]
     paused_by = [str(path) for path in pause_paths if path.exists()]
     if paused_by:
@@ -616,6 +662,16 @@ def validate_policy(policy):
         )
     if policy.get("storage_guard") is not None:
         storage_guard.validate_policy(policy["storage_guard"])
+    milestone = policy.get("hosted_spending_milestone")
+    if milestone is not None and (
+        not isinstance(milestone, dict)
+        or not isinstance(milestone.get("id"), str)
+        or not milestone["id"].strip()
+        or isinstance(milestone.get("notification_tokens"), bool)
+        or not isinstance(milestone.get("notification_tokens"), int)
+        or milestone["notification_tokens"] < 1
+    ):
+        raise ValueError("Hosted spending milestone requires a stable ID and positive token threshold")
     daily_limit = policy.get("max_agent_runs_per_day")
     if daily_limit is not None and (
         isinstance(daily_limit, bool) or not isinstance(daily_limit, int) or daily_limit < 1

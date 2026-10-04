@@ -59,6 +59,77 @@ def _result(outcome):
     }
 
 
+def _milestone_account(cli, tmp_path, policy, tokens):
+    policy["hosted_spending_milestone"] = {
+        "id": "campaign-hosted-tokens", "notification_tokens": 100_000_000,
+    }
+    budget = tmp_path / "budget.json"
+    cli.write(budget, {"limits": {}, "work": {
+        "history": {"status": "failed", "tokens": tokens},
+    }})
+    receipt = tmp_path / "worker-status.json"
+    cli.write(receipt, {"status": "running", "cumulative_budget": str(budget)})
+    cli.write(tmp_path / "registry.json", {"runs": [{
+        "id": "E10", "step_id": "14372.2", "status_path": str(receipt),
+    }]})
+    return budget
+
+
+def test_milestone_queues_at_threshold_once_across_restart_without_repair(monitor, tmp_path, monkeypatch):
+    cli, policy, state, observation = monitor
+    budget = _milestone_account(cli, tmp_path, policy, 99_999_999)
+    observation.update(status="healthy", incidents=[])
+    monkeypatch.setattr(cli, "run_agent", lambda *args: pytest.fail("Milestone must not trigger repair"))
+    sent = []
+    monkeypatch.setattr(notifications, "_deliver", lambda *args: sent.append(args))
+    first = cli.check(tmp_path, policy, state, act=True)
+    assert not first["hosted_spending"]["threshold_reached"]
+    assert not (tmp_path / "alerts").exists()
+    for tokens in (100_000_000, 100_000_001, 110_000_000):
+        account = cli.read(budget)
+        account["work"]["history"]["tokens"] = tokens
+        cli.write(budget, account)
+        # Deduplication survives a controller restart and increasing usage.
+        state = cli.read(tmp_path / "state.json")
+        status = cli.check(tmp_path, policy, state, act=True)
+        assert status["status"] == "healthy"
+        assert status["hosted_spending"]["threshold_reached"]
+        notifications.flush_notifications(tmp_path, policy["notifications"])
+    assert len(sent) == 1 and state["agent_runs"] == [] and state["incidents"] == {}
+    assert not (tmp_path / "PAUSE").exists() and not (tmp_path / "STOP").exists()
+
+
+def test_milestone_does_not_suppress_independent_repair_or_send_synchronously(monitor, tmp_path, monkeypatch):
+    cli, policy, state, _ = monitor
+    _milestone_account(cli, tmp_path, policy, 100_000_000)
+    monkeypatch.setattr(notifications, "_deliver", lambda *args: pytest.fail("Synchronous delivery"))
+    monkeypatch.setattr(cli, "run_agent", lambda *args: _result("repaired"))
+    result = cli.check(tmp_path, policy, state, act=True)
+    assert result["outcome"] == "repaired"
+    assert result["hosted_spending"]["notification"]["delivery"] == "pending"
+    assert state["agent_runs"][0]["incident"] == "failure"
+
+
+def test_spending_observation_error_does_not_block_repair(monitor, tmp_path, monkeypatch):
+    cli, policy, state, _ = monitor
+    budget = _milestone_account(cli, tmp_path, policy, 100_000_000)
+    budget.write_text("incomplete json")
+    monkeypatch.setattr(cli, "run_agent", lambda *args: _result("repaired"))
+    result = cli.check(tmp_path, policy, state, act=True)
+    assert result["outcome"] == "repaired"
+    assert result["hosted_spending"]["status"] == "unavailable"
+    assert not result["hosted_spending"]["threshold_reached"]
+
+
+def test_read_only_milestone_observation_never_queues_mail(monitor, tmp_path, monkeypatch):
+    cli, policy, state, _ = monitor
+    _milestone_account(cli, tmp_path, policy, 100_000_000)
+    monkeypatch.setattr(cli, "notify_intervention", lambda *args, **kwargs: pytest.fail("Read only"))
+    result = cli.check(tmp_path, policy, state, act=False)
+    assert result["hosted_spending"]["threshold_reached"]
+    assert not (tmp_path / "alerts").exists()
+
+
 def test_decision_alert_is_immediate_and_not_resent(monitor, tmp_path, monkeypatch):
     cli, policy, state, _ = monitor
     sent = []

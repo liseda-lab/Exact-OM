@@ -23,11 +23,25 @@ _ACTION_REQUIRED_OUTCOMES = {
     "incident_attempt_limit",
     "supervisor_unavailable",
 }
+_REQUESTED_MILESTONE_OUTCOMES = {"hosted_token_milestone"}
+
+
+def _resolved(alert: Mapping[str, Any]) -> bool:
+    """A recorded user decision can retire an obsolete message without inventing delivery."""
+    resolution = alert.get("resolution")
+    return bool(
+        isinstance(resolution, Mapping)
+        and resolution.get("kind") == "superseded_by_user_authorization"
+        and resolution.get("authorization")
+        and resolution.get("resolved_at")
+    )
 
 
 def _suppress_non_actionable(alert: dict[str, Any]) -> bool:
     """Filter new and legacy outbox entries without hiding delivery uncertainty."""
-    if alert.get("outcome") in _ACTION_REQUIRED_OUTCOMES:
+    if _resolved(alert):
+        return True
+    if alert.get("outcome") in _ACTION_REQUIRED_OUTCOMES | _REQUESTED_MILESTONE_OUTCOMES:
         return False
     previous = alert.get("delivery")
     if previous not in {"sent", "ambiguous", "suppressed"}:
@@ -65,6 +79,7 @@ def _message(alert: Mapping[str, Any], config: Mapping[str, Any]) -> EmailMessag
     label = {
         "problem_detected": "Problem detected; automatic repair pending",
         "recovered": "Experiment recovered",
+        "hosted_token_milestone": "Hosted token milestone reached",
     }.get(alert["outcome"], "Action required: " + alert["outcome"])
     message["Subject"] = "[Exact-OM] " + label
     # Reuse Message-ID after an uncertain delivery; local dedup cannot guarantee exactly-once SMTP.
@@ -180,8 +195,8 @@ def notify_intervention(
 ) -> dict[str, Any]:
     """Persist one immutable message per incident/outcome; the monitor queues only.
 
-    Only outcomes requiring human action enter the delivery queue; other events
-    retain a suppressed local receipt. Deferred delivery is drained independently,
+    Human-action outcomes and explicitly requested milestones enter the delivery
+    queue; other events retain a suppressed local receipt. Delivery is drained independently,
     including after the incident has disappeared. Existing bodies stay unchanged
     for safe Gmail deduplication.
     Synchronous delivery remains available for explicit transport checks.
@@ -285,7 +300,8 @@ def notification_incidents(directory: str | Path) -> list[dict[str, Any]]:
             alert = json.loads(path.read_text())
         except (OSError, ValueError):
             continue
-        if alert.get("delivery") != "ambiguous" or alert.get("notification_incident"):
+        if (_resolved(alert) or alert.get("delivery") != "ambiguous"
+                or alert.get("notification_incident")):
             continue
         identity = hashlib.sha256(("notification:" + alert["id"]).encode()).hexdigest()[:24]
         incidents.append(

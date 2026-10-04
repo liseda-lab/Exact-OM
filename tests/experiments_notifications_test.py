@@ -196,6 +196,52 @@ def test_existing_message_is_immutable_while_queued(tmp_path):
     assert first == second
 
 
+def test_requested_token_milestone_delivers_once_without_action_required_label(tmp_path, monkeypatch):
+    sent = []
+    monkeypatch.setattr(notifications, "_deliver", lambda message, _: sent.append(message))
+    for _ in range(3):
+        notifications.notify_intervention(
+            tmp_path, INCIDENT, "hosted_token_milestone", "100M tokens; experiments continue",
+            config=COMMAND, defer=True,
+        )
+        notifications.flush_notifications(tmp_path, COMMAND)
+    assert len(sent) == 1
+    assert str(sent[0]["Subject"]) == "[Exact-OM] Hosted token milestone reached"
+    assert "experiments continue" in sent[0].get_content()
+
+
+@pytest.mark.parametrize("delivery", ["pending", "failed", "ambiguous"])
+def test_superseded_user_decision_preserves_delivery_evidence_without_resend(
+    tmp_path, monkeypatch, delivery
+):
+    alert = notifications.notify_intervention(
+        tmp_path, INCIDENT, "requires_user", "Authorize larger spending",
+        config=COMMAND, defer=True,
+    )
+    alert.update(delivery=delivery, attempts=1, error="original uncertainty", resolution={
+        "kind": "superseded_by_user_authorization",
+        "authorization": "User authorized continued spending on 2026-10-04",
+        "resolved_at": "2026-10-04T18:00:00+00:00",
+    })
+    path = notifications.Path(alert["path"])
+    notifications._write(path, alert)
+    before = path.read_bytes()
+    monkeypatch.setattr(notifications, "_deliver", lambda *args: pytest.fail("Obsolete decision"))
+    assert notifications.notification_incidents(tmp_path) == []
+    notifications.notify_intervention(
+        tmp_path, INCIDENT, "requires_user", "Changed", config=COMMAND,
+    )
+    notifications.flush_notifications(tmp_path, COMMAND)
+    assert path.read_bytes() == before
+
+
+def test_incomplete_resolution_does_not_hide_delivery_uncertainty(tmp_path):
+    alert = notifications.notify_intervention(tmp_path, INCIDENT, "requires_user", "Decide")
+    alert.update(delivery="ambiguous", resolution={"kind": "superseded_by_user_authorization"})
+    notifications._write(notifications.Path(alert["path"]), alert)
+    assert len(notifications.notification_incidents(tmp_path)) == 1
+
+
 def test_ambiguous_send_creates_one_repair_incident_without_recursive_alerts(tmp_path):
     alert = notifications.notify_intervention(
         tmp_path, INCIDENT, "requires_user", "Decide", config=COMMAND, defer=True
