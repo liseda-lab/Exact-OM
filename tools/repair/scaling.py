@@ -28,6 +28,40 @@ from tools.repair.prepare import case_from_dict, case_to_dict
 METHODS = ('grammar_circuit', 'semantic_circuit', 'semantic_enumeration_decoder')
 
 
+def endpoint_policy(schedule):
+    """Capture endpoint admission without changing legacy frozen schedules.
+
+    Zero disables newly retrieved substitutions only; supplied candidates and
+    complete original bundles are retained. Non-elementary originals still
+    require explicitly specified semantics before endpoint substitution.
+    """
+    default = dict(schema='exact-repair/scaling-endpoint-policy/v1',
+                   endpoints_per_side=2, admission='complete_elementary_relation')
+    policy = schedule.get('endpoint_policy', default)
+    if (not isinstance(policy, dict) or set(policy) != set(default)
+            or policy['schema'] != default['schema']
+            or policy['admission'] != default['admission']
+            or type(policy['endpoints_per_side']) is not int
+            or policy['endpoints_per_side'] < 0):
+        raise ValueError('Invalid captured scaling endpoint policy')
+    return dict(policy)
+
+
+def generation_input(problem_record, config, schedule):
+    """One observable retrieval/materialization entry point for every method."""
+    from exact.repair.candidates import materialize_retrieved_endpoints
+    from exact.repair.retrieval import RetrievalConfig, retrieve_vocabulary
+
+    original = read_record(problem_record)
+    policy = endpoint_policy(schedule)
+    retrieval = retrieve_vocabulary(original, config=RetrievalConfig(
+        classes_per_side=config['menu'], properties_per_side=2,
+        endpoints_per_side=policy['endpoints_per_side']))
+    problem = (materialize_retrieved_endpoints(original, retrieval)
+               if policy['endpoints_per_side'] else original)
+    return original, problem, retrieval
+
+
 def configurations():
     base = dict(mapping_count=4, depth=1, constructors=1, menu=2, candidate_cap=16)
     return [dict(id='baseline', **base)] + [
@@ -120,20 +154,16 @@ def prepare(corpus_attempt, profile_schedule, protocol_binding, output):
 def generate(problem_record, config, method, schedule, directory, cache):
     """Publish incremental pools so a generation timeout retains completed work."""
     import torch
-    from exact.repair.candidates import materialize_retrieved_endpoints, deduplicate_candidates
+    from exact.repair.candidates import deduplicate_candidates
     from exact.repair.circuit import FactoredConditionedMixture
     from exact.repair.grammar import mapping_grammar, compile_families, with_immutable_context
     from exact.repair.proposals import enumerate_grammar
-    from exact.repair.retrieval import RetrievalConfig, retrieve_vocabulary
 
     torch.set_num_threads(1)
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True)
     started = time.monotonic()
-    original = read_record(problem_record)
-    retrieval = retrieve_vocabulary(original, config=RetrievalConfig(
-        classes_per_side=config['menu'], properties_per_side=2, endpoints_per_side=2))
-    problem = materialize_retrieved_endpoints(original, retrieval)
+    original, problem, retrieval = generation_input(problem_record, config, schedule)
     objects = list(problem.objects)
     reports = []
     for index, obj in enumerate(problem.objects):
@@ -188,7 +218,7 @@ def generate(problem_record, config, method, schedule, directory, cache):
         reports.append(details)
         write_artifact(directory/'pool-progress.json', dict(input=replace_inventory(problem, tuple(objects)).to_dict(),
             reports=reports, completed_objects=len(reports), scheduled_objects=len(objects),
-            retrieval_hash=canonical_hash(retrieval)))
+            retrieval_hash=canonical_hash(retrieval), endpoint_policy=endpoint_policy(schedule)))
     return binding(directory/'pool-progress.json')
 
 
@@ -216,7 +246,8 @@ def evaluate(schedule, row, output, cache_source=None):
     pool_path = output/'pool-progress.json'
     pool = read(pool_path) if pool_path.exists() else None
     problem = read_record(pool['input']) if pool else case.problem
-    result = dict(generation_status=generation.status, generation_detail=generation.detail,
+    result = dict(endpoint_policy=endpoint_policy(schedule),
+        generation_status=generation.status, generation_detail=generation.detail,
         generation_resources=dict(generation.resource_usage), pool=binding(pool_path) if pool else None,
         generation_complete=bool(pool and pool['completed_objects']==pool['scheduled_objects']
             and all(r['status']=='complete' for r in pool['reports'])),
