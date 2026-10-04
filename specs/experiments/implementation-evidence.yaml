@@ -206,7 +206,7 @@ families:
         supported declaration.
   E21:
     amendment: E21-binary-judge-amendment.yaml
-    amendment_status: metadata_preflight_passed_source_freeze_and_publication_pending
+    amendment_status: implemented_verified_and_queued
     implemented_paths:
       - exact/impl/models/selector/llm_learning.py
       - exact/impl/models/semantic_llm.py

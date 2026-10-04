@@ -4,7 +4,7 @@ experiment: E21
 approved: true
 approval_scope: Support the selected E07 binary judge; preserve five E21 treatments and original roles.
 specification: E21-supervised-llm.md
-status: metadata_preflight_passed_source_freeze_and_publication_pending
+status: implemented_verified_and_queued
 scientific_results: not_executed
 changes_shared_native_packages: false
 selected_teacher:
@@ -86,8 +86,9 @@ verification:
     protected_exact_candidates_excluded_by_extraction: 1
     scientific_calls: 0
     hosted_calls: 0
-  source_freeze: pending
-  publication: pending
+  source_freeze: ed856e5f76f5fbe5b89e2133d43c8985fd08a867
+  publication: queued
+  publication_receipt: ../../data/experiments-v2/approved-judges-20261004-01/publication.json
   paid_calls_during_implementation: 0
   required_regressions:
     - binary_fusion_and_effective_threshold
