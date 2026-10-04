@@ -535,7 +535,9 @@ def _pending_annotation_then_block(profile, messages, max_output_tokens, role, d
         {"role": role, "payload": {"messages": messages, "max_tokens": max_output_tokens}}
     )
     ledger.sent(key)
-    time.sleep(10)
+    (Path(directory) / "sender-started").write_text(str(os.getpid()))
+    time.sleep(60)
+    (Path(directory) / "sender-finished").write_text("unexpected completion")
 
 
 def test_total_annotation_deadline_kills_sender_and_preserves_charge(tmp_path, monkeypatch):
@@ -543,7 +545,9 @@ def test_total_annotation_deadline_kills_sender_and_preserves_charge(tmp_path, m
 
     import exact.repair.semantic_fidelity as sf
 
-    config = run(max_seconds_per_request=1.0)
+    # The post-send fixture must reach ledger.sent before its deadline. Worker
+    # startup is supervised too, so allow finite cold-start headroom here.
+    config = run(max_seconds_per_request=10.0)
     router = LLMRouter(
         {
             name: {"backend": "openrouter", "model": "vendor/" + name}
@@ -555,12 +559,42 @@ def test_total_annotation_deadline_kills_sender_and_preserves_charge(tmp_path, m
     started = time.monotonic()
     with pytest.raises(RuntimeError, match="worker timeout"):
         a.annotate(packet(), role=TEACHER)
-    assert time.monotonic() - started < 5  # Only runaway detection, not a performance claim.
+    assert time.monotonic() - started < config.max_seconds_per_request + 5
+    assert (tmp_path / "sender-started").is_file(), "fixture never reached wire dispatch"
+    assert not (tmp_path / "sender-finished").exists()
     summary = a.summary()
     assert summary["reserved_requests"] == 1 and summary["reserved_cost_usd"] == 1
     assert summary["wire"]["roles"][TEACHER]["unknown"] == 1
     with sqlite3.connect(a.ledger.path) as db:
         assert db.execute("SELECT state FROM attempts").fetchone()[0] == "unknown"
+
+
+def test_annotation_startup_timeout_preserves_reserve_without_inventing_wire_attempt(
+    tmp_path, monkeypatch
+):
+    import exact.repair.semantic_fidelity as sf
+    from exact.repair.workers import CallResult
+
+    router = LLMRouter(
+        {
+            name: {"backend": "openrouter", "model": "vendor/" + name}
+            for name in ("teacher", "evaluator")
+        }
+    )
+    annotation = SemanticAnnotationAdapter(router, run(max_seconds_per_request=1.0), tmp_path)
+    monkeypatch.setattr(
+        sf,
+        "bounded_call",
+        lambda *args, **kwargs: CallResult("timeout", detail="startup deadline exhausted"),
+    )
+    with pytest.raises(RuntimeError, match="worker timeout"):
+        annotation.annotate(packet(), role=TEACHER)
+    summary = annotation.summary()
+    assert summary["reserved_requests"] == 1 and summary["reserved_cost_usd"] == 1
+    assert summary["wire"]["roles"] == {}
+    with sqlite3.connect(annotation.ledger.path) as db:
+        assert db.execute("SELECT count(*) FROM attempts").fetchone()[0] == 0
+        assert db.execute("SELECT state FROM repair_annotation_reserves").fetchone()[0] == "unresolved"
 
 
 def _offline_lookup_fixture(split="train"):
