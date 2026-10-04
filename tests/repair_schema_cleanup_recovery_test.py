@@ -64,8 +64,10 @@ def test_recovery_rejects_changed_slice(change):
 
 
 @pytest.mark.parametrize('change', [None, 'nonce', 'command', 'missing_prefix', 'row_identity',
-    'guard_identity', 'spent_next_row', 'spent_next_payload', 'finished_guard'])
-def test_original_validation_binds_prefix_guard_and_unstarted_rows(tmp_path, change):
+    'guard_identity', 'spent_next_row', 'spent_next_payload', 'finished_guard',
+    'wrong_command_index', 'other_error', 'different_attempt'])
+@pytest.mark.parametrize('command_index', [0, 1])
+def test_original_validation_binds_prefix_guard_and_unstarted_rows(tmp_path, change, command_index):
     from exact.repair.api import write_artifact
     from exact.repair.records import canonical_hash
     from tools.repair.expanded_corpus import binding
@@ -84,9 +86,12 @@ def test_original_validation_binds_prefix_guard_and_unstarted_rows(tmp_path, cha
         frozen_batch={'path':'/original/batch.json'},source_root='/original/code',schema_plan=binding(schema_plan))
     receipt=tmp_path/'completion.json'
     write_artifact(receipt,dict(status='failed',exit_code=1,step_id=STEP,dispatch_nonce='nonce',
-        error={'message':recovery.COMMAND_ERROR},batch='/original/batch.json',work=str(work.parent)))
+        error={'message': ('command 0 exited 1: ValueError: other failure' if change=='other_error' else
+            recovery.COMMAND_ERROR.replace('command 1', f'command {command_index}'))},
+        batch='/original/batch.json',work=str(work.parent)))
     owner=tmp_path/'step.json';write_artifact(owner,dict(step_id=STEP,dispatch_nonce='wrong' if change=='nonce' else 'nonce'))
-    command=tmp_path/'command.json'
+    receipt_index=command_index+1 if change=='wrong_command_index' else command_index
+    command=(tmp_path/'other-attempt' if change=='different_attempt' else tmp_path)/f'command-{receipt_index}.json'
     write_artifact(command,dict(cwd='/wrong' if change=='command' else '/original/code',
         argv=['python','-m','tools.repair.schema_recovery',str(schema_plan),str(work),'--start','0','--stop','3']))
     refs=[]

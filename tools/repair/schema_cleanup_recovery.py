@@ -83,10 +83,15 @@ def validate_original(plan, evidence, identity):
     start, stop, failed = slice_bounds(plan)
     completion, owner, command = (bound(evidence[k]) for k in ('completion', 'ownership', 'command'))
     work = Path(completion['work']) / 'evaluation'
+    command_error = re.fullmatch(
+        r'command (0|[1-9][0-9]*) exited 1: RuntimeError: Schema recovery cleanup incomplete; retain in-flight guard',
+        completion.get('error', {}).get('message', ''))
+    if (command_error is None or Path(evidence['command']['path']) !=
+            Path(evidence['completion']['path']).parent / f'command-{command_error[1]}.json'):
+        raise ValueError('Cleanup error must bind its exact original command receipt')
     if (completion['status'] != 'failed' or completion['exit_code'] != 1
             or completion['step_id'] != plan['original_step']
             or owner != dict(step_id=completion['step_id'], dispatch_nonce=completion['dispatch_nonce'])
-            or completion['error']['message'] != COMMAND_ERROR
             or completion['batch'] != plan['frozen_batch']['path']
             or command['cwd'] != plan['source_root']
             or command['argv'][1:] != ['-m', 'tools.repair.schema_recovery',
