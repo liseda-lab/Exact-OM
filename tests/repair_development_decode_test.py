@@ -135,14 +135,27 @@ def test_timeout_retained_without_replay_and_guard_blocks_restart(tmp_path, monk
         decode.fresh.one_row(schedule, other, tmp_path, "frozen", evaluator=decode.evaluate_row)
 
 
-def test_native_label_calls_are_persisted(prepared, tmp_path, monkeypatch):
-    from functools import partial
-    from tests.repair_fresh_evaluation_test import test_native_control_generation_and_evaluator_pipeline
+def test_native_label_calls_are_persisted(prepared, tmp_path):
+    from exact.repair.workers import bounded_call
+    from tools.repair.prepare import load_preparation, case_to_dict
     from tools.repair.batch import read
 
-    monkeypatch.setattr(decode.fresh, "evaluate_row",
-                        partial(decode.fresh.evaluate_row, record_native_labels=True))
-    test_native_control_generation_and_evaluator_pipeline(prepared, tmp_path, "uniform")
+    source, protocol = prepared
+    cases, _, _ = load_preparation(source)
+    case = next(c for c in cases if c.split == "development")
+    write_artifact(tmp_path / "input.json", case.problem.to_dict())
+    write_artifact(tmp_path / "evaluator.json", case_to_dict(case))
+    item = dict(case_id=case.case_id, structural_parent=case.structural_parent,
+        family=case.family, family_exposure="seen_family", status="materialized",
+        observable=binding(tmp_path / "input.json"), evaluator=binding(tmp_path / "evaluator.json"))
+    arms = [dict(id="uniform", kind="control", status="available", protocol=binding(protocol))]
+    row = decode.fresh.make_rows([item], arms)[0]
+    outcome = bounded_call(decode.evaluate_row, dict(cases=[item], arms=arms), row,
+                           str(tmp_path / "run"), timeout=300, cpu_seconds=600, memory_mb=8192)
+    write_artifact(tmp_path / "native-call-outcome.json", dict(status=outcome.status,
+        detail=outcome.detail, cleanup_complete=outcome.cleanup_complete,
+        resources=dict(outcome.resource_usage), event_journal=outcome.event_journal))
+    assert outcome.status == "complete", outcome.detail
     result = read(tmp_path / "run/result.json")
     assert result["logical_status"] == "VERIFIED_FEASIBLE"
     call = read(tmp_path / "run/native-label/call.json")
