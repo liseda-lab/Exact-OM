@@ -310,7 +310,8 @@ def ensure_cleanup(outcome):
         )
 
 
-def evaluate_row(schedule, row, directory, *, remaining_budget=None, inventory_only=False):
+def evaluate_row(schedule, row, directory, *, remaining_budget=None, inventory_only=False,
+                 record_native_labels=False):
     """Full comparison call including generation, solving and evaluator-only queries."""
     from exact.repair.pipeline import bounded_freeze_checkpoint, repair_neural_round
     from exact.repair.workers import bounded_call
@@ -482,6 +483,8 @@ def evaluate_row(schedule, row, directory, *, remaining_budget=None, inventory_o
                 )
                 remaining = resources["case_wall_seconds"] - (time.monotonic() - started) - 5
                 if remaining > 0:
+                    label_options = ({"evidence_directory": directory / "native-label"}
+                                     if record_native_labels else {})
                     labeled = bounded_call(
                         _assignment_label,
                         dataclasses.replace(case, problem=frozen.problem),
@@ -491,8 +494,15 @@ def evaluate_row(schedule, row, directory, *, remaining_budget=None, inventory_o
                         timeout=remaining,
                         memory_mb=row["memory_mb"],
                         cpu_seconds=row["cpu_seconds"],
+                        **label_options,
                     )
                     ensure_cleanup(labeled)
+                    if record_native_labels:
+                        from tools.repair.acquisition import record_call
+
+                        record_call(directory / "native-label", labeled, remaining,
+                                    dataclasses.replace(case, problem=frozen.problem),
+                                    repair.assignment)
                     result.update(
                         semantic_status=labeled.status,
                         semantic_detail=labeled.detail,

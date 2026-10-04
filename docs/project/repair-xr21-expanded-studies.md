@@ -236,3 +236,36 @@ clean controls are paired within size/condition and are not load-matched to corr
 cases. No confidence interval across independent parents is supported for this
 single ancestry. Optional depth 3 remains unactivated. Final receipt review closes
 only the registered scaling stage; other expanded studies remain registered.
+
+## Development generated-decoding prerequisite
+
+Before fitting the larger cohort, a separate development diagnostic exercises
+generated-pool decoding and selected-assignment external labeling with six fresh
+untrained full-schema models (HGT/R-GCN/no-graph, unary/pairwise, initialization
+seed 13), plus the existing symbolic retained-axiom, uniform and deletion controls.
+The models are initialized without corpus payloads and are forbidden as training
+warm starts, teachers or selected research checkpoints. The symbolic retained-axiom
+heuristic is not the required strongest semantic control; deletion remains a
+language ablation. This stage tests the inference/evaluator path, not learned
+quality or convergence, and does not replace supervised generated acquisition.
+
+All 32 development cases, 16 inherited structural parents and nine arms remain in
+the 288-row denominator. Existing train/test/fresh-evaluation release identities
+are preserved; no test payload enters this diagnostic. Cold caches are isolated
+per row. Every arm retains 300 wall seconds, 600 CPU seconds, 8192 MiB and the
+existing 60-second generation allowance. Sixteen rows form a 5400-second slice,
+using the measured development timeouts and the unchanged case allowances.
+Interrupted rows require explicit ownership and spent-budget reconciliation;
+completed and timed-out rows are never implicitly repeated.
+
+Generation and decoding receive observable records only. The evaluator opens
+the original development query basis after a native-authorized selection and
+records its new pool, selected label, search ledger and native label-call evidence.
+This is separately charged selected-assignment labeling, not reacquisition or
+replacement of the original finite teachers. Original intended-parent unknowns,
+query-scope limitations and overlap-only usable supervision remain explicit;
+diagnostic scores are not admitted training labels. Receipt review, native/query
+eligibility, optimizer capacity, actual supervised generated acquisition and
+development selection, all 18 strict fitting protocols, held-out matched semantic
+controls and final reporting remain registered obligations. Passing all 45 mapped
+fixture requirements still does not establish G0-G2 or learning efficiency.
