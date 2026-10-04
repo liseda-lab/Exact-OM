@@ -111,3 +111,34 @@ snapshot alongside all eight settled attempt charges. The audit worker and its
 maintenance are charged separately. Projection qualification does not qualify
 full-source reasoning, held-out transfer, production matcher performance,
 strongest-symbolic comparisons, research gates, or learning efficiency.
+
+## Scaling receipt audit and support-incidence qualification
+
+The primary resource sweep retains all 240 rows and every original and replacement
+attempt. Its audit distinguishes successful batch processes, native feasibility,
+generated-pool coverage, generation errors and fallback to the supplied inventory.
+The original clean-control endpoint-retrieval errors require explicit repair or
+terminal accounting before generated-pool comparisons can be qualified. Optional
+depth 3 is not activated because the development depth-2 generation evidence does
+not establish viability; this decision does not change existing scientific caps.
+
+The next support-incidence branch projects the lexicographically first original
+development parent into one exposed diagnostic ancestry group. At 4/8/16 corrupted
+mapping objects, it compares 2/4/8 two-edge conflicts with shared or nonshared first
+edges. The paired corrupt conditions have equal mapping, symbol and disjointness
+counts. Clean controls retain only the nonempty intended prefix mappings and have
+half as many objects; they are coherence controls, not load-matched corrupt arms.
+All names, sizes, conditions and controls share one ancestry group, with an alias
+audit against the frozen corpus inventory and previous overlap constructions.
+
+Twelve cases reserve 72 evaluation rows: three existing scaling methods and paired
+cold/warm caches. Before evaluation, exact support enumeration in the restricted
+named-subclass/disjointness fragment is checked by native witnesses of each minimal
+support, every proper subset, empty/full theories and the intended repair. This is
+not exhaustive native subset enumeration or general OWL qualification. Each witness
+case has 300 seconds, 600 CPU seconds and 8192 MiB; a 4200-second operational slice
+covers the twelve cases and receipt overhead. Unknown or unavailable witnesses keep
+their evaluation rows in the denominator. Native witness completion, generation
+adapter qualification, actual evaluation and the final resource report remain
+separate stages. No held-out, G0-G2, strongest-symbolic or learning claim follows
+from this preparation.
