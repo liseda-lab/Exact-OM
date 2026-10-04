@@ -20,6 +20,7 @@ import { shareReads, type SharedSource } from "@/lib/workspace/sharedReads";
 import type { WorkspaceSource } from "@/lib/workspace/types";
 import { useEntityContext, useExplanation } from "@/lib/workspace/WorkspaceContext";
 import type { EntityRef } from "@/lib/types";
+import { createAccessGuard, type AccessGuard } from "@/study/accessGuard";
 import { contextProblem, explanationProblem, inBatches, renderExpectations, requiredContent, validateCapabilities, validateCase, workspaceCapabilities, type CaseComponent, type ScopeCapabilities } from "@/study/caseReadiness";
 import type { ExplanationResource, StudyCase, StudyState } from "@/study/types";
 
@@ -62,7 +63,7 @@ export function useCaseContent({ state, components, ontologyName, caseLabels }: 
   attemptRef.current = attempt;
   const readinessRef = useRef(readiness);
   readinessRef.current = readiness;
-  const shared = useRef<{ key: string; source: SharedSource } | null>(null);
+  const shared = useRef<{ key: string; source: SharedSource; guard: AccessGuard } | null>(null);
   const stateRef = useRef(state);
   stateRef.current = state;
   const namesRef = useRef(ontologyName);
@@ -78,6 +79,7 @@ export function useCaseContent({ state, components, ontologyName, caseLabels }: 
     setSource(null);
     setReadiness({ attempt: attemptRef.current, kind: "loading", done: 0, total: 1 });
     return () => {
+      shared.current?.guard.cancel();
       shared.current?.source.close();
       shared.current = null;
     };
@@ -161,24 +163,26 @@ export function useCaseContent({ state, components, ontologyName, caseLabels }: 
       }
       const key = `study|${session}|${current.study_revision}|${current.presentation_id}|${scope}|${caps.policy_hash}`;
       if (shared.current?.key !== key) {
+        shared.current?.guard.cancel();
         shared.current?.source.close();
         const api = createApiSource({ key, base, sessionId: session, kind: "study_resource", capabilities: workspaceCapabilities(caps, (id) => namesRef.current(id)), ontologyName: (id) => namesRef.current(id) });
         // A refused optional read (for example a restricted resource) is local; only a
         // refusal of the scope itself means the session or policy no longer permits the case.
-        const suspect = (error: unknown) => {
-          const lost = () => block({ attempt: attemptRef.current, kind: "blocked", cause: "session", title: LOST_ACCESS, failures: [{ label: "Your session", detail: error instanceof Error ? error.message : "Access changed." }] });
-          if (error instanceof ApiError && error.status !== 403) return lost();
-          scopedRead(base, "/capabilities", undefined, undefined, session).then(
-            () => undefined,
-            (check) => {
-              if (check instanceof ApiError && [401, 403, 409].includes(check.status)) lost();
-            },
-          );
-        };
+        // Each re-check belongs to the attempt current when it is issued (19 F20).
+        const guard = createAccessGuard({
+          attempt: () => attemptRef.current,
+          live: () => shared.current?.key === key,
+          check: (signal) => scopedRead(base, "/capabilities", undefined, signal, session),
+          needsCheck: (error) => error instanceof ApiError && error.status === 403,
+          lost: (error) => error instanceof ApiError && [401, 403, 409].includes(error.status),
+          onLost: (issuedFor, error) =>
+            block({ attempt: issuedFor, kind: "blocked", cause: "session", title: LOST_ACCESS, failures: [{ label: "Your session", detail: error instanceof Error ? error.message : "Access changed." }] }),
+        });
         shared.current = {
           key,
+          guard,
           source: shareReads(api, {
-            onSuspect: suspect,
+            onSuspect: guard.suspect,
             validateContext: (entity, value) => contextProblem(value, entity),
             validateExplanation: (task, entities, value) => explanationProblem(value, task, entities),
           }),
@@ -211,6 +215,8 @@ export function useCaseContent({ state, components, ontologyName, caseLabels }: 
     // After a render failure the culprit is unknown: refetch every focal read rather than
     // re-rendering a cached response that may be unusable.
     if (readinessRef.current.kind === "blocked" && readinessRef.current.cause === "render") shared.current?.source.reset();
+    // Checks issued for the attempt being retried can no longer decide anything.
+    shared.current?.guard.cancel();
     setAttempt((value) => value + 1);
   }, []);
   const rendered = useCallback((forAttempt: number) => setReadiness((value) => (value.kind === "rendering" && value.attempt === forAttempt ? { attempt: forAttempt, kind: "usable" } : value)), []);
