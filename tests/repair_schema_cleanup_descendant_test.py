@@ -18,6 +18,7 @@ def fixture(tmp_path, monkeypatch):
     runtime={'test':'frozen'}
     monkeypatch.setattr(study,'runtime_manifest',lambda:runtime)
     monkeypatch.setattr(batch,'checked_batch',lambda path:read(path))
+    monkeypatch.setattr(recovery,'validate_previous_export',lambda ref:read(ref['path']))
     monkeypatch.setattr(first,'confirm_owner_gone',lambda step:dict(step_id=step,cgroup_absent=True,surviving_processes=0,signals_sent=0))
     monkeypatch.setattr(recovery,'prior_adapter',lambda plan:(read(plan['previous_cleanup_plan']['path']),first))
     source=str(Path(science.__file__).resolve().parents[2])

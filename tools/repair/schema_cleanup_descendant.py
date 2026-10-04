@@ -11,6 +11,7 @@ import fcntl
 import importlib.util
 from pathlib import Path
 import sys
+import subprocess
 
 
 def prior_adapter(plan):
@@ -26,9 +27,18 @@ def prior_adapter(plan):
     return previous, module
 
 
+def validate_previous_export(reference):
+    """The wrapper export and inner science export have distinct runtime hashes."""
+    from tools.repair.expanded_corpus import bound
+    batch = bound(reference)
+    subprocess.run([batch['python'], '-c',
+        'import sys; from tools.repair.batch import checked_batch; checked_batch(sys.argv[1])',
+        reference['path']], cwd=batch['code'], check=True, capture_output=True, text=True, timeout=120)
+    return batch
+
+
 def validate_chain(plan, evidence, identity):
     from exact.repair.records import canonical_hash
-    from tools.repair.batch import checked_batch
     from tools.repair.expanded_corpus import bound
     from tools.repair.expanded_profile import checked_checkpoint
     from tools.repair import schema_recovery as science
@@ -47,8 +57,7 @@ def validate_chain(plan, evidence, identity):
     prefix = adapter.validate_original(previous, prior_evidence, identity)
     adapter.confirm_owner_gone(previous['original_step'])
     completion, owner, command = (bound(evidence[k]) for k in ('completion','ownership','command'))
-    replacement_batch = bound(plan['previous_batch'])
-    checked_batch(plan['previous_batch']['path'])
+    replacement_batch = validate_previous_export(plan['previous_batch'])
     old_output = Path(previous['output'])
     expected_argv = [replacement_batch['python'], previous['runner']['path'],
         plan['previous_cleanup_plan']['path'], str(old_output), '--code', previous['source_root']]
