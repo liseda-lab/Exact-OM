@@ -28,7 +28,9 @@ position, analysis-3 exports) is in the
 [integration frontend handoff](../docs/verification/explanation-integration-frontend-handoff.md)
 and the [joint acceptance record](../docs/verification/explanation-integration-acceptance.md);
 post-implementation findings R06–R09 (fact paging, study full context, retry, component-aware
-readiness) are in the [follow-up handoff](../docs/verification/explanation-integration-frontend-followup.md).
+readiness) are in the [follow-up handoff](../docs/verification/explanation-integration-frontend-followup.md),
+and R10–R11 (attempt-bound access checks, typed navigation) in the
+[second follow-up](../docs/verification/explanation-integration-frontend-followup-2.md).
 
 exact-study/2.0 sessions run only against a study service that advertises
 `integration_contract: "study-integration/1"`; otherwise the page says the service needs an
@@ -148,7 +150,9 @@ frozen contexts with `python explanations_visualizer/e2e/prepare_main_app_packag
 `EXACT_E2E_MAIN_APP_URL`.
 
 Add `--paged-facts 26` to the fixture build for the paging regressions: it adds a non-focal
-source class, "Paged facts source", whose categories and parents exceed the first page. For the
+source class, "Paged facts source", whose categories and parents exceed the first page, and an
+object and a data property ("Paged object property", "Paged data property") whose named
+superproperties do too. For the
 main-app paging test, wrap the same contexts with `prepare_main_app_package.py …
 --extra-category alternate_definitions`, serve that package, and set `EXACT_E2E_PAGED_MAIN_APP_URL`
 and `EXACT_E2E_PAGED_SOURCE` (the fixture's source ontology version).

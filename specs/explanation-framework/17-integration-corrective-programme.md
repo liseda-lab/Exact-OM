@@ -1,8 +1,8 @@
 # Integration corrective programme and agent protocol
 
-**2026-10-04. Status: R01 and R02 reopened again by R10–R11 (second post-implementation review)
-after R06–R09 were fixed. R04 joint-verified; R03 blocked only on the manual J10 audit.
-Reviewed baseline: `2d9715b`.**
+**2026-10-04. Status: R06–R11 (post-implementation findings) fixed and verified at `eb4f955`, so
+R01 and R02 are joint-verified again ([second follow-up](../../docs/verification/explanation-integration-frontend-followup-2.md)).
+R04 joint-verified; R03 blocked only on the manual J10 audit. Reviewed baseline: `2d9715b`.**
 The [backend handoff](../../docs/verification/explanation-integration-backend-handoff.md)
 records implementation `96b76fe`; the [frontend handoff](../../docs/verification/explanation-integration-frontend-handoff.md)
 records `6895bc6`; the [joint acceptance record](../../docs/verification/explanation-integration-acceptance.md)
@@ -78,7 +78,7 @@ CSP, P3) was found and fixed during S3.
 | R11 | R01 / J03 | P2 | Parents loaded by continuation lose their entity type, so a property's later-page superproperty opens as a class. Carry the backend's typed entity through continuation records and every navigation callback in both products. | Frontend |
 
 The [second review](evidence/frontend-integration-review-20261004.md) reproduced R10 and R11 at
-`ad9461c`; they reopen R02 and R01 until F20–F21 are verified.
+`ad9461c`. They reopened R02 and R01 until F20–F21 were verified, which happened at `eb4f955`.
 
 The existing browser test's “hierarchy region is visible” assertion misses R01; an action
 after changing lesson hides R03. Test strengthening is part of each correction, not a fifth

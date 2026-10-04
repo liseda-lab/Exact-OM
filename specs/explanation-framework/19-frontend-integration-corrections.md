@@ -1,9 +1,11 @@
 # Frontend assignment: consume and verify the complete study workspace
 
 **2026-10-04. F11–F15 implemented in `6895bc6`; F16–F19 (R06–R09) verified at `23aa74f`
-([follow-up handoff](../../docs/verification/explanation-integration-frontend-followup.md)).
-R10–R11 reopen R02/R01 and require F20–F21 below. R04 is joint-verified; R03 awaits the
-manual screen-reader/keyboard audit in J10.** See the
+([follow-up](../../docs/verification/explanation-integration-frontend-followup.md)); F20–F21
+(R10–R11) in `d8b19a0`/`e754e77`, verified at `eb4f955`
+([second follow-up](../../docs/verification/explanation-integration-frontend-followup-2.md)).
+R01, R02 and R04 are joint-verified on the synthetic fixture; R03 awaits the manual
+screen-reader/keyboard audit in J10.** See the
 [frontend handoff](../../docs/verification/explanation-integration-frontend-handoff.md) and the
 [joint acceptance record](../../docs/verification/explanation-integration-acceptance.md). The
 requirements below remain normative. Follow
