@@ -98,3 +98,16 @@ frozen. It is not declared complete by this branch. Receipt review, semantic
 scope review and the final failure-inclusive paired report remain registered
 through actual completion. Larger trained-model robustness is not added to this
 schedule; any addition requires a separate predeclared design.
+
+## Real-projection stage closure
+
+The registered real-module branch uses two lexical subclass projections from one
+historically exposed NCIT/DOID training pair. Its six cases and nine arms retain
+all 54 outcomes. `tools.repair.real_module_audit` closes this stage from the
+original report, nonce-bound Slurm completions, frozen source/runtime, captured
+release/license evidence, inherited pair split, and native qualification and row
+receipts. It makes no new scientific calls and preserves the original cost
+snapshot alongside all eight settled attempt charges. The audit worker and its
+maintenance are charged separately. Projection qualification does not qualify
+full-source reasoning, held-out transfer, production matcher performance,
+strongest-symbolic comparisons, research gates, or learning efficiency.
