@@ -683,6 +683,7 @@ def freeze_neural_round(
                     max_depth=max_depth,
                     max_constructors=max_constructors,
                     fixed_axioms=problem.fixed_axioms,
+                    omitted_generation_symbols=omitted,
                     enabled_actions=enabled_actions,
                     source_classes=menu.source_classes,
                     target_classes=menu.target_classes,
@@ -827,6 +828,9 @@ def freeze_neural_round(
                 )
                 if any(
                     c.candidate_id in removed or not encoding.candidate_assignments(c)
+                    or ({str(e.iri.value)
+                         for ax in (*c.axioms, *c.active_expressions)
+                         for e in owl.signature(ax)} - original_symbols) & omitted
                     for c in selected
                 ):
                     raise AssertionError("frozen candidate pool violates its effective declaration")

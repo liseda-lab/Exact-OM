@@ -559,6 +559,7 @@ def mapping_grammar(
     enabled_actions: Iterable[str] | None = None,
     fixed_axioms: Iterable[Any] = (),
     constraint_identity: str = "",
+    omitted_generation_symbols: Iterable[str] = (),
     source_classes: Iterable[Any] | None = None,
     target_classes: Iterable[Any] | None = None,
     source_properties: Iterable[Any] | None = None,
@@ -650,6 +651,21 @@ def mapping_grammar(
     controls = [
         c for c in deduplicate_candidates(controls) if set(c.action_tags) & actions & fixed_actions
     ]
+    # Ontology controls are rebuilt from visible fixed axioms above. Apply the
+    # output-vocabulary intervention here, before these branches enter either
+    # the sampling distribution or protected representatives. Premises remain
+    # visible and symbols in unchanged editable axioms remain legal.
+    omitted = frozenset(omitted_generation_symbols)
+    if omitted:
+        original_symbols = {
+            str(e.iri.value) for axiom in originals for e in owl.signature(axiom)
+        }
+        controls = [
+            c for c in controls
+            if not ({str(e.iri.value)
+                     for axiom in (*c.axioms, *c.active_expressions)
+                     for e in owl.signature(axiom)} - original_symbols) & omitted
+        ]
     templates = [
         GrammarTemplate(f"fixed:{c.candidate_id}", c.action_tags[0], fixed=c) for c in controls
     ]

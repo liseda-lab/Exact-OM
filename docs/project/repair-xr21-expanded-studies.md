@@ -288,3 +288,21 @@ case budgets. Original artifacts, the ownership guard and failed-attempt costs
 remain intact. The revised report keeps all 16 slice rows and the 288-row study
 denominator. A companion report projects the same row bindings into the existing
 controller's monitoring format; it adds no scientific result or gate claim.
+
+## Robustness ontology output-omission correction
+
+Robustness schema slice 093 stopped after twelve saved rows when a fixed domain
+repair regenerated an omitted output symbol from a still-visible subclass
+premise. The separately frozen correction filters these fixed ontology branches
+before sampling and protected-representative selection; asserted evidence and
+unchanged editable axioms remain visible. It changes neither omission targets
+nor scientific budgets, model weights, case identities or splits.
+
+The replacement retains the twelve saved rows and the failed thirteenth row as
+unknown without replay, then executes only the three untouched rows. Both source
+identities, original error and all costs remain bound. Unstarted later robustness
+slices use the same correction with their original schedules and budgets; their
+superseded descriptors are preserved. Completed and active workers retain their
+original exports. The final report must identify this implementation revision,
+keep all 2,880 rows and report unknowns; no gate or semantic-quality claim follows
+from the repair.
