@@ -25,6 +25,7 @@ from fastapi import (
 )
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
+from starlette.datastructures import Headers, MutableHeaders
 
 from .administration import RevisionPage, revisions
 from .exports import csv_archive
@@ -106,6 +107,50 @@ class BodyLimitMiddleware:
                 },
             )
             await response(scope, receive, send)
+
+
+class StudyProtectionMiddleware:
+    """Apply origin and security headers without reconstructing response streams.
+
+    Forward the producer's body and completion messages unchanged. In particular,
+    an interrupted producer must not acquire a synthetic final body: that would
+    contradict Content-Length and replace the original cancellation/failure with
+    an HTTP framing error.
+    """
+
+    def __init__(self, app, *, origin):
+        self.app = app
+        self.origin = origin.rstrip("/")
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            return await self.app(scope, receive, send)
+
+        async def protected_send(message):
+            if message["type"] == "http.response.start":
+                message = {**message, "headers": list(message.get("headers", []))}
+                headers = MutableHeaders(scope=message)
+                headers["Cache-Control"] = "private, no-store"
+                headers["Referrer-Policy"] = "no-referrer"
+                headers["X-Content-Type-Options"] = "nosniff"
+                # Keep the document's exact script hashes and strict style policy.
+                if "content-security-policy" not in headers:
+                    headers["Content-Security-Policy"] = (
+                        "default-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'none'"
+                    )
+            await send(message)
+
+        # Cookie-authenticated mutations require the configured deployment origin;
+        # the researcher CLI uses a separate bearer credential.
+        if (
+            scope["method"] not in {"GET", "HEAD", "OPTIONS"}
+            and scope["path"].startswith("/api/v1/study")
+            and Headers(scope=scope).get("origin") != self.origin
+        ):
+            response = JSONResponse({"detail": "Origin is not authorized"}, status_code=403)
+            await response(scope, receive, protected_send)
+        else:
+            await self.app(scope, receive, protected_send)
 
 
 class Authentication:
@@ -449,6 +494,7 @@ def create_study_app(
     app = FastAPI(title="Exact ranking study", version="1.0", docs_url=None, redoc_url=None)
     app.state.study_store = store
     app.add_middleware(BodyLimitMiddleware)
+    app.add_middleware(StudyProtectionMiddleware, origin=origin)
     app.include_router(
         create_study_router(
             store,
@@ -457,30 +503,6 @@ def create_study_app(
             origin=origin,
         )
     )
-    expected_origin = origin.rstrip("/")
-
-    @app.middleware("http")
-    async def protect(request: Request, call_next):
-        # Mutations with participant cookies always require the deployment's origin.
-        # The admin CLI authenticates with a separate bearer credential.
-        if (
-            request.method not in {"GET", "HEAD", "OPTIONS"}
-            and request.url.path.startswith("/api/v1/study")
-            and request.headers.get("origin") != expected_origin
-        ):
-            response = JSONResponse({"detail": "Origin is not authorized"}, status_code=403)
-        else:
-            response = await call_next(request)
-        response.headers["Cache-Control"] = "private, no-store"
-        response.headers["Referrer-Policy"] = "no-referrer"
-        response.headers["X-Content-Type-Options"] = "nosniff"
-        # Study pages carry a per-document policy (exact inline-script hashes, no
-        # 'unsafe-inline'); everything else keeps the strict API default.
-        if "content-security-policy" not in response.headers:
-            response.headers["Content-Security-Policy"] = (
-                "default-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'none'"
-            )
-        return response
 
     @app.exception_handler(RequestValidationError)
     async def validation_error(request, exc):
