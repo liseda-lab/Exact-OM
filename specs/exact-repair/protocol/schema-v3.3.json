@@ -347,6 +347,58 @@
       "title": "CorpusEvidence",
       "type": "object"
     },
+    "DeclaredGraphSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "edge_types": {
+          "items": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 3,
+            "minItems": 3,
+            "type": "array"
+          },
+          "minItems": 1,
+          "title": "Edge Types",
+          "type": "array"
+        },
+        "language": {
+          "const": "pyowl-core/public-structural-ast/v1",
+          "title": "Language",
+          "type": "string"
+        },
+        "language_hash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Language Hash",
+          "type": "string"
+        },
+        "node_types": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Node Types",
+          "type": "array"
+        },
+        "schema": {
+          "const": "exact-repair/declared-graph-schema/v1",
+          "title": "Schema",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema",
+        "language",
+        "language_hash",
+        "node_types",
+        "edge_types"
+      ],
+      "title": "DeclaredGraphSchema",
+      "type": "object"
+    },
     "Evaluation": {
       "additionalProperties": false,
       "properties": {
@@ -1048,6 +1100,17 @@
           "const": "explicit_missingness/v3",
           "title": "Feature Masks",
           "type": "string"
+        },
+        "graph_schema": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DeclaredGraphSchema"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
         "hidden_width": {
           "minimum": 1,
