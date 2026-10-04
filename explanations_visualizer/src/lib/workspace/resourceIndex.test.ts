@@ -4,6 +4,8 @@ import test from "node:test";
 import { BUILDER_CATEGORIES, comparisonFor, entityContextFrom, evidenceFor, hierarchyFor, indexResources, profileFor, resolveFact, searchIn } from "./resourceIndex.ts";
 // @ts-expect-error Node's direct TypeScript runner requires the explicit extension.
 import { ENTITY, TUTORIAL_RESOURCE } from "../../study/v2/tutorialContent.ts";
+import type { ExplanationResource, OriginalFact } from "../../study/types";
+import type { EntityRef } from "../types";
 
 const complete = indexResources([TUTORIAL_RESOURCE], { prepared: "all" });
 // A bounded case resource like the study builder's: only the source and its five candidates.
@@ -71,6 +73,66 @@ test("prepared hierarchy navigation says where its information ends (C02)", () =
   const sourceParents = hierarchyFor(complete, source, "parents", "literal_asserted", "complete");
   assert.equal(sourceParents.items.length, 2, "multiple inheritance is preserved");
   assert.equal(hierarchyFor(complete, source, "parents", "reasoner_inferred", "complete").status, "not_run");
+});
+
+type Projected = { fact_id: string; origins: unknown[]; value: { iri?: string }; hierarchy_projection?: { parent: unknown; child: unknown } };
+
+test("tutorial card parents carry the recorded typed parent and keep their fact identity (19 F21)", () => {
+  const parents = entityContextFrom(complete, source, "scope").parents.items as Projected[];
+  assert.deepEqual(parents.map((fact) => fact.hierarchy_projection?.parent), [ENTITY["a.crate"], ENTITY["a.lidded"]]);
+  assert.deepEqual(parents.map((fact) => fact.fact_id), ["practice.a.crpc.subclass.a.crate", "practice.a.crpc.subclass.a.lidded"]);
+  assert.ok(parents.every((fact) => fact.hierarchy_projection?.child === source));
+  // A bounded case resource keeps the same typed parents.
+  const boundedParents = entityContextFrom(prepared, source, "scope").parents.items as Projected[];
+  assert.deepEqual(boundedParents.map((fact) => fact.hierarchy_projection?.parent), [ENTITY["a.crate"], ENTITY["a.lidded"]]);
+});
+
+// A v1 study publication resource as the study builder freezes it: content-addressed ontology
+// versions, typed AST nodes ({iri, kind, type}) and recorded edges for the bounded first page only.
+const V1 = `sha256:${"1".repeat(64)}`;
+const DOID = (id: string) => `http://purl.obolibrary.org/obo/DOID_${id}`;
+const v1Focal: EntityRef = { ontology_version_id: V1, iri: DOID("11665"), kind: "class" };
+const v1Node = (iri: string, typed: Record<string, unknown>) => ({ iri: { type: "IRI", value: iri }, ...typed });
+const v1SubClass = (id: string, parent: Record<string, unknown>): OriginalFact => ({
+  fact_id: id,
+  subject: v1Focal,
+  predicate_iri: null,
+  category: "hierarchy",
+  value: { term_type: "expression_ref", expression_id: id, ast: { annotations: [], sub_class: v1Node(v1Focal.iri, { kind: "class", type: "Class" }), super_class: parent, type: "SubClassOf" } },
+  qualifiers: [],
+  axiom_ref: id,
+  origins: [{ document_sha256: `sha256:${"d".repeat(64)}`, axiom_id: id, source_span: { start: 10, end: 42, unit: "byte" }, provenance_status: "recorded" }],
+  interpretation: "asserted",
+});
+const v1Resource: ExplanationResource = {
+  artifact_type: "study_explanation",
+  contract_version: "exact-study/1.0",
+  entities: [v1Focal],
+  facts: [
+    v1SubClass("sha256:edge", v1Node(DOID("0080014"), { kind: "class", type: "Class" })),
+    v1SubClass("sha256:ast", v1Node(DOID("162"), { kind: "class", type: "Class" })),
+    v1SubClass("sha256:untyped", v1Node(DOID("4"), {})),
+    v1SubClass("sha256:contradictory", v1Node(DOID("7"), { kind: "object_property", type: "Class" })),
+  ],
+  hierarchy: [{ child: v1Focal, parent: { ontology_version_id: V1, iri: DOID("0080014"), kind: "class" }, basis: "literal_asserted", fact_ids: ["sha256:edge"], derivation: null }],
+  entity_profiles: [],
+  pair_comparison: [],
+  evidence: [],
+  limitations: [],
+  capabilities: { context: "partial", hierarchy: "partial" },
+};
+
+test("v1 publication parents are typed from the recorded edge or the AST; unknown types stay unprojected (19 F21)", () => {
+  const index = indexResources([v1Resource]);
+  const parents = entityContextFrom(index, v1Focal, "scope").parents.items as Projected[];
+  const byId = Object.fromEntries(parents.map((fact) => [fact.fact_id, fact]));
+  assert.deepEqual(Object.keys(byId).sort(), ["sha256:ast", "sha256:contradictory", "sha256:edge", "sha256:untyped"], "every parent fact is still listed");
+  assert.deepEqual(byId["sha256:edge"].hierarchy_projection?.parent, v1Resource.hierarchy[0].parent, "the recorded edge supplies the typed parent");
+  assert.deepEqual(byId["sha256:ast"].hierarchy_projection?.parent, { ontology_version_id: V1, iri: DOID("162"), kind: "class" }, "beyond the recorded edges the AST's own type is used");
+  assert.equal(byId["sha256:untyped"].hierarchy_projection, undefined, "a parent without a recorded type is not given one");
+  assert.equal(byId["sha256:contradictory"].hierarchy_projection, undefined, "a contradictory record is not resolved by guessing");
+  assert.equal(byId["sha256:untyped"].value.iri, DOID("4"), "an unprojected parent is still shown by IRI");
+  assert.ok(parents.every((fact) => fact.origins.length === 1), "provenance is kept");
 });
 
 test("evidence keeps its recorded interpretation and per-candidate scope (C04)", () => {

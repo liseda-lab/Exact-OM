@@ -182,6 +182,29 @@ function categoryStatus(index: ResourceIndex, entity: EntityRef, category: strin
 
 const EXTRA_CATEGORIES = ["alternate_definitions", "types", "assertions", "domains", "ranges", "characteristics", "comments", "definition_citations", "term_metadata", "annotations", "xrefs", "mappings", "axioms", "labels"];
 
+const NODE_KINDS: Record<string, EntityKind> = { Class: "class", ObjectProperty: "object_property", DataProperty: "data_property", NamedIndividual: "individual" };
+const RECORDED_KINDS: Record<string, EntityKind> = { class: "class", object_property: "object_property", data_property: "data_property", individual: "individual", named_individual: "individual" };
+
+/** The type an AST entity node records (its `kind`, else its OWL node type); null when it records none or contradicts itself. */
+function recordedKind(node: { kind?: unknown; type?: unknown }): EntityKind | null {
+  const kind = RECORDED_KINDS[String(node.kind)] ?? null;
+  const typed = NODE_KINDS[String(node.type)] ?? null;
+  if (kind && typed && kind !== typed) return null;
+  return kind ?? typed;
+}
+
+/**
+ * The typed parent of a stored subclass axiom (19 F21): the recorded hierarchy edge for this
+ * fact when there is one, else the type the axiom's own AST records. Never a guessed kind; a
+ * parent with no recorded type stays unprojected and is shown, not opened.
+ */
+function parentProjection(index: ResourceIndex, fact: OriginalFact, entity: EntityRef, parent: { iri: string; kind?: unknown; type?: unknown }): Fact["hierarchy_projection"] {
+  const edge = index.hierarchy.find((item) => item.basis === "literal_asserted" && item.fact_ids.includes(fact.fact_id) && entityKey(item.child) === entityKey(entity) && item.parent.iri === parent.iri);
+  const kind = edge ? null : recordedKind(parent);
+  const typed = edge?.parent ?? (kind ? { ontology_version_id: entity.ontology_version_id, iri: parent.iri, kind } : null);
+  return typed ? { id: `${fact.fact_id}|${entityKey(entity)}`, child: entity, parent: typed, basis: "literal_asserted" } : undefined;
+}
+
 export function entityContextFrom(index: ResourceIndex, entity: EntityRef, scopeNote: string): EntityContext {
   const facts = index.bySubject.get(entityKey(entity)) ?? [];
   const ontology = entity.ontology_version_id;
@@ -191,14 +214,16 @@ export function entityContextFrom(index: ResourceIndex, entity: EntityRef, scope
     return page(items, ontology, status.status, status.reason, status.truncated);
   };
   // Named parents are the hierarchy facts whose stored axiom has this entity as the subclass.
+  // Each keeps its fact identity and provenance and carries the parent's recorded type.
   const parentFacts = facts
     .filter((fact) => fact.category === "hierarchy")
-    .flatMap((fact) => {
+    .flatMap((fact): Fact[] => {
       const ast = fact.value.ast as Record<string, unknown> | null | undefined;
       const sub = (ast?.sub_class as { iri?: { value?: string } } | undefined)?.iri?.value;
-      const sup = (ast?.super_class as { iri?: { value?: string }; type?: string } | undefined);
+      const sup = (ast?.super_class as { iri?: { value?: string }; kind?: unknown; type?: unknown } | undefined);
       if (ast?.type !== "SubClassOf" || sub !== entity.iri || !sup?.iri?.value) return [];
-      return [{ ...toFact(fact), value: { term_type: "iri", iri: sup.iri.value } as Term }];
+      const projection = parentProjection(index, fact, entity, { iri: sup.iri.value, kind: sup.kind, type: sup.type });
+      return [{ ...toFact(fact), value: { term_type: "iri", iri: sup.iri.value } as Term, ...(projection ? { hierarchy_projection: projection } : {}) }];
     });
   const parentStatus = categoryStatus(index, entity, "hierarchy", parentFacts.length);
   const label = labelOf(index, ontology, entity.iri);
