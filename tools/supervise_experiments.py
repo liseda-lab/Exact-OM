@@ -418,6 +418,67 @@ def dispatch_worker(directory, policy, stop_event):
         stop_event.wait(15)
 
 
+def replacement_progress(directory, policy, incident, registry):
+    """Re-observe bound recovery ownership before escalating the previous failure."""
+    if incident.get("kind") not in {"run_failed", "completion_failed", "launcher_failed", "scientific_software_error"}:
+        return None
+    runs = {row["id"]: row for row in registry["runs"]}
+    focus = incident.get("focus_run_id") or next(iter(incident.get("run_ids", [])), None)
+    if focus not in runs:
+        return None
+    steps = slurm_steps(policy["allocation"])
+    observation = inspect_runs(registry["runs"], step_states=steps)
+    findings = {row["run_id"]: row for row in observation["findings"]}
+
+    def linked(prior, candidate):
+        path = Path(prior["completion_path"])
+        return (candidate.get("recovery_of") == prior["id"]
+                and candidate.get("logical_id") == prior.get("logical_id")
+                and prior["step_id"] not in steps
+                and candidate.get("recovery_completion_sha256") == digest(path)
+                and 1 <= candidate.get("repair_attempt", 0) <= candidate.get("max_repairs", 0) <= 2)
+
+    try:
+        current = runs[focus]
+        while current.get("superseded_by"):
+            successor = runs[current["superseded_by"]]
+            if not linked(current, successor):
+                return None
+            current = successor
+        if current["id"] != focus:
+            nonce, step = current.get("dispatch_nonce"), current["step_id"]
+            receipt = read(Path(current["status_path"]).with_name("step.json"))
+            if nonce is None or receipt != dict(step_id=step, dispatch_nonce=nonce):
+                return None
+            finding = findings.get(current["id"], {})
+            completion_path = Path(current["completion_path"])
+            completion = read(completion_path) if completion_path.exists() else {}
+            owned_completion = (completion.get("step_id") == step
+                                and completion.get("dispatch_nonce") == nonce)
+            if finding.get("status") == "complete" and owned_completion:
+                return dict(status="complete", run_id=current["id"], step_id=step)
+            if finding.get("status") == "healthy" and step in steps:
+                return dict(status="running", run_id=current["id"], step_id=step)
+            if owned_completion and completion.get("status") == "failed":
+                causes = [row for row in observation["incidents"] if row.get("focus_run_id") == current["id"]]
+                if causes and all(incident["id"] not in {row["id"], *row.get("legacy_incident_ids", [])}
+                                  for row in causes):
+                    return dict(status="different_failure", run_id=current["id"],
+                                incident_ids=[row["id"] for row in causes])
+        dispatch_path = directory / "dispatch-state.json"
+        dispatch = read(dispatch_path) if dispatch_path.exists() else {}
+        waiting = pending_recoveries(registry, observation, policy["allocation"], steps, dispatch)
+        target = waiting.get(current["id"])
+        if target:
+            batch = next(row for row in registry["pending_batches"] if row["id"] == target)
+            if linked(current, batch["launch"]["run"]):
+                return dict(status="queued", run_id=target)
+    except (OSError, ValueError, KeyError, TypeError):
+        # An unqualified replacement cannot hide a confirmed original failure.
+        pass
+    return None
+
+
 def check(directory, policy, state, *, act=False, stop_requested=lambda: False):
     registry = read(directory / "registry.json")
     migrate_retry_accounting(state, registry)
@@ -633,6 +694,9 @@ def check(directory, policy, state, *, act=False, stop_requested=lambda: False):
                                           "invocation": attempt}
             write(run / "report.json", report)
             record["last_result"] = result
+            recovery = replacement_progress(directory, policy, incident, after)
+            if recovery:
+                current["replacement_progress"] = recovery
             timed_out = report.get("interrupted") and report.get("interruption_reason") == "timeout"
             if (report.get("interrupted") and not timed_out) or result.get("outcome") == "needs_user":
                 record["needs_user"] = True
@@ -640,7 +704,7 @@ def check(directory, policy, state, *, act=False, stop_requested=lambda: False):
                 current["notification"] = notify_blocker(
                     directory, policy, incident, "requires_user", result=result, report=report
                 )
-            elif record["unsuccessful_attempts"] >= policy["max_attempts_per_incident"]:
+            elif not recovery and record["unsuccessful_attempts"] >= policy["max_attempts_per_incident"]:
                 current["notification"] = notify_blocker(
                     directory,
                     policy,
@@ -658,7 +722,8 @@ def check(directory, policy, state, *, act=False, stop_requested=lambda: False):
                 unsuccessful_attempts=record["unsuccessful_attempts"],
             )
             _, next_reason = eligible(state, incident, policy, time.time())
-            if next_reason in {"requires_user", "incident_attempt_limit", "daily_agent_limit"}:
+            if (next_reason in {"requires_user", "incident_attempt_limit", "daily_agent_limit"}
+                    and (not recovery or next_reason == "requires_user")):
                 blocked.append({"incident_id": incident["id"], "kind": incident["kind"],
                                 "batch_id": incident.get("batch_id"), "reason": next_reason})
                 current.update(status="blocked", action=next_reason)
@@ -667,6 +732,7 @@ def check(directory, policy, state, *, act=False, stop_requested=lambda: False):
             elif blocked:
                 current["status"] = "blocked"
             break  # At most one intervention at a time; recheck its outcome promptly.
+    current["checked_at"] = timestamp()
     write(directory / "status.json", current)
     print(json.dumps(current, sort_keys=True), flush=True)
     return current

@@ -280,3 +280,23 @@ def test_alias_migration_preserves_observation_and_result_history():
     migrate_incident_aliases(state, [incident])
     assert current['attempts'] == current['unsuccessful_attempts'] == 2
     assert state['agent_runs'] == [{'incident': 'old', 'attempt': 1}]
+
+
+@pytest.mark.parametrize('calls,prior,expected', [(1, 2, 1), (2, 2, 2), (0, 1, 0)])
+def test_only_proven_first_occurrence_floor_is_corrected_and_calls_remain(calls, prior, expected):
+    from exact.experiments.interventions import migrate_incident_aliases
+    state = {'incidents': {'B': dict(
+        attempts=calls, unsuccessful_attempts=prior,
+        observations=3, unsuccessful_recovery_run_ids=['first-B'])},
+             'agent_runs': [dict(incident='B', attempt=i+1) for i in range(calls)]}
+    archived = json.loads(json.dumps(state['agent_runs']))
+    incident = dict(id='B', first_occurrence_recovery_run_ids=['first-B'])
+    migrate_incident_aliases(state, [incident])
+    record = state['incidents']['B']
+    assert record['attempts'] == calls and record['unsuccessful_attempts'] == expected
+    correction = record['receipt_floor_corrections'][0]
+    assert correction['prior_unsuccessful_attempts'] == prior
+    assert correction['invocation_history'] == archived == state['agent_runs']
+    migrate_incident_aliases(state, [incident])
+    assert len(record['receipt_floor_corrections']) == 1
+    assert record['unsuccessful_attempts'] == expected

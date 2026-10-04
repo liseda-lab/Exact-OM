@@ -181,7 +181,8 @@ def migrate_incident_aliases(state: dict, incidents: list[dict]) -> None:
     for incident in incidents:
         aliases = incident.get("legacy_incident_ids", [])
         failed_replacements = incident.get("unsuccessful_recovery_run_ids", [])
-        if not aliases and not failed_replacements:
+        first_occurrences = set(incident.get("first_occurrence_recovery_run_ids", []))
+        if not aliases and not failed_replacements and not first_occurrences:
             continue
         target = records.setdefault(incident["id"],
                                     dict(attempts=0, unsuccessful_attempts=0, observations=0))
@@ -213,10 +214,26 @@ def migrate_incident_aliases(state: dict, incidents: list[dict]) -> None:
             merged.add(identity)
             source["merged_into"] = incident["id"]
         target["merged_incident_ids"] = sorted(merged)
+        previous_floor = set(target.get("unsuccessful_recovery_run_ids", []))
+        invented = previous_floor & first_occurrences
+        if invented:
+            # Version 1 counted a new cause's first appearance in any descendant.
+            # Correct only that receipt-proven floor, retaining every model charge.
+            prior_count = target["unsuccessful_attempts"]
+            charged_invocations = target.get("attempts", 0)
+            target["unsuccessful_attempts"] = max(charged_invocations, prior_count - len(invented))
+            target.setdefault("receipt_floor_corrections", []).append({
+                "version": 2, "excluded_first_occurrences": sorted(invented),
+                "prior_unsuccessful_attempts": prior_count,
+                "preserved_invocations": charged_invocations,
+                "corrected_unsuccessful_attempts": target["unsuccessful_attempts"],
+                "invocation_history": [dict(entry) for entry in state.get("agent_runs", [])
+                                       if entry.get("incident") in {incident["id"], *merged}],
+            })
         # Manual repairs have no model invocation record. Qualified failed
         # replacement receipts provide a lower bound, never a second charge.
         target["unsuccessful_recovery_run_ids"] = sorted(
-            set(target.get("unsuccessful_recovery_run_ids", [])) | set(failed_replacements)
+            (previous_floor - invented) | set(failed_replacements)
         )
         target["unsuccessful_attempts"] = max(
             target["unsuccessful_attempts"], len(target["unsuccessful_recovery_run_ids"])

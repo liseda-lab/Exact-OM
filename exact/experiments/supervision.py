@@ -304,6 +304,7 @@ def assess_runs(
     enabled = _registry(runs)
     identities = _recovery_identities(runs)
     by_id = {run["id"]: run for run in runs}
+    predecessors = {run["superseded_by"]: run["id"] for run in runs if run.get("superseded_by")}
 
     def failure(name: str, kind: str, reason: str, detail: Any = None) -> dict:
         scope, aliases = identities[name]
@@ -319,14 +320,23 @@ def assess_runs(
             return _incident(name, kind, reason, original, scope=scope)
         normalized = _batch_failure_detail(original)
         incident = _incident(name, kind, reason, normalized, scope=scope)
-        legacy, failed_replacements = set(), []
+        legacy, failed_replacements, first_occurrences = set(), [], []
+
+        def owned_completion(member):
+            receipt = observations.get(member, {}).get("completion") or {}
+            row = by_id[member]
+            return receipt if (receipt.get("step_id") == row["step_id"]
+                               and row.get("dispatch_nonce") is not None
+                               and receipt.get("dispatch_nonce") == row["dispatch_nonce"]
+                               and receipt.get("status") in {"failed", "complete"}) else None
+
         for member in members:
             observed = observations.get(member, {})
             for source in (observed.get("status"), observed.get("completion")):
                 candidate = _recovery_detail((source or {}).get("error"), aliases)
                 if candidate is not None and _batch_failure_detail(candidate) == normalized:
                     legacy.add(_incident(member, kind, reason, candidate, scope=scope)["id"])
-            completion, run = observed.get("completion") or {}, by_id[member]
+            completion = observed.get("completion") or {}
             candidate = _recovery_detail(completion.get("error"), aliases)
             if candidate is not None and _batch_failure_detail(candidate) == normalized:
                 legacy_detail = _recovery_detail(
@@ -334,15 +344,25 @@ def assess_runs(
                 )
                 legacy.add(_incident(member, "completion_failed", reason, legacy_detail, scope=scope)["id"])
                 if (member != scope and completion.get("status") == "failed"
-                        and completion.get("step_id") == run["step_id"]
-                        and run.get("dispatch_nonce") is not None
-                        and completion.get("dispatch_nonce") == run["dispatch_nonce"]):
-                    failed_replacements.append(member)
+                        and owned_completion(member)):
+                    parent, prior, qualified = predecessors[member], [], True
+                    while parent is not None:
+                        ancestor = owned_completion(parent)
+                        qualified = qualified and ancestor is not None
+                        if ancestor is not None:
+                            prior.append(_batch_failure_detail(_recovery_detail(ancestor.get("error"), aliases)))
+                        parent = predecessors.get(parent)
+                    if normalized in prior:
+                        failed_replacements.append(member)
+                    elif qualified:
+                        first_occurrences.append(member)
         legacy.discard(incident["id"])
         if legacy:
             incident["legacy_incident_ids"] = sorted(legacy)
         if failed_replacements:
             incident["unsuccessful_recovery_run_ids"] = sorted(failed_replacements)
+        if first_occurrences:
+            incident["first_occurrence_recovery_run_ids"] = sorted(first_occurrences)
         return incident
 
     findings = {}

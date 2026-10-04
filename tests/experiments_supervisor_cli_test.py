@@ -906,3 +906,75 @@ def test_failed_manual_replacements_bound_retries_without_model_calls(
     record['unsuccessful_attempts'] = 2
     cli.check(tmp_path, policy, state, act=False)
     assert record['unsuccessful_attempts'] == 2
+
+
+@pytest.mark.parametrize('replacement_state', ['queued', 'running', 'complete', 'failed', 'wrong_nonce', 'wrong_binding'])
+def test_post_intervention_reobserves_owned_recovery_before_limit_email(
+    cli, controller, tmp_path, monkeypatch, replacement_state
+):
+    policy, state = controller
+    old_dir, new_dir = tmp_path / 'old', tmp_path / 'new'
+    old_dir.mkdir()
+    new_dir.mkdir()
+    error = dict(type='RuntimeError', message='command 0 exited 1: same failure')
+    prior = dict(id='old', logical_id='logical', step_id='14372.1', dispatch_nonce='old-owner',
+                 status_path=str(old_dir / 'status.json'), completion_path=str(old_dir / 'completion.json'))
+    cli.write(Path(prior['status_path']), dict(status='failed', error=error))
+    cli.write(Path(prior['completion_path']), dict(status='failed', step_id=prior['step_id'],
+              dispatch_nonce='old-owner', error=error))
+    registry = dict(runs=[prior], pending_batches=[], capacity=dict(cpus=2))
+    cli.write(tmp_path / 'registry.json', registry)
+    incident = cli.inspect_runs(registry['runs'], step_states={})['incidents'][0]
+    state['incidents'][incident['id']] = dict(attempts=1, unsuccessful_attempts=1, observations=2)
+    steps = {'14372.0': 'RUNNING'}
+    monkeypatch.setattr(cli, 'slurm_steps', lambda _: steps)
+    clock = ['before-intervention']
+    monkeypatch.setattr(cli, 'timestamp', lambda: clock[0])
+    alerts = []
+    monkeypatch.setattr(cli, 'notify_blocker', lambda *a, **kw: alerts.append(a[3]) or {})
+
+    def repair(*args):
+        clock[0] = 'after-intervention'
+        successor = dict(id='new', logical_id='logical', recovery_of='old', repair_attempt=2,
+                         max_repairs=2, recovery_completion_sha256=cli.digest(Path(prior['completion_path'])),
+                         status_path=str(new_dir / 'status.json'), completion_path=str(new_dir / 'completion.json'),
+                         exit_path=str(new_dir / 'exit_code'))
+        if replacement_state in {'queued', 'wrong_binding'}:
+            if replacement_state == 'wrong_binding':
+                successor['recovery_completion_sha256'] = 'not-the-receipt'
+            prior['pending_recovery'] = 'new'
+            script = tmp_path / 'worker.sh'
+            script.write_text('true\n')
+            registry['pending_batches'] = [dict(id='new', depends_on=[], resources=dict(cpus=2), launch=dict(
+                run=successor, nonce='new-owner-qualified',
+                argv=['/usr/bin/srun', '--jobid=14372', '/bin/bash', str(script)],
+                tmux_socket=str(tmp_path / 'socket'), step_path=str(new_dir / 'step.json'),
+                launcher_log=str(new_dir / 'launcher.log'),
+                bindings=[dict(path=str(script), sha256=cli.digest(script))]))]
+        else:
+            prior.update(enabled=False, superseded_by='new')
+            successor.update(step_id='14372.2', dispatch_nonce='new-owner')
+            registry['runs'].append(successor)
+            cli.write(new_dir / 'step.json', dict(step_id='14372.2',
+                      dispatch_nonce='wrong' if replacement_state == 'wrong_nonce' else 'new-owner'))
+            if replacement_state in {'running', 'wrong_nonce'}:
+                steps['14372.2'] = 'RUNNING'
+                cli.write(new_dir / 'status.json', dict(status='running'))
+            else:
+                receipt = dict(status=replacement_state, step_id='14372.2', dispatch_nonce='new-owner')
+                if replacement_state == 'failed':
+                    receipt['error'] = {**error, 'message': error['message'].replace('command 0', 'command 1')}
+                cli.write(new_dir / 'status.json', receipt)
+                cli.write(new_dir / 'completion.json', receipt)
+        cli.write(tmp_path / 'registry.json', registry)
+        return dict(status='complete', result=_result('submitted'), result_valid=True)
+
+    monkeypatch.setattr(cli, 'run_agent', repair)
+    result = cli.check(tmp_path, policy, state, act=True)
+    verified = replacement_state in {'queued', 'running', 'complete'}
+    assert ('incident_attempt_limit' not in alerts) == verified
+    assert (result['status'] != 'blocked') == verified
+    assert result['checked_at'] == 'after-intervention'
+    assert state['incidents'][incident['id']]['unsuccessful_attempts'] == 2
+    if verified:
+        assert result['replacement_progress']['status'] == replacement_state

@@ -400,3 +400,24 @@ def test_batch_completion_only_failure_keeps_recovery_incident_identity():
         'status': 'failed', 'exit_code': 1, 'error': detail}}}, step_states={})['incidents'][0]
     assert fallback['kind'] == 'run_failed'
     assert fallback['id'] == ordinary['id']
+
+
+@pytest.mark.parametrize('causes,expected,first', [
+    (['A', 'B'], [], ['cause1']),
+    (['A', 'B', 'B'], ['cause2'], ['cause1']),
+    (['A', 'B', 'A'], ['cause2'], []),
+    (['A', 'B', 'B', 'B'], ['cause2', 'cause3'], ['cause1']),
+])
+def test_new_cause_is_not_a_failed_repair_and_recurrence_keeps_ancestry(causes, expected, first):
+    runs, observations = [], {}
+    for index, cause in enumerate(causes):
+        row = dict(id=f'cause{index}', step_id=f'1.{index}', dispatch_nonce=f'owner{index}')
+        if index < len(causes) - 1:
+            row.update(enabled=False, superseded_by=f'cause{index+1}')
+        receipt = dict(status='failed', step_id=row['step_id'], dispatch_nonce=row['dispatch_nonce'],
+                       error=dict(type='RuntimeError', message=f'command {index} exited 1: {cause}'))
+        observations[row['id']] = dict(status=receipt, completion=receipt)
+        runs.append(row)
+    incident = assess_runs(runs, observations, step_states={})['incidents'][0]
+    assert incident.get('unsuccessful_recovery_run_ids', []) == expected
+    assert incident.get('first_occurrence_recovery_run_ids', []) == first
