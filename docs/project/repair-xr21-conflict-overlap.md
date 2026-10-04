@@ -47,3 +47,13 @@ audit can further restrict interpretation; it cannot promote the diagnostic to
 new independent test parents. Existing symbolic-control limitations and G0–G2
 restrictions remain. No additional model training or checkpoint selection is
 performed, and no API expenditure is authorized.
+
+The terminal receipt audit uses `tools.repair.overlap_audit` in a separately
+frozen, charged worker. It verifies the original and replacement step/nonces,
+source exports, runtimes, output manifests, checkpoints, native witness subset
+coverage, row payloads, paired availability and settled attempt charges. It
+preserves the original report and all failed attempts. Its process-status and
+scientific-status counts remain separate: a completed process can contain a
+timeout or an unavailable model schema. This worker makes no new native calls
+and repeats no scientific rows. Its completion closes only the registered
+overlap diagnostic stage; the remaining expanded program stays pending.
