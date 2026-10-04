@@ -15,6 +15,60 @@ from tests.prepared_batch_history_test import _fixture as history_fixture
 from tools import experiment_resources, prepared_batch, resume_e19_once
 
 
+@pytest.mark.parametrize("already_retained", [False, True])
+@pytest.mark.parametrize("multiple", [False, True])
+def test_generic_recovery_retains_failed_setup_interval_once(
+    tmp_path, monkeypatch, already_retained, multiple
+):
+    from tools.finalize_prepared_selection import charge_failed_finalization
+
+    worker = _worker(tmp_path, monkeypatch)
+    recipe = prepared_batch.read(worker.path)
+    recipe.update(
+        parent_run_id="E21-original",
+        failed_finalization_interval={"run_id": "E21-original/pre-screen", "start": 4, "end": 5},
+    )
+    intervals = [recipe["failed_finalization_interval"]]
+    if multiple:
+        intervals += [
+            {"run_id": "E21-original/post-admission", "start": 7, "end": 9},
+            {"run_id": "E21-original/terminal-tail", "start": 12, "end": 13},
+        ]
+        del recipe["failed_finalization_interval"]
+        recipe["failed_finalization_intervals"] = intervals
+    prepared_batch.write(worker.path, recipe)
+    if already_retained:
+        for interval in intervals:
+            charge_failed_finalization(
+                {**recipe, "failed_finalization_interval": interval},
+                BudgetLedger(worker.parent, worker.limits),
+                prepared_batch.read(worker.parent),
+            )
+
+    def execute(*args, **kwargs):
+        account = prepared_batch.read(worker.runtime / "budget.json")
+        charge = account["work"]["failed-finalization/E21-original/pre-screen"]
+        assert (charge["start"], charge["end"], charge["status"]) == (4, 5, "failed")
+        assert charge["requests"] == charge["tokens"] == charge["actual_usd"] == 0
+        assert (
+            account["work"]["historical/closed"]
+            == prepared_batch.read(worker.parent)["work"]["historical/closed"]
+        )
+        charges = [
+            value
+            for key, value in account["work"].items()
+            if key.startswith("failed-finalization/")
+        ]
+        assert len(charges) == len(intervals)
+        assert sum(value["seconds"] for value in charges) == sum(
+            value["end"] - value["start"] for value in intervals
+        )
+        _outputs(worker)
+
+    monkeypatch.setattr(experiment_resources, "guarded_execute", execute)
+    prepared_batch.run_recipe(worker.path)
+
+
 @pytest.mark.parametrize("failed", [False, True])
 def test_saved_treatment_import_is_charged_and_failure_never_runs_cells(
     tmp_path, monkeypatch, failed

@@ -636,6 +636,17 @@ def run_recipe(path):
         from exact.experiments.budget import BudgetLedger
 
         ledger = BudgetLedger(runtime / "budget.json", state["limits"])
+        if "failed_finalization_interval" in recipe and "failed_finalization_intervals" in recipe:
+            raise ValueError("Use one failed-finalization interval form, not both")
+        intervals = recipe.get("failed_finalization_intervals", [])
+        if recipe.get("failed_finalization_interval"):
+            intervals = [recipe["failed_finalization_interval"]]
+        for interval in intervals:
+            from tools.finalize_prepared_selection import charge_failed_finalization
+
+            charge_failed_finalization(
+                {**recipe, "failed_finalization_interval": interval}, ledger, ledger.snapshot()
+            )
         setup = "prepared-dispatch/" + recipe["scientific_step"] + "/" + os.environ["SLURM_STEP_ID"]
         ledger.admit(setup, group="reserve", seconds=0, forecast_known=False)
         ledger.finish(
@@ -697,15 +708,12 @@ def run_recipe(path):
                     actual_usd=0,
                 )
         if recipe.get("e22_label_repair"):
-            from tools.finalize_prepared_selection import charge_failed_finalization
             from tools.recover_e22_labels import prepare_label_recovery
 
             work = "preparation/E22/label-repair/" + os.environ["SLURM_STEP_ID"]
             ledger.admit(work, group="reserve", seconds=0, forecast_known=False)
             migration_start, migration_status = time.time(), "failed"
             try:
-                if recipe.get("failed_finalization_interval"):
-                    charge_failed_finalization(recipe, ledger, read(runtime / "budget.json"))
                 prepare_label_recovery(recipe, campaign, runtime, code)
                 migration_status = "complete"
             finally:
@@ -719,7 +727,6 @@ def run_recipe(path):
                     actual_usd=0,
                 )
         if recipe.get("graph_storage_repair"):
-            from tools.finalize_prepared_selection import charge_failed_finalization
             from tools.recover_graph_storage import import_saved
 
             work = (
@@ -731,8 +738,6 @@ def run_recipe(path):
             ledger.admit(work, group="reserve", seconds=0, forecast_known=False)
             migration_start, migration_status = time.time(), "failed"
             try:
-                if recipe.get("failed_finalization_interval"):
-                    charge_failed_finalization(recipe, ledger, read(runtime / "budget.json"))
                 import_saved(recipe, campaign, runtime, code)
                 migration_status = "complete"
             finally:
