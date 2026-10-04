@@ -1,4 +1,4 @@
-"""Development-only teacher acquisition with per-call native evidence and safe resume."""
+"""Frozen train/development teacher acquisition with native evidence and safe resume."""
 from __future__ import annotations
 
 import argparse
@@ -60,12 +60,12 @@ def record_call(directory, result, seconds, case, assignment):
     raise_on_software_failure(dict(status=result.status, detail=result.detail))
 
 
-def case_worker(record, settings, directory):
+def case_worker(record, settings, directory, split='development'):
     from tools.repair.train import label_case
 
     case = case_from_dict(record)
-    if case.split != 'development' or case.schema_revision != 'v3':
-        raise ValueError('Diagnostic acquisition admits only frozen v3 development cases')
+    if split not in {'train', 'development'} or case.split != split or case.schema_revision != 'v3':
+        raise ValueError('Acquisition admits only the declared frozen v3 train/development split')
     cache = label_case(case, **settings, evidence_directory=Path(directory) / 'native')
     return dict(artifact=publish_label_cache(cache, Path(directory) / 'cache'),
                 status='complete' if cache.complete else 'partial', coverage=cache.coverage,
@@ -73,22 +73,33 @@ def case_worker(record, settings, directory):
 
 
 def validate_schedule(plan):
+    split = plan.get('split', 'development')
+    contracts = {
+        'development': ('exact-repair/development-acquisition-plan/v1', 'development_manifest', 32),
+        'train': ('exact-repair/training-acquisition-plan/v1', 'training_manifest', 128),
+    }
+    if split not in contracts:
+        raise ValueError('Acquisition cannot open held-out cases')
+    schema, manifest_key, expected_count = contracts[split]
+    if (plan.get('schema') != schema or plan.get('expected_cases') != expected_count
+            or plan.get('heldout_use') is not False or plan.get('model_fitting') is not False):
+        raise ValueError('Acquisition plan must bind its split, full denominator and diagnostic scope')
     completion = verify_binding(plan['corpus_completion'])
-    if completion['status'] != 'complete' or completion['releases']['development']['manifest'] != plan['development_manifest']:
+    if completion['status'] != 'complete' or completion['releases'][split]['manifest'] != plan[manifest_key]:
         raise ValueError('Acquisition corpus completion or release mismatch')
-    manifest = verify_binding(plan['development_manifest'])
+    manifest = verify_binding(plan[manifest_key])
     rows = manifest['rows']
-    if len(rows) != 32 or len({r['case_id'] for r in rows}) != 32:
-        raise ValueError('Acquisition must preserve all 32 development cases')
+    if len(rows) != expected_count or len({r['case_id'] for r in rows}) != expected_count:
+        raise ValueError(f'Acquisition must preserve all {expected_count} {split} cases')
     cases = []
     for row in rows:
         record = verify_binding(row['evaluator'])
         case = case_from_dict(record)
-        if (row['status'] != 'materialized' or row['split'] != 'development'
-                or case.split != 'development' or case.schema_revision != 'v3'
+        if (row['status'] != 'materialized' or row['split'] != split
+                or case.split != split or case.schema_revision != 'v3'
                 or case.case_id != row['case_id'] or case.structural_parent != row['structural_parent']
                 or record['hash'] != row['case_hash'] or case.problem.content_hash != row['input_hash']):
-            raise ValueError('Acquisition crossed frozen development case identity')
+            raise ValueError('Acquisition crossed frozen split or case identity')
         cases.append((row, record, case))
     return cases
 
@@ -99,7 +110,8 @@ def run(plan_path, output, start, stop):
     plan = read(plan_path)
     cases = validate_schedule(plan)
     if not 0 <= start < stop <= len(cases):
-        raise ValueError('Invalid development acquisition slice')
+        raise ValueError('Invalid acquisition slice')
+    split = plan.get('split', 'development')
     output = Path(output)
     output.mkdir(parents=True, exist_ok=True)
     identity = canonical_hash((sha(plan_path), sha(__file__),
@@ -131,7 +143,7 @@ def run(plan_path, output, start, stop):
             write_artifact(marker, dict(identity=expected, started_epoch=time.time(), case_id=case.case_id))
             write_artifact(output / 'progress.json', dict(completed_rows=len(rows), case_id=case.case_id))
             began = time.monotonic()
-            result = bounded_call(case_worker, record, plan['teacher'], str(directory),
+            result = bounded_call(case_worker, record, plan['teacher'], str(directory), split,
                 timeout=plan['worker_seconds'], cpu_seconds=plan['cpu_seconds'], memory_mb=plan['memory_mb'])
             if not result.cleanup_complete:
                 raise RuntimeError('Acquisition outer worker cleanup incomplete')
@@ -147,12 +159,12 @@ def run(plan_path, output, start, stop):
                 outer_status=result.status, detail=result.detail, cleanup_complete=True,
                 resources=dict(result.resource_usage), elapsed_seconds=time.monotonic()-began,
                 native_evidence=native, supervision_eligible=False,
-                scope='Separate development acquisition diagnostic; adoption requires dependency and gate review')
+                scope=f'Separate {split} acquisition diagnostic; adoption requires dependency and gate review')
             marker.unlink()
             raise_on_software_failure(saved)
             rows.append(binding(receipt))
         return checkpoint(output / 'report.json', identity,
-            schema='exact-repair/development-acquisition/v1', status='complete',
+            schema=f'exact-repair/{"training" if split == "train" else "development"}-acquisition/v1', status='complete',
             plan=binding(plan_path), scheduled_rows=stop-start, recorded_rows=len(rows), rows=rows,
             counts=dict(Counter(read(r['path'])['status'] for r in rows)),
             supervision_eligible=False, heldout_cases_opened=False,
