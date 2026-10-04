@@ -17,6 +17,18 @@ from tools.repair.historical_regression import binding, verify_binding
 from tools.repair.prepare import case_from_dict, publish_label_cache, read_label_cache
 
 
+_INTENDED_PARENT_UNVERIFIED = (
+    "ValueError: Generated intended parent has not been verified feasible and query-complete"
+)
+
+
+def raise_on_software_failure(saved):
+    from exact.experiments.science_health import software_failure
+
+    if software_failure(saved["status"], saved.get("detail", "")):
+        raise RuntimeError("Acquisition software failure: " + saved.get("detail", saved["status"]))
+
+
 class RecordingVerifier(OwlVerifier):
     """Persist each actual native check, including unknown reasons and support scope."""
     def __init__(self, directory):
@@ -110,6 +122,7 @@ def run(plan_path, output, start, stop):
                     if read(marker).get('identity') != expected or not saved['cleanup_complete']:
                         raise ValueError('Completed acquisition marker identity or cleanup differs')
                     marker.unlink()
+                raise_on_software_failure(saved)
                 rows.append(binding(receipt))
                 continue
             if marker.exists():
@@ -125,16 +138,17 @@ def run(plan_path, output, start, stop):
             value = result.value if result.status == 'complete' else None
             if value:
                 read_label_cache(value['artifact'], directory / 'cache', case)
-            checkpoint(receipt, expected, case_id=case.case_id, family=case.family,
+            saved = checkpoint(receipt, expected, case_id=case.case_id, family=case.family,
                 parent=case.structural_parent, split=case.split,
                 status=(value['status'] if value else 'unknown_intended_parent'
-                        if 'Generated intended parent has not been verified feasible and query-complete' in result.detail
+                        if result.status == 'error' and result.detail == _INTENDED_PARENT_UNVERIFIED
                         else result.status), result=value,
                 outer_status=result.status, detail=result.detail, cleanup_complete=True,
                 resources=dict(result.resource_usage), elapsed_seconds=time.monotonic()-began,
                 native_evidence=native, supervision_eligible=False,
                 scope='Separate development acquisition diagnostic; adoption requires dependency and gate review')
             marker.unlink()
+            raise_on_software_failure(saved)
             rows.append(binding(receipt))
         return checkpoint(output / 'report.json', identity,
             schema='exact-repair/development-acquisition/v1', status='complete',

@@ -204,3 +204,39 @@ def test_native_exact_minimal_supports_and_coherent_control(parent, tmp_path, co
         assert result["actual_minimal_supports"] == sorted(item["expected_minimal_supports"])
         assert len(result["checks"]) == (16 if case.control == "corrupted" else 1)
         assert all(c["qualified"] for c in result["checks"])
+
+
+@pytest.mark.parametrize("cleanup", [True, False])
+def test_witness_software_failure_is_persisted_and_resume_never_spends_again(
+    schedule, tmp_path, monkeypatch, cleanup
+):
+    from types import SimpleNamespace
+
+    import exact.repair.workers as workers
+
+    path, _ = schedule
+    calls = []
+
+    def failed(*args, **kwargs):
+        calls.append(kwargs)
+        return SimpleNamespace(
+            status="error",
+            detail="ValueError: native witness bug",
+            cleanup_complete=cleanup,
+            resource_usage=(("cpu_seconds", 2),),
+            value=None,
+        )
+
+    monkeypatch.setattr(workers, "bounded_call", failed)
+    monkeypatch.setattr(overlap, "witness_identity", lambda _: "frozen-witness-identity")
+    output = tmp_path / "failed-witness"
+    expected = "software failure" if cleanup else "cleanup"
+    with pytest.raises(RuntimeError, match=expected):
+        overlap.run_witness(path, output)
+    receipts = list((output / "rows").glob("*.json"))
+    assert len(receipts) == 1 and fresh.read(receipts[0])["status"] == "error"
+    assert bool(list((output / "inflight").glob("*.json"))) is not cleanup
+    assert not (output / "report.json").exists()
+    with pytest.raises(RuntimeError, match=expected):
+        overlap.run_witness(path, output)
+    assert len(calls) == 1

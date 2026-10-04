@@ -272,3 +272,29 @@ def test_preparation_stage_lock_prevents_concurrent_direct_resume(tmp_path, monk
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         with pytest.raises(BlockingIOError):
             modules.prepare("plan.json", output)
+
+
+
+@pytest.mark.parametrize("status", ["error", "worker_error"])
+def test_native_software_error_is_persisted_then_raised_without_reexecution(tmp_path, monkeypatch, status):
+    calls = []
+    def failed(*args, **kwargs):
+        calls.append(1)
+        return CallResult(status, detail="AttributeError: missing qualification field", cleanup_complete=True)
+    monkeypatch.setattr("exact.repair.workers.bounded_call", failed)
+    path = tmp_path / "qualified.json"
+    for _ in range(2):
+        with pytest.raises(RuntimeError, match="Recorded native software failure"):
+            modules.saved_call(path, "identity", None)
+    assert calls == [1]
+    saved = json.loads(path.read_text())
+    assert saved["status"] == status
+    assert saved["cleanup_complete"] is True
+    assert not path.with_suffix(".inflight.json").exists()
+
+
+@pytest.mark.parametrize("status", ["timeout", "unknown"])
+def test_native_unknown_and_timeout_remain_recorded_unavailable_outcomes(tmp_path, monkeypatch, status):
+    monkeypatch.setattr("exact.repair.workers.bounded_call", lambda *a, **k: CallResult(status))
+    path = tmp_path / "qualified.json"
+    assert modules.saved_call(path, "identity", None)["status"] == status

@@ -313,6 +313,7 @@ def witness_identity(schedule_path):
 
 
 def run_witness(schedule_path, output):
+    from exact.experiments.science_health import software_failure
     from exact.repair.workers import bounded_call
 
     schedule, output = read(schedule_path), Path(output)
@@ -338,7 +339,6 @@ def run_witness(schedule_path, output):
                 cpu_seconds=600,
                 memory_mb=8192,
             )
-            fresh.ensure_cleanup(call)
             saved = checkpoint(
                 row_path,
                 row_identity,
@@ -350,9 +350,12 @@ def run_witness(schedule_path, output):
                 resources=dict(call.resource_usage),
                 result=call.value if call.status == "complete" else None,
             )
+            fresh.ensure_cleanup(call)
             guard.unlink()
         if guard.exists() or not saved["cleanup_complete"]:
             raise RuntimeError("Witness ownership or cleanup unresolved")
+        if software_failure(saved["status"], saved.get("detail", "")):
+            raise RuntimeError("Native witness software failure: " + saved.get("detail", "error"))
         if saved.get("result"):
             for check in saved["result"]["checks"]:
                 bound(check["proof"])

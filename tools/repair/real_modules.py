@@ -171,12 +171,16 @@ def saved_call(path, identity, function, *args, seconds=60):
     if saved is not None:
         if not saved.get("cleanup_complete"):
             raise RuntimeError("Prior native cleanup incomplete")
+        if saved.get("status") in {"error", "worker_error"}:
+            raise RuntimeError("Recorded native software failure: " + str(saved.get("detail", "")))
         return saved
     checkpoint(guard,identity,started_epoch=time.time())
     outcome=bounded_call(function,*args,timeout=seconds,memory_mb=8192,cpu_seconds=120)
     saved=checkpoint(path,identity,status=outcome.status,value=outcome.value,detail=outcome.detail,cleanup_complete=outcome.cleanup_complete,resources=dict(outcome.resource_usage))
     if not outcome.cleanup_complete:raise RuntimeError("Native cleanup incomplete")
     guard.unlink()
+    if outcome.status in {"error", "worker_error"}:
+        raise RuntimeError("Recorded native software failure: " + str(outcome.detail))
     return saved
 
 

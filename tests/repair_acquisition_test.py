@@ -87,3 +87,51 @@ def test_acquisition_resume_preserves_finished_error_and_rejects_changed_plan(tm
     with pytest.raises(ValueError, match='dependencies changed'):
         acquisition.run(plan, tmp_path / 'output', 0, 1)
     assert len(calls) == 1
+
+
+@pytest.mark.parametrize('detail,expected_status', [
+    ('RuntimeError: native bridge failed', 'error'),
+    ('ValueError: Generated intended parent has not been verified feasible and query-complete',
+     'unknown_intended_parent'),
+    ('RuntimeError: Generated intended parent has not been verified feasible and query-complete', 'error'),
+])
+def test_acquisition_run_persists_and_stops_on_unexpected_error(tmp_path, monkeypatch, detail, expected_status):
+    from tools.repair import acquisition
+    from exact.repair.api import write_artifact
+    from exact.repair import study
+
+    cases = []
+    for seed in (13, 37):
+        case = parent_case('overlap', 2, seed)
+        record = case_to_dict(case)
+        cases.append((dict(case_id=case.case_id, case_hash=record['hash']), record, case))
+    plan, output = tmp_path / 'plan.json', tmp_path / 'output'
+    write_artifact(plan, dict(teacher={}, worker_seconds=10, cpu_seconds=20, memory_mb=512))
+    monkeypatch.setattr(acquisition, 'validate_schedule', lambda p: cases)
+    monkeypatch.setattr(study, 'runtime_manifest', lambda: {'fixture': 'same-source'})
+    calls = []
+    def call(*args, **kwargs):
+        calls.append(args)
+        return outcome('error', detail=detail)
+    monkeypatch.setattr(acquisition, 'bounded_call', call)
+    if expected_status == 'error':
+        for _ in range(2):
+            with pytest.raises(RuntimeError, match='Acquisition software failure'):
+                acquisition.run(plan, output, 0, 2)
+        assert len(calls) == 1  # Resume preserves the error, never spends again.
+        assert not (output / 'report.json').exists()
+        receipts = list(output.glob('cases/*/completion.json'))
+        assert len(receipts) == 1
+    else:
+        report = acquisition.run(plan, output, 0, 2)
+        assert acquisition.run(plan, output, 0, 2) == report
+        assert len(calls) == 2
+        assert report['counts'] == {'unknown_intended_parent': 2}
+        receipts = list(output.glob('cases/*/completion.json'))
+    assert not list(output.glob('cases/*/inflight.json'))
+    for receipt in receipts:
+        saved = read(receipt)
+        assert saved['status'] == expected_status
+        assert saved['detail'] == detail and saved['outer_status'] == 'error'
+        assert saved['cleanup_complete'] and saved['resources']['wall_seconds'] == 0.01
+        assert not saved['supervision_eligible']
