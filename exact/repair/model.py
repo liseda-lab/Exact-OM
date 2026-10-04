@@ -84,6 +84,7 @@ class RepairModel(nn.Module):
         support_enabled: bool = False,
         support_readout_identity: str = SUPPORT_READOUT_IDENTITY,
         pair_factor_bound: float = 1.0,
+        graph_schema: dict | None = None,
     ) -> None:
         super().__init__()
         if revision not in {"v2", "v3"}:
@@ -103,6 +104,14 @@ class RepairModel(nn.Module):
         if hidden_dim < 1 or heads < 1 or hidden_dim % heads or layers < 0:
             raise ValueError("hidden_dim must be positive and divisible by heads; layers >= 0")
         self.metadata = (tuple(sorted(metadata[0])), tuple(sorted(metadata[1])))
+        self.graph_schema_hash = None
+        if graph_schema is not None:
+            from .graph_schema import declared_metadata
+            from .records import canonical_hash
+
+            if revision != "v3" or self.metadata != declared_metadata(graph_schema):
+                raise ModelGraphSchemaError("Model metadata differs from declared graph schema")
+            self.graph_schema_hash = canonical_hash(graph_schema)
         if not self.metadata[0]:
             raise ValueError("The encoder requires at least one node type")
         self.feature_dim, self.hidden_dim, self.encoder = feature_dim, hidden_dim, encoder
@@ -121,6 +130,10 @@ class RepairModel(nn.Module):
         }
         if revision == "v3":
             self.config["support_readout_identity"] = support_readout_identity
+        if graph_schema is not None:
+            from copy import deepcopy
+
+            self.config["graph_schema"] = deepcopy(graph_schema)
         self.input_projection = nn.ModuleDict(
             {kind: nn.Linear(feature_dim, hidden_dim) for kind in self.metadata[0]}
         )
@@ -171,7 +184,9 @@ class RepairModel(nn.Module):
         if self.revision == "v3" and graph.feature_schema != "exact-repair/observable-features/v3":
             raise ValueError("V3 model requires the versioned v3 observable feature view")
         validate_admitted_supports(graph)
-        compatibility = graph_schema_compatibility(self.metadata, self.encoder, graph)
+        compatibility = graph_schema_compatibility(
+            self.metadata, "declared" if self.graph_schema_hash else self.encoder, graph
+        )
         if not compatibility["compatible"]:
             raise ModelGraphSchemaError(str(compatibility))
         device = self.empty_bundle.device

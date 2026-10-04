@@ -709,6 +709,7 @@ def train_cases(
     threads: int = 1,
     quantization_scale: int = 1000,
     warm_start_metadata: Any | None = None,
+    graph_schema: dict | None = None,
     proposal_arm: str = "grammar_mixture",
     compile_seconds: float = 20.0,
     max_circuit_nodes: int = 100000,
@@ -781,6 +782,8 @@ def train_cases(
     ):
         raise ValueError("Report recovery requires an existing checkpoint and no other migration")
     identity_options = dict(locals())
+    if graph_schema is None:
+        identity_options.pop("graph_schema")
     for key in (
         "checkpoint_path",
         "deadline_seconds",
@@ -975,11 +978,12 @@ def train_cases(
     failed_compilations: set[str] = set()
     node_types = {kind for graph in graphs.values() for kind in graph.metadata[0]}
     edge_types = {edge for graph in graphs.values() for edge in graph.metadata[1]}
-    if warm_start_metadata is not None:
-        node_types.update(warm_start_metadata[0])
-        edge_types.update(tuple(edge) for edge in warm_start_metadata[1])
+    from exact.repair.graph_schema import training_metadata
+
+    metadata = training_metadata((node_types, edge_types), graph_schema, warm_start_metadata)
     model = RepairModel(
-        (node_types, edge_types),
+        metadata,
+        graph_schema=graph_schema,
         hidden_dim=hidden_dim,
         heads=heads,
         layers=layers,
@@ -1038,6 +1042,12 @@ def train_cases(
     recovery_lineage: list[dict[str, Any]] = []
     if checkpoint_path is not None and checkpoint_path.exists():
         saved = torch.load(checkpoint_path, weights_only=True, map_location=device)
+        if graph_schema is not None and (
+            saved.get("graph_schema") != graph_schema
+            or saved.get("graph_schema_hash") != model.graph_schema_hash
+            or saved.get("metadata") != model.metadata
+        ):
+            raise ValueError("Resume checkpoint declared graph schema changed")
         if (
             saved.get("schema") != f"exact-repair/training-state/{revision}"
             or saved.get("identity") != resume_identity
@@ -1177,6 +1187,8 @@ def train_cases(
                 dict(
                     schema=f"exact-repair/training-state/{revision}",
                     identity=resume_identity,
+                    **(dict(graph_schema=graph_schema, graph_schema_hash=model.graph_schema_hash,
+                            metadata=model.metadata) if graph_schema is not None else {}),
                     model=model.state_dict(),
                     optimizer=optimizer.state_dict(),
                     cpu_rng=torch.get_rng_state(),
@@ -2080,6 +2092,8 @@ def train_cases(
         "resumable": interrupted,
         "recovery_revision": "exact-phase-resume/v3.1",
         "encoder": encoder,
+        **(dict(graph_schema=graph_schema, graph_schema_hash=model.graph_schema_hash)
+           if graph_schema is not None else {}),
         "feature_schema": (
             FEATURE_SCHEMA_V3 if revision == "v3" else "exact-repair/observable-features/v2"
         ),
@@ -2222,6 +2236,7 @@ def _protocol_arguments(protocol: Mapping[str, Any]) -> dict[str, Any]:
     return {
         "revision": revision,
         "encoder": graph["encoder"],
+        **({"graph_schema": graph["graph_schema"]} if graph.get("graph_schema") else {}),
         "pairwise": protocol["model"]["pair_benefit"] if revision == "v3" else False,
         **(
             {
@@ -2414,6 +2429,8 @@ def _train_payload(training, development, options):
         "state_dict": {key: value.detach().cpu() for key, value in model.state_dict().items()},
         "metadata": model.metadata,
         "config": model.config,
+        **({"graph_schema_hash": model.graph_schema_hash}
+           if getattr(model, "graph_schema_hash", None) is not None else {}),
     }
     if revision == "v3":
         state["model_schema"] = "exact-repair/model/v3"

@@ -1,0 +1,1999 @@
+{
+  "$defs": {
+    "Circuit": {
+      "additionalProperties": false,
+      "properties": {
+        "components": {
+          "minimum": 1,
+          "title": "Components",
+          "type": "integer"
+        },
+        "partition": {
+          "const": "family_template",
+          "title": "Partition",
+          "type": "string"
+        },
+        "vtree": {
+          "enum": [
+            "right_linear",
+            "balanced",
+            "grouped"
+          ],
+          "title": "Vtree",
+          "type": "string"
+        },
+        "gc_policy": {
+          "const": "protected_roots",
+          "title": "Gc Policy",
+          "type": "string"
+        },
+        "gc_version": {
+          "minLength": 1,
+          "title": "Gc Version",
+          "type": "string"
+        },
+        "allocated_node_limit": {
+          "minimum": 1,
+          "title": "Allocated Node Limit",
+          "type": "integer"
+        },
+        "live_node_limit": {
+          "minimum": 1,
+          "title": "Live Node Limit",
+          "type": "integer"
+        },
+        "reachable_node_limit": {
+          "minimum": 1,
+          "title": "Reachable Node Limit",
+          "type": "integer"
+        },
+        "element_limit": {
+          "minimum": 1,
+          "title": "Element Limit",
+          "type": "integer"
+        },
+        "rss_mb": {
+          "minimum": 1,
+          "title": "Rss Mb",
+          "type": "integer"
+        },
+        "call_seconds": {
+          "exclusiveMinimum": 0,
+          "title": "Call Seconds",
+          "type": "number"
+        },
+        "aggregate_seconds": {
+          "exclusiveMinimum": 0,
+          "title": "Aggregate Seconds",
+          "type": "number"
+        },
+        "cache_directory": {
+          "minLength": 1,
+          "title": "Cache Directory",
+          "type": "string"
+        },
+        "cache_version": {
+          "minLength": 1,
+          "title": "Cache Version",
+          "type": "string"
+        },
+        "cache_reuse": {
+          "const": "integrity_checked_immutable",
+          "title": "Cache Reuse",
+          "type": "string"
+        },
+        "semantic_constraints": {
+          "const": "proved_immutable_context",
+          "title": "Semantic Constraints",
+          "type": "string"
+        },
+        "proof_dependencies": {
+          "minLength": 1,
+          "title": "Proof Dependencies",
+          "type": "string"
+        },
+        "distribution_identity": {
+          "minLength": 1,
+          "title": "Distribution Identity",
+          "type": "string"
+        }
+      },
+      "required": [
+        "components",
+        "partition",
+        "vtree",
+        "gc_policy",
+        "gc_version",
+        "allocated_node_limit",
+        "live_node_limit",
+        "reachable_node_limit",
+        "element_limit",
+        "rss_mb",
+        "call_seconds",
+        "aggregate_seconds",
+        "cache_directory",
+        "cache_version",
+        "cache_reuse",
+        "semantic_constraints",
+        "proof_dependencies",
+        "distribution_identity"
+      ],
+      "title": "Circuit",
+      "type": "object"
+    },
+    "Collection": {
+      "additionalProperties": false,
+      "properties": {
+        "schedule_version": {
+          "const": "exact-repair/attempt-schedule/v1",
+          "title": "Schedule Version",
+          "type": "string"
+        },
+        "plan_quotas": {
+          "additionalProperties": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "propertyNames": {
+            "enum": [
+              "utility",
+              "proposal",
+              "diversity",
+              "quartet",
+              "uniform"
+            ]
+          },
+          "title": "Plan Quotas",
+          "type": "object"
+        },
+        "quartet_budget_unit": {
+          "const": "assignment_attempts",
+          "title": "Quartet Budget Unit",
+          "type": "string"
+        },
+        "rounds": {
+          "minimum": 0,
+          "title": "Rounds",
+          "type": "integer"
+        },
+        "cases_per_round": {
+          "minimum": 0,
+          "title": "Cases Per Round",
+          "type": "integer"
+        },
+        "plan_attempts_per_case": {
+          "minimum": 0,
+          "title": "Plan Attempts Per Case",
+          "type": "integer"
+        },
+        "utility_attempts": {
+          "minimum": 0,
+          "title": "Utility Attempts",
+          "type": "integer"
+        },
+        "diversity_attempts": {
+          "minimum": 0,
+          "title": "Diversity Attempts",
+          "type": "integer"
+        },
+        "quartet_attempts": {
+          "minimum": 0,
+          "title": "Quartet Attempts",
+          "type": "integer"
+        },
+        "proposal_attempts": {
+          "minimum": 0,
+          "title": "Proposal Attempts",
+          "type": "integer"
+        },
+        "generator_fraction": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Generator Fraction",
+          "type": "number"
+        },
+        "exploration_fraction": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Exploration Fraction",
+          "type": "number"
+        },
+        "diversity_rule": {
+          "minLength": 1,
+          "title": "Diversity Rule",
+          "type": "string"
+        },
+        "quartet_context": {
+          "const": "same_background_all_four_feasible",
+          "title": "Quartet Context",
+          "type": "string"
+        },
+        "deduplication": {
+          "const": "canonical_assignment_with_origins",
+          "title": "Deduplication",
+          "type": "string"
+        },
+        "retries": {
+          "minimum": 0,
+          "title": "Retries",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "schedule_version",
+        "plan_quotas",
+        "quartet_budget_unit",
+        "rounds",
+        "cases_per_round",
+        "plan_attempts_per_case",
+        "utility_attempts",
+        "diversity_attempts",
+        "quartet_attempts",
+        "proposal_attempts",
+        "generator_fraction",
+        "exploration_fraction",
+        "diversity_rule",
+        "quartet_context",
+        "deduplication",
+        "retries"
+      ],
+      "title": "Collection",
+      "type": "object"
+    },
+    "Corpus": {
+      "additionalProperties": false,
+      "properties": {
+        "families": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Families",
+          "type": "array"
+        },
+        "groups_per_family": {
+          "$ref": "#/$defs/SplitCounts"
+        },
+        "corruptions_per_group": {
+          "minimum": 1,
+          "title": "Corruptions Per Group",
+          "type": "integer"
+        },
+        "clean_controls_per_group": {
+          "minimum": 0,
+          "title": "Clean Controls Per Group",
+          "type": "integer"
+        },
+        "generated_objects": {
+          "items": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "minItems": 1,
+          "title": "Generated Objects",
+          "type": "array"
+        },
+        "split_seed": {
+          "minimum": 0,
+          "title": "Split Seed",
+          "type": "integer"
+        },
+        "split_unit": {
+          "const": "clean_structural_parent",
+          "title": "Split Unit",
+          "type": "string"
+        },
+        "composition_holdout": {
+          "minLength": 1,
+          "title": "Composition Holdout",
+          "type": "string"
+        },
+        "evidence": {
+          "$ref": "#/$defs/CorpusEvidence"
+        }
+      },
+      "required": [
+        "families",
+        "groups_per_family",
+        "corruptions_per_group",
+        "clean_controls_per_group",
+        "generated_objects",
+        "split_seed",
+        "split_unit",
+        "composition_holdout",
+        "evidence"
+      ],
+      "title": "Corpus",
+      "type": "object"
+    },
+    "CorpusEvidence": {
+      "additionalProperties": false,
+      "properties": {
+        "simulator": {
+          "const": "label_jaccard_plus_noise_v2",
+          "title": "Simulator",
+          "type": "string"
+        },
+        "noise_std": {
+          "minimum": 0,
+          "title": "Noise Std",
+          "type": "number"
+        },
+        "misleading_label_fraction": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Misleading Label Fraction",
+          "type": "number"
+        },
+        "latent_corruption_features": {
+          "const": false,
+          "title": "Latent Corruption Features",
+          "type": "boolean"
+        },
+        "counterbalance_provenance": {
+          "const": true,
+          "title": "Counterbalance Provenance",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "simulator",
+        "noise_std",
+        "misleading_label_fraction",
+        "latent_corruption_features",
+        "counterbalance_provenance"
+      ],
+      "title": "CorpusEvidence",
+      "type": "object"
+    },
+    "DeclaredGraphSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "schema": {
+          "const": "exact-repair/declared-graph-schema/v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "language": {
+          "const": "pyowl-core/public-structural-ast/v1",
+          "title": "Language",
+          "type": "string"
+        },
+        "language_hash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Language Hash",
+          "type": "string"
+        },
+        "node_types": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Node Types",
+          "type": "array"
+        },
+        "edge_types": {
+          "items": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 3,
+            "minItems": 3,
+            "type": "array"
+          },
+          "minItems": 1,
+          "title": "Edge Types",
+          "type": "array"
+        }
+      },
+      "required": [
+        "schema",
+        "language",
+        "language_hash",
+        "node_types",
+        "edge_types"
+      ],
+      "title": "DeclaredGraphSchema",
+      "type": "object"
+    },
+    "Evaluation": {
+      "additionalProperties": false,
+      "properties": {
+        "cohorts": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Cohorts",
+          "type": "array"
+        },
+        "train_manifest": {
+          "minLength": 1,
+          "title": "Train Manifest",
+          "type": "string"
+        },
+        "development_manifest": {
+          "minLength": 1,
+          "title": "Development Manifest",
+          "type": "string"
+        },
+        "test_manifest": {
+          "minLength": 1,
+          "title": "Test Manifest",
+          "type": "string"
+        },
+        "fresh_confirmatory_parents": {
+          "title": "Fresh Confirmatory Parents",
+          "type": "boolean"
+        },
+        "metrics": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Metrics",
+          "type": "array"
+        },
+        "accounting": {
+          "const": "four_baseline_full_preprocess_search_query_costs",
+          "title": "Accounting",
+          "type": "string"
+        },
+        "cache_policy": {
+          "minLength": 1,
+          "title": "Cache Policy",
+          "type": "string"
+        },
+        "checkpoint_rule": {
+          "const": "development_generated_pool",
+          "title": "Checkpoint Rule",
+          "type": "string"
+        },
+        "independent_judge": {
+          "minLength": 1,
+          "title": "Independent Judge",
+          "type": "string"
+        },
+        "grouping": {
+          "const": "parent_and_ontology_pair",
+          "title": "Grouping",
+          "type": "string"
+        },
+        "interval_method": {
+          "minLength": 1,
+          "title": "Interval Method",
+          "type": "string"
+        },
+        "all_scheduled_case_denominator": {
+          "const": true,
+          "title": "All Scheduled Case Denominator",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "cohorts",
+        "train_manifest",
+        "development_manifest",
+        "test_manifest",
+        "fresh_confirmatory_parents",
+        "metrics",
+        "accounting",
+        "cache_policy",
+        "checkpoint_rule",
+        "independent_judge",
+        "grouping",
+        "interval_method",
+        "all_scheduled_case_denominator"
+      ],
+      "title": "Evaluation",
+      "type": "object"
+    },
+    "Generation": {
+      "additionalProperties": false,
+      "properties": {
+        "grammar_version": {
+          "minLength": 1,
+          "title": "Grammar Version",
+          "type": "string"
+        },
+        "templates": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Templates",
+          "type": "array"
+        },
+        "constructors": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Constructors",
+          "type": "array"
+        },
+        "omission_mode": {
+          "enum": [
+            "none",
+            "final_candidate",
+            "missing_vocabulary",
+            "grammar_unavailable"
+          ],
+          "title": "Omission Mode",
+          "type": "string"
+        },
+        "omission_manifest": {
+          "minLength": 1,
+          "title": "Omission Manifest",
+          "type": "string"
+        },
+        "stages": {
+          "items": {
+            "$ref": "#/$defs/GenerationStage"
+          },
+          "maxItems": 3,
+          "minItems": 1,
+          "title": "Stages",
+          "type": "array"
+        },
+        "max_total_draws_per_object": {
+          "minimum": 0,
+          "title": "Max Total Draws Per Object",
+          "type": "integer"
+        },
+        "elementary_guarantee": {
+          "const": "reserve_before_complex",
+          "title": "Elementary Guarantee",
+          "type": "string"
+        },
+        "tie_rule": {
+          "const": "canonical_candidate_id",
+          "title": "Tie Rule",
+          "type": "string"
+        }
+      },
+      "required": [
+        "grammar_version",
+        "templates",
+        "constructors",
+        "omission_mode",
+        "omission_manifest",
+        "stages",
+        "max_total_draws_per_object",
+        "elementary_guarantee",
+        "tie_rule"
+      ],
+      "title": "Generation",
+      "type": "object"
+    },
+    "GenerationStage": {
+      "additionalProperties": false,
+      "properties": {
+        "classes_per_side": {
+          "minimum": 1,
+          "title": "Classes Per Side",
+          "type": "integer"
+        },
+        "properties_per_side": {
+          "minimum": 1,
+          "title": "Properties Per Side",
+          "type": "integer"
+        },
+        "endpoints_per_side": {
+          "minimum": 1,
+          "title": "Endpoints Per Side",
+          "type": "integer"
+        },
+        "max_depth": {
+          "minimum": 0,
+          "title": "Max Depth",
+          "type": "integer"
+        },
+        "max_constructors": {
+          "minimum": 0,
+          "title": "Max Constructors",
+          "type": "integer"
+        },
+        "candidate_cap": {
+          "minimum": 1,
+          "title": "Candidate Cap",
+          "type": "integer"
+        },
+        "draws_per_object": {
+          "minimum": 0,
+          "title": "Draws Per Object",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "classes_per_side",
+        "properties_per_side",
+        "endpoints_per_side",
+        "max_depth",
+        "max_constructors",
+        "candidate_cap",
+        "draws_per_object"
+      ],
+      "title": "GenerationStage",
+      "type": "object"
+    },
+    "Identity": {
+      "additionalProperties": false,
+      "properties": {
+        "implementation_revision": {
+          "const": "exact-repair/review-corrections/v2",
+          "title": "Implementation Revision",
+          "type": "string"
+        },
+        "research_revision": {
+          "const": "XR-2.1",
+          "title": "Research Revision",
+          "type": "string"
+        },
+        "record_schema": {
+          "const": "exact-repair/records/v3",
+          "title": "Record Schema",
+          "type": "string"
+        },
+        "feature_schema": {
+          "const": "exact-repair/observable-features/v3",
+          "title": "Feature Schema",
+          "type": "string"
+        },
+        "label_schema": {
+          "enum": [
+            "exact-repair/teacher-cache/v3",
+            "exact-repair/fidelity-training/v3.3",
+            "exact-repair/mixed-targets/v3.3"
+          ],
+          "title": "Label Schema",
+          "type": "string"
+        },
+        "code_hash": {
+          "minLength": 1,
+          "title": "Code Hash",
+          "type": "string"
+        },
+        "dirty_hash": {
+          "minLength": 1,
+          "title": "Dirty Hash",
+          "type": "string"
+        },
+        "run_id": {
+          "minLength": 1,
+          "title": "Run Id",
+          "type": "string"
+        },
+        "parent_run_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Parent Run Id"
+        },
+        "purpose": {
+          "enum": [
+            "smoke",
+            "development",
+            "confirmatory"
+          ],
+          "title": "Purpose",
+          "type": "string"
+        },
+        "execution_authorized": {
+          "title": "Execution Authorized",
+          "type": "boolean"
+        },
+        "automatic_campaign_resumption": {
+          "const": false,
+          "title": "Automatic Campaign Resumption",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "implementation_revision",
+        "research_revision",
+        "record_schema",
+        "feature_schema",
+        "label_schema",
+        "code_hash",
+        "dirty_hash",
+        "run_id",
+        "parent_run_id",
+        "purpose",
+        "execution_authorized",
+        "automatic_campaign_resumption"
+      ],
+      "title": "Identity",
+      "type": "object"
+    },
+    "Inputs": {
+      "additionalProperties": false,
+      "properties": {
+        "ontology_manifest": {
+          "minLength": 1,
+          "title": "Ontology Manifest",
+          "type": "string"
+        },
+        "import_manifest": {
+          "minLength": 1,
+          "title": "Import Manifest",
+          "type": "string"
+        },
+        "alignment_manifest": {
+          "minLength": 1,
+          "title": "Alignment Manifest",
+          "type": "string"
+        },
+        "evidence_manifest": {
+          "minLength": 1,
+          "title": "Evidence Manifest",
+          "type": "string"
+        },
+        "relation_interpretation": {
+          "minLength": 1,
+          "title": "Relation Interpretation",
+          "type": "string"
+        },
+        "licensing_manifest": {
+          "minLength": 1,
+          "title": "Licensing Manifest",
+          "type": "string"
+        },
+        "availability_manifest": {
+          "minLength": 1,
+          "title": "Availability Manifest",
+          "type": "string"
+        },
+        "matcher_source": {
+          "minLength": 1,
+          "title": "Matcher Source",
+          "type": "string"
+        },
+        "split_parent_manifest": {
+          "minLength": 1,
+          "title": "Split Parent Manifest",
+          "type": "string"
+        },
+        "evidence_cutoff": {
+          "minLength": 1,
+          "title": "Evidence Cutoff",
+          "type": "string"
+        },
+        "defer_production_matcher": {
+          "title": "Defer Production Matcher",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "ontology_manifest",
+        "import_manifest",
+        "alignment_manifest",
+        "evidence_manifest",
+        "relation_interpretation",
+        "licensing_manifest",
+        "availability_manifest",
+        "matcher_source",
+        "split_parent_manifest",
+        "evidence_cutoff",
+        "defer_production_matcher"
+      ],
+      "title": "Inputs",
+      "type": "object"
+    },
+    "LLMBudget": {
+      "additionalProperties": false,
+      "properties": {
+        "calls": {
+          "minimum": 0,
+          "title": "Calls",
+          "type": "integer"
+        },
+        "tokens": {
+          "minimum": 0,
+          "title": "Tokens",
+          "type": "integer"
+        },
+        "cost_usd": {
+          "minimum": 0,
+          "title": "Cost Usd",
+          "type": "number"
+        },
+        "wall_seconds": {
+          "minimum": 0,
+          "title": "Wall Seconds",
+          "type": "number"
+        }
+      },
+      "required": [
+        "calls",
+        "tokens",
+        "cost_usd",
+        "wall_seconds"
+      ],
+      "title": "LLMBudget",
+      "type": "object"
+    },
+    "LLMLabels": {
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "execution_authorized": {
+          "title": "Execution Authorized",
+          "type": "boolean"
+        },
+        "teacher_profile": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Teacher Profile"
+        },
+        "evaluator_profile": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Evaluator Profile"
+        },
+        "teacher_role": {
+          "const": "repair_semantic_teacher",
+          "title": "Teacher Role",
+          "type": "string"
+        },
+        "evaluator_role": {
+          "const": "repair_semantic_evaluator",
+          "title": "Evaluator Role",
+          "type": "string"
+        },
+        "ledger_directory": {
+          "minLength": 1,
+          "title": "Ledger Directory",
+          "type": "string"
+        },
+        "rubric_version": {
+          "minLength": 1,
+          "title": "Rubric Version",
+          "type": "string"
+        },
+        "prompt_version": {
+          "minLength": 1,
+          "title": "Prompt Version",
+          "type": "string"
+        },
+        "evidence_schema": {
+          "minLength": 1,
+          "title": "Evidence Schema",
+          "type": "string"
+        },
+        "model_manifest": {
+          "minLength": 1,
+          "title": "Model Manifest",
+          "type": "string"
+        },
+        "criterion_applicability": {
+          "minLength": 1,
+          "title": "Criterion Applicability",
+          "type": "string"
+        },
+        "tie_policy": {
+          "const": "separate_tie_loss",
+          "title": "Tie Policy",
+          "type": "string"
+        },
+        "abstention_policy": {
+          "const": "mask_global_targets_keep_denominator",
+          "title": "Abstention Policy",
+          "type": "string"
+        },
+        "teacher_budget": {
+          "$ref": "#/$defs/LLMBudget"
+        },
+        "evaluator_budget": {
+          "$ref": "#/$defs/LLMBudget"
+        },
+        "aggregate_budget": {
+          "$ref": "#/$defs/LLMBudget"
+        },
+        "cache_policy": {
+          "const": "dependency_bound_raw_revalidation",
+          "title": "Cache Policy",
+          "type": "string"
+        },
+        "independent_evaluator": {
+          "title": "Independent Evaluator",
+          "type": "boolean"
+        },
+        "annotation_manifest": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Annotation Manifest"
+        },
+        "aggregation_revision": {
+          "const": "exact-repair/semantic-fidelity-aggregate/v3.3",
+          "title": "Aggregation Revision",
+          "type": "string"
+        }
+      },
+      "required": [
+        "enabled",
+        "execution_authorized",
+        "teacher_profile",
+        "evaluator_profile",
+        "teacher_role",
+        "evaluator_role",
+        "ledger_directory",
+        "rubric_version",
+        "prompt_version",
+        "evidence_schema",
+        "model_manifest",
+        "criterion_applicability",
+        "tie_policy",
+        "abstention_policy",
+        "teacher_budget",
+        "evaluator_budget",
+        "aggregate_budget",
+        "cache_policy",
+        "independent_evaluator",
+        "annotation_manifest",
+        "aggregation_revision"
+      ],
+      "title": "LLMLabels",
+      "type": "object"
+    },
+    "Losses": {
+      "additionalProperties": false,
+      "properties": {
+        "target_basis": {
+          "enum": [
+            "symbolic",
+            "ai_weak",
+            "mixed"
+          ],
+          "title": "Target Basis",
+          "type": "string"
+        },
+        "scale_alignment": {
+          "minLength": 1,
+          "title": "Scale Alignment",
+          "type": "string"
+        },
+        "mixture_symbolic_weight": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Mixture Symbolic Weight",
+          "type": "number"
+        },
+        "anchors": {
+          "minLength": 1,
+          "title": "Anchors",
+          "type": "string"
+        },
+        "benefit_weight": {
+          "minimum": 0,
+          "title": "Benefit Weight",
+          "type": "number"
+        },
+        "ranking_weight": {
+          "minimum": 0,
+          "title": "Ranking Weight",
+          "type": "number"
+        },
+        "proposal_weight": {
+          "minimum": 0,
+          "title": "Proposal Weight",
+          "type": "number"
+        },
+        "interaction_loss_weight": {
+          "minimum": 0,
+          "title": "Interaction Loss Weight",
+          "type": "number"
+        },
+        "risk_loss_weight": {
+          "minimum": 0,
+          "title": "Risk Loss Weight",
+          "type": "number"
+        },
+        "support_loss_weight": {
+          "default": 0.2,
+          "minimum": 0,
+          "title": "Support Loss Weight",
+          "type": "number"
+        },
+        "sampled_proposal_loss_weight": {
+          "minimum": 0,
+          "title": "Sampled Proposal Loss Weight",
+          "type": "number"
+        },
+        "masks": {
+          "const": "complete_same_basis_per_loss",
+          "title": "Masks",
+          "type": "string"
+        },
+        "normalization": {
+          "const": "eligible_terms",
+          "title": "Normalization",
+          "type": "string"
+        },
+        "sampled_target_approximation": {
+          "const": "sample_conditioned_ranking_imitation",
+          "title": "Sampled Target Approximation",
+          "type": "string"
+        }
+      },
+      "required": [
+        "target_basis",
+        "scale_alignment",
+        "mixture_symbolic_weight",
+        "anchors",
+        "benefit_weight",
+        "ranking_weight",
+        "proposal_weight",
+        "interaction_loss_weight",
+        "risk_loss_weight",
+        "sampled_proposal_loss_weight",
+        "masks",
+        "normalization",
+        "sampled_target_approximation"
+      ],
+      "title": "Losses",
+      "type": "object"
+    },
+    "Model": {
+      "additionalProperties": false,
+      "properties": {
+        "graph_schema": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DeclaredGraphSchema"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "backbone": {
+          "enum": [
+            "hgt",
+            "rgcn",
+            "no_graph"
+          ],
+          "title": "Backbone",
+          "type": "string"
+        },
+        "readout": {
+          "const": "target_candidate_attention",
+          "title": "Readout",
+          "type": "string"
+        },
+        "hidden_width": {
+          "minimum": 1,
+          "title": "Hidden Width",
+          "type": "integer"
+        },
+        "layers": {
+          "minimum": 1,
+          "title": "Layers",
+          "type": "integer"
+        },
+        "attention_heads": {
+          "minimum": 1,
+          "title": "Attention Heads",
+          "type": "integer"
+        },
+        "dropout": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Dropout",
+          "type": "number"
+        },
+        "context_hops": {
+          "minimum": 0,
+          "title": "Context Hops",
+          "type": "integer"
+        },
+        "max_nodes": {
+          "minimum": 1,
+          "title": "Max Nodes",
+          "type": "integer"
+        },
+        "max_edges": {
+          "minimum": 1,
+          "title": "Max Edges",
+          "type": "integer"
+        },
+        "max_supports": {
+          "minimum": 0,
+          "title": "Max Supports",
+          "type": "integer"
+        },
+        "max_text_tokens": {
+          "minimum": 0,
+          "title": "Max Text Tokens",
+          "type": "integer"
+        },
+        "feature_masks": {
+          "const": "explicit_missingness/v3",
+          "title": "Feature Masks",
+          "type": "string"
+        },
+        "pair_selector": {
+          "const": "exact-repair/interaction-selection/v3",
+          "title": "Pair Selector",
+          "type": "string"
+        },
+        "max_pair_neighbors": {
+          "minimum": 0,
+          "title": "Max Pair Neighbors",
+          "type": "integer"
+        },
+        "max_object_pairs": {
+          "minimum": 0,
+          "title": "Max Object Pairs",
+          "type": "integer"
+        },
+        "max_candidate_factors": {
+          "minimum": 0,
+          "title": "Max Candidate Factors",
+          "type": "integer"
+        },
+        "proposal_context": {
+          "enum": [
+            "independent",
+            "selected_other_actions"
+          ],
+          "title": "Proposal Context",
+          "type": "string"
+        },
+        "unary_benefit": {
+          "title": "Unary Benefit",
+          "type": "boolean"
+        },
+        "pair_benefit": {
+          "title": "Pair Benefit",
+          "type": "boolean"
+        },
+        "plan_risk": {
+          "title": "Plan Risk",
+          "type": "boolean"
+        },
+        "preparation_schema": {
+          "const": "exact-repair/effective-preparation/v3.1",
+          "title": "Preparation Schema",
+          "type": "string"
+        },
+        "support_admission_policy": {
+          "const": "atomic-complete-support/v3.1",
+          "title": "Support Admission Policy",
+          "type": "string"
+        },
+        "support_enabled": {
+          "default": false,
+          "title": "Support Enabled",
+          "type": "boolean"
+        },
+        "support_target": {
+          "const": "qualified_witness_violation/v1",
+          "default": "qualified_witness_violation/v1",
+          "title": "Support Target",
+          "type": "string"
+        },
+        "cost_predictor": {
+          "const": false,
+          "title": "Cost Predictor",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "backbone",
+        "readout",
+        "hidden_width",
+        "layers",
+        "attention_heads",
+        "dropout",
+        "context_hops",
+        "max_nodes",
+        "max_edges",
+        "max_supports",
+        "max_text_tokens",
+        "feature_masks",
+        "pair_selector",
+        "max_pair_neighbors",
+        "max_object_pairs",
+        "max_candidate_factors",
+        "proposal_context",
+        "unary_benefit",
+        "pair_benefit",
+        "plan_risk",
+        "preparation_schema",
+        "support_admission_policy",
+        "cost_predictor"
+      ],
+      "title": "Model",
+      "type": "object"
+    },
+    "Objective": {
+      "additionalProperties": false,
+      "properties": {
+        "calibration_identity": {
+          "minLength": 1,
+          "title": "Calibration Identity",
+          "type": "string"
+        },
+        "edit_weights": {
+          "additionalProperties": {
+            "minimum": 0,
+            "type": "number"
+          },
+          "propertyNames": {
+            "minLength": 1
+          },
+          "title": "Edit Weights",
+          "type": "object"
+        },
+        "integer_scale": {
+          "minimum": 1,
+          "title": "Integer Scale",
+          "type": "integer"
+        },
+        "rounding": {
+          "const": "half_even",
+          "title": "Rounding",
+          "type": "string"
+        },
+        "pair_factor_bound": {
+          "minimum": 0,
+          "title": "Pair Factor Bound",
+          "type": "number"
+        },
+        "frozen_epoch_rule": {
+          "const": "invalidate_on_pool_or_coefficient_change",
+          "title": "Frozen Epoch Rule",
+          "type": "string"
+        }
+      },
+      "required": [
+        "calibration_identity",
+        "edit_weights",
+        "integer_scale",
+        "rounding",
+        "pair_factor_bound",
+        "frozen_epoch_rule"
+      ],
+      "title": "Objective",
+      "type": "object"
+    },
+    "Policy": {
+      "additionalProperties": false,
+      "properties": {
+        "public_signature_manifest": {
+          "minLength": 1,
+          "title": "Public Signature Manifest",
+          "type": "string"
+        },
+        "private_signature_manifest": {
+          "minLength": 1,
+          "title": "Private Signature Manifest",
+          "type": "string"
+        },
+        "source_exception_mode": {
+          "enum": [
+            "none",
+            "proved_source_incoherence"
+          ],
+          "title": "Source Exception Mode",
+          "type": "string"
+        },
+        "source_proof_manifest": {
+          "minLength": 1,
+          "title": "Source Proof Manifest",
+          "type": "string"
+        },
+        "hard_query_manifest": {
+          "minLength": 1,
+          "title": "Hard Query Manifest",
+          "type": "string"
+        },
+        "activated_obligations": {
+          "title": "Activated Obligations",
+          "type": "boolean"
+        },
+        "eligibility_manifest": {
+          "minLength": 1,
+          "title": "Eligibility Manifest",
+          "type": "string"
+        },
+        "authorship_manifest": {
+          "minLength": 1,
+          "title": "Authorship Manifest",
+          "type": "string"
+        }
+      },
+      "required": [
+        "public_signature_manifest",
+        "private_signature_manifest",
+        "source_exception_mode",
+        "source_proof_manifest",
+        "hard_query_manifest",
+        "activated_obligations",
+        "eligibility_manifest",
+        "authorship_manifest"
+      ],
+      "title": "Policy",
+      "type": "object"
+    },
+    "Reasoning": {
+      "additionalProperties": false,
+      "properties": {
+        "capability_matrix": {
+          "minLength": 1,
+          "title": "Capability Matrix",
+          "type": "string"
+        },
+        "routing": {
+          "const": "capability_before_cost",
+          "title": "Routing",
+          "type": "string"
+        },
+        "detector_rules": {
+          "minLength": 1,
+          "title": "Detector Rules",
+          "type": "string"
+        },
+        "support_budget": {
+          "minimum": 0,
+          "title": "Support Budget",
+          "type": "integer"
+        },
+        "query_coverage": {
+          "const": "all_required",
+          "title": "Query Coverage",
+          "type": "string"
+        },
+        "session_cache_policy": {
+          "const": "immutable_dependencies",
+          "title": "Session Cache Policy",
+          "type": "string"
+        },
+        "unknown_causes": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Unknown Causes",
+          "type": "array"
+        }
+      },
+      "required": [
+        "capability_matrix",
+        "routing",
+        "detector_rules",
+        "support_budget",
+        "query_coverage",
+        "session_cache_policy",
+        "unknown_causes"
+      ],
+      "title": "Reasoning",
+      "type": "object"
+    },
+    "Resources": {
+      "additionalProperties": false,
+      "properties": {
+        "case_wall_seconds": {
+          "exclusiveMinimum": 0,
+          "title": "Case Wall Seconds",
+          "type": "number"
+        },
+        "case_cpu_seconds": {
+          "exclusiveMinimum": 0,
+          "title": "Case Cpu Seconds",
+          "type": "number"
+        },
+        "case_rss_mb": {
+          "minimum": 1,
+          "title": "Case Rss Mb",
+          "type": "integer"
+        },
+        "diagnosis_seconds": {
+          "exclusiveMinimum": 0,
+          "title": "Diagnosis Seconds",
+          "type": "number"
+        },
+        "generation_seconds": {
+          "exclusiveMinimum": 0,
+          "title": "Generation Seconds",
+          "type": "number"
+        },
+        "verification_seconds": {
+          "exclusiveMinimum": 0,
+          "title": "Verification Seconds",
+          "type": "number"
+        },
+        "startup_seconds": {
+          "exclusiveMinimum": 0,
+          "title": "Startup Seconds",
+          "type": "number"
+        },
+        "cleanup_grace_seconds": {
+          "exclusiveMinimum": 0,
+          "title": "Cleanup Grace Seconds",
+          "type": "number"
+        },
+        "stage_wall_seconds": {
+          "additionalProperties": {
+            "exclusiveMinimum": 0,
+            "type": "number"
+          },
+          "propertyNames": {
+            "minLength": 1
+          },
+          "title": "Stage Wall Seconds",
+          "type": "object"
+        },
+        "stage_cpu_seconds": {
+          "additionalProperties": {
+            "exclusiveMinimum": 0,
+            "type": "number"
+          },
+          "propertyNames": {
+            "minLength": 1
+          },
+          "title": "Stage Cpu Seconds",
+          "type": "object"
+        },
+        "stage_rss_mb": {
+          "additionalProperties": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "propertyNames": {
+            "minLength": 1
+          },
+          "title": "Stage Rss Mb",
+          "type": "object"
+        },
+        "concurrency": {
+          "minimum": 1,
+          "title": "Concurrency",
+          "type": "integer"
+        },
+        "campaign_wall_seconds": {
+          "exclusiveMinimum": 0,
+          "title": "Campaign Wall Seconds",
+          "type": "number"
+        },
+        "campaign_cpu_seconds": {
+          "exclusiveMinimum": 0,
+          "title": "Campaign Cpu Seconds",
+          "type": "number"
+        },
+        "campaign_gpu_hours": {
+          "minimum": 0,
+          "title": "Campaign Gpu Hours",
+          "type": "number"
+        },
+        "allocated_gpus": {
+          "minimum": 0,
+          "title": "Allocated Gpus",
+          "type": "integer"
+        },
+        "campaign_cost_usd": {
+          "minimum": 0,
+          "title": "Campaign Cost Usd",
+          "type": "number"
+        },
+        "supervise_startup_and_transfer": {
+          "const": true,
+          "title": "Supervise Startup And Transfer",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "case_wall_seconds",
+        "case_cpu_seconds",
+        "case_rss_mb",
+        "diagnosis_seconds",
+        "generation_seconds",
+        "verification_seconds",
+        "startup_seconds",
+        "cleanup_grace_seconds",
+        "stage_wall_seconds",
+        "stage_cpu_seconds",
+        "stage_rss_mb",
+        "concurrency",
+        "campaign_wall_seconds",
+        "campaign_cpu_seconds",
+        "campaign_gpu_hours",
+        "allocated_gpus",
+        "campaign_cost_usd",
+        "supervise_startup_and_transfer"
+      ],
+      "title": "Resources",
+      "type": "object"
+    },
+    "Selection": {
+      "additionalProperties": false,
+      "properties": {
+        "shortlist_size": {
+          "minimum": 1,
+          "title": "Shortlist Size",
+          "type": "integer"
+        },
+        "utility_window": {
+          "minimum": 0,
+          "title": "Utility Window",
+          "type": "integer"
+        },
+        "construction_seconds": {
+          "exclusiveMinimum": 0,
+          "title": "Construction Seconds",
+          "type": "number"
+        },
+        "tie_rule": {
+          "const": "canonical_assignment_id",
+          "title": "Tie Rule",
+          "type": "string"
+        },
+        "matched_utility_first_control": {
+          "const": true,
+          "title": "Matched Utility First Control",
+          "type": "boolean"
+        },
+        "risk_ordering": {
+          "title": "Risk Ordering",
+          "type": "boolean"
+        },
+        "support_cuts": {
+          "const": "proved_presence_only",
+          "title": "Support Cuts",
+          "type": "string"
+        },
+        "pending_ledger": {
+          "const": "unknown_and_untested_retain_upper_bounds",
+          "title": "Pending Ledger",
+          "type": "string"
+        },
+        "exact_upper_bounds": {
+          "const": true,
+          "title": "Exact Upper Bounds",
+          "type": "boolean"
+        },
+        "retry_budget": {
+          "minimum": 0,
+          "title": "Retry Budget",
+          "type": "integer"
+        },
+        "max_master_solves": {
+          "minimum": 1,
+          "title": "Max Master Solves",
+          "type": "integer"
+        },
+        "max_candidate_checks": {
+          "minimum": 1,
+          "title": "Max Candidate Checks",
+          "type": "integer"
+        },
+        "stopping": {
+          "enum": [
+            "first_incumbent",
+            "optimality"
+          ],
+          "title": "Stopping",
+          "type": "string"
+        }
+      },
+      "required": [
+        "shortlist_size",
+        "utility_window",
+        "construction_seconds",
+        "tie_rule",
+        "matched_utility_first_control",
+        "risk_ordering",
+        "support_cuts",
+        "pending_ledger",
+        "exact_upper_bounds",
+        "retry_budget",
+        "max_master_solves",
+        "max_candidate_checks",
+        "stopping"
+      ],
+      "title": "Selection",
+      "type": "object"
+    },
+    "SplitCounts": {
+      "additionalProperties": false,
+      "properties": {
+        "train": {
+          "minimum": 0,
+          "title": "Train",
+          "type": "integer"
+        },
+        "development": {
+          "minimum": 0,
+          "title": "Development",
+          "type": "integer"
+        },
+        "test": {
+          "minimum": 0,
+          "title": "Test",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "train",
+        "development",
+        "test"
+      ],
+      "title": "SplitCounts",
+      "type": "object"
+    },
+    "Teacher": {
+      "additionalProperties": false,
+      "properties": {
+        "target_schema": {
+          "const": "exact-repair/semantic-target/v3.1",
+          "title": "Target Schema",
+          "type": "string"
+        },
+        "aggregation": {
+          "const": "weighted-family-means/v1",
+          "title": "Aggregation",
+          "type": "string"
+        },
+        "consequence_manifest": {
+          "minLength": 1,
+          "title": "Consequence Manifest",
+          "type": "string"
+        },
+        "typed_nonvacuity": {
+          "const": true,
+          "title": "Typed Nonvacuity",
+          "type": "boolean"
+        },
+        "temperature": {
+          "exclusiveMinimum": 0,
+          "title": "Temperature",
+          "type": "number"
+        },
+        "max_queries": {
+          "minimum": 1,
+          "title": "Max Queries",
+          "type": "integer"
+        },
+        "family_weights": {
+          "additionalProperties": {
+            "minimum": 0,
+            "type": "number"
+          },
+          "propertyNames": {
+            "minLength": 1
+          },
+          "title": "Family Weights",
+          "type": "object"
+        },
+        "enumeration_ceiling": {
+          "minimum": 1,
+          "title": "Enumeration Ceiling",
+          "type": "integer"
+        },
+        "deadline_seconds": {
+          "exclusiveMinimum": 0,
+          "title": "Deadline Seconds",
+          "type": "number"
+        },
+        "per_query_masks": {
+          "const": true,
+          "title": "Per Query Masks",
+          "type": "boolean"
+        },
+        "eligibility": {
+          "const": "complete_exact_or_explicit_sampled",
+          "title": "Eligibility",
+          "type": "string"
+        }
+      },
+      "required": [
+        "target_schema",
+        "aggregation",
+        "consequence_manifest",
+        "typed_nonvacuity",
+        "temperature",
+        "max_queries",
+        "family_weights",
+        "enumeration_ceiling",
+        "deadline_seconds",
+        "per_query_masks",
+        "eligibility"
+      ],
+      "title": "Teacher",
+      "type": "object"
+    },
+    "Training": {
+      "additionalProperties": false,
+      "properties": {
+        "recovery_revision": {
+          "const": "exact-phase-resume/v3.1",
+          "title": "Recovery Revision",
+          "type": "string"
+        },
+        "revision": {
+          "const": "v3",
+          "title": "Revision",
+          "type": "string"
+        },
+        "optimizer": {
+          "const": "adamw",
+          "title": "Optimizer",
+          "type": "string"
+        },
+        "dtype": {
+          "const": "float32",
+          "title": "Dtype",
+          "type": "string"
+        },
+        "device": {
+          "enum": [
+            "cpu",
+            "cuda"
+          ],
+          "title": "Device",
+          "type": "string"
+        },
+        "threads": {
+          "minimum": 1,
+          "title": "Threads",
+          "type": "integer"
+        },
+        "generation_stage": {
+          "minimum": 0,
+          "title": "Generation Stage",
+          "type": "integer"
+        },
+        "smooth_l1_beta": {
+          "exclusiveMinimum": 0,
+          "title": "Smooth L1 Beta",
+          "type": "number"
+        },
+        "ranking_temperature": {
+          "exclusiveMinimum": 0,
+          "title": "Ranking Temperature",
+          "type": "number"
+        },
+        "max_repair_pairs_per_case": {
+          "minimum": 1,
+          "title": "Max Repair Pairs Per Case",
+          "type": "integer"
+        },
+        "min_dev_improvement": {
+          "minimum": 0,
+          "title": "Min Dev Improvement",
+          "type": "number"
+        },
+        "learning_rate": {
+          "exclusiveMinimum": 0,
+          "title": "Learning Rate",
+          "type": "number"
+        },
+        "weight_decay": {
+          "minimum": 0,
+          "title": "Weight Decay",
+          "type": "number"
+        },
+        "gradient_clip": {
+          "exclusiveMinimum": 0,
+          "title": "Gradient Clip",
+          "type": "number"
+        },
+        "batch_size": {
+          "minimum": 1,
+          "title": "Batch Size",
+          "type": "integer"
+        },
+        "max_epochs": {
+          "minimum": 1,
+          "title": "Max Epochs",
+          "type": "integer"
+        },
+        "evaluate_every": {
+          "minimum": 1,
+          "title": "Evaluate Every",
+          "type": "integer"
+        },
+        "patience": {
+          "minimum": 1,
+          "title": "Patience",
+          "type": "integer"
+        },
+        "seeds": {
+          "items": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "title": "Seeds",
+          "type": "array"
+        },
+        "sampled_assignments": {
+          "minimum": 0,
+          "title": "Sampled Assignments",
+          "type": "integer"
+        },
+        "active_round_every_epochs": {
+          "minimum": 1,
+          "title": "Active Round Every Epochs",
+          "type": "integer"
+        },
+        "minimum_generated_coverage": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Minimum Generated Coverage",
+          "type": "number"
+        },
+        "quality_uncertainty_z": {
+          "minimum": 0,
+          "title": "Quality Uncertainty Z",
+          "type": "number"
+        },
+        "missing_label_fallback": {
+          "enum": [
+            "stop",
+            "exploratory"
+          ],
+          "title": "Missing Label Fallback",
+          "type": "string"
+        },
+        "checkpoint_criterion": {
+          "const": "generated_pool_verified_quality_effort",
+          "title": "Checkpoint Criterion",
+          "type": "string"
+        },
+        "proposal_loss": {
+          "const": "exact_and_sample_conditioned",
+          "title": "Proposal Loss",
+          "type": "string"
+        },
+        "benefit_loss": {
+          "const": "anchored_value_rank_quartet_risk",
+          "title": "Benefit Loss",
+          "type": "string"
+        }
+      },
+      "required": [
+        "recovery_revision",
+        "revision",
+        "optimizer",
+        "dtype",
+        "device",
+        "threads",
+        "generation_stage",
+        "smooth_l1_beta",
+        "ranking_temperature",
+        "max_repair_pairs_per_case",
+        "min_dev_improvement",
+        "learning_rate",
+        "weight_decay",
+        "gradient_clip",
+        "batch_size",
+        "max_epochs",
+        "evaluate_every",
+        "patience",
+        "seeds",
+        "sampled_assignments",
+        "active_round_every_epochs",
+        "minimum_generated_coverage",
+        "quality_uncertainty_z",
+        "missing_label_fallback",
+        "checkpoint_criterion",
+        "proposal_loss",
+        "benefit_loss"
+      ],
+      "title": "Training",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "exact-repair/protocol/v3",
+      "title": "Schema",
+      "type": "string"
+    },
+    "identity": {
+      "$ref": "#/$defs/Identity"
+    },
+    "input": {
+      "$ref": "#/$defs/Inputs"
+    },
+    "corpus": {
+      "$ref": "#/$defs/Corpus"
+    },
+    "policy": {
+      "$ref": "#/$defs/Policy"
+    },
+    "generation": {
+      "$ref": "#/$defs/Generation"
+    },
+    "circuit": {
+      "$ref": "#/$defs/Circuit"
+    },
+    "model": {
+      "$ref": "#/$defs/Model"
+    },
+    "teacher": {
+      "$ref": "#/$defs/Teacher"
+    },
+    "collection": {
+      "$ref": "#/$defs/Collection"
+    },
+    "losses": {
+      "$ref": "#/$defs/Losses"
+    },
+    "llm_labels": {
+      "$ref": "#/$defs/LLMLabels"
+    },
+    "objective": {
+      "$ref": "#/$defs/Objective"
+    },
+    "selection": {
+      "$ref": "#/$defs/Selection"
+    },
+    "reasoning": {
+      "$ref": "#/$defs/Reasoning"
+    },
+    "resources": {
+      "$ref": "#/$defs/Resources"
+    },
+    "training": {
+      "$ref": "#/$defs/Training"
+    },
+    "evaluation": {
+      "$ref": "#/$defs/Evaluation"
+    }
+  },
+  "required": [
+    "schema",
+    "identity",
+    "input",
+    "corpus",
+    "policy",
+    "generation",
+    "circuit",
+    "model",
+    "teacher",
+    "collection",
+    "losses",
+    "llm_labels",
+    "objective",
+    "selection",
+    "reasoning",
+    "resources",
+    "training",
+    "evaluation"
+  ],
+  "title": "RepairProtocolV3",
+  "type": "object"
+}

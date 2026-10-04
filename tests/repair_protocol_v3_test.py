@@ -21,7 +21,7 @@ def test_manifest_is_complete_static_and_historical_inputs_stay_separate():
     with pytest.raises(ValueError, match="explicitly declare v3"):
         load_protocol_v3(ROOT / "specs/exact-repair/protocol/pilot.json")
     assert (
-        json.loads((SAMPLE.parent / "schema-v3.3.json").read_text())
+        json.loads((SAMPLE.parent / "schema-v3.4.json").read_text())
         == RepairProtocolV3.model_json_schema()
     )
 

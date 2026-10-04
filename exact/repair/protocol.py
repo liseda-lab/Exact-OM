@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_serializer, model_validator
 
 from exact.repair.records import canonical_hash
 from exact.repair.semantic_fidelity import _strict_json
@@ -136,7 +136,23 @@ class Circuit(StrictSection):
     distribution_identity: Text
 
 
+class DeclaredGraphSchema(StrictSection):
+    schema_id: Literal["exact-repair/declared-graph-schema/v1"] = Field(alias="schema")
+    language: Literal["pyowl-core/public-structural-ast/v1"]
+    language_hash: Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
+    node_types: Annotated[list[Text], Field(min_length=1)]
+    edge_types: Annotated[list[Annotated[list[Text], Field(min_length=3, max_length=3)]], Field(min_length=1)]
+
+    @model_validator(mode="after")
+    def supported_language(self):
+        from exact.repair.graph_schema import declared_metadata
+
+        declared_metadata(self.model_dump(by_alias=True))
+        return self
+
+
 class Model(StrictSection):
+    graph_schema: DeclaredGraphSchema | None = None
     backbone: Literal["hgt", "rgcn", "no_graph"]
     readout: Literal["target_candidate_attention"]
     hidden_width: PositiveCount
@@ -162,6 +178,13 @@ class Model(StrictSection):
     support_enabled: bool = False
     support_target: Literal["qualified_witness_violation/v1"] = "qualified_witness_violation/v1"
     cost_predictor: Literal[False]
+
+    @model_serializer(mode="wrap")
+    def preserve_legacy_identity(self, handler):
+        result = handler(self)
+        if self.graph_schema is None:
+            result.pop("graph_schema", None)
+        return result
 
 
 class Teacher(StrictSection):
