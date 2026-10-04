@@ -40,12 +40,29 @@ def link_recovery(directory, run_id, *, steps, step_id):
             raise ValueError("Prior worker is live or replacement disappeared")
         if candidate["logical_id"] != prior["logical_id"]:
             raise ValueError("Recovery changed logical job")
-        if not 1 <= candidate["repair_attempt"] <= candidate["max_repairs"] <= 2:
+        continuation = candidate.get("recovery_kind") == "operational_continuation"
+        if not continuation and not 1 <= candidate["repair_attempt"] <= candidate["max_repairs"] <= 2:
             raise ValueError("Recovery repair limit exceeded")
         receipt = Path(prior["completion_path"])
         if hashlib.sha256(receipt.read_bytes()).hexdigest() != candidate["recovery_completion_sha256"]:
             raise ValueError("Failed predecessor evidence changed")
         completion = _read(receipt)
+        if continuation:
+            from tools.repair.expanded_corpus import bound
+            from tools.repair.scaling_endpoint_continuation import CAUSE, SCHEMA
+
+            plan = bound(candidate["continuation_plan"])
+            if (candidate.get("repair_attempt") != 0 or candidate.get("max_repairs") != 2
+                    or type(candidate.get("continuation_attempt")) is not int
+                    or candidate["continuation_attempt"] < 1
+                    or plan.get("schema") != SCHEMA
+                    or plan.get("recovery_kind") != "operational_continuation"
+                    or plan.get("prior_costs_reset") is not False
+                    or plan.get("scientific_budgets_changed") is not False
+                    or plan.get("completion") != dict(path=str(receipt), sha256=candidate["recovery_completion_sha256"])
+                    or plan.get("original_step") != prior["step_id"]
+                    or completion.get("status") != "failed" or completion.get("error") != CAUSE):
+                raise ValueError("Operational continuation requires bound timeout evidence and unchanged scientific limits")
         if completion.get("status") != "failed":
             # Successful orchestration can contain failed native rows. This
             # exception requires explicit, byte-bound scanner evidence; a model

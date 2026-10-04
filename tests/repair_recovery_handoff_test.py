@@ -131,3 +131,36 @@ def test_scientific_recovery_rejects_unqualified_or_changed_evidence(tmp_path, t
     with pytest.raises(ValueError, match="qualified scientific failure"):
         link_recovery(tmp_path, "new", steps={"12.2": "RUNNING"}, step_id="12.2")
     assert (tmp_path / "registry.json").read_bytes() == before
+
+
+@pytest.mark.parametrize("tamper", [None, "cause", "budget", "completion", "repair_attempt"])
+def test_operational_continuation_does_not_consume_software_repair_attempt(tmp_path, tamper):
+    from tools.repair.expanded_corpus import binding
+    from tools.repair.scaling_endpoint_continuation import CAUSE, SCHEMA
+
+    registry, _ = scientific_recovery(tmp_path)
+    old, new = registry["runs"]
+    receipt = tmp_path / "old-attempt/completion.json"
+    receipt.write_text(json.dumps(dict(status="failed", error=CAUSE if tamper != "cause" else {"type": "ValueError"})))
+    plan = dict(schema=SCHEMA, recovery_kind="operational_continuation", original_step=old["step_id"],
+                completion=binding(receipt), prior_costs_reset=False, scientific_budgets_changed=False)
+    if tamper == "budget":
+        plan["scientific_budgets_changed"] = True
+    if tamper == "completion":
+        plan["completion"]["sha256"] = "wrong"
+    path = tmp_path / "continuation.json"
+    path.write_text(json.dumps(plan))
+    new.update(recovery_kind="operational_continuation", continuation_attempt=1,
+               repair_attempt=0 if tamper != "repair_attempt" else 1,
+               recovery_completion_sha256=binding(receipt)["sha256"], continuation_plan=binding(path))
+    (tmp_path / "registry.json").write_text(json.dumps(registry))
+    before = (tmp_path / "registry.json").read_bytes()
+    if tamper:
+        with pytest.raises(ValueError, match="Operational continuation"):
+            link_recovery(tmp_path, "new", steps={"12.2": "RUNNING"}, step_id="12.2")
+        assert (tmp_path / "registry.json").read_bytes() == before
+    else:
+        link_recovery(tmp_path, "new", steps={"12.2": "RUNNING"}, step_id="12.2")
+        saved = json.loads((tmp_path / "registry.json").read_text())
+        assert saved["runs"][0]["superseded_by"] == "new"
+        assert saved["runs"][1]["repair_attempt"] == 0

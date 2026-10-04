@@ -143,6 +143,19 @@ adapter qualification, actual evaluation and the final resource report remain
 separate stages. No held-out, G0-G2, strongest-symbolic or learning claim follows
 from this preparation.
 
+The separately registered endpoint-disabled baseline amendment retains its
+24-row denominator and original 60-second qualification probe limits. Its first
+qualification worker exhausted a 1,200-second operational slice after 22 tests
+(452.72 seconds), 14 saved rows and part of the next generation probe. The
+continuation raises only the cumulative logical-worker allowance to 2,400
+seconds. It reuses the completed tests and 14 byte-identical rows, preserves the
+interrupted probe as unknown without replay, and executes only the untouched
+final probe. Original receipts, payloads, ownership guard and costs remain
+preserved. A separately frozen adapter verifies source/runtime compatibility
+and publishes the completed qualification denominator for the existing dependent
+evaluation jobs. This operational continuation consumes no software-repair
+attempt and does not establish complete generation or research gates.
+
 The incidence evaluation reuses the frozen 12 cases and all 72 method/cache rows.
 Generation qualification first checks every observed input and then runs 36
 separately charged probes (one per case and method), each with the existing
