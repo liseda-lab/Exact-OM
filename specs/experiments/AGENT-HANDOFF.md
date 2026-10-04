@@ -8,7 +8,8 @@ launch experiments or claim the missing implementation is finished.
 
 Implement the missing v2 experiment capabilities in Exact-OM and run a bounded broad search on
 one RTX 5090 node with 64 GB or 128 GB RAM, using OpenRouter for all generative LLM work.
-Use the campaign time/token limits and the user's broad OpenRouter spending discretion;
+Use the current [notification-only spending amendment](HOSTED-SPENDING-AMENDMENT-20261004.md)
+and advisory time forecasts;
 record projected and actual cost without requesting another arbitrary monetary cap. Focus each family on its appropriate
 development case, then validate selected findings more broadly at the defined gates.
 The user confirms OAEI and BioKG-Align data are available: locate and lock them, including

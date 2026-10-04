@@ -1,5 +1,9 @@
 # Exact-OM experiment programme v2
 
+**Hosted spending amendment, 2026-10-04:** [Notification-only spending](HOSTED-SPENDING-AMENDMENT-20261004.md)
+supersedes aggregate request/token stops for the authorized remaining campaign. Continue
+accounting and notify once at 100 million tokens; the threshold does not stop experiments.
+
 **Approved optional-input amendment, 2026-10-03:**
 [Public-input amendment](PUBLIC-INPUT-AMENDMENT-20261003.md) records the E08 deferral,
 E24 directional diagnostic, E23 OpenEA case, and gated E14 native OWL comparison.
@@ -7,7 +11,7 @@ E24 directional diagnostic, E23 OpenEA case, and gated E14 native OWL comparison
 **Operational amendment, 2026-09-29:** [RUN-ONCE-EXECUTION.md](RUN-ONCE-EXECUTION.md)
 supersedes time caps, full qualification repeats and the old dispatch dates below.
 Runtime figures are advisory forecasts; they neither terminate work nor prevent admission.
-Scientific controls, populations, gates and API spending protection remain in force.
+Scientific controls, populations, gates and per-request safeguards remain in force.
 The current remaining inventory is [remaining-work.yaml](remaining-work.yaml).
 
 **Design revision: 2026-09-10 (E04 benchmark-NIL scope). G0 passed; E05/E26/E06 screens retained their controls. All six E02 cells and final reports completed on 2026-09-20; E02 retained the hard-anchor baseline. The reporting repair reused every scientific output and made zero new model calls. D1 SNOMED preparation completed. FMA reification repair and full native preprocessing passed; step 14234.14 completed in 15m15s with 3.32GiB peak RAM. E09 qualification resumed on liseda-03 at 16:49 UTC on 2026-09-24 as step 14372.1, with conditional automatic continuation into its four hierarchy arms. Cold and warm scoring completed; an inference-only replay validation error was repaired without rescoring. Continuation resumed as step 14372.2 at 18:48 UTC. The main `.venv` now uses the four published PyPI 0.2.1 native packages.**
@@ -138,5 +142,5 @@ from schemas or fail-closed stubs alone.
 
 When assigned execution, the agent may run the approved bounded campaign and mechanically freeze
 predeclared selections after gates pass; repeated permission is not required. All generative LLM roles use OpenRouter under the user's broad spending discretion; record
-cost forecasts/actuals and honor phase request/token limits. Missing credentials or file paths
+cost forecasts/actuals and apply the current recorded spending amendment. Missing credentials or file paths
 are specific input-resolution blocks, not a reason to declare the available datasets unavailable. A final release/default change is a separate action from running the research.

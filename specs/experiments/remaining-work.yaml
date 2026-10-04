@@ -7,6 +7,14 @@ source_inventory:
 source_dispositions: data/experiments-v2/e19-qualification-01/dispositions.json
 target_hours: 168
 target_is_execution_limit: false
+hosted_spending_amendment:
+  date: '2026-10-04'
+  mode: notification_only
+  notification_tokens: 100000000
+  threshold_stops_work: false
+  specification: specs/experiments/HOSTED-SPENDING-AMENDMENT-20261004.md
+  policy: data/experiments-v2/supervisor-maintenance-20261004/notification-only-spending-01/hosted-spending-policy.json
+  preserve_historical_accounting: true
 completed_scientific_cells: 59
 remaining_declared_cells:
   development: 85
