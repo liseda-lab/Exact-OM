@@ -1,0 +1,1423 @@
+{
+  "schema_version": "exact-study-integration-backend-final-verification/1",
+  "recorded_at": "2026-10-04T14:38:28.196507+00:00",
+  "synthetic_only": true,
+  "status": "R14_R15_verified_R16_unresolved_joint_acceptance_and_launch_open",
+  "start_commit": "2646d1f5d620f9a88f40308cbb6974b464c7a91e",
+  "reviewed_frontend_commit": "2646d1f5d620f9a88f40308cbb6974b464c7a91e",
+  "reviewed_final_code_commit": "9bdd9ab44ad1bfbb866dade25c6c32a60daba50a",
+  "runtime_under_final_tests": "8d5054ba8bca49ba3951d558bba05a6fe73985be",
+  "implementation_commits": [
+    "fa03f97b8384e2c2e347b6031e3019fd8c2447cb",
+    "8d5054ba8bca49ba3951d558bba05a6fe73985be"
+  ],
+  "diagnostics_commit": "9bdd9ab44ad1bfbb866dade25c6c32a60daba50a",
+  "diagnostics_source_commits": [
+    "97e229f1175897b0ce9532ded414334a935a5f26",
+    "bd2c35dd22224d9ef36dc3c70601e92863f77042"
+  ],
+  "documentation_commit": "Subsequent commit containing this receipt; deliberately not self-referential",
+  "frontend_changed": false,
+  "branch": "dev",
+  "publication_protocol": "exact-study/2.0",
+  "runtime_extension": "study-integration/1",
+  "generated_contracts_sha256": {
+    "specs/explanation-framework/protocol/study-publication.runtime-schema.json": "8ab442c83f8e48cb04d95d0fa1314aadd74d0276aceab701bdab0afe8167bf71",
+    "specs/explanation-framework/protocol/study-resource.runtime-schema.json": "377adad61c90efb788bea90e6c40ec7f5a6f9b0a3b99390b00b7ea23623909bc",
+    "specs/explanation-framework/protocol/study-tutorial.runtime-schema.json": "f43a26ced867b7f2a1a4a86506cbd0daa7fd3eee3ddc42597372e2631375c619",
+    "specs/explanation-framework/protocol/study.runtime-openapi.json": "efc858f56227ee2f7c451ac583a89e5f917425ad80d5774b8f13eb822f1239e1"
+  },
+  "changed_contracts": [
+    "specs/explanation-framework/protocol/study.runtime-openapi.json"
+  ],
+  "implementation_files_sha256": {
+    "exact_inspect/study/api.py": "e963f4e302e2f2298fcec9d4889df07ee2935a5197deb1d79cb5608f83dfb717",
+    "exact_inspect/study/v2_models.py": "93dd8bf67ef675874bc1fc4aad9f10e1ee4364cfb85b6ff84ef072e5c9666b04",
+    "exact_inspect/study/tutorial.py": "347b506556795e7be4631e70003da2cb24867baf490661040dc083c0cc137b7d",
+    "tests/explanation_tutorial_entity_contract_test.py": "7d2ca9cda2dc930fdfa0c58970cde2c734651abb3f73d91467f5e2e797960a51",
+    "tests/explanation_study_disconnect_test.py": "cd869d841b013f22fdfd4e0da508e77b30dd1a82899277bcbac98dd4cc4c1887",
+    "tools/review_study_disconnects.py": "7b5db569f4ce8e8b02dae8e53ea31dc630098993682e42be3852a524c6dc0265",
+    "tools/review_study_reload.mjs": "c279da56c7f5ec1cbad158bbb83b4a688b873b70dc437ffa11bea6a5685984ee"
+  },
+  "findings": {
+    "R14": {
+      "priority": 2,
+      "owner": "backend",
+      "status": "fixed_and_verified",
+      "summary": "Implicit entity kind completed v2 tutorial actions",
+      "root_cause": "Shared EntityRef defaulted class before TutorialAction validation",
+      "correction": "Action-specific required kind; strict entity_key; historical frozen resources normalized through unchanged resource model in memory",
+      "baseline": "Real router regression on archived 2646d1f: 200 instead of 422; before-change run observed context.parent completion",
+      "implementation_commit": "fa03f97b8384e2c2e347b6031e3019fd8c2447cb",
+      "regression": "tests/explanation_tutorial_entity_contract_test.py",
+      "legacy_retry": "Omitted kind now 422; explicit original normalized kind replays immutable canonical receipt",
+      "publication_resource_tutorial_schemas_changed": false
+    },
+    "R15": {
+      "priority": 2,
+      "owner": "backend",
+      "status": "fixed_and_verified_at_reproduced_boundary",
+      "summary": "Interrupted response acquired false terminal body and h11 length error",
+      "root_cause": "BaseHTTPMiddleware relay synthesized empty final body after cancelled producer declared 8 / emitted 4 bytes",
+      "baseline_exception": "h11 LocalProtocolError: Too little data for declared Content-Length",
+      "correction": "Pure ASGI origin/security wrapper forwards original body/completion/cancellation and original exceptions",
+      "implementation_commit": "8d5054ba8bca49ba3951d558bba05a6fe73985be",
+      "source_commit": "416ce6979c3274dcc706949628843f4b36bae13c",
+      "regression": "tests/explanation_study_disconnect_test.py",
+      "dependencies_changed": false,
+      "historic_stall_causation_proven": false
+    },
+    "R16": {
+      "priority": 2,
+      "severity_provisional": true,
+      "owner": "backend_integration",
+      "status": "unresolved_not_reproduced",
+      "summary": "Historical intermittent page.reload stall",
+      "root_cause": null,
+      "relation_to_R15": "Unknown; deterministic injected framing defect does not establish original browser-stall causation",
+      "needed_evidence": "Correlated browser navigation/request timing, producer/transport events and traceback from an actual recurrence",
+      "frontend_implementation_followup": null
+    }
+  },
+  "independent_review": {
+    "owner": "integration_review",
+    "mode": "read_only",
+    "scope": [
+      "Action model/schema and legacy compatibility",
+      "Separate in-memory reproduction of legacy resource omission",
+      "Middleware framing/auth/header/cancellation review",
+      "Diagnostic tool isolation and evidence labels"
+    ],
+    "findings_corrected": [
+      "Normalize historically admitted resource defaults before strict identity lookup",
+      "Name observer counters as attempted producer output"
+    ],
+    "final_combined_suites_executed_by": "integrating_backend_agent",
+    "independent_frontend_baseline": "User-reported review at 2646d1f; no new frontend blocker",
+    "final_handoff_review": "No material corrections or blockers found; counts, provenance, bounded claims and open gates independently checked"
+  },
+  "parallel_ownership": [
+    {
+      "owner": "root",
+      "checkout": "current dev",
+      "scope": "action model/helper/schema/tests/docs",
+      "postgres_port": 18973,
+      "https_port": 18974
+    },
+    {
+      "owner": "timing_exports",
+      "checkout": "managed study-timing-integration",
+      "branch": "codex/study-disconnect-review",
+      "scope": "middleware/disconnect tests/tools",
+      "postgres_port": 19013,
+      "https_port": 19014
+    },
+    {
+      "owner": "integration_review",
+      "mode": "read_only"
+    }
+  ],
+  "environment": {
+    "python": "3.12.14",
+    "packages": {
+      "fastapi": "0.116.2",
+      "starlette": "0.48.0",
+      "uvicorn": "0.35.0",
+      "h11": "0.16.0",
+      "anyio": "4.15.1",
+      "pydantic": "2.13.5",
+      "psycopg": "3.3.6",
+      "pyowl-core": "0.2.1",
+      "pytest": "9.1.1"
+    },
+    "postgresql": "16.2",
+    "node": "24.19.0",
+    "chrome": "154.0.8037.97",
+    "playwright": "1.63.0",
+    "next": "15.5.26",
+    "react": "19.1.0",
+    "service": "tools.serve_explanation_v2_e2e; actual study app and compiled static frontend",
+    "origin": "https://127.0.0.1:18974",
+    "database": "Dedicated synthetic PostgreSQL",
+    "tls": "Self-signed loopback certificate; browser ignores certificate errors locally",
+    "csp": "Unmodified service document CSP with exact inline script hashes; no unsafe-inline",
+    "frontend_source": "2646d1f",
+    "frontend_build_copy": "Scratch outside iCloud; repository sole source; locked installed dependencies",
+    "package_lock_sha256": "41a798e905007b679dd559faed1950294afbea62cf475827aeb8031e11a7159c"
+  },
+  "fixture": {
+    "generator": "python -m tools.build_explanation_v2_fixture <empty-dir> --navigation-size 65 --paged-facts 26",
+    "synthetic": true,
+    "study_revision": "synthetic-v2-793aad1c40bf4f0ba0dbf5ca79a13883",
+    "tutorial_version": "tutorial/2.0-native-2-nav65",
+    "tutorial_hash": "sha256:514c65380e055f139adec81e9de9b58e90e2be8aa65da7602544769e18f91168",
+    "publication_sha256": "0f6205be34f125a9f3f8385d77ac9aab06f57df4c78560a5f7a413fc6f156a15",
+    "assets": [
+      {
+        "asset_id": "source",
+        "kind": "ontology",
+        "sha256": "392392d0341d5277209beb2145d596f797be33919820bc2ff333709916660780",
+        "size_bytes": 125613
+      },
+      {
+        "asset_id": "target",
+        "kind": "ontology",
+        "sha256": "8a69e2bac620ea43a1416fcef559c0466ff9fe9592f0f1fefd5a18fa59ca4dea",
+        "size_bytes": 72889
+      },
+      {
+        "asset_id": "practice-0",
+        "kind": "ontology",
+        "sha256": "3d3efaf641ac0d51f2388588eaa266558b429d0c4b3ea3058f35bb884f3de57b",
+        "size_bytes": 5948
+      },
+      {
+        "asset_id": "practice-1",
+        "kind": "ontology",
+        "sha256": "2886465863db717ec51e91df80dd6d8965b9fdbeea2cc315e07ab97998c802f1",
+        "size_bytes": 6821
+      },
+      {
+        "asset_id": "case-explanations-0",
+        "kind": "explanation",
+        "sha256": "ae6260f21ee0b985bc3b5a25d668f4c3d41f4cac236cedc2fcc93980c5294c46",
+        "size_bytes": 616791
+      },
+      {
+        "asset_id": "case-explanations-1",
+        "kind": "explanation",
+        "sha256": "e079bd94119a3c0b7f1819d7b39b7037b0446843f881d8d84488c7f43fd3eb24",
+        "size_bytes": 616376
+      },
+      {
+        "asset_id": "case-explanations-2",
+        "kind": "explanation",
+        "sha256": "b8f08ac957dd8c273611eebeb709e083feff2662ddb6d5dcc5fd6a5e5d2dbb26",
+        "size_bytes": 682792
+      },
+      {
+        "asset_id": "case-explanations-3",
+        "kind": "explanation",
+        "sha256": "df43ce9e37c5ae32958a915a4cc1f2664f342ba84c9663d03ab224badbb2eb8f",
+        "size_bytes": 680204
+      },
+      {
+        "asset_id": "practice-explanations",
+        "kind": "explanation",
+        "sha256": "76c45fce53d947f0280638b0d5b3e68efc47067ee027f68f4ad4e4aeeff9a670",
+        "size_bytes": 265515
+      }
+    ],
+    "file_count": 59,
+    "inventory": [
+      {
+        "path": ".practice-0-context.lock",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "size_bytes": 0
+      },
+      {
+        "path": ".practice-1-context.lock",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "size_bytes": 0
+      },
+      {
+        "path": ".source-v2-context.lock",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "size_bytes": 0
+      },
+      {
+        "path": ".target-v2-context.lock",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "size_bytes": 0
+      },
+      {
+        "path": "case-explanations-0.json",
+        "sha256": "ae6260f21ee0b985bc3b5a25d668f4c3d41f4cac236cedc2fcc93980c5294c46",
+        "size_bytes": 616791
+      },
+      {
+        "path": "case-explanations-1.json",
+        "sha256": "e079bd94119a3c0b7f1819d7b39b7037b0446843f881d8d84488c7f43fd3eb24",
+        "size_bytes": 616376
+      },
+      {
+        "path": "case-explanations-2.json",
+        "sha256": "b8f08ac957dd8c273611eebeb709e083feff2662ddb6d5dcc5fd6a5e5d2dbb26",
+        "size_bytes": 682792
+      },
+      {
+        "path": "case-explanations-3.json",
+        "sha256": "df43ce9e37c5ae32958a915a4cc1f2664f342ba84c9663d03ab224badbb2eb8f",
+        "size_bytes": 680204
+      },
+      {
+        "path": "practice-0-context/attempts.jsonl",
+        "sha256": "ac700fbe44861205d695a9298bc1f8f93b49018b8e204d37f9797e60b9f84538",
+        "size_bytes": 69
+      },
+      {
+        "path": "practice-0-context/checkpoints.jsonl",
+        "sha256": "6c63dbbdd235ef057de615a34d65c8277505d614304359c93a66f70625e1e96d",
+        "size_bytes": 214
+      },
+      {
+        "path": "practice-0-context/context.sqlite",
+        "sha256": "7d7b18a5e909d01280dd96dd3e037abc7132fb536df64c28dd3c5444901617d6",
+        "size_bytes": 393216
+      },
+      {
+        "path": "practice-0-context/manifest.json",
+        "sha256": "dc0ec4247422f02dc84b42fa0addb79331289222dca0e59309e450f18e435a43",
+        "size_bytes": 3964
+      },
+      {
+        "path": "practice-0-v2.ofn",
+        "sha256": "3d3efaf641ac0d51f2388588eaa266558b429d0c4b3ea3058f35bb884f3de57b",
+        "size_bytes": 5948
+      },
+      {
+        "path": "practice-0-v2.ofn.receipt.json",
+        "sha256": "997092fe59acdad2123fbb22ff68667af66d7e08fa3c2423866181c083bf89d3",
+        "size_bytes": 1597
+      },
+      {
+        "path": "practice-1-context/attempts.jsonl",
+        "sha256": "80e923aedb745e0c6c73ea5aac33da40dcbc6b501fc2851c901e4490c32d6491",
+        "size_bytes": 68
+      },
+      {
+        "path": "practice-1-context/checkpoints.jsonl",
+        "sha256": "88c69899ee79cd5a9c8c6ea31147098c37013b6151a5cc4049b2ebd00ee69ddd",
+        "size_bytes": 216
+      },
+      {
+        "path": "practice-1-context/context.sqlite",
+        "sha256": "c36109ccf58fe80c5cb682fcc77c216c8ce7cb45cedb745c78cd477549169f8d",
+        "size_bytes": 417792
+      },
+      {
+        "path": "practice-1-context/manifest.json",
+        "sha256": "f070a5e83481223019ff335588c1e9265ae96a951d1ce559d273217f67947136",
+        "size_bytes": 3965
+      },
+      {
+        "path": "practice-1-v2.ofn",
+        "sha256": "2886465863db717ec51e91df80dd6d8965b9fdbeea2cc315e07ab97998c802f1",
+        "size_bytes": 6821
+      },
+      {
+        "path": "practice-1-v2.ofn.receipt.json",
+        "sha256": "f0a8afca12fdf6246a90420603a6fdb790df95ff8add344e1a044494987a6b94",
+        "size_bytes": 1596
+      },
+      {
+        "path": "practice-explanations.json",
+        "sha256": "76c45fce53d947f0280638b0d5b3e68efc47067ee027f68f4ad4e4aeeff9a670",
+        "size_bytes": 265515
+      },
+      {
+        "path": "publication.json",
+        "sha256": "0f6205be34f125a9f3f8385d77ac9aab06f57df4c78560a5f7a413fc6f156a15",
+        "size_bytes": 56598
+      },
+      {
+        "path": "source-v2-context/attempts.jsonl",
+        "sha256": "6d42cf0663eabf6b33922eb31b8417ee194f182eacd426aa9731f151121e1149",
+        "size_bytes": 68
+      },
+      {
+        "path": "source-v2-context/checkpoints.jsonl",
+        "sha256": "42f0ccf8739af43bbf83cf1a7ecb9f343f34af7cba4edb47eba6a69c619aeb7d",
+        "size_bytes": 216
+      },
+      {
+        "path": "source-v2-context/context.sqlite",
+        "sha256": "cfb1f8c0dac050d65cadeb20101831dc00471781ed5908f1644e0a08b54ebfef",
+        "size_bytes": 9289728
+      },
+      {
+        "path": "source-v2-context/manifest.json",
+        "sha256": "e73f3a858f8dc3bc1a9d5eee24aa97dd8102e03a4cca2ebda8845f27343ba729",
+        "size_bytes": 3930
+      },
+      {
+        "path": "source-v2.ofn",
+        "sha256": "392392d0341d5277209beb2145d596f797be33919820bc2ff333709916660780",
+        "size_bytes": 125613
+      },
+      {
+        "path": "source-v2.ofn.receipt.json",
+        "sha256": "dfe7f7d7368f589d3e563f97844107df30df15527573675b2936bc7595673c69",
+        "size_bytes": 1667
+      },
+      {
+        "path": "target-v2-context/attempts.jsonl",
+        "sha256": "2a52cf8ea8b45043f0a82358d0515370211c428bb5c7127db30a88fc4460d51e",
+        "size_bytes": 68
+      },
+      {
+        "path": "target-v2-context/checkpoints.jsonl",
+        "sha256": "289b0866371d9083c2333281f88f6e28ff06f292754c5c3fd23619e211c26892",
+        "size_bytes": 214
+      },
+      {
+        "path": "target-v2-context/context.sqlite",
+        "sha256": "99f5e83c1bad73ff6110c7e040d9527f55122951437a9c57218af6ce8e4e50a7",
+        "size_bytes": 5840896
+      },
+      {
+        "path": "target-v2-context/manifest.json",
+        "sha256": "83708751219afe55b3d477a318701a7c7e93280601708b09d50fac171d9ffe2f",
+        "size_bytes": 3927
+      },
+      {
+        "path": "target-v2.ofn",
+        "sha256": "8a69e2bac620ea43a1416fcef559c0466ff9fe9592f0f1fefd5a18fa59ca4dea",
+        "size_bytes": 72889
+      },
+      {
+        "path": "target-v2.ofn.receipt.json",
+        "sha256": "39984536a013bbf32dcf291db043f4bd3e6739413a0acb511180cf2005d9d6d0",
+        "size_bytes": 1583
+      },
+      {
+        "path": "workspaces/08830c4dcc440f975519a0cef278dfb4a8faef0347bf403525687f2c59d5759f/ae8a560bb83083a05931855bc4cc8cc24530c3c81392a12228ece3ef036b7e6c/context.sqlite",
+        "sha256": "75f1515642daf29c1a4a454929dd4ecbc68d4d911671ad2866fdcdf81d06aff2",
+        "size_bytes": 7397376
+      },
+      {
+        "path": "workspaces/08830c4dcc440f975519a0cef278dfb4a8faef0347bf403525687f2c59d5759f/ae8a560bb83083a05931855bc4cc8cc24530c3c81392a12228ece3ef036b7e6c/manifest.json",
+        "sha256": "9401a152dddbde9855b330d0cf3d3bb5dc531f68fb102ac113a3c6d792b121ad",
+        "size_bytes": 4245
+      },
+      {
+        "path": "workspaces/08830c4dcc440f975519a0cef278dfb4a8faef0347bf403525687f2c59d5759f/de5a34340ac7daf4bf941dcc68473c0a4a176c38e13ce7186bf6eb8a990a1bbb/context.sqlite",
+        "sha256": "8d7b390c3115ebfa588500fecacf409f3bbd1160560de9c98b93e6a778781e30",
+        "size_bytes": 4689920
+      },
+      {
+        "path": "workspaces/08830c4dcc440f975519a0cef278dfb4a8faef0347bf403525687f2c59d5759f/de5a34340ac7daf4bf941dcc68473c0a4a176c38e13ce7186bf6eb8a990a1bbb/manifest.json",
+        "sha256": "ea0e2f466cd8773819794ef92d7c4a78ae547275c39e427f1aafdeb1f539dd77",
+        "size_bytes": 4142
+      },
+      {
+        "path": "workspaces/08830c4dcc440f975519a0cef278dfb4a8faef0347bf403525687f2c59d5759f/workspace.sqlite",
+        "sha256": "076c12a53d2677025672961de3b177c66b01dfd11f5f5b1b6dc5502c6a59d95a",
+        "size_bytes": 86016
+      },
+      {
+        "path": "workspaces/2205d65fc64264cabe55de44d263831ae17f11e8ac63c3f2ce9f89a40e6e2c36/0c60e8895d61091081bdc6ec873e83621035c012bea8e5895077f0ea90076e22/context.sqlite",
+        "sha256": "71c747fbc75d4d3296c17df1140162e6d27f231d13b10525787633a76c73ad86",
+        "size_bytes": 335872
+      },
+      {
+        "path": "workspaces/2205d65fc64264cabe55de44d263831ae17f11e8ac63c3f2ce9f89a40e6e2c36/0c60e8895d61091081bdc6ec873e83621035c012bea8e5895077f0ea90076e22/manifest.json",
+        "sha256": "6e10419be46f5c7838c8d5abe16c6bbc1a4c118f1ad71f73aae24117f173e892",
+        "size_bytes": 4207
+      },
+      {
+        "path": "workspaces/2205d65fc64264cabe55de44d263831ae17f11e8ac63c3f2ce9f89a40e6e2c36/7dd65240293c2be7f586c396ae24895b2ad9475c6a62819158cbf2eb103b2294/context.sqlite",
+        "sha256": "85836aacf2bfca9c42005f3b8233f27e4e159b92edd5a8da91f32609cf08163c",
+        "size_bytes": 364544
+      },
+      {
+        "path": "workspaces/2205d65fc64264cabe55de44d263831ae17f11e8ac63c3f2ce9f89a40e6e2c36/7dd65240293c2be7f586c396ae24895b2ad9475c6a62819158cbf2eb103b2294/manifest.json",
+        "sha256": "0584f57b0a0bfcc4cb9487e9dc97183be04fe54d25f099e8068d93c2b527f649",
+        "size_bytes": 4206
+      },
+      {
+        "path": "workspaces/2205d65fc64264cabe55de44d263831ae17f11e8ac63c3f2ce9f89a40e6e2c36/workspace.sqlite",
+        "sha256": "9a702e543ae9e95a8f5b873652a57b5deb21f7329bad22b1d3824e0f0c485b15",
+        "size_bytes": 77824
+      },
+      {
+        "path": "workspaces/5a9ffc1b224c39120942a738fe40e7e4c46576c4aadc66af5d0b159d58725113/ae8a560bb83083a05931855bc4cc8cc24530c3c81392a12228ece3ef036b7e6c/context.sqlite",
+        "sha256": "75f1515642daf29c1a4a454929dd4ecbc68d4d911671ad2866fdcdf81d06aff2",
+        "size_bytes": 7397376
+      },
+      {
+        "path": "workspaces/5a9ffc1b224c39120942a738fe40e7e4c46576c4aadc66af5d0b159d58725113/ae8a560bb83083a05931855bc4cc8cc24530c3c81392a12228ece3ef036b7e6c/manifest.json",
+        "sha256": "9401a152dddbde9855b330d0cf3d3bb5dc531f68fb102ac113a3c6d792b121ad",
+        "size_bytes": 4245
+      },
+      {
+        "path": "workspaces/5a9ffc1b224c39120942a738fe40e7e4c46576c4aadc66af5d0b159d58725113/de5a34340ac7daf4bf941dcc68473c0a4a176c38e13ce7186bf6eb8a990a1bbb/context.sqlite",
+        "sha256": "8d7b390c3115ebfa588500fecacf409f3bbd1160560de9c98b93e6a778781e30",
+        "size_bytes": 4689920
+      },
+      {
+        "path": "workspaces/5a9ffc1b224c39120942a738fe40e7e4c46576c4aadc66af5d0b159d58725113/de5a34340ac7daf4bf941dcc68473c0a4a176c38e13ce7186bf6eb8a990a1bbb/manifest.json",
+        "sha256": "ea0e2f466cd8773819794ef92d7c4a78ae547275c39e427f1aafdeb1f539dd77",
+        "size_bytes": 4142
+      },
+      {
+        "path": "workspaces/5a9ffc1b224c39120942a738fe40e7e4c46576c4aadc66af5d0b159d58725113/workspace.sqlite",
+        "sha256": "a711b174eb292838e431ede3a0f4465745011acb2e11a664085ff0a88cd7724e",
+        "size_bytes": 86016
+      },
+      {
+        "path": "workspaces/6b61ffc40a5981cb934edb72130ab6b8bc9a092ee23affa5aae0c5062d1cb3c9/ae8a560bb83083a05931855bc4cc8cc24530c3c81392a12228ece3ef036b7e6c/context.sqlite",
+        "sha256": "75f1515642daf29c1a4a454929dd4ecbc68d4d911671ad2866fdcdf81d06aff2",
+        "size_bytes": 7397376
+      },
+      {
+        "path": "workspaces/6b61ffc40a5981cb934edb72130ab6b8bc9a092ee23affa5aae0c5062d1cb3c9/ae8a560bb83083a05931855bc4cc8cc24530c3c81392a12228ece3ef036b7e6c/manifest.json",
+        "sha256": "9401a152dddbde9855b330d0cf3d3bb5dc531f68fb102ac113a3c6d792b121ad",
+        "size_bytes": 4245
+      },
+      {
+        "path": "workspaces/6b61ffc40a5981cb934edb72130ab6b8bc9a092ee23affa5aae0c5062d1cb3c9/de5a34340ac7daf4bf941dcc68473c0a4a176c38e13ce7186bf6eb8a990a1bbb/context.sqlite",
+        "sha256": "8d7b390c3115ebfa588500fecacf409f3bbd1160560de9c98b93e6a778781e30",
+        "size_bytes": 4689920
+      },
+      {
+        "path": "workspaces/6b61ffc40a5981cb934edb72130ab6b8bc9a092ee23affa5aae0c5062d1cb3c9/de5a34340ac7daf4bf941dcc68473c0a4a176c38e13ce7186bf6eb8a990a1bbb/manifest.json",
+        "sha256": "ea0e2f466cd8773819794ef92d7c4a78ae547275c39e427f1aafdeb1f539dd77",
+        "size_bytes": 4142
+      },
+      {
+        "path": "workspaces/6b61ffc40a5981cb934edb72130ab6b8bc9a092ee23affa5aae0c5062d1cb3c9/workspace.sqlite",
+        "sha256": "75c8b88475a521274354a7a685745bf9851789e7f3ca395a7ebbe29fef032e51",
+        "size_bytes": 86016
+      },
+      {
+        "path": "workspaces/bfe33abe57b2929dee867a2c656996da3d3d15d5c52a34b2157d7594afca56dd/ae8a560bb83083a05931855bc4cc8cc24530c3c81392a12228ece3ef036b7e6c/context.sqlite",
+        "sha256": "75f1515642daf29c1a4a454929dd4ecbc68d4d911671ad2866fdcdf81d06aff2",
+        "size_bytes": 7397376
+      },
+      {
+        "path": "workspaces/bfe33abe57b2929dee867a2c656996da3d3d15d5c52a34b2157d7594afca56dd/ae8a560bb83083a05931855bc4cc8cc24530c3c81392a12228ece3ef036b7e6c/manifest.json",
+        "sha256": "9401a152dddbde9855b330d0cf3d3bb5dc531f68fb102ac113a3c6d792b121ad",
+        "size_bytes": 4245
+      },
+      {
+        "path": "workspaces/bfe33abe57b2929dee867a2c656996da3d3d15d5c52a34b2157d7594afca56dd/de5a34340ac7daf4bf941dcc68473c0a4a176c38e13ce7186bf6eb8a990a1bbb/context.sqlite",
+        "sha256": "8d7b390c3115ebfa588500fecacf409f3bbd1160560de9c98b93e6a778781e30",
+        "size_bytes": 4689920
+      },
+      {
+        "path": "workspaces/bfe33abe57b2929dee867a2c656996da3d3d15d5c52a34b2157d7594afca56dd/de5a34340ac7daf4bf941dcc68473c0a4a176c38e13ce7186bf6eb8a990a1bbb/manifest.json",
+        "sha256": "ea0e2f466cd8773819794ef92d7c4a78ae547275c39e427f1aafdeb1f539dd77",
+        "size_bytes": 4142
+      },
+      {
+        "path": "workspaces/bfe33abe57b2929dee867a2c656996da3d3d15d5c52a34b2157d7594afca56dd/workspace.sqlite",
+        "sha256": "0a3afbd9ee52ec7c24a35a8ccbad0975d69745b0e4c1857dea14ed2abe6dd31a",
+        "size_bytes": 86016
+      }
+    ],
+    "inventory_sha256": "b9944a6fec8f5baced26a04bff9805bc82746486a9d919007e9fc19644b32833",
+    "admitted_revisions": {
+      "synthetic-v2-793aad1c40bf4f0ba0dbf5ca79a13883": "07af91d5fb946491ac072f04de5ad7f604156f478d2e4ff1eca5a253c48872f3",
+      "synthetic-v2-793aad1c40bf4f0ba0dbf5ca79a13883-ctx": "d65e65bfcef85b23c8702e93ff8ce89753607812a742b978657fc5e692d1942d",
+      "synthetic-v2-793aad1c40bf4f0ba0dbf5ca79a13883-desc": "8c04d47053c03ee12915f259fb1c6f66f758cf5055384b63713535e0050ec9d3",
+      "synthetic-v2-793aad1c40bf4f0ba0dbf5ca79a13883-nav": "054bca3c86bb13b5dfdbdb5ffb70d69ad87ab776e067c977a2f88bc9783daddf",
+      "synthetic-v2-793aad1c40bf4f0ba0dbf5ca79a13883-cmp": "1f7c70623812aaa945e5cd436601d72596e464902b0ae2285d09de896b62e28e"
+    }
+  },
+  "reload_investigation": {
+    "runtime_source_commit": "416ce6979c3274dcc706949628843f4b36bae13c",
+    "diagnostic_tool_source_commit": "97e229f1175897b0ce9532ded414334a935a5f26",
+    "later_label_only_commit": "bd2c35dd22224d9ef36dc3c70601e92863f77042",
+    "frontend_build_same_as_root": true,
+    "origin": "https://127.0.0.1:19014",
+    "postgresql": "16.2 separate synthetic cluster on 19013",
+    "fixture_publication_sha256": "d9f3137da548d2bf5643186ea7b6909c9f5d9c8968f7e5d8f2ced84da47e82d4",
+    "fixture_study_revision": "synthetic-v2-d8d4258d14384835add14ebd07118420",
+    "standard": {
+      "scenario": "synthetic-tutorial-reload-disconnect",
+      "repetitions": 20,
+      "normal_reload": 20,
+      "reload_during_stream": 20,
+      "explicit_stream_abort": 20,
+      "interrupted_producer": 20,
+      "subsequent_health_checks": 60,
+      "csp_violations": 0,
+      "reload_ms": [
+        243,
+        231,
+        252,
+        265,
+        203,
+        251,
+        308,
+        287,
+        307,
+        232,
+        253,
+        246,
+        280,
+        195,
+        245,
+        232,
+        240,
+        207,
+        220,
+        304,
+        304,
+        262,
+        265,
+        218,
+        235,
+        224,
+        219,
+        243,
+        229,
+        221,
+        247,
+        322,
+        291,
+        225,
+        325,
+        283,
+        257,
+        273,
+        197,
+        244
+      ],
+      "failures": [],
+      "reload_timing_ms": {
+        "min": 195,
+        "median": 245.5,
+        "max": 325
+      }
+    },
+    "authenticated_resource": {
+      "scenario": "synthetic-tutorial-reload-resource",
+      "authenticated_resource_reload": 20,
+      "full_resource_checks": 20,
+      "full_state_checks": 20,
+      "repetitions": 20,
+      "normal_reload": 0,
+      "reload_during_stream": 0,
+      "explicit_stream_abort": 0,
+      "interrupted_producer": 0,
+      "subsequent_health_checks": 21,
+      "csp_violations": 0,
+      "reload_ms": [
+        261,
+        319,
+        218,
+        387,
+        329,
+        307,
+        248,
+        234,
+        269,
+        200,
+        236,
+        261,
+        205,
+        303,
+        341,
+        312,
+        310,
+        235,
+        299,
+        210,
+        239
+      ],
+      "failures": [],
+      "reload_timing_ms": {
+        "min": 200,
+        "median": 261,
+        "max": 387
+      }
+    },
+    "producer_counters": "Attempted original application messages, not delivered network bytes. Historical logs use bytes/final_body; tooling now explicitly names producer_bytes/producer_final_body. Browser independently verifies received 1024 bytes and subsequent full hashes/lengths.",
+    "instrumentation": [
+      "ASGI byte/end messages",
+      "http.disconnect receive observation",
+      "Original exception class",
+      "Producer finally completion",
+      "Playwright reload and restored-lesson 15s deadlines",
+      "Received first body chunk before navigation/abort",
+      "Full subsequent resource SHA256 and Content-Length",
+      "Subsequent state length and tutorial stage",
+      "Console CSP violation capture"
+    ],
+    "service_results": {
+      "standard_slow_producer_finalizations": 40,
+      "standard_slow_observations": 40,
+      "expected_injected_CancelledError": 20,
+      "resource_observations": 20,
+      "h11_LocalProtocolError": 0
+    },
+    "seeded_diagnostic_not_acceptance": true,
+    "stalls_observed": 0,
+    "historical_stall_fixed": false
+  },
+  "checks": {
+    "backend_sqlite_final": {
+      "status": "passed",
+      "commit": "8d5054b",
+      "tests": 170,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 2,
+      "seconds": 308.81,
+      "junit_sha256": "39d536ac9b9ef27e61283c31299d0d30b9817a255a214bca5f0227e449811212",
+      "passed": 168,
+      "suite_files": [
+        "tests/explanation_integration_contract_test.py",
+        "tests/explanation_integration_position_test.py",
+        "tests/explanation_integration_timing_test.py",
+        "tests/explanation_study_test.py",
+        "tests/explanation_study_v2_test.py",
+        "tests/explanation_study_workspace_test.py",
+        "tests/explanation_study_resource_test.py",
+        "tests/explanation_telemetry_policy_test.py",
+        "tests/explanation_corrective_http_test.py",
+        "tests/explanation_study_image_contents_test.py",
+        "tests/explanation_http_runtime_test.py",
+        "tests/explanation_export_policy_test.py",
+        "tests/explanation_tutorial_entity_contract_test.py",
+        "tests/explanation_study_disconnect_test.py",
+        "tests/explanation_frontend_serving_test.py"
+      ],
+      "command_suffix": "-q -ra --tb=short --maxfail=2",
+      "skips": "Only two opt-in PostgreSQL restart/restore tests; both pass in final PostgreSQL rerun"
+    },
+    "postgresql_core_initial": {
+      "commit": "fa03f97",
+      "tests": 69,
+      "failures": 1,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 307.273,
+      "junit_sha256": "f8d5c96c96b0f954cf305c31de20e2344ef2cc6882a171eb579471f91313982d",
+      "passed": 68,
+      "suite_files": [
+        "tests/explanation_study_test.py",
+        "tests/explanation_study_v2_test.py",
+        "tests/explanation_integration_contract_test.py",
+        "tests/explanation_integration_position_test.py",
+        "tests/explanation_integration_timing_test.py",
+        "tests/explanation_corrective_http_test.py",
+        "tests/explanation_tutorial_entity_contract_test.py"
+      ],
+      "failure": "Receipt retention directory outside required data/explanation-framework/postgres subtree; restart/restore assertions before guard passed"
+    },
+    "postgresql_final_rerun": {
+      "status": "passed",
+      "commit": "8d5054b",
+      "tests": 9,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 71.199,
+      "junit_sha256": "6a7e38fde842374607db5918ec0b7219cd73d106f70ac53368145e81a655011c",
+      "passed": 9,
+      "suite_files": [
+        "tests/explanation_tutorial_entity_contract_test.py",
+        "tests/explanation_corrective_http_test.py",
+        "tests/explanation_study_test.py::test_postgresql_real_restart_and_backup_restore",
+        "tests/explanation_study_v2_test.py::test_v2_postgresql_backup_restore_preserves_training_and_draft"
+      ],
+      "environment": {
+        "EXACT_STUDY_TEST_DATABASE_URL": "postgresql://127.0.0.1:18973/exact_backend_final_regression",
+        "EXACT_STUDY_TEST_PGBIN": "/tmp/exact-backend-corrections-20261003/pg/bin",
+        "EXACT_STUDY_TEST_PGDATA": "/tmp/exact-backend-corrections-20261003/pgdata-utf8",
+        "EXACT_STUDY_TEST_RECOVERY_DIR": "data/explanation-framework/postgres/backend-final-20261004"
+      },
+      "distinct_core_tests_with_passing_evidence": 69
+    },
+    "recovery": {
+      "artifact_type": "study_recovery_verification",
+      "schema_version": 1,
+      "executed_at": "2026-10-04T14:14:15.633883+00:00",
+      "synthetic_only": true,
+      "database": "postgres (PostgreSQL) 16.2",
+      "verified": [
+        "actual_server_restart",
+        "reusable_invitation",
+        "same_assignment_and_submission",
+        "same_acknowledgements_history_and_events",
+        "pg_dump_and_pg_restore_into_separate_database",
+        "same_immutable_export"
+      ],
+      "verified_row_counts": {
+        "sessions": 1,
+        "mutations": 6,
+        "history": 6,
+        "events": 2,
+        "timing_segments": 1
+      },
+      "backup_sha256": "b2cf86507b6fc94ea2cb352c6f982c109a2889cc7ddf561a9c59051f78307d1e",
+      "backup_size_bytes": 15890654,
+      "immutable_export_sha256": "95068729f256d638ec5f027e0c36725c62ab9703ce0dff45819ba0e438270cb5",
+      "retention": "Private ignored local test artifacts; no production retention claim"
+    },
+    "live_https_entity_boundary": {
+      "transport": "HTTPS",
+      "database": "PostgreSQL",
+      "results": [
+        {
+          "case": "omitted",
+          "status": 422,
+          "state_unchanged": true
+        },
+        {
+          "case": "null",
+          "status": 422,
+          "state_unchanged": true
+        },
+        {
+          "case": "unknown",
+          "status": 422,
+          "state_unchanged": true
+        },
+        {
+          "case": "wrong_typed_identity",
+          "status": 422,
+          "state_unchanged": true
+        },
+        {
+          "case": "explicit_recorded_class",
+          "status": 200,
+          "requirement_completed": true
+        }
+      ]
+    },
+    "frontend_unit": {
+      "passed": 75,
+      "failed": 0,
+      "command": "node --test src/study/*.test.ts src/study/v2/*.test.ts src/lib/*.test.ts src/lib/workspace/*.test.ts",
+      "initial_setup_failure": "Scratch parent missing checked-in backend examples JSON; copied unchanged then reran all 75 successfully"
+    },
+    "frontend_typecheck": "passed: tsc --noEmit",
+    "frontend_build": "passed: next build static export",
+    "browser_final": {
+      "passed": 42,
+      "failed": 0,
+      "skipped": 0,
+      "retries": 0,
+      "stats": {
+        "startTime": "2026-10-04T14:30:53.196Z",
+        "duration": 193694.80099999998,
+        "expected": 42,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      },
+      "command": "EXACT_E2E_STUDY_V2_CONFIG=<private> EXACT_CHROMIUM_PATH=<chrome> playwright test e2e/study-v2-backend.spec.ts e2e/study-v2-integration.spec.ts",
+      "fresh_journey": "New invitation; every lesson/assessment interaction in UI; both conditions/consultation/completion; no API-completed training",
+      "tests": [
+        {
+          "file": "study-v2-backend.spec.ts",
+          "title": "study-v2-backend.spec.ts > fresh browser journey: training, both conditions, reports and completion over the scoped workspace",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 30932,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "study-v2-integration.spec.ts",
+          "title": "study-v2-integration.spec.ts > R03 tutorial position (J06) > lesson 1 → 2 then reload without any lesson-2 action restores lesson 2, with focus on the new heading",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 1511,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "study-v2-integration.spec.ts",
+          "title": "study-v2-integration.spec.ts > R03 tutorial position (J06) > the assessment landing, a partial draft and a focused question all survive reload",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 3445,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "study-v2-integration.spec.ts",
+          "title": "study-v2-integration.spec.ts > R03 tutorial position (J06) > an incorrect attempt gives feedback, a retry passes on the server, and both receipts survive reload",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 3039,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "study-v2-integration.spec.ts",
+          "title": "study-v2-integration.spec.ts > R03 tutorial position (J06) > rapid Next/Back while saves are delayed keeps the last destination, on screen and on the server",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 3051,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "study-v2-integration.spec.ts",
+          "title": "study-v2-integration.spec.ts > R03 tutorial position (J06) > navigation while offline is kept in this tab and saved after reconnecting",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 1132,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "study-v2-integration.spec.ts",
+          "title": "study-v2-integration.spec.ts > R03 tutorial position (J06) > a stale second tab adopts the server's position after its conflicting navigation",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 1980,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "study-v2-integration.spec.ts",
+          "title": "study-v2-integration.spec.ts > R03 tutorial position (J06) > opening tutorial help during a scored case keeps completion, assignment and the case",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 2640,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "study-v2-integration.spec.ts",
+          "title": "study-v2-integration.spec.ts > R01/R02 scored explanation case (J01, J04, J05) > the scored case reads its scoped workspace: six contexts, admitted descriptions and comparisons, then one case_ready",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 2975,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "study-v2-integration.spec.ts",
+          "title": "study-v2-integration.spec.ts > R01/R02 scored explanation case (J01, J04, J05) > a v2 explanation case without its workspace descriptor is blocked, never served from prepared excerpts",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 2099,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "study-v2-integration.spec.ts",
+          "title": "study-v2-integration.spec.ts > R01/R02 scored explanation case (J01, J04, J05) > capabilities for another scope are incompatible and block the case",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 1215,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "study-v2-integration.spec.ts",
+          "title": "study-v2-integration.spec.ts > R01/R02 scored explanation case (J01, J04, J05) > a target-context failure blocks ranking and case_ready until a retry succeeds, reusing valid reads",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 4473,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "study-v2-integration.spec.ts",
+          "title": "study-v2-integration.spec.ts > R01/R02 scored explanation case (J01, J04, J05) > a slow fifth candidate keeps the case loading; case_ready and case timing start only after it",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 4611,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "study-v2-integration.spec.ts",
+          "title": "study-v2-integration.spec.ts > R01/R02 scored explanation case (J01, J04, J05) > a comparison failure blocks with its own label; a profile failure likewise",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 3198,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "study-v2-integration.spec.ts",
+          "title": "study-v2-integration.spec.ts > R01/R02 scored explanation case (J01, J04, J05) > an authorized, recorded absence is a usable terminal status, not a failure (diagnostic)",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 1946,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "study-v2-integration.spec.ts",
+          "title": "study-v2-integration.spec.ts > R01/R02 scored explanation case (J01, J04, J05) > a 200 response describing another entity is an invalid binding and blocks readiness",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 2093,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "study-v2-integration.spec.ts",
+          "title": "study-v2-integration.spec.ts > R01/R02 scored explanation case (J01, J04, J05) > an optional hierarchy failure stays local and does not block submission",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 2175,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "study-v2-integration.spec.ts",
+          "title": "study-v2-integration.spec.ts > R01/R02 scored explanation case (J01, J04, J05) > a blocking failure keeps a saved partial ranking and its order through retry",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 2460,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "study-v2-integration.spec.ts",
+          "title": "study-v2-integration.spec.ts > R01/R02 scored explanation case (J01, J04, J05) > replacing the session aborts the old case: nothing from it becomes ready",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 6245,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "study-v2-integration.spec.ts",
+          "title": "study-v2-integration.spec.ts > R01/R02 scored explanation case (J01, J04, J05) > a second tab loads its own readiness and reports its own ready observation (J05)",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 5325,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "study-v2-integration.spec.ts",
+          "title": "study-v2-integration.spec.ts > R01/R02 scored explanation case (J01, J04, J05) > pause and resume never reopen case timing before the content is usable again",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 2971,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "study-v2-integration.spec.ts",
+          "title": "study-v2-integration.spec.ts > J02 participant boundaries (browser subset) > a baseline case reads no workspace, and a previous explanation scope is denied after advancing",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 1656,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "study-v2-integration.spec.ts",
+          "title": "study-v2-integration.spec.ts > J08 researcher export (browser) > v2 exports request and verify analysis 3 in JSON and CSV",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 1320,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "study-v2-integration.spec.ts",
+          "title": "study-v2-integration.spec.ts > J08 researcher export (browser) > a returned schema other than analysis 3 is reported and not saved (diagnostic)",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 781,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "study-v2-integration.spec.ts",
+          "title": "study-v2-integration.spec.ts > J10 layout and accessibility on the real service > setup, a tutorial lesson and an explanation case reflow from 320 to 2560 px at 100% and 200% text (light)",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 10221,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "study-v2-integration.spec.ts",
+          "title": "study-v2-integration.spec.ts > J10 layout and accessibility on the real service > setup, a tutorial lesson and an explanation case reflow from 320 to 2560 px at 100% and 200% text (dark)",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 10126,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "study-v2-integration.spec.ts",
+          "title": "study-v2-integration.spec.ts > R06/R07 study full context and fact pagination (19 F16, F17) > a searched non-focal entity's full context pages every category; closing keeps the case",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 17047,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "study-v2-integration.spec.ts",
+          "title": "study-v2-integration.spec.ts > R06/R07 study full context and fact pagination (19 F16, F17) > a focal entity's full context shows its description; a citation opens and returns; a parent navigates",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 2519,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "study-v2-integration.spec.ts",
+          "title": "study-v2-integration.spec.ts > R08 retry refetches unusable responses (19 F18) > a malformed 200 context injected once blocks the case; Retry refetches it and restores usability in place",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 3168,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "study-v2-integration.spec.ts",
+          "title": "study-v2-integration.spec.ts > R08 retry refetches unusable responses (19 F18) > a slow required read finishing after another failed cannot unblock the case",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 7707,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "study-v2-integration.spec.ts",
+          "title": "study-v2-integration.spec.ts > Optional reads refused with 403 (19 F18) > a refused optional read stays local; only a refused scope blocks the case",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 3609,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "study-v2-integration.spec.ts",
+          "title": "study-v2-integration.spec.ts > R09 readiness follows the admitted components (19 F19) > pair_comparison only: usable once exactly its content renders; a failure blocks and Retry recovers",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 4341,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "study-v2-integration.spec.ts",
+          "title": "study-v2-integration.spec.ts > R09 readiness follows the admitted components (19 F19) > original_context only: usable once exactly its content renders; a failure blocks and Retry recovers",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 4183,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "study-v2-integration.spec.ts",
+          "title": "study-v2-integration.spec.ts > R09 readiness follows the admitted components (19 F19) > entity_description only: usable once exactly its content renders; a failure blocks and Retry recovers",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 4349,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "study-v2-integration.spec.ts",
+          "title": "study-v2-integration.spec.ts > R09 readiness follows the admitted components (19 F19) > hierarchy + evidence_table + evidence_graph only: usable once exactly its content renders; a failure blocks and Retry recovers",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 4269,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "study-v2-integration.spec.ts",
+          "title": "study-v2-integration.spec.ts > R09 readiness follows the admitted components (19 F19) > comparison only: a recorded absence is usable (diagnostic)",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 4198,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "study-v2-integration.spec.ts",
+          "title": "study-v2-integration.spec.ts > R10 access checks belong to the attempt that issued them (19 F20) > a delayed check failure cannot undo a successful retry; the draft and cached contexts survive",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 3110,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "study-v2-integration.spec.ts",
+          "title": "study-v2-integration.spec.ts > R10 access checks belong to the attempt that issued them (19 F20) > a check still in flight from a submitted presentation cannot affect the next case",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 5078,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "study-v2-integration.spec.ts",
+          "title": "study-v2-integration.spec.ts > R10 access checks belong to the attempt that issued them (19 F20) > a check still in flight from a replaced session cannot affect the new session",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 2687,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "study-v2-integration.spec.ts",
+          "title": "study-v2-integration.spec.ts > R11 continued parents keep their entity type (19 F21) > study: a object property's later-page superproperty opens as a object property; the case is kept",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 3495,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "study-v2-integration.spec.ts",
+          "title": "study-v2-integration.spec.ts > R11 continued parents keep their entity type (19 F21) > study: a data property's later-page superproperty opens as a data property; the case is kept",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 3603,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "study-v2-integration.spec.ts",
+          "title": "study-v2-integration.spec.ts > R12 tutorial card parents keep their recorded type (19 F21) > lesson 1's source card opens both parents as typed classes; lesson 2 saves a typed parent action",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 2920,
+              "retry": 0
+            }
+          ]
+        }
+      ]
+    },
+    "runtime_schema_check": "passed: python -m tools.freeze_explanation_contracts --check",
+    "spec_validator": {
+      "scope": "specification artifacts only; not backend acceptance",
+      "status": "passed",
+      "json_files": 27,
+      "schema_fixtures": 13,
+      "local_links": 191,
+      "study_schedules": 8,
+      "scoring_oracles": 9,
+      "errors": []
+    },
+    "lint": "Focused Ruff check (existing fixture-import and ambiguous-name exceptions), node --check tools/review_study_reload.mjs, git diff --check passed"
+  },
+  "acceptance_matrix": {
+    "J01": "Reverified API and browser",
+    "J02": "Reverified backend; browser baseline/help/stale-scope subset",
+    "J03": "Current study browser reverified; unchanged main-app parity evidence reused from frontend follow-up 3",
+    "J04": "Reverified; labelled faults distinct from happy path",
+    "J05": "Reverified affected readiness/retry/conflict/second tab/pause boundaries",
+    "J06": "Reverified browser and database persistence",
+    "J07": "Fresh complete unseeded UI journey passed",
+    "J08": "Reverified backend timing/export oracles and admin browser",
+    "J09": "Legacy and v2 regression/restart/restore passed",
+    "J10": "Automated only; manual keyboard/screen reader open",
+    "J11": "Study/CSP/forms/exports reverified; unchanged main-app and v1 browser evidence reused",
+    "J12": "Relevant build/contracts/suites passed; external and human gates open"
+  },
+  "reused_evidence": [
+    "docs/verification/explanation-integration-frontend-followup-3-receipt.json",
+    "docs/verification/explanation-integration-acceptance-receipt.json"
+  ],
+  "limitations": [
+    "Finite synthetic reload scenarios do not establish historical stall causation",
+    "Main-app/library/demo and v1 browser suite not freshly rerun; independent frontend evidence reused",
+    "v1 historical browser evidence uses SQLite/HTTP harness; fresh v1 backend checks use PostgreSQL",
+    "Local self-signed HTTPS does not verify deployment TLS",
+    "No human accessibility/usability/pilot verification",
+    "No real release package admission or local container image run"
+  ],
+  "remaining_gates": {
+    "R16_reload_stall": "unresolved",
+    "J10_manual_accessibility": "not_performed",
+    "real_release_package": {
+      "status": "missing",
+      "path": "data/explanation-framework/backend-release/package/package.json",
+      "required": "Matching frozen contexts/explanations/resources and admission evidence; older deploy bundle not substitute"
+    },
+    "docker": {
+      "status": "daemon_unavailable",
+      "observed": "Cannot connect to unix:///Users/pedrocotovio/.docker/run/docker.sock; CLI alone is not an available daemon"
+    },
+    "deployment_trusted_https_restore": "not_verified_not_deployed",
+    "formative_usability_duration_pilot": "not_performed",
+    "study_owner_consent_information_approval": "open",
+    "real_case_adjudication": "open",
+    "original_DOID_admission_and_import_closure": "open_prior_gate_not_reverified"
+  },
+  "frontend_followup": {
+    "implementation_required": false,
+    "current_frontend_explicit_kinds_verified": true,
+    "legacy_clients": "Must send original recorded kind; omitted retries now 422",
+    "human_audit": "J10 changed parent/recovery controls remain for manual audit"
+  },
+  "conclusions": {
+    "implementation": "R14 and reproduced R15 corrected/reviewed/verified; R16 unresolved",
+    "joint_acceptance": "Affected automated matrix and fresh journey passed; full acceptance open for R16/J10",
+    "launch_readiness": "Not established; no gates waived"
+  },
+  "preserved_protocol": {
+    "protege_required": false,
+    "methods_optional_combinable_changeable": true,
+    "reporting_unit": "per source-plus-candidate-set case",
+    "frozen_publications_rewritten": false,
+    "stored_receipts_rewritten": false
+  },
+  "local_artifact_hashes": {
+    "/tmp/exact-backend-final-20261004/entity-baseline-confirmation.log": "7dca72ec94f4dff4edcfdd62e0a5e3c68192c62d9a64f539016a4eb442337286",
+    "/tmp/exact-backend-final-20261004/entity-tests-final.log": "0c479edc71ad6060b713eba940d8604a0facacef760c049ba767f1ccffc29975",
+    "/tmp/exact-backend-final-20261004/backend-sqlite-final.log": "353c2b8e94e148eec02f379774189f9e4b8eff1accc2067d945c1be0cfff8086",
+    "/tmp/exact-backend-final-20261004/backend-postgresql.log": "536805de3b6c3c5f82719efa7eb8761684ad2cc99a128ec4a726794dafa53d20",
+    "/tmp/exact-backend-final-20261004/backend-postgresql-final.log": "f50c7d13f527d119340d6f75a2d8770b0693969afa0623bd7125931fc23d1d8c",
+    "/tmp/exact-backend-final-20261004/frontend-unit-rerun.log": "45b60bae0298192c89128f12aa8b3fdac05d0ef4b1ccca84e0d912f6279f6ab4",
+    "/tmp/exact-backend-final-20261004/build.log": "9bc10f0f5165f4c7c48780f07ab887e2e71dd73733c433fabdf529f06aee3ce2",
+    "/tmp/exact-backend-final-20261004/browser-initial.log": "74e6851cd208979262cd503d976fb31afffdf663d8f51ba7965b80f363db7c8c",
+    "/tmp/exact-backend-final-20261004/browser-final.log": "251de17d6c7a2a764ba2b92d33ddd863729cada3698d7f66cab54c4a61180a8e",
+    "/tmp/exact-backend-final-20261004/service-final.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "/tmp/exact-backend-final-20261004/docker-check.log": "2798c947a0be59969001777209e647c56d30e2292592ba126f154933b21d30d6",
+    "/tmp/exact-backend-final-20261004/spec-final.log": "b6edc61ba58ada390311831507072445df2d0f0ae299af9ad8615782fd64a66c"
+  },
+  "diagnostic_artifact_hashes": {
+    "/tmp/exact-disconnect-review-20261004/baseline-h11-cause.log": "f68bb56e1a643b2f987a2cce58e244c81673c70df9beaf10c2a8f92d822f9013",
+    "/tmp/exact-disconnect-review-20261004/baseline-regression.log": "d59ab2e72e54f8609033e69d9e8c3170295819cbe6be94cb3d22b23ea23a6d7e",
+    "/tmp/exact-disconnect-review-20261004/browser-reload-receipt.json": "53b3d866d447a84c7831298c009ef495edae929c143400bc9cb50a7e69b08533",
+    "/tmp/exact-disconnect-review-20261004/browser-resource-receipt.json": "0a0210dd1ed735eb2bf8a661fa6fd72c77b205baee95ce812fd7f0584cece934",
+    "/tmp/exact-disconnect-review-20261004/service.log": "1e5f564b1aafcd0252fb0a0b1f27c91e701f6e030889a03e66bb94ddc0fc604c",
+    "/tmp/exact-disconnect-review-20261004/service-resource.log": "57a05457941e38ff2b4bd80940ad15e1faab793567b9ca4d3ba0a18c96e5a5b8"
+  },
+  "git": {
+    "unrelated_archive_preserved": true,
+    "pushed": false,
+    "deployed": false,
+    "participant_contact": false
+  },
+  "cleanup": {
+    "root_https_service_stopped": true,
+    "root_synthetic_postgresql_stopped": true,
+    "investigator_https_service_stopped": true,
+    "investigator_postgresql_stopped": true,
+    "private_synthetic_databases_and_recovery_artifacts_retained_locally": true,
+    "unrelated_untracked_archive_preserved": true
+  }
+}

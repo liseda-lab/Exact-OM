@@ -1,5 +1,12 @@
 # Study integration joint acceptance — 2026-10-03 (S3)
 
+> **Latest backend verification (2026-10-04):** the
+> [final backend review](explanation-integration-backend-final-review.md) and
+> [receipt](explanation-integration-backend-final-receipt.json) record R14/R15 corrections,
+> a fresh combined journey and backend/PostgreSQL checks. R16's historical reload stall
+> remains unresolved; J10 and the release gates remain open. The dated results below
+> are historical and are not rewritten by this supplement.
+
 > **Reopened after this record, then re-closed.** A post-implementation review reproduced
 > R06–R09, which reopened R01 and R02 ([review](../../specs/explanation-framework/evidence/frontend-integration-review-20261003.md)).
 > They were fixed and verified in the [follow-up handoff](explanation-integration-frontend-followup.md).

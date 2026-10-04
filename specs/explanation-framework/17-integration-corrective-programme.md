@@ -1,16 +1,24 @@
 # Integration corrective programme and agent protocol
 
+**Latest backend review (2026-10-04): R14 typed-action validation and R15 interrupted-response
+framing are fixed and verified at `8d5054b`; R16, the historical reload stall, remains
+unresolved.** See the [final backend review](../../docs/verification/explanation-integration-backend-final-review.md)
+and [receipt](../../docs/verification/explanation-integration-backend-final-receipt.json).
+The combined automated journey passes; full acceptance still requires R16 disposition
+and the J10 manual audit. No additional frontend implementation blocker was found.
+
 **2026-10-04. Status: R06–R11 (post-implementation findings) fixed and verified at `eb4f955`, so
 R01 and R02 are joint-verified again ([second follow-up](../../docs/verification/explanation-integration-frontend-followup-2.md)).
 A third review of `e36cfa5` found R12 (tutorial and v1 card parents no longer navigate; reopened
 R03's frontend status) and R13 (racy readiness test evidence); both are fixed and verified at
 `1808ed0` ([third follow-up](../../docs/verification/explanation-integration-frontend-followup-3.md)).
-R04 joint-verified; R03 blocked only on the manual J10 audit. Reviewed baseline: `2d9715b`.**
+R04 joint-verified; R03 blocked on the manual J10 audit. Reviewed baseline: `2d9715b`.**
 The [backend handoff](../../docs/verification/explanation-integration-backend-handoff.md)
 records implementation `96b76fe`; the [frontend handoff](../../docs/verification/explanation-integration-frontend-handoff.md)
 records `6895bc6`; the [joint acceptance record](../../docs/verification/explanation-integration-acceptance.md)
 gives the J01–J12 results, a new fixed finding (R05) and the remaining human and release gates.
-The follow-up is not fully accepted until a person completes the J10 screen-reader/keyboard audit.
+The follow-up is not fully accepted until a person completes the J10 screen-reader/keyboard
+audit and the unresolved R16 finding has an evidence-backed disposition.
 Start here for the next correction cycle. The [review record](evidence/integration-review-20261003.md)
 separates direct observations, a diagnostic reproduction and checks that remain outstanding.
 The implementation assignments are [18 — Backend](18-backend-integration-corrections.md)
@@ -81,6 +89,9 @@ CSP, P3) was found and fixed during S3.
 | R11 | R01 / J03 | P2 | Parents loaded by continuation lose their entity type, so a property's later-page superproperty opens as a class. Carry the backend's typed entity through continuation records and every navigation callback in both products. | Frontend |
 | R12 | R03 / J07, J09 (frontend subset) | P2 | After R11, card parents need a typed projection, but the frozen-resource adapter used by the tutorial and v1 publications supplies bare IRIs, so their parent buttons are disabled. Derive each parent's type from the recorded hierarchy edge or the axiom's AST, keeping ontology, fact identity and provenance; never default a kind. | Frontend |
 | R13 | R02 / J04–J05 evidence | P3 | A recovery test reads recorded traffic synchronously, before the `case_ready` acknowledgement is recorded, so it fails intermittently. Wait for the acknowledgement, check that it was accepted, then check the count. | Frontend (test) |
+| R14 | R03 / J07, J09 backend subset | P2 | V2 tutorial actions omitted `entity.kind`, which the shared model defaulted to class before validation. Require a kind in action evidence at the HTTP boundary while preserving legacy publication/resource normalization and historical receipts. Fixed and verified in `fa03f97`. | Backend |
+| R15 | J05, J11 | P2 | Cancelled response producers could acquire a synthetic final body in the middleware relay, causing the exact h11 Content-Length exception. Preserve original ASGI framing, headers and cancellation; fixed and verified in `8d5054b`. This does not prove the historical stall's cause. | Backend |
+| R16 | J05 / complete acceptance | P2 provisional | Historical intermittent reload stall remains unexplained. Finite real-service reload/abort/stream trials did not reproduce it. Retain unresolved status and require correlated browser/ASGI/transport evidence before assigning causation or closing it. | Backend integration, with frontend investigation if needed |
 
 The [second review](evidence/frontend-integration-review-20261004.md) reproduced R10 and R11 at
 `ad9461c`. They reopened R02 and R01 until F20–F21 were verified, which happened at `eb4f955`.

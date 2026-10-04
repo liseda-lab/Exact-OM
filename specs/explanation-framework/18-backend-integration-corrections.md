@@ -1,6 +1,8 @@
 # Backend assignment: discovery, recovery and timing integrity
 
-**2026-10-03. Implemented and backend-verified in `96b76fe`; frontend/joint acceptance pending.**
+**S1 baseline (2026-10-03): implemented and backend-verified in `96b76fe`.**
+Current disposition and the subsequent R14–R16 backend review are recorded in the
+[final backend review](../../docs/verification/explanation-integration-backend-final-review.md).
 See the [S1 handoff](../../docs/verification/explanation-integration-backend-handoff.md)
 and its exact verification receipt. The requirements below remain normative. Read
 [17](17-integration-corrective-programme.md) for order, ownership and acceptance. This assignment
@@ -29,6 +31,23 @@ newly published revisions to their actual compatible software build under the ex
 Any deployment incompatible with an active revision must fail admission explicitly, not
 reset the session or silently change its protocol. Preserve immutable old mutation receipts;
 idempotent replays may return their original shape, after which the client can refresh state.
+
+### R15 / R16 — Interrupted response integrity and reload investigation
+
+Security/origin middleware must forward the producer's body, completion and cancellation
+semantics without manufacturing a successful ending for an interrupted response. Preserve
+declared Content-Length, duplicate cookies, exact document CSP, authentication, response
+bytes and producer/transport exceptions. Test a producer interrupted before and after body
+bytes with real HTTP framing, cancellation propagation, disconnected transport cleanup,
+HEAD and subsequent requests. Do not suppress exceptions or change dependencies solely
+because an h11 error appeared near a disconnect.
+
+R15 covers the reproduced middleware framing defect. R16 separately tracks the historical
+browser reload stall: a deterministic injected protocol failure does not prove that it
+caused that symptom. Exercise the compiled frontend on the actual HTTPS/PostgreSQL service
+under normal CSP, recording ordinary reloads, outstanding responses, cancellation,
+interrupted streams and later requests. If the stall remains unreproduced, retain it as
+unresolved with exact scenario counts and instrumentation; do not mark it fixed by R15.
 
 ## B11 / R01 — Discover the participant's authorized workspace
 

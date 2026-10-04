@@ -71,6 +71,16 @@ frozen `requirement_id` and `action` code, plus the corresponding typed evidence
 - Consultation practice: allowed unique `methods` (multiple or none as required).
 - Download discovery: the synthetic ontology `asset_ids`.
 
+Every supplied action entity requires an explicit recorded `kind`: `class`,
+`object_property`, `data_property` or `individual`. Missing/null/unknown kinds fail
+HTTP validation with 422; a wrong typed identity also fails atomically. This uses
+an action-specific model: legacy v1 and frozen publication/resource defaults remain
+unchanged. Historical resources are normalized through their original schema in
+memory, without rewriting their bytes or hashes. Previously accepted implicit action
+requests now fail HTTP validation, even on retry. Their saved receipts remain intact:
+resend with the original normalized kind under the same key to replay the original
+canonical request. See [R14 verification](explanation-integration-backend-final-review.md).
+
 Corrected clients send a complete `position` object: either
 `{"view":"lesson","lesson_id":"<frozen lesson ID>","question_id":null}` or
 `{"view":"assessment","lesson_id":null,"question_id":null}`. An assessment may name a

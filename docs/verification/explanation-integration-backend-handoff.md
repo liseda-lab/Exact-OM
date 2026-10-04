@@ -1,5 +1,10 @@
 # Study integration backend handoff — 2026-10-03
 
+> Historical S1 receipt. The [2026-10-04 final backend review](explanation-integration-backend-final-review.md)
+> records the current frontend integration, R14/R15 corrections and unresolved R16.
+> Its [receipt](explanation-integration-backend-final-receipt.json) supersedes the pending
+> frontend status below within its explicitly verified scope; full acceptance remains open.
+
 **S1 backend verified; frontend integration and joint acceptance pending.** This implements
 specifications 17/18 from `b5d8b64`. It does not close the UI findings or reuse the earlier
 browser receipt as evidence of their correction. The implementation commit is

@@ -486,7 +486,7 @@
   },
   "current_acceptance_authority": "specs/explanation-framework/17-integration-corrective-programme.md",
   "integration_followup_20261003": {
-    "status": "R01_R02_R04_joint_verified_R03_blocked_on_J10_manual_audit",
+    "status": "R14_R15_verified_R16_unresolved_R03_blocked_on_J10_manual_audit",
     "reviewed_commit": "2d9715b",
     "authority": "specs/explanation-framework/17-integration-corrective-programme.md",
     "evidence": "specs/explanation-framework/evidence/integration-review-20261003.md",
@@ -559,7 +559,8 @@
         "frontend_status": "frontend_verified",
         "blocked_by": "J10 manual screen-reader and keyboard audit not performed",
         "reopened_by": [
-          "R12"
+          "R12",
+          "R14"
         ]
       },
       "R04": {
@@ -676,9 +677,39 @@
           "specs/explanation-framework/evidence/frontend-integration-review-20261004-3.md",
           "docs/verification/explanation-integration-frontend-followup-3.md"
         ]
+      },
+      "R14": {
+        "priority": 2,
+        "owner": "backend",
+        "status": "fixed_and_verified",
+        "summary": "Implicit entity kind completed v2 tutorial actions",
+        "evidence": [
+          "docs/verification/explanation-integration-backend-final-review.md",
+          "docs/verification/explanation-integration-backend-final-receipt.json"
+        ]
+      },
+      "R15": {
+        "priority": 2,
+        "owner": "backend",
+        "status": "fixed_and_verified_at_reproduced_boundary",
+        "summary": "Interrupted response acquired false terminal body and h11 length error",
+        "evidence": [
+          "docs/verification/explanation-integration-backend-final-review.md",
+          "docs/verification/explanation-integration-backend-final-receipt.json"
+        ]
+      },
+      "R16": {
+        "priority": 2,
+        "owner": "backend_integration",
+        "status": "unresolved_not_reproduced",
+        "summary": "Historical intermittent page.reload stall",
+        "evidence": [
+          "docs/verification/explanation-integration-backend-final-review.md",
+          "docs/verification/explanation-integration-backend-final-receipt.json"
+        ]
       }
     },
-    "implementation_acceptance": "R06_R13_fixed_R01_R02_reverified_R03_blocked_on_J10_manual_audit",
+    "implementation_acceptance": "R14_R15_corrected_and_verified_full_acceptance_open_for_R16_and_J10",
     "historical_evidence_preserved": true,
     "launch_gates_waived": false,
     "live_publication": false,
@@ -701,6 +732,27 @@
     "second_followup_commit": "eb4f955",
     "third_followup_handoff": "docs/verification/explanation-integration-frontend-followup-3.md",
     "third_followup_receipt": "docs/verification/explanation-integration-frontend-followup-3-receipt.json",
-    "third_followup_commit": "1808ed0"
+    "third_followup_commit": "1808ed0",
+    "backend_final_review": "docs/verification/explanation-integration-backend-final-review.md",
+    "backend_final_receipt": "docs/verification/explanation-integration-backend-final-receipt.json",
+    "backend_final_runtime_commit": "8d5054ba8bca49ba3951d558bba05a6fe73985be",
+    "backend_final_reviewed_commit": "9bdd9ab44ad1bfbb866dade25c6c32a60daba50a"
+  },
+  "backend_final_review_20261004": {
+    "reviewed_checkout": "2646d1f5d620f9a88f40308cbb6974b464c7a91e",
+    "implementation_commits": [
+      "fa03f97b8384e2c2e347b6031e3019fd8c2447cb",
+      "8d5054ba8bca49ba3951d558bba05a6fe73985be"
+    ],
+    "diagnostics_commit": "9bdd9ab44ad1bfbb866dade25c6c32a60daba50a",
+    "review": "docs/verification/explanation-integration-backend-final-review.md",
+    "receipt": "docs/verification/explanation-integration-backend-final-receipt.json",
+    "conclusions": {
+      "implementation": "R14 and reproduced R15 corrected/reviewed/verified; R16 unresolved",
+      "joint_acceptance": "Affected automated matrix and fresh journey passed; full acceptance open for R16/J10",
+      "launch_readiness": "Not established; no gates waived"
+    },
+    "frontend_implementation_followup_required": false,
+    "release_gates_waived": false
   }
 }
