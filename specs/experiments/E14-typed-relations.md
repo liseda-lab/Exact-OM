@@ -95,6 +95,8 @@ Local integration verification: 99 focused tests pass with published 0.2.2 and 9
 unchanged main 0.2.1 environment. This establishes integration/fixture behavior, not full
 NCIT admission or a bridge result. Evidence is in
 `data/experiments-v2/e14-pyhermit-20261004-01/`.
+Another 41 adjacent tests pass. Tiny real native admission and bridge fixtures fail at a
+one-byte index limit and succeed at an explicit 128 MiB allowance with strict reasoning.
 
 Durable boundaries: **Typed train features/heads, bridge queries, typed predictions.**
 All changed inputs/semantics invalidate their consuming descendants; preserve valid upstream

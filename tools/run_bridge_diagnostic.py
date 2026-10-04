@@ -56,6 +56,7 @@ def prepare_recipe(bindings, originals, output):
         "rationales": False,
         "max_memory_bytes": 80 * 1024**3,
         "max_compile_work": 2**64 - 1,
+        "max_native_symbol_index_bytes": 80 * 1024**3,
         "timeout_seconds": None,
         "comparison_scope": "known_valid_pairs_graph_view_vs_full_OWL_not_logical_parity_or_end_to_end_F1",
     }
