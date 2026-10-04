@@ -279,6 +279,7 @@ class ReasonerSettings:
     worker_wire: bool = False
     max_memory_bytes: int | None = None
     max_compile_work: int | None = None
+    max_native_symbol_index_bytes: int | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.backend, str) or not self.backend:
@@ -312,6 +313,14 @@ class ReasonerSettings:
             or not 0 < self.max_compile_work <= 2**64 - 1
         ):
             raise ValueError("reasoner max_compile_work must be a positive u64 or None")
+        if self.max_native_symbol_index_bytes is not None and (
+            isinstance(self.max_native_symbol_index_bytes, bool)
+            or not isinstance(self.max_native_symbol_index_bytes, int)
+            or not 0 < self.max_native_symbol_index_bytes <= 2**64 - 1
+        ):
+            raise ValueError(
+                "reasoner max_native_symbol_index_bytes must be a positive u64 or None"
+            )
 
     @classmethod
     def from_value(cls, value: object = None) -> "ReasonerSettings":
@@ -338,6 +347,7 @@ class ReasonerSettings:
                 "worker_wire",
                 "max_memory_bytes",
                 "max_compile_work",
+                "max_native_symbol_index_bytes",
             }
         )
         if unknown:
@@ -350,6 +360,9 @@ class ReasonerSettings:
             worker_wire=cast(bool, normalized.get("worker_wire", False)),
             max_memory_bytes=cast(int | None, normalized.get("max_memory_bytes")),
             max_compile_work=cast(int | None, normalized.get("max_compile_work")),
+            max_native_symbol_index_bytes=cast(
+                int | None, normalized.get("max_native_symbol_index_bytes")
+            ),
         )
 
 
@@ -637,6 +650,11 @@ def reasoner_cache_identity(
             if selected.max_compile_work is not None
             else {}
         ),
+        **(
+            {"max_native_symbol_index_bytes": selected.max_native_symbol_index_bytes}
+            if selected.max_native_symbol_index_bytes is not None
+            else {}
+        ),
         "core_package_version": core_package_version,
         "core_api_version": list(pyowl_core.API_VERSION),
         "core_model_schema_version": int(pyowl_core.MODEL_SCHEMA_VERSION),
@@ -680,7 +698,9 @@ def require_native_reasoner_support(
     selected = ReasonerSettings.from_value(settings)
     _validate_backend(name, selected.backend)
     if name != "hermit" and (
-        selected.max_memory_bytes is not None or selected.max_compile_work is not None
+        selected.max_memory_bytes is not None
+        or selected.max_compile_work is not None
+        or selected.max_native_symbol_index_bytes is not None
     ):
         raise ValueError(
             "Compilation resource settings are supported only by the native HermiT adapter"
@@ -692,6 +712,8 @@ def require_native_reasoner_support(
             f"{name} lacks the required public native pipeline capability"
         )
     check()
+    if name == "hermit":
+        _hermit_config(selected)
     if selected.worker_wire or (name == "elk" and selected.timeout_seconds is not None):
         raise ReasonerUnavailableError(
             f"{name} verified-wire workers lack native receipt support; "
@@ -993,12 +1015,10 @@ def _hermit_query(reasoner: Any, iri: str, *, upward: bool, direct: bool) -> set
     }
 
 
-def _create_hermit(
-    snapshot: OntologyView, settings: ReasonerSettings
-) -> tuple[Any, ReasonerProvenance, type[Exception]]:
-    require_native_reasoner_support("hermit", settings)
+def _hermit_config(settings: ReasonerSettings) -> Any:
+    """Validate explicit resource options before any native ontology loading."""
     pyhermit = _optional_module("pyhermit", "hermit")
-    config = pyhermit.ReasonerConfig(
+    return pyhermit.ReasonerConfig(
         backend=settings.backend,
         require_native_pipeline=True,
         timeout=settings.timeout_seconds,
@@ -1009,7 +1029,20 @@ def _create_hermit(
             if settings.max_compile_work is not None
             else {}
         ),
+        **(
+            {"max_native_symbol_index_bytes": settings.max_native_symbol_index_bytes}
+            if settings.max_native_symbol_index_bytes is not None
+            else {}
+        ),
     )
+
+
+def _create_hermit(
+    snapshot: OntologyView, settings: ReasonerSettings
+) -> tuple[Any, ReasonerProvenance, type[Exception]]:
+    require_native_reasoner_support("hermit", settings)
+    pyhermit = _optional_module("pyhermit", "hermit")
+    config = _hermit_config(settings)
     reasoner = pyhermit.Reasoner(snapshot, config=config)
     try:
         if reasoner.ontology is not snapshot:
@@ -1300,7 +1333,8 @@ def load_reasoner(
     if not isinstance(store, OwlOntologySource):
         raise TypeError("store must be OwlOntologySource")
     selected = ReasonerSettings.from_value(settings)
-    selected = ReasonerSettings(
+    selected = replace(
+        selected,
         backend=selected.backend if backend is None else backend,
         workers=selected.workers if workers is None else workers,
         timeout_seconds=selected.timeout_seconds if timeout is None else timeout,

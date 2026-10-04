@@ -56,8 +56,12 @@ work. Use the supplied incident and machine observations to locate current evide
   roles. No private test references may influence optimization, admission or selection.
   Rationales stay off. Ontology loading, processing, reasoning and projection use the native
   packages, never Python/JVM fallbacks. Do not invent negatives or fitted artifacts.
-  The separate pyHermiT integration awaits the user's publication; do not install unpublished
-  code, implement a replacement or include that integration in routine campaign repairs.
+  The user approved published pyHermiT integration on 2026-10-04. Release 0.2.2 is installed
+  only in an isolated E14 environment, but lacks the earlier compiler memory/work fixes
+  needed by full NCIT. Keep optional E14 bridge dispatch held until a complete corrective
+  release is published and freshly admitted; do not drop required resource options, install
+  unpublished experiment code or repeat a known-cap failure. See E14's dated integration
+  amendment. Independent eligible experiments continue.
 - All experimental generative calls use OpenRouter under their declared accounting and role
   controls. Preserve historical cache-only queues; prepare separate properly bound roles for
   new authorized hosted comparisons rather than reusing a cached-only template. Replay identical

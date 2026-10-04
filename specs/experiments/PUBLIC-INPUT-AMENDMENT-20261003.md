@@ -133,3 +133,14 @@ Local execution receipts and publication evidence are under
 `input-verification-02.json`, `reasoning-inputs-02/preparation.json`, `HANDOFF.md` and
 `publication.json`. The preparation manifest SHA-256 is
 `09112a63da125e413e63a2400534ca42e889fae25cf1a60ff24745645ccb0a04`.
+
+### Published native resource follow-up — 2026-10-04
+
+The subsequent user approval permits installing the published pyHermiT resource repair in
+an isolated E14 runtime; it does not change the approved metadata exclusions or strict
+datatype policy. Published 0.2.2 was verified and installed separately, but its resource PR
+omitted the earlier E14 compiler memory/work fixes. Full admission therefore remains held
+pending a corrective published package; the matching bridge comparison remains dependent
+on admission. Do not reuse an old failed admission as a pass, remove the required work
+allowance, or run the completed main typing experiment again. The [E14 specification](E14-typed-relations.md)
+records exact integration requirements and the fixture verification boundary.

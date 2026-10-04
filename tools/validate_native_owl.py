@@ -40,6 +40,11 @@ def run_diagnostic(recipe_path):
         "inputs": recipe["inputs"],
         "imports": recipe["imports"],
         "ontologies": {},
+        "resource_options": {
+            name: recipe[name]
+            for name in ("max_memory_bytes", "max_compile_work", "max_native_symbol_index_bytes")
+            if recipe.get(name) is not None
+        },
     }
     if recipe.get("reasoning_preparation"):
         result.update(
@@ -65,6 +70,18 @@ def run_diagnostic(recipe_path):
     began = time.monotonic()
     reasoner = None
     try:
+        options = {
+            "backend": "native",
+            "require_native_pipeline": True,
+            "timeout": None,
+            "workers": 1,
+            "max_memory_bytes": recipe["max_memory_bytes"],
+        }
+        for name in ("max_compile_work", "max_native_symbol_index_bytes"):
+            if recipe.get(name) is not None:
+                options[name] = recipe[name]
+        # Reject incompatible releases before loading either full ontology.
+        config = pyhermit.ReasonerConfig(**options)
         for side, path in paths.items():
             if result["ontologies"].get(side, {}).get("status") == "passed":
                 result["reused_ontologies"].append(side)
@@ -80,17 +97,8 @@ def run_diagnostic(recipe_path):
             )
             report.update(load_seconds=time.monotonic() - started, stage="native_compile")
             write(output / "admission.json", result)
-            options = {
-                "backend": "native",
-                "require_native_pipeline": True,
-                "timeout": None,
-                "workers": 1,
-                "max_memory_bytes": recipe["max_memory_bytes"],
-            }
-            if recipe.get("max_compile_work") is not None:
-                options["max_compile_work"] = recipe["max_compile_work"]
             started = time.monotonic()
-            reasoner = pyhermit.Reasoner(view, config=pyhermit.ReasonerConfig(**options))
+            reasoner = pyhermit.Reasoner(view, config=config)
             report.update(compile_seconds=time.monotonic() - started, stage="native_queries")
             write(output / "admission.json", result)
             if not reasoner.is_consistent():

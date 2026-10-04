@@ -451,7 +451,10 @@ def test_compile_work_allowance_rejects_invalid_values(allowance):
 
 
 def test_compile_resource_settings_are_explicit_and_native_hermit_only():
-    from exact.ontology.reasoning import reasoner_cache_identity, require_native_reasoner_support
+    from exact.ontology.reasoning import (
+        reasoner_cache_identity,
+        require_native_reasoner_support,
+    )
 
     settings = ReasonerSettings.from_value(
         {"backend": "native", "max_memory_bytes": 1024**3, "max_compile_work": 2**64 - 1}
@@ -462,3 +465,49 @@ def test_compile_resource_settings_are_explicit_and_native_hermit_only():
     assert "max_compile_work" not in reasoner_cache_identity("hermit")
     with pytest.raises(ValueError, match="native HermiT"):
         require_native_reasoner_support("elk", {"max_compile_work": 100})
+
+
+@pytest.mark.parametrize("allowance", [True, 0, -1, 1.5, 2**64])
+def test_native_symbol_allowance_rejects_invalid_values(allowance):
+    with pytest.raises(ValueError, match="positive u64"):
+        ReasonerSettings.from_value({"max_native_symbol_index_bytes": allowance})
+
+
+def test_native_symbol_allowance_partitions_cache_and_rejects_elk():
+    default = reasoning_module.reasoner_cache_identity("hermit")
+    assert "max_native_symbol_index_bytes" not in default
+    settings = {"max_native_symbol_index_bytes": 1024**3}
+    changed = reasoning_module.reasoner_cache_identity("hermit", settings)
+    assert changed.pop("max_native_symbol_index_bytes") == 1024**3
+    assert changed == default
+    with pytest.raises(ValueError, match="native HermiT"):
+        reasoning_module.require_native_reasoner_support("elk", settings)
+
+
+def test_loading_reasoner_preserves_resource_settings_with_overrides(reasoning_source, monkeypatch):
+    settings = ReasonerSettings(
+        max_memory_bytes=1024**3,
+        max_compile_work=2**64 - 1,
+        max_native_symbol_index_bytes=512 * 1024**2,
+    )
+    captured = []
+    monkeypatch.setattr(
+        reasoning_module,
+        "HermitHierarchyReasoner",
+        lambda source, selected: captured.append((source, selected)),
+    )
+    load_reasoner("hermit", reasoning_source, settings=settings, workers=2)
+    assert captured == [(reasoning_source, reasoning_module.replace(settings, workers=2))]
+
+
+def test_explicit_symbol_limit_reaches_native_configuration(monkeypatch):
+    import pyhermit
+
+    captured = []
+    monkeypatch.setattr(pyhermit, "ReasonerConfig", lambda **kwargs: captured.append(kwargs))
+    reasoning_module.require_native_reasoner_support(
+        "hermit", {"max_native_symbol_index_bytes": 1024**3}
+    )
+    assert captured[0]["max_native_symbol_index_bytes"] == 1024**3
+    assert captured[0]["require_native_pipeline"] is True
+    assert "max_compile_work" not in captured[0]

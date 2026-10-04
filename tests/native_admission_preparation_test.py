@@ -108,3 +108,49 @@ def test_preparation_drift_blocks_before_native_load(tmp_path, monkeypatch, arti
     with pytest.raises(ValueError):
         validate_native_owl.run_diagnostic(path)
     assert not (Path(recipe["output"]) / "completion.json").exists()
+
+
+def test_incompatible_resource_configuration_fails_before_loading(tmp_path, monkeypatch):
+    import pyhermit
+    import pyowl_core as core
+
+    path, recipe = _prepared(tmp_path)
+    recipe["max_compile_work"] = 2**64 - 1
+    write(path, recipe)
+
+    def config(**options):
+        assert options["max_compile_work"] == 2**64 - 1
+        raise TypeError("unsupported max_compile_work")
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("Incompatible configuration must fail before loading NCIT")
+
+    monkeypatch.setattr(pyhermit, "ReasonerConfig", config)
+    monkeypatch.setattr(core, "load_snapshot", forbidden)
+    with pytest.raises(TypeError, match="unsupported max_compile_work"):
+        validate_native_owl.run_diagnostic(path)
+    result = json.loads((Path(recipe["output"]) / "admission.json").read_text())
+    assert result["status"] == "failed" and result["ontologies"] == {}
+    assert not (Path(recipe["output"]) / "completion.json").exists()
+
+
+def test_explicit_index_limit_is_validated_and_bound_to_admission(tmp_path, monkeypatch):
+    import pyhermit
+
+    path, recipe = _prepared(tmp_path)
+    recipe["max_native_symbol_index_bytes"] = 128 * 1024**2
+    write(path, recipe)
+    original = pyhermit.ReasonerConfig
+    captured = []
+
+    def config(**options):
+        captured.append(options.pop("max_native_symbol_index_bytes"))
+        return original(**options)
+
+    monkeypatch.setattr(pyhermit, "ReasonerConfig", config)
+    assert validate_native_owl.run_diagnostic(path)["status"] == "passed"
+    assert captured == [128 * 1024**2]
+    recipe["max_native_symbol_index_bytes"] *= 2
+    write(path, recipe)
+    with pytest.raises(ValueError, match="admission identity changed"):
+        validate_native_owl.run_diagnostic(path)

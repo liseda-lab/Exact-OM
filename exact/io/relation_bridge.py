@@ -39,6 +39,7 @@ def native_bridge(
     checkpoint_path=None,
     max_memory_bytes=None,
     max_compile_work=None,
+    max_native_symbol_index_bytes=None,
     preparation_identity=None,
 ):
     import pyhermit
@@ -49,6 +50,7 @@ def native_bridge(
         ReasonerSettings,
         _create_hermit,
         reasoner_cache_identity,
+        require_native_reasoner_support,
     )
     from exact.ontology.store import OwlOntologySource
     from exact.utils.provenance import sha256_file
@@ -59,7 +61,9 @@ def native_bridge(
         workers=1,
         max_memory_bytes=max_memory_bytes,
         max_compile_work=max_compile_work,
+        max_native_symbol_index_bytes=max_native_symbol_index_bytes,
     )
+    require_native_reasoner_support("hermit", settings)
     # A path allows diagnostic admission without loading the two roots twice.
     origins = [
         (

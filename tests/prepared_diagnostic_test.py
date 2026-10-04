@@ -59,6 +59,7 @@ def test_dependency_validation_checks_both_nested_diagnostic_bindings(tmp_path, 
         "unexpected_preparation",
         "different_reasoning_input",
         "different_reasoning_import",
+        "different_resource_options",
     ],
 )
 def test_e14_requires_compatible_passed_admission_before_account_copy_or_execution(
@@ -80,6 +81,8 @@ def test_e14_requires_compatible_passed_admission_before_account_copy_or_executi
         report["installed_code"] = {**installed, "pyhermit": "old-code"}
     if admission_state == "different_input":
         report["inputs"] = {**owl, "target": {**owl["target"], "sha256": "0" * 64}}
+    if admission_state == "different_resource_options":
+        report["resource_options"] = {"max_native_symbol_index_bytes": 1024**3}
     preparation = {"path": str(tmp_path / "preparation.json"), "sha256": "a" * 64}
     uses_preparation = admission_state in {
         "prepared_passed",

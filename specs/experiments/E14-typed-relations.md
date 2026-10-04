@@ -73,6 +73,29 @@ No individual experiment uses final outcomes to qualify its component for E17.
   are prerequisites for comparison execution; no native package policy change is required.
   Report prepared-input reasoning distinctly from admission of the unmodified original.
 
+### Published reasoner integration — 2026-10-04
+
+The user authorized installation of published pyHermiT after merging its resource-limit PR.
+Version 0.2.2 is installed in a new isolated E14 environment; existing workers and packages
+remain unchanged. Its explicit `max_native_symbol_index_bytes` must be passed to admission
+and bridge execution: omission still means 64 MiB. Exact now binds this setting to cache and
+admission identities, checks configuration compatibility before native loading, and preserves
+all resource settings when applying loader overrides.
+
+**Full admission remains blocked.** The published release omits the earlier compiler work
+and memory fixes from the E14 candidate: `max_compile_work` is unsupported, with independent
+2-billion-work and 512 MiB compiler/profile defaults. The candidate receipt records prior
+NCIT failure at the work limit. Do not drop that option or repeat full admission with a known
+incompatible release. A corrective upstream PR must preserve published default behavior,
+strict reasoning and existing constructor/cache/pickle compatibility. After its publication,
+prepare a fresh bound admission and dependent bridge comparison with identical input and
+resource identities. Retain the completed main E14 treatments and all failed-attempt costs.
+
+Local integration verification: 99 focused tests pass with published 0.2.2 and 99 with the
+unchanged main 0.2.1 environment. This establishes integration/fixture behavior, not full
+NCIT admission or a bridge result. Evidence is in
+`data/experiments-v2/e14-pyhermit-20261004-01/`.
+
 Durable boundaries: **Typed train features/heads, bridge queries, typed predictions.**
 All changed inputs/semantics invalidate their consuming descendants; preserve valid upstream
 artifacts. Store completed source/request/fold IDs and attempt lineage. Tests must demonstrate

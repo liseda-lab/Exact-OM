@@ -128,9 +128,21 @@ def run_prepared_diagnostic(recipe_path, registry):
             or admission.get("inputs") != protocol["owl"]
             or admission.get("imports") != protocol["imports"]
             or admission.get("installed_code") != ontology_execution_identity("hermit")
+            or admission.get("resource_options", {})
+            != {
+                name: protocol[name]
+                for name in (
+                    "max_memory_bytes",
+                    "max_compile_work",
+                    "max_native_symbol_index_bytes",
+                )
+                if protocol.get(name) is not None
+            }
             or not reasoning_matches
         ):
-            raise ValueError("Native admission does not match the current originals and packages")
+            raise ValueError(
+                "Native admission does not match the current originals and packages/resources"
+            )
     runtime = root / "runtime" / recipe["campaign_id"]
     parent, state = latest_account(registry)
     launch_path = root / "launch.json"

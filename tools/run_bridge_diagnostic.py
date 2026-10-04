@@ -173,6 +173,7 @@ def run_diagnostic(recipe_path):
         timeout_seconds=recipe["timeout_seconds"],
         max_memory_bytes=recipe["max_memory_bytes"],
         max_compile_work=recipe.get("max_compile_work"),
+        max_native_symbol_index_bytes=recipe.get("max_native_symbol_index_bytes"),
         import_map=imports,
         checkpoint_path=output / "native-checkpoint.json",
         preparation_identity=preparation,

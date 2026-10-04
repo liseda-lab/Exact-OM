@@ -94,6 +94,29 @@ def test_bridge_comparison_rejects_test_reference_binding(tmp_path):
         diagnostic.run_diagnostic(path)
 
 
+def test_bridge_index_allowance_reaches_config_and_invalidates_checkpoint(tmp_path, monkeypatch):
+    import pyhermit
+
+    path, recipe = _fixture(tmp_path)
+    recipe["max_native_symbol_index_bytes"] = 128 * 1024**2
+    path.write_text(json.dumps(recipe))
+    original = pyhermit.ReasonerConfig
+    captured = []
+
+    def config(**options):
+        captured.append(options.pop("max_native_symbol_index_bytes"))
+        return original(**options)
+
+    monkeypatch.setattr(pyhermit, "ReasonerConfig", config)
+    result = diagnostic.run_diagnostic(path)
+    assert result["native"]["by_relation"]["<"]["tp"] == 1
+    assert captured and set(captured) == {128 * 1024**2}
+    recipe["max_native_symbol_index_bytes"] *= 2
+    path.write_text(json.dumps(recipe))
+    with pytest.raises(ValueError, match="checkpoint inputs or implementation changed"):
+        diagnostic.run_diagnostic(path)
+
+
 def test_bridge_comparison_detects_inputs_changing_during_native_work(tmp_path, monkeypatch):
     path, recipe = _fixture(tmp_path)
     original = diagnostic.native_bridge
