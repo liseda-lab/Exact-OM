@@ -3,8 +3,7 @@ import copy
 import pytest
 
 from tools.prepared_batch import binding
-from tools.recover_hosted_spending import _ALLOWED, verify_code
-from tools.recover_training_retention import verify_identity
+from tools.recover_hosted_spending import _ALLOWED, verify_code, verify_identity
 
 
 def _sources(tmp_path):
@@ -68,7 +67,7 @@ def test_checkpoint_cannot_cross_input_config_seed_or_role(field):
     )
     expected = copy.deepcopy(original)
     expected.update(artifact_id="new", implementation={"files": {"new": "sha"}})
-    verify_identity(original, expected, original["implementation"], stage="extraction")
+    verify_identity(original, expected, original["implementation"])
     expected[field] = "changed"
     with pytest.raises(ValueError, match="identity differs"):
-        verify_identity(original, expected, original["implementation"], stage="extraction")
+        verify_identity(original, expected, original["implementation"])

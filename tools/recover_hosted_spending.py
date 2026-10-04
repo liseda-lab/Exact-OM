@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 from dataclasses import replace
 from pathlib import Path
 
@@ -38,6 +39,16 @@ def verify_code(old_code, code, repair):
         if old != new:
             raise ValueError("Scientific implementation changed outside the accounting amendment")
     return before
+
+
+def verify_identity(saved, expected, old_impl):
+    target = copy.deepcopy(expected)
+    target.pop("artifact_id")
+    target["implementation"] = old_impl
+    source = dict(saved)
+    source.pop("artifact_id")
+    if source != target:
+        raise ValueError("Checkpoint input/config/role/seed identity differs")
 
 
 def _cells(recipe, campaign, runtime):
@@ -86,7 +97,6 @@ def import_saved(recipe, campaign, runtime, code, *, verify_only=False):
     from exact.experiments import harness
     from exact.experiments.recovery import ArtifactStore
     from exact.experiments.runtime import CellRecovery
-    from tools.recover_training_retention import verify_identity
 
     settings = recipe["hosted_spending_repair"]
     completion = read(verified(settings["source_completion"]))
@@ -136,9 +146,7 @@ def import_saved(recipe, campaign, runtime, code, *, verify_only=False):
         raise ValueError("Checkpoint binding is outside its source artifact")
     if source.latest_checkpoint(artifact_id) != payload:
         raise ValueError("Bound checkpoint is not the latest verified saved boundary")
-    verify_identity(
-        payload["identity"], recovery.identities["extraction"], old_impl, stage="extraction"
-    )
+    verify_identity(payload["identity"], recovery.identities["extraction"], old_impl)
     parent = source.verify(recovery.identities["inputs"]["artifact_id"])
     if parent["identity"] != recovery.identities["inputs"]:
         raise ValueError("Checkpoint inputs changed")
