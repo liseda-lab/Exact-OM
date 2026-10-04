@@ -446,7 +446,9 @@ def test_typed_generation_records_are_actual_pipeline_output_and_roundtrip(tmp_p
     result = bounded_freeze_neural_round(
         problem,
         model,
-        seconds=30,
+        # This checks typed records and roundtrip integrity, not generation speed.
+        # Keep a finite startup allowance matching the transport fixture above.
+        seconds=120,
         draws_per_object=3,
         proposal_arm="grammar_uniform",
         max_depth=0,
