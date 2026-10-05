@@ -422,3 +422,24 @@ and spent-budget reconciliation before continuation. Receipt and coverage review
 training-only supervised acquisition, optimizer capacity, eighteen fitting protocols,
 generated development selection, held-out matched semantic controls and final
 reporting remain registered. This experiment does not establish research gates.
+
+## Common-inventory receipt and selected-value audit
+
+After the 36 diagnostic slices, a separately frozen receipt audit retains all
+576 rows, 64 cases, 32 parents and nine arms. It authenticates the 26-test native
+validation, all 39 validation/original/replacement attempts, nonce-bound ownership,
+frozen source/runtime, output manifests, selected assignments, labels, objectives,
+query identities and settled charges. The slice-17 cleanup row remains unknown;
+the slice-22 published verification timeout retains unavailable outer telemetry.
+Neither spent row is replayed, and both failed attempts remain charged.
+
+Selected-only value errors are recomputed from saved quantized objectives and
+usable selected labels. Their conditional denominators accompany every arm and
+family summary; they are not whole-inventory calibration or external semantic
+regret. The original worker did not persist per-obligation native label traces;
+this limitation stays explicit. Typed nonvacuity can be derived when undeclared,
+while the original basis still contains no unwanted probes. Receipt integrity
+makes no new native call and does not establish intended-parent truth, strongest
+symbolic comparisons, G0-G2 or learning efficiency. Intended-parent/query
+qualification, required semantic-control review and the failure-inclusive final
+parent-group report remain registered obligations after this audit.
