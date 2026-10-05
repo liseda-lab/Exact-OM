@@ -23,6 +23,7 @@ from exact.impl.models.selector.listwise_llm import (
     listwise_labels,
     transform_listwise_probabilities,
 )
+from exact.llm.prompt_budget import PromptBudgetError
 from exact.llm.routing import extract_chat_text, extract_first_token_top_logprobs
 
 
@@ -560,6 +561,8 @@ class SemanticLLMMixin:
             result["passed"] = True
             result["provider"] = payload.get("provider")
             result["label_ids"] = label_ids
+        except PromptBudgetError:
+            raise
         except (RuntimeError, ValueError, KeyError, OSError, urlerror.URLError) as exc:
             result["error"] = str(exc)
             if payload is not None:
@@ -1213,6 +1216,8 @@ class SemanticLLMMixin:
                                     provider={"require_parameters": True},
                                     seed=self.request_seed,
                                 )
+                            except PromptBudgetError:
+                                raise
                             except Exception as exc:
                                 prompt_sha1 = self._record_hosted_decision_request_debug(
                                     profile.name,
@@ -1267,6 +1272,8 @@ class SemanticLLMMixin:
                                 for payload, probability in zip(payloads, outputs)
                             )
                         return torch.tensor(outputs, dtype=torch.float32, device=self.device)
+                    except PromptBudgetError:
+                        raise
                     except (RuntimeError, ValueError, KeyError, OSError, urlerror.URLError) as exc:
                         if os.getenv("EXACT_EXPERIMENT_MODE") == "1" or getattr(
                             self, "llm_experiment_enabled", False

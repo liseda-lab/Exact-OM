@@ -22,6 +22,7 @@ import pandas as pd  # noqa: F401
 import torch  # noqa: F401
 
 from exact.core.contracts.model import IModel
+from exact.llm.prompt_budget import PromptBudgetError
 from exact.utils.data import read_table  # noqa: F401
 from exact.utils.formatting import (  # noqa: F401
     clip01,
@@ -459,6 +460,8 @@ class AcceptanceMixin:
         try:
             text = self._run_llm_prompt(primary_model, prompt)
             payload = self._parse_llm_payload(text)
+        except PromptBudgetError:
+            raise
         except Exception as exc:  # noqa: BLE001
             if not self._llm_warning_logged:
                 self._log(
@@ -532,6 +535,8 @@ class AcceptanceMixin:
         try:
             text = self._run_llm_prompt(primary_model, prompt)
             payload = self._parse_llm_payload(text)
+        except PromptBudgetError:
+            raise
         except Exception as exc:  # noqa: BLE001
             if not self._llm_warning_logged:
                 self._log(

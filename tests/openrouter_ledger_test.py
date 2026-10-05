@@ -181,6 +181,8 @@ def test_experiment_mode_disables_profile_fallback_and_checks_response_identity(
     tmp_path, monkeypatch
 ):
     monkeypatch.setenv("EXACT_EXPERIMENT_MODE", "1")
+    # This test isolates response identity; prompt admission has its own boundary tests.
+    monkeypatch.setattr("exact.llm.routing.validate_prompt_budget", lambda *args, **kwargs: {})
     local = LLMRouter(
         llm_profiles={"local": {"backend": "local_hf", "model": "model"}},
         llm_routing={"default_profile": "local"},

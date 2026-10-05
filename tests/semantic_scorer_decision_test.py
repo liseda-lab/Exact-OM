@@ -1,4 +1,5 @@
 import importlib.util
+import json
 import sqlite3
 from pathlib import Path
 from types import SimpleNamespace
@@ -154,7 +155,10 @@ def test_binary_teacher_retains_ordered_costs_without_changing_prompts(monkeypat
 
 
 def test_binary_exemplars_reach_hosted_prompt_and_reject_training_query(monkeypatch):
-    from exact.impl.models.selector.llm_learning import teacher_identity
+    from exact.impl.models.selector.llm_learning import (
+        EXEMPLAR_RENDERING,
+        teacher_identity,
+    )
 
     monkeypatch.setenv("EXACT_EXPERIMENT_MODE", "1")
     scorer = _hosted_scorer()
@@ -169,8 +173,12 @@ def test_binary_exemplars_reach_hosted_prompt_and_reject_training_query(monkeypa
     scorer._llm_router.profiles["hosted"].backend = "openrouter"
     scorer._llm_router.profiles["hosted"].revision = "fixture-revision"
     scorer._attached_dataset = SimpleNamespace(dataset_signature="fixture")
+    scorer._get_hosted_decision_tokenizer = lambda profile: SimpleNamespace(
+        encode=lambda text, **kwargs: list(range((len(text) + 3) // 4))
+    )
     scorer._exemplar_artifact = {
         "schema_version": 1,
+        "exemplar_rendering": dict(EXEMPLAR_RENDERING),
         "training_sources": ["train1", "train2", "train3", "train4"],
         "application": {"dataset_signature": "fixture"},
         "teacher_binding": teacher_identity(scorer),
@@ -179,7 +187,19 @@ def test_binary_exemplars_reach_hosted_prompt_and_reject_training_query(monkeypa
                 "source": source,
                 "features": [0.6, 0.6, 0.0, 1.0],
                 "candidates": [
-                    {"target": source + "target", "equivalent": True, "evidence": "training fact"}
+                    {
+                        "target": source + "target",
+                        "equivalent": True,
+                        "evidence": json.dumps(
+                            {
+                                "source_label": source,
+                                "target_label": source + "target",
+                                "facts": [
+                                    {"side": "source", "triple": [source, "is", "training fact"]}
+                                ],
+                            }
+                        ),
+                    }
                 ],
             }
             for source in ["train1", "train2", "train3", "train4"]
@@ -202,6 +222,38 @@ def test_binary_exemplars_reach_hosted_prompt_and_reject_training_query(monkeypa
     with pytest.raises(ValueError, match="overlaps training"):
         scorer.llm_binary_decision_probs(["train1"], ["target"], ["src"], ["tgt"], ["facts"], [0.6])
     assert len(seen) == 1
+    scorer._exemplar_artifact.pop("exemplar_rendering")
+    with pytest.raises(ValueError, match="rendering identity changed"):
+        scorer.llm_binary_decision_probs(
+            ["heldout"], ["target"], ["src"], ["tgt"], ["facts"], [0.6]
+        )
+    assert len(seen) == 1
+
+
+@pytest.mark.parametrize("experiment_mode", ["0", "1"])
+@pytest.mark.parametrize("stage", ["probe", "decision"])
+def test_prompt_budget_errors_propagate_without_fallback_or_error_wrapping(
+    monkeypatch, experiment_mode, stage
+):
+    from exact.llm.prompt_budget import PromptBudgetError
+
+    monkeypatch.setenv("EXACT_EXPERIMENT_MODE", experiment_mode)
+    scorer = _hosted_scorer()
+    scorer.llm_experiment_enabled = False
+    error = PromptBudgetError("fixture oversized input")
+
+    def fail(**kwargs):
+        raise error
+
+    scorer._llm_router.hosted.chat_completion = fail
+    if stage == "probe":
+        scorer._probe_hosted_decision_profile = (
+            SemanticScorer._probe_hosted_decision_profile.__get__(scorer)
+        )
+    with pytest.raises(PromptBudgetError) as caught:
+        scorer.llm_yesno_probs_batched(["src"], ["tgt"], ["src summary"], ["tgt summary"])
+    assert caught.value is error
+    assert scorer.llm_decision_stats()["local_fallbacks"] == 0
 
 
 def test_binary_teacher_rejects_unobserved_probabilities(monkeypatch):

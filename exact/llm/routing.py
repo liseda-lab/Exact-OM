@@ -12,11 +12,12 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from time import monotonic
-from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
 
 import httpx
 
 from exact.llm.ledger import RequestLedger
+from exact.llm.prompt_budget import validate_prompt_budget
 from exact.utils.formatting import strip_code_fences
 
 DEFAULT_OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
@@ -275,6 +276,7 @@ class OpenRouterClient:
         headers: Optional[Dict[str, str]] = None,
         payload: Optional[Dict[str, Any]] = None,
         timeout_secs: float = 60.0,
+        before_attempt: Optional[Callable[[], Any]] = None,
     ) -> Dict[str, Any]:
         model = None
         provider = None
@@ -295,6 +297,8 @@ class OpenRouterClient:
                 raise RuntimeError(details) from exc
 
         for attempt in range(self.max_retries + 1):
+            if before_attempt is not None:
+                before_attempt()
             try:
                 response = self._client.request(
                     method=method,
@@ -519,9 +523,12 @@ class OpenRouterClient:
         strict = os.getenv("EXACT_EXPERIMENT_MODE") == "1"
         if strict:
             payload["provider"] = {**(payload.get("provider") or {}), "allow_fallbacks": False}
+        # Validate the final sanitized payload serialized on every wire attempt.
+        payload = _sanitize_json_payload(payload)
         directory = self.ledger_dir or os.getenv("EXACT_OPENROUTER_LEDGER_DIR")
         url = f"{profile.api_base}/{endpoint}"
         if not directory:
+            assessment = validate_prompt_budget(profile, payload, endpoint, role=role)
             api_key = self.resolve_api_key(profile)
             if not api_key:
                 raise RuntimeError(f"Missing OpenRouter API key for profile '{profile.name}'.")
@@ -531,6 +538,15 @@ class OpenRouterClient:
                 headers=_json_headers(api_key=api_key, extra=profile.extra_headers),
                 payload=payload,
                 timeout_secs=profile.timeout_secs,
+                **(
+                    {
+                        "before_attempt": lambda: validate_prompt_budget(
+                            profile, payload, endpoint, role=role
+                        )
+                    }
+                    if assessment is not None
+                    else {}
+                ),
             )
         ledger = RequestLedger(Path(directory))
         identity = {
@@ -563,6 +579,9 @@ class OpenRouterClient:
             cached = ledger.cached(key)
             if cached is not None:
                 return decode(cached)
+            # Replay remains free even when an older request exceeds today's cap.
+            # Rejection precedes sent/unknown states and paid retry authorization.
+            validate_prompt_budget(profile, payload, endpoint, role=role)
             api_key = self.resolve_api_key(profile)
             if not api_key:
                 raise RuntimeError(f"Missing OpenRouter API key for profile '{profile.name}'.")
@@ -571,6 +590,7 @@ class OpenRouterClient:
                 self.retry_unknown_requests or os.getenv("EXACT_OPENROUTER_RETRY_UNKNOWN") == "1"
             )
             for retry in range(self.max_retries + 1):
+                validate_prompt_budget(profile, payload, endpoint, role=role)
                 number = ledger.sent(key, retry_unknown=allow_unknown)
                 started = monotonic()
                 try:

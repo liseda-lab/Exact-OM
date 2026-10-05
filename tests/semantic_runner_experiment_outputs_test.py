@@ -326,7 +326,6 @@ def test_runner_persists_deduplicated_sanitized_llm_backend_provenance(
         "request_seed": 17,
         "request_time": "2026-08-28T12:00:00+00:00",
         "decoding": {
-            "max_input_tokens": 256,
             "max_tokens": 32,
             "temperature": 0.2,
             "top_p": 0.8,
@@ -481,3 +480,37 @@ def test_runner_marks_missing_llm_token_totals_unavailable_without_inferring_the
             "observation_count": 2,
             "reported_observations": 0,
         }
+
+
+def test_hosted_decoding_reports_actual_admission_policy(tmp_path, monkeypatch):
+    policy = tmp_path / "prompt-policy.json"
+    policy.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "max_input_tokens": 12288,
+                "max_input_bytes": 32768,
+                "max_output_tokens": 1024,
+                "chat_overhead_tokens": 128,
+            }
+        )
+    )
+    digest = hashlib.sha256(policy.read_bytes()).hexdigest()
+    monkeypatch.setenv("EXACT_LLM_PROMPT_POLICY_PATH", str(policy))
+    monkeypatch.setenv("EXACT_LLM_PROMPT_POLICY_SHA256", digest)
+    runner = SemanticAlignmentRunner(
+        dataset=_FixtureDataset(),
+        model=_BackendUsageModel,
+        device=torch.device("cpu"),
+        output_dir=tmp_path / "metadata",
+    )
+    for task in ("decision", "summary", "rationale"):
+        hosted = runner._llm_decoding_defaults(task, "openrouter")
+        assert "max_input_tokens" not in hosted
+        assert hosted["input_admission_tokens"] == 12288
+        assert hosted["max_input_bytes"] == 32768
+        assert hosted["prompt_policy_sha256"] == digest
+        assert hosted["provider_exact_token_count"] is False
+        local = runner._llm_decoding_defaults(task, "local_hf")
+        assert local["max_input_tokens"] in {256, 384, 512}
+        assert "prompt_policy_sha256" not in local

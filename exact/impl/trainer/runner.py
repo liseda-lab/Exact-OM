@@ -451,6 +451,20 @@ class SemanticAlignmentRunner(
             decoding["top_p"] = getattr(model, "llm_top_p", None)
             if backend != "openrouter":
                 decoding["do_sample"] = getattr(model, "llm_do_sample", None)
+        if backend == "openrouter":
+            # Local generation truncation limits never bounded hosted messages.
+            from exact.llm.prompt_budget import load_prompt_budget_policy
+
+            decoding.pop("max_input_tokens", None)
+            selected = load_prompt_budget_policy(required=False)
+            if selected is not None:
+                policy = selected["policy"]
+                decoding.update(
+                    input_admission_tokens=policy["max_input_tokens"],
+                    max_input_bytes=policy["max_input_bytes"],
+                    prompt_policy_sha256=selected["sha256"],
+                    provider_exact_token_count=False,
+                )
         return {key: value for key, value in decoding.items() if value is not None}
 
     def _enrich_llm_backend_metadata(
