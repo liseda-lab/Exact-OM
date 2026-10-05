@@ -599,3 +599,21 @@ The final readiness worker and its preparation are charged separately. Its
 successful process receipt must be authenticated before the local training
 preparation slot closes. The consolidated preliminary report still owns overall
 scope completion, cumulative accounting and the existing deduplicated idle email.
+
+## Robustness activation-sensitive final removal recovery
+
+Schema slice 132 stopped after twelve saved rows when its thirteenth row's
+predeclared final-pool target carried a `keep` tag but added a nonvacuity
+activation to the original axioms. Action tags describe derivations; canonical
+bundle identity includes both axioms and activations. The correction protects
+only the unchanged original bundle with no activation, while preserving the
+frozen removal targets and final exclusion across every producer.
+
+A separately frozen recovery retains all thirteen original receipts and the
+generation-error payload. The spent thirteenth row remains unknown without
+replay; only the three untouched rows continue. Unstarted slices 133–180 use
+the same one-file correction with unchanged schedules, models and scientific
+budgets; superseded descriptors and both source identities remain bound.
+Original errors, all costs, all 2,880 scheduled rows and the same-cause retry
+limit remain. This corrects execution and does not establish scientific gates
+or semantic quality. Final reporting must identify the implementation revision.

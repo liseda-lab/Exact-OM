@@ -513,6 +513,7 @@ def freeze_neural_round(
     from .candidates import (
         budget_candidates,
         deduplicate_candidates,
+        make_candidate,
         materialize_retrieved_endpoints,
     )
     from .retrieval import retrieve_vocabulary
@@ -813,7 +814,13 @@ def freeze_neural_round(
                             "preserved candidate violates the effective nested generation language"
                         )
                 offered = deduplicate_candidates((*offered, *preserved))
-                if any("keep" in c.action_tags and c.candidate_id in removed for c in offered):
+                # Action tags describe derivations and can alias activated or
+                # changed bundles. Only the original axioms without activation
+                # constitute the unchanged mandatory state.
+                unchanged_id = make_candidate(
+                    obj.object_id, obj.original_axioms, ("keep",)
+                ).candidate_id
+                if unchanged_id in removed:
                     raise ValueError(
                         "evaluator removal cannot remove the unchanged mandatory state"
                     )
