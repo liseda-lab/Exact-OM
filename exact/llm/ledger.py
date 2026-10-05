@@ -17,7 +17,12 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Iterator, Mapping
 
-from exact.utils.hosted_spending import load_spending_policy
+from exact.llm.spending_admission import (
+    HostedSpendingError,
+    reserve_attempt,
+    selected_policy,
+    settle_attempt,
+)
 
 
 def request_identity(payload: Mapping[str, Any]) -> tuple[str, str]:
@@ -87,6 +92,8 @@ class RequestLedger:
                 db.execute("ALTER TABLE attempts ADD COLUMN elapsed_seconds REAL")
             if "spending_policy_sha256" not in columns:
                 db.execute("ALTER TABLE attempts ADD COLUMN spending_policy_sha256 TEXT")
+            if "spending_grant_id" not in columns:
+                db.execute("ALTER TABLE attempts ADD COLUMN spending_grant_id TEXT")
 
     @contextmanager
     def _transaction(self) -> Iterator[sqlite3.Connection]:
@@ -153,7 +160,7 @@ class RequestLedger:
 
     def sent(self, key: str, *, retry_unknown: bool = False) -> int:
         """Claim one wire attempt; duplicate active writers and unapproved retries fail."""
-        policy = load_spending_policy()
+        policy = selected_policy()
         with self._transaction() as db:
             if db.execute("SELECT 1 FROM requests WHERE request_id=?", (key,)).fetchone() is None:
                 raise ValueError("Request was not planned")
@@ -185,9 +192,18 @@ class RequestLedger:
             request_cap = os.getenv("EXACT_OPENROUTER_REQUEST_CAP")
             token_cap = os.getenv("EXACT_OPENROUTER_TOKEN_CAP")
             if request_cap or token_cap or policy:
-                rows = db.execute(
-                    "SELECT a.usage,r.tokens FROM attempts a LEFT JOIN reservations r USING(request_id,number)"
-                ).fetchall()
+                # Shared v2 accounting already imports historical exposure once.
+                # Copied local histories are caches, not the campaign authority.
+                rows = (
+                    db.execute(
+                        "SELECT a.usage,r.tokens FROM attempts a LEFT JOIN reservations r "
+                        "USING(request_id,number)"
+                    ).fetchall()
+                    if request_cap
+                    or token_cap
+                    or (policy and policy["policy"]["schema_version"] == 1)
+                    else []
+                )
                 if request_cap and len(rows) + 1 > int(request_cap):
                     raise ValueError("OpenRouter request budget exhausted before transmission")
                 identity = json.loads(
@@ -199,10 +215,17 @@ class RequestLedger:
                 if type(payload.get("max_tokens")) is not int or payload["max_tokens"] <= 0:
                     raise ValueError("Budgeted hosted requests need a finite max_tokens bound")
                 # UTF-8 bytes bound text token counts conservatively; include framing overhead.
+                prompts = payload.get("prompt")
+                batch_size = len(prompts) if isinstance(prompts, list) else 1
+                choices = payload.get("n", 1)
+                if type(choices) is not int or choices < 1 or batch_size < 1:
+                    raise ValueError(
+                        "Budgeted requests require finite positive output multiplicity"
+                    )
                 reserved = (
                     len(json.dumps(payload, ensure_ascii=False).encode())
-                    + 256
-                    + int(payload["max_tokens"])
+                    + 256 * batch_size
+                    + int(payload["max_tokens"]) * batch_size * choices
                 )
                 used = 0
                 for row in rows:
@@ -230,9 +253,18 @@ class RequestLedger:
                     "INSERT OR IGNORE INTO spending_policies VALUES (?,?)",
                     (policy["sha256"], record),
                 )
+            central_grant = None
+            if policy and policy["policy"]["schema_version"] == 2:
+                central_grant = reserve_attempt(
+                    policy,
+                    tokens=reserved,
+                    request_id=key,
+                    local_ledger=str(self.path.resolve()),
+                    attempt=number,
+                )
             db.execute(
-                "INSERT INTO attempts(request_id,number,state,pid,host,spending_policy_sha256) "
-                "VALUES (?,?,?,?,?,?)",
+                "INSERT INTO attempts(request_id,number,state,pid,host,spending_policy_sha256,spending_grant_id) "
+                "VALUES (?,?,?,?,?,?,?)",
                 (
                     key,
                     number,
@@ -240,6 +272,7 @@ class RequestLedger:
                     os.getpid(),
                     socket.gethostname(),
                     policy["sha256"] if policy else None,
+                    central_grant,
                 ),
             )
             if grant is not None:
@@ -315,6 +348,19 @@ class RequestLedger:
     def usage(self, key: str, number: int, usage: Mapping[str, Any]) -> None:
         """Record provider-reported actual usage without inventing missing prices."""
         with self._transaction() as db:
+            attempt = db.execute(
+                "SELECT spending_grant_id,spending_policy_sha256 FROM attempts "
+                "WHERE request_id=? AND number=?",
+                (key, number),
+            ).fetchone()
+            if attempt is not None and attempt["spending_grant_id"]:
+                retained = db.execute(
+                    "SELECT record FROM spending_policies WHERE sha256=?",
+                    (attempt["spending_policy_sha256"],),
+                ).fetchone()
+                if retained is None:
+                    raise HostedSpendingError("Central spending grant lacks its retained policy")
+                settle_attempt(json.loads(retained["record"]), attempt["spending_grant_id"], usage)
             db.execute(
                 "UPDATE attempts SET usage=? WHERE request_id=? AND number=?",
                 (json.dumps(dict(usage), sort_keys=True), key, number),

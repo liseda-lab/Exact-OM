@@ -18,6 +18,7 @@ import httpx
 
 from exact.llm.ledger import RequestLedger
 from exact.llm.prompt_budget import validate_prompt_budget
+from exact.llm.spending_admission import HostedSpendingError, selected_policy
 from exact.utils.formatting import strip_code_fences
 
 DEFAULT_OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
@@ -528,6 +529,11 @@ class OpenRouterClient:
         directory = self.ledger_dir or os.getenv("EXACT_OPENROUTER_LEDGER_DIR")
         url = f"{profile.api_base}/{endpoint}"
         if not directory:
+            spending = selected_policy()
+            if spending and spending["policy"]["schema_version"] == 2:
+                raise HostedSpendingError(
+                    "Hard-pause hosted policy requires a durable request ledger"
+                )
             assessment = validate_prompt_budget(profile, payload, endpoint, role=role)
             api_key = self.resolve_api_key(profile)
             if not api_key:
