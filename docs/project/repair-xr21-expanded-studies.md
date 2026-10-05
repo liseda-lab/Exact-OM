@@ -317,3 +317,15 @@ superseded descriptors are preserved. Completed and active workers retain their
 original exports. The final report must identify this implementation revision,
 keep all 2,880 rows and report unknowns; no gate or semantic-quality claim follows
 from the repair.
+
+The twenty-second common-inventory slice stopped while hashing an unreadable
+atomic-write temporary after ten finished rows and a published verification-timeout
+result. Its separately frozen manifest adapter binds the original execution,
+guard, published payloads, temporary-file metadata and departed ownership. It
+retains that UNKNOWN result without replay and records unavailable outer-call
+telemetry explicitly; original attempt costs remain charged. Only the five
+untouched rows continue with the original scientific export and case budgets.
+Call telemetry is persisted before artifact collection, and temporary debris is
+inventoried without reading or changing it; published artifacts still require
+hash validation. The full sixteen-row slice and 576-row diagnostic denominator
+remain, with no new semantic-quality, gate or learning-efficiency claim.
