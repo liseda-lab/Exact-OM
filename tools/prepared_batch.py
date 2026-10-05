@@ -1019,8 +1019,13 @@ export PYTHONPATH={shlex.quote(str(code))}
         },
     }
     from tools.storage_guard import guard_launch
+    from tools.hosted_prompt_guard import guard_launch as guard_hosted_launch
 
-    descriptor = guard_launch(descriptor, read(supervisor / "policy.json"), supervisor)
+    policy = read(supervisor / "policy.json")
+    descriptor = guard_launch(descriptor, policy, supervisor)
+    descriptor = guard_hosted_launch(
+        descriptor, policy, recipe_path=recipe_path, receipt_path=root / "hosted-prompt-guard.json"
+    )
     write(root / "launch-descriptor.json", descriptor, immutable=True)
     status(root, "prepared_waiting_dependencies", dependencies=batch["depends_on"])
     return descriptor

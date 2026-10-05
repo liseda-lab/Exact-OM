@@ -30,7 +30,7 @@ from exact.experiments.supervision import (  # noqa: E402
     pending_batches,
 )
 
-from tools import storage_guard  # noqa: E402
+from tools import hosted_prompt_guard, storage_guard  # noqa: E402
 
 RESULT_SCHEMA = {
     "type": "object",
@@ -421,6 +421,11 @@ def notification_worker(directory, policy, stop_event):
         stop_event.wait(15)
 
 
+def validate_prepared_launch(launch, policy, directory):
+    storage_guard.validate_launch(launch, policy, directory)
+    hosted_prompt_guard.validate_launch(launch, policy)
+
+
 def dispatch_worker(directory, policy, stop_event):
     """Lightweight prepared handoffs continue even while a repair model is busy."""
     while not stop_event.is_set():
@@ -428,7 +433,7 @@ def dispatch_worker(directory, policy, stop_event):
             result = dispatch_ready(
                 directory, policy["allocation"], slurm_steps(policy["allocation"]),
                 supervisor_step=os.environ.get("SLURM_STEP_ID"),
-                validate_launch=lambda launch: storage_guard.validate_launch(launch, policy, directory),
+                validate_launch=lambda launch: validate_prepared_launch(launch, policy, directory),
             )
             write(directory / "dispatch-status.json", {**result, "checked_at": timestamp()})
         except Exception as exc:
@@ -662,6 +667,8 @@ def validate_policy(policy):
         )
     if policy.get("storage_guard") is not None:
         storage_guard.validate_policy(policy["storage_guard"])
+    if policy.get("hosted_prompt_guard") is not None:
+        hosted_prompt_guard.validate_policy(policy["hosted_prompt_guard"])
     milestone = policy.get("hosted_spending_milestone")
     if milestone is not None and (
         not isinstance(milestone, dict)
