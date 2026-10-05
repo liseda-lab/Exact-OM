@@ -284,3 +284,12 @@ Local verification: 15 installed-wheel resource cases and tiny native/checkpoint
 started. The GitHub matrix's missing-native-core prerequisite is being repaired separately;
 local fixture success does not establish release readiness. Monitor the two queued roots
 named above after E21 finishes. No long validation monitoring or supervisor restart is needed.
+
+CI follow-up: pyHermiT PR2 commit `e666050` repairs only the test prerequisite and separates
+its mandatory 15 native resource cases from the original compatibility phase. Package source
+and build metadata remain identical to the queued `d8d7a2f` candidate. Local checks passed:
+21 packaging/helper tests on Python 3.12, nine helper tests on 3.10, the 15 installed resource
+cases and a fresh native-core receipt probe. The actual missing-native source-build path
+and hosted matrix still await CI verification; no publication/merge was performed.
+Evidence: `e14-pr2-validation-20261005-01/evidence/ci-review.json`, also bound by the registry's
+priority-validation record. Existing candidate wheel, environment and receipts are unchanged.
