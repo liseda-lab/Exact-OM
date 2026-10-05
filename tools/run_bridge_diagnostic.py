@@ -13,6 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from exact.core.entities.kinds import EntityKind  # noqa: E402
 from exact.experiments.relation_metrics import relation_metrics  # noqa: E402
+from exact.io.relation_bridge import _digest as bridge_query_key  # noqa: E402
 from exact.io.relation_bridge import native_bridge  # noqa: E402
 from exact.io.relations import _semantic_entailment  # noqa: E402
 from exact.io.sources.csv_kg import create_source  # noqa: E402
@@ -102,6 +103,66 @@ def anchor_records(frame):
     ]
 
 
+def validate_native_queries(pairs, checkpoint, coherence):
+    """Require native query evidence, including identity-checked resumed observations."""
+    receipt = {"status": "failed", "query_count": len(pairs), "directed_queries": 0}
+    path = checkpoint.parent / "native-validation.json"
+    try:
+        expected = {
+            bridge_query_key((str(row.SrcEntity), str(row.TgtEntity), "class", "class"))
+            for row in pairs.itertuples(index=False)
+        }
+        if not expected:
+            raise ValueError("No native queries exercised the composed ontology")
+        receipt["checkpoint"] = bind(checkpoint)
+        state = json.loads(checkpoint.read_text())
+        observations = state["queries"]
+        if set(observations) != expected:
+            raise ValueError("Native checkpoint does not cover the exact query inventory")
+        unsatisfiable = 0
+        for key, observation in observations.items():
+            if observation.get("consistent") is not True:
+                raise ValueError(
+                    "Composed-world consistency not established for query "
+                    + key
+                    + ": "
+                    + str(observation.get("reason", "missing evidence"))
+                )
+            satisfiable = observation.get("endpoints_satisfiable")
+            if satisfiable is False and observation.get("reason") == "unsatisfiable_endpoint":
+                if any(name in observation for name in ("forward", "reverse", "relation")):
+                    raise ValueError("Unsatisfiable query contains directional claims: " + key)
+                unsatisfiable += 1
+                continue
+            if satisfiable is not True:
+                raise ValueError("Endpoint satisfiability not established for query " + key)
+            forward, reverse = observation.get("forward"), observation.get("reverse")
+            if type(forward) is not bool or type(reverse) is not bool:
+                raise ValueError("Both directional native answers are required for query " + key)
+            relation = "=" if forward and reverse else "<" if forward else ">" if reverse else None
+            if observation.get("relation") != relation or observation.get("reason") != (
+                None if relation else "not_entailed"
+            ):
+                raise ValueError("Native relation/abstention disagrees with query evidence: " + key)
+            receipt["directed_queries"] += 1
+        if not receipt["directed_queries"]:
+            raise ValueError("No satisfiable pair exercised directional native queries")
+        # Every accepted observation was written only after native construction and
+        # consistency. Resume may compile zero worlds; retained query evidence suffices.
+        receipt.update(
+            status="passed",
+            unsatisfiable_endpoint_pairs=unsatisfiable,
+            newly_compiled_anchor_worlds=coherence["compiled_anchor_worlds"],
+            compilation_evidence="successful_native_query_observations",
+        )
+    except (OSError, ValueError, KeyError, TypeError, AttributeError) as error:
+        receipt["error"] = str(error)
+        write(path, receipt)
+        raise ValueError("E14 candidate native validation failed: " + str(error)) from error
+    write(path, receipt)
+    return bind(path)
+
+
 def run_diagnostic(recipe_path):
     recipe = json.loads(Path(recipe_path).read_text())
     fixed = {
@@ -119,6 +180,9 @@ def run_diagnostic(recipe_path):
     }
     if any(recipe.get(key) != value for key, value in fixed.items()):
         raise ValueError("E14 recipe differs from approved diagnostic protocol")
+    require_native_validation = recipe.get("require_native_query_validation", False)
+    if type(require_native_validation) is not bool:
+        raise ValueError("require_native_query_validation must be Boolean")
     if set(recipe["inputs"]) != {"source", "target", "train", "valid"}:
         raise ValueError("E14 inputs must be public train/valid only")
     paths = {name: verified(value) for name, value in recipe["inputs"].items()}
@@ -188,6 +252,11 @@ def run_diagnostic(recipe_path):
             verified(value)
     if preparation:
         verify_preparation(preparation, recipe["owl"], recipe["imports"])
+    native_validation = None
+    if require_native_validation:
+        native_validation = validate_native_queries(
+            native_pairs, output / "native-checkpoint.json", native_attrs["coherence_audit"]
+        )
     # One explicit anchor inventory is shared by both methods. No exact-label or
     # scored-candidate anchor discovery is allowed in this controlled comparison.
     graph = _semantic_entailment(
@@ -227,6 +296,8 @@ def run_diagnostic(recipe_path):
             reasoning_imports=reasoning_imports,
             admission_scope="full_original_logical_content_with_recorded_metadata_exclusions",
         )
+    if native_validation:
+        result.update(require_native_query_validation=True, native_validation=native_validation)
     write(output / "bridge-diagnostic.json", result)
     write(
         output / "completion.json",

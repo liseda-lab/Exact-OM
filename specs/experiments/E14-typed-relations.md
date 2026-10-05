@@ -147,6 +147,16 @@ existing prepared diagnostic runner, public train/valid roles, no hosted calls o
 and detached numeric Slurm steps. Retain host/storage guards, no imposed time deadline and
 the latest cumulative accounting, copied only at dispatch.
 
+The candidate bridge recipe sets `require_native_query_validation: true`. Before comparison
+completion, its exact query inventory must contain successful composed-world consistency,
+endpoint-satisfiability checks and both directional answers for every satisfiable pair;
+at least one pair must exercise directional queries. `not_entailed` and genuinely
+unsatisfiable endpoints remain valid observations, not fabricated relations. Identity-checked
+completed query checkpoints satisfy this requirement on resume without compiling again.
+Missing/unsupported query evidence, inconsistent worlds or an empty query inventory produce
+a failed `native-validation.json` and keep the gate closed. Ordinary diagnostics retain
+their existing reporting behavior when this option is absent or false.
+
 Append the bridge-validation dependency to the 11 other pending batches, preserving their
 original dependencies; leave held `E14-bridge-run-once-followup` unchanged. Successful bridge
 completion releases ordinary queue eligibility automatically. Failure keeps the gate in

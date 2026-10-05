@@ -94,6 +94,161 @@ def test_bridge_comparison_rejects_test_reference_binding(tmp_path):
         diagnostic.run_diagnostic(path)
 
 
+def test_candidate_gate_passes_real_native_queries_and_complete_checkpoint_resume(
+    tmp_path, monkeypatch
+):
+    from exact.ontology import reasoning
+
+    path, recipe = _fixture(tmp_path)
+    recipe["require_native_query_validation"] = True
+    path.write_text(json.dumps(recipe))
+    result = diagnostic.run_diagnostic(path)
+    receipt = json.loads((tmp_path / "result/native-validation.json").read_text())
+    assert receipt["status"] == "passed" and receipt["directed_queries"] == 1
+    assert receipt["newly_compiled_anchor_worlds"] == 1
+    assert result["native_validation"] == diagnostic.bind(
+        tmp_path / "result/native-validation.json"
+    )
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("A fully verified query checkpoint must not recompile its ontology")
+
+    monkeypatch.setattr(reasoning, "_create_hermit", forbidden)
+    resumed = diagnostic.run_diagnostic(path)
+    assert resumed["native_coherence"]["compiled_anchor_worlds"] == 0
+    receipt = json.loads((tmp_path / "result/native-validation.json").read_text())
+    assert receipt["status"] == "passed" and receipt["newly_compiled_anchor_worlds"] == 0
+
+
+@pytest.mark.parametrize("required", [False, True])
+def test_candidate_gate_rejects_swallowed_native_profile_error_but_diagnostic_reports_it(
+    tmp_path, monkeypatch, required
+):
+    import pyhermit
+
+    from exact.ontology import reasoning
+
+    path, recipe = _fixture(tmp_path)
+    recipe["require_native_query_validation"] = required
+    path.write_text(json.dumps(recipe))
+
+    def unsupported(*args, **kwargs):
+        raise pyhermit.OntologyProfileError("Injected composed-world profile failure")
+
+    monkeypatch.setattr(reasoning, "_create_hermit", unsupported)
+    if required:
+
+        def forbidden(*args, **kwargs):
+            pytest.fail("Failed native validation must stop before graph comparison")
+
+        monkeypatch.setattr(diagnostic, "_semantic_entailment", forbidden)
+        with pytest.raises(ValueError, match="Composed-world consistency not established"):
+            diagnostic.run_diagnostic(path)
+        receipt = json.loads((tmp_path / "result/native-validation.json").read_text())
+        assert receipt["status"] == "failed"
+        assert not (tmp_path / "result/completion.json").exists()
+    else:
+        result = diagnostic.run_diagnostic(path)
+        assert result["native_abstentions"][0]["reason"] == "unsupported_profile"
+        assert result["native_coherence"]["compiled_anchor_worlds"] == 0
+        assert (tmp_path / "result/completion.json").exists()
+        assert not (tmp_path / "result/native-validation.json").exists()
+
+
+@pytest.mark.parametrize("unsatisfiable", [False, True])
+def test_candidate_gate_distinguishes_unrelated_queries_from_no_directional_evidence(
+    tmp_path, unsatisfiable
+):
+    path, recipe = _fixture(tmp_path)
+    source = tmp_path / "source.ofn"
+    source.write_text(
+        "Ontology(Declaration(Class(<urn:a>)) Declaration(Class(<urn:c>))"
+        + (" SubClassOf(<urn:c> <http://www.w3.org/2002/07/owl#Nothing>)" if unsatisfiable else "")
+        + ")"
+    )
+    recipe["owl"]["source"] = diagnostic.bind(source)
+    recipe["require_native_query_validation"] = True
+    path.write_text(json.dumps(recipe))
+    if unsatisfiable:
+        with pytest.raises(ValueError, match="No satisfiable pair exercised directional"):
+            diagnostic.run_diagnostic(path)
+        assert not (tmp_path / "result/completion.json").exists()
+    else:
+        result = diagnostic.run_diagnostic(path)
+        assert result["native_abstentions"][0]["reason"] == "not_entailed"
+        assert (
+            json.loads((tmp_path / "result/native-validation.json").read_text())["status"]
+            == "passed"
+        )
+
+
+def test_candidate_gate_retains_genuine_unsatisfiable_endpoint_abstention(tmp_path):
+    path, recipe = _fixture(tmp_path)
+    source = tmp_path / "source.ofn"
+    source.write_text(
+        source.read_text()[:-1] + " Declaration(Class(<urn:e>)) SubClassOf(<urn:e> <urn:a>)"
+        " SubClassOf(<urn:c> <http://www.w3.org/2002/07/owl#Nothing>))"
+    )
+    for filename, extra in [("properties.csv", "e,urn:e\n"), ("entities.csv", "e,class\n")]:
+        with (tmp_path / "source" / filename).open("a") as stream:
+            stream.write(extra)
+    with (tmp_path / "valid.tsv").open("a") as stream:
+        stream.write("e\td\t<\n")
+    recipe["owl"]["source"] = diagnostic.bind(source)
+    recipe["inputs"]["source"] = diagnostic.bind(tmp_path / "source")
+    recipe["inputs"]["valid"] = diagnostic.bind(tmp_path / "valid.tsv")
+    recipe["require_native_query_validation"] = True
+    path.write_text(json.dumps(recipe))
+    result = diagnostic.run_diagnostic(path)
+    assert result["native_abstentions"][0]["reason"] == "unsatisfiable_endpoint"
+    receipt = json.loads((tmp_path / "result/native-validation.json").read_text())
+    assert receipt["status"] == "passed"
+    assert receipt["directed_queries"] == receipt["unsatisfiable_endpoint_pairs"] == 1
+
+
+@pytest.mark.parametrize(
+    "damage", ["missing_reverse", "missing_query", "inconsistent", "wrong_relation"]
+)
+def test_candidate_gate_rejects_unusable_query_evidence(tmp_path, monkeypatch, damage):
+    path, recipe = _fixture(tmp_path)
+    recipe["require_native_query_validation"] = True
+    path.write_text(json.dumps(recipe))
+    original = diagnostic.native_bridge
+
+    def damaged(*args, **kwargs):
+        result = original(*args, **kwargs)
+        checkpoint = kwargs["checkpoint_path"]
+        state = json.loads(checkpoint.read_text())
+        observation = next(iter(state["queries"].values()))
+        if damage == "missing_reverse":
+            observation.pop("reverse")
+        elif damage == "missing_query":
+            state["queries"].clear()
+        elif damage == "inconsistent":
+            observation["consistent"] = False
+        else:
+            observation["relation"] = ">"
+        checkpoint.write_text(json.dumps(state))
+        return result
+
+    monkeypatch.setattr(diagnostic, "native_bridge", damaged)
+    with pytest.raises(ValueError, match="E14 candidate native validation failed"):
+        diagnostic.run_diagnostic(path)
+    assert not (tmp_path / "result/completion.json").exists()
+
+
+def test_candidate_gate_rejects_empty_query_inventory(tmp_path):
+    path, recipe = _fixture(tmp_path)
+    valid = tmp_path / "valid.tsv"
+    valid.write_text("SrcEntity\tTgtEntity\tRelation\n")
+    recipe["inputs"]["valid"] = diagnostic.bind(valid)
+    recipe["require_native_query_validation"] = True
+    path.write_text(json.dumps(recipe))
+    with pytest.raises(ValueError, match="No native queries exercised"):
+        diagnostic.run_diagnostic(path)
+    assert not (tmp_path / "result/completion.json").exists()
+
+
 def test_bridge_index_allowance_reaches_config_and_invalidates_checkpoint(tmp_path, monkeypatch):
     import pyhermit
 
