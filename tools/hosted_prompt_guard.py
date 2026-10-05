@@ -55,7 +55,9 @@ def validate_policy(config):
         raise ValueError("Hosted prompt guard policy is invalid: " + str(error)) from error
     allowed = config.get("allowed_source_sha256")
     if not isinstance(allowed, dict) or not set(REQUIRED_SOURCE_FILES) <= set(allowed):
-        raise ValueError("Hosted prompt guard requires approved transport and semantic source hashes")
+        raise ValueError(
+            "Hosted prompt guard requires approved transport and semantic source hashes"
+        )
     for name, hashes in allowed.items():
         if (
             not isinstance(name, str)
@@ -63,7 +65,10 @@ def validate_policy(config):
             or ".." in Path(name).parts
             or not isinstance(hashes, list)
             or not hashes
-            or any(not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{64}", value) for value in hashes)
+            or any(
+                not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{64}", value)
+                for value in hashes
+            )
         ):
             raise ValueError("Hosted prompt guard source approval is invalid")
 
@@ -78,10 +83,11 @@ def validate_launch(launch, policy):
     if attached not in launch.get("bindings", []):
         raise ValueError("Prepared launch lacks a bound hosted prompt guard receipt")
     receipt = json.loads(_verify(attached).read_text())
-    _validate_receipt(launch, config, receipt)
+    _validate_receipt(launch, policy, receipt)
 
 
-def _validate_receipt(launch, config, receipt):
+def _validate_receipt(launch, policy, receipt):
+    config = policy["hosted_prompt_guard"]
     if not isinstance(receipt, dict):
         raise ValueError("Hosted prompt guard receipt must be an object")
     if (
@@ -122,6 +128,53 @@ def _validate_receipt(launch, config, receipt):
         raise ValueError("Hosted prompt guard source/environment differs from the frozen recipe")
     bound(receipt["prompt_policy"])
     environment = json.loads(bound(receipt["environment"]).read_text())
+    spending = policy.get("hosted_spending_policy")
+    if spending is not None:
+        from exact.utils.hosted_spending import load_spending_policy
+
+        if receipt.get("spending_policy") != spending:
+            raise ValueError("Hosted worker lacks the reviewed campaign spending policy")
+        bound(spending)
+        selected = load_spending_policy(spending)
+        if selected is None or selected["policy"].get("mode") != "hard_pause":
+            raise ValueError("Hosted launch requires the approved spending pause policy")
+        expected = {
+            "EXACT_HOSTED_SPENDING_POLICY_PATH": spending["path"],
+            "EXACT_HOSTED_SPENDING_POLICY_SHA256": spending["sha256"],
+            "EXACT_HOSTED_CAMPAIGN_ID": selected["policy"]["campaign_id"],
+        }
+        if any(environment.get(key) != value for key, value in expected.items()):
+            raise ValueError("Hosted worker environment lacks the bound spending policy")
+        scope = launch["run"].get("hosted_scope")
+        if (
+            not isinstance(scope, dict)
+            or set(scope) != {"campaign_id", "experiment_id"}
+            or receipt.get("hosted_scope") != scope
+            or scope["campaign_id"] != selected["policy"]["campaign_id"]
+        ):
+            raise ValueError("Hosted launch lacks its bound scientific spending scope")
+        from exact.core.entities.configs.yaml_io import load_yaml_mapping
+
+        campaign = load_yaml_mapping(bound(recipe.get("base_campaign")))
+        step = next(
+            (row for row in campaign["steps"] if row["id"] == recipe.get("scientific_step")), None
+        )
+        if (
+            campaign.get("campaign_id") != scope["campaign_id"]
+            or step is None
+            or step.get("family") != scope["experiment_id"]
+        ):
+            raise ValueError("Hosted launch spending scope differs from its declared family")
+        protected = {
+            "exact/llm/ledger.py",
+            "exact/llm/spending_admission.py",
+            "exact/utils/hosted_spending.py",
+            "exact/experiments/runtime.py",
+            "exact/experiments/harness.py",
+            "tools/prepared_batch.py",
+        }
+        if not protected <= set(config["allowed_source_sha256"]):
+            raise ValueError("Hosted launch lacks reviewed spending admission and scope code")
     required_environment = {
         "EXACT_EXPERIMENT_MODE": "1",
         "EXACT_LLM_PROMPT_POLICY_PATH": config["prompt_policy"]["path"],
@@ -169,16 +222,23 @@ def guard_launch(launch, policy, *, recipe_path, receipt_path, mode="guarded_hos
             for name in config["allowed_source_sha256"]
         }
         receipt.update(
-            code_root=recipe["code_root"], commit=recipe["commit"], source_files=sources,
-            environment=recipe["environment"], prompt_policy=config["prompt_policy"],
+            code_root=recipe["code_root"],
+            commit=recipe["commit"],
+            source_files=sources,
+            environment=recipe["environment"],
+            prompt_policy=config["prompt_policy"],
         )
         dependencies.extend([recipe["environment"], config["prompt_policy"], *sources.values()])
+        if policy.get("hosted_spending_policy") is not None:
+            receipt["spending_policy"] = policy["hosted_spending_policy"]
+            receipt["hosted_scope"] = launch["run"].get("hosted_scope")
+            dependencies.extend([receipt["spending_policy"], recipe.get("base_campaign")])
     else:
         raise ValueError("Unknown hosted prompt guard launch mode")
     for item in dependencies:
         if item not in launch["bindings"]:
             launch["bindings"].append(item)
-    _validate_receipt(launch, config, receipt)
+    _validate_receipt(launch, policy, receipt)
     path = Path(receipt_path).resolve()
     content = json.dumps(receipt, indent=2, sort_keys=True) + "\n"
     if path.exists():
