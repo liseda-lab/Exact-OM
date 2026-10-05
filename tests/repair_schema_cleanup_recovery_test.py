@@ -116,7 +116,8 @@ def test_original_validation_binds_prefix_guard_and_unstarted_rows(tmp_path, cha
         assert set(recovery.validate_original(plan,evidence,'science'))=={0,1}
 
 
-def test_runner_reuses_prefix_preserves_guard_and_science_denominator(tmp_path, monkeypatch):
+@pytest.mark.parametrize('failed_index', [8, 15])
+def test_runner_reuses_prefix_preserves_guard_and_science_denominator(tmp_path, monkeypatch, failed_index):
     from exact.experiments.science_health import inspect_science
     from exact.repair.api import write_artifact
     from exact.repair.records import canonical_hash
@@ -137,12 +138,13 @@ def test_runner_reuses_prefix_preserves_guard_and_science_denominator(tmp_path, 
     schema_plan = tmp_path/'schema-plan.json'; write_artifact(schema_plan, {'schedule':binding(schedule)})
     completion = tmp_path/'failed-completion.json'; write_artifact(completion, {'work':str(work)})
     previous, guard, owner = fixture(); prior = {}
-    for index in range(8):
+    previous['row']['id'] = guard['row']['id'] = f'row{failed_index}'
+    for index in range(failed_index):
         payload = work/f'result-{index}.json'; write_artifact(payload, {'row_id':f'row{index}','status':'timeout'})
         path = work/f'original-{index}.json'
         saved = checkpoint(path, 'old', row={'id':f'row{index}'}, status='complete', result=binding(payload))
         prior[index] = (binding(path), saved)
-    failed = work/'failed.json'; write_artifact(failed, previous); prior[8]=(binding(failed), previous)
+    failed = work/'failed.json'; write_artifact(failed, previous); prior[failed_index]=(binding(failed), previous)
     guard_path = work/'guard.json'; write_artifact(guard_path, guard)
     evidence = tmp_path/'evidence.json'; write_artifact(evidence, {'guard':binding(guard_path),'completion':binding(completion)})
     originals = {p:Path(p).read_bytes() for p in [guard_path,*[ref['path'] for ref,_ in prior.values()]]}
@@ -150,6 +152,7 @@ def test_runner_reuses_prefix_preserves_guard_and_science_denominator(tmp_path, 
     monkeypatch.setattr(recovery, 'confirm_owner_gone', lambda step:owner)
     requested, executed = [], []
     def continue_rows(plan, output, start, stop):
+        assert failed_index < 15, 'Final-row reconciliation must make no scientific call'
         requested.append((start,stop)); refs=[]
         for index in range(start,stop):
             path=output/f'row{index}.json'
@@ -165,11 +168,18 @@ def test_runner_reuses_prefix_preserves_guard_and_science_denominator(tmp_path, 
     write_artifact(plan,dict(runner=binding(recovery.__file__),output=str(output),source_root=str(source),
         runtime={'fixture':'same'},schema_plan=binding(schema_plan),schema_identity=identity,
         evidence=binding(evidence),frozen_batch=binding(frozen),original_step=STEP,
-        original_slice=[0,16],failed_index=8,only_unstarted_slice=[9,16],original_row_count=16,prior_costs_reset=False))
+        original_slice=[0,16],failed_index=failed_index,only_unstarted_slice=[failed_index+1,16],original_row_count=16,prior_costs_reset=False))
     first=recovery.run(plan,output);second=recovery.run(plan,output)
-    assert first==second and requested==[(9,16)]*2 and executed==list(range(9,16))
+    assert first==second
+    assert requested==([(failed_index+1,16)]*2 if failed_index < 15 else [])
+    assert executed==list(range(failed_index+1,16))
+    assert first['cleanup_recovery']['continued_rows']==15-failed_index
+    if failed_index == 15:
+        assert not (output/'continuation').exists()
     assert first['scheduled']==first['recorded']==16
-    assert first['outcomes']=={'complete':8,'unknown_after_cleanup_reconciliation':1,'timeout':7}
+    expected={'complete':failed_index,'unknown_after_cleanup_reconciliation':1}
+    if failed_index < 15: expected['timeout']=15-failed_index
+    assert first['outcomes']==expected
     assert all(Path(path).read_bytes()==raw for path,raw in originals.items())
     attempt=tmp_path/'attempt';attempt.mkdir()
     write_artifact(attempt/'outputs.json',{'evaluation-revision-002/report.json':sha(output/'report.json')})
@@ -177,3 +187,12 @@ def test_runner_reuses_prefix_preserves_guard_and_science_denominator(tmp_path, 
              completion_path=str(attempt/'completion.json'))
     complete=dict(status='complete',step_id=run['step_id'],dispatch_nonce='nonce',work=str(work))
     assert inspect_science(run,complete)==dict(failures=[],errors=[])
+
+
+@pytest.mark.parametrize('failed_index', [-1, 16, 17, True])
+def test_recovery_rejects_failure_outside_slice(failed_index):
+    plan = dict(original_slice=[0,16], failed_index=failed_index,
+                only_unstarted_slice=[failed_index+1,16], original_row_count=16,
+                prior_costs_reset=False)
+    with pytest.raises(ValueError):
+        recovery.slice_bounds(plan)

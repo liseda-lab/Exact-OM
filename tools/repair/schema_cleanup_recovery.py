@@ -46,7 +46,7 @@ def slice_bounds(plan):
     start, stop = plan['original_slice']
     failed = plan['failed_index']
     if (any(type(v) is not int for v in (start, stop, failed))
-            or not 0 <= start <= failed < stop - 1
+            or not 0 <= start <= failed < stop
             or plan['only_unstarted_slice'] != [failed + 1, stop]
             or plan['original_row_count'] != stop - start
             or plan['prior_costs_reset'] is not False):
@@ -176,7 +176,12 @@ def run(plan_path, output):
                 raise ValueError('Reconciled unknown provenance changed')
         else:
             saved = checkpoint(revised, recovery_identity, **expected)
-        continuation = science.run(Path(plan['schema_plan']['path']), output / 'continuation', failed + 1, stop)
+        # A last-row failure has no untouched suffix. Publish the retained
+        # denominator without entering the scientific runner or replaying work.
+        continuation = (science.run(Path(plan['schema_plan']['path']),
+                                    output / 'continuation', failed + 1, stop)
+                        if failed + 1 < stop else
+                        dict(scheduled=0, recorded=0, rows=[]))
         if continuation['scheduled'] != stop - failed - 1 or continuation['recorded'] != stop - failed - 1:
             raise ValueError('Continuation denominator changed')
         refs = [dict(**prior[i][0], row_id=prior[i][1]['row']['id'], status=prior[i][1]['status'])

@@ -443,3 +443,17 @@ makes no new native call and does not establish intended-parent truth, strongest
 symbolic comparisons, G0-G2 or learning efficiency. Intended-parent/query
 qualification, required semantic-control review and the failure-inclusive final
 parent-group report remain registered obligations after this audit.
+
+
+## Robustness final-row cleanup reconciliation
+
+Robustness schema slice 113 stopped on a nested cleanup error in its sixteenth
+and final row. A separately frozen recovery adapter binds the original nonce,
+command, all sixteen row receipts and payloads, runtime, retained guard and
+departed Slurm ownership. It preserves the fifteen finished rows and retains
+the interrupted row as unknown without replay. With no untouched suffix, the
+recovery makes no scientific calls and publishes the complete sixteen-row receipt
+denominator. All original artifacts, failed-attempt costs and the 2,880-row
+study denominator remain. This reconciliation does not resolve the underlying
+native teardown cause or establish semantic quality, research gates or learning
+efficiency. Downstream robustness slices and final reporting remain registered.
