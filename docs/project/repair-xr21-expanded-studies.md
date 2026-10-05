@@ -385,3 +385,40 @@ Receipt and eligibility review, supervised generated acquisition, optimizer
 capacity, eighteen strict fitting protocols, development checkpoint selection,
 64 held-out cases with matched semantic controls and final reporting remain
 registered obligations.
+
+## Development generated-pool acquisition resource experiment
+
+All 32 intended-parent resource rows qualified on their original development
+policy and typed query basis. Five nonce-bound worker receipts, 320 native
+payloads and all settled charges are bound in the acquisition eligibility review.
+Observed intended-check times ranged from 3.29 to 183.84 seconds. This qualifies
+only those development theories and queries on the actual Python HermiT backend;
+the original finite-inventory labels and all earlier unknowns remain unchanged.
+
+A separate development resource experiment acquires labels on newly generated
+inventories before freezing training-side acquisition. All 32 cases and sixteen
+parents retain their release identities. The original uniform grammar generator,
+retrieval, circuit and action bounds remain fixed. Its outer generation allowance
+is 300 wall seconds. Each of at most eight unique assignment labels receives
+300 wall seconds, 600 CPU seconds and 8192 MiB. These resource allowances belong
+only to this experiment; original comparison budgets are unchanged. Two cases
+form a 6000-second operational slice, including 600 seconds for setup and receipts.
+
+Each case reserves eight slots: unchanged and deletion controls, two independent
+uniform draws, and a four-member counterfactual group on the unchanged background.
+The first two eligible unlocked objects with alternatives form the group, preferring
+new axiom/activation bundles absent from the original inventory. Missing alternatives
+are explicit; duplicate slots retain their denominator and share only an identical
+assignment's label. Uniform draw probabilities are not inclusion propensities.
+No outcome-based rejection or replacement sampling is performed. All 256 slots
+remain represented, including generation failures, native unknowns and duplicates.
+
+Generation receives observable records only. Assignment selection is frozen before
+the evaluator record is supplied to the independent native labeler. New caches bind
+the generated inventory, original query basis, backend, costs and sampler; they are
+sample-conditioned development labels, never exact teachers or fitting data. Native
+call errors and partial evidence remain saved. An interrupted case requires owner
+and spent-budget reconciliation before continuation. Receipt and coverage review,
+training-only supervised acquisition, optimizer capacity, eighteen fitting protocols,
+generated development selection, held-out matched semantic controls and final
+reporting remain registered. This experiment does not establish research gates.
