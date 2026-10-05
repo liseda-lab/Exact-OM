@@ -567,3 +567,35 @@ prior attempt costs. Row effort is a descriptive measure, never a second charge.
 The parent preparation slot remains until the actual final worker receipt is
 authenticated; then only local evaluation reporting closes, with all gaps carried
 to the registered consolidated preliminary report and independent branches intact.
+
+## Preliminary training-readiness final receipt report
+
+After the final development collection slice, one separately frozen receipt-only
+report binds the original 160 fixed-inventory acquisition cases, six 32-case
+gradient probes, the 288-row untrained decoding audit, 32 intended-parent resource
+checks and all 256 generated-collection assignment slots. It retains original
+failed attempts and replacement ancestry, including the collection14 transport
+error, exact retained native label and untouched-assignment continuation. All
+known labels are reconstructed from saved policy/query reports without new native
+calls; unknown calls retain partial payloads and their original denominators.
+Sampler decisions, exact-duplicate label reuse, generated inventories, cache
+identities and usable masks are checked independently. Development labels remain
+excluded from fitting and exact-teacher claims. Reserved training-program test
+payloads are not opened.
+
+The report distinguishes implementation faults, finite-resource timeouts,
+unsupported generation, and scientific-design gaps. It carries the full-schema
+contract, mapped fixture scope, original overlap-only finite-inventory supervision,
+probe interpretation revisions, and missing optimizer/minibatch qualification.
+Its proposed cluster matrix retains six arms and three seeds, development-only
+selection and the original held-out identities, but is neither frozen nor approved
+for execution. TRAIN-only generated acquisition, 18 fitting runs and dependent
+held-out comparisons remain deferred under the preliminary-scope amendment.
+The future storage policy places code/configuration in home, active artifacts on
+parallel storage and checksum-verified completed artifacts in archive; actual
+mount paths await the final cluster design. No current data migration occurs.
+
+The final readiness worker and its preparation are charged separately. Its
+successful process receipt must be authenticated before the local training
+preparation slot closes. The consolidated preliminary report still owns overall
+scope completion, cumulative accounting and the existing deduplicated idle email.
