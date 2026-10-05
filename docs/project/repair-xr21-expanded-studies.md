@@ -353,3 +353,35 @@ protocols, 64-case held-out matched semantic controls and final reporting remain
 registered obligations. Disposable diagnostic weights cannot become warm starts,
 teachers or selected research checkpoints. The audit closes only this receipt
 prerequisite, not the larger training study.
+
+## Development intended-parent resource qualification
+
+The completed decoding audit retains only five known selected scores in its
+288-row denominator. Original finite-inventory acquisition used a 30-second
+intended-parent guard, with 24 of 32 development rows unknown at that guard.
+A separately named development resource experiment now checks all 32 original
+development cases and 16 inherited parents with 600 wall seconds, 1200 CPU
+seconds and 8192 MiB per case. This larger native-call allowance applies only
+to this new resource experiment; all original acquisition and comparison
+allowances, labels, errors and costs remain immutable. Each eight-case slice
+has a 5400-second operational allowance, covering the 4800-second worst case
+plus setup, receipt and cleanup overhead. No held-out payload is opened.
+
+The worker checks the original intended theory against the complete original
+policy, then the unchanged query basis. It persists native backend/support
+receipts and fsyncs each completed obligation before advancing, retaining
+partial evidence and the full query denominator on timeout. The original guard's
+feasible-and-query-complete condition is recorded separately from whether the
+intended theory satisfies every desired/unwanted target. Typed nonvacuity is
+derived by the existing query implementation when not explicitly declared;
+absence of an explicit declaration is not absence of a nonvacuity check.
+The original basis has no unwanted probes; this experiment does not add any.
+
+Rows checkpoint once, and interruption requires owner and spent-budget
+reconciliation before continuation. Results qualify only the bound development
+intended theory, policy, query basis and actual backend. They do not supply
+generated-assignment supervision, replace original labels or establish G0-G2.
+Receipt and eligibility review, supervised generated acquisition, optimizer
+capacity, eighteen strict fitting protocols, development checkpoint selection,
+64 held-out cases with matched semantic controls and final reporting remain
+registered obligations.
