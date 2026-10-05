@@ -2,10 +2,11 @@ schema_version: 1
 amendment_id: E21-selected-binary-judge-20261004
 experiment: E21
 approved: true
-approval_scope: Support the selected E07 binary judge; preserve five E21 treatments and original roles.
+approval_scope: Support the selected E07 binary judge; preserve five E21 treatments
+  and original roles.
 specification: E21-supervised-llm.md
-status: implemented_verified_and_queued
-scientific_results: not_executed
+status: completed_original_renderer
+scientific_results: development_screen_completed_no_supervised_arm_selected
 changes_shared_native_packages: false
 selected_teacher:
   producer: E07
@@ -19,17 +20,17 @@ selected_teacher:
   max_candidates_per_source: 5
   ordering: descending_base_score_then_target_iri
   immutable_bindings_required:
-    - completed_selection_and_resolved_config
-    - provider_model_prompt_probability_and_seed
-    - candidate_and_source_population
-    - effective_acceptance_and_fusion
+  - completed_selection_and_resolved_config
+  - provider_model_prompt_probability_and_seed
+  - candidate_and_source_population
+  - effective_acceptance_and_fusion
   rationales: false
 treatments:
-  - frozen_judge
-  - knn_exemplars
-  - benefit_router
-  - student_gold
-  - student_distilled
+- frozen_judge
+- knn_exemplars
+- benefit_router
+- student_gold
+- student_distilled
 population:
   case: D0_E03
   development_source_cap: 200
@@ -54,7 +55,13 @@ router:
   final_endpoint: measured_complete_population_F1_and_cost
   all_training_candidate_outcomes_required: true
 students:
-  matched: [features, architecture, optimizer, source_population, grouped_folds, inference_integration]
+  matched:
+  - features
+  - architecture
+  - optimizer
+  - source_population
+  - grouped_folds
+  - inference_integration
   gold_target: public_training_gold
   distilled_target: equal_gold_teacher_mixture_for_valid_teacher_pairs_otherwise_gold
   teacher_coverage_and_generation_cost_reported: true
@@ -68,8 +75,15 @@ helpfulness_prerequisite:
   candidate_pairs: 4000
   sampled_pool_fingerprints_equal: false
   discrepancy: E07 cached sample manifest lacks E25 encoder and retrieval metadata.
-  observed_equal: [full_pool_manifest, source_ids, candidate_pairs, base_scores, uncertainty, protected_exact]
-  required_before_admission: Bound verified population/reference/scoring/acceptance compatibility proof.
+  observed_equal:
+  - full_pool_manifest
+  - source_ids
+  - candidate_pairs
+  - base_scores
+  - uncertainty
+  - protected_exact
+  required_before_admission: Bound verified population/reference/scoring/acceptance
+    compatibility proof.
 verification:
   tests: passed
   combined_fixture_suite:
@@ -91,14 +105,31 @@ verification:
   publication_receipt: ../../data/experiments-v2/approved-judges-20261004-01/publication.json
   paid_calls_during_implementation: 0
   required_regressions:
-    - binary_fusion_and_effective_threshold
-    - uninvoked_candidates_remain_in_counterfactual_population
-    - incomplete_or_invalid_teacher_results
-    - training_and_development_role_isolation
-    - matched_gold_and_distilled_students
-    - teacher_request_and_source_shard_resume
-    - helpfulness_population_and_reference_compatibility
+  - binary_fusion_and_effective_threshold
+  - uninvoked_candidates_remain_in_counterfactual_population
+  - incomplete_or_invalid_teacher_results
+  - training_and_development_role_isolation
+  - matched_gold_and_distilled_students
+  - teacher_request_and_source_shard_resume
+  - helpfulness_population_and_reference_compatibility
 limitations:
-  - Source-local router targets do not reproduce cross-source greedy target competition.
-  - Hosted weight revision may not be independently immutable; retain the resolved identity limitation.
-  - Passing fixtures and metadata preflight do not establish measured E21 quality or release readiness.
+- Source-local router targets do not reproduce cross-source greedy target competition.
+- Hosted weight revision may not be independently immutable; retain the resolved identity
+  limitation.
+- Passing fixtures and metadata preflight do not establish measured E21 quality or
+  release readiness.
+completed_original_rendering:
+  completion:
+    path: /home/pgcotovio/Exact-OM/data/experiments-v2/e21-spending-recovery-02/completion.json
+    sha256: d6a94dc873f984fc7a53decf7a95e571b8b90ee99db1876a9580dc1467c606ec
+  selection:
+    path: /home/pgcotovio/Exact-OM/data/experiments-v2/e21-spending-recovery-02/runtime/exact-om-focused-v2/screen/selection.json
+    sha256: 3df779ca7c6c51b993c28c928d5bc9ec0fd521c50e2c4e6702529aac224787be
+  baseline_f1: 0.823
+  knn_exemplars_f1: 0.79
+  benefit_router_f1: 0.823
+  student_gold_f1: 0.672
+  student_distilled_f1: 0.678
+  selection_status: screened_out
+  compact_renderer_quality: not_run
+  prospective_safety_amendment: HOSTED-SPENDING-SAFETY.yaml

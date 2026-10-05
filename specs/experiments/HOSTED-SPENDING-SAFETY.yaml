@@ -1,0 +1,43 @@
+schema_version: 1
+amendment_id: hosted-prompt-and-spending-safety-20261005
+approved: true
+status: verified_preparing_prospective_deployment
+scope: All new paid experimental requests and future queued hosted workers
+scientific_changes:
+  exemplar_renderer: compact-whole-facts-v1
+  historical_E21_results: retained_original_rendering
+  compact_quality_validation: not_run
+  automatic_paid_rerun: false
+prompt_limits:
+  input_admission_tokens: 12288
+  input_utf8_bytes: 32768
+  output_tokens: 1024
+  tokenizer: pinned_offline
+  framing_reserve: 128
+  provider_exact_token_count: false
+spending_limits:
+  campaign_alert_interval: 10000000
+  experiment_warning_tokens: 10000000
+  experiment_tokens_cap: 25000000
+  campaign_tokens_cap: 200000000
+  past_usage_included: true
+  pause_before_paid_send: true
+  approval_to_raise: true
+  local_only_work_continues: true
+bootstrap:
+  path: /home/pgcotovio/Exact-OM/data/experiments-v2/hosted-prompt-safety-20261005-01/spending-bootstrap.json
+  sha256: aba2641557dd72d561c9753a91ddcac8f3f0425bbb219c6e39cb0aa0c77ba616
+verification:
+  final_combined_regressions: 409
+  frozen_worker_regressions:
+    E12: 139
+    E25: 131
+    E04: 161
+  offline_original_normal_calls_accepted: 1000
+  offline_original_oversized_calls_rejected: 1000
+  offline_compact_calls_accepted: 1000
+  paid_calls_during_implementation: 0
+  source_receipt:
+    path: /home/pgcotovio/Exact-OM/data/experiments-v2/hosted-prompt-safety-20261005-01/compact-preflight.json
+    sha256: 48c2981e32dea9d10bf86e92a012057d62b96da88568990fcd84d2e9bb8c9999
+handoff: ../../data/experiments-v2/hosted-prompt-safety-20261005-01/HANDOFF.md

@@ -198,3 +198,44 @@ the working fitting directory and superseded artifacts before accepting repeated
 Completed fitting JSON may share hash-verified read-only CAS inodes through the reviewed
 post-completion helper. Never apply this cleanup to an unfinished runtime or mutate linked
 outputs in place; recovery restores into a new independent destination.
+
+## Hosted prompt protection amendment — 2026-10-05
+
+The user authorizes correcting oversized contexts and prospective request protection. Every
+new paid worker must bind `EXACT_LLM_PROMPT_POLICY_PATH` and its SHA256 in its recipe environment
+and use the reviewed guarded transport. Current limits are 12,288 estimated input tokens,
+32,768 UTF-8 input bytes and 1,024 requested output tokens; existing smaller role output bounds
+remain. Validate the complete prompt, including exemplars, before any transmission. No silent
+truncation, local/base-score fallback, policy removal or automatic cap escalation is permitted
+on a `PromptBudgetError`. Preserve completed requests/checkpoints, identify the offending role
+and local size estimate, and repair the prompt construction within its declared method. If a
+scientific change or exceptional large input needs a decision, issue one intervention alert.
+
+The supervisor launch gate requires a reviewed receipt binding the worker, recipe, environment,
+prompt policy and guarded source. Explicitly reviewed native/cached-only recipes may use a
+bound no-new-hosted-calls exemption. Pending preparation uses the protected code and successor
+environment. Never copy a stale unguarded launch merely because it previously passed admission.
+Keep E14 candidate-first prerequisites and all host/storage guards intact.
+
+The completed original E21 kNN arm is historical evidence, not the compact renderer's result.
+Do not rerun it for accounting or silently promote a compact variant using the old artifact.
+Any prospective compact run requires its own fitting/prompt identity and paired evaluation.
+Before new batches, record the maximum planned paid calls (including teacher/setup/retries)
+and the corresponding guarded input/output estimate. Large legitimate total computation is
+not a reason to kill a running cell: cumulative spending stays notification-only, including
+the existing one-time 100M-token alert. No accounting or unknown paid attempt may be erased.
+
+### Superseding approved spending pauses — 2026-10-05
+
+The user subsequently approved campaign alerts every 10M tokens, an experiment warning at 10M
+and pause at 25M, and a campaign pause at 200M, counting all past expenditure. This supersedes
+the notification-only policy above for new paid workers. Read HOSTED-SPENDING-SAFETY.md and
+the bound v2 policy. The shared admission store, not copied per-run ledgers, controls admission.
+A `HostedSpendPause` requires explicit user approval to raise that scope's allowance. Preserve
+its durable pause and checkpoints; do not invoke automatic model repair to clear it, change
+the experiment identity, remove the policy, reset counters or switch to a different payer.
+Independent eligible native/local work may continue. Keep completed original E21 results; its
+historical spending already exceeds 25M and no new paid E21 request is authorized by default.
+Approved historical warning thresholds are acknowledged once; report newly crossed intervals
+and genuine blocked attempts through the durable outbox without repeated emails. Include
+reported dollar cost and missing-cost limitations alongside token counts.

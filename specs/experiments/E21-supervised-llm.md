@@ -144,3 +144,45 @@ removal, or inapplicability is a deliverable; an unimplemented arm is not an emp
 Resolve this family's question into numbered research questions and a primary endpoint in the
 executable design before its screen; answer each as supported, not supported or inconclusive
 with evidence. RUN-PLAN section 7 governs incomplete references and claim limitations.
+
+## Hosted context correction — 2026-10-05
+
+The original binary kNN arm serialized three full training-source records, each with five
+candidate evidence packets, into every binary decision. Its 1,000 completed requests consumed
+68,128,913 input tokens and $10.21993695 in provider-reported cost. The additional context was
+not an independently declared treatment or validated requirement. Rationales were off; output
+was one token per request. Retain these results, prompts and costs under their original frozen
+identity. Do not rerun or relabel them as results of the compact renderer.
+
+Prospective exemplar fitting binds a new compact rendering identity. Preserve the same source
+retrieval, source/candidate order, all candidate identities and gold labels. Decode each evidence
+packet once, retain labels and complete semantic facts, remove redundant transport/provenance
+fields, and distribute whole facts deterministically across candidates. Record omissions;
+never truncate a fact/string, drop a candidate, invent evidence or silently change the source
+count. The complete example suffix is bounded by the pinned tokenizer and UTF-8 bytes. If the
+mandatory identity/label/evidence structure cannot fit, fail locally. Old exemplar artifacts
+are incompatible with new fitting/rendering. A compact-versus-original quality comparison has
+not been performed; this is a versioned method change, not a claim of equivalent predictions.
+
+Every new paid experiment request must also pass the shared final-payload admission check:
+at most 12,288 estimated input tokens (pinned local tokenizer plus 128 framing tokens),
+32,768 UTF-8 bytes of input text and 1,024 requested output tokens. Smaller task-specific
+output limits remain in force. This includes all appended examples and all generative roles,
+chat and completion endpoints, retries, and requests without a ledger. Token estimates are
+not asserted to equal provider billing. Unsupported payload structures or unavailable pinned
+tokenizers fail before transmission. Exact historical response replay remains free and usable.
+
+The bounds are prospective operational protection; they do not change acceptance thresholds,
+training/development populations, references, or completed results. Aggregate spending follows the approved
+[interval alerts and campaign/family pauses](HOSTED-SPENDING-SAFETY.md). Retain unknown-send guards and all charges.
+New scientific batch preparation must state call counts and their bounded token forecast before
+submission; exceptional large inputs require an explicit revised protocol, not removal of the
+guard or repeated attempts. Frozen workers must carry the reviewed guard and immutable policy;
+a current checkout fix alone does not protect an older queued worker.
+
+The original five-arm development screen subsequently completed with selection status
+`screened_out`: frozen judge F1 0.823, original kNN exemplars 0.790, benefit router 0.823,
+student gold 0.672 and distilled student 0.678. No supervised extension was selected.
+These are focused development results under the original rendering, not held-out test
+results or evidence about the new compact variant. Completion and selection bindings
+are retained in the machine-readable binary-judge amendment.
