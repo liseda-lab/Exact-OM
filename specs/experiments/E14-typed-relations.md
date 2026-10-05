@@ -108,6 +108,29 @@ descriptor as ineligible and preserves the completed main experiment and failed 
 See the local `HANDOFF.md` and `integration.json` in the evidence directory for the branch,
 verification report, CI links, exact owner action and next admission/queue steps.
 
+### Publication-readiness review — 2026-10-05
+
+PR [#2](https://github.com/OAEI-ML/pyHermiT/pull/2) is now open. Two independent source
+reviews found the known memory, work and index repairs together, with no further proven
+package implementation defect in the E14 path. Both hosted workflows passed `e074de7`,
+including six native platforms and eight ABI3 checks. A verification gap was then closed
+on the same PR in `d8d7a2f`: installed native wheel suites now include 15 focused resource,
+index and deferred-identity cases. Those cases and 10 runner-contract tests pass locally;
+the updated head must pass hosted checks separately. No new version was published.
+
+Hold publication pending full-input candidate validation. First install a fresh candidate
+wheel and run a tiny strict native admission/bridge with the intended resource settings:
+config construction and the generic native probe alone cannot detect a stale extension's
+missing optional capabilities. Then validate full prepared NCIT, original DOID/imports and
+the actual training-anchor composed world. Separate admission does not prove combined-world
+consistency, endpoint satisfiability or entailment. Preserve all host/storage protections;
+compiler byte accounting is not a total-RSS limit. The historical recipe/frozen runtime
+must be replaced because it lacks the explicit symbol-index allowance.
+
+This review did not queue or start full-input validation. It needs the heavy lane after E21;
+active experiments and completed main E14 results remain unchanged. Detailed review and
+continuation: `data/experiments-v2/e14-pr2-review-20261005-01/HANDOFF.md` and `review.json`.
+
 Durable boundaries: **Typed train features/heads, bridge queries, typed predictions.**
 All changed inputs/semantics invalidate their consuming descendants; preserve valid upstream
 artifacts. Store completed source/request/fold IDs and attempt lineage. Tests must demonstrate
