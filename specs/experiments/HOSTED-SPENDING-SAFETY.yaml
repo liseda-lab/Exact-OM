@@ -1,7 +1,7 @@
 schema_version: 1
 amendment_id: hosted-prompt-and-spending-safety-20261005
 approved: true
-status: verified_preparing_prospective_deployment
+status: deployed_verified
 scope: All new paid experimental requests and future queued hosted workers
 scientific_changes:
   exemplar_renderer: compact-whole-facts-v1
@@ -41,3 +41,17 @@ verification:
     path: /home/pgcotovio/Exact-OM/data/experiments-v2/hosted-prompt-safety-20261005-01/compact-preflight.json
     sha256: 48c2981e32dea9d10bf86e92a012057d62b96da88568990fcd84d2e9bb8c9999
 handoff: ../../data/experiments-v2/hosted-prompt-safety-20261005-01/HANDOFF.md
+deployment:
+  supervisor_step: '14372.246'
+  source_commit: 07950b8f13abe730094907d2175f85d6aec97384
+  active_E14_step_preserved: '14372.232'
+  guarded_paid_launches: 6
+  reviewed_no_paid_call_launches: 3
+  historical_accounted_tokens: 96190067
+  next_campaign_alert: 100000000
+  maintenance_pause: removed
+  receipt: ../../data/experiments-v2/hosted-prompt-safety-20261005-01/deployment-verification.json
+remaining_limitations:
+  - Compact rendering quality not measured; no automatic paid rerun.
+  - External email transport unchanged; live test delivery not performed.
+  - Conservative unknown or orphan reservations require explicit reconciliation.

@@ -65,3 +65,10 @@ only prospective admission and family propagation changed. A crash after reservi
 but before recording the local attempt can leave conservative exposure that requires explicit
 reconciliation; it never silently frees uncertain spending. Warning delivery still depends on
 the existing email transport; the durable outbox and deterministic limits are independent.
+
+Deployed to supervisor step `14372.246` using frozen main commit `07950b8f13abe730094907d2175f85d6aec97384`.
+All nine prepared launches passed full checks after publication. Six use guarded paid paths;
+three have explicit no-new-paid-call exemptions. E14 step `14372.232` and the interactive
+allocation were retained. The maintenance pause is removed; deployment introduced zero paid
+calls and zero model repairs. See `deployment-verification.json` and `HANDOFF.md` for exact
+source bindings, worker adaptations, counters and remaining verification limits.
