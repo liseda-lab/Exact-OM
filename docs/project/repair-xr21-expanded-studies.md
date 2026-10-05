@@ -329,3 +329,27 @@ Call telemetry is persisted before artifact collection, and temporary debris is
 inventoried without reading or changing it; published artifacts still require
 hash validation. The full sixteen-row slice and 576-row diagnostic denominator
 remain, with no new semantic-quality, gate or learning-efficiency claim.
+
+## Development decoding receipt and readiness audit
+
+After all eighteen diagnostic slices finish, a separately frozen audit authenticates
+all 288 rows, the six-model validation and every original/replacement attempt.
+It binds nonce/step/exit receipts, frozen source/runtime, output manifests, row
+payloads, generation reports, search ledgers and settled costs. The two recovered
+cleanup rows retain their original errors, spent effort and unknown outcomes;
+completed rows and untouched suffixes keep their exact recovery provenance.
+
+The audit reports all 32 development cases, sixteen parents and nine arms,
+including timeouts and unsupported bundles. Known selected scores require a native
+authorizing assignment, the original query identity, selected label and persisted
+native call evidence. Backend/check details and the declared desired, unwanted
+and nonvacuity query coverage remain explicit. This makes no new native calls,
+opens no held-out payloads, admits no supervision and does not establish G0-G2.
+
+The original 160-case label limitations and mapped fixture evidence remain bound.
+Native intended-parent/query eligibility, actual supervised generated acquisition,
+optimizer capacity, development checkpoint selection, eighteen strict fitting
+protocols, 64-case held-out matched semantic controls and final reporting remain
+registered obligations. Disposable diagnostic weights cannot become warm starts,
+teachers or selected research checkpoints. The audit closes only this receipt
+prerequisite, not the larger training study.
