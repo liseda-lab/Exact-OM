@@ -457,3 +457,34 @@ denominator. All original artifacts, failed-attempt costs and the 2,880-row
 study denominator remain. This reconciliation does not resolve the underlying
 native teardown cause or establish semantic quality, research gates or learning
 efficiency. Downstream robustness slices and final reporting remain registered.
+
+## Fresh-evaluation intended-parent resource qualification
+
+The completed common-inventory audit authenticates 576 rows and 39 attempts;
+it does not qualify the intended theories or extend the query basis. A separate
+resource experiment checks all 64 original fresh-evaluation cases and 32 paired
+parents, in immutable release order. Its 600-wall/1200-CPU/8192-MiB intended-only
+allowance is inherited from the completed development resource experiment,
+whose native checks took 3.29–183.84 seconds. No fresh arm outcome selects cases,
+settings or budgets. Original 300-wall/600-CPU arm comparisons, 60-second
+generation allowances, models, selected labels and unknowns remain unchanged.
+Eight cases form each 5400-second operational slice; native fixture validation
+precedes the eight slices. This is separately charged qualification, not a replay
+of primary or common-inventory arm rows.
+
+The frozen plan binds the original fresh release, structural fingerprints,
+clean/corrupted pairing, intended theories, policies and typed query identities.
+The worker checks the intended policy and then every original query, persisting
+backend/support receipts and fsynced per-obligation progress. The original guard's
+feasible-and-query-complete condition remains separate from actual satisfaction
+of the desired/unwanted targets. Typed nonvacuity is derived where not explicitly
+declared; the original basis has no unwanted probes, and none are added.
+
+All native unknowns, timeouts and partial evidence retain their denominators.
+An interrupted row requires ownership and spent-budget reconciliation; saved
+rows are never implicitly replayed. Qualification results are evaluator-only,
+with no fitting, checkpoint selection, generated-assignment supervision or
+replacement of earlier labels. Native receipt and query-eligibility review,
+required semantic-control review under an outcome-independent design, and the
+failure-inclusive parent-group final report remain registered. This experiment
+does not establish strongest-symbolic comparisons, G0-G2 or learning efficiency.

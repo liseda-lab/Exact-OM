@@ -81,6 +81,11 @@ def case_worker(record, directory):
     case = case_from_dict(record)
     if case.split != 'development' or case.schema_revision != 'v3':
         raise ValueError('Intended resource worker only admits development v3')
+    return check_intended(case, directory)
+
+
+def check_intended(case, directory):
+    """Check a caller-qualified case; persist policy and typed-query evidence."""
     directory = Path(directory)
     verifier = ProgressVerifier(directory / 'native')
     snapshot = snapshot_from_axioms(case.intended_theory)
@@ -103,7 +108,7 @@ def case_worker(record, directory):
     return result
 
 
-def one_case(row, record, case, output, identity, budget):
+def one_case(row, record, case, output, identity, budget, *, worker=case_worker, schema=SCHEMA):
     directory = Path(output) / 'cases' / canonical_hash((case.case_id, row['case_hash']))
     receipt, guard = directory / 'completion.json', directory / 'inflight.json'
     expected = canonical_hash((identity, row))
@@ -124,7 +129,7 @@ def one_case(row, record, case, output, identity, budget):
         raise RuntimeError('Interrupted native resource row needs owner/budget reconciliation')
     write_artifact(guard, dict(identity=expected, case_id=case.case_id, started_epoch=time.time()))
     began = time.monotonic()
-    call = bounded_call(case_worker, record, str(directory), timeout=budget['wall_seconds'],
+    call = bounded_call(worker, record, str(directory), timeout=budget['wall_seconds'],
                         cpu_seconds=budget['cpu_seconds'], memory_mb=budget['memory_mb'])
     # Persist outer errors before hashing or deciding whether recovery is safe.
     write_artifact(directory / 'call.json', dict(status=call.status, detail=call.detail,
@@ -136,7 +141,7 @@ def one_case(row, record, case, output, identity, budget):
     status = call.status if value is None else (
         'qualified' if value['original_guard_passed'] and value['intended_target_satisfied'] else
         'intended_target_mismatch' if value['original_guard_passed'] else 'native_unknown_or_infeasible')
-    saved = checkpoint(receipt, expected, schema=SCHEMA, case_id=case.case_id,
+    saved = checkpoint(receipt, expected, schema=schema, case_id=case.case_id,
         parent=case.structural_parent, family=case.family, split=case.split, control=case.control,
         status=status, outer_status=call.status, detail=call.detail,
         cleanup_complete=call.cleanup_complete, resources=dict(call.resource_usage),
