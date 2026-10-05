@@ -184,3 +184,16 @@ removal, or inapplicability is a deliverable; an unimplemented arm is not an emp
 Resolve this family's question into numbered research questions and a primary endpoint in the
 executable design before its screen; answer each as supported, not supported or inconclusive
 with evidence. RUN-PLAN section 7 governs incomplete references and claim limitations.
+
+### Candidate validation queue published — 2026-10-05
+
+`e14-pr2-validation-20261005-01/publication.json` now records atomic publication of the
+admission → bridge chain after E21, with the other 11 pending batches gated on successful
+bridge validation. Independent descriptor review and eight scheduler-state simulations
+passed; the post-publication check preserved existing runs, prior dependencies and held E14.
+The optimized installed candidate passed 15 resource cases plus tiny admission/bridge/resume;
+Exact's candidate gate and prepared diagnostics passed 36 tests at `b463e45c`.
+Full-input validation remains pending, so this is neither a full-input pass nor release
+readiness. The initial updated wheel-matrix CI exposed missing native pyowl-core test
+prerequisites on three platforms; its correction is separate from the pinned candidate
+compiler, and publication still requires owner review of CI and full-input results.

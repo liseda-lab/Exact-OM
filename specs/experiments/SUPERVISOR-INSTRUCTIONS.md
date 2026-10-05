@@ -71,7 +71,9 @@ work. Use the supplied incident and machine observations to locate current evide
   The 11 other pending batches must depend on bridge validation, retaining original
   prerequisites; leave held `E14-bridge-run-once-followup` unchanged. Success releases
   ordinary eligibility; failure retains the gate for bounded repair or a user decision.
-  Preserve this gate in recovery descendants and newly prepared batches while it is active.
+  Preserve this gate in recovery descendants of gated batches and newly prepared scientific
+  batches while it is active. Repairs of prerequisite E21 or the validation chain must keep
+  the dependency graph acyclic and may precede this gate.
   This explicit user amendment supersedes earlier frozen instructions only for candidate
   validation and its priority. It permits no merge, publication, production environment
   change or automatic scientific promotion. Read

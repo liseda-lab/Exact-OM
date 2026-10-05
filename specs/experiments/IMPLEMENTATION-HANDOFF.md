@@ -268,3 +268,19 @@ Preparation and execution evidence belong under
 receipts for subsequent state; no full-input pass, queue submission or release readiness is
 claimed here. Existing E21 work, completed main E14 results and failed-attempt costs remain
 preserved. The exact protocol is in [E14](E14-typed-relations.md).
+
+### E14 candidate validation queued — 2026-10-05
+
+The above chain is now queued: its `publication.json`, `queue-verification.json` and
+`post-publication-check.json` establish actual publication and priority, with E21 and the
+existing supervisor still live. Both workers use frozen Exact `b463e45c`, the isolated
+optimized PR2 wheel, matching explicit memory/work/index options, and the reviewed storage
+guard. The bridge's candidate-only query-evidence check prevents unsupported/error
+abstentions from counting as a successful validation. Its protocol remains 300 sources,
+935 query pairs and 3,680 public training anchors; no hosted calls or rationales.
+
+Local verification: 15 installed-wheel resource cases and tiny native/checkpoint checks;
+36 Exact diagnostic/gate tests. Full ontology admission and bridge execution have not yet
+started. The GitHub matrix's missing-native-core prerequisite is being repaired separately;
+local fixture success does not establish release readiness. Monitor the two queued roots
+named above after E21 finishes. No long validation monitoring or supervisor restart is needed.
