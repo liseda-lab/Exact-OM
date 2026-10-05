@@ -131,6 +131,35 @@ This review did not queue or start full-input validation. It needs the heavy lan
 active experiments and completed main E14 results remain unchanged. Detailed review and
 continuation: `data/experiments-v2/e14-pr2-review-20261005-01/HANDOFF.md` and `review.json`.
 
+### User-authorized candidate-first validation — 2026-10-05
+
+The user now authorizes queuing PR #2 candidate `d8d7a2f` ahead of all other pending work,
+after active `E21-binary-recovery-01` finishes. Install a real optimized candidate wheel in
+a fresh isolated environment; do not use a source-path override or change production
+environments. Before full inputs, require the installed-wheel resource/identity cases and
+a tiny strict native admission/bridge with the combined intended memory, work and index
+allowances. Preserve native package identities and the approved metadata-only preparation.
+
+The planned chain is `E14-pr2-native-admission-20261005-01` (full prepared NCIT and original
+DOID/imports), then `E14-pr2-bridge-validation-20261005-01` (the existing full 300-source,
+seed-17 diagnostic with all public training anchors and per-query checkpoints). Use the
+existing prepared diagnostic runner, public train/valid roles, no hosted calls or rationales,
+and detached numeric Slurm steps. Retain host/storage guards, no imposed time deadline and
+the latest cumulative accounting, copied only at dispatch.
+
+Append the bridge-validation dependency to the 11 other pending batches, preserving their
+original dependencies; leave held `E14-bridge-run-once-followup` unchanged. Successful bridge
+completion releases ordinary queue eligibility automatically. Failure keeps the gate in
+place for bounded repair or an explicit user decision; do not bypass it as optional work.
+This scoped authorization supersedes the earlier unpublished-package and independent-work
+instructions only for this candidate validation. It authorizes no merge, package publication,
+production integration or automatic promotion of candidate outputs into scientific results.
+
+Operational root: `data/experiments-v2/e14-pr2-validation-20261005-01/`.
+**Preparation only until its `publication.json` records actual queue publication.** That
+receipt establishes scheduling, not successful admission, completed validation or release
+readiness; those require their own execution evidence.
+
 Durable boundaries: **Typed train features/heads, bridge queries, typed predictions.**
 All changed inputs/semantics invalidate their consuming descendants; preserve valid upstream
 artifacts. Store completed source/request/fold IDs and attempt lineage. Tests must demonstrate

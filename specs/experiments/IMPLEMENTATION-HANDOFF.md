@@ -243,3 +243,28 @@ Validation: 176 finalization regression tests, 14 E01 queue/report checks, and
 96 combined supervisor/notification tests passed. The final Gmail parser and receipt
 recovery check passed 13 focused tests after testing real delivery. Counts overlap;
 no unique total is implied. Lint/format checks passed for the supervisor changes.
+
+## E14 candidate-first validation authorized — 2026-10-05
+
+The user authorized PR #2 candidate `d8d7a2f` validation before other pending work, after
+active E21. Prepare a fresh isolated environment with a real optimized candidate wheel;
+verify installed-wheel resource/identity cases and tiny native admission/bridge with all
+three resource controls before full ontology work. The planned detached Slurm chain is
+`E14-pr2-native-admission-20261005-01` (full prepared NCIT, original DOID/imports), followed
+by `E14-pr2-bridge-validation-20261005-01` (unchanged 300-source, seed-17 public-development
+diagnostic and full training anchors). Reuse verified preparation, preserve checkpoints,
+and inherit the latest cumulative account at dispatch; keep host/storage guards enabled.
+
+The 11 other pending batches gain the bridge-validation prerequisite without losing their
+existing dependencies. Held actual `E14-bridge-run-once-followup` remains unchanged. A passed
+bridge restores ordinary queue eligibility automatically; a failed gate stays for bounded
+repair or an explicit user decision. This scoped amendment overrides prior frozen supervisor
+instructions about unpublished packages and independent work only for this validation.
+It grants no merge, publication, production integration or automatic scientific promotion.
+
+Preparation and execution evidence belong under
+`data/experiments-v2/e14-pr2-validation-20261005-01/`. **This is preparation until
+`publication.json` records actual queue publication.** Consult its handoff and terminal
+receipts for subsequent state; no full-input pass, queue submission or release readiness is
+claimed here. Existing E21 work, completed main E14 results and failed-attempt costs remain
+preserved. The exact protocol is in [E14](E14-typed-relations.md).

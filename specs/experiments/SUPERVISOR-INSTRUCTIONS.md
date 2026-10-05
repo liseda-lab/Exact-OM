@@ -62,6 +62,22 @@ work. Use the supplied incident and machine observations to locate current evide
   release is published and freshly admitted; do not drop required resource options, install
   unpublished experiment code or repeat a known-cap failure. See E14's dated integration
   amendment. Independent eligible experiments continue.
+- Scoped exception approved on 2026-10-05: validate PR #2 candidate `d8d7a2f` first after
+  active E21, using an optimized wheel installed only in a fresh isolated environment.
+  Require installed-wheel resource/identity cases and tiny native admission/bridge with
+  combined controls before full input. Planned chain:
+  `E14-pr2-native-admission-20261005-01`, then `E14-pr2-bridge-validation-20261005-01`.
+  Preserve the existing full NCIT/DOID admission and 300-source, seed-17 bridge protocol.
+  The 11 other pending batches must depend on bridge validation, retaining original
+  prerequisites; leave held `E14-bridge-run-once-followup` unchanged. Success releases
+  ordinary eligibility; failure retains the gate for bounded repair or a user decision.
+  Preserve this gate in recovery descendants and newly prepared batches while it is active.
+  This explicit user amendment supersedes earlier frozen instructions only for candidate
+  validation and its priority. It permits no merge, publication, production environment
+  change or automatic scientific promotion. Read
+  `data/experiments-v2/e14-pr2-validation-20261005-01/HANDOFF.md`; treat the chain as
+  preparation until its `publication.json` proves queue publication. Queue publication
+  is not proof of validation success. Preserve normal host/storage guards and accounting.
 - All experimental generative calls use OpenRouter under their declared accounting and role
   controls. Preserve historical cache-only queues; prepare separate properly bound roles for
   new authorized hosted comparisons rather than reusing a cached-only template. Replay identical
