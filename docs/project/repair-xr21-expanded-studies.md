@@ -488,3 +488,26 @@ replacement of earlier labels. Native receipt and query-eligibility review,
 required semantic-control review under an outcome-independent design, and the
 failure-inclusive parent-group final report remain registered. This experiment
 does not establish strongest-symbolic comparisons, G0-G2 or learning efficiency.
+
+## Fresh qualification and required-control scope review
+
+A separate receipt review authenticates all nine intended-resource attempts and
+all 64 cases/32 parents. It reconstructs policy and typed-query identities from
+the frozen cases, checks the actual intended-theory fingerprint, backend/support
+records and fsynced completed obligations, and recomputes semantic masks and
+qualification from those saved native outcomes. It makes no new reasoning calls
+and changes no primary or common-inventory result. Unknowns and mismatches retain
+their original denominator; passing intended theories does not label a selected
+repair or supply an inference-time semantic target.
+
+The source-bound control review distinguishes the retained-original-axiom
+heuristic, zero-benefit rich-action control and keep/delete language ablation.
+The historical controls do not qualify the strongest symbolic semantic baseline.
+Existing grammar/semantic circuit and decoder code is implementation evidence,
+not fresh matched-comparison evidence. Required observable-only semantic-control
+implementation and development qualification, separately frozen fresh matched
+control evaluation, and final parent-group reporting remain registered. Hidden
+intended theories, evaluator queries and post-selection labels cannot become
+control evidence. Any new comparison retains original cases, models, languages,
+scientific budgets and failure denominators, with development-only settings and
+separate charged receipts. This review does not establish G0-G2 or close the study.
