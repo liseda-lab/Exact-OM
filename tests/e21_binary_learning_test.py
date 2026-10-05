@@ -1,5 +1,6 @@
 """Train-only binary E21 interventions preserve the selected source scoring rule."""
 
+import json
 from copy import deepcopy
 from types import SimpleNamespace
 
@@ -101,6 +102,24 @@ def fit(model, path, *, frame=None, application=None):
         config=model.llm_experiment_config,
         application=APPLICATION if application is None else application,
     )
+
+
+def test_compact_exemplar_rendering_identity_changes_the_frozen_training_artifact(
+    tmp_path, monkeypatch
+):
+    from exact.impl.models.selector.llm_learning import EXEMPLAR_RENDERING
+
+    model = BinaryTeacher(gate="source_top_fraction")
+    model.llm_experiment_config["exemplars"] = "knn"
+    first = fit(model, tmp_path)
+    path = first["exemplar_artifact"]
+    assert first["exemplars"]["exemplar_rendering"] == EXEMPLAR_RENDERING
+    monkeypatch.setitem(EXEMPLAR_RENDERING, "version", "fixture-new-rendering")
+    second = fit(model, tmp_path)
+    assert second["exemplar_artifact"] != path
+    with open(path) as stream:
+        assert json.load(stream)["exemplar_rendering"]["version"] != EXEMPLAR_RENDERING["version"]
+    assert not model.calls
 
 
 def test_binary_counterfactual_uses_beta_uncertainty_threshold_and_full_source_pool(tmp_path):

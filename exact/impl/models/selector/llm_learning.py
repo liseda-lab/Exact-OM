@@ -4,15 +4,149 @@ from __future__ import annotations
 
 import json
 import math
+from itertools import zip_longest
 from pathlib import Path
 
 import torch
+
+from exact.llm.prompt_budget import PromptBudgetError
 
 from .fitting import fingerprint, freeze_json, safe_training_labels
 from .oracle_replay import _outcome
 
 PAIR_FEATURES = ["S_base", "U", "q_lex", "Q_struct"]
 SOURCE_FEATURES = ["top_score", "top_two_margin", "candidate_entropy", "displayed_count"]
+EXEMPLAR_RENDERING = {
+    "version": "compact-whole-facts-v1",
+    "max_input_tokens": 2500,
+    "max_utf8_bytes": 12000,
+    "selection": "fair-first-fact-then-candidate-round-robin-packet-order",
+}
+
+
+def _exemplar_evidence(candidate):
+    """Project semantic facts, excluding repeated transport/provenance fields."""
+    packet = candidate["evidence"]
+    packet = json.loads(packet) if isinstance(packet, str) else packet
+    if not isinstance(packet, dict) or not isinstance(packet.get("facts"), list):
+        raise ValueError("Compact exemplars require structured evidence packets")
+    if any(not isinstance(packet.get(key), str) for key in ("source_label", "target_label")):
+        raise ValueError("Compact exemplars require source and target labels")
+    facts, seen = [], set()
+    for raw in packet["facts"]:
+        if not isinstance(raw, dict) or raw.get("side") not in {"source", "target"}:
+            raise ValueError("Compact exemplar fact has no valid evidence side")
+        fact = {key: raw[key] for key in ("side", "group") if key in raw}
+        if "triple" in raw:
+            if not isinstance(raw["triple"], list) or len(raw["triple"]) != 3:
+                raise ValueError("Compact exemplar triples must retain all three terms")
+            fact["triple"] = raw["triple"]
+        elif isinstance(raw.get("text"), str) and raw.get("property_iri"):
+            fact.update(property=raw["property_iri"], text=raw["text"])
+        else:
+            raise ValueError("Compact exemplar fact has no complete semantic representation")
+        fact.update(
+            (key, raw[key])
+            for key in ("datatype", "language", "state", "contradiction_semantics")
+            if raw.get(key) not in (None, "")
+        )
+        identity = json.dumps(fact, ensure_ascii=False, sort_keys=True)
+        if identity not in seen:
+            facts.append(fact)
+            seen.add(identity)
+    return packet, facts
+
+
+def _compact_exemplars(selected, tokenizer):
+    """Keep every selected identity/label and budget only complete evidence facts."""
+    header = (
+        "\nTraining-only examples (their gold labels concern other sources). "
+        "Facts are a budgeted subset; omitted or absent facts are unknown, not contradictions.\n"
+    )
+    examples, slots = [], []
+    for row in selected:
+        example = {"source": row["source"], "candidates": []}
+        for candidate in row["candidates"]:
+            packet, facts = _exemplar_evidence(candidate)
+            example.setdefault("source_label", packet["source_label"])
+            if not isinstance(candidate["equivalent"], bool):
+                raise ValueError("Exemplar gold labels must be Boolean")
+            rendered = {
+                "target": candidate["target"],
+                "target_label": packet["target_label"],
+                "equivalent": candidate["equivalent"],
+                "facts": [],
+                "omitted_facts": len(facts),
+            }
+            if packet["source_label"] != example["source_label"]:
+                rendered["source_label"] = packet["source_label"]
+            example["candidates"].append(rendered)
+            slots.append((rendered, facts))
+        examples.append(example)
+
+    def render():
+        return header + json.dumps(examples, ensure_ascii=False, separators=(",", ":"))
+
+    def measure(text):
+        return len(tokenizer.encode(text, add_special_tokens=False)), len(text.encode("utf-8"))
+
+    def fits(counts):
+        return (
+            counts[0] <= EXEMPLAR_RENDERING["max_input_tokens"]
+            and counts[1] <= EXEMPLAR_RENDERING["max_utf8_bytes"]
+        )
+
+    counts = measure(render())
+    if not fits(counts):
+        raise PromptBudgetError("Compact exemplar identities and labels exceed the input budget")
+    # Count facts individually first: avoid repeatedly tokenizing the complete suffix.
+    # The final measurement below accounts for tokenizer boundary interactions exactly.
+    added, remaining = [], []
+    evidence_slots = sum(bool(facts) for _, facts in slots)
+    fair_tokens = (EXEMPLAR_RENDERING["max_input_tokens"] - counts[0]) // max(evidence_slots, 1)
+    fair_bytes = (EXEMPLAR_RENDERING["max_utf8_bytes"] - counts[1]) // max(evidence_slots, 1)
+    for rendered, facts in slots:
+        pending = []
+        for fact in facts:
+            encoded = json.dumps(fact, ensure_ascii=False, separators=(",", ":"))
+            size = len(encoded.encode("utf-8")) + 1
+            if size > EXEMPLAR_RENDERING["max_utf8_bytes"]:
+                continue
+            tokens = measure(encoded)[0] + 8
+            if not rendered["facts"] and tokens <= fair_tokens and size <= fair_bytes:
+                rendered["facts"].append(fact)
+                rendered["omitted_facts"] -= 1
+                added.append(rendered)
+                counts = (counts[0] + tokens, counts[1] + size)
+            else:
+                pending.append((fact, tokens, size))
+        remaining.append(pending)
+    if any(facts and not row["facts"] for row, facts in slots):
+        raise PromptBudgetError(
+            "Compact exemplar budget cannot retain evidence for every candidate"
+        )
+    for facts_at_rank in zip_longest(*remaining):
+        for (rendered, _), item in zip(slots, facts_at_rank):
+            if item is None:
+                continue
+            fact, tokens, size = item
+            prospective = (counts[0] + tokens, counts[1] + size)
+            if fits(prospective):
+                rendered["facts"].append(fact)
+                rendered["omitted_facts"] -= 1
+                added.append(rendered)
+                counts = prospective
+    text = render()
+    while not fits(measure(text)) and added:
+        rendered = added.pop()
+        rendered["facts"].pop()
+        rendered["omitted_facts"] += 1
+        text = render()
+    if not fits(measure(text)) or any(facts and not row["facts"] for row, facts in slots):
+        raise PromptBudgetError(
+            "Compact exemplar budget cannot retain evidence for every candidate"
+        )
+    return text
 
 
 def source_features(scores):
@@ -171,6 +305,8 @@ def exemplar_context(model, source_iri, candidate_scores):
     """Shared source-level retrieval for the selected binary or comparative prompt."""
     payload = model._exemplar_artifact
     validate_learning_binding(payload, model, [source_iri])
+    if payload.get("exemplar_rendering") != EXEMPLAR_RENDERING:
+        raise ValueError("Exemplar rendering identity changed; prepare a new training artifact")
     profile = source_features(candidate_scores)
     ordered = sorted(
         [row for row in payload["examples"] if row["source"] != source_iri],
@@ -180,9 +316,10 @@ def exemplar_context(model, source_iri, candidate_scores):
         ),
     )
     selected = ordered[: min(3, int(model.llm_experiment_config.get("exemplar_count", 3)))]
-    text = "\nTraining-only examples (their gold labels concern other sources):\n" + json.dumps(
-        [{key: row[key] for key in ("source", "candidates")} for row in selected], sort_keys=True
-    )
+    router = model._llm_router
+    profile_name = router.routing.decision_profile or router.routing.default_profile
+    tokenizer = model._get_hosted_decision_tokenizer(router.profiles[profile_name])
+    text = _compact_exemplars(selected, tokenizer)
     return text, [row["source"] for row in selected]
 
 
@@ -304,6 +441,8 @@ def fit_llm_artifacts(model, frame, reference_pairs, directory, *, config, appli
             frame.get("llm_evidence_packet", []).tolist() if "llm_evidence_packet" in frame else []
         ),
     }
+    if config.get("exemplars") == "knn":
+        recipe["exemplar_rendering"] = dict(EXEMPLAR_RENDERING)
     directory = Path(directory) / ("llm-" + fingerprint(recipe))
     common = {
         "schema_version": 1,
@@ -338,6 +477,7 @@ def fit_llm_artifacts(model, frame, reference_pairs, directory, *, config, appli
             **common,
             "kind": "llm_exemplars",
             "feature_schema": SOURCE_FEATURES,
+            "exemplar_rendering": dict(EXEMPLAR_RENDERING),
             "examples": examples,
         }
         result["exemplars"] = freeze_json(directory / "exemplars.json", payload)
