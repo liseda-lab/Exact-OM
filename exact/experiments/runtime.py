@@ -6,6 +6,7 @@ import hashlib
 import inspect
 import json
 import os
+import re
 import shutil
 import sqlite3
 from pathlib import Path
@@ -37,6 +38,23 @@ def _write(path: Path, value: Mapping[str, Any]) -> None:
         stream.flush()
         os.fsync(stream.fileno())
     os.replace(temporary, path)
+
+
+def hosted_scope_environment(
+    campaign_id: str, family: str, *, policy: Mapping[str, Any] | None = None
+) -> dict[str, str]:
+    """Bind paid work to the declared scientific family, never its recovery name."""
+    selected = load_spending_policy() if policy is None else policy
+    if not selected or selected["policy"].get("mode") != "hard_pause":
+        return {}
+    if campaign_id != selected["policy"]["campaign_id"]:
+        raise ValueError("Hosted spending campaign differs from the frozen campaign")
+    if not isinstance(family, str) or not re.fullmatch(r"E[0-9]{2}|G0", family):
+        raise ValueError("Hosted spending requires the frozen canonical experiment family")
+    return {
+        "EXACT_HOSTED_CAMPAIGN_ID": campaign_id,
+        "EXACT_HOSTED_EXPERIMENT_ID": family,
+    }
 
 
 def _files(root: Path, directories: Sequence[str]) -> dict[str, Path]:
@@ -359,6 +377,12 @@ class CellRecovery:
         policy = load_spending_policy(self.metadata.get("spending_policy"))
         if policy:
             budget = spending_policy_environment(policy)
+            scope = self.metadata.get("hosted_scope", {})
+            budget.update(
+                hosted_scope_environment(
+                    scope.get("campaign_id"), scope.get("experiment_id"), policy=policy
+                )
+            )
         return {
             **budget,
             **{

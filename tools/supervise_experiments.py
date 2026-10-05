@@ -145,6 +145,8 @@ def slurm_steps(allocation):
 def eligible(state, incident, policy, now):
     """Bound retries of one unresolved error; a daily cap is optional."""
     record = state["incidents"][incident["id"]]
+    if incident["kind"] == "hosted_spending_pause":
+        return False, "requires_user"
     if record.get("needs_user"):
         return False, "requires_user"
     if record.get("attempts", 0) >= policy["max_attempts_per_incident"]:
@@ -308,6 +310,8 @@ def refresh_progress(policy, directory):
 
 def observe_hosted_spending(directory, policy, registry, *, act=False):
     """Queue a requested milestone independently of repairs and dispatch admission."""
+    if policy.get("hosted_spending_policy"):
+        return observe_hosted_limits(directory, policy, act=act)
     config = policy.get("hosted_spending_milestone")
     if config is None:
         return None
@@ -345,6 +349,135 @@ def observe_hosted_spending(directory, policy, registry, *, act=False):
     except OSError as exc:
         result["persistence_error"] = type(exc).__name__
     return result
+
+
+def observe_hosted_limits(directory, policy, *, act=False):
+    """Observe the shared admission store; historical approvals seed acknowledgments."""
+    from exact.llm.spending_admission import admission_snapshot
+
+    result = {"checked_at": timestamp(), "mode": "hard_pause"}
+    try:
+        result.update(admission_snapshot(policy["hosted_spending_policy"]))
+        result["snapshot_valid"] = True
+        result["status"] = "observed"
+        campaign = result["campaign_id"]
+        interval = result["notification_tokens"]
+        path = directory / "hosted-spending-acknowledged.json"
+        acknowledged = read(path) if path.exists() else {
+            "campaign_id": campaign,
+            "campaign_tokens": result["historical_tokens"] // interval * interval,
+            "experiments": [name for name, row in result["experiments"].items()
+                            if row["historical_tokens"] >= result["experiment_warning_tokens"]],
+        }
+        if acknowledged["campaign_id"] != campaign:
+            raise ValueError("Hosted milestone acknowledgments belong to another campaign")
+        legacy = policy.get("hosted_spending_milestone")
+        if legacy:
+            ident = hashlib.sha256(json.dumps([
+                "hosted-token-milestone:" + legacy["id"], "hosted_token_milestone"
+            ]).encode()).hexdigest()[:24]
+            if (directory / "alerts" / (ident + ".json")).exists():
+                acknowledged["campaign_tokens"] = max(
+                    acknowledged["campaign_tokens"], legacy["notification_tokens"]
+                )
+        messages = []
+        for threshold in range(
+            acknowledged["campaign_tokens"] + interval, result["accounted_tokens"] + 1, interval
+        ):
+            messages.append((
+                f"hosted-token-interval:{campaign}:{threshold}",
+                f"Campaign hosted usage crossed {threshold:,} tokens.",
+            ))
+        for name, row in sorted(result["experiments"].items()):
+            if (name not in acknowledged["experiments"]
+                    and row["accounted_tokens"] >= result["experiment_warning_tokens"]):
+                messages.append((
+                    f"hosted-experiment-warning:{campaign}:{name}:{result['experiment_warning_tokens']}",
+                    f"{name} hosted usage reached {row['accounted_tokens']:,} tokens; "
+                    f"new paid requests pause at "
+                    f"{result.get('experiment_tokens_caps', {}).get(name, result['experiment_tokens_cap']):,} tokens.",
+                ))
+        result["notifications"] = []
+        if act:
+            for identifier, reason in messages:
+                result["notifications"].append(notify_intervention(
+                    directory, {"id": identifier, "kind": "hosted_token_milestone",
+                                "run_ids": [], "reason": reason},
+                    "hosted_token_milestone", reason +
+                    f" Campaign accounted total: {result['accounted_tokens']:,}; "
+                    f"in-flight reservations: {result['reserved_tokens']:,}. "
+                    f"Provider-reported campaign cost: ${result['reported_cost_usd']:.6f}; "
+                    f"{result['unpriced_attempts']:,} attempts have no reported price. "
+                    "This warning does not interrupt work; admission ceilings require explicit approval.",
+                    config=policy.get("notifications", {}),
+                    handoff=str(directory / "hosted-spending.json"), defer=True,
+                ))
+                if not Path(result["notifications"][-1]["path"]).is_file():
+                    raise OSError("Hosted milestone outbox receipt was not persisted")
+            # The outbox supplies restart-safe deduplication if this write fails.
+            acknowledged["campaign_tokens"] = max(
+                acknowledged["campaign_tokens"], result["accounted_tokens"] // interval * interval
+            )
+            acknowledged["experiments"] = sorted(set(acknowledged["experiments"]) | {
+                name for name, row in result["experiments"].items()
+                if row["accounted_tokens"] >= result["experiment_warning_tokens"]
+            })
+            write(path, acknowledged)
+    except Exception as exc:
+        result.update(status="unavailable", error=type(exc).__name__ + ": " + str(exc))
+    write(directory / "hosted-spending.json", result)
+    return result
+
+
+def prioritize_hosted_pauses(spending, registry, observation):
+    """Replace generic retries for an actual paid-call denial with approval incidents."""
+    if not spending or not spending.get("snapshot_valid") or not spending.get("pauses"):
+        return
+    pauses = [row for row in spending["pauses"] if row.get("active")]
+    if not pauses:
+        return
+    scopes = {}
+    scoped_runs = list(registry["runs"])
+    for batch in registry.get("pending_batches", []):
+        run = (batch.get("launch") or {}).get("run", {})
+        if run.get("hosted_scope"):
+            scoped_runs.extend([run, {**run, "id": batch["id"]}])
+    for run in scoped_runs:
+        scope = run.get("hosted_scope")
+        if scope is None and run.get("status_path"):
+            path = Path(run["status_path"]).parent / "hosted-scope.json"
+            if path.exists():
+                scope = read(path)
+        if scope and scope.get("campaign_id") == spending["campaign_id"]:
+            scopes[run["id"]] = scope["experiment_id"]
+    affected = {
+        name for name, family in scopes.items()
+        if any(row["scope"] == "campaign" or row["experiment_id"] == family for row in pauses)
+    }
+    blocked = []
+    for row in pauses:
+        scope = row["experiment_id"] if row["scope"] == "experiment" else spending["campaign_id"]
+        blocked.append({
+            "id": "hosted-spend-pause:" + str(row["id"]),
+            "kind": "hosted_spending_pause", "run_ids": sorted(
+                name for name, family in scopes.items()
+                if row["scope"] == "campaign" or row["experiment_id"] == family
+            ),
+            "reason": f"{scope} hosted admission paused at {row['accounted_tokens']:,} tokens: "
+                      f"the next {row['requested_tokens']:,}-token reservation exceeds "
+                      f"the approved {row['limit']:,} ceiling. Explicit user approval is required; "
+                      "do not repair, requeue, clear the pause or raise the limit automatically.",
+        })
+    retry_kinds = {"run_failed", "launcher_failed", "step_missing", "completion_failed", "dispatch_failed", "next_batch"}
+    observation["incidents"] = blocked + [
+        row for row in observation["incidents"]
+        if row["kind"] != "hosted_spending_pause" and not (row["kind"] in retry_kinds and (
+            set(row.get("run_ids", [])) & affected
+            or "HostedSpendPause" in row.get("reason", "")
+            or "Hosted spending paused:" in row.get("reason", "")
+        ))
+    ]
+    observation["status"] = "needs_attention"
 
 
 def notify_blocker(directory, policy, incident, action, *, result=None, report=None):
@@ -424,6 +557,23 @@ def notification_worker(directory, policy, stop_event):
 def validate_prepared_launch(launch, policy, directory):
     storage_guard.validate_launch(launch, policy, directory)
     hosted_prompt_guard.validate_launch(launch, policy)
+    if policy.get("hosted_spending_policy") and launch.get("hosted_prompt_guard"):
+        from exact.llm.spending_admission import HostedSpendPause, admission_snapshot
+
+        receipt = read(Path(launch["hosted_prompt_guard"]["path"]))
+        if receipt.get("mode") == "no_new_hosted_calls":
+            return
+        environment = read(Path(receipt["environment"]["path"]))
+        snapshot = admission_snapshot(policy["hosted_spending_policy"])
+        scope = launch.get("run", {}).get("hosted_scope", {})
+        family = scope.get("experiment_id")
+        if (environment.get("EXACT_HOSTED_CAMPAIGN_ID") != snapshot["campaign_id"]
+                or scope.get("campaign_id") != snapshot["campaign_id"] or not family
+                or environment.get("EXACT_HOSTED_EXPERIMENT_ID", family) != family):
+            raise ValueError("Prepared hosted launch lacks its stable campaign/experiment scope")
+        for pause in snapshot["pauses"]:
+            if pause["active"] and (pause["scope"] == "campaign" or pause["experiment_id"] == family):
+                raise HostedSpendPause({**pause, "campaign_id": snapshot["campaign_id"]})
 
 
 def dispatch_worker(directory, policy, stop_event):
@@ -506,6 +656,7 @@ def check(directory, policy, state, *, act=False, stop_requested=lambda: False):
     if mail_incidents:
         observation["incidents"].extend(mail_incidents)
         observation["status"] = "needs_attention"
+    prioritize_hosted_pauses(spending, registry, observation)
     if suppressed and not observation["incidents"]:
         observation["status"] = "waiting"
     now = time.time()
@@ -554,7 +705,7 @@ def check(directory, policy, state, *, act=False, stop_requested=lambda: False):
             confirmed = incident["kind"] not in {"step_missing", "inspect_evidence"} or (
                 record["observations"] >= 2 and now - record.get("first_seen_epoch", now) >= 60
             )
-            if incident["kind"] != "next_batch" and confirmed:
+            if incident["kind"] not in {"next_batch", "hosted_spending_pause"} and confirmed:
                 notify_blocker(directory, policy, incident, "problem_detected")
                 record["alerted"] = True
         write(directory / "state.json", state)
@@ -669,6 +820,12 @@ def validate_policy(policy):
         storage_guard.validate_policy(policy["storage_guard"])
     if policy.get("hosted_prompt_guard") is not None:
         hosted_prompt_guard.validate_policy(policy["hosted_prompt_guard"])
+    if policy.get("hosted_spending_policy") is not None:
+        from exact.utils.hosted_spending import load_spending_policy
+
+        spending = load_spending_policy(policy["hosted_spending_policy"])
+        if spending["policy"]["mode"] != "hard_pause":
+            raise ValueError("Central hosted spending supervision requires a hard-pause policy")
     milestone = policy.get("hosted_spending_milestone")
     if milestone is not None and (
         not isinstance(milestone, dict)

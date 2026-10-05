@@ -633,6 +633,35 @@ def run_recipe(path):
                 immutable=True,
             )
         os.environ.update(hosted_caps(state, runtime / "openrouter"))
+        if spending_policy and spending_policy["policy"].get("mode") == "hard_pause":
+            from exact.core.entities.configs.yaml_io import load_yaml_mapping
+            from exact.experiments.runtime import hosted_scope_environment
+
+            frozen = load_yaml_mapping(campaign)
+            declared = next(
+                step for step in frozen["steps"] if step["id"] == recipe["scientific_step"]
+            )
+            scope = hosted_scope_environment(
+                frozen["campaign_id"], declared["family"], policy=spending_policy
+            )
+            base = load_yaml_mapping(verified(recipe["base_campaign"]))
+            original = next(
+                step for step in base["steps"] if step["id"] == recipe["scientific_step"]
+            )
+            if (frozen["campaign_id"], declared["family"]) != (
+                base["campaign_id"],
+                original["family"],
+            ):
+                raise ValueError("Prepared hosted family differs from its frozen declaration")
+            os.environ.update(scope)
+            write(
+                root / "hosted-scope.json",
+                {
+                    "campaign_id": scope["EXACT_HOSTED_CAMPAIGN_ID"],
+                    "experiment_id": scope["EXACT_HOSTED_EXPERIMENT_ID"],
+                },
+                immutable=True,
+            )
         if recipe.get("hosted_retry_authorizations"):
             from tools.authorize_hosted_retries import apply_authorizations
 
@@ -1018,10 +1047,27 @@ export PYTHONPATH={shlex.quote(str(code))}
             "completion_path": str((root / "completion.json").resolve()),
         },
     }
-    from tools.storage_guard import guard_launch
     from tools.hosted_prompt_guard import guard_launch as guard_hosted_launch
+    from tools.storage_guard import guard_launch
 
     policy = read(supervisor / "policy.json")
+    if policy.get("hosted_spending_policy") and not recipe.get("diagnostic"):
+        from exact.core.entities.configs.yaml_io import load_yaml_mapping
+        from exact.experiments.runtime import hosted_scope_environment
+        from exact.utils.hosted_spending import load_spending_policy
+
+        frozen = load_yaml_mapping(verified(recipe["base_campaign"]))
+        declared = next(step for step in frozen["steps"] if step["id"] == recipe["scientific_step"])
+        scope = hosted_scope_environment(
+            frozen["campaign_id"],
+            declared["family"],
+            policy=load_spending_policy(policy["hosted_spending_policy"]),
+        )
+        descriptor["run"]["hosted_scope"] = {
+            "campaign_id": scope["EXACT_HOSTED_CAMPAIGN_ID"],
+            "experiment_id": scope["EXACT_HOSTED_EXPERIMENT_ID"],
+        }
+        descriptor["bindings"].append(recipe["base_campaign"])
     descriptor = guard_launch(descriptor, policy, supervisor)
     descriptor = guard_hosted_launch(
         descriptor, policy, recipe_path=recipe_path, receipt_path=root / "hosted-prompt-guard.json"

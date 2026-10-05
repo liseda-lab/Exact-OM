@@ -1668,7 +1668,19 @@ def build_cells(
                         resolved_supervision=supervision,
                         negative_label_policy=config.negative_label_policy,
                         generate_rationales=config.generate_rationales,
-                        recovery=suite.campaign,
+                        recovery=(
+                            {
+                                **suite.campaign,
+                                "hosted_scope": {
+                                    "campaign_id": suite.suite_id,
+                                    "experiment_id": config.frozen_constants.get(
+                                        "campaign_v2", {}
+                                    ).get("family", config.experiment_id),
+                                },
+                            }
+                            if suite.campaign
+                            else None
+                        ),
                         published_matcher=arm.published_matcher,
                         diagnostics=config.frozen_constants.get("evaluation_diagnostics", {}).get(
                             task.id
@@ -2785,6 +2797,20 @@ def execute_cell(
             runtime_options: dict[str, Any] = (
                 {"env": recovery.environment()} if recovery is not None else {}
             )
+            if recovery is None:
+                from exact.experiments.runtime import hosted_scope_environment
+                from exact.utils.hosted_spending import load_spending_policy
+
+                spending = load_spending_policy()
+                if spending and spending["policy"].get("mode") == "hard_pause":
+                    source_config = suite.by_id[cell.experiment_id].config
+                    runtime_options["env"] = hosted_scope_environment(
+                        suite.suite_id,
+                        source_config.frozen_constants.get("campaign_v2", {}).get(
+                            "family", source_config.experiment_id
+                        ),
+                        policy=spending,
+                    )
             return_code, elapsed, peak_kb = _run_subprocess(
                 command,
                 cwd=workdir,
