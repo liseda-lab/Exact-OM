@@ -532,3 +532,38 @@ frozen launch descriptors and superseded descriptor provenance. No support data
 is truncated, scientific call is replayed, or development label admitted to
 fitting. Training acquisition, optimizer capacity, eighteen fitting protocols,
 development selection, held-out semantic controls and final reporting remain.
+
+## Preliminary fresh-evaluation final report
+
+The 2026-10-05 preliminary-scope amendment defers new semantic-control studies,
+full training and final cluster execution until corrections and the final design
+are reviewed. The registered final evaluation report therefore closes only local
+reporting. Missing stronger symbolic, no-repair, score-greedy and matched generator
+controls remain explicit correction/design gaps; their scientific obligations are
+not declared complete.
+
+The report authenticates the actual primary, common-inventory and intended-scope
+audit workers, their nonce/step/source/runtime/output receipts and all files those
+audits verified. It preserves 576 primary and 576 fixed-inventory rows, 64 cases,
+32 clean/corrupted parent pairs, all original/replacement attempts and settled
+charges. Intended qualification retains its own 64-case denominator and native
+scope. No inference, fitting, label replacement, new native call or replay occurs.
+
+Generated-pool native-verified selected quality and coverage are primary;
+fixed-inventory selected-only value errors remain diagnostic, with unavailable
+external regret. Every arm reports all scheduled rows, missingness, process and
+scientific statuses, generation/support scope and effort. Per-arm family,
+seen/unseen-family and clean/corrupted strata retain their original parent groups.
+All six learned arms are paired separately against the three historical controls.
+Descriptive 95% intervals use 2,000 parent-group bootstrap resamples, seed
+20261003, keeping both variants together. Unknown quality is not zero-imputed;
+conditional quality and paired-quality estimates publish usable and scheduled
+denominators, including bootstrap draws with no usable scores. One-parent strata
+cannot establish uncertainty across independent parents. There are no confirmatory
+superiority, strongest-symbolic, learning-efficiency or research-gate claims.
+
+The final worker and its preparation are charged separately from the union of
+prior attempt costs. Row effort is a descriptive measure, never a second charge.
+The parent preparation slot remains until the actual final worker receipt is
+authenticated; then only local evaluation reporting closes, with all gaps carried
+to the registered consolidated preliminary report and independent branches intact.
