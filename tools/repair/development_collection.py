@@ -134,7 +134,7 @@ def label_assignment(record, assignment, profile, directory):
     label = _assignment_label(case, tuple(assignment), tuple(tuple(p) for p in profile),
                               semantic_target=target, evidence_directory=Path(directory) / 'native')
     write_artifact(Path(directory) / 'label.json', asdict(label))
-    return asdict(label)
+    return binding(Path(directory) / 'label.json')
 
 
 def save_call(path, result, seconds):
@@ -210,6 +210,9 @@ def one_case(row, output, identity, plan):
                 memory_mb=budget['memory_mb'])
             label_call = save_call(target / 'call.json', native, budget['assignment_seconds'])
             raise_on_software_failure(label_call)
+            if native.status == 'complete':
+                if native.value != binding(target / 'label.json'):
+                    raise ValueError('Label transport receipt differs from published artifact')
             if native.status != 'complete':
                 from exact.repair.records import candidate_cost
                 cost = sum(candidate_cost(o, o.candidates[i], tuple(tuple(p) for p in profile))

@@ -167,9 +167,10 @@ def test_native_assignment_label_evidence_is_external_and_query_complete(tmp_pat
     assert result.cleanup_complete
     assert (tmp_path / 'label.json').exists()
     assert list((tmp_path / 'native').glob('check-*.json'))
-    if result.value['feasible']:
-        assert len(result.value['semantic_vector']) == len(case.probes)
-        assert result.value['benefit'] is not None
+    label = collection.verify_binding(result.value)
+    if label['feasible']:
+        assert len(label['semantic_vector']) == len(case.probes)
+        assert label['benefit'] is not None
 
 
 @pytest.mark.slow

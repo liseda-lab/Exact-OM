@@ -511,3 +511,24 @@ intended theories, evaluator queries and post-selection labels cannot become
 control evidence. Any new comparison retains original cases, models, languages,
 scientific budgets and failure denominators, with development-only settings and
 separate charged receipts. This review does not establish G0-G2 or close the study.
+
+## Development collection result-transport recovery
+
+Collection slice 14 completed its first case, then persisted the second case's
+first native label before its 17.7 MB support payload exceeded the 16 MiB worker
+transport frame. A separately frozen adapter authenticates the original nonce,
+command, source/runtime, generation, sampler and complete native policy/query
+reports. It reconstructs the published label from those saved reports without
+repeating reasoning. The original transport error, guard, payloads and costs
+remain immutable. Only the second case's untouched unique assignment continues,
+with the original 300-wall/600-CPU/8192-MiB call budget. Exact duplicates retain
+all slots and share only the identical label; all sixteen slice slots and all
+256 development slots remain represented.
+
+Label workers now return a file/hash receipt after publishing their full label.
+The final two unstarted slices use this transport adapter against the same
+original scientific export, schedule and resource limits. They retain separate
+frozen launch descriptors and superseded descriptor provenance. No support data
+is truncated, scientific call is replayed, or development label admitted to
+fitting. Training acquisition, optimizer capacity, eighteen fitting protocols,
+development selection, held-out semantic controls and final reporting remain.
