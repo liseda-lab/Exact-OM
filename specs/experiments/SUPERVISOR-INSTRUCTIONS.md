@@ -56,30 +56,33 @@ work. Use the supplied incident and machine observations to locate current evide
   roles. No private test references may influence optimization, admission or selection.
   Rationales stay off. Ontology loading, processing, reasoning and projection use the native
   packages, never Python/JVM fallbacks. Do not invent negatives or fitted artifacts.
-  The user approved published pyHermiT integration on 2026-10-04. Release 0.2.2 is installed
-  only in an isolated E14 environment, but lacks the earlier compiler memory/work fixes
-  needed by full NCIT. Keep optional E14 bridge dispatch held until a complete corrective
-  release is published and freshly admitted; do not drop required resource options, install
-  unpublished experiment code or repeat a known-cap failure. See E14's dated integration
-  amendment. Independent eligible experiments continue.
-- Scoped exception approved on 2026-10-05: validate PR #2 candidate `d8d7a2f` first after
-  active E21, using an optimized wheel installed only in a fresh isolated environment.
-  Require installed-wheel resource/identity cases and tiny native admission/bridge with
-  combined controls before full input. Planned chain:
-  `E14-pr2-native-admission-20261005-01`, then `E14-pr2-bridge-validation-20261005-01`.
-  Preserve the existing full NCIT/DOID admission and 300-source, seed-17 bridge protocol.
-  The 11 other pending batches must depend on bridge validation, retaining original
-  prerequisites; leave held `E14-bridge-run-once-followup` unchanged. Success releases
-  ordinary eligibility; failure retains the gate for bounded repair or a user decision.
-  Preserve this gate in recovery descendants of gated batches and newly prepared scientific
-  batches while it is active. Repairs of prerequisite E21 or the validation chain must keep
-  the dependency graph acyclic and may precede this gate.
-  This explicit user amendment supersedes earlier frozen instructions only for candidate
-  validation and its priority. It permits no merge, publication, production environment
-  change or automatic scientific promotion. Read
-  `data/experiments-v2/e14-pr2-validation-20261005-01/HANDOFF.md`; treat the chain as
-  preparation until its `publication.json` proves queue publication. Queue publication
-  is not proof of validation success. Preserve normal host/storage guards and accounting.
+  Historical package approvals remain recorded in E14's dated amendments. Published
+  pyHermiT 0.2.2 was installed only in an isolated environment and lacked earlier compiler
+  memory/work fixes. The October 5 exception admitted optimized PR #2 candidate `d8d7a2f`
+  in another isolated environment, with installed-wheel and tiny native fixtures followed
+  by full NCIT/DOID admission. Preserve these package/input identities and their evidence;
+  do not silently replace production environments or omit required resource settings.
+- **Superseding user approval, 2026-10-06:** stop and defer the optional full-OWL bridge;
+  release the remaining core queue. The October 5 candidate-first gate is withdrawn.
+  `E14-pr2-native-admission-20261005-01` passed on October 5 at 14:39 UTC. The subsequent
+  `E14-pr2-bridge-validation-20261005-01` had no completed query checkpoints after about
+  30 hours; this is an inconclusive deferred comparison, not a failed scientific hypothesis.
+  Preserve the completed five main E14 treatments, admission evidence, unfinished bridge
+  artifacts and interrupted accounting. Verify the old owner has stopped and reconcile
+  its ledger before successor dispatch.
+  Remove only the added optional bridge dependencies from eligible pending work and its
+  recovery descendants. Retain every original scientific, host/storage and spending gate.
+  Do not automatically restart either the candidate bridge or held
+  `E14-bridge-run-once-followup`, create a replacement full-OWL gate, or add such a gate to
+  newly prepared work. Deferral is intentional and must not trigger automatic repair.
+  Full-scale bridge completion no longer blocks the core campaign or resource-PR publication.
+  Release CI, packaging/compatibility checks and owner review remain separate requirements;
+  a future published-package integration needs its own reviewed binding and does not resume
+  the deferred experiment. No automatic package publication, production replacement or
+  scientific promotion is authorized by this scheduling amendment. See the October 6
+  amendments in `E14-typed-relations.md` and `PUBLIC-INPUT-AMENDMENT-20261003.md`, plus the
+  registry's operational stop/release receipts. Earlier candidate queue publication remains
+  historical evidence, not an active priority instruction.
 - All experimental generative calls use OpenRouter under their declared accounting and role
   controls. Preserve historical cache-only queues; prepare separate properly bound roles for
   new authorized hosted comparisons rather than reusing a cached-only template. Replay identical
@@ -215,7 +218,8 @@ The supervisor launch gate requires a reviewed receipt binding the worker, recip
 prompt policy and guarded source. Explicitly reviewed native/cached-only recipes may use a
 bound no-new-hosted-calls exemption. Pending preparation uses the protected code and successor
 environment. Never copy a stale unguarded launch merely because it previously passed admission.
-Keep E14 candidate-first prerequisites and all host/storage guards intact.
+Preserve original scientific prerequisites and all host/storage guards. The October 6 E14
+deferral above supersedes the former candidate-first dependency; do not restore it.
 
 The completed original E21 kNN arm is historical evidence, not the compact renderer's result.
 Do not rerun it for accounting or silently promote a compact variant using the old artifact.
