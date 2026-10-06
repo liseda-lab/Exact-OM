@@ -596,3 +596,46 @@ unexpanded_scope:
 dependency_resolution_note: The existing label-free pool_freeze contract is already usable; do not confuse
   that port with completion of the separate supervised E20 experiment. Producer dependencies in this snapshot
   do not grant run admission.
+e14_deferral_amendment:
+  date: '2026-10-06'
+  authority: explicit_user_approval
+  specification: specs/experiments/E14-typed-relations.md
+  supersedes: optional_bridge_candidate_first_queue_and_publication_gate_2026-10-05
+  historical_inventory_counts_unchanged: true
+  current_dispositions:
+    E14:
+      state: complete
+      completed_cells: 5
+      remaining_cells: 0
+      evidence: data/experiments-v2/e14-ledger-recovery-03/completion.json
+    E14-bridge:
+      state: deferred_user_approved
+      scientific_outcome: inconclusive_no_comparison_result
+      remaining_scheduled_cells: 0
+      deferred_declared_cells: 1
+      automatic_retry: false
+      blocks_core_campaign: false
+      blocks_package_publication: false
+  native_admission:
+    state: passed
+    completed_at: '2026-10-05T14:39:50+00:00'
+    scope: prepared_NCIT_original_DOID_and_imports_loading_and_compilation
+    evidence: data/experiments-v2/e14-pr2-native-admission-20261005-01/diagnostic/admission.json
+  composed_bridge:
+    run_id: E14-pr2-bridge-validation-20261005-01
+    stop_authorized: true
+    terminal_state_authority: operational_stop_and_accounting_receipt
+    observation_date: '2026-10-06'
+    elapsed_hours_approx: 30
+    source_groups: 300
+    anchor_count: 3680
+    query_count: 935
+    completed_query_checkpoints: 0
+    native_substage: unknown_before_first_completed_query
+    comparison_result: absent
+    evidence: data/experiments-v2/e14-pr2-bridge-validation-20261005-01/diagnostic/native-checkpoint.json
+  release_scope: Resource correctness and fixture validation are separate from unvalidated large-scale
+    bridge performance. CI, packaging, compatibility and owner review remain independent release gates.
+  recovery_policy: Preserve admission evidence, completed main results, unfinished diagnostic artifacts
+    and interrupted accounting. Release only the added optional bridge queue dependencies; retain all
+    original scientific prerequisites, storage and spending protections. No automatic scientific promotion.

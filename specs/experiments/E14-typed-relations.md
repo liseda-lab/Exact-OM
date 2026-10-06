@@ -6,6 +6,10 @@ This file replaces the v1 matrix for this family. [RUN-PLAN](RUN-PLAN.md),
 [checkpoint recovery](CHECKPOINT-RECOVERY.md) are binding. A passing helper test does not
 establish an executable experiment or a performance result.
 
+**Current disposition, 2026-10-06:** the five main treatments are complete; the optional
+full-OWL bridge is deferred by user approval. The superseding amendment at the end of this
+file removes its core-queue and package-publication gates while retaining all prior evidence.
+
 ## Existing implementation and missing work
 
 Inspected baseline: 655f599e714e13d592f702f326ca5a36f6b50b2f.
@@ -197,3 +201,35 @@ Full-input validation remains pending, so this is neither a full-input pass nor 
 readiness. The initial updated wheel-matrix CI exposed missing native pyowl-core test
 prerequisites on three platforms; its correction is separate from the pinned candidate
 compiler, and publication still requires owner review of CI and full-input results.
+
+### User-approved optional bridge deferral — 2026-10-06
+
+This amendment supersedes the October 5 candidate-first scheduling and publication gate.
+The user authorizes stopping and deferring the optional full-OWL bridge comparison and
+releasing the remaining core queue. Neither its successful completion nor a new full-scale
+bridge run is required for the core experiments or publication of the resource-limit PR.
+Remove only the added optional bridge dependencies; retain every original scientific,
+storage and spending prerequisite. Do not automatically retry this deferred comparison.
+
+All **five main E14 treatments are complete**, with their original results and selection
+retained in `data/experiments-v2/e14-ledger-recovery-03/completion.json`. The isolated PR #2
+candidate also **passed full native admission** on prepared NCIT and original DOID/imports
+on October 5 at 14:39 UTC; its receipt is
+`data/experiments-v2/e14-pr2-native-admission-20261005-01/diagnostic/admission.json`.
+This establishes full-input native loading/compilation with the explicit resource settings,
+in addition to the installed-wheel and small inference fixtures already recorded.
+
+The subsequent composed-world diagnostic ran for approximately 30 hours and still had
+**0 of 935 completed query checkpoints** at the October 6 status check. Its frozen population
+contains 300 validation sources and 3,680 training-equivalence anchors. Logging cannot
+distinguish bridge loading/compilation, consistency checking or the first query at that
+boundary. No comparison predictions or metrics were produced. Record it as **deferred,
+inconclusive**, not an empirical negative, parity result, reasoning success or proven
+deadlock. Preserve its population, checkpoint, execution receipts and cumulative interrupted
+time; the operational stop/accounting receipt must establish the actual terminal state.
+
+Resource-setting correctness and small-fixture reasoning validation do not establish
+acceptable large-scale composed-world performance. That performance limitation remains
+open independently of PR publication, whose current CI, packaging and review gates must
+be assessed separately. This amendment grants no automatic scientific promotion of
+candidate outputs, production environment replacement or package publication action.

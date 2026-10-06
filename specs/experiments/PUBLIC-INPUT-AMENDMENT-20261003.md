@@ -144,3 +144,28 @@ pending a corrective published package; the matching bridge comparison remains d
 on admission. Do not reuse an old failed admission as a pass, remove the required work
 allowance, or run the completed main typing experiment again. The [E14 specification](E14-typed-relations.md)
 records exact integration requirements and the fixture verification boundary.
+
+### Superseding E14 disposition — 2026-10-06
+
+The user approved stopping and deferring the optional full-OWL bridge comparison so the
+remaining core experiments can proceed. This supersedes the October 5 candidate-first
+queue and package-publication gate recorded in the [E14 specification](E14-typed-relations.md).
+The optional bridge is no longer a prerequisite for either the core campaign or publication
+of the resource-limit PR; all original scientific prerequisites and operational protections
+remain. Do not automatically retry the deferred bridge or treat it as a completed comparison.
+
+The five main E14 arms are complete and unchanged. Full strict native admission of prepared
+NCIT and original DOID/imports passed on October 5 at 14:39 UTC. The composed-world comparison
+then spent approximately 30 hours without completing its first of 935 query checkpoints
+(300 validation sources, 3,680 training anchors). Its precise native substage was not
+observable, and no native-versus-graph result was produced. Preserve the successful admission,
+the unfinished diagnostic artifacts and all interrupted-attempt accounting; record the
+optional scientific result as deferred/inconclusive, not negative, equivalent or successful.
+
+The resource patch's installed-wheel tests, small inference fixtures and full-input admission
+remain valid evidence within their scope. Large-scale bridge reasoning performance remains
+unvalidated and does not block publication; release CI, package compatibility and owner review
+are separate gates. Original source/preparation identities, strict native semantics and the
+ban on private-test optimization are unchanged. Machine-readable current E14 dispositions
+appear in `remaining-work.yaml` under `e14_deferral_amendment`; earlier inventory counts and
+execution accounts remain historical records.
