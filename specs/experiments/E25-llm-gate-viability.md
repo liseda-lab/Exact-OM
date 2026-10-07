@@ -15,6 +15,9 @@ Inspected baseline: 655f599e714e13d592f702f326ca5a36f6b50b2f.
 **Agent must implement:** Actual decision-off wiring, source-top-fraction and transferred-threshold policies, stratified forced judgments, decoupled trust, and budget-matched real-response oracle diagnostics.
 
 **Inputs/bindings to resolve:** OpenRouter primary identity/logprobs and budget; complete or justified development labels for counterfactual outcomes.
+The approved [2026-10-07 replay amendment](E25-BENCHMARK-REPLAY-AMENDMENT-20261007.md)
+adds an explicitly benchmark-relative development diagnostic for the existing binary judge.
+It does not declare the Bio-ML reference complete or relax the default true-label oracle.
 The user confirms the OAEI/BioKG data are available. Resolve paths, revisions and capabilities;
 do not perpetuate an old unavailable flag without checking the supplied data.
 
@@ -30,7 +33,7 @@ Start with 300 development source groups (all eligible if fewer), seed 17, excep
 
 ## Question, treatments, and implementation contract
 
-Do not replay development pair identities at inference. Compare gate error detection with its ability to find errors this judge can fix. Include confident errors, close candidates, natural NIL, pool misses, collisions and clear controls. Force the same source sample when comparing judge formats. Standalone accuracy, correction, harm and post-selector effect are separate outputs. The three trust replays are a separate sequential diagnostic after E07 supplies a compatible judge, using the same observed responses and no new calls; do not cross every routing fraction with every trust setting. Keep pre-LLM and post-LLM decisions, and freeze acceptance on permitted train/development groups. A fitted trust weight is a later E21 variant.
+Do not replay development pair identities at inference. Compare gate error detection with its ability to find errors this judge can fix. Include confident errors, close candidates, natural NIL, pool misses, collisions and clear controls. Force the same source sample when comparing judge formats. Standalone accuracy, correction, harm and post-selector effect are separate outputs. Applicable trust replays are a separate sequential diagnostic after E07 supplies a compatible judge, using the same observed responses and no new calls; do not cross every routing fraction with every trust setting. Keep pre-LLM and post-LLM decisions, and freeze acceptance on permitted train/development groups. A fitted trust weight is a later E21 variant.
 
 At most **11 distinct treatment configurations/cells as specified below** before any explicitly declared source expansion. This is a bounded sequential design, not a Cartesian product. Shared deterministic controls are computed once.
 
@@ -40,11 +43,28 @@ At most **11 distinct treatment configurations/cells as specified below** before
 - source_top_005: top 5%.
 - source_top_010: top 10%.
 - forced_sources: up to 200 stratified development sources, diagnostic.
-- oracle_perfect: perfect-answer ceiling with fixed interventions, development only, no live calls.
-- oracle_observed: budget-matched routing ceiling using already-recorded real forced responses.
+- oracle_perfect: hypothetical reference-perfect answers on fixed intervention support, development only, no live calls; the approved incomplete-reference replay is benchmark-relative.
+- oracle_observed: budget-matched routing diagnostic using already-recorded real forced responses; distinguish benchmark-relative outcomes from independently confirmed correctness.
 - trust_shipped: cached forced-response replay with the current beta*U weight.
 - trust_constant: same cached per-candidate probabilities with constant weight 0.5.
-- trust_source: use the frozen comparative choice as the routed within-source ranking, with separately frozen acceptance/cardinality.
+- trust_source: use the frozen comparative choice as the routed within-source ranking, with separately frozen acceptance/cardinality; explicitly inapplicable to the current binary judge, which supplies no comparative choice.
+
+The approved cached replay uses the same forced producer's **300 development sources**, with
+up to **200 actually judged sources**, and preserves its candidates, displayed intervention
+support, scores, threshold and cardinality. Its oracle comparison has a decision-off replay
+on that same population, observed-response routing and hypothetical reference-perfect
+routing. The earlier 200-source main E25 control cannot silently substitute for the paired
+300-source off replay. Its trust comparison contains only shipped `beta*U` and constant
+`0.5`; binary `source_first` is inapplicable, not an empirical null.
+
+These are zero-new-hosted-call development diagnostics. Unmatched pairs may be scored as
+nonmatches only under the explicitly named benchmark-reference scope; they do not become
+confirmed negatives for training, ontology-NIL evidence or claims of reference completeness.
+Neither oracle is a demonstrated global optimum, and the diagnostic outputs do not train
+models or determine final product selection. The historical true-label oracle remains the
+default for genuinely complete or explicitly confirmed data. The dated amendment controls
+population, recovery and claim boundaries. Implementation and queue evidence are recorded
+in that amendment; scientific completion requires the new workers' reports.
 
 All generative roles use OpenRouter. Local non-generative encoders/heads use the single RTX 5090.
 Separate target-label-free, in-pair supervised and transferred results. A named diagnostic may

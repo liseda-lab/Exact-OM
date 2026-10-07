@@ -1,6 +1,23 @@
 schema_version: 1
 kind: planning_snapshot_not_campaign_lock
 recorded_at: '2026-09-29T18:28:17.277127+00:00'
+e25_benchmark_replay_amendment:
+  approved_at: '2026-10-07'
+  specification: specs/experiments/E25-BENCHMARK-REPLAY-AMENDMENT-20261007.md
+  state: queued_waiting_for_capacity
+  implementation_complete: true
+  execution_commit: 3de671a044a5d7127f9aeebd483fc90b7b87e631
+  verification: data/experiments-v2/e25-benchmark-amendment-20261007-01/verification-v2.json
+  publication: data/experiments-v2/e25-benchmark-amendment-20261007-01/publication.json
+  handoff: data/experiments-v2/e25-benchmark-amendment-20261007-01/HANDOFF.md
+  producer_source_groups: 300
+  maximum_actually_judged_sources: 200
+  new_hosted_calls: 0
+  preserve_historical_runs_and_charges: true
+  default_true_label_oracle_unchanged: true
+  training_or_final_selection_use: false
+  accounting: One formerly declared trust cell is inapplicable to the binary judge;
+    the executable development and total counts decrease by one, not by a completed result.
 source_inventory:
   path: data/experiments-v2/prepared-campaign-12/campaign.lock.yaml
   sha256: 13ca166dc50197a09cb548b28575fd85449cd6c7f915b7eb86bfef6569cf9263
@@ -17,10 +34,10 @@ hosted_spending_amendment:
   preserve_historical_accounting: true
 completed_scientific_cells: 59
 remaining_declared_cells:
-  development: 85
+  development: 84
   composition: 8
   class_final: 63
-  total: 156
+  total: 155
 accounting_note: E01 includes approved sixth arm. E03 primary four complete; its optional fifth remains.
   Qualification/retries are historical cost, not extra scientific cells. Counts are not time percentages.
   Preserve cumulative charges; forecasts advisory.
@@ -335,16 +352,42 @@ work:
   after:
   - E25-forced
   binding_group: hosted
-  state: pending_binding_or_dependency
+  state: queued_waiting_for_capacity
+  queue_id: E25-oracles-benchmark-reference-20261007-01
+  amendment: specs/experiments/E25-BENCHMARK-REPLAY-AMENDMENT-20261007.md
+  label_scope: benchmark_relative_development_diagnostic
+  arms:
+  - decision_off
+  - oracle_observed
+  - oracle_perfect
+  population: Same 300-source forced producer, up to 200 actually judged sources;
+    retain candidate and intervention support, threshold and cardinality.
+  paired_control: Reconstruct decision-off from this producer; the old 200-source main
+    E25 control cannot substitute for the paired 300-source control.
+  new_hosted_calls: 0
+  claim_limit: Benchmark agreement only; no reference-completeness, semantic-truth or
+    global-optimum claim, training targets or final product selection.
   remaining_forecast_hours: null
 - step: E25-trust
-  remaining_cells: 3
+  remaining_cells: 2
   cases:
   - D0
   after:
   - E25-forced
   binding_group: hosted
-  state: pending_binding_or_dependency
+  state: queued_waiting_for_capacity
+  queue_id: E25-trust-binary-replay-20261007-01
+  amendment: specs/experiments/E25-BENCHMARK-REPLAY-AMENDMENT-20261007.md
+  arms:
+  - trust_shipped
+  - trust_constant
+  population: Same frozen 300-source forced producer and observed binary responses;
+    preserve candidate support, threshold and cardinality.
+  inapplicable:
+    trust_source: The current binary judge has no comparative choice for source_first;
+      this is inapplicability, not an empirical null or a completed scientific cell.
+  new_hosted_calls: 0
+  training_or_final_selection_use: false
   remaining_forecast_hours: null
 - step: E22-policy
   remaining_cells: 2

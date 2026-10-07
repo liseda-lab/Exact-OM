@@ -93,12 +93,24 @@ Other statistics are recorded diagnostic features or inputs to E21, not an undec
 
 Measure routing and trust separately. Fit any fusion weight/calibrator only on training groups,
 with development selection. Include the shipped beta*U mixture, a frozen constant-weight
-comparison, and source-level decision integration; no optimal reporting-set weight. E25 names three
-cached trust replays, followed by at most one selected integration at G4. Its source-first
+comparison, and source-level decision integration where the judge supports it; no optimal
+reporting-set weight. E25's general design names three cached trust replays. Its source-first
 variant uses the comparative choice within the displayed alternatives, including none, then
 the frozen acceptance/cardinality rules; it does not turn displayed-none into ontology NIL. Keep
 both pre-LLM and post-LLM decisions and correction/harm counts. Missing or malformed model output
 uses the same predeclared deterministic abstain/base fallback in paired arms and is counted.
+
+The approved [E25 amendment of 2026-10-07](E25-BENCHMARK-REPLAY-AMENDMENT-20261007.md)
+restricts the current binary-judge trust diagnostic to shipped `beta*U` and constant `0.5`;
+source-first is explicitly inapplicable, not a failed or null treatment. It also permits an
+explicit benchmark-relative development oracle comparison: paired decision-off, observed
+responses and hypothetical reference-perfect answers on the same 300-source forced producer,
+with up to 200 actually judged sources and unchanged candidate/intervention support,
+threshold and cardinality. The earlier 200-source main control is not the paired control.
+Reference-relative errors do not establish semantic falsehood, complete gold or a global
+optimum. These cached diagnostics make zero new hosted calls and supply no training targets
+or final product selection. The default true-label oracle retains its existing confirmed-label
+requirements; other experiments' metric contracts are unchanged.
 
 ## 5. Evidence presentation and categorical probabilities
 
