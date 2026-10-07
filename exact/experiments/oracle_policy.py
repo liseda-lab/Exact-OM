@@ -237,6 +237,30 @@ def build_oracle_artifacts(
         artifact = destination / (name + ".json")
         freeze_json(artifact, payload)
         artifacts[name] = str(artifact)
+    if outcome_semantics == "benchmark_reference":
+        # An empty replay is decision-off, with the same score/population checks
+        # as the interventions. Plain gate=off would bypass that frozen evidence.
+        payload = _payload(
+            population,
+            [],
+            {},
+            {},
+            [],
+            [],
+            mode="oracle_replay",
+            protocol="forced_cached_trust",
+            budget=0,
+            negative_label_policy=negative_label_policy,
+            threshold=threshold,
+            beta=beta,
+            fusion_weight="beta_u",
+            constant_weight=0.5,
+            teacher_binding=teacher,
+        )
+        payload.update(label_independent_selection=True, semantic_control="decision_off")
+        artifact = destination / "decision_off.json"
+        freeze_json(artifact, payload)
+        artifacts["decision_off"] = str(artifact)
     if outcome_semantics == "verified_labels" and negative_label_policy not in {
         "complete_reference",
         "confirmed_negatives",
@@ -498,7 +522,7 @@ def materialize_followup(source, suite, manifests, selections):
         if name in artifacts["unavailable"]:
             arm["stages"] = []
             continue
-        if name == "decision_off":
+        if name == "decision_off" and name not in artifacts["artifacts"]:
             arm["overlay"] = {"llm": {"experiment": {"gate": {"mode": "off", "artifact": None}}}}
             continue
         path = Path(artifacts["artifacts"][name])

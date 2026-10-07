@@ -195,6 +195,7 @@ def test_benchmark_scope_is_explicit_and_preserves_full_population_and_label_pol
     assert original["identity"] != amended["identity"]
     assert "oracle_observed" not in original["artifacts"]
     assert set(amended["artifacts"]) == {
+        "decision_off",
         "trust_shipped",
         "trust_constant",
         "oracle_observed",
@@ -252,6 +253,45 @@ def test_unscored_protected_exact_pairs_stay_outside_replay_population(tmp_path)
     artifact = json.loads(Path(result["artifacts"]["trust_constant"]).read_text())
     assert len(artifact["population_rows"]) == 6
     assert all(row["Src"] != "exact" for row in artifact["population_rows"])
+
+
+def test_benchmark_off_control_validates_scores_without_changing_them(tmp_path, monkeypatch):
+    trace, inputs = forced_trace(tmp_path)
+    result = build_oracle_artifacts(
+        trace,
+        [],
+        tmp_path / "policies",
+        reference_role="development",
+        negative_label_policy="unknown",
+        outcome_semantics="benchmark_reference",
+    )
+    model = _scorer(
+        llm_experiment_config={
+            "enabled": True,
+            "gate": {"mode": "oracle_replay", "artifact": result["artifacts"]["decision_off"]},
+        }
+    )
+    model.attach_dataset(_TinyDataset())
+    model.use_llm = True
+    for method in (
+        "llm_grouped_decision_probs",
+        "llm_yesno_probs_batched",
+        "generate_pair_briefs_batched",
+    ):
+        monkeypatch.setattr(model, method, lambda *args, **kwargs: pytest.fail("Off made a call"))
+    result = model(**inputs)
+    assert result["S_final"].tolist() == result["S_base"].tolist()
+    assert result["oracle_diagnostic"]["llm_invocations"] == 0
+    assert result["oracle_diagnostic"]["selected_sources"] == []
+    assert all(not row["invoked"] for row in result["llm_gate_diagnostics"])
+    # Changed frozen scores must fail even though no source is routed.
+    for field in ("S_base", "U"):
+        population = model._gate_artifact.payload["population_rows"]
+        original = population[0][field]
+        population[0][field] += 0.1
+        with pytest.raises(ValueError, match="frozen response"):
+            model(**inputs)
+        population[0][field] = original
 
 
 def test_followup_binds_completed_recipe_and_refuses_population_or_role_changes(
@@ -369,7 +409,9 @@ def test_followup_binds_completed_recipe_and_refuses_population_or_role_changes(
     )
     amended = materialize_followup(benchmark, suite, [item], {})
     assert amended.base_config_path == config_path
-    assert amended.config.arms[0].overlay["llm"]["experiment"]["gate"]["mode"] == "off"
+    off_gate = amended.config.arms[0].overlay["llm"]["experiment"]["gate"]
+    assert off_gate["mode"] == "oracle_replay"
+    assert json.loads(Path(off_gate["artifact"]).read_text())["semantic_control"] == "decision_off"
     assert all(arm.stages == ["screen"] for arm in amended.config.arms)
     amended_metadata = amended.config.frozen_constants["resolved_oracle_policy"]
     assert amended_metadata["source_count"] == 3

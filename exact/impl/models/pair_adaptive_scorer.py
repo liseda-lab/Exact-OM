@@ -593,13 +593,17 @@ class PairAdaptiveSemanticScorer(
         payload = artifact.payload
         if mode in {"oracle_perfect", "oracle_replay"}:
             artifact.require_fields(
-                "selected_sources",
-                "decision_probs",
                 "population_rows",
                 "fixed_fusion",
                 "negative_label_policy",
                 kind="oracle replay",
             )
+            # Zero beneficial interventions (and the paired off control) are
+            # valid replays. Require the collections, not nonempty selections.
+            if not isinstance(payload.get("selected_sources"), list) or not isinstance(
+                payload.get("decision_probs"), dict
+            ):
+                raise ValueError("Oracle replay requires selected_sources and decision_probs")
             if (
                 payload.get("kind") != "llm_oracle_replay"
                 or not payload.get("no_llm_invocations")
