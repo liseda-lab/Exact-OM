@@ -675,3 +675,37 @@ identity; shared qualification and reused rows are charged once, while preparati
 materialization overhead and this final worker remain separately accounted.
 Authenticate the final worker before closing only the robustness preparation
 slot, then carry all limitations into consolidated preliminary scope reporting.
+
+## Consolidated preliminary report and completion review
+
+The receipt-only consolidated report authenticates eleven completed branch workers,
+their frozen source/runtime and output manifests, prior audit indexes, and every
+registered original/replacement completion against its nonce, Slurm step and settled
+charge. It binds both the historical requirement matrix and the current 45 mapped
+fixture requirements; neither fixture coverage nor completed processes establish
+G0–G2. Historical native backend counts, actual generation limits, fresh and
+robustness missing quality, development label masks, exposed overlap/scaling
+ancestries and the single exposed real ontology pair remain explicit.
+
+The report retains all original stage denominators, including 2,880 robustness
+rows, separate 36-row overlap evidence, 576 primary and 576 inventory fresh rows,
+160 acquisition cases, 192 gradient probes, 288 decode rows, 32 intended checks,
+256 development collection slots, 336 scaling rows and 54 real-projection rows.
+All original reports and failure/replacement history remain hash-bound. Shared
+attempt costs are unioned by ledger identity, with inherited pilot and separate
+historical smoke checked without resetting either. Preparation and final-worker
+settlement require a later cumulative accounting snapshot.
+
+Correction priorities distinguish implementation defects, resource exhaustion,
+unsupported language, instrumentation and scientific-design gaps, with evidence
+and acceptance checks. The six-arm/three-seed cluster matrix, training-only label
+qualification, development selection, required controls and storage tiers remain
+an unapproved proposal under the 2026-10-05 preliminary-scope amendment. No fitting,
+new labels, native calls, held-out training payload access or migration occurs.
+
+The report publishes a scope-readiness receipt, not premature campaign completion.
+The registered final preparation slot remains until its actual worker receipt,
+validation, complete outputs and final costs are authenticated. Only then may
+local scope completion be published, pending batches emptied and remaining work
+marked terminal. Larger training/control obligations stay explicitly deferred;
+the existing deterministic notifier owns the single approval-needed idle email.
