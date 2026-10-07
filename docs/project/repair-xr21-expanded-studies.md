@@ -645,3 +645,33 @@ remain deferred under the preliminary-scope amendment. Receipt integrity does
 not establish strongest-symbolic comparisons, research gates or learning
 efficiency. Preparation and the audit worker are charged separately, without
 resetting any original scientific budget or cost.
+
+## Preliminary robustness final paired report
+
+The final receipt-only report binds the completed 2,880-row robustness audit,
+64-case fresh intended/control-scope audit, and separate 36-row overlap audit.
+It authenticates their actual nonce-bound workers, source/runtime, output hashes,
+original evidence and settled attempt costs. All 320 variants, 64 base cases,
+32 parents, six learned arms, three historical controls, six reconciled unknowns,
+source revisions and four original profile timeouts remain represented.
+
+Each of four perturbations is paired with its separately charged baseline within
+arm and base case. Both variants stay together in 2,000 parent-group bootstrap
+draws (seed 20261003). Descriptive 95% intervals accompany quality coverage,
+conditional benefit/utility, wall effort and available measured CPU differences.
+Missing quality and CPU telemetry are not zero-imputed; scheduled, usable and
+bootstrap denominators remain explicit. No-op cases remain in every comparison.
+Family, exposure and clean/corrupt strata retain all outcomes. Scientific-source
+pairs are reported because implementation revisions can confound intervention
+differences; these are descriptive executed outcomes, not causal superiority.
+
+Overlap remains a separate exposed diagnostic ancestry with no population
+interval. Intended-parent qualification does not relabel selected repairs or
+extend the query basis. Missing effective-menu snapshots, selected-label traces,
+stronger semantic controls and robustness-specific inventory diagnostics remain
+explicit correction/design gaps under the preliminary amendment. No new native
+calls, fitting, labels or replay occur. Attempt costs are unioned by immutable
+identity; shared qualification and reused rows are charged once, while preparation,
+materialization overhead and this final worker remain separately accounted.
+Authenticate the final worker before closing only the robustness preparation
+slot, then carry all limitations into consolidated preliminary scope reporting.
