@@ -102,3 +102,13 @@ preflight failure remain preserved. Workers resolve the latest cumulative accoun
 Existing storage and spending controls remain unchanged. The ordinary pipeline may perform
 local scoring when shared caches cannot supply it; the zero-new-call constraint is enforced
 at the hosted transport boundary, independently of cache availability.
+
+## Subsequent output-only recovery
+
+Both approved comparisons finished their primary and selector scoring but failed in
+candidate-audit hashing when the replay policy contained a `Path`. Use the same JSON-safe
+policy already written to the source audit; no scoring or selection semantics change.
+All five latest saved checkpoints contain 5,842 primary pairs and complete selector rows.
+The strict importer preserves numerical rows and relocates only identical gate-file paths
+and dependent checkpoint fingerprints. Its paired population and compatibility checks remain
+in force. See the [repair and deployment handoff](E25-AUDIT-RECOVERY-20261007.md).

@@ -182,3 +182,23 @@ Also perform one short real development interruption/resume and a harmless reloc
 before the unattended campaign. This proves the actual models/filesystem path, not benchmark
 quality. Keep an operator-readable recovery summary and exact continuation command in every
 interrupted or failed attempt.
+
+## Prepared queue handoff and cumulative accounting
+
+A pending recovery has no Slurm identity. Record the failed parent’s `pending_recovery`
+and the reviewed batch’s matching `recovery_for`; leave `superseded_by` unset until the
+dispatcher verifies a numeric step receipt and matching nonce. Registration validates and
+atomically publishes the new run, predecessor link and removal of the pending descriptor
+under `registry.json.lock`. Ambiguous parents, conflicts and dependency cycles fail closed.
+
+Registration disables the predecessor for health/dependency purposes and explicitly sets
+`retain_accounting: true`. The prepared worker’s `latest_account` includes these retained
+ledgers so a successor cannot lose failed/unknown charges before creating its own account.
+Unmarked historical disabled rows retain their existing behavior. Divergent closed charges
+and unclosed reservations still prevent admission; never select a cheaper history. Both the
+controller and worker must support this contract before deploying a prepared recovery.
+
+This corrects the 2026-10-07 E25 handoff defect: a pending ID was prematurely used as
+`superseded_by`, invalidating monitoring and dispatch. The recovery retained completed
+primary/selector checkpoints and repaired audit serialization only. See the dated
+[E25 repair handoff](E25-AUDIT-RECOVERY-20261007.md).

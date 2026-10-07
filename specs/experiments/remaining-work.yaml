@@ -353,7 +353,9 @@ work:
   - E25-forced
   binding_group: hosted
   state: queued_waiting_for_capacity
-  queue_id: E25-oracles-benchmark-reference-20261007-01
+  queue_id: E25-oracles-audit-recovery-20261007-02
+  recovery_handoff: specs/experiments/E25-AUDIT-RECOVERY-20261007.md
+  saved_stage: Complete primary and selector checkpoints; audit/output/evaluation pending.
   amendment: specs/experiments/E25-BENCHMARK-REPLAY-AMENDMENT-20261007.md
   label_scope: benchmark_relative_development_diagnostic
   arms:
@@ -375,8 +377,10 @@ work:
   after:
   - E25-forced
   binding_group: hosted
-  state: queued_waiting_for_capacity
-  queue_id: E25-trust-binary-replay-20261007-01
+  state: running_checkpoint_recovery
+  queue_id: E25-trust-audit-recovery-20261007-01
+  recovery_handoff: specs/experiments/E25-AUDIT-RECOVERY-20261007.md
+  saved_stage: Complete primary and selector checkpoints; audit/output/evaluation pending.
   amendment: specs/experiments/E25-BENCHMARK-REPLAY-AMENDMENT-20261007.md
   arms:
   - trust_shipped
